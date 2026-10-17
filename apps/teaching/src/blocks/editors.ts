@@ -1,4 +1,6 @@
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
+import { createQuestionDropEditor } from '@/blocks/question-drop';
+import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
@@ -2829,6 +2831,10 @@ function createBlockEditorFields(
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
     case 'peer_feedback':
       return createPeerFeedbackEditor(block, onChange);
+    case 'question_drop':
+      return createQuestionDropEditor(block, onChange, context.lessonId);
+    case 'quiz_question':
+      return createQuizQuestionEditor(block, onChange, context.getLessonBlocks);
     case 'question_set':
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
     case 'timeline':

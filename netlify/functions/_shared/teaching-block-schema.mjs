@@ -1,7 +1,7 @@
 // Generated from apps/teaching/src/schemas/block.ts; regenerate with scripts/generate-alchemy-schema.mjs.
 
 // apps/teaching/src/schemas/block.ts
-import { z as z4 } from "zod";
+import { z as z5 } from "zod";
 
 // apps/teaching/src/schemas/common.ts
 import { z } from "zod";
@@ -52,247 +52,446 @@ var KaplanQualifiersSchema = z2.array(KaplanQualifierSchema).max(3).superRefine(
   }
 });
 
-// apps/teaching/src/schemas/toolkit.ts
+// apps/teaching/src/quiz/core.ts
 import { z as z3 } from "zod";
-var TkStepSchema = z3.object({
-  id: z3.string().min(1),
-  title: z3.string(),
-  prompt: z3.string()
+var QUIZ_QUESTION_KINDS = [
+  "multiple_choice",
+  "multi_select",
+  "true_false",
+  "short_answer",
+  "fill_gap",
+  "odd_one_out",
+  "matching",
+  "ordering",
+  "categorise",
+  "quote_technique",
+  "find_it",
+  "label_image",
+  "extended_response",
+  "explain_effect"
+];
+var QuizQuestionKindSchema = z3.enum(QUIZ_QUESTION_KINDS);
+var QUIZ_LIMITS = {
+  prompt: 1e3,
+  option: 300,
+  hint: 500,
+  explanation: 1e3,
+  passage: 4e3,
+  answer: 200,
+  model: 3e3,
+  response: 6e3,
+  marksMax: 20
+};
+var Id = z3.string().min(1).max(64);
+var Text = (max) => z3.string().trim().min(1).max(max);
+var OptionalText = (max) => z3.string().trim().max(max).optional();
+var QuizImageSchema = z3.object({
+  url: z3.string().min(1).max(2e3),
+  alt: z3.string().max(300).default("")
 });
-var TkRevealSchema = z3.object({
-  id: z3.string().min(1),
-  label: z3.string(),
-  body: z3.string()
+var QuizChoiceSchema = z3.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
+var QuizPairSchema = z3.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
+var QuizGroupSchema = z3.object({ id: Id, name: Text(120) });
+var QuizSortItemSchema = z3.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
+var QuizPinSchema = z3.object({
+  id: Id,
+  x: z3.number().min(0).max(1),
+  y: z3.number().min(0).max(1),
+  label: Text(120)
 });
-var TkTeacherNoteSchema = z3.object({
-  what: z3.string().default(""),
-  run: z3.array(z3.string()).default([]),
-  say: z3.array(z3.string()).default([]),
-  watch: z3.array(z3.string()).default([]),
-  extra_label: z3.string().default(""),
-  extra: z3.array(z3.string()).default([]),
-  time: z3.string().default(""),
-  source: z3.string().default(""),
+var base = {
+  id: Id,
+  prompt: z3.string().trim().max(QUIZ_LIMITS.prompt),
+  marks: z3.number().int().min(1).max(QUIZ_LIMITS.marksMax),
+  hint: OptionalText(QUIZ_LIMITS.hint),
+  explanation: OptionalText(QUIZ_LIMITS.explanation),
+  image: QuizImageSchema.optional()
+};
+var QuizQuestionSchema = z3.discriminatedUnion("kind", [
+  z3.object({ ...base, kind: z3.literal("multiple_choice"), options: z3.array(QuizChoiceSchema).min(2).max(6), correct: z3.array(Id).length(1) }),
+  z3.object({ ...base, kind: z3.literal("multi_select"), options: z3.array(QuizChoiceSchema).min(2).max(8), correct: z3.array(Id).min(1).max(8) }),
+  z3.object({ ...base, kind: z3.literal("true_false"), answer: z3.boolean() }),
+  z3.object({
+    ...base,
+    kind: z3.literal("short_answer"),
+    accepted: z3.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
+    case_sensitive: z3.boolean().optional()
+  }),
+  z3.object({ ...base, kind: z3.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z3.boolean().optional() }),
+  z3.object({ ...base, kind: z3.literal("odd_one_out"), options: z3.array(QuizChoiceSchema).min(3).max(6), correct: z3.array(Id).length(1) }),
+  z3.object({ ...base, kind: z3.literal("matching"), pairs: z3.array(QuizPairSchema).min(2).max(8) }),
+  z3.object({ ...base, kind: z3.literal("ordering"), items: z3.array(QuizChoiceSchema).min(3).max(8) }),
+  z3.object({
+    ...base,
+    kind: z3.literal("categorise"),
+    groups: z3.array(QuizGroupSchema).min(2).max(4),
+    items: z3.array(QuizSortItemSchema).min(2).max(16)
+  }),
+  z3.object({
+    ...base,
+    kind: z3.literal("quote_technique"),
+    quote: Text(QUIZ_LIMITS.passage),
+    options: z3.array(QuizChoiceSchema.extend({ technique_id: z3.string().max(64).optional() })).min(2).max(6),
+    correct: z3.array(Id).length(1)
+  }),
+  z3.object({
+    ...base,
+    kind: z3.literal("find_it"),
+    segments: z3.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
+    correct: z3.array(Id).min(1).max(40)
+  }),
+  z3.object({ ...base, kind: z3.literal("label_image"), image: QuizImageSchema, pins: z3.array(QuizPinSchema).min(2).max(8) }),
+  z3.object({
+    ...base,
+    kind: z3.literal("extended_response"),
+    model_answer: OptionalText(QUIZ_LIMITS.model),
+    guide: OptionalText(QUIZ_LIMITS.model)
+  }),
+  z3.object({
+    ...base,
+    kind: z3.literal("explain_effect"),
+    quote: Text(QUIZ_LIMITS.passage),
+    technique: OptionalText(120),
+    model_answer: OptionalText(QUIZ_LIMITS.model),
+    guide: OptionalText(QUIZ_LIMITS.model)
+  })
+]).superRefine((q, ctx) => {
+  for (const message of questionProblems(q)) {
+    ctx.addIssue({ code: z3.ZodIssueCode.custom, message });
+  }
+});
+var QuizQuestionDraftSchema = z3.custom(
+  (value) => !!value && typeof value === "object" && !Array.isArray(value) && typeof value.id === "string" && QUIZ_QUESTION_KINDS.includes(value.kind),
+  { message: "A quiz question needs an id and a known kind." }
+);
+function questionProblems(q) {
+  const out = [];
+  const needsPrompt = q.kind !== "fill_gap";
+  if (needsPrompt && !q.prompt.trim()) out.push("Write the question.");
+  const unique = (ids, what) => {
+    if (new Set(ids).size !== ids.length) out.push(`Two ${what} share an id.`);
+  };
+  switch (q.kind) {
+    case "multiple_choice":
+    case "multi_select":
+    case "odd_one_out":
+    case "quote_technique": {
+      unique(q.options.map((o) => o.id), "options");
+      const ids = new Set(q.options.map((o) => o.id));
+      if (!q.correct.length || q.correct.some((id) => !ids.has(id))) out.push("Tick the right answer.");
+      if (new Set(q.options.map((o) => norm(o.text))).size !== q.options.length) out.push("Two options say the same thing.");
+      break;
+    }
+    case "find_it": {
+      unique(q.segments.map((s) => s.id), "lines");
+      const ids = new Set(q.segments.map((s) => s.id));
+      if (!q.correct.length || q.correct.some((id) => !ids.has(id))) out.push("Tap the line or lines that answer the question.");
+      if (q.correct.length >= q.segments.length) out.push("Leave at least one line that isn\u2019t an answer.");
+      break;
+    }
+    case "fill_gap":
+      if (!parseGapPassage(q.passage).some((part) => part.type === "gap")) out.push("Blank out at least one word.");
+      break;
+    case "matching":
+      unique(q.pairs.map((p) => p.id), "pairs");
+      if (new Set(q.pairs.map((p) => norm(p.right))).size !== q.pairs.length) out.push("Two pairs have the same right-hand side.");
+      break;
+    case "ordering":
+      unique(q.items.map((i) => i.id), "items");
+      break;
+    case "categorise": {
+      unique(q.groups.map((g) => g.id), "groups");
+      unique(q.items.map((i) => i.id), "items");
+      const groups = new Set(q.groups.map((g) => g.id));
+      if (q.items.some((i) => !groups.has(i.group))) out.push("Put every item in a group.");
+      break;
+    }
+    case "label_image":
+      unique(q.pins.map((p) => p.id), "pins");
+      if (new Set(q.pins.map((p) => norm(p.label))).size !== q.pins.length) out.push("Two pins have the same label.");
+      break;
+    default:
+      break;
+  }
+  return out;
+}
+function parseGapPassage(passage) {
+  const parts = [];
+  const re = /\[\[([^\]]*)\]\]/g;
+  let last = 0;
+  for (let m = re.exec(passage); m; m = re.exec(passage)) {
+    if (m.index > last) parts.push({ type: "text", text: passage.slice(last, m.index) });
+    const answers = (m[1] ?? "").split("|").map((a) => a.trim()).filter(Boolean);
+    if (answers.length) parts.push({ type: "gap", answers });
+    else parts.push({ type: "text", text: m[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < passage.length) parts.push({ type: "text", text: passage.slice(last) });
+  return parts;
+}
+var QuizFeedbackSchema = z3.enum(["instant", "end", "released"]);
+var QuizSettingsSchema = z3.object({
+  /** Whole-quiz countdown in minutes. */
+  timer_minutes: z3.number().int().min(1).max(180).optional(),
+  /** Per-question countdown in seconds. */
+  question_seconds: z3.number().int().min(10).max(600).optional(),
+  /** Hard timers lock answers at zero; soft timers only show the time. */
+  timer_hard: z3.boolean().optional(),
+  shuffle_questions: z3.boolean().optional(),
+  shuffle_options: z3.boolean().optional(),
+  attempts: z3.number().int().min(1).max(5).optional(),
+  feedback: QuizFeedbackSchema.optional(),
+  /** Share of a question's marks a hint costs, 0 to 1. */
+  hint_cost: z3.number().min(0).max(1).optional(),
+  confidence: z3.boolean().optional(),
+  closes_at: z3.string().datetime().optional()
+});
+function norm(value, caseSensitive = false) {
+  const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();
+  return caseSensitive ? cleaned : cleaned.toLowerCase();
+}
+
+// apps/teaching/src/schemas/toolkit.ts
+import { z as z4 } from "zod";
+var TkStepSchema = z4.object({
+  id: z4.string().min(1),
+  title: z4.string(),
+  prompt: z4.string()
+});
+var TkRevealSchema = z4.object({
+  id: z4.string().min(1),
+  label: z4.string(),
+  body: z4.string()
+});
+var TkTeacherNoteSchema = z4.object({
+  what: z4.string().default(""),
+  run: z4.array(z4.string()).default([]),
+  say: z4.array(z4.string()).default([]),
+  watch: z4.array(z4.string()).default([]),
+  extra_label: z4.string().default(""),
+  extra: z4.array(z4.string()).default([]),
+  time: z4.string().default(""),
+  source: z4.string().default(""),
   /** True once the teacher edits the note; Thinking move then stops rebuilding it. */
-  edited: z3.boolean().default(false)
+  edited: z4.boolean().default(false)
 });
-var TkJotsSchema = z3.record(z3.string()).default({});
-var TkItemListSchema = z3.array(z3.string().min(1)).default([]);
-var ToolkitSkillContentSchema = z3.object({
-  item: z3.string().min(1),
-  label: z3.string(),
-  definition: z3.string(),
-  definition_source: z3.string().default(""),
+var TkJotsSchema = z4.record(z4.string()).default({});
+var TkItemListSchema = z4.array(z4.string().min(1)).default([]);
+var ToolkitSkillContentSchema = z4.object({
+  item: z4.string().min(1),
+  label: z4.string(),
+  definition: z4.string(),
+  definition_source: z4.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
-  context: z3.string().default(""),
-  steps: z3.array(TkStepSchema).max(8),
-  show_test: z3.boolean().default(true),
-  checks: z3.array(z3.string()).max(8).default([]),
-  reveals: z3.array(TkRevealSchema).max(6).default([]),
-  links: z3.object({ tools: TkItemListSchema, values: TkItemListSchema }).default({ tools: [], values: [] }),
-  show_links: z3.boolean().default(true),
+  guide: z4.string().default(""),
+  context: z4.string().default(""),
+  steps: z4.array(TkStepSchema).max(8),
+  show_test: z4.boolean().default(true),
+  checks: z4.array(z4.string()).max(8).default([]),
+  reveals: z4.array(TkRevealSchema).max(6).default([]),
+  links: z4.object({ tools: TkItemListSchema, values: TkItemListSchema }).default({ tools: [], values: [] }),
+  show_links: z4.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ToolFrameSchema = z3.enum(["fork", "steps", "converter", "stress"]);
-var PairLevelSchema = z3.enum(["none", "level1", "level2", "level3", "maths", "inquiry"]);
-var StressVerdictSchema = z3.enum(["survives", "fails", "qualifies"]);
-var ForkSlotsSchema = z3.object({
-  kind: z3.string().default(""),
-  marker: z3.string().default(""),
-  a: z3.string().default(""),
-  b: z3.string().default("")
+var ToolFrameSchema = z4.enum(["fork", "steps", "converter", "stress"]);
+var PairLevelSchema = z4.enum(["none", "level1", "level2", "level3", "maths", "inquiry"]);
+var StressVerdictSchema = z4.enum(["survives", "fails", "qualifies"]);
+var ForkSlotsSchema = z4.object({
+  kind: z4.string().default(""),
+  marker: z4.string().default(""),
+  a: z4.string().default(""),
+  b: z4.string().default("")
 });
-var ToolkitToolContentSchema = z3.object({
-  item: z3.string().min(1),
-  label: z3.string(),
-  definition: z3.string(),
-  definition_source: z3.string().default(""),
+var ToolkitToolContentSchema = z4.object({
+  item: z4.string().min(1),
+  label: z4.string(),
+  definition: z4.string(),
+  definition_source: z4.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
+  guide: z4.string().default(""),
   frame: ToolFrameSchema,
-  sentence: z3.string().default(""),
-  steps: z3.array(TkStepSchema).max(8).default([]),
+  sentence: z4.string().default(""),
+  steps: z4.array(TkStepSchema).max(8).default([]),
   /** Fork frame: the worked example filled into the slots on reveal. */
   worked: ForkSlotsSchema.default({}),
-  worked_note: z3.string().default(""),
-  converters: z3.array(z3.object({ id: z3.string().min(1), closed: z3.string(), open: z3.string() })).max(10).default([]),
-  statements: z3.array(
-    z3.object({
-      id: z3.string().min(1),
-      text: z3.string(),
+  worked_note: z4.string().default(""),
+  converters: z4.array(z4.object({ id: z4.string().min(1), closed: z4.string(), open: z4.string() })).max(10).default([]),
+  statements: z4.array(
+    z4.object({
+      id: z4.string().min(1),
+      text: z4.string(),
       verdict: StressVerdictSchema,
-      reason: z3.string()
+      reason: z4.string()
     })
   ).max(10).default([]),
   pair_level: PairLevelSchema.default("none"),
-  reveals: z3.array(TkRevealSchema).max(6).default([]),
-  links: z3.object({ skills: TkItemListSchema, tools: TkItemListSchema }).default({ skills: [], tools: [] }),
-  show_links: z3.boolean().default(true),
+  reveals: z4.array(TkRevealSchema).max(6).default([]),
+  links: z4.object({ skills: TkItemListSchema, tools: TkItemListSchema }).default({ skills: [], tools: [] }),
+  show_links: z4.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ToolkitValueContentSchema = z3.object({
-  item: z3.string().min(1),
-  label: z3.string(),
-  definition: z3.string(),
-  definition_source: z3.string().default(""),
+var ToolkitValueContentSchema = z4.object({
+  item: z4.string().min(1),
+  label: z4.string(),
+  definition: z4.string(),
+  definition_source: z4.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
-  claim: z3.string().default(""),
-  options: z3.array(z3.object({ id: z3.string().min(1), text: z3.string() })).max(8).default([]),
-  probes: z3.array(z3.object({ id: z3.string().min(1), question: z3.string(), asks: z3.string() })).max(8).default([]),
-  instruction: z3.string().default(""),
-  model: z3.object({ label: z3.string(), body: z3.string() }).default({ label: "", body: "" }),
-  discussion: z3.string().default(""),
+  guide: z4.string().default(""),
+  claim: z4.string().default(""),
+  options: z4.array(z4.object({ id: z4.string().min(1), text: z4.string() })).max(8).default([]),
+  probes: z4.array(z4.object({ id: z4.string().min(1), question: z4.string(), asks: z4.string() })).max(8).default([]),
+  instruction: z4.string().default(""),
+  model: z4.object({ label: z4.string(), body: z4.string() }).default({ label: "", body: "" }),
+  discussion: z4.string().default(""),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ThinkingMoveStepSchema = z3.object({
-  id: z3.string().min(1),
-  tool: z3.string().min(1),
-  prompt: z3.string(),
-  frame: z3.string(),
-  example: z3.string()
+var ThinkingMoveStepSchema = z4.object({
+  id: z4.string().min(1),
+  tool: z4.string().min(1),
+  prompt: z4.string(),
+  frame: z4.string(),
+  example: z4.string()
 });
-var ThinkingMoveContentSchema = z3.object({
-  skill: z3.string().min(1),
-  tools: z3.array(z3.string().min(1)).min(1).max(5),
-  value: z3.string().min(1),
-  community: z3.string().default(""),
+var ThinkingMoveContentSchema = z4.object({
+  skill: z4.string().min(1),
+  tools: z4.array(z4.string().min(1)).min(1).max(5),
+  value: z4.string().min(1),
+  community: z4.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
-  stimulus: z3.string().default(""),
-  steps: z3.array(ThinkingMoveStepSchema).max(5).default([]),
-  check: z3.array(z3.string()).max(8).default([]),
-  why: z3.string().default(""),
+  guide: z4.string().default(""),
+  stimulus: z4.string().default(""),
+  steps: z4.array(ThinkingMoveStepSchema).max(5).default([]),
+  check: z4.array(z4.string()).max(8).default([]),
+  why: z4.string().default(""),
   teacher_note: TkTeacherNoteSchema.optional(),
   /** skill|tools|value the note was last built from. */
-  note_basis: z3.string().default(""),
+  note_basis: z4.string().default(""),
   teacher_jots: TkJotsSchema.optional()
 });
-var QuadrantSchema = z3.enum(["comprehension", "research", "speculation", "inquiry"]);
-var QuestionQuadrantContentSchema = z3.object({
+var QuadrantSchema = z4.enum(["comprehension", "research", "speculation", "inquiry"]);
+var QuestionQuadrantContentSchema = z4.object({
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
-  stimulus: z3.string().default(""),
-  procedure: z3.enum(["sort", "create"]).default("sort"),
-  questions: z3.array(z3.object({ id: z3.string().min(1), text: z3.string(), quadrant: QuadrantSchema })).max(16).default([]),
-  converters: z3.array(z3.object({ id: z3.string().min(1), closed: z3.string(), open: z3.string() })).max(8).default([]),
+  guide: z4.string().default(""),
+  stimulus: z4.string().default(""),
+  procedure: z4.enum(["sort", "create"]).default("sort"),
+  questions: z4.array(z4.object({ id: z4.string().min(1), text: z4.string(), quadrant: QuadrantSchema })).max(16).default([]),
+  converters: z4.array(z4.object({ id: z4.string().min(1), closed: z4.string(), open: z4.string() })).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ConceptGameKindSchema = z3.enum(["kind_sort", "degree_line", "word_sort"]);
-var ConceptFeaturesContentSchema = z3.object({
+var ConceptGameKindSchema = z4.enum(["kind_sort", "degree_line", "word_sort"]);
+var ConceptFeaturesContentSchema = z4.object({
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
-  concepts: z3.array(
-    z3.object({
-      id: z3.string().min(1),
-      label: z3.string(),
-      central: z3.boolean(),
-      contestable: z3.boolean(),
-      common: z3.boolean()
+  guide: z4.string().default(""),
+  concepts: z4.array(
+    z4.object({
+      id: z4.string().min(1),
+      label: z4.string(),
+      central: z4.boolean(),
+      contestable: z4.boolean(),
+      common: z4.boolean()
     })
   ).max(8).default([]),
-  analogy: z3.object({ stem: z3.string(), example: z3.string() }).default({ stem: "", example: "" }),
-  game: z3.object({
+  analogy: z4.object({ stem: z4.string(), example: z4.string() }).default({ stem: "", example: "" }),
+  game: z4.object({
     kind: ConceptGameKindSchema,
-    left: z3.string(),
-    middle: z3.string(),
-    right: z3.string(),
-    cards: z3.array(z3.object({ id: z3.string().min(1), text: z3.string(), prompt: z3.string() })).max(16)
+    left: z4.string(),
+    middle: z4.string(),
+    right: z4.string(),
+    cards: z4.array(z4.object({ id: z4.string().min(1), text: z4.string(), prompt: z4.string() })).max(16)
   }).default({ kind: "kind_sort", left: "", middle: "?", right: "", cards: [] }),
-  criteria: z3.array(z3.string()).max(8).default([]),
+  criteria: z4.array(z4.string()).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ThinkingIntentionsContentSchema = z3.object({
-  content: z3.string().default(""),
-  skills: z3.array(z3.string().min(1)).max(2).default([]),
-  tools: z3.array(z3.string().min(1)).max(6).default([]),
-  values: z3.array(z3.string().min(1)).max(4).default([]),
-  community: z3.array(z3.string().min(1)).max(2).default([]),
-  success: z3.array(z3.string()).max(6).default([])
+var ThinkingIntentionsContentSchema = z4.object({
+  content: z4.string().default(""),
+  skills: z4.array(z4.string().min(1)).max(2).default([]),
+  tools: z4.array(z4.string().min(1)).max(6).default([]),
+  values: z4.array(z4.string().min(1)).max(4).default([]),
+  community: z4.array(z4.string().min(1)).max(2).default([]),
+  success: z4.array(z4.string()).max(6).default([])
 });
-var ThinkingReflectionContentSchema = z3.object({
-  variant: z3.enum(["lesson", "unit"]).default("lesson"),
+var ThinkingReflectionContentSchema = z4.object({
+  variant: z4.enum(["lesson", "unit"]).default("lesson"),
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
-  concept: z3.string().default(""),
+  guide: z4.string().default(""),
+  concept: z4.string().default(""),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var AnalogyTierSchema = z3.object({
-  task: z3.string().default(""),
-  steps: z3.array(TkStepSchema).max(6).default([]),
-  example: z3.string().default("")
+var AnalogyTierSchema = z4.object({
+  task: z4.string().default(""),
+  steps: z4.array(TkStepSchema).max(6).default([]),
+  example: z4.string().default("")
 });
-var FluidAnalogyContentSchema = z3.object({
-  kind: z3.string().min(1),
-  label: z3.string(),
-  definition: z3.string(),
+var FluidAnalogyContentSchema = z4.object({
+  kind: z4.string().min(1),
+  label: z4.string(),
+  definition: z4.string(),
   /** The text, character or idea students work with. */
-  focus: z3.string().default(""),
+  focus: z4.string().default(""),
   /** The level students start at. */
-  level: z3.number().int().min(1).max(3).default(1),
+  level: z4.number().int().min(1).max(3).default(1),
   /** Students can step between levels themselves. */
-  student_choice: z3.boolean().default(true),
-  tiers: z3.array(AnalogyTierSchema).length(3),
-  show_check: z3.boolean().default(true),
-  checks: z3.array(z3.string()).max(8).default([]),
+  student_choice: z4.boolean().default(true),
+  tiers: z4.array(AnalogyTierSchema).length(3),
+  show_check: z4.boolean().default(true),
+  checks: z4.array(z4.string()).max(8).default([]),
   /** Show the prompt-card name for classes using the printed deck. */
-  show_card: z3.boolean().default(false),
+  show_card: z4.boolean().default(false),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var AnalogySlotSchema = z3.object({
-  key: z3.string().min(1),
-  label: z3.string().default(""),
-  frame: z3.string().default(""),
-  example: z3.string().default("")
+var AnalogySlotSchema = z4.object({
+  key: z4.string().min(1),
+  label: z4.string().default(""),
+  frame: z4.string().default(""),
+  example: z4.string().default("")
 });
-var AnalogyStageSchema = z3.object({
-  task: z3.string().default(""),
-  slots: z3.array(AnalogySlotSchema).max(12).default([])
+var AnalogyStageSchema = z4.object({
+  task: z4.string().default(""),
+  slots: z4.array(AnalogySlotSchema).max(12).default([])
 });
-var AnalogyMoveContentSchema = z3.object({
-  label: z3.string(),
-  definition: z3.string(),
+var AnalogyMoveContentSchema = z4.object({
+  label: z4.string(),
+  definition: z4.string(),
   /** The text, character or idea students work with. */
-  focus: z3.string().default(""),
+  focus: z4.string().default(""),
   /** The level students start at. */
-  level: z3.number().int().min(1).max(3).default(1),
+  level: z4.number().int().min(1).max(3).default(1),
   /** Students can step between levels themselves. */
-  student_choice: z3.boolean().default(true),
-  levels: z3.array(AnalogyStageSchema).length(3),
-  show_check: z3.boolean().default(true),
-  checks: z3.array(z3.string()).max(8).default([]),
+  student_choice: z4.boolean().default(true),
+  levels: z4.array(AnalogyStageSchema).length(3),
+  show_check: z4.boolean().default(true),
+  checks: z4.array(z4.string()).max(8).default([]),
   /** Show the prompt-card name for classes using the printed deck. */
-  show_card: z3.boolean().default(false),
+  show_card: z4.boolean().default(false),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var AnalogyTypesContentSchema = z3.object({
+var AnalogyTypesContentSchema = z4.object({
   /** Student instruction shown at the top of the block. */
-  guide: z3.string().default(""),
-  focus: z3.string().default(""),
+  guide: z4.string().default(""),
+  focus: z4.string().default(""),
   /** Types marked "This lesson". */
-  types: z3.array(z3.string().min(1)).max(7).default([]),
-  show_contrast: z3.boolean().default(true),
-  weak: z3.string().default(""),
-  strong: z3.string().default(""),
-  why: z3.string().default(""),
-  process: z3.array(z3.string()).max(8).default([]),
-  show_check: z3.boolean().default(true),
-  checks: z3.array(z3.string()).max(8).default([]),
+  types: z4.array(z4.string().min(1)).max(7).default([]),
+  show_contrast: z4.boolean().default(true),
+  weak: z4.string().default(""),
+  strong: z4.string().default(""),
+  why: z4.string().default(""),
+  process: z4.array(z4.string()).max(8).default([]),
+  show_check: z4.boolean().default(true),
+  checks: z4.array(z4.string()).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var TeacherNoteBlockContentSchema = z3.object({
-  title: z3.string().default("Teacher note"),
-  html: z3.string().default("")
+var TeacherNoteBlockContentSchema = z4.object({
+  title: z4.string().default("Teacher note"),
+  html: z4.string().default("")
 });
 var TOOLKIT_NOTE_BLOCK_TYPES = [
   "toolkit_skill",
@@ -309,8 +508,8 @@ var TOOLKIT_BLOCK_TYPES = [
 ];
 
 // apps/teaching/src/schemas/block.ts
-var VisibilitySchema = z4.enum(["student_teacher", "teacher_only"]);
-var BlockTypeSchema = z4.enum([
+var VisibilitySchema = z5.enum(["student_teacher", "teacher_only"]);
+var BlockTypeSchema = z5.enum([
   "rich_text",
   "heading",
   "callout",
@@ -329,6 +528,8 @@ var BlockTypeSchema = z4.enum([
   "accordion",
   "table",
   "peer_feedback",
+  "question_drop",
+  "quiz_question",
   "question_set",
   "flashcards",
   "cloze",
@@ -368,19 +569,19 @@ var BlockTypeSchema = z4.enum([
   "analogy_chains",
   "teacher_note"
 ]);
-var ColumnPresetSchema = z4.enum(["50-50", "33-67", "67-33", "33-33-33", "custom"]);
-var SpacerSizeSchema = z4.enum(["small", "medium", "large"]);
-var VideoProviderSchema = z4.enum(["youtube", "vimeo", "file"]);
-var EmbedProviderSchema = z4.enum([
+var ColumnPresetSchema = z5.enum(["50-50", "33-67", "67-33", "33-33-33", "custom"]);
+var SpacerSizeSchema = z5.enum(["small", "medium", "large"]);
+var VideoProviderSchema = z5.enum(["youtube", "vimeo", "file"]);
+var EmbedProviderSchema = z5.enum([
   "google_maps",
   "google_slides",
   "google_docs",
   "pdf",
   "generic"
 ]);
-var HeadingVariantSchema = z4.enum(["page", "section", "subsection"]);
-var MediaSizeVariantSchema = z4.enum(["small", "medium", "large"]);
-var CalloutStyleSchema = z4.enum([
+var HeadingVariantSchema = z5.enum(["page", "section", "subsection"]);
+var MediaSizeVariantSchema = z5.enum(["small", "medium", "large"]);
+var CalloutStyleSchema = z5.enum([
   "information",
   "important",
   "warning",
@@ -390,8 +591,8 @@ var CalloutStyleSchema = z4.enum([
   "remember",
   "teacher"
 ]);
-var QuestionKindSchema = z4.enum(["short_answer", "multiple_choice"]);
-var ResponseSpaceSchema = z4.enum([
+var QuestionKindSchema = z5.enum(["short_answer", "multiple_choice"]);
+var ResponseSpaceSchema = z5.enum([
   "none",
   "short",
   "medium",
@@ -401,93 +602,93 @@ var ResponseSpaceSchema = z4.enum([
 var blockTimestamps = {
   created_at: IsoDateSchema,
   updated_at: IsoDateSchema,
-  schema_version: z4.literal(1)
+  schema_version: z5.literal(1)
 };
 var blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
-  layout: z4.record(z4.unknown()).default({}),
-  print: z4.record(z4.unknown()).default({}),
-  settings: z4.record(z4.unknown()).default({})
+  layout: z5.record(z5.unknown()).default({}),
+  print: z5.record(z5.unknown()).default({}),
+  settings: z5.record(z5.unknown()).default({})
 };
-var RichTextBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("rich_text"),
-  variant: z4.string().default("medium"),
+var RichTextBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("rich_text"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({ html: z4.string() }),
+  content: z5.object({ html: z5.string() }),
   ...blockLayout,
   ...blockTimestamps
 });
-var HeadingBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("heading"),
+var HeadingBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("heading"),
   variant: HeadingVariantSchema,
   visibility: VisibilitySchema,
-  content: z4.object({ text: z4.string() }),
+  content: z5.object({ text: z5.string() }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CalloutBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("callout"),
-  variant: z4.string().default("medium"),
+var CalloutBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("callout"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     style: CalloutStyleSchema,
-    title: z4.string().optional(),
-    body: z4.string(),
-    related_to: z4.object({
-      block_id: z4.string().min(1),
-      question_id: z4.string().min(1).optional()
+    title: z5.string().optional(),
+    body: z5.string(),
+    related_to: z5.object({
+      block_id: z5.string().min(1),
+      question_id: z5.string().min(1).optional()
     }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ImageBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("image"),
+var ImageBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("image"),
   variant: MediaSizeVariantSchema.default("large"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    url: z4.string(),
-    alt_text: z4.string(),
-    caption: z4.string().optional(),
-    annotations: z4.array(
-      z4.object({
-        id: z4.string().min(1),
-        body: z4.string().min(1),
-        selector: z4.unknown().optional()
+  content: z5.object({
+    url: z5.string(),
+    alt_text: z5.string(),
+    caption: z5.string().optional(),
+    annotations: z5.array(
+      z5.object({
+        id: z5.string().min(1),
+        body: z5.string().min(1),
+        selector: z5.unknown().optional()
       })
     ).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var GalleryLayoutSchema = z4.enum(["grid", "carousel", "comparison"]);
-var GalleryItemSchema = z4.object({
-  id: z4.string().min(1),
-  url: z4.string(),
-  alt_text: z4.string(),
-  caption: z4.string().optional()
+var GalleryLayoutSchema = z5.enum(["grid", "carousel", "comparison"]);
+var GalleryItemSchema = z5.object({
+  id: z5.string().min(1),
+  url: z5.string(),
+  alt_text: z5.string(),
+  caption: z5.string().optional()
 });
-var GalleryBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("gallery"),
+var GalleryBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("gallery"),
   variant: MediaSizeVariantSchema.default("large"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     layout: GalleryLayoutSchema,
-    items: z4.array(GalleryItemSchema).min(2).max(12)
+    items: z5.array(GalleryItemSchema).min(2).max(12)
   }).superRefine((content, ctx) => {
     if (content.layout === "comparison" && content.items.length !== 2) {
       ctx.addIssue({
-        code: z4.ZodIssueCode.custom,
+        code: z5.ZodIssueCode.custom,
         message: "Comparison galleries need exactly 2 items",
         path: ["items"]
       });
@@ -496,282 +697,314 @@ var GalleryBlockSchema = z4.object({
   ...blockLayout,
   ...blockTimestamps
 });
-var VideoBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("video"),
+var VideoBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("video"),
   variant: MediaSizeVariantSchema.default("large"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     provider: VideoProviderSchema,
-    external_id: z4.string(),
-    url: z4.string().optional(),
-    start_seconds: z4.number().int().positive().optional(),
-    title: z4.string().optional(),
-    caption: z4.string().optional()
+    external_id: z5.string(),
+    url: z5.string().optional(),
+    start_seconds: z5.number().int().positive().optional(),
+    title: z5.string().optional(),
+    caption: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var EmbedBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("embed"),
-  variant: z4.string().default("large"),
+var EmbedBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("embed"),
+  variant: z5.string().default("large"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    url: z4.string(),
-    title: z4.string().optional(),
+  content: z5.object({
+    url: z5.string(),
+    title: z5.string().optional(),
     provider: EmbedProviderSchema.optional(),
-    embed_url: z4.string().optional()
+    embed_url: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var HtmlBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("html"),
-  variant: z4.string().default("medium"),
+var HtmlBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("html"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({ html: z4.string() }),
+  content: z5.object({ html: z5.string() }),
   ...blockLayout,
   ...blockTimestamps
 });
-var HtmlAppAiProviderSchema = z4.enum(["openai", "anthropic"]);
-var HtmlAppAiSchema = z4.object({
-  enabled: z4.literal(true),
+var HtmlAppAiProviderSchema = z5.enum(["openai", "anthropic"]);
+var HtmlAppAiSchema = z5.object({
+  enabled: z5.literal(true),
   provider: HtmlAppAiProviderSchema,
-  model: z4.string().min(1),
-  system: z4.string(),
-  max_tokens: z4.number().int().positive().max(2e3)
+  model: z5.string().min(1),
+  system: z5.string(),
+  max_tokens: z5.number().int().positive().max(2e3)
 });
-var HtmlAppBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("html_app"),
-  variant: z4.string().default("large"),
+var HtmlAppBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("html_app"),
+  variant: z5.string().default("large"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
-    html: z4.string(),
-    height_px: z4.number().int().positive().max(4e3).optional(),
+  content: z5.object({
+    title: z5.string().optional(),
+    html: z5.string(),
+    height_px: z5.number().int().positive().max(4e3).optional(),
     ai: HtmlAppAiSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuoteBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("quote"),
-  variant: z4.string().default("medium"),
+var QuoteBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("quote"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    quote: z4.string(),
-    attribution: z4.string().optional(),
-    source: z4.string().optional(),
-    reference: z4.string().optional()
+  content: z5.object({
+    quote: z5.string(),
+    attribution: z5.string().optional(),
+    source: z5.string().optional(),
+    reference: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var DividerBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("divider"),
-  variant: z4.string().default("medium"),
+var DividerBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("divider"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({}).default({}),
+  content: z5.object({}).default({}),
   ...blockLayout,
   ...blockTimestamps
 });
-var DefinitionBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("definition"),
-  variant: z4.string().default("medium"),
+var DefinitionBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("definition"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    term: z4.string(),
-    definition: z4.string()
+  content: z5.object({
+    term: z5.string(),
+    definition: z5.string()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CodeBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("code"),
-  variant: z4.string().default("medium"),
+var CodeBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("code"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    code: z4.string(),
-    language: z4.string().optional()
+  content: z5.object({
+    code: z5.string(),
+    language: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AudioBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("audio"),
-  variant: z4.string().default("medium"),
+var AudioBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("audio"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    url: z4.string(),
-    title: z4.string().optional()
+  content: z5.object({
+    url: z5.string(),
+    title: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AttachmentBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("attachment"),
-  variant: z4.string().default("medium"),
+var AttachmentBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("attachment"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    url: z4.string(),
-    title: z4.string(),
-    filename: z4.string().optional()
+  content: z5.object({
+    url: z5.string(),
+    title: z5.string(),
+    filename: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AccordionItemSchema = z4.object({
-  title: z4.string(),
-  body: z4.string()
+var AccordionItemSchema = z5.object({
+  title: z5.string(),
+  body: z5.string()
 });
-var AccordionBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("accordion"),
-  variant: z4.string().default("medium"),
+var AccordionBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("accordion"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    items: z4.array(AccordionItemSchema)
+  content: z5.object({
+    items: z5.array(AccordionItemSchema)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var TableBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("table"),
-  variant: z4.string().default("large"),
+var TableBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("table"),
+  variant: z5.string().default("large"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    headers: z4.array(z4.string()),
-    rows: z4.array(z4.array(z4.string()))
+  content: z5.object({
+    headers: z5.array(z5.string()),
+    rows: z5.array(z5.array(z5.string()))
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuestionItemSchema = z4.object({
-  id: z4.string().min(1),
-  prompt: z4.string(),
+var QuestionItemSchema = z5.object({
+  id: z5.string().min(1),
+  prompt: z5.string(),
   kind: QuestionKindSchema,
-  options: z4.array(z4.string()).optional(),
+  options: z5.array(z5.string()).optional(),
   response_space: ResponseSpaceSchema.optional()
 });
-var PeerFeedbackBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("peer_feedback"),
-  variant: z4.string().default("medium"),
+var PeerFeedbackBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("peer_feedback"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    prompt: z4.string().max(4e3),
-    strength_prompt: z4.string().max(300).default("One thing that works well\u2026"),
-    suggestion_prompt: z4.string().max(300).default("One suggestion or question\u2026")
+  content: z5.object({
+    prompt: z5.string().max(4e3),
+    strength_prompt: z5.string().max(300).default("One thing that works well\u2026"),
+    suggestion_prompt: z5.string().max(300).default("One suggestion or question\u2026")
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuestionSetBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("question_set"),
-  variant: z4.string().default("medium"),
+var QuestionDropBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("question_drop"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
-    questions: z4.array(QuestionItemSchema)
+  content: z5.object({
+    target_quiz_id: z5.string().max(64).default(""),
+    prompt: z5.string().max(500).default(""),
+    kinds: z5.array(QuizQuestionKindSchema).max(20).default([]),
+    marks_min: z5.number().int().min(1).max(20).default(1),
+    marks_max: z5.number().int().min(1).max(20).default(3),
+    per_student: z5.number().int().min(1).max(5).default(1),
+    accepting: z5.boolean().default(true)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var FlashcardSourceSchema = z4.object({
-  block_id: z4.string().min(1),
-  annotation_id: z4.string().min(1),
-  lesson_id: z4.string().optional(),
-  kind: z4.enum(["quote_to_technique", "find_it", "line_recall"]),
-  source_hash: z4.string().min(1)
+var QuizQuestionBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("quiz_question"),
+  variant: z5.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z5.object({
+    question: QuizQuestionDraftSchema,
+    /** Teacher-only: the question came from a student's Question drop. */
+    from_submission: z5.string().max(200).optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
 });
-var FlashcardItemSchema = z4.object({
-  id: z4.string().min(1),
-  front: z4.string(),
-  back: z4.string(),
-  image_url: z4.string().optional(),
-  image_alt: z4.string().optional(),
+var QuestionSetBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("question_set"),
+  variant: z5.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z5.object({
+    title: z5.string().optional(),
+    questions: z5.array(QuestionItemSchema)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var FlashcardSourceSchema = z5.object({
+  block_id: z5.string().min(1),
+  annotation_id: z5.string().min(1),
+  lesson_id: z5.string().optional(),
+  kind: z5.enum(["quote_to_technique", "find_it", "line_recall"]),
+  source_hash: z5.string().min(1)
+});
+var FlashcardItemSchema = z5.object({
+  id: z5.string().min(1),
+  front: z5.string(),
+  back: z5.string(),
+  image_url: z5.string().optional(),
+  image_alt: z5.string().optional(),
   /** Teacher-only metadata; stripped from the student payload. */
   source: FlashcardSourceSchema.optional()
 });
-var FlashcardsBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("flashcards"),
-  variant: z4.string().default("medium"),
+var FlashcardsBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("flashcards"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    cards: z4.array(FlashcardItemSchema).min(1).max(20),
-    shuffle: z4.boolean().optional()
+  content: z5.object({
+    cards: z5.array(FlashcardItemSchema).min(1).max(20),
+    shuffle: z5.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ClozeBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("cloze"),
-  variant: z4.string().default("medium"),
+var ClozeBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("cloze"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
-    text: z4.string(),
-    case_sensitive: z4.boolean().optional()
+  content: z5.object({
+    title: z5.string().optional(),
+    text: z5.string(),
+    case_sensitive: z5.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var SelfCheckModeSchema = z4.enum(["reveal", "checklist", "confidence"]);
-var SelfCheckItemSchema = z4.object({
-  id: z4.string().min(1),
-  label: z4.string()
+var SelfCheckModeSchema = z5.enum(["reveal", "checklist", "confidence"]);
+var SelfCheckItemSchema = z5.object({
+  id: z5.string().min(1),
+  label: z5.string()
 });
-var SelfCheckBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("self_check"),
-  variant: z4.string().default("medium"),
+var SelfCheckBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("self_check"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
+  content: z5.object({
+    title: z5.string().optional(),
     mode: SelfCheckModeSchema,
-    prompt: z4.string(),
-    answer: z4.string().optional(),
-    items: z4.array(SelfCheckItemSchema).max(12).optional()
+    prompt: z5.string(),
+    answer: z5.string().optional(),
+    items: z5.array(SelfCheckItemSchema).max(12).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ChartTypeSchema = z4.enum(["bar", "line", "pie", "scatter"]);
-var ChartPointSchema = z4.object({
-  x: z4.union([z4.string(), z4.number()]),
-  y: z4.number()
+var ChartTypeSchema = z5.enum(["bar", "line", "pie", "scatter"]);
+var ChartPointSchema = z5.object({
+  x: z5.union([z5.string(), z5.number()]),
+  y: z5.number()
 });
-var ChartSeriesColorSchema = z4.enum([
+var ChartSeriesColorSchema = z5.enum([
   "wave",
   "danger",
   "success",
@@ -779,145 +1012,145 @@ var ChartSeriesColorSchema = z4.enum([
   "pastel-lilac-ink",
   "navy-2"
 ]);
-var ChartSeriesSchema = z4.object({
-  id: z4.string().min(1),
-  name: z4.string(),
+var ChartSeriesSchema = z5.object({
+  id: z5.string().min(1),
+  name: z5.string(),
   color: ChartSeriesColorSchema.optional(),
-  points: z4.array(ChartPointSchema).min(1).max(24)
+  points: z5.array(ChartPointSchema).min(1).max(24)
 });
-var ChartBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("chart"),
-  variant: z4.string().default("medium"),
+var ChartBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("chart"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     chart_type: ChartTypeSchema,
-    title: z4.string().optional(),
-    x_label: z4.string().optional(),
-    y_label: z4.string().optional(),
-    series: z4.array(ChartSeriesSchema).min(1).max(6)
+    title: z5.string().optional(),
+    x_label: z5.string().optional(),
+    y_label: z5.string().optional(),
+    series: z5.array(ChartSeriesSchema).min(1).max(6)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var EquationBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("equation"),
-  variant: z4.string().default("medium"),
+var EquationBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("equation"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    latex: z4.string(),
-    caption: z4.string().optional()
+  content: z5.object({
+    latex: z5.string(),
+    caption: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var DiagramSourceSchema = z4.enum(["image", "svg"]);
+var DiagramSourceSchema = z5.enum(["image", "svg"]);
 var DIAGRAM_IMAGE_PUBLISH_URL_ISSUE = "Diagram image needs a valid http(s) URL to publish";
-var DiagramBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("diagram"),
-  variant: z4.string().default("medium"),
+var DiagramBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("diagram"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     source: DiagramSourceSchema,
-    image_url: z4.string().optional(),
-    image_alt: z4.string().optional(),
-    svg_markup: z4.string().optional(),
-    caption: z4.string().optional()
+    image_url: z5.string().optional(),
+    image_alt: z5.string().optional(),
+    svg_markup: z5.string().optional(),
+    caption: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var GraphNodeSchema = z4.object({
-  id: z4.string().min(1),
-  label: z4.string(),
-  parent_id: z4.string().nullable().optional(),
-  color: z4.string().optional(),
-  x: z4.number().optional(),
-  y: z4.number().optional()
+var GraphNodeSchema = z5.object({
+  id: z5.string().min(1),
+  label: z5.string(),
+  parent_id: z5.string().nullable().optional(),
+  color: z5.string().optional(),
+  x: z5.number().optional(),
+  y: z5.number().optional()
 });
-var GraphBuildModeSchema = z4.enum(["outline", "canvas"]);
-var GraphEdgeSchema = z4.object({
-  id: z4.string().min(1),
-  from: z4.string().min(1),
-  to: z4.string().min(1),
-  label: z4.string().optional()
+var GraphBuildModeSchema = z5.enum(["outline", "canvas"]);
+var GraphEdgeSchema = z5.object({
+  id: z5.string().min(1),
+  from: z5.string().min(1),
+  to: z5.string().min(1),
+  label: z5.string().optional()
 });
-var MindMapBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("mind_map"),
-  variant: z4.string().default("medium"),
+var MindMapBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("mind_map"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
-    nodes: z4.array(GraphNodeSchema).min(1).max(24),
-    edges: z4.array(GraphEdgeSchema).max(40),
+  content: z5.object({
+    title: z5.string().optional(),
+    nodes: z5.array(GraphNodeSchema).min(1).max(24),
+    edges: z5.array(GraphEdgeSchema).max(40),
     mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ConceptMapBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("concept_map"),
-  variant: z4.string().default("medium"),
+var ConceptMapBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("concept_map"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
-    nodes: z4.array(GraphNodeSchema).min(1).max(24),
-    edges: z4.array(GraphEdgeSchema).max(40),
+  content: z5.object({
+    title: z5.string().optional(),
+    nodes: z5.array(GraphNodeSchema).min(1).max(24),
+    edges: z5.array(GraphEdgeSchema).max(40),
     mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var WhiteboardBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("whiteboard"),
-  variant: z4.string().default("large"),
+var WhiteboardBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("whiteboard"),
+  variant: z5.string().default("large"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    document_id: z4.string().min(1),
-    seed_document_id: z4.string().min(1).optional(),
-    title: z4.string().optional(),
-    height_px: z4.number().int().min(360).max(1400).default(640),
-    published_snapshot: z4.unknown().optional()
+  content: z5.object({
+    document_id: z5.string().min(1),
+    seed_document_id: z5.string().min(1).optional(),
+    title: z5.string().optional(),
+    height_px: z5.number().int().min(360).max(1400).default(640),
+    published_snapshot: z5.unknown().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var TimelineEventSchema = z4.object({
-  id: z4.string().min(1),
-  when: z4.string(),
-  label: z4.string(),
-  description: z4.string(),
-  image_url: z4.string().optional(),
-  image_alt: z4.string().optional(),
-  link_url: z4.string().optional(),
-  link_label: z4.string().optional()
+var TimelineEventSchema = z5.object({
+  id: z5.string().min(1),
+  when: z5.string(),
+  label: z5.string(),
+  description: z5.string(),
+  image_url: z5.string().optional(),
+  image_alt: z5.string().optional(),
+  link_url: z5.string().optional(),
+  link_label: z5.string().optional()
 });
-var TimelineLayoutSchema = z4.enum(["rail", "alternate", "horizontal"]);
-var TimelineBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("timeline"),
-  variant: z4.string().default("medium"),
+var TimelineLayoutSchema = z5.enum(["rail", "alternate", "horizontal"]);
+var TimelineBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("timeline"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     layout: TimelineLayoutSchema.optional(),
-    events: z4.array(TimelineEventSchema).min(1).max(12)
+    events: z5.array(TimelineEventSchema).min(1).max(12)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CardStackTintSchema = z4.enum([
+var CardStackTintSchema = z5.enum([
   "navy",
   "wave",
   "marine",
@@ -927,83 +1160,83 @@ var CardStackTintSchema = z4.enum([
   "sage",
   "peach"
 ]);
-var CardStackItemSchema = z4.object({
-  id: z4.string().min(1),
-  number: z4.string().optional(),
-  eyebrow: z4.string(),
-  title: z4.string(),
-  description: z4.string(),
-  image_url: z4.string().optional(),
-  image_alt: z4.string().optional(),
+var CardStackItemSchema = z5.object({
+  id: z5.string().min(1),
+  number: z5.string().optional(),
+  eyebrow: z5.string(),
+  title: z5.string(),
+  description: z5.string(),
+  image_url: z5.string().optional(),
+  image_alt: z5.string().optional(),
   tint: CardStackTintSchema
 });
-var CardStackBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("card_stack"),
-  variant: z4.string().default("medium"),
+var CardStackBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("card_stack"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
-    cards: z4.array(CardStackItemSchema).min(1).max(8)
+  content: z5.object({
+    title: z5.string().optional(),
+    cards: z5.array(CardStackItemSchema).min(1).max(8)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CollectionSourceSchema = z4.enum(["unit_lessons", "recent_lessons"]);
-var CollectionBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("collection"),
-  variant: z4.string().default("medium"),
+var CollectionSourceSchema = z5.enum(["unit_lessons", "recent_lessons"]);
+var CollectionBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("collection"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     source: CollectionSourceSchema,
-    title: z4.string().optional()
+    title: z5.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AnthologyViewSchema = z4.enum(["text", "theme", "technique", "connections"]);
-var AnthologyBlockObjectSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("anthology"),
-  variant: z4.string().default("medium"),
+var AnthologyViewSchema = z5.enum(["text", "theme", "technique", "connections"]);
+var AnthologyBlockObjectSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("anthology"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
+  content: z5.object({
+    title: z5.string().optional(),
     default_view: AnthologyViewSchema.default("text")
   }),
   ...blockLayout,
   ...blockTimestamps
 });
 var AnthologyBlockSchema = AnthologyBlockObjectSchema;
-var OutcomesBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("outcomes"),
-  variant: z4.string().default("medium"),
+var OutcomesBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("outcomes"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({}).default({}),
+  content: z5.object({}).default({}),
   ...blockLayout,
   ...blockTimestamps
 });
-var AnnotationFamilyKeySchema = z4.enum([
+var AnnotationFamilyKeySchema = z5.enum([
   "Descriptive",
   "Repetitive",
   "Comparative",
   "Structural",
   "Intertextual"
 ]);
-var AnnotationLayerKindSchema = z4.enum([
+var AnnotationLayerKindSchema = z5.enum([
   "family",
   "free",
   "lens",
   "teacher",
   "voice"
 ]);
-var AnnotationColourSchema = z4.enum([
+var AnnotationColourSchema = z5.enum([
   "wave",
   "high-sea",
   "sand",
@@ -1013,167 +1246,167 @@ var AnnotationColourSchema = z4.enum([
   "coral",
   "mist"
 ]);
-var AnnotationGranularitySchema = z4.enum(["word", "phrase", "line", "stanza"]);
-var AnnotationLineAlignSchema = z4.enum(["left", "center", "right"]);
-var AnnotationLineSchema = z4.object({
-  id: z4.string().min(1),
+var AnnotationGranularitySchema = z5.enum(["word", "phrase", "line", "stanza"]);
+var AnnotationLineAlignSchema = z5.enum(["left", "center", "right"]);
+var AnnotationLineSchema = z5.object({
+  id: z5.string().min(1),
   /** Plain text. Anchor offsets always index into this, never into `html`. */
-  text: z4.string(),
+  text: z5.string(),
   /** Inline formatting only (strong / em / u) over exactly `text`. */
-  html: z4.string().optional(),
+  html: z5.string().optional(),
   align: AnnotationLineAlignSchema.optional(),
   /** Indent steps (poetry layout); 0 or absent = flush. */
-  indent: z4.number().int().min(0).max(8).optional()
+  indent: z5.number().int().min(0).max(8).optional()
 });
-var AnnotationStanzaSchema = z4.object({
-  id: z4.string().min(1),
-  lines: z4.array(AnnotationLineSchema).min(1)
+var AnnotationStanzaSchema = z5.object({
+  id: z5.string().min(1),
+  lines: z5.array(AnnotationLineSchema).min(1)
 });
-var AnnotationTextSchema = z4.object({
-  kind: z4.enum(["verse", "prose"]),
-  stanzas: z4.array(AnnotationStanzaSchema).min(1)
+var AnnotationTextSchema = z5.object({
+  kind: z5.enum(["verse", "prose"]),
+  stanzas: z5.array(AnnotationStanzaSchema).min(1)
 });
-var AnnotationSublayerSchema = z4.object({
-  id: z4.string().min(1),
-  name: z4.string().min(1),
-  subgroup: z4.string().optional()
+var AnnotationSublayerSchema = z5.object({
+  id: z5.string().min(1),
+  name: z5.string().min(1),
+  subgroup: z5.string().optional()
 });
-var AnnotationLayerSchema = z4.object({
-  id: z4.string().min(1),
-  name: z4.string().min(1),
+var AnnotationLayerSchema = z5.object({
+  id: z5.string().min(1),
+  name: z5.string().min(1),
   kind: AnnotationLayerKindSchema,
   family: AnnotationFamilyKeySchema.optional(),
   colour: AnnotationColourSchema,
-  symbol: z4.string().optional(),
-  sublayers: z4.array(AnnotationSublayerSchema).optional()
+  symbol: z5.string().optional(),
+  sublayers: z5.array(AnnotationSublayerSchema).optional()
 });
-var AnnotationQuoteSchema = z4.object({
-  exact: z4.string().min(1),
-  prefix: z4.string().optional(),
-  suffix: z4.string().optional()
+var AnnotationQuoteSchema = z5.object({
+  exact: z5.string().min(1),
+  prefix: z5.string().optional(),
+  suffix: z5.string().optional()
 });
-var AnnotationAnchorSchema = z4.object({
+var AnnotationAnchorSchema = z5.object({
   /** Required on every stop when the annotation is a thread. */
-  id: z4.string().min(1).optional(),
+  id: z5.string().min(1).optional(),
   granularity: AnnotationGranularitySchema,
-  stanza: z4.string().min(1),
-  line: z4.string().optional(),
-  start: z4.number().int().min(0).optional(),
-  end: z4.number().int().min(0).optional(),
+  stanza: z5.string().min(1),
+  line: z5.string().optional(),
+  start: z5.number().int().min(0).optional(),
+  end: z5.number().int().min(0).optional(),
   quote: AnnotationQuoteSchema,
   /** Per-stop caption for thread step-through; sanitised on publish. */
-  note_html: z4.string().optional()
+  note_html: z5.string().optional()
 });
-var AnnotationTechniqueRefSchema = z4.object({
-  id: z4.string().min(1),
-  table_version: z4.string().min(1)
+var AnnotationTechniqueRefSchema = z5.object({
+  id: z5.string().min(1),
+  table_version: z5.string().min(1)
 });
-var AnnotationAttachmentSchema = z4.discriminatedUnion("kind", [
-  z4.object({
-    kind: z4.literal("link"),
-    url: z4.string(),
-    label: z4.string().optional()
+var AnnotationAttachmentSchema = z5.discriminatedUnion("kind", [
+  z5.object({
+    kind: z5.literal("link"),
+    url: z5.string(),
+    label: z5.string().optional()
   }),
-  z4.object({
-    kind: z4.literal("video"),
-    url: z4.string(),
-    start_seconds: z4.number().int().min(0).optional()
+  z5.object({
+    kind: z5.literal("video"),
+    url: z5.string(),
+    start_seconds: z5.number().int().min(0).optional()
   }),
-  z4.object({
-    kind: z4.literal("audio"),
-    url: z4.string(),
-    title: z4.string().optional()
+  z5.object({
+    kind: z5.literal("audio"),
+    url: z5.string(),
+    title: z5.string().optional()
   }),
-  z4.object({
-    kind: z4.literal("image"),
-    url: z4.string(),
-    alt_text: z4.string()
+  z5.object({
+    kind: z5.literal("image"),
+    url: z5.string(),
+    alt_text: z5.string()
   }),
-  z4.object({
-    kind: z4.literal("block"),
-    block_id: z4.string().min(1)
+  z5.object({
+    kind: z5.literal("block"),
+    block_id: z5.string().min(1)
   })
 ]);
-var AnthologyTagSchema = z4.object({
-  include: z4.boolean(),
-  themes: z4.array(z4.string().trim().max(40)).max(8).default([]),
-  concepts: z4.array(z4.string().trim().max(40)).max(8).default([])
+var AnthologyTagSchema = z5.object({
+  include: z5.boolean(),
+  themes: z5.array(z5.string().trim().max(40)).max(8).default([]),
+  concepts: z5.array(z5.string().trim().max(40)).max(8).default([])
 });
-var AnnotationThreadKindSchema = z4.enum([
+var AnnotationThreadKindSchema = z5.enum([
   "motif",
   "opposition",
   "volta",
   "echo",
   "argument"
 ]);
-var AnnotationThreadSchema = z4.object({
+var AnnotationThreadSchema = z5.object({
   /** What links the places, in a few words; shown on the thread button. */
-  title: z4.string().trim().max(80).optional(),
+  title: z5.string().trim().max(80).optional(),
   kind: AnnotationThreadKindSchema.optional(),
-  order: z4.enum(["text", "custom"]).default("text"),
-  anchor_order: z4.array(z4.string().min(1)).optional()
+  order: z5.enum(["text", "custom"]).default("text"),
+  anchor_order: z5.array(z5.string().min(1)).optional()
 });
-var AnnotationVoiceWordSchema = z4.object({
-  w: z4.string(),
-  start: z4.number(),
-  end: z4.number()
+var AnnotationVoiceWordSchema = z5.object({
+  w: z5.string(),
+  start: z5.number(),
+  end: z5.number()
 });
-var AnnotationVoiceClipSchema = z4.object({
-  id: z4.string().min(1),
-  start_s: z4.number(),
-  end_s: z4.number(),
-  word_range: z4.tuple([z4.number().int().min(0), z4.number().int().min(0)]),
+var AnnotationVoiceClipSchema = z5.object({
+  id: z5.string().min(1),
+  start_s: z5.number(),
+  end_s: z5.number(),
+  word_range: z5.tuple([z5.number().int().min(0), z5.number().int().min(0)]),
   anchor: AnnotationAnchorSchema.optional(),
-  source: z4.enum(["tap", "quote", "ai", "manual"]),
-  confidence: z4.number().min(0).max(1),
-  approved: z4.boolean(),
-  transcript_text: z4.string()
+  source: z5.enum(["tap", "quote", "ai", "manual"]),
+  confidence: z5.number().min(0).max(1),
+  approved: z5.boolean(),
+  transcript_text: z5.string()
 });
-var AnnotationVoiceTrackSchema = z4.object({
-  id: z4.string().min(1),
-  layer_id: z4.string().min(1),
-  kind: z4.enum(["reading", "think_aloud", "feedback"]),
-  title: z4.string().min(1),
-  audio: z4.object({
-    media_id: z4.string().optional(),
-    url: z4.string().min(1),
-    duration_s: z4.number().min(0),
-    mime: z4.string().min(1)
+var AnnotationVoiceTrackSchema = z5.object({
+  id: z5.string().min(1),
+  layer_id: z5.string().min(1),
+  kind: z5.enum(["reading", "think_aloud", "feedback"]),
+  title: z5.string().min(1),
+  audio: z5.object({
+    media_id: z5.string().optional(),
+    url: z5.string().min(1),
+    duration_s: z5.number().min(0),
+    mime: z5.string().min(1)
   }),
-  transcript: z4.object({
-    words: z4.array(AnnotationVoiceWordSchema),
-    timing: z4.enum(["word", "segment", "estimated"])
+  transcript: z5.object({
+    words: z5.array(AnnotationVoiceWordSchema),
+    timing: z5.enum(["word", "segment", "estimated"])
   }),
-  taps: z4.array(
-    z4.object({
-      t: z4.number(),
+  taps: z5.array(
+    z5.object({
+      t: z5.number(),
       anchor: AnnotationAnchorSchema
     })
   ).optional(),
-  clips: z4.array(AnnotationVoiceClipSchema).default([]),
-  status: z4.enum(["draft", "published"]),
-  extras: z4.array(
-    z4.object({
-      id: z4.string().min(1),
-      kind: z4.enum(["where_to_next", "technique_tag", "class_note"]),
-      html: z4.string(),
-      approved: z4.boolean()
+  clips: z5.array(AnnotationVoiceClipSchema).default([]),
+  status: z5.enum(["draft", "published"]),
+  extras: z5.array(
+    z5.object({
+      id: z5.string().min(1),
+      kind: z5.enum(["where_to_next", "technique_tag", "class_note"]),
+      html: z5.string(),
+      approved: z5.boolean()
     })
   ).optional()
 });
-var AnnotationItemSchema = z4.object({
-  id: z4.string().min(1),
-  layer_id: z4.string().min(1),
-  sublayer_id: z4.string().optional(),
+var AnnotationItemSchema = z5.object({
+  id: z5.string().min(1),
+  layer_id: z5.string().min(1),
+  sublayer_id: z5.string().optional(),
   anchor: AnnotationAnchorSchema,
   /** Extra stops; present and non-empty => this annotation is a thread. Max 24. */
-  also_anchors: z4.array(AnnotationAnchorSchema).max(24).optional(),
+  also_anchors: z5.array(AnnotationAnchorSchema).max(24).optional(),
   thread: AnnotationThreadSchema.optional(),
   anthology: AnthologyTagSchema.optional(),
   technique: AnnotationTechniqueRefSchema.optional(),
-  body: z4.object({
-    html: z4.string(),
-    attachments: z4.array(AnnotationAttachmentSchema).default([])
+  body: z5.object({
+    html: z5.string(),
+    attachments: z5.array(AnnotationAttachmentSchema).default([])
   }),
   created_at: IsoDateSchema,
   updated_at: IsoDateSchema
@@ -1183,7 +1416,7 @@ var AnnotationItemSchema = z4.object({
   const primaryId = ann.anchor.id;
   if (!primaryId) {
     ctx.addIssue({
-      code: z4.ZodIssueCode.custom,
+      code: z5.ZodIssueCode.custom,
       message: "Thread primary anchor needs an id",
       path: ["anchor", "id"]
     });
@@ -1194,14 +1427,14 @@ var AnnotationItemSchema = z4.object({
   const expectedCount = extras.length + (primaryId ? 1 : 0);
   if (ids.length !== expectedCount) {
     ctx.addIssue({
-      code: z4.ZodIssueCode.custom,
+      code: z5.ZodIssueCode.custom,
       message: "Every thread stop needs an id",
       path: ["also_anchors"]
     });
   }
   if (new Set(ids).size !== ids.length) {
     ctx.addIssue({
-      code: z4.ZodIssueCode.custom,
+      code: z5.ZodIssueCode.custom,
       message: "Thread stop ids must be unique within the annotation",
       path: ["also_anchors"]
     });
@@ -1212,33 +1445,33 @@ var AnnotationItemSchema = z4.object({
   const isPermutation = order.length === ids.length && new Set(order).size === order.length && order.every((id) => idSet.has(id));
   if (!isPermutation) {
     ctx.addIssue({
-      code: z4.ZodIssueCode.custom,
+      code: z5.ZodIssueCode.custom,
       message: "anchor_order must be a permutation of thread stop ids",
       path: ["thread", "anchor_order"]
     });
   }
 });
-var AnnotationBlockSettingsSchema = z4.object({
-  show_markers: z4.boolean().default(true),
-  default_layer_id: z4.string().optional(),
+var AnnotationBlockSettingsSchema = z5.object({
+  show_markers: z5.boolean().default(true),
+  default_layer_id: z5.string().optional(),
   /** Lines of context kept around each stop in thread focus. */
-  thread_context: z4.union([z4.literal(0), z4.literal(1)]).optional(),
+  thread_context: z5.union([z5.literal(0), z5.literal(1)]).optional(),
   /** How notes are drawn on the text. Absent = fineliner. */
-  ink_style: z4.enum(["fineliner", "highlighter"]).optional()
+  ink_style: z5.enum(["fineliner", "highlighter"]).optional()
 });
-var AnnotationBlockObjectSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("annotation"),
-  variant: z4.string().default("medium"),
+var AnnotationBlockObjectSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("annotation"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string().optional(),
-    attribution: z4.string().optional(),
+  content: z5.object({
+    title: z5.string().optional(),
+    attribution: z5.string().optional(),
     text: AnnotationTextSchema,
-    layers: z4.array(AnnotationLayerSchema).default([]),
-    annotations: z4.array(AnnotationItemSchema).default([]),
-    voice_tracks: z4.array(AnnotationVoiceTrackSchema).optional(),
+    layers: z5.array(AnnotationLayerSchema).default([]),
+    annotations: z5.array(AnnotationItemSchema).default([]),
+    voice_tracks: z5.array(AnnotationVoiceTrackSchema).optional(),
     anthology: AnthologyTagSchema.optional(),
     settings: AnnotationBlockSettingsSchema.default({ show_markers: true })
   }),
@@ -1255,14 +1488,14 @@ function refineAnnotationVoiceTracks(block, ctx) {
   for (const [index, track] of (block.content.voice_tracks ?? []).entries()) {
     if (!voiceLayerIds.has(track.layer_id)) {
       ctx.addIssue({
-        code: z4.ZodIssueCode.custom,
+        code: z5.ZodIssueCode.custom,
         message: "voice_track.layer_id must point at a voice layer",
         path: ["content", "voice_tracks", index, "layer_id"]
       });
     }
     if (teacherLayerIds.has(track.layer_id)) {
       ctx.addIssue({
-        code: z4.ZodIssueCode.custom,
+        code: z5.ZodIssueCode.custom,
         message: "voice_track cannot sit on a teacher layer",
         path: ["content", "voice_tracks", index, "layer_id"]
       });
@@ -1271,11 +1504,11 @@ function refineAnnotationVoiceTracks(block, ctx) {
 }
 var AnnotationBlockSchema = AnnotationBlockObjectSchema.superRefine(refineAnnotationVoiceTracks);
 function toolkitBlockSchema(blockType, content) {
-  return z4.object({
-    id: z4.string().min(1),
-    type: z4.literal("block"),
-    block_type: z4.literal(blockType),
-    variant: z4.string().default("medium"),
+  return z5.object({
+    id: z5.string().min(1),
+    type: z5.literal("block"),
+    block_type: z5.literal(blockType),
+    variant: z5.string().default("medium"),
     visibility: VisibilitySchema,
     content,
     ...blockLayout,
@@ -1311,11 +1544,11 @@ var AnalogyProblemBlockSchema = toolkitBlockSchema("analogy_problem", AnalogyMov
 var AnalogyMetaphorBlockSchema = toolkitBlockSchema("analogy_metaphor", AnalogyMoveContentSchema);
 var AnalogyTransferBlockSchema = toolkitBlockSchema("analogy_transfer", AnalogyMoveContentSchema);
 var AnalogyChainsBlockSchema = toolkitBlockSchema("analogy_chains", AnalogyMoveContentSchema);
-var TeacherNoteBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("teacher_note"),
-  variant: z4.string().default("medium"),
+var TeacherNoteBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("teacher_note"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema.transform(() => "teacher_only"),
   content: TeacherNoteBlockContentSchema,
   ...blockLayout,
@@ -1340,6 +1573,8 @@ var leafBlockSchemas = [
   AccordionBlockSchema,
   TableBlockSchema,
   PeerFeedbackBlockSchema,
+  QuestionDropBlockSchema,
+  QuizQuestionBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,
@@ -1372,51 +1607,51 @@ var leafBlockSchemas = [
   AnalogyChainsBlockSchema,
   TeacherNoteBlockSchema
 ];
-var SpacerBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("spacer"),
-  variant: z4.string().default("medium"),
+var SpacerBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("spacer"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     size: SpacerSizeSchema
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ColumnChildBlockSchema = z4.lazy(
-  () => z4.discriminatedUnion("block_type", [...leafBlockSchemas, SpacerBlockSchema])
+var ColumnChildBlockSchema = z5.lazy(
+  () => z5.discriminatedUnion("block_type", [...leafBlockSchemas, SpacerBlockSchema])
 );
-var columnsArraySchema = z4.array(
-  z4.object({
-    width: z4.number().int().min(1).max(12),
-    blocks: z4.array(ColumnChildBlockSchema)
+var columnsArraySchema = z5.array(
+  z5.object({
+    width: z5.number().int().min(1).max(12),
+    blocks: z5.array(ColumnChildBlockSchema)
   })
 ).superRefine((columns, ctx) => {
   const sum = columns.reduce((acc, col) => acc + col.width, 0);
   if (sum !== 12) {
     ctx.addIssue({
-      code: z4.ZodIssueCode.custom,
+      code: z5.ZodIssueCode.custom,
       message: "Column widths must sum to 12",
       path: []
     });
   }
 });
-var ColumnsBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("columns"),
-  variant: z4.string().default("medium"),
+var ColumnsBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("columns"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
+  content: z5.object({
     preset: ColumnPresetSchema,
     columns: columnsArraySchema
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var TabChildBlockSchema = z4.lazy(
-  () => z4.discriminatedUnion("block_type", [
+var TabChildBlockSchema = z5.lazy(
+  () => z5.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
@@ -1424,26 +1659,26 @@ var TabChildBlockSchema = z4.lazy(
     CardStackBlockSchema
   ])
 );
-var TabsBlockSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("tabs"),
-  variant: z4.string().default("medium"),
+var TabsBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("tabs"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    tabs: z4.array(
-      z4.object({
-        id: z4.string().min(1),
-        label: z4.string(),
-        blocks: z4.array(TabChildBlockSchema)
+  content: z5.object({
+    tabs: z5.array(
+      z5.object({
+        id: z5.string().min(1),
+        label: z5.string(),
+        blocks: z5.array(TabChildBlockSchema)
       })
     ).min(2).max(8)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var SectionChildBlockSchema = z4.lazy(
-  () => z4.discriminatedUnion("block_type", [
+var SectionChildBlockSchema = z5.lazy(
+  () => z5.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
@@ -1452,20 +1687,20 @@ var SectionChildBlockSchema = z4.lazy(
     CardStackBlockSchema
   ])
 );
-var SectionLinkSchema = z4.object({
-  mode: z4.literal("linked"),
-  source_composition_id: z4.string().min(1)
+var SectionLinkSchema = z5.object({
+  mode: z5.literal("linked"),
+  source_composition_id: z5.string().min(1)
 });
-var SectionBlockObjectSchema = z4.object({
-  id: z4.string().min(1),
-  type: z4.literal("block"),
-  block_type: z4.literal("section"),
-  variant: z4.string().default("medium"),
+var SectionBlockObjectSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("section"),
+  variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z4.object({
-    title: z4.string(),
-    collapsed_in_editor: z4.boolean().optional(),
-    blocks: z4.array(SectionChildBlockSchema),
+  content: z5.object({
+    title: z5.string(),
+    collapsed_in_editor: z5.boolean().optional(),
+    blocks: z5.array(SectionChildBlockSchema),
     link: SectionLinkSchema.optional()
   }),
   ...blockLayout,
@@ -1474,15 +1709,15 @@ var SectionBlockObjectSchema = z4.object({
 function refineLinkedSection(section, ctx) {
   if (section.content.link && section.content.blocks.length > 0) {
     ctx.addIssue({
-      code: z4.ZodIssueCode.custom,
+      code: z5.ZodIssueCode.custom,
       message: "Linked sections must have empty content.blocks",
       path: ["content", "blocks"]
     });
   }
 }
 var SectionBlockSchema = SectionBlockObjectSchema.superRefine(refineLinkedSection);
-var BlockSchema = z4.lazy(
-  () => z4.discriminatedUnion("block_type", [
+var BlockSchema = z5.lazy(
+  () => z5.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
@@ -1590,10 +1825,12 @@ export {
   MindMapBlockSchema,
   OutcomesBlockSchema,
   PeerFeedbackBlockSchema,
+  QuestionDropBlockSchema,
   QuestionItemSchema,
   QuestionKindSchema,
   QuestionQuadrantBlockSchema,
   QuestionSetBlockSchema,
+  QuizQuestionBlockSchema,
   QuoteBlockSchema,
   ResponseSpaceSchema,
   RichTextBlockSchema,

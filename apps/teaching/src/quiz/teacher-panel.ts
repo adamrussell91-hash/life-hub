@@ -1,0 +1,951 @@
+import { apiPost } from '@/api/client';
+import type { Block } from '@/schemas/block';
+import type { Lesson } from '@/schemas/lesson';
+import {
+  QUIZ_KIND_INFO,
+  blankQuestion,
+  norm,
+  resolveQuizSettings,
+  type MarkResult,
+  type PublicQuestion,
+  type QuestionKey,
+  type QuizQuestion,
+  type QuizResponse,
+  type QuizSettings
+} from '@/quiz/core';
+import { answerLines } from '@/blocks/quiz-question';
+import { mountQuestionBuilder } from '@/quiz/builder';
+import { mountQuestionPlayer } from '@/quiz/player';
+import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
+import './quiz.css';
+
+/**
+ * The teacher's quiz panel, shown above the canvas on a lesson whose type is
+ * Quiz: questions students sent in, quiz settings, results with marking, and
+ * the live round. Approving a student's question adds it to the lesson as an
+ * ordinary quiz question block, so the canvas stays the one place questions
+ * are edited and ordered.
+ */
+
+export type QuizPanelOptions = {
+  getLesson: () => Lesson;
+  onSettings: (settings: QuizSettings) => void;
+  onAddBlocks: (blocks: Block[]) => void;
+  onRemoveBlock: (blockId: string) => void;
+  idFactory: () => string;
+};
+
+export type QuizPanelHandle = { root: HTMLElement; update(lesson: Lesson): void; dispose(): void };
+
+type Submission = {
+  id: string;
+  question: QuizQuestion;
+  flagged: boolean;
+  created_at: string;
+  source_lesson_id: string;
+  source_title: string;
+  block_id: string;
+  device: string;
+  status: 'pending' | 'approved' | 'rejected';
+  quiz_block_id: string | null;
+};
+
+type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey };
+type AttemptSummary = { id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
+type QuestionStats = {
+  id: string;
+  question: PublicQuestion;
+  key: QuestionKey;
+  answered: number;
+  total: number;
+  full: number;
+  pending: number;
+  hinted: number;
+  confidence: Record<'1' | '2' | '3', [number, number]>;
+  picks: Record<string, number>;
+};
+type Results = { published: false } | { published: true; version: string; feedback: string; released: boolean; attempts: AttemptSummary[]; questions: QuestionStats[] };
+type Live = {
+  session: string;
+  code: string;
+  phase: 'lobby' | 'question' | 'reveal' | 'done';
+  index: number;
+  total: number;
+  joined: number;
+  question?: PublicQuestion;
+  key?: QuestionKey;
+  answered?: number;
+  right?: number;
+  marked?: number;
+  picks?: Record<string, number>;
+  written?: string[];
+};
+
+type Tab = 'tray' | 'settings' | 'results' | 'live';
+
+const TAB_KEY = 'quiz-panel:tab';
+
+export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
+  const lessonId = options.getLesson().id;
+  const endpoint = `/api/lessons/${encodeURIComponent(lessonId)}/quiz`;
+  const root = el('section', 'qz-panel-root');
+  root.setAttribute('aria-label', 'Quiz');
+  const tabs = el('div', 'qz-tabs');
+  tabs.setAttribute('role', 'tablist');
+  const body = el('div', 'qz-tabpanel');
+  body.setAttribute('role', 'tabpanel');
+  const alert = el('p', 'qz-alert');
+  alert.setAttribute('role', 'alert');
+  alert.hidden = true;
+  root.append(tabs, alert, body);
+
+  let tab: Tab = (sessionStorageGet(TAB_KEY) as Tab) || 'tray';
+  let submissions: Submission[] | null = null;
+  let filter: 'pending' | 'approved' | 'rejected' | 'flagged' = 'pending';
+  let editing: string | null = null;
+  let results: Results | null = null;
+  let openAttempt: string | null = null;
+  let live: Live | null = null;
+  let disposed = false;
+  let timer: number | undefined;
+
+  const post = <T>(body: Record<string, unknown>) => apiPost<T>(endpoint, body);
+  const showError = (error: unknown) => {
+    alert.textContent = errorText(error);
+    alert.hidden = false;
+  };
+
+  const TAB_LABELS: Record<Tab, string> = { tray: 'From students', settings: 'Settings', results: 'Results', live: 'Live' };
+  function paintTabs(): void {
+    tabs.replaceChildren();
+    for (const t of Object.keys(TAB_LABELS) as Tab[]) {
+      const waiting = t === 'tray' && submissions ? submissions.filter((s) => s.status === 'pending').length : 0;
+      const b = el('button', 'qz-tab', waiting ? `${TAB_LABELS[t]} (${waiting})` : TAB_LABELS[t]);
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(t === tab));
+      b.addEventListener('click', () => {
+        tab = t;
+        sessionStorageSet(TAB_KEY, t);
+        openAttempt = null;
+        alert.hidden = true;
+        paintTabs();
+        paint();
+        void refresh();
+      });
+      tabs.append(b);
+    }
+  }
+
+  function paint(): void {
+    if (disposed) return;
+    if (tab === 'tray') body.replaceChildren(trayView());
+    else if (tab === 'settings') body.replaceChildren(settingsView());
+    else if (tab === 'results') body.replaceChildren(resultsView());
+    else body.replaceChildren(liveView());
+  }
+
+  let painted = '';
+  async function refresh(): Promise<void> {
+    try {
+      let data: unknown;
+      if (tab === 'tray') data = submissions = (await post<{ submissions: Submission[] }>({ action: 'submissions' })).submissions;
+      else if (tab === 'results' && !openAttempt) data = results = await post<Results>({ action: 'results' });
+      else if (tab === 'live') data = live = (await post<{ live: Live | null }>({ action: 'live_status' })).live;
+      else return;
+      paintTabs();
+      if (tab === 'tray' && editing) return; // never repaint under a teacher who is editing
+      // Polls only repaint when something changed, so buttons never move under a click.
+      const signature = JSON.stringify([tab, filter, data]);
+      if (signature === painted) return;
+      painted = signature;
+      paint();
+      board?.refresh();
+    } catch (error) {
+      if (tab !== 'settings') showError(error);
+    }
+  }
+
+  function schedule(): void {
+    window.clearTimeout(timer);
+    if (disposed) return;
+    const wait = tab === 'live' && live ? 2500 : 15000;
+    timer = window.setTimeout(async () => {
+      if (!root.isConnected) return;
+      if (!document.hidden && (tab !== 'results' || !openAttempt)) await refresh();
+      schedule();
+    }, wait);
+  }
+
+  /* ── Tray ── */
+
+  function trayView(): HTMLElement {
+    const wrap = el('div', 'qz-tray');
+    const bar = el('div', 'qz-tray__bar');
+    const add = button('Write a question yourself', 'secondary', () => {
+      const id = options.idFactory();
+      const now = new Date().toISOString();
+      options.onAddBlocks([
+        {
+          id,
+          type: 'block',
+          block_type: 'quiz_question',
+          variant: 'medium',
+          visibility: 'student_teacher',
+          content: { question: blankQuestion('multiple_choice', id) },
+          layout: {},
+          print: {},
+          settings: {},
+          created_at: now,
+          updated_at: now,
+          schema_version: 1
+        } as Block
+      ]);
+    });
+    if (!submissions) {
+      wrap.append(bar, el('p', 'qz-note', 'Loading questions…'));
+      bar.append(add);
+      return wrap;
+    }
+    const counts = {
+      pending: submissions.filter((s) => s.status === 'pending' && !s.flagged).length,
+      flagged: submissions.filter((s) => s.status === 'pending' && s.flagged).length,
+      approved: submissions.filter((s) => s.status === 'approved').length,
+      rejected: submissions.filter((s) => s.status === 'rejected').length
+    };
+    const pick = select(
+      [
+        { value: 'pending', label: `Waiting (${counts.pending})` },
+        { value: 'flagged', label: `Flagged words (${counts.flagged})` },
+        { value: 'approved', label: `Approved (${counts.approved})` },
+        { value: 'rejected', label: `Rejected (${counts.rejected})` }
+      ],
+      filter
+    );
+    pick.setAttribute('aria-label', 'Show');
+    pick.addEventListener('change', () => {
+      filter = pick.value as typeof filter;
+      paint();
+    });
+    bar.append(pick, add);
+    const shown = submissions.filter((s) =>
+      filter === 'flagged' ? s.status === 'pending' && s.flagged : filter === 'pending' ? s.status === 'pending' && !s.flagged : s.status === filter
+    );
+    if (filter === 'pending' && shown.length > 1) {
+      bar.append(
+        button(`Approve all ${shown.length}`, 'ghost', async function () {
+          if (!window.confirm(`Add all ${shown.length} waiting questions to the quiz? You can still edit or remove them on the page.`)) return;
+          this.disabled = true;
+          await approveMany(shown);
+        })
+      );
+    }
+    wrap.append(bar);
+    if (!submissions.length) {
+      wrap.append(
+        el('p', 'qz-note', 'No questions yet. Add a Question drop block to this week’s lessons and choose this quiz as where it feeds into.')
+      );
+      return wrap;
+    }
+    if (!shown.length) {
+      wrap.append(el('p', 'qz-note', filter === 'pending' ? 'Nothing waiting. You’re all caught up.' : 'None here.'));
+      return wrap;
+    }
+    const names = deviceNames(submissions.map((s) => s.device));
+    const list = el('div', 'qz-tray__list');
+    for (const group of similarGroups(shown)) {
+      if (group.length > 1) {
+        const g = el('div', 'qz-similar');
+        g.append(el('p', 'qz-similar__title', `${group.length} similar questions: pick the best`));
+        for (const s of group) g.append(submissionCard(s, names));
+        list.append(g);
+      } else list.append(submissionCard(group[0] as Submission, names));
+    }
+    wrap.append(list);
+    return wrap;
+  }
+
+  function submissionCard(s: Submission, names: Map<string, string>): HTMLElement {
+    const card = el('article', 'qz-sub');
+    card.dataset.status = s.status;
+    const head = el('div', 'qz-sub__head');
+    head.append(
+      el('span', 'qz-eyebrow', QUIZ_KIND_INFO[s.question.kind]?.label ?? 'Question'),
+      el('span', 'qz-sub__meta', `${names.get(s.device) ?? 'A student'} · ${s.source_title} · ${plural(s.question.marks, 'mark')}`)
+    );
+    if (s.flagged) head.append(el('span', 'qz-chip qz-chip--flag', 'Flagged words'));
+    card.append(head);
+
+    if (editing === s.id) {
+      let edited = s.question;
+      const builder = mountQuestionBuilder({ question: s.question, audience: 'teacher', allowImageUrl: true, onChange: (q) => (edited = q) });
+      const actions = el('div', 'qz-actions');
+      actions.append(
+        button('Save and approve', 'primary', async function () {
+          const problem = builder.problem();
+          if (problem) {
+            showError(problem);
+            return;
+          }
+          this.disabled = true;
+          editing = null;
+          await approve(s, edited);
+        }),
+        button('Cancel', 'ghost', () => {
+          editing = null;
+          paint();
+        })
+      );
+      card.append(builder.root, actions);
+      return card;
+    }
+
+    const prompt = s.question.prompt?.trim();
+    if (prompt) card.append(el('p', 'qz-sub__prompt', prompt));
+    const lines = el('div', 'qz-card__answer');
+    for (const line of answerLines(s.question)) lines.append(el('p', 'qz-card__line', line));
+    card.append(lines);
+    if (s.question.hint) card.append(el('p', 'qz-note', `Hint: ${s.question.hint}`));
+
+    const actions = el('div', 'qz-actions');
+    if (s.status === 'pending') {
+      actions.append(
+        button('Approve', 'primary', async function () {
+          this.disabled = true;
+          await approve(s, s.question);
+        }),
+        button('Edit, then approve', 'secondary', () => {
+          editing = s.id;
+          paint();
+        }),
+        button('Reject', 'ghost', async function () {
+          this.disabled = true;
+          await review(s, 'rejected');
+        })
+      );
+    } else {
+      const inQuiz = s.quiz_block_id && blockExists(options.getLesson().blocks, s.quiz_block_id);
+      actions.append(el('span', 'qz-note', s.status === 'approved' ? (inQuiz ? 'In the quiz.' : 'Approved, then removed from the page.') : 'Rejected.'));
+      actions.append(
+        button('Undo', 'ghost', async function () {
+          this.disabled = true;
+          if (s.status === 'approved' && s.quiz_block_id && inQuiz) options.onRemoveBlock(s.quiz_block_id);
+          await review(s, 'pending');
+        })
+      );
+    }
+    card.append(actions);
+    return card;
+  }
+
+  function questionBlock(s: Submission, question: QuizQuestion): Block {
+    const id = options.idFactory();
+    const now = new Date().toISOString();
+    return {
+      id,
+      type: 'block',
+      block_type: 'quiz_question',
+      variant: 'medium',
+      visibility: 'student_teacher',
+      content: { question: { ...question, id }, from_submission: s.id },
+      layout: {},
+      print: {},
+      settings: {},
+      created_at: now,
+      updated_at: now,
+      schema_version: 1
+    } as Block;
+  }
+
+  async function approve(s: Submission, question: QuizQuestion): Promise<void> {
+    const block = questionBlock(s, question);
+    try {
+      submissions = (await post<{ submissions: Submission[] }>({ action: 'review', submission_id: s.id, status: 'approved', quiz_block_id: block.id })).submissions;
+      options.onAddBlocks([block]);
+      alert.hidden = true;
+    } catch (error) {
+      showError(error);
+    }
+    paintTabs();
+    paint();
+  }
+
+  async function approveMany(list: Submission[]): Promise<void> {
+    const added: Block[] = [];
+    for (const s of list) {
+      const block = questionBlock(s, s.question);
+      try {
+        submissions = (await post<{ submissions: Submission[] }>({ action: 'review', submission_id: s.id, status: 'approved', quiz_block_id: block.id })).submissions;
+        added.push(block);
+      } catch (error) {
+        showError(error);
+        break;
+      }
+    }
+    if (added.length) options.onAddBlocks(added);
+    paintTabs();
+    paint();
+  }
+
+  async function review(s: Submission, status: 'rejected' | 'pending'): Promise<void> {
+    try {
+      submissions = (await post<{ submissions: Submission[] }>({ action: 'review', submission_id: s.id, status })).submissions;
+      alert.hidden = true;
+    } catch (error) {
+      showError(error);
+    }
+    paintTabs();
+    paint();
+  }
+
+  /* ── Settings ── */
+
+  function settingsView(): HTMLElement {
+    const lesson = options.getLesson();
+    const raw: QuizSettings = { ...(lesson.quiz ?? {}) };
+    const s = resolveQuizSettings(raw);
+    const wrap = el('div', 'qz-settings');
+    const save = (patch: Partial<QuizSettings>) => {
+      const next: QuizSettings = { ...(options.getLesson().quiz ?? {}), ...patch };
+      for (const k of Object.keys(next) as Array<keyof QuizSettings>) if (next[k] === undefined) delete next[k];
+      options.onSettings(next);
+    };
+    const number = (label: string, value: number | undefined, min: number, max: number, hint: string, apply: (n: number | undefined) => void) => {
+      const input = el('input', 'qz-input qz-input--marks');
+      input.type = 'number';
+      input.min = String(min);
+      input.max = String(max);
+      input.placeholder = 'Off';
+      input.value = value ? String(value) : '';
+      input.addEventListener('change', () => {
+        const n = Math.round(Number(input.value));
+        if (!input.value.trim() || !Number.isFinite(n) || n <= 0) {
+          input.value = '';
+          apply(undefined);
+          return;
+        }
+        const clamped = Math.max(min, Math.min(max, n));
+        input.value = String(clamped);
+        apply(clamped);
+      });
+      return labelled(label, input, hint);
+    };
+    const grid = el('div', 'qz-settings__grid');
+    grid.append(
+      number('Quiz timer (minutes)', raw.timer_minutes, 1, 180, 'Blank for no timer.', (n) => save({ timer_minutes: n })),
+      number('Time per question (seconds)', raw.question_seconds, 10, 600, 'Blank for no limit.', (n) => save({ question_seconds: n }))
+    );
+    const attempts = select(
+      [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: n === 1 ? 'One go' : `${n} goes` })),
+      String(s.attempts)
+    );
+    attempts.addEventListener('change', () => save({ attempts: Number(attempts.value) }));
+    grid.append(labelled('Attempts', attempts));
+    const feedback = select(
+      [
+        { value: 'instant', label: 'After each question' },
+        { value: 'end', label: 'At the end' },
+        { value: 'released', label: 'When I release them' }
+      ],
+      s.feedback
+    );
+    feedback.addEventListener('change', () => save({ feedback: feedback.value as QuizSettings['feedback'] }));
+    grid.append(labelled('Show right answers', feedback));
+    const hint = select(
+      [
+        { value: '0', label: 'Free' },
+        { value: '0.25', label: 'A quarter of the marks' },
+        { value: '0.5', label: 'Half the marks' },
+        { value: '1', label: 'All the marks' }
+      ],
+      String(s.hint_cost)
+    );
+    hint.addEventListener('change', () => save({ hint_cost: Number(hint.value) }));
+    grid.append(labelled('A hint costs', hint));
+    const closes = el('input', 'qz-input');
+    closes.type = 'datetime-local';
+    closes.value = raw.closes_at ? toLocalInput(raw.closes_at) : '';
+    closes.addEventListener('change', () => save({ closes_at: closes.value ? new Date(closes.value).toISOString() : undefined }));
+    grid.append(labelled('Closes', closes, 'Also stops new questions arriving from Question drop blocks.'));
+    wrap.append(grid);
+
+    const toggles = el('div', 'qz-settings__toggles');
+    toggles.append(
+      checkbox('Hard timer: lock answers when time runs out', !!s.timer_hard, (on) => save({ timer_hard: on })),
+      checkbox('Shuffle question order', !!s.shuffle_questions, (on) => save({ shuffle_questions: on })),
+      checkbox('Shuffle answer options', !!s.shuffle_options, (on) => save({ shuffle_options: on })),
+      checkbox('Ask “How sure are you?” on each question', !!s.confidence, (on) => save({ confidence: on }))
+    );
+    wrap.append(toggles, el('p', 'qz-note', 'Students get changes to questions and settings when you publish.'));
+    return wrap;
+  }
+
+  /* ── Results ── */
+
+  function resultsView(): HTMLElement {
+    const wrap = el('div', 'qz-results');
+    if (openAttempt) {
+      wrap.append(el('p', 'qz-note', 'Loading attempt…'));
+      void post<{ attempt: AttemptDetail }>({ action: 'attempt', attempt_id: openAttempt })
+        .then((res) => wrap.replaceChildren(attemptView(res.attempt)))
+        .catch(showError);
+      return wrap;
+    }
+    if (!results) {
+      wrap.append(el('p', 'qz-note', 'Loading results…'));
+      return wrap;
+    }
+    if (!results.published) {
+      wrap.append(el('p', 'qz-note', 'Publish the quiz to start collecting results.'));
+      return wrap;
+    }
+    const r = results;
+    const total = r.attempts.length;
+    const avg = total ? r.attempts.reduce((sum, a) => sum + (a.max ? a.score / a.max : 0), 0) / total : 0;
+    const waiting = r.attempts.reduce((sum, a) => sum + a.pending, 0);
+    const top = el('div', 'qz-results__top');
+    top.append(
+      stat(String(total), total === 1 ? 'attempt' : 'attempts'),
+      stat(total ? `${Math.round(avg * 100)}%` : '–', 'average'),
+      stat(String(waiting), waiting === 1 ? 'answer to mark' : 'answers to mark')
+    );
+    if (r.feedback === 'released') {
+      top.append(
+        button(r.released ? 'Hide results from students' : 'Release results to students', r.released ? 'ghost' : 'primary', async function () {
+          this.disabled = true;
+          try {
+            results = await post<Results>({ action: 'release', released: !r.released });
+          } catch (error) {
+            showError(error);
+          }
+          paint();
+        })
+      );
+    }
+    wrap.append(top);
+    if (!total) {
+      wrap.append(el('p', 'qz-note', 'No one has finished the quiz yet. This updates by itself.'));
+      return wrap;
+    }
+
+    wrap.append(el('h4', 'qz-h', 'By question'));
+    const qs = el('ol', 'qz-qstats');
+    for (const q of r.questions) qs.append(questionStat(q));
+    wrap.append(qs);
+
+    wrap.append(el('h4', 'qz-h', 'Attempts'));
+    const names = deviceNames(r.attempts.map((a) => a.device));
+    const list = el('ul', 'qz-attempts');
+    for (const a of r.attempts) {
+      const li = el('li');
+      const b = el('button', 'qz-attempt');
+      b.type = 'button';
+      b.append(
+        el('span', 'qz-attempt__who', `${names.get(a.device) ?? 'A student'}${a.n > 0 ? ` · go ${a.n + 1}` : ''}`),
+        el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}`),
+        el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
+      );
+      if (a.pending) b.dataset.pending = 'true';
+      b.addEventListener('click', () => {
+        openAttempt = a.id;
+        paint();
+      });
+      li.append(b);
+      list.append(li);
+    }
+    wrap.append(list);
+    return wrap;
+  }
+
+  function questionStat(q: QuestionStats): HTMLElement {
+    const li = el('li', 'qz-qstat');
+    const pct = q.total ? Math.round((q.full / q.total) * 100) : 0;
+    const head = el('div', 'qz-qstat__head');
+    head.append(el('span', 'qz-qstat__prompt', questionLabel(q.question)), el('span', 'qz-qstat__pct', `${pct}% full marks`));
+    li.append(head);
+    li.append(meter(pct));
+    const notes: string[] = [];
+    if (q.pending) notes.push(`${q.pending} to mark`);
+    if (q.hinted) notes.push(`${q.hinted} used the hint`);
+    const sureWrong = q.confidence['3'][0] - q.confidence['3'][1];
+    if (sureWrong > 0) notes.push(`${sureWrong} ${sureWrong === 1 ? 'was' : 'were'} sure but didn’t get full marks`);
+    if (notes.length) li.append(el('p', 'qz-note', notes.join(' · ')));
+    if ('options' in q.question && q.key.answer.type === 'choice') {
+      const right = new Set(q.key.answer.ids);
+      const picksTotal = Object.values(q.picks).reduce((a, b) => a + b, 0);
+      const bars = el('ul', 'qz-bars');
+      for (const o of q.question.options) {
+        const n = q.picks[o.id] ?? 0;
+        const row = el('li', 'qz-bars__row');
+        if (right.has(o.id)) row.dataset.state = 'right';
+        row.append(el('span', 'qz-bars__label', o.text), meter(picksTotal ? Math.round((n / picksTotal) * 100) : 0), el('span', 'qz-bars__n', String(n)));
+        bars.append(row);
+      }
+      li.append(bars);
+    }
+    return li;
+  }
+
+  type AttemptDetail = { id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; rows: Row[] };
+
+  function attemptView(a: AttemptDetail): HTMLElement {
+    const wrap = el('div', 'qz-attempt-detail');
+    const bar = el('div', 'qz-tray__bar');
+    bar.append(
+      button('← All attempts', 'ghost', () => {
+        openAttempt = null;
+        paint();
+        void refresh();
+      }),
+      el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}${a.pending ? ` · ${a.pending} to mark` : ''}${a.overtime ? ' · Late' : ''}`)
+    );
+    wrap.append(bar);
+    a.rows.forEach((r, i) => {
+      const item = el('div', 'qz-attempt-row');
+      item.append(mountQuestionPlayer({ question: r.question, response: r.response, number: i + 1, result: { mark: r.mark, key: r.key, hinted: r.hinted, awarded: r.awarded } }));
+      if (r.confidence) item.append(el('p', 'qz-note', `How sure: ${['', 'Guessing', 'Fairly sure', 'Sure'][r.confidence]}`));
+      const markRow = el('div', 'qz-mark');
+      const input = el('input', 'qz-input qz-input--marks');
+      input.type = 'number';
+      input.min = '0';
+      input.max = String(r.mark.max);
+      input.step = '0.5';
+      input.value = r.awarded === null ? '' : String(r.awarded);
+      input.placeholder = '–';
+      const save = button(r.awarded === null ? 'Mark' : 'Change mark', r.awarded === null ? 'primary' : 'ghost', async function () {
+        const score = input.value.trim() === '' ? null : Number(input.value);
+        this.disabled = true;
+        try {
+          const res = await post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score });
+          wrap.replaceWith(attemptView(res.attempt));
+        } catch (error) {
+          showError(error);
+          this.disabled = false;
+        }
+      });
+      markRow.append(labelled(`Marks out of ${formatMarks(r.mark.max)}`, input), save);
+      item.append(markRow);
+      wrap.append(item);
+    });
+    return wrap;
+  }
+
+  /* ── Live ── */
+
+  function liveView(): HTMLElement {
+    const wrap = el('div', 'qz-live');
+    if (!live) {
+      wrap.append(
+        el('p', 'qz-note', 'Run the quiz from the front, one question at a time. Students join on the quiz page with a code. No leaderboard: you see how the class went, not who.'),
+        button('Start live quiz', 'primary', async function () {
+          this.disabled = true;
+          await liveAction('live_start');
+        })
+      );
+      return wrap;
+    }
+    const l = live;
+    const bar = el('div', 'qz-live__bar');
+    const code = el('div', 'qz-code');
+    code.append(el('span', 'qz-code__label', 'Code'), el('span', 'qz-code__value', formatCode(l.code)));
+    bar.append(
+      code,
+      el('span', 'qz-note', `${plural(l.joined, 'student')} joined${l.index >= 0 ? ` · Question ${l.index + 1} of ${l.total}` : ''}`),
+      button('Show on board', 'ghost', () => showBoard())
+    );
+    wrap.append(bar, liveStage(l, false), liveControls(l));
+    return wrap;
+  }
+
+  function liveControls(l: Live): HTMLElement {
+    const actions = el('div', 'qz-actions');
+    if (l.phase === 'lobby') {
+      actions.append(button('First question', 'primary', async function () {
+        this.disabled = true;
+        await liveAction('live_next');
+      }));
+    } else if (l.phase === 'question') {
+      actions.append(button('Reveal answer', 'primary', async function () {
+        this.disabled = true;
+        await liveAction('live_reveal');
+      }));
+    } else if (l.phase === 'reveal') {
+      actions.append(button(l.index + 1 >= l.total ? 'Finish' : 'Next question', 'primary', async function () {
+        this.disabled = true;
+        await liveAction('live_next');
+      }));
+      if (l.index > 0) actions.append(button('Back', 'ghost', () => void liveAction('live_back')));
+    }
+    actions.append(
+      button('End', 'ghost', async function () {
+        if (!window.confirm('End the live quiz?')) return;
+        this.disabled = true;
+        await liveAction('live_end');
+      })
+    );
+    return actions;
+  }
+
+  async function liveAction(action: string): Promise<void> {
+    try {
+      live = (await post<{ live: Live | null }>({ action })).live;
+      if (live?.phase === 'done') live = null;
+      alert.hidden = true;
+    } catch (error) {
+      showError(error);
+    }
+    paint();
+    board?.refresh();
+    schedule();
+  }
+
+  let board: { refresh(): void } | null = null;
+  function showBoard(): void {
+    const overlay = el('div', 'qz-board');
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Live quiz board');
+    const inner = el('div', 'qz-board__inner');
+    const close = button('Close board', 'secondary', () => dismiss());
+    overlay.append(inner, close);
+    const paintBoard = () => {
+      if (!live) {
+        dismiss();
+        return;
+      }
+      inner.replaceChildren();
+      if (live.phase === 'lobby') {
+        inner.append(el('p', 'qz-board__label', 'Open the quiz and type this code'), el('p', 'qz-board__code', formatCode(live.code)), el('p', 'qz-board__label', plural(live.joined, 'student') + ' joined'));
+      } else {
+        inner.append(liveStage(live, true), liveControls(live));
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismiss();
+    };
+    function dismiss(): void {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+      board = null;
+    }
+    document.addEventListener('keydown', onKey);
+    document.body.append(overlay);
+    board = { refresh: paintBoard };
+    paintBoard();
+    close.focus();
+  }
+
+  function liveStage(l: Live, big: boolean): HTMLElement {
+    const stage = el('div', `qz-live__stage${big ? ' qz-live__stage--board' : ''}`);
+    if (l.phase === 'lobby' || !l.question) {
+      stage.append(el('p', 'qz-note', 'Waiting for students to join. Start the first question when everyone’s in.'));
+      return stage;
+    }
+    const q = l.question;
+    const revealed = l.phase === 'reveal';
+    stage.append(el('p', 'qz-player__meta', `Question ${l.index + 1} of ${l.total} · ${QUIZ_KIND_INFO[q.kind].label}`));
+    if (q.prompt) stage.append(el('h3', `qz-player__prompt${big ? ' qz-player__prompt--board' : ''}`, q.prompt));
+    if (q.kind === 'quote_technique' && q.quote) stage.append(el('blockquote', 'qz-quote', q.quote));
+    if (q.kind === 'explain_effect') stage.append(el('blockquote', 'qz-quote', q.quote));
+    if (q.image && q.kind !== 'label_image') {
+      const img = el('img', 'qz-live__img');
+      img.src = q.image.url;
+      img.alt = q.image.alt;
+      stage.append(img);
+    }
+    const answered = l.answered ?? 0;
+    stage.append(el('p', 'qz-live__count', `${answered} of ${l.joined} answered`));
+    const picks = l.picks ?? {};
+    const picksTotal = Object.values(picks).reduce((a, b) => a + b, 0);
+    const right = l.key?.answer.type === 'choice' ? new Set(l.key.answer.ids) : new Set<string>();
+    const optionsList =
+      'options' in q ? q.options : q.kind === 'find_it' ? q.segments : q.kind === 'true_false' ? [{ id: 'true', text: 'True' }, { id: 'false', text: 'False' }] : null;
+    if (optionsList) {
+      const bars = el('ul', 'qz-bars qz-bars--live');
+      for (const o of optionsList) {
+        const n = picks[o.id] ?? 0;
+        const row = el('li', 'qz-bars__row');
+        const isRight = right.has(o.id) || (l.key?.answer.type === 'boolean' && String(l.key.answer.value) === o.id);
+        if (revealed && isRight) row.dataset.state = 'right';
+        row.append(el('span', 'qz-bars__label', o.text), meter(revealed && picksTotal ? Math.round((n / picksTotal) * 100) : 0), el('span', 'qz-bars__n', revealed ? String(n) : ''));
+        bars.append(row);
+      }
+      stage.append(bars);
+    } else if (revealed && l.key) {
+      stage.append(el('p', 'qz-live__count', `${l.right ?? 0} of ${l.marked ?? answered} got full marks`));
+    }
+    if (revealed && l.key) {
+      const shown = keySummary(q, l.key);
+      if (shown) stage.append(el('p', 'qz-right-answer', shown));
+      if (l.key.explanation) stage.append(el('p', 'qz-result__why', l.key.explanation));
+      if (l.written?.length) {
+        const list = el('ul', 'qz-written');
+        for (const text of l.written.slice(0, big ? 12 : 30)) list.append(el('li', '', text));
+        stage.append(list);
+      }
+    }
+    return stage;
+  }
+
+  paintTabs();
+  paint();
+  void refresh().finally(schedule);
+  const onVisible = () => {
+    if (!document.hidden && root.isConnected) void refresh();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+
+  return {
+    root,
+    update() {
+      // Settings controls already show what the teacher typed; repainting them would steal focus.
+      if (tab === 'tray' && !editing) paint();
+    },
+    dispose() {
+      disposed = true;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      root.remove();
+    }
+  };
+}
+
+/* ── helpers ── */
+
+/** A question's words for a list: its prompt, or its passage with the gaps shown. */
+function questionLabel(q: PublicQuestion): string {
+  if (q.prompt.trim()) return q.prompt;
+  if (q.kind === 'fill_gap') return q.parts.map((p) => (p.type === 'text' ? p.text : '____')).join('');
+  return QUIZ_KIND_INFO[q.kind].label;
+}
+
+function stat(value: string, label: string): HTMLElement {
+  const box = el('div', 'qz-stat');
+  box.append(el('span', 'qz-stat__value', value), el('span', 'qz-stat__label', label));
+  return box;
+}
+
+function meter(pct: number): HTMLElement {
+  const track = el('span', 'qz-meter');
+  track.setAttribute('aria-hidden', 'true');
+  const fill = el('span', 'qz-meter__fill');
+  fill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  track.append(fill);
+  return track;
+}
+
+/** "Student A", "Student B" in order of first appearance. Never a name. */
+function deviceNames(devices: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const d of devices) {
+    if (out.has(d)) continue;
+    const n = out.size;
+    const letters = n < 26 ? String.fromCharCode(65 + n) : `${String.fromCharCode(65 + Math.floor(n / 26) - 1)}${String.fromCharCode(65 + (n % 26))}`;
+    out.set(d, `Student ${letters}`);
+  }
+  return out;
+}
+
+/** Groups questions whose wording mostly overlaps, so the teacher can keep the best one. */
+function similarGroups(list: Submission[]): Submission[][] {
+  const words = (s: Submission) =>
+    new Set(
+      norm(`${s.question.prompt ?? ''} ${(s.question as { quote?: string }).quote ?? ''} ${(s.question as { passage?: string }).passage ?? ''}`)
+        .split(/[^a-z0-9']+/)
+        .filter((w) => w.length > 2)
+    );
+  const sets = list.map(words);
+  const groups: number[][] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < list.length; i++) {
+    if (seen.has(i)) continue;
+    const group = [i];
+    seen.add(i);
+    for (let j = i + 1; j < list.length; j++) {
+      if (seen.has(j)) continue;
+      const a = sets[i] as Set<string>;
+      const b = sets[j] as Set<string>;
+      if (a.size < 2 || b.size < 2) continue;
+      const shared = [...a].filter((w) => b.has(w)).length;
+      if (shared / (a.size + b.size - shared) >= 0.6) {
+        group.push(j);
+        seen.add(j);
+      }
+    }
+    groups.push(group);
+  }
+  return groups.map((g) => g.map((i) => list[i] as Submission));
+}
+
+function blockExists(blocks: Block[], id: string): boolean {
+  for (const b of blocks) {
+    if (b.id === id) return true;
+    const c = b.content as { blocks?: Block[]; columns?: Array<{ blocks: Block[] }>; tabs?: Array<{ blocks: Block[] }> };
+    const nested = [c.blocks, ...(c.columns ?? []).map((x) => x.blocks), ...(c.tabs ?? []).map((x) => x.blocks)];
+    if (nested.some((children) => Array.isArray(children) && blockExists(children, id))) return true;
+  }
+  return false;
+}
+
+/** The right answer as one line, in the question's own words. */
+export function keySummary(q: PublicQuestion, key: QuestionKey): string {
+  const a = key.answer;
+  const text = (list: Array<{ id: string; text: string }>, ids: string[]) => ids.map((id) => list.find((x) => x.id === id)?.text ?? '').filter(Boolean).join(', ');
+  switch (a.type) {
+    case 'choice':
+      return `Answer: ${'options' in q ? text(q.options, a.ids) : q.kind === 'find_it' ? text(q.segments, a.ids) : ''}`;
+    case 'boolean':
+      return `Answer: ${a.value ? 'True' : 'False'}`;
+    case 'text':
+      return `Answer: ${a.accepted.join(' / ')}`;
+    case 'gaps':
+      return `Answer: ${Object.values(a.gaps).map((g) => g[0]).join(', ')}`;
+    case 'order':
+      return q.kind === 'ordering' ? `Order: ${a.ids.map((id, i) => `${i + 1}. ${q.items.find((x) => x.id === id)?.text ?? ''}`).join('  ')}` : '';
+    case 'map': {
+      if (q.kind === 'matching') return Object.entries(a.map).map(([l, r]) => `${q.left.find((x) => x.id === l)?.text} → ${q.right.find((x) => x.id === r)?.text}`).join(' · ');
+      if (q.kind === 'categorise') return q.groups.map((g) => `${g.text}: ${q.items.filter((i) => a.map[i.id] === g.id).map((i) => i.text).join(', ')}`).join(' · ');
+      if (q.kind === 'label_image') return q.pins.map((p) => `${p.n}. ${q.labels.find((x) => x.id === a.map[p.id])?.text ?? ''}`).join(' · ');
+      return '';
+    }
+    case 'manual':
+      return a.model_answer ? `Model answer: ${a.model_answer}` : '';
+  }
+}
+
+function formatCode(code: string): string {
+  return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+}
+
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function timeAgo(iso: string): string {
+  const mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (!Number.isFinite(mins)) return '';
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+}
+
+function sessionStorageGet(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function sessionStorageSet(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* private mode: the tab just won't be remembered */
+  }
+}

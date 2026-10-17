@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
+import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
   AnalogyTypesContentSchema,
@@ -36,6 +37,8 @@ export const BlockTypeSchema = z.enum([
   'accordion',
   'table',
   'peer_feedback',
+  'question_drop',
+  'quiz_question',
   'question_set',
   'flashcards',
   'cloze',
@@ -424,6 +427,37 @@ export const PeerFeedbackBlockSchema = z.object({
     prompt: z.string().max(4000),
     strength_prompt: z.string().max(300).default('One thing that works well…'),
     suggestion_prompt: z.string().max(300).default('One suggestion or question…')
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Question drop: students write a question that feeds a quiz lesson in the
+ * same unit. The teacher picks the quiz and approves each question there.
+ */
+export const QuestionDropBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('question_drop'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    target_quiz_id: z.string().max(64).default(''),
+    prompt: z.string().max(500).default(''),
+    kinds: z.array(QuizQuestionKindSchema).max(20).default([]),
+    marks_min: z.number().int().min(1).max(20).default(1),
+    marks_max: z.number().int().min(1).max(20).default(3),
+    per_student: z.number().int().min(1).max(5).default(1),
+    accepting: z.boolean().default(true)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/** One question in a quiz lesson. Answers are split off on publish and never reach students. */
+export const QuizQuestionBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('quiz_question'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    question: QuizQuestionDraftSchema,
+    /** Teacher-only: the question came from a student's Question drop. */
+    from_submission: z.string().max(200).optional()
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1184,6 +1218,8 @@ const leafBlockSchemas = [
   AccordionBlockSchema,
   TableBlockSchema,
   PeerFeedbackBlockSchema,
+  QuestionDropBlockSchema,
+  QuizQuestionBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,

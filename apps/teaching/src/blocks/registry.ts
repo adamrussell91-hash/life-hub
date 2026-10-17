@@ -84,6 +84,8 @@ import {
   type RenderMode
 } from '@/blocks/render';
 import { renderPeerFeedback, createPeerFeedbackEditor } from '@/blocks/peer-feedback';
+import { renderQuestionDrop, createQuestionDropEditor } from '@/blocks/question-drop';
+import { renderQuizQuestion, createQuizQuestionEditor } from '@/blocks/quiz-question';
 import type { Block } from '@/schemas/block';
 import {
   createAnalogyTypesEditor,
@@ -185,6 +187,8 @@ export const blockRegistry: {
     createEditor: createTableEditor
   },
   peer_feedback: { render: renderPeerFeedback, createEditor: createPeerFeedbackEditor },
+  question_drop: { render: renderQuestionDrop, createEditor: (block, onChange) => createQuestionDropEditor(block, onChange) },
+  quiz_question: { render: renderQuizQuestion, createEditor: (block, onChange) => createQuizQuestionEditor(block, onChange) },
   question_set: {
     render: renderQuestionSetBlock,
     createEditor: createQuestionSetEditor
