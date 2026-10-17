@@ -1,5 +1,7 @@
 # Design kit compliance report
 
+> Superseded for element-level comparison by `packages/design-kit/audits/2026-10-17-0502-ui-element-audit.md` (17 October 2026, 05:02 UTC). This September note only scored shared chrome.
+
 **Date:** 2026-09-05  
 **Scope:** Life, Teaching, Knowledge, Tasks against `packages/design-kit`  
 **Source of truth:** `packages/design-kit/` (`AGENTS.md`, `RAIL.md`, `MOBILE.md`, `ICONS.md`, `TASKS.md`)

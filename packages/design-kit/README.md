@@ -30,6 +30,10 @@ Flat freeze (no `css/` subfolder):
 
 ## Compliance
 
-Cross-hub audit: [`docs/design-kit-compliance.md`](../../docs/design-kit-compliance.md).
+Control inventory, 17 October 2026 05:02 UTC: [`audits/2026-10-17-0502-ui-element-audit.md`](audits/2026-10-17-0502-ui-element-audit.md).
+
+Screen log, 17 October 2026 05:27 UTC: [`audits/2026-10-17-0527-screen-audit.md`](audits/2026-10-17-0527-screen-audit.md).
+
+Earlier chrome-only scorecard: [`docs/design-kit-compliance.md`](../../docs/design-kit-compliance.md).
 
 Canonical upstream history of these files: `github.com/adamrussell91-hash/hub-design-kit`.
