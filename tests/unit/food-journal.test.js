@@ -21,6 +21,10 @@ import {
   liveVisits,
   dayOneRating,
   dayOneLocation,
+  dayOneTitle,
+  visitTags,
+  tagKey,
+  tagLabel,
   plainNotes,
 } from "../../apps/life/js/food-journal/model.js";
 import {
@@ -331,7 +335,14 @@ test("background capture lifecycle polls a result and strips input image payload
         dishes: [],
       }),
   });
-  const queue = createFoodJournalAssistHandler(d),
+  const kicked = [];
+  const queue = createFoodJournalAssistHandler({
+      ...d,
+      invokeRun: async (request, id) => {
+        kicked.push(id);
+        return true;
+      },
+    }),
     runner = createFoodJournalRunHandler(d);
   const created = (
     await (
@@ -347,6 +358,7 @@ test("background capture lifecycle polls a result and strips input image payload
       )
     ).json()
   ).data;
+  assert.deepEqual(kicked, [created.id]);
   const response = await runner(
     new Request("https://example.test/api/food-journal-run", {
       method: "POST",
@@ -660,9 +672,12 @@ test("Day One Markdown reads as headings and paragraphs, not raw symbols", () =>
     { kind: "heading", text: "Description" },
     { kind: "para", text: "Ham, cheese, mustard" },
     { kind: "heading", text: "Rating and recommendation" },
-    { kind: "para", text: "4.5/5 a good one! Would order again. #Lunch" },
+    { kind: "para", text: "4.5/5 a good one! Would order again." },
   ]);
   assert.equal(firstSentence(notes), "Ham, cheese, mustard 4.5/5 a good one!");
+  assert.deepEqual(noteBlocks("So good.#pie Corner pies"), [
+    { kind: "para", text: "So good. Corner pies" },
+  ]);
   assert.doesNotMatch(plainNotes(notes), /#{2,}|---|\\|dayone-moment/);
   assert.deepEqual(noteBlocks("Plain words.\n\nMore words."), [
     { kind: "para", text: "Plain words." },
@@ -782,6 +797,69 @@ test("the Location Adam wrote replaces Day One's GPS place, then same-day entrie
   assert.equal(tidyImports(next).journal.visits.find((v) => v.id === burgers.id).venue.name, "Corner Burgers Hillside");
   assert.equal(dayOneLocation("###### Location\nCafe One\n\n###### Rating\n4/5"), "Cafe One");
   assert.equal(dayOneLocation("No headings here"), "");
+});
+
+test("hashtags come from dish tags and #words, ignoring case", () => {
+  const v = dated("2026-06-07", "Lunch", "Cafe", [["Toastie", null]]);
+  v.dishes[0].tags = ["Pizza", "pizza"];
+  v.notes = "Great day! #Burger and #pizza.\nNot a tag: C# or #1";
+  assert.deepEqual(visitTags(v), ["pizza", "burger"]);
+  assert.equal(tagLabel("burger"), "#Burger");
+  assert.equal(tagKey("#Burger"), "burger");
+});
+
+test("imported titles that are a photo link or the template placeholder get a real name", () => {
+  const entry = (id, created, title, notes, venue = "Cafe One") => {
+    const v = dated("2026-04-14", title, venue, [[title, null]]);
+    v.source_id = `dayone:${id}`;
+    v.notes = notes;
+    v.import_metadata = { original_created_at: created };
+    return v;
+  };
+  const journal = {
+    ...emptyJournal(),
+    visits: [
+      entry("a", "2026-04-14T01:00:00Z", "![](dayone-moment://ABC)", "![](dayone-moment://ABC)\nCheese pie\nSo good.#pie"),
+      entry("b", "2026-04-14T05:00:00Z", "Title", "## Title\n\n---\n\n###### Description\n\n---\n\n###### Location\nNoodle Bar\n#ramen", "12 Main St"),
+      entry("c", "2026-04-14T09:00:00Z", "Title", "## Title\n\n###### Description", ""),
+    ],
+  };
+  const { journal: next } = tidyImports(journal);
+  const titles = liveVisits(next).map((v) => [v.title, v.dishes[0].title]);
+  assert.deepEqual(titles.sort(), [
+    ["Cheese pie", "Cheese pie"],
+    ["Meal", "Meal"],
+    ["Ramen at Noodle Bar", "Ramen at Noodle Bar"],
+  ]);
+  assert.equal(dayOneTitle("![](dayone-moment://X)\n\n## Toastie\n"), "Toastie");
+});
+
+test("same address, same day, hours apart stays two meals", () => {
+  const entry = (id, created, title) => {
+    const v = dated("2026-04-14", title, "12 Home St", [[title, null]]);
+    v.source_id = `dayone:${id}`;
+    v.import_metadata = { original_created_at: created };
+    return v;
+  };
+  const journal = {
+    ...emptyJournal(),
+    visits: [
+      entry("a", "2026-04-14T00:00:00Z", "Eggs"),
+      entry("b", "2026-04-14T00:20:00Z", "Coffee"),
+      entry("c", "2026-04-14T09:00:00Z", "Curry"),
+    ],
+  };
+  const live = liveVisits(tidyImports(journal).journal);
+  assert.deepEqual(live.map((v) => v.title).sort(), ["Curry", "Eggs & Coffee"]);
+});
+
+test("fix-up takes the venue the text names over a GPS street address", () => {
+  const v = { ...dated("2016-08-06", "Pie", "88 Main Street", [["Pie", null]]), source_id: "dayone:p" };
+  v.venue.address = "Hillside";
+  const next = applyFixup(v, { venue: { name: "Corner Pies", address: "" }, dishes: [] });
+  assert.deepEqual(next.venue, { name: "Corner Pies", address: "Hillside" });
+  const written = { ...v, import_metadata: { location_from_text: true } };
+  assert.equal(applyFixup(written, { venue: { name: "Other" }, dishes: [] }).venue.name, "88 Main Street");
 });
 
 test("editorial action returns a headline and only keeps a pull quote copied from the notes", async () => {

@@ -134,3 +134,53 @@ test("a long journal signs its photos in a few batched requests, not one each", 
     globalThis.IntersectionObserver = previous.IntersectionObserver;
   }
 });
+
+test("a hashtag replaces Meal on the entry and opens the timeline of every entry with it", async () => {
+  const dom = new JSDOM(
+    '<!doctype html><html data-hub="life"><body><div id="food-journal-dashboard"></div></body></html>',
+    { url: "http://127.0.0.1/" },
+  );
+  const previous = { document: globalThis.document };
+  globalThis.document = dom.window.document;
+  const make = (title, date, tags, notes = "") => {
+    const visit = newVisit();
+    visit.title = title;
+    visit.date = date;
+    visit.venue = { name: "Cafe", address: "" };
+    visit.notes = notes;
+    visit.dishes = [{ ...newDish(), title, tags }];
+    return visit;
+  };
+  const journal = {
+    ...emptyJournal(),
+    visits: [
+      make("Smash", "2026-06-07", ["burger"], "Day out! #Burger"),
+      make("Double", "2026-05-01", ["Burger"]),
+      make("Margherita", "2026-04-01", ["pizza"]),
+    ],
+  };
+  const view = createFoodJournalView({
+    root: dom.window.document,
+    storage: { getItem: () => null, setItem() {}, removeItem() {} },
+    api: { load: async () => ({ journal, version: "v1" }), media: async () => ({ urls: {} }) },
+  });
+  const doc = dom.window.document;
+  try {
+    view.show();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    [...doc.querySelectorAll(".hub-pills__btn")].find((b) => b.textContent === "Timeline").click();
+    [...doc.querySelectorAll(".fj-stretch")].find((b) => b.textContent === "Smash").click();
+    const labels = [...doc.querySelectorAll(".fj-facts dt")].map((n) => n.textContent);
+    assert.ok(labels.includes("Tags"));
+    assert.ok(!labels.includes("Meal"));
+    assert.equal(doc.querySelector(".fj-prose").textContent.includes("#"), false);
+    assert.equal(doc.querySelector(".fj-facts .fj-tag")?.textContent, "#Burger");
+    doc.querySelector(".fj-facts .fj-tag").click();
+    assert.equal(doc.querySelector(".hub-search").value, "#burger");
+    const titles = [...doc.querySelectorAll(".fj-row__title")].map((n) => n.textContent);
+    assert.deepEqual(titles, ["Smash", "Double"]);
+  } finally {
+    view.reset();
+    globalThis.document = previous.document;
+  }
+});
