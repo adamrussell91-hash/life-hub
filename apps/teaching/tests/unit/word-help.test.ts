@@ -247,6 +247,7 @@ describe('teacher text tools', () => {
     });
     expect(ctx.tiptap.setHtml).not.toHaveBeenCalled();
     expect(dialog.querySelector('.text-tools-review__preview')?.innerHTML).toBe('<p>Just do it.</p>');
+    expect(dialog.querySelector('.text-tools-review__length')?.textContent).toBe('4 words → 3 words');
     [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Replace text')!.click();
     expect(ctx.tiptap.setHtml).toHaveBeenCalledWith('<p>Just do it.</p>', true);
     const undo = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Undo');
@@ -255,7 +256,7 @@ describe('teacher text tools', () => {
   });
 
   it('a declined Fry rewrite explains why and offers no replace', () => {
-    const dialog = openFryReview({ declined: true, reason: 'This is a procedure.' }, () => {});
+    const dialog = openFryReview({ declined: true, reason: 'This is a procedure.' }, '<p>Steps</p>', () => {});
     expect(dialog.textContent).toContain('This is a procedure.');
     expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Close']);
   });

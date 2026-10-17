@@ -153,7 +153,7 @@ export function createRichTextTools(options: {
     try {
       const result = await rewrite(before);
       say('');
-      openFryReview(result, () => {
+      openFryReview(result, before, () => {
         if (result.declined) return;
         const previous = tiptap.getHtml();
         tiptap.setHtml(result.html, true);
@@ -182,8 +182,13 @@ export function createRichTextTools(options: {
 }
 
 /** Preview before anything changes: Replace or Discard. A decline just explains. */
+function wordCount(html: string): number {
+  return plainText(html).split(/\s+/).filter(Boolean).length;
+}
+
 export function openFryReview(
   result: Awaited<ReturnType<typeof rewriteAsFryExplainer>>,
+  beforeHtml: string,
   onReplace: () => void
 ): HTMLDialogElement {
   const dialog = document.createElement('dialog');
@@ -199,6 +204,10 @@ export function openFryReview(
     reason.textContent = result.reason;
     body.append(reason);
   } else {
+    const length = document.createElement('p');
+    length.className = 'text-tools-review__length';
+    length.textContent = `${wordCount(beforeHtml)} words → ${wordCount(result.html)} words`;
+    body.append(length);
     const preview = document.createElement('div');
     preview.className = 'block-rich-text text-tools-review__preview';
     preview.innerHTML = sanitizeRichTextHtml(result.html);
