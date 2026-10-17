@@ -8,6 +8,7 @@ import {
   type LibraryNote,
   type LibraryTool
 } from '@/toolkit/library';
+import { analogyNoteFor } from '@/toolkit/analogy';
 
 export type ToolkitSkillBlock = Extract<Block, { block_type: 'toolkit_skill' }>;
 export type ToolkitToolBlock = Extract<Block, { block_type: 'toolkit_tool' }>;
@@ -607,6 +608,9 @@ export function libraryNoteFor(block: Block): TkTeacherNote | null {
       return conceptNote(block.content.game.kind);
     case 'thinking_reflection':
       return reflectionNote();
+    case 'fluid_analogy':
+    case 'analogy_types':
+      return analogyNoteFor(block);
     default:
       return null;
   }

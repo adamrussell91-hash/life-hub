@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import {
+  AnalogyTypesContentSchema,
   ConceptFeaturesContentSchema,
+  FluidAnalogyContentSchema,
   QuestionQuadrantContentSchema,
   TeacherNoteBlockContentSchema,
   ThinkingIntentionsContentSchema,
@@ -61,6 +63,8 @@ export const BlockTypeSchema = z.enum([
   'concept_features',
   'thinking_intentions',
   'thinking_reflection',
+  'fluid_analogy',
+  'analogy_types',
   'teacher_note'
 ]);
 
@@ -1131,6 +1135,9 @@ export const ThinkingReflectionBlockSchema = toolkitBlockSchema(
   ThinkingReflectionContentSchema
 );
 
+export const FluidAnalogyBlockSchema = toolkitBlockSchema('fluid_analogy', FluidAnalogyContentSchema);
+export const AnalogyTypesBlockSchema = toolkitBlockSchema('analogy_types', AnalogyTypesContentSchema);
+
 /** Always teacher-only: any stored visibility is read back as `teacher_only`. */
 export const TeacherNoteBlockSchema = z.object({
   id: z.string().min(1),
@@ -1183,6 +1190,8 @@ const leafBlockSchemas = [
   ConceptFeaturesBlockSchema,
   ThinkingIntentionsBlockSchema,
   ThinkingReflectionBlockSchema,
+  FluidAnalogyBlockSchema,
+  AnalogyTypesBlockSchema,
   TeacherNoteBlockSchema
 ] as const;
 

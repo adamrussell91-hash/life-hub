@@ -224,6 +224,45 @@ var ThinkingReflectionContentSchema = z3.object({
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
+var AnalogyTierSchema = z3.object({
+  task: z3.string().default(""),
+  steps: z3.array(TkStepSchema).max(6).default([]),
+  example: z3.string().default("")
+});
+var FluidAnalogyContentSchema = z3.object({
+  kind: z3.string().min(1),
+  label: z3.string(),
+  definition: z3.string(),
+  /** The text, character or idea students work with. */
+  focus: z3.string().default(""),
+  /** The level students start at. */
+  level: z3.number().int().min(1).max(3).default(1),
+  /** Students can step between levels themselves. */
+  student_choice: z3.boolean().default(true),
+  tiers: z3.array(AnalogyTierSchema).length(3),
+  show_check: z3.boolean().default(true),
+  checks: z3.array(z3.string()).max(8).default([]),
+  /** Show the prompt-card name for classes using the printed deck. */
+  show_card: z3.boolean().default(false),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
+var AnalogyTypesContentSchema = z3.object({
+  /** Student instruction shown at the top of the block. */
+  guide: z3.string().default(""),
+  focus: z3.string().default(""),
+  /** Types marked "This lesson". */
+  types: z3.array(z3.string().min(1)).max(7).default([]),
+  show_contrast: z3.boolean().default(true),
+  weak: z3.string().default(""),
+  strong: z3.string().default(""),
+  why: z3.string().default(""),
+  process: z3.array(z3.string()).max(8).default([]),
+  show_check: z3.boolean().default(true),
+  checks: z3.array(z3.string()).max(8).default([]),
+  teacher_note: TkTeacherNoteSchema.optional(),
+  teacher_jots: TkJotsSchema.optional()
+});
 var TeacherNoteBlockContentSchema = z3.object({
   title: z3.string().default("Teacher note"),
   html: z3.string().default("")
@@ -291,6 +330,8 @@ var BlockTypeSchema = z4.enum([
   "concept_features",
   "thinking_intentions",
   "thinking_reflection",
+  "fluid_analogy",
+  "analogy_types",
   "teacher_note"
 ]);
 var ColumnPresetSchema = z4.enum(["50-50", "33-67", "67-33", "33-33-33", "custom"]);
@@ -1227,6 +1268,8 @@ var ThinkingReflectionBlockSchema = toolkitBlockSchema(
   "thinking_reflection",
   ThinkingReflectionContentSchema
 );
+var FluidAnalogyBlockSchema = toolkitBlockSchema("fluid_analogy", FluidAnalogyContentSchema);
+var AnalogyTypesBlockSchema = toolkitBlockSchema("analogy_types", AnalogyTypesContentSchema);
 var TeacherNoteBlockSchema = z4.object({
   id: z4.string().min(1),
   type: z4.literal("block"),
@@ -1277,6 +1320,8 @@ var leafBlockSchemas = [
   ConceptFeaturesBlockSchema,
   ThinkingIntentionsBlockSchema,
   ThinkingReflectionBlockSchema,
+  FluidAnalogyBlockSchema,
+  AnalogyTypesBlockSchema,
   TeacherNoteBlockSchema
 ];
 var SpacerBlockSchema = z4.object({
@@ -1410,6 +1455,7 @@ var BlockSchema = z4.lazy(
 export {
   AccordionBlockSchema,
   AccordionItemSchema,
+  AnalogyTypesBlockSchema,
   AnnotationAnchorSchema,
   AnnotationAttachmentSchema,
   AnnotationBlockObjectSchema,
@@ -1471,6 +1517,7 @@ export {
   FlashcardItemSchema,
   FlashcardSourceSchema,
   FlashcardsBlockSchema,
+  FluidAnalogyBlockSchema,
   GalleryBlockSchema,
   GalleryItemSchema,
   GalleryLayoutSchema,
