@@ -173,12 +173,16 @@ export function chipFromEvent(event) {
               : null;
   const feedMeta = record.feed && record.location ? `${clockMeta(start, end)} · ${record.location}` : null;
   const peopleMeta = kind === 'professional' || kind === 'comm' ? withMeta(clockMeta(start, end), record) : null;
+  // One lesson over several slots: each chip says which part it is, not the title again.
+  const part = isClass && record.session_count > 1 ? `part ${record.session_index} of ${record.session_count}` : '';
   const classMeta = isClass
     ? record.period
-      ? `P${record.period} · ${record.focus || record.title || ''}`.trim()
-      : record.class_title && record.title && record.class_title !== record.title
+      ? part
+        ? `P${record.period} · ${part}`
+        : `P${record.period} · ${record.focus || record.title || ''}`.trim()
+      : [record.class_title && record.title && record.class_title !== record.title
         ? `${record.class_title} · ${clockMeta(start, end)}`
-        : record.class_title || clockMeta(start, end)
+        : record.class_title || clockMeta(start, end), part].filter(Boolean).join(' · ')
     : clockMeta(start, end);
   return {
     id: record.id || event.path,

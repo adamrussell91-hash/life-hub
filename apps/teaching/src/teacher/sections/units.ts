@@ -662,6 +662,8 @@ export function renderUnitPage(
       const meta = document.createElement('p');
       meta.className = 'lesson-list__meta';
       meta.textContent = lesson.published ? 'Published' : 'Draft';
+      const sessions = sessionsPerClass(curriculum.scheduled_lessons ?? [], lesson.id);
+      if (sessions > 1) meta.textContent += ` · taught over ${sessions} sessions`;
 
       info.append(title, meta);
 
@@ -702,6 +704,15 @@ export function renderUnitPage(
       disposed = true;
     }
   };
+}
+
+/** Most slots any one class spends on this lesson (a poem over Thursday and Friday = 2). */
+function sessionsPerClass(rows: Array<{ lesson_id: string; class_id: string }>, lessonId: string): number {
+  const byClass = new Map<string, number>();
+  for (const row of rows) {
+    if (row.lesson_id === lessonId) byClass.set(row.class_id, (byClass.get(row.class_id) ?? 0) + 1);
+  }
+  return Math.max(0, ...byClass.values());
 }
 
 async function saveUnitAsTemplate(unit: Unit): Promise<void> {
