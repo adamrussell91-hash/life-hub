@@ -259,12 +259,15 @@
 
 /* ---- student button ---------------------------------------------------- */
 
+/* A quiet text link tucked under the block's right edge: no pill, no border.
+   The 44px tap height stays, but it is invisible and pulled into the gap. */
 .word-help-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) calc(-1 * var(--space-3));
 }
 
 .word-help-bar__btn {
@@ -272,37 +275,48 @@
   align-items: center;
   gap: var(--space-1);
   min-height: 2.75rem;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-full);
-  background: var(--paper);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
   color: var(--muted);
+  opacity: 0.7;
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.word-help-bar__btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .word-help-bar__btn:hover,
 .word-help-bar__btn:focus-visible {
   color: var(--wave);
-  border-color: color-mix(in oklab, var(--wave) 40%, transparent);
+  opacity: 1;
+}
+
+.word-help-bar__btn:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: -2px;
+  border-radius: var(--radius-xs);
 }
 
 .word-help-bar__btn.is-on {
-  color: var(--pastel-blue-ink);
-  background: var(--pastel-blue);
-  border-color: transparent;
+  color: var(--wave);
+  opacity: 1;
 }
 
 .word-help-bar__btn:disabled {
   cursor: progress;
-  opacity: 0.7;
+  opacity: 0.5;
 }
 
 .word-help-bar__status {
+  order: -1;
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
