@@ -24,7 +24,7 @@ test('whole exchange: unique identities, no self review, private feedback, immut
   const store = storeFixture(); const activity = await call(store, { action: 'start' }, true);
   const students = ['0-0', '1-0', '2-0'].map((identity, i) => ({ identity, session: activity.session, token: String(i + 1).repeat(48) }));
   await Promise.all(students.map(s => call(store, { ...s, action: 'join', code: activity.code })));
-  await assert.rejects(call(store, { ...students[0], token: 'a'.repeat(48), action: 'join', code: activity.code }), /already taken/);
+  await assert.rejects(call(store, { ...students[0], token: 'a'.repeat(48), action: 'join', code: activity.code }), /took that symbol/);
   await assert.rejects(call(store, { ...students[0], action: 'join', code: 'wrong' }), /code/);
   const publicState = await call(store, {});
   assert.equal(publicState.taken.length, 3); assert.equal(publicState.code, undefined); assert.equal(publicState.rows, undefined);
@@ -32,14 +32,16 @@ test('whole exchange: unique identities, no self review, private feedback, immut
   await call(store, { ...students[0], action: 'submit', text: 'overwrite' });
   assert.equal((await call(store, students[0])).text, 'Writing 0');
   const review = await call(store, { action: 'review' }, true);
-  assert.equal(new Set(Object.values(review.assignments)).size, 3);
-  for (const [from, to] of Object.entries(review.assignments)) assert.notEqual(from, to);
+  assert.equal(review.assignments, undefined);
+  assert.equal(new Set(review.rows.map(r => r.reviewer)).size, 3);
+  for (const row of review.rows) { assert.ok(row.reviewer); assert.notEqual(row.reviewer, row.id); }
   for (const s of students) {
     const state = await call(store, s); assert.ok(state.assigned_text); assert.notEqual(state.assigned_text, state.text);
     await call(store, { ...s, action: 'feedback', strength: `Strength ${s.identity}`, suggestion: 'Add evidence' });
     assert.equal((await call(store, s)).received, null);
   }
-  await call(store, { action: 'results' }, true);
+  const returned = await call(store, { action: 'results' }, true);
+  for (const row of returned.rows) { assert.ok(row.gave); assert.equal(row.received.strength, `Strength ${row.reviewer}`); }
   for (const s of students) { const state = await call(store, s); assert.equal(state.received.suggestion, 'Add evidence'); assert.notEqual(state.received.strength, `Strength ${s.identity}`); }
   await call(store, { action: 'start' }, true);
   await assert.rejects(call(store, students[0]), /Join again/);
@@ -50,7 +52,7 @@ test('moderation excludes writing; late and excluded students cannot submit revi
   for (const s of students) { await call(store, { ...s, action: 'join', code: a.code }); await call(store, { ...s, action: 'submit', text: s.identity }); }
   await assert.rejects(call(store, { action: 'review', exclude: ['0-0', '1-0'] }, true), /at least two/);
   const review = await call(store, { action: 'review', exclude: ['2-0'] }, true);
-  assert.equal(review.assignments['2-0'], undefined);
+  assert.equal(review.rows.find(r => r.id === '2-0').included, false);
   await assert.rejects(call(store, { ...students[2], action: 'feedback', strength: 'x', suggestion: 'x' }), /no writing/);
   await assert.rejects(call(store, { ...students[0], action: 'submit', text: 'late' }), /ended/);
   store.data.delete('published/lessons/lesson1'); await assert.rejects(call(store, students[0]), /Publish/);
@@ -76,4 +78,15 @@ test('teacher production entry starts sessions only behind the operator session 
   const response = await createPeerFeedbackHandler(deps)(req());
   assert.equal(response.status, 200); assert.match((await response.json()).data.code, /^\d{6}$/);
   assert.equal((await createPeerFeedbackHandler({ ...deps, verifySessionToken: () => ({ valid: false }) })(req())).status, 401);
+});
+test('ending an activity closes it for everyone; students no longer see who has joined once writing ends', async () => {
+  const store = storeFixture(); const a = await call(store, { action: 'start' }, true);
+  const students = ['0-0', '1-0'].map((identity, i) => ({ identity, session: a.session, token: String(i + 1).repeat(48) }));
+  for (const s of students) { await call(store, { ...s, action: 'join', code: ` ${a.code} ` }); await call(store, { ...s, action: 'submit', text: s.identity }); }
+  assert.equal((await call(store, {})).taken.length, 2);
+  await call(store, { action: 'review' }, true);
+  assert.deepEqual((await call(store, {})).taken, []);
+  assert.equal((await call(store, { action: 'end' }, true)).phase, 'idle');
+  assert.equal((await call(store, students[0])).phase, 'idle');
+  assert.equal((await call(store, {}, true)).phase, 'idle');
 });
