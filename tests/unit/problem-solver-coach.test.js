@@ -74,6 +74,23 @@ test('scripted coach: asks the goal, fills the frame, then gatekeeps 5 Whys', as
   assert.equal(challenged.node.slot, 'problem');
 });
 
+test('scripted coach: a switch: answer suggests switching to Problem tree', async () => {
+  let s = createSession({ text: 'The rota keeps changing late.' }, deps);
+  s = applyCoachTurn(s, await scriptedCoach(s), deps);
+  for (const text of ['A rota fixed a full week ahead', 'It changed late three of four weeks', 'We can change the day it is published']) {
+    s = say(s, text, deps);
+    s = applyCoachTurn(s, await scriptedCoach(s), deps);
+  }
+  s = acceptSuggestion(s, deps);
+  s = applyCoachTurn(s, await scriptedCoach(s), deps);
+  s = say(s, 'switch: the causes branch in several directions', deps);
+  const turn = await scriptedCoach(s);
+  assert.equal(turn.node, null);
+  assert.deepEqual(turn.suggestion, { kind: 'switch_tool', tool: 'problem_tree', reason: 'the causes branch in several directions' });
+  s = acceptSuggestion(applyCoachTurn(s, turn, deps), deps);
+  assert.deepEqual(s.define.runs.map((run) => [run.tool, run.status]), [['five_whys', 'switched'], ['problem_tree', 'active']]);
+});
+
 test('an edge to an unplaced slot triggers repair instead of failing the turn', async () => {
   const bad = reply({ verdict: 'accept', node: { slot: 'problem', text: 'Rota changes late.' }, edges: [{ from: 'problem', to: 'why:1', kind: 'relates' }] });
   const replies = [bad, reply({ verdict: 'accept', node: { slot: 'problem', text: 'Rota changes late.' } })];

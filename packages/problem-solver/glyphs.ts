@@ -12,11 +12,21 @@ import metacognition from './glyphs/skills/metacognition.svg?raw';
 import reflective_thinking from './glyphs/skills/reflective_thinking.svg?raw';
 import searching from './glyphs/skills/searching.svg?raw';
 import synthesis from './glyphs/skills/synthesis.svg?raw';
+import concept_map from './glyphs/tools/concept_map.svg?raw';
+import five_whys from './glyphs/tools/five_whys.svg?raw';
+import gap_basic from './glyphs/tools/gap_basic.svg?raw';
+import gap_radar from './glyphs/tools/gap_radar.svg?raw';
+import problem_statement from './glyphs/tools/problem_statement.svg?raw';
+import problem_tree from './glyphs/tools/problem_tree.svg?raw';
+import smart from './glyphs/tools/smart.svg?raw';
+import type { PsToolId } from './types';
 
 const SOURCES: Record<string, string> = {
   abstract_thinking, analysis, creative_thinking, critical_thinking, decision_making, inference,
   learning, logical_reasoning, metacognition, reflective_thinking, searching, synthesis
 };
+
+const EMBLEMS: Record<PsToolId, string> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart };
 
 let copy = 0;
 
@@ -46,4 +56,13 @@ export function skillChip(id: string, { missing = false }: { missing?: boolean }
   chip.append(skillGlyph(id, doc), label);
   chip.title = SKILLS.find((skill) => skill.id === id)?.description ?? '';
   return chip;
+}
+
+/** The tool's emblem from the corner of its toolkit page, in book colours. */
+export function toolEmblem(id: PsToolId, doc: Document = document): HTMLSpanElement {
+  const span = doc.createElement('span');
+  span.className = 'ps-emblem';
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = EMBLEMS[id] ?? '';
+  return span;
 }
