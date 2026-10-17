@@ -120,6 +120,60 @@ describe('crowded margin notes', () => {
   });
 });
 
+describe('open note in the right-hand column', () => {
+  function rect(x: number, y: number, w: number, h: number): DOMRect {
+    return { x, y, left: x, top: y, width: w, height: h, right: x + w, bottom: y + h, toJSON: () => ({}) } as DOMRect;
+  }
+
+  function setup(style: 'fineliner' | 'highlighter') {
+    const host = document.createElement('div');
+    host.getBoundingClientRect = () => rect(0, 0, 1200, 600);
+    const marks = [10, 200, 220].map((y, i) => {
+      const el = document.createElement('button');
+      el.className = 'block-annotation__anchor';
+      el.getClientRects = () => [rect(20, y, 40, 18)] as unknown as DOMRectList;
+      el.getBoundingClientRect = () => rect(20, y, 40, 18);
+      host.append(el);
+      return {
+        annotationId: `a${i}`,
+        kind: 'word' as const,
+        colour: 'wave' as const,
+        el,
+        label: `Note ${i}`,
+        onOpen: () => undefined
+      };
+    });
+    marks[1]!.el.classList.add('is-open');
+    const panel = document.createElement('div');
+    panel.className = 'block-annotation__panel';
+    panel.dataset.annotationId = 'a1';
+    host.append(panel);
+    document.body.append(host);
+    return { host, marks, panel };
+  }
+
+  it('sits beside its line and pushes later notes below it, in line order', () => {
+    const { host, marks, panel } = setup('fineliner');
+    drawAnnotationInk(host, marks, { style: 'fineliner', activeId: 'a1' });
+    expect(panel.style.top).toBe('200px');
+    expect(panel.style.left).not.toBe('');
+    const labels = Array.from(host.querySelectorAll<HTMLElement>('.block-annotation__margin-note'));
+    // The open note replaces its own margin label.
+    expect(labels.map((n) => n.dataset.annotationId)).toEqual(['a0', 'a2']);
+    expect(parseFloat(labels[0]!.style.top)).toBe(10);
+    expect(parseFloat(labels[1]!.style.top)).toBeGreaterThan(200);
+    host.remove();
+  });
+
+  it('gets the column in highlighter style too, without margin labels', () => {
+    const { host, marks, panel } = setup('highlighter');
+    drawAnnotationInk(host, marks, { style: 'highlighter', activeId: 'a1' });
+    expect(panel.style.top).toBe('200px');
+    expect(host.querySelectorAll('.block-annotation__margin-note')).toHaveLength(0);
+    host.remove();
+  });
+});
+
 describe('ink style setting', () => {
   it('the view defaults to fineliner and honours highlighter', () => {
     const fine = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
