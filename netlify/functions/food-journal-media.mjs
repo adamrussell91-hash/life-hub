@@ -50,6 +50,33 @@ export function createFoodJournalMediaHandler(deps = {}) {
         });
         return okResponse(200, { id, key, url }, PRIVATE_CACHE);
       }
+      // One request signs a whole screen of photos, so a long timeline does
+      // not trip the rate limit one photo at a time.
+      if (
+        body?.action === "read" &&
+        Array.isArray(body.keys) &&
+        body.keys.length > 0 &&
+        body.keys.length <= 60 &&
+        body.keys.every(
+          (k) =>
+            typeof k === "string" && /^food\/photos\/[a-zA-Z0-9_-]+\.jpg$/.test(k),
+        )
+      ) {
+        const { journal } = await ctx.repo.getJournal();
+        const known = new Set(
+          readableJournal(journal).visits.flatMap((v) =>
+            v.dishes.flatMap((d) => d.photos.map((p) => p.key)),
+          ),
+        );
+        const urls = {};
+        for (const key of new Set(body.keys))
+          if (known.has(key))
+            urls[key] = await knowledgePresignGet(ctx.env, {
+              key,
+              signGet: deps.signGet,
+            });
+        return okResponse(200, { urls }, PRIVATE_CACHE);
+      }
       if (
         body?.action === "read" &&
         /^food\/photos\/[a-zA-Z0-9_-]+\.jpg$/.test(body.key)
