@@ -9,6 +9,7 @@ import {
   type LibraryTool
 } from '@/toolkit/library';
 import { analogyNoteFor } from '@/toolkit/analogy';
+import { analogyMoveNote } from '@/toolkit/analogy-moves';
 
 export type ToolkitSkillBlock = Extract<Block, { block_type: 'toolkit_skill' }>;
 export type ToolkitToolBlock = Extract<Block, { block_type: 'toolkit_tool' }>;
@@ -611,6 +612,14 @@ export function libraryNoteFor(block: Block): TkTeacherNote | null {
     case 'fluid_analogy':
     case 'analogy_types':
       return analogyNoteFor(block);
+    case 'analogy_close_reading':
+    case 'analogy_pattern':
+    case 'analogy_reverse':
+    case 'analogy_problem':
+    case 'analogy_metaphor':
+    case 'analogy_transfer':
+    case 'analogy_chains':
+      return analogyMoveNote(block.block_type);
     default:
       return null;
   }

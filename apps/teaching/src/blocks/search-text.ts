@@ -128,7 +128,14 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'thinking_intentions':
     case 'thinking_reflection':
     case 'fluid_analogy':
-    case 'analogy_types': {
+    case 'analogy_types':
+    case 'analogy_close_reading':
+    case 'analogy_pattern':
+    case 'analogy_reverse':
+    case 'analogy_problem':
+    case 'analogy_metaphor':
+    case 'analogy_transfer':
+    case 'analogy_chains': {
       // Never index teacher notes or class notes; search can reach student pages.
       const { teacher_note: _note, teacher_jots: _jots, ...studentContent } = c;
       walkStrings(studentContent, parts);
