@@ -151,4 +151,6 @@ When editing a hub, replace local logout/refresh chrome **and** the left rail wi
 
 ## Compliance
 
-Full cross-hub audit: `docs/design-kit-compliance.md`.
+Element inventory (17 October 2026, 05:02 UTC): `audits/2026-10-17-0502-ui-element-audit.md`.
+
+Earlier chrome scorecard (5 September 2026): `docs/design-kit-compliance.md`. That scorecard only covers shared chrome. Use the October audit to compare filters, menus, deletion, cards, motion, colour, and placement.
