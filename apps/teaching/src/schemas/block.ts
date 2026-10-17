@@ -31,6 +31,7 @@ export const BlockTypeSchema = z.enum([
   'attachment',
   'accordion',
   'table',
+  'peer_feedback',
   'question_set',
   'flashcards',
   'cloze',
@@ -399,6 +400,17 @@ export const QuestionItemSchema = z.object({
   kind: QuestionKindSchema,
   options: z.array(z.string()).optional(),
   response_space: ResponseSpaceSchema.optional()
+});
+
+export const PeerFeedbackBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('peer_feedback'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    prompt: z.string().max(4000),
+    strength_prompt: z.string().max(300).default('One thing that works well…'),
+    suggestion_prompt: z.string().max(300).default('One suggestion or question…')
+  }), ...blockLayout, ...blockTimestamps
 });
 
 export const QuestionSetBlockSchema = z.object({
@@ -1147,6 +1159,7 @@ const leafBlockSchemas = [
   AttachmentBlockSchema,
   AccordionBlockSchema,
   TableBlockSchema,
+  PeerFeedbackBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,

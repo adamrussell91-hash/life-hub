@@ -1,0 +1,19 @@
+.peer-feedback { display: grid; gap: var(--space-4); }
+.peer-feedback label { display: grid; gap: var(--space-2); font-weight: 500; margin-block: var(--space-3); }
+.peer-feedback textarea, .peer-feedback input:not([type=checkbox]) { width: 100%; box-sizing: border-box; padding: var(--space-3); font: inherit; color: inherit; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.peer-feedback textarea { resize: vertical; min-height: 6rem; }
+.peer-feedback__picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-2); }
+.peer-feedback .btn { min-height: 44px; white-space: normal; }
+.peer-feedback__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) 0 calc(var(--space-3) + env(safe-area-inset-bottom)); background: var(--paper); }
+.peer-feedback__writing { padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); margin-block: var(--space-3); }
+.peer-feedback__writing p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.peer-feedback__writing label { display: flex; align-items: center; min-height: 44px; }
+.peer-feedback__writing input[type=checkbox] { width: 24px; height: 24px; }
+@media (max-width: 720px) {
+  .peer-feedback textarea, .peer-feedback input:not([type=checkbox]) { font-size: var(--text-md); }
+  .peer-feedback__actions .btn { flex: 1; }
+}
+@media print { .peer-feedback__exchange { display: none; } }
+
+.peer-feedback__form { display: grid; grid-template-rows: minmax(0, 1fr) auto; max-height: 72dvh; overflow: hidden; }
+.peer-feedback__fields { overflow-y: auto; padding: var(--space-1); }
