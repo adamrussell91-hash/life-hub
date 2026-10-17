@@ -221,34 +221,40 @@ export const ThinkingReflectionContentSchema = z.object({
   teacher_jots: TkJotsSchema.optional()
 });
 
-/** Analogous Thinking: one of the seven levels of fluid analogising. */
-export const AnalogyLevelContentSchema = z.object({
-  level: z.string().min(1),
+/** One level of a fluid analogy type: the task, framed steps, an example. */
+export const AnalogyTierSchema = z.object({
+  task: z.string().default(''),
+  steps: z.array(TkStepSchema).max(6).default([]),
+  example: z.string().default('')
+});
+
+/** Fluid analogy: one of the seven types of analogy, at three levels. */
+export const FluidAnalogyContentSchema = z.object({
+  kind: z.string().min(1),
   label: z.string(),
   definition: z.string(),
-  /** Student instruction shown at the top of the block. */
-  guide: z.string().default(''),
   /** The text, character or idea students work with. */
   focus: z.string().default(''),
-  frame: z.string().default(''),
-  example: z.string().default(''),
-  helps: z.string().default(''),
+  /** The level students start at. */
+  level: z.number().int().min(1).max(3).default(1),
+  /** Students can step between levels themselves. */
+  student_choice: z.boolean().default(true),
+  tiers: z.array(AnalogyTierSchema).length(3),
   show_check: z.boolean().default(true),
   checks: z.array(z.string()).max(8).default([]),
-  show_next: z.boolean().default(true),
   /** Show the prompt-card name for classes using the printed deck. */
   show_card: z.boolean().default(false),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
 
-/** Analogous Thinking: all seven levels, the process and the check. */
-export const AnalogyLadderContentSchema = z.object({
+/** Analogy types: all seven, the three levels, the process and the check. */
+export const AnalogyTypesContentSchema = z.object({
   /** Student instruction shown at the top of the block. */
   guide: z.string().default(''),
   focus: z.string().default(''),
-  /** Levels marked "This lesson". */
-  levels: z.array(z.string().min(1)).max(7).default([]),
+  /** Types marked "This lesson". */
+  types: z.array(z.string().min(1)).max(7).default([]),
   show_contrast: z.boolean().default(true),
   weak: z.string().default(''),
   strong: z.string().default(''),
@@ -294,4 +300,4 @@ export const TOOLKIT_BLOCK_TYPES = [
 export type ToolkitBlockType = (typeof TOOLKIT_BLOCK_TYPES)[number];
 
 /** Analogous Thinking blocks: teacher note and class notes like the toolkit, no griffin. */
-export const ANALOGY_BLOCK_TYPES = ['analogy_ladder', 'analogy_level'] as const;
+export const ANALOGY_BLOCK_TYPES = ['analogy_types', 'fluid_analogy'] as const;

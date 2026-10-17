@@ -7,9 +7,10 @@ import type { Quadrant, StressVerdict, TkTeacherNote } from '@/schemas/toolkit';
 import {
   ANALOGY_INTRO,
   ANALOGY_LEVELS,
-  analogyLevel,
-  type AnalogyLadderBlock,
-  type AnalogyLevelBlock
+  ANALOGY_TYPES,
+  analogyType,
+  type AnalogyTypesBlock,
+  type FluidAnalogyBlock
 } from '@/toolkit/analogy';
 import { classLabel } from '@/toolkit/class-context';
 import {
@@ -51,8 +52,8 @@ type ToolkitBlock =
   | ConceptFeaturesBlock
   | ThinkingIntentionsBlock
   | ThinkingReflectionBlock
-  | AnalogyLevelBlock
-  | AnalogyLadderBlock
+  | FluidAnalogyBlock
+  | AnalogyTypesBlock
   | TeacherNoteBlock;
 
 // ─── Small DOM helpers ──────────────────────────────────────────────────────
@@ -1143,37 +1144,17 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
   return wrap;
 }
 
-// ─── Analogous Thinking ─────────────────────────────────────────────────────
+// ─── Fluid analogy ──────────────────────────────────────────────────────────
 
 /** Same eyebrow as the toolkit, without the griffin: not a Newington framework block. */
 function analogyEyebrow(text: string): HTMLElement {
   return el('p', 'tk-eyebrow an-eyebrow', text);
 }
 
-/** Seven rising steps; the current level and those below it are filled. */
-function levelSteps(current: number): HTMLElement {
-  const list = el('ol', 'an-steps');
-  list.setAttribute('aria-label', `Level ${current} of ${ANALOGY_LEVELS.length}`);
-  for (const level of ANALOGY_LEVELS) {
-    const step = el('li', 'an-steps__step', String(level.level));
-    step.title = `Level ${level.level}: ${level.label}`;
-    step.style.setProperty('--an-step', String(level.level));
-    if (level.level <= current) step.classList.add('is-reached');
-    if (level.level === current) step.setAttribute('aria-current', 'step');
-    list.append(step);
-  }
-  return list;
-}
-
-function analogyChecks(title: string, checks: string[]): HTMLElement | null {
-  const lines = checks.filter((line) => line.trim());
-  if (!lines.length) return null;
-  const box = el('div', 'an-check');
-  box.append(el('p', 'tk-subhead', title));
+function analogyCheckList(checks: string[]): HTMLElement {
   const list = el('ul', 'tk-checks an-checks');
-  for (const line of lines) list.append(el('li', undefined, line));
-  box.append(list);
-  return box;
+  for (const line of checks) if (line.trim()) list.append(el('li', undefined, line));
+  return list;
 }
 
 function analogyFocus(text: string): HTMLElement | null {
@@ -1183,59 +1164,120 @@ function analogyFocus(text: string): HTMLElement | null {
   return box;
 }
 
-function renderAnalogyLevel(block: AnalogyLevelBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
-  const c = block.content;
-  const level = analogyLevel(c.level);
-  const n = level?.level ?? 1;
-  const wrap = root(block.block_type);
-  const head = el('div', 'an-head');
-  head.append(analogyEyebrow(`Analogous Thinking · Level ${n} of ${ANALOGY_LEVELS.length}`), levelSteps(n));
-  wrap.append(head);
-
+function analogyCard(title: string, tag: string | undefined, definition: string, cardName: string | null): HTMLElement {
   const card = el('div', 'block-definition tk-card tk-card--analogy');
-  const title = el('p', 'tk-card__title', c.label.trim() || level?.label || 'Untitled');
-  if (level) title.append(el('span', 'an-tag', level.tag));
-  card.append(title);
-  if (c.definition.trim()) card.append(el('p', 'tk-card__definition', c.definition));
-  if (c.show_card && level) card.append(el('p', 'an-card-name', `Card ${n} · ${level.card}`));
-  wrap.append(card);
+  const heading = el('p', 'tk-card__title', title || 'Untitled');
+  if (tag) heading.append(el('span', 'an-tag', tag));
+  card.append(heading);
+  if (definition.trim()) card.append(el('p', 'tk-card__definition', definition));
+  if (cardName) card.append(el('p', 'an-card-name', cardName));
+  return card;
+}
 
-  appendIf(wrap, analogyFocus(c.focus), guideLine(c.guide));
-  if (c.frame.trim()) {
-    const sentence = el('p', 'tk-sentence');
-    sentence.append(el('span', 'tk-sentence__label', 'Sentence starter'), document.createTextNode(c.frame));
-    wrap.append(sentence);
+function levelName(level: number): string {
+  return ANALOGY_LEVELS[level - 1]?.name ?? '';
+}
+
+/** One level: the task, the framed steps, the example behind a reveal. */
+function tierPanel(
+  block: FluidAnalogyBlock,
+  tier: FluidAnalogyBlock['content']['tiers'][number],
+  level: number,
+  mode: TkRenderMode,
+  ctx: TkRenderContext
+): HTMLElement {
+  const panel = el('div', 'an-tier');
+  panel.dataset.level = String(level);
+  appendIf(panel, guideLine(tier.task));
+  const steps = tier.steps.filter((step) => step.title.trim() || step.prompt.trim());
+  if (steps.length) {
+    const list = el('ol', 'an-steps');
+    for (const step of steps) {
+      const item = el('li', 'an-step');
+      if (step.title.trim()) item.append(el('span', 'an-step__title', step.title.trim()));
+      if (step.prompt.trim()) item.append(el('span', 'an-step__frame', step.prompt.trim()));
+      list.append(item);
+    }
+    panel.append(list);
   }
-  if (c.example.trim()) {
-    appendIf(wrap, reveal({ ctx, mode, blockId: block.id, part: 'example', label: 'An example', body: c.example }));
+  if (tier.example.trim()) {
+    appendIf(panel, reveal({ ctx, mode, blockId: block.id, part: `example-${level}`, label: 'An example', body: tier.example }));
   }
-  if (c.helps.trim()) {
-    const helps = el('p', 'an-helps');
-    helps.append(el('strong', undefined, 'This helps you '), document.createTextNode(c.helps.trim()));
-    wrap.append(helps);
+  return panel;
+}
+
+function renderFluidAnalogy(block: FluidAnalogyBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
+  const c = block.content;
+  const type = analogyType(c.kind);
+  const wrap = root(block.block_type);
+  wrap.append(
+    analogyEyebrow(type ? `Fluid analogy · Type ${type.order} of ${ANALOGY_TYPES.length}` : 'Fluid analogy'),
+    analogyCard(
+      c.label.trim() || type?.label || '',
+      type?.tag,
+      c.definition,
+      c.show_card && type ? `Card ${type.order} · ${type.card}` : null
+    )
+  );
+  appendIf(wrap, analogyFocus(c.focus));
+
+  const choose = c.student_choice && mode !== 'print';
+  const key = activityKey(ctx, block.id, 'level');
+  const saved = choose ? loadActivityState<{ level?: unknown }>(key)?.level : undefined;
+  let current = typeof saved === 'number' && saved >= 1 && saved <= 3 ? saved : c.level;
+
+  if (!choose) {
+    wrap.append(el('p', 'an-level-badge', `Level ${c.level} · ${levelName(c.level)}`));
+    wrap.append(tierPanel(block, c.tiers[c.level - 1]!, c.level, mode, ctx));
+  } else {
+    const switcher = el('div', 'an-levels');
+    switcher.setAttribute('role', 'group');
+    switcher.setAttribute('aria-label', 'Level');
+    const buttons: HTMLButtonElement[] = [];
+    const panels = c.tiers.map((tier, index) => tierPanel(block, tier, index + 1, mode, ctx));
+    const paint = () => {
+      buttons.forEach((button, index) => button.setAttribute('aria-pressed', index + 1 === current ? 'true' : 'false'));
+      panels.forEach((panel, index) => {
+        panel.hidden = index + 1 !== current;
+      });
+    };
+    ANALOGY_LEVELS.forEach(({ level, name }) => {
+      const button = el('button', 'an-levels__btn');
+      button.type = 'button';
+      button.append(el('span', 'an-levels__num', `Level ${level}`), el('span', 'an-levels__name', name));
+      button.addEventListener('click', () => {
+        current = level;
+        saveActivityState(key, { level });
+        paint();
+      });
+      buttons.push(button);
+      switcher.append(button);
+    });
+    wrap.append(switcher, ...panels);
+    paint();
   }
-  if (c.show_check) appendIf(wrap, analogyChecks('Check your analogy', c.checks));
-  const next = level ? ANALOGY_LEVELS[level.level] : undefined;
-  if (c.show_next && next) {
-    const line = el('p', 'an-next');
-    line.append(
-      el('span', 'an-next__label', 'Ready for more?'),
-      el('strong', undefined, `Level ${next.level}: ${next.label}. `),
-      document.createTextNode(next.definition)
-    );
-    wrap.append(line);
+
+  const checks = c.checks.filter((line) => line.trim());
+  if (c.show_check && checks.length) {
+    if (mode === 'print') {
+      const box = el('div', 'an-check');
+      box.append(el('p', 'tk-subhead', 'Check your analogy'), analogyCheckList(checks));
+      wrap.append(box);
+    } else {
+      appendIf(
+        wrap,
+        reveal({ ctx, mode, blockId: block.id, part: 'check', label: 'Check your analogy', fixedLabel: true, body: () => analogyCheckList(checks) })
+      );
+    }
   }
   if (mode === 'teacher') wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots));
   return wrap;
 }
 
-function renderAnalogyLadder(block: AnalogyLadderBlock, mode: TkRenderMode): HTMLElement {
+function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLElement {
   const c = block.content;
   const wrap = root(block.block_type);
-  wrap.append(analogyEyebrow('Analogous Thinking · Seven levels'));
-  const card = el('div', 'block-definition tk-card tk-card--analogy');
-  card.append(el('p', 'tk-card__title', ANALOGY_INTRO.title), el('p', 'tk-card__definition', ANALOGY_INTRO.body));
-  wrap.append(card);
+  wrap.append(analogyEyebrow('Fluid analogy · Seven types'), analogyCard(ANALOGY_INTRO.title, undefined, ANALOGY_INTRO.body, null));
   appendIf(wrap, analogyFocus(c.focus), guideLine(c.guide));
 
   if (c.show_contrast && (c.weak.trim() || c.strong.trim())) {
@@ -1253,35 +1295,46 @@ function renderAnalogyLadder(block: AnalogyLadderBlock, mode: TkRenderMode): HTM
     if (c.why.trim()) wrap.append(el('p', 'an-contrast__why', c.why));
   }
 
-  const chosen = new Set(c.levels);
-  const ladder = el('ol', 'an-ladder');
-  ladder.setAttribute('aria-label', 'The seven levels of analogy');
-  for (const level of ANALOGY_LEVELS) {
-    const rung = el('li', 'an-ladder__rung');
-    rung.style.setProperty('--an-step', String(level.level));
-    if (chosen.has(level.id)) rung.classList.add('is-chosen');
-    const head = el('p', 'an-ladder__head');
-    head.append(
-      el('span', 'an-ladder__num', String(level.level)),
-      el('span', 'an-ladder__name', level.label),
-      el('span', 'an-tag', level.tag)
-    );
-    if (chosen.has(level.id)) head.append(el('span', 'an-ladder__chosen', 'This lesson'));
-    rung.append(head, el('p', 'an-ladder__text', level.definition));
-    ladder.append(rung);
+  const chosen = new Set(c.types);
+  const list = el('ol', 'an-types');
+  list.setAttribute('aria-label', 'The seven types of analogy');
+  for (const type of ANALOGY_TYPES) {
+    const item = el('li', 'an-types__item');
+    if (chosen.has(type.id)) item.classList.add('is-chosen');
+    const head = el('p', 'an-types__head');
+    head.append(el('span', 'an-types__num', String(type.order)), el('span', 'an-types__name', type.label), el('span', 'an-tag', type.tag));
+    if (chosen.has(type.id)) head.append(el('span', 'an-types__chosen', 'This lesson'));
+    item.append(head, el('p', 'an-types__text', type.definition));
+    list.append(item);
   }
-  wrap.append(ladder);
+  wrap.append(list);
+
+  const levels = el('div', 'an-tiers-box');
+  levels.append(el('p', 'tk-subhead', 'Every type has three levels'));
+  const tiers = el('ol', 'an-tiers');
+  for (const { level, name, summary } of ANALOGY_LEVELS) {
+    const item = el('li', 'an-tiers__item');
+    item.append(el('span', 'an-tiers__num', `Level ${level}`), el('strong', 'an-tiers__name', name), el('span', 'an-tiers__text', summary));
+    tiers.append(item);
+  }
+  levels.append(tiers);
+  wrap.append(levels);
 
   const steps = c.process.filter((line) => line.trim());
   if (steps.length) {
     const box = el('div', 'an-process-box');
     box.append(el('p', 'tk-subhead', 'A simple process you can use'));
-    const list = el('ol', 'an-process');
-    for (const line of steps) list.append(el('li', undefined, line));
-    box.append(list);
+    const process = el('ol', 'an-process');
+    for (const line of steps) process.append(el('li', undefined, line));
+    box.append(process);
     wrap.append(box);
   }
-  if (c.show_check) appendIf(wrap, analogyChecks('How to check your analogy', c.checks));
+  const checks = c.checks.filter((line) => line.trim());
+  if (c.show_check && checks.length) {
+    const box = el('div', 'an-check');
+    box.append(el('p', 'tk-subhead', 'How to check your analogy'), analogyCheckList(checks));
+    wrap.append(box);
+  }
   if (mode === 'teacher') wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots));
   return wrap;
 }
@@ -1324,10 +1377,10 @@ export function renderToolkitContent(block: Block, mode: TkRenderMode, ctx: TkRe
       return renderIntentions(b, mode);
     case 'thinking_reflection':
       return renderReflection(b, mode, ctx);
-    case 'analogy_level':
-      return renderAnalogyLevel(b, mode, ctx);
-    case 'analogy_ladder':
-      return renderAnalogyLadder(b, mode);
+    case 'fluid_analogy':
+      return renderFluidAnalogy(b, mode, ctx);
+    case 'analogy_types':
+      return renderAnalogyTypes(b, mode);
     case 'teacher_note':
       return renderTeacherNoteBlock(b, mode);
     default:

@@ -106,8 +106,8 @@ const TOOLKIT_TEACHER_FIELD_TYPES = new Set([
   'question_quadrant',
   'concept_features',
   'thinking_reflection',
-  'analogy_level',
-  'analogy_ladder'
+  'fluid_analogy',
+  'analogy_types'
 ]);
 
 function filterBlocksForStudentInner(blocks, teacherOnlyIds) {

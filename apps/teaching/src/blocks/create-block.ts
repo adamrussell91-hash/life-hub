@@ -1,6 +1,6 @@
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider } from '@/schemas/block';
-import { analogyLadderContent, analogyLevelContent } from '@/toolkit/analogy';
+import { analogyTypesContent, fluidAnalogyContent } from '@/toolkit/analogy';
 import {
   conceptContent,
   intentionsContent,
@@ -63,8 +63,8 @@ export const NEW_BLOCK_TYPES = [
   'concept_features',
   'thinking_intentions',
   'thinking_reflection',
-  'analogy_ladder',
-  'analogy_level'
+  'analogy_types',
+  'fluid_analogy'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -116,8 +116,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   concept_features: 'Features of a Concept',
   thinking_intentions: 'Thinking intentions',
   thinking_reflection: 'Thinking reflection',
-  analogy_ladder: 'Analogy ladder',
-  analogy_level: 'Analogy level'
+  analogy_types: 'Analogy types',
+  fluid_analogy: 'Fluid analogy'
 };
 
 export const EMBED_INSERT_PRESETS = [
@@ -190,7 +190,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Analogous Thinking',
-    types: ['analogy_ladder', 'analogy_level']
+    types: ['analogy_types', 'fluid_analogy']
   },
   {
     label: 'Learning',
@@ -226,8 +226,8 @@ const TOOLKIT_GROUP_TYPES = [
   'question_quadrant',
   'concept_features',
   'thinking_reflection',
-  'analogy_ladder',
-  'analogy_level'
+  'analogy_types',
+  'fluid_analogy'
 ];
 
 const HOMEPAGE_EXCLUDED = new Set([
@@ -391,19 +391,19 @@ export function createBlock(type: NewBlockType, id: string): Block {
         variant: 'medium',
         content: reflectionContent()
       };
-    case 'analogy_level':
+    case 'fluid_analogy':
       return {
         ...shared,
-        block_type: 'analogy_level',
+        block_type: 'fluid_analogy',
         variant: 'medium',
-        content: analogyLevelContent('analogy:close_reading')
+        content: fluidAnalogyContent('analogy:close_reading', id)
       };
-    case 'analogy_ladder':
+    case 'analogy_types':
       return {
         ...shared,
-        block_type: 'analogy_ladder',
+        block_type: 'analogy_types',
         variant: 'medium',
-        content: analogyLadderContent()
+        content: analogyTypesContent()
       };
     case 'rich_text':
       return { ...shared, block_type: 'rich_text', variant: 'medium', content: { html: '' } };

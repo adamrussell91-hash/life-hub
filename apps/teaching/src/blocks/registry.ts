@@ -86,8 +86,8 @@ import {
 } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 import {
-  createAnalogyLadderEditor,
-  createAnalogyLevelEditor,
+  createAnalogyTypesEditor,
+  createFluidAnalogyEditor,
   createConceptFeaturesEditor,
   createQuestionQuadrantEditor,
   createTeacherNoteBlockEditor,
@@ -279,8 +279,8 @@ export const blockRegistry: {
     render: (block, mode) => renderBlock(block, mode),
     createEditor: createThinkingReflectionEditor
   },
-  analogy_level: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyLevelEditor },
-  analogy_ladder: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyLadderEditor },
+  fluid_analogy: { render: (block, mode) => renderBlock(block, mode), createEditor: createFluidAnalogyEditor },
+  analogy_types: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyTypesEditor },
   teacher_note: { render: (block, mode) => renderBlock(block, mode), createEditor: createTeacherNoteBlockEditor }
 };
 
