@@ -51,7 +51,6 @@ import { createSkincareApi } from './skincare-api.js';
 import { createKnowledgeApi } from './knowledge-api.js';
 import { createTasksApi } from './tasks-api.js';
 import { createScheduleApi } from './schedule-api.js';
-import { renderFutureMap, loadFutureMapTrips } from './render-future-map.js';
 import { createPropertyApi } from './property-api.js';
 import { createPropertyView } from './render-property.js';
 import { createGarageHomeApi } from './garage-home-api.js';
@@ -231,8 +230,6 @@ controller = createAppController({
   knowledgeApi,
   tasksApi,
   scheduleApi,
-  renderFutureMap,
-  loadFutureMapTrips,
   foodJournalView,
   garageHomeView,
   skincareController,
@@ -281,7 +278,7 @@ document.addEventListener('keydown', (event) => {
     placeholder: 'Jump in Life Hub',
     groups: [{
       heading: 'Go to',
-      items: ['home', 'chat', 'food-journal', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'future-map', 'management'].map((id) => ({
+      items: ['home', 'chat', 'food-journal', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'management'].map((id) => ({
         id,
         label: id.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
         onSelect: () => document.querySelector(`[data-section="${id}"]`)?.click()
