@@ -10,6 +10,7 @@ import { knowledgeHubPageUrl } from '@/alchemy/connections';
 import { knowledgeHubOrigin } from '@/alchemy/client';
 import { applyAlchemyProposal, blockRevision, canonical, contextSnapshot, type AlchemyEntity, type AlchemyProposal, type AlchemyResult } from './block-revision';
 import { PassiveScheduler } from './passive-scheduler';
+import { awaitAlchemyJob, ALCHEMY_WAIT_MS } from './jobs';
 export {createAlchemyButton} from './block-button';
 
 type Options={host:HTMLElement;kind:'lesson'|'unit';id:string;unit?:AlchemyEntity;getEntity:()=>AlchemyEntity;flush:()=>Promise<void>;apply:(next:AlchemyEntity)=>Promise<void>;request?:(body:unknown,signal:AbortSignal)=>Promise<AlchemyResult>;checkContext?:(proposal:AlchemyProposal)=>Promise<boolean>};
@@ -21,7 +22,7 @@ export function mountBlockAssistant(options:Options) {
   const lifecycle=new AbortController();
   let unitRevision=options.unit?canonical(contextSnapshot(options.unit)):'';
   const proposals=new Map<string,AlchemyProposal>(), localContexts=new Map<string,string>();
-  const request=options.request??((body,signal)=>apiPost<AlchemyResult>('/api/alchemy-blocks',body,{signal}));
+  const request=options.request??(async(body,signal)=>awaitAlchemyJob(await apiPost<AlchemyResult>('/api/alchemy-blocks',body,{signal}),signal));
   const entityRevision=()=>canonical(contextSnapshot(options.getEntity()))+'|'+unitRevision;
   // A row's suggestion can land on any block inside it (one question in a tabbed set).
   function rowIds(rowId:string):Set<string>{
@@ -49,7 +50,7 @@ export function mountBlockAssistant(options:Options) {
   }
   async function analyze(ids:string[],mode:'passive'|'manual',instruction='',previous?:AlchemyProposal):Promise<AlchemyResult>{
     if(busy)throw new Error('Ann is already checking a block. Try again shortly.');
-    busy=true;abort=new AbortController();const currentAbort=abort;const timeout=setTimeout(()=>currentAbort.abort(),23000);
+    busy=true;abort=new AbortController();const currentAbort=abort;const timeout=setTimeout(()=>currentAbort.abort(),ALCHEMY_WAIT_MS);
     try {
       await options.flush();if(disposed)throw new Error('Editor closed.');
       const original=entityRevision();
@@ -89,7 +90,7 @@ export function mountBlockAssistant(options:Options) {
     const body=document.createElement('div');body.className='alchemy-review__body';body.setAttribute('aria-live','polite');
     const actions=document.createElement('div');actions.className='alchemy-review__actions';
     const accept=document.createElement('button');accept.type='button';accept.className='btn btn--primary alchemy-review__accept';accept.textContent='Apply suggestion';accept.hidden=true;
-    const discard=document.createElement('button');discard.type='button';discard.className='btn btn--ghost';discard.textContent='Discard';
+    const discard=document.createElement('button');discard.type='button';discard.className='btn btn--ghost';discard.textContent='Discard';discard.hidden=true;
     const hide=document.createElement('button');hide.type='button';hide.className='btn btn--ghost';hide.textContent='Close';
     const form=document.createElement('form');form.className='alchemy-review__composer';
     const input=document.createElement('textarea');input.placeholder='Keep this, change this, leave this part out…';input.setAttribute('aria-label','Discuss this block with Ann');input.maxLength=2000;
@@ -100,18 +101,18 @@ export function mountBlockAssistant(options:Options) {
     function setWorking(value:boolean){working=value;send.disabled=value;accept.disabled=value;}
     function paintProposal(){
       body.replaceChildren();for(const turn of conversation){const text=document.createElement('p');text.textContent=(turn.role==='user'?'You: ':'Ann: ')+turn.text;body.append(text);}
-      accept.hidden=!current;
+      accept.hidden=!current;discard.hidden=!current;
       if(!current){const empty=document.createElement('p');empty.textContent='Ann has no change to suggest for this block. Tell her what you want below.';body.append(empty);return;}
       const rationale=document.createElement('p');rationale.className='alchemy-review__rationale';rationale.textContent=current.rationale;body.append(rationale);
       const preview=document.createElement('div');preview.className='alchemy-review__preview';preview.append(renderBlock(current.replacement,'student'));body.append(preview);
       for(const source of current.sources){const link=document.createElement('a');link.href=knowledgeHubPageUrl(knowledgeHubOrigin(),source.id);link.target='_blank';link.rel='noopener noreferrer';link.textContent=source.title;body.append(link);const excerpt=document.createElement('p');excerpt.textContent=source.excerpt;body.append(excerpt);}
     }
     async function ask(instruction=''){
-      setWorking(true);error.textContent='';if(!current)body.textContent='Ann is checking the block and its context…';
+      setWorking(true);error.textContent='';if(!current)body.textContent='Ann is reading the block, its lesson and unit, and your unit notes…';
       try {if(entityRevision()!==startContext)throw new Error('The lesson or unit changed. Close this review and ask Ann again.');
         const previous=current;const result=await analyze([blockId],'manual',conversation.map(t=>t.role+': '+t.text).join('\n').slice(-1800)||instruction,previous);
         if(dialog!==review)return;const ids=rowIds(blockId);current=result.proposals.find(p=>ids.has(p.blockId));paintProposal();scheduler.suppress([blockId]);
-      }catch(e){error.textContent=e instanceof Error?e.message:'Ann could not finish this check.';}finally{setWorking(false);}
+      }catch(e){if(!current)body.replaceChildren();error.textContent=e instanceof Error&&e.name!=='AbortError'?e.message:'Ann could not finish this check. Try again.';}finally{setWorking(false);}
     }
     form.addEventListener('submit',event=>{event.preventDefault();if(working||!input.value.trim())return;conversation.push({role:'user',text:input.value.trim()});input.value='';void ask();});
     accept.addEventListener('click',()=>{if(!current||working)return;void(async()=>{
