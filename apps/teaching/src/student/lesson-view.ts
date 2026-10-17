@@ -2,6 +2,7 @@ import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
+import { mountStudentQuiz } from '@/quiz/student-quiz';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { scheduleNeighbors } from '@/schedule/schedule-neighbors';
 import { formatStudentDate } from '@/student/format';
@@ -71,7 +72,7 @@ function renderPublishedLesson(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
@@ -101,7 +102,10 @@ function renderPublishedLesson(
   const openNoteId = readNoteHash();
   const blocks = document.createElement('div');
   blocks.className = 'lesson-blocks';
+  // A quiz lesson shows its other blocks as an introduction, then the quiz itself.
+  const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
   for (const block of lesson.blocks) {
+    if (isQuiz && block.block_type === 'quiz_question') continue;
     blocks.append(
       renderBlock(block, 'student', {
         lessonId: lesson.lesson_id,
@@ -117,6 +121,7 @@ function renderPublishedLesson(
     feedbackOff: lesson.feedback_off === true
   });
   content.append(blocks);
+  if (isQuiz) content.append(mountStudentQuiz(lesson));
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {
     const url = new URL(window.location.href);

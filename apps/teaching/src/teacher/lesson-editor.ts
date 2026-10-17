@@ -242,6 +242,11 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         delete lesson.outcome_ids;
       }
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
+      if (next.quiz) {
+        lesson.quiz = next.quiz;
+      } else {
+        delete lesson.quiz;
+      }
     }
 
     function bumpDraftClock(): void {

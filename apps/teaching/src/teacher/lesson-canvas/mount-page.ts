@@ -50,6 +50,7 @@ import {
 import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
 import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 import { createTeacherClassExamples } from '@/class-examples/teacher';
+import { mountQuizPanel, type QuizPanelHandle } from '@/quiz/teacher-panel';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -113,6 +114,29 @@ export type LessonPageHandle = {
   revealPublishBlock(blockId: string, errorIds?: string[]): void;
   dispose(): void;
 };
+
+function removeBlockFromTree(blocks: Block[], id: string): Block[] {
+  return blocks
+    .filter((block) => block.id !== id)
+    .map((block) => {
+      if (block.block_type === 'section') {
+        return { ...block, content: { ...block.content, blocks: removeBlockFromTree(block.content.blocks as Block[], id) } } as Block;
+      }
+      if (block.block_type === 'columns') {
+        return {
+          ...block,
+          content: { ...block.content, columns: block.content.columns.map((c) => ({ ...c, blocks: removeBlockFromTree(c.blocks as Block[], id) })) }
+        } as Block;
+      }
+      if (block.block_type === 'tabs') {
+        return {
+          ...block,
+          content: { ...block.content, tabs: block.content.tabs.map((t) => ({ ...t, blocks: removeBlockFromTree(t.blocks as Block[], id) })) }
+        } as Block;
+      }
+      return block;
+    });
+}
 
 function replaceBlockInTree(blocks: Block[], updated: Block): Block[] {
   return blocks.map((block) => {
@@ -915,14 +939,45 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   modeSelect.addEventListener('change', () => {
     const pedagogical_mode = modeSelect.value as PedagogicalMode;
     emitLesson({ ...lesson, pedagogical_mode });
+    syncQuizPanel();
   });
   metaRow.append(modeSelect);
 
   const canvasHost = document.createElement('div');
   canvasHost.className = 'lesson-page__canvas';
 
+  // A lesson set to Quiz gets its quiz panel: questions from students, settings, results and live.
+  const quizHost = document.createElement('div');
+  quizHost.className = 'lesson-page__quiz';
+  let quizPanel: QuizPanelHandle | null = null;
+  function syncQuizPanel(): void {
+    const isQuiz = resolvePedagogicalMode(lesson.pedagogical_mode) === 'quiz';
+    if (isQuiz && !quizPanel) {
+      quizPanel = mountQuizPanel({
+        getLesson: () => lesson,
+        idFactory: options.idFactory,
+        onSettings: (quiz) => emitLesson({ ...lesson, quiz }),
+        onAddBlocks: (added) => {
+          const blocks = [...lesson.blocks, ...added];
+          emitLesson({ ...lesson, blocks });
+          canvas.update(blocks, media);
+        },
+        onRemoveBlock: (blockId) => {
+          const blocks = removeBlockFromTree(lesson.blocks, blockId);
+          emitLesson({ ...lesson, blocks });
+          canvas.update(blocks, media);
+        }
+      });
+      quizHost.append(quizPanel.root);
+    } else if (!isQuiz && quizPanel) {
+      quizPanel.dispose();
+      quizPanel = null;
+    }
+    quizHost.hidden = !isQuiz;
+  }
+
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, canvasHost);
+  root.append(coverHost, metaRow, quizHost, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -960,6 +1015,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       })
   });
 
+  syncQuizPanel();
+
   const stripHost = document.createElement('div');
   stripHost.className = 'lesson-page__meta-outcomes';
   metaRow.append(stripHost);
@@ -991,6 +1048,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
+      syncQuizPanel();
+      quizPanel?.update(lesson);
       banner.update({
         cover: lesson.cover ?? null,
         title: lesson.title,
@@ -1006,6 +1065,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {
+      quizPanel?.dispose();
       classExamples.dispose();
       pulse.dispose();
       canvas.dispose();

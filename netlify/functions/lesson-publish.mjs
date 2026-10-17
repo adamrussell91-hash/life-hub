@@ -19,6 +19,7 @@ import {
 } from './_shared/whiteboard-blobs.mjs';
 import { attachedOutcomeIds, filterBlocksForStudent, sanitizeBlocksDeep } from './_shared/teaching-student.mjs';
 import { materialiseLinkedCompositions } from './_shared/composition-blocks.mjs';
+import { prepareQuizPublish, storeQuizKey } from './_shared/quiz.mjs';
 
 export const config = { path: '/api/lessons/:id/publish' };
 
@@ -134,8 +135,8 @@ export function createLessonPublishHandler(deps = {}) {
 
     let studentBlocks;
     try {
-      const resolved = await materialiseLinkedCompositions(filterBlocksForStudent(draft.blocks), store, id);
-      studentBlocks = filterBlocksForStudent(resolved);
+      const resolved = await materialiseLinkedCompositions(filterBlocksForStudent(draft.blocks, { keepQuizQuestions: true }), store, id);
+      studentBlocks = filterBlocksForStudent(resolved, { keepQuizQuestions: true });
     } catch (error) {
       return withCors(errorResponse(
         error.status === 400 ? 400 : 503,
@@ -187,6 +188,18 @@ export function createLessonPublishHandler(deps = {}) {
       }
     }
 
+    // Quiz answers are split off here and stored apart; students only get the questions.
+    const quizPublish = prepareQuizPublish(draft, publishBlocks);
+    if (quizPublish.problems.length > 0) {
+      return withCors(
+        errorResponse(400, 'validation_error', `A quiz question isn’t finished: ${quizPublish.problems[0]}`, false),
+        request,
+        env
+      );
+    }
+    publishBlocks = quizPublish.blocks;
+    if (quizPublish.quiz) await storeQuizKey(store, id, quizPublish.quiz);
+
     const snapshot = {
       lesson_id: id,
       title,
@@ -196,7 +209,8 @@ export function createLessonPublishHandler(deps = {}) {
       schema_version: 1,
       ...(draft.cover ? { cover: draft.cover } : {}),
       ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
-      ...(draft.feedback_off === true ? { feedback_off: true } : {})
+      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {})
     };
 
     await setJSON(store, publishedLessonKey(id), snapshot);

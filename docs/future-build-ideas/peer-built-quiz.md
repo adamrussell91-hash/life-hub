@@ -2,7 +2,7 @@
 
 Break out of the "every page is a plain lesson" box. A lesson in a unit can be set to **Quiz**. Through the week, a special **Question drop** block in ordinary lessons asks students to write a question (short answer, multiple choice, and so on, with a mark value). Each submission feeds into the quiz lesson the block points at. Adam reviews, edits and approves the pool in the teacher view, and the approved questions become the weekly review quiz. Because it is a quiz, it gets real quiz features: timers, hints and the like.
 
-It is a concept doc, not a build brief. Nothing builds from it until Adam names a slice.
+**Status: built (17 October 2026).** Adam asked for the whole thing. Everything below shipped, including every question type, timers, hints, attempts, held results, confidence, teacher marking and live mode. Code: `apps/teaching/src/quiz/`, `apps/teaching/src/blocks/question-drop.ts`, `apps/teaching/src/blocks/quiz-question.ts`, `netlify/functions/_shared/quiz.mjs`, `netlify/functions/_shared/question-drop.mjs`.
 
 ## Adam's asks
 
@@ -117,3 +117,4 @@ Quiz lesson kind + Question drop block with the **Feeds into** drop-down + teach
 - **2026-10-17:** Created from Adam's idea: quiz lesson kind, question drop block feeding a weekly review, teacher approval tray, quiz features menu.
 - **2026-10-17:** Recorded decisions (no author credit, per-block target from a quiz-only drop-down). Added the question types section in three tiers and widened the first slice.
 - **2026-10-17:** Corrected the claim that lessons have no type: twelve label-only types already exist. Quiz becomes the thirteenth, and the first that changes behaviour.
+- **2026-10-17:** Built in full. Quiz lessons, Question drop, all 14 question types, approval tray, settings, results with marking and release, and live mode with a join code and board view.

@@ -1,3 +1,4 @@
+import { blankQuestion } from '@/quiz/core';
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider } from '@/schemas/block';
 import { analogyTypesContent, fluidAnalogyContent } from '@/toolkit/analogy';
@@ -36,6 +37,8 @@ export const NEW_BLOCK_TYPES = [
   'accordion',
   'table',
   'peer_feedback',
+  'question_drop',
+  'quiz_question',
   'question_set',
   'flashcards',
   'cloze',
@@ -97,6 +100,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   accordion: 'Accordion',
   table: 'Table',
   peer_feedback: 'Peer feedback',
+  question_drop: 'Question drop',
+  quiz_question: 'Quiz question',
   question_set: 'Question set',
   flashcards: 'Flashcards',
   cloze: 'Cloze',
@@ -220,7 +225,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
+    types: ['peer_feedback', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -265,6 +270,8 @@ const TOOLKIT_GROUP_TYPES = [
 
 const HOMEPAGE_EXCLUDED = new Set([
   'peer_feedback',
+  'question_drop',
+  'quiz_question',
   ...TOOLKIT_GROUP_TYPES,
   'teacher_note',
   'flashcards',
@@ -286,7 +293,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -569,6 +576,14 @@ export function createBlock(type: NewBlockType, id: string): Block {
     case 'peer_feedback':
       return { ...shared, block_type: 'peer_feedback', variant: 'medium', content: {
         prompt: '', strength_prompt: 'One thing that works well…', suggestion_prompt: 'One suggestion or question…'
+      } };
+    case 'question_drop':
+      return { ...shared, block_type: 'question_drop', variant: 'medium', content: {
+        target_quiz_id: '', prompt: '', kinds: [], marks_min: 1, marks_max: 3, per_student: 1, accepting: true
+      } };
+    case 'quiz_question':
+      return { ...shared, block_type: 'quiz_question', variant: 'medium', content: {
+        question: blankQuestion('multiple_choice', id)
       } };
     case 'question_set':
       return {
