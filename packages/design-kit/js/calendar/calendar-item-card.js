@@ -11,6 +11,7 @@ import {
   STATUS_CHOICES,
   canTickItem,
   editableFields,
+  itemId,
   itemRecord,
   itemType,
   itemTypeLabel,
@@ -116,6 +117,10 @@ function contextRows(item, values) {
   if (record.room) rows.push(['Room', record.room]);
   if (record.cycle_day) rows.push(['Timetable', 'Day ' + record.cycle_day + (record.period ? ' · Period ' + record.period : '')]);
   if (record.planning_status === 'not_planned') rows.push(['Lesson plan', 'Not planned yet']);
+  if (record.session_count > 1 && Array.isArray(record.sessions)) {
+    const slots = record.sessions.map((s) => `${weekday(s.date)} ${formatDisplayDate(s.date)}${s.period ? ` P${s.period}` : ''}`);
+    rows.push(['Taught over', `${record.session_count} sessions · ${slots.join(', ')}`]);
+  }
   if (typeof record.location === 'string' && record.location) rows.push(['Where', record.location]);
   if (record.feed) rows.push(['From', 'iCloud · read-only here']);
   // Tasks and work blocks show their status as pills (statusHtml), not a row.
@@ -217,6 +222,7 @@ export function itemCardHtml(item, opts = {}) {
     : '';
   const status = statusHtml(item);
   const plan = planHtml(item, values);
+  const link = lessonLinkHtml(item);
   const fields = editableFields(item);
   if (!fields.length) {
     const notes = values.notes ? `<p class="cal-card__notes">${escapeHtml(values.notes)}</p>` : '';
@@ -227,7 +233,28 @@ export function itemCardHtml(item, opts = {}) {
     `<form class="cal-card__form" data-part="card-form" novalidate>${fields.map((field) => fieldHtml(field, values, itemType(item))).join('')}` +
     `<p class="cal-card__error" data-part="card-error" role="alert" hidden></p>` +
     `<div class="cal-pop__acts"><button type="submit" class="btn btn--primary" data-part="card-save">Save</button></div></form>`;
-  return `${head}${status}${context}${inferred}${plan}${form}`;
+  return `${head}${status}${context}${inferred}${plan}${link}${form}`;
+}
+
+/**
+ * A lesson taught over several slots. The slot keeps its day and period; only which
+ * lesson it teaches changes. An empty draft it leaves behind goes to Trash.
+ */
+function lessonLinkHtml(item) {
+  if (itemType(item) !== 'scheduled_lesson' || !itemId(item)) return '';
+  const record = itemRecord(item);
+  if (record.session_index > 1) {
+    return `<div class="cal-card__ask" data-part="card-link"><span>Continues this lesson from an earlier slot.</span>`
+      + `<button type="button" class="btn btn--ghost" data-link-lesson="">Plan a separate lesson here</button></div>`;
+  }
+  const previous = record.previous_lesson;
+  if (!previous?.id || (record.session_count > 1)) return '';
+  const hint = record.planning_status === 'not_planned'
+    ? 'Keeps this slot on the calendar. The empty lesson here goes to Trash.'
+    : 'Keeps this slot on the calendar. This slot’s own lesson stays in the unit, unscheduled.';
+  return `<div class="cal-card__ask" data-part="card-link"><span>Still teaching the last lesson?</span>`
+    + `<button type="button" class="btn btn--secondary" data-link-lesson="${escapeHtml(previous.id)}">Same lesson as “${escapeHtml(previous.title)}”</button>`
+    + `<p class="cal-card__hint">${escapeHtml(hint)}</p></div>`;
 }
 
 function addMinutes(hhmm, minutes) {
@@ -372,6 +399,13 @@ export function bindItemCard(node, item, handlers = {}) {
       void once(button, button.getAttribute('data-infer') === 'yes'
         ? { depends_on: [...list('depends_on'), after] }
         : { dismissed_inferred: [...list('dismissed_inferred'), after] });
+    });
+  }
+  for (const button of node.querySelectorAll?.('[data-link-lesson]') ?? []) {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void once(button, { link_lesson: button.getAttribute('data-link-lesson') || null });
     });
   }
   for (const button of node.querySelectorAll?.('[data-status]') ?? []) {
