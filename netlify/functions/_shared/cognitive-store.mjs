@@ -5,20 +5,20 @@ import { knowledgeR2Config } from './knowledge-r2.mjs';
 
 const PREFIX = 'cognitive-protocols/v1';
 
-function keyFor(owner, id) {
-  return `${PREFIX}/${encodeURIComponent(owner)}/${id}.json`;
+function keyFor(owner, id, prefix = PREFIX) {
+  return `${prefix}/${encodeURIComponent(owner)}/${id}.json`;
 }
 
-function indexKeyFor(owner, id) {
-  return `${PREFIX}/${encodeURIComponent(owner)}/index/${id}.json`;
+function indexKeyFor(owner, id, prefix = PREFIX) {
+  return `${prefix}/${encodeURIComponent(owner)}/index/${id}.json`;
 }
 
-function indexPrefix(owner) {
-  return `${PREFIX}/${encodeURIComponent(owner)}/index/`;
+function indexPrefix(owner, prefix = PREFIX) {
+  return `${prefix}/${encodeURIComponent(owner)}/index/`;
 }
 
-function metaKey(owner, name) {
-  return `${PREFIX}/${encodeURIComponent(owner)}/_ops/${name}.json`;
+function metaKey(owner, name, prefix = PREFIX) {
+  return `${prefix}/${encodeURIComponent(owner)}/_ops/${name}.json`;
 }
 
 export const INCOMPLETE_PROTOCOL_PURGE_MARKER = 'purged-incomplete-2026-10-05';
@@ -109,20 +109,20 @@ function decrypt(text, secret) {
   return JSON.parse(Buffer.concat([decipher.update(Buffer.from(parsed.ciphertext, 'base64')), decipher.final()]).toString('utf8'));
 }
 
-export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }) {
+export function createR2CognitiveStore({ client, bucket, encryptionSecret = '', prefix = PREFIX, indexRow = sessionIndexRow }) {
   if (!client || !bucket) throw new TypeError('R2 client and bucket are required.');
   async function putIndex(owner, value) {
     await client.send(new PutObjectCommand({
       Bucket: bucket,
-      Key: indexKeyFor(owner, value.id),
-      Body: encrypt(sessionIndexRow(value), encryptionSecret),
+      Key: indexKeyFor(owner, value.id, prefix),
+      Body: encrypt(indexRow(value), encryptionSecret),
       ContentType: 'application/json'
     }));
   }
   return {
     async read(owner, id) {
       try {
-        const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: keyFor(owner, id) }));
+        const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: keyFor(owner, id, prefix) }));
         return { value: decrypt(await bodyText(result.Body), encryptionSecret), etag: result.ETag };
       } catch (error) {
         if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NoSuchKey') return null;
@@ -133,7 +133,7 @@ export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }
       try {
         const input = {
           Bucket: bucket,
-          Key: keyFor(owner, id),
+          Key: keyFor(owner, id, prefix),
           Body: encrypt(value, encryptionSecret),
           ContentType: 'application/json',
           ...(expectedEtag === null ? { IfNoneMatch: '*' } : { IfMatch: expectedEtag })
@@ -148,12 +148,12 @@ export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }
     },
     async delete(owner, id) {
       // Index rows are deleted with the session so the Past runs list cannot retain orphans.
-      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: keyFor(owner, id) }));
-      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: indexKeyFor(owner, id) }));
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: keyFor(owner, id, prefix) }));
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: indexKeyFor(owner, id, prefix) }));
     },
     async getMeta(owner, name) {
       try {
-        const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: metaKey(owner, name) }));
+        const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: metaKey(owner, name, prefix) }));
         return decrypt(await bodyText(result.Body), encryptionSecret);
       } catch (error) {
         if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NoSuchKey') return null;
@@ -163,7 +163,7 @@ export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }
     async setMeta(owner, name, value) {
       await client.send(new PutObjectCommand({
         Bucket: bucket,
-        Key: metaKey(owner, name),
+        Key: metaKey(owner, name, prefix),
         Body: encrypt(value, encryptionSecret),
         ContentType: 'application/json'
       }));
@@ -177,7 +177,7 @@ export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }
       do {
         const page = await client.send(new ListObjectsV2Command({
           Bucket: bucket,
-          Prefix: indexPrefix(owner),
+          Prefix: indexPrefix(owner, prefix),
           ContinuationToken
         }));
         for (const item of page.Contents || []) {
@@ -204,7 +204,7 @@ export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }
   };
 }
 
-export async function defaultGetCognitiveStore(env) {
+export async function defaultGetCognitiveStore(env, options = {}) {
   const config = knowledgeR2Config(env);
   if (!config) return null;
   const { S3Client } = await import('@aws-sdk/client-s3');
@@ -216,5 +216,5 @@ export async function defaultGetCognitiveStore(env) {
   const sessionSecret = umbrellaSessionSecret(env);
   const encryptionSecret = typeof sessionSecret === 'string' ? sessionSecret : '';
   if (Buffer.byteLength(encryptionSecret) < 32) return null;
-  return createR2CognitiveStore({ client, bucket: config.bucket, encryptionSecret });
+  return createR2CognitiveStore({ client, bucket: config.bucket, encryptionSecret, ...options });
 }
