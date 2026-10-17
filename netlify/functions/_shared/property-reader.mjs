@@ -53,7 +53,7 @@ Reply with JSON only, no prose, in this shape:
 Entry shapes (dates are YYYY-MM-DD, amounts are plain numbers with no $ or commas):
 - {"kind":"statement","date","gross","deductions","periodFrom","periodTo","number","note"}: a rental agent statement. gross is total rent received. deductions is everything the agent kept or paid out (fees plus bills paid on your behalf). number is the statement number if printed.
 - {"kind":"expense","date","amount","category","note","inStatement","renews"}: a cost. category is one of ${Object.keys(EXPENSE_CATEGORIES).join(', ')}. On an agent statement, add one expense with "inStatement":true for each bill the agent paid (repairs, council, water, strata, insurance), but not for the agent's own management or letting fees. "renews":"yearly" only for a yearly policy or charge.
-- {"kind":"interest","date","amount","balanceAfter","note"}: one per interest charge on a loan statement, dated the day it was charged.
+- {"kind":"interest","date","amount","balanceAfter","note"}: one per interest charge on a loan statement, dated the day it was charged. amount is the interest debited to the loan (the Debit column). Some lenders print a line like "DEBIT INTEREST AFTER OFFSET SAVING OF $166.84" with the debit in its own column: the figure after "SAVING OF" is the interest the offset saved, never the amount.
 - {"kind":"balance","date","balance","note"}: the closing loan balance on a loan statement, dated the statement end. Record a loan balance as a positive number.
 - {"kind":"rate","date","rate","note"}: only when the document shows the interest rate changing; rate is a percentage like 5.44.
 
