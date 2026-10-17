@@ -30,7 +30,7 @@ export interface TeacherHomeOptions {
 }
 
 /**
- * Dashboard: cover banner, clock, shared calendar, class tiles.
+ * Dashboard: cover banner with clock overlay, shared calendar, class tiles.
  */
 export function renderTeacherHome(
   canvas: HTMLElement,
@@ -68,13 +68,11 @@ export function renderTeacherHome(
   });
   disposers.push(banner.dispose);
 
-  const toolbar = document.createElement('div');
-  toolbar.className = 'home-dashboard__toolbar';
-
+  // Clock and create control sit on the cover so it carries content, not just a photo.
   const clockHost = document.createElement('div');
   clockHost.className = 'home-dashboard__clock';
   disposers.push(mountHomeClock(clockHost));
-  toolbar.append(clockHost, createHost);
+  bannerHost.append(clockHost, createHost);
 
   const createControl = mountCreateControl(createHost, {
     context: 'home',
@@ -155,7 +153,6 @@ export function renderTeacherHome(
 
   root.append(
     bannerHost,
-    toolbar,
     calendarHost,
     buildClassesPanel(
       curriculum.classes.filter((cls) => cls.status === 'active'),
