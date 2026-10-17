@@ -4,6 +4,8 @@
 
 .pulse-host {
   position: relative;
+  /* The dot owns the top-right 1.75rem; keep the block's text out from under it. */
+  padding-inline-end: 1.75rem;
 }
 
 .pulse {
@@ -226,5 +228,9 @@
 @media print {
   .pulse {
     display: none;
+  }
+
+  .pulse-host {
+    padding-inline-end: 0;
   }
 }

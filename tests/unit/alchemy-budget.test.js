@@ -44,3 +44,14 @@ test('an oversized selection cannot permanently disable valid future checks',asy
  await budget.finish(ticket,{error:{status:400,code:'alchemy_input_limit'}});advance(600001);
  assert.ok(await budget.reserve({key:'small',mode:'manual'}));
 });
+test('a background failure does not lock out a direct ask, and the pause says why and how long',async()=>{
+ const {budget,advance}=setup();const t=await budget.reserve({key:'a',mode:'passive'});await budget.finish(t,{error:{status:500,code:'alchemy_upstream'}});
+ await assert.rejects(budget.reserve({key:'b',mode:'manual'}),e=>e.code==='alchemy_cooldown'&&/last check failed/.test(e.message)&&/under a minute/.test(e.message));
+ advance(30001);const m=await budget.reserve({key:'b',mode:'manual'});await budget.finish(m,{result:{proposals:[]}});
+ await assert.rejects(budget.reserve({key:'c',mode:'passive'}),e=>e.code==='alchemy_cooldown');
+});
+test('a provider rate limit holds direct asks too and names the wait',async()=>{
+ const {budget,advance}=setup();const t=await budget.reserve({key:'a',mode:'manual'});await budget.finish(t,{error:{status:429,retryAfterMs:240000}});
+ await assert.rejects(budget.reserve({key:'b',mode:'manual'}),e=>/slow down/.test(e.message)&&/about 4 minutes/.test(e.message));
+ advance(240001);assert.ok(await budget.reserve({key:'b',mode:'manual'}));
+});
