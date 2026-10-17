@@ -208,7 +208,7 @@ export function createFoodJournalView({
   function photoNode(photo) {
     const image = el("img", "food-photo");
     image.alt = "Dish photo";
-    image.loading = "lazy";
+    image.decoding = "async";
     const cached = photoCache.get(photo.key),
       token = epoch;
     let refreshed = false;
@@ -216,7 +216,7 @@ export function createFoodJournalView({
       api
         .media({ action: "read", key: photo.key })
         .then(({ url }) => {
-          if (token !== epoch) return;
+          if (token !== epoch || !url) return;
           photoCache.set(photo.key, url);
           photoExpires.set(photo.key, Date.now() + 240000);
           image.src = url;
@@ -232,9 +232,18 @@ export function createFoodJournalView({
       cached &&
       (cached.startsWith("blob:") ||
         (photoExpires.get(photo.key) || 0) > Date.now())
-    )
+    ) {
       image.src = cached;
-    else if (typeof IntersectionObserver === "function") {
+      return image;
+    }
+    // iOS never fetches an image that is both loading=lazy and given a src
+    // later. Watch visibility, then assign src with the browser's normal load.
+    const watch = () => {
+      if (token !== epoch || image.getAttribute("src")) return;
+      if (typeof IntersectionObserver !== "function" || !image.isConnected) {
+        void sign();
+        return;
+      }
       const observer = new IntersectionObserver(
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) {
@@ -247,7 +256,9 @@ export function createFoodJournalView({
       );
       photoObservers.add(observer);
       observer.observe(image);
-    } else void sign();
+    };
+    if (image.isConnected) watch();
+    else queueMicrotask(watch);
     return image;
   }
   function dishCard(dish, visit, custom = false) {
