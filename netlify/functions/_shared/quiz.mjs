@@ -230,6 +230,13 @@ async function loadAttempt(store, k, device, start) {
 async function deviceAttempts(store, k, device) {
   const list = await listBlobKeys(store, k.attempts(device));
   const starts = (await Promise.all(list.map((key) => read(store, key)))).filter(Boolean).sort((a, b) => a.n - b.n);
+  // Listings lag behind writes, so a go started moments ago can be missing.
+  // Reads by key are current: check the slots after the last listed go.
+  for (let n = starts.reduce((top, s) => Math.max(top, s.n + 1), 0); n < 100; n += 1) {
+    const next = await read(store, k.attempt(device, n));
+    if (!next) break;
+    starts.push(next);
+  }
   return Promise.all(starts.map((start) => loadAttempt(store, k, device, start)));
 }
 
