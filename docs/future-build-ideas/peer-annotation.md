@@ -61,7 +61,8 @@ Students can only press buttons and type into the boxes the button asks for. The
 - **2026-10-17:** **Prose only.** Students will not write poetry here, so paragraphs and sentences are the only structure needed.
 - **2026-10-17:** **Plain comments are allowed.** A highlight doesn't need a button.
 - **2026-10-17:** **Only students who hand in writing are in the swap.** Absent students are never part of it. If a student hands in but doesn't finish their reviews, their two writers get whatever came in (one layer or none). No reassigning.
-- **2026-10-17:** **Cap of 20 notes per reviewer on one piece**, so up to 40 across both layers.
+- **2026-10-17:** **Cap of 20 notes per reviewer on one piece** (confirmed), so up to 40 across both layers.
+- **2026-10-17:** **Word check.** Notes and comments go through the same server-side word check as the simple block (`peer-feedback-filter.mjs`). A flagged note is hidden from the writer and held for Adam to release or remove. It's a rough net and kids will get round it; the teacher view and "Show student symbols" are the backstop.
 - **2026-10-17:** **No teacher layer.**
 - **2026-10-17:** **Students never see symbols by default**, their own or anyone else's. Reviewers show as **Reviewer 1** and **Reviewer 2**, so nobody can work out who said what. That means students don't pick a symbol when joining. They type the code and press Join, and the server quietly assigns a free symbol.
 - **2026-10-17:** **The teacher sees everything, by symbol.** In the block's teacher view Adam can pick a symbol (or flick between them) to see that student's writing, both layers on it, and every note that student gave on other pieces.
@@ -69,12 +70,11 @@ Students can only press buttons and type into the boxes the button asks for. The
 
 ## Open questions
 
-- **Does the hidden-symbol rule also apply to the simple two-box version** (PR 896)? It uses the same join flow, so it probably should.
-- **Moderation before hand-back:** should Adam be able to delete a single abusive note before releasing feedback, so the writer never sees it?
-- **Cap per reviewer or per piece:** 20 per reviewer is assumed above. Adam said "20 on a piece of writing", so confirm.
+- **Moderation for unflagged notes:** flagged notes are held automatically. Should Adam also be able to remove any single note by hand before hand-back?
 - **Small groups:** with only two pieces in the swap, each student can only get one reviewer. Fall back to one each.
 
 ## History
 
+- **2026-10-17:** Confirmed the 20-per-reviewer cap and added the word check. Hidden symbols, the show-symbols switch and the word check are now built into the simple block (PR 896), so annotate mode inherits them.
 - **2026-10-17:** Recorded Adam's answers: one button bank, prose only, plain comments allowed, swap only includes those who hand in, 20-note cap, no teacher layer, symbols hidden from students with a teacher "Show student symbols" switch. Moved the resolved open questions into Decided.
 - **2026-10-17:** Created from Adam's idea while reviewing the peer feedback block (PR 896). Resources-by-teacher decision recorded.
