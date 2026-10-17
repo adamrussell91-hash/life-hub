@@ -40,3 +40,15 @@ it('a changed sibling requalifies the contextual passive assessment',async()=>{
  const assistant=impl.mountBlockAssistant({host,kind:'lesson',id:'l',getEntity:()=>entity,flush:async()=>{},apply:async()=>{},request:async(body:any)=>{calls++;batches.push(body.blocks);return {proposals:[],assessed:body.blocks,contextRevision:'ctx',mode:'empty'};}});
  await vi.advanceTimersByTimeAsync(30000);expect(calls).toBe(1);b.content.text='A different learning activity';assistant.changed();await vi.advanceTimersByTimeAsync(180000);expect(calls).toBe(2);expect(batches[1]).toContain('a');assistant.dispose();host.remove();vi.useRealTimers();
 });
+it('puts one quiet button on each top-level row and shows a nested suggestion on its row',async()=>{
+ const q=createBlock('heading','q');const tabs=createBlock('tabs','t') as any;tabs.content.tabs[0].blocks=[q];const entity={title:'Lesson',blocks:[tabs]};
+ const host=document.createElement('div');document.body.append(host);
+ const row=document.createElement('div');row.className='lesson-page__block';row.dataset.blockId='t';
+ const nested=document.createElement('div');nested.className='block';nested.dataset.blockId='q';row.append(nested);host.append(row);
+ const result={contextRevision:'ctx',assessed:['t'],proposals:[{blockId:'q',original:rev.blockRevision(q),contextRevision:'ctx',rationale:'Ask about effect.',replacement:{...q,content:{text:'How does it shape tone?',variant:'h2'}},sources:[]}]};
+ const assistant=impl.mountBlockAssistant({host,kind:'lesson',id:'l',getEntity:()=>entity,flush:async()=>{},apply:async()=>{},request:async()=>result,checkContext:async()=>true});
+ expect(host.querySelectorAll('.alchemy-block-button').length).toBe(1);expect(nested.querySelector('.alchemy-block-button')).toBeNull();
+ (row.querySelector('.alchemy-block-button') as HTMLButtonElement).click();
+ await vi.waitFor(()=>expect(document.querySelector('.alchemy-review__rationale')?.textContent).toContain('effect'));
+ assistant.dispose();host.remove();document.querySelectorAll('dialog').forEach(d=>d.remove());
+});
