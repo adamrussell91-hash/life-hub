@@ -262,6 +262,7 @@ var BlockTypeSchema = z4.enum([
   "attachment",
   "accordion",
   "table",
+  "peer_feedback",
   "question_set",
   "flashcards",
   "cloze",
@@ -598,6 +599,20 @@ var QuestionItemSchema = z4.object({
   kind: QuestionKindSchema,
   options: z4.array(z4.string()).optional(),
   response_space: ResponseSpaceSchema.optional()
+});
+var PeerFeedbackBlockSchema = z4.object({
+  id: z4.string().min(1),
+  type: z4.literal("block"),
+  block_type: z4.literal("peer_feedback"),
+  variant: z4.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z4.object({
+    prompt: z4.string().max(4e3),
+    strength_prompt: z4.string().max(300).default("One thing that works well\u2026"),
+    suggestion_prompt: z4.string().max(300).default("One suggestion or question\u2026")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
 });
 var QuestionSetBlockSchema = z4.object({
   id: z4.string().min(1),
@@ -1240,6 +1255,7 @@ var leafBlockSchemas = [
   AttachmentBlockSchema,
   AccordionBlockSchema,
   TableBlockSchema,
+  PeerFeedbackBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,
@@ -1471,6 +1487,7 @@ export {
   MediaSizeVariantSchema,
   MindMapBlockSchema,
   OutcomesBlockSchema,
+  PeerFeedbackBlockSchema,
   QuestionItemSchema,
   QuestionKindSchema,
   QuestionQuadrantBlockSchema,

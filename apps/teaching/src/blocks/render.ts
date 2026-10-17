@@ -1,3 +1,4 @@
+import { renderPeerFeedback } from '@/blocks/peer-feedback';
 import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
 import { calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
 import { FAILURE } from '@/app/failure';
@@ -2243,6 +2244,8 @@ function renderBlockContent(
       return renderAccordionBlock(block, mode);
     case 'table':
       return renderTableBlock(block, mode);
+    case 'peer_feedback':
+      return renderPeerFeedback(block, mode, ctx);
     case 'question_set':
       return renderQuestionSetBlock(block, mode);
     case 'flashcards':
