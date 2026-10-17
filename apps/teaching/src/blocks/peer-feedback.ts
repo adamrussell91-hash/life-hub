@@ -8,30 +8,34 @@ import './peer-feedback.css';
  * one strength and one suggestion, then read what came back.
  *
  * The teacher runs the round from the block on the lesson page. Students join
- * on their published lesson with the code on the board and a coloured symbol;
- * no accounts. A random token on the device proves which symbol is theirs, and
- * drafts are kept on the device so a reload or a dropped connection loses
- * nothing. State lives on the server; this file only paints it.
+ * on their published lesson with just the code on the board; no accounts.
+ * The server quietly gives each device a coloured symbol. Students never see
+ * symbols unless the teacher turns on "Show student symbols", which puts each
+ * student's own symbol in the corner of the block so the teacher can match a
+ * symbol to a student. Drafts are kept on the device so a reload or a dropped
+ * connection loses nothing. State lives on the server; this file paints it.
  */
 
 type PeerBlock = Extract<Block, { block_type: 'peer_feedback' }>;
 type Phase = 'idle' | 'write' | 'review' | 'results';
 type Feedback = { strength: string; suggestion: string };
 
+type Received = Feedback & { flagged: boolean; status: 'ok' | 'held' | 'released' | 'removed' };
 type TeacherRow = {
   id: string;
   text: string;
+  flagged: boolean;
   included: boolean;
   gave: boolean;
   reviewer: string | null;
-  received: Feedback | null;
+  received: Received | null;
 };
-type TeacherState = { phase: Phase; session?: string; code?: string; rows?: TeacherRow[] };
+type TeacherState = { phase: Phase; session?: string; code?: string; show_symbols?: boolean; rows?: TeacherRow[] };
 type StudentState = {
   phase: Phase;
   session?: string;
-  taken?: string[];
-  identity?: string;
+  joined?: boolean;
+  symbol?: string | null;
   text?: string;
   submitted?: boolean;
   included?: boolean;
@@ -39,7 +43,8 @@ type StudentState = {
   assigned_text?: string;
   received?: Feedback | null;
 };
-type Identity = { session: string; identity: string; token: string };
+/** What a device keeps: the round it joined and its secret token. Never its symbol. */
+type Device = { session: string; token: string };
 
 const POLL_MS = 5000;
 const MAX_WRITING = 8000;
@@ -65,7 +70,6 @@ const SHAPES = [
   { name: 'heart', path: 'M12 19.5s-7-4.3-7-9.2A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.3c0 4.9-7 9.2-7 9.2z' }
 ] as const;
 
-const IDENTITIES = Array.from({ length: 36 }, (_, i) => `${i % 6}-${Math.floor(i / 6)}`);
 
 function parts(id: string): [number, number] {
   const [c, s] = id.split('-').map(Number);
@@ -217,7 +221,14 @@ export function renderPeerFeedback(block: PeerBlock, mode: RenderMode, ctx: Rend
     root.append(el('p', 'pf-note', 'Students take part from the published lesson.'));
     return root;
   }
-  root.append(mode === 'teacher' ? mountTeacher(block, ctx.lessonId) : mountStudent(block, ctx.lessonId));
+  if (mode === 'teacher') {
+    root.append(mountTeacher(block, ctx.lessonId));
+  } else {
+    const corner = el('div', 'pf-corner');
+    corner.hidden = true;
+    head.append(corner);
+    root.append(mountStudent(block, ctx.lessonId, corner));
+  }
   return root;
 }
 
@@ -256,6 +267,8 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
   let painted = '';
   let busy = false;
   const excluded = new Set<string>();
+  /** Flagged answers start out of the swap once; after that the tickbox is the teacher's. */
+  const autoExcluded = new Set<string>();
 
   async function send(action: string, extra: Record<string, unknown> = {}, pressed?: HTMLButtonElement): Promise<void> {
     if (busy) return;
@@ -284,10 +297,23 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
     }
   }
 
+  function freshRound(): void {
+    excluded.clear();
+    autoExcluded.clear();
+  }
+
   function paint(): void {
     if (!state) {
       body.replaceChildren(el('p', 'pf-note', 'Loading…'));
       return;
+    }
+    if (state.phase === 'write') {
+      for (const r of state.rows ?? []) {
+        if (r.flagged && !autoExcluded.has(r.id)) {
+          autoExcluded.add(r.id);
+          excluded.add(r.id);
+        }
+      }
     }
     const signature = JSON.stringify([state, [...excluded]]);
     if (signature === painted) return;
@@ -298,9 +324,9 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
   function idleView(): HTMLElement {
     const box = el('div', 'pf-panel pf-panel--start');
     box.append(
-      el('p', 'pf-panel__text', 'Students join on the lesson link with a code and a coloured symbol. No accounts.'),
-      button('Start activity', 'primary', function (this: HTMLButtonElement) {
-        excluded.clear();
+      el('p', 'pf-panel__text', 'Students join on the lesson link with the code. No accounts, and they never pick or see a symbol.'),
+      button('Start activity', 'primary', function () {
+        freshRound();
         void send('start', {}, this);
       })
     );
@@ -314,42 +340,53 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
     const bar = el('div', 'pf-bar');
     const code = el('div', 'pf-code');
     code.append(el('span', 'pf-code__label', 'Code'), el('span', 'pf-code__value', formatCode(s.code ?? '')));
+    const tools = el('div', 'pf-bar__tools');
+    const symbols = el('label', 'pf-switch pf-switch--bar');
+    const symbolsBox = el('input');
+    symbolsBox.type = 'checkbox';
+    symbolsBox.checked = !!s.show_symbols;
+    symbolsBox.addEventListener('change', () => {
+      void send('symbols', { show: symbolsBox.checked });
+    });
+    symbols.append(symbolsBox, el('span', '', 'Show student symbols'));
+    symbols.title = 'Each student sees their own symbol in the corner of the block, so you can match a symbol to a student.';
     const showBig = button('Show on board', 'ghost', () => showCodeOverlay(s.code ?? ''));
     showBig.classList.add('pf-bar__board');
-    bar.append(code, stepper(s.phase), showBig);
+    tools.append(symbols, showBig);
+    bar.append(code, stepper(s.phase), tools);
     wrap.append(bar);
 
     const handedIn = rows.filter((r) => r.text);
     const writing = rows.filter((r) => !r.text);
     const inSwap = handedIn.filter((r) => !excluded.has(r.id));
+    const held = rows.filter((r) => r.received?.status === 'held').length;
 
     const next = el('div', 'pf-next');
     const summary = el('p', 'pf-next__text');
-    let primary: HTMLButtonElement | null = null;
+    let primary: HTMLButtonElement;
     if (s.phase === 'write') {
-      summary.textContent = rows.length
-        ? `${handedIn.length} of ${rows.length} handed in.`
-        : 'Waiting for students to join.';
-      primary = button('Start the swap', 'primary', function (this: HTMLButtonElement) {
+      summary.textContent = rows.length ? `${handedIn.length} of ${rows.length} handed in.` : 'Waiting for students to join.';
+      if (inSwap.length < 2 && rows.length) summary.textContent += ' The swap needs at least two answers.';
+      primary = button('Start the swap', 'primary', function () {
         void send('review', { exclude: [...excluded] }, this);
       });
       primary.disabled = inSwap.length < 2;
-      if (inSwap.length < 2 && rows.length) summary.textContent += ' The swap needs at least two answers.';
     } else if (s.phase === 'review') {
       const swapped = rows.filter((r) => r.included);
       const sent = swapped.filter((r) => r.gave).length;
       summary.textContent = `${sent} of ${swapped.length} have sent feedback.`;
-      primary = button(sent < swapped.length ? 'Hand back what’s in' : 'Hand feedback back', 'primary', function (this: HTMLButtonElement) {
+      primary = button(sent < swapped.length ? 'Hand back what’s in' : 'Hand feedback back', 'primary', function () {
         void send('results', {}, this);
       });
     } else {
       summary.textContent = 'Feedback is back with the writers.';
-      primary = button('Start a new activity', 'primary', function (this: HTMLButtonElement) {
-        excluded.clear();
+      primary = button('Start a new activity', 'primary', function () {
+        freshRound();
         void send('start', {}, this);
       });
     }
-    const end = button('End', 'ghost', function (this: HTMLButtonElement) {
+    if (held) summary.textContent += ` ${held} held for you to check.`;
+    const end = button('End', 'ghost', function () {
       if (window.confirm('End this activity? Students will no longer see it.')) void send('end', {}, this);
     });
     const actions = el('div', 'pf-next__actions');
@@ -388,6 +425,7 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
     const head = el('div', 'pf-row__head');
     const who = el('span', 'pf-row__who');
     who.append(token(r.id, 'sm'), el('span', '', identityName(r.id)));
+    if (r.flagged) who.append(el('span', 'pf-chip pf-chip--flag', 'Flagged words'));
     head.append(who);
 
     if (phase === 'write') {
@@ -411,16 +449,56 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
     }
     item.append(head, el('p', 'pf-row__text', r.text));
 
-    if (phase === 'results' && r.included) {
-      if (r.received) item.append(feedbackPair(block, r.received, r.reviewer));
-      else item.append(el('p', 'pf-note', 'No feedback came back for this one.'));
-    }
+    // Feedback shows as it arrives, so anything held can be dealt with before hand-back.
+    if (r.received) item.append(receivedView(r.received, r.reviewer));
+    else if (phase === 'results' && r.included) item.append(el('p', 'pf-note', 'No feedback came back for this one.'));
     return item;
+  }
+
+  function receivedView(received: Received, reviewer: string | null): HTMLElement {
+    if (received.status === 'removed') {
+      const gone = el('p', 'pf-note');
+      gone.append('Feedback from ', reviewerTag(reviewer), ' was removed. The writer won’t see it.');
+      return gone;
+    }
+    const wrap = feedbackPair(block, received, reviewer);
+    if (received.status === 'held' || received.status === 'released') {
+      const bar = el('div', 'pf-held');
+      bar.dataset.status = received.status;
+      bar.append(
+        el('span', 'pf-held__text', received.status === 'held' ? 'Held: flagged words. The writer can’t see this yet.' : 'Released after checking.')
+      );
+      const actions = el('div', 'pf-held__actions');
+      if (received.status === 'held' && reviewer) {
+        actions.append(
+          button('Release', 'secondary', function () {
+            void send('release', { reviewer }, this);
+          })
+        );
+      }
+      if (reviewer) {
+        actions.append(
+          button('Remove', 'ghost', function () {
+            void send('remove', { reviewer }, this);
+          })
+        );
+      }
+      bar.append(actions);
+      wrap.prepend(bar);
+      wrap.classList.add('pf-feedback--held');
+    }
+    return wrap;
   }
 
   paint();
   poller(root, () => send('status'));
   return root;
+}
+
+function reviewerTag(id: string | null): HTMLElement {
+  const tag = el('span', 'pf-tag');
+  if (id) tag.append(token(id, 'sm'), ` ${identityName(id)}`);
+  return tag;
 }
 
 function formatCode(code: string): string {
@@ -453,6 +531,7 @@ function showCodeOverlay(code: string): void {
   close.focus();
 }
 
+/** Two feedback cards. `from` is for the teacher only; students never see who wrote it. */
 function feedbackPair(block: PeerBlock, feedback: Feedback, from?: string | null): HTMLElement {
   const wrap = el('div', 'pf-feedback');
   const a = el('div', 'pf-feedback__card pf-feedback__card--strength');
@@ -462,7 +541,7 @@ function feedbackPair(block: PeerBlock, feedback: Feedback, from?: string | null
   wrap.append(a, b);
   if (from) {
     const by = el('p', 'pf-feedback__from');
-    by.append('From ', token(from, 'sm'), ` ${identityName(from)}`);
+    by.append('From ', reviewerTag(from));
     wrap.append(by);
   }
   return wrap;
@@ -470,7 +549,7 @@ function feedbackPair(block: PeerBlock, feedback: Feedback, from?: string | null
 
 /* ── Student ───────────────────────────────────────────────────────── */
 
-function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
+function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): HTMLElement {
   const endpoint = `/api/published/peer-feedback/${encodeURIComponent(lessonId)}/${encodeURIComponent(block.id)}`;
   const storage = `peer-feedback:${lessonId}:${block.id}`;
   const root = el('div', 'pf-run');
@@ -480,16 +559,13 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
   alert.hidden = true;
   root.append(body, alert);
 
-  let identity = readJSON<Identity>(`${storage}:identity`);
+  let device = readJSON<Device>(`${storage}:device`);
   let state = (lastState.get(endpoint) as StudentState | undefined) ?? null;
   let view = '';
   let busy = false;
   let joinCode = '';
-  let picked: string | null = null;
-  /** Taken symbols live in the picker; it updates in place so a half-typed code survives. */
-  let refreshPicker: (() => void) | null = null;
 
-  const draftKey = (name: string) => `${storage}:${state?.session ?? ''}:${identity?.identity ?? ''}:${name}`;
+  const draftKey = (name: string) => `${storage}:${state?.session ?? ''}:${name}`;
 
   function showError(text: string): void {
     alert.textContent = text;
@@ -497,8 +573,8 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
   }
 
   function forget(): void {
-    identity = null;
-    writeJSON(`${storage}:identity`, null);
+    device = null;
+    writeJSON(`${storage}:device`, null);
   }
 
   async function send(action: string, extra: Record<string, unknown> = {}, pressed?: HTMLButtonElement): Promise<boolean> {
@@ -510,8 +586,8 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
       pressed.textContent = 'Sending…';
     }
     try {
-      const next = await apiPost<StudentState>(endpoint, { ...(identity ?? {}), action, ...extra });
-      if (identity && next.session && next.session !== identity.session) forget();
+      const next = await apiPost<StudentState>(endpoint, { ...(device ?? {}), action, ...extra });
+      if (device && next.session && next.session !== device.session) forget();
       state = next;
       lastState.set(endpoint, state);
       alert.hidden = true;
@@ -519,9 +595,8 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
       return true;
     } catch (error) {
       const code = error instanceof ApiClientError ? error.code : '';
-      if (code === 'new_session' || code === 'not_joined' || code === 'taken') {
+      if (code === 'new_session' || code === 'not_joined') {
         forget();
-        picked = null;
         view = '';
         busy = false;
         await send('status');
@@ -539,8 +614,22 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
 
   function viewKey(s: StudentState): string {
     if (s.phase === 'idle') return 'idle';
-    if (!identity || !s.identity) return s.phase === 'write' ? 'join' : 'closed';
-    return [s.phase, s.identity, s.submitted, s.included, s.reviewed, !!s.received].join(':');
+    if (!device || !s.joined) return s.phase === 'write' ? 'join' : 'closed';
+    return [s.phase, s.submitted, s.included, s.reviewed, !!s.received].join(':');
+  }
+
+  function paintCorner(symbol: string | null | undefined): void {
+    const key = symbol ?? '';
+    if (corner.dataset.symbol === key) return;
+    corner.dataset.symbol = key;
+    corner.hidden = !symbol;
+    corner.replaceChildren();
+    if (symbol) {
+      const t = token(symbol, 'sm');
+      t.setAttribute('role', 'img');
+      t.setAttribute('aria-label', `Your symbol: ${identityName(symbol)}`);
+      corner.append(t);
+    }
   }
 
   function paint(): void {
@@ -548,13 +637,10 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
       body.replaceChildren(el('p', 'pf-note', 'Loading…'));
       return;
     }
+    paintCorner(state.symbol);
     const key = viewKey(state);
-    if (key === view) {
-      refreshPicker?.();
-      return;
-    }
+    if (key === view) return;
     view = key;
-    refreshPicker = null;
     const s = state;
     if (key === 'idle') {
       body.replaceChildren(waitPanel('Your teacher hasn’t started this yet.', 'This page updates by itself.'));
@@ -564,9 +650,7 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
       body.replaceChildren(waitPanel('This activity has moved on, so joining has closed.', 'Ask your teacher what to do next.'));
     } else {
       const frame = el('div', 'pf-student');
-      const top = el('div', 'pf-student__top');
-      top.append(youBar(s.identity!, s.phase), stepper(s.phase));
-      frame.append(top, studentStage(s));
+      frame.append(stepper(s.phase), studentStage(s));
       body.replaceChildren(frame);
     }
   }
@@ -577,21 +661,10 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
     return box;
   }
 
-  function youBar(id: string, phase: Phase): HTMLElement {
-    const bar = el('div', 'pf-you');
-    bar.append(token(id, 'md'));
-    const words = el('div', 'pf-you__words');
-    words.append(el('span', 'pf-you__name', `You’re ${identityName(id)}`));
-    words.append(el('span', 'pf-you__sub', phase === 'review' ? 'The writer won’t see your symbol.' : 'Nobody else sees your symbol.'));
-    bar.append(words);
-    return bar;
-  }
-
   function joinView(): HTMLElement {
     const wrap = el('div', 'pf-join');
-
     const codeWrap = el('div', 'pf-field');
-    const codeLabel = el('label', 'pf-field__label', '1. Type the code on the board');
+    const codeLabel = el('label', 'pf-field__label', 'Type the code on the board');
     codeLabel.htmlFor = `pf-code-${block.id}`;
     const code = el('input', 'pf-code-input');
     code.id = `pf-code-${block.id}`;
@@ -600,101 +673,67 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
     code.maxLength = 7;
     code.placeholder = '000 000';
     code.value = joinCode;
-    code.addEventListener('input', () => {
-      joinCode = code.value;
-      update();
-    });
-    codeWrap.append(codeLabel, code);
+    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint', 'No account and no name. Classmates won’t know which answer is yours.'));
 
-    const pickWrap = el('div', 'pf-field');
-    const pickLabel = el('p', 'pf-field__label', '2. Pick a symbol');
-    pickLabel.id = `pf-pick-${block.id}`;
-    const grid = el('div', 'pf-picker');
-    grid.setAttribute('role', 'radiogroup');
-    grid.setAttribute('aria-labelledby', pickLabel.id);
-    const choices = new Map<string, HTMLButtonElement>();
-    for (const id of IDENTITIES) {
-      const choice = el('button', 'pf-pick');
-      choice.type = 'button';
-      choice.setAttribute('role', 'radio');
-      choice.setAttribute('aria-label', identityName(id));
-      choice.append(token(id, 'md'));
-      choice.addEventListener('click', () => {
-        picked = id;
-        update();
-      });
-      choices.set(id, choice);
-      grid.append(choice);
-    }
-    const pickedName = el('p', 'pf-picked');
-    pickWrap.append(pickLabel, grid, pickedName);
-
-    const join = button('Join', 'primary', function (this: HTMLButtonElement) {
+    const join = button('Join', 'primary', function () {
       void doJoin(this);
     });
     join.classList.add('pf-join__go');
-
-    function update(): void {
-      const taken = new Set(state?.taken ?? []);
-      if (picked && taken.has(picked)) picked = null;
-      for (const [id, choice] of choices) {
-        const isTaken = taken.has(id);
-        choice.disabled = isTaken;
-        choice.setAttribute('aria-checked', String(id === picked));
-        choice.title = isTaken ? `${identityName(id)} (taken)` : identityName(id);
-      }
-      pickedName.textContent = picked ? `You’ll be ${identityName(picked)}.` : '';
-      join.disabled = !picked || joinCode.replace(/\D/g, '').length !== 6;
-    }
-    refreshPicker = update;
+    const ready = () => {
+      join.disabled = joinCode.replace(/\D/g, '').length !== 6;
+    };
+    code.addEventListener('input', () => {
+      joinCode = code.value;
+      ready();
+    });
+    code.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !join.disabled) join.click();
+    });
+    ready();
 
     async function doJoin(pressed: HTMLButtonElement): Promise<void> {
-      if (!picked || !state?.session) return;
-      const tokenValue = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
-      const candidate = { session: state.session, identity: picked, token: tokenValue };
-      if (!writeJSON(`${storage}:identity`, candidate)) {
+      if (!state?.session) return;
+      const secret = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+      const candidate = { session: state.session, token: secret };
+      if (!writeJSON(`${storage}:device`, candidate)) {
         showError('This browser won’t save anything, so you can’t join here. Try a normal (not private) window.');
         return;
       }
-      identity = candidate;
-      const ok = await send('join', { code: joinCode.replace(/\D/g, '') }, pressed);
-      if (!ok && identity) forget();
+      device = candidate;
+      const ok = await send('join', { code: joinCode }, pressed);
+      if (!ok && device) forget();
     }
 
-    update();
-    wrap.append(codeWrap, pickWrap, join);
+    wrap.append(codeWrap, join);
     return wrap;
   }
 
   /** A draft-saving text box: every keystroke is kept on this device. */
-  function draftField(label: string, name: string, max: number, rows: number, hint?: string): HTMLTextAreaElement {
-    const { wrap, input } = field(label, hint);
-    input.rows = rows;
-    input.maxLength = max;
-    input.value = readJSON<string>(draftKey(name)) ?? '';
-    input.addEventListener('input', () => {
-      if (!writeJSON(draftKey(name), input.value)) showError('This browser isn’t saving drafts. Keep this page open until you send.');
+  function draftField(label: string, name: string, max: number, rows: number, hint?: string): { wrap: HTMLElement; input: HTMLTextAreaElement } {
+    const made = field(label, hint);
+    made.input.rows = rows;
+    made.input.maxLength = max;
+    made.input.value = readJSON<string>(draftKey(name)) ?? '';
+    made.input.addEventListener('input', () => {
+      if (!writeJSON(draftKey(name), made.input.value)) showError('This browser isn’t saving drafts. Keep this page open until you send.');
     });
-    pending.push(wrap);
-    return input;
+    return made;
   }
-  let pending: HTMLElement[] = [];
 
   function studentStage(s: StudentState): HTMLElement {
     const stage = el('div', 'pf-stage');
-    pending = [];
 
     if (s.phase === 'write' && !s.submitted) {
-      const input = draftField('Your answer', 'writing', MAX_WRITING, 7, 'You can’t change it after you hand it in.');
-      const hand = button('Hand it in', 'primary', function (this: HTMLButtonElement) {
-        if (!input.value.trim()) {
+      const answer = draftField('Your answer', 'writing', MAX_WRITING, 7, 'You can’t change it after you hand it in.');
+      const hand = button('Hand it in', 'primary', function () {
+        if (!answer.input.value.trim()) {
           showError('Write something first.');
-          input.focus();
+          answer.input.focus();
           return;
         }
-        void send('submit', { text: input.value }, this);
+        void send('submit', { text: answer.input.value }, this);
       });
-      stage.append(...pending, actionsRow(hand));
+      stage.append(answer.wrap, actionsRow(hand));
       return stage;
     }
 
@@ -719,15 +758,15 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
       const form = el('div', 'pf-review__form');
       const strength = draftField(block.content.strength_prompt, 'strength', MAX_FEEDBACK, 3);
       const suggestion = draftField(block.content.suggestion_prompt, 'suggestion', MAX_FEEDBACK, 3);
-      const sendBtn = button('Send feedback', 'primary', function (this: HTMLButtonElement) {
-        if (!strength.value.trim() || !suggestion.value.trim()) {
+      const sendBtn = button('Send feedback', 'primary', function () {
+        if (!strength.input.value.trim() || !suggestion.input.value.trim()) {
           showError('Fill in both boxes before sending.');
-          (strength.value.trim() ? suggestion : strength).focus();
+          (strength.input.value.trim() ? suggestion : strength).input.focus();
           return;
         }
-        void send('feedback', { strength: strength.value, suggestion: suggestion.value }, this);
+        void send('feedback', { strength: strength.input.value, suggestion: suggestion.input.value }, this);
       });
-      form.append(...pending, actionsRow(sendBtn));
+      form.append(strength.wrap, suggestion.wrap, actionsRow(sendBtn));
       pair.append(theirs, form);
       stage.append(pair);
       return stage;
@@ -739,8 +778,8 @@ function mountStudent(block: PeerBlock, lessonId: string): HTMLElement {
     } else {
       stage.append(
         waitPanel(
-          s.included ? 'No feedback came back this time.' : 'Your answer wasn’t in this swap.',
-          'Ask your teacher if you’d like someone to read it.'
+          s.included ? 'No feedback has come back yet.' : 'Your answer wasn’t in this swap.',
+          s.included ? 'This page updates by itself. If nothing arrives, ask your teacher.' : 'Ask your teacher if you’d like someone to read it.'
         )
       );
     }
