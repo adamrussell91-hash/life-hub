@@ -27,6 +27,24 @@ export const SAMPLES = {
       { from: 'c3', to: 'e2', kind: 'relates' }
     ]
   ),
+  concept_map: run(
+    'concept_map',
+    [
+      node('theme', 'theme', 'Why the allotment yields less each year.', 'Falling yields'),
+      node('c1', 'concept:1', 'Soil is compacted.', 'Compacted soil'),
+      node('c2', 'concept:2', 'Watering is irregular.', 'Irregular watering', { state: 'contested', objection: 'Is this measured or a guess?' }),
+      node('c3', 'concept:3', 'Crops are not rotated.', 'No rotation'),
+      node('c4', 'concept:4', 'Pests overwinter in debris.', 'Overwintering pests'),
+      node('c5', 'concept:5', 'Nutrients run low.', 'Low nutrients')
+    ],
+    [
+      { from: 'theme', to: 'c1', kind: 'hierarchical' },
+      { from: 'theme', to: 'c3', kind: 'hierarchical' },
+      { from: 'c3', to: 'c5', kind: 'hierarchical' },
+      { from: 'c1', to: 'c2', kind: 'association' },
+      { from: 'c4', to: 'c5', kind: 'cross' }
+    ]
+  ),
   problem_statement: run('problem_statement', [
     node('problem', 'problem', 'One in four deliveries misses its window.', 'Quarter late'),
     node('impact', 'impact', 'Refunds cost about 3,000 a month and support time doubles.', 'Refunds and support load'),
@@ -88,3 +106,17 @@ export const SAMPLES = {
     node('a', 'a', 'Within current courier contracts and staffing.', 'Within contracts')
   ])
 };
+
+const session = (model, phase, runs) => ({
+  id: `sample-${model}`, title: 'Late deliveries', revision: 1, status: phase === 'defined' ? 'defined' : 'active', phase,
+  frame: {}, model: { id: model, reason: '' }, links: [], define: { runs, finishedEarly: false, exitObjection: null },
+  turns: [], summary: '', suggestion: null, pendingKeep: null, runner: { status: 'idle', mode: 'turn', error: null }, createdAt: '', updatedAt: ''
+});
+const chain = [
+  { ...SAMPLES.five_whys, id: 'run-whys', status: 'switched', switchReason: 'The causes branch, so a tree fits better.' },
+  { ...SAMPLES.problem_tree, id: 'run-tree', status: 'done' },
+  { ...SAMPLES.smart, id: 'run-smart', status: 'done' }
+];
+SAMPLES.record = session('seven_step', 'defined', chain);
+SAMPLES.record_polya = session('polya', 'define', [chain[0], { ...chain[1], status: 'active' }]);
+SAMPLES.record_triz = session('triz', 'defined', chain.slice(1));
