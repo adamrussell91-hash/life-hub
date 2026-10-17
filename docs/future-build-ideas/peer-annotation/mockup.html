@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peer annotation mockup</title>
+<style>
+  :root {
+    --paper: #fbf8f2; --cotton: #f5f1e9; --shore: #eae7da; --ink: #13233a; --muted: #6b7788;
+    --marine: #142b51; --wave: #376fb7; --success: #2f7a4f; --danger: #9b2c2c; --gold-ink: #6c581f;
+    --lilac-ink: #5d4e70; --orange-ink: #a85a0c; --line: rgba(23, 55, 94, 0.10);
+    --sage: #dfe9e1; --blue: #dceafa; --peach: #f2dfd0; --gold: #f1e2b6; --lilac: #e8e0f1;
+    --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; font-family: var(--font); color: var(--ink); background: var(--paper); }
+  h1 { margin: 0 auto 4px; max-width: 980px; font-size: 1.4rem; }
+  .lede { margin: 0 auto 24px; max-width: 980px; color: var(--muted); font-size: 0.95rem; }
+  .stage { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 28px; max-width: 980px; margin: auto; }
+  .col h2 { margin: 0 0 10px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .phone { display: grid; gap: 14px; padding: 18px; background: var(--cotton); border: 1px solid var(--line); border-radius: 24px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .you { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.95rem; }
+  .count { font-size: 0.8rem; color: var(--muted); }
+  .tok { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--c); flex: none; }
+  .tok svg { width: 62%; height: 62%; fill: #fff; }
+  .tok--sm { width: 20px; height: 20px; }
+  .hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
+  .paper { padding: 16px 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; line-height: 1.75; font-size: 1rem; }
+  .paper p { margin: 0 0 10px; }
+  .paper p:last-child { margin: 0; }
+  .s { cursor: pointer; border-radius: 4px; padding: 1px 0; transition: background-color 120ms; }
+  .s:hover { background: rgba(55, 111, 183, 0.08); }
+  .s.sel { background: rgba(55, 111, 183, 0.18); outline: 2px solid var(--wave); outline-offset: 1px; }
+  .s.mark { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 4px; text-decoration-color: var(--m); background: color-mix(in srgb, var(--m) 12%, transparent); }
+  .tray { display: grid; gap: 10px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+  .tray[hidden] { display: none; }
+  .quote { margin: 0; font-size: 0.85rem; color: var(--muted); font-style: italic; }
+  .codes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .code { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--ink); background: var(--bg); border: 2px solid transparent; border-radius: 999px; cursor: pointer; }
+  .code[aria-pressed="true"] { border-color: var(--marine); }
+  .code i { width: 10px; height: 10px; border-radius: 50%; background: var(--m); }
+  label { display: grid; gap: 6px; font-size: 0.85rem; font-weight: 600; }
+  input[type=text] { width: 100%; padding: 10px 12px; font: inherit; font-size: 16px; border: 1px solid rgba(23,55,94,.18); border-radius: 10px; background: #fff; color: var(--ink); }
+  .row { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn { min-height: 40px; padding: 8px 16px; font: inherit; font-size: 0.9rem; font-weight: 600; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.7); color: var(--marine); cursor: pointer; }
+  .btn--primary { background: var(--marine); border-color: var(--marine); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .notes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .note { display: flex; gap: 8px; align-items: baseline; font-size: 0.85rem; }
+  .note b { color: var(--m); }
+  .note span { color: var(--muted); }
+  .layers { display: flex; flex-wrap: wrap; gap: 8px; }
+  .layer { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+  .layer[aria-pressed="false"] { opacity: .45; }
+  .summary { margin: 0; font-size: 0.85rem; color: var(--ink); }
+  .card { display: grid; gap: 8px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--m); border-radius: 12px; }
+  .card[hidden] { display: none; }
+  .card__head { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
+  .card__code { font-weight: 700; color: var(--ink); font-size: 0.95rem; }
+  .card__answer { margin: 0; font-size: 0.95rem; }
+  .res { display: flex; gap: 10px; align-items: center; padding: 10px; background: var(--cotton); border-radius: 10px; text-decoration: none; color: var(--ink); }
+  .res__thumb { display: grid; place-items: center; width: 64px; height: 40px; border-radius: 6px; background: var(--marine); color: #fff; font-size: 1rem; flex: none; }
+  .res small { display: block; color: var(--muted); font-size: 0.75rem; }
+  .tech { padding: 10px 12px; background: var(--lilac); border-radius: 10px; font-size: 0.85rem; }
+  .tech b { display: block; margin-bottom: 2px; }
+  .setup { max-width: 980px; margin: 32px auto 0; padding: 18px; background: var(--cotton); border: 1px dashed rgba(23,55,94,.25); border-radius: 18px; }
+  .setup h2 { margin: 0 0 4px; font-size: 1rem; }
+  .setup table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
+  .setup th, .setup td { text-align: left; padding: 8px; border-top: 1px solid var(--line); vertical-align: top; }
+  .setup th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; }
+  .setup-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Peer annotation</h1>
+<p class="lede">Left: giving feedback (one layer, your buttons). Right: getting it back (two layers, one per reviewer). Below: the teacher setup that decides what each button links to. Tap things; it's live.</p>
+
+<div class="stage">
+  <section class="col">
+    <h2>Giving feedback · 1 of 2</h2>
+    <div class="phone">
+      <div class="top">
+        <div class="you"><span class="tok" style="--c:var(--wave)"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg></span>You're Blue star</div>
+        <span class="count">Piece 1 of 2</span>
+      </div>
+      <p class="hint">Tap a sentence, then pick what you want to say about it.</p>
+      <div class="paper" id="give-text">
+        <p><span class="s">The poet uses a simile when she says "the sea is a hungry dog".</span> <span class="s">This shows the sea is dangerous.</span> <span class="s">The sea is also described as "giant and grey" which makes it seem bigger than the speaker.</span></p>
+        <p><span class="s">At the end the speaker feels calm.</span> <span class="s">This is because the storm has gone.</span></p>
+      </div>
+      <div class="tray" id="tray" hidden>
+        <p class="quote" id="tray-quote"></p>
+        <div class="codes" id="give-codes"></div>
+        <label id="ask-wrap" hidden><span id="ask-label"></span><input type="text" id="ask"></label>
+        <label>Anything to add? (optional)<input type="text" id="comment" maxlength="140"></label>
+        <div class="row"><button class="btn" id="cancel" type="button">Cancel</button><button class="btn btn--primary" id="add" type="button" disabled>Add</button></div>
+      </div>
+      <ul class="notes" id="give-notes"></ul>
+      <div class="row"><button class="btn btn--primary" type="button" id="send" disabled>Send, then piece 2</button></div>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2>Getting it back</h2>
+    <div class="phone">
+      <div class="top">
+        <div class="you"><span class="tok" style="--c:var(--danger)"><svg viewBox="0 0 24 24"><path d="M12 19.5s-7-4.3-7-9.2A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.3c0 4.9-7 9.2-7 9.2z"/></svg></span>Feedback on your answer</div>
+      </div>
+      <div class="layers" id="layers"></div>
+      <p class="summary" id="summary"></p>
+      <div class="paper" id="get-text">
+        <p><span class="s" data-k="a">The poet uses a simile when she says "the sea is a hungry dog".</span> <span class="s" data-k="b">This shows the sea is dangerous.</span> <span class="s" data-k="c">The sea is also described as "giant and grey" which makes it seem bigger than the speaker.</span></p>
+        <p><span class="s" data-k="d">At the end the speaker feels calm.</span> <span class="s" data-k="e">This is because the storm has gone.</span></p>
+      </div>
+      <div class="card" id="card" hidden></div>
+      <p class="hint" id="get-hint">Tap an underlined sentence to read the note.</p>
+    </div>
+  </section>
+</div>
+
+<section class="setup">
+  <h2>Teacher setup for this block (students never see this)</h2>
+  <p class="hint">Each button can ask the reviewer for a word, and can carry a resource you choose. The resource is attached automatically when the writer opens that note.</p>
+  <div class="setup-wrap"><table>
+    <thead><tr><th>Button</th><th>Asks the reviewer</th><th>Writer automatically gets</th></tr></thead>
+    <tbody id="setup-rows"></tbody>
+  </table></div>
+</section>
+
+<script>
+const SHAPES = {
+  star: 'M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z',
+  diamond: 'M12 4l8 8-8 8-8-8z'
+};
+const CODES = [
+  { id: 'tech', label: 'Wrong technique', m: 'var(--orange-ink)', bg: 'var(--peach)', ask: 'Should be:', resource: { kind: 'technique' } },
+  { id: 'evidence', label: 'Needs evidence', m: 'var(--wave)', bg: 'var(--blue)', resource: { kind: 'video', title: 'Embedding a quote in 60 seconds', src: 'Video · 1:02' } },
+  { id: 'effect', label: 'Explain the effect', m: 'var(--lilac-ink)', bg: 'var(--lilac)', resource: { kind: 'video', title: 'Technique → effect → so what?', src: 'Video · 2:15' } },
+  { id: 'great', label: 'Great quote', m: 'var(--success)', bg: 'var(--sage)' },
+  { id: 'unclear', label: 'Unclear', m: 'var(--gold-ink)', bg: 'var(--gold)', ask: 'What confused you?' }
+];
+const TECH = { metaphor: { name: 'Metaphor', def: 'Says one thing IS another, without "like" or "as".', vs: 'A simile uses "like" or "as": "the sea is like a hungry dog".' } };
+const code = id => CODES.find(c => c.id === id);
+const tok = (colour, shape, sm) => `<span class="tok${sm ? ' tok--sm' : ''}" style="--c:${colour}"><svg viewBox="0 0 24 24"><path d="${SHAPES[shape]}"/></svg></span>`;
+
+/* ── Giving ── */
+const giveText = document.getElementById('give-text');
+const tray = document.getElementById('tray');
+const notes = [];
+let selected = null, chosen = null;
+const giveCodes = document.getElementById('give-codes');
+for (const c of CODES) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'code'; b.style.setProperty('--m', c.m); b.style.setProperty('--bg', c.bg);
+  b.innerHTML = `<i></i>${c.label}`; b.setAttribute('aria-pressed', 'false');
+  b.addEventListener('click', () => {
+    chosen = c.id;
+    giveCodes.querySelectorAll('.code').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    const askWrap = document.getElementById('ask-wrap');
+    askWrap.hidden = !c.ask;
+    document.getElementById('ask-label').textContent = c.ask || '';
+    document.getElementById('add').disabled = false;
+    if (c.ask) document.getElementById('ask').focus();
+  });
+  giveCodes.append(b);
+}
+giveText.addEventListener('click', e => {
+  const s = e.target.closest('.s'); if (!s || s.classList.contains('mark')) return;
+  giveText.querySelectorAll('.sel').forEach(x => x.classList.remove('sel'));
+  s.classList.add('sel'); selected = s;
+  document.getElementById('tray-quote').textContent = `"${s.textContent}"`;
+  tray.hidden = false;
+});
+function resetTray() {
+  tray.hidden = true; chosen = null; selected?.classList.remove('sel'); selected = null;
+  giveCodes.querySelectorAll('.code').forEach(x => x.setAttribute('aria-pressed', 'false'));
+  document.getElementById('ask').value = ''; document.getElementById('comment').value = '';
+  document.getElementById('ask-wrap').hidden = true; document.getElementById('add').disabled = true;
+}
+document.getElementById('cancel').addEventListener('click', resetTray);
+document.getElementById('add').addEventListener('click', () => {
+  const c = code(chosen);
+  selected.classList.remove('sel'); selected.classList.add('mark'); selected.style.setProperty('--m', c.m);
+  notes.push({ c, answer: document.getElementById('ask').value.trim(), comment: document.getElementById('comment').value.trim() });
+  const li = document.createElement('li'); li.className = 'note'; li.style.setProperty('--m', c.m);
+  const extra = [notes.at(-1).answer, notes.at(-1).comment].filter(Boolean).join(' · ');
+  li.innerHTML = `<b>${c.label}</b><span>${extra}</span>`;
+  document.getElementById('give-notes').append(li);
+  document.getElementById('send').disabled = false;
+  selected = null; resetTray();
+});
+document.getElementById('send').addEventListener('click', e => { e.target.textContent = 'Sent ✓ (piece 2 would open here)'; e.target.disabled = true; });
+
+/* ── Getting back ── */
+const REVIEWERS = [
+  { id: 'r1', name: 'Blue star', colour: 'var(--wave)', shape: 'star', on: true },
+  { id: 'r2', name: 'Green diamond', colour: 'var(--success)', shape: 'diamond', on: true }
+];
+const RECEIVED = [
+  { r: 'r1', k: 'a', code: 'tech', answer: 'metaphor', comment: 'No "like" or "as", so it\'s a metaphor.' },
+  { r: 'r2', k: 'a', code: 'great', comment: 'Love this quote choice.' },
+  { r: 'r1', k: 'b', code: 'effect' },
+  { r: 'r2', k: 'b', code: 'effect', comment: 'Why does it make it dangerous?' },
+  { r: 'r2', k: 'e', code: 'evidence' }
+];
+const getText = document.getElementById('get-text');
+const card = document.getElementById('card');
+function paintLayers() {
+  const host = document.getElementById('layers'); host.innerHTML = '';
+  for (const r of REVIEWERS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'layer';
+    b.setAttribute('aria-pressed', String(r.on)); b.innerHTML = `${tok(r.colour, r.shape, true)}${r.name}`;
+    b.addEventListener('click', () => { r.on = !r.on; card.hidden = true; paintLayers(); });
+    host.append(b);
+  }
+  const live = RECEIVED.filter(n => REVIEWERS.find(r => r.id === n.r).on);
+  const counts = {}; live.forEach(n => counts[n.code] = (counts[n.code] || 0) + 1);
+  document.getElementById('summary').textContent = Object.entries(counts).map(([id, n]) => `${n} × ${code(id).label}`).join(' · ') || 'Both layers hidden.';
+  getText.querySelectorAll('.s').forEach(s => {
+    const here = live.filter(n => n.k === s.dataset.k);
+    s.classList.toggle('mark', here.length > 0);
+    if (here.length) s.style.setProperty('--m', REVIEWERS.find(r => r.id === here[0].r).colour);
+  });
+}
+getText.addEventListener('click', e => {
+  const s = e.target.closest('.s.mark'); if (!s) return;
+  const here = RECEIVED.filter(n => n.k === s.dataset.k && REVIEWERS.find(r => r.id === n.r).on);
+  card.innerHTML = '';
+  card.style.setProperty('--m', REVIEWERS.find(r => r.id === here[0].r).colour);
+  for (const n of here) {
+    const r = REVIEWERS.find(x => x.id === n.r), c = code(n.code);
+    const part = document.createElement('div'); part.style.display = 'grid'; part.style.gap = '8px';
+    let html = `<div class="card__head">${tok(r.colour, r.shape, true)}${r.name}</div><div class="card__code">${c.label}${n.answer ? ': ' + n.answer : ''}</div>`;
+    if (n.comment) html += `<p class="card__answer">${n.comment}</p>`;
+    if (c.resource?.kind === 'technique' && TECH[n.answer?.toLowerCase()]) {
+      const t = TECH[n.answer.toLowerCase()];
+      html += `<div class="tech"><b>${t.name}</b>${t.def}<br><small>${t.vs}</small></div>`;
+    } else if (c.resource?.kind === 'video') {
+      html += `<a class="res" href="#" onclick="return false"><span class="res__thumb">▶</span><span>${c.resource.title}<small>${c.resource.src} · added by your teacher</small></span></a>`;
+    }
+    part.innerHTML = html; card.append(part);
+  }
+  card.hidden = false; document.getElementById('get-hint').hidden = true;
+});
+paintLayers();
+
+/* ── Setup table ── */
+document.getElementById('setup-rows').innerHTML = CODES.map(c => `<tr><td><span class="code" style="--m:${c.m};--bg:${c.bg};cursor:default"><i></i>${c.label}</span></td><td>${c.ask || '—'}</td><td>${c.resource ? (c.resource.kind === 'technique' ? 'Technique card for the word they typed' : `▶ ${c.resource.title}`) : '—'}</td></tr>`).join('');
+</script>
+</body>
+</html>
