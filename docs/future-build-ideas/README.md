@@ -88,7 +88,7 @@ This split is an **Open question** for the next round, not a decision.
 | Metropolis: the ground (Adam to fill in) | Brief | [life-city-ground.md](life-city-ground.md) |
 | Life City asset inventory | Inventory | [life-city-assets.md](life-city-assets.md) |
 | Notion → GitHub gap map | Future build inventory | [notion-github-gap-map.md](notion-github-gap-map.md) |
-| Peer annotation: feedback as two annotation layers | Concept and mockup | [peer-annotation.md](peer-annotation.md) |
+| Peer annotation: feedback as two annotation layers | Built (Notes on the text mode) | [peer-annotation.md](peer-annotation.md) |
 | Peer-built weekly review: quiz lessons fed by student questions | Built | [peer-built-quiz.md](peer-built-quiz.md) |
 
 ## History

@@ -1,0 +1,537 @@
+/* Peer feedback, annotate mode: notes on the text, layers per reviewer. Tokens only. */
+
+.pa-give,
+.pa-get,
+.pa-teacher,
+.pa-bank {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pa-give p,
+.pa-get p,
+.pa-teacher p,
+.pa-bank p {
+  margin: 0;
+}
+
+.pa-give__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pa-give__title {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.pa-give__count,
+.pa-hint {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.pa-hint[hidden] {
+  display: none;
+}
+
+/* ── The writing ───────────────────────────────────────────────────── */
+
+.pa-paper {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+
+.pa-give .pa-sentence {
+  cursor: pointer;
+}
+
+.pa-give .pa-sentence:hover .pa-run:not(.pa-run--selected) {
+  background: color-mix(in srgb, var(--wave) 8%, transparent);
+}
+
+.pa-run {
+  border-radius: 3px;
+}
+
+.pa-run--mark {
+  background: color-mix(in srgb, var(--pa-mark) 14%, transparent);
+  text-decoration: underline;
+  text-decoration-color: var(--pa-mark);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 4px;
+}
+
+/* Both reviewers on the same words: the second colour as a band under the first. */
+.pa-run--both {
+  box-shadow: inset 0 -2px 0 var(--pa-mark-2);
+}
+
+.pa-run--selected {
+  background: color-mix(in srgb, var(--wave) 20%, transparent);
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+.pa-paper-host--read .pa-run--mark {
+  cursor: pointer;
+}
+
+.pa-paper-host--read .pa-run--mark:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.pa-run--open {
+  background: color-mix(in srgb, var(--pa-mark) 30%, transparent);
+}
+
+/* ── Giving: the tray under the writing ────────────────────────────── */
+
+.pa-tray {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--wave);
+  border-radius: var(--radius-md);
+}
+
+.pa-tray[hidden] {
+  display: none;
+}
+
+.pa-quote,
+.pa-note__quote,
+.pa-card__quote {
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--muted);
+}
+
+.pa-codes,
+.pa-layers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pa-code,
+.pa-layer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  white-space: nowrap;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.pa-code[data-colour='blue'] { background: var(--pastel-blue); }
+.pa-code[data-colour='sage'] { background: var(--pastel-sage); }
+.pa-code[data-colour='peach'] { background: var(--pastel-peach); }
+.pa-code[data-colour='gold'] { background: var(--pastel-gold); }
+.pa-code[data-colour='lilac'] { background: var(--pastel-lilac); }
+
+.pa-code[aria-pressed='true'] {
+  border-color: var(--marine);
+  box-shadow: 0 0 0 1px var(--marine);
+}
+
+.pa-layer[aria-pressed='false'] {
+  color: var(--muted);
+  background: transparent;
+  border-style: dashed;
+}
+
+.pa-layer[aria-pressed='false'] .pa-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--pa-dot);
+}
+
+.pa-code:focus-visible,
+.pa-layer:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.pa-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--pa-dot);
+  border-radius: 50%;
+}
+
+.pa-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: var(--radius-md);
+}
+
+.pa-input:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+/* ── Note lists ────────────────────────────────────────────────────── */
+
+.pa-notes {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pa-notes[hidden] {
+  display: none;
+}
+
+.pa-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.pa-note[data-status='removed'] {
+  opacity: 0.55;
+}
+
+.pa-note[data-status='held'] {
+  border-color: var(--danger);
+}
+
+.pa-note__main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.pa-note__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.pa-note__comment,
+.pa-card__comment {
+  font-size: var(--text-sm);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pa-note__actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+
+.pa-send-hint {
+  margin-right: auto;
+  align-self: center;
+}
+
+/* ── Getting it back ───────────────────────────────────────────────── */
+
+.pa-summary {
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.pa-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.pa-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pa-mark);
+  border-radius: var(--radius-md);
+}
+
+.pa-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.pa-card__title {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.pa-res {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--cotton);
+  border-radius: var(--radius-md);
+}
+
+.pa-res:hover {
+  background: var(--shore);
+}
+
+.pa-res:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.pa-res__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 3rem;
+  height: 2.25rem;
+  color: var(--paper);
+  background: var(--marine);
+  border-radius: var(--radius-sm);
+}
+
+.pa-res__words {
+  display: grid;
+  min-width: 0;
+}
+
+.pa-res__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.pa-res__meta {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.pa-technique {
+  min-width: 0;
+}
+
+/* ── Teacher ───────────────────────────────────────────────────────── */
+
+.pa-tlayer {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--pa-mark);
+}
+
+.pa-tlayer__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.pa-focus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pa-focus__label {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.pa-focus__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  white-space: nowrap;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.pa-focus__chip[aria-pressed='true'] {
+  border-color: var(--marine);
+  box-shadow: 0 0 0 1px var(--marine);
+}
+
+/* ── Editor: mode switch and the shared button bank ───────────────── */
+
+.pa-mode {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--shore);
+  border-radius: var(--radius-full);
+}
+
+.pa-mode__option {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-4);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.pa-mode__option[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: var(--elev-1);
+}
+
+.pa-bank__rows {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pa-bank__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.pa-bank__wide {
+  grid-column: 1 / -1;
+}
+
+.pa-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pa-swatch {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.pa-swatch[data-colour='blue'] { background: var(--pastel-blue); }
+.pa-swatch[data-colour='sage'] { background: var(--pastel-sage); }
+.pa-swatch[data-colour='peach'] { background: var(--pastel-peach); }
+.pa-swatch[data-colour='gold'] { background: var(--pastel-gold); }
+.pa-swatch[data-colour='lilac'] { background: var(--pastel-lilac); }
+
+.pa-swatch[aria-pressed='true'] {
+  border-color: var(--marine);
+}
+
+.pa-swatch:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.pa-bank__row-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: end;
+}
+
+.pa-bank__status {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.pa-bank__status[data-tone='error'] {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .pa-paper {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .pa-input {
+    font-size: max(16px, var(--text-base));
+  }
+
+  .pa-note {
+    flex-direction: column;
+  }
+
+  .pa-note__actions {
+    align-self: flex-end;
+  }
+
+  .pa-note__actions .btn {
+    min-height: 44px;
+  }
+}
+
+/* Four resource choices: an even grid that wraps cleanly instead of a lopsided pill. */
+.pa-bank .pa-mode {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  border-radius: var(--radius-md);
+}
+
+.pa-bank .pa-mode__option {
+  border-radius: var(--radius-sm);
+}

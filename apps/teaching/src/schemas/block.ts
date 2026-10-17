@@ -425,6 +425,8 @@ export const PeerFeedbackBlockSchema = z.object({
   visibility: VisibilitySchema,
   content: z.object({
     prompt: z.string().max(4000),
+    /** comments: two feedback boxes, one reader. annotate: notes on the text, two readers. */
+    mode: z.enum(['comments', 'annotate']).default('comments'),
     strength_prompt: z.string().max(300).default('One thing that works well…'),
     suggestion_prompt: z.string().max(300).default('One suggestion or question…')
   }), ...blockLayout, ...blockTimestamps
