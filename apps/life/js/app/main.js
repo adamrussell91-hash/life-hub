@@ -117,23 +117,29 @@ const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);
 const skincareApi = createSkincareApi(fetchImpl);
 const foodJournalView = createFoodJournalView({ root: document, api: createFoodJournalApi(fetchImpl) });
+// Property renders inside Management's Property tab, so the page keeps the
+// Management title rather than taking the property's name.
 const propertyView = createPropertyView({
   root: document,
-  api: createPropertyApi(fetchImpl),
-  setTitle: title => {
-    const heading = document.querySelector('#page-title');
-    if (heading && document.querySelector('#property-dashboard')?.hidden === false) heading.textContent = title;
-  }
+  api: createPropertyApi(fetchImpl)
 });
 const garageHomeView = createGarageHomeView({
   root: document,
   api: createGarageHomeApi(fetchImpl),
-  // Investments hand off to the Property page through the rail button, so the
-  // controller's own section switch (title, hash, visibility) runs as usual.
-  openSection: name => document.querySelector(`.hub-nav-item[data-section="${name}"]`)?.click(),
+  propertyPanel: {
+    show: () => {
+      const panel = document.querySelector('#property-dashboard');
+      if (panel) panel.hidden = false;
+      propertyView.show();
+    },
+    hide: () => {
+      const panel = document.querySelector('#property-dashboard');
+      if (panel) panel.hidden = true;
+    }
+  },
   setTitle: title => {
     const heading = document.querySelector('#page-title');
-    if (heading && document.querySelector('#garage-home-dashboard')?.hidden === false) heading.textContent = title;
+    if (heading && document.querySelector('#management-dashboard')?.hidden === false) heading.textContent = title;
   }
 });
 const teachingApi = createTeachingApi(fetchImpl);
@@ -228,7 +234,6 @@ controller = createAppController({
   renderFutureMap,
   loadFutureMapTrips,
   foodJournalView,
-  propertyView,
   garageHomeView,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
@@ -276,7 +281,7 @@ document.addEventListener('keydown', (event) => {
     placeholder: 'Jump in Life Hub',
     groups: [{
       heading: 'Go to',
-      items: ['home', 'chat', 'food-journal', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'future-map'].map((id) => ({
+      items: ['home', 'chat', 'food-journal', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'future-map', 'management'].map((id) => ({
         id,
         label: id.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
         onSelect: () => document.querySelector(`[data-section="${id}"]`)?.click()

@@ -45,8 +45,7 @@ const MORE_SECTIONS = new Set([
   'skincare',
   'central-node',
   'future-map',
-  'property',
-  'garage-home'
+  'management'
 ]);
 
 const HASH_SECTIONS = new Set([
@@ -63,8 +62,7 @@ const HASH_SECTIONS = new Set([
   'mind',
   'central-node',
   'future-map',
-  'property',
-  'garage-home',
+  'management',
   'hub-map'
 ]);
 
@@ -86,6 +84,8 @@ export function sectionFromHash(hash) {
   if (!section) return null;
   if (section === 'central-node-dashboard') return 'central-node';
   if (section === 'shortcuts') return 'home';
+  // Garage & Home and Property merged into Management; old links still land.
+  if (section === 'garage-home' || section === 'property') return 'management';
   return HASH_SECTIONS.has(section) ? section : null;
 }
 
@@ -127,7 +127,6 @@ export function createAppController(dependencies) {
     renderFutureMap,
     loadFutureMapTrips,
     foodJournalView,
-    propertyView,
     garageHomeView,
     skincareController,
     skincareRoutines,
@@ -249,7 +248,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'food-journal' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'future-map' || target === 'property' || target === 'garage-home' || target === 'more') continue;
+    if (target === 'home' || target === 'chat' || target === 'food-journal' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'future-map' || target === 'management' || target === 'more') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -285,11 +284,8 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="future-map"]') ?? []) {
     bind(button, 'click', () => showSection('future-map'));
   }
-  for (const button of root.querySelectorAll?.('[data-section="property"]') ?? []) {
-    bind(button, 'click', () => showSection('property'));
-  }
-  for (const button of root.querySelectorAll?.('[data-section="garage-home"]') ?? []) {
-    bind(button, 'click', () => showSection('garage-home'));
+  for (const button of root.querySelectorAll?.('[data-section="management"]') ?? []) {
+    bind(button, 'click', () => showSection('management'));
   }
   for (const button of root.querySelectorAll?.('[data-section="food-journal"]') ?? []) {
     bind(button, 'click', () => showSection('food-journal'));
@@ -775,8 +771,7 @@ export function createAppController(dependencies) {
     mind: { eyebrow: 'Life Hub', title: 'Mind' },
     'central-node': { eyebrow: 'Life Hub', title: 'Central Node' },
     'future-map': { eyebrow: 'Life Hub', title: 'Future map' },
-    property: { eyebrow: 'Life Hub · Property', title: 'Property' },
-    'garage-home': { eyebrow: 'Life Hub', title: 'Garage & Home' },
+    management: { eyebrow: 'Life Hub', title: 'Management' },
     'hub-map': { eyebrow: 'Life Hub', title: 'Hub map' }
   };
 
@@ -837,10 +832,8 @@ export function createAppController(dependencies) {
     const centralNode = root.querySelector('#central-node-dashboard');
     const futureMap = root.querySelector('#future-map-dashboard');
     const hubMapSection = root.querySelector('#hub-map-dashboard');
-    const property = root.querySelector('#property-dashboard');
-    const garageHome = root.querySelector('#garage-home-dashboard');
-    if (property) property.hidden = name !== 'property';
-    if (garageHome) garageHome.hidden = name !== 'garage-home';
+    const management = root.querySelector('#management-dashboard');
+    if (management) management.hidden = name !== 'management';
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
     if (fitness) fitness.hidden = name !== 'fitness';
@@ -923,8 +916,11 @@ export function createAppController(dependencies) {
     }
     if (name === 'central-node') renderCentralNodeSection();
     if (name === 'food-journal') foodJournalView?.show?.();
-    if (name === 'property') propertyView?.show?.();
-    if (name === 'garage-home') void garageHomeView?.show?.();
+    if (name === 'management') {
+      // An old #property link opens straight on the Property tab.
+      const legacy = String(windowTarget.location?.hash ?? '').replace(/^#\/*/, '').split(/[/?#]/)[0];
+      void garageHomeView?.show?.(legacy === 'property' ? { tab: 'property' } : undefined);
+    }
     if (name === 'future-map') {
       void loadFutureMap();
       void loadFutureMapTrips?.(root, { fetchImpl: apiFetch });
