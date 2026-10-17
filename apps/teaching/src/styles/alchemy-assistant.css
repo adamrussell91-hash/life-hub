@@ -1,12 +1,16 @@
 .alchemy-block-button { display: none; }
-[data-alchemy-assistant] .block, [data-alchemy-assistant] .alchemy-editor-block { position: relative; padding-bottom: var(--space-12); }
-[data-alchemy-assistant] .alchemy-block-button { display: inline-flex; align-items: center; justify-content: center; position: absolute; right: var(--space-1); bottom: var(--space-1); width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--cotton); color: var(--alchemy-accent); cursor: pointer; }
-.alchemy-block-button img { border-radius: 50%; object-fit: cover; }
-.alchemy-block-button__beaker { position: absolute; right: -2px; bottom: 0; border-radius: 50%; background: var(--cotton); }
-.alchemy-block-button__badge { position: absolute; top: 0; right: 0; min-width: 16px; border-radius: 50%; background: var(--alchemy-accent); color: var(--cotton); font-size: 10px; line-height: 16px; text-align: center; }
+/* Rows keep 2.75rem clear for the ⋯ menu; the beaker needs one more button's width so text never runs under it. */
+[data-alchemy-assistant] .lesson-page__block { padding-right: calc(2.75rem + var(--space-8)); }
+/* Sits just left of the row's ⋯ menu and matches it: muted, quiet, only present when the row is in use. */
+[data-alchemy-assistant] .lesson-page__block > .alchemy-block-button { display: inline-grid; place-items: center; position: absolute; top: var(--space-2); right: calc(var(--space-2) + var(--space-8) + 2px); z-index: 2; width: var(--space-8); height: var(--space-8); margin: 0; padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--muted); cursor: pointer; opacity: 0; -webkit-tap-highlight-color: transparent; transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease; }
+/* No hover on touch: keep it findable but faint. */
+@media (hover: none) { [data-alchemy-assistant] .lesson-page__block > .alchemy-block-button { opacity: .45; } }
+.lesson-page__block:hover > .alchemy-block-button, .lesson-page__block:focus-within > .alchemy-block-button, .lesson-page__block--selected > .alchemy-block-button, .alchemy-block-button.has-suggestion { opacity: 1; }
+.alchemy-block-button:hover { color: var(--alchemy-accent); background: color-mix(in srgb, var(--alchemy-accent) 8%, transparent); }
+.alchemy-block-button:focus-visible { opacity: 1; outline: 2px solid var(--wave); outline-offset: 2px; }
+.alchemy-block-button__badge { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--alchemy-accent); }
 .alchemy-block-button__badge[hidden] { display: none; }
-.alchemy-block-button.has-suggestion { box-shadow: 0 0 0 2px var(--alchemy-accent); }
-.alchemy-block-button:focus-visible { outline: 3px solid var(--wave); outline-offset: 3px; }
+.alchemy-block-button.has-suggestion { color: var(--alchemy-accent); }
 .alchemy-review { padding: var(--space-4); width: min(640px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); border: 1px solid var(--line); border-radius: var(--radius-lg); color: var(--ink); }
 .alchemy-review[open] { display: flex; flex-direction: column; }
 .alchemy-review::backdrop { background: rgb(0 0 0 / .3); backdrop-filter: blur(4px); }
@@ -21,3 +25,15 @@
 .alchemy-review__error { flex-shrink: 0; margin: var(--space-2) 0 0; color: var(--red, var(--ink)); }
 @media (max-width: 720px) { .alchemy-review { width: calc(100vw - 1rem); max-height: calc(var(--vv-height, 100dvh) - 1rem); box-sizing: border-box; padding: var(--space-3); } }
 @media print { .alchemy-block-button, .alchemy-review { display: none !important; } }
+.unit-notes { margin-top: var(--space-6); border-top: 1px solid var(--line); padding-top: var(--space-3); color: var(--ink); }
+.unit-notes__summary { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; cursor: pointer; color: var(--muted); font-size: .85rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.unit-notes__count { color: var(--muted); font-weight: 500; letter-spacing: 0; }
+.unit-notes__intro, .unit-notes__why, .unit-notes__status, .unit-notes__empty { margin: 0; color: var(--muted); font-size: .9rem; }
+.unit-notes__list { display: grid; gap: var(--space-2); margin: var(--space-3) 0; padding: 0; list-style: none; }
+.unit-notes__item { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.unit-notes__item a { font-weight: 600; overflow-wrap: anywhere; }
+.unit-notes__remove { flex-shrink: 0; min-width: 44px; min-height: 44px; margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0; border: 0; background: transparent; color: var(--muted); font-size: 1.1rem; cursor: pointer; border-radius: var(--radius-xs); }
+.unit-notes__remove:hover { color: var(--ink); }
+.unit-notes__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.unit-notes__actions .btn { min-height: 44px; }
+@media print { .unit-notes { display: none; } }

@@ -1,4 +1,5 @@
 import { mountBlockAssistant } from '@/alchemy/block-assistant';
+import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { navigate } from '@/app/router';
@@ -778,6 +779,7 @@ function mountUnitPlanEditor(
   pageCol.append(errorBanner, toolbar, canvasHost);
   root.append(railHost, pageCol);
   host.replaceChildren(root);
+  const unitNotes = mountUnitNotesPanel(pageCol, options.unit.id);
 
   function saveErrorMessage(error: unknown): string {
     return error instanceof ApiClientError
@@ -963,6 +965,7 @@ function mountUnitPlanEditor(
     },
     dispose: () => {
       assistant?.dispose();
+      unitNotes.dispose();
       if (saveTimer !== null) {
         clearTimeout(saveTimer);
         saveTimer = null;
