@@ -206,7 +206,7 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
             draft = loadDraft(next.current);
             questionStarted = Date.now();
             view = 'quiz';
-          }
+          } else if (next) showError('The quiz didn’t open. Try again in a moment.');
           paint();
         })
       );

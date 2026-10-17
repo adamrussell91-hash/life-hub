@@ -326,3 +326,25 @@ test('two checks at once can never undo each other', async () => {
   const status = await quizAction(store, 'quiz1', me);
   assert.deepEqual(Object.keys(status.current.answers).sort(), ['qa', 'qb']);
 });
+
+test('a just-started attempt opens even while the blob listing lags behind', async () => {
+  const store = baseStore();
+  await publishQuiz(store);
+  // Netlify Blobs listings are eventually consistent: a key written moments ago can be missing.
+  const list = store.list.bind(store);
+  const hidden = new Set();
+  const set = store.setJSON.bind(store);
+  store.setJSON = async (key, value, options) => {
+    if (key.includes('/attempts/')) hidden.add(key);
+    return set(key, value, options);
+  };
+  store.list = async opts => {
+    const out = await list(opts);
+    return { blobs: out.blobs.filter(b => !hidden.has(b.key)) };
+  };
+  const me = { token: token(13) };
+  const started = await quizAction(store, 'quiz1', { ...me, action: 'start' });
+  assert.equal(started.current?.n, 0, 'the start reply carries the open attempt');
+  assert.equal((await quizAction(store, 'quiz1', { ...me, action: 'hint', question_id: 'qa' })).hint, 'Think comparison.');
+  assert.equal((await quizAction(store, 'quiz1', { ...me, action: 'start' })).current.n, 0, 'a second tap resumes rather than starting another go');
+});
