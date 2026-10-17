@@ -20,7 +20,7 @@ It is a concept doc, not a build brief. Nothing builds from it until Adam names 
 | Question kinds `short_answer`, `multiple_choice`, with options and response space | `QuestionItemSchema`, `QuestionKindSchema` in `apps/teaching/src/schemas/block.ts` | Starting shape for a submitted question. Needs an answer key, marks and hint added |
 | Question set block | `QuestionSetBlockSchema` | Closest existing "list of questions" block; the quiz body could reuse its renderer for layout |
 | Peer feedback: join with code, silent symbol per device, create-only blob per student, teacher moderation and release, word filter | `netlify/functions/_shared/peer-feedback.mjs`, `peer-feedback-filter.mjs` | The whole anonymous-submission and teacher-moderation pattern. Submissions are one create-only blob per symbol; flagged text is held |
-| Lesson record with `unit_id` and `sequence` | `apps/teaching/src/schemas/lesson.ts` | Lessons have **no type field today**. A quiz lesson needs one (`lesson_kind: 'lesson' \| 'quiz'`) |
+| Lesson types (`pedagogical_mode`): Lab, Workshop, Lesson (default), Lecture, Tutorial, Seminar, Project, Case Study, Game, Station Rotation, Design Sprint, Assessment | `apps/teaching/src/curriculum/pedagogical-mode.ts`, picker in the lesson canvas and create modal, filter and column in the lessons library | Today these are **labels only**: they change nothing about how a lesson behaves for students. Add **Quiz** as a 13th type; it is the first type that changes behaviour |
 | Self check, flashcards, cloze | `block.ts` | Quiz mechanics to borrow from (reveal, shuffle) |
 
 ## The flow
@@ -85,7 +85,7 @@ Students build these on a phone, so each type needs a builder that is quick to f
 
 ## Data sketch
 
-- `LessonSchema` gains `lesson_kind: 'lesson' | 'quiz'` (default `lesson`) and, for quizzes, `quiz: { opens_at?, closes_at?, timer?, shuffle?, attempts?, feedback: 'instant' | 'end' | 'released' }`.
+- `PEDAGOGICAL_MODES` gains `'quiz'` (label **Quiz**). No new lesson field for the type itself. `LessonSchema` gains, for quizzes only, `quiz: { opens_at?, closes_at?, timer?, shuffle?, attempts?, feedback: 'instant' | 'end' | 'released' }`.
 - New block `question_drop`: `content: { target_quiz_id /* must be a quiz lesson in the same unit */, prompt?, allowed_kinds, marks: { min, max }, per_student_max }`.
 - Submissions, one create-only blob per student per drop:
   `question_drop/{quiz}/{source_lesson}/{block}/{symbol}/{n}` → `{ kind, prompt, body, marks, hint?, explanation?, image?, flagged }`, where `body` is a per-type union (options and correct ids, pairs, ordered items, groups, gap positions, anchor range, pins, model answer).
@@ -107,6 +107,7 @@ Quiz lesson kind + Question drop block with the **Feeds into** drop-down + teach
 
 ## Decided
 
+- **2026-10-17:** Quiz is a new lesson type alongside the existing twelve (`pedagogical_mode: 'quiz'`), not a separate field. **Assessment** stays as is: it is a label for formal assessment tasks, and a peer-built weekly review is not one. The **Feeds into** drop-down lists lessons in the unit whose type is Quiz.
 - **2026-10-17:** No author credit anywhere. It is not needed and has no educational value.
 - **2026-10-17:** Adam picks the target quiz on each Question drop block, from a drop-down of the unit's lessons set to Quiz, so questions stay tied to that week's teaching. No "accept from any lesson" option.
 - **2026-10-17:** Multiple choice and short answer are the floor, not the ceiling. The block offers a wide range of question types.
@@ -115,3 +116,4 @@ Quiz lesson kind + Question drop block with the **Feeds into** drop-down + teach
 
 - **2026-10-17:** Created from Adam's idea: quiz lesson kind, question drop block feeding a weekly review, teacher approval tray, quiz features menu.
 - **2026-10-17:** Recorded decisions (no author credit, per-block target from a quiz-only drop-down). Added the question types section in three tiers and widened the first slice.
+- **2026-10-17:** Corrected the claim that lessons have no type: twelve label-only types already exist. Quiz becomes the thirteenth, and the first that changes behaviour.
