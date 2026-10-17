@@ -1,5 +1,6 @@
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider } from '@/schemas/block';
+import { analogyTypesContent, fluidAnalogyContent } from '@/toolkit/analogy';
 import {
   conceptContent,
   intentionsContent,
@@ -62,7 +63,9 @@ export const NEW_BLOCK_TYPES = [
   'question_quadrant',
   'concept_features',
   'thinking_intentions',
-  'thinking_reflection'
+  'thinking_reflection',
+  'analogy_types',
+  'fluid_analogy'
 ] as const;
 
 export type NewBlockType = (typeof NEW_BLOCK_TYPES)[number];
@@ -114,7 +117,9 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   question_quadrant: 'Question Quadrant',
   concept_features: 'Features of a Concept',
   thinking_intentions: 'Thinking intentions',
-  thinking_reflection: 'Thinking reflection'
+  thinking_reflection: 'Thinking reflection',
+  analogy_types: 'Analogy types',
+  fluid_analogy: 'Fluid analogy'
 };
 
 export const EMBED_INSERT_PRESETS = [
@@ -186,6 +191,10 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
     ]
   },
   {
+    label: 'Analogous Thinking',
+    types: ['analogy_types', 'fluid_analogy']
+  },
+  {
     label: 'Learning',
     types: ['peer_feedback', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
   },
@@ -218,7 +227,9 @@ const TOOLKIT_GROUP_TYPES = [
   'thinking_move',
   'question_quadrant',
   'concept_features',
-  'thinking_reflection'
+  'thinking_reflection',
+  'analogy_types',
+  'fluid_analogy'
 ];
 
 const HOMEPAGE_EXCLUDED = new Set([
@@ -382,6 +393,20 @@ export function createBlock(type: NewBlockType, id: string): Block {
         block_type: 'thinking_reflection',
         variant: 'medium',
         content: reflectionContent()
+      };
+    case 'fluid_analogy':
+      return {
+        ...shared,
+        block_type: 'fluid_analogy',
+        variant: 'medium',
+        content: fluidAnalogyContent('analogy:close_reading', id)
+      };
+    case 'analogy_types':
+      return {
+        ...shared,
+        block_type: 'analogy_types',
+        variant: 'medium',
+        content: analogyTypesContent()
       };
     case 'rich_text':
       return { ...shared, block_type: 'rich_text', variant: 'medium', content: { html: '' } };

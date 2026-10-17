@@ -53,6 +53,15 @@ import {
   libraryValue,
   type ToolkitKind
 } from '@/toolkit/library';
+import {
+  ANALOGY_GUIDE,
+  ANALOGY_LEVELS,
+  ANALOGY_TYPES,
+  analogyTypesContent,
+  fluidAnalogyContent,
+  type AnalogyTypesBlock,
+  type FluidAnalogyBlock
+} from '@/toolkit/analogy';
 import { createVisibilitySelect } from '@/blocks/editors';
 
 type Change<T extends Block> = (block: T) => void;
@@ -1362,6 +1371,200 @@ export function createThinkingReflectionEditor(
           api.emit();
         }, { placeholder: 'e.g. responsibility' }),
         el('p', 'tk-ed__hint', 'The tools, values and community skills used on this page fill in by themselves.')
+      ),
+      ...noteNodes(api, getLatest)
+    ];
+  });
+}
+
+// ─── Fluid analogy ──────────────────────────────────────────────────────────
+
+/** The seven types as one row of buttons, easiest first. */
+function typePicker(current: string, onPick: (id: string) => void): HTMLElement {
+  const row = el('div', 'hub-pills hub-pills--loose tk-ed__pills an-ed__types');
+  row.setAttribute('role', 'group');
+  row.setAttribute('aria-label', 'Type of analogy');
+  for (const type of ANALOGY_TYPES) {
+    const button = el('button', 'hub-pills__btn', `${type.order}. ${type.label}`);
+    button.type = 'button';
+    button.dataset.kind = type.id;
+    button.title = type.definition;
+    button.setAttribute('aria-pressed', type.id === current ? 'true' : 'false');
+    button.addEventListener('click', () => onPick(type.id));
+    row.append(button);
+  }
+  return row;
+}
+
+const LEVEL_OPTIONS = ANALOGY_LEVELS.map(({ level, name }) => ({
+  value: String(level) as '1' | '2' | '3',
+  label: `Level ${level} · ${name}`
+}));
+
+export function createFluidAnalogyEditor(
+  block: FluidAnalogyBlock,
+  onChange: Change<FluidAnalogyBlock>,
+  getLatest: () => FluidAnalogyBlock = () => block
+): HTMLElement {
+  /** Which level's wording the fields below show. */
+  let editing = block.content.level;
+  return makeEditor(block, onChange, getLatest, (api) => {
+    const c = api.content;
+    const tier = c.tiers[editing - 1]!;
+    return [
+      section(
+        '',
+        el('span', 'tk-ed__label', 'Type of analogy'),
+        typePicker(c.kind, (id) => {
+          if (id === c.kind) return;
+          const fresh = fluidAnalogyContent(id, getLatest().id);
+          api.content = {
+            ...fresh,
+            focus: c.focus,
+            level: c.level,
+            student_choice: c.student_choice,
+            show_check: c.show_check,
+            checks: c.checks,
+            show_card: c.show_card,
+            teacher_note: c.teacher_note?.edited ? c.teacher_note : fresh.teacher_note,
+            teacher_jots: c.teacher_jots
+          };
+          api.emit();
+          api.rebuild();
+        }),
+        ...cardFields(api),
+        field('Working with (optional)', c.focus, (value) => {
+          c.focus = value;
+          api.emit();
+        }, { multiline: true, rows: 2, placeholder: 'e.g. Macbeth’s ambition, or a line from the text' }),
+        el('span', 'tk-ed__label', 'Students start at'),
+        pills('Starting level', LEVEL_OPTIONS, String(c.level) as '1' | '2' | '3', (value) => {
+          c.level = Number(value);
+          api.emit();
+        }),
+        checkbox('Students can move between levels', c.student_choice, (checked) => {
+          c.student_choice = checked;
+          api.emit();
+        })
+      ),
+      section(
+        'Wording for each level',
+        pills('Level to edit', LEVEL_OPTIONS, String(editing) as '1' | '2' | '3', (value) => {
+          editing = Number(value);
+          api.rebuild();
+        }),
+        field('What to do (students see this)', tier.task, (value) => {
+          tier.task = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        stepsList('Steps', tier.steps, `${getLatest().id}_l${editing}`, (next) => {
+          tier.steps = next;
+          api.emit();
+        }),
+        field('Example (students reveal it)', tier.example, (value) => {
+          tier.example = value;
+          api.emit();
+        }, { multiline: true, rows: 4 })
+      ),
+      more(
+        'More options',
+        checkbox('Show “Check your analogy”', c.show_check, (checked) => {
+          c.show_check = checked;
+          api.emit();
+        }),
+        stringList({ label: 'Check questions', noun: 'question', items: c.checks, max: 8, onChange: (items) => {
+          c.checks = items;
+          api.emit();
+        } }),
+        checkbox('Show the prompt-card name (for the printed deck)', c.show_card, (checked) => {
+          c.show_card = checked;
+          api.emit();
+        }),
+        resetButton('Reset to the library wording', () => {
+          const fresh = fluidAnalogyContent(c.kind, getLatest().id);
+          api.content = {
+            ...fresh,
+            focus: c.focus,
+            level: c.level,
+            student_choice: c.student_choice,
+            teacher_note: c.teacher_note,
+            teacher_jots: c.teacher_jots
+          };
+          api.emit();
+          api.rebuild();
+        })
+      ),
+      ...noteNodes(api, getLatest)
+    ];
+  });
+}
+
+export function createAnalogyTypesEditor(
+  block: AnalogyTypesBlock,
+  onChange: Change<AnalogyTypesBlock>,
+  getLatest: () => AnalogyTypesBlock = () => block
+): HTMLElement {
+  return makeEditor(block, onChange, getLatest, (api) => {
+    const c = api.content;
+    const marks = el('div', 'an-ed__marks');
+    for (const type of ANALOGY_TYPES) {
+      marks.append(
+        checkbox(`${type.order}. ${type.label}`, c.types.includes(type.id), (checked) => {
+          const next = new Set(c.types);
+          if (checked) next.add(type.id);
+          else next.delete(type.id);
+          c.types = ANALOGY_TYPES.filter((item) => next.has(item.id)).map((item) => item.id);
+          api.emit();
+        })
+      );
+    }
+    return [
+      section(
+        '',
+        guideField(c, api.emit, ANALOGY_GUIDE.types),
+        field('Working with (optional)', c.focus, (value) => {
+          c.focus = value;
+          api.emit();
+        }, { multiline: true, rows: 2, placeholder: 'e.g. the text the class is reading' }),
+        el('span', 'tk-ed__label', 'Mark the types for this lesson'),
+        marks
+      ),
+      more(
+        'More options',
+        checkbox('Show a weak and a strong analogy', c.show_contrast, (checked) => {
+          c.show_contrast = checked;
+          api.emit();
+        }),
+        field('A weak analogy', c.weak, (value) => {
+          c.weak = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        field('A strong analogy', c.strong, (value) => {
+          c.strong = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        field('Why the second is stronger', c.why, (value) => {
+          c.why = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        stringList({ label: 'Process steps', noun: 'step', items: c.process, max: 8, multiline: true, onChange: (items) => {
+          c.process = items;
+          api.emit();
+        } }),
+        checkbox('Show “How to check your analogy”', c.show_check, (checked) => {
+          c.show_check = checked;
+          api.emit();
+        }),
+        stringList({ label: 'Check questions', noun: 'question', items: c.checks, max: 8, onChange: (items) => {
+          c.checks = items;
+          api.emit();
+        } }),
+        resetButton('Reset to the library wording', () => {
+          const fresh = analogyTypesContent();
+          api.content = { ...fresh, focus: c.focus, types: c.types, teacher_note: c.teacher_note, teacher_jots: c.teacher_jots };
+          api.emit();
+          api.rebuild();
+        })
       ),
       ...noteNodes(api, getLatest)
     ];

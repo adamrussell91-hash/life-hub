@@ -63,3 +63,12 @@ Drawn for Teaching Hub as 256px line art in the same stroke as the set above. Ea
 | `thinking_reflection.png` | Loop arrows, griffin badge |
 | `teacher_note.png` | Note with a lock (no badge: not part of the Newington set) |
 | `badge-griffin.png` | Orange griffin on transparent, used in the toolkit eyebrow |
+
+## Analogous Thinking
+
+Drawn in-repo as 256px line art in the same stroke (#272A2D, 12px, round caps), rendered from SVG. No griffin badge: fluid analogising is not part of the Newington framework.
+
+| Palette file | Shows |
+| --- | --- |
+| `fluid_analogy.png` | A square mapped onto a circle: different surface, same centre |
+| `analogy_types.png` | Seven rising steps |

@@ -126,7 +126,9 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'question_quadrant':
     case 'concept_features':
     case 'thinking_intentions':
-    case 'thinking_reflection': {
+    case 'thinking_reflection':
+    case 'fluid_analogy':
+    case 'analogy_types': {
       // Never index teacher notes or class notes; search can reach student pages.
       const { teacher_note: _note, teacher_jots: _jots, ...studentContent } = c;
       walkStrings(studentContent, parts);

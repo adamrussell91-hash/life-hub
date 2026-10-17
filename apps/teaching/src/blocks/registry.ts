@@ -86,6 +86,8 @@ import {
 import { renderPeerFeedback, createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import type { Block } from '@/schemas/block';
 import {
+  createAnalogyTypesEditor,
+  createFluidAnalogyEditor,
   createConceptFeaturesEditor,
   createQuestionQuadrantEditor,
   createTeacherNoteBlockEditor,
@@ -278,6 +280,8 @@ export const blockRegistry: {
     render: (block, mode) => renderBlock(block, mode),
     createEditor: createThinkingReflectionEditor
   },
+  fluid_analogy: { render: (block, mode) => renderBlock(block, mode), createEditor: createFluidAnalogyEditor },
+  analogy_types: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyTypesEditor },
   teacher_note: { render: (block, mode) => renderBlock(block, mode), createEditor: createTeacherNoteBlockEditor }
 };
 

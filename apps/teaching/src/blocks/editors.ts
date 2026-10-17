@@ -3,6 +3,8 @@ import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createAlchemyButton } from '@/alchemy/block-button';
 import {
+  createAnalogyTypesEditor,
+  createFluidAnalogyEditor,
   createConceptFeaturesEditor,
   createQuestionQuadrantEditor,
   createTeacherNoteBlockEditor,
@@ -2917,6 +2919,10 @@ function createBlockEditorFields(
         onChange,
         latest as () => Extract<Block, { block_type: 'thinking_reflection' }>
       );
+    case 'fluid_analogy':
+      return createFluidAnalogyEditor(block, onChange, latest as () => Extract<Block, { block_type: 'fluid_analogy' }>);
+    case 'analogy_types':
+      return createAnalogyTypesEditor(block, onChange, latest as () => Extract<Block, { block_type: 'analogy_types' }>);
     case 'teacher_note':
       return createTeacherNoteBlockEditor(block, onChange, latest as () => Extract<Block, { block_type: 'teacher_note' }>);
   }
