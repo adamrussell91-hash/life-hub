@@ -196,15 +196,69 @@ function stepList(steps: Array<{ title: string; prompt: string }>): HTMLOListEle
   return list;
 }
 
-function chip(id: string): HTMLElement | null {
+/**
+ * Panel shared by a group of link chips. Clicking a chip shows what that
+ * skill, tool or value is under the chips; clicking it again closes it.
+ */
+type ChipDetail = { panel: HTMLElement; toggle: (id: string, button: HTMLButtonElement) => void };
+
+function chipDetailBody(id: string): HTMLElement[] {
+  const item = libraryItem(id);
+  if (!item) return [];
+  const out: HTMLElement[] = [el('p', 'tk-links__detail-title', item.label)];
+  if (item.definition.trim()) out.push(el('p', 'tk-links__detail-text', item.definition));
+  if (item.kind === 'tool' && item.sentence.trim()) out.push(el('p', 'tk-sentence', item.sentence));
+  if (item.kind === 'value' && item.instruction.trim()) out.push(el('p', 'tk-links__detail-text', item.instruction));
+  if (item.kind !== 'value' && item.steps.length) {
+    const list = el('ol', 'tk-links__detail-steps');
+    for (const step of item.steps) {
+      const li = el('li');
+      if (step.title.trim()) li.append(el('strong', undefined, step.title.trim()), document.createTextNode(' '));
+      li.append(document.createTextNode(step.prompt));
+      list.append(li);
+    }
+    out.push(list);
+  }
+  return out;
+}
+
+function chipDetail(): ChipDetail {
+  const panel = el('div', 'tk-links__detail');
+  panel.id = nextDomId('tk-chip-detail');
+  panel.setAttribute('role', 'region');
+  panel.hidden = true;
+  let current: HTMLButtonElement | null = null;
+  const toggle = (id: string, button: HTMLButtonElement) => {
+    current?.setAttribute('aria-expanded', 'false');
+    if (current === button) {
+      current = null;
+      panel.hidden = true;
+      panel.replaceChildren();
+      return;
+    }
+    current = button;
+    button.setAttribute('aria-expanded', 'true');
+    panel.setAttribute('aria-label', itemLabel(id));
+    panel.replaceChildren(...chipDetailBody(id));
+    panel.hidden = false;
+  };
+  return { panel, toggle };
+}
+
+function chip(id: string, detail: ChipDetail): HTMLElement | null {
   const label = itemLabel(id);
   const kind = itemKind(id);
   if (!label || !kind) return null;
-  return el('span', `hub-list__chip tk-chip tk-chip--${kind}`, label);
+  const button = el('button', `hub-list__chip tk-chip tk-chip--${kind}`, label);
+  button.type = 'button';
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-controls', detail.panel.id);
+  button.addEventListener('click', () => detail.toggle(id, button));
+  return button;
 }
 
-function chipRow(label: string, ids: readonly string[]): HTMLElement | null {
-  const chips = ids.map(chip).filter((node): node is HTMLElement => node !== null);
+function chipRow(label: string, ids: readonly string[], detail: ChipDetail): HTMLElement | null {
+  const chips = ids.map((id) => chip(id, detail)).filter((node): node is HTMLElement => node !== null);
   if (chips.length === 0) return null;
   const row = el('div', 'tk-links__row');
   row.append(el('span', 'tk-links__label', label));
@@ -215,10 +269,13 @@ function chipRow(label: string, ids: readonly string[]): HTMLElement | null {
 }
 
 function linkChips(rows: Array<[string, readonly string[]]>): HTMLElement | null {
-  const built = rows.map(([label, ids]) => chipRow(label, ids)).filter((row): row is HTMLElement => row !== null);
+  const detail = chipDetail();
+  const built = rows
+    .map(([label, ids]) => chipRow(label, ids, detail))
+    .filter((row): row is HTMLElement => row !== null);
   if (built.length === 0) return null;
   const wrap = el('div', 'tk-links');
-  wrap.append(...built);
+  wrap.append(...built, detail.panel);
   return wrap;
 }
 
@@ -1108,13 +1165,15 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
   const progress = reflectionBox('Reflect on progress', 'wave');
   progress.append(el('p', 'tk-reflect__q', `How well did we go in building / expanding our understanding of ${concept}?`));
   progress.append(el('p', 'tk-reflect__q', 'What kinds of thinking / thinking tools did we use today?'));
-  appendIf(progress, chipRow('Tools', used.tools));
+  const detail = chipDetail();
+  appendIf(progress, chipRow('Tools', used.tools, detail));
   if (used.values.length) {
     progress.append(el('p', 'tk-reflect__q', 'Were our contributions …?'));
-    appendIf(progress, chipRow('Values', used.values));
+    appendIf(progress, chipRow('Values', used.values, detail));
   } else {
     progress.append(el('p', 'tk-reflect__q', 'Were our contributions clear, relevant, precise, significant, coherent …?'));
   }
+  if (used.tools.length || used.values.length) progress.append(detail.panel);
   wrap.append(progress);
 
   const process = reflectionBox('Reflect on process', 'shore');
