@@ -207,6 +207,26 @@ test('publishing linked compositions freezes their source content while preservi
   assert.equal(published.blocks[0].content.blocks[0].content.html, '<p>Read this</p>');
 });
 
+test('publish reads the draft strongly so a just-saved block is not lost', async () => {
+  const before = { ...seed['lessons/lesson_1'], blocks: [] };
+  const peer = {
+    id: 'peer_1', type: 'block', block_type: 'peer_feedback', variant: 'medium', visibility: 'student_teacher',
+    content: { prompt: 'ice cream', strength_prompt: 'Works', suggestion_prompt: 'Try' }
+  };
+  const store = memoryStore({ 'lessons/lesson_1': { ...before, blocks: [peer] } });
+  // Netlify Blobs can still serve the previous draft to an eventual read just after a save.
+  const strongGet = store.get;
+  store.get = (key, options = {}) =>
+    key === 'lessons/lesson_1' && options.consistency !== 'strong' ? before : strongGet(key, options);
+  const handler = createLessonPublishHandler({ env, now, getContentStore: async () => store });
+  const response = await handler(request('https://api.adam-russell.com/api/lessons/lesson_1/publish', { method: 'POST' }));
+  assert.equal(response.status, 200);
+  const published = await strongGet('published/lessons/lesson_1', { type: 'json', consistency: 'strong' });
+  assert.deepEqual(published.blocks.map(block => block.id), ['peer_1']);
+  const draft = await strongGet('lessons/lesson_1', { type: 'json', consistency: 'strong' });
+  assert.deepEqual(draft.blocks.map(block => block.id), ['peer_1']);
+});
+
 test('publish refuses a missing linked composition without writing a partial student snapshot', async () => {
   const store = memoryStore({ 'lessons/lesson_1': {
     ...seed['lessons/lesson_1'], blocks: [{
