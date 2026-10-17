@@ -17,7 +17,7 @@ test('the shelf comes first, removed notes stay out, and archive candidates fill
 
 test('gather keeps only notes Ann was shown, with her reasons',async()=>{
  const store=memoryAlchemyStore();store.rows.set('units/u',{data:{id:'u',title:'Poetry: tone and voice',blocks:[]},etag:'0'});
- const handler=createAlchemyUnitNotesHandler({env:{LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'s'.repeat(32),ANTHROPIC_API_KEY:'test'},getContentStore:async()=>store,verifySessionToken:t=>({valid:t==='ok'}),
+ const handler=createAlchemyUnitNotesHandler({inline:true,env:{LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'s'.repeat(32),ANTHROPIC_API_KEY:'test'},getContentStore:async()=>store,verifySessionToken:t=>({valid:t==='ok'}),
   index:async()=>[{id:'n1',title:'Tone in poetry',excerpt:'voice and tone'},{id:'n2',title:'Gardening',excerpt:''}],
   complete:async()=>({unitNotes:[{id:'n1',why:'Shows how to question tone.'},{id:'invented',why:'x'}]})});
  const post=body=>handler(new Request('https://api.example/api/alchemy-unit-notes',{method:'POST',headers:{'content-type':'application/json',cookie:'life_hub_session=ok'},body:JSON.stringify(body)}));

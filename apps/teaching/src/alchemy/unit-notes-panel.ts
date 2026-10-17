@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from '@/api/client';
 import { knowledgeHubPageUrl } from '@/alchemy/connections';
 import { knowledgeHubOrigin } from '@/alchemy/client';
+import { awaitAlchemyJob } from '@/alchemy/jobs';
 
 type UnitNote = { id: string; title: string; why?: string };
 
@@ -91,7 +92,9 @@ export function mountUnitNotesPanel(host: HTMLElement, unitId: string): { refres
   gather.addEventListener('click', () => {
     gather.disabled = true;
     status.textContent = 'Ann is reading the archive for this unit…';
-    void apiPost<{ notes: UnitNote[]; added: number }>('/api/alchemy-unit-notes', { unit: unitId, action: 'gather' })
+    type Gathered = { notes: UnitNote[]; added: number };
+    void apiPost<Gathered>('/api/alchemy-unit-notes', { unit: unitId, action: 'gather' })
+      .then((first) => awaitAlchemyJob<Gathered>(first))
       .then((result) => {
         if (disposed) return;
         paint(result.notes);
