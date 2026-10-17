@@ -20,7 +20,13 @@ import {
   importDayOne,
   safeUrl,
   nearbyVenues,
+  today,
+  editorialBasis,
+  needsEditorial,
+  fixupQueue,
+  applyFixup,
 } from "./model.js";
+import { paintMagazine, paintTimeline, paintEntry, paintFixup } from "./pages.js";
 import {
   compressPhoto,
   inspectPhoto,
@@ -80,8 +86,12 @@ export function createFoodJournalView({
     loaded = false,
     busy = false,
     epoch = 0,
-    mode = "journal",
+    mode = "magazine",
+    entryId = null,
+    fixIndex = 0,
     dialog = null;
+  let editorialRunning = false;
+  const editorialFailed = new Set();
   let filterControls = [],
     journalQuery = "",
     filters = {},
@@ -157,7 +167,7 @@ export function createFoodJournalView({
       },
     };
   }
-  async function persist(next) {
+  async function persist(next, { quiet = false } = {}) {
     if (busy) throw new Error("A save is already running.");
     busy = true;
     const token = epoch;
@@ -168,10 +178,58 @@ export function createFoodJournalView({
       journal = value.journal;
       version = value.version;
       render();
-      showHubToast("Saved.");
+      if (!quiet) {
+        showHubToast("Saved.");
+        void refreshEditorial();
+      }
       return value;
     } finally {
       busy = false;
+    }
+  }
+  // Headline, standfirst and pull quote are written by the API and saved
+  // without review. Runs after saves, one visit at a time, never while the
+  // person has a sheet open or another save is in flight.
+  async function refreshEditorial() {
+    if (editorialRunning || !loaded) return;
+    editorialRunning = true;
+    const token = epoch;
+    try {
+      for (let round = 0; round < 3; round++) {
+        const target = liveVisits(journal).find(
+          (v) =>
+            needsEditorial(v) &&
+            !editorialFailed.has(`${v.id}:${editorialBasis(v)}`),
+        );
+        if (!target) return;
+        const basis = editorialBasis(target);
+        let editorial;
+        try {
+          ({ editorial } = await api.assist({
+            action: "editorial",
+            visit_id: target.id,
+            basis,
+          }));
+        } catch {
+          editorialFailed.add(`${target.id}:${basis}`);
+          continue;
+        }
+        for (let wait = 0; (busy || dialog) && wait < 600; wait++)
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (token !== epoch || busy || dialog) return;
+        const next = structuredClone(journal),
+          visit = next.visits.find((v) => v.id === target.id);
+        if (!visit || editorialBasis(visit) !== basis) continue;
+        visit.editorial = { ...editorial, basis };
+        try {
+          await persist(next, { quiet: true });
+        } catch {
+          editorialFailed.add(`${target.id}:${basis}`);
+          return;
+        }
+      }
+    } finally {
+      editorialRunning = false;
     }
   }
   async function load() {
@@ -184,6 +242,7 @@ export function createFoodJournalView({
       version = value.version;
       loaded = true;
       render();
+      void refreshEditorial();
     } catch (e) {
       if (token !== epoch) return;
       status(e.message, true);
@@ -261,147 +320,159 @@ export function createFoodJournalView({
     else queueMicrotask(watch);
     return image;
   }
-  function dishCard(dish, visit, custom = false) {
-    const card = el("article", "hub-card food-dish");
-    if (dish.photos[0]) card.append(photoNode(dish.photos[0]));
+  function dishCard(dish, visit) {
+    const card = el("article", "hub-card food-dish fj-menu-card");
+    if (dish.photos[0]) {
+      const box = el("div", "fj-menu-card__media");
+      box.append(photoNode(dish.photos[0]));
+      card.append(box);
+    }
     const content = el("div", "food-card__body");
-    content.append(el("h3", "food-dish__title", dish.title));
+    content.append(el("h3", "food-dish__title fj-serif", dish.title));
     content.append(
       el(
         "p",
         "food-meta",
-        [dish.cuisine, dish.meal_type, custom ? visit.venue.name : ""]
+        [dish.cuisine, dish.meal_type, visit.venue.name]
           .filter(Boolean)
           .join(" · "),
       ),
     );
+    if (dish.rating != null) {
+      const stars = el("p", "fj-stars");
+      stars.setAttribute("role", "img");
+      stars.setAttribute("aria-label", `${dish.rating} out of 5`);
+      stars.append(
+        "★".repeat(dish.rating),
+        el("span", "fj-stars__off", "★".repeat(5 - dish.rating)),
+      );
+      content.append(stars);
+    }
     if (dish.tags.length) {
       const tags = el("div", "hub-chips");
       for (const t of dish.tags) tags.append(el("span", "hub-chip", t));
       content.append(tags);
     }
-    content.append(
-      rating(dish, async (value) => {
-        if (busy) return;
-        const next = structuredClone(journal);
-        next.visits
-          .find((v) => v.id === visit.id)
-          .dishes.find((d) => d.id === dish.id).rating = value;
-        try {
-          await persist(next);
-        } catch (e) {
-          status(e.message, true);
-        }
-      }),
-    );
-    if (dish.notes) content.append(el("p", "food-notes", dish.notes));
+    if (dish.notes && dish.notes !== visit.notes)
+      content.append(el("p", "food-notes fj-serif fj-italic", dish.notes));
     const actions = el("div", "food-actions");
     actions.append(
       button("Recipe", (e) => openRecipe(dish, e.currentTarget)),
       button(
-        "Restaurant",
+        "Eat it again",
         (e) => openRestaurant(visit, e.currentTarget, dish),
         "ghost",
       ),
+      button("Open entry", () => openEntry(visit.id), "ghost"),
     );
     content.append(actions);
     card.append(content);
     return card;
   }
-  function visitCard(visit) {
-    const card = el("article", "hub-card food-visit");
-    const photo = visit.dishes.flatMap((d) => d.photos)[0];
-    if (photo) card.append(photoNode(photo));
-    const body = el("div", "food-card__body");
-    body.append(
-      el(
-        "h2",
-        "food-visit__title",
-        visit.title || visit.dishes[0]?.title || "Meal",
-      ),
-      el(
-        "p",
-        "food-meta",
-        [
-          visit.venue.name || "At home",
-          formatDisplayDate(visit.date),
-          `${visit.dishes.length} ${visit.dishes.length === 1 ? "dish" : "dishes"}`,
-        ].join(" · "),
-      ),
-    );
-    const preview = el(
-      "p",
-      "food-preview",
-      visit.dishes
-        .slice(0, 2)
-        .map((d) => d.title)
-        .join(", ") +
-        (visit.dishes.length > 2 ? ` and ${visit.dishes.length - 2} more` : ""),
-    );
-    body.append(preview);
-    body.append(
-      rating(visit.dishes[0], async (value) => {
-        if (busy) return;
-        const next = structuredClone(journal);
-        next.visits.find((v) => v.id === visit.id).dishes[0].rating = value;
-        try {
-          await persist(next);
-        } catch (e) {
-          status(e.message, true);
-        }
-      }),
-    );
-    const details = el("details", "food-stack"),
-      summary = el(
-        "summary",
-        "",
-        `View ${visit.dishes.length === 1 ? "dish" : "dishes"}`,
-      ),
-      stack = el("div", "food-stack__dishes");
-    details.append(summary, stack);
-    let painted = false;
-    details.addEventListener("toggle", () => {
-      if (details.open && !painted) {
-        painted = true;
-        for (const d of visit.dishes) stack.append(dishCard(d, visit));
-      }
-    });
-    body.append(details);
-    const actions = el("div", "food-actions");
-    actions.append(
-      button("Edit", (e) => editVisit(visit, e.currentTarget)),
-      button("Delete", (e) => deleteVisit(visit, e.currentTarget), "ghost"),
-    );
-    body.append(actions);
-    card.append(body);
-    return card;
+  function openEntry(id) {
+    entryId = id;
+    render();
+    host?.scrollIntoView?.({ block: "start" });
   }
+  function setMode(next) {
+    mode = next;
+    entryId = null;
+    render();
+  }
+  async function rateDish(visit, dish, value) {
+    if (busy) return;
+    const next = structuredClone(journal);
+    const target = next.visits
+      .find((v) => v.id === visit.id)
+      ?.dishes.find((d) => d.id === dish.id);
+    if (!target) return;
+    target.rating = value;
+    try {
+      await persist(next);
+    } catch (e) {
+      status(e.message, true);
+    }
+  }
+  async function fixVisit(visit, trigger) {
+    if (busy) return;
+    trigger.disabled = true;
+    status("Reading the original entry and splitting it into dishes.");
+    let draft = visit;
+    try {
+      const result = await api.assist({ action: "fixup", visit_id: visit.id });
+      draft = applyFixup(visit, result.draft);
+      status("Check the dishes, rate them and add photos, then save.");
+    } catch (e) {
+      status(`${e.message} You can still fix it up by hand.`, true);
+    }
+    if (trigger.isConnected) trigger.disabled = false;
+    editVisit(draft, trigger, { fixup: true });
+  }
+  async function markReviewed(visit, trigger) {
+    if (busy) return;
+    trigger.disabled = true;
+    const next = structuredClone(journal);
+    next.visits.find((v) => v.id === visit.id).reviewed = true;
+    try {
+      await persist(next);
+    } catch (e) {
+      status(e.message, true);
+      if (trigger.isConnected) trigger.disabled = false;
+    }
+  }
+  const pageContext = {
+    journal: () => journal,
+    today,
+    photoNode,
+    button,
+    openEntry,
+    setMode,
+    editVisit,
+    deleteVisit,
+    openRecipe,
+    openRestaurant,
+    hasRecipe: (dishId) => journal.recipes.some((r) => r.dish_id === dishId),
+    rate: rateDish,
+    fixVisit,
+    markReviewed,
+    skipFixup: () => {
+      fixIndex++;
+      render();
+    },
+  };
   function render() {
     if (!host) return;
     for (const c of filterControls) c.dispose();
     filterControls = [];
     host.replaceChildren();
+    const queue = loaded ? fixupQueue(journal).length : 0;
+    if (mode === "fixup" && !queue) mode = "magazine";
     const toolbar = el("div", "food-toolbar"),
       pills = el("div", "hub-pills");
     pills.setAttribute("role", "tablist");
-    for (const [id, label] of [
-      ["journal", "Journal"],
+    pills.setAttribute("aria-label", "Food Journal views");
+    const tabs = [
+      ["magazine", "Magazine"],
+      ["timeline", "Timeline"],
       ["menu", "Custom Menu"],
-    ]) {
-      const b = button(
-        label,
-        () => {
-          mode = id;
-          render();
-        },
-        "ghost",
-      );
+    ];
+    if (queue) tabs.push(["fixup", `Fix up (${queue})`]);
+    for (const [id, label] of tabs) {
+      const b = button(label, () => setMode(id), "ghost");
       b.className = "hub-pills__btn";
       b.classList.toggle("is-active", mode === id);
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", String(mode === id));
       pills.append(b);
     }
+    const more = createHubMenuButton(
+      () => [
+        { label: "Import", onSelect: () => openImport(more) },
+        { label: "Backup", onSelect: () => void backup() },
+        { label: "Restore", onSelect: () => restore(more) },
+      ],
+      { label: "Import, backup and restore" },
+    );
     toolbar.append(
       pills,
       button(
@@ -409,9 +480,7 @@ export function createFoodJournalView({
         (e) => editVisit(newVisit(), e.currentTarget),
         "primary",
       ),
-      button("Import", (e) => openImport(e.currentTarget)),
-      button("Backup", () => backup()),
-      button("Restore", (e) => restore(e.currentTarget)),
+      more,
     );
     host.append(toolbar);
     const line = el("p", "canvas-status");
@@ -439,114 +508,98 @@ export function createFoodJournalView({
       );
       host.append(row);
     }
-    const grid = el("div", "food-grid");
-    grid.dataset.foodGrid = "";
-    if (mode === "journal") {
+    if (entryId) {
+      const visit = liveVisits(journal).find((v) => v.id === entryId);
+      if (visit) {
+        paintEntry(pageContext, host, visit);
+        return;
+      }
+      entryId = null;
+    }
+    if (mode === "magazine") {
+      paintMagazine(pageContext, host);
+      return;
+    }
+    if (mode === "fixup") {
+      paintFixup(pageContext, host, fixIndex);
+      return;
+    }
+    if (mode === "timeline") {
       const search = el("input", "hub-search");
       search.placeholder = "Search visits and saved menus";
       search.setAttribute("aria-label", "Search Food Journal");
       search.value = journalQuery;
+      const list = el("div", "fj-timeline");
       search.addEventListener("input", () => {
         journalQuery = search.value;
-        paintVisits(grid);
+        paintTimeline(pageContext, list, journalQuery);
       });
-      host.append(search);
+      host.append(search, list);
+      paintTimeline(pageContext, list, journalQuery);
+      return;
     }
-    if (mode === "menu") {
-      const controls = el("div", "food-filters");
-      const search = el("input", "hub-search");
-      search.placeholder = "Search dishes, venues and menus";
-      search.setAttribute("aria-label", "Search Custom Menu");
-      search.value = filters.query || "";
-      search.addEventListener("input", () => {
-        filters.query = search.value;
-        paintMenu(grid);
-      });
-      controls.append(search);
-      const all = menuDishes(journal);
-      for (const [key, label, values] of [
-        ["meal", "Meal type", MEAL_TYPES],
-        [
-          "cuisine",
-          "Cuisine",
-          [...new Set(all.map((x) => x.dish.cuisine).filter(Boolean))].sort(),
-        ],
-        [
-          "tag",
-          "Indicator",
-          [...new Set(all.flatMap((x) => x.dish.tags))].sort(),
-        ],
-        ["rating", "Minimum rating", ["1", "2", "3", "4", "5"]],
-      ]) {
-        const control = createHubFilter({
-          key,
-          label,
-          value: filters[key] || "",
-          defaultValue: "",
-          options: [
-            { value: "", label },
-            ...values.map((value) => ({ value, label: value })),
-          ],
-          onChange: (v) => {
-            filters[key] = v;
-            paintMenu(grid);
-          },
-        });
-        filterControls.push(control);
-        controls.append(control.el);
-      }
-      controls.append(
-        button(
-          "Reset",
-          () => {
-            filters = {};
-            render();
-          },
-          "ghost",
-        ),
-      );
-      host.append(controls);
+    const grid = el("div", "food-grid");
+    grid.dataset.foodGrid = "";
+    const controls = el("div", "food-filters");
+    const search = el("input", "hub-search");
+    search.placeholder = "Search dishes, venues and menus";
+    search.setAttribute("aria-label", "Search Custom Menu");
+    search.value = filters.query || "";
+    search.addEventListener("input", () => {
+      filters.query = search.value;
       paintMenu(grid);
-    } else {
-      paintVisits(grid);
+    });
+    controls.append(search);
+    const all = menuDishes(journal);
+    for (const [key, label, values] of [
+      ["meal", "Meal type", MEAL_TYPES],
+      [
+        "cuisine",
+        "Cuisine",
+        [...new Set(all.map((x) => x.dish.cuisine).filter(Boolean))].sort(),
+      ],
+      [
+        "tag",
+        "Indicator",
+        [...new Set(all.flatMap((x) => x.dish.tags))].sort(),
+      ],
+      ["rating", "Minimum rating", ["1", "2", "3", "4", "5"]],
+    ]) {
+      const control = createHubFilter({
+        key,
+        label,
+        value: filters[key] || "",
+        defaultValue: "",
+        options: [
+          { value: "", label },
+          ...values.map((value) => ({ value, label: value })),
+        ],
+        onChange: (v) => {
+          filters[key] = v;
+          paintMenu(grid);
+        },
+      });
+      filterControls.push(control);
+      controls.append(control.el);
     }
+    controls.append(
+      button(
+        "Reset",
+        () => {
+          filters = {};
+          render();
+        },
+        "ghost",
+      ),
+    );
+    host.append(controls);
+    paintMenu(grid);
     host.append(grid);
-  }
-  function paintVisits(grid) {
-    grid.replaceChildren();
-    for (const visit of liveVisits(journal)) {
-      const text = [
-        visit.title,
-        visit.venue.name,
-        visit.venue.address,
-        visit.notes,
-        visit.menu_text,
-        ...visit.dishes.map((d) => d.title),
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (
-        !journalQuery.trim() ||
-        text.includes(journalQuery.toLowerCase().trim())
-      )
-        grid.append(visitCard(visit));
-    }
-    if (!grid.children.length)
-      grid.append(
-        el(
-          "p",
-          "canvas-status",
-          journalQuery
-            ? "No visits match your search."
-            : "Add your first visit or import past meals.",
-        ),
-      );
   }
   function paintMenu(grid) {
     grid.replaceChildren();
     const found = menuDishes(journal, filters);
-    for (const { dish, visit } of found)
-      grid.append(dishCard(dish, visit, true));
+    for (const { dish, visit } of found) grid.append(dishCard(dish, visit));
     if (!found.length)
       grid.append(el("p", "canvas-status", "No dishes match your selection."));
   }
@@ -617,18 +670,23 @@ export function createFoodJournalView({
     updateSearch();
     s.actions.append(button("Close", s.close, "ghost"), find);
   }
-  function editVisit(original, trigger) {
+  function editVisit(original, trigger, { fixup = false } = {}) {
     const baseVersion = Object.hasOwn(original, "__draft_version")
       ? original.__draft_version
       : version;
     let visit = structuredClone(original);
     delete visit.__draft_version;
+    // Saving a fix-up takes the import out of the queue, including from a resumed draft.
+    if (fixup) visit.reviewed = true;
     const newerSavedVisit =
       baseVersion !== version
         ? journal.visits.find((v) => v.id === visit.id)
         : null;
     let reviewedNewerVisit = !newerSavedVisit;
-    const s = modal(original.title ? "Edit visit" : "Add visit", trigger);
+    const s = modal(
+      fixup ? "Fix up entry" : original.title ? "Edit visit" : "Add visit",
+      trigger,
+    );
     let dishList = null,
       captureImages = [],
       pendingPhotos = [],
@@ -1580,6 +1638,9 @@ export function createFoodJournalView({
     journal = emptyJournal();
     version = null;
     loaded = false;
+    entryId = null;
+    fixIndex = 0;
+    editorialFailed.clear();
     photoCache.clear();
     photoExpires.clear();
     for (const observer of photoObservers) observer.disconnect();

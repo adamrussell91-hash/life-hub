@@ -206,3 +206,152 @@ export function importDayOne(payload, journal) {
   }
   return { visits, skipped };
 }
+
+// ── Magazine, entry and fix-up helpers ─────────────────────────────────────
+export const isImport = (visit) =>
+  String(visit.source_id || "").startsWith("dayone:");
+export const visitPhotos = (visit) => visit.dishes.flatMap((d) => d.photos);
+export function visitRating(visit) {
+  const rated = visit.dishes.filter((d) => d.rating != null);
+  if (!rated.length) return null;
+  return (
+    Math.round((rated.reduce((n, d) => n + d.rating, 0) / rated.length) * 10) /
+    10
+  );
+}
+export function firstSentence(text, max = 220) {
+  const clean = String(text || "")
+    .replace(/^#+\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const match = clean.match(/^.+?[.!?](?=\s|$)/);
+  const sentence = match ? match[0] : clean;
+  return sentence.length > max
+    ? sentence.slice(0, max - 1).trimEnd() + "…"
+    : sentence;
+}
+// Changes whenever the words the editorial was written from change.
+export function editorialBasis(visit) {
+  const source = JSON.stringify([
+    visit.title,
+    visit.notes,
+    visit.venue.name,
+    visit.dishes.map((d) => [d.title, d.notes, d.cuisine]),
+  ]);
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < source.length; i++) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+// Unfixed Day One imports wait for fix-up before they get a headline.
+export const needsEditorial = (visit) =>
+  (!isImport(visit) || visit.reviewed === true) &&
+  visit.editorial?.basis !== editorialBasis(visit);
+export function fixupQueue(journal) {
+  return liveVisits(journal).filter((v) => isImport(v) && !v.reviewed);
+}
+export function applyFixup(visit, draft) {
+  const next = structuredClone(visit);
+  if (draft.title?.trim()) next.title = draft.title.trim();
+  if (!next.venue.name && draft.venue?.name)
+    next.venue = {
+      ...next.venue,
+      name: draft.venue.name,
+      address: next.venue.address || draft.venue.address || "",
+    };
+  if (!draft.dishes?.length) return next;
+  const photos = visitPhotos(visit),
+    tags = visit.dishes[0]?.tags || [];
+  next.dishes = draft.dishes.map((d, index) => ({
+    ...newDish(),
+    title: d.title,
+    cuisine: d.cuisine || "",
+    meal_type: MEAL_TYPES.includes(d.meal_type) ? d.meal_type : "Dinner",
+    tags: [...new Set([...(d.tags || []), ...(index === 0 ? tags : [])])],
+    notes: d.notes || "",
+    photos: index === 0 ? photos : [],
+  }));
+  return next;
+}
+const venueKey = (visit) => visit.venue.name.trim().toLowerCase();
+export function venueHistory(journal, visit) {
+  const key = venueKey(visit);
+  if (!key) return { visits: [], always: "" };
+  const all = liveVisits(journal).filter((v) => venueKey(v) === key);
+  const visits = all.filter((v) => v.id !== visit.id);
+  let always = "";
+  if (all.length > 1)
+    always =
+      visit.dishes.find((d) =>
+        all.every((v) =>
+          v.dishes.some(
+            (x) => x.title.trim().toLowerCase() === d.title.trim().toLowerCase(),
+          ),
+        ),
+      )?.title || "";
+  return { visits, always };
+}
+const byBest = (a, b) =>
+  b.dish.rating - a.dish.rating ||
+  Number(b.dish.photos.length > 0) - Number(a.dish.photos.length > 0) ||
+  b.visit.date.localeCompare(a.visit.date);
+export function journalHighlights(journal, todayKey = today()) {
+  const visits = liveVisits(journal);
+  const month = todayKey.slice(0, 7),
+    year = todayKey.slice(0, 4);
+  const [y, m] = month.split("-").map(Number);
+  const previous = `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}`;
+  const firstSeen = new Map();
+  for (const v of [...visits].reverse()) {
+    const key = venueKey(v);
+    if (key && !firstSeen.has(key)) firstSeen.set(key, v.date);
+  }
+  const inMonth = (prefix) => visits.filter((v) => v.date.startsWith(prefix));
+  const average = (list) => {
+    const rated = list.flatMap((v) =>
+      v.dishes.filter((d) => d.rating != null),
+    );
+    return rated.length
+      ? Math.round(
+          (rated.reduce((n, d) => n + d.rating, 0) / rated.length) * 10,
+        ) / 10
+      : null;
+  };
+  const rated = (list) =>
+    list
+      .flatMap((visit) => visit.dishes.map((dish) => ({ dish, visit })))
+      .filter(({ dish }) => dish.rating != null)
+      .sort(byBest);
+  const thisMonth = inMonth(month),
+    thisYear = visits.filter((v) => v.date.startsWith(year));
+  const cuisines = new Map();
+  for (const v of thisYear)
+    for (const d of v.dishes)
+      if (d.cuisine.trim())
+        cuisines.set(d.cuisine.trim(), (cuisines.get(d.cuisine.trim()) || 0) + 1);
+  return {
+    cover: visits[0] || null,
+    recent: visits.slice(1, 5),
+    total: visits.length,
+    places: firstSeen.size,
+    month: {
+      key: month,
+      meals: thisMonth.length,
+      newPlaces: [...firstSeen.values()].filter((d) => d.startsWith(month))
+        .length,
+      average: average(thisMonth),
+      previousAverage: average(inMonth(previous)),
+      best: rated(thisMonth)[0] || null,
+    },
+    yearBest: rated(thisYear).slice(0, 5),
+    cuisines: [...cuisines]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 4),
+    onThisDay:
+      visits.find(
+        (v) => v.date.slice(5) === todayKey.slice(5) && v.date < todayKey,
+      ) || null,
+  };
+}
