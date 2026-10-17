@@ -1,5 +1,6 @@
 // apps/tasks/src/views/problem-solver/canvas.ts
 import { el } from '@/views/hub-kit';
+import { createConceptMapView } from '../../../../../packages/problem-solver/render/concept-map';
 import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
 import { createGapBasicView } from '../../../../../packages/problem-solver/render/gap-basic';
 import { createGapRadarView } from '../../../../../packages/problem-solver/render/gap-radar';
@@ -18,6 +19,7 @@ export type CanvasHandlers = { onScore?: (scores: Scores) => void };
 const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   five_whys: () => createFiveWhysView(),
   problem_tree: () => createProblemTreeView(),
+  concept_map: () => createConceptMapView(),
   problem_statement: () => createProblemStatementView(),
   gap_basic: () => createGapBasicView(),
   gap_radar: () => createGapRadarView(),
