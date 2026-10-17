@@ -47,10 +47,26 @@ try {
   for (const [page, identity, text] of [[a, 'Blue Star', 'First argument with evidence.'], [b, 'Green Star', 'Second argument with reasoning.']]) {
     await page.goto(`${origin}/peer-check`);
     await page.getByLabel('Activity code').fill(code);
+    if (page === a) await page.screenshot({ path: '/tmp/peer-feedback-phone-picker.png', fullPage: true });
+    if (page === b) assert.equal(await page.getByRole('button', { name: '★ Blue Star', exact: true }).count(), 0);
+    if (page === a) {
+      await page.getByLabel('Activity code').fill('000000');
+      await page.getByRole('button', { name: `★ ${identity}`, exact: true }).click();
+      await page.getByRole('status').filter({ hasText: 'Check the activity code.' }).waitFor();
+      await page.getByLabel('Activity code').fill(code);
+    }
     await page.getByRole('button', { name: `★ ${identity}`, exact: true }).click();
     await page.getByLabel('Your writing', { exact: true }).fill(text);
     await page.reload();
     assert.equal(await page.getByLabel('Your writing', { exact: true }).inputValue(), text);
+    if (page === a) {
+      await page.route(`${origin}/api/published/peer-feedback/lesson1/peer1`, route => route.abort('failed'), { times: 1 });
+      await page.getByRole('button', { name: 'Submit writing', exact: true }).click();
+      await page.getByRole('status').filter({ hasText: /fetch|network/i }).waitFor();
+      assert.equal(await page.getByLabel('Your writing', { exact: true }).inputValue(), text);
+      await page.reload();
+      assert.equal(await page.getByLabel('Your writing', { exact: true }).inputValue(), text);
+    }
     await page.getByRole('button', { name: 'Submit writing', exact: true }).click();
     await page.getByText('Writing submitted.', { exact: false }).waitFor();
     console.log(`${identity} submitted`);
