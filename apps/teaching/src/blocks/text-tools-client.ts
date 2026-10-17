@@ -3,9 +3,11 @@
  * background function, so the first answer is usually `working`.
  */
 import { apiGet, apiPost } from '@/api/client';
+import type { LiteraryElementsTable } from '@/blocks/literary-elements';
+import { normaliseTechniqueFindings, type TechniqueFinding } from '@/blocks/technique-scan';
 import { normaliseWordHelp, type WordHelpEntry } from '@/blocks/word-help';
 
-export type TextTool = 'dictionary' | 'fry';
+export type TextTool = 'dictionary' | 'fry' | 'techniques';
 
 export type FryResult = { html: string };
 
@@ -63,6 +65,23 @@ export async function rewriteAsFryExplainer(html: string, options?: PollOptions)
   )) as Partial<FryResult> | undefined;
   if (typeof result?.html === 'string' && result.html) return { html: result.html };
   throw new Error('The explainer came back empty. Try again.');
+}
+
+/**
+ * Teacher: find the Periodic Table techniques in a block's current HTML.
+ * Names the table does not know are dropped here.
+ */
+export async function scanTechniquesAsTeacher(
+  html: string,
+  table: LiteraryElementsTable,
+  options?: PollOptions
+): Promise<TechniqueFinding[]> {
+  const result = await pollTextToolJob(
+    () => apiPost<JobView>('/api/text-tools', { tool: 'techniques', html }, { signal: options?.signal }),
+    (key) => apiGet<JobView>(`/api/text-tools/${encodeURIComponent(key)}`, { signal: options?.signal }),
+    { intervalMs: 2000, ...options }
+  );
+  return normaliseTechniqueFindings((result as { findings?: unknown } | undefined)?.findings, table);
 }
 
 /** Student: scan a published block. The server reads the text from the lesson. */
