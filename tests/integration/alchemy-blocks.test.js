@@ -7,7 +7,7 @@ function setup(extra={}) {
  const block={id:'b',type:'block',schema_version:1,block_type:'heading',visibility:'student_teacher',variant:'section',order:0,created_at:'2026-10-13T00:00:00Z',updated_at:'2026-10-13T00:00:00Z',content:{text:'Find the main idea'}};
  store.rows.set('lessons/l',{data:{id:'l',title:'Reading',unit_id:'u',blocks:[block]},etag:'0'});
  store.rows.set('units/u',{data:{id:'u',title:'Reading and interpretation',blocks:[]},etag:'0'});
- let calls=0;const deps={env:{LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'s'.repeat(32),ANTHROPIC_API_KEY:'test',ALCHEMY_PASSIVE_MODEL:'cheap'},getContentStore:async()=>store,verifySessionToken:t=>({valid:t==='ok'}),retrieve:async()=>[{id:'p',title:'Scaffolding',excerpt:'Model the process first.'}],getSource:async()=>({id:'p',title:'Scaffolding',body:'Model first'}),complete:async()=>{calls++;return {proposals:[{blockId:'b',rationale:'Model before independent work.',content:{text:'Watch a model, then find the main idea'},sourceIds:['p']}]};},...extra};
+ let calls=0;const deps={env:{LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'s'.repeat(32),ANTHROPIC_API_KEY:'test',ALCHEMY_PASSIVE_MODEL:'cheap'},inline:true,getContentStore:async()=>store,verifySessionToken:t=>({valid:t==='ok'}),retrieve:async()=>[{id:'p',title:'Scaffolding',excerpt:'Model the process first.'}],getSource:async()=>({id:'p',title:'Scaffolding',body:'Model first'}),complete:async()=>{calls++;return {proposals:[{blockId:'b',rationale:'Model before independent work.',content:{text:'Watch a model, then find the main idea'},sourceIds:['p']}]};},...extra};
  const handler=createAlchemyBlocksHandler(deps);
  const req=(patch={},auth=true)=>new Request('https://api.example/api/alchemy-blocks',{method:'POST',headers:{'content-type':'application/json',...(auth?{cookie:'life_hub_session=ok'}:{})},body:JSON.stringify({kind:'lesson',id:'l',blocks:['b'],mode:'passive',...patch})});
  return {handler,req,store,calls:()=>calls};
@@ -86,4 +86,27 @@ test('Ann can target one question inside a tabbed row',async()=>{
  const q={id:'q',type:'block',schema_version:1,block_type:'heading',visibility:'student_teacher',variant:'section',order:0,created_at:'2026-10-13T00:00:00Z',updated_at:'2026-10-13T00:00:00Z',content:{text:'What device is used?'}};
  store.rows.get('lessons/l').data.blocks.push({id:'t',type:'block',block_type:'tabs',visibility:'student_teacher',variant:'medium',created_at:'2026-10-13T00:00:00Z',updated_at:'2026-10-13T00:00:00Z',content:{tabs:[{id:'t1',label:'Practice 1',blocks:[q]},{id:'t2',label:'Practice 2',blocks:[]}]}});
  const r=await handler(req({mode:'manual',blocks:['t']}));assert.equal(r.status,200);const p=(await r.json()).data.proposals[0];assert.equal(p.blockId,'q');assert.equal(p.replacement.content.text,'How does the frost imagery shape the tone?');
+});
+test('a cache miss becomes a background job the page can poll to Ann’s answer',async()=>{
+ const {createAlchemyBlocksRunHandler}=await import('../../netlify/functions/alchemy-blocks-run.mjs');
+ let started;const {req,store,calls}=setup({inline:false,invokeRun:async(_request,id)=>{started=id;return true;}});
+ const shared={env:{LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'s'.repeat(32),ANTHROPIC_API_KEY:'test',ALCHEMY_PASSIVE_MODEL:'cheap'},getContentStore:async()=>store,verifySessionToken:t=>({valid:t==='ok'}),retrieve:async()=>[{id:'p',title:'Scaffolding',excerpt:'Model the process first.'}],getSource:async()=>({id:'p',title:'Scaffolding',body:'Model first'}),complete:async()=>({proposals:[{blockId:'b',rationale:'Model first.',content:{text:'Watch, then try'},sourceIds:['p']}]})};
+ const front=createAlchemyBlocksHandler({...shared,invokeRun:async(_request,id)=>{started=id;return true;}});
+ const r=await front(req({mode:'manual'}));assert.equal(r.status,202);const {job}=(await r.json()).data;assert.equal(job,started);
+ const poll=()=>front(new Request('https://api.example/api/alchemy-blocks?job='+job,{headers:{cookie:'life_hub_session=ok'}})).then(x=>x.json()).then(x=>x.data);
+ assert.equal((await poll()).status,'working');
+ const run=createAlchemyBlocksRunHandler(shared);
+ assert.equal((await run(new Request('https://api.example/api/alchemy-blocks/run',{method:'POST',headers:{'content-type':'application/json',cookie:'life_hub_session=ok'},body:JSON.stringify({id:job})}))).status,200);
+ const done=await poll();assert.equal(done.status,'done');assert.equal(done.result.proposals[0].replacement.content.text,'Watch, then try');assert.equal(calls(),0);
+});
+test('if the background runner cannot start, the check still runs in the request',async()=>{
+ const {handler,req,calls}=setup({inline:false,invokeRun:async()=>false});const r=await handler(req({mode:'manual'}));assert.equal(r.status,200);assert.equal((await r.json()).data.proposals.length,1);assert.equal(calls(),1);
+});
+test('a background job records Ann’s error for the page instead of hanging',async()=>{
+ const {createAlchemyBlocksRunHandler}=await import('../../netlify/functions/alchemy-blocks-run.mjs');
+ const {store}=setup();const {createAlchemyJob,readAlchemyJob}=await import('../../netlify/functions/_shared/alchemy-check.mjs');
+ const id=await createAlchemyJob(store,{type:'block',body:{kind:'lesson',id:'l',blocks:['b'],mode:'manual'}});
+ const run=createAlchemyBlocksRunHandler({env:{LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'s'.repeat(32),ANTHROPIC_API_KEY:'test'},getContentStore:async()=>store,verifySessionToken:()=>({valid:true}),deadlineMs:40,retrieve:async()=>[],complete:async()=>new Promise(()=>{})});
+ await run(new Request('https://api.example/api/alchemy-blocks/run',{method:'POST',headers:{'content-type':'application/json',cookie:'life_hub_session=ok'},body:JSON.stringify({id})}));
+ const job=await readAlchemyJob(store,id);assert.equal(job.status,'error');assert.equal(job.error.code,'alchemy_timeout');
 });
