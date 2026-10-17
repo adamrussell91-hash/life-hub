@@ -27,7 +27,11 @@ export function createAlchemyBlocksRunHandler(deps={}) {
         ?await (deps.gather??gatherUnitNotes)({unitId:job.unit,env,store,deps,deadlineMs})
         :await runAlchemyCheck({body:job.body,env,store,deps,deadlineMs});
       outcome={status:'done',result};
-    }catch(error){outcome={status:'error',error:alchemyJobError(error)};}
+    }catch(error){
+      outcome={status:'error',error:alchemyJobError(error)};
+      // The page only shows Ann's message; the log keeps the cause so a failure can be traced.
+      console.error('alchemy job failed',job.type,outcome.error.status,outcome.error.code,error?.message);
+    }
     await finishAlchemyJob(store,job,outcome);
     return withCors(okResponse(200,{job:job.id,status:outcome.status}),request,env);
   },deps);
