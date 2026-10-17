@@ -1,6 +1,7 @@
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider } from '@/schemas/block';
 import { analogyTypesContent, fluidAnalogyContent } from '@/toolkit/analogy';
+import { analogyMoveContent } from '@/toolkit/analogy-moves';
 import {
   conceptContent,
   intentionsContent,
@@ -65,6 +66,13 @@ export const NEW_BLOCK_TYPES = [
   'thinking_intentions',
   'thinking_reflection',
   'analogy_types',
+  'analogy_close_reading',
+  'analogy_pattern',
+  'analogy_reverse',
+  'analogy_problem',
+  'analogy_metaphor',
+  'analogy_transfer',
+  'analogy_chains',
   'fluid_analogy'
 ] as const;
 
@@ -119,7 +127,14 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   thinking_intentions: 'Thinking intentions',
   thinking_reflection: 'Thinking reflection',
   analogy_types: 'Analogy types',
-  fluid_analogy: 'Fluid analogy'
+  analogy_close_reading: 'Close Reading',
+  analogy_pattern: 'Pattern Translation',
+  analogy_reverse: 'Reverse Analogising',
+  analogy_problem: 'Problem Solving',
+  analogy_metaphor: 'Metaphorical Analysis',
+  analogy_transfer: 'Conceptual Transfer',
+  analogy_chains: 'Analogical Chains',
+  fluid_analogy: 'Fluid analogy (earlier version)'
 };
 
 export const EMBED_INSERT_PRESETS = [
@@ -192,7 +207,16 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Analogous Thinking',
-    types: ['analogy_types', 'fluid_analogy']
+    types: [
+      'analogy_types',
+      'analogy_close_reading',
+      'analogy_pattern',
+      'analogy_reverse',
+      'analogy_problem',
+      'analogy_metaphor',
+      'analogy_transfer',
+      'analogy_chains'
+    ]
   },
   {
     label: 'Learning',
@@ -229,6 +253,13 @@ const TOOLKIT_GROUP_TYPES = [
   'concept_features',
   'thinking_reflection',
   'analogy_types',
+  'analogy_close_reading',
+  'analogy_pattern',
+  'analogy_reverse',
+  'analogy_problem',
+  'analogy_metaphor',
+  'analogy_transfer',
+  'analogy_chains',
   'fluid_analogy'
 ];
 
@@ -394,6 +425,19 @@ export function createBlock(type: NewBlockType, id: string): Block {
         variant: 'medium',
         content: reflectionContent()
       };
+    case 'analogy_close_reading':
+    case 'analogy_pattern':
+    case 'analogy_reverse':
+    case 'analogy_problem':
+    case 'analogy_metaphor':
+    case 'analogy_transfer':
+    case 'analogy_chains':
+      return {
+        ...shared,
+        block_type: type,
+        variant: 'medium',
+        content: analogyMoveContent(type)
+      } as Block;
     case 'fluid_analogy':
       return {
         ...shared,

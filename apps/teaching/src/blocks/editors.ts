@@ -5,6 +5,7 @@ import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
   createAnalogyTypesEditor,
   createFluidAnalogyEditor,
+  createAnalogyMoveEditor,
   createConceptFeaturesEditor,
   createQuestionQuadrantEditor,
   createTeacherNoteBlockEditor,
@@ -15,6 +16,7 @@ import {
   createToolkitToolEditor,
   createToolkitValueEditor
 } from '@/toolkit/editors';
+import type { AnalogyMoveBlock } from '@/toolkit/analogy-moves';
 import katex from 'katex';
 import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
 import {
@@ -2924,6 +2926,14 @@ function createBlockEditorFields(
       );
     case 'fluid_analogy':
       return createFluidAnalogyEditor(block, onChange, latest as () => Extract<Block, { block_type: 'fluid_analogy' }>);
+    case 'analogy_close_reading':
+    case 'analogy_pattern':
+    case 'analogy_reverse':
+    case 'analogy_problem':
+    case 'analogy_metaphor':
+    case 'analogy_transfer':
+    case 'analogy_chains':
+      return createAnalogyMoveEditor(block, onChange, latest as () => AnalogyMoveBlock);
     case 'analogy_types':
       return createAnalogyTypesEditor(block, onChange, latest as () => Extract<Block, { block_type: 'analogy_types' }>);
     case 'teacher_note':

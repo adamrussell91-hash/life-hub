@@ -352,6 +352,13 @@ describe('blockRegistry', () => {
   it('maps every block_type to render and editor helpers', () => {
     expect(Object.keys(blockRegistry).sort()).toEqual([
       'accordion',
+      'analogy_chains',
+      'analogy_close_reading',
+      'analogy_metaphor',
+      'analogy_pattern',
+      'analogy_problem',
+      'analogy_reverse',
+      'analogy_transfer',
       'analogy_types',
       'annotation',
       'anthology',
