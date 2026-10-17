@@ -10,6 +10,16 @@ test('published Teaching student APIs are public', () => {
   assert.equal(isPublicStudentApi('GET', '/api/published/feedback/tok_abc/audio'), true);
   assert.equal(isPublicStudentApi('GET', '/api/media/file-1/file'), true);
   assert.equal(isPublicStudentApi('POST', '/api/html-app-ai'), true);
+  assert.equal(isPublicStudentApi('POST', '/api/published/word-help/week-1'), true);
+  assert.equal(isPublicStudentApi('GET', `/api/published/word-help/week-1/${'a'.repeat(64)}`), true);
+  assert.equal(isPublicStudentApi('POST', '/api/published/word-help-run'), true);
+});
+
+test('teacher text tools stay behind the operator session', () => {
+  assert.equal(isPublicStudentApi('POST', '/api/text-tools'), false);
+  assert.equal(isPublicStudentApi('GET', `/api/text-tools/${'a'.repeat(64)}`), false);
+  assert.equal(isPublicStudentApi('POST', '/api/text-tools-run'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/published/word-help/week-1/not-a-key'), false);
 });
 
 test('operator APIs are not public student routes', () => {

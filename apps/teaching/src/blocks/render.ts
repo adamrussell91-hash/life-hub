@@ -12,6 +12,8 @@ import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { buildAnnotationView } from '@/blocks/annotation-view';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
+import { applyWordHelp, readWordHelp } from '@/blocks/word-help';
+import { createStudentWordHelpBar } from '@/blocks/word-help-bar';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { embedFrameSrc, embedUsesIframe } from '@/blocks/embed-url';
@@ -125,12 +127,23 @@ function videoWatchUrl(
 
 export function renderRichTextBlock(
   block: Extract<Block, { block_type: 'rich_text' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
   const body = document.createElement('div');
   body.className = 'block-rich-text';
   body.innerHTML = sanitizeRichTextHtml(block.content.html);
-  return wrapBlock(body, block, mode);
+  if (mode === 'print') return wrapBlock(body, block, mode);
+
+  const preScanned = readWordHelp(block);
+  if (preScanned.length) applyWordHelp(body, preScanned);
+  const wrapper = wrapBlock(body, block, mode);
+  if (mode === 'student' && ctx.lessonId && body.textContent?.trim()) {
+    wrapper.append(
+      createStudentWordHelpBar({ body, lessonId: ctx.lessonId, blockId: block.id, preScanned })
+    );
+  }
+  return wrapper;
 }
 
 export function renderHeadingBlock(
@@ -2197,7 +2210,7 @@ function renderBlockContent(
   try {
     switch (block.block_type) {
     case 'rich_text':
-      return renderRichTextBlock(block, mode);
+      return renderRichTextBlock(block, mode, ctx);
     case 'heading':
       return renderHeadingBlock(block, mode);
     case 'callout':
