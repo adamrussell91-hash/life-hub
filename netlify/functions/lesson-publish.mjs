@@ -118,7 +118,10 @@ export function createLessonPublishHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Lesson not found', false), request, env);
     }
 
-    const draft = await getJSON(store, draftLessonKey(id));
+    // Strong read: the editor saves just before publishing, and an eventual
+    // read can still return the older draft, which would then be published
+    // and written back over the teacher's latest changes.
+    const draft = await getJSON(store, draftLessonKey(id), { consistency: 'strong' });
     if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
       return withCors(errorResponse(404, 'not_found', 'Lesson not found', false), request, env);
     }
