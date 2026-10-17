@@ -263,7 +263,6 @@ const SHELL_FILES = [
   'js/app/chart-kit/masonry.js',
   'js/app/mind-thread-sheet.js',
   'js/app/render-nutrition.js',
-  'js/app/render-future-map.js',
   'js/app/render-skincare.js',
   'js/app/aesthetics/aesthetics-model.js',
   'js/app/aesthetics/dress-looks.js',

@@ -34,6 +34,7 @@ export const NEW_BLOCK_TYPES = [
   'attachment',
   'accordion',
   'table',
+  'peer_feedback',
   'question_set',
   'flashcards',
   'cloze',
@@ -87,6 +88,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   attachment: 'Attachment',
   accordion: 'Accordion',
   table: 'Table',
+  peer_feedback: 'Peer feedback',
   question_set: 'Question set',
   flashcards: 'Flashcards',
   cloze: 'Cloze',
@@ -194,7 +196,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
+    types: ['peer_feedback', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -231,6 +233,7 @@ const TOOLKIT_GROUP_TYPES = [
 ];
 
 const HOMEPAGE_EXCLUDED = new Set([
+  'peer_feedback',
   ...TOOLKIT_GROUP_TYPES,
   'teacher_note',
   'flashcards',
@@ -252,7 +255,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -519,6 +522,10 @@ export function createBlock(type: NewBlockType, id: string): Block {
           rows: [['', '', '']]
         }
       };
+    case 'peer_feedback':
+      return { ...shared, block_type: 'peer_feedback', variant: 'medium', content: {
+        prompt: '', strength_prompt: 'One thing that works well…', suggestion_prompt: 'One suggestion or question…'
+      } };
     case 'question_set':
       return {
         ...shared,

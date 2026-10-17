@@ -9,7 +9,6 @@ import {
   createChartEditor,
   createClozeEditor,
   createCodeEditor,
-  createAnthologyEditor,
   createCollectionEditor,
   createConceptMapEditor,
   createDefinitionEditor,
@@ -84,6 +83,7 @@ import {
   renderWhiteboardBlock,
   type RenderMode
 } from '@/blocks/render';
+import { renderPeerFeedback, createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import type { Block } from '@/schemas/block';
 import {
   createAnalogyTypesEditor,
@@ -183,6 +183,7 @@ export const blockRegistry: {
     render: renderTableBlock,
     createEditor: createTableEditor
   },
+  peer_feedback: { render: renderPeerFeedback, createEditor: createPeerFeedbackEditor },
   question_set: {
     render: renderQuestionSetBlock,
     createEditor: createQuestionSetEditor
