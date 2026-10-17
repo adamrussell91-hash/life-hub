@@ -192,5 +192,4 @@
 .pl-block.is-platform { border-left: 3px solid var(--pl-rule); padding-left: 2px; }
 .pl-block.is-platform.is-left { border-left: 0; border-right: 3px solid var(--pl-rule); padding: 0 2px 0 0; }
 .pl-block.is-platform .pl-lbl { padding-top: 0; padding-bottom: 0; }
-.pl-lbl.is-also .pl-name { font-weight: 500; color: var(--pl-muted); }
 .pl-stop.is-interchange { stroke: var(--pl-ink); stroke-width: 4; }
