@@ -163,6 +163,14 @@
 
   .history { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); text-align: center; margin: 0; overflow-wrap: anywhere; }
 
+  .classes { background: var(--cotton); border: 1px solid var(--line); border-radius: 20px; padding: 18px 22px; display: grid; gap: 12px; }
+  .classes__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .classes__head h2 { margin: 0; font-size: 1.05rem; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .classes textarea { min-height: 120px; background: var(--paper); }
+  .count { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  select { font: 600 0.85rem var(--font); color: var(--ink); background: var(--cotton); border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 8px; }
+  select:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
   .legend { display: grid; gap: 10px; }
   .legend ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.9rem; max-width: 62ch; }
   @media (prefers-reduced-motion: reduce) {
@@ -177,8 +185,18 @@
     <p>A small toolbox that lives on a divider, or as its own block. Tap the faint gear on the divider below, pick a tool, and it opens in the gap between the two blocks. Everything here works.</p>
   </header>
 
+  <section class="classes" aria-label="Class students">
+    <div class="classes__head">
+      <div><p class="eyebrow" style="margin:0 0 2px">Class settings · Students</p><h2>Enter each class list once</h2></div>
+      <span class="count" data-r="class-count"></span>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Classes" data-r="class-tabs"></div>
+    <textarea id="class-students" aria-label="Students in this class, one per line"></textarea>
+    <p class="note">One name per line, or paste a column from a spreadsheet. The name picker and groups tool read straight from here. Sample names only.</p>
+  </section>
+
   <section class="lesson" aria-label="Sample lesson page">
-    <h2 class="lesson__title">Year 9 · Narrative openings</h2>
+    <h2 class="lesson__title">9ENG2 · Narrative openings</h2>
 
     <div class="blk"><h3>Read the extract</h3><p>The opening of <i>The Lottery</i>. Note every detail that feels ordinary.</p></div>
 
@@ -199,16 +217,44 @@
       <li><b>Divider host.</b> The gear sits at the end of the rule at low opacity. Hover or focus lifts it; tapping slides the tool chips out along the line. The first divider opens on the timer so you can see the stack.</li>
       <li><b>Tools block.</b> Same toolbox, but it takes a block's slot. The last block on the page opens on the name picker.</li>
       <li><b>Stacked timers.</b> Reading 5:00 then Writing 10:00. Each segment has its own colour on the bar, it rolls straight into the next one, and it chimes at each change.</li>
-      <li><b>Names, numbers, groups and dice</b> share one sample class list. Picked names can drop out so nobody is called twice.</li>
+      <li><b>Class lists.</b> Each class gets a Students section. Type or paste the list once. The name picker and groups tool open on this lesson's class, and a dropdown switches to any other class. Edits to a list show up in the picker straight away.</li>
+      <li><b>Names, numbers, groups and dice.</b> Picked names can drop out so nobody is called twice.</li>
     </ul>
-    <p class="note">Sample class list only. In a real build the list would come from the class roster, and nothing about who was picked would be saved unless you choose to.</p>
+    <p class="note">Sample names only. Who was picked is not saved anywhere. It resets when you close the tool.</p>
   </section>
 </div>
 
 <script>
 (() => {
-  const SAMPLE = ['Ava', 'Noah', 'Mia', 'Leo', 'Isla', 'Kai', 'Zara', 'Eli', 'Ruby', 'Finn', 'Maya', 'Arlo', 'Ivy', 'Jack', 'Nina', 'Theo', 'Lola', 'Sami', 'Ella', 'Hugo', 'Aria', 'Oscar', 'Pia', 'Toby'];
-  let classList = SAMPLE.slice();
+  const LESSON_CLASS = '9ENG2';
+  const CLASSES = {
+    '9ENG2': ['Ava', 'Noah', 'Mia', 'Leo', 'Isla', 'Kai', 'Zara', 'Eli', 'Ruby', 'Finn', 'Maya', 'Arlo', 'Ivy', 'Jack', 'Nina', 'Theo', 'Lola', 'Sami', 'Ella', 'Hugo', 'Aria', 'Oscar', 'Pia', 'Toby'],
+    '10ENG1': ['Grace', 'Liam', 'Chloe', 'Ethan', 'Sienna', 'Max', 'Harper', 'Lucas', 'Matilda', 'Archie', 'Evie', 'Jasper', 'Willow', 'Ned', 'Georgia', 'Felix', 'Stella', 'Ollie'],
+    '7ENG3': ['Ruby', 'Alfie', 'Poppy', 'Charlie', 'Frankie', 'Henry', 'Daisy', 'Billy', 'Rosie', 'Sam', 'Lily', 'Ari', 'Molly', 'Zac', 'Esme', 'Jai', 'Tilly', 'Rafa', 'Bea', 'Remy', 'Nell', 'Otis']
+  };
+  const listeners = new Set();
+  const onClassesChange = (fn) => listeners.add(fn);
+  const classOptions = (sel) => Object.keys(CLASSES).map((c) => `<option value="${c}"${c === sel ? ' selected' : ''}>${c}${c === LESSON_CLASS ? ' (this lesson)' : ''}</option>`).join('');
+
+  /* Class settings: Students section */
+  (() => {
+    const tabs = document.querySelector('[data-r="class-tabs"]');
+    const ta = document.getElementById('class-students');
+    const count = document.querySelector('[data-r="class-count"]');
+    let cur = LESSON_CLASS;
+    const draw = () => {
+      tabs.innerHTML = Object.keys(CLASSES).map((c) => `<button class="chip" role="tab" aria-selected="${c === cur}" aria-pressed="${c === cur}" data-c="${c}">${c}</button>`).join('');
+      ta.value = CLASSES[cur].join('\n');
+      count.textContent = `${CLASSES[cur].length} students in ${cur}`;
+    };
+    tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (b) { cur = b.dataset.c; draw(); } });
+    ta.addEventListener('input', () => {
+      CLASSES[cur] = ta.value.split(/[\n\t,]/).map((x) => x.trim()).filter(Boolean);
+      count.textContent = `${CLASSES[cur].length} students in ${cur}`;
+      listeners.forEach((fn) => fn(cur));
+    });
+    draw();
+  })();
 
   const ICON = {
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
@@ -341,8 +387,9 @@
 
   /* ---------- Name picker ---------- */
   function namesTool(root) {
-    let pool = classList.slice(); const picked = [];
+    let cls = LESSON_CLASS; let pool = CLASSES[cls].slice(); const picked = [];
     root.innerHTML = `
+      <div class="row row--center"><label class="inl">Class <select id="names-class-${root.dataset.uid}">${classOptions(cls)}</select></label></div>
       <div class="big big--name" data-r="out" aria-live="polite">Ready</div>
       <p class="sub" data-r="left"></p>
       <div class="row row--center">
@@ -350,24 +397,24 @@
         <button class="btn" data-a="reset">Put everyone back</button>
         <label class="inl"><input type="checkbox" id="names-drop-${root.dataset.uid}" checked> Don't pick the same person twice</label>
       </div>
-      <div class="picked" data-r="picked"></div>
-      <details><summary class="sub" style="text-align:left;cursor:pointer">Class list (sample)</summary>
-        <textarea id="names-list-${root.dataset.uid}" aria-label="Class list, one name per line">${classList.join('\n')}</textarea></details>`;
+      <div class="picked" data-r="picked"></div>`;
     const $ = (r) => root.querySelector(`[data-r="${r}"]`);
     const drop = root.querySelector('input[type="checkbox"]');
     const render = () => {
-      $('left').textContent = drop.checked ? `${pool.length} of ${classList.length} still to go` : `${classList.length} in the class`;
+      const all = CLASSES[cls];
+      $('left').textContent = drop.checked ? `${pool.length} of ${all.length} still to go` : `${all.length} in ${cls}`;
       $('picked').innerHTML = picked.map((n) => `<span class="tag">${esc(n)}</span>`).join('');
     };
-    root.querySelector('textarea').addEventListener('change', (e) => {
-      classList = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean); pool = classList.slice(); picked.length = 0; render();
-    });
+    const restart = () => { pool = CLASSES[cls].slice(); picked.length = 0; $('out').textContent = 'Ready'; render(); };
+    root.querySelector('select').addEventListener('change', (e) => { cls = e.target.value; restart(); });
+    drop.addEventListener('change', render);
+    onClassesChange((c) => { if (c === cls) { pool = pool.filter((n) => CLASSES[cls].includes(n)); render(); } });
     root.addEventListener('click', (e) => {
       const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
-      if (a === 'reset') { pool = classList.slice(); picked.length = 0; $('out').textContent = 'Ready'; render(); }
+      if (a === 'reset') restart();
       if (a === 'pick') {
-        const src = drop.checked ? pool : classList;
-        if (!src.length) { $('out').textContent = 'Everyone’s had a go'; return; }
+        const src = drop.checked ? pool : CLASSES[cls];
+        if (!src.length) { $('out').textContent = CLASSES[cls].length ? 'Everyone’s had a go' : 'No students yet'; return; }
         const out = $('out'); out.classList.add('rolling');
         const winner = src[rand(src.length)];
         let k = 0; const steps = 16;
@@ -424,6 +471,7 @@
   function groupsTool(root) {
     root.innerHTML = `
       <div class="row row--center">
+        <label class="inl">Class <select id="grp-class-${root.dataset.uid}">${classOptions(LESSON_CLASS)}</select></label>
         <label class="inl">Groups of <input type="number" id="grp-size-${root.dataset.uid}" min="2" max="8" value="4"></label>
         <button class="btn btn--go" data-a="make">Make groups</button>
       </div>
@@ -432,12 +480,14 @@
     const $ = (r) => root.querySelector(`[data-r="${r}"]`);
     const make = () => {
       const size = Math.min(8, Math.max(2, Number(root.querySelector('input').value) || 4));
+      const cls = root.querySelector('select').value; const classList = CLASSES[cls];
       const s = shuffle(classList); const n = Math.max(1, Math.round(s.length / size)); const gs = Array.from({ length: n }, () => []);
       s.forEach((name, i) => gs[i % n].push(name));
-      $('info').textContent = `${classList.length} students · ${n} groups`;
+      $('info').textContent = `${cls} · ${classList.length} students · ${n} groups`;
       $('out').innerHTML = gs.map((g, i) => { const [c, ink] = GROUP_COLOURS[i % GROUP_COLOURS.length]; return `<div class="group" style="--gc:${c};--gi:${ink}"><b>Group ${i + 1}</b>${g.map((x) => `<span>${esc(x)}</span>`).join('')}</div>`; }).join('');
     };
     root.addEventListener('click', (e) => { if (e.target.closest('[data-a="make"]')) make(); });
+    root.querySelector('select').addEventListener('change', make);
     make();
   }
 
