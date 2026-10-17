@@ -4,6 +4,8 @@
  *   dictionary  Finds the challenging words in a block and writes a short
  *               dictionary card for each (teacher and students).
  *   fry         Rewrites a block as a Fry explainer (teacher only).
+ *   techniques  Finds the Periodic Table techniques a passage uses, for the
+ *               teacher to approve (see technique-scan.mjs).
  *
  * The live deploy cuts synchronous functions off at about ten seconds, which
  * is shorter than either model call. So a request starts a job record keyed by
@@ -14,10 +16,18 @@
 import { createHash } from 'node:crypto';
 import { completeMessage as defaultCompleteMessage } from './anthropic-client.mjs';
 import { buildFryExplainerSystem } from './fry-explainer-prompt.mjs';
+import {
+  MAX_TECHNIQUE_SCAN_CHARS,
+  parseTechniqueResult,
+  requestTechniqueScan as defaultRequestTechniqueScan
+} from './technique-scan.mjs';
 import { getJSON, setJSON } from './teaching-blobs.mjs';
 import { sanitizeRichTextHtml } from './teaching-student.mjs';
+import { TextToolError } from './text-tool-error.mjs';
 
-export const TEXT_TOOLS = ['dictionary', 'fry'];
+export { TextToolError };
+
+export const TEXT_TOOLS = ['dictionary', 'fry', 'techniques'];
 export const TEXT_TOOL_PREFIX = 'text_tools/';
 /** Bump when a prompt changes so old cached results are not served. */
 export const TEXT_TOOL_VERSION = 3;
@@ -30,7 +40,13 @@ export const TEXT_TOOL_ERROR_COOLDOWN_MS = 60_000;
 
 const DEFAULT_MODELS = {
   dictionary: 'claude-haiku-4-5',
-  fry: 'claude-sonnet-5'
+  fry: 'claude-sonnet-5',
+  techniques: 'gpt-4o'
+};
+const MODEL_ENV = {
+  dictionary: 'TEXT_TOOLS_DICTIONARY_MODEL',
+  fry: 'TEXT_TOOLS_FRY_MODEL',
+  techniques: 'TEXT_TOOLS_TECHNIQUES_MODEL'
 };
 const MAX_TOKENS = { dictionary: 4096, fry: 4096 };
 const KEY_RE = /^[a-f0-9]{64}$/;
@@ -48,7 +64,7 @@ export function textToolJobKey(key) {
 }
 
 export function textToolModel(tool, env = {}) {
-  const override = tool === 'fry' ? env.TEXT_TOOLS_FRY_MODEL : env.TEXT_TOOLS_DICTIONARY_MODEL;
+  const override = env[MODEL_ENV[tool]];
   return typeof override === 'string' && override.trim() ? override.trim() : DEFAULT_MODELS[tool];
 }
 
@@ -84,6 +100,9 @@ export function textToolInputError(tool, text) {
   if (!text) return 'This block has no text yet.';
   if (text.length > MAX_TEXT_TOOL_CHARS) {
     return `This block is too long for one pass (${text.length} characters, limit ${MAX_TEXT_TOOL_CHARS}). Split it into smaller blocks.`;
+  }
+  if (tool === 'techniques' && text.length > MAX_TECHNIQUE_SCAN_CHARS) {
+    return `This block is too long for a technique scan (${text.length} characters, limit ${MAX_TECHNIQUE_SCAN_CHARS}). Split it into smaller blocks.`;
   }
   if (tool === 'fry' && countWords(text) < 25) {
     return 'There is not enough here to build an explainer from. Write the key ideas first, at least a few sentences.';
@@ -266,13 +285,6 @@ export function parseFryResult(raw) {
 
 // ----------------------------------------------------------------------- run
 
-export class TextToolError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'TextToolError';
-  }
-}
-
 export function countWords(text) {
   return String(text ?? '').split(/\s+/).filter(Boolean).length;
 }
@@ -311,13 +323,36 @@ export function buildTextToolRequest(tool, text) {
  * Run one job to completion and write the outcome onto its record. Safe to
  * call twice: a finished record is left alone.
  */
-export async function runTextToolJob({ store, env = {}, key, completeMessage = defaultCompleteMessage, nowIso = () => new Date().toISOString() }) {
+export async function runTextToolJob({
+  store,
+  env = {},
+  key,
+  completeMessage = defaultCompleteMessage,
+  requestTechniqueScan = defaultRequestTechniqueScan,
+  nowIso = () => new Date().toISOString()
+}) {
   const job = await readTextToolJob(store, key);
   if (!job) return null;
   if (job.status !== 'working') return job;
 
   let next;
-  if (!env.ANTHROPIC_API_KEY) {
+  if (job.tool === 'techniques') {
+    try {
+      const raw = await requestTechniqueScan({
+        env,
+        text: job.text,
+        model: textToolModel(job.tool, env),
+        signal: AbortSignal.timeout(120_000)
+      });
+      next = { ...job, status: 'done', result: parseTechniqueResult(raw, job.text) };
+    } catch (error) {
+      next = {
+        ...job,
+        status: 'error',
+        error: error instanceof TextToolError ? error.message : 'The AI service did not answer. Try again in a minute.'
+      };
+    }
+  } else if (!env.ANTHROPIC_API_KEY) {
     next = { ...job, status: 'error', error: 'The AI service is not configured (ANTHROPIC_API_KEY).' };
   } else {
     try {

@@ -264,11 +264,11 @@
     <p class="eyebrow" style="margin:0">Assessment page · countdown header block</p>
     <div class="countdown" data-r="countdown">
       <div><h3>Narrative writing task</h3><p data-r="cd-due"></p></div>
-      <div class="countdown__n"><span data-r="cd-n">0</span><small>school days to go</small></div>
+      <div class="countdown__n"><span data-r="cd-n">0</span><small>days to go</small></div>
       <div class="ticks" data-r="cd-ticks" aria-hidden="true"></div>
     </div>
     <div class="blk"><h3>Task</h3><p>Write a 600 word short story that opens somewhere ordinary and lets one detail feel wrong.</p></div>
-    <p class="note">Counts school days only, so weekends are left out. A build could also leave out school holidays and pupil-free days from the term calendar.</p>
+    <p class="note">Counts every day, including weekends, school holidays and pupil-free days. They are all days students can study.</p>
   </section>
 
   <section class="legend">
@@ -284,7 +284,7 @@
       <li><b>Technique spinner.</b> Scans a block's text and only spins through the techniques it found, not all 310. Teacher picks the prompt: find it in the extract, or use it in your writing.</li>
       <li><b>Timer presets.</b> Teacher only. One tap loads a saved stack, like Think, Pair, Share.</li>
       <li><b>Stopwatch, coin flip and scoreboard.</b> Students also get the stopwatch, coin and technique spinner. The scoreboard stays with the teacher.</li>
-      <li><b>Countdown header.</b> A header block for the assessment page, counting school days to the due date.</li>
+      <li><b>Countdown header.</b> A header block for the assessment page, counting every day to the due date.</li>
       <li><b>Names, numbers, groups and dice.</b> Picked names can drop out so nobody is called twice.</li>
     </ul>
     <p class="note">Sample names only. Who was picked is not saved anywhere. It resets when you close the tool.</p>
@@ -690,7 +690,7 @@
         <label class="inl">Text <select id="tech-src-${root.dataset.uid}"><option>Read the extract</option><option>Write your opening</option></select></label>
         ${view === 'teacher' ? `<label class="inl">Prompt <select id="tech-mode-${root.dataset.uid}" data-r="mode"><option value="find">Find it in the text</option><option value="use">Use it in your writing</option></select></label>` : ''}
       </div>
-      <p class="sub">Scan found <b>${SCANNED.length}</b> of 310 techniques in this text. The spinner only picks from these.</p>
+      <p class="sub">You approved <b>${SCANNED.length}</b> techniques from this text's scan. The spinner only picks from these.</p>
       <div class="scanbar" data-r="scan">${SCANNED.map((t, i) => `<span class="tag" style="--fc:${FAMILY[t.fam]}" data-k="${i}">${t.name}</span>`).join('')}</div>
       <div class="tech" data-r="out">
         <div class="tech__tile" style="--fc:var(--line-strong)"><b>?</b><small>Spin</small></div>
@@ -727,12 +727,11 @@
   (() => {
     const box = document.querySelector('[data-r="countdown"]'); if (!box) return;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const isSchool = (d) => d.getDay() > 0 && d.getDay() < 6;
-    // Due date: the 10th school day from today, at 3:00 pm
-    const due = new Date(today); let n = 0; while (n < 10) { due.setDate(due.getDate() + 1); if (isSchool(due)) n++; }
-    const set = new Date(today); let total = 0; for (let i = 0; i < 15; i++) { set.setDate(set.getDate() - 1); if (isSchool(set)) total++; if (total === 5) break; }
-    let left = 0; const d = new Date(today); while (d < due) { d.setDate(d.getDate() + 1); if (isSchool(d)) left++; }
-    const all = left + 5;
+    // Sample task: set 7 days ago, due 14 days from today at 3:00 pm. Every day counts.
+    const DAY = 86_400_000;
+    const due = new Date(today); due.setDate(due.getDate() + 14);
+    const left = Math.round((due - today) / DAY);
+    const all = left + 7;
     box.querySelector('[data-r="cd-n"]').textContent = left;
     box.querySelector('[data-r="cd-due"]').textContent = `Due ${due.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}, 3:00 pm`;
     box.querySelector('[data-r="cd-ticks"]').innerHTML = Array.from({ length: all }, (_, i) => `<i class="${i < all - left ? 'gone' : ''}"></i>`).join('');
