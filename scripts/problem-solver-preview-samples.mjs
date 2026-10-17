@@ -106,3 +106,17 @@ export const SAMPLES = {
     node('a', 'a', 'Within current courier contracts and staffing.', 'Within contracts')
   ])
 };
+
+const session = (model, phase, runs) => ({
+  id: `sample-${model}`, title: 'Late deliveries', revision: 1, status: phase === 'defined' ? 'defined' : 'active', phase,
+  frame: {}, model: { id: model, reason: '' }, links: [], define: { runs, finishedEarly: false, exitObjection: null },
+  turns: [], summary: '', suggestion: null, pendingKeep: null, runner: { status: 'idle', mode: 'turn', error: null }, createdAt: '', updatedAt: ''
+});
+const chain = [
+  { ...SAMPLES.five_whys, id: 'run-whys', status: 'switched', switchReason: 'The causes branch, so a tree fits better.' },
+  { ...SAMPLES.problem_tree, id: 'run-tree', status: 'done' },
+  { ...SAMPLES.smart, id: 'run-smart', status: 'done' }
+];
+SAMPLES.record = session('seven_step', 'defined', chain);
+SAMPLES.record_polya = session('polya', 'define', [chain[0], { ...chain[1], status: 'active' }]);
+SAMPLES.record_triz = session('triz', 'defined', chain.slice(1));
