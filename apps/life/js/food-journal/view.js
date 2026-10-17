@@ -25,6 +25,7 @@ import {
   needsEditorial,
   fixupQueue,
   applyFixup,
+  plainNotes,
 } from "./model.js";
 import { paintMagazine, paintTimeline, paintEntry, paintFixup } from "./pages.js";
 import {
@@ -98,6 +99,7 @@ export function createFoodJournalView({
     photoCache = new Map(),
     photoExpires = new Map(),
     photoObservers = new Set(),
+    signQueue = new Map(),
     objectUrls = new Set();
   const draftKey = "life-food-journal-draft-v1";
   function readDraft() {
@@ -264,6 +266,32 @@ export function createFoodJournalView({
       row.append(button("Clear", () => onRate(null), "ghost"));
     return row;
   }
+  // Photos that come into view together are signed in one request.
+  function signPhoto(key) {
+    return new Promise((resolve, reject) => {
+      if (!signQueue.size)
+        setTimeout(() => {
+          const batch = signQueue;
+          signQueue = new Map();
+          const keys = [...batch.keys()];
+          for (let i = 0; i < keys.length; i += 50) {
+            const chunk = keys.slice(i, i + 50);
+            api
+              .media({ action: "read", keys: chunk })
+              .then(({ urls = {} }) => {
+                for (const k of chunk)
+                  for (const w of batch.get(k)) w.resolve(urls[k] || null);
+              })
+              .catch((e) => {
+                for (const k of chunk) for (const w of batch.get(k)) w.reject(e);
+              });
+          }
+        }, 50);
+      const waiting = signQueue.get(key) || [];
+      waiting.push({ resolve, reject });
+      signQueue.set(key, waiting);
+    });
+  }
   function photoNode(photo) {
     const image = el("img", "food-photo");
     image.alt = "Dish photo";
@@ -271,16 +299,21 @@ export function createFoodJournalView({
     const cached = photoCache.get(photo.key),
       token = epoch;
     let refreshed = false;
-    const sign = () =>
-      api
-        .media({ action: "read", key: photo.key })
-        .then(({ url }) => {
-          if (token !== epoch || !url) return;
+    const sign = (attempt = 0) =>
+      signPhoto(photo.key)
+        .then((url) => {
+          if (token !== epoch) return;
+          if (!url) return image.remove();
           photoCache.set(photo.key, url);
           photoExpires.set(photo.key, Date.now() + 240000);
           image.src = url;
         })
-        .catch(() => image.remove());
+        .catch(() => {
+          // A busy server is not a missing photo: try again before giving up.
+          if (token === epoch && attempt < 3)
+            setTimeout(() => void sign(attempt + 1), 2000 * 2 ** attempt);
+          else image.remove();
+        });
     image.addEventListener("error", () => {
       if (!refreshed && !cached?.startsWith("blob:") && token === epoch) {
         refreshed = true;
@@ -353,8 +386,10 @@ export function createFoodJournalView({
       for (const t of dish.tags) tags.append(el("span", "hub-chip", t));
       content.append(tags);
     }
-    if (dish.notes && dish.notes !== visit.notes)
-      content.append(el("p", "food-notes fj-serif fj-italic", dish.notes));
+    if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes))
+      content.append(
+        el("p", "food-notes fj-serif fj-italic", plainNotes(dish.notes)),
+      );
     const actions = el("div", "food-actions");
     actions.append(
       button("Recipe", (e) => openRecipe(dish, e.currentTarget)),

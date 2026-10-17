@@ -951,6 +951,18 @@ html[data-hub="life"] .hub-card.food-dish {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.fj-prose__label {
+  margin: var(--space-4) 0 calc(-1 * var(--space-2));
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pastel-peach-ink);
+}
+.fj-prose__label:first-child {
+  margin-top: 0;
+}
 .fj-prose__first::first-letter {
   float: left;
   font-size: 5.5rem;

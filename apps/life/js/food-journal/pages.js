@@ -6,6 +6,8 @@ import {
   visitPhotos,
   visitRating,
   firstSentence,
+  noteBlocks,
+  plainNotes,
   venueHistory,
   fixupQueue,
   isImport,
@@ -480,16 +482,18 @@ export function paintEntry(ctx, host, visit) {
 
   const columns = el("div", "fj-entry__columns");
   const prose = el("div", "fj-prose fj-serif");
-  const paragraphs = String(visit.notes || "")
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  paragraphs.forEach((text, index) => {
-    const p = el("p", index === 0 ? "fj-prose__first" : "", text);
-    prose.append(p);
+  const blocks = noteBlocks(visit.notes, { title: headline(visit) });
+  const paragraphs = blocks.filter((b) => b.kind === "para");
+  for (const block of blocks) {
+    if (block.kind === "heading") {
+      prose.append(el("h3", "fj-prose__label", block.text));
+      continue;
+    }
+    const index = paragraphs.indexOf(block);
+    prose.append(el("p", index === 0 ? "fj-prose__first" : "", block.text));
     if (index === Math.min(1, paragraphs.length - 1) && visit.editorial?.pull_quote)
       prose.append(el("blockquote", "fj-pull fj-italic", `“${visit.editorial.pull_quote}”`));
-  });
+  }
   if (!paragraphs.length)
     prose.append(el("p", "fj-meta", "No notes yet. Edit this visit to add them."));
   columns.append(prose);
@@ -599,8 +603,8 @@ function menuDish(ctx, visit, dish) {
   }
   line.append(rate);
   body.append(line);
-  if (dish.notes && dish.notes !== visit.notes)
-    body.append(el("p", "fj-dish__note fj-serif fj-italic", dish.notes));
+  if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes))
+    body.append(el("p", "fj-dish__note fj-serif fj-italic", plainNotes(dish.notes)));
   const tags = unique([dish.cuisine, ...dish.tags]);
   if (tags.length) body.append(el("p", "fj-meta", tags.join(" · ")));
   const actions = el("div", "fj-dish__actions");
