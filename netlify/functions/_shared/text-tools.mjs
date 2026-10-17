@@ -20,7 +20,7 @@ import { sanitizeRichTextHtml } from './teaching-student.mjs';
 export const TEXT_TOOLS = ['dictionary', 'fry'];
 export const TEXT_TOOL_PREFIX = 'text_tools/';
 /** Bump when a prompt changes so old cached results are not served. */
-export const TEXT_TOOL_VERSION = 2;
+export const TEXT_TOOL_VERSION = 3;
 export const MAX_TEXT_TOOL_CHARS = 12_000;
 export const MAX_DICTIONARY_WORDS = 40;
 /** A job still "working" after this long is treated as dead and may restart. */
@@ -256,16 +256,12 @@ export function cleanFryHtml(html) {
 
 export function parseFryResult(raw) {
   const text = String(raw ?? '');
-  const declined = text.match(/<declined>([\s\S]*?)<\/declined>/i);
-  if (declined) {
-    return { declined: true, reason: clip(declined[1], 600) || 'This block cannot carry the explainer structure.' };
-  }
   const explainer = text.match(/<explainer>([\s\S]*?)(?:<\/explainer>|$)/i);
   const html = explainer ? cleanFryHtml(explainer[1]) : '';
   if (!html || !/<p>/.test(html)) {
     throw new TextToolError('The explainer came back empty. Try again.');
   }
-  return { declined: false, html };
+  return { html };
 }
 
 // ----------------------------------------------------------------------- run

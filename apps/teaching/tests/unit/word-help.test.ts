@@ -238,7 +238,7 @@ describe('teacher text tools', () => {
 
   it('Fry explainer waits for Replace, then swaps the text with undo', async () => {
     const ctx = setup('<p>Old text about voice.</p>');
-    const tools = createRichTextTools({ ...ctx, rewrite: async () => ({ declined: false, html: '<p>Just do it.</p>' }) });
+    const tools = createRichTextTools({ ...ctx, rewrite: async () => ({ html: '<p>Just do it.</p>' }) });
     tools.buttons[1].click();
     const dialog = await vi.waitFor(() => {
       const found = document.querySelector('.text-tools-review');
@@ -255,9 +255,9 @@ describe('teacher text tools', () => {
     expect(ctx.tiptap.setHtml).toHaveBeenLastCalledWith('<p>Old text about voice.</p>', true);
   });
 
-  it('a declined Fry rewrite explains why and offers no replace', () => {
-    const dialog = openFryReview({ declined: true, reason: 'This is a procedure.' }, '<p>Steps</p>', () => {});
-    expect(dialog.textContent).toContain('This is a procedure.');
-    expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Close']);
+  it('the Fry preview always offers Replace and Discard, never a refusal', () => {
+    const dialog = openFryReview({ html: '<p>Why does a poem need a stage?</p>' }, '<p>Course intro</p>', () => {});
+    expect(dialog.querySelector('h2')?.textContent).toBe('Fry explainer');
+    expect([...dialog.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Replace text', 'Discard']);
   });
 });

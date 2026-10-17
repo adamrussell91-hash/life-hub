@@ -7,7 +7,7 @@ import { normaliseWordHelp, type WordHelpEntry } from '@/blocks/word-help';
 
 export type TextTool = 'dictionary' | 'fry';
 
-export type FryResult = { declined: true; reason: string } | { declined: false; html: string };
+export type FryResult = { html: string };
 
 type JobView = {
   key: string;
@@ -60,9 +60,8 @@ export async function rewriteAsFryExplainer(html: string, options?: PollOptions)
     () => apiPost<JobView>('/api/text-tools', { tool: 'fry', html }, { signal: options?.signal }),
     (key) => apiGet<JobView>(`/api/text-tools/${encodeURIComponent(key)}`, { signal: options?.signal }),
     { timeoutMs: 240_000, intervalMs: 2500, ...options }
-  )) as Partial<{ declined: boolean; reason: string; html: string }> | undefined;
-  if (result?.declined) return { declined: true, reason: result.reason || 'This block cannot carry the explainer structure.' };
-  if (typeof result?.html === 'string' && result.html) return { declined: false, html: result.html };
+  )) as Partial<FryResult> | undefined;
+  if (typeof result?.html === 'string' && result.html) return { html: result.html };
   throw new Error('The explainer came back empty. Try again.');
 }
 
