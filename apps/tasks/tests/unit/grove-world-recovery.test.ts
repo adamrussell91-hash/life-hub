@@ -1,6 +1,6 @@
 import {it,expect,vi,afterEach} from 'vitest';
 import * as heightfield from '@/domain/grove/heightfield';
-import {generateAnnualWorld} from '@/domain/grove/world';
+import {generateAnnualGeography,generateAnnualWorld} from '@/domain/grove/world';
 import {worldKeyForYear} from '@/domain/grove/world-key';
 // Recovery exercises several complete annual generation attempts.
 vi.setConfig({testTimeout:30000});
@@ -9,7 +9,8 @@ const flat=(key:Parameters<typeof original>[0])=>{const f=original(key);return {
 afterEach(()=>vi.restoreAllMocks());
 it('uses a deterministic second attempt when the first has no lake',()=>{
  vi.spyOn(heightfield,'generateHeightfield').mockImplementation((key,attempt=0)=>attempt===0?flat(key):original(key,attempt));
- const w=generateAnnualWorld(worldKeyForYear(2027));expect(w.generation).toEqual({attempt:1,fallback:false,hydrologyVersion:1});expect(w.hydrology.quality.substantialLakes).toBeGreaterThan(0);
+ // Attempt selection happens before regions; the fallback case below runs the complete world.
+ const w=generateAnnualGeography(worldKeyForYear(2027));expect(w.generation).toEqual({attempt:1,fallback:false,hydrologyVersion:1});expect(w.hydrology.quality.substantialLakes).toBeGreaterThan(0);
  expect(w.bed).toEqual(original(worldKeyForYear(2027),1).bed);
 });
 it('uses the verified fallback after bounded unsuitable attempts, retaining the requested identity',()=>{
