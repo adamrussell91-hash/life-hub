@@ -259,8 +259,9 @@
 
 /* ---- student button ---------------------------------------------------- */
 
-/* A quiet text link tucked under the block's right edge: no pill, no border.
-   The 44px tap height stays, but it is invisible and pulled into the gap. */
+/* Just the book icon tucked under the block's right edge. Hover or keyboard
+   focus slides the "Dictionary scan" label out to its left; leaving slides it
+   back. The 44px tap height stays, but it is invisible and pulled into the gap. */
 .word-help-bar {
   display: flex;
   flex-wrap: wrap;
@@ -272,23 +273,56 @@
 
 .word-help-bar__btn {
   display: inline-flex;
+  flex-direction: row-reverse;
   align-items: center;
-  gap: var(--space-1);
   min-height: 2.75rem;
-  padding: 0 var(--space-1);
+  min-width: 2.75rem;
+  justify-content: flex-start; /* row-reverse: pins the icon to the right edge */
+  padding: 0 var(--space-2);
   border: 0;
   background: none;
   color: var(--muted);
-  opacity: 0.7;
+  opacity: 0.6;
   font: inherit;
   font-size: var(--text-xs);
+  white-space: nowrap;
   cursor: pointer;
-  transition: color 160ms ease, opacity 160ms ease;
+  transition: color 220ms ease, opacity 220ms ease;
 }
 
 .word-help-bar__btn svg {
+  flex: none;
   width: 0.875rem;
   height: 0.875rem;
+}
+
+.word-help-bar__label {
+  display: inline-block;
+  overflow: hidden;
+  max-width: 0;
+  margin-right: 0;
+  opacity: 0;
+  transform: translateX(0.5rem);
+  transition:
+    max-width 280ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    margin-right 280ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 200ms ease,
+    transform 280ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.word-help-bar__btn:hover .word-help-bar__label,
+.word-help-bar__btn:focus-visible .word-help-bar__label {
+  max-width: 8rem;
+  margin-right: var(--space-1);
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-help-bar__label {
+    transition: opacity 120ms ease;
+    transform: none;
+  }
 }
 
 .word-help-bar__btn:hover,
