@@ -1,3 +1,5 @@
+import { withAppBase } from '@/app/base-path';
+
 export type AgentSlug = 'ann' | 'clementine' | 'hammond' | 'clare';
 
 export interface AgentDefinition {
@@ -18,8 +20,8 @@ export const AGENTS: AgentDefinition[] = [
     slug: 'ann',
     name: "Ann O'Tation",
     colour: '#5B141A',
-    avatarSrc: '/assets/agents/ann.png',
-    heroSrc: '/assets/agents/full/ann.png',
+    avatarSrc: withAppBase('/assets/agents/ann.png'),
+    heroSrc: withAppBase('/assets/agents/full/ann.png'),
     nameTriggers: ["ann o'tation", 'ann otation', 'ann'],
     protocolFile: 'ann-protocol.md'
   },
@@ -27,8 +29,8 @@ export const AGENTS: AgentDefinition[] = [
     slug: 'clementine',
     name: 'Professor Clementine Haig',
     colour: '#3B57A8',
-    avatarSrc: '/assets/agents/clementine.png',
-    heroSrc: '/assets/agents/full/clementine.png',
+    avatarSrc: withAppBase('/assets/agents/clementine.png'),
+    heroSrc: withAppBase('/assets/agents/full/clementine.png'),
     nameTriggers: ['professor clementine haig', 'clementine haig', 'clementine', 'haig'],
     protocolFile: 'clementine-protocol.md'
   },
@@ -36,8 +38,8 @@ export const AGENTS: AgentDefinition[] = [
     slug: 'hammond',
     name: 'General Hammond',
     colour: '#2D2D2D',
-    avatarSrc: '/assets/agents/hammond.png',
-    heroSrc: '/assets/agents/full/hammond.png',
+    avatarSrc: withAppBase('/assets/agents/hammond.png'),
+    heroSrc: withAppBase('/assets/agents/full/hammond.png'),
     nameTriggers: ['general hammond', 'hammond'],
     protocolFile: 'hammond-protocol.md'
   },
@@ -45,8 +47,8 @@ export const AGENTS: AgentDefinition[] = [
     slug: 'clare',
     name: 'Clare DèMind',
     colour: '#F7DD4C',
-    avatarSrc: '/assets/agents/clare.png',
-    heroSrc: '/assets/agents/full/clare.png',
+    avatarSrc: withAppBase('/assets/agents/clare.png'),
+    heroSrc: withAppBase('/assets/agents/full/clare.png'),
     nameTriggers: ['clare dèmind', 'clare demind', 'clare'],
     protocolFile: 'clare-protocol.md'
   }
