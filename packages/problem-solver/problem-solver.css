@@ -883,6 +883,53 @@
   .ps-smart__shape, .ps-smart__tri polygon, .ps-smart__letter { transition: none; }
 }
 
+/* Concept mapping (toolkit p.49): graph-blocks draws the map; the theme and its
+   concepts are listed underneath as flat book-colour pills that open their details. */
+.ps-cmap { display: flex; flex-direction: column; gap: var(--space-3); }
+.ps-cmap__stage { min-height: 120px; border-radius: 6px; background: var(--paper); }
+.ps-cmap__stage .graph-stage { overflow-x: auto; }
+.ps-cmap__pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-cmap__item { min-width: 0; max-width: 100%; }
+
+.ps-cmap__shape {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms var(--ps-ease);
+}
+
+.ps-cmap__shape:hover { transform: translateY(-1px); }
+.ps-cmap__shape:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ps-cmap__item--red .ps-cmap__shape { background: var(--ps-red); }
+.ps-cmap__item--blue .ps-cmap__shape { background: var(--ps-blue); }
+.ps-cmap__item--yellow .ps-cmap__shape { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+
+.ps-cmap__meta {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.ps-cmap__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: var(--weight-semibold); }
+.ps-cmap__shape .ps-objection { flex: none; margin: 0; align-self: center; }
+.ps-cmap__panel { display: flex; flex-direction: column; }
+.ps-cmap__panel .ps-details { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-cmap__shape { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
