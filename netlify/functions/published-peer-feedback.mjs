@@ -12,11 +12,11 @@ export function createPublishedPeerFeedbackHandler(deps = {}) {
     const match = new URL(request.url).pathname.match(/\/peer-feedback\/([^/]+)\/([^/]+)$/);
     try {
       const text = await request.text();
-      if (text.length > 16000) throw new PeerError(413, 'Keep your response shorter.');
+      if (text.length > 16000) throw new PeerError(413, 'too_large', 'Keep your response shorter.');
       const result = await peerAction(store, match?.[1], match?.[2], JSON.parse(text));
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {
-      if (e instanceof PeerError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, 'peer_feedback', e.message, false), request, env);
+      if (e instanceof PeerError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, e.code ?? 'bad_request', e instanceof SyntaxError ? 'Invalid request.' : e.message, false), request, env);
       throw e;
     }
   }, deps);
