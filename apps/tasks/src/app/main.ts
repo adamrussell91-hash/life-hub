@@ -164,6 +164,10 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderPropertiesView(canvas);
     case 'term-dates':
       return renderTermDatesView(canvas);
+    case 'problem-solver': {
+      const { renderProblemSolverView } = await import('@/views/problem-solver/view');
+      return renderProblemSolverView(canvas);
+    }
     case 'city': {
       const { renderCityView } = await import('@/views/city/view');
       return renderCityView(canvas);
