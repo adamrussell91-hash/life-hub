@@ -207,6 +207,101 @@ export function importDayOne(payload, journal) {
   return { visits, skipped };
 }
 
+// Day One reviews carry the score in the text as "4/5" or "4\\.5/5". Dates
+// such as 21/5/26 are not scores.
+export function dayOneRating(text) {
+  const source = String(text || "").replace(/\\([.!])/g, "$1");
+  const m = source.match(/(?:^|[^\d.\/])(\d(?:\.5)?)\s*\/\s*5(?![\d.\/])/);
+  const value = m ? Number(m[1]) : NaN;
+  return value >= 1 && value <= 5 ? value : null;
+}
+// The place Adam wrote under a "Location" heading. Day One's own place name
+// comes from GPS and is often a car park or the building next door.
+export function dayOneLocation(text) {
+  const blocks = noteBlocks(text);
+  const at = blocks.findIndex(
+    (b) => b.kind === "heading" && /^location$/i.test(b.text),
+  );
+  const next = at >= 0 ? blocks[at + 1] : null;
+  return next?.kind === "para" ? next.text.slice(0, 200) : "";
+}
+const placeKey = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+const sameVisitKey = (visit) => `${visit.date}|${placeKey(visit.venue.name)}`;
+const createdAt = (visit) => visit.import_metadata?.original_created_at || "";
+function joinTitles(titles) {
+  const names = [...new Set(titles.map((t) => t.trim()).filter(Boolean))];
+  const joined =
+    names.length > 1
+      ? `${names.slice(0, -1).join(", ")} & ${names.at(-1)}`
+      : names[0] || "";
+  return joined.slice(0, 200);
+}
+// Day One kept one entry per dish. Entries from the same day at the same
+// venue become one visit with several dishes, and a score written in the
+// text becomes the dish rating. Merged-away entries are soft-deleted so a
+// re-import still recognises their source ids. Safe to run repeatedly.
+export function tidyImports(journal) {
+  const next = structuredClone(journal);
+  let changed = false;
+  for (const visit of withoutDeleted(next.visits).filter(isImport)) {
+    if (!visit.import_metadata?.location_from_text) {
+      const written = dayOneLocation(visit.notes);
+      if (written) {
+        visit.venue = { name: written, address: visit.venue.address || "" };
+        visit.import_metadata = {
+          ...(visit.import_metadata || {}),
+          location_from_text: true,
+        };
+        changed = true;
+      }
+    }
+  }
+  for (const visit of withoutDeleted(next.visits).filter(isImport))
+    for (const dish of visit.dishes) {
+      if (dish.rating != null) continue;
+      const rating = dayOneRating(
+        dish.notes || (visit.dishes.length === 1 ? visit.notes : ""),
+      );
+      if (rating != null) {
+        dish.rating = rating;
+        changed = true;
+      }
+    }
+  const groups = new Map();
+  for (const visit of withoutDeleted(next.visits).filter(
+    (v) => isImport(v) && placeKey(v.venue.name),
+  )) {
+    const key = sameVisitKey(visit);
+    groups.set(key, [...(groups.get(key) || []), visit]);
+  }
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    group.sort((a, b) => createdAt(a).localeCompare(createdAt(b)));
+    const [keeper, ...rest] = group;
+    const moved = new Map();
+    for (const other of rest) {
+      for (const dish of other.dishes) {
+        const copy = { ...structuredClone(dish), id: newId("dish") };
+        moved.set(dish.id, copy.id);
+        keeper.dishes.push(copy);
+      }
+      keeper.notes = [keeper.notes, other.notes].filter(Boolean).join("\n\n---\n\n");
+      keeper.import_media = [
+        ...(keeper.import_media || []),
+        ...(other.import_media || []),
+      ];
+      other.status = "deleted";
+    }
+    keeper.dishes = keeper.dishes.slice(0, 100);
+    keeper.title = joinTitles(keeper.dishes.map((d) => d.title)) || keeper.title;
+    keeper.reviewed = group.every((v) => v.reviewed === true);
+    for (const recipe of next.recipes)
+      if (moved.has(recipe.dish_id)) recipe.dish_id = moved.get(recipe.dish_id);
+    changed = true;
+  }
+  return { journal: next, changed };
+}
+
 // ── Magazine, entry and fix-up helpers ─────────────────────────────────────
 export const isImport = (visit) =>
   String(visit.source_id || "").startsWith("dayone:");
@@ -294,17 +389,38 @@ export function applyFixup(visit, draft) {
       address: next.venue.address || draft.venue.address || "",
     };
   if (!draft.dishes?.length) return next;
-  const photos = visitPhotos(visit),
-    tags = visit.dishes[0]?.tags || [];
-  next.dishes = draft.dishes.map((d, index) => ({
-    ...newDish(),
-    title: d.title,
-    cuisine: d.cuisine || "",
-    meal_type: MEAL_TYPES.includes(d.meal_type) ? d.meal_type : "Dinner",
-    tags: [...new Set([...(d.tags || []), ...(index === 0 ? tags : [])])],
-    notes: d.notes || "",
-    photos: index === 0 ? photos : [],
-  }));
+  const tags = visit.dishes[0]?.tags || [];
+  // The AI never invents a rating; it only carries over the one Adam gave a
+  // dish of the same name, or the only dish when there was only one.
+  const same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const used = new Set();
+  const source = (d) => {
+    const match =
+      visit.dishes.find((o) => !used.has(o.id) && same(o.title, d.title || "")) ||
+      (visit.dishes.length === 1 && draft.dishes.length === 1 ? visit.dishes[0] : null);
+    if (match) used.add(match.id);
+    return match;
+  };
+  next.dishes = draft.dishes.map((d) => {
+    const old = source(d);
+    return {
+      ...newDish(),
+      title: d.title,
+      cuisine: d.cuisine || "",
+      meal_type: MEAL_TYPES.includes(d.meal_type) ? d.meal_type : "Dinner",
+      tags: [...new Set([...(d.tags || []), ...(old?.tags || [])])],
+      rating: old?.rating ?? null,
+      notes: d.notes || "",
+      photos: old ? [...old.photos] : [],
+    };
+  });
+  const leftover = visit.dishes
+    .filter((o) => !used.has(o.id))
+    .flatMap((o) => o.photos);
+  if (next.dishes[0]) {
+    next.dishes[0].photos = [...leftover, ...next.dishes[0].photos].slice(0, 20);
+    next.dishes[0].tags = [...new Set([...next.dishes[0].tags, ...tags])];
+  }
   return next;
 }
 const venueKey = (visit) => visit.venue.name.trim().toLowerCase();

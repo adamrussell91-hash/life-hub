@@ -26,6 +26,7 @@ import {
   fixupQueue,
   applyFixup,
   plainNotes,
+  tidyImports,
 } from "./model.js";
 import { paintMagazine, paintTimeline, paintEntry, paintFixup } from "./pages.js";
 import {
@@ -244,6 +245,10 @@ export function createFoodJournalView({
       version = value.version;
       loaded = true;
       render();
+      const tidy = tidyImports(journal);
+      if (tidy.changed && !busy)
+        await persist(tidy.journal, { quiet: true }).catch(() => {});
+      if (token !== epoch) return;
       void refreshEditorial();
     } catch (e) {
       if (token !== epoch) return;
@@ -1507,7 +1512,7 @@ export function createFoodJournalView({
           }
           next.visits.push(v);
         }
-        await persist(next);
+        await persist(tidyImports(next).journal);
         s.close();
         const photoNote = files.length
           ? matched
