@@ -12,7 +12,7 @@ const env = {
 };
 const session = createSessionToken(
   {
-    now: Date.parse('2026-09-17T00:00:00Z'),
+    now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 4)
   },
   SECRET

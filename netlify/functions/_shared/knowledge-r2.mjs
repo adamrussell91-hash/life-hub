@@ -14,17 +14,25 @@ export function knowledgeR2Unbound() {
   });
 }
 
+// R2 rejects the AWS SDK's default CRC32 checksum mode with 501 NotImplemented,
+// which makes a presigned photo URL return XML instead of the JPEG.
+export function knowledgeR2ClientOptions(config) {
+  return {
+    region: 'auto',
+    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED'
+  };
+}
+
 export async function knowledgePresignPut(env, { key, contentType, signPut, expiresIn = 300 } = {}) {
   const config = knowledgeR2Config(env);
   if (!config) throw knowledgeR2Unbound();
   if (typeof signPut === 'function') return signPut({ ...config, key, contentType, expiresIn });
   const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
   const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
-  const client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey }
-  });
+  const client = new S3Client(knowledgeR2ClientOptions(config));
   return getSignedUrl(
     client,
     new PutObjectCommand({ Bucket: config.bucket, Key: key, ContentType: contentType }),
@@ -38,11 +46,7 @@ export async function knowledgePresignGet(env, { key, signGet, expiresIn = 300 }
   if (typeof signGet === 'function') return signGet({ ...config, key, expiresIn });
   const { GetObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
   const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
-  const client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey }
-  });
+  const client = new S3Client(knowledgeR2ClientOptions(config));
   return getSignedUrl(
     client,
     new GetObjectCommand({ Bucket: config.bucket, Key: key }),
