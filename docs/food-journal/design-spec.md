@@ -57,3 +57,15 @@ Backup JSON embeds photo bytes with private references and retains complete jour
 ## Failure register checks
 
 L1: grid shares right edge and has no overflow at 1440/390/320. L2: no fixed blank card height. R4: long visit and recipe editors, import review and delete confirmation have docked actions at 390 and 320, controls at least 16px. W1: all API calls pass through existing absolute authenticated transport. W2: real app route mounts Food Journal. W4: exifr is loaded only on photo selection. W5/W6: versioned writes and capture merge preserve personal changes. P3/P5: every in scope acceptance scenario is tested and incomplete work is reported honestly. M1: idle page has no repeated decorative motion.
+
+## Editorial redesign, 17 October 2026
+
+Adam chose the combined direction from the redesign mockups: the editorial magazine as the default view, the timeline kept as a second view, gallery-style text over photos, stat tiles, and an entry page with a full-width menu card whose dishes each carry Recipe and Eat it again.
+
+Views: Magazine (default), Timeline, Custom Menu, and Fix up (only while Day One imports remain). Import, Backup and Restore sit in the toolbar's ··· menu. Selecting any visit opens its entry page in place; the edit sheet, delete confirmation and recipe flows are unchanged.
+
+Owner-approved exception to "No model proposal writes until the person saves": the headline, standfirst and pull quote are written by the API and saved without review. They live in `visit.editorial`, never replace the title, notes or ratings, and regenerate when the words change (`editorialBasis`, which ignores ratings). A pull quote is kept only when it is copied verbatim from the visit or dish notes. Unfixed Day One imports get no editorial. When the call fails, pages fall back to the title and the first sentence of the notes.
+
+Fix up is temporary and exists for the Day One imports. The API splits the original text into dishes as a draft in the normal edit sheet; the person checks it, rates and adds photos, and saving sets `visit.reviewed`. The imported text stays in the notes. Dish ratings are never set by the model.
+
+Bodoni Moda is the display face here, the same approved exception Aesthetics uses. Dates still display as dd/mm/yy.
