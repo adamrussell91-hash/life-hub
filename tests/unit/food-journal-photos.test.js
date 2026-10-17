@@ -52,7 +52,7 @@ test("a visit photo loads from its signed URL without native lazy loading", asyn
   try {
     view.show();
     await new Promise((resolve) => setTimeout(resolve, 30));
-    const image = dom.window.document.querySelector(".food-grid .food-photo");
+    const image = dom.window.document.querySelector(".fj-cover .food-photo");
     assert.ok(image);
     assert.notEqual(image.getAttribute("loading"), "lazy");
     assert.equal(image.getAttribute("src"), "https://r2.test/food/photos/photo_1.jpg");

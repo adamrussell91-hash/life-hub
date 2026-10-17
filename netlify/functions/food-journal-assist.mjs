@@ -64,10 +64,6 @@ export function createFoodJournalAssistHandler(deps = {}) {
         false,
         PRIVATE,
       );
-    checkRateLimit(`food-start:${owner}`, {
-      limit: 8,
-      now: (deps.now ?? Date.now)(),
-    });
     const raw = await request.text();
     if (raw.length > 4 * 1024 * 1024)
       return errorResponse(
@@ -89,7 +85,7 @@ export function createFoodJournalAssistHandler(deps = {}) {
         PRIVATE,
       );
     }
-    if (!["capture", "recipe"].includes(input?.action))
+    if (!["capture", "recipe", "editorial", "fixup"].includes(input?.action))
       return errorResponse(
         400,
         "validation_error",
@@ -97,6 +93,11 @@ export function createFoodJournalAssistHandler(deps = {}) {
         false,
         PRIVATE,
       );
+    // Background headlines get their own budget so they never block research.
+    checkRateLimit(
+      `${input.action === "editorial" ? "food-editorial" : "food-start"}:${owner}`,
+      { limit: input.action === "editorial" ? 20 : 8, now: (deps.now ?? Date.now)() },
+    );
     const id = randomUUID();
     await store.create(id, {
       owner,

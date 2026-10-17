@@ -9,6 +9,13 @@ import {
   importDayOne,
   nearbyVenues,
   dayOneDate,
+  journalHighlights,
+  venueHistory,
+  editorialBasis,
+  needsEditorial,
+  fixupQueue,
+  applyFixup,
+  firstSentence,
 } from "../../apps/life/js/food-journal/model.js";
 import {
   mergeCapture,
@@ -20,7 +27,10 @@ import {
 } from "../../netlify/functions/_shared/food-journal-schema.mjs";
 import { createFoodJournalHandler } from "../../netlify/functions/food-journal.mjs";
 import { createFoodJournalMediaHandler } from "../../netlify/functions/food-journal-media.mjs";
-import { createFoodJournalProcessHandler } from "../../netlify/functions/_shared/food-journal-process.mjs";
+import {
+  createFoodJournalProcessHandler,
+  verbatimQuote,
+} from "../../netlify/functions/_shared/food-journal-process.mjs";
 import { createFoodJournalAssistHandler } from "../../netlify/functions/food-journal-assist.mjs";
 import { createFoodJournalRunHandler } from "../../netlify/functions/food-journal-run.mjs";
 import { createMemoryChatJobStore } from "../../netlify/functions/_shared/chat-job-store.mjs";
@@ -533,4 +543,190 @@ test("portion scaling handles ranges, mixed unicode fractions and compact units"
   assert.equal(scaleIngredient("2–3 onions", 2), "4 to 6 onions");
   assert.equal(scaleIngredient("1½ cups flour", 2), "3 cups flour");
   assert.equal(scaleIngredient("100g pasta", 2), "200g pasta");
+});
+
+function dated(date, title, venue, dishes) {
+  const v = newVisit();
+  v.date = date;
+  v.title = title;
+  v.venue = { name: venue, address: "" };
+  v.dishes = dishes.map(([dishTitle, rating, cuisine = ""]) => ({
+    ...newDish(),
+    title: dishTitle,
+    rating,
+    cuisine,
+  }));
+  return v;
+}
+
+test("magazine highlights count the month, rank the best dishes and find this day in earlier years", () => {
+  const journal = {
+    ...emptyJournal(),
+    visits: [
+      dated("2026-10-16", "Tapas", "Casa", [["Octopus", 5, "Spanish"], ["Bread", 2, "Spanish"]]),
+      dated("2026-10-04", "Brunch", "Grove", [["Eggs", 4, "Cafe"]]),
+      dated("2026-09-20", "Fish", "Wharf", [["Barramundi", 5, "Seafood"]]),
+      dated("2025-10-17", "Ramen", "Ikko", [["Tonkotsu", 4, "Japanese"]]),
+      dated("2024-03-01", "Old", "Casa", [["Octopus", 5, "Spanish"]]),
+      { ...dated("2026-10-10", "Gone", "Ghost", [["Deleted", 5]]), status: "deleted" },
+    ],
+  };
+  const h = journalHighlights(journal, "2026-10-17");
+  assert.equal(h.cover.title, "Tapas");
+  assert.deepEqual(h.recent.map((v) => v.title), ["Brunch", "Fish", "Ramen", "Old"]);
+  assert.equal(h.month.meals, 2);
+  assert.equal(h.month.newPlaces, 1, "Casa was first visited in 2024");
+  assert.equal(h.month.average, 3.7);
+  assert.equal(h.month.previousAverage, 5);
+  assert.equal(h.month.best.dish.title, "Octopus");
+  assert.deepEqual(h.yearBest.map((x) => x.dish.title), ["Octopus", "Barramundi", "Eggs", "Bread"]);
+  assert.deepEqual(h.cuisines[0], ["Spanish", 2]);
+  assert.equal(h.onThisDay.title, "Ramen");
+  assert.equal(h.total, 5);
+});
+
+test("venue history lists earlier visits and the dish ordered every time", () => {
+  const now = dated("2026-10-16", "Tapas", "Casa Olivo", [["Octopus", 5], ["Bread", 2]]);
+  const journal = {
+    ...emptyJournal(),
+    visits: [
+      now,
+      dated("2025-06-01", "Birthday", "casa olivo ", [["octopus", 5], ["Croquetas", 5]]),
+      dated("2024-01-01", "Elsewhere", "Other", [["Octopus", 3]]),
+    ],
+  };
+  const history = venueHistory(journal, now);
+  assert.deepEqual(history.visits.map((v) => v.title), ["Birthday"]);
+  assert.equal(history.always, "Octopus");
+  assert.deepEqual(venueHistory(journal, dated("2026-01-01", "Home", "", [["Toast", 3]])), { visits: [], always: "" });
+});
+
+test("editorial basis changes with the words, not the rating, and unfixed imports wait", () => {
+  const v = dated("2026-10-16", "Tapas", "Casa", [["Octopus", 5]]);
+  v.notes = "The octopus was the standout.";
+  const basis = editorialBasis(v);
+  assert.equal(needsEditorial(v), true);
+  v.editorial = { headline: "H", standfirst: "S", pull_quote: "", basis };
+  assert.equal(needsEditorial(v), false);
+  v.dishes[0].rating = 3;
+  assert.equal(editorialBasis(v), basis);
+  v.notes += " More.";
+  assert.notEqual(editorialBasis(v), basis);
+  const imported = { ...dated("2026-01-01", "Import", "", [["Thing", null]]), source_id: "dayone:x" };
+  assert.equal(needsEditorial(imported), false);
+  assert.deepEqual(fixupQueue({ ...emptyJournal(), visits: [imported, v] }).map((x) => x.title), ["Import"]);
+  assert.equal(needsEditorial({ ...imported, reviewed: true }), true);
+  assert.equal(firstSentence("## Title\nFirst line here. Second."), "Title First line here.");
+});
+
+test("fix-up splits dishes, keeps the original text, photos and tags, and never sets ratings", () => {
+  const v = { ...dated("2026-09-13", "Late dumplings", "", [["Late dumplings", null]]), source_id: "dayone:x" };
+  v.notes = "Late dumplings\nPork gyoza, chilli wontons.";
+  v.dishes[0].photos = [{ id: "p1", key: "food/photos/p1.jpg" }];
+  v.dishes[0].tags = ["food"];
+  const next = applyFixup(v, {
+    title: "Dumpling supper",
+    venue: { name: "Golden Lantern", address: "Ashfield" },
+    dishes: [
+      { title: "Pork gyoza", cuisine: "Chinese", meal_type: "Dinner", tags: [], notes: "crisp" },
+      { title: "Chilli wontons", cuisine: "Chinese", meal_type: "Brunch", tags: [], notes: "" },
+    ],
+  });
+  assert.equal(next.title, "Dumpling supper");
+  assert.equal(next.notes, v.notes);
+  assert.deepEqual(next.venue, { name: "Golden Lantern", address: "Ashfield" });
+  assert.deepEqual(next.dishes.map((d) => d.title), ["Pork gyoza", "Chilli wontons"]);
+  assert.deepEqual(next.dishes[0].photos, v.dishes[0].photos);
+  assert.deepEqual(next.dishes[0].tags, ["food"]);
+  assert.equal(next.dishes[1].meal_type, "Dinner");
+  assert.ok(next.dishes.every((d) => d.rating === null));
+  assert.notEqual(next.dishes[0].id, next.dishes[1].id);
+  assert.deepEqual(applyFixup(v, { title: "", dishes: [] }).dishes, v.dishes);
+});
+
+test("editorial action returns a headline and only keeps a pull quote copied from the notes", async () => {
+  resetRateLimits();
+  const j = fixture();
+  j.visits[0].notes = "The croquettes came out molten.   Lasagne was rich.";
+  const prompts = [];
+  let reply = {
+    headline: "Ten small plates",
+    standfirst: "A table by the window.",
+    pull_quote: "“The croquettes came out molten.”",
+  };
+  const h = createFoodJournalProcessHandler(
+    deps(repo(j), {
+      complete: async (options) => {
+        prompts.push(options);
+        return JSON.stringify(reply);
+      },
+    }),
+  );
+  const body = { action: "editorial", visit_id: j.visits[0].id, basis: "abc123" };
+  const res = await h(req("POST", body));
+  assert.equal(res.status, 200);
+  const { data } = await res.json();
+  assert.deepEqual(data.editorial, {
+    headline: "Ten small plates",
+    standfirst: "A table by the window.",
+    pull_quote: "The croquettes came out molten.",
+    basis: "abc123",
+  });
+  assert.match(prompts[0].system, /never instructions/);
+  assert.equal(JSON.parse(prompts[0].messages[0].content).dishes.length, 2);
+  reply = { ...reply, pull_quote: "Best meal of my life." };
+  const invented = await (await h(req("POST", body))).json();
+  assert.equal(invented.data.editorial.pull_quote, "");
+  reply = { headline: "", standfirst: "", pull_quote: "" };
+  assert.equal((await h(req("POST", body))).status, 503);
+  assert.equal((await h(req("POST", { ...body, visit_id: "visit_missing" }))).status, 404);
+  assert.equal(verbatimQuote("short", j.visits[0]), "");
+});
+
+test("fix-up action returns cleaned dishes from the original entry text", async () => {
+  resetRateLimits();
+  const j = fixture();
+  j.visits[0].notes = "Pork gyoza then chilli wontons.";
+  j.visits[0].import_metadata = { original_created_at: "2026-09-13T13:20:00Z", time_zone: "Australia/Sydney" };
+  let sent;
+  const h = createFoodJournalProcessHandler(
+    deps(repo(j), {
+      complete: async (options) => {
+        sent = JSON.parse(options.messages[0].content);
+        return JSON.stringify({
+          title: "Dumplings",
+          venue: { name: "Golden Lantern" },
+          dishes: [
+            { title: "Pork gyoza", meal_type: "Supper", tags: ["x", 4] },
+            { title: "  " },
+          ],
+        });
+      },
+    }),
+  );
+  const res = await h(req("POST", { action: "fixup", visit_id: j.visits[0].id }));
+  assert.equal(res.status, 200);
+  const { data } = await res.json();
+  assert.equal(sent.text, "Pork gyoza then chilli wontons.");
+  assert.equal(sent.recorded_at, "2026-09-13T13:20:00Z");
+  assert.deepEqual(data.draft.dishes, [
+    { title: "Pork gyoza", cuisine: "", meal_type: "Dinner", tags: ["x"], notes: "" },
+  ]);
+  assert.deepEqual(data.draft.venue, { name: "Golden Lantern", address: "" });
+});
+
+test("schema accepts editorial and review state and rejects malformed ones", () => {
+  const j = fixture();
+  j.visits[0].reviewed = true;
+  j.visits[0].editorial = { headline: "H", standfirst: "S", pull_quote: "", basis: "abc" };
+  assert.doesNotThrow(() => validateFoodJournal(j));
+  for (const broken of [
+    { reviewed: "yes" },
+    { editorial: { headline: 1, standfirst: "", pull_quote: "", basis: "" } },
+    { editorial: { headline: "H", standfirst: "S", pull_quote: "", basis: "x".repeat(65) } },
+  ]) {
+    const bad = fixture();
+    Object.assign(bad.visits[0], broken);
+    assert.throws(() => validateFoodJournal(bad), /invalid/i);
+  }
 });

@@ -15,7 +15,7 @@ import { createFoodJournalAssistHandler } from "../../netlify/functions/food-jou
 import { createFoodJournalRunHandler } from "../../netlify/functions/food-journal-run.mjs";
 import { createFoodJournalMediaHandler } from "../../netlify/functions/food-journal-media.mjs";
 import { createMemoryChatJobStore } from "../../netlify/functions/_shared/chat-job-store.mjs";
-let browser, server, base;
+let browser, server, base, pages = 0;
 before(async () => {
   server = createStaticServer({
     root: new URL("../../dist/", import.meta.url),
@@ -70,7 +70,7 @@ function fixture() {
     ],
   };
 }
-async function pageFor(width = 1440) {
+async function pageFor(width = 1440, { editorial = false } = {}) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     reducedMotion: "reduce",
@@ -132,7 +132,30 @@ async function pageFor(width = 1440) {
     verifySessionToken: () => ({ valid: true }),
     createFoodJournalRepository: () => repo,
     getStore: async () => jobs,
+    // Each page gets its own rate-limit minute so background headlines in one
+    // test cannot spend another test's research budget.
+    now: (() => {
+      const offset = ++pages * 120000;
+      return () => Date.now() + offset;
+    })(),
     complete: async (options) => {
+      if (editorial && options.system.includes("magazine furniture")) {
+        const entry = JSON.parse(options.messages[0].content);
+        return JSON.stringify({
+          headline: `Headline: ${entry.title}`,
+          standfirst: "A table of small plates.",
+          pull_quote: entry.notes.split(".")[0],
+        });
+      }
+      if (options.system.includes("old diary entry"))
+        return JSON.stringify({
+          title: "Dumpling supper",
+          venue: { name: "Golden Lantern", address: "" },
+          dishes: [
+            { title: "Pork gyoza", cuisine: "Chinese", meal_type: "Dinner", tags: [], notes: "crisp bottoms" },
+            { title: "Chilli wontons", cuisine: "Chinese", meal_type: "Dinner", tags: [], notes: "" },
+          ],
+        });
       const photoText =
         options.messages[0].content.find(
           (x) => x.type === "text" && x.text.includes("Photo role: dish"),
@@ -251,6 +274,16 @@ async function pageFor(width = 1440) {
     },
   };
 }
+async function journalMenu(page, name) {
+  await page
+    .getByRole("button", { name: "Import, backup and restore", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
+}
+async function openFirstEntry(page) {
+  await page.locator(".food-visit .fj-stretch").first().click();
+  await page.locator(".fj-entry").waitFor();
+}
 async function phoneGate(page) {
   const result = await page.locator(".food-sheet").evaluate((sheet) => {
     const rect = sheet
@@ -356,10 +389,16 @@ for (const width of [390, 320])
       await page.locator("#food-journal-dashboard script").count(),
       0,
     );
+    await openFirstEntry(page);
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+      width,
+    );
     await page
       .getByRole("button", { name: "Delete", exact: true })
       .first()
       .click();
+
     await phoneGate(page);
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await page.getByRole("tab", { name: "Custom Menu" }).click();
@@ -381,7 +420,7 @@ for (const width of [390, 320])
           exact: true,
         }),
       })
-      .getByRole("button", { name: "Restaurant", exact: true })
+      .getByRole("button", { name: "Eat it again", exact: true })
       .click();
     await page.getByLabel("Search area", { exact: true }).fill("Sydney");
     await phoneGate(page);
@@ -392,7 +431,7 @@ for (const width of [390, 320])
       /google\.com\/maps\/search/,
     );
     await page.getByRole("button", { name: "Close", exact: true }).click();
-    await page.getByRole("button", { name: "Import", exact: true }).click();
+    await journalMenu(page, "Import");
     await phoneGate(page);
     await page.getByLabel("Day One JSON export").setInputFiles({
       name: "dayone.json",
@@ -415,7 +454,7 @@ for (const width of [390, 320])
       .click();
     await page.locator(".food-sheet").waitFor({ state: "detached" });
     assert.equal(read().visits.length, 3);
-    await page.getByRole("button", { name: "Restore", exact: true }).click();
+    await journalMenu(page, "Restore");
     await phoneGate(page);
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     assert.deepEqual(errors, []);
@@ -475,7 +514,7 @@ test("capture, private upload, menu text, backup and restore work through the re
   assert.equal(read().visits.length, 2);
   assert.equal(read().visits[1].dishes[0].photos.length, 1);
   const photoState = await page.evaluate(() => {
-    const node = document.querySelector(".food-grid .food-photo");
+    const node = document.querySelector(".fj-portrait .food-photo");
     const card = node?.closest(".food-visit");
     return {
       loading: node?.getAttribute("loading") ?? null,
@@ -490,13 +529,13 @@ test("capture, private upload, menu text, backup and restore work through the re
   assert.ok(photoState.naturalWidth > 0, JSON.stringify(photoState));
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "Backup", exact: true }).click(),
+    journalMenu(page, "Backup"),
   ]);
   const backup = JSON.parse(await readFile(await download.path(), "utf8"));
   assert.equal(backup.format, "life-food-backup");
   assert.equal(Object.keys(backup.assets).length, 1);
   assert.ok(!JSON.stringify(backup).includes("https://food-media.test"));
-  await page.getByRole("button", { name: "Restore", exact: true }).click();
+  await journalMenu(page, "Restore");
   await page.getByLabel("Food Journal backup").setInputFiles({
     name: "backup.json",
     mimeType: "application/json",
@@ -514,6 +553,7 @@ test("capture, private upload, menu text, backup and restore work through the re
 
 test("a conflicted visit draft survives reload and requires review before replacing newer data", async () => {
   const { page, read, otherDevice } = await pageFor(390);
+  await openFirstEntry(page);
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByLabel("Visit title", { exact: true }).fill("My revision");
   otherDevice();
@@ -620,7 +660,7 @@ test("a failed initial load cannot produce an empty backup labelled as successfu
     .locator("[data-food-status]")
     .filter({ hasText: "Load failed." })
     .waitFor();
-  await page.getByRole("button", { name: "Backup", exact: true }).click();
+  await journalMenu(page, "Backup");
   await page
     .getByText("Load your journal before backing up.", { exact: true })
     .waitFor();
@@ -649,5 +689,90 @@ test("successful background recipe research opens a reviewable cooking card and 
   assert.equal(recipe.candidates.length, 10);
   assert.equal(recipe.sources.length, 3);
   assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("magazine, entry, auto-written headline and Day One fix-up work through the real route", async () => {
+  const { page, read, errors } = await pageFor(1440, { editorial: true });
+  // The API writes the headline in the background and it lands without review.
+  for (let i = 0; i < 40 && !read().visits[0].editorial; i++)
+    await page.waitForTimeout(250);
+  assert.equal(read().visits[0].editorial.headline, "Headline: Tapas night");
+  await page
+    .getByRole("heading", { name: "Headline: Tapas night", exact: true })
+    .waitFor();
+  assert.equal(await page.locator(".fj-masthead").count(), 1);
+  await openFirstEntry(page);
+  assert.equal(
+    await page.locator(".fj-entry__title").innerText(),
+    "Tapas night",
+  );
+  assert.equal(await page.locator(".fj-dish").count(), 2);
+  assert.equal(
+    await page
+      .locator(".fj-menu")
+      .getByRole("button", { name: "Open recipe", exact: true })
+      .count(),
+    1,
+  );
+  await page
+    .getByRole("group", { name: "Rate Croquettes" })
+    .getByRole("button", { name: "4 out of 5" })
+    .click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[aria-label="Rate Croquettes"] [aria-label="4 out of 5"]')
+        ?.getAttribute("aria-pressed") === "true",
+  );
+  assert.equal(read().visits[0].dishes[1].rating, 4);
+
+  await page.getByRole("button", { name: "← Food Journal", exact: true }).click();
+  await journalMenu(page, "Import");
+  await page.getByLabel("Day One JSON export").setInputFiles({
+    name: "dayone.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        entries: [
+          {
+            uuid: "fixup-food",
+            creationDate: "2026-09-13T13:20:00Z",
+            timeZone: "Australia/Sydney",
+            text: "Late dumplings\nPork gyoza with crisp bottoms, then chilli wontons.",
+          },
+        ],
+      }),
+    ),
+  });
+  await page.getByRole("button", { name: "Import 1 meal", exact: true }).click();
+  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  // Unfixed imports wait for fix-up before they get a headline.
+  const imported = read().visits.find((v) => v.source_id === "dayone:fixup-food");
+  assert.equal(imported.editorial, undefined);
+  await page.getByRole("tab", { name: "Fix up (1)" }).click();
+  await page.getByRole("button", { name: "Fix this entry", exact: true }).click();
+  await page.locator(".food-sheet").waitFor();
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".food-sheet input")].some(
+      (n) => n.value === "Chilli wontons",
+    ),
+  );
+  await page.getByRole("button", { name: "Save visit", exact: true }).click();
+  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  const fixed = read().visits.find((v) => v.source_id === "dayone:fixup-food");
+  assert.equal(fixed.reviewed, true);
+  assert.deepEqual(
+    fixed.dishes.map((d) => d.title),
+    ["Pork gyoza", "Chilli wontons"],
+  );
+  assert.match(fixed.notes, /Pork gyoza with crisp bottoms/);
+  assert.equal(fixed.venue.name, "Golden Lantern");
+  assert.equal(await page.getByRole("tab", { name: /^Fix up/ }).count(), 0);
+  await page.getByRole("tab", { name: "Timeline" }).click();
+  await page.getByLabel("Search Food Journal").fill("gyoza");
+  assert.equal(await page.locator(".fj-row").count(), 1);
+  assert.deepEqual(errors, []);
+  await page.screenshot({ path: "/tmp/food-journal-magazine.png", fullPage: true });
   await page.close();
 });
