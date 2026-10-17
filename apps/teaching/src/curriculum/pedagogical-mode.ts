@@ -12,7 +12,8 @@ export const PEDAGOGICAL_MODES = [
   'game',
   'station_rotation',
   'design_sprint',
-  'assessment'
+  'assessment',
+  'quiz'
 ] as const;
 
 export type PedagogicalMode = (typeof PEDAGOGICAL_MODES)[number];
@@ -33,7 +34,8 @@ export const PEDAGOGICAL_MODE_LABELS: Record<PedagogicalMode, string> = {
   game: 'Game',
   station_rotation: 'Station Rotation',
   design_sprint: 'Design Sprint',
-  assessment: 'Assessment'
+  assessment: 'Assessment',
+  quiz: 'Quiz'
 };
 
 export function isPedagogicalMode(value: unknown): value is PedagogicalMode {

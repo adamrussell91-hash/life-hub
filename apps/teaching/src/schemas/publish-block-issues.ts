@@ -4,6 +4,7 @@ import { sanitizeSvgMarkup, svgHasMeaningfulContent } from '@/blocks/sanitize-sv
 import { isHttpUrl } from '@/blocks/url-safety';
 import { validateConceptMap, validateMindMap } from '@/blocks/graph-layout';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block } from '@/schemas/block';
+import { checkQuestion } from '@/quiz/core';
 
 export type PublishBlockIssue = {
   blockId: string;
@@ -18,6 +19,8 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   html: 'HTML',
   html_app: 'HTML app',
   question_set: 'Question set',
+  question_drop: 'Question drop',
+  quiz_question: 'Quiz question',
   self_check: 'Self check',
   mind_map: 'Mind map',
   concept_map: 'Concept map'
@@ -176,6 +179,13 @@ function blockCaption(block: Block): string | null {
 function ownIssue(block: Block): string | null {
   if (block.block_type === 'collection') {
     return 'Collection blocks can only be used on class homepages';
+  }
+  if (block.block_type === 'question_drop' && !block.content.target_quiz_id) {
+    return 'Choose the quiz this Question drop feeds into';
+  }
+  if (block.block_type === 'quiz_question') {
+    const checked = checkQuestion(block.content.question);
+    if (!checked.ok) return checked.message;
   }
   if (block.block_type === 'image') {
     if (!isHttpUrl(block.content.url)) {
