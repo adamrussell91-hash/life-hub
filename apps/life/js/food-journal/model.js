@@ -215,8 +215,18 @@ export function dayOneRating(text) {
   const value = m ? Number(m[1]) : NaN;
   return value >= 1 && value <= 5 ? value : null;
 }
-const sameVisitKey = (visit) =>
-  `${visit.date}|${visit.venue.name.trim().toLowerCase()}`;
+// The place Adam wrote under a "Location" heading. Day One's own place name
+// comes from GPS and is often a car park or the building next door.
+export function dayOneLocation(text) {
+  const blocks = noteBlocks(text);
+  const at = blocks.findIndex(
+    (b) => b.kind === "heading" && /^location$/i.test(b.text),
+  );
+  const next = at >= 0 ? blocks[at + 1] : null;
+  return next?.kind === "para" ? next.text.slice(0, 200) : "";
+}
+const placeKey = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+const sameVisitKey = (visit) => `${visit.date}|${placeKey(visit.venue.name)}`;
 const createdAt = (visit) => visit.import_metadata?.original_created_at || "";
 function joinTitles(titles) {
   const names = [...new Set(titles.map((t) => t.trim()).filter(Boolean))];
@@ -233,6 +243,19 @@ function joinTitles(titles) {
 export function tidyImports(journal) {
   const next = structuredClone(journal);
   let changed = false;
+  for (const visit of withoutDeleted(next.visits).filter(isImport)) {
+    if (!visit.import_metadata?.location_from_text) {
+      const written = dayOneLocation(visit.notes);
+      if (written) {
+        visit.venue = { name: written, address: visit.venue.address || "" };
+        visit.import_metadata = {
+          ...(visit.import_metadata || {}),
+          location_from_text: true,
+        };
+        changed = true;
+      }
+    }
+  }
   for (const visit of withoutDeleted(next.visits).filter(isImport))
     for (const dish of visit.dishes) {
       if (dish.rating != null) continue;
@@ -246,7 +269,7 @@ export function tidyImports(journal) {
     }
   const groups = new Map();
   for (const visit of withoutDeleted(next.visits).filter(
-    (v) => isImport(v) && v.venue.name.trim(),
+    (v) => isImport(v) && placeKey(v.venue.name),
   )) {
     const key = sameVisitKey(visit);
     groups.set(key, [...(groups.get(key) || []), visit]);
