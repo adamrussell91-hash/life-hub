@@ -50,7 +50,10 @@ export function createAlchemyBudget(store, { now = Date.now, timeZone = 'Austral
       await change(state => {
         if (state.lease?.id !== ticket.id) return state;
         delete state.lease;
-        if (error) {
+        if (error?.code === 'alchemy_timeout') {
+          // A slow check is not a provider fault: a short pause, not the escalating lockout.
+          state.cooldown = now() + 60000;
+        } else if (error) {
           state.failures = (state.failures || 0) + 1;
           state.permanent = (error.code === 'alchemy_upstream' && [400,401,402,403,404].includes(error.status)) || error.code === 'alchemy_unconfigured';
           state.cooldown = now() + Math.max(error.retryAfterMs || 0, state.failures >= 3 ? 1800000 : Math.min(3600000, 300000 * 2 ** (state.failures - 1)));
