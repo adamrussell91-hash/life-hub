@@ -73,10 +73,11 @@
   .trigger:hover { background: var(--wave-soft); color: var(--wave); }
   .host.is-open .trigger { transform: rotate(60deg); color: var(--wave); }
   .tray {
-    display: flex; gap: 4px; overflow: hidden; max-width: 0; opacity: 0;
+    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; overflow: hidden; max-width: 0; max-height: 34px; opacity: 0; min-width: 0;
     transition: max-width 320ms cubic-bezier(.2,.8,.2,1), opacity 200ms;
   }
-  .host.tray-out .tray { max-width: 560px; opacity: 1; }
+  .host.tray-out .tray { max-width: 100%; max-height: 200px; opacity: 1; }
+  .div__row .div__rule { min-width: 24px; }
   .chip {
     display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 500 0.8rem var(--font);
     padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper);
@@ -178,6 +179,38 @@
   .count { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
   select { font: 600 0.85rem var(--font); color: var(--ink); background: var(--cotton); border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 8px; }
   select:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .laps { display: grid; gap: 4px; max-height: 160px; overflow: auto; font-family: var(--mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  .laps div { display: flex; justify-content: space-between; padding: 4px 10px; border-radius: 8px; background: var(--cotton); }
+  .coin { width: 120px; height: 120px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; font: 700 1.1rem var(--font); letter-spacing: 0.06em; text-transform: uppercase; background: var(--gold); color: var(--gold-ink); border: 3px solid color-mix(in srgb, var(--gold-ink) 40%, transparent); }
+  .coin.flip { animation: coin 900ms cubic-bezier(.3,.7,.3,1); }
+  @keyframes coin { 0% { transform: rotateX(0) translateY(0); } 50% { transform: rotateX(900deg) translateY(-28px); } 100% { transform: rotateX(1800deg) translateY(0); } }
+  .teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .team { border-radius: 14px; padding: 12px; background: var(--gc); color: var(--gi); display: grid; gap: 6px; justify-items: center; }
+  .team input[type="text"] { width: 100%; text-align: center; font-weight: 700; background: transparent; border-color: transparent; color: inherit; }
+  .team input[type="text"]:hover { border-color: var(--line-strong); }
+  .team__pts { font: 700 2.6rem var(--mono); font-variant-numeric: tabular-nums; line-height: 1; }
+  .team .row { justify-content: center; }
+  .team .btn { background: var(--paper); }
+  .tech { display: grid; gap: 10px; justify-items: center; text-align: center; }
+  .tech__tile { width: 104px; height: 104px; border-radius: 16px; display: grid; place-items: center; align-content: center; gap: 2px; background: color-mix(in srgb, var(--fc) 22%, var(--paper)); border: 2px solid var(--fc); color: var(--ink); }
+  .tech__tile b { font: 700 2rem var(--font); line-height: 1; }
+  .tech__tile small { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .tech__name { font-size: clamp(1.4rem, 6vw, 2rem); font-weight: 700; margin: 0; }
+  .tech__def { margin: 0; max-width: 52ch; color: var(--muted); font-size: 0.92rem; }
+  .tech__task { margin: 0; font-weight: 600; color: var(--marine); }
+  .scanbar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .scanbar .tag { background: color-mix(in srgb, var(--fc) 20%, var(--paper)); color: var(--ink); }
+  .scanbar .tag.is-hit { outline: 2px solid var(--fc); }
+  .assess { background: var(--cotton); border: 1px solid var(--line); border-radius: 20px; padding: 22px; display: grid; gap: 12px; }
+  .countdown { border-radius: 16px; padding: 18px 20px; background: var(--marine); color: var(--paper); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+  .countdown h3 { margin: 0 0 4px; font-size: 1.1rem; text-wrap: balance; }
+  .countdown p { margin: 0; font-size: 0.88rem; opacity: 0.85; }
+  .countdown__n { text-align: center; font: 700 3rem var(--mono); line-height: 1; font-variant-numeric: tabular-nums; }
+  .countdown__n small { display: block; font: 600 0.72rem var(--font); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 6px; opacity: 0.85; }
+  .ticks { grid-column: 1 / -1; display: flex; gap: 4px; }
+  .ticks i { flex: 1; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--paper) 25%, transparent); }
+  .ticks i.gone { background: var(--paper); }
   .legend { display: grid; gap: 10px; }
   .legend ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.9rem; max-width: 62ch; }
   @media (prefers-reduced-motion: reduce) {
@@ -194,7 +227,7 @@
       <span class="inl">View as</span>
       <button class="chip" data-view="teacher" aria-pressed="true">Teacher</button>
       <button class="chip" data-view="student" aria-pressed="false">Student</button>
-      <span class="sub" data-r="view-note" style="text-align:left">Students get the timer and dice only.</span>
+      <span class="sub" data-r="view-note" style="text-align:left">Students get the timer, stopwatch, technique spinner, coin and dice.</span>
     </div>
   </header>
 
@@ -220,11 +253,22 @@
 
     <div class="blk"><h3>Write your opening</h3><p>150 words. Start somewhere ordinary and let one detail feel wrong.</p></div>
 
-    <div class="div host" data-mount="divider"></div>
+    <div class="div host" data-mount="divider" data-start="technique"></div>
 
     <div class="blk"><h3>Share</h3><p>Two volunteers read aloud. The class names the detail that felt wrong.</p></div>
 
     <div class="blk blk--tools host" data-mount="block" data-start="names"></div>
+  </section>
+
+  <section class="assess" aria-label="Sample assessment page">
+    <p class="eyebrow" style="margin:0">Assessment page · countdown header block</p>
+    <div class="countdown" data-r="countdown">
+      <div><h3>Narrative writing task</h3><p data-r="cd-due"></p></div>
+      <div class="countdown__n"><span data-r="cd-n">0</span><small>school days to go</small></div>
+      <div class="ticks" data-r="cd-ticks" aria-hidden="true"></div>
+    </div>
+    <div class="blk"><h3>Task</h3><p>Write a 600 word short story that opens somewhere ordinary and lets one detail feel wrong.</p></div>
+    <p class="note">Counts school days only, so weekends are left out. A build could also leave out school holidays and pupil-free days from the term calendar.</p>
   </section>
 
   <section class="legend">
@@ -237,6 +281,10 @@
       <li><b>Skip in picker.</b> Set only in the class's Students section. The picker quietly leaves that student out and never shows a total that would give it away. Try skipping a name, then picking.</li>
       <li><b>Sound.</b> Chime is on by default. The speaker button on any open tool mutes every tool.</li>
       <li><b>Student view.</b> Students run their own copy of the saved timer stack. Your copy is the one on the board.</li>
+      <li><b>Technique spinner.</b> Scans a block's text and only spins through the techniques it found, not all 310. Teacher picks the prompt: find it in the extract, or use it in your writing.</li>
+      <li><b>Timer presets.</b> Teacher only. One tap loads a saved stack, like Think, Pair, Share.</li>
+      <li><b>Stopwatch, coin flip and scoreboard.</b> Students also get the stopwatch, coin and technique spinner. The scoreboard stays with the teacher.</li>
+      <li><b>Countdown header.</b> A header block for the assessment page, counting school days to the due date.</li>
       <li><b>Names, numbers, groups and dice.</b> Picked names can drop out so nobody is called twice.</li>
     </ul>
     <p class="note">Sample names only. Who was picked is not saved anywhere. It resets when you close the tool.</p>
@@ -300,11 +348,16 @@
     sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
     muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>',
     expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+    stopwatch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="14" r="7.5"/><path d="M12 14V10M10 2.5h4M12 2.5v4M18.5 6.5l1.5-1.5"/></svg>',
+    technique: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M9 15.5V8.5h3.5a2 2 0 0 1 0 4H9M14 15.5l-2-3"/></svg>',
+    scores: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>',
+    coin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>'
   };
   const TOOLS = [
-    { id: 'timer', label: 'Timer' }, { id: 'names', label: 'Names' }, { id: 'number', label: 'Number' },
-    { id: 'groups', label: 'Groups' }, { id: 'dice', label: 'Dice' }
+    { id: 'timer', label: 'Timer' }, { id: 'stopwatch', label: 'Stopwatch' }, { id: 'names', label: 'Names' },
+    { id: 'number', label: 'Number' }, { id: 'groups', label: 'Groups' }, { id: 'technique', label: 'Technique' },
+    { id: 'scores', label: 'Scores' }, { id: 'coin', label: 'Coin' }, { id: 'dice', label: 'Dice' }
   ];
   const SEG_COLOURS = ['var(--wave)', 'var(--peach-ink)', 'var(--sage-ink)', 'var(--lilac-ink)', 'var(--gold-ink)'];
   const GROUP_COLOURS = [['var(--sage)', 'var(--sage-ink)'], ['var(--peach)', 'var(--peach-ink)'], ['var(--lilac)', 'var(--lilac-ink)'], ['var(--gold)', 'var(--gold-ink)']];
@@ -349,6 +402,8 @@
         <button class="btn" data-a="reset">Reset</button>
         <button class="btn" data-a="plus">+1 min</button>
       </div>
+      <div class="presets" data-r="presets"${view === 'student' ? ' hidden' : ''}><span class="inl">Presets</span>
+        <button class="chip" data-p="0">Read, Write</button><button class="chip" data-p="1">Think, Pair, Share</button><button class="chip" data-p="2">Plan, Draft, Edit</button><button class="chip" data-p="3">Silent reading 15</button></div>
       <div class="stack" data-r="stack"></div>
       <p class="sub" style="text-align:left">Saved with this lesson. It is ready to start when the lesson opens.</p>
       <div class="row"><button class="btn btn--sm" data-a="add">+ Add a timer to the stack</button>
@@ -404,7 +459,15 @@
       renderBar(); $('clock').textContent = fmt(st.left);
       st.raf = requestAnimationFrame(tick);
     }
+    const PRESETS = [
+      [{ label: 'Reading time', min: 5 }, { label: 'Writing time', min: 10 }],
+      [{ label: 'Think', min: 1 }, { label: 'Pair', min: 2 }, { label: 'Share', min: 3 }],
+      [{ label: 'Plan', min: 5 }, { label: 'Draft', min: 15 }, { label: 'Edit', min: 5 }],
+      [{ label: 'Silent reading', min: 15 }]
+    ];
     root.addEventListener('click', (e) => {
+      const pr = e.target.closest('[data-p]');
+      if (pr) { cancelAnimationFrame(st.raf); st.running = false; st.done = false; st.segs = PRESETS[pr.dataset.p].map((x) => ({ ...x })); st.i = 0; st.left = st.segs[0].min * 60; renderAll(); return; }
       const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
       if (a === 'go') {
         if (st.done) { st.done = false; st.i = 0; st.left = st.segs[0].min * 60; }
@@ -551,7 +614,131 @@
     draw([3, 5], false);
   }
 
-  const BUILDERS = { timer: timerTool, names: namesTool, number: numberTool, groups: groupsTool, dice: diceTool };
+  /* ---------- Stopwatch ---------- */
+  function stopwatchTool(root) {
+    let t = 0, running = false, last = 0, raf = 0; const laps = [];
+    const f = (ms) => { const cs = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}.${String(cs).padStart(2, '0')}`; };
+    root.innerHTML = `
+      <div class="big big--time" data-r="clock">0:00.00</div>
+      <div class="row row--center"><button class="btn btn--go" data-a="go">Start</button><button class="btn" data-a="lap">Lap</button><button class="btn" data-a="reset">Reset</button></div>
+      <div class="laps" data-r="laps"></div>`;
+    const $ = (r) => root.querySelector(`[data-r="${r}"]`);
+    const tick = (now) => { if (!running) return; t += now - last; last = now; $('clock').textContent = f(t); raf = requestAnimationFrame(tick); };
+    root.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      if (a === 'go') { running = !running; if (running) { last = performance.now(); raf = requestAnimationFrame(tick); } else cancelAnimationFrame(raf); root.querySelector('[data-a="go"]').textContent = running ? 'Stop' : 'Start'; }
+      if (a === 'lap' && t > 0) { laps.unshift(t); $('laps').innerHTML = laps.map((x, i) => `<div><span>Lap ${laps.length - i}</span><span>${f(x)}</span></div>`).join(''); }
+      if (a === 'reset') { cancelAnimationFrame(raf); running = false; t = 0; laps.length = 0; $('clock').textContent = f(0); $('laps').innerHTML = ''; root.querySelector('[data-a="go"]').textContent = 'Start'; }
+    });
+    return () => { cancelAnimationFrame(raf); running = false; };
+  }
+
+  /* ---------- Coin ---------- */
+  function coinTool(root) {
+    root.innerHTML = `<div class="coin" data-r="coin">Heads</div><p class="sub" data-r="tally">&nbsp;</p>
+      <div class="row row--center"><button class="btn btn--go" data-a="flip">Flip</button></div>`;
+    const coin = root.querySelector('[data-r="coin"]'); let h = 0, tl = 0;
+    root.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-a="flip"]')) return;
+      const heads = Math.random() < 0.5;
+      coin.classList.remove('flip'); void coin.offsetWidth; coin.classList.add('flip');
+      setTimeout(() => { coin.textContent = heads ? 'Heads' : 'Tails'; heads ? h++ : tl++; root.querySelector('[data-r="tally"]').textContent = `Heads ${h} · Tails ${tl}`; chime(1); }, 450);
+    });
+  }
+
+  /* ---------- Scoreboard ---------- */
+  function scoresTool(root) {
+    let teams = [{ n: 'Team 1', p: 0 }, { n: 'Team 2', p: 0 }, { n: 'Team 3', p: 0 }];
+    root.innerHTML = `<div class="teams" data-r="teams"></div>
+      <div class="row row--center"><button class="btn btn--sm" data-a="add">+ Team</button><button class="btn btn--sm" data-a="remove">− Team</button><button class="btn btn--sm" data-a="zero">Reset scores</button></div>`;
+    const draw = () => {
+      const top = Math.max(...teams.map((t) => t.p));
+      root.querySelector('[data-r="teams"]').innerHTML = teams.map((t, i) => { const [c, ink] = GROUP_COLOURS[i % GROUP_COLOURS.length]; return `<div class="team" style="--gc:${c};--gi:${ink}">
+        <input type="text" id="team-${root.dataset.uid}-${i}" value="${esc(t.n)}" data-i="${i}" aria-label="Team name">
+        <div class="team__pts">${t.p}${top > 0 && t.p === top ? '<span aria-label="leading" style="font-size:1rem"> ★</span>' : ''}</div>
+        <div class="row"><button class="btn btn--sm" data-d="-1" data-i="${i}" aria-label="Take a point from ${esc(t.n)}">−1</button><button class="btn btn--sm" data-d="1" data-i="${i}" aria-label="Give ${esc(t.n)} a point">+1</button><button class="btn btn--sm" data-d="5" data-i="${i}">+5</button></div></div>`; }).join('');
+    };
+    root.addEventListener('input', (e) => { if (e.target.dataset.i != null) teams[e.target.dataset.i].n = e.target.value; });
+    root.addEventListener('click', (e) => {
+      const d = e.target.closest('[data-d]');
+      if (d) { const t = teams[d.dataset.i]; t.p = Math.max(0, t.p + Number(d.dataset.d)); draw(); return; }
+      const a = e.target.closest('[data-a]')?.dataset.a;
+      if (a === 'add' && teams.length < 6) teams.push({ n: `Team ${teams.length + 1}`, p: 0 });
+      if (a === 'remove' && teams.length > 2) teams.pop();
+      if (a === 'zero') teams.forEach((t) => { t.p = 0; });
+      if (a) draw();
+    });
+    draw();
+  }
+
+  /* ---------- Technique spinner ---------- */
+  const FAMILY = { Descriptive: '#ff7d5a', Repetitive: '#36d39a', Comparative: '#a98bff', Structural: '#f7b733', Intertextual: '#28d2e8' };
+  // What a scan of the "Read the extract" block found (sample). Rows from literary-elements.json.
+  const SCANNED = [
+    { sym: 'For', name: 'Foreshadowing', fam: 'Structural', def: 'Hints of future events or outcomes', eff: 'Creates suspense and invites rereading for discovery' },
+    { sym: 'Ju', name: 'Juxtaposition', fam: 'Comparative', def: 'Placing contrasting elements side by side without connectives', eff: 'Creates tension and forces comparison' },
+    { sym: 'Vi', name: 'Visual Imagery', fam: 'Descriptive', def: 'Language appealing to the sense of sight', eff: 'Helps reader visualize scenes and characters' },
+    { sym: 'St', name: 'Situational Irony', fam: 'Comparative', def: 'When reality contradicts expectation in events', eff: 'Creates humor, pathos, or philosophical tension' },
+    { sym: 'Un', name: 'Understatement', fam: 'Descriptive', def: 'Representing something as less important than it is', eff: 'Creates humor or unexpected effect through contrast' },
+    { sym: 'Ob', name: 'Object Symbolism', fam: 'Comparative', def: 'Objects representing abstract ideas or themes', eff: 'Creates concrete focus for abstract concepts' },
+    { sym: 'Tc', name: 'Tricolon', fam: 'Repetitive', def: 'Series of three parallel items or clauses', eff: 'Creates completion and emphasis through triple rhythm' }
+  ];
+  function techniqueTool(root) {
+    const used = new Set();
+    root.innerHTML = `
+      <div class="row row--center">
+        <label class="inl">Text <select id="tech-src-${root.dataset.uid}"><option>Read the extract</option><option>Write your opening</option></select></label>
+        ${view === 'teacher' ? `<label class="inl">Prompt <select id="tech-mode-${root.dataset.uid}" data-r="mode"><option value="find">Find it in the text</option><option value="use">Use it in your writing</option></select></label>` : ''}
+      </div>
+      <p class="sub">Scan found <b>${SCANNED.length}</b> of 310 techniques in this text. The spinner only picks from these.</p>
+      <div class="scanbar" data-r="scan">${SCANNED.map((t, i) => `<span class="tag" style="--fc:${FAMILY[t.fam]}" data-k="${i}">${t.name}</span>`).join('')}</div>
+      <div class="tech" data-r="out">
+        <div class="tech__tile" style="--fc:var(--line-strong)"><b>?</b><small>Spin</small></div>
+      </div>
+      <div class="row row--center"><button class="btn btn--go" data-a="spin">Spin</button>
+        <label class="inl"><input type="checkbox" id="tech-norep-${root.dataset.uid}" checked> No repeats</label></div>`;
+    const $ = (r) => root.querySelector(`[data-r="${r}"]`);
+    const tile = (t, spinning) => `<div class="tech__tile" style="--fc:${FAMILY[t.fam]}"><b>${t.sym}</b><small>${t.fam}</small></div>` + (spinning ? `<p class="tech__name" style="color:var(--muted)">${t.name}</p>` : '');
+    root.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-a="spin"]')) return;
+      const norep = root.querySelector('input[type="checkbox"]').checked;
+      let opts = SCANNED.map((_, i) => i).filter((i) => !norep || !used.has(i));
+      if (!opts.length) { used.clear(); opts = SCANNED.map((_, i) => i); }
+      const win = opts[rand(opts.length)]; let k = 0;
+      const spin = () => {
+        const j = rand(SCANNED.length);
+        $('out').innerHTML = tile(SCANNED[j], true);
+        root.querySelectorAll('.scanbar .tag').forEach((x) => x.classList.toggle('is-hit', Number(x.dataset.k) === j));
+        if (++k < 14) setTimeout(spin, 45 + k * k * 1.8);
+        else {
+          const t = SCANNED[win]; used.add(win);
+          const mode = $('mode') ? $('mode').value : 'find';
+          root.querySelectorAll('.scanbar .tag').forEach((x) => x.classList.toggle('is-hit', Number(x.dataset.k) === win));
+          $('out').innerHTML = tile(t) + `<p class="tech__name">${t.name}</p><p class="tech__def">${t.def}. ${t.eff}.</p>
+            <p class="tech__task">${mode === 'use' ? `Use ${t.name.toLowerCase()} once in your opening.` : `Find ${t.name.toLowerCase()} in the extract. What does it do to the reader?`}</p>`;
+          chime(1);
+        }
+      };
+      spin();
+    });
+  }
+
+  /* ---------- Countdown header (assessment page) ---------- */
+  (() => {
+    const box = document.querySelector('[data-r="countdown"]'); if (!box) return;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const isSchool = (d) => d.getDay() > 0 && d.getDay() < 6;
+    // Due date: the 10th school day from today, at 3:00 pm
+    const due = new Date(today); let n = 0; while (n < 10) { due.setDate(due.getDate() + 1); if (isSchool(due)) n++; }
+    const set = new Date(today); let total = 0; for (let i = 0; i < 15; i++) { set.setDate(set.getDate() - 1); if (isSchool(set)) total++; if (total === 5) break; }
+    let left = 0; const d = new Date(today); while (d < due) { d.setDate(d.getDate() + 1); if (isSchool(d)) left++; }
+    const all = left + 5;
+    box.querySelector('[data-r="cd-n"]').textContent = left;
+    box.querySelector('[data-r="cd-due"]').textContent = `Due ${due.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}, 3:00 pm`;
+    box.querySelector('[data-r="cd-ticks"]').innerHTML = Array.from({ length: all }, (_, i) => `<i class="${i < all - left ? 'gone' : ''}"></i>`).join('');
+  })();
+
+  const BUILDERS = { timer: timerTool, stopwatch: stopwatchTool, names: namesTool, number: numberTool, groups: groupsTool, technique: techniqueTool, scores: scoresTool, coin: coinTool, dice: diceTool };
 
   /* ---------- Host: divider or block ---------- */
   let uid = 0;
@@ -625,7 +812,7 @@
     if (start) { setTray(true); open(start); }
   }
   let view = 'teacher';
-  const STUDENT_TOOLS = ['timer', 'dice'];
+  const STUDENT_TOOLS = ['timer', 'stopwatch', 'technique', 'coin', 'dice'];
   function allowed(id) { return !!id && (view === 'teacher' || STUDENT_TOOLS.includes(id)); }
   function mountAll() { document.querySelectorAll('[data-mount]').forEach(mount); }
   document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {

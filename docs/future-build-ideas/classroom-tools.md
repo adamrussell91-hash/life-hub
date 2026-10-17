@@ -46,31 +46,33 @@ Each open tool has a full-screen button for the projector, and a close button th
 - **Students run their own copy of the timer stack.** The teacher's copy is the one on the board.
 - **Sound:** the chime is on by default, with a mute switch on every open tool that mutes them all.
 
-## Suggested tools (not yet chosen)
+- **Skip in picker applies to the name picker only.** Groups still include every student.
+- **No preferred-name field.** Adam enters the preferred name as the student's name in the list.
+
+## Chosen extra tools
 
 | Tool | What it does | Who sees it |
 |---|---|---|
-| Stopwatch | Counts up. Useful for timing a read-aloud or a speech | Teacher and students |
-| Wait-time | A silent 5 to 10 second ring after a question, before hands go up | Teacher |
-| Traffic light | Work, whisper, silent. A big signal on the board | Teacher |
-| Coin flip | Heads or tails, for debate sides or first turn | Teacher and students |
-| Technique spinner | Lands on a technique from the Periodic Table of Literary Elements, with its card. "Find one in the extract" | Teacher and students |
-| Sentence starter spinner | Lands on a stem the teacher has written, for example "The writer suggests…" | Teacher and students |
-| Writing prompt | A random image or opening line from a set the teacher keeps | Teacher and students |
-| Team scoreboard | Points for two to six teams, for quiz games | Teacher |
-| Countdown to a date | "9 school days until the essay is due" | Teacher and students |
-| Who's next queue | Hands-up order, so the teacher calls on people fairly | Teacher (uses names) |
-| Seat shuffle | A random seating plan from the class list, honouring skip in picker | Teacher (uses names) |
-| Timer presets | Saved stacks such as Think, Pair, Share (1, 2, 3 minutes) | Teacher |
+| Technique spinner | Runs on a block's text. A scan finds which of the 310 Periodic Table techniques appear in that text, and the spinner only picks from those. The teacher sets the prompt: "Find it in the text" or "Use it in your writing". Lands on the element tile, definition and effect | Teacher and students |
+| Stopwatch | Counts up, with laps. For timing a read-aloud or speech | Teacher and students |
+| Coin flip | Heads or tails, with a running tally | Teacher and students |
+| Team scoreboard | Two to six named teams, +1, +5 and −1, with the leader starred | Teacher |
+| Timer presets | One tap loads a saved stack: Read, Write; Think, Pair, Share; Plan, Draft, Edit; Silent reading 15 | Teacher |
+| Countdown header | Not a toolbox tool. A header-style block for the **assessment page**: task name, due date and time, school days left, and a tick bar of days gone | Everyone who opens the assessment page |
+
+Student toolbox: timer, stopwatch, technique spinner, coin and dice.
+
+Not chosen for now: wait-time, traffic light, sentence starter spinner, writing prompt, who's next queue, seat shuffle.
 
 ## Open questions
 
-- **Preferred names:** should the Students section also hold a preferred name, used everywhere the picker shows a name?
-- **Groups and skipped students:** should skip in picker also leave a student out of groups, or does it apply to the name picker only?
-- **Which suggested tools to add?**
+- **Which scan does the technique spinner use?** Adam says a scan-text function already exists. The Periodic Table widget has a Scanner pane (`widgets` repo). The Teaching Hub's own text scan today is the Dictionary scan for word help (`blocks/text-tools-client.ts`), which finds words, not techniques. Confirm which one, and whether its results are saved on the block (like `settings.word_help`) so the spinner does not re-scan every lesson.
+- **Who reviews the scan?** The annotation-block doc says AI technique suggestions are teacher-side only until accepted. The spinner should probably follow the same rule: the teacher accepts the found list once, then students spin through it.
+- **Countdown school days:** weekends are left out. Should it also leave out school holidays and pupil-free days from the term calendar?
 
 ## History
 
+- **2026-10-17:** Adam chose the technique spinner (scan first, relevant techniques only), stopwatch, coin flip, team scoreboard, timer presets, and a countdown header block for the assessment page. Skip applies to the name picker only. No preferred-name field. Mockup updated.
 - **2026-10-17:** Skip in picker lives only in the class Students section, students get their own timer copy, mute switch added. Suggested a list of further tools. Mockup updated.
 - **2026-10-17:** Adam settled four questions: divider and block both, names on the class, timer stacks saved with the lesson, students get timer and dice only. Mockup gains a Teacher/Student view switch.
 - **2026-10-17:** Class lists move onto the class: a Students section per class, and the name picker and groups tool choose a class from a dropdown.
