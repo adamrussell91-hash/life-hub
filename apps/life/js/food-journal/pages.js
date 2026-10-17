@@ -8,6 +8,10 @@ import {
   firstSentence,
   noteBlocks,
   plainNotes,
+  visitTags,
+  tagKey,
+  tagLabel,
+  HASHTAG,
   venueHistory,
   fixupQueue,
   isImport,
@@ -54,6 +58,24 @@ function stars(value) {
   return span;
 }
 // Whole-card click target that stays a real button inside the heading.
+function tagButton(ctx, key) {
+  const b = el("button", "fj-tag", tagLabel(key));
+  b.type = "button";
+  b.setAttribute("aria-label", `Show every ${tagLabel(key)} entry`);
+  b.addEventListener("click", () => ctx.openTag(key));
+  return b;
+}
+// Text with its #hashtags turned into tag buttons.
+function withTags(ctx, node, text) {
+  let last = 0;
+  for (const m of text.matchAll(HASHTAG)) {
+    const start = m.index + m[1].length;
+    node.append(text.slice(last, start), tagButton(ctx, tagKey(m[2])));
+    last = start + m[2].length + 1;
+  }
+  node.append(text.slice(last));
+  return node;
+}
 function stretch(tag, cls, text, onOpen) {
   const heading = el(tag, cls);
   const b = el("button", "fj-stretch", text);
@@ -320,10 +342,12 @@ function portrait(ctx, visit) {
 export function paintTimeline(ctx, list, query) {
   list.replaceChildren();
   const q = query.trim().toLowerCase();
+  const tag = /^#\S+$/.test(q) ? tagKey(q) : "";
   const visits = liveVisits(ctx.journal()).filter(
     (visit) =>
       !q ||
-      [
+      (tag ? visitTags(visit).includes(tag) : [
+        ...visitTags(visit).map(tagLabel),
         visit.title,
         visit.editorial?.headline,
         visit.venue.name,
@@ -334,14 +358,18 @@ export function paintTimeline(ctx, list, query) {
       ]
         .join(" ")
         .toLowerCase()
-        .includes(q),
+        .includes(q)),
   );
   if (!visits.length) {
     list.append(
       el(
         "p",
         "canvas-status",
-        q ? "No visits match your search." : "Add your first visit or import past meals.",
+        tag
+          ? `No visits tagged ${tagLabel(tag)}.`
+          : q
+            ? "No visits match your search."
+            : "Add your first visit or import past meals.",
       ),
     );
     return;
@@ -386,8 +414,10 @@ function row(ctx, visit) {
       unique([
         visit.venue.name || "At home",
         formatDisplayDate(visit.date),
-        ...unique(visit.dishes.map((d) => d.meal_type)),
         ...unique(visit.dishes.map((d) => d.cuisine)),
+        ...(visitTags(visit).length
+          ? [visitTags(visit).map(tagLabel).join(" ")]
+          : unique(visit.dishes.map((d) => d.meal_type))),
       ]).join(" · "),
     ),
   );
@@ -422,9 +452,10 @@ export function paintEntry(ctx, host, visit) {
   page.append(nav);
 
   const head = el("header", "fj-entry__head");
+  const tags = visitTags(visit);
   const kick = unique([
     ...unique(visit.dishes.map((d) => d.cuisine)),
-    ...unique(visit.dishes.map((d) => d.meal_type)),
+    ...(tags.length ? [] : unique(visit.dishes.map((d) => d.meal_type))),
     isImport(visit) ? "From Day One" : "",
   ]).join(" · ");
   if (kick) head.append(kicker(kick));
@@ -440,7 +471,9 @@ export function paintEntry(ctx, host, visit) {
   for (const [label, value] of [
     ["When", formatDisplayDate(visit.date)],
     ["Where", visit.venue.name || "At home"],
-    ["Meal", unique(visit.dishes.map((d) => d.meal_type)).join(", ")],
+    tags.length
+      ? ["Tags", tags]
+      : ["Meal", unique(visit.dishes.map((d) => d.meal_type)).join(", ")],
     ["Cuisine", unique(visit.dishes.map((d) => d.cuisine)).join(", ")],
     ["Rating", rating],
   ]) {
@@ -448,7 +481,10 @@ export function paintEntry(ctx, host, visit) {
     const cell = el("div", "fj-facts__cell");
     const dd = el("dd", "fj-serif");
     if (label === "Rating") dd.append(stars(value), ` ${value}`);
-    else dd.textContent = value;
+    else if (label === "Tags") {
+      dd.classList.add("fj-tags");
+      dd.append(...value.map((key) => tagButton(ctx, key)));
+    } else dd.textContent = value;
     cell.append(el("dt", "", label), dd);
     facts.append(cell);
   }
@@ -494,7 +530,7 @@ export function paintEntry(ctx, host, visit) {
       continue;
     }
     const index = paragraphs.indexOf(block);
-    prose.append(el("p", index === 0 ? "fj-prose__first" : "", block.text));
+    prose.append(withTags(ctx, el("p", index === 0 ? "fj-prose__first" : ""), block.text));
     if (index === Math.min(1, paragraphs.length - 1) && visit.editorial?.pull_quote)
       prose.append(el("blockquote", "fj-pull fj-italic", `“${visit.editorial.pull_quote}”`));
   }
@@ -611,8 +647,13 @@ function menuDish(ctx, visit, dish) {
   body.append(line);
   if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes))
     body.append(el("p", "fj-dish__note fj-serif fj-italic", plainNotes(dish.notes)));
-  const tags = unique([dish.cuisine, ...dish.tags]);
-  if (tags.length) body.append(el("p", "fj-meta", tags.join(" · ")));
+  const dishTags = unique(dish.tags.map(tagKey));
+  if (dish.cuisine || dishTags.length) {
+    const meta = el("p", "fj-meta fj-tags");
+    if (dish.cuisine) meta.append(dish.cuisine);
+    meta.append(...dishTags.map((key) => tagButton(ctx, key)));
+    body.append(meta);
+  }
   const actions = el("div", "fj-dish__actions");
   actions.append(
     ctx.button(ctx.hasRecipe(dish.id) ? "Open recipe" : "Find a recipe", (e) => ctx.openRecipe(dish, e.currentTarget), ctx.hasRecipe(dish.id) ? "primary" : "secondary"),

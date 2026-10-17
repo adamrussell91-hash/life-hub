@@ -164,11 +164,7 @@ export function importDayOne(payload, journal) {
       continue;
     }
     seen.add(source_id);
-    const title = text
-      .split("\n")
-      .find(Boolean)
-      .replace(/^#+\s*/, "")
-      .slice(0, 200);
+    const title = dayOneTitle(text) || "Meal";
     const place = entry.location || {};
     visits.push({
       ...newVisit(),
@@ -207,6 +203,55 @@ export function importDayOne(payload, journal) {
   return { visits, skipped };
 }
 
+// Day One section headings from Adam's entry template; "Title" is the
+// template's placeholder, never a real name.
+const SECTION = /^(title|description|rating( and recommendation)?|location|shared with.*)$/i;
+// The first real line of a Day One entry: no photo links, headings marks,
+// rules, escapes or template section names.
+export function dayOneTitle(text) {
+  for (const raw of String(text || "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\\([\\`*_{}[\]()#+\-.!|>~])/g, "$1")
+    .split(/\r?\n/)) {
+    const line = raw
+      .replace(/^#{1,6}\s+/, "")
+      .replace(HASHTAG, "$1")
+      .trim();
+    if (!line || /^([-*_])\1{2,}$/.test(line)) continue;
+    if (SECTION.test(line)) return "";
+    return line.slice(0, 200);
+  }
+  return "";
+}
+const badTitle = (title) =>
+  !String(title || "").trim() ||
+  /dayone-moment|!\[/.test(title) ||
+  SECTION.test(String(title).trim());
+// A readable title for an imported entry whose own title is a photo link or
+// the template placeholder: "Burger at Ibby's", the venue, or "Meal".
+function importTitle(visit) {
+  const own = dayOneTitle(visit.notes);
+  if (own && !badTitle(own)) return own;
+  const tag = visitTags(visit)[0],
+    venue = visit.venue.name.trim();
+  const dish = tag ? tagLabel(tag).slice(1) : "";
+  if (dish && venue) return `${dish} at ${venue}`.slice(0, 200);
+  return dish || venue || "Meal";
+}
+// Hashtags come from dish tags and from #words in the notes. They match
+// ignoring case, so #pizza and #Pizza are one tag.
+export const tagKey = (tag) =>
+  String(tag || "").replace(/^#/, "").trim().toLowerCase();
+export const tagLabel = (key) =>
+  `#${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+export const HASHTAG = /(^|[\s.,!?;:()])#([A-Za-z][\w-]*)/g;
+export function visitTags(visit) {
+  const keys = new Set();
+  for (const dish of visit.dishes) for (const t of dish.tags) keys.add(tagKey(t));
+  for (const m of String(visit.notes || "").matchAll(HASHTAG)) keys.add(tagKey(m[2]));
+  keys.delete("");
+  return [...keys];
+}
 // Day One reviews carry the score in the text as "4/5" or "4\\.5/5". Dates
 // such as 21/5/26 are not scores.
 export function dayOneRating(text) {
@@ -256,6 +301,15 @@ export function tidyImports(journal) {
       }
     }
   }
+  for (const visit of withoutDeleted(next.visits).filter(isImport)) {
+    if (!badTitle(visit.title)) continue;
+    const old = visit.title,
+      title = importTitle(visit);
+    visit.title = title;
+    for (const dish of visit.dishes)
+      if (dish.title === old || badTitle(dish.title)) dish.title = title;
+    changed = true;
+  }
   for (const visit of withoutDeleted(next.visits).filter(isImport))
     for (const dish of visit.dishes) {
       if (dish.rating != null) continue;
@@ -274,9 +328,25 @@ export function tidyImports(journal) {
     const key = sameVisitKey(visit);
     groups.set(key, [...(groups.get(key) || []), visit]);
   }
+  // Entries written more than three hours apart are separate meals, even at
+  // the same address (breakfast and dinner at home).
+  const sittings = [];
   for (const group of groups.values()) {
-    if (group.length < 2) continue;
     group.sort((a, b) => createdAt(a).localeCompare(createdAt(b)));
+    let run = [];
+    for (const visit of group) {
+      const gap =
+        Date.parse(createdAt(visit)) - Date.parse(createdAt(run.at(-1) || visit));
+      if (run.length && gap > 3 * 60 * 60 * 1000) {
+        sittings.push(run);
+        run = [];
+      }
+      run.push(visit);
+    }
+    sittings.push(run);
+  }
+  for (const group of sittings) {
+    if (group.length < 2) continue;
     const [keeper, ...rest] = group;
     const moved = new Map();
     for (const other of rest) {
@@ -320,8 +390,14 @@ export function visitRating(visit) {
 export function noteBlocks(text, { title = "" } = {}) {
   const blocks = [];
   let lines = [];
+  // Hashtags show as tag buttons on the entry, so they leave the prose.
   const flush = () => {
-    const joined = lines.join(" ").replace(/\s+/g, " ").trim();
+    const joined = lines
+      .join(" ")
+      .replace(HASHTAG, "$1")
+      .replace(/\s+([.,!?;:])/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
     if (joined) blocks.push({ kind: "para", text: joined });
     lines = [];
   };
@@ -382,7 +458,11 @@ export function fixupQueue(journal) {
 export function applyFixup(visit, draft) {
   const next = structuredClone(visit);
   if (draft.title?.trim()) next.title = draft.title.trim();
-  if (!next.venue.name && draft.venue?.name)
+  // A GPS place name is often a street address; the venue the text names wins.
+  if (
+    draft.venue?.name &&
+    (!next.venue.name || (isImport(visit) && !visit.import_metadata?.location_from_text))
+  )
     next.venue = {
       ...next.venue,
       name: draft.venue.name,
