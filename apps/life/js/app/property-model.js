@@ -269,6 +269,31 @@ export function addEntry(record, input, { id, today }) {
   return { record: { ...record, entries: [...record.entries, entry].sort(byDate) }, entry };
 }
 
+export const MAX_BATCH_ENTRIES = 40;
+
+/** Add several entries in one write (a read statement). All or nothing: one bad entry rejects the batch. */
+export function addEntries(record, inputs, { newId, today }) {
+  if (!Array.isArray(inputs) || inputs.length === 0) return { error: 'Pick at least one record to save.' };
+  if (inputs.length > MAX_BATCH_ENTRIES) return { error: `Save at most ${MAX_BATCH_ENTRIES} records at once.` };
+  const added = [];
+  for (const [index, input] of inputs.entries()) {
+    const result = normalizeEntry(input);
+    if (result.error) return { error: inputs.length === 1 ? result.error : `Record ${index + 1}: ${result.error}` };
+    added.push({ id: `${result.entry.kind}-${newId()}`, ...result.entry, recordedOn: today });
+  }
+  return { record: { ...record, entries: [...record.entries, ...added].sort(byDate) }, entries: added };
+}
+
+const ENTRY_AMOUNT = { statement: 'gross', interest: 'amount', balance: 'balance', expense: 'amount', valuation: 'amount', rent: 'weeklyRent', rate: 'rate' };
+
+/** An entry already on file with the same kind, date and amount (a statement read twice). */
+export function findDuplicate(record, entry) {
+  const key = ENTRY_AMOUNT[entry?.kind];
+  if (!key) return null;
+  return record.entries.find(existing => existing.kind === entry.kind && existing.date === entry.date
+    && Math.abs((existing[key] ?? 0) - (entry[key] ?? 0)) < 0.01) ?? null;
+}
+
 export function removeEntry(record, id) {
   if (!record.entries.some(entry => entry.id === id)) return { error: 'That record is already gone.' };
   return { record: { ...record, entries: record.entries.filter(entry => entry.id !== id) } };
