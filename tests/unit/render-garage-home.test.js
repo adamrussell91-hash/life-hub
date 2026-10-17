@@ -32,7 +32,8 @@ function setup() {
     importPack: pack => call({ action: 'import', pack })
   };
   const opened = [];
-  const view = createGarageHomeView({ root: dom.window.document, api, now: () => NOW, openSection: name => opened.push(name) });
+  const propertyPanel = { show: () => opened.push('show'), hide: () => opened.push('hide') };
+  const view = createGarageHomeView({ root: dom.window.document, api, now: () => NOW, propertyPanel });
   const host = dom.window.document.querySelector('#garage-home-dashboard');
   const click = selector => {
     const node = host.querySelector(selector);
@@ -84,7 +85,7 @@ test('moving with "always" adds a sender rule; ignore keeps it out', async () =>
   assert.ok(calls.some(c => c?.mail?.action === 'ignore'));
 });
 
-test('Homes ticks inspection prep and tax-time items; investments hand off to Property', async () => {
+test('Homes ticks inspection prep and tax-time items; investments open the Property tab', async () => {
   const { view, host, click, settle, opened } = setup();
   await view.show();
   click('[data-gh-tab="homes"]');
@@ -96,8 +97,21 @@ test('Homes ticks inspection prep and tax-time items; investments hand off to Pr
   await settle();
   assert.equal(host.querySelector('[data-gh-act="needed"]').getAttribute('aria-checked'), 'true');
   assert.match(host.textContent, /Stovetop|maintenance request/i);
+  opened.length = 0;
   click('[data-gh-go="property"]');
-  assert.deepEqual(opened, ['property']);
+  assert.equal(host.querySelector('[data-gh-tab="property"]').getAttribute('aria-selected'), 'true');
+  assert.equal(host.querySelector('[data-gh="body"]').hidden, true);
+  assert.deepEqual(opened, ['show']);
+  click('[data-gh-tab="homes"]');
+  assert.equal(host.querySelector('[data-gh="body"]').hidden, false);
+  assert.deepEqual(opened, ['show', 'hide']);
+});
+
+test('show({ tab: "property" }) opens Management straight on the Property tab', async () => {
+  const { view, host, opened } = setup();
+  await view.show({ tab: 'property' });
+  assert.equal(host.querySelector('[data-gh-tab="property"]').getAttribute('aria-selected'), 'true');
+  assert.equal(opened.at(-1), 'show');
 });
 
 test('Garage draws Odometer Road with a ghost estimate and opens a visit on tap', async () => {

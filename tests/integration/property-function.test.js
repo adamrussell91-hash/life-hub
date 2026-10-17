@@ -117,6 +117,49 @@ test('POST settings and lodged update the record', async () => {
   assert.deepEqual(lodged.data.record.lodgedYears, ['2025-26']);
 });
 
+test('POST add-many writes every entry in one commit', async () => {
+  const { calls, fetchImpl } = githubStub({ record: { entries: [] } });
+  const response = await handler(fetchImpl)(request({ method: 'POST', body: { action: 'add-many', entries: [
+    { kind: 'statement', date: '2026-10-01', gross: 1300, deductions: 143 },
+    { kind: 'expense', date: '2026-09-20', amount: 180, category: 'repairs', inStatement: true }
+  ] } }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.entries.length, 2);
+  const writes = puts(calls);
+  assert.equal(writes.length, 1);
+  assert.match(writes[0].body.message, /add 2 from a statement/);
+  assert.equal(written(writes[0]).entries.length, 2);
+});
+
+test('POST read returns proposals from the statement and writes nothing', async () => {
+  const github = githubStub({ record: { tenancy: { agent: 'Test Realty' }, entries: [] } });
+  let prompt;
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).startsWith('https://api.anthropic.com')) {
+      prompt = JSON.parse(options.body).system;
+      return Response.json({ content: [{ type: 'text', text: '{"document":"agent statement","summary":"Statement 42","entries":[{"kind":"statement","date":"2026-10-01","gross":1300,"deductions":143}]}' }] });
+    }
+    return github.fetchImpl(url, options);
+  };
+  const read = createPropertyHandler({ env: { ...validEnv, ANTHROPIC_API_KEY: 'anthropic-key' }, fetchImpl, now: () => Date.parse('2026-10-08T01:00:00Z'), newId: () => 'abc123' });
+  const file = { name: 'statement.pdf', type: 'application/pdf', data: Buffer.from('%PDF').toString('base64') };
+  const response = await read(request({ method: 'POST', body: { action: 'read', file } }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.entries[0].gross, 1300);
+  assert.match(prompt, /Test Realty/);
+  assert.equal(puts(github.calls).length, 0);
+});
+
+test('POST read without an Anthropic key says it is not set up', async () => {
+  const { fetchImpl } = githubStub({ record: { entries: [] } });
+  const file = { name: 'statement.pdf', type: 'application/pdf', data: Buffer.from('%PDF').toString('base64') };
+  const response = await handler(fetchImpl)(request({ method: 'POST', body: { action: 'read', file } }));
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'reader_unconfigured');
+});
+
 test('rejects bad bodies, unknown actions and signed-out requests', async () => {
   const { fetchImpl } = githubStub({ record: { entries: [] } });
   assert.equal((await handler(fetchImpl)(request({ method: 'POST', body: { action: 'explode' } }))).status, 400);
