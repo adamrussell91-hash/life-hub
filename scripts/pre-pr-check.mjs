@@ -12,13 +12,21 @@
  * Options:
  *   --docs-only   Skip Professional typecheck. Still runs npm test + static
  *                 guards. Only for PRs with zero runtime / test / type impact.
+ *   --full        Run the whole Tasks Hub vitest suite, not just the tests
+ *                 the change can reach (also PRE_PR_FULL=1).
  *   --help
  *
  * This script is the source of truth for which commands agents must run.
  * Keep steps aligned with `.github/workflows/pages.yml`:
- *   - Pages runs `npm test` with pipefail, then the Tasks Hub vitest suite
- *     (`cd apps/tasks && ./node_modules/.bin/vitest run`), then `npm run build`
+ *   - Pages runs `npm test` and the full Tasks Hub vitest suite in a `test`
+ *     job beside the deploy, so a break still shows red on main
  *   - `build:professional` runs `npm run typecheck` (`tsc --noEmit`) first
+ *
+ * Tasks Hub vitest runs only the tests the change can reach (vitest
+ * `--changed`, which follows imports). A Teaching-only PR runs none of them,
+ * so the slow Grove world tests stay out of PRs that never touch the Grove.
+ * Anything named grove, Tasks fixtures or config, or this gate itself, runs
+ * the whole suite, because tests read those files without importing them.
  *
  * Agent checklist (Project store): docs/mandatory-pre-pr-check.md
  * Principle: never weaken Pages / hide failures to go green.
@@ -40,13 +48,14 @@ Mandatory before any life-hub PR. Exit 0 required.
 Steps:
   1. Static guards (rail IDs, registry count parity, Contents mock sha)
   2. npm test          (same as Pages)
-  3. Tasks Hub vitest  (same as Pages; installs apps/tasks deps if missing)
+  3. Tasks Hub vitest  (tests the change reaches; --full for all of them)
   4. Professional typecheck  (same as build:professional; skipped with --docs-only)
 `);
   process.exit(0);
 }
 
 const docsOnly = args.has('--docs-only');
+const forceFull = args.has('--full') || process.env.PRE_PR_FULL === '1';
 const failures = [];
 
 function fail(msg) {
@@ -175,6 +184,45 @@ function checkProfessionalContentsMocks() {
   pass(`Professional Contents mocks include sha (${files.length} scanned files)`);
 }
 
+function git(gitArgs) {
+  const result = spawnSync('git', gitArgs, { cwd: root, encoding: 'utf8' });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+/** Commit the change is measured from: PRE_PR_BASE (CI), else merge-base with origin/main. */
+function changeBase() {
+  const ref = process.env.PRE_PR_BASE || git(['merge-base', 'HEAD', 'origin/main']);
+  return ref ? git(['rev-parse', '--verify', `${ref}^{commit}`]) : null;
+}
+
+// Tests read these with fs or vite config rather than imports, so vitest's
+// import graph cannot see them. Touching one runs the whole suite.
+const FULL_SUITE_TRIGGERS = [
+  /grove/i,
+  /^apps\/tasks\/(fixtures|tests\/helpers)\//,
+  /^apps\/tasks\/(package(-lock)?\.json|vite\.config\.ts|tsconfig[^/]*\.json)$/,
+  /^packages\//,
+  /^scripts\/pre-pr-check\.mjs$/,
+  /^\.github\/workflows\//
+];
+
+/** Vitest args for this change: all tests, or only those it can reach. */
+function tasksVitestArgs() {
+  if (forceFull) return { args: ['run'], why: '--full' };
+  const base = changeBase();
+  if (!base) return { args: ['run'], why: 'no base commit to compare against' };
+  const committed = git(['diff', '--name-only', base]);
+  const untracked = git(['ls-files', '--others', '--exclude-standard']);
+  if (committed === null || untracked === null) return { args: ['run'], why: 'git diff failed' };
+  const changed = `${committed}\n${untracked}`.split('\n').filter(Boolean);
+  const trigger = changed.find((file) => FULL_SUITE_TRIGGERS.some((re) => re.test(file)));
+  if (trigger) return { args: ['run'], why: `${trigger} changed` };
+  return {
+    args: ['run', '--changed', base, '--passWithNoTests'],
+    why: `${changed.length} changed files, none Grove or Tasks config`
+  };
+}
+
 function lineAt(src, index) {
   return src.slice(0, index).split('\n').length;
 }
@@ -214,7 +262,10 @@ if (!existsSync(join(tasksDir, 'node_modules'))) {
 const tasksEnv = { ...process.env };
 delete tasksEnv.ANTHROPIC_API_KEY;
 const tasksVitest = join(tasksDir, 'node_modules', '.bin', 'vitest');
-const tasksOk = run('Tasks Hub vitest (Pages)', tasksVitest, ['run'], {
+const tasksPlan = tasksVitestArgs();
+const tasksScope = tasksPlan.args.includes('--changed') ? 'tests this change reaches' : 'full suite';
+console.log(`\nTasks Hub vitest scope: ${tasksScope} (${tasksPlan.why})`);
+const tasksOk = run(`Tasks Hub vitest (${tasksScope})`, tasksVitest, tasksPlan.args, {
   cwd: tasksDir,
   env: tasksEnv
 });
