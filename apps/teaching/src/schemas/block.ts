@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
+import { KaplanQualifiersSchema } from './kaplan';
 import {
   AnalogyTypesContentSchema,
   ConceptFeaturesContentSchema,
@@ -107,6 +108,7 @@ const blockTimestamps = {
 };
 
 const blockLayout = {
+  qualifiers: KaplanQualifiersSchema.optional(),
   layout: z.record(z.unknown()).default({}),
   print: z.record(z.unknown()).default({}),
   settings: z.record(z.unknown()).default({})

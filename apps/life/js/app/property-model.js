@@ -598,6 +598,36 @@ function monthsCovered(start, end) {
   return months;
 }
 
+const EARLY_POSTING_DAYS = 5;
+
+function previousMonth(yearMonth) {
+  const year = Number(yearMonth.slice(0, 4));
+  const month = Number(yearMonth.slice(5, 7));
+  return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
+}
+
+/** Months each charge covers. Month-end interest posts on the next business day when the month ends on a weekend, so a charge in the first few days of a month covers the month before unless that month has its own. */
+function monthsCharged(charges) {
+  const months = new Set();
+  const early = [];
+  for (const entry of charges) {
+    if (Number(entry.date.slice(8, 10)) <= EARLY_POSTING_DAYS) early.push(entry);
+    else months.add(entry.date.slice(0, 7));
+  }
+  for (const entry of early) {
+    const before = previousMonth(entry.date.slice(0, 7));
+    months.add(months.has(before) ? entry.date.slice(0, 7) : before);
+  }
+  return months;
+}
+
+function monthList(months) {
+  const consecutive = months.every((month, index) => index === 0 || previousMonth(month) === months[index - 1]);
+  if (months.length === 1) return monthLabel(months[0]);
+  if (consecutive) return `${monthLabel(months[0])}–${monthLabel(months.at(-1))}`;
+  return `${months.slice(0, -1).map(monthLabel).join(', ')} and ${monthLabel(months.at(-1))}`;
+}
+
 export function taxYearSummary(record, today, fy = focusFinancialYear(record, today)) {
   const tenancy = tenancyStart(record);
   const statements = ofKind(record, 'statement').filter(entry => inRange(entry.date, fy.start, fy.end));
@@ -609,7 +639,7 @@ export function taxYearSummary(record, today, fy = focusFinancialYear(record, to
   const periodStart = tenancy && tenancy > fy.start ? tenancy : fy.start;
   const periodEnd = today < fy.end ? today : fy.end;
   const rentedMonths = tenancy && periodStart <= periodEnd ? monthsCovered(periodStart, periodEnd) : [];
-  const chargedMonths = new Set(charges.map(entry => entry.date.slice(0, 7)));
+  const chargedMonths = monthsCharged(charges);
   const missingMonths = rentedMonths.filter(month => !chargedMonths.has(month));
   const { monthly } = interestProfile(record);
   const firstMonthShare = tenancy && missingMonths[0] === tenancy.slice(0, 7)
@@ -657,7 +687,7 @@ export function taxYearSummary(record, today, fy = focusFinancialYear(record, to
     { key: 'agent', label: 'Agent fees and costs', detail: 'Management, letting, and anything paid through the agent', status: statements.length ? 'done' : 'missing', amount: agentCosts },
     {
       key: 'interest',
-      label: missingMonths.length ? `Loan interest, ${monthLabel(missingMonths[0])}–${monthLabel(missingMonths.at(-1))}` : 'Loan interest',
+      label: missingMonths.length ? `Loan interest, ${monthList(missingMonths)}` : 'Loan interest',
       detail: missingMonths.length ? `${missingMonths.length} month${missingMonths.length === 1 ? '' : 's'} of charges not recorded` : `${charges.length} charges recorded`,
       status: missingMonths.length ? 'missing' : rentedMonths.length ? 'done' : 'missing',
       amount: missingMonths.length ? interestEstimate : interestRecorded,
