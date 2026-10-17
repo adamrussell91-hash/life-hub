@@ -3,7 +3,11 @@ import { randomUUID, createHash } from 'node:crypto';
 const STATE = 'alchemy/v1/operator-budget';
 const DAY = 86400000;
 // Worst case for one check: the prompt byte cap and max_tokens. Real usage replaces it once known.
-const INPUT = 16000, OUTPUT = 1600;
+// Ann rewrites a whole block, so a long reading block needs room both ways.
+export const ALCHEMY_INPUT_CAP = 32000, ALCHEMY_OUTPUT_CAP = 6000;
+const INPUT = ALCHEMY_INPUT_CAP, OUTPUT = ALCHEMY_OUTPUT_CAP;
+// Errors found before or instead of asking Ann say nothing about the AI service, so they never pause her.
+const LOCAL = new Set(['alchemy_input_limit', 'alchemy_input', 'alchemy_stale', 'not_found']);
 export const alchemyError = (status, code, message, retryAfterMs = 0) => Object.assign(new Error(message), { status, code, retryAfterMs });
 const wait = ms => { const m = Math.ceil(ms / 60000); return ms < 60000 ? 'in under a minute' : m === 1 ? 'in about a minute' : `in about ${m} minutes`; };
 // Say why Ann is waiting and for how long, not just that she is.
@@ -62,6 +66,8 @@ export function createAlchemyBudget(store, { now = Date.now, timeZone = 'Austral
           state.cooldown = now() + 60000;
           state.manualCooldown = now() + 15000;
           state.cooldownReason = 'timeout';
+        } else if (LOCAL.has(error?.code)) {
+          // The lease is released above; nothing else changes.
         } else if (error) {
           state.failures = (state.failures || 0) + 1;
           state.permanent = (error.code === 'alchemy_upstream' && [400,401,402,403,404].includes(error.status)) || error.code === 'alchemy_unconfigured';
