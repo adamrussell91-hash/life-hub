@@ -74,8 +74,20 @@ export interface SaveControllerOptions {
   getLesson: () => Lesson;
   /** Whether a published snapshot already exists for this lesson. */
   hasPublishedVersion: boolean;
+  /** Whether the saved draft has changed since that snapshot was published. */
+  hasUnpublishedChanges?: boolean;
   /** Autosave debounce window in ms. Defaults to 600. */
   debounceMs?: number;
+}
+
+/**
+ * Publish stamps the draft's `updated_at` with its `published_at`, and every
+ * later save moves `updated_at` on, so a newer `updated_at` means the draft
+ * holds changes students cannot see yet.
+ */
+export function hasUnpublishedChanges(lesson: Pick<Lesson, 'published_at' | 'updated_at'>): boolean {
+  if (!lesson.published_at || !lesson.updated_at) return false;
+  return Date.parse(lesson.updated_at) > Date.parse(lesson.published_at);
 }
 
 /**
@@ -109,7 +121,11 @@ export class SaveController {
     this.getLesson = options.getLesson;
     this.hasPublishedVersion = options.hasPublishedVersion;
     this.debounceMs = options.debounceMs ?? 600;
-    this.state = this.hasPublishedVersion ? 'published' : 'saved';
+    this.state = !this.hasPublishedVersion
+      ? 'saved'
+      : options.hasUnpublishedChanges
+        ? 'unpublished_changes'
+        : 'published';
   }
 
   getState(): SaveState {
