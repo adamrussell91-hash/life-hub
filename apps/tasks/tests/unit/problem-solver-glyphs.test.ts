@@ -22,3 +22,17 @@ describe('skill glyphs', () => {
     expect(skillGlyph('nope').childElementCount).toBe(0);
   });
 });
+
+describe('tool emblems', () => {
+  it('every tool has an emblem in book colours with no ids', async () => {
+    const { toolEmblem } = await import('../../../../packages/problem-solver/glyphs');
+    const { TOOLS } = await import('../../../../packages/problem-solver/tools/index.mjs');
+    for (const id of Object.keys(TOOLS) as Array<keyof typeof TOOLS>) {
+      const emblem = toolEmblem(id);
+      expect(emblem.className).toBe('ps-emblem');
+      expect(emblem.getAttribute('aria-hidden')).toBe('true');
+      expect(emblem.querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 100 100');
+      expect(emblem.querySelector('[id]')).toBeNull();
+    }
+  });
+});

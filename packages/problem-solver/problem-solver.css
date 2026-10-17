@@ -21,6 +21,19 @@
   height: 100%;
 }
 
+.ps-emblem {
+  display: inline-flex;
+  width: 1.5em;
+  height: 1.5em;
+  flex: none;
+  vertical-align: middle;
+}
+
+.ps-emblem svg {
+  width: 100%;
+  height: 100%;
+}
+
 .ps-skill {
   display: inline-flex;
   align-items: center;
