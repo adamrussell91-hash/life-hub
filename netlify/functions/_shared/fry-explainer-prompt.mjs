@@ -204,19 +204,16 @@ A teacher has pressed the Fry Explainer button on a text block in a lesson. Rewr
 - The readers are secondary school students unless the text clearly says otherwise. Pitch the vocabulary to them.
 - Keep roughly the length of the source block. This overrides the 800 to 1400 words in the Length section above, which is for a standalone explainer written from scratch. You are given the block's word count and a target range. Stay inside it.
 - A shorter budget compresses the structure, it does not drop it. Keep every move from recognition to transfer, but give each one a sentence or two instead of a paragraph. Use the cut order from the Length section. Shrink consolidation (step 5) and the boundary (step 10) first, fold consolidation into a single line, and keep one prediction where there would be three. Never cut the push.
-- Run step 0 first. If the topic fails both tests, or the block is instructions, a procedure, reference notes, assessment material or a convention, do not force it. Decline and say why in one or two plain sentences.
+- Always write the rewrite. The teacher pressed the button on purpose, so never refuse, and set aside the "When not to use" list and the "write something else" line in step 0. Use step 0 only to choose the opening. An intuition-rich idea gets a contradiction. An intuition-poor one gets an anomaly or a contrast pair.
+- If the block is framing or overview material (a course introduction, a syllabus, a poet and a module focus), find the one idea in it a student could discover for themselves and build the explainer around that. Every fact, name and framing point the block gives must still appear, and the logistics can sit inside the consolidation or the transfer.
 
 ## Output format
 
-Reply with exactly one of these and nothing else.
+Reply with this and nothing else.
 
 <explainer>
 The rewritten block as HTML. Use only p, strong, em, ul, ol, li, blockquote and br. One idea per paragraph. Put each prediction question in its own paragraph. No headings, no title, no classes, no inline styles.
-</explainer>
-
-<declined>
-One or two sentences on why this block cannot carry the structure.
-</declined>`;
+</explainer>`;
 
 export function buildFryExplainerSystem() {
   return `${FRY_EXPLAINER_FRAMEWORK}\n\n${FRY_REWRITE_TASK}`;

@@ -154,7 +154,6 @@ export function createRichTextTools(options: {
       const result = await rewrite(before);
       say('');
       openFryReview(result, before, () => {
-        if (result.declined) return;
         const previous = tiptap.getHtml();
         tiptap.setHtml(result.html, true);
         paintStrip();
@@ -181,11 +180,11 @@ export function createRichTextTools(options: {
   return { buttons: [dictionary, fry], status, strip };
 }
 
-/** Preview before anything changes: Replace or Discard. A decline just explains. */
 function wordCount(html: string): number {
   return plainText(html).split(/\s+/).filter(Boolean).length;
 }
 
+/** Preview before anything changes: Replace or Discard. */
 export function openFryReview(
   result: Awaited<ReturnType<typeof rewriteAsFryExplainer>>,
   beforeHtml: string,
@@ -196,23 +195,16 @@ export function openFryReview(
   dialog.setAttribute('aria-label', 'Fry explainer');
 
   const heading = document.createElement('h2');
-  heading.textContent = result.declined ? 'Not a Fry topic' : 'Fry explainer';
+  heading.textContent = 'Fry explainer';
   const body = document.createElement('div');
   body.className = 'text-tools-review__body';
-  if (result.declined) {
-    const reason = document.createElement('p');
-    reason.textContent = result.reason;
-    body.append(reason);
-  } else {
-    const length = document.createElement('p');
-    length.className = 'text-tools-review__length';
-    length.textContent = `${wordCount(beforeHtml)} words → ${wordCount(result.html)} words`;
-    body.append(length);
-    const preview = document.createElement('div');
-    preview.className = 'block-rich-text text-tools-review__preview';
-    preview.innerHTML = sanitizeRichTextHtml(result.html);
-    body.append(preview);
-  }
+  const length = document.createElement('p');
+  length.className = 'text-tools-review__length';
+  length.textContent = `${wordCount(beforeHtml)} words → ${wordCount(result.html)} words`;
+  const preview = document.createElement('div');
+  preview.className = 'block-rich-text text-tools-review__preview';
+  preview.innerHTML = sanitizeRichTextHtml(result.html);
+  body.append(length, preview);
 
   const actions = document.createElement('div');
   actions.className = 'text-tools-review__actions';
@@ -220,21 +212,19 @@ export function openFryReview(
     dialog.close?.();
     dialog.remove();
   };
-  if (!result.declined) {
-    const replace = document.createElement('button');
-    replace.type = 'button';
-    replace.className = 'btn btn--primary';
-    replace.textContent = 'Replace text';
-    replace.addEventListener('click', () => {
-      close();
-      onReplace();
-    });
-    actions.append(replace);
-  }
+  const replace = document.createElement('button');
+  replace.type = 'button';
+  replace.className = 'btn btn--primary';
+  replace.textContent = 'Replace text';
+  replace.addEventListener('click', () => {
+    close();
+    onReplace();
+  });
+  actions.append(replace);
   const dismiss = document.createElement('button');
   dismiss.type = 'button';
   dismiss.className = 'btn btn--ghost';
-  dismiss.textContent = result.declined ? 'Close' : 'Discard';
+  dismiss.textContent = 'Discard';
   dismiss.addEventListener('click', close);
   actions.append(dismiss);
   dialog.addEventListener('cancel', () => dialog.remove());
