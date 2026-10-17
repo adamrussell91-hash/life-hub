@@ -1650,9 +1650,728 @@ button.tk-chip:focus-visible {
   text-align: left;
 }
 
+.an-ed__slot {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.an-ed__slot-title {
+  padding: 0 4px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+}
+
 .an-ed__marks {
   display: grid;
   gap: 4px;
+}
+
+/* The seven analogy blocks ------------------------------------------------- */
+/* One block per type. Each organiser is drawn in the shape of its move; empty
+   boxes are dashed with the prompt, and "Show an example" fills the same boxes. */
+
+.an-move {
+  --an-tint: var(--pastel-blue);
+  --an-ink: var(--pastel-blue-ink);
+}
+
+.an-move--pattern,
+.an-move--chains {
+  --an-tint: var(--pastel-lilac);
+  --an-ink: var(--pastel-lilac-ink);
+}
+
+.an-move--reverse {
+  --an-tint: var(--pastel-sage);
+  --an-ink: var(--pastel-sage-ink);
+}
+
+.an-move--problem {
+  --an-tint: var(--pastel-gold);
+  --an-ink: var(--pastel-gold-ink);
+}
+
+.an-move--metaphor {
+  --an-tint: var(--pastel-peach);
+  --an-ink: var(--pastel-peach-ink);
+}
+
+.an-move__card {
+  grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: start;
+}
+
+.an-move__card::before {
+  background: var(--an-ink);
+}
+
+.an-move__card > :not(.an-move__icon) {
+  grid-column: 2;
+}
+
+.an-move__icon {
+  grid-row: 1 / span 3;
+  display: block;
+  width: 44px;
+  height: 44px;
+  padding: 7px;
+  border-radius: var(--radius-xs);
+  background: var(--an-tint);
+  color: var(--an-ink);
+}
+
+.an-move__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.an-stage__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.an-stage__shape {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--an-ink);
+}
+
+.an-stage__toggle {
+  white-space: nowrap;
+}
+
+.an-org {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--an-tint) 40%, #fff);
+}
+
+.an-org__caption {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--an-ink);
+}
+
+/* A box: dashed with its prompt; solid and filled with the example. */
+.an-box {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px dashed var(--shallow);
+  border-radius: var(--radius-xs);
+  background: #fff;
+  font-family: var(--font-ui);
+  line-height: 1.45;
+}
+
+.an-box__label {
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--an-ink);
+}
+
+.an-box__frame {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.an-box__example {
+  display: none;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.an-org.is-example .an-box {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--an-ink) 30%, #fff);
+}
+
+.an-org.is-example .an-box__frame {
+  display: none;
+}
+
+.an-org.is-example .an-box__example {
+  display: block;
+}
+
+/* The point the organiser leads to. */
+.an-so {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--navy) 25%, #fff);
+  border-left: 4px solid var(--navy);
+}
+
+.an-so .an-box__label {
+  color: var(--navy);
+}
+
+/* Close Reading: a bridge --------------------------------------------------- */
+
+.an-bridge__piers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+  align-items: center;
+}
+
+.an-bridge__pier,
+.an-bridge__option {
+  border-bottom-width: 4px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--an-ink);
+}
+
+.an-bridge__pier-stack {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* An arch over a deck between the two piers. */
+.an-bridge__span {
+  align-self: center;
+  height: 36px;
+  margin: 0 -2px;
+  border: 3px solid var(--an-ink);
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  box-shadow: inset 0 -3px 0 var(--an-ink);
+}
+
+.an-bridge__deck {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* A plank runs the width of the bridge, fixed at both piers. */
+.an-plank {
+  border-left: 4px solid var(--an-ink);
+  border-right: 4px solid var(--an-ink);
+}
+
+.an-plank--broken {
+  border-right: 4px dotted var(--danger);
+}
+
+.an-plank--broken .an-box__label {
+  color: var(--danger);
+}
+
+.an-plank--broken .an-box__label::before {
+  content: '✕ ';
+}
+
+/* Pattern Translation: a strip, then the same pattern found again ---------- */
+
+.an-pattern__strip {
+  display: grid;
+  grid-template-columns: repeat(var(--beats, 2), minmax(0, 1fr));
+  column-gap: 22px;
+  row-gap: var(--space-1);
+}
+
+.an-beat {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--an-ink) 30%, #fff);
+  border-top: 4px solid var(--an-ink);
+}
+
+/* Arrow from one step to the next. */
+.an-beat:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -18px;
+  border: 7px solid transparent;
+  border-left: 9px solid var(--an-ink);
+  transform: translateY(-50%);
+}
+
+.an-pattern__found {
+  display: grid;
+  grid-template-columns: repeat(var(--found, 1), minmax(0, 1fr));
+  gap: var(--space-1) var(--space-2);
+}
+
+.an-sighting {
+  padding-left: calc(var(--space-3) + 28px);
+}
+
+/* Small repeat of the strip: the same pattern, somewhere else. */
+.an-sighting::before {
+  content: '›››';
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-3);
+  font-weight: var(--weight-bold);
+  letter-spacing: -1px;
+  color: var(--an-ink);
+}
+
+.an-condition {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--an-ink) 35%, #fff);
+  border-radius: var(--radius-full);
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+/* Reverse Analogising: a test bench ---------------------------------------- */
+
+.an-bench__analogy {
+  justify-items: center;
+  text-align: center;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--an-ink) 35%, #fff);
+}
+
+.an-bench__analogy .an-box__frame,
+.an-bench__analogy .an-box__example {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.an-bench__analogy .an-box__example {
+  color: var(--depth);
+}
+
+.an-bench__sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.an-side--holds {
+  border-top: 4px solid var(--success);
+}
+
+.an-side--breaks {
+  border-top: 4px solid var(--danger);
+}
+
+.an-side--holds .an-box__label {
+  color: var(--success);
+}
+
+.an-side--breaks .an-box__label {
+  color: var(--danger);
+}
+
+.an-side--holds .an-box__label::before {
+  content: '✓ ';
+}
+
+.an-side--breaks .an-box__label::before {
+  content: '✕ ';
+}
+
+.an-verdict {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.an-verdict__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.an-verdict__chip {
+  padding: 3px 14px;
+  border: 1.5px solid var(--navy);
+  border-radius: var(--radius-full);
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+  color: var(--navy);
+}
+
+.an-org.is-example .an-verdict__chip.is-example {
+  background: var(--navy);
+  color: #fff;
+}
+
+/* Problem Solving: a route out to another field and back -------------------- */
+
+.an-route__stops {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--stops, 3), minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: an-stop;
+}
+
+/* The track the stops sit on. */
+.an-route__stops::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: calc(100% / (var(--stops, 3) * 2));
+  right: calc(100% / (var(--stops, 3) * 2));
+  height: 3px;
+  background: var(--an-ink);
+}
+
+.an-route__item {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  counter-increment: an-stop;
+}
+
+.an-route__item::before {
+  content: counter(an-stop);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--an-ink);
+  border-radius: 50%;
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  color: var(--an-ink);
+}
+
+/* The text at both ends of the route; the borrowed field in between. */
+.an-route__item[data-slot='problem']::before,
+.an-route__item[data-slot='back']::before {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #fff;
+}
+
+.an-route__item .an-box {
+  justify-self: stretch;
+}
+
+.an-route__item[data-slot='back'] .an-box {
+  border-left: 4px solid var(--navy);
+}
+
+/* Metaphorical Analysis: ripples ------------------------------------------- */
+
+.an-ripple__core {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.an-ripple__core .an-box {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--an-ink) 35%, #fff);
+}
+
+.an-ripple__core .an-box__example {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--depth);
+}
+
+.an-ripple__is {
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-style: italic;
+  font-weight: var(--weight-bold);
+  color: var(--an-ink);
+}
+
+.an-ripple__rings {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* Each implication one ripple further out. */
+.an-ring {
+  margin-left: calc(var(--ring, 0) * 28px);
+  border-left: 4px solid var(--an-ink);
+  border-radius: 22px var(--radius-xs) var(--radius-xs) 22px;
+}
+
+.an-ring:nth-child(2) {
+  border-left-color: color-mix(in srgb, var(--an-ink) 65%, #fff);
+}
+
+.an-ring:nth-child(3) {
+  border-left-color: color-mix(in srgb, var(--an-ink) 40%, #fff);
+}
+
+/* What the metaphor leaves in the dark. */
+.an-shadow {
+  border-color: var(--muted);
+  background: repeating-linear-gradient(-45deg, #fff 0 8px, color-mix(in srgb, var(--shallow) 18%, #fff) 8px 10px);
+}
+
+.an-shadow .an-box__label {
+  color: var(--muted);
+}
+
+.an-rival {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--an-ink) 35%, #fff);
+  border-left: 4px double var(--an-ink);
+}
+
+/* Conceptual Transfer: a rule carried into new places ---------------------- */
+
+.an-rule {
+  justify-self: center;
+  width: min(100%, 34rem);
+  border: 2px solid var(--navy);
+  text-align: center;
+  justify-items: center;
+}
+
+.an-rule .an-box__label {
+  color: var(--navy);
+}
+
+.an-transfer__tests {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--tests, 1), minmax(0, 1fr));
+  gap: var(--space-2);
+  padding-top: 24px;
+}
+
+/* Lines down from the rule to each test. */
+.an-transfer__tests::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: calc(100% / (var(--tests, 1) * 2));
+  right: calc(100% / (var(--tests, 1) * 2));
+  height: 2px;
+  background: var(--an-ink);
+}
+
+.an-transfer__tests::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 11px;
+  background: var(--an-ink);
+}
+
+.an-test {
+  border-top: 4px solid var(--an-ink);
+}
+
+.an-test::before {
+  content: '';
+  position: absolute;
+  top: -16px;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 12px;
+  background: var(--an-ink);
+}
+
+.an-edge {
+  border: 1.5px dashed var(--high-sea-ink);
+  border-top: 3px solid var(--high-sea-ink);
+}
+
+.an-edge .an-box__label {
+  color: var(--high-sea-ink);
+}
+
+/* Analogical Chains: idea, link, idea … then first joined to last ----------- */
+
+.an-chain__links {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  margin: 0;
+  padding: 0 40px 0 0;
+  list-style: none;
+}
+
+/* The bracket that joins the first idea to the last. */
+.an-chain__links::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  right: 12px;
+  width: 20px;
+  border: 3px solid color-mix(in srgb, var(--an-ink) 55%, #fff);
+  border-left: 0;
+  border-radius: 0 16px 16px 0;
+}
+
+.an-chain__node,
+.an-chain__link {
+  width: min(100%, 30rem);
+}
+
+.an-node {
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--an-ink);
+  border-radius: var(--radius-full);
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+.an-node .an-box__example {
+  font-weight: var(--weight-bold);
+  color: var(--depth);
+}
+
+/* A link hangs between two ideas on the chain's line. */
+.an-chain__link {
+  margin-left: 22px;
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  border-left: 3px solid var(--an-ink);
+}
+
+.an-link {
+  font-size: var(--text-sm);
+}
+
+.an-ends {
+  border: 2px solid var(--navy);
+}
+
+.an-ends .an-box__label {
+  color: var(--navy);
+}
+
+.an-ends .an-box__label::before {
+  content: '↺ ';
+}
+
+@media (max-width: 560px) {
+  .an-bridge__piers {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+  }
+
+  .an-bridge__span {
+    justify-self: center;
+    width: 3px;
+    min-height: 20px;
+    height: 20px;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--an-ink);
+  }
+
+  .an-pattern__strip {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 22px;
+  }
+
+  .an-pattern__strip .an-org__caption {
+    margin-bottom: -14px;
+  }
+
+  .an-beat:not(:last-child)::after {
+    top: auto;
+    right: auto;
+    bottom: -20px;
+    left: 50%;
+    border: 7px solid transparent;
+    border-top: 9px solid var(--an-ink);
+    transform: translateX(-50%);
+  }
+
+  .an-bench__sides,
+  .an-pattern__found,
+  .an-transfer__tests,
+  .an-ripple__core {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .an-ripple__is {
+    justify-self: center;
+  }
+
+  .an-ring {
+    margin-left: calc(var(--ring, 0) * 14px);
+  }
+
+  .an-transfer__tests::before {
+    display: none;
+  }
+
+  .an-test:not(:first-child)::before {
+    display: none;
+  }
+
+  /* The route runs down the page. */
+  .an-route__stops {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .an-route__stops::before {
+    top: 14px;
+    bottom: 14px;
+    left: 13px;
+    right: auto;
+    width: 3px;
+    height: auto;
+  }
+
+  .an-route__item {
+    grid-template-columns: 28px minmax(0, 1fr);
+    justify-items: stretch;
+    align-items: start;
+    gap: var(--space-2);
+  }
+}
+
+@media print {
+  .an-org {
+    break-inside: avoid;
+    background: #fff;
+    border: 1px solid var(--line);
+  }
+
+  /* Room to write in each empty box. */
+  .an-box {
+    padding-bottom: 2.4em;
+  }
 }
 
 /* Phone ---------------------------------------------------------------------- */

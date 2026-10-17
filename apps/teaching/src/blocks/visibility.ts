@@ -79,7 +79,14 @@ const TEACHER_FIELD_BLOCK_TYPES = new Set<string>([
   'concept_features',
   'thinking_reflection',
   'fluid_analogy',
-  'analogy_types'
+  'analogy_types',
+  'analogy_close_reading',
+  'analogy_pattern',
+  'analogy_reverse',
+  'analogy_problem',
+  'analogy_metaphor',
+  'analogy_transfer',
+  'analogy_chains'
 ]);
 
 /** Toolkit blocks carry a teacher note and class notes that never reach students. */

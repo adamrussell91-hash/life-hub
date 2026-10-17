@@ -71,14 +71,25 @@ The prompt-card deck was designed with three levels per card; only Level 1 was p
 
 ### The blocks
 
-| Block | What it does |
-|---|---|
-| Fluid analogy | One type. A level switch (Level 1 · Make it, Level 2 · Explain it, Level 3 · Use it), then the level's task, two or three numbered steps each with its sentence frame, and two buttons: **Show an example** and **Check your analogy**. Optional "Working with" focus. About half a printed page |
-| Analogy types | The seven types, the three levels, a weak and a strong analogy, the five-step process and the check. The teacher marks the types in play this lesson. For introducing fluid analogising |
+Each type is its own block, with its own organiser drawn in the shape of the move. Every organiser is a set of boxes: empty boxes are dashed and show the prompt; **Show an example** fills the same boxes with a worked example. Level 1 has the fewest boxes, Level 3 the most.
+
+| Block | Organiser | What the boxes are |
+|---|---|---|
+| Close Reading | **Bridge** | The text and the thing outside it as two piers, each link as a plank across, the limit as a broken plank, then what it shows. Level 3 puts three candidates (concrete, abstract, another discipline) on the far pier |
+| Pattern Translation | **Pattern strip** | The pattern as two or three steps with arrows (no names at Levels 2 and 3), then where it is found again, when it holds, and the point it makes |
+| Reverse Analogising | **Test bench** | The analogy on the bench, what holds (✓) against what breaks (✕), what the break reveals. Level 3 adds the challenge to the usual reading and a Keep / Qualify / Drop verdict |
+| Problem Solving | **Route** | Numbered stops on a track: the problem in the text, the other field, the shared method, back to the text. Both ends are filled navy: the route starts and finishes in the text |
+| Metaphorical Analysis | **Ripples** | "[idea] *is* [metaphor]", its implications rippling out one step at a time, what it leaves in the dark (hatched), and at Level 3 a rival metaphor and the comparison |
+| Conceptual Transfer | **Rule and tests** | The idea (Level 3: a rule) at the top, lines down to one, two or three new contexts, and the edge where it stops applying |
+| Analogical Chains | **Chain** | Idea, "is like … because", idea … (three, four or five ideas), with a bracket joining the first to the last, then the hidden pattern and (Level 3) a sentence about the text |
+| Analogy types | List | The seven types, the three levels, a weak and a strong analogy, the five-step process and the check. The teacher marks the types in play this lesson. For introducing fluid analogising |
+
+Each block has its own tint and line-art icon (`src/toolkit/analogy-icons.ts`, also the picker PNGs).
 
 - **Levels.** The teacher sets the starting level. By default students can move between levels themselves (same task, different depth); untick "Students can move between levels" to lock it. A student's choice is remembered on their device. Print shows the starting level only.
-- **Editing.** "Wording for each level" edits one level at a time. Changing type keeps the focus, level settings, check settings, My notes and an edited teacher note; the three levels take the new type's wording.
+- **Editing.** "Wording for each level" edits one level at a time: the task, then each box's heading, prompt and example. A box keeps its place in the organiser; clear all three fields to hide it. The type is fixed by the block: to use another type, add that block.
+- **Earlier version.** The one-block `fluid_analogy` (a type switch inside one block) is no longer in the picker. Lessons that saved one still render and edit it.
 - **No right answers.** There is no right analogy, only more and less productive ones. Nothing in these blocks marks an answer; the check asks students to judge their own.
 - **Card names** show only when "Show the prompt-card name" is ticked, for classes using the printed deck.
-- **Teacher content** is stripped exactly like the toolkit's: `fluid_analogy` and `analogy_types` are in the teacher-field sets in `src/blocks/visibility.ts` and `netlify/functions/_shared/teaching-student.mjs`, and in the shared fixture.
-- Library: `src/toolkit/analogy.ts`.
+- **Teacher content** is stripped exactly like the toolkit's: `analogy_types`, the seven `analogy_*` blocks and `fluid_analogy` are in the teacher-field sets in `src/blocks/visibility.ts` and `netlify/functions/_shared/teaching-student.mjs`, and in the shared fixture.
+- Library: `src/toolkit/analogy.ts` (types, levels, teacher notes) and `src/toolkit/analogy-moves.ts` (each block's boxes and examples).

@@ -17,11 +17,13 @@ import {
   analogyType,
   fluidAnalogyContent
 } from '@/toolkit/analogy';
+import { ANALOGY_MOVE_TYPES, analogyMove, type AnalogyMoveBlock, type AnalogyMoveType } from '@/toolkit/analogy-moves';
 import type { Lesson } from '@/schemas/lesson';
 
 type Fluid = Extract<Block, { block_type: 'fluid_analogy' }>;
 
-const ANALOGY_BLOCK_TYPES = ['fluid_analogy', 'analogy_types'] as const;
+const MOVE_TYPES = [...ANALOGY_MOVE_TYPES];
+const ANALOGY_BLOCK_TYPES = ['fluid_analogy', 'analogy_types', ...MOVE_TYPES] as const;
 const SENTINEL = 'ANALOGY_TEACHER_SENTINEL_unit';
 
 function withSentinel(block: Block): Block {
@@ -116,10 +118,26 @@ describe('Fluid analogy blocks', () => {
     expect(labels.indexOf('Analogous Thinking')).toBe(labels.indexOf('Thinking Toolkit') + 1);
     expect(BLOCK_GROUPS.find((group) => group.label === 'Analogous Thinking')?.types).toEqual([
       'analogy_types',
-      'fluid_analogy'
+      'analogy_close_reading',
+      'analogy_pattern',
+      'analogy_reverse',
+      'analogy_problem',
+      'analogy_metaphor',
+      'analogy_transfer',
+      'analogy_chains'
     ]);
+    // The earlier one-block version still renders saved lessons but is no longer offered.
+    expect(BLOCK_GROUPS.some((group) => (group.types as string[]).includes('fluid_analogy'))).toBe(false);
     expect(HOMEPAGE_BLOCK_GROUPS.some((group) => group.label === 'Analogous Thinking')).toBe(false);
-    expect(NEW_BLOCK_LABEL.fluid_analogy).toBe('Fluid analogy');
+    expect(MOVE_TYPES.map((type) => NEW_BLOCK_LABEL[type])).toEqual([
+      'Close Reading',
+      'Pattern Translation',
+      'Reverse Analogising',
+      'Problem Solving',
+      'Metaphorical Analysis',
+      'Conceptual Transfer',
+      'Analogical Chains'
+    ]);
     expect(NEW_BLOCK_LABEL.analogy_types).toBe('Analogy types');
     for (const type of ANALOGY_BLOCK_TYPES) {
       expect(INSERT_MENU_DESCRIPTION[type].trim()).not.toBe('');
@@ -180,7 +198,7 @@ describe('Fluid analogy blocks', () => {
       for (const mode of ['teacher', 'student', 'print'] as const) {
         const text = renderBlock(block, mode).textContent ?? '';
         expect(text, `${block.block_type} ${mode}`).not.toMatch(/analogy:[a-z]/);
-        expect(text, `${block.block_type} ${mode}`).not.toMatch(/fluid_analogy|analogy_types/);
+        expect(text, `${block.block_type} ${mode}`).not.toMatch(/fluid_analogy|analogy_[a-z]/);
       }
     }
   });
@@ -285,6 +303,142 @@ describe('Fluid analogy block', () => {
     task.dispatchEvent(new Event('input'));
     expect(latest.content.tiers[2]!.task).toBe('Find it in two fields.');
     expect(latest.content.tiers[0]!.task).toBe(analogyType('analogy:pattern')!.tiers[0]!.task);
+  });
+});
+
+function move(type: AnalogyMoveType, id: string, patch: Partial<AnalogyMoveBlock['content']> = {}): AnalogyMoveBlock {
+  const block = createBlock(type, id) as AnalogyMoveBlock;
+  return { ...block, content: { ...block.content, ...patch } } as AnalogyMoveBlock;
+}
+
+function shownStage(view: HTMLElement): HTMLElement {
+  return [...view.querySelectorAll<HTMLElement>('.an-stage')].find((panel) => !panel.hidden)!;
+}
+
+/** The organiser each block draws: one shape per type. */
+const SHAPES: Record<AnalogyMoveType, string> = {
+  analogy_close_reading: '.an-bridge',
+  analogy_pattern: '.an-pattern',
+  analogy_reverse: '.an-bench',
+  analogy_problem: '.an-route',
+  analogy_metaphor: '.an-ripple',
+  analogy_transfer: '.an-transfer',
+  analogy_chains: '.an-chain'
+};
+
+describe('The seven analogy blocks', () => {
+  it('give each type its own block, in order, with three levels of boxes', () => {
+    expect(MOVE_TYPES.map((type) => analogyMove(type).library.order)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    for (const type of MOVE_TYPES) {
+      const { stages } = analogyMove(type);
+      expect(stages, type).toHaveLength(3);
+      stages.forEach((stage, index) => {
+        const where = `${type} level ${index + 1}`;
+        expect(stage.task.trim(), where).not.toBe('');
+        expect(stage.slots.length, where).toBeGreaterThanOrEqual(2);
+        const keys = stage.slots.map((slot) => slot.key);
+        expect(new Set(keys).size, where).toBe(keys.length);
+        for (const slot of stage.slots) {
+          expect(slot.label.trim(), `${where} ${slot.key}`).not.toBe('');
+          expect(slot.frame.trim(), `${where} ${slot.key}`).not.toBe('');
+          expect(slot.example.trim(), `${where} ${slot.key}`).not.toBe('');
+        }
+      });
+    }
+  });
+
+  it('draw every library box somewhere in their organiser, at every level', () => {
+    for (const type of MOVE_TYPES) {
+      analogyMove(type).stages.forEach((stage, index) => {
+        const view = renderBlock(move(type, `shape_${type}_${index}`, { level: index + 1, student_choice: false }), 'student');
+        const organiser = view.querySelector(SHAPES[type]);
+        expect(organiser, type).not.toBeNull();
+        const drawn = [...organiser!.querySelectorAll<HTMLElement>('.an-box')].map((node) => node.dataset.slot);
+        expect(drawn.sort(), `${type} level ${index + 1}`).toEqual(stage.slots.map((slot) => slot.key).sort());
+      });
+    }
+  });
+
+  it('shows the prompts, and fills the same boxes with the example on request', () => {
+    const block = move('analogy_close_reading', 'mv_example');
+    const view = renderBlock(block, 'student', { lessonId: 'lesson_mv' });
+    const stage = shownStage(view);
+    const organiser = stage.querySelector<HTMLElement>('.an-org')!;
+    const toggle = stage.querySelector<HTMLButtonElement>('.an-stage__toggle')!;
+    expect(toggle.textContent).toBe('Show an example');
+    expect(organiser.classList.contains('is-example')).toBe(false);
+    expect(organiser.querySelector('[data-slot="outside"] .an-box__frame')?.textContent).toBe('Something that works the same way');
+    toggle.click();
+    expect(organiser.classList.contains('is-example')).toBe(true);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(organiser.querySelector('[data-slot="outside"] .an-box__example')?.textContent).toBe('A chess sacrifice');
+    const again = renderBlock(block, 'student', { lessonId: 'lesson_mv' });
+    expect(shownStage(again).querySelector('.an-org')?.classList.contains('is-example')).toBe(true);
+  });
+
+  it('lets students step between levels; the teacher can lock one', () => {
+    const view = renderBlock(move('analogy_chains', 'mv_switch'), 'student');
+    const buttons = [...view.querySelectorAll<HTMLButtonElement>('.an-levels__btn')];
+    buttons[2]!.click();
+    expect(shownStage(view).dataset.level).toBe('3');
+    expect(shownStage(view).querySelectorAll('.an-node')).toHaveLength(5);
+    expect(view.querySelectorAll('.an-stage:not([hidden])')).toHaveLength(1);
+
+    const locked = renderBlock(move('analogy_pattern', 'mv_lock', { level: 2, student_choice: false }), 'student');
+    expect(locked.querySelector('.an-levels')).toBeNull();
+    expect(locked.querySelector('.an-level-badge')?.textContent).toBe('Level 2 · Explain it');
+  });
+
+  it('prints the empty organiser and the check, with no buttons', () => {
+    const printed = renderBlock(move('analogy_transfer', 'mv_print', { level: 3 }), 'print');
+    expect(printed.querySelector('button')).toBeNull();
+    expect(printed.querySelectorAll('.an-stage')).toHaveLength(1);
+    expect(printed.querySelectorAll('.an-test')).toHaveLength(3);
+    expect(printed.textContent).toContain('Check your analogy');
+  });
+
+  it('marks the example’s verdict on the test bench', () => {
+    const view = renderBlock(move('analogy_reverse', 'mv_verdict', { level: 3 }), 'student');
+    const chips = [...view.querySelectorAll<HTMLElement>('.an-stage:not([hidden]) .an-verdict__chip')];
+    expect(chips.map((chip) => chip.textContent)).toEqual(['Keep', 'Qualify', 'Drop']);
+    expect(chips.filter((chip) => chip.classList.contains('is-example')).map((chip) => chip.textContent)).toEqual(['Qualify']);
+  });
+
+  it('hides a box the teacher cleared', () => {
+    const block = move('analogy_close_reading', 'mv_clear', { level: 2, student_choice: false });
+    block.content.levels[1]!.slots = block.content.levels[1]!.slots.map((slot) =>
+      slot.key === 'limit' ? { ...slot, label: '', frame: '', example: '' } : slot
+    );
+    const view = renderBlock(block, 'student');
+    expect(view.querySelector('[data-slot="limit"]')).toBeNull();
+    expect(view.querySelector('[data-slot="insight"]')).not.toBeNull();
+  });
+
+  it('edits each level’s boxes separately and resets to the library', () => {
+    let latest = move('analogy_metaphor', 'mv_edit', { focus: 'Argument', teacher_jots: { '': 'keep me' } });
+    const editor = createBlockEditor(latest, (next) => {
+      latest = next as AnalogyMoveBlock;
+    }, () => latest);
+    editor.querySelector('[aria-label="Level to edit"]')!.querySelector<HTMLButtonElement>('[data-value="3"]')!.click();
+    const rival = [...editor.querySelectorAll<HTMLFieldSetElement>('fieldset.an-ed__slot')].find(
+      (set) => set.querySelector('legend')?.textContent === 'A rival metaphor'
+    )!;
+    const example = [...rival.querySelectorAll<HTMLLabelElement>('label.tk-ed__field')]
+      .find((label) => label.textContent?.startsWith('Example'))!
+      .querySelector('textarea')!;
+    example.value = 'A dance.';
+    example.dispatchEvent(new Event('input'));
+    expect(latest.content.levels[2]!.slots.find((slot) => slot.key === 'rival')?.example).toBe('A dance.');
+    expect(latest.content.levels[0]!.slots.some((slot) => slot.example === 'A dance.')).toBe(false);
+    expect(latest.block_type).toBe('analogy_metaphor');
+  });
+
+  it('shows the deck card name only when asked', () => {
+    expect(renderBlock(move('analogy_metaphor', 'mv_c1'), 'student').textContent).not.toContain('Glimmsprite');
+    const view = renderBlock(move('analogy_metaphor', 'mv_c2', { show_card: true, focus: 'The fruitless crown' }), 'student');
+    expect(view.textContent).toContain('Card 5 · Glimmsprite');
+    expect(view.querySelector('.an-eyebrow')?.textContent).toBe('Analogous Thinking · Type 5 of 7');
+    expect(view.querySelector('.an-focus')?.textContent).toContain('The fruitless crown');
   });
 });
 

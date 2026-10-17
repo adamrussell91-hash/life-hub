@@ -2296,6 +2296,13 @@ function renderBlockContent(
     case 'thinking_reflection':
     case 'fluid_analogy':
     case 'analogy_types':
+    case 'analogy_close_reading':
+    case 'analogy_pattern':
+    case 'analogy_reverse':
+    case 'analogy_problem':
+    case 'analogy_metaphor':
+    case 'analogy_transfer':
+    case 'analogy_chains':
     case 'teacher_note':
       return wrapBlock(renderToolkitContent(block, mode, ctx)!, block, mode);
     }

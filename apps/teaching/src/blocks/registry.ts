@@ -88,6 +88,7 @@ import type { Block } from '@/schemas/block';
 import {
   createAnalogyTypesEditor,
   createFluidAnalogyEditor,
+  createAnalogyMoveEditor,
   createConceptFeaturesEditor,
   createQuestionQuadrantEditor,
   createTeacherNoteBlockEditor,
@@ -281,6 +282,13 @@ export const blockRegistry: {
     createEditor: createThinkingReflectionEditor
   },
   fluid_analogy: { render: (block, mode) => renderBlock(block, mode), createEditor: createFluidAnalogyEditor },
+  analogy_close_reading: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyMoveEditor },
+  analogy_pattern: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyMoveEditor },
+  analogy_reverse: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyMoveEditor },
+  analogy_problem: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyMoveEditor },
+  analogy_metaphor: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyMoveEditor },
+  analogy_transfer: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyMoveEditor },
+  analogy_chains: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyMoveEditor },
   analogy_types: { render: (block, mode) => renderBlock(block, mode), createEditor: createAnalogyTypesEditor },
   teacher_note: { render: (block, mode) => renderBlock(block, mode), createEditor: createTeacherNoteBlockEditor }
 };

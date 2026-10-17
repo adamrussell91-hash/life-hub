@@ -62,6 +62,7 @@ import {
   type AnalogyTypesBlock,
   type FluidAnalogyBlock
 } from '@/toolkit/analogy';
+import { analogyMove, analogyMoveContent, type AnalogyMoveBlock } from '@/toolkit/analogy-moves';
 import { createVisibilitySelect } from '@/blocks/editors';
 
 type Change<T extends Block> = (block: T) => void;
@@ -1482,6 +1483,100 @@ export function createFluidAnalogyEditor(
         }),
         resetButton('Reset to the library wording', () => {
           const fresh = fluidAnalogyContent(c.kind, getLatest().id);
+          api.content = {
+            ...fresh,
+            focus: c.focus,
+            level: c.level,
+            student_choice: c.student_choice,
+            teacher_note: c.teacher_note,
+            teacher_jots: c.teacher_jots
+          };
+          api.emit();
+          api.rebuild();
+        })
+      ),
+      ...noteNodes(api, getLatest)
+    ];
+  });
+}
+
+/** One of the seven analogy blocks. The organiser's boxes are fixed by type; their wording is not. */
+export function createAnalogyMoveEditor<T extends AnalogyMoveBlock>(
+  block: T,
+  onChange: Change<T>,
+  getLatest: () => T = () => block
+): HTMLElement {
+  /** Which level's wording the fields below show. */
+  let editing = block.content.level;
+  return makeEditor(block, onChange, getLatest, (api) => {
+    const c = api.content;
+    const stage = c.levels[editing - 1]!;
+    const boxes = stage.slots.map((slot) => {
+      const group = el('fieldset', 'an-ed__slot');
+      group.append(
+        el('legend', 'an-ed__slot-title', slot.label.trim() || 'Box'),
+        field('Heading', slot.label, (value) => {
+          slot.label = value;
+          api.emit();
+        }),
+        field('Prompt in the empty box', slot.frame, (value) => {
+          slot.frame = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        field('Example', slot.example, (value) => {
+          slot.example = value;
+          api.emit();
+        }, { multiline: true, rows: 2 })
+      );
+      return group;
+    });
+    return [
+      section(
+        '',
+        ...cardFields(api),
+        field('Working with (optional)', c.focus, (value) => {
+          c.focus = value;
+          api.emit();
+        }, { multiline: true, rows: 2, placeholder: 'e.g. Macbeth’s ambition, or a line from the text' }),
+        el('span', 'tk-ed__label', 'Students start at'),
+        pills('Starting level', LEVEL_OPTIONS, String(c.level) as '1' | '2' | '3', (value) => {
+          c.level = Number(value);
+          api.emit();
+        }),
+        checkbox('Students can move between levels', c.student_choice, (checked) => {
+          c.student_choice = checked;
+          api.emit();
+        })
+      ),
+      section(
+        'Wording for each level',
+        pills('Level to edit', LEVEL_OPTIONS, String(editing) as '1' | '2' | '3', (value) => {
+          editing = Number(value);
+          api.rebuild();
+        }),
+        field('What to do (students see this)', stage.task, (value) => {
+          stage.task = value;
+          api.emit();
+        }, { multiline: true, rows: 2 }),
+        el('p', 'tk-ed__hint', `${analogyMove(getLatest().block_type).shape}: each box keeps its place. Students see the prompt, then the example when they ask for it. Clear a box to hide it.`),
+        ...boxes
+      ),
+      more(
+        'More options',
+        checkbox('Show “Check your analogy”', c.show_check, (checked) => {
+          c.show_check = checked;
+          api.emit();
+        }),
+        stringList({ label: 'Check questions', noun: 'question', items: c.checks, max: 8, onChange: (items) => {
+          c.checks = items;
+          api.emit();
+        } }),
+        checkbox('Show the prompt-card name (for the printed deck)', c.show_card, (checked) => {
+          c.show_card = checked;
+          api.emit();
+        }),
+        resetButton('Reset to the library wording', () => {
+          const fresh = analogyMoveContent(getLatest().block_type);
           api.content = {
             ...fresh,
             focus: c.focus,
