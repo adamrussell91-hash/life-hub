@@ -18,8 +18,10 @@ import {
   GitHubConfigurationError
 } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
+import { PropertyReaderError, readPropertyDocument } from './_shared/property-reader.mjs';
 import {
   PROPERTY_DATA_PATH,
+  addEntries,
   addEntry,
   emptyPropertyRecord,
   markLodged,
@@ -31,7 +33,7 @@ import {
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const REPOSITORY_MESSAGE = 'The repository is temporarily unavailable.';
-const ACTIONS = new Set(['add', 'remove', 'settings', 'lodged']);
+const ACTIONS = new Set(['add', 'add-many', 'remove', 'settings', 'lodged', 'read']);
 
 export const config = { path: '/api/property' };
 
@@ -87,22 +89,35 @@ export function createPropertyHandler({
       if (!body) return errorResponse(400, 'invalid_request', 'Provide a valid property update.', false, PRIVATE_CACHE);
       const { record, sha } = await load(github);
       const today = sydneyDateKey(new Date(now()));
+      if (body.action === 'read') return await read(body.file, record, today);
       const result = apply(record, body, today);
       if (result.error) return errorResponse(400, 'invalid_entry', result.error, false, PRIVATE_CACHE);
       await github.writeFile({
         path: PROPERTY_DATA_PATH,
         content: JSON.stringify(result.record, null, 2),
         ...(sha ? { sha } : {}),
-        message: `chore(property): ${body.action}${body.action === 'add' ? ` ${body.entry.kind}` : ''}`
+        message: `chore(property): ${commitLabel(body, result)}`
       });
-      return jsonResponse(200, { ok: true, data: { record: result.record, ...(result.entry ? { entry: result.entry } : {}) } }, PRIVATE_CACHE);
+      const extra = result.entry ? { entry: result.entry } : result.entries ? { entries: result.entries } : {};
+      return jsonResponse(200, { ok: true, data: { record: result.record, ...extra } }, PRIVATE_CACHE);
     } catch (error) {
       return mapRepositoryError(error);
     }
   }
 
+  async function read(file, record, today) {
+    try {
+      const data = await readPropertyDocument({ file, record, today, apiKey: env.ANTHROPIC_API_KEY, fetchImpl, model: env.PROPERTY_READER_MODEL || undefined });
+      return jsonResponse(200, { ok: true, data }, PRIVATE_CACHE);
+    } catch (error) {
+      if (error instanceof PropertyReaderError) return errorResponse(error.status, error.code, error.message, error.retryable, PRIVATE_CACHE);
+      throw error;
+    }
+  }
+
   function apply(record, body, today) {
     if (body.action === 'add') return addEntry(record, body.entry, { id: `${body.entry?.kind ?? 'entry'}-${newId()}`, today });
+    if (body.action === 'add-many') return addEntries(record, body.entries, { newId, today });
     if (body.action === 'remove') return removeEntry(record, body.id);
     if (body.action === 'settings') return updateSettings(record, body.patch);
     return markLodged(record, body.fy);
@@ -134,10 +149,18 @@ async function parseBody(request) {
   }
   if (!body || typeof body !== 'object' || Array.isArray(body) || !ACTIONS.has(body.action)) return null;
   if (body.action === 'add' && (!body.entry || typeof body.entry !== 'object')) return null;
+  if (body.action === 'add-many' && !Array.isArray(body.entries)) return null;
+  if (body.action === 'read' && (!body.file || typeof body.file !== 'object')) return null;
   if (body.action === 'remove' && (typeof body.id !== 'string' || !body.id)) return null;
   if (body.action === 'settings' && (!body.patch || typeof body.patch !== 'object')) return null;
   if (body.action === 'lodged' && typeof body.fy !== 'string') return null;
   return body;
+}
+
+function commitLabel(body, result) {
+  if (body.action === 'add') return `add ${body.entry.kind}`;
+  if (body.action === 'add-many') return `add ${result.entries.length} from a statement`;
+  return body.action;
 }
 
 function mapRepositoryError(error) {

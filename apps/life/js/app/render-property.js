@@ -14,6 +14,7 @@ import {
   buildPropertyModel,
   currentRent,
   currentValuation,
+  findDuplicate,
   guessFromText,
   pointAtYear,
   simulateFuture,
@@ -101,8 +102,10 @@ const SHELL = `
   <p class="prop-lens__meta" data-prop="lens-meta"></p>
   <div class="prop-lens__actions">
     <button class="btn btn--ghost" type="button" data-prop-open="settings">Details</button>
+    <button class="btn btn--ghost" type="button" data-prop="upload"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/></svg>Add statement</button>
     <button class="btn btn--primary" type="button" data-prop-open="record"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Record</button>
   </div>
+  <input class="prop-sr" type="file" data-prop="file" accept="application/pdf,image/*" multiple tabindex="-1" aria-hidden="true">
 </div>
 <p class="prop-status" data-prop="status" role="status" hidden></p>
 
@@ -233,6 +236,7 @@ const SHELL = `
   <form class="prop-sheet__panel" method="dialog" data-prop="record-form" novalidate>
     <header class="prop-sheet__head"><h2 id="prop-record-title">Record</h2><p>Type it in your own words, or pick what it is.</p></header>
     <div class="prop-sheet__body">
+      <button class="prop-drop" type="button" data-prop="upload"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/></svg><span><b>Read it from a PDF or photo</b>Agent and loan statements, bills and receipts. You check it before it saves.</span></button>
       <div class="prop-field"><label for="prop-rec-text">What happened</label><input type="text" id="prop-rec-text" data-prop="rec-text" placeholder="Paid $180 to the plumber for the hot water" autocomplete="off"></div>
       <div class="prop-chips" role="group" aria-label="What is it" data-prop="rec-kinds"></div>
       <div class="prop-fields" data-prop="rec-fields"></div>
@@ -241,6 +245,22 @@ const SHELL = `
     <footer class="prop-sheet__foot">
       <button class="btn btn--ghost" type="button" data-prop-close="record">Cancel</button>
       <button class="btn btn--primary" type="submit" data-prop="rec-save">Record</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog class="prop-sheet" data-prop="review-sheet" aria-labelledby="prop-review-title">
+  <form class="prop-sheet__panel" method="dialog" data-prop="review-form" novalidate>
+    <header class="prop-sheet__head"><h2 id="prop-review-title">Check what was read</h2><p>Untick anything you don't want. Fix any figure before saving.</p></header>
+    <div class="prop-sheet__body">
+      <p class="prop-review__status" data-prop="review-status" role="status"></p>
+      <ul class="prop-review" data-prop="review-list"></ul>
+      <button class="prop-drop prop-drop--quiet" type="button" data-prop="review-more"><span><b>Add another file</b>Another statement, bill or receipt to check with these.</span></button>
+    </div>
+    <p class="prop-sheet__error" data-prop="review-error" role="alert" hidden></p>
+    <footer class="prop-sheet__foot">
+      <button class="btn btn--ghost" type="button" data-prop-close="review">Cancel</button>
+      <button class="btn btn--primary" type="submit" data-prop="review-save" disabled>Save</button>
     </footer>
   </form>
 </dialog>
@@ -304,6 +324,56 @@ function getPath(object, path) {
   return path.split('.').reduce((value, key) => value?.[key], object);
 }
 
+// ── Uploads ─────────────────────────────────────────────────────────────────
+
+const UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PHOTO_KEEP_BYTES = 1.5 * 1024 * 1024;
+const PHOTO_MAX_EDGE = 2000;
+
+function readAsBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
+    reader.onerror = () => reject(new Error('That file could not be opened.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Re-encode a photo as a JPEG no wider than PHOTO_MAX_EDGE (also turns iPhone HEIC into something readable). */
+function shrinkPhoto(file, doc) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = doc.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('That photo could not be opened.'))), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That photo could not be opened. Try a PDF or a JPEG.')); };
+    img.src = url;
+  });
+}
+
+/** Turn a picked file into the { name, type, data } the reader takes. */
+export async function prepareUpload(file, doc = document) {
+  const name = file.name || 'Photo';
+  const type = (file.type || '').toLowerCase();
+  if (type === 'application/pdf' || /\.pdf$/i.test(name)) {
+    if (file.size > UPLOAD_MAX_BYTES) throw new Error('That PDF is over 4MB. Save a smaller copy and try again.');
+    return { name, type: 'application/pdf', data: await readAsBase64(file) };
+  }
+  if (!type.startsWith('image/') && !/\.(jpe?g|png|webp|heic|heif)$/i.test(name)) throw new Error('Use a PDF or a photo.');
+  if (PHOTO_TYPES.includes(type) && file.size <= PHOTO_KEEP_BYTES) return { name, type, data: await readAsBase64(file) };
+  const blob = await shrinkPhoto(file, doc);
+  if (blob.size > UPLOAD_MAX_BYTES) throw new Error('That photo is too large to read.');
+  return { name, type: 'image/jpeg', data: await readAsBase64(blob) };
+}
+
 // ── View ────────────────────────────────────────────────────────────────────
 
 export function createPropertyView({ root, api, now = () => new Date(), setTitle = () => {} }) {
@@ -323,7 +393,8 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     tmRentGrowth: null,
     nextStepDismissed: false,
     recordKind: 'expense',
-    removing: null
+    removing: null,
+    review: { items: [], reading: [], notes: [] }
   };
   let built = false;
   let model = null;
@@ -348,6 +419,10 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
       if (period) {
         state.period = period.dataset.propPeriod;
         update();
+        return;
+      }
+      if (event.target.closest('[data-prop="upload"], [data-prop="review-more"]')) {
+        q('file').click();
         return;
       }
       const open = event.target.closest('[data-prop-open]');
@@ -408,6 +483,32 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
       paintRecordFields({ ...(guess.amount !== null ? amountField(guess) : {}), ...(guess.category ? { category: guess.category } : {}), note: event.target.value.trim() }, { keepValues: true });
     });
     q('record-form').addEventListener('submit', event => { event.preventDefault(); void onRecord(); });
+    q('review-form').addEventListener('submit', event => { event.preventDefault(); void onSaveReview(); });
+    q('review-list').addEventListener('change', event => {
+      const keep = event.target.closest('[data-prop-keep]');
+      if (!keep) return;
+      const item = state.review.items.find(row => row.id === keep.dataset.propKeep);
+      if (item) item.keep = keep.checked;
+      paintReviewFoot();
+    });
+    q('file').addEventListener('change', event => {
+      const files = [...(event.target.files ?? [])];
+      event.target.value = '';
+      void onFiles(files);
+    });
+    el.addEventListener('dragover', event => {
+      if (!state.record || ![...(event.dataTransfer?.types ?? [])].includes('Files')) return;
+      event.preventDefault();
+      el.classList.add('is-dropping');
+    });
+    el.addEventListener('dragleave', event => { if (!el.contains(event.relatedTarget)) el.classList.remove('is-dropping'); });
+    el.addEventListener('drop', event => {
+      el.classList.remove('is-dropping');
+      const files = [...(event.dataTransfer?.files ?? [])];
+      if (!state.record || !files.length) return;
+      event.preventDefault();
+      void onFiles(files);
+    });
     q('settings-form').addEventListener('submit', event => { event.preventDefault(); void onSaveSettings(); });
 
     const svg = q('tm-svg');
@@ -560,15 +661,19 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     return out;
   }
 
-  async function onRecord() {
-    const values = readForm(q('rec-fields'));
-    const entry = { kind: state.recordKind };
-    for (const [key, value] of Object.entries(values)) {
+  function entryFromForm(kind, container) {
+    const entry = { kind };
+    for (const [key, value] of Object.entries(readForm(container))) {
       if (key === 'renews') { if (value) entry.renews = 'yearly'; continue; }
       if (typeof value === 'boolean') { entry[key] = value; continue; }
       if (value === '') continue;
       entry[key] = ['date', 'periodFrom', 'periodTo', 'note', 'category'].includes(key) ? value : Number(String(value).replace(/[$,\s%]/g, ''));
     }
+    return entry;
+  }
+
+  async function onRecord() {
+    const entry = entryFromForm(state.recordKind, q('rec-fields'));
     const ok = await mutate(async () => {
       const data = await api.addEntry(entry);
       return data?.record;
@@ -577,6 +682,96 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
     else {
       q('rec-error').hidden = false;
       q('rec-error').textContent = 'Check the fields above and try again.';
+    }
+  }
+
+  // ── Read a statement ──────────────────────────────────────────────────────
+
+  async function onFiles(files) {
+    if (!files.length || !state.record) return;
+    closeSheet('record');
+    if (!q('review-sheet').open) state.review = { items: [], reading: [], notes: [] };
+    const review = state.review;
+    q('review-error').hidden = true;
+    openSheet('review');
+    review.reading.push(...files.map(file => file.name || 'Photo'));
+    paintReview();
+    for (const file of files) {
+      if (state.review !== review) return;
+      const name = file.name || 'Photo';
+      try {
+        const upload = await prepareUpload(file, doc);
+        const result = await api.readDocument(upload);
+        if (state.review !== review) return;
+        addReviewItems(result?.entries ?? [], name);
+        const found = result?.entries?.length ?? 0;
+        const note = found
+          ? `${result.summary || 'Read'}${result.skipped ? ` (${result.skipped} line${result.skipped === 1 ? '' : 's'} could not be read)` : ''}`
+          : result?.summary || 'Nothing to record was found.';
+        review.notes.push({ name, text: note, empty: !found });
+      } catch (error) {
+        review.notes.push({ name, text: error?.message || 'That file could not be read.', empty: true });
+      }
+      if (state.review !== review) return;
+      review.reading.splice(review.reading.indexOf(name), 1);
+      paintReview();
+    }
+  }
+
+  function addReviewItems(entries, source) {
+    for (const entry of entries) {
+      const duplicate = findDuplicate(state.record, entry) || findDuplicate({ entries: state.review.items.map(item => item.entry) }, entry);
+      state.review.items.push({ id: `rev-${state.review.items.length + 1}`, entry, source, duplicate: Boolean(duplicate), keep: !duplicate });
+    }
+  }
+
+  function paintReview() {
+    const { items, reading, notes } = state.review;
+    const lines = [
+      ...notes.map(note => `<span class="${note.empty ? 'is-bad' : ''}"><b>${escapeHtml(note.name)}</b> ${escapeHtml(note.text)}</span>`),
+      ...reading.map(name => `<span class="prop-review__reading"><b>${escapeHtml(name)}</b> Reading…</span>`)
+    ];
+    q('review-status').innerHTML = lines.join('');
+    const list = q('review-list');
+    // Keep figures already edited when another file finishes reading.
+    const edited = new Map([...list.querySelectorAll('[data-prop-review]')].map(row => [row.dataset.propReview, readForm(row.querySelector('.prop-fields'))]));
+    list.innerHTML = items.map(item => {
+      const values = edited.get(item.id) ?? { ...item.entry, renews: item.entry.renews === 'yearly' };
+      const fields = KIND_FIELDS[item.entry.kind].map(([name, label, type]) => fieldHtml(`${item.id}-${name}`, name, label, type, values[name])).join('');
+      return `<li class="prop-review__item${item.keep ? '' : ' is-off'}" data-prop-review="${item.id}">
+        <label class="prop-check prop-review__keep" for="prop-${item.id}-keep"><input type="checkbox" id="prop-${item.id}-keep" data-prop-keep="${item.id}" ${item.keep ? 'checked' : ''}><span><b>${KIND_LABELS[item.entry.kind]}</b> ${escapeHtml(describeEntry(item.entry).amount)}</span>${item.duplicate ? '<span class="prop-pill prop-pill--stale">Already on file</span>' : ''}</label>
+        <div class="prop-fields">${fields}</div></li>`;
+    }).join('');
+    paintReviewFoot();
+  }
+
+  function paintReviewFoot() {
+    const kept = state.review.items.filter(item => item.keep).length;
+    for (const row of q('review-list').querySelectorAll('[data-prop-review]')) {
+      row.classList.toggle('is-off', !state.review.items.find(item => item.id === row.dataset.propReview)?.keep);
+    }
+    const save = q('review-save');
+    save.disabled = kept === 0 || state.review.reading.length > 0;
+    save.textContent = kept ? `Save ${kept} record${kept === 1 ? '' : 's'}` : 'Save';
+  }
+
+  async function onSaveReview() {
+    const entries = state.review.items
+      .filter(item => item.keep)
+      .map(item => {
+        // Figures with no field on the form (statement number, deductible share) ride along unchanged.
+        const shown = new Set(KIND_FIELDS[item.entry.kind].map(([name]) => name));
+        const hidden = Object.fromEntries(Object.entries(item.entry).filter(([key]) => !shown.has(key)));
+        return { ...hidden, ...entryFromForm(item.entry.kind, host().querySelector(`[data-prop-review="${item.id}"] .prop-fields`)) };
+      });
+    if (!entries.length) return;
+    const ok = await mutate(() => api.addEntries(entries), `Recorded ${entries.length} from the statement`);
+    if (ok) {
+      state.review = { items: [], reading: [], notes: [] };
+      closeSheet('review');
+    } else {
+      q('review-error').hidden = false;
+      q('review-error').textContent = 'Check the figures above and try again.';
     }
   }
 
@@ -944,14 +1139,14 @@ export function createPropertyView({ root, api, now = () => new Date(), setTitle
   function paintStatement(row) {
     const box = q('stmt');
     if (!row) {
-      box.innerHTML = `<p class="prop-kicker">Statements</p><h3 class="prop-h">Record your first agent statement</h3><p class="prop-sub">Gross rent and what the agent kept. Two statements a month builds the ledger and spots any that go missing.</p><button class="btn btn--primary" type="button" data-prop-open="record" data-prop-kind="statement">Record a statement</button>`;
+      box.innerHTML = `<p class="prop-kicker">Statements</p><h3 class="prop-h">Record your first agent statement</h3><p class="prop-sub">Gross rent and what the agent kept. Two statements a month builds the ledger and spots any that go missing.</p><div class="prop-stmt__actions"><button class="btn btn--primary" type="button" data-prop="upload">Add the PDF</button><button class="btn btn--ghost" type="button" data-prop-open="record" data-prop-kind="statement">Type it in</button></div>`;
       return;
     }
     if (row.expected) {
       box.innerHTML = `<p class="prop-kicker">Expected statement</p><div class="prop-stmt__head"><span class="prop-stmt__no">${formatDisplayDate(row.date)}</span><span class="prop-pill prop-pill--stale">Not recorded</span></div>
         <p class="prop-sub">Your statements usually arrive on these days of the month. This one should be in the agent's portal.</p>
         <dl><div><dt>Expected rent</dt><dd>≈ ${money(row.gross, 2)}</dd></div><div><dt>Expected fees</dt><dd>≈ ${money(row.deductions, 2)}</dd></div></dl>
-        <button class="btn btn--primary" type="button" data-prop-open="record" data-prop-kind="statement" data-prop-date="${row.date}">Record this statement</button>`;
+        <div class="prop-stmt__actions"><button class="btn btn--primary" type="button" data-prop="upload">Add the PDF</button><button class="btn btn--ghost" type="button" data-prop-open="record" data-prop-kind="statement" data-prop-date="${row.date}">Type it in</button></div>`;
       return;
     }
     const period = row.periodFrom && row.periodTo ? `Rent ${formatDisplayDate(row.periodFrom)} to ${formatDisplayDate(row.periodTo)}` : 'Rent statement';
