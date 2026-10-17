@@ -1,6 +1,6 @@
 // apps/tasks/src/views/problem-solver/coach-panel.ts
 import { el } from '@/views/hub-kit';
-import { skillChip } from '../../../../../packages/problem-solver/glyphs';
+import { skillChip, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import type { PsAction, PsSession } from '../../../../../packages/problem-solver/types';
 
@@ -32,7 +32,9 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
   if (!suggestion) return null;
   const card = el('div', 'ps-suggestion confirm-card');
   const title = suggestion.kind === 'finish_define' ? 'Ready to move on' : `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
-  card.append(el('p', 'ps-suggestion__title', title), el('p', 'ps-suggestion__reason', suggestion.reason));
+  const heading = el('p', 'ps-suggestion__title', title);
+  if (suggestion.kind !== 'finish_define') heading.prepend(toolEmblem(suggestion.tool));
+  card.append(heading, el('p', 'ps-suggestion__reason', suggestion.reason));
   const row = el('div', 'ps-suggestion__actions');
   row.append(actionButton(suggestion.kind === 'finish_define' ? 'Move on' : 'Start it', 'accept_suggestion', handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
   card.append(row);

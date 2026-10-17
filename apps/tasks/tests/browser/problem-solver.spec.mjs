@@ -21,7 +21,7 @@ async function answer(page, text) {
 }
 
 for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
-  test(`5 Whys builds one shape per accepted answer at ${viewport.width}px`, async ({ page }) => {
+  test(`5 Whys, a switch to Problem tree and the record at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await signIn(page);
     await page.getByLabel('Describe the problem').fill('The weekly rota keeps changing at the last minute');
@@ -52,5 +52,34 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await expect(page.locator('.ps-whys [data-node]')).toHaveCount(2, { timeout: 20_000 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+
+    // Switch to a problem tree, add the problem and a cause, then finish Define.
+    await answer(page, 'switch: the causes branch in several directions');
+    await expect(page.locator('.ps-suggestion')).toContainText('Switch to: Problem tree');
+    await expect(page.locator('.ps-suggestion .ps-emblem svg')).toBeVisible();
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-tree')).toBeAttached();
+    await expect(page.locator('.ps-canvas__title')).toContainText('Problem tree');
+    await answer(page, 'The weekly rota is changed at the last minute');
+    await answer(page, 'Shift swaps are agreed privately by text message');
+    await expect(page.locator('.ps-tree [data-node]')).toHaveCount(2);
+    await page.getByRole('button', { name: "I've defined it" }).click();
+
+    // The record opens with Define done; the 5 Whys run is on the filmstrip as switched.
+    const define = page.locator('.ps-record [data-step="define"]');
+    await expect(define).toHaveAttribute('data-state', 'done', { timeout: 20_000 });
+    await expect(page.locator('.ps-record__card.is-switched')).toContainText('Switched');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    if (process.env.PS_SHOT_DIR) {
+      await page.screenshot({ path: `${process.env.PS_SHOT_DIR}/ps-record-${viewport.width > 600 ? 'desktop' : 'mobile'}.png`, fullPage: true });
+    }
+
+    // Define morphs into the coloured chart, and back.
+    await define.getByRole('button').click();
+    await expect(page.locator('.ps-tree [data-node]')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Back to record' }).click();
+    await expect(define).toBeVisible();
+    await page.locator('.ps-record__card.is-switched button').click();
+    await expect(page.locator('.ps-whys [data-node]')).toHaveCount(2);
   });
 }

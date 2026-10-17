@@ -32,6 +32,10 @@ included_files = [
 [functions.knowledge-clementine-chat]
   timeout = 26
 
+# Reading a statement PDF with Claude can pass the 10s default.
+[functions.property]
+  timeout = 26
+
 [functions.knowledge-tidy]
   timeout = 26
 

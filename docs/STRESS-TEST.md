@@ -701,7 +701,7 @@ Do not open a PR. Do not “just fix” a failure unless Adam’s prompt for tha
 
 If a rail item or hash exists in the product and is missing here, add it in the same report’s Notes and treat the omission as a miss in the sweep.
 
-**Life sections:** Home, Chat, Nutrition, Fitness, Body, Bloods, Medical Overview, Mind, Skincare, Calendar, Central Node, Future map (`/#future-map`).
+**Life sections:** Home, Chat, Nutrition, Fitness, Body, Bloods, Medical Overview, Mind, Skincare, Calendar, Central Node, Management (`/#management`).
 
 **Teaching routes:** `/`, `/sign-in`, `/chat`, `/classes`, `/classes/:id`, `/scope-sequences`, `/scope-sequences/:subjectId`, `/units`, `/units/:unitId`, `/lessons`, `/lessons/:id`, `/templates`, `/resources`, `/trash`, `/s/lessons/:id`, `/s/units/:id`, `/s/classes/:id`, `/s/classes/:id/lessons/:id`.
 
