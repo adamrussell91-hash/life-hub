@@ -1,103 +1,216 @@
-/** Classroom exchanges use one immutable object per claim, writing and review.
- * Only the teacher writes the active round and frozen review assignments. */
+/**
+ * Peer feedback: students write, swap anonymously, and read what came back.
+ *
+ *   peer_feedback/{lesson}/{block}/active                       round state (teacher writes only)
+ *   peer_feedback/{lesson}/{block}/{session}/claims/{identity}  { token_hash }
+ *   peer_feedback/{lesson}/{block}/{session}/writing/{identity} { text }
+ *   peer_feedback/{lesson}/{block}/{session}/reviews/{identity} { strength, suggestion }, written BY identity
+ *
+ * One create-only blob per claim, piece of writing and review, so students
+ * never race each other. Only the teacher writes the round and the frozen
+ * review assignments. A student proves an identity with a random device token.
+ */
 import { randomBytes, randomInt, createHash } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
+
 const STRONG = { type: 'json', consistency: 'strong' };
+const ACTIVITY_HOURS = 12;
+export const MAX_WRITING = 8000;
+export const MAX_FEEDBACK = 2000;
+/** "colour-symbol" pairs: six colours by six symbols. */
 export const IDENTITIES = Array.from({ length: 36 }, (_, i) => `${i % 6}-${Math.floor(i / 6)}`);
-const baseKey = (lesson, block) => `peer_feedback/${lesson}/${block}`;
-const hash = value => createHash('sha256').update(value).digest('hex');
+
 export class PeerError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, code, message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
 }
-const reject = (status, message) => { throw new PeerError(status, message); };
-const read = (store, path) => store.get(path, STRONG);
-function find(blocks, id) {
+
+const reject = (status, code, message) => {
+  throw new PeerError(status, code, message);
+};
+const read = (store, key) => store.get(key, STRONG);
+const hash = (value) => createHash('sha256').update(value).digest('hex');
+
+function findBlock(blocks, id) {
   for (const b of blocks ?? []) {
     if (b.visibility === 'teacher_only') continue;
     if (b.id === id && b.block_type === 'peer_feedback') return b;
-    const nested = [b.content?.blocks, ...(b.content?.columns ?? []).map(x => x.blocks), ...(b.content?.tabs ?? []).map(x => x.blocks)];
-    for (const children of nested) { const hit = find(children, id); if (hit) return hit; }
+    const nested = [
+      b.content?.blocks,
+      ...(b.content?.columns ?? []).map((c) => c.blocks),
+      ...(b.content?.tabs ?? []).map((t) => t.blocks)
+    ];
+    for (const children of nested) {
+      const hit = findBlock(children, id);
+      if (hit) return hit;
+    }
   }
+  return null;
 }
-async function liveBlock(store, lesson, block) {
-  if (!isSafeId(lesson) || !isSafeId(block)) reject(404, 'Activity not found.');
-  const [draft, published] = await Promise.all([read(store, draftLessonKey(lesson)), read(store, publishedLessonKey(lesson))]);
-  if (!draft || isDeletedRecord(draft) || !find(draft.blocks, block) || !published || !find(published.blocks, block)) reject(404, 'Publish this lesson and block before starting an activity.');
+
+/** The block must exist in both the draft and the published lesson. */
+async function assertLive(store, lesson, block) {
+  if (!isSafeId(lesson) || !isSafeId(block)) reject(404, 'not_found', 'Activity not found.');
+  const [draft, published] = await Promise.all([
+    read(store, draftLessonKey(lesson)),
+    read(store, publishedLessonKey(lesson))
+  ]);
+  const live =
+    draft && !isDeletedRecord(draft) && findBlock(draft.blocks, block) && published && findBlock(published.blocks, block);
+  if (!live) reject(404, 'not_published', 'Publish this lesson and block before starting an activity.');
 }
-const child = (base, session, kind, id) => `${base}/${session}/${kind}/${id}`;
-async function roster(store, base, session) {
-  return Promise.all(IDENTITIES.map(async id => {
-    const [claim, writing] = await Promise.all([read(store, child(base, session, 'claims', id)), read(store, child(base, session, 'writing', id))]);
-    return { id, joined: !!claim, text: writing?.text ?? '' };
-  }));
+
+function keys(lesson, block, session) {
+  const base = `peer_feedback/${lesson}/${block}`;
+  return {
+    active: `${base}/active`,
+    claim: (id) => `${base}/${session}/claims/${id}`,
+    writing: (id) => `${base}/${session}/writing/${id}`,
+    review: (id) => `${base}/${session}/reviews/${id}`
+  };
 }
-export async function peerAction(store, lesson, block, body, teacher = false) {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'Invalid request.');
-  await liveBlock(store, lesson, block);
-  const base = baseKey(lesson, block);
-  let activity = await read(store, `${base}/active`);
+
+async function claimedIds(store, k) {
+  const claims = await Promise.all(IDENTITIES.map((id) => read(store, k.claim(id))));
+  return IDENTITIES.filter((_, i) => claims[i]);
+}
+
+/** Who reviews whom: a shuffled ring, so nobody gets their own and every piece gets one reader. */
+function ring(ids) {
+  const order = [...ids];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return Object.fromEntries(order.map((id, i) => [id, order[(i + 1) % order.length]]));
+}
+
+const reviewerOf = (assignments, writer) => Object.keys(assignments).find((r) => assignments[r] === writer) ?? null;
+
+async function teacherAction(store, k, activity, body) {
   const action = body.action ?? 'status';
-  if (teacher && action === 'start') {
-    activity = { session: randomBytes(16).toString('hex'), code: String(randomInt(100000, 1000000)), phase: 'write', expires: Date.now() + 12 * 3600000, assignments: {} };
-    await store.setJSON(`${base}/active`, activity);
+  if (!['status', 'start', 'review', 'results', 'end'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+
+  const joined = await claimedIds(store, k);
+  const writing = Object.fromEntries(
+    await Promise.all(joined.map(async (id) => [id, (await read(store, k.writing(id)))?.text ?? '']))
+  );
+
+  if (action === 'review') {
+    if (activity.phase !== 'write') reject(409, 'wrong_phase', 'The writing round has already ended.');
+    const excluded = new Set(Array.isArray(body.exclude) ? body.exclude : []);
+    const included = joined.filter((id) => writing[id] && !excluded.has(id));
+    if (included.length < 2) reject(400, 'too_few', 'Include at least two pieces of writing to swap.');
+    activity = { ...activity, phase: 'review', assignments: ring(included) };
+    await store.setJSON(k.active, activity);
+  } else if (action === 'results') {
+    if (activity.phase !== 'review') reject(409, 'wrong_phase', 'Start the feedback round first.');
+    activity = { ...activity, phase: 'results' };
+    await store.setJSON(k.active, activity);
+  }
+
+  const reviews = Object.fromEntries(
+    await Promise.all(joined.map(async (id) => [id, await read(store, k.review(id))]))
+  );
+  const rows = joined.map((id) => {
+    const reviewer = reviewerOf(activity.assignments, id);
+    return {
+      id,
+      text: writing[id],
+      included: id in activity.assignments,
+      gave: !!reviews[id],
+      reviewer,
+      received: reviewer ? reviews[reviewer] ?? null : null
+    };
+  });
+  return { session: activity.session, code: activity.code, phase: activity.phase, expires: activity.expires, rows };
+}
+
+async function studentAction(store, k, activity, body) {
+  const action = body.action ?? 'status';
+  if (!['status', 'join', 'submit', 'feedback'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (body.session && body.session !== activity.session) {
+    reject(409, 'new_session', 'Your teacher started a new activity. Join again.');
+  }
+  const shared = { session: activity.session, phase: activity.phase };
+
+  if (!body.identity) {
+    if (action !== 'status') reject(400, 'no_identity', 'Choose a symbol to join.');
+    return { ...shared, taken: activity.phase === 'write' ? await claimedIds(store, k) : [] };
+  }
+  const id = body.identity;
+  if (!IDENTITIES.includes(id) || typeof body.token !== 'string' || !/^[a-f0-9]{48}$/.test(body.token)) {
+    reject(400, 'no_identity', 'Choose a symbol to join.');
+  }
+
+  if (action === 'join') {
+    if (activity.phase !== 'write') reject(409, 'joining_closed', 'Joining has closed for this activity.');
+    if (String(body.code ?? '').trim() !== activity.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
+    await store.setJSON(k.claim(id), { token_hash: hash(body.token) }, { onlyIfNew: true });
+  }
+  const claim = await read(store, k.claim(id));
+  if (!claim) reject(403, 'not_joined', 'Join the activity first.');
+  if (claim.token_hash !== hash(body.token)) reject(403, 'taken', 'Someone just took that symbol. Pick another.');
+
+  const assigned = activity.assignments[id] ?? null;
+  if (action === 'submit') {
+    if (activity.phase !== 'write') reject(409, 'wrong_phase', 'The writing round has ended.');
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    if (!text || text.length > MAX_WRITING) reject(400, 'bad_text', `Write between 1 and ${MAX_WRITING.toLocaleString('en-AU')} characters.`);
+    await store.setJSON(k.writing(id), { text }, { onlyIfNew: true });
+  }
+  if (action === 'feedback') {
+    if (activity.phase !== 'review' || !assigned) reject(409, 'wrong_phase', 'You have no writing to give feedback on.');
+    const fields = [body.strength, body.suggestion].map((x) => (typeof x === 'string' ? x.trim() : ''));
+    if (fields.some((x) => !x || x.length > MAX_FEEDBACK)) reject(400, 'bad_text', 'Fill in both boxes before sending.');
+    await store.setJSON(k.review(id), { strength: fields[0], suggestion: fields[1] }, { onlyIfNew: true });
+  }
+
+  const reviewer = reviewerOf(activity.assignments, id);
+  const [own, review, toReview, received] = await Promise.all([
+    read(store, k.writing(id)),
+    read(store, k.review(id)),
+    assigned && activity.phase === 'review' ? read(store, k.writing(assigned)) : null,
+    reviewer && activity.phase === 'results' ? read(store, k.review(reviewer)) : null
+  ]);
+  return {
+    ...shared,
+    identity: id,
+    text: own?.text ?? '',
+    submitted: !!own,
+    included: !!assigned,
+    reviewed: !!review,
+    assigned_text: toReview?.text ?? '',
+    received: received ?? null
+  };
+}
+
+export async function peerAction(store, lesson, block, body, teacher = false) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
+  await assertLive(store, lesson, block);
+  let activity = await read(store, keys(lesson, block, '').active);
+
+  if (teacher && body.action === 'start') {
+    activity = {
+      session: randomBytes(16).toString('hex'),
+      code: String(randomInt(100000, 1000000)),
+      phase: 'write',
+      expires: Date.now() + ACTIVITY_HOURS * 3600_000,
+      assignments: {}
+    };
+    await store.setJSON(keys(lesson, block, '').active, activity);
+  }
+  if (teacher && body.action === 'end' && activity) {
+    activity = { ...activity, expires: 0 };
+    await store.setJSON(keys(lesson, block, '').active, activity);
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
-  if (teacher) {
-    const rows = await roster(store, base, activity.session);
-    if (action === 'review') {
-      if (activity.phase !== 'write') reject(409, 'The writing round has already ended.');
-      const excluded = new Set(Array.isArray(body.exclude) ? body.exclude : []);
-      const ids = rows.filter(r => r.text && !excluded.has(r.id)).map(r => r.id);
-      if (ids.length < 2) reject(400, 'Include at least two pieces of writing.');
-      for (let i = ids.length - 1; i > 0; i--) { const j = randomInt(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
-      activity.assignments = Object.fromEntries(ids.map((id, i) => [id, ids[(i + 1) % ids.length]]));
-      activity.phase = 'review';
-      await store.setJSON(`${base}/active`, activity);
-    } else if (action === 'results' || action === 'close') {
-      if (action === 'results' && activity.phase !== 'review') reject(409, 'Start the feedback round first.');
-      activity.phase = 'results';
-      await store.setJSON(`${base}/active`, activity);
-    } else if (action !== 'status' && action !== 'start') reject(400, 'Unknown action.');
-    const reviews = await Promise.all(rows.map(r => read(store, child(base, activity.session, 'reviews', r.id))));
-    return { ...activity, rows: rows.map((r, i) => ({ ...r, review: reviews[i] ?? null })) };
-  }
-  if (body.session && body.session !== activity.session) reject(409, 'Your teacher started a new activity. Join again.');
-  const publicState = { session: activity.session, phase: activity.phase };
-  if (!body.identity) {
-    if (action !== 'status') reject(400, 'Choose an identity to join.');
-    const rows = await roster(store, base, activity.session);
-    return { ...publicState, taken: rows.filter(r => r.joined).map(r => r.id) };
-  }
-  if (!IDENTITIES.includes(body.identity) || typeof body.token !== 'string' || !/^[a-f0-9]{48}$/.test(body.token)) reject(400, 'Choose an identity to join.');
-  const id = body.identity;
-  const claimKey = child(base, activity.session, 'claims', id);
-  if (action === 'join') {
-    if (activity.phase !== 'write') reject(409, 'Joining is closed.');
-    if (body.code !== activity.code) reject(403, 'Check the activity code.');
-    await store.setJSON(claimKey, { token_hash: hash(body.token) }, { onlyIfNew: true });
-  }
-  const claim = await read(store, claimKey);
-  if (!claim || claim.token_hash !== hash(body.token)) reject(403, 'That identity is already taken. Choose another.');
-  if (action === 'submit') {
-    if (activity.phase !== 'write') reject(409, 'The writing round has ended.');
-    if (typeof body.text !== 'string' || !body.text.trim() || body.text.length > 8000) reject(400, 'Write between 1 and 8,000 characters.');
-    await store.setJSON(child(base, activity.session, 'writing', id), { text: body.text.trim() }, { onlyIfNew: true });
-  }
-  const assigned = activity.assignments[id];
-  if (action === 'feedback') {
-    if (activity.phase !== 'review' || !assigned) reject(409, 'You have no writing assigned for review.');
-    if (![body.strength, body.suggestion].every(x => typeof x === 'string' && x.trim() && x.length <= 2000)) reject(400, 'Complete both feedback fields (up to 2,000 characters each).');
-    await store.setJSON(child(base, activity.session, 'reviews', id), { strength: body.strength.trim(), suggestion: body.suggestion.trim() }, { onlyIfNew: true });
-  }
-  if (!['status', 'join', 'submit', 'feedback'].includes(action)) reject(400, 'Unknown action.');
-  const [own, review, writing] = await Promise.all([
-    read(store, child(base, activity.session, 'writing', id)),
-    read(store, child(base, activity.session, 'reviews', id)),
-    assigned ? read(store, child(base, activity.session, 'writing', assigned)) : null
-  ]);
-  const reviewer = Object.keys(activity.assignments).find(r => activity.assignments[r] === id);
-  const received = activity.phase === 'results' && reviewer ? await read(store, child(base, activity.session, 'reviews', reviewer)) : null;
-  return { ...publicState, identity: id, text: own?.text ?? '', submitted: !!own, reviewed: !!review, assigned_text: writing?.text ?? '', received, included: !!assigned };
+
+  const k = keys(lesson, block, activity.session);
+  return teacher ? teacherAction(store, k, activity, body) : studentAction(store, k, activity, body);
 }
