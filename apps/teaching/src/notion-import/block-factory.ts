@@ -8,7 +8,8 @@ const DEFAULT_VARIANT: Partial<Record<BlockType, string>> = {
   video: 'large',
   embed: 'large',
   table: 'large',
-  html_app: 'large'
+  html_app: 'large',
+  heading: 'section'
 };
 
 export function makeBlock<T extends BlockType>(
