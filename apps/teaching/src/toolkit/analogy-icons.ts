@@ -1,36 +1,29 @@
 /**
- * Line-art glyphs for the seven analogy blocks: 256px grid, 12px round stroke,
- * the same stroke as the lesson block icons. The PNGs in
- * `public/assets/blocks/analogy_*.png` are rendered from these, and the block
+ * Line-art glyphs for the seven analogy blocks: 256px grid, 10px round stroke,
+ * the same stroke as the lesson block icons. The SVGs in
+ * `public/assets/blocks/analogy_*.svg` are rendered from these, and the block
  * card draws them inline so the picker and the page match.
  */
 
 import type { AnalogyMoveType } from '@/toolkit/analogy-moves';
 
 export const ANALOGY_ICON_BODY: Record<AnalogyMoveType, string> = {
-  // A bridge: an arch and a deck between two piers.
   analogy_close_reading:
-    '<path d="M24 172H232"/><path d="M44 172Q128 52 212 172"/><path d="M68 172V212M188 172V212"/><path d="M100 124V172M128 112V172M156 124V172"/>',
-  // The same three-step pattern, found again lower down.
+    '<path d="M128 66c-26-20-64-24-100-12v142c36-12 74-8 100 12 26-20 64-24 100-12V54c-36-12-74-8-100 12Zm0 0v64M52 84h42M52 108h30M164 84h40M174 108h30"/><path d="M88 158h80m-16-16 16 16-16 16m-48-32-16 16 16 16"/>',
   analogy_pattern:
-    '<path d="M36 52l28 28-28 28M96 52l28 28-28 28M156 52l28 28-28 28"/><path d="M72 148l28 28-28 28M132 148l28 28-28 28M192 148l28 28-28 28" stroke-dasharray="1 22"/>',
-  // A test: holds on one side, breaks on the other.
+    '<rect x="30" y="38" width="196" height="70" rx="14"/><rect x="30" y="148" width="196" height="70" rx="14"/><circle cx="66" cy="73" r="13"/><path d="m110 86 17-26 17 26Z"/><rect x="174" y="60" width="26" height="26" rx="4"/><circle cx="66" cy="183" r="13"/><path d="m110 196 17-26 17 26Z"/><rect x="174" y="170" width="26" height="26" rx="4"/><path d="M128 112v32m-12-12 12 12 12-12"/>',
   analogy_reverse:
-    '<path d="M128 52V204"/><path d="M40 128l26 26 42-52"/><path d="M156 100l56 56M212 100l-56 56"/>',
-  // Out to another field and back.
+    '<rect x="42" y="38" width="172" height="184" rx="18"/><path d="M92 38v-8h72v32H92ZM128 88v108M62 160h132"/><path d="m67 118 13 13 24-28M155 107l28 28m0-28-28 28M66 183h34M154 183h34"/>',
   analogy_problem:
-    '<rect x="28" y="64" width="44" height="44" rx="10"/><path d="M72 86H176a42 42 0 0 1 0 84H88"/><path d="M108 150l-20 20 20 20"/>',
-  // A metaphor and the ripples that spread from it.
+    '<rect x="28" y="38" width="76" height="84" rx="12"/><path d="M48 62h36M48 84h24M104 80h65q43 0 43 43t-43 43h-29m16-16-16 16 16 16"/><rect x="28" y="150" width="76" height="76" rx="12"/><path d="m48 188 12 12 25-28M140 166h-30"/>',
   analogy_metaphor:
-    '<circle cx="80" cy="128" r="18"/><path d="M122 92a52 52 0 0 1 0 72"/><path d="M152 66a88 88 0 0 1 0 124"/><path d="M184 42a122 122 0 0 1 0 172" stroke-dasharray="2 24"/>',
-  // A rule, carried down into three new places.
+    '<rect x="28" y="42" width="114" height="146" rx="14"/><path d="M52 70h65M52 94h48M52 118h26"/><circle cx="165" cy="157" r="55"/><path d="m205 198 27 29M143 158l16 16 28-34"/>',
   analogy_transfer:
-    '<path d="M56 52H200"/><path d="M128 52V108M64 108H192M64 108V140M128 108V140M192 108V140"/><rect x="40" y="140" width="48" height="48" rx="10"/><rect x="104" y="140" width="48" height="48" rx="10"/><rect x="168" y="140" width="48" height="48" rx="10"/>',
-  // Three links of a chain.
+    '<rect x="79" y="28" width="98" height="70" rx="12"/><path d="m105 62 15 15 29-30M128 98v32M56 150v-20h144v20m-157-12 13 12 13-12m118 0 13 12 13-12"/><rect x="24" y="164" width="64" height="64" rx="12"/><circle cx="200" cy="196" r="32"/><path d="m44 195 10 10 17-22m110 12 10 10 17-22"/>',
   analogy_chains:
-    '<rect x="20" y="104" width="96" height="48" rx="24"/><rect x="80" y="104" width="96" height="48" rx="24"/><rect x="140" y="104" width="96" height="48" rx="24"/>'
+    '<path d="m103 82 25-25a38 38 0 0 1 54 54l-25 25M99 120l-25 25a38 38 0 0 0 54 54l25-25M100 156l56-56"/><path d="M41 58h28M55 44v28M186 194h30m-15-15v30"/>'
 };
 
 export function analogyIconSvg(type: AnalogyMoveType, stroke = 'currentColor'): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" stroke="${stroke}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">${ANALOGY_ICON_BODY[type]}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" stroke="${stroke}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">${ANALOGY_ICON_BODY[type]}</svg>`;
 }
