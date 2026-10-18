@@ -81,20 +81,29 @@ export function mountBoard(actions: BoardActions = {}): { root: HTMLElement; upd
     if (!W || !H) return;
     const list = [...items.values()];
     const rings = list.length > 30 ? 3 : 2;
-    const size = list.length > 60 ? 24 : 32;
-    orbit.classList.toggle('bs-orbit--dense', list.length > 60);
-    const R = Math.max(60, Math.min(W / 2 - size, (H / 2 - size) / 0.78));
+    const fractions = rings === 2 ? [0.68, 1] : [0.6, 0.8, 1];
+    // Fit the widest ellipse the box allows; narrow boxes go rounder rather than smaller.
+    const R = Math.max(60, Math.min(W / 2 - 20, (H / 2 - 20) / 0.78));
+    const squash = Math.min(1, (H / 2 - 20) / R);
+    // Shapes shrink until the inner ring has room for its share.
+    const perRing = Math.ceil(list.length / rings);
+    const inner = R * fractions[0]!;
+    const size = Math.round(Math.max(14, Math.min(32, ((2 * Math.PI * inner * (1 + squash)) / 2 / perRing) * 0.8)));
+    if (orbit.style.getPropertyValue('--bs-size') !== `${size}px`) {
+      orbit.style.setProperty('--bs-size', `${size}px`);
+      centre.style.width = `${Math.max(110, Math.round(inner * 1.5 - size))}px`;
+    }
     const still = prefersReducedMotion();
     list.forEach((it, i) => {
       const ring = i % rings;
       const inRing = Math.ceil((list.length - ring) / rings);
       const slot = Math.floor(i / rings);
-      const radius = R * (rings === 2 ? [0.62, 1][ring]! : [0.55, 0.78, 1][ring]!);
+      const radius = R * fractions[ring]!;
       const dir = ring % 2 ? -1 : 1;
       const speed = still ? 0 : 0.00011 - ring * 0.00002;
       const a = (slot / inRing) * Math.PI * 2 + ring * 0.7 + dir * t * speed;
       const tx = W / 2 + Math.cos(a) * radius;
-      const ty = H / 2 + Math.sin(a) * radius * 0.78;
+      const ty = H / 2 + Math.sin(a) * radius * squash;
       const k = still ? 1 : EASE;
       it.x += (tx - it.x) * k;
       it.y += (ty - it.y) * k;

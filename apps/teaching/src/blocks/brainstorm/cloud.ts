@@ -1,7 +1,7 @@
 /** Word cloud counts for brainstorm answers. */
 
 const STOP = new Set(
-  'a an and are as at be because but by for from he her him his i if in into is it its just me my of on or our she so than that the their them they this to too us was we were what when which who why will with you your'.split(' ')
+  'a about all also an and any are as at be been being because can could did do does done had has have but by for from he her him his i if in into is it its just me my of on or our she so than that the their them they this to too us very was we were what when which who why will with would you your'.split(' ')
 );
 const MAX_WORDS = 40;
 
