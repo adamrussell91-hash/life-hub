@@ -1,0 +1,449 @@
+<title>Problem Solver Landing</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: Life Hub navy rail + cotton canvas; inside the canvas, the Problem Solver
+   "workbench" uses the toolkit book's flat red / yellow / blue geometry. */
+:root {
+  --rail: #17375e;
+  --rail-2: #142b51;
+  --on-rail: rgba(255, 255, 255, 0.92);
+  --on-rail-muted: rgba(255, 255, 255, 0.62);
+  --on-rail-hover: rgba(255, 255, 255, 0.1);
+  --paper: #fbf8f2;
+  --cotton: #f5f1e9;
+  --card: #ffffff;
+  --ink: #13233a;
+  --muted: #6b7788;
+  --line: rgba(23, 55, 94, 0.12);
+  --navy: #17375e;
+  --wave: #376fb7;
+  /* Book palette (toolkit) */
+  --ps-red: #d7262e;
+  --ps-yellow: #f6be2c;
+  --ps-blue: #2c55a4;
+  --ps-on-yellow: #2a2210;
+  --ps-ghost: rgba(19, 35, 58, 0.14);
+  --ps-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ps-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --font-ui: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --rail: #0d1a33; --rail-2: #0a1536; --paper: #131a26; --cotton: #182131; --card: #1d2738;
+    --ink: #eef1f5; --muted: #9aa6b6; --line: rgba(255, 255, 255, 0.1); --navy: #4d7cc4; --wave: #7aa6e0;
+    --ps-red: #e8474e; --ps-yellow: #f6c445; --ps-blue: #4f7bd0; --ps-ghost: rgba(255, 255, 255, 0.16);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --rail: #0d1a33; --rail-2: #0a1536; --paper: #131a26; --cotton: #182131; --card: #1d2738;
+  --ink: #eef1f5; --muted: #9aa6b6; --line: rgba(255, 255, 255, 0.1); --navy: #4d7cc4; --wave: #7aa6e0;
+  --ps-red: #e8474e; --ps-yellow: #f6c445; --ps-blue: #4f7bd0; --ps-ghost: rgba(255, 255, 255, 0.16);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+button, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--wave); outline-offset: 3px; border-radius: 6px; }
+
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.rail { background: var(--rail); color: var(--on-rail); padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.rail__brand { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 0 12px 18px; }
+.rail__group { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--on-rail-muted); padding: 14px 12px 6px; }
+.rail a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; color: var(--on-rail); text-decoration: none; font-size: 14.5px; }
+.rail a:hover { background: var(--on-rail-hover); }
+.rail a[aria-current="page"] { background: rgba(255, 255, 255, 0.12); font-weight: 600; }
+.rail .dot { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; opacity: 0.85; }
+.rail .dot svg { width: 18px; height: 18px; }
+
+.canvas { min-width: 0; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.canvas__inner { max-width: 1240px; margin: 0 auto; padding-inline: clamp(0px, 3vw, 32px); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+
+.ps-glyph { display: inline-flex; width: 20px; height: 20px; flex: none; }
+.ps-glyph svg, .ps-emblem svg { width: 100%; height: 100%; display: block; }
+.ps-emblem { display: inline-flex; width: 28px; height: 28px; flex: none; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 14px; border: 0; cursor: pointer; font-weight: 600; transition: transform 180ms var(--ps-ease), background 180ms; }
+.btn--primary { background: var(--navy); color: #fff; }
+.btn--primary:hover { transform: translateY(-1px); }
+.btn--ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.btn--ghost:hover { background: var(--cotton); }
+
+.mock-note { font-size: 12px; color: var(--muted); margin: 0; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 12px 16px; gap: 6px; }
+  .rail__brand { padding: 0 8px 0 0; white-space: nowrap; }
+  .rail__group, .rail a:not([aria-current="page"]) { display: none; }
+  .rail a { white-space: nowrap; }
+  .canvas { padding-block: 20px 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+
+/* ── Hero: the "loom" of book shapes beside the start box ── */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(24px, 4vw, 56px); align-items: center; padding-block: 8px 40px; }
+.hero__copy { display: grid; gap: 18px; min-width: 0; }
+.hero h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; color: var(--navy); text-wrap: balance; }
+.hero h1 span { display: inline-flex; align-items: baseline; gap: 0.12em; }
+.hero h1 i { display: inline-block; width: 0.62em; height: 0.62em; border-radius: 50%; background: var(--ps-red); font-style: normal; transform: translateY(0.02em); animation: bob 4s var(--ps-ease) infinite; }
+.hero h1 i:nth-of-type(2) { background: var(--ps-yellow); border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); animation-delay: -1.3s; }
+.hero h1 i:nth-of-type(3) { background: var(--ps-blue); border-radius: 0.62em 0.62em 0 0; height: 0.31em; animation-delay: -2.6s; }
+@keyframes bob { 0%, 100% { transform: translateY(0.02em) rotate(0); } 50% { transform: translateY(-0.08em) rotate(8deg); } }
+.hero__lede { margin: 0; font-size: 17px; color: var(--muted); max-width: 46ch; }
+
+.start { position: relative; background: var(--card); border-radius: 24px; padding: 20px; display: grid; gap: 14px; box-shadow: 0 1px 0 var(--line), 0 18px 40px -24px rgba(23, 55, 94, 0.35); overflow: hidden; }
+.start::before { content: ""; position: absolute; right: -36px; top: -36px; width: 96px; height: 96px; border-radius: 50%; background: var(--ps-yellow); transform: scale(var(--pulse, 1)); transition: transform 260ms var(--ps-spring); }
+.start label { font-weight: 700; font-size: 17px; position: relative; }
+.start textarea { width: 100%; min-height: 84px; resize: vertical; border: 0; border-radius: 14px; background: var(--cotton); padding: 14px 16px; font-size: 16px; line-height: 1.45; }
+.start textarea::placeholder { color: var(--muted); }
+.start__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
+.start__tries { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.try { border: 0; background: transparent; box-shadow: inset 0 0 0 1px var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.try:hover { color: var(--ink); background: var(--cotton); }
+
+.loom { position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 4 / 3; }
+.loom svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.tile { transform-box: fill-box; transform-origin: center; }
+.tile.enter { animation: tileIn 720ms var(--ps-spring) both; }
+.tile.leave { animation: tileOut 300ms var(--ps-ease) both; }
+@keyframes tileIn { from { transform: scale(0) rotate(-120deg); } to { transform: scale(1) rotate(0); } }
+@keyframes tileOut { to { transform: scale(0) rotate(90deg); } }
+.loom__caption { position: absolute; left: 0; bottom: -28px; font: 500 11px var(--font-mono); color: var(--muted); letter-spacing: 0.02em; }
+
+/* ── Section headings ── */
+.section { display: grid; gap: 18px; padding-block: 36px 8px; }
+.section__head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; }
+.section h2 { margin: 0; font-size: 26px; letter-spacing: -0.02em; font-weight: 750; text-wrap: balance; }
+.section__aside { color: var(--muted); font-size: 14px; margin: 0; max-width: 52ch; }
+
+/* ── Problems as built shapes ── */
+.problems { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; list-style: none; margin: 0; padding: 0; }
+.prob { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; align-items: start; padding: 18px; border-radius: 22px; background: var(--card); text-decoration: none; color: inherit; box-shadow: 0 1px 0 var(--line); transition: transform 260ms var(--ps-ease), box-shadow 260ms; animation: rise 600ms var(--ps-ease) both; animation-delay: calc(var(--i) * 90ms + 300ms); }
+.prob:hover { transform: translateY(-3px); box-shadow: 0 18px 36px -22px rgba(23, 55, 94, 0.45); }
+@keyframes rise { from { transform: translateY(14px); } }
+.medal { width: 92px; height: 92px; }
+.medal svg { width: 100%; height: 100%; overflow: visible; }
+.medal .piece { transform-box: view-box; transform-origin: 50px 50px; transition: transform 420ms var(--ps-spring); }
+.prob:hover .medal .p-top { transform: translateY(-5px); }
+.prob:hover .medal .p-mid { transform: scaleX(1.08); }
+.prob:hover .medal .p-bot { transform: translateY(5px); }
+.prob:hover .medal .p-tool { transform: rotate(90deg) scale(1.06); }
+.prob__body { display: grid; gap: 6px; min-width: 0; }
+.prob__title { margin: 0; font-size: 16.5px; font-weight: 650; line-height: 1.3; text-wrap: pretty; }
+.prob__meta { margin: 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.phase { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
+.phase::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--ps-blue)); }
+.prob__skills { display: flex; gap: 4px; color: var(--ink); margin-top: 4px; }
+.prob__skills .ps-glyph { width: 18px; height: 18px; opacity: 0.85; }
+.prob--new { place-items: center; grid-template-columns: 1fr; text-align: center; background: transparent; box-shadow: inset 0 0 0 1.5px var(--ps-ghost); color: var(--muted); min-height: 128px; cursor: pointer; border: 0; font-size: 15px; }
+.prob--new:hover { color: var(--ink); }
+
+/* ── How a session builds ── */
+.build { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--card); border-radius: 26px; padding: 26px 22px; box-shadow: 0 1px 0 var(--line); position: relative; overflow: hidden; }
+.build__step { display: grid; gap: 10px; justify-items: start; padding: 0 14px; position: relative; min-width: 0; }
+.build__step + .build__step::before { content: ""; position: absolute; left: 0; top: 34px; width: 1px; height: calc(100% - 34px); background: var(--line); }
+.build__art { width: 68px; height: 68px; }
+.build__art svg { width: 100%; height: 100%; overflow: visible; }
+.build__step h3 { margin: 0; font-size: 15.5px; }
+.build__step p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.build__n { font: 500 11px var(--font-mono); color: var(--muted); }
+.assemble .a1 { animation: a1 6s var(--ps-ease) infinite; }
+.assemble .a2 { animation: a2 6s var(--ps-ease) infinite; }
+.assemble .a3 { animation: a3 6s var(--ps-ease) infinite; }
+@keyframes a1 { 0% { transform: translateY(-30px); opacity: 0; } 10%, 85% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+@keyframes a2 { 0%, 18% { transform: translateX(-60px); opacity: 0; } 30%, 85% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+@keyframes a3 { 0%, 38% { transform: translateY(30px); opacity: 0; } 50%, 85% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+.spin-slow { transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toolkit shelf ── */
+.shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); gap: 12px; }
+.tool { display: grid; gap: 10px; padding: 16px; border-radius: 20px; background: transparent; box-shadow: inset 0 0 0 1px var(--line); text-align: left; cursor: pointer; border: 0; transition: background 220ms; }
+.tool:hover { background: var(--card); }
+.tool .ps-emblem { width: 52px; height: 52px; transition: transform 520ms var(--ps-spring); }
+.tool:hover .ps-emblem, .tool:focus-visible .ps-emblem { transform: rotate(-90deg) scale(1.08); }
+.tool b { font-size: 14.5px; }
+.tool span:last-child { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+
+/* ── Thinking skills ribbon ── */
+.skills { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.skill { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: var(--card); box-shadow: 0 1px 0 var(--line); }
+.skill .ps-glyph { width: 34px; height: 34px; color: var(--ink); transition: transform 600ms var(--ps-spring); }
+.skill:hover .ps-glyph { transform: rotate(180deg); }
+.skill b { display: block; font-size: 13px; font-weight: 600; line-height: 1.25; }
+.skill small { font: 500 11px var(--font-mono); color: var(--muted); }
+.skill[data-n="0"] { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.skill[data-n="0"] .ps-glyph { opacity: 0.35; }
+.skill > span:last-child { display: block; min-width: 0; }
+.bar { display: block; height: 4px; border-radius: 4px; background: var(--ps-ghost); margin-top: 5px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: var(--w); background: var(--c); border-radius: inherit; animation: grow 1.2s var(--ps-ease) both 0.6s; }
+@keyframes grow { from { width: 0; } }
+
+@media (max-width: 1100px) { .skills { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; }
+  .loom { justify-self: stretch; max-width: none; order: -1; aspect-ratio: 2 / 1; }
+  .build { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 24px; }
+  .build__step:nth-child(3)::before { display: none; }
+}
+@media (max-width: 520px) {
+  .skills { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .build { grid-template-columns: 1fr; }
+  .build__step::before { display: none; }
+  .prob { grid-template-columns: 64px minmax(0, 1fr); }
+  .medal { width: 64px; height: 64px; }
+}
+</style>
+
+<div class="app">
+  <nav class="rail" aria-label="Tasks Hub">
+    <div class="rail__brand">TASKS HUB</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>Backlog</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 11l8-4M8 13l8 4"/></svg></span>Graph</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h18"/><circle cx="7" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg></span>Timeline</a>
+    <div class="rail__group">TOOLS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/></svg></span>Maps</a>
+    <a href="landing.html" aria-current="page"><span class="dot"><svg viewBox="0 0 100 100"><path fill="#f6be2c" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/><path fill="#d7262e" d="M2.38 56A48 48 0 0 0 97.62 56Z"/><path fill="#7ea2e6" d="M2.38 44A48 48 0 0 1 97.62 44Z"/></svg></span>Problem Solver</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>Search</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6h14M5 12h14M5 18h9"/></svg></span>Term dates</a>
+    <div class="rail__group">HUBS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9H4z"/></svg></span>Life</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h7v14H4zM13 5h7v14h-7z"/></svg></span>Teaching</a>
+  </nav>
+
+  <main class="canvas">
+    <div class="canvas__inner">
+      <p class="eyebrow">Tasks Hub</p>
+
+      <section class="hero">
+        <div class="hero__copy">
+          <h1>Problem <span>Solver<i></i><i></i><i></i></span></h1>
+          <p class="hero__lede">Name the thing that is stuck. A coach asks one question at a time and builds the toolkit's charts with you, piece by piece.</p>
+          <form class="start" id="start-form">
+            <label for="start-text">What problem are you trying to solve?</label>
+            <textarea id="start-text" rows="3" placeholder="Say it the way you would to a friend. Rough is fine."></textarea>
+            <div class="start__row">
+              <div class="start__tries" aria-label="Examples">
+                <button type="button" class="try" data-text="My weekly plan falls apart by Wednesday">Weekly plan slips</button>
+                <button type="button" class="try" data-text="Year 9 homework completion has dropped since half term">Homework dropping</button>
+              </div>
+              <button class="btn btn--primary" type="submit">Start</button>
+            </div>
+          </form>
+        </div>
+        <div class="loom" aria-hidden="true">
+          <svg id="loom" viewBox="0 0 400 300"></svg>
+          <span class="loom__caption" id="loom-caption">shapes from the toolkit · rearranging</span>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="h-problems">
+        <div class="section__head">
+          <h2 id="h-problems">Your problems</h2>
+          <p class="section__aside">Each badge fills in as the session moves. Blue, yellow and red are the three framing questions; the centre is the tool in use.</p>
+        </div>
+        <ul class="problems" id="problems"></ul>
+        <p class="mock-note">Example problems for the mockup.</p>
+      </section>
+
+      <section class="section" aria-labelledby="h-build">
+        <div class="section__head">
+          <h2 id="h-build">How a session builds</h2>
+          <p class="section__aside">The order follows the toolkit's problem solving process.</p>
+        </div>
+        <div class="build">
+          <div class="build__step">
+            <div class="build__art"><svg viewBox="0 0 100 100" class="assemble">
+              <path class="a1" fill="var(--ps-blue)" d="M2.38 44A48 48 0 0 1 97.62 44Z"/>
+              <path class="a2" fill="var(--ps-yellow)" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/>
+              <path class="a3" fill="var(--ps-red)" d="M2.38 56A48 48 0 0 0 97.62 56Z"/>
+            </svg></div>
+            <span class="build__n">1 · FRAME</span>
+            <h3>Three questions</h3>
+            <p>What is the goal, what is true, and what can be done. Each answer drops a piece into place.</p>
+          </div>
+          <div class="build__step">
+            <div class="build__art" id="build-tool"></div>
+            <span class="build__n">2 · DEFINE</span>
+            <h3>The coach picks a tool</h3>
+            <p>5 Whys for one clear symptom, a problem tree when causes tangle. The chart draws as you answer.</p>
+          </div>
+          <div class="build__step">
+            <div class="build__art"><svg viewBox="0 0 100 100"><g class="spin-slow"><circle cx="50" cy="50" r="48" fill="var(--ps-ghost)"/><path fill="var(--ps-red)" d="M50 2A48 48 0 0 0 50 98Z"/><path fill="var(--ps-blue)" d="M50 50V2A48 48 0 0 1 98 50Z"/></g><circle cx="50" cy="50" r="14" fill="var(--card)"/></svg></div>
+            <span class="build__n">3 · SKILLS</span>
+            <h3>Thinking you used</h3>
+            <p>Each answer earns the book's thinking skill marks, so you can see which ones you lean on.</p>
+          </div>
+          <div class="build__step">
+            <div class="build__art"><svg viewBox="0 0 100 100"><path fill="var(--ps-yellow)" d="M83.94 16.06A48 48 0 0 0 16.06 83.94Z"/><path fill="var(--ps-blue)" d="M83.94 16.06A48 48 0 0 1 16.06 83.94Z"/><path fill="var(--ps-red)" d="M50 30L70 66H30Z" class="spin-slow" style="animation-duration:5s"/></svg></div>
+            <span class="build__n">4 · DEFINED</span>
+            <h3>A record you can act on</h3>
+            <p>Finish with SMART objectives and a black and white record of every step.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="h-tools">
+        <div class="section__head">
+          <h2 id="h-tools">The toolkit</h2>
+          <p class="section__aside">Seven Define tools. The coach chooses, but you can see what each one is for.</p>
+        </div>
+        <div class="shelf" id="shelf"></div>
+      </section>
+
+      <section class="section" aria-labelledby="h-skills">
+        <div class="section__head">
+          <h2 id="h-skills">Thinking skills you have used</h2>
+          <p class="section__aside">Counts across all sessions. Faint marks have not come up yet.</p>
+        </div>
+        <div class="skills" id="skills"></div>
+        <p class="mock-note">Example counts for the mockup.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const GLYPHS={"abstract_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><clipPath id=\"ps-abstract-clip\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-abstract-clip)\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M-100 0l100 100\"/><path d=\"M-95 0l100 100\"/><path d=\"M-90 0l100 100\"/><path d=\"M-85 0l100 100\"/><path d=\"M-80 0l100 100\"/><path d=\"M-75 0l100 100\"/><path d=\"M-70 0l100 100\"/><path d=\"M-65 0l100 100\"/><path d=\"M-60 0l100 100\"/><path d=\"M-55 0l100 100\"/><path d=\"M-50 0l100 100\"/><path d=\"M-45 0l100 100\"/><path d=\"M-40 0l100 100\"/><path d=\"M-35 0l100 100\"/><path d=\"M-30 0l100 100\"/><path d=\"M-25 0l100 100\"/><path d=\"M-20 0l100 100\"/><path d=\"M-15 0l100 100\"/><path d=\"M-10 0l100 100\"/><path d=\"M-5 0l100 100\"/><path d=\"M0 0l100 100\"/><path d=\"M5 0l100 100\"/><path d=\"M10 0l100 100\"/><path d=\"M15 0l100 100\"/><path d=\"M20 0l100 100\"/><path d=\"M25 0l100 100\"/><path d=\"M30 0l100 100\"/><path d=\"M35 0l100 100\"/><path d=\"M40 0l100 100\"/><path d=\"M45 0l100 100\"/><path d=\"M50 0l100 100\"/><path d=\"M55 0l100 100\"/><path d=\"M60 0l100 100\"/><path d=\"M65 0l100 100\"/><path d=\"M70 0l100 100\"/><path d=\"M75 0l100 100\"/><path d=\"M80 0l100 100\"/><path d=\"M85 0l100 100\"/><path d=\"M90 0l100 100\"/><path d=\"M95 0l100 100\"/><path d=\"M100 0l100 100\"/></g></svg>","analysis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><clipPath id=\"ps-analysis\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-analysis)\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"><circle cx=\"50\" cy=\"50\" r=\"44\"/><circle cx=\"50\" cy=\"62\" r=\"44\"/><circle cx=\"50\" cy=\"74\" r=\"44\"/><circle cx=\"50\" cy=\"86\" r=\"44\"/><circle cx=\"50\" cy=\"98\" r=\"44\"/><circle cx=\"50\" cy=\"110\" r=\"44\"/><circle cx=\"50\" cy=\"122\" r=\"44\"/></g><circle cx=\"50\" cy=\"50\" r=\"44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/></svg>","creative_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><circle cx=\"50\" cy=\"73\" r=\"20\"/><path d=\"M47 73L4.000 53.000 53 73Z\"/><path d=\"M47 73L4.699 45.012 53 73Z\"/><path d=\"M47 73L6.774 37.267 53 73Z\"/><path d=\"M47 73L10.163 30.000 53 73Z\"/><path d=\"M47 73L14.762 23.432 53 73Z\"/><path d=\"M47 73L20.432 17.762 53 73Z\"/><path d=\"M47 73L27.000 13.163 53 73Z\"/><path d=\"M47 73L34.267 9.774 53 73Z\"/><path d=\"M47 73L42.012 7.699 53 73Z\"/><path d=\"M47 73L50.000 7.000 53 73Z\"/><path d=\"M47 73L57.988 7.699 53 73Z\"/><path d=\"M47 73L65.733 9.774 53 73Z\"/><path d=\"M47 73L73.000 13.163 53 73Z\"/><path d=\"M47 73L79.568 17.762 53 73Z\"/><path d=\"M47 73L85.238 23.432 53 73Z\"/><path d=\"M47 73L89.837 30.000 53 73Z\"/><path d=\"M47 73L93.226 37.267 53 73Z\"/><path d=\"M47 73L95.301 45.012 53 73Z\"/><path d=\"M47 73L96.000 53.000 53 73Z\"/></svg>","critical_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-critical-thinking\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"black\" stroke-width=\"22\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"white\" stroke-width=\"7\"/></mask></defs><g mask=\"url(#ps-critical-thinking)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","decision_making":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-decision-making\"><rect width=\"100\" height=\"100\" fill=\"white\"/><g fill=\"black\"><circle cx=\"30\" cy=\"50\" r=\"18\"/><circle cx=\"70\" cy=\"50\" r=\"18\"/></g></mask></defs><g mask=\"url(#ps-decision-making)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","inference":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-inference\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M33 25V68H76 M49 25V52H76\" fill=\"none\" stroke=\"black\" stroke-width=\"5\"/></mask></defs><g mask=\"url(#ps-inference)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","learning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-learning\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M16 63 45 25 85 38 55 76Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-learning)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","logical_reasoning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><path d=\"M52.3028 6.0603A44 44 0 0 1 69.9756 10.7957L61.8038 26.8338A26 26 0 0 0 51.3607 24.0356Z\"/><path d=\"M73.9641 13.0985A44 44 0 0 1 86.9015 26.0359L71.8054 35.8394A26 26 0 0 0 64.1606 28.1946Z\"/><path d=\"M89.2043 30.0244A44 44 0 0 1 93.9397 47.6972L75.9644 48.6393A26 26 0 0 0 73.1662 38.1962Z\"/><path d=\"M93.9397 52.3028A44 44 0 0 1 89.2043 69.9756L73.1662 61.8038A26 26 0 0 0 75.9644 51.3607Z\"/><path d=\"M86.9015 73.9641A44 44 0 0 1 73.9641 86.9015L64.1606 71.8054A26 26 0 0 0 71.8054 64.1606Z\"/><path d=\"M69.9756 89.2043A44 44 0 0 1 52.3028 93.9397L51.3607 75.9644A26 26 0 0 0 61.8038 73.1662Z\"/><path d=\"M47.6972 93.9397A44 44 0 0 1 30.0244 89.2043L38.1962 73.1662A26 26 0 0 0 48.6393 75.9644Z\"/><path d=\"M26.0359 86.9015A44 44 0 0 1 13.0985 73.9641L28.1946 64.1606A26 26 0 0 0 35.8394 71.8054Z\"/><path d=\"M10.7957 69.9756A44 44 0 0 1 6.0603 52.3028L24.0356 51.3607A26 26 0 0 0 26.8338 61.8038Z\"/><path d=\"M6.0603 47.6972A44 44 0 0 1 10.7957 30.0244L26.8338 38.1962A26 26 0 0 0 24.0356 48.6393Z\"/><path d=\"M13.0985 26.0359A44 44 0 0 1 26.0359 13.0985L35.8394 28.1946A26 26 0 0 0 28.1946 35.8394Z\"/><path d=\"M30.0244 10.7957A44 44 0 0 1 47.6972 6.0603L48.6393 24.0356A26 26 0 0 0 38.1962 26.8338Z\"/></svg>","metacognition":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(0 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(45 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(90 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(135 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(180 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(225 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(270 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(315 50 50)\"/></svg>","reflective_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><path d=\"M50 50L94.0000 50.0000A44 44 0 0 1 92.6930 60.6446Z\"/><path d=\"M50 50L90.6507 66.8381A44 44 0 0 1 85.3697 76.1722Z\"/><path d=\"M50 50L81.1127 81.1127A44 44 0 0 1 72.6617 87.7154Z\"/><path d=\"M50 50L66.8381 90.6507A44 44 0 0 1 56.5036 93.5167Z\"/><path d=\"M50 50L50.0000 94.0000A44 44 0 0 1 39.3554 92.6930Z\"/><path d=\"M50 50L33.1619 90.6507A44 44 0 0 1 23.8278 85.3697Z\"/><path d=\"M50 50L18.8873 81.1127A44 44 0 0 1 12.2846 72.6617Z\"/><path d=\"M50 50L9.3493 66.8381A44 44 0 0 1 6.4833 56.5036Z\"/><path d=\"M50 50L6.0000 50.0000A44 44 0 0 1 7.3070 39.3554Z\"/><path d=\"M50 50L9.3493 33.1619A44 44 0 0 1 14.6303 23.8278Z\"/><path d=\"M50 50L18.8873 18.8873A44 44 0 0 1 27.3383 12.2846Z\"/><path d=\"M50 50L33.1619 9.3493A44 44 0 0 1 43.4964 6.4833Z\"/><path d=\"M50 50L50.0000 6.0000A44 44 0 0 1 60.6446 7.3070Z\"/><path d=\"M50 50L66.8381 9.3493A44 44 0 0 1 76.1722 14.6303Z\"/><path d=\"M50 50L81.1127 18.8873A44 44 0 0 1 87.7154 27.3383Z\"/><path d=\"M50 50L90.6507 33.1619A44 44 0 0 1 93.5167 43.4964Z\"/></svg>","searching":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-searching\"><rect width=\"100\" height=\"100\" fill=\"white\"/><circle cx=\"50\" cy=\"50\" r=\"19\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-searching)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","synthesis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-synthesis\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M50 8Q62 32 92 50Q63 67 50 92Q32 64 8 50Q34 35 50 8Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-synthesis)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>"};const EMBLEMS={"concept_map":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle fill=\"#2c55a4\" cx=\"50\" cy=\"50\" r=\"48\"/><circle fill=\"#d7262e\" cx=\"36\" cy=\"42\" r=\"10\"/><circle fill=\"#f6be2c\" cx=\"62\" cy=\"36\" r=\"9\"/><circle fill=\"#2c55a4\" cx=\"62\" cy=\"36\" r=\"4\"/><circle fill=\"#f6be2c\" cx=\"45\" cy=\"64\" r=\"9\"/><circle fill=\"#2c55a4\" cx=\"45\" cy=\"64\" r=\"4\"/><circle fill=\"#d7262e\" cx=\"67\" cy=\"62\" r=\"7\"/><circle fill=\"#f6be2c\" cx=\"27\" cy=\"60\" r=\"5\"/></svg>\n","five_whys":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#d7262e\" d=\"M2 50A48 48 0 0 1 98 50Z\"/><path fill=\"#2c55a4\" d=\"M2 50A48 48 0 0 0 98 50Z\"/><path fill=\"#f6be2c\" d=\"M39 18L50 27L61 18V24L50 33L39 24ZM39 33L50 42L61 33V39L50 48L39 39ZM39 48L50 57L61 48V54L50 63L39 54ZM39 63L50 72L61 63V69L50 78L39 69Z\"/></svg>\n","gap_basic":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#2c55a4\" d=\"M2.38 44A48 48 0 0 1 97.62 44Z\"/><path fill=\"#f6be2c\" d=\"M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z\"/><path fill=\"#d7262e\" d=\"M2.38 56A48 48 0 0 0 97.62 56Z\"/></svg>\n","gap_radar":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#2c55a4\" d=\"M2.38 44A48 48 0 0 1 97.62 44Z\"/><path fill=\"#f6be2c\" d=\"M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z\"/><path fill=\"#d7262e\" d=\"M2.38 56A48 48 0 0 0 97.62 56Z\"/></svg>\n","problem_statement":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#d7262e\" d=\"M50 2A48 48 0 0 0 50 98Z\"/><path fill=\"#2c55a4\" d=\"M50 50V2A48 48 0 0 1 98 50Z\"/><path fill=\"#f6be2c\" d=\"M50 50H98A48 48 0 0 1 50 98Z\"/></svg>\n","problem_tree":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle fill=\"#f6be2c\" cx=\"50\" cy=\"50\" r=\"48\"/><circle fill=\"#2c55a4\" cx=\"50\" cy=\"35\" r=\"13\"/><path fill=\"#d7262e\" d=\"M30 56H70V63H30ZM30 69H70V76H30Z\"/></svg>\n","smart":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#f6be2c\" d=\"M83.94 16.06A48 48 0 0 0 16.06 83.94Z\"/><path fill=\"#2c55a4\" d=\"M83.94 16.06A48 48 0 0 1 16.06 83.94Z\"/><path fill=\"#d7262e\" d=\"M50 30L70 66H30Z\"/></svg>\n"};
+let copy = 0;
+function glyph(id) {
+  copy += 1;
+  return (GLYPHS[id] || '').replace(/id="(ps-[a-z-]+)"/g, `id="$1-${copy}"`).replace(/url\(#(ps-[a-z-]+)\)/g, `url(#$1-${copy})`);
+}
+const C = ['var(--ps-red)', 'var(--ps-yellow)', 'var(--ps-blue)'];
+
+/* ── Loom: a 4×3 board of book shapes that keeps rebuilding itself ── */
+const SHAPES = [
+  (c) => `<path fill="${c}" d="M2 50A48 48 0 0 1 98 50Z"/>`,
+  (c) => `<circle cx="50" cy="50" r="46" fill="${c}"/>`,
+  (c) => `<path fill="${c}" d="M2 2H98A96 96 0 0 1 2 98Z"/>`,
+  (c) => `<path fill="${c}" d="M50 8L94 92H6Z"/>`,
+  (c) => `<path fill="${c}" d="M24 14L50 32L76 14V28L50 46L24 28ZM24 46L50 64L76 46V60L50 78L24 60Z"/>`,
+  (c) => `<path fill="${c}" d="M4 38H96V62H4Z"/><circle cx="50" cy="50" r="10" fill="var(--paper)"/>`,
+  (c) => `<circle cx="50" cy="50" r="46" fill="${c}"/><circle cx="50" cy="50" r="20" fill="var(--paper)"/>`,
+  (c, d) => `<path fill="${c}" d="M2 50A48 48 0 0 1 98 50Z"/><path fill="${d}" d="M2 50A48 48 0 0 0 98 50Z"/>`,
+  (c, d) => `<circle cx="50" cy="50" r="46" fill="${c}"/><circle cx="50" cy="38" r="13" fill="${d}"/>`
+];
+const loom = document.getElementById('loom');
+const cells = [];
+const rand = (n) => Math.floor(Math.random() * n);
+function tileMarkup() {
+  const a = rand(3), b = (a + 1 + rand(2)) % 3;
+  return { html: SHAPES[rand(SHAPES.length)](C[a], C[b]), rot: rand(4) * 90 };
+}
+for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${c * 100} ${r * 100})`);
+  const bg = `<rect x="4" y="4" width="92" height="92" rx="${(r + c) % 3 === 0 ? 46 : 14}" fill="var(--cotton)"/>`;
+  g.innerHTML = bg + '<g class="tile"></g>';
+  loom.append(g);
+  cells.push(g.lastChild);
+}
+function paint(tile, delay = 0) {
+  const t = tileMarkup();
+  tile.innerHTML = `<g transform="rotate(${t.rot} 50 50)">${t.html}</g>`;
+  tile.style.animationDelay = `${delay}ms`;
+  tile.classList.remove('leave');
+  tile.classList.remove('enter');
+  void tile.getBBox?.();
+  tile.classList.add('enter');
+}
+cells.forEach((tile, i) => paint(tile, i * 110));
+function swap(i = rand(cells.length)) {
+  const tile = cells[i];
+  tile.style.animationDelay = '0ms';
+  tile.classList.remove('enter');
+  tile.classList.add('leave');
+  setTimeout(() => paint(tile), 300);
+}
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (!reduced) setInterval(() => swap(), 1700);
+
+/* Typing in the start box nudges the board and the yellow corner */
+const form = document.getElementById('start-form');
+const field = document.getElementById('start-text');
+let last = 0;
+field.addEventListener('input', () => {
+  const now = Date.now();
+  form.style.setProperty('--pulse', 1.18);
+  setTimeout(() => form.style.setProperty('--pulse', 1), 160);
+  if (now - last > 260) { swap(); last = now; }
+});
+document.querySelectorAll('.try').forEach((b) => b.addEventListener('click', () => { field.value = b.dataset.text; field.focus(); swap(); swap(); }));
+form.addEventListener('submit', (e) => { e.preventDefault(); location.href = 'session.html'; });
+
+/* ── Problem badges ── */
+const PROBLEMS = [
+  { title: 'My weekly plan falls apart by Wednesday', phase: 'Framing', frame: 1, tool: null, when: 'Today', skills: ['abstract_thinking', 'decision_making'] },
+  { title: 'Year 9 homework completion has dropped since half term', phase: 'Defining', frame: 3, tool: 'five_whys', when: '14 Oct', skills: ['analysis', 'inference', 'critical_thinking'] },
+  { title: 'Too many side projects, none of them finished', phase: 'Defining', frame: 3, tool: 'problem_tree', when: '9 Oct', skills: ['synthesis', 'analysis'] },
+  { title: 'Marking takes my whole Sunday', phase: 'Defined', frame: 3, tool: 'smart', when: '2 Oct', skills: ['decision_making', 'reflective_thinking', 'metacognition', 'logical_reasoning'] }
+];
+const PHASE_C = { Framing: 'var(--ps-blue)', Defining: 'var(--ps-yellow)', Defined: 'var(--ps-red)' };
+const TOOL_NAMES = { five_whys: '5 Whys', problem_tree: 'Problem tree', concept_map: 'Concept mapping', gap_basic: 'Gap analysis', gap_radar: 'Gap analysis (advanced)', problem_statement: 'Problem statement', smart: 'SMART objectives' };
+function medal(p) {
+  const ghost = 'var(--ps-ghost)';
+  const tool = p.tool ? `<g class="piece p-tool" transform="translate(30 30) scale(.4)">${EMBLEMS[p.tool]}</g>` : `<circle class="piece p-tool" cx="50" cy="50" r="9" fill="var(--card)" stroke="${ghost}" stroke-width="2" stroke-dasharray="3 3"/>`;
+  return `<svg viewBox="0 0 100 100">
+    <path class="piece p-top" fill="${p.frame >= 1 ? 'var(--ps-blue)' : ghost}" d="M2.38 44A48 48 0 0 1 97.62 44Z"/>
+    <path class="piece p-mid" fill="${p.frame >= 2 ? 'var(--ps-yellow)' : ghost}" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/>
+    <path class="piece p-bot" fill="${p.frame >= 3 ? 'var(--ps-red)' : ghost}" d="M2.38 56A48 48 0 0 0 97.62 56Z"/>
+    ${p.tool ? '<circle cx="50" cy="50" r="24" fill="var(--card)"/>' : ''}${tool}
+  </svg>`;
+}
+const list = document.getElementById('problems');
+PROBLEMS.forEach((p, i) => {
+  const li = document.createElement('li');
+  li.style.display = 'contents';
+  li.innerHTML = `<a class="prob" href="session.html" style="--i:${i}">
+    <span class="medal">${medal(p)}</span>
+    <span class="prob__body">
+      <h3 class="prob__title">${p.title}</h3>
+      <p class="prob__meta"><span class="phase" style="--c:${PHASE_C[p.phase]}">${p.phase}</span>${p.tool ? `<span>${TOOL_NAMES[p.tool]}</span>` : '<span>Question 1 of 3</span>'}<span>${p.when}</span></p>
+      <span class="prob__skills">${p.skills.map((s) => `<span class="ps-glyph" title="${s.replace('_', ' ')}">${glyph(s)}</span>`).join('')}</span>
+    </span>
+  </a>`;
+  list.append(li);
+});
+const add = document.createElement('li');
+add.style.display = 'contents';
+add.innerHTML = `<button class="prob prob--new" type="button" style="--i:${PROBLEMS.length}">+ New problem</button>`;
+add.firstChild.addEventListener('click', () => { field.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+list.append(add);
+
+/* ── Define step art cycles through tool emblems ── */
+const toolArt = document.getElementById('build-tool');
+const toolOrder = ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'smart'];
+let ti = 0;
+function nextTool() {
+  toolArt.innerHTML = `<svg viewBox="0 0 100 100"><g class="tile enter">${EMBLEMS[toolOrder[ti % toolOrder.length]]}</g></svg>`;
+  ti += 1;
+}
+nextTool();
+if (!reduced) setInterval(nextTool, 2400);
+
+/* ── Toolkit shelf ── */
+const WHEN = {
+  five_whys: 'One clear symptom with a likely single chain of cause.',
+  problem_tree: 'Several causes and effects that need sorting.',
+  concept_map: 'A messy system that needs a holistic view.',
+  gap_basic: 'A clear present state and a desired state.',
+  gap_radar: 'Several dimensions of the gap, scored 1 to 10.',
+  problem_statement: 'Summarise the problem, its impacts and benefits.',
+  smart: 'Last in Define: goals you can act on.'
+};
+document.getElementById('shelf').innerHTML = Object.keys(WHEN).map((id) => `<button class="tool" type="button"><span class="ps-emblem">${EMBLEMS[id]}</span><b>${TOOL_NAMES[id]}</b><span>${WHEN[id]}</span></button>`).join('');
+
+/* ── Skills ribbon ── */
+const SKILLS = [['abstract_thinking', 'Abstract thinking', 6], ['searching', 'Searching', 3], ['learning', 'Learning', 0], ['decision_making', 'Decision making', 9], ['inference', 'Inference', 5], ['reflective_thinking', 'Reflective thinking', 4], ['synthesis', 'Synthesis', 2], ['analysis', 'Analysis', 11], ['logical_reasoning', 'Logical reasoning', 3], ['critical_thinking', 'Critical thinking', 7], ['metacognition', 'Metacognition', 1], ['creative_thinking', 'Creative thinking', 0]];
+const max = Math.max(...SKILLS.map((s) => s[2]));
+document.getElementById('skills').innerHTML = SKILLS.map(([id, name, n], i) => `<div class="skill" data-n="${n}"><span class="ps-glyph">${glyph(id)}</span><span><b>${name}</b><small>${n ? `${n}×` : 'not yet'}</small><span class="bar"><i style="--w:${(n / max) * 100}%;--c:${C[i % 3]}"></i></span></span></div>`).join('');
+</script>

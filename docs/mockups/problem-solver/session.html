@@ -1,0 +1,494 @@
+<title>Problem Solver Session</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: Life Hub navy rail + cotton canvas; inside the canvas, the Problem Solver
+   "workbench" uses the toolkit book's flat red / yellow / blue geometry. */
+:root {
+  --rail: #17375e;
+  --rail-2: #142b51;
+  --on-rail: rgba(255, 255, 255, 0.92);
+  --on-rail-muted: rgba(255, 255, 255, 0.62);
+  --on-rail-hover: rgba(255, 255, 255, 0.1);
+  --paper: #fbf8f2;
+  --cotton: #f5f1e9;
+  --card: #ffffff;
+  --ink: #13233a;
+  --muted: #6b7788;
+  --line: rgba(23, 55, 94, 0.12);
+  --navy: #17375e;
+  --wave: #376fb7;
+  /* Book palette (toolkit) */
+  --ps-red: #d7262e;
+  --ps-yellow: #f6be2c;
+  --ps-blue: #2c55a4;
+  --ps-on-yellow: #2a2210;
+  --ps-ghost: rgba(19, 35, 58, 0.14);
+  --ps-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ps-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --font-ui: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --rail: #0d1a33; --rail-2: #0a1536; --paper: #131a26; --cotton: #182131; --card: #1d2738;
+    --ink: #eef1f5; --muted: #9aa6b6; --line: rgba(255, 255, 255, 0.1); --navy: #4d7cc4; --wave: #7aa6e0;
+    --ps-red: #e8474e; --ps-yellow: #f6c445; --ps-blue: #4f7bd0; --ps-ghost: rgba(255, 255, 255, 0.16);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --rail: #0d1a33; --rail-2: #0a1536; --paper: #131a26; --cotton: #182131; --card: #1d2738;
+  --ink: #eef1f5; --muted: #9aa6b6; --line: rgba(255, 255, 255, 0.1); --navy: #4d7cc4; --wave: #7aa6e0;
+  --ps-red: #e8474e; --ps-yellow: #f6c445; --ps-blue: #4f7bd0; --ps-ghost: rgba(255, 255, 255, 0.16);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+button, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--wave); outline-offset: 3px; border-radius: 6px; }
+
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.rail { background: var(--rail); color: var(--on-rail); padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.rail__brand { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 0 12px 18px; }
+.rail__group { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--on-rail-muted); padding: 14px 12px 6px; }
+.rail a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; color: var(--on-rail); text-decoration: none; font-size: 14.5px; }
+.rail a:hover { background: var(--on-rail-hover); }
+.rail a[aria-current="page"] { background: rgba(255, 255, 255, 0.12); font-weight: 600; }
+.rail .dot { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; opacity: 0.85; }
+.rail .dot svg { width: 18px; height: 18px; }
+
+.canvas { min-width: 0; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.canvas__inner { max-width: 1240px; margin: 0 auto; padding-inline: clamp(0px, 3vw, 32px); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+
+.ps-glyph { display: inline-flex; width: 20px; height: 20px; flex: none; }
+.ps-glyph svg, .ps-emblem svg { width: 100%; height: 100%; display: block; }
+.ps-emblem { display: inline-flex; width: 28px; height: 28px; flex: none; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 14px; border: 0; cursor: pointer; font-weight: 600; transition: transform 180ms var(--ps-ease), background 180ms; }
+.btn--primary { background: var(--navy); color: #fff; }
+.btn--primary:hover { transform: translateY(-1px); }
+.btn--ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.btn--ghost:hover { background: var(--cotton); }
+
+.mock-note { font-size: 12px; color: var(--muted); margin: 0; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 12px 16px; gap: 6px; }
+  .rail__brand { padding: 0 8px 0 0; white-space: nowrap; }
+  .rail__group, .rail a:not([aria-current="page"]) { display: none; }
+  .rail a { white-space: nowrap; }
+  .canvas { padding-block: 20px 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+
+.top { display: grid; gap: 10px; }
+.back { color: var(--muted); text-decoration: none; font-size: 14px; width: fit-content; }
+.back:hover { color: var(--ink); }
+.title { margin: 0; font-size: clamp(22px, 2.6vw, 30px); line-height: 1.2; letter-spacing: -0.02em; font-weight: 750; text-wrap: balance; max-width: 34ch; }
+
+/* ── Process track: stations drawn as book shapes ── */
+.track { position: relative; margin: 22px 0 26px; overflow-x: auto; padding-bottom: 4px; }
+.track ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(8, minmax(84px, 1fr)); position: relative; min-width: 680px; }
+.track ol::before, .track ol::after { content: ""; position: absolute; left: calc(100% / 16); top: 15px; height: 4px; border-radius: 4px; }
+.track ol::before { right: calc(100% / 16); background: var(--ps-ghost); }
+.track ol::after { width: calc((100% - 100% / 8) * var(--p, 0)); background: var(--navy); transition: width 900ms var(--ps-ease); }
+.stn { display: grid; justify-items: center; gap: 8px; position: relative; z-index: 1; text-align: center; }
+.stn__mark { width: 34px; height: 34px; display: grid; place-items: center; }
+.stn__mark svg { width: 100%; height: 100%; overflow: visible; }
+.stn b { font-size: 12.5px; font-weight: 600; }
+.stn small { font-size: 11px; color: var(--muted); }
+.stn[data-state="future"] b { color: var(--muted); font-weight: 500; }
+.stn[data-state="now"] .stn__mark { animation: breathe 2.4s var(--ps-ease) infinite; }
+@keyframes breathe { 50% { transform: scale(1.12); } }
+
+/* ── Board ── */
+.board { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); gap: 24px; align-items: start; }
+.bench { background: var(--card); border-radius: 28px; padding: clamp(18px, 2.4vw, 28px); box-shadow: 0 1px 0 var(--line); display: grid; gap: 24px; position: relative; overflow: hidden; min-width: 0; }
+.bench__head { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.bench__head h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+.bench__head h2 .ps-emblem { width: 26px; height: 26px; }
+.count { font: 500 12px var(--font-mono); color: var(--muted); }
+
+/* Frame: the gap-analysis emblem assembles as questions are answered */
+.frame { display: grid; grid-template-columns: minmax(180px, 280px) minmax(0, 1fr); gap: 28px; align-items: center; }
+.medal { position: relative; width: 100%; aspect-ratio: 1; max-width: 280px; }
+.medal svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.pc { transform-box: view-box; transform-origin: 50px 50px; transition: transform 700ms var(--ps-spring); }
+.pc__fill { transition: clip-path 900ms var(--ps-ease); }
+.pc__ghost { fill: none; stroke: var(--ps-ghost); stroke-width: 0.8; stroke-dasharray: 2.4 2; }
+.pc[data-state="now"] .pc__ghost { stroke: var(--c); stroke-width: 1.2; animation: march 1.2s linear infinite; }
+.pc[data-state="now"] { animation: lift 2.4s var(--ps-ease) infinite; }
+@keyframes march { to { stroke-dashoffset: -8.8; } }
+@keyframes lift { 50% { transform: translateY(var(--ly, 0)) scale(1.02); } }
+.pc--top { --ly: -1.5px; }
+.pc--bot { --ly: 1.5px; }
+.pc--mid { --ly: 0px; }
+.pc__fill[data-filled="false"] { clip-path: inset(0 100% 0 0); }
+.pc__fill[data-filled="true"] { clip-path: inset(0 0 0 0); }
+.medal.is-done .pc--top { transform: translateY(-6px); }
+.medal.is-done .pc--bot { transform: translateY(6px); }
+.medal__core { transform-box: view-box; transform-origin: 50px 50px; transform: scale(0) rotate(-180deg); transition: transform 800ms var(--ps-spring) 250ms; }
+.medal.is-done .medal__core { transform: scale(1) rotate(0); }
+
+.answers { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; min-width: 0; }
+.ans { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; padding: 14px 16px; border-radius: 18px; transition: background 400ms var(--ps-ease), box-shadow 400ms; box-shadow: inset 0 0 0 1px var(--line); }
+.ans__mark { width: 22px; height: 22px; margin-top: 1px; }
+.ans__mark svg { width: 100%; height: 100%; }
+.ans__q { margin: 0; font-weight: 650; font-size: 15px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.ans__a { margin: 4px 0 0; color: var(--ink); font-size: 14.5px; line-height: 1.5; min-height: 1.5em; }
+.ans__a:empty::before { content: "Waiting for your answer"; color: var(--muted); font-style: italic; }
+.ans[data-state="done"] { background: var(--cotton); box-shadow: none; }
+.ans[data-state="now"] { box-shadow: inset 0 0 0 2px var(--c); }
+.ans[data-state="future"] .ans__q { color: var(--muted); }
+.now-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--c); color: var(--on-c, #fff); }
+.caret::after { content: ""; display: inline-block; width: 2px; height: 1em; background: currentColor; margin-left: 2px; vertical-align: -2px; animation: blink 0.9s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Skills tray */
+.tray { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; }
+.tray__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tray__head h3 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.slots { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; }
+.slot { aspect-ratio: 1; max-width: 100%; border-radius: 50%; display: grid; place-items: center; position: relative; color: var(--ink); }
+.slot .ps-glyph { width: 100%; height: 100%; opacity: 0.16; transition: opacity 400ms, transform 700ms var(--ps-spring); }
+.slot.on .ps-glyph { opacity: 1; }
+.slot.pop .ps-glyph { animation: earn 900ms var(--ps-spring); }
+@keyframes earn { 0% { transform: scale(0.2) rotate(-200deg); } 60% { transform: scale(1.25) rotate(10deg); } 100% { transform: none; } }
+.slot.pop::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--ps-yellow); animation: ring 900ms var(--ps-ease) forwards; }
+@keyframes ring { from { transform: scale(0.5); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+
+/* 5 Whys build (after the frame) */
+.whys { display: grid; justify-items: center; gap: 8px; padding-block: 8px; }
+.whys svg { width: min(100%, 300px); height: auto; overflow: visible; }
+.whys .w { transform-box: fill-box; transform-origin: 50% 0; animation: drop 700ms var(--ps-spring) both; }
+@keyframes drop { from { transform: translateY(-20px) scaleY(0.2); opacity: 0; } }
+.whys text { font: 600 7px var(--font-ui); }
+
+/* ── Coach ── */
+.coach { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.msgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; max-height: 62vh; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
+.msg { display: grid; gap: 6px; max-width: 92%; animation: msgIn 480ms var(--ps-spring) both; }
+@keyframes msgIn { from { transform: translateY(10px) scale(0.97); opacity: 0; } }
+.msg--user { align-self: end; justify-items: end; }
+.msg--user .bubble { background: var(--navy); color: #fff; border-radius: 20px 20px 6px 20px; }
+.msg--coach { grid-template-columns: 30px minmax(0, 1fr); align-items: start; column-gap: 10px; }
+.msg--coach .bubble { background: var(--card); border-radius: 20px 20px 20px 6px; box-shadow: 0 1px 0 var(--line); }
+.msg--coach .chips { grid-column: 2; }
+.bubble { padding: 12px 16px; font-size: 14.5px; line-height: 1.5; }
+.av { width: 30px; height: 30px; }
+.av svg { width: 100%; height: 100%; overflow: visible; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--cotton); font-size: 12px; color: var(--ink); animation: chipIn 600ms var(--ps-spring) both; animation-delay: calc(var(--i, 0) * 120ms + 200ms); }
+.chip .ps-glyph { width: 20px; height: 20px; }
+.chip--missing { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
+.chip--missing .ps-glyph { opacity: 0.5; }
+@keyframes chipIn { from { transform: scale(0.4) rotate(-12deg); opacity: 0; } }
+
+.thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding-left: 40px; }
+.dots { display: inline-flex; gap: 5px; align-items: end; height: 14px; }
+.dots i { width: 11px; height: 11px; animation: hop 900ms var(--ps-ease) infinite; }
+.dots i:nth-child(1) { background: var(--ps-red); border-radius: 50%; }
+.dots i:nth-child(2) { background: var(--ps-yellow); clip-path: polygon(50% 0, 100% 100%, 0 100%); animation-delay: 120ms; }
+.dots i:nth-child(3) { background: var(--ps-blue); border-radius: 11px 11px 0 0; height: 6px; animation-delay: 240ms; }
+@keyframes hop { 40% { transform: translateY(-6px) rotate(20deg); } }
+
+.suggest { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; padding: 16px; border-radius: 22px; background: var(--card); box-shadow: inset 0 0 0 2px var(--ps-yellow); animation: msgIn 600ms var(--ps-spring) both; }
+.suggest .ps-emblem { width: 56px; height: 56px; animation: spinIn 1s var(--ps-spring) both; }
+@keyframes spinIn { from { transform: rotate(-270deg) scale(0); } }
+.suggest h3 { margin: 0; font-size: 15.5px; }
+.suggest p { margin: 4px 0 12px; font-size: 13.5px; color: var(--muted); }
+.suggest__row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.composer { display: grid; gap: 8px; background: var(--card); border-radius: 22px; padding: 12px; box-shadow: 0 1px 0 var(--line), 0 14px 30px -24px rgba(23, 55, 94, 0.4); }
+.composer__now { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 0 4px; }
+.composer__now svg { width: 16px; height: 16px; flex: none; }
+.composer textarea { width: 100%; border: 0; resize: none; min-height: 72px; background: var(--cotton); border-radius: 14px; padding: 12px 14px; font-size: 15px; line-height: 1.45; }
+.composer__row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.composer__row .mock-note { padding-left: 4px; }
+
+@media (max-width: 980px) { .board { grid-template-columns: minmax(0, 1fr); } .msgs { max-height: none; } }
+@media (max-width: 620px) {
+  .frame { grid-template-columns: 1fr; justify-items: center; }
+  .medal { max-width: 200px; }
+  .answers { width: 100%; }
+  .slots { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+</style>
+
+<div class="app">
+  <nav class="rail" aria-label="Tasks Hub">
+    <div class="rail__brand">TASKS HUB</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>Backlog</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 11l8-4M8 13l8 4"/></svg></span>Graph</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h18"/><circle cx="7" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg></span>Timeline</a>
+    <div class="rail__group">TOOLS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/></svg></span>Maps</a>
+    <a href="landing.html" aria-current="page"><span class="dot"><svg viewBox="0 0 100 100"><path fill="#f6be2c" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/><path fill="#d7262e" d="M2.38 56A48 48 0 0 0 97.62 56Z"/><path fill="#7ea2e6" d="M2.38 44A48 48 0 0 1 97.62 44Z"/></svg></span>Problem Solver</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>Search</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6h14M5 12h14M5 18h9"/></svg></span>Term dates</a>
+    <div class="rail__group">HUBS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9H4z"/></svg></span>Life</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h7v14H4zM13 5h7v14h-7z"/></svg></span>Teaching</a>
+  </nav>
+
+  <main class="canvas">
+    <div class="canvas__inner">
+      <div class="top">
+        <p class="eyebrow">Tasks Hub · Problem Solver</p>
+        <a class="back" href="landing.html">← Problems</a>
+        <h1 class="title">My weekly plan falls apart by Wednesday</h1>
+      </div>
+
+      <nav class="track" aria-label="Process">
+        <ol id="track"></ol>
+      </nav>
+
+      <div class="board">
+        <section class="bench" aria-labelledby="bench-title">
+          <div class="bench__head">
+            <h2 id="bench-title">Frame the problem</h2>
+            <span class="count" id="count">1 of 3 answered</span>
+          </div>
+          <div id="stage">
+            <div class="frame">
+              <div class="medal" id="medal" aria-hidden="true">
+                <svg viewBox="-4 -10 108 120">
+                  <g class="pc pc--top" style="--c:var(--ps-blue)">
+                    <path class="pc__ghost" d="M2.38 44A48 48 0 0 1 97.62 44Z"/>
+                    <path class="pc__fill" fill="var(--ps-blue)" d="M2.38 44A48 48 0 0 1 97.62 44Z"/>
+                  </g>
+                  <g class="pc pc--mid" style="--c:var(--ps-yellow)">
+                    <path class="pc__ghost" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/>
+                    <path class="pc__fill" fill="var(--ps-yellow)" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/>
+                  </g>
+                  <g class="pc pc--bot" style="--c:var(--ps-red)">
+                    <path class="pc__ghost" d="M2.38 56A48 48 0 0 0 97.62 56Z"/>
+                    <path class="pc__fill" fill="var(--ps-red)" d="M2.38 56A48 48 0 0 0 97.62 56Z"/>
+                  </g>
+                  <g class="medal__core"><circle cx="50" cy="50" r="22" fill="var(--card)"/><g transform="translate(32 32) scale(.36)" id="core-emblem"></g></g>
+                </svg>
+              </div>
+              <ol class="answers" id="answers"></ol>
+            </div>
+          </div>
+          <div class="tray">
+            <div class="tray__head"><h3>Thinking skills this session</h3><span class="count" id="skill-count">2 of 12</span></div>
+            <div class="slots" id="slots"></div>
+          </div>
+        </section>
+
+        <section class="coach" aria-label="Coach">
+          <ul class="msgs" id="msgs" aria-live="polite"></ul>
+          <div id="extras"></div>
+          <form class="composer" id="composer">
+            <div class="composer__now" id="composer-now"></div>
+            <label class="sr-only" for="answer" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Your answer</label>
+            <textarea id="answer" rows="3"></textarea>
+            <div class="composer__row">
+              <p class="mock-note" id="note">Example answer filled in. Press Send to see the frame build.</p>
+              <button class="btn btn--primary" id="send" type="submit">Send</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const GLYPHS={"abstract_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><clipPath id=\"ps-abstract-clip\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-abstract-clip)\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M-100 0l100 100\"/><path d=\"M-95 0l100 100\"/><path d=\"M-90 0l100 100\"/><path d=\"M-85 0l100 100\"/><path d=\"M-80 0l100 100\"/><path d=\"M-75 0l100 100\"/><path d=\"M-70 0l100 100\"/><path d=\"M-65 0l100 100\"/><path d=\"M-60 0l100 100\"/><path d=\"M-55 0l100 100\"/><path d=\"M-50 0l100 100\"/><path d=\"M-45 0l100 100\"/><path d=\"M-40 0l100 100\"/><path d=\"M-35 0l100 100\"/><path d=\"M-30 0l100 100\"/><path d=\"M-25 0l100 100\"/><path d=\"M-20 0l100 100\"/><path d=\"M-15 0l100 100\"/><path d=\"M-10 0l100 100\"/><path d=\"M-5 0l100 100\"/><path d=\"M0 0l100 100\"/><path d=\"M5 0l100 100\"/><path d=\"M10 0l100 100\"/><path d=\"M15 0l100 100\"/><path d=\"M20 0l100 100\"/><path d=\"M25 0l100 100\"/><path d=\"M30 0l100 100\"/><path d=\"M35 0l100 100\"/><path d=\"M40 0l100 100\"/><path d=\"M45 0l100 100\"/><path d=\"M50 0l100 100\"/><path d=\"M55 0l100 100\"/><path d=\"M60 0l100 100\"/><path d=\"M65 0l100 100\"/><path d=\"M70 0l100 100\"/><path d=\"M75 0l100 100\"/><path d=\"M80 0l100 100\"/><path d=\"M85 0l100 100\"/><path d=\"M90 0l100 100\"/><path d=\"M95 0l100 100\"/><path d=\"M100 0l100 100\"/></g></svg>","analysis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><clipPath id=\"ps-analysis\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-analysis)\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"><circle cx=\"50\" cy=\"50\" r=\"44\"/><circle cx=\"50\" cy=\"62\" r=\"44\"/><circle cx=\"50\" cy=\"74\" r=\"44\"/><circle cx=\"50\" cy=\"86\" r=\"44\"/><circle cx=\"50\" cy=\"98\" r=\"44\"/><circle cx=\"50\" cy=\"110\" r=\"44\"/><circle cx=\"50\" cy=\"122\" r=\"44\"/></g><circle cx=\"50\" cy=\"50\" r=\"44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/></svg>","creative_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><circle cx=\"50\" cy=\"73\" r=\"20\"/><path d=\"M47 73L4.000 53.000 53 73Z\"/><path d=\"M47 73L4.699 45.012 53 73Z\"/><path d=\"M47 73L6.774 37.267 53 73Z\"/><path d=\"M47 73L10.163 30.000 53 73Z\"/><path d=\"M47 73L14.762 23.432 53 73Z\"/><path d=\"M47 73L20.432 17.762 53 73Z\"/><path d=\"M47 73L27.000 13.163 53 73Z\"/><path d=\"M47 73L34.267 9.774 53 73Z\"/><path d=\"M47 73L42.012 7.699 53 73Z\"/><path d=\"M47 73L50.000 7.000 53 73Z\"/><path d=\"M47 73L57.988 7.699 53 73Z\"/><path d=\"M47 73L65.733 9.774 53 73Z\"/><path d=\"M47 73L73.000 13.163 53 73Z\"/><path d=\"M47 73L79.568 17.762 53 73Z\"/><path d=\"M47 73L85.238 23.432 53 73Z\"/><path d=\"M47 73L89.837 30.000 53 73Z\"/><path d=\"M47 73L93.226 37.267 53 73Z\"/><path d=\"M47 73L95.301 45.012 53 73Z\"/><path d=\"M47 73L96.000 53.000 53 73Z\"/></svg>","critical_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-critical-thinking\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"black\" stroke-width=\"22\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"white\" stroke-width=\"7\"/></mask></defs><g mask=\"url(#ps-critical-thinking)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","decision_making":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-decision-making\"><rect width=\"100\" height=\"100\" fill=\"white\"/><g fill=\"black\"><circle cx=\"30\" cy=\"50\" r=\"18\"/><circle cx=\"70\" cy=\"50\" r=\"18\"/></g></mask></defs><g mask=\"url(#ps-decision-making)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","inference":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-inference\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M33 25V68H76 M49 25V52H76\" fill=\"none\" stroke=\"black\" stroke-width=\"5\"/></mask></defs><g mask=\"url(#ps-inference)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","learning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-learning\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M16 63 45 25 85 38 55 76Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-learning)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","logical_reasoning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><path d=\"M52.3028 6.0603A44 44 0 0 1 69.9756 10.7957L61.8038 26.8338A26 26 0 0 0 51.3607 24.0356Z\"/><path d=\"M73.9641 13.0985A44 44 0 0 1 86.9015 26.0359L71.8054 35.8394A26 26 0 0 0 64.1606 28.1946Z\"/><path d=\"M89.2043 30.0244A44 44 0 0 1 93.9397 47.6972L75.9644 48.6393A26 26 0 0 0 73.1662 38.1962Z\"/><path d=\"M93.9397 52.3028A44 44 0 0 1 89.2043 69.9756L73.1662 61.8038A26 26 0 0 0 75.9644 51.3607Z\"/><path d=\"M86.9015 73.9641A44 44 0 0 1 73.9641 86.9015L64.1606 71.8054A26 26 0 0 0 71.8054 64.1606Z\"/><path d=\"M69.9756 89.2043A44 44 0 0 1 52.3028 93.9397L51.3607 75.9644A26 26 0 0 0 61.8038 73.1662Z\"/><path d=\"M47.6972 93.9397A44 44 0 0 1 30.0244 89.2043L38.1962 73.1662A26 26 0 0 0 48.6393 75.9644Z\"/><path d=\"M26.0359 86.9015A44 44 0 0 1 13.0985 73.9641L28.1946 64.1606A26 26 0 0 0 35.8394 71.8054Z\"/><path d=\"M10.7957 69.9756A44 44 0 0 1 6.0603 52.3028L24.0356 51.3607A26 26 0 0 0 26.8338 61.8038Z\"/><path d=\"M6.0603 47.6972A44 44 0 0 1 10.7957 30.0244L26.8338 38.1962A26 26 0 0 0 24.0356 48.6393Z\"/><path d=\"M13.0985 26.0359A44 44 0 0 1 26.0359 13.0985L35.8394 28.1946A26 26 0 0 0 28.1946 35.8394Z\"/><path d=\"M30.0244 10.7957A44 44 0 0 1 47.6972 6.0603L48.6393 24.0356A26 26 0 0 0 38.1962 26.8338Z\"/></svg>","metacognition":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(0 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(45 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(90 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(135 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(180 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(225 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(270 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(315 50 50)\"/></svg>","reflective_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><path d=\"M50 50L94.0000 50.0000A44 44 0 0 1 92.6930 60.6446Z\"/><path d=\"M50 50L90.6507 66.8381A44 44 0 0 1 85.3697 76.1722Z\"/><path d=\"M50 50L81.1127 81.1127A44 44 0 0 1 72.6617 87.7154Z\"/><path d=\"M50 50L66.8381 90.6507A44 44 0 0 1 56.5036 93.5167Z\"/><path d=\"M50 50L50.0000 94.0000A44 44 0 0 1 39.3554 92.6930Z\"/><path d=\"M50 50L33.1619 90.6507A44 44 0 0 1 23.8278 85.3697Z\"/><path d=\"M50 50L18.8873 81.1127A44 44 0 0 1 12.2846 72.6617Z\"/><path d=\"M50 50L9.3493 66.8381A44 44 0 0 1 6.4833 56.5036Z\"/><path d=\"M50 50L6.0000 50.0000A44 44 0 0 1 7.3070 39.3554Z\"/><path d=\"M50 50L9.3493 33.1619A44 44 0 0 1 14.6303 23.8278Z\"/><path d=\"M50 50L18.8873 18.8873A44 44 0 0 1 27.3383 12.2846Z\"/><path d=\"M50 50L33.1619 9.3493A44 44 0 0 1 43.4964 6.4833Z\"/><path d=\"M50 50L50.0000 6.0000A44 44 0 0 1 60.6446 7.3070Z\"/><path d=\"M50 50L66.8381 9.3493A44 44 0 0 1 76.1722 14.6303Z\"/><path d=\"M50 50L81.1127 18.8873A44 44 0 0 1 87.7154 27.3383Z\"/><path d=\"M50 50L90.6507 33.1619A44 44 0 0 1 93.5167 43.4964Z\"/></svg>","searching":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-searching\"><rect width=\"100\" height=\"100\" fill=\"white\"/><circle cx=\"50\" cy=\"50\" r=\"19\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-searching)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","synthesis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><defs><mask id=\"ps-synthesis\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M50 8Q62 32 92 50Q63 67 50 92Q32 64 8 50Q34 35 50 8Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-synthesis)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>"};const EMBLEMS={"concept_map":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle fill=\"#2c55a4\" cx=\"50\" cy=\"50\" r=\"48\"/><circle fill=\"#d7262e\" cx=\"36\" cy=\"42\" r=\"10\"/><circle fill=\"#f6be2c\" cx=\"62\" cy=\"36\" r=\"9\"/><circle fill=\"#2c55a4\" cx=\"62\" cy=\"36\" r=\"4\"/><circle fill=\"#f6be2c\" cx=\"45\" cy=\"64\" r=\"9\"/><circle fill=\"#2c55a4\" cx=\"45\" cy=\"64\" r=\"4\"/><circle fill=\"#d7262e\" cx=\"67\" cy=\"62\" r=\"7\"/><circle fill=\"#f6be2c\" cx=\"27\" cy=\"60\" r=\"5\"/></svg>\n","five_whys":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#d7262e\" d=\"M2 50A48 48 0 0 1 98 50Z\"/><path fill=\"#2c55a4\" d=\"M2 50A48 48 0 0 0 98 50Z\"/><path fill=\"#f6be2c\" d=\"M39 18L50 27L61 18V24L50 33L39 24ZM39 33L50 42L61 33V39L50 48L39 39ZM39 48L50 57L61 48V54L50 63L39 54ZM39 63L50 72L61 63V69L50 78L39 69Z\"/></svg>\n","gap_basic":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#2c55a4\" d=\"M2.38 44A48 48 0 0 1 97.62 44Z\"/><path fill=\"#f6be2c\" d=\"M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z\"/><path fill=\"#d7262e\" d=\"M2.38 56A48 48 0 0 0 97.62 56Z\"/></svg>\n","gap_radar":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#2c55a4\" d=\"M2.38 44A48 48 0 0 1 97.62 44Z\"/><path fill=\"#f6be2c\" d=\"M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z\"/><path fill=\"#d7262e\" d=\"M2.38 56A48 48 0 0 0 97.62 56Z\"/></svg>\n","problem_statement":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#d7262e\" d=\"M50 2A48 48 0 0 0 50 98Z\"/><path fill=\"#2c55a4\" d=\"M50 50V2A48 48 0 0 1 98 50Z\"/><path fill=\"#f6be2c\" d=\"M50 50H98A48 48 0 0 1 50 98Z\"/></svg>\n","problem_tree":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle fill=\"#f6be2c\" cx=\"50\" cy=\"50\" r=\"48\"/><circle fill=\"#2c55a4\" cx=\"50\" cy=\"35\" r=\"13\"/><path fill=\"#d7262e\" d=\"M30 56H70V63H30ZM30 69H70V76H30Z\"/></svg>\n","smart":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><path fill=\"#f6be2c\" d=\"M83.94 16.06A48 48 0 0 0 16.06 83.94Z\"/><path fill=\"#2c55a4\" d=\"M83.94 16.06A48 48 0 0 1 16.06 83.94Z\"/><path fill=\"#d7262e\" d=\"M50 30L70 66H30Z\"/></svg>\n"};
+let copy = 0;
+function glyph(id) {
+  copy += 1;
+  return (GLYPHS[id] || '').replace(/id="(ps-[a-z-]+)"/g, `id="$1-${copy}"`).replace(/url\(#(ps-[a-z-]+)\)/g, `url(#$1-${copy})`);
+}
+const NAMES = { abstract_thinking: 'Abstract thinking', searching: 'Searching', learning: 'Learning', decision_making: 'Decision making', inference: 'Inference', reflective_thinking: 'Reflective thinking', synthesis: 'Synthesis', analysis: 'Analysis', logical_reasoning: 'Logical reasoning', critical_thinking: 'Critical thinking', metacognition: 'Metacognition', creative_thinking: 'Creative thinking' };
+const sleep = (ms) => new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? Math.min(ms, 60) : ms));
+
+/* ── Process track ── */
+const STEPS = [['Frame', '3 questions'], ['Define', 'Pick a tool'], ['Analyse', ''], ['Devise', ''], ['Decide', ''], ['Implement', ''], ['Improve', ''], ['Document', '']];
+const MARKS = [
+  '<path fill="var(--ps-blue)" d="M2.38 44A48 48 0 0 1 97.62 44Z"/><path fill="var(--ps-yellow)" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/><path fill="var(--ps-red)" d="M2.38 56A48 48 0 0 0 97.62 56Z"/>',
+  '<path fill="var(--ps-red)" d="M2 50A48 48 0 0 1 98 50Z"/><path fill="var(--ps-blue)" d="M2 50A48 48 0 0 0 98 50Z"/><path fill="var(--ps-yellow)" d="M36 30L50 42L64 30V40L50 52L36 40ZM36 50L50 62L64 50V60L50 72L36 60Z"/>',
+  '<circle cx="50" cy="50" r="48" fill="var(--c)"/><circle cx="50" cy="50" r="20" fill="var(--card)"/>',
+  '<path fill="var(--c)" d="M50 4L96 92H4Z"/>',
+  '<circle cx="50" cy="50" r="48" fill="var(--c)"/><circle cx="32" cy="50" r="14" fill="var(--card)"/><circle cx="68" cy="50" r="14" fill="var(--card)"/>',
+  '<path fill="var(--c)" d="M4 4H96V96H4Z"/>',
+  '<path fill="var(--c)" d="M50 2A48 48 0 0 0 50 98Z"/><path fill="var(--c)" opacity=".5" d="M50 2A48 48 0 0 1 50 98Z"/>',
+  '<path fill="var(--c)" d="M4 4H70L96 30V96H4Z"/>'
+];
+let stepIndex = 0;
+function drawTrack() {
+  const ol = document.getElementById('track');
+  ol.style.setProperty('--p', stepIndex / (STEPS.length - 1));
+  ol.innerHTML = STEPS.map(([name, note], i) => {
+    const state = i < stepIndex ? 'done' : i === stepIndex ? 'now' : 'future';
+    const c = state === 'future' ? 'var(--ps-ghost)' : ['var(--ps-blue)', 'var(--ps-yellow)', 'var(--ps-red)'][i % 3];
+    const mark = (i <= 1 && state !== 'future') ? MARKS[i] : MARKS[i].replace(/var\(--ps-(blue|yellow|red)\)/g, 'var(--c)');
+    return `<li class="stn" data-state="${state}" ${state === 'now' ? 'aria-current="step"' : ''}><span class="stn__mark"><svg viewBox="0 0 100 100" style="--c:${c}">${mark}</svg></span><b>${name}</b><small>${state === 'now' ? note : state === 'done' ? 'Done' : ' '}</small></li>`;
+  }).join('');
+}
+
+/* ── Frame state ── */
+const FRAME = [
+  { key: 'goal', q: 'What is the goal?', c: 'var(--ps-blue)', onc: '#fff', piece: '.pc--top', mark: '<path fill="var(--ps-blue)" d="M2.38 60A48 48 0 0 1 97.62 60Z"/>', a: 'Finish each week with my five planned priorities done, every week for a full term.' },
+  { key: 'true', q: 'What is true?', c: 'var(--ps-yellow)', onc: 'var(--ps-on-yellow)', piece: '.pc--mid', mark: '<rect x="2" y="38" width="96" height="24" rx="12" fill="var(--ps-yellow)"/>', a: '' },
+  { key: 'can', q: 'What can be done?', c: 'var(--ps-red)', onc: '#fff', piece: '.pc--bot', mark: '<path fill="var(--ps-red)" d="M2.38 40A48 48 0 0 0 97.62 40Z"/>', a: '' }
+];
+let answered = 1;
+function drawFrame() {
+  document.getElementById('answers').innerHTML = FRAME.map((f, i) => {
+    const state = i < answered ? 'done' : i === answered ? 'now' : 'future';
+    return `<li class="ans" data-state="${state}" style="--c:${f.c};--on-c:${f.onc}" data-i="${i}">
+      <span class="ans__mark"><svg viewBox="0 0 100 100" style="opacity:${state === 'future' ? 0.3 : 1}">${f.mark}</svg></span>
+      <span><p class="ans__q">${f.q}${state === 'now' ? '<span class="now-tag">Now</span>' : ''}</p><p class="ans__a">${f.a}</p></span>
+    </li>`;
+  }).join('');
+  FRAME.forEach((f, i) => {
+    const g = document.querySelector(f.piece);
+    g.dataset.state = i < answered ? 'done' : i === answered ? 'now' : 'future';
+    g.querySelector('.pc__fill').dataset.filled = String(i < answered);
+  });
+  document.getElementById('count').textContent = `${Math.min(answered, 3)} of 3 answered`;
+  const now = FRAME[answered];
+  document.getElementById('composer-now').innerHTML = now ? `<svg viewBox="0 0 100 100">${now.mark}</svg>Answering: <b style="color:var(--ink)">${now.q}</b>` : '<span>Frame complete. Add a note, or start the next tool.</span>';
+}
+
+/* ── Skills tray ── */
+const earned = new Set(['abstract_thinking', 'decision_making']);
+const slots = document.getElementById('slots');
+slots.innerHTML = Object.keys(NAMES).map((id) => `<span class="slot${earned.has(id) ? ' on' : ''}" data-id="${id}" title="${NAMES[id]}"><span class="ps-glyph">${glyph(id)}</span></span>`).join('');
+function earn(ids) {
+  ids.forEach((id, i) => setTimeout(() => {
+    const slot = slots.querySelector(`[data-id="${id}"]`);
+    earned.add(id);
+    slot.classList.add('on', 'pop');
+    setTimeout(() => slot.classList.remove('pop'), 950);
+    document.getElementById('skill-count').textContent = `${earned.size} of 12`;
+  }, i * 260));
+}
+
+/* ── Coach thread ── */
+const COACH_AV = `<svg viewBox="0 0 100 100"><circle cx="34" cy="62" r="30" fill="var(--ps-blue)"/><path d="M62 10L96 70H28Z" fill="var(--ps-yellow)"/><circle cx="72" cy="74" r="18" fill="var(--ps-red)"/></svg>`;
+const msgs = document.getElementById('msgs');
+function chips(seen = [], missing = []) {
+  const all = [...seen.map((id) => [id, false]), ...missing.map((id) => [id, true])];
+  return all.length ? `<div class="chips">${all.map(([id, miss], i) => `<span class="chip${miss ? ' chip--missing' : ''}" style="--i:${i}" title="${miss ? 'Not seen yet' : 'Seen in this answer'}"><span class="ps-glyph">${glyph(id)}</span>${NAMES[id]}</span>`).join('')}</div>` : '';
+}
+function say(role, text, opts = {}) {
+  const li = document.createElement('li');
+  li.className = `msg msg--${role}`;
+  li.innerHTML = role === 'coach'
+    ? `<span class="av">${COACH_AV}</span><div class="bubble">${text}</div>${chips(opts.seen, opts.missing)}`
+    : `<div class="bubble">${text}</div>${chips(opts.seen, opts.missing)}`;
+  msgs.append(li);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+say('user', 'My weekly plan falls apart by Wednesday');
+say('coach', "Let's start with the goal. What does a week that holds together look like, in concrete terms, say a term from now?");
+say('user', FRAME[0].a, { seen: ['abstract_thinking', 'decision_making'] });
+say('coach', "That's measurable and has a time frame. Now, what is actually true about your weeks right now? Separate what you have tracked from what you assume.");
+
+const SCRIPT = [
+  {
+    answer: "Last four weeks I finished 2, 3, 1 and 2 of the five. Tuesday and Wednesday meetings run over. I think I plan too much, but I've never checked.",
+    seen: ['analysis', 'critical_thinking'], missing: ['searching'],
+    reply: "Good split between tracked and assumed. \"I plan too much\" is still a guess, so we'll test it later. Last frame question: what can you change, and what is outside your control?"
+  },
+  {
+    answer: "I can cap the plan at three, block Thursday morning, and drop one recurring meeting. I can't move the department meeting.",
+    seen: ['decision_making', 'reflective_thinking'], missing: [],
+    reply: 'That completes the frame. You have one clear symptom with a likely chain of cause, so 5 Whys is a good next tool.'
+  }
+];
+const field = document.getElementById('answer');
+const send = document.getElementById('send');
+let turn = 0;
+field.value = SCRIPT[0].answer;
+
+async function typeInto(node, text) {
+  node.classList.add('caret');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  for (let i = 0; i <= text.length; i += reduced ? text.length : 3) { node.textContent = text.slice(0, i); await sleep(14); }
+  node.textContent = text;
+  node.classList.remove('caret');
+}
+
+document.getElementById('composer').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const step = SCRIPT[turn];
+  const text = field.value.trim();
+  if (!step || !text) return;
+  send.disabled = true;
+  field.value = '';
+  say('user', text, { seen: step.seen, missing: step.missing });
+  const think = document.createElement('li');
+  think.className = 'thinking';
+  think.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>Coach is thinking';
+  msgs.append(think);
+  msgs.scrollTop = msgs.scrollHeight;
+  await sleep(1300);
+  think.remove();
+
+  FRAME[answered].a = text;
+  const row = () => document.querySelector(`.ans[data-i="${answered}"] .ans__a`);
+  const target = row();
+  target.textContent = '';
+  const fill = document.querySelector(`${FRAME[answered].piece} .pc__fill`);
+  fill.dataset.filled = 'true';
+  await typeInto(target, text);
+  earn(step.seen);
+  answered += 1;
+  drawFrame();
+  say('coach', step.reply);
+  turn += 1;
+
+  if (turn < SCRIPT.length) {
+    field.value = SCRIPT[turn].answer;
+    send.disabled = false;
+    return;
+  }
+  document.getElementById('note').textContent = '';
+  document.getElementById('core-emblem').innerHTML = EMBLEMS.five_whys;
+  document.getElementById('medal').classList.add('is-done');
+  stepIndex = 1;
+  drawTrack();
+  const card = document.createElement('div');
+  card.className = 'suggest';
+  card.innerHTML = `<span class="ps-emblem">${EMBLEMS.five_whys}</span><div><h3>Next: 5 Whys</h3><p>One clear symptom with a likely single chain of cause.</p><div class="suggest__row"><button class="btn btn--primary" type="button" id="start-tool">Start it</button><button class="btn btn--ghost" type="button" id="not-now">Not now</button></div></div>`;
+  document.getElementById('extras').append(card);
+  document.getElementById('not-now').addEventListener('click', () => { card.remove(); send.disabled = false; });
+  document.getElementById('start-tool').addEventListener('click', () => { card.remove(); startWhys(); });
+});
+
+/* ── After the frame: the 5 Whys chart starts building ── */
+async function startWhys() {
+  const bench = document.getElementById('bench-title');
+  bench.innerHTML = `<span class="ps-emblem">${EMBLEMS.five_whys}</span>5 Whys`;
+  document.getElementById('count').textContent = 'Why 2 of 5';
+  const stage = document.getElementById('stage');
+  stage.innerHTML = `<div class="whys"><svg viewBox="0 0 120 200" id="whys"></svg></div>`;
+  const svg = document.getElementById('whys');
+  const parts = [
+    `<g class="w"><path fill="var(--ps-red)" d="M10 50A50 50 0 0 1 110 50Z"/><text x="60" y="38" text-anchor="middle" fill="#fff">The problem</text><text x="60" y="46" text-anchor="middle" fill="#fff" style="font-weight:400;font-size:5.5px">Plan falls apart by Wednesday</text></g>`,
+    `<g class="w" style="animation-delay:.25s"><path fill="var(--ps-yellow)" d="M10 54H110L60 94Z"/><text x="60" y="64" text-anchor="middle" fill="var(--ps-on-yellow)">Why 1?</text><text x="60" y="72" text-anchor="middle" fill="var(--ps-on-yellow)" style="font-weight:400;font-size:5px">Meetings eat Tue and Wed</text></g>`,
+    `<g class="w" style="animation-delay:.5s"><path fill="none" stroke="var(--ps-ghost)" stroke-width="1" stroke-dasharray="3 2" d="M10 98H110L60 138Z"/><text x="60" y="110" text-anchor="middle" fill="var(--muted)">Why 2?</text></g>`,
+    `<g class="w" style="animation-delay:.7s"><path fill="none" stroke="var(--ps-ghost)" stroke-width="1" stroke-dasharray="3 2" d="M10 150A50 50 0 0 0 110 150Z"/><text x="60" y="162" text-anchor="middle" fill="var(--muted)">Root cause</text></g>`
+  ];
+  for (const p of parts) { svg.insertAdjacentHTML('beforeend', p); await sleep(250); }
+  say('coach', "Why do the meetings on Tuesday and Wednesday take over the week? Give me the first reason that comes to mind, we'll test it next.");
+  document.getElementById('composer-now').innerHTML = `<svg viewBox="0 0 100 100"><path fill="var(--ps-yellow)" d="M4 10H96L50 90Z"/></svg>Answering: <b style="color:var(--ink)">Why 2?</b>`;
+  document.getElementById('note').textContent = 'End of the mockup demo.';
+  send.disabled = false;
+}
+
+drawTrack();
+drawFrame();
+</script>
