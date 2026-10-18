@@ -17,6 +17,7 @@ import {
   applyFixup,
   firstSentence,
   noteBlocks,
+  sharedOnce,
   tidyImports,
   liveVisits,
   dayOneRating,
@@ -725,6 +726,39 @@ test("Day One Markdown reads as headings and paragraphs, not raw symbols", () =>
   ]);
 });
 
+// Merged Day One entries each carry the same Location and Shared with
+// sections; the entry shows them once, after the dishes.
+test("merged notes show shared sections once, after the dishes", () => {
+  const part = (dish, text, rating) =>
+    [
+      `### ${dish}`,
+      "### Description",
+      text,
+      "### Rating and recommendation",
+      rating,
+      "### Location",
+      "Ibby's Burgers and Shakes",
+      "### Shared with/occasion",
+      "Day outing with Redacted!",
+    ].join("\n");
+  const notes = [
+    part("The Cheese", "Smashed beef", "4.5/5 great"),
+    part("Nashville Tenders", "Crispy fried", "4/5 very hot"),
+    part("Oklahoma", "Double smashed beef", "4/5 was good"),
+  ].join("\n\n---\n\n");
+  const blocks = sharedOnce(noteBlocks(notes));
+  const text = (b) => b.text;
+  assert.deepEqual(blocks.map(text), [
+    "The Cheese", "Description", "Smashed beef", "Rating and recommendation", "4.5/5 great",
+    "Nashville Tenders", "Description", "Crispy fried", "Rating and recommendation", "4/5 very hot",
+    "Oklahoma", "Description", "Double smashed beef", "Rating and recommendation", "4/5 was good",
+    "Location", "Ibby's Burgers and Shakes",
+    "Shared with/occasion", "Day outing with Redacted!",
+  ]);
+  // A single entry is unchanged.
+  const one = noteBlocks(part("The Cheese", "Smashed beef", "4.5/5 great"));
+  assert.deepEqual(sharedOnce(one), one);
+});
 test("fix-up splits dishes, keeps the original text, photos and tags, and never sets ratings", () => {
   const v = { ...dated("2026-09-13", "Late dumplings", "", [["Late dumplings", null]]), source_id: "dayone:x" };
   v.notes = "Late dumplings\nPork gyoza, chilli wontons.";
