@@ -1,5 +1,6 @@
 import type { CurriculumResponse } from '@/teacher/nav';
 import { openCreateModal } from '@/teacher/create/modal';
+import { openNotionImportModal } from '@/teacher/notion-import/modal';
 import type { CreateContext, CreateKind, EntityCreatedHandler } from '@/teacher/create/types';
 
 export type { CreateContext, CreateKind } from '@/teacher/create/types';
@@ -78,6 +79,27 @@ export function mountCreateControl(
       });
       menu.append(button);
     }
+
+    const importItem = document.createElement('button');
+    importItem.type = 'button';
+    importItem.className = 'create-control__menu-item hub-create__item';
+    importItem.dataset.createImport = 'notion';
+    importItem.setAttribute('role', 'menuitem');
+    importItem.textContent = 'Import from Notion';
+    importItem.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeMenu();
+      openNotionImportModal({
+        curriculum: options.curriculum,
+        onDone: (report) => {
+          const first = report.written[0];
+          if (!first) return;
+          if (first.startsWith('lesson_')) void options.onCreated('lesson', first);
+          else if (first.startsWith('unit_')) void options.onCreated('unit', first);
+        }
+      });
+    });
+    menu.append(importItem);
 
     host.append(menu);
 

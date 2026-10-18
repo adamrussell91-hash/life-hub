@@ -1,0 +1,372 @@
+import type { CurriculumResponse } from '@/teacher/nav';
+import type { EntityOverride, ImportPlanPreview, PlannedEntityPreview } from '@/notion-import/types';
+import {
+  parseNotionPageId,
+  searchNotion,
+  startApply,
+  startPlan,
+  waitForJob,
+  type NotionImportReport
+} from './api';
+import { buildRows, choicesFrom, groupWarnings, toggleExcluded } from './preview-model';
+
+export interface NotionImportOptions {
+  curriculum: CurriculumResponse;
+  onDone: (report: NotionImportReport) => void;
+}
+
+const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)';
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function button(label: string, className: string, hook?: string): HTMLButtonElement {
+  const btn = el('button', className, label);
+  btn.type = 'button';
+  if (hook) btn.setAttribute(hook, '');
+  return btn;
+}
+
+function pluralise(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+export function openNotionImportModal(options: NotionImportOptions): { close: () => void } {
+  const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  let closed = false;
+
+  const backdrop = el('div', 'create-modal-backdrop notion-import');
+  backdrop.dataset.notionImportModal = '';
+  const dialog = el('div', 'create-modal glass-panel glass-tile notion-import__dialog');
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'notion-import-title');
+  const title = el('h2', 'create-modal__title', 'Import from Notion');
+  title.id = 'notion-import-title';
+  const body = el('div', 'notion-import__body');
+  const footer = el('div', 'create-modal__footer notion-import__footer');
+  dialog.append(title, body, footer);
+  backdrop.append(dialog);
+  document.body.append(backdrop);
+
+  const error = el('p', 'create-modal__error notion-import__error');
+  error.hidden = true;
+  error.dataset.notionError = '';
+  error.setAttribute('role', 'alert');
+  const showError = (message: string): void => {
+    error.textContent = message;
+    error.hidden = !message;
+  };
+
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener('keydown', onKeyDown);
+    backdrop.remove();
+    returnFocus?.focus?.();
+  };
+
+  // Escape closes, but never while someone is typing in a field (I8).
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return;
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) return;
+    event.preventDefault();
+    close();
+  };
+  document.addEventListener('keydown', onKeyDown);
+  backdrop.addEventListener('click', (event) => { if (event.target === backdrop) close(); });
+  dialog.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') return;
+    const items = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)];
+    if (!items.length) return;
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+
+  function setStep(content: Node[], actions: HTMLElement[]): void {
+    body.replaceChildren(...content, error);
+    footer.replaceChildren(...actions);
+  }
+
+  const cancelBtn = (label = 'Cancel'): HTMLButtonElement => {
+    const btn = button(label, 'btn btn--ghost');
+    btn.addEventListener('click', close);
+    return btn;
+  };
+
+  let pageId = '';
+  let plan: ImportPlanPreview | null = null;
+  let excluded = new Set<string>();
+  let overrides: Record<string, EntityOverride> = {};
+  const htmlAsCode = new Set<string>();
+
+  // ---- Step 1: pick a page ----
+  function renderPick(): void {
+    const label = el('label', 'create-modal__field');
+    label.append(el('span', 'create-modal__label', 'Notion link or search'));
+    const input = el('input', 'create-modal__input');
+    input.type = 'text';
+    input.dataset.notionLink = '';
+    input.placeholder = 'Paste a Notion page link, or type to search';
+    input.autocomplete = 'off';
+    label.append(input);
+    const results = el('ul', 'notion-import__results');
+    results.hidden = true;
+
+    const previewBtn = button('Preview', 'btn btn--decisive', 'data-notion-preview');
+    previewBtn.addEventListener('click', () => void preview(input.value));
+    input.addEventListener('keydown', (event) => { if (event.key === 'Enter') void preview(input.value); });
+
+    let timer: number | undefined;
+    let seq = 0;
+    input.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      const text = input.value.trim();
+      if (parseNotionPageId(text) || text.length < 2) { results.hidden = true; results.replaceChildren(); return; }
+      const mine = ++seq;
+      timer = window.setTimeout(async () => {
+        let items: Awaited<ReturnType<typeof searchNotion>>['items'];
+        try { ({ items } = await searchNotion(text)); }
+        catch (e) { if (mine === seq && !closed) showError(e instanceof Error ? e.message : 'Search failed.'); return; }
+        if (mine !== seq || closed) return;
+        showError('');
+        results.hidden = false;
+        if (!items.length) { results.replaceChildren(el('li', 'notion-import__muted', 'No pages found.')); return; }
+        results.replaceChildren(...items.map((item) => {
+          const li = el('li');
+          const pick = button(item.category ? `${item.title} · ${item.category}` : item.title, 'notion-import__result');
+          pick.addEventListener('click', () => void preview(item.page_id));
+          li.append(pick);
+          return li;
+        }));
+      }, 300);
+    });
+
+    setStep([label, results], [cancelBtn(), previewBtn]);
+    input.focus();
+  }
+
+  async function preview(raw: string): Promise<void> {
+    const id = parseNotionPageId(raw);
+    if (!id) {
+      showError('That isn’t a Notion link. Paste the page link from Notion (Share, then Copy link).');
+      return;
+    }
+    pageId = id;
+    showError('');
+    setStep([el('p', 'notion-import__status', 'Reading from Notion…')], [cancelBtn()]);
+    try {
+      const job = await waitForJob(await startPlan(id), () => {});
+      if (closed) return;
+      if (job.status === 'failed' || !job.plan) { renderPick(); showError(job.error ?? 'Could not read that page.'); return; }
+      plan = job.plan;
+      excluded = new Set();
+      overrides = {};
+      htmlAsCode.clear();
+      renderPreview();
+    } catch (e) {
+      if (closed) return;
+      renderPick();
+      showError(e instanceof Error ? e.message : 'Could not read that page.');
+    }
+  }
+
+  // ---- Step 2: preview ----
+  function fieldWrap(text: string, control: HTMLElement): HTMLLabelElement {
+    const wrap = el('label', 'notion-import__picker');
+    wrap.append(el('span', 'notion-import__picker-label', text), control);
+    return wrap;
+  }
+
+  function optionSelect(hook: string, placeholder: string, items: Array<{ id: string; title: string }>, current: string | undefined): HTMLSelectElement {
+    const select = el('select', 'create-modal__select');
+    select.dataset.notionPicker = hook;
+    const empty = el('option', '', placeholder);
+    empty.value = '';
+    select.append(empty);
+    for (const item of items) {
+      const opt = el('option', '', item.title);
+      opt.value = item.id;
+      select.append(opt);
+    }
+    select.value = current ?? '';
+    return select;
+  }
+
+  function unmet(entity: PlannedEntityPreview): boolean {
+    const o = overrides[entity.page_id] ?? {};
+    return entity.needs.some((need) =>
+      need === 'year' ? !o.year_id : need === 'subject' ? !o.subject_id && !o.create_subject_title : !o.unit_id);
+  }
+
+  function pickersFor(entity: PlannedEntityPreview, isRoot: boolean, refresh: () => void): HTMLElement[] {
+    const o = (): EntityOverride => (overrides[entity.page_id] ??= {});
+    const out: HTMLElement[] = [];
+    const wantsHierarchy = entity.kind === 'unit' || entity.kind === 'class';
+    if (entity.needs.includes('year') || (isRoot && wantsHierarchy)) {
+      const years = options.curriculum.years.slice().sort((a, b) => a.year_level - b.year_level)
+        .map((y) => ({ id: y.id, title: y.title }));
+      const select = optionSelect(`year:${entity.page_id}`, 'Choose a year', years, overrides[entity.page_id]?.year_id ?? entity.suggested.year_id);
+      select.addEventListener('change', () => { o().year_id = select.value || undefined; refresh(); });
+      out.push(fieldWrap('Year', select));
+    }
+    if (entity.needs.includes('subject') || (isRoot && wantsHierarchy)) {
+      const subjects = options.curriculum.subjects.slice().sort((a, b) => a.title.localeCompare(b.title))
+        .map((s) => ({ id: s.id, title: s.display_title || s.title }));
+      const current = overrides[entity.page_id];
+      const createTitle = current?.create_subject_title ?? (current?.subject_id || entity.suggested.subject_id ? undefined : entity.suggested.subject_title);
+      const select = optionSelect(`subject:${entity.page_id}`, 'Choose a subject', subjects, current?.subject_id ?? entity.suggested.subject_id);
+      if (entity.suggested.subject_title || current?.create_subject_title) {
+        const text = current?.create_subject_title ?? entity.suggested.subject_title!;
+        const opt = el('option', '', `Create “${text}”`);
+        opt.value = `create:${text}`;
+        select.append(opt);
+        if (createTitle) select.value = `create:${createTitle}`;
+      }
+      select.addEventListener('change', () => {
+        if (select.value.startsWith('create:')) { o().create_subject_title = select.value.slice(7); delete o().subject_id; }
+        else { o().subject_id = select.value || undefined; delete o().create_subject_title; }
+        refresh();
+      });
+      out.push(fieldWrap('Subject', select));
+    }
+    if (entity.needs.includes('unit')) {
+      const units = options.curriculum.units.slice().sort((a, b) => a.title.localeCompare(b.title))
+        .map((u) => ({ id: u.id, title: u.title }));
+      const select = optionSelect(`unit:${entity.page_id}`, 'Choose a unit', units, overrides[entity.page_id]?.unit_id);
+      select.addEventListener('change', () => { o().unit_id = select.value || undefined; refresh(); });
+      out.push(fieldWrap('Unit', select));
+    }
+    return out;
+  }
+
+  function renderPreview(): void {
+    if (!plan) return;
+    const current = plan;
+    const scroll = body.scrollTop;
+    const focusedInclude = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.notionInclude : undefined;
+
+    const importBtn = button('Import', 'btn btn--decisive', 'data-notion-import');
+    const hint = el('p', 'notion-import__muted notion-import__hint');
+    const refresh = (): void => {
+      const included = current.entities.filter((e) => !excluded.has(e.page_id));
+      const blocked = included.filter(unmet).length;
+      importBtn.disabled = included.length === 0 || blocked > 0;
+      hint.textContent = included.length === 0 ? 'Nothing is ticked.'
+        : blocked ? `${pluralise(blocked, 'item')} still need a choice.` : '';
+      hint.hidden = !hint.textContent;
+    };
+
+    const tree = el('ul', 'notion-import__tree');
+    for (const row of buildRows(current, excluded)) {
+      const entity = current.entities.find((e) => e.page_id === row.page_id);
+      const li = el('li', `notion-import__row${row.included ? '' : ' is-excluded'}`);
+      li.dataset.notionRow = row.page_id;
+      li.style.setProperty('--depth', String(row.depth));
+      const line = el('div', 'notion-import__line');
+      if (entity) {
+        const box = el('input');
+        box.type = 'checkbox';
+        box.checked = row.included;
+        box.dataset.notionInclude = row.page_id;
+        box.setAttribute('aria-label', `Include ${row.title}`);
+        box.addEventListener('click', () => { excluded = toggleExcluded(current, excluded, row.page_id); renderPreview(); });
+        line.append(box);
+      }
+      line.append(el('span', 'notion-import__title', row.title));
+      const chip = (text: string, tone = ''): HTMLElement => {
+        const c = el('span', `notion-import__chip${tone}`, text);
+        c.title = text;
+        return c;
+      };
+      line.append(chip(row.label));
+      if (row.badge) line.append(chip(row.badge, ' notion-import__chip--accent'));
+      if (row.warning_count) line.append(chip(pluralise(row.warning_count, 'note'), ' notion-import__chip--warn'));
+      li.append(line);
+      if (row.skipped_reason) li.append(el('p', 'notion-import__muted', row.skipped_reason));
+      if (entity && row.included) {
+        const pickers = pickersFor(entity, row.depth === 0, refresh);
+        if (pickers.length) {
+          const wrap = el('div', 'notion-import__pickers');
+          wrap.append(...pickers);
+          li.append(wrap);
+        }
+      }
+      tree.append(li);
+    }
+
+    const warnings = el('section', 'notion-import__warnings');
+    warnings.dataset.notionWarnings = '';
+    for (const group of groupWarnings(current, excluded)) {
+      const details = el('details');
+      details.append(el('summary', '', `${group.title} (${group.items.length})`));
+      const list = el('ul');
+      for (const w of group.items) list.append(el('li', '', w.message));
+      details.append(list);
+      warnings.append(details);
+    }
+    for (const app of current.html_apps.filter((a) => !excluded.has(a.page_id))) {
+      const label = el('label', 'notion-import__toggle');
+      const box = el('input');
+      box.type = 'checkbox';
+      box.checked = !htmlAsCode.has(app.notion_block_id);
+      box.addEventListener('change', () => { if (box.checked) htmlAsCode.delete(app.notion_block_id); else htmlAsCode.add(app.notion_block_id); });
+      label.append(box, el('span', '', `Run as interactive: ${app.preview}`));
+      warnings.append(label);
+    }
+
+    importBtn.addEventListener('click', () => void runImport());
+    const back = button('Back', 'btn btn--ghost');
+    back.addEventListener('click', () => { showError(''); renderPick(); });
+    setStep([tree, warnings, hint], [back, importBtn]);
+    refresh();
+    body.scrollTop = scroll;
+    if (focusedInclude) body.querySelector<HTMLElement>(`[data-notion-include="${CSS.escape(focusedInclude)}"]`)?.focus();
+  }
+
+  // ---- Step 3: import ----
+  async function runImport(): Promise<void> {
+    showError('');
+    const status = el('p', 'notion-import__status', 'Importing…');
+    status.setAttribute('role', 'status');
+    setStep([status], [cancelBtn('Close')]);
+    try {
+      const job = await waitForJob(await startApply(pageId, choicesFrom(excluded, overrides, htmlAsCode)), (j) => {
+        if (!j.progress || closed) return;
+        status.textContent = j.progress.phase === 'media'
+          ? `Copying files ${j.progress.done} of ${j.progress.total}…`
+          : `Saving ${j.progress.done} of ${j.progress.total}…`;
+      });
+      if (job.status === 'failed' || !job.report) { failImport(job.error ?? 'The import failed.'); return; }
+      options.onDone(job.report);
+      if (closed) return;
+      const done = el('div', 'notion-import__done');
+      done.dataset.notionDone = '';
+      done.append(el('p', '', `Imported ${pluralise(job.report.written.length, 'item')}.`));
+      if (job.report.skipped.length) done.append(el('p', 'notion-import__muted', `${job.report.skipped.length} skipped.`));
+      if (job.report.warnings.length) done.append(el('p', 'notion-import__muted', pluralise(job.report.warnings.length, 'note') + ' to check.'));
+      const finish = button('Done', 'btn btn--decisive');
+      finish.addEventListener('click', close);
+      setStep([done], [finish]);
+      finish.focus();
+    } catch (e) {
+      failImport(e instanceof Error ? e.message : 'The import failed.');
+    }
+  }
+
+  function failImport(message: string): void {
+    if (closed) return;
+    renderPreview();
+    showError(message);
+  }
+
+  renderPick();
+  return { close };
+}
