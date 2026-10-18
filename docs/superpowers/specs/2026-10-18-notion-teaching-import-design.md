@@ -147,7 +147,7 @@ The Teaching Hub limits nesting:
 
 ### Inline text
 
-Bold, italic, underline, strikethrough, inline code and links are kept.
+Bold, italic, underline and links are kept. Strikethrough and inline code become plain text, because Teaching Hub rich text doesn't allow those tags.
 Colours and highlights are dropped. Mentions become their plain text.
 Equations stay inline as text. The output goes through the existing
 rich-text sanitiser.
