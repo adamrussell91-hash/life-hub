@@ -616,6 +616,7 @@ var EmbedProviderSchema = z6.enum([
 var HeadingVariantSchema = z6.enum(["page", "section", "subsection"]);
 var MediaSizeVariantSchema = z6.enum(["small", "medium", "large"]);
 var CalloutStyleSchema = z6.enum([
+  "cultural_warning",
   "information",
   "important",
   "warning",
