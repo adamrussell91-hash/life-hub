@@ -117,7 +117,7 @@ button, textarea, input { font: inherit; color: inherit; }
 .count { font: 500 12px var(--font-mono); color: var(--muted); }
 
 /* Frame: the gap-analysis emblem assembles as questions are answered */
-.frame { display: grid; grid-template-columns: minmax(180px, 280px) minmax(0, 1fr); gap: 28px; align-items: center; }
+.frame { display: grid; grid-template-columns: minmax(180px, 280px) minmax(0, 1fr); gap: 28px; align-items: start; }
 .medal { position: relative; width: 100%; aspect-ratio: 1; max-width: 280px; }
 .medal svg { width: 100%; height: 100%; overflow: visible; display: block; }
 .pc { transform-box: view-box; transform-origin: 50px 50px; transition: transform 700ms var(--ps-spring); }
@@ -173,9 +173,11 @@ button, textarea, input { font: inherit; color: inherit; }
 
 /* ── Coach ── */
 .coach { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.msgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; max-height: 62vh; overflow-y: auto; padding-right: 4px; scroll-behavior: smooth; }
-.msg { display: grid; gap: 6px; max-width: 92%; animation: msgIn 480ms var(--ps-spring) both; }
-@keyframes msgIn { from { transform: translateY(10px) scale(0.97); opacity: 0; } }
+.msgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; height: min(62vh, 560px); overflow-y: auto; overflow-anchor: none; padding-right: 4px; }
+.msgs > :first-child { margin-top: auto; }
+.msg { display: grid; gap: 6px; max-width: 92%; }
+.msg.is-new { animation: msgIn 420ms var(--ps-spring); }
+@keyframes msgIn { from { transform: translateY(8px) scale(0.98); } }
 .msg--user { align-self: end; justify-items: end; }
 .msg--user .bubble { background: var(--navy); color: #fff; border-radius: 20px 20px 6px 20px; }
 .msg--coach { grid-template-columns: 30px minmax(0, 1fr); align-items: start; column-gap: 10px; }
@@ -185,13 +187,14 @@ button, textarea, input { font: inherit; color: inherit; }
 .av { width: 30px; height: 30px; }
 .av svg { width: 100%; height: 100%; overflow: visible; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--cotton); font-size: 12px; color: var(--ink); animation: chipIn 600ms var(--ps-spring) both; animation-delay: calc(var(--i, 0) * 120ms + 200ms); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--cotton); font-size: 12px; color: var(--ink); }
+.is-new .chip .ps-glyph { animation: chipIn 600ms var(--ps-spring) both; animation-delay: calc(var(--i, 0) * 120ms + 200ms); }
 .chip .ps-glyph { width: 20px; height: 20px; }
 .chip--missing { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
 .chip--missing .ps-glyph { opacity: 0.5; }
-@keyframes chipIn { from { transform: scale(0.4) rotate(-12deg); opacity: 0; } }
+@keyframes chipIn { from { transform: scale(0.3) rotate(-160deg); } }
 
-.thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; padding-left: 40px; }
+.thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
 .dots { display: inline-flex; gap: 5px; align-items: end; height: 14px; }
 .dots i { width: 11px; height: 11px; animation: hop 900ms var(--ps-ease) infinite; }
 .dots i:nth-child(1) { background: var(--ps-red); border-radius: 50%; }
@@ -199,7 +202,7 @@ button, textarea, input { font: inherit; color: inherit; }
 .dots i:nth-child(3) { background: var(--ps-blue); border-radius: 11px 11px 0 0; height: 6px; animation-delay: 240ms; }
 @keyframes hop { 40% { transform: translateY(-6px) rotate(20deg); } }
 
-.suggest { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; padding: 16px; border-radius: 22px; background: var(--card); box-shadow: inset 0 0 0 2px var(--ps-yellow); animation: msgIn 600ms var(--ps-spring) both; }
+.suggest { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; padding: 16px; border-radius: 22px; background: var(--card); box-shadow: inset 0 0 0 2px var(--ps-yellow); animation: msgIn 600ms var(--ps-spring); }
 .suggest .ps-emblem { width: 56px; height: 56px; animation: spinIn 1s var(--ps-spring) both; }
 @keyframes spinIn { from { transform: rotate(-270deg) scale(0); } }
 .suggest h3 { margin: 0; font-size: 15.5px; }
@@ -207,16 +210,17 @@ button, textarea, input { font: inherit; color: inherit; }
 .suggest__row { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .composer { display: grid; gap: 8px; background: var(--card); border-radius: 22px; padding: 12px; box-shadow: 0 1px 0 var(--line), 0 14px 30px -24px rgba(23, 55, 94, 0.4); }
-.composer__now { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 0 4px; }
+.composer__now { min-height: 20px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 0 4px; }
 .composer__now svg { width: 16px; height: 16px; flex: none; }
 .composer textarea { width: 100%; border: 0; resize: none; min-height: 72px; background: var(--cotton); border-radius: 14px; padding: 12px 14px; font-size: 15px; line-height: 1.45; }
 .composer__row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.composer__row .mock-note { padding-left: 4px; }
+.composer__row .mock-note { padding-left: 4px; min-height: 2.6em; flex: 1 1 200px; }
 
-@media (max-width: 980px) { .board { grid-template-columns: minmax(0, 1fr); } .msgs { max-height: none; } }
+@media (max-width: 980px) { .board { grid-template-columns: minmax(0, 1fr); } .msgs { height: min(70vh, 520px); } }
 @media (max-width: 620px) {
   .frame { grid-template-columns: 1fr; justify-items: center; }
   .medal { max-width: 200px; }
+  .frame .medal { position: static; }
   .answers { width: 100%; }
   .slots { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
@@ -382,19 +386,24 @@ function chips(seen = [], missing = []) {
   const all = [...seen.map((id) => [id, false]), ...missing.map((id) => [id, true])];
   return all.length ? `<div class="chips">${all.map(([id, miss], i) => `<span class="chip${miss ? ' chip--missing' : ''}" style="--i:${i}" title="${miss ? 'Not seen yet' : 'Seen in this answer'}"><span class="ps-glyph">${glyph(id)}</span>${NAMES[id]}</span>`).join('')}</div>` : '';
 }
+function atBottom() { return msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40; }
+function stick(was) { if (was) msgs.scrollTop = msgs.scrollHeight; }
 function say(role, text, opts = {}) {
+  const was = atBottom();
   const li = document.createElement('li');
-  li.className = `msg msg--${role}`;
+  li.className = `msg msg--${role}${opts.fresh === false ? '' : ' is-new'}`;
   li.innerHTML = role === 'coach'
     ? `<span class="av">${COACH_AV}</span><div class="bubble">${text}</div>${chips(opts.seen, opts.missing)}`
     : `<div class="bubble">${text}</div>${chips(opts.seen, opts.missing)}`;
   msgs.append(li);
-  msgs.scrollTop = msgs.scrollHeight;
+  stick(was);
+  return li;
 }
-say('user', 'My weekly plan falls apart by Wednesday');
-say('coach', "Let's start with the goal. What does a week that holds together look like, in concrete terms, say a term from now?");
-say('user', FRAME[0].a, { seen: ['abstract_thinking', 'decision_making'] });
-say('coach', "That's measurable and has a time frame. Now, what is actually true about your weeks right now? Separate what you have tracked from what you assume.");
+say('user', 'My weekly plan falls apart by Wednesday', { fresh: false });
+say('coach', "Let's start with the goal. What does a week that holds together look like, in concrete terms, say a term from now?", { fresh: false });
+say('user', FRAME[0].a, { seen: ['abstract_thinking', 'decision_making'], fresh: false });
+say('coach', "That's measurable and has a time frame. Now, what is actually true about your weeks right now? Separate what you have tracked from what you assume.", { fresh: false });
+msgs.scrollTop = msgs.scrollHeight;
 
 const SCRIPT = [
   {
@@ -429,13 +438,8 @@ document.getElementById('composer').addEventListener('submit', async (e) => {
   send.disabled = true;
   field.value = '';
   say('user', text, { seen: step.seen, missing: step.missing });
-  const think = document.createElement('li');
-  think.className = 'thinking';
-  think.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>Coach is thinking';
-  msgs.append(think);
-  msgs.scrollTop = msgs.scrollHeight;
+  const slot = say('coach', '<span class="thinking"><span class="dots"><i></i><i></i><i></i></span>Coach is thinking</span>');
   await sleep(1300);
-  think.remove();
 
   FRAME[answered].a = text;
   const row = () => document.querySelector(`.ans[data-i="${answered}"] .ans__a`);
@@ -447,7 +451,9 @@ document.getElementById('composer').addEventListener('submit', async (e) => {
   earn(step.seen);
   answered += 1;
   drawFrame();
-  say('coach', step.reply);
+  const was = atBottom();
+  slot.querySelector('.bubble').textContent = step.reply;
+  stick(was);
   turn += 1;
 
   if (turn < SCRIPT.length) {
@@ -460,10 +466,12 @@ document.getElementById('composer').addEventListener('submit', async (e) => {
   document.getElementById('medal').classList.add('is-done');
   stepIndex = 1;
   drawTrack();
-  const card = document.createElement('div');
+  const card = document.createElement('li');
   card.className = 'suggest';
   card.innerHTML = `<span class="ps-emblem">${EMBLEMS.five_whys}</span><div><h3>Next: 5 Whys</h3><p>One clear symptom with a likely single chain of cause.</p><div class="suggest__row"><button class="btn btn--primary" type="button" id="start-tool">Start it</button><button class="btn btn--ghost" type="button" id="not-now">Not now</button></div></div>`;
-  document.getElementById('extras').append(card);
+  card.style.listStyle = 'none';
+  msgs.append(card);
+  msgs.scrollTop = msgs.scrollHeight;
   document.getElementById('not-now').addEventListener('click', () => { card.remove(); send.disabled = false; });
   document.getElementById('start-tool').addEventListener('click', () => { card.remove(); startWhys(); });
 });
