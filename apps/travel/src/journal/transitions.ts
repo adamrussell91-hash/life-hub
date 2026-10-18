@@ -176,10 +176,10 @@ export function renderJournalTransition(options: RenderTransitionOptions): HTMLE
   details.type = 'button';
   details.className = 'btn btn--ghost journal-transition__details';
   details.textContent = 'View journey details';
-  details.disabled = !ticket;
-  details.title = ticket
-    ? 'Open itinerary details (bookings are not changed from the journal)'
-    : 'Link an itinerary ticket to open booking details';
+  // A permanently greyed button explains nothing on a phone: only offer it
+  // when there is a linked booking to open.
+  details.hidden = !ticket;
+  details.title = 'Open itinerary details (bookings are not changed from the journal)';
 
   if (ticket) {
     details.addEventListener('click', () => {

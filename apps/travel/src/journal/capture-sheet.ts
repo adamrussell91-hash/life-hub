@@ -9,6 +9,7 @@ import {
 } from '@/journal/drafts';
 import { bootstrapJournalForFirstMoment } from '@/journal/capture-context';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export type CaptureMode = CaptureDraftMode;
@@ -251,7 +252,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
 
   function refreshContext(): void {
     const leg = options.journal.legs.find((l) => l.id === options.legId);
-    context.textContent = `${leg?.destination ?? 'Trip'} · ${localDate}`;
+    context.textContent = `${leg?.destination ?? 'Trip'} · ${formatDisplayDate(localDate)}`;
   }
 
   function setMode(next: CaptureMode, userChange = false): void {
