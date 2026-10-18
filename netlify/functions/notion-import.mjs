@@ -109,7 +109,7 @@ export function createNotionImportHandler(deps = {}) {
       const client = createNotionClient({ token: notionToken(env), fetchImpl: deps.fetchImpl, sleep: deps.sleep });
       const result = await client.queryDataSource(dataSource, {
         page_size: 20,
-        ...(q ? { filter: { property: 'Name', title: { contains: q } } } : {}),
+        ...(q ? { filter: { property: 'title', title: { contains: q } } } : {}),
         sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }]
       });
       const items = (result.results ?? []).map((page) => ({

@@ -26,6 +26,7 @@ brought over again after a fix. It is not a sync.
 | Text colour and highlights | Dropped. Text renders in the theme's normal colour. |
 | Curriculum Map, Scope and Sequence | Skipped, and listed in the preview. |
 | Conversion | Deterministic code. No AI in the conversion path. |
+| Syllabus re-import | Replaces the document after saving it to version history (kind `document`), the same as units and lessons. |
 
 ## Source shape
 
@@ -215,8 +216,9 @@ Teaching Hub → Create → **Import from Notion**.
 3. Year and subject pickers for each top-level item, filled from Notion.
 4. Warnings, grouped as flattened, skipped, file too big, and HTML run as
    interactive (each with a toggle).
-5. Import, with progress in files and entities. When it finishes: open the
-   result, and view the import report.
+5. Import, with progress in files and entities. When it finishes, the hub
+   opens the first imported class, unit, lesson or syllabus, and the done
+   screen shows the import report.
 
 ## Errors
 
@@ -266,10 +268,17 @@ One PR, with these steps as commits:
 3. **Reader and mapper,** with tests.
 4. **Rehoster and applier,** with versioning.
 5. **Preview UI.**
-6. **Making it visible:** the Program label and filter on the subject page; the
-   Syllabus document page, linked from its subject.
+6. **Making it visible:** the Program label and the All/Units/Programs filter
+   are on the Units index (programs are never scheduled into classes), and
+   syllabuses are listed under the Units index header, each linking to a
+   read-only page at `/documents/:id`.
 
 If step 6 grows, it moves to its own PR.
+
+## Known limits
+
+- Uploaded videos are streamed without HTTP Range support, so they may not play
+  on iPhone or iPad Safari. YouTube and Vimeo links are unaffected.
 
 ## Not in scope
 

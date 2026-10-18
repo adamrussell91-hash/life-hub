@@ -172,6 +172,14 @@ test('search: returns slim items', async () => {
   assert.deepEqual((await body(res)).data.items, [{ page_id: 'p1', title: 'Made-up', category: 'Unit', last_edited_time: 't' }]);
 });
 
+test('search: filters on the title property id so a renamed Name column still works', async () => {
+  let sent;
+  const fetchImpl = async (url, init) => { sent = JSON.parse(init.body); return new Response(JSON.stringify({ results: [] }), { status: 200 }); };
+  const handler = createNotionImportHandler(deps(memoryStore(), { fetchImpl }));
+  await handler(req('GET', '/api/notion-import/search?q=poem'));
+  assert.deepEqual(sent.filter, { property: 'title', title: { contains: 'poem' } });
+});
+
 test('other methods are 405', async () => {
   const handler = createNotionImportHandler(deps(memoryStore()));
   assert.equal((await handler(req('PUT', '/api/notion-import/jobs'))).status, 405);

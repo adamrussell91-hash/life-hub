@@ -259,7 +259,7 @@ export async function applyPlan(store, plan, { now, rehost, onProgress = async (
     const key = KEY[entity.kind](entity.id);
     const existing = await getJSON(store, key);
     let checkpoint = { ok: true };
-    if (existing && (entity.kind === 'lesson' || entity.kind === 'unit')) {
+    if (existing && (entity.kind === 'lesson' || entity.kind === 'unit' || entity.kind === 'document')) {
       checkpoint = await tryWriteCheckpoint(versions, { kind: entity.kind, parentId: entity.id, snapshot: existing, reason: 'notion_import', now });
     }
     if (existing && entity.kind === 'class') {

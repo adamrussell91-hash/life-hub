@@ -8,6 +8,7 @@ import {
   versionIndexKey,
   versionKey
 } from './teaching-blobs.mjs';
+import { documentKey } from './notion-import-store.mjs';
 
 export const VERSION_RETENTION = 10;
 export const CHECKPOINT_AFTER_SAVE_WARNING = 'Saved, but version history checkpoint failed.';
@@ -66,18 +67,21 @@ export async function tryWriteCheckpoint(store, args) {
 export function versionTypeForKind(kind) {
   if (kind === 'lesson') return 'lesson_version';
   if (kind === 'unit') return 'unit_version';
+  if (kind === 'document') return 'document_version';
   return 'class_homepage_version';
 }
 
 export function liveKeyForKind(kind, parentId) {
   if (kind === 'lesson') return draftLessonKey(parentId);
   if (kind === 'unit') return unitKey(parentId);
+  if (kind === 'document') return documentKey(parentId);
   return classKey(parentId);
 }
 
 export function parentNotFoundMessage(kind) {
   if (kind === 'lesson') return 'Lesson not found';
   if (kind === 'unit') return 'Unit not found';
+  if (kind === 'document') return 'Document not found';
   return 'Class not found';
 }
 
@@ -137,6 +141,9 @@ export function snapshotValidForKind(kind, snapshot) {
   }
   if (kind === 'unit') {
     return snapshot.type === 'unit' || Array.isArray(snapshot.lesson_ids);
+  }
+  if (kind === 'document') {
+    return snapshot.type === 'document' || Array.isArray(snapshot.blocks);
   }
   return false;
 }

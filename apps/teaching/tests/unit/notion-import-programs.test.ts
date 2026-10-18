@@ -7,7 +7,7 @@ vi.mock('@/api/universal-links', async (importOriginal) => ({
   listUniversalLinksForEntity: vi.fn().mockResolvedValue({ outgoing: [], incoming: [] })
 }));
 
-import { renderUnitsIndex } from '@/teacher/sections/units';
+import { renderUnitPage, renderUnitsIndex } from '@/teacher/sections/units';
 import { renderDocumentPage } from '@/teacher/sections/documents';
 import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
 import type { CurriculumResponse } from '@/teacher/nav';
@@ -88,11 +88,37 @@ describe('programs in the units index', () => {
     expect(ids().sort()).toEqual(['unit_plain', 'unit_prog']);
   });
 
-  it('links a syllabus from its subject group', () => {
+  it('lists every syllabus under the header, whatever the filter', () => {
     renderUnitsIndex(canvas, curriculum);
-    const link = canvas.querySelector<HTMLAnchorElement>('a[data-document-id="doc_syl"]')!;
+    canvas.querySelector<HTMLButtonElement>('[data-unit-filter="programs"]')!.click();
+    const link = canvas.querySelector<HTMLAnchorElement>('[data-syllabuses] a[data-document-id="doc_syl"]')!;
     expect(link.getAttribute('href')).toBe('/documents/doc_syl');
-    expect(link.textContent).toContain('Syllabus');
+    expect(link.textContent).toContain('Made-up Syllabus');
+    expect(link.textContent).toContain('Made-up Subject');
+  });
+
+  it('shows syllabuses even when there are no units', () => {
+    renderUnitsIndex(canvas, { ...curriculum, units: [] });
+    expect(canvas.querySelector('[data-syllabuses] a[data-document-id="doc_syl"]')).not.toBeNull();
+    expect(canvas.textContent).toContain('No units yet.');
+  });
+
+  it('says so when a filter has no matches and hides pills with no programs', () => {
+    renderUnitsIndex(canvas, { ...curriculum, units: [plain] });
+    expect(canvas.querySelector('[data-unit-filter]')).toBeNull();
+    renderUnitsIndex(canvas, { ...curriculum, units: [program] });
+    canvas.querySelector<HTMLButtonElement>('[data-unit-filter="units"]')!.click();
+    expect(canvas.querySelector('[data-units-empty-filter]')!.textContent).toBe('No units yet.');
+  });
+
+  it('offers no Schedule lessons on a program page', () => {
+    const labels = (id: string) => {
+      const host = document.createElement('div');
+      renderUnitPage(host, curriculum, id);
+      return [...host.querySelectorAll('button')].map((b) => b.textContent);
+    };
+    expect(labels('unit_plain')).toContain('Schedule lessons');
+    expect(labels('unit_prog')).not.toContain('Schedule lessons');
   });
 
   it('keeps programs out of the schedule-unit picker', () => {

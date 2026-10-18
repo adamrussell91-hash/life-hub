@@ -2,7 +2,7 @@
 import { NotionApiError } from './notion-client.mjs';
 
 // PROVISIONAL: these are the plan's defaults. They stay provisional until the
-// Task 1 tabs check is run and recorded in the spec ("Tabs check result").
+// tabs check in the plan's Task 1 is run and its result recorded.
 const TAB_CONTAINER_TYPE = 'tab';
 const TAB_ITEM_TYPE = 'paragraph';
 

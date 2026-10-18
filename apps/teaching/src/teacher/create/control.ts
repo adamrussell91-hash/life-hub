@@ -1,5 +1,6 @@
 import type { CurriculumResponse } from '@/teacher/nav';
 import { openCreateModal } from '@/teacher/create/modal';
+import { navigate } from '@/app/router';
 import { reconcileCurriculum } from '@/app/curriculum-state';
 import { openNotionImportModal } from '@/teacher/notion-import/modal';
 import type { CreateContext, CreateKind, EntityCreatedHandler } from '@/teacher/create/types';
@@ -97,8 +98,11 @@ export function mountCreateControl(
           if (classId) { void options.onCreated('class', classId); return; }
           const first = report.written.find((id) => id.startsWith('unit_') || id.startsWith('lesson_'));
           if (first) { void options.onCreated(first.startsWith('lesson_') ? 'lesson' : 'unit', first); return; }
-          // Nothing to open, but new records exist: refresh what the app holds.
-          void reconcileCurriculum().catch(() => {});
+          // Nothing else to open: refresh what the app holds, then open a syllabus if that's all there is.
+          const documentId = report.written.find((id) => id.startsWith('document_'));
+          void reconcileCurriculum()
+            .catch(() => {})
+            .then(() => { if (documentId) navigate(`/documents/${documentId}`); });
         }
       });
     });
