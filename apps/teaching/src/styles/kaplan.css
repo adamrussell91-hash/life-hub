@@ -41,6 +41,15 @@
   margin: 0 0 var(--space-2);
 }
 .kaplan-workspace__prompt { font-size: var(--text-base); max-width: var(--measure); }
+.kaplan-focus {
+  margin: 0 0 var(--space-2); max-width: var(--measure);
+  color: var(--navy); font-size: var(--text-base); font-weight: var(--weight-medium);
+}
+.kaplan-focus__label {
+  display: block; margin-bottom: var(--space-1);
+  font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps);
+  text-transform: uppercase; color: var(--muted);
+}
 .kaplan-eyebrow {
   font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps);
   text-transform: uppercase; color: var(--muted); margin: var(--space-4) 0 var(--space-2);

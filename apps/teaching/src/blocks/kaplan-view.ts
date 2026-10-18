@@ -1,9 +1,22 @@
 import type { KaplanLens, KaplanQualifier } from '@/schemas/kaplan';
-import { KAPLAN_LABELS, kaplanSteps, kaplanSymbol } from './kaplan';
+import { KAPLAN_LABELS, kaplanFocusText, kaplanSteps, kaplanSymbol } from './kaplan';
 import { loadActivityState, saveActivityState, storageKey } from './learning-activity';
 
 type ViewOptions = { mode: 'student' | 'teacher' | 'print'; blockId: string; lessonId?: string };
 type LensState = { step: number; notes: [string, string, string] };
+
+/** The teacher's focus, shown once in sentence case rather than repeated in the uppercase eyebrow. */
+function focusLine(qualifier: KaplanQualifier): HTMLElement | null {
+  const text = kaplanFocusText(qualifier.focus);
+  if (!text) return null;
+  const line = document.createElement('p');
+  line.className = 'kaplan-focus';
+  const label = document.createElement('span');
+  label.className = 'kaplan-focus__label';
+  label.textContent = 'Thinking about';
+  line.append(label, document.createTextNode(text));
+  return line;
+}
 
 function initialState(key?: string): LensState {
   const saved = key ? loadActivityState<unknown>(key) : null;
@@ -39,6 +52,8 @@ export function renderKaplanQualifiers(qualifiers: KaplanQualifier[], options: V
       const title = document.createElement('h3');
       title.className = 'kaplan-workspace__title';
       title.append(kaplanSymbol(qualifier.lens), document.createTextNode(KAPLAN_LABELS[qualifier.lens]));
+      const focus = focusLine(qualifier);
+      if (focus) section.append(focus);
       const list = document.createElement('ol');
       for (const step of kaplanSteps(qualifier)) {
         const li = document.createElement('li');
@@ -53,7 +68,8 @@ export function renderKaplanQualifiers(qualifiers: KaplanQualifier[], options: V
         }
         list.append(li);
       }
-      section.append(title, list);
+      section.prepend(title);
+      section.append(list);
       root.append(section);
     }
     return root;
@@ -86,7 +102,7 @@ export function renderKaplanQualifiers(qualifiers: KaplanQualifier[], options: V
     });
     const label = document.createElement('p');
     label.className = 'kaplan-eyebrow';
-    label.textContent = `Step ${state.step + 1} of 3${qualifier.focus ? ` · ${qualifier.focus}` : ''}`;
+    label.textContent = `Step ${state.step + 1} of 3`;
     const stepTitle = document.createElement('h4');
     stepTitle.className = 'kaplan-workspace__step-title';
     stepTitle.tabIndex = -1;
@@ -94,7 +110,10 @@ export function renderKaplanQualifiers(qualifiers: KaplanQualifier[], options: V
     const prompt = document.createElement('p');
     prompt.className = 'kaplan-workspace__prompt';
     prompt.textContent = steps[state.step]!.prompt;
-    workspace.append(heading, progress, label, stepTitle, prompt);
+    workspace.append(heading, progress);
+    const focus = focusLine(qualifier);
+    if (focus) workspace.append(focus);
+    workspace.append(label, stepTitle, prompt);
 
     if (qualifier.mode === 'notes') {
       const noteLabel = document.createElement('label');
