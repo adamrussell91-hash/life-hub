@@ -47,7 +47,15 @@ interface SavePayload {
 
 interface MediaPayload extends JournalMediaUploadJob {
   kind: 'media';
+  queuedAt?: string;
 }
+
+/**
+ * Bytes whose media row is still missing from the server after this long
+ * belong to a moment that was never saved or was deleted permanently.
+ * Until then a missing row only means the save has not landed yet.
+ */
+const ORPHAN_MEDIA_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface JournalSyncedEvent {
   tripId: string;
@@ -125,8 +133,16 @@ export async function clearQueuedJournalSave(tripId: string): Promise<void> {
   await removeJournalOp(SAVE_PREFIX + tripId).catch(() => undefined);
 }
 
-export async function queueJournalMedia(job: JournalMediaUploadJob): Promise<void> {
-  const payload: MediaPayload = { kind: 'media', ...job };
+/**
+ * Keep these bytes on the device until they are backed up. Pass
+ * `flush: false` when the moment that references them is saved right after
+ * (then call `flushJournalOutbox`), so the upload does not race the save.
+ */
+export async function queueJournalMedia(
+  job: JournalMediaUploadJob,
+  options: { flush?: boolean } = {},
+): Promise<void> {
+  const payload: MediaPayload = { kind: 'media', ...job, queuedAt: new Date().toISOString() };
   const result = await enqueueJournalOp({
     id: MEDIA_PREFIX + job.mediaId,
     replace: true,
@@ -136,7 +152,7 @@ export async function queueJournalMedia(job: JournalMediaUploadJob): Promise<voi
     payload,
   });
   if (!result.ok) throw new Error(result.quota.message);
-  scheduleFlush();
+  if (options.flush !== false) scheduleFlush();
 }
 
 export async function dropQueuedJournalMedia(mediaIds: string[]): Promise<void> {
@@ -161,16 +177,23 @@ async function sendSave(payload: SavePayload): Promise<JournalOpAck> {
 }
 
 async function sendMedia(payload: MediaPayload): Promise<JournalOpAck> {
+  // The moment that references these bytes has not reached the server yet:
+  // uploading now would only fail verify. Keep them and try after the save.
+  if (await hasPendingSave(payload.tripId)) {
+    return { state: 'failed', error: 'Waiting for the journal save' };
+  }
   try {
     const envelope = await backUpJournalMedia(payload);
     void emitSynced(payload.tripId, envelope);
     return { state: 'acked', server_version: envelope.version };
   } catch (err) {
-    // The moment was deleted (or never saved) — nothing references these bytes.
     if (err instanceof ApiClientError && err.code === 'not_found') {
       const { journal } = await getJournal(payload.tripId);
       const row = journal.media.find((m) => m.id === payload.mediaId);
-      if (!row || row.lifecycle !== 'live') return { state: 'acked' };
+      // Deleted from the journal: nothing references these bytes any more.
+      if (row && row.lifecycle !== 'live') return { state: 'acked' };
+      const age = Date.now() - Date.parse(payload.queuedAt ?? '');
+      if (!row && Number.isFinite(age) && age > ORPHAN_MEDIA_AFTER_MS) return { state: 'acked' };
     }
     throw err;
   }

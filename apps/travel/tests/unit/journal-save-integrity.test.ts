@@ -190,3 +190,30 @@ describe('journal outbox media', () => {
     expect(await listJournalOps()).toEqual([]);
   });
 });
+
+describe('journal outbox ordering', () => {
+  it('never uploads or drops photo bytes while the moment that uses them is still waiting to save', async () => {
+    __setJournalOpsStoreForTests(memoryStore());
+    const mediaUpload = await import('@/journal/media-upload');
+    const backup = vi.spyOn(mediaUpload, 'backUpJournalMedia');
+    vi.spyOn(journalApi, 'saveJournal').mockRejectedValue(
+      new ApiClientError({ code: 'network_error', message: 'offline' }),
+    );
+    const { queueJournalMedia } = await import('@/journal/journal-outbox');
+
+    await queueJournalSave('trp_test', 'sha_v1', journal([moment({ id: 'mom_a' })]));
+    await queueJournalMedia({
+      tripId: 'trp_test',
+      mediaId: 'med_waiting',
+      blob: new Blob(['x'], { type: 'image/jpeg' }),
+      contentType: 'image/jpeg',
+    });
+    await flushJournalOutbox();
+
+    expect(backup).not.toHaveBeenCalled();
+    expect((await listJournalOps()).map((op) => op.id)).toEqual([
+      'a-save:trp_test',
+      'b-media:med_waiting',
+    ]);
+  });
+});

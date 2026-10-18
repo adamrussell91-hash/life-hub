@@ -6,7 +6,11 @@ import {
   makeMediaId,
   normalizeMediaContentType,
 } from '@/journal/media-upload';
-import { dropQueuedJournalMedia, queueJournalMedia } from '@/journal/journal-outbox';
+import {
+  dropQueuedJournalMedia,
+  flushJournalOutbox,
+  queueJournalMedia,
+} from '@/journal/journal-outbox';
 import { rememberLocalJournalMedia } from '@/journal/media-loading';
 import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import {
@@ -343,10 +347,12 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
         playback.src = voicePlaybackUrl;
         playback.hidden = false;
         retakeBtn.hidden = false;
-        attachVoiceBtn.hidden = false;
         recordBtn.hidden = true;
         stopBtn.hidden = true;
-        voiceStatus.textContent = 'Review your recording, then attach it to this moment.';
+        // One less tap with one hand: a finished recording is attached; Retake replaces it.
+        voiceAttached = true;
+        voiceStatus.textContent = 'Voice note ready. Save to add it, or Retake.';
+        markDirty();
       });
       voiceRecording.start();
       recordBtn.hidden = true;
@@ -494,12 +500,10 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
       for (const a of attachments) {
         const mediaId = makeMediaId();
         mediaRows.push(await buildJournalMediaRow(mediaId, a.blob, a.contentType, a));
-        await queueJournalMedia({
-          tripId: options.tripId,
-          mediaId,
-          blob: a.blob,
-          contentType: a.contentType,
-        });
+        await queueJournalMedia(
+          { tripId: options.tripId, mediaId, blob: a.blob, contentType: a.contentType },
+          { flush: false },
+        );
       }
     } catch {
       await dropQueuedJournalMedia(mediaRows.map((m) => m.id));
@@ -546,6 +550,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
       return;
     }
     attachments.forEach((a, i) => rememberLocalJournalMedia(mediaRows[i]!.id, a.blob));
+    if (mediaRows.length) void flushJournalOutbox();
     // Only now is everything either on the server or in the outbox.
     await clearCaptureDraft(options.tripId, options.legId, options.localDate);
     options.onSaved?.(envelope);

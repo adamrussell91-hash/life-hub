@@ -1,5 +1,6 @@
 import type { JournalDocument } from '@/api/journal';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import {
   applyPermanentDelete,
@@ -18,16 +19,21 @@ export interface TrashRow {
 export function listTrashRows(journal: JournalDocument): TrashRow[] {
   const rows: TrashRow[] = [];
   for (const moment of journal.moments.filter((m) => m.lifecycle === 'deleted')) {
+    const snippet = moment.text?.trim().replace(/\s+/g, ' ');
+    const photos = moment.media_ids.length;
     rows.push({
       target: { kind: 'moment', id: moment.id },
-      label: moment.place?.name ?? 'Moment',
-      detail: moment.local_date,
+      label:
+        moment.place?.name ??
+        (snippet ? (snippet.length > 60 ? `${snippet.slice(0, 59)}…` : snippet) : null) ??
+        (photos ? `${photos} photo${photos === 1 ? '' : 's'}` : 'Moment'),
+      detail: formatDisplayDate(moment.local_date),
     });
   }
   for (const day of journal.days.filter((d) => d.lifecycle === 'deleted')) {
     rows.push({
       target: { kind: 'day', id: day.id },
-      label: `Day ${day.local_date}`,
+      label: `Day ${formatDisplayDate(day.local_date)}`,
       detail: 'Day section',
     });
   }
