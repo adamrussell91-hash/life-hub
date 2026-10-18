@@ -94,6 +94,10 @@ try {
   assert.ok(Math.hypot(after.x - before.x, after.y - before.y) > 0.5, 'shapes keep moving in orbit');
   await shot(t, 'teacher-orbit');
   console.log('Orbit moving with 64 shapes');
+  // Students see the same orbit on their own screen, before anyone shares the board.
+  await waitFor(async () => (await a.locator('.bs-board .bs-orbit__item.pf-token').count()) === 64, 'student orbit');
+  assert.equal(await a.locator('.bs-board .bs-card').count(), 0, 'student orbit has no text');
+  await shot(a, 'student-orbit');
 
   await t.getByRole('button', { name: 'Reveal answers' }).click();
   await t.locator('.bs-card').first().waitFor();
