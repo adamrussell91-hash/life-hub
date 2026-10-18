@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v212';
+const CACHE_NAME = 'life-hub-shell-v213';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -267,6 +267,7 @@ const SHELL_FILES = [
   'js/app/render-skincare.js',
   'js/app/aesthetics/aesthetics-model.js',
   'js/app/aesthetics/dress-looks.js',
+  'js/app/aesthetics/outfit-model.js',
   'js/app/aesthetics/fragrance-library.js',
   'js/app/aesthetics/sydney-weather.js',
   'js/app/aesthetics/notion-aesthetics-source.js',

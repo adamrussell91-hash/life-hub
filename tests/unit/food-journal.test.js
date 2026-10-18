@@ -17,6 +17,7 @@ import {
   applyFixup,
   firstSentence,
   noteBlocks,
+  sharedOnce,
   tidyImports,
   liveVisits,
   dayOneRating,
@@ -321,6 +322,46 @@ test("media reads require a live journal reference and uploads use food namespac
       .status,
     200,
   );
+});
+// The page lives on life-hub.adam-russell.com and the API on another host, so
+// Safari reports "Load failed" for any answer that lacks CORS headers.
+test("research start and poll answer the Life Hub origin with CORS headers", async () => {
+  resetRateLimits();
+  const store = createMemoryChatJobStore();
+  const origin = "https://life-hub.adam-russell.com";
+  const handler = createFoodJournalAssistHandler(
+    deps(repo(), { getStore: async () => store, invokeRun: async () => true }),
+  );
+  const started = await handler(
+    new Request("https://example.test/api/food-journal-assist", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ action: "recipe", dish_id: "dish_1" }),
+    }),
+  );
+  assert.equal(started.status, 202);
+  assert.equal(started.headers.get("access-control-allow-origin"), origin);
+  assert.equal(started.headers.get("access-control-allow-credentials"), "true");
+  const { id } = (await started.json()).data;
+  const polled = await handler(
+    new Request(`https://example.test/api/food-journal-assist?id=${id}`, {
+      headers: { origin },
+    }),
+  );
+  assert.equal(polled.status, 200);
+  assert.equal(polled.headers.get("access-control-allow-origin"), origin);
+  let limited;
+  for (let i = 0; i < 8; i++)
+    limited = await handler(
+      new Request("https://example.test/api/food-journal-assist", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin },
+        body: JSON.stringify({ action: "recipe", dish_id: "dish_1" }),
+      }),
+    );
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get("access-control-allow-origin"), origin);
+  assert.match((await limited.json()).error.message, /Try again in a minute/);
 });
 test("background capture lifecycle polls a result and strips input image payloads", async () => {
   resetRateLimits();
@@ -685,6 +726,39 @@ test("Day One Markdown reads as headings and paragraphs, not raw symbols", () =>
   ]);
 });
 
+// Merged Day One entries each carry the same Location and Shared with
+// sections; the entry shows them once, after the dishes.
+test("merged notes show shared sections once, after the dishes", () => {
+  const part = (dish, text, rating) =>
+    [
+      `### ${dish}`,
+      "### Description",
+      text,
+      "### Rating and recommendation",
+      rating,
+      "### Location",
+      "Ibby's Burgers and Shakes",
+      "### Shared with/occasion",
+      "Day outing with Redacted!",
+    ].join("\n");
+  const notes = [
+    part("The Cheese", "Smashed beef", "4.5/5 great"),
+    part("Nashville Tenders", "Crispy fried", "4/5 very hot"),
+    part("Oklahoma", "Double smashed beef", "4/5 was good"),
+  ].join("\n\n---\n\n");
+  const blocks = sharedOnce(noteBlocks(notes));
+  const text = (b) => b.text;
+  assert.deepEqual(blocks.map(text), [
+    "The Cheese", "Description", "Smashed beef", "Rating and recommendation", "4.5/5 great",
+    "Nashville Tenders", "Description", "Crispy fried", "Rating and recommendation", "4/5 very hot",
+    "Oklahoma", "Description", "Double smashed beef", "Rating and recommendation", "4/5 was good",
+    "Location", "Ibby's Burgers and Shakes",
+    "Shared with/occasion", "Day outing with Redacted!",
+  ]);
+  // A single entry is unchanged.
+  const one = noteBlocks(part("The Cheese", "Smashed beef", "4.5/5 great"));
+  assert.deepEqual(sharedOnce(one), one);
+});
 test("fix-up splits dishes, keeps the original text, photos and tags, and never sets ratings", () => {
   const v = { ...dated("2026-09-13", "Late dumplings", "", [["Late dumplings", null]]), source_id: "dayone:x" };
   v.notes = "Late dumplings\nPork gyoza, chilli wontons.";

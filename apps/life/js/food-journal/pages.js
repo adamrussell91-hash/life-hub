@@ -7,6 +7,7 @@ import {
   visitRating,
   firstSentence,
   noteBlocks,
+  sharedOnce,
   plainNotes,
   visitTags,
   tagKey,
@@ -522,7 +523,7 @@ export function paintEntry(ctx, host, visit) {
 
   const columns = el("div", "fj-entry__columns");
   const prose = el("div", "fj-prose fj-serif");
-  const blocks = noteBlocks(visit.notes, { title: headline(visit) });
+  const blocks = sharedOnce(noteBlocks(visit.notes, { title: headline(visit) }));
   const paragraphs = blocks.filter((b) => b.kind === "para");
   for (const block of blocks) {
     if (block.kind === "heading") {

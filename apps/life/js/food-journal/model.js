@@ -419,6 +419,20 @@ export function noteBlocks(text, { title = "" } = {}) {
     blocks.shift();
   return blocks;
 }
+// Same-day Day One entries merge into one visit, and each brought its own
+// Location and Shared with sections. Show a section (a heading and the
+// paragraphs under it) once, at its last place, so shared details sit after
+// the dishes instead of repeating between them.
+export function sharedOnce(blocks) {
+  const sections = [];
+  for (const block of blocks)
+    if (block.kind === "heading" || !sections.length) sections.push([block]);
+    else sections.at(-1).push(block);
+  const key = (section) =>
+    section.map((b) => `${b.kind}:${b.text.toLowerCase()}`).join("\n");
+  const last = new Map(sections.map((section, i) => [key(section), i]));
+  return sections.filter((section, i) => last.get(key(section)) === i).flat();
+}
 export function plainNotes(text) {
   return noteBlocks(text)
     .filter((b) => b.kind === "para")
