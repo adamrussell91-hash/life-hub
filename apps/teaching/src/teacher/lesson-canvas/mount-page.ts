@@ -755,7 +755,8 @@ export function mountBlockCanvas(
       const target = pendingReveal;
       pendingReveal = null;
       const row = root.querySelector(`.lesson-page__block[data-block-id="${target}"]`);
-      const editor = row?.querySelector('.lesson-page__inspector') ?? row;
+      const nested = row ? null : root.querySelector(`.hub-list__row[data-key="${CSS.escape(target)}"]`);
+      const editor = nested ?? row?.querySelector('.lesson-page__inspector') ?? row;
       if (editor) scrollElementIntoView(editor);
     }
   }
@@ -778,9 +779,20 @@ export function mountBlockCanvas(
         setHint(result.message);
         return;
       }
-      setHint('');
-      emit(result.blocks);
-      selectAndReveal(block.id);
+      // Only page-level rows can be selected. A block added inside a section,
+      // column or tab opens its container's editor, scrolled to the new block;
+      // selecting the nested id itself left nothing editable on the page.
+      const containerId = rootAncestorId(result.blocks, block.id) ?? block.id;
+      const container = findBlockById(result.blocks, containerId);
+      emit(result.blocks, false);
+      pendingReveal = block.id;
+      if (selectedId === containerId) render();
+      else select(containerId);
+      setHint(
+        containerId !== block.id && container
+          ? `Added inside the ${blockTypeLabel(container).toLowerCase()}. Choose Done to add blocks to the page instead.`
+          : ''
+      );
     },
     revealPublishBlock(blockId: string, errorIds: string[] = [blockId]) {
       publishErrorIds = new Set(errorIds);

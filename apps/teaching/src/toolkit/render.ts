@@ -1073,7 +1073,10 @@ function renderIntentions(block: ThinkingIntentionsBlock, mode: TkRenderMode): H
   wrap.append(eyebrow('Thinking intentions'));
   let filled = 0;
   if (c.content.trim()) {
-    wrap.append(intentionRow('We are learning', paragraphs(c.content)));
+    // The learning intention leads the block in its own panel, apart from the how-we-think rows.
+    const lead = el('div', 'tk-intent__lead');
+    lead.append(el('p', 'tk-intent__label', 'We are learning'), paragraphs(c.content, 'tk-intent__focus'));
+    wrap.append(lead);
     filled += 1;
   }
   const thinking = [

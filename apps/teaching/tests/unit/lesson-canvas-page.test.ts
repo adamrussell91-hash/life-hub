@@ -756,6 +756,30 @@ describe('mountBlockCanvas', () => {
     expect(next[0].content.blocks.map((block) => block.block_type)).toEqual(['heading']);
   });
 
+  it('a block added inside a section stays editable, and Done sends the next one to the page', () => {
+    const onChange = vi.fn();
+    const section = createBlock('section', 'sec1');
+    const handle = mountBlockCanvas(host, {
+      blocks: [section],
+      onChange,
+      idFactory: () => ids.shift() ?? 'new_x'
+    });
+
+    enterBlockEdit(host, '[data-block-id="sec1"]');
+    handle.insertType('accordion');
+
+    // The section's editor stays open with the accordion's fields in it.
+    const sectionRow = host.querySelector('.lesson-page__block[data-block-id="sec1"]')!;
+    expect(sectionRow.classList.contains('lesson-page__block--selected')).toBe(true);
+    expect(sectionRow.querySelector('.block-editor__accordion-title')).not.toBeNull();
+    expect(host.querySelector('.lesson-page__hint')?.textContent).toContain('Added inside the section');
+
+    host.querySelector<HTMLButtonElement>('.lesson-page__done')!.click();
+    handle.insertType('heading');
+    const next = onChange.mock.calls.at(-1)?.[0] as Block[];
+    expect(next.map((block) => block.block_type)).toEqual(['section', 'heading']);
+  });
+
   it('omits the edit menu on a published student canvas', () => {
     mountBlockCanvas(host, {
       blocks: [createBlock('heading', 'h1')],
