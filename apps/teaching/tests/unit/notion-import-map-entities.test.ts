@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildImportPlan } from '@/notion-import/map-entities';
 import { EMPTY_CHOICES, type MapContext, type NotionPage, type NotionTree } from '@/notion-import/types';
-import { p } from './notion-import-fixtures';
+import { bullet, node, p, rt } from './notion-import-fixtures';
 
 const now = '2026-10-18T00:00:00.000Z';
 function page(id: string, category: string | null, extra: Partial<NotionPage> = {}): NotionPage {
@@ -201,5 +201,34 @@ describe('unreadable sub-pages', () => {
       page_id: 'p1', notion_block_id: null, rule: 'skipped',
       message: 'A sub-page could not be read from Notion (object_not_found); share it with the integration or import it separately.'
     });
+  });
+});
+
+describe('unreadable blocks at any depth', () => {
+  const bad = (n: any) => ({ ...n, children_error: 'object_not_found' });
+  const warningsFor = (blocks: any[]) => {
+    const plan = buildImportPlan(tree('p1', page('p1', 'Lesson', { blocks })), ctx());
+    return plan.warnings.filter((w) => w.message.includes('would not return the contents'));
+  };
+  it('warns once for a top-level node', () => {
+    const w = warningsFor([bad(node('toggle', { rich_text: rt('T') }))]);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ rule: 'skipped', page_id: 'p1', message: 'Notion would not return the contents of this toggle block (object_not_found); it was left out.' });
+  });
+  it('warns once for a paragraph under a list item', () => {
+    expect(warningsFor([bullet('A', [bad(p('inner'))])])).toHaveLength(1);
+  });
+  it('warns once for a nested list item', () => {
+    expect(warningsFor([bullet('A', [bullet('B', [bad(bullet('C'))])])])).toHaveLength(1);
+  });
+  it('warns once for a paragraph inside a callout', () => {
+    expect(warningsFor([node('callout', { rich_text: rt('C'), icon: null, color: 'default' }, [bad(p('inner'))])])).toHaveLength(1);
+  });
+  it('warns once for a tab item', () => {
+    const tab = bad(node('tab', { label: 'One' }, [p('x')]));
+    expect(warningsFor([node('tabs', {}, [tab])])).toHaveLength(1);
+  });
+  it('warns once for a toggle run', () => {
+    expect(warningsFor([p('a'), bad(node('toggle', { rich_text: rt('T') })), p('b')])).toHaveLength(1);
   });
 });

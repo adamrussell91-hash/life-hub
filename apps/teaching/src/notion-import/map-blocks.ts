@@ -341,9 +341,14 @@ function unsupportedNode(n: NotionNode, st: BlockState): Block[] {
 
 // ---------- entry ----------
 
-function warnChildrenError(n: NotionNode, st: BlockState): void {
-  if (!n.children_error) return;
-  warn(st, n, 'skipped', `Notion would not return the contents of this ${typeLabel(n)} block (${n.children_error}); it was left out.`);
+/** Warn, once per node and at any depth, about blocks whose children Notion would not return. */
+export function warnUnreadable(nodes: NotionNode[], st: BlockState): void {
+  for (const n of nodes) {
+    if (n.children_error) {
+      warn(st, n, 'skipped', `Notion would not return the contents of this ${typeLabel(n)} block (${n.children_error}); it was left out.`);
+    }
+    warnUnreadable(n.children, st);
+  }
 }
 
 export function mapBlocks(nodes: NotionNode[], scope: Scope, st: BlockState): Block[] {
@@ -354,7 +359,6 @@ export function mapBlocks(nodes: NotionNode[], scope: Scope, st: BlockState): Bl
     if (TEXT_RUN_TYPES.has(n.type)) {
       const run: NotionNode[] = [];
       while (i < nodes.length && TEXT_RUN_TYPES.has(nodes[i].type)) run.push(nodes[i++]);
-      for (const r of run) warnChildrenError(r, st);
       const r = new Run();
       textRunInto(run, st, r);
       for (const part of r.finish()) {
@@ -363,7 +367,6 @@ export function mapBlocks(nodes: NotionNode[], scope: Scope, st: BlockState): Bl
       }
       continue;
     }
-    warnChildrenError(n, st);
     const layout = mapLayout(nodes, i, scope, st);
     if (layout) {
       out.push(...layout.blocks);

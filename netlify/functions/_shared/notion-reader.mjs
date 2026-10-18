@@ -60,7 +60,8 @@ function normalizeTabs(raw, children) {
       id: c.id,
       type: 'tab',
       data: { label: plain(c.data.rich_text) || `Tab ${k + 1}` },
-      children: c.children
+      children: c.children,
+      ...(c.children_error ? { children_error: c.children_error } : {})
     }))
   };
 }
@@ -99,13 +100,17 @@ async function subItemIds(client, page) {
   return items.map((item) => item.relation?.id).filter(Boolean);
 }
 
-export async function readNotionTree(client, rootId, { maxPages = 200, deadlineMs, now = Date.now } = {}) {
+/**
+ * @param {{ maxPages?: number, deadlineAt?: number, now?: () => number }} [opts]
+ *   deadlineAt is an absolute epoch-ms time (compared with now(), default Date.now).
+ */
+export async function readNotionTree(client, rootId, { maxPages = 200, deadlineAt, now = Date.now } = {}) {
   const pages = {};
   const unreadable = [];
   const queue = [{ id: rootId, parent: null }];
   let rootKey = null;
   const guard = () => {
-    if (deadlineMs !== undefined && now() > deadlineMs) throw new Error(TOO_MUCH);
+    if (deadlineAt !== undefined && now() > deadlineAt) throw new Error(TOO_MUCH);
   };
   while (queue.length) {
     const { id, parent } = queue.shift();

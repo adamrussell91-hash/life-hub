@@ -1,7 +1,7 @@
 // apps/teaching/src/notion-import/map-entities.ts
 import type { PedagogicalMode } from '../curriculum/pedagogical-mode';
 import { makeBlock } from './block-factory';
-import { createBlockState, mapBlocks, mediaUrl, type BlockState } from './map-blocks';
+import { createBlockState, mapBlocks, mediaUrl, warnUnreadable, type BlockState } from './map-blocks';
 import type {
   EntityKind, ImportPlan, MapContext, NotionPage, NotionTree, PlannedEntity
 } from './types';
@@ -85,6 +85,7 @@ export function buildImportPlan(tree: NotionTree, ctx: MapContext): ImportPlan {
     }
 
     const st: BlockState = createBlockState(pageId, ctx.now, ctx.choices.html_as_code);
+    warnUnreadable(pg.blocks, st);
     const blocks = mapBlocks(pg.blocks, 'top', st);
     pg.files.forEach((f, k) => {
       const ref = `file:${pageId}:${k}`;

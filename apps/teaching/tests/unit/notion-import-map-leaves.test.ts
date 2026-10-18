@@ -259,15 +259,3 @@ describe('nested blocks stay in place', () => {
     expect(st.warnings[0].message).toBe('PDF has no file; skipped.');
   });
 });
-
-describe('unreadable children', () => {
-  it('warns once when Notion would not return a block\'s children', () => {
-    const st = state();
-    const n = { ...node('toggle', { rich_text: rt('T') }), children_error: 'object_not_found' };
-    mapBlocks([n], 'top', st);
-    const hits = st.warnings.filter((w) => w.message.includes('would not return the contents'));
-    expect(hits).toHaveLength(1);
-    expect(hits[0].rule).toBe('skipped');
-    expect(hits[0].message).toBe('Notion would not return the contents of this toggle block (object_not_found); it was left out.');
-  });
-});

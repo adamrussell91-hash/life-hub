@@ -527,9 +527,13 @@ function unsupportedNode(n, st) {
   const html = plainParagraphsHtml(deepPlainText(n));
   return html ? [makeBlock("rich_text", st.ids.from(n.id), { html }, st.now)] : [];
 }
-function warnChildrenError(n, st) {
-  if (!n.children_error) return;
-  warn(st, n, "skipped", `Notion would not return the contents of this ${typeLabel(n)} block (${n.children_error}); it was left out.`);
+function warnUnreadable(nodes, st) {
+  for (const n of nodes) {
+    if (n.children_error) {
+      warn(st, n, "skipped", `Notion would not return the contents of this ${typeLabel(n)} block (${n.children_error}); it was left out.`);
+    }
+    warnUnreadable(n.children, st);
+  }
 }
 function mapBlocks(nodes, scope, st) {
   const out = [];
@@ -539,7 +543,6 @@ function mapBlocks(nodes, scope, st) {
     if (TEXT_RUN_TYPES.has(n.type)) {
       const run = [];
       while (i < nodes.length && TEXT_RUN_TYPES.has(nodes[i].type)) run.push(nodes[i++]);
-      for (const r2 of run) warnChildrenError(r2, st);
       const r = new Run();
       textRunInto(run, st, r);
       for (const part of r.finish()) {
@@ -548,7 +551,6 @@ function mapBlocks(nodes, scope, st) {
       }
       continue;
     }
-    warnChildrenError(n, st);
     const layout = mapLayout(nodes, i, scope, st);
     if (layout) {
       out.push(...layout.blocks);
@@ -771,6 +773,7 @@ function buildImportPlan(tree, ctx) {
       return;
     }
     const st = createBlockState(pageId, ctx.now, ctx.choices.html_as_code);
+    warnUnreadable(pg.blocks, st);
     const blocks = mapBlocks(pg.blocks, "top", st);
     pg.files.forEach((f, k) => {
       const ref = `file:${pageId}:${k}`;
