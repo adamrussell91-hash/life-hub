@@ -210,7 +210,9 @@ async function pageFor(width = 1440, { editorial = false } = {}) {
         };
       },
     },
-    signPut: async ({ key }) => "https://food-media.test/" + key,
+    putObject: async ({ key, body }) => {
+      assets.set(key, Buffer.from(body));
+    },
     signGet: async ({ key }) => "https://food-media.test/" + key,
   };
   // Production starts the background run from the assist function; do the
@@ -248,7 +250,7 @@ async function pageFor(width = 1440, { editorial = false } = {}) {
         new Request(r.url(), {
           method: r.method(),
           headers,
-          ...(r.postData() ? { body: r.postData() } : {}),
+          ...(r.postDataBuffer() ? { body: r.postDataBuffer() } : {}),
         }),
       );
       await route.fulfill({
@@ -494,6 +496,23 @@ for (const width of [390, 320])
 test("capture, private upload, menu text, backup and restore work through the real entry point", async () => {
   const { page, read, errors } = await pageFor(390);
   await page.getByRole("button", { name: "Add visit", exact: true }).click();
+  // On a phone the visit form is a full page with Close and Save on top.
+  await page.waitForTimeout(600);
+  const layout = await page.evaluate(() => {
+    const box = (q) => document.querySelector(q).getBoundingClientRect();
+    return {
+      sheet: box(".food-sheet"),
+      actions: box(".food-sheet__actions"),
+      fields: box(".food-sheet__fields"),
+      width: innerWidth,
+      height: innerHeight,
+    };
+  });
+  assert.ok(Math.abs(layout.sheet.width - layout.width) < 2, JSON.stringify(layout));
+  assert.ok(Math.abs(layout.sheet.height - layout.height) < 2, JSON.stringify(layout));
+  assert.ok(layout.actions.bottom <= layout.fields.top + 1, JSON.stringify(layout));
+  // One way in for dish photos.
+  assert.equal(await page.getByLabel("Add photos to this dish").count(), 0);
   const jpeg =
     "/9j/4AAQSkZJRgABAQAAAQABAAD/4QBIRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAZADAAIAAAAUAAAALAAAAAAyMDI2OjEyOjAyIDE4OjMwOjAwAP/bAEMACAYGBwYFCAcHBwkJCAoMFA0MCwsMGRITDxQdGh8eHRocHCAkLicgIiwjHBwoNyksMDE0NDQfJzk9ODI8LjM0Mv/bAEMBCQkJDAsMGA0NGDIhHCEyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMv/AABEIABAAEAMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AO0ooooA/9k=";
   const photo = {
@@ -529,6 +548,11 @@ test("capture, private upload, menu text, backup and restore work through the re
   await gyoza.uncheck();
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 1);
   await gyoza.check();
+  const tags = page.getByLabel("Tags", { exact: true }).first();
+  await tags.fill("Spicy");
+  await tags.press("Enter");
+  await page.getByRole("button", { name: "Remove tag Spicy", exact: true }).waitFor();
+  assert.equal(await tags.inputValue(), "");
   assert.match(
     await page.getByLabel("Menu text", { exact: true }).inputValue(),
     /Soba noodles/,
@@ -542,6 +566,7 @@ test("capture, private upload, menu text, backup and restore work through the re
     ["Soba noodles", "Pork gyoza"],
   );
   assert.equal(read().visits[1].menu_items.length, 2);
+  assert.ok(read().visits[1].dishes[0].tags.includes("Spicy"));
   const photoState = await page.evaluate(() => {
     const node = document.querySelector(".fj-portrait .food-photo");
     const card = node?.closest(".food-visit");
