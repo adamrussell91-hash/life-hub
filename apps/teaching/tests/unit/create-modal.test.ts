@@ -168,6 +168,19 @@ describe('mountCreateControl', () => {
     expect(menu!.querySelectorAll('[data-create-kind]')).toHaveLength(5);
   });
 
+  it('home menu ends with Import from Notion, which opens the import modal', () => {
+    const result = mountCreateControl(host, { context: 'home', curriculum, onCreated: vi.fn() });
+    dispose = result.dispose;
+    host.querySelector<HTMLButtonElement>('[data-create-trigger]')!.click();
+
+    const item = host.querySelector<HTMLButtonElement>('[data-create-import="notion"]');
+    expect(item?.textContent).toBe('Import from Notion');
+    item!.click();
+
+    expect(document.querySelector('[data-notion-import-modal]')).toBeTruthy();
+    expect(host.querySelector('[data-create-menu]')).toBeNull();
+  });
+
   it('classes context shows a single New class control without the full four-item menu', () => {
     const result = mountCreateControl(host, {
       context: 'classes',

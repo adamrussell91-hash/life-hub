@@ -514,6 +514,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const sessionSecret = options.sessionSecret ?? DEFAULT_SESSION_SECRET;
 
   const store = new MockStore();
+  // Notion import jobs live in memory. A plan job is 'planned' straight away; an apply job is 'done'.
+  const notionJobs = new Map<string, Record<string, unknown>>();
   store.loadSeed(options.seed);
 
   const seedIds = {
@@ -3479,6 +3481,49 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
+    }
+
+    if (method === 'GET' && path === '/api/notion-import/search') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      return okResponse(200, { items: [] });
+    }
+    if (method === 'POST' && path === '/api/notion-import/jobs') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const req = (body ?? {}) as { kind?: string; page_id?: unknown };
+      if ((req.kind !== 'plan' && req.kind !== 'apply') || typeof req.page_id !== 'string' || !req.page_id) {
+        return errorResponse(400, 'validation_error', 'Choose a Notion page to import.');
+      }
+      const id = `nij_mock${String(notionJobs.size + 1).padStart(4, '0')}`;
+      const now = new Date().toISOString();
+      const base = { id, kind: req.kind, page_id: req.page_id, updated_at: now };
+      notionJobs.set(
+        id,
+        req.kind === 'plan'
+          ? {
+              ...base,
+              status: 'planned',
+              plan: {
+                root_page_id: req.page_id,
+                entities: [
+                  { page_id: req.page_id, parent_page_id: null, kind: 'unit', label: 'Unit', id: 'unit_n_mock1', title: 'Sample imported unit', existing: false, needs: [], suggested: {} },
+                  { page_id: 'mock-lesson-1', parent_page_id: req.page_id, kind: 'lesson', label: 'Lesson', id: 'lesson_n_mock1', title: 'Sample imported lesson', existing: false, needs: [], suggested: {} }
+                ],
+                skipped: [],
+                warnings: [{ page_id: 'mock-lesson-1', notion_block_id: 'mock-block-1', rule: 'flattened', message: 'A two column layout was stacked.' }],
+                html_apps: [],
+                new_subjects: [],
+                media_count: 0
+              }
+            }
+          : { ...base, status: 'done', report: { written: ['unit_n_mock1', 'lesson_n_mock1'], skipped: [], warnings: [] } }
+      );
+      return okResponse(202, { job_id: id });
+    }
+    const notionJobMatch = path.match(/^\/api\/notion-import\/jobs\/([^/]+)$/);
+    if (method === 'GET' && notionJobMatch) {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const job = notionJobs.get(notionJobMatch[1]!);
+      return job ? okResponse(200, job) : errorResponse(404, 'not_found', 'Import job not found.');
     }
 
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);
