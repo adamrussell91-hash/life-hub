@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CalloutBlockSchema, type Block } from '@/schemas/block';
-import { decorateCalloutReferences, refreshCalloutReferences, calloutTargets, calloutIdentity, createCalloutTargetPicker } from '@/blocks/callout-reference';
+import { decorateCalloutReferences, refreshCalloutReferences, resolvedCalloutStyle, calloutTargets, calloutIdentity, createCalloutTargetPicker } from '@/blocks/callout-reference';
 
 const activity = { id: 'activity', block_type: 'question_set', visibility: 'student_teacher', content: { title: 'Video questions', questions: [{ id: 'q1', prompt: 'First?' }, { id: 'q2', prompt: 'Why does habit change perception?' }] } } as Block;
 const callout = { id: 'extension', type: 'block', block_type: 'callout', visibility: 'student_teacher', content: { style: 'extension', body: 'Try another view.', related_to: { block_id: 'activity', question_id: 'q2' } } } as Block;
@@ -160,5 +160,14 @@ describe('callout references', () => {
     refreshCalloutReferences(scope, [activity, {...callout,content:{style:'extension',body:'No link'}} as Block], 'teacher');
     expect(scope.querySelectorAll('.callout-ref, .callout-ref-list')).toHaveLength(0);
     expect(scope.querySelector('input')).toBe(input);
+  });
+});
+
+describe('cultural warning identity', () => {
+  it('recognises explicitly titled legacy notices without changing ordinary information', () => {
+    expect(resolvedCalloutStyle({style: 'information', title: 'Cultural Warning for Teachers and Students'})).toBe('cultural_warning');
+    expect(resolvedCalloutStyle({style: 'information', title: 'Video information'})).toBe('information');
+    expect(resolvedCalloutStyle({style: 'warning', title: 'Cultural warning'})).toBe('warning');
+    expect(calloutIdentity('cultural_warning').textContent).toBe('Cultural warning');
   });
 });
