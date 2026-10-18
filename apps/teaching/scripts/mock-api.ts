@@ -34,6 +34,7 @@ import {
   BlockSchema,
   ClassHomepageSchema,
   ClassSchema,
+  type ClassStudent,
   CompositionTemplateSchema,
   CoverPatchSchema,
   CurriculumOutcomeSchema,
@@ -1540,18 +1541,28 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasHomepage = record.homepage !== undefined;
     const hasCover = record.cover !== undefined;
     const hasTitle = record.title !== undefined;
+    const hasStudents = record.students !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasTitle && !hasStatus) {
+    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasTitle && !hasStudents && !hasStatus) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, title, and/or status'
+        'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, title, students, and/or status'
       );
+    }
+
+    let students: ClassStudent[] | undefined;
+    if (hasStudents) {
+      const studentsParsed = ClassSchema.shape.students.safeParse(record.students);
+      if (!studentsParsed.success || !studentsParsed.data) {
+        return errorResponse(400, 'validation_error', 'students is invalid');
+      }
+      students = studentsParsed.data;
     }
 
     let meeting_days: number[] | undefined;
@@ -1666,6 +1677,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     if (title !== undefined) {
       merged.title = title;
+    }
+
+    if (students !== undefined) {
+      merged.students = students;
     }
 
     if (hasStatus) {

@@ -19,6 +19,20 @@ export const ClassHomepageSchema = z.object({
 
 export type ClassHomepage = z.infer<typeof ClassHomepageSchema>;
 
+/**
+ * One student on a class list, for the classroom name picker and groups.
+ * Lives only on the class record (teacher side). `skip_picker` quietly leaves
+ * the student out of the name picker and is never shown on a lesson page.
+ */
+export const ClassStudentSchema = z.object({
+  name: z.string().min(1).max(80),
+  skip_picker: z.boolean().default(false)
+});
+
+export type ClassStudent = z.infer<typeof ClassStudentSchema>;
+
+export const MAX_CLASS_STUDENTS = 60;
+
 export const ClassSchema = z.object({
   ...CommonFields,
   ...TrashFields,
@@ -34,7 +48,8 @@ export const ClassSchema = z.object({
   meeting_days: z.array(z.number().int().min(1).max(7)).optional(),
   timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
-  cover: CoverSchema.optional()
+  cover: CoverSchema.optional(),
+  students: z.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional()
 });
 
 export type Class = z.infer<typeof ClassSchema>;

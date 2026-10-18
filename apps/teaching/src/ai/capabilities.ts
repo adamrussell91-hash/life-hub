@@ -137,6 +137,8 @@ const BY_TYPE: Partial<Record<Block['block_type'], AiAction[]>> = {
     { id: 'balance', label: 'Balance content' }
   ],
   divider: [],
+  classroom_tools: [],
+  countdown: [],
   spacer: []
 };
 

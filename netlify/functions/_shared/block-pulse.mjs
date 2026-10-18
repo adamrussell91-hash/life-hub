@@ -26,6 +26,8 @@ export const PULSE_OPTIONS = ['confused', 'stuck', 'example', 'flat', 'worked'];
 export const PULSE_EXCLUDED_TYPES = new Set([
   'heading',
   'divider',
+  'classroom_tools',
+  'countdown',
   'spacer',
   'section',
   'columns',
