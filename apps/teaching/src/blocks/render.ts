@@ -1,6 +1,7 @@
 import { renderPeerFeedback } from '@/blocks/peer-feedback';
 import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
+import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
 import { canHaveDiscern } from '@/blocks/discern';
@@ -2257,6 +2258,8 @@ function renderBlockContent(
       return wrapBlock(renderPeerFeedback(block, mode, ctx), block, mode);
     case 'question_drop':
       return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
+    case 'brainstorm':
+      return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
     case 'discern_confirm':
       return wrapBlock(renderDiscernConfirm(block, mode, ctx), block, mode);
     case 'quiz_question':

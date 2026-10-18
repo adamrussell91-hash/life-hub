@@ -40,6 +40,7 @@ export const NEW_BLOCK_TYPES = [
   'table',
   'peer_feedback',
   'question_drop',
+  'brainstorm',
   'quiz_question',
   'question_set',
   'flashcards',
@@ -105,6 +106,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   table: 'Table',
   peer_feedback: 'Peer feedback',
   question_drop: 'Question drop',
+  brainstorm: 'Brainstorm',
   quiz_question: 'Quiz question',
   question_set: 'Question set',
   flashcards: 'Flashcards',
@@ -229,7 +231,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -274,6 +276,7 @@ const TOOLKIT_GROUP_TYPES = [
 
 const HOMEPAGE_EXCLUDED = new Set([
   'peer_feedback',
+  'brainstorm',
   'question_drop',
   'quiz_question',
   ...TOOLKIT_GROUP_TYPES,
@@ -297,7 +300,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -594,6 +597,10 @@ export function createBlock(type: NewBlockType, id: string): Block {
     case 'peer_feedback':
       return { ...shared, block_type: 'peer_feedback', variant: 'medium', content: {
         prompt: '', mode: 'comments', strength_prompt: 'One thing that works well…', suggestion_prompt: 'One suggestion or question…'
+      } };
+    case 'brainstorm':
+      return { ...shared, block_type: 'brainstorm', variant: 'medium', content: {
+        question: '', safety: 'approve', per_student: 3, max_length: 140, layout: 'grid'
       } };
     case 'question_drop':
       return { ...shared, block_type: 'question_drop', variant: 'medium', content: {
