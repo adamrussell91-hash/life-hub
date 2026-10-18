@@ -25,6 +25,9 @@ describe('richTextHtml', () => {
     expect(richTextHtml([t('Other page', {}, '/0123456789abcdef0123456789abcdef')]))
       .toBe('<a href="https://www.notion.so/0123456789abcdef0123456789abcdef">Other page</a>');
   });
+  it('drops protocol-relative hrefs', () => {
+    expect(richTextHtml([t('x', {}, '//evil.example/a')])).toBe('x');
+  });
   it('turns mentions into plain text even when they carry an href', () => {
     expect(richTextHtml([t('Some Page', {}, 'https://www.notion.so/abc', 'mention')])).toBe('Some Page');
   });

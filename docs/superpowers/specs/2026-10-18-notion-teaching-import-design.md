@@ -149,8 +149,7 @@ The Teaching Hub limits nesting:
 
 Bold, italic, underline and links are kept. Strikethrough and inline code become plain text, because Teaching Hub rich text doesn't allow those tags.
 Colours and highlights are dropped. Mentions become their plain text.
-Equations stay inline as text. The output goes through the existing
-rich-text sanitiser.
+Equations stay inline as text. The mapper builds rich text only from the Teaching Hub's allowed tags, escaping all text and attribute values, so the output is already in sanitised form.
 
 ### Rules for things with no direct match
 
@@ -164,11 +163,11 @@ rich-text sanitiser.
 
   | Colour or emoji | Style |
   |---|---|
-  | red, ⚠️ | `warning` |
+  | red, orange, ⚠️, ❗ | `warning` |
   | yellow | `important` |
   | blue, ℹ️ 📋 📅 | `information` |
   | green, ✅ | `remember` |
-  | purple, 🚀 | `extension` |
+  | purple, pink, 🚀 | `extension` |
   | anything else | `information` |
 
   Callout children that aren't text are placed straight after the callout,
@@ -176,7 +175,9 @@ rich-text sanitiser.
 - **Toggle:** a run of text-only toggles becomes one `accordion` with an item
   for each toggle. A toggle containing anything else becomes a `section` with
   `collapsed_in_editor: true`, titled with the toggle text. A toggle heading
-  becomes a collapsed `section`.
+  becomes a collapsed `section`. Inside a section or tabs, a toggle or a
+  1-tab or 9+-tab group becomes a subsection heading plus its blocks, because
+  sections can't nest.
 - **Columns:** Notion width ratios are rounded to whole 12ths, every column is
   at least 1, and the total is 12. Content that's too deep for a column is
   flattened inside the column: nested columns have their blocks stacked, and a

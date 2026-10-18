@@ -15,7 +15,7 @@ export function escapeHtml(text: string): string {
 function safeHref(href: string | null | undefined): string | null {
   if (!href) return null;
   try {
-    const url = new URL(href, href.startsWith('/') ? 'https://www.notion.so' : undefined);
+    const url = new URL(href, /^\/(?!\/)/.test(href) ? 'https://www.notion.so' : undefined);
     return ['http:', 'https:', 'mailto:'].includes(url.protocol) ? url.href : null;
   } catch {
     return null;

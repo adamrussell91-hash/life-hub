@@ -62,13 +62,15 @@ function listItemHtml(item: NotionNode, st: BlockState): string {
   return `<li>${inner}</li>`;
 }
 
+const listTag = (n: NotionNode) => (n.type === 'numbered_list_item' ? 'ol' : 'ul');
+
 function listsHtml(items: NotionNode[], st: BlockState): string {
   let html = '';
   let i = 0;
   while (i < items.length) {
-    const tag = items[i].type === 'numbered_list_item' ? 'ol' : 'ul';
+    const tag = listTag(items[i]);
     let run = '';
-    while (i < items.length && (items[i].type === 'numbered_list_item' ? 'ol' : 'ul') === tag) {
+    while (i < items.length && listTag(items[i]) === tag) {
       run += listItemHtml(items[i], st);
       i += 1;
     }
@@ -77,7 +79,7 @@ function listsHtml(items: NotionNode[], st: BlockState): string {
   return html;
 }
 
-function textRunHtml(run: NotionNode[], st: BlockState): string {
+function textRunHtml(run: NotionNode[], st: BlockState, hoisted: NotionNode[]): string {
   let html = '';
   let i = 0;
   while (i < run.length) {
@@ -85,7 +87,13 @@ function textRunHtml(run: NotionNode[], st: BlockState): string {
     if (n.type === 'paragraph') {
       const text = richTextHtml(n.data.rich_text);
       if (text) html += `<p>${text}</p>`;
-      if (n.children.length) html += textRunHtml(n.children.filter((c) => TEXT_RUN_TYPES.has(c.type)), st);
+      const textKids = n.children.filter((c) => TEXT_RUN_TYPES.has(c.type));
+      const otherKids = n.children.filter((c) => !TEXT_RUN_TYPES.has(c.type));
+      if (textKids.length) html += textRunHtml(textKids, st, hoisted);
+      if (otherKids.length) {
+        warn(st, n, 'flattened', 'Blocks nested under a paragraph were moved after it.');
+        hoisted.push(...otherKids);
+      }
       i += 1;
       continue;
     }
@@ -101,6 +109,8 @@ export function deepPlainText(n: NotionNode): string {
   const kids = n.children.map(deepPlainText).filter(Boolean);
   return [own, ...kids].filter(Boolean).join('\n');
 }
+
+const typeLabel = (n: NotionNode) => n.type.replace(/_/g, ' ');
 
 function plainParagraphsHtml(text: string): string {
   return text
@@ -136,6 +146,18 @@ export function mediaUrl(st: BlockState, ref: string, node: NotionNode | null, u
   return `${MEDIA_PLACEHOLDER_PREFIX}${ref}`;
 }
 
+/** Resolves a media block's file, or records a skip. Returns the placeholder-or-URL and file name. */
+function mediaFile(n: NotionNode, st: BlockState, purpose: MediaPurpose): { url: string; name: string; hosted: boolean } | null {
+  const f = fileUrl(n.data ?? {});
+  if (!f) {
+    const label = typeLabel(n);
+    warn(st, n, 'skipped', `${label.charAt(0).toUpperCase()}${label.slice(1)} has no file; skipped.`);
+    return null;
+  }
+  const name = fileName(n.data, f.url);
+  return { url: mediaUrl(st, n.id, n, f.url, f.hosted, name, purpose), name, hosted: f.hosted };
+}
+
 const FULL_HTML = /<(html|body|script)\b/i;
 
 // ---------- leaves ----------
@@ -150,10 +172,6 @@ function mapLeaf(n: NotionNode, st: BlockState): Block[] | null {
     case 'heading_3': {
       const variant = n.type === 'heading_1' ? 'page' : n.type === 'heading_2' ? 'section' : 'subsection';
       return [makeBlock('heading', id(), { text: plainText(d.rich_text) }, now, variant)];
-    }
-    case 'quote': {
-      const extra = n.children.map(deepPlainText).filter(Boolean);
-      return [makeBlock('quote', id(), { quote: [plainText(d.rich_text), ...extra].join('\n') }, now)];
     }
     case 'divider':
       return [makeBlock('divider', id(), { tools: true, timer_stack: [] }, now)];
@@ -178,49 +196,50 @@ function mapLeaf(n: NotionNode, st: BlockState): Block[] | null {
       return [makeBlock('table', id(), { headers, rows: d.has_column_header ? rows.slice(1) : rows }, now)];
     }
     case 'image': {
-      const f = fileUrl(d);
-      if (!f) return null;
+      const f = mediaFile(n, st, 'image');
+      if (!f) return [];
       const caption = plainText(d.caption);
       if (!caption) warn(st, n, 'alt_text', 'Image has no caption, so its alt text is empty.');
-      const url = mediaUrl(st, n.id, n, f.url, f.hosted, fileName(d, f.url), 'image');
-      return [makeBlock('image', id(), { url, alt_text: caption, caption: caption || undefined }, now)];
+      return [makeBlock('image', id(), { url: f.url, alt_text: caption, caption: caption || undefined }, now)];
     }
     case 'video': {
-      const f = fileUrl(d);
-      if (!f) return null;
-      if (!f.hosted) {
-        const parsed = parseVideoInput(f.url);
-        if (parsed && parsed.provider !== 'file') {
-          return [makeBlock('video', id(), { ...parsed, url: f.url, caption: plainText(d.caption) || undefined }, now)];
-        }
-        return [makeBlock('embed', id(), { url: f.url, provider: 'generic' }, now)];
+      const raw = fileUrl(d);
+      if (!raw) {
+        mediaFile(n, st, 'video');
+        return [];
       }
-      const url = mediaUrl(st, n.id, n, f.url, true, fileName(d, f.url), 'video');
-      return [makeBlock('video', id(), { provider: 'file', external_id: url, url }, now)];
+      const caption = plainText(d.caption) || undefined;
+      if (!raw.hosted) {
+        const parsed = parseVideoInput(raw.url);
+        if (parsed) return [makeBlock('video', id(), { ...parsed, url: raw.url, caption }, now)];
+        warn(st, n, 'flattened', 'Video is not YouTube, Vimeo or a direct file; kept as a link embed.');
+        return [makeBlock('embed', id(), { url: raw.url, provider: 'generic' }, now)];
+      }
+      const f = mediaFile(n, st, 'video')!;
+      return [makeBlock('video', id(), { provider: 'file', external_id: f.url, url: f.url, caption }, now)];
     }
     case 'file': {
-      const f = fileUrl(d);
-      if (!f) return null;
-      const name = fileName(d, f.url);
-      if (/\.html?$/i.test(name)) {
-        const html = mediaUrl(st, n.id, n, f.url, f.hosted, name, 'html');
-        warn(st, n, 'html_app', `${name} will run as an interactive.`);
-        return [makeBlock('html_app', id(), { title: name, html }, now)];
+      const raw = fileUrl(d);
+      if (raw && !raw.hosted && /\.html?$/i.test(fileName(d, raw.url))) {
+        warn(st, n, 'flattened', 'External HTML file kept as a link embed; only uploaded files can run as an interactive.');
+        return [makeBlock('embed', id(), { url: raw.url, provider: 'generic', title: plainText(d.caption) || undefined }, now)];
       }
-      const url = mediaUrl(st, n.id, n, f.url, f.hosted, name, 'attachment');
-      return [makeBlock('attachment', id(), { url, title: plainText(d.caption) || name, filename: name }, now)];
+      const isHtml = !!raw && /\.html?$/i.test(fileName(d, raw.url));
+      const f = mediaFile(n, st, isHtml ? 'html' : 'attachment');
+      if (!f) return [];
+      if (isHtml) {
+        warn(st, n, 'html_app', `${f.name} will run as an interactive.`);
+        return [makeBlock('html_app', id(), { title: f.name, html: f.url }, now)];
+      }
+      return [makeBlock('attachment', id(), { url: f.url, title: plainText(d.caption) || f.name, filename: f.name }, now)];
     }
     case 'pdf': {
-      const f = fileUrl(d);
-      if (!f) return null;
-      const url = mediaUrl(st, n.id, n, f.url, f.hosted, fileName(d, f.url), 'pdf');
-      return [makeBlock('embed', id(), { url, provider: 'pdf', title: plainText(d.caption) || undefined }, now)];
+      const f = mediaFile(n, st, 'pdf');
+      return f ? [makeBlock('embed', id(), { url: f.url, provider: 'pdf', title: plainText(d.caption) || undefined }, now)] : [];
     }
     case 'audio': {
-      const f = fileUrl(d);
-      if (!f) return null;
-      const url = mediaUrl(st, n.id, n, f.url, f.hosted, fileName(d, f.url), 'audio');
-      return [makeBlock('audio', id(), { url, title: plainText(d.caption) || undefined }, now)];
+      const f = mediaFile(n, st, 'audio');
+      return f ? [makeBlock('audio', id(), { url: f.url, title: plainText(d.caption) || undefined }, now)] : [];
     }
     case 'embed':
     case 'bookmark':
@@ -235,15 +254,11 @@ function mapLeaf(n: NotionNode, st: BlockState): Block[] | null {
         title: plainText(d.caption) || undefined
       }, now)];
     }
-    case 'synced_block': {
-      const html = plainParagraphsHtml(n.children.map(deepPlainText).join('\n'));
-      return html ? [makeBlock('rich_text', id(), { html }, now)] : [];
-    }
     case 'child_database':
     case 'link_to_page':
     case 'table_of_contents':
     case 'breadcrumb':
-      warn(st, n, 'skipped', `Notion ${n.type.replace(/_/g, ' ')} skipped.`);
+      warn(st, n, 'skipped', `Notion ${typeLabel(n)} skipped.`);
       return [];
     default:
       return null;
@@ -251,7 +266,7 @@ function mapLeaf(n: NotionNode, st: BlockState): Block[] | null {
 }
 
 function unsupportedNode(n: NotionNode, st: BlockState): Block[] {
-  warn(st, n, 'unsupported', `Notion ${n.type.replace(/_/g, ' ')} block is not supported; kept its text.`);
+  warn(st, n, 'unsupported', `Notion ${typeLabel(n)} block is not supported; kept its text.`);
   const html = plainParagraphsHtml(deepPlainText(n));
   return html ? [makeBlock('rich_text', st.ids.from(n.id), { html }, st.now)] : [];
 }
@@ -266,8 +281,10 @@ export function mapBlocks(nodes: NotionNode[], scope: Scope, st: BlockState): Bl
     if (TEXT_RUN_TYPES.has(n.type)) {
       const run: NotionNode[] = [];
       while (i < nodes.length && TEXT_RUN_TYPES.has(nodes[i].type)) run.push(nodes[i++]);
-      const html = textRunHtml(run, st);
+      const hoisted: NotionNode[] = [];
+      const html = textRunHtml(run, st, hoisted);
       if (html) out.push(makeBlock('rich_text', st.ids.from(run[0].id), { html }, st.now));
+      if (hoisted.length) out.push(...mapBlocks(hoisted, scope, st));
       continue;
     }
     const layout = mapLayout(nodes, i, scope, st);
@@ -291,16 +308,21 @@ const CALLOUT_BY_COLOUR: Record<string, string> = {
   purple: 'extension',
   pink: 'extension'
 };
-const CALLOUT_BY_EMOJI: Record<string, string> = {
+const stripVs = (e: string) => e.replace(/\uFE0F/g, '');
+const CALLOUT_BY_EMOJI_RAW: Record<string, string> = {
   '⚠️': 'warning', '❗': 'warning', 'ℹ️': 'information', '📋': 'information',
   '📅': 'information', '✅': 'remember', '🚀': 'extension'
 };
+
+const CALLOUT_BY_EMOJI: Record<string, string> = Object.fromEntries(
+  Object.entries(CALLOUT_BY_EMOJI_RAW).map(([k, v]) => [stripVs(k), v])
+);
 
 export function calloutStyle(data: Record<string, any>): string {
   const colour = String(data.color ?? '').replace(/_background$/, '');
   if (CALLOUT_BY_COLOUR[colour]) return CALLOUT_BY_COLOUR[colour];
   const emoji = data.icon?.type === 'emoji' ? data.icon.emoji : '';
-  return CALLOUT_BY_EMOJI[emoji] ?? 'information';
+  return CALLOUT_BY_EMOJI[stripVs(String(emoji))] ?? 'information';
 }
 
 function isTextOnly(n: NotionNode): boolean {
@@ -320,7 +342,7 @@ function boldLine(text: string, st: BlockState, notionId: string): Block {
 }
 
 /** A titled group of blocks, shaped to fit the scope it lands in. */
-function titledGroup(title: string, children: NotionNode[], scope: Scope, st: BlockState, notionId: string): Block[] {
+function titledGroup(title: string, children: NotionNode[], scope: Scope, st: BlockState, notionId: string, boldInColumn = true): Block[] {
   if (scope === 'top') {
     return [makeBlock('section', st.ids.from(notionId), {
       title,
@@ -329,7 +351,7 @@ function titledGroup(title: string, children: NotionNode[], scope: Scope, st: Bl
     }, st.now)];
   }
   const inner = mapBlocks(children, scope, st);
-  if (scope === 'column') return [boldLine(title, st, notionId), ...inner];
+  if (scope === 'column' && boldInColumn) return [boldLine(title, st, notionId), ...inner];
   return [makeBlock('heading', st.ids.from(notionId), { text: title }, st.now, 'subsection'), ...inner];
 }
 
@@ -343,11 +365,30 @@ function mapCallout(n: NotionNode, scope: Scope, st: BlockState): Block[] {
   return [callout, ...mapBlocks(otherKids, scope, st)];
 }
 
+function mapQuote(n: NotionNode, scope: Scope, st: BlockState): Block[] {
+  const textKids = n.children.filter(isTextOnly);
+  const otherKids = n.children.filter((c) => !isTextOnly(c));
+  const quote = [plainText(n.data.rich_text), ...textKids.map(deepPlainText)].filter(Boolean).join('\n');
+  const block = makeBlock('quote', st.ids.from(n.id), { quote }, st.now);
+  if (!otherKids.length) return [block];
+  warn(st, n, 'flattened', 'Images or other blocks inside a quote were placed after it.');
+  return [block, ...mapBlocks(otherKids, scope, st)];
+}
+
+function mapSynced(n: NotionNode, scope: Scope, st: BlockState): Block[] {
+  warn(st, n, 'flattened', 'Synced block copied as plain text; the sync link was dropped.');
+  const textKids = n.children.filter(isTextOnly);
+  const otherKids = n.children.filter((c) => !isTextOnly(c));
+  const html = plainParagraphsHtml(textKids.map(deepPlainText).join('\n'));
+  const out: Block[] = html ? [makeBlock('rich_text', st.ids.from(n.id), { html }, st.now)] : [];
+  return [...out, ...mapBlocks(otherKids, scope, st)];
+}
+
 function mapColumns(n: NotionNode, scope: Scope, st: BlockState): Block[] {
   const cols = n.children.filter((c) => c.type === 'column');
   if (scope === 'column' || cols.length > 12) {
-    warn(st, n, 'flattened', 'Columns inside a column were stacked.');
-    return cols.flatMap((c) => mapBlocks(c.children, 'column', st));
+    warn(st, n, 'flattened', cols.length > 12 ? 'More than 12 columns; stacked.' : 'Columns inside a column were stacked.');
+    return cols.flatMap((c) => mapBlocks(c.children, scope, st));
   }
   if (cols.length <= 1) return cols.flatMap((c) => mapBlocks(c.children, scope, st));
   const widths = columnWidths(cols.map((c) => c.data?.width_ratio));
@@ -371,7 +412,7 @@ function mapTabs(n: NotionNode, scope: Scope, st: BlockState): Block[] {
       ? 'Tabs inside tabs or columns became headings.'
       : `${items.length} tab(s) cannot be a tabs block; each became its own group.`);
   }
-  return items.flatMap((t, k) => titledGroup(label(t, k), t.children, scope, st, t.id));
+  return items.flatMap((t, k) => titledGroup(label(t, k), t.children, scope, st, t.id, false));
 }
 
 function mapLayout(nodes: NotionNode[], i: number, scope: Scope, st: BlockState): { blocks: Block[]; next: number } | null {
@@ -387,6 +428,8 @@ function mapLayout(nodes: NotionNode[], i: number, scope: Scope, st: BlockState)
     if (scope !== 'top') warn(st, n, 'flattened', 'A toggle inside a layout was opened out.');
     return { blocks: titledGroup(plainText(n.data.rich_text), n.children, scope, st, n.id), next: i + 1 };
   }
+  if (n.type === 'quote') return { blocks: mapQuote(n, scope, st), next: i + 1 };
+  if (n.type === 'synced_block') return { blocks: mapSynced(n, scope, st), next: i + 1 };
   if (n.type === 'callout') return { blocks: mapCallout(n, scope, st), next: i + 1 };
   if (n.type === 'column_list') return { blocks: mapColumns(n, scope, st), next: i + 1 };
   if (n.type === 'tabs') return { blocks: mapTabs(n, scope, st), next: i + 1 };
