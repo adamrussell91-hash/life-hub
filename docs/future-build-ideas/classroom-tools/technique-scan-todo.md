@@ -1,6 +1,6 @@
 # Technique scan: to-do for ChatGPT
 
-The plumbing for the technique scan is built and tested. What is left is porting the Periodic Table widget's **Passage Scanner** into it, then the teacher review screen. Idea and decisions: [../classroom-tools.md](../classroom-tools.md).
+The technique scan is built and tested end to end, including the teacher review screen and the spinner. **One thing is left:** port the Periodic Table widget's **Passage Scanner** call into `requestTechniqueScan`. Until then the Technique scan button says "The technique scan is not connected yet." Idea and decisions: [../classroom-tools.md](../classroom-tools.md).
 
 ## What the scan is for
 
@@ -16,7 +16,9 @@ A teacher scans a text block. The scan finds which of the 310 Periodic Table tec
 | Page side | `apps/teaching/src/blocks/technique-scan.ts` | Maps technique names to table ids and drops names the table does not have. Saves on `block.settings.technique_scan`. `approveTechniques` records the teacher's ticks. `spinnerTechniques` is the spinner's list. `confidenceTier` gives Likely, Possible or Worth considering |
 | Client call | `scanTechniquesAsTeacher(html, table)` in `apps/teaching/src/blocks/text-tools-client.ts` | Starts the job, polls it, returns findings with table ids |
 | Student filter | `studentTechniqueScan`, called from `filterBlocksForStudent` | Published lessons only carry the approved techniques and their quotes. The model's explanations and unticked hits stay with the teacher |
-| Tests | `tests/unit/technique-scan.test.js`, `apps/teaching/tests/unit/technique-scan.test.ts` | Parser, job, endpoint, student filter, approval |
+| Teacher review screen | "Technique scan" button in a text block's toolbar, `apps/teaching/src/blocks/rich-text-tools.ts` and `blocks/technique-review.ts` | Shows each quote with its techniques, confidence bar, tier and explanation. Likely finds start ticked. Save writes `settings.technique_scan`. A strip under the block lists what is approved, with Review and Clear, and warns when the text has changed since the scan |
+| Spinner | Technique tool in the classroom toolbox, `apps/teaching/src/blocks/classroom-tools/tools.ts` | Picks a text block on the page with approved techniques and spins only through those |
+| Tests | `tests/unit/technique-scan.test.js`, `apps/teaching/tests/unit/technique-scan.test.ts`, `apps/teaching/tests/unit/classroom-tools.test.ts` | Parser, job, endpoint, student filter, approval, spinner |
 
 ## To do
 
@@ -30,14 +32,8 @@ A teacher scans a text block. The scan finds which of the 310 Periodic Table tec
    - Throw `TextToolError` with a plain message when the key is missing ("The technique scan is not configured (OPENAI_API_KEY).").
 2. **Bump `TEXT_TOOL_VERSION`** in `text-tools.mjs` when the prompt goes in, so no old result is served.
 3. **Add `OPENAI_API_KEY` to the Netlify site** if it is not already set for this function. Adam does this. Do not put it in the repo.
-4. **Teacher review screen.** Add a "Technique scan" button beside "Dictionary scan" in `apps/teaching/src/blocks/rich-text-tools.ts`.
-   - Show each quote with its techniques: family colour, name, confidence bar, tier and the explanation.
-   - Tick boxes per technique. Pre-tick the Likely ones (70% and above); Adam checks the list and saves.
-   - Save with `createTechniqueScan` then `approveTechniques` onto `settings.technique_scan`.
-   - If the block's text changes after a scan, say so and offer "Scan again", the way word help reports words no longer in the text.
-5. **Spinner hook-up** (when the classroom tools block is built). The spinner reads `spinnerTechniques(block, table)` from the block the teacher picks. With nothing approved it says "No techniques approved yet. Run Technique scan on this block and tick the ones to use." For "Find it" prompts, `quotesForTechnique` gives the teacher where it is.
-6. **Tests.** Mock `fetch` for `requestTechniqueScan`. The test network guard blocks real calls. Cover: a good reply, an empty reply that retries once, a missing key, and an upstream error.
-7. **Run `npm run pre-pr-check`** from the repo root. It must exit 0 before the PR.
+4. **Tests.** Mock `fetch` for `requestTechniqueScan`. The test network guard blocks real calls. Cover: a good reply, an empty reply that retries once, a missing key, and an upstream error.
+5. **Run `npm run pre-pr-check`** from the repo root. It must exit 0 before the PR.
 
 ## Done looks like
 

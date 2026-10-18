@@ -25,8 +25,11 @@ export {
 export {
   ClassSchema,
   ClassHomepageSchema,
+  ClassStudentSchema,
+  MAX_CLASS_STUDENTS,
   type Class,
-  type ClassHomepage
+  type ClassHomepage,
+  type ClassStudent
 } from './class';
 export {
   ScheduledLessonSchema,

@@ -22,6 +22,7 @@ import {
   type HomepageEditorHandle
 } from '@/teacher/sections/homepage-editor';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
+import { mountClassStudents } from '@/teacher/sections/class-students';
 import { openScheduleOverflow } from '@/teacher/schedule-overflow';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
@@ -353,6 +354,11 @@ export function renderClassPage(
   const sequenceHost = document.createElement('div');
   sequenceHost.className = 'class-page__sequence-host';
   main.append(sequenceHost);
+
+  const studentsHost = document.createElement('div');
+  studentsHost.className = 'class-page__students-host';
+  main.append(studentsHost);
+  mountClassStudents(studentsHost, pageClass);
 
   const sequence = renderUnitSequence(sequenceHost, {
     units: activeUnits,

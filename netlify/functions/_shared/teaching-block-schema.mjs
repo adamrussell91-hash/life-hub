@@ -521,6 +521,8 @@ var BlockTypeSchema = z5.enum([
   "html_app",
   "quote",
   "divider",
+  "classroom_tools",
+  "countdown",
   "definition",
   "code",
   "audio",
@@ -777,13 +779,66 @@ var QuoteBlockSchema = z5.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var TimerSegmentSchema = z5.object({
+  label: z5.string().max(60),
+  minutes: z5.number().min(0.25).max(180)
+});
+var ClassroomToolIdSchema = z5.enum([
+  "timer",
+  "stopwatch",
+  "names",
+  "number",
+  "groups",
+  "technique",
+  "scores",
+  "coin",
+  "dice"
+]);
 var DividerBlockSchema = z5.object({
   id: z5.string().min(1),
   type: z5.literal("block"),
   block_type: z5.literal("divider"),
   variant: z5.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z5.object({}).default({}),
+  content: z5.object({
+    /** The faint gear at the end of the rule that slides out the classroom tools. */
+    tools: z5.boolean().default(true),
+    /** Timers saved with the lesson, ready when it opens. */
+    timer_stack: z5.array(TimerSegmentSchema).max(8).default([])
+  }).default({}),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var ClassroomToolsBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("classroom_tools"),
+  variant: z5.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z5.object({
+    timer_stack: z5.array(TimerSegmentSchema).max(8).default([]),
+    /** Tool to show open when the page loads. Falls back if the viewer cannot use it. */
+    start_tool: ClassroomToolIdSchema.optional()
+  }).default({}),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var CountdownBlockSchema = z5.object({
+  id: z5.string().min(1),
+  type: z5.literal("block"),
+  block_type: z5.literal("countdown"),
+  variant: z5.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z5.object({
+    title: z5.string().max(200).default(""),
+    /** YYYY-MM-DD, or empty until the teacher sets it. */
+    due_date: z5.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
+    /** HH:MM, 24-hour, or empty for no time. */
+    due_time: z5.string().regex(/^(\d{2}:\d{2})?$/).default(""),
+    /** When the task was set, so the bar can show days gone. Optional. */
+    set_date: z5.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
+    note: z5.string().max(400).default("")
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -1568,6 +1623,8 @@ var leafBlockSchemas = [
   HtmlAppBlockSchema,
   QuoteBlockSchema,
   DividerBlockSchema,
+  ClassroomToolsBlockSchema,
+  CountdownBlockSchema,
   DefinitionBlockSchema,
   CodeBlockSchema,
   AudioBlockSchema,
@@ -1789,6 +1846,8 @@ export {
   ChartSeriesColorSchema,
   ChartSeriesSchema,
   ChartTypeSchema,
+  ClassroomToolIdSchema,
+  ClassroomToolsBlockSchema,
   ClozeBlockSchema,
   CodeBlockSchema,
   CollectionBlockSchema,
@@ -1798,6 +1857,7 @@ export {
   ColumnsBlockSchema,
   ConceptFeaturesBlockSchema,
   ConceptMapBlockSchema,
+  CountdownBlockSchema,
   DIAGRAM_IMAGE_PUBLISH_URL_ISSUE,
   DefinitionBlockSchema,
   DiagramBlockSchema,
@@ -1854,6 +1914,7 @@ export {
   TimelineBlockSchema,
   TimelineEventSchema,
   TimelineLayoutSchema,
+  TimerSegmentSchema,
   ToolkitSkillBlockSchema,
   ToolkitToolBlockSchema,
   ToolkitValueBlockSchema,

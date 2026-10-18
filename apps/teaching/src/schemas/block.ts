@@ -30,6 +30,8 @@ export const BlockTypeSchema = z.enum([
   'html_app',
   'quote',
   'divider',
+  'classroom_tools',
+  'countdown',
   'definition',
   'code',
   'audio',
@@ -311,13 +313,79 @@ export const QuoteBlockSchema = z.object({
   ...blockTimestamps
 });
 
+/** One timer in a classroom tools stack, e.g. "Reading time", 5 minutes. */
+export const TimerSegmentSchema = z.object({
+  label: z.string().max(60),
+  minutes: z.number().min(0.25).max(180)
+});
+export type TimerSegment = z.infer<typeof TimerSegmentSchema>;
+
+export const ClassroomToolIdSchema = z.enum([
+  'timer',
+  'stopwatch',
+  'names',
+  'number',
+  'groups',
+  'technique',
+  'scores',
+  'coin',
+  'dice'
+]);
+export type ClassroomToolId = z.infer<typeof ClassroomToolIdSchema>;
+
 export const DividerBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
   block_type: z.literal('divider'),
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
-  content: z.object({}).default({}),
+  content: z
+    .object({
+      /** The faint gear at the end of the rule that slides out the classroom tools. */
+      tools: z.boolean().default(true),
+      /** Timers saved with the lesson, ready when it opens. */
+      timer_stack: z.array(TimerSegmentSchema).max(8).default([])
+    })
+    .default({}),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+/** The classroom toolbox as its own block, taking a block's slot on the page. */
+export const ClassroomToolsBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('classroom_tools'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z
+    .object({
+      timer_stack: z.array(TimerSegmentSchema).max(8).default([]),
+      /** Tool to show open when the page loads. Falls back if the viewer cannot use it. */
+      start_tool: ClassroomToolIdSchema.optional()
+    })
+    .default({}),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+/** Header for an assessment page: the task, its due date and how many days are left. */
+export const CountdownBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('countdown'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().max(200).default(''),
+    /** YYYY-MM-DD, or empty until the teacher sets it. */
+    due_date: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(''),
+    /** HH:MM, 24-hour, or empty for no time. */
+    due_time: z.string().regex(/^(\d{2}:\d{2})?$/).default(''),
+    /** When the task was set, so the bar can show days gone. Optional. */
+    set_date: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(''),
+    note: z.string().max(400).default('')
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -1213,6 +1281,8 @@ const leafBlockSchemas = [
   HtmlAppBlockSchema,
   QuoteBlockSchema,
   DividerBlockSchema,
+  ClassroomToolsBlockSchema,
+  CountdownBlockSchema,
   DefinitionBlockSchema,
   CodeBlockSchema,
   AudioBlockSchema,

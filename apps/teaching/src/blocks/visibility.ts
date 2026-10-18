@@ -1,3 +1,4 @@
+import { studentTechniqueScan } from '@/blocks/technique-scan';
 import type { Block } from '@/schemas/block';
 
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
@@ -108,6 +109,7 @@ function filterBlocksForStudentInner(
       (block) =>
         block.visibility === 'student_teacher' && (block.block_type as string) !== 'teacher_note'
     )
+    .map((block) => studentTechniqueScan(block))
     .map((block) => {
       if (TEACHER_FIELD_BLOCK_TYPES.has(block.block_type)) {
         return stripToolkitTeacherFields(block);

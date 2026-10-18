@@ -134,7 +134,47 @@ export function spinnerTechniques(
     .filter((tech): tech is LiteraryTechnique => Boolean(tech));
 }
 
+function looseKey(value: string): string {
+  return value.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim();
+}
+
+/** The quote is still in the text, ignoring case, spacing and curly quotes. */
+export function quoteAppearsIn(text: string, quote: string): boolean {
+  const q = looseKey(quote);
+  return q.length > 0 && looseKey(text).includes(q);
+}
+
 /** Where each approved technique shows up in the text, for "find it" prompts. */
 export function quotesForTechnique(scan: TechniqueScanData, id: string): string[] {
   return scan.findings.filter((finding) => finding.techniques.some((hit) => hit.id === id)).map((finding) => finding.quote);
+}
+
+/**
+ * Mirror of the server's student filter: a published block keeps only the
+ * approved techniques and their quotes, never unticked hits or the model's
+ * explanations. With nothing approved, the scan is dropped.
+ */
+export function studentTechniqueScan<T extends { settings?: Record<string, unknown> }>(block: T): T {
+  const scan = block.settings?.technique_scan as Record<string, unknown> | undefined;
+  if (!scan) return block;
+  const { technique_scan: _scan, ...settings } = block.settings ?? {};
+  const approved = new Set(
+    Array.isArray(scan.approved_ids) ? scan.approved_ids.filter((id): id is string => typeof id === 'string') : []
+  );
+  const findings = (Array.isArray(scan.findings) ? scan.findings : [])
+    .map((finding: { quote?: unknown; techniques?: unknown }) => ({
+      quote: finding?.quote,
+      techniques: (Array.isArray(finding?.techniques) ? finding.techniques : [])
+        .filter((hit: { id?: unknown }) => typeof hit?.id === 'string' && approved.has(hit.id))
+        .map((hit: { id: string; confidence?: unknown }) => ({ id: hit.id, confidence: hit.confidence }))
+    }))
+    .filter((finding) => typeof finding.quote === 'string' && finding.techniques.length > 0);
+  if (!findings.length) return { ...block, settings };
+  return {
+    ...block,
+    settings: {
+      ...settings,
+      technique_scan: { findings, approved_ids: [...approved], scanned_at: scan.scanned_at, approved_at: scan.approved_at }
+    }
+  };
 }

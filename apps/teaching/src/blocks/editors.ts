@@ -1,4 +1,5 @@
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
+import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
@@ -909,16 +910,7 @@ export function createQuoteEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
-export function createDividerEditor(
-  block: Extract<Block, { block_type: 'divider' }>,
-  onChange: BlockChangeHandler<Extract<Block, { block_type: 'divider' }>>,
-  getLatest: () => Extract<Block, { block_type: 'divider' }> = () => block
-): HTMLElement {
-  const hint = document.createElement('p');
-  hint.className = 'block-editor__hint';
-  hint.textContent = 'Divider — no extra fields.';
-  return editorShell(block, onChange, hint, getLatest);
-}
+export { createDividerEditor, createClassroomToolsEditor, createCountdownEditor };
 
 export function createDefinitionEditor(
   block: Extract<Block, { block_type: 'definition' }>,
@@ -2810,6 +2802,10 @@ function createBlockEditorFields(
       return createQuoteEditor(block, onChange, latest as () => Extract<Block, { block_type: 'quote' }>);
     case 'divider':
       return createDividerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'divider' }>);
+    case 'classroom_tools':
+      return createClassroomToolsEditor(block, onChange, latest as () => Extract<Block, { block_type: 'classroom_tools' }>);
+    case 'countdown':
+      return createCountdownEditor(block, onChange, latest as () => Extract<Block, { block_type: 'countdown' }>);
     case 'definition':
       return createDefinitionEditor(block, onChange, latest as () => Extract<Block, { block_type: 'definition' }>);
     case 'code':

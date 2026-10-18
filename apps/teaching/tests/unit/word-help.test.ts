@@ -213,7 +213,7 @@ describe('teacher text tools', () => {
     const ctx = setup('<p>The ephemeral glow.</p>');
     const tools = createRichTextTools({ ...ctx, scan: async () => [entry('ephemeral')] });
     document.body.append(tools.status, tools.strip);
-    expect(tools.buttons.map((b) => b.textContent)).toEqual(['Dictionary scan', 'Fry explainer']);
+    expect(tools.buttons.map((b) => b.textContent)).toEqual(['Dictionary scan', 'Fry explainer', 'Technique scan']);
     expect(tools.strip.hidden).toBe(true);
 
     tools.buttons[0].click();
