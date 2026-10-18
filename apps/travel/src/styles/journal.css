@@ -842,6 +842,13 @@
   min-height: 3rem;
 }
 
+/* Only the chosen capture type reads as selected. */
+.journal-capture__mode:not(.is-active) {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
 .journal-capture__mode.is-active {
   box-shadow: inset 0 0 0 2px var(--wave);
 }
