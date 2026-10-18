@@ -10,14 +10,16 @@ import { getJSON, listJSON, OUTCOME_PREFIX, setJSON, SUBJECT_PREFIX, YEAR_PREFIX
 // and new media downloads stop at 14.
 export const READ_BUDGET_MS = 12 * 60 * 1000;
 export const MEDIA_BUDGET_MS = 14 * 60 * 1000;
-export const RUNNING_FRESH_MS = 2 * 60 * 1000;
+export const STALE_RUNNING_MS = 2 * 60 * 1000;
 
-export const EMPTY = { excluded_page_ids: [], overrides: {}, html_as_code: [] };
+export const EMPTY_CHOICES = { excluded_page_ids: [], overrides: {}, html_as_code: [] };
+
+export class NotionSetupError extends Error {}
 
 export function notionToken(env) {
   const token = typeof env?.NOTION_TEACHING_TOKEN === 'string' ? env.NOTION_TEACHING_TOKEN.trim() : '';
   if (!token) {
-    throw new Error('Notion import is not set up: add NOTION_TEACHING_TOKEN to the site environment variables.');
+    throw new NotionSetupError('Notion import is not set up: add NOTION_TEACHING_TOKEN to the site environment variables.');
   }
   return token;
 }
@@ -32,17 +34,37 @@ export function friendlyError(error) {
   if (error instanceof NotionApiError && error.status === 429) {
     return 'Notion is busy; try again in a minute.';
   }
+  if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+    return 'Notion took too long to respond; try again in a minute.';
+  }
   return error?.message || 'The import failed.';
 }
 
 const PAGE_ID = /(?<![0-9a-f])[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}(?![0-9a-f])/gi;
 
-export function normalizePageId(raw) {
-  const matches = String(raw ?? '').match(PAGE_ID);
-  if (!matches) return String(raw ?? '');
-  // A pasted URL puts the page id last, after the title slug.
-  const h = matches[matches.length - 1].replace(/-/g, '').toLowerCase();
+function dashed(hex32) {
+  const h = hex32.replace(/-/g, '').toLowerCase();
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function lastId(text) {
+  const matches = String(text ?? '').match(PAGE_ID);
+  return matches ? dashed(matches[matches.length - 1]) : null;
+}
+
+/**
+ * Turns a pasted link or bare id into the dashed id Notion's API uses. For a URL,
+ * the `p` param (a peek-opened page) wins, then the last id in the path. The query
+ * is never searched, because `?v=` is a database view id, not the page.
+ */
+export function normalizePageId(raw) {
+  const text = String(raw ?? '').trim();
+  if (/[/?#]/.test(text)) {
+    let url = null;
+    try { url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`); } catch { /* not a URL */ }
+    if (url) return lastId(url.searchParams.get('p')) ?? lastId(url.pathname) ?? text;
+  }
+  return lastId(text) ?? text;
 }
 
 async function mapContext(store, choices, now) {
@@ -55,63 +77,114 @@ async function mapContext(store, choices, now) {
     subjects: subjects.filter(Boolean).map((s) => ({ id: s.id, title: s.display_title || s.title })),
     outcomes: outcomes.filter(Boolean).map((o) => ({ id: o.id, code: o.code })),
     source_map,
-    choices: { ...EMPTY, ...choices }
+    choices: { ...EMPTY_CHOICES, ...choices }
   };
 }
 
 async function buildPlan(store, pageId, choices, deps) {
-  const client = createNotionClient({ token: notionToken(deps.env), fetchImpl: deps.fetchImpl, sleep: deps.sleep });
+  const clock = deps.clock ?? Date.now;
+  const client = createNotionClient({
+    token: notionToken(deps.env),
+    fetchImpl: deps.fetchImpl,
+    sleep: deps.sleep,
+    ...(deps.requestTimeoutMs ? { requestTimeoutMs: deps.requestTimeoutMs } : {})
+  });
   const tree = await readNotionTree(client, normalizePageId(pageId), {
-    deadlineAt: (deps.clock ?? Date.now)() + READ_BUDGET_MS
+    deadlineAt: clock() + READ_BUDGET_MS,
+    now: clock
   });
   return buildImportPlan(tree, await mapContext(store, choices, deps.now));
 }
 
-// Job ids are client-generated. A job that already exists is a replay, and a fresh
-// running job is a duplicate background retry; both must do nothing. A stale
-// running job is a crashed run, which Netlify retries, so that one may proceed.
-async function alreadyHandled(store, jobId, clock = Date.now) {
-  const existing = await getJSON(store, notionJobKey(jobId));
-  if (!existing) return false;
-  if (existing.status !== 'running') return true;
-  const age = clock() - Date.parse(existing.updated_at ?? '');
-  return !(age >= RUNNING_FRESH_MS);
+/** What the preview needs and nothing more: no entity records, no Notion file urls. */
+export function previewOf(plan) {
+  return {
+    root_page_id: plan.root_page_id,
+    entities: plan.entities.map(({ page_id, parent_page_id, kind, label, id, title, existing, needs, suggested }) => (
+      { page_id, parent_page_id, kind, label, id, title, existing, needs, suggested }
+    )),
+    skipped: plan.skipped,
+    warnings: plan.warnings,
+    html_apps: plan.html_apps,
+    new_subjects: plan.new_subjects,
+    media_count: plan.media.length
+  };
 }
 
-export async function runPlan(store, { job_id, page_id, choices }, deps) {
+/**
+ * Takes a queued job (or a crashed one that went quiet) and marks it running.
+ * Returns null, doing nothing, when the job is missing, the wrong kind, finished,
+ * or running and still fresh (a duplicate background retry).
+ */
+async function claimJob(store, jobId, kind, clock) {
+  const job = await getJSON(store, notionJobKey(jobId));
+  if (!job || job.kind !== kind) return null;
+  if (job.status === 'running') {
+    // NaN-safe: an unparseable updated_at fails `age < STALE`, so the job counts as stale.
+    const age = clock() - Date.parse(job.updated_at);
+    if (age < STALE_RUNNING_MS) return null;
+  } else if (job.status !== 'queued') {
+    return null;
+  }
+  return writeJob(store, jobId, { status: 'running', phase: 'reading' });
+}
+
+async function runJob(store, jobId, kind, deps, work) {
+  const clock = deps.clock ?? Date.now;
+  const job = await claimJob(store, jobId, kind, clock);
+  if (!job) return;
   const now = deps.now ?? new Date().toISOString();
-  if (await alreadyHandled(store, job_id, deps.clock)) return;
-  await writeJob(store, job_id, { kind: 'plan', status: 'running', phase: 'reading' });
   try {
-    const plan = await buildPlan(store, page_id, choices, { ...deps, now });
-    await writeJob(store, job_id, { status: 'planned', phase: 'done', plan });
+    await work(job, { ...deps, clock, now });
   } catch (error) {
-    await writeJob(store, job_id, { status: 'failed', error: friendlyError(error) });
+    await writeJob(store, jobId, { status: 'failed', error: friendlyError(error) });
   }
 }
 
-export async function runApply(store, { job_id, page_id, choices }, deps) {
-  const now = deps.now ?? new Date().toISOString();
-  if (await alreadyHandled(store, job_id, deps.clock)) return;
-  const clock = deps.clock ?? Date.now;
-  const mediaDeadlineAt = deps.mediaDeadlineAt ?? clock() + MEDIA_BUDGET_MS;
-  await writeJob(store, job_id, { kind: 'apply', status: 'running', phase: 'reading' });
-  try {
+export function runPlan(store, jobId, deps) {
+  return runJob(store, jobId, 'plan', deps, async (job, d) => {
+    const plan = await buildPlan(store, job.page_id, job.choices, d);
+    await writeJob(store, jobId, { status: 'planned', phase: 'done', plan: previewOf(plan) });
+  });
+}
+
+export function runApply(store, jobId, deps) {
+  return runJob(store, jobId, 'apply', deps, async (job, d) => {
+    const mediaDeadlineAt = d.mediaDeadlineAt ?? d.clock() + MEDIA_BUDGET_MS;
+    const timeoutSignal = d.timeoutSignal ?? ((ms) => AbortSignal.timeout(ms));
     // Re-read so Notion file URLs are fresh (they expire within minutes).
-    const plan = await buildPlan(store, page_id, choices, { ...deps, now });
+    const plan = await buildPlan(store, job.page_id, job.choices, d);
     const report = await applyPlan(store, plan, {
-      now,
+      now: d.now,
       rehost: async (s, ref) => {
-        if (clock() > mediaDeadlineAt) {
+        if (d.clock() > mediaDeadlineAt) {
           return { ok: false, reason: 'failed', message: `Ran out of time before ${ref.name} could be downloaded.` };
         }
-        return rehostMedia(s, ref, { fetchImpl: deps.fetchImpl, origin: deps.origin, now });
+        const ms = Math.max(1000, Math.min(60000, mediaDeadlineAt + 60000 - d.clock()));
+        return rehostMedia(s, ref, { fetchImpl: d.fetchImpl, origin: d.origin, now: d.now, signal: timeoutSignal(ms) });
       },
-      onProgress: (progress) => writeJob(store, job_id, { phase: progress.phase, progress })
+      onProgress: (progress) => writeJob(store, jobId, { phase: progress.phase, progress })
     });
-    await setJSON(store, notionReportKey(job_id), { job_id, page_id, created_at: now, ...report });
-    await writeJob(store, job_id, { status: 'done', phase: 'done', report });
-  } catch (error) {
-    await writeJob(store, job_id, { status: 'failed', error: friendlyError(error) });
+    await setJSON(store, notionReportKey(jobId), { job_id: jobId, page_id: job.page_id, created_at: d.now, ...report });
+    await writeJob(store, jobId, { status: 'done', phase: 'done', report });
+  });
+}
+
+/** Fire the background run, passing only the job id. A 202 means Netlify accepted it. */
+export async function kickNotionImportRun(request, runPath, jobId, fetchImpl = fetch) {
+  try {
+    const response = await fetchImpl(new URL(runPath, request.url), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(request.headers.get('cookie') ? { cookie: request.headers.get('cookie') } : {}),
+        ...(request.headers.get('origin') ? { origin: request.headers.get('origin') } : {})
+      },
+      body: JSON.stringify({ job_id: jobId }),
+      signal: AbortSignal.timeout(5_000)
+    });
+    return response.status === 202 || response.ok;
+  } catch {
+    return false;
   }
 }

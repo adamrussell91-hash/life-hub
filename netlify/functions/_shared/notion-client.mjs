@@ -15,7 +15,8 @@ export function createNotionClient({
   token,
   fetchImpl = fetch,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  maxRetries = 5
+  maxRetries = 5,
+  requestTimeoutMs = 30_000
 }) {
   let requestCount = 0;
 
@@ -31,7 +32,9 @@ export function createNotionClient({
             'Notion-Version': NOTION_VERSION,
             ...(body ? { 'content-type': 'application/json' } : {})
           },
-          body: body ? JSON.stringify(body) : undefined
+          body: body ? JSON.stringify(body) : undefined,
+          // A hung request throws a TimeoutError, which the catch below retries.
+          signal: AbortSignal.timeout(requestTimeoutMs)
         });
       } catch (err) {
         // Network failure (DNS, reset, timeout): retry with backoff.
