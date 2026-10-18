@@ -20,6 +20,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   html_app: 'HTML app',
   question_set: 'Question set',
   question_drop: 'Question drop',
+  discern_confirm: 'Discern Confirm',
   quiz_question: 'Quiz question',
   self_check: 'Self check',
   mind_map: 'Mind map',
@@ -40,7 +41,9 @@ export function publishBlockIssues(blocks: Block[]): string | null {
 export function listPublishBlockIssues(blocks: Block[]): PublishBlockIssue[] {
   const typeOrder = collectTypeOrder(blocks);
   const issues: PublishBlockIssue[] = [];
-  walk(blocks, [], typeOrder, issues);
+  const discernHosts = new Set<string>();
+  visitBlocks(blocks, (block) => { if (block.discern) discernHosts.add(block.id); });
+  walk(blocks, [], typeOrder, issues, discernHosts);
   return issues;
 }
 
@@ -58,11 +61,12 @@ function walk(
   blocks: Block[],
   ancestors: string[],
   typeOrder: Map<string, string[]>,
-  issues: PublishBlockIssue[]
+  issues: PublishBlockIssue[],
+  discernHosts: Set<string>
 ): void {
   for (const block of blocks) {
     const label = locateBlock(block, ancestors, typeOrder);
-    const message = ownIssue(block);
+    const message = ownIssue(block, discernHosts);
     if (message) {
       issues.push({
         blockId: block.id,
@@ -73,20 +77,21 @@ function walk(
     }
 
     if (block.block_type === 'section') {
-      walk(block.content.blocks as Block[], [...ancestors, shortLabel(block)], typeOrder, issues);
+      walk(block.content.blocks as Block[], [...ancestors, shortLabel(block)], typeOrder, issues, discernHosts);
     } else if (block.block_type === 'columns') {
       block.content.columns.forEach((column, index) => {
         walk(
           column.blocks as Block[],
           [...ancestors, `Column ${index + 1}`],
           typeOrder,
-          issues
+          issues,
+          discernHosts
         );
       });
     } else if (block.block_type === 'tabs') {
       block.content.tabs.forEach((tab, index) => {
         const tabLabel = tab.label.trim() ? `Tab “${truncate(tab.label.trim())}”` : `Tab ${index + 1}`;
-        walk(tab.blocks as Block[], [...ancestors, tabLabel], typeOrder, issues);
+        walk(tab.blocks as Block[], [...ancestors, tabLabel], typeOrder, issues, discernHosts);
       });
     }
   }
@@ -176,7 +181,16 @@ function blockCaption(block: Block): string | null {
   }
 }
 
-function ownIssue(block: Block): string | null {
+function ownIssue(block: Block, discernHosts: Set<string>): string | null {
+  if (block.block_type === 'discern_confirm' && !discernHosts.has(block.content.target_block_id)) {
+    return 'This Confirm card is not linked to a block with Discern. Delete it or add Discern again';
+  }
+  if (block.discern?.initial.type === 'choose' && block.discern.initial.options.filter((o) => o.trim()).length < 2) {
+    return 'Discern needs at least two initial answer options';
+  }
+  if (block.discern?.mode === 'theirs' && !block.discern.who.trim()) {
+    return 'Discern needs the name of whose choice students are judging';
+  }
   if (block.block_type === 'collection') {
     return 'Collection blocks can only be used on class homepages';
   }

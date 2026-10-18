@@ -377,6 +377,7 @@ describe('blockRegistry', () => {
       'countdown',
       'definition',
       'diagram',
+      'discern_confirm',
       'divider',
       'embed',
       'equation',

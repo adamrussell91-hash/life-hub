@@ -12,7 +12,7 @@ export const KAPLAN_PATHS: Record<KaplanLens, string> = {
 };
 
 export function canHaveKaplanQualifier(block: Block): boolean {
-  return !['heading', 'divider', 'classroom_tools', 'countdown', 'spacer', 'columns', 'section', 'tabs', 'collection', 'outcomes'].includes(block.block_type);
+  return !['heading', 'divider', 'classroom_tools', 'countdown', 'spacer', 'columns', 'section', 'tabs', 'collection', 'outcomes', 'discern_confirm'].includes(block.block_type);
 }
 
 /** Plain-language symbol drawings: repeating tiles, spectacles, and balance scales. */
