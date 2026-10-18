@@ -2,6 +2,7 @@ import { setToolkitClasses } from '@/toolkit/class-context';
 import { mountBlockAssistant } from '@/alchemy/block-assistant';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
+import { withAppBase } from '@/app/base-path';
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { agentColour, readLastAgentSlug, type AgentSlug } from '@/ai/agents';
@@ -25,7 +26,8 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
-import { mountPublicLinkControl, teacherPreviewUrl } from '@/teacher/public-link';
+import { mountPublicLinkControl } from '@/teacher/public-link';
+import { lessonDisplayPath } from '@/teacher/lesson-display';
 import {
   buildLinkedPreview,
   ensureCompositionCached,
@@ -750,13 +752,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         'lesson-editor__publish-panel--success'
       );
       refreshPublicLink();
-      const preview = refs.contextBar.querySelector<HTMLAnchorElement>('.context-bar__preview');
-      if (preview) {
-        preview.href = teacherPreviewUrl('lesson', lesson.id);
-        preview.setAttribute('aria-disabled', 'false');
-        preview.tabIndex = 0;
-        preview.classList.remove('is-disabled');
-      }
       page?.revealPublishBlock('', []);
     }
 
@@ -866,7 +861,17 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const historyHost = document.createElement('div');
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
-    const studentPath = teacherPreviewUrl('lesson', lesson.id);
+    const displayHref = withAppBase(lessonDisplayPath(lesson.id));
+    const openDisplay = () => {
+      window.open(displayHref, '_blank', 'noopener,noreferrer');
+    };
+    const displayButton = document.createElement('a');
+    displayButton.className = 'btn btn--secondary context-bar__display';
+    displayButton.href = displayHref;
+    displayButton.target = '_blank';
+    displayButton.rel = 'noopener noreferrer';
+    displayButton.textContent = 'Display';
+    displayButton.title = 'Open the projector view with your live controls';
     const feedbackMenuLabel = () =>
       lesson.feedback_off ? 'Turn on student feedback' : 'Turn off student feedback';
     const optionsMenu = mountPageOptionsMenu(
@@ -886,14 +891,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           }
         },
         {
-          label: 'Student preview',
-          className: 'context-bar__preview',
-          href: studentPath,
-          target: '_blank',
-          onSelect: () => {
-            if (!lesson.published_at) return;
-            window.open(teacherPreviewUrl('lesson', lesson.id), '_blank', 'noopener,noreferrer');
-          }
+          label: 'Display view',
+          className: 'context-bar__display-item',
+          onSelect: openDisplay
         },
         {
           label: feedbackMenuLabel(),
@@ -983,27 +983,16 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     });
 
-    function syncPreviewLink(): void {
-      const preview = optionsMenu.el.querySelector<HTMLAnchorElement>('.context-bar__preview');
-      if (!preview) return;
-      preview.href = teacherPreviewUrl('lesson', lesson.id);
-      const published = Boolean(lesson.published_at);
-      preview.setAttribute('aria-disabled', published ? 'false' : 'true');
-      preview.classList.toggle('is-disabled', !published);
-    }
-    syncPreviewLink();
-
     if (actions) {
-      actions.append(optionsMenu.el, publicLinkHost, historyHost);
+      actions.append(optionsMenu.el, displayButton, publicLinkHost, historyHost);
     } else {
-      refs.contextBar.append(optionsMenu.el, publicLinkHost, historyHost);
+      refs.contextBar.append(optionsMenu.el, displayButton, publicLinkHost, historyHost);
     }
     bindBuilderFullPage(builder, {
       getActive: () => fullPage,
       setActive: setFullPage
     });
     refreshPublicLink();
-    syncPreviewLink();
 
     function applyRestoredLesson(restored: Lesson): void {
       Object.assign(lesson, restored);

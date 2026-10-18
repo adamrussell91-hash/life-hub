@@ -207,6 +207,15 @@ describe('router match', () => {
     expect(match('/lessons/lesson_aotfw_008')?.name).toBe('teacher-lesson');
   });
 
+  it('matches the signed-in Display view for a lesson', () => {
+    expect(match('/lessons/lesson_aotfw_008/display')).toEqual({
+      name: 'teacher-lesson-display',
+      params: { lessonId: 'lesson_aotfw_008' },
+      requiresAuth: true,
+      path: '/lessons/lesson_aotfw_008/display'
+    });
+  });
+
   it('marks only teacher routes as auth-required', () => {
     const cases: Array<[string, boolean]> = [
       ['/', true],
