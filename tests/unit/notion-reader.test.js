@@ -298,11 +298,28 @@ test('deadline stops the read partway through', async () => {
   let t = 0;
   const now = () => (t += 1);
   // checks: page u1 (1), children u1 (2), page l1 (3) -> past deadline 2
-  await assert.rejects(readNotionTree(client, 'u1', { deadlineMs: 2, now }), /Too much to read from Notion in one go\. Import a smaller part \(for example one unit at a time\)\./);
+  await assert.rejects(readNotionTree(client, 'u1', { deadlineAt: 2, now }), /Too much to read from Notion in one go\. Import a smaller part \(for example one unit at a time\)\./);
 });
 
 test('missing last_edited_time becomes an empty string', () => {
   const body = pageBody('u1', 'U', 'Unit');
   delete body.last_edited_time;
   assert.equal(normalizePage(body, []).last_edited_time, '');
+});
+
+test('tab item whose children 404 keeps children_error after normalisation', async () => {
+  const { fetchImpl } = fakeNotion({
+    'GET /v1/pages/u1': pageBody('u1', 'U', 'Lesson'),
+    'GET /v1/blocks/u1/children': { results: [{ id: 'tb', type: 'tab', has_children: true, tab: {} }], has_more: false },
+    'GET /v1/blocks/tb/children': { results: [
+      { id: 't1', type: 'paragraph', has_children: true, paragraph: { rich_text: text('One') } },
+      { id: 't2', type: 'paragraph', has_children: false, paragraph: { rich_text: text('Two') } }
+    ], has_more: false }
+    // t1 children: 404
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  const [tabs] = (await readNotionTree(client, 'u1')).pages.u1.blocks;
+  assert.equal(tabs.type, 'tabs');
+  assert.equal(tabs.children[0].children_error, 'object_not_found');
+  assert.equal(tabs.children[1].children_error, undefined);
 });
