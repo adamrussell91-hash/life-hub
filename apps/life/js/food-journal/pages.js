@@ -15,6 +15,7 @@ import {
   HASHTAG,
   venueHistory,
   fixupQueue,
+  venueQueue,
   isImport,
 } from "./model.js";
 
@@ -703,6 +704,69 @@ export function paintFixup(ctx, host, index) {
     ctx.button("Mark as done", (e) => ctx.markReviewed(visit, e.currentTarget), "ghost"),
   );
   card.append(actions);
+  page.append(card);
+  host.append(page);
+}
+
+// One unsure venue at a time: the food places that were near the photo, the
+// name it has now, or type it yourself.
+export function paintVenueCheck(ctx, host, index) {
+  const queue = venueQueue(ctx.journal());
+  const page = el("section", "fj-fixup");
+  const head = el("header", "fj-fixup__head");
+  head.append(
+    el("h2", "fj-section__title fj-serif", "Check venues"),
+    el(
+      "p",
+      "fj-meta",
+      queue.length
+        ? `${queue.length} left. These are the places near where the photo was taken. Pick where you ate.`
+        : "Every venue is checked.",
+    ),
+  );
+  page.append(head);
+  if (!queue.length) {
+    host.append(page);
+    return;
+  }
+  const visit = queue[index % queue.length];
+  const { venue } = visit;
+  const card = el("article", "fj-card fj-card--outline fj-fixup__card");
+  card.append(
+    kicker(`${weekday(visit.date)} ${formatDisplayDate(visit.date)}`),
+    el("h3", "fj-card__title fj-serif", visit.title),
+  );
+  const said = firstSentence(plainNotes(visit.notes), 220);
+  if (said) card.append(el("p", "fj-fixup__original fj-serif", said));
+  card.append(
+    el(
+      "p",
+      "fj-meta",
+      `Saved as ${[venue.name || "no venue", venue.address].filter(Boolean).join(", ")}`,
+    ),
+  );
+  const near = venue.match?.candidates || [];
+  const picks = el("div", "food-actions");
+  for (const c of near)
+    picks.append(
+      ctx.button(
+        `${c.name} · ${c.distance} m`,
+        (e) => ctx.pickVenue(visit, c, e.currentTarget),
+        "ghost",
+      ),
+    );
+  if (!near.length)
+    card.append(el("p", "fj-meta", "No food places are mapped near the photo."));
+  const actions = el("div", "food-actions");
+  if (venue.name)
+    actions.append(
+      ctx.button(`Keep ${venue.name}`, (e) => ctx.pickVenue(visit, null, e.currentTarget), "ghost"),
+    );
+  actions.append(
+    ctx.button("Type it", (e) => ctx.editVisit(visit, e.currentTarget), "ghost"),
+    ctx.button("Skip for now", () => ctx.skipVenue(), "ghost"),
+  );
+  card.append(picks, actions);
   page.append(card);
   host.append(page);
 }

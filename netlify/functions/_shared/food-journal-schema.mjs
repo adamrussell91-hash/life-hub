@@ -80,6 +80,23 @@ export function validateFoodJournal(j) {
         (!Number.isFinite(v.venue[k]) || Math.abs(v.venue[k]) > bound)
       )
         bad("Location is invalid.");
+    if (v.venue.match != null) {
+      const m = v.venue.match;
+      if (
+        typeof m !== "object" ||
+        !["sure", "check"].includes(m.confidence) ||
+        (m.candidates != null &&
+          (!Array.isArray(m.candidates) || m.candidates.length > 5))
+      )
+        bad("Venue match is invalid.");
+      for (const c of m.candidates || []) {
+        if (!c || typeof c !== "object") bad("Venue match is invalid.");
+        text(c.name, "Venue", 200);
+        text(c.address, "Address", 1000);
+        if (![c.lat, c.lon, c.distance].every(Number.isFinite))
+          bad("Venue match is invalid.");
+      }
+    }
     if (!Array.isArray(v.dishes) || !v.dishes.length || v.dishes.length > 100)
       bad("Add between one and 100 dishes.");
     unique(v.dishes);
