@@ -4979,6 +4979,7 @@ a.home-class-tile:hover {
 
 .callout__body {
   margin: 0;
+  white-space: pre-wrap;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   color: var(--muted);

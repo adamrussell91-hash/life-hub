@@ -146,3 +146,65 @@ describe('leaf blocks', () => {
     expect(st.warnings.map((w) => w.rule)).toEqual(['skipped', 'unsupported']);
   });
 });
+
+describe('no silent content loss', () => {
+  const rules = (st: any) => st.warnings.map((w: any) => w.rule);
+  const img = () => node('image', { ...notionFile('https://files.example/i.png'), caption: rt('cap') });
+
+  it('moves non-text paragraph children after the text with a warning', () => {
+    const st = state();
+    const blocks = mapBlocks([node('paragraph', { rich_text: rt('Intro') }, [img()])], 'top', st) as any[];
+    expect(blocks.map((b) => b.block_type)).toEqual(['rich_text', 'image']);
+    expect(rules(st)).toContain('flattened');
+    expect(valid(blocks)).toBe(true);
+  });
+
+  it('keeps media under a quote after it', () => {
+    const st = state();
+    const blocks = mapBlocks([node('quote', { rich_text: rt('Q') }, [p('more'), img()])], 'top', st) as any[];
+    expect(blocks.map((b) => b.block_type)).toEqual(['quote', 'image']);
+    expect(blocks[0].content.quote).toBe('Q\nmore');
+    expect(rules(st)).toContain('flattened');
+  });
+
+  it('warns on synced blocks and keeps their media', () => {
+    const st = state();
+    const blocks = mapBlocks([node('synced_block', { synced_from: null }, [p('Shared'), img()])], 'top', st) as any[];
+    expect(blocks.map((b) => b.block_type)).toEqual(['rich_text', 'image']);
+    expect(rules(st)).toContain('flattened');
+  });
+
+  it('turns an external .html file into a generic embed, not an html_app', () => {
+    const st = state();
+    const [b] = mapBlocks([node('file', { ...external('https://cdn.example/sim.html'), name: 'sim.html', caption: [] })], 'top', st) as any[];
+    expect(b.block_type).toBe('embed');
+    expect(b.content).toMatchObject({ provider: 'generic', url: 'https://cdn.example/sim.html' });
+    expect(rules(st)).toContain('flattened');
+    expect(valid([b])).toBe(true);
+  });
+
+  it('keeps hosted video captions', () => {
+    const [b] = mapBlocks([node('video', { ...notionFile('https://files.example/c.mp4', 'c.mp4'), caption: rt('Watch') })], 'top', state()) as any[];
+    expect(b.content.caption).toBe('Watch');
+  });
+
+  it('maps a direct external video file to a file video, and other external video to a warned embed', () => {
+    const st = state();
+    const blocks = mapBlocks([
+      node('video', external('https://cdn.example/clip.mp4')),
+      node('video', external('https://videos.example/watch/1'))
+    ], 'top', st) as any[];
+    expect(blocks[0].content).toMatchObject({ provider: 'file', url: 'https://cdn.example/clip.mp4' });
+    expect(blocks[1].block_type).toBe('embed');
+    expect(rules(st)).toEqual(['flattened']);
+    expect(valid(blocks)).toBe(true);
+  });
+
+  it('skips media blocks with no file, with a warning', () => {
+    const st = state();
+    const blocks = mapBlocks([node('image', {}), node('pdf', {}), node('video', {}), node('file', {}), node('audio', {})], 'top', st);
+    expect(blocks).toEqual([]);
+    expect(rules(st)).toEqual(['skipped', 'skipped', 'skipped', 'skipped', 'skipped']);
+    expect(st.warnings[0].message).toBe('Image has no file; skipped.');
+  });
+});

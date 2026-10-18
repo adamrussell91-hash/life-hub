@@ -134,3 +134,29 @@ describe('child pages', () => {
     expect(st.warnings.some((w) => w.rule === 'flattened')).toBe(true);
   });
 });
+
+describe('no silent content loss (layout)', () => {
+  it('uses a heading per tab for tabs inside a column, and a bold line for a toggle', () => {
+    const blocks = mapBlocks([
+      columns(column([tabs(tab('A', [p('a')]), tab('B', [p('b')]))]), column([toggle('T', [image()])]))
+    ], 'top', state()) as any[];
+    const [c1, c2] = blocks[0].content.columns;
+    expect(c1.blocks.map((b: any) => b.block_type)).toEqual(['heading', 'rich_text', 'heading', 'rich_text']);
+    expect(c2.blocks[0].content.html).toBe('<p><strong>T</strong></p>');
+    expect(valid(blocks)).toBe(true);
+  });
+
+  it('warns for more than 12 columns, but not when unwrapping a single column', () => {
+    const many = state();
+    mapBlocks([columns(...Array.from({ length: 13 }, () => column([p('x')])))], 'top', many);
+    expect(many.warnings.map((w) => w.message)).toEqual(['More than 12 columns; stacked.']);
+    const one = state();
+    mapBlocks([columns(column([p('solo')]))], 'top', one);
+    expect(one.warnings).toEqual([]);
+  });
+
+  it('matches emoji with or without the variation selector', () => {
+    const blocks = mapBlocks([node('callout', { rich_text: rt('x'), color: 'default', icon: { type: 'emoji', emoji: '⚠' } })], 'top', state()) as any[];
+    expect(blocks[0].content.style).toBe('warning');
+  });
+});
