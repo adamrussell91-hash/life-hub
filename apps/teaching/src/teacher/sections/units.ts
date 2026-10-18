@@ -123,6 +123,8 @@ export function renderUnitsIndex(
   const root = document.createElement('div');
   root.className = 'units-index';
   canvas.append(root);
+  const syllabuses = syllabusRow(curriculum, subjectsById);
+  if (syllabuses) root.append(syllabuses);
 
   if (units.length === 0) {
     const empty = document.createElement('p');
@@ -175,7 +177,7 @@ export function renderUnitsIndex(
     filterButtons.set(value, btn);
     filterHost.append(btn);
   }
-  groupByHost.after(filterHost);
+  if (units.some((unit) => unit.kind === 'program')) groupByHost.after(filterHost);
 
   const listHost = document.createElement('div');
   listHost.className = 'units-index__list';
@@ -202,6 +204,14 @@ export function renderUnitsIndex(
     const shown = units.filter((unit) =>
       kindFilter === 'all' ? true : kindFilter === 'programs' ? unit.kind === 'program' : unit.kind !== 'program'
     );
+    if (shown.length === 0) {
+      const none = document.createElement('p');
+      none.className = 'teacher-layout__canvas-status';
+      none.dataset.unitsEmptyFilter = '';
+      none.textContent = kindFilter === 'programs' ? 'No programs yet.' : 'No units yet.';
+      listHost.append(none);
+      return;
+    }
     const groups = groupUnits(shown, groupBy, yearsById, subjectsById);
     for (const group of groups) {
       const section = document.createElement('section');
@@ -223,12 +233,7 @@ export function renderUnitsIndex(
         grid.append(card.el);
       }
 
-      section.append(heading);
-      if (groupBy === 'subject') {
-        const links = syllabusLinks(curriculum, group.units[0]?.subject_id);
-        if (links) section.append(links);
-      }
-      section.append(grid);
+      section.append(heading, grid);
       listHost.append(section);
     }
   }
@@ -258,20 +263,29 @@ export function renderUnitsIndex(
   };
 }
 
-/** Read-only Syllabus documents imported for a subject, linked from its group. */
-function syllabusLinks(curriculum: CurriculumResponse, subjectId: string | undefined): HTMLElement | null {
-  if (!subjectId) return null;
+/** Every active Syllabus, always reachable regardless of group-by or filter. */
+function syllabusRow(
+  curriculum: CurriculumResponse,
+  subjectsById: Map<string, Subject>
+): HTMLElement | null {
   const docs = (curriculum.documents ?? []).filter(
-    (doc) => doc.status === 'active' && doc.kind === 'syllabus' && doc.subject_id === subjectId
+    (doc) => doc.status === 'active' && doc.kind === 'syllabus'
   );
   if (docs.length === 0) return null;
-  const row = document.createElement('p');
-  row.className = 'units-index__meta units-index__documents';
-  for (const doc of docs) {
+  const row = document.createElement('div');
+  row.className = 'units-index__documents';
+  row.dataset.syllabuses = '';
+  const label = document.createElement('h2');
+  label.className = 'units-index__group-title';
+  label.textContent = 'Syllabuses';
+  row.append(label);
+  for (const doc of docs.slice().sort((a, b) => a.title.localeCompare(b.title))) {
+    const subject = subjectsById.get(doc.subject_id);
     const link = document.createElement('a');
+    link.className = 'units-index__meta';
     link.href = `/documents/${doc.id}`;
     link.dataset.documentId = doc.id;
-    link.textContent = `Syllabus: ${doc.title}`;
+    link.textContent = subject ? `${doc.title} · ${subject.title}` : doc.title;
     link.addEventListener('click', (event) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
       event.preventDefault();
@@ -458,10 +472,12 @@ export function renderUnitPage(
 
   const optionsMenu = mountPageOptionsMenu(
     [
-      {
-        label: 'Schedule lessons',
-        onSelect: () => { openScheduleTimetableModal({ curriculum, unitId, onSuccess: () => options.onMutated?.() }); }
-      },
+      ...(unit.kind === 'program'
+        ? []
+        : [{
+            label: 'Schedule lessons',
+            onSelect: () => { openScheduleTimetableModal({ curriculum, unitId, onSuccess: () => options.onMutated?.() }); }
+          }]),
       {
         label: 'History',
         onSelect: () => {

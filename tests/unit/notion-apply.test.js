@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyPlan, replacePlaceholders } from '../../netlify/functions/_shared/notion-apply.mjs';
-import { NOTION_SOURCE_MAP_KEY } from '../../netlify/functions/_shared/notion-import-store.mjs';
+import { documentKey, NOTION_SOURCE_MAP_KEY } from '../../netlify/functions/_shared/notion-import-store.mjs';
 import { classKey, draftLessonKey, subjectKey, unitKey, versionIndexKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 
 const now = '2026-10-18T00:00:00.000Z';
@@ -63,6 +63,27 @@ test('re-import snapshots the existing lesson, keeps created_at and hub-only fie
   assert.equal(lesson.created_at, '2026-01-01T00:00:00.000Z');
   assert.equal(lesson.published_at, '2026-02-01T00:00:00.000Z');
   assert.equal(store.read(versionIndexKey('lesson', 'lesson_n_l1')).entries.length, 1);
+});
+
+test('re-importing a syllabus document snapshots it first; a failed checkpoint leaves it alone', async () => {
+  const docPlan = () => ({
+    root_page_id: 'd1', new_subjects: [], media: [], warnings: [], skipped: [], html_apps: [],
+    entities: [{ page_id: 'd1', parent_page_id: null, kind: 'document', label: 'Syllabus', id: 'document_n_d1', title: 'New', existing: false, needs: [], suggested: {},
+      record: { ...common('document_n_d1', 'New'), type: 'document', kind: 'syllabus', subject_id: 'subject_1', blocks: [], source: source('d1') } }]
+  });
+  const existing = { ...common('document_n_d1', 'Old'), type: 'document', kind: 'syllabus', subject_id: 'subject_1', blocks: [], source: source('d1') };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [documentKey('document_n_d1')]: existing });
+  await applyPlan(store, docPlan(), { now, rehost });
+  assert.equal(store.read(documentKey('document_n_d1')).title, 'New');
+  const index = store.read(versionIndexKey('document', 'document_n_d1'));
+  assert.equal(index.entries.length, 1);
+  assert.equal(store.read(`versions/document/document_n_d1/${index.latest_revision}`).snapshot.title, 'Old');
+
+  const failing = memoryStore({ [subjectKey('subject_1')]: subject, [documentKey('document_n_d1')]: existing });
+  const original = failing.setJSON;
+  failing.setJSON = async (key, value) => { if (key.startsWith('versions/')) throw new Error('nope'); return original(key, value); };
+  await applyPlan(failing, docPlan(), { now, rehost });
+  assert.equal(failing.read(documentKey('document_n_d1')).title, 'Old');
 });
 
 test('re-import keeps lessons added to the unit in the Teaching Hub', async () => {

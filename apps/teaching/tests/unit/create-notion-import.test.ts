@@ -4,8 +4,10 @@ let captured: { onDone: (r: any) => void } | null = null;
 vi.mock('@/teacher/notion-import/modal', () => ({
   openNotionImportModal: vi.fn((o: any) => { captured = o; return { close: () => {} }; })
 }));
+vi.mock('@/app/router', () => ({ navigate: vi.fn() }));
 vi.mock('@/app/curriculum-state', () => ({ reconcileCurriculum: vi.fn(async () => ({})) }));
 
+import { navigate } from '@/app/router';
 import { reconcileCurriculum } from '@/app/curriculum-state';
 import { mountCreateControl } from '@/teacher/create/control';
 
@@ -15,6 +17,7 @@ describe('create menu: Import from Notion onDone', () => {
   beforeEach(() => {
     onCreated.mockReset();
     vi.mocked(reconcileCurriculum).mockClear();
+    vi.mocked(navigate).mockClear();
     host = document.createElement('div');
     document.body.append(host);
     mountCreateControl(host, { context: 'home', curriculum: { years: [], subjects: [], units: [], lessons: [], classes: [] } as any, onCreated });
@@ -32,9 +35,15 @@ describe('create menu: Import from Notion onDone', () => {
     captured!.onDone(report(['document_n_x', 'lesson_n_y', 'unit_n_z']));
     expect(onCreated).toHaveBeenCalledWith('lesson', 'lesson_n_y');
   });
-  it('refreshes the curriculum when nothing is navigable', () => {
+  it('opens the syllabus when it is the only navigable record', async () => {
     captured!.onDone(report(['document_n_x']));
     expect(onCreated).not.toHaveBeenCalled();
     expect(reconcileCurriculum).toHaveBeenCalled();
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/documents/document_n_x'));
+  });
+  it('only refreshes when there is nothing to open', () => {
+    captured!.onDone(report(['subject_n_x']));
+    expect(reconcileCurriculum).toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,7 @@ async function writeTimetable(store,classId,body) {
   const unit=typeof body.unit_id==='string' ? await read(store,unitKey(body.unit_id)) : null;
   if(!cls || isDeletedRecord(cls)) fail(404,'not_found','Class not found.');
   if(!unit || isDeletedRecord(unit)) fail(404,'not_found','Unit not found.');
+  if(unit.kind==='program') fail(400,'program_not_schedulable',"Programs aren't scheduled into classes.");
   if(unit.subject_id!==cls.subject_id) fail(400,'subject_mismatch','Unit subject does not match class subject.');
   let timetable, sessions;
   try {

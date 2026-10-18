@@ -2361,6 +2361,12 @@ a:hover {
   margin-left: var(--space-2);
 }
 
+.units-index__documents {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
 .units-index__documents a {
   color: var(--navy);
   text-decoration: underline;
