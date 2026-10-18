@@ -53,22 +53,38 @@ Attaching Discern adds a Confirm card straight after the block, linked back with
 
 ## Teacher class spread
 
-Anonymous: dots and initial answers only, never notes. Every tail drawn faintly on one graph.
+Anonymous: no names, ever. Every tail drawn faintly on one graph.
+
+- **Dot labels:** the teacher also sees the students' anonymised dot labels, so a dip at Against comes with the reasons ("Anger is louder than hope"), not just the drop. For example, tap a step to list that step's labels for the highlighted tails.
 
 - **By shape:** chips with counts that highlight those tails; which step shook the most students; how many barely moved; how many finished uneasy.
 - **By initial answer** (Scale and Choose only): tails coloured by initial answer, with a table of students per answer, how many were shaken by Against, how many finished uneasy and the most common shape.
 - The Confirm card shows where the class's final dots landed.
 
-This needs a small anonymous submission of five dots plus the initial answer per device. Block pulse (`apps/teaching/src/blocks/block-pulse.ts`) and question drop already do anonymous per-device submission and can be the pattern.
+This needs a small anonymous submission of five dots, five labels and the initial answer per device. Block pulse (`apps/teaching/src/blocks/block-pulse.ts`) and question drop already do anonymous per-device submission and can be the pattern.
 
-## Open questions
+## Decisions (18 October 2026)
 
-- Which blocks can take Discern? Probably the same list as Kaplan (`canHaveKaplanQualifier`).
-- Can a block carry both a Kaplan lens and Discern?
-- Should the teacher see anonymised dot labels as well as dots?
-- Print mode: a blank five by five grid for the book?
-- Parked: a character's own tail, plotting how settled a character is across key moments of a text. Separate build.
+- **Blocks:** the same blocks as Kaplan for now (`canHaveKaplanQualifier`).
+- **Kaplan and Discern together:** a block can carry both. Keep it to a few attachments per block so it does not get busy; this is the teacher's call, not a hard limit.
+- **Dot labels in the class spread:** yes (see above).
+- **Print mode:** not needed for now.
+- **Character's own tail:** yes, as an optional setting the teacher turns on (see below).
+
+## Character's own tail (optional setting)
+
+Available in "someone else's choice" mode. Instead of plotting the student's own settledness across the four steps, the x-axis becomes key moments in the text and the student plots how settled **the character** is at each one, with a few words of evidence as each dot's label. Macbeth's wavering, from the witches to the dagger soliloquy to after the murder, becomes a line.
+
+- The teacher sets the moments (three to six), e.g. "Act 1 Scene 3", "Dagger soliloquy", "After the murder".
+- Same graph, same "copy into your book" step, same anonymous class spread, so the teacher can see where the class reads the character as most and least settled.
+- Not just different wording: the x-axis and the teacher-set moments are new, so this is its own slice.
+- Open: does it replace the four steps for that block, or follow them as an extra?
+
+## Related thought: Ignatian Pedagogical Paradigm as a lesson shape
+
+Jesuit schools turned the Exercises into a lesson shape: **context, experience, reflection, action, evaluation**. It could become a lesson shape or template in the teaching hub, separate from the Discern qualifier. Keep in mind; nothing decided.
 
 ## History
 
 - 18 October 2026: concept and mockup.
+- 18 October 2026: decisions on blocks, Kaplan pairing, dot labels and print mode; character's own tail added as an optional setting; Ignatian Pedagogical Paradigm noted as a possible lesson shape.
