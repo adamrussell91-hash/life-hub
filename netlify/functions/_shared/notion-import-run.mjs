@@ -91,7 +91,8 @@ async function buildPlan(store, pageId, choices, deps) {
   });
   const tree = await readNotionTree(client, normalizePageId(pageId), {
     deadlineAt: clock() + READ_BUDGET_MS,
-    now: clock
+    now: clock,
+    onPage: deps.onPage
   });
   return buildImportPlan(tree, await mapContext(store, choices, deps.now));
 }
@@ -117,7 +118,7 @@ export function previewOf(plan) {
  * or running and still fresh (a duplicate background retry).
  */
 async function claimJob(store, jobId, kind, clock) {
-  const job = await getJSON(store, notionJobKey(jobId));
+  const job = await getJSON(store, notionJobKey(jobId), { consistency: 'strong' });
   if (!job || job.kind !== kind) return null;
   if (job.status === 'running') {
     // NaN-safe: an unparseable updated_at fails `age < STALE`, so the job counts as stale.
@@ -141,9 +142,13 @@ async function runJob(store, jobId, kind, deps, work) {
   }
 }
 
+// Keeps updated_at fresh while reading, so a slow read is not mistaken for a crashed run.
+const heartbeat = (store, jobId) => ({ done, total_known }) =>
+  writeJob(store, jobId, { phase: 'reading', progress: { phase: 'reading', done, total: total_known } });
+
 export function runPlan(store, jobId, deps) {
   return runJob(store, jobId, 'plan', deps, async (job, d) => {
-    const plan = await buildPlan(store, job.page_id, job.choices, d);
+    const plan = await buildPlan(store, job.page_id, job.choices, { ...d, onPage: heartbeat(store, jobId) });
     await writeJob(store, jobId, { status: 'planned', phase: 'done', plan: previewOf(plan) });
   });
 }
@@ -153,14 +158,15 @@ export function runApply(store, jobId, deps) {
     const mediaDeadlineAt = d.mediaDeadlineAt ?? d.clock() + MEDIA_BUDGET_MS;
     const timeoutSignal = d.timeoutSignal ?? ((ms) => AbortSignal.timeout(ms));
     // Re-read so Notion file URLs are fresh (they expire within minutes).
-    const plan = await buildPlan(store, job.page_id, job.choices, d);
+    const plan = await buildPlan(store, job.page_id, job.choices, { ...d, onPage: heartbeat(store, jobId) });
     const report = await applyPlan(store, plan, {
       now: d.now,
       rehost: async (s, ref) => {
         if (d.clock() > mediaDeadlineAt) {
           return { ok: false, reason: 'failed', message: `Ran out of time before ${ref.name} could be downloaded.` };
         }
-        const ms = Math.max(1000, Math.min(60000, mediaDeadlineAt + 60000 - d.clock()));
+        // Bounded by the cutoff itself, so no download outlives the media window.
+        const ms = Math.max(1000, Math.min(60000, mediaDeadlineAt - d.clock()));
         return rehostMedia(s, ref, { fetchImpl: d.fetchImpl, origin: d.origin, now: d.now, signal: timeoutSignal(ms) });
       },
       onProgress: (progress) => writeJob(store, jobId, { phase: progress.phase, progress })

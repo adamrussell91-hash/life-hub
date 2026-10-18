@@ -15,7 +15,7 @@ export async function readSourceMap(store) {
 }
 
 export async function writeJob(store, id, patch) {
-  const current = (await getJSON(store, notionJobKey(id))) ?? { id };
+  const current = (await getJSON(store, notionJobKey(id), { consistency: 'strong' })) ?? { id };
   const next = { ...current, ...patch, id, updated_at: new Date().toISOString() };
   await setJSON(store, notionJobKey(id), next);
   return next;

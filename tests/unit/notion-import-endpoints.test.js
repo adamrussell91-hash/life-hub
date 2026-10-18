@@ -45,10 +45,11 @@ const env = { ...gate, NOTION_TEACHING_TOKEN: 't', NOTION_TEACHING_DATA_SOURCE_I
 
 function memoryStore() {
   const map = new Map();
+  const reads = [];
   return {
-    map,
+    map, reads,
     read: (k) => (map.has(k) ? JSON.parse(map.get(k)) : null),
-    async get(key) { return map.has(key) ? JSON.parse(map.get(key)) : null; },
+    async get(key, o) { reads.push([key, o]); return map.has(key) ? JSON.parse(map.get(key)) : null; },
     async setJSON(key, v) { map.set(key, JSON.stringify(v)); },
     async set(key, v) { map.set(key, typeof v === 'string' ? v : JSON.stringify({ bytes: true })); },
     async list({ prefix } = {}) { return { blobs: [...map.keys()].filter((k) => !prefix || k.startsWith(prefix)).map((key) => ({ key })) }; }
@@ -128,6 +129,28 @@ test('GET jobs/:id: 400, 404 and 200', async () => {
   const ok = await handler(req('GET', '/api/notion-import/jobs/nij_present01'));
   assert.equal(ok.status, 200);
   assert.equal((await body(ok)).data.status, 'planned');
+});
+
+test('GET jobs/:id reads with strong consistency', async () => {
+  const store = memoryStore();
+  store.map.set(notionJobKey('nij_present01'), JSON.stringify({ id: 'nij_present01', status: 'queued' }));
+  await createNotionImportHandler(deps(store))(req('GET', '/api/notion-import/jobs/nij_present01'));
+  assert.deepEqual(store.reads.map(([, o]) => o?.consistency), ['strong']);
+});
+
+test('POST jobs: after a failed kick, a job that already moved on is left alone', async () => {
+  const store = memoryStore();
+  const handler = createNotionImportHandler(deps(store, {
+    kickNotionImportRun: async (_r, _p, id) => {
+      store.map.set(notionJobKey(id), JSON.stringify({ ...JSON.parse(store.map.get(notionJobKey(id))), status: 'running' }));
+      return false;
+    }
+  }));
+  const res = await handler(req('POST', '/api/notion-import/jobs', { kind: 'plan', page_id: BARE }));
+  assert.equal(res.status, 502);
+  const [job] = [...store.map.values()].map((v) => JSON.parse(v));
+  assert.equal(job.status, 'running');
+  assert.ok(store.reads.every(([, o]) => o?.consistency === 'strong'));
 });
 
 test('search: setup errors are 503 not_configured and not retryable', async () => {
