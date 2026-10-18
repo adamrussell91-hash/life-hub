@@ -1,5 +1,6 @@
 import type { CurriculumResponse } from '@/teacher/nav';
 import { openCreateModal } from '@/teacher/create/modal';
+import { reconcileCurriculum } from '@/app/curriculum-state';
 import { openNotionImportModal } from '@/teacher/notion-import/modal';
 import type { CreateContext, CreateKind, EntityCreatedHandler } from '@/teacher/create/types';
 
@@ -92,10 +93,12 @@ export function mountCreateControl(
       openNotionImportModal({
         curriculum: options.curriculum,
         onDone: (report) => {
-          const first = report.written[0];
-          if (!first) return;
-          if (first.startsWith('lesson_')) void options.onCreated('lesson', first);
-          else if (first.startsWith('unit_')) void options.onCreated('unit', first);
+          const classId = report.written.find((id) => id.startsWith('class_'));
+          if (classId) { void options.onCreated('class', classId); return; }
+          const first = report.written.find((id) => id.startsWith('unit_') || id.startsWith('lesson_'));
+          if (first) { void options.onCreated(first.startsWith('lesson_') ? 'lesson' : 'unit', first); return; }
+          // Nothing to open, but new records exist: refresh what the app holds.
+          void reconcileCurriculum().catch(() => {});
         }
       });
     });

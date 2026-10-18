@@ -34,6 +34,15 @@ describe('parseNotionPageId', () => {
     expect(parseNotionPageId('01234567-89ab-cdef-0123-456789abcdef')).toBe('01234567-89ab-cdef-0123-456789abcdef');
     expect(parseNotionPageId('not a link')).toBeNull();
   });
+
+  it('mirrors the server: p wins when it holds an id, else the path; # and bad p are ignored', () => {
+    const a = '0123456789abcdef0123456789abcdef';
+    const b = 'fedcba9876543210fedcba9876543210';
+    expect(parseNotionPageId(`https://notion.so/Page-${a}?p=notanid`)).toBe('01234567-89ab-cdef-0123-456789abcdef');
+    expect(parseNotionPageId(`https://notion.so/Page-${a}?p=${b}&pm=s`)).toBe('fedcba98-7654-3210-fedc-ba9876543210');
+    expect(parseNotionPageId(`https://notion.so/Page-${a}#${b}`)).toBe('01234567-89ab-cdef-0123-456789abcdef');
+    expect(parseNotionPageId('https://notion.so/Page?p=notanid')).toBeNull();
+  });
 });
 
 describe('preview model', () => {
