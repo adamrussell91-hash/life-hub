@@ -72,13 +72,17 @@ export function toggleExcluded(plan: ImportPlanPreview, excluded: Set<string>, p
   return next;
 }
 
-export function groupWarnings(plan: ImportPlanPreview, excluded: Set<string>): Array<{ rule: WarningRule; title: string; items: ImportWarning[] }> {
+export function groupWarningList(warnings: ImportWarning[]): Array<{ rule: WarningRule; title: string; items: ImportWarning[] }> {
   const groups = new Map<WarningRule, ImportWarning[]>();
-  for (const w of plan.warnings) {
-    if (excluded.has(w.page_id) || w.rule === 'needs_choice') continue;
+  for (const w of warnings) {
+    if (w.rule === 'needs_choice') continue;
     groups.set(w.rule, [...(groups.get(w.rule) ?? []), w]);
   }
   return [...groups].map(([rule, items]) => ({ rule, title: RULE_TITLES[rule] ?? rule, items }));
+}
+
+export function groupWarnings(plan: ImportPlanPreview, excluded: Set<string>): Array<{ rule: WarningRule; title: string; items: ImportWarning[] }> {
+  return groupWarningList(plan.warnings.filter((w) => !excluded.has(w.page_id)));
 }
 
 export function choicesFrom(excluded: Set<string>, overrides: Record<string, EntityOverride>, htmlAsCode: Set<string>): ImportChoices {

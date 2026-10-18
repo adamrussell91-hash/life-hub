@@ -25,26 +25,32 @@ export interface NotionImportJob {
 }
 
 /** The server accepts links, `?p=` peek links and bare ids, and answers 400 "Choose a Notion page to import." otherwise. This only gives instant feedback. */
-export function parseNotionPageId(input: string): string | null {
-  let text = input.trim();
-  // A bare id or slug is scanned as text; parsing it as a URL would turn the id into a hostname.
-  if (/^[a-z][a-z0-9+.-]*:|[/?]/i.test(text)) {
-    try {
-      const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
-      const fromP = url.searchParams.get('p');
-      text = fromP ?? url.pathname; // never the query: ?v= is a database view id
-    } catch { /* not a URL: scan the text */ }
-  }
-  const found = text.match(/(?<![0-9a-f])[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}(?![0-9a-f])/gi);
+const PAGE_ID = /(?<![0-9a-f])[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}(?![0-9a-f])/gi;
+
+function lastId(text: string | null): string | null {
+  const found = text?.match(PAGE_ID);
   const hex = found?.[found.length - 1]?.replace(/-/g, '').toLowerCase();
   if (!hex) return null;
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/** Mirrors the server's normalizePageId: `p` (a peek link) first, then the path, never the query. */
+export function parseNotionPageId(input: string): string | null {
+  const text = input.trim();
+  if (/[/?#]/.test(text)) {
+    try {
+      const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+      return lastId(url.searchParams.get('p')) ?? lastId(url.pathname);
+    } catch { /* not a URL: scan the text */ }
+  }
+  return lastId(text);
+}
+
 export const searchNotion = (q: string) =>
   apiGet<{ items: NotionSearchItem[] }>(`/api/notion-import/search?q=${encodeURIComponent(q)}`);
 
-export const getNotionJob = (id: string) => apiGet<NotionImportJob>(`/api/notion-import/jobs/${id}`);
+export const getNotionJob = (id: string, signal?: AbortSignal) =>
+  apiGet<NotionImportJob>(`/api/notion-import/jobs/${id}`, { signal });
 
 /**
  * POST /api/notion-import/jobs   { kind: 'plan' | 'apply', page_id: string, choices?: ImportChoices }
@@ -61,6 +67,15 @@ async function startJob(kind: 'plan' | 'apply', pageId: string, choices?: Import
 export const startPlan = (pageId: string, choices?: ImportChoices) => startJob('plan', pageId, choices);
 export const startApply = (pageId: string, choices: ImportChoices) => startJob('apply', pageId, choices);
 
+/** Thrown when polling gave up. The job may still finish, so the UI offers to check again. */
+export class JobTimeoutError extends Error {
+  constructor() { super('The import is taking too long. Check back shortly.'); this.name = 'JobTimeoutError'; }
+}
+
+const abortError = (): Error => new DOMException('The import was cancelled.', 'AbortError');
+/** Network failures and non-JSON gateway pages are blips, not answers. */
+const TRANSIENT_CODES = new Set(['network_error', 'invalid_response']);
+
 const QUEUED_LIMIT_MS = 60_000;
 const SILENT_LIMIT_MS = 4 * 60_000;
 
@@ -76,19 +91,29 @@ export async function waitForJob(
   onUpdate: (job: NotionImportJob) => void,
   {
     intervalMs = 1500, timeoutMs = 15 * 60 * 1000,
-    sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+    signal,
+    sleep = (ms: number) => new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+      const onAbort = (): void => { clearTimeout(timer); reject(abortError()); };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    }),
     now = Date.now
+  }: {
+    intervalMs?: number; timeoutMs?: number; signal?: AbortSignal;
+    sleep?: (ms: number) => Promise<void>; now?: () => number;
   } = {}
 ): Promise<NotionImportJob> {
   const started = now();
   let seen = '';
   let seenAt = started;
   for (;;) {
+    if (signal?.aborted) throw abortError();
     let job: NotionImportJob | null = null;
     try {
-      job = await getNotionJob(id);
+      job = await getNotionJob(id, signal);
     } catch (error) {
-      if (error instanceof ApiClientError) throw error;
+      if (signal?.aborted) throw abortError();
+      if (error instanceof ApiClientError && !TRANSIENT_CODES.has(error.code)) throw error;
     }
     if (job) {
       onUpdate(job);
@@ -99,7 +124,8 @@ export async function waitForJob(
       if (job.status === 'queued' && quiet > QUEUED_LIMIT_MS) throw new Error("The import didn't start. Try again.");
       if (job.status === 'running' && quiet > SILENT_LIMIT_MS) throw new Error('The import stopped responding. Try again.');
     }
-    if (now() - started > timeoutMs) throw new Error('The import is taking too long. Check back shortly.');
+    if (now() - started > timeoutMs) throw new JobTimeoutError();
     await sleep(intervalMs);
+    if (signal?.aborted) throw abortError();
   }
 }
