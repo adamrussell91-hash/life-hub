@@ -1,6 +1,6 @@
 # Technique scan: to-do for ChatGPT
 
-The Passage Scanner port is implemented, including the server-only OpenAI call and the generated list of all 310 technique names. The existing teacher review screen, student filter and spinner remain in place. **Deployment task for Adam:** verify that `OPENAI_API_KEY` is set for the Netlify function, then scan a short extract on the deployed site. Idea and decisions: [../classroom-tools.md](../classroom-tools.md).
+The Passage Scanner port is implemented, including the server-only OpenAI call and the generated list of all 310 technique names. The existing teacher review screen, student filter and spinner remain in place. `OPENAI_API_KEY` is configured as a Netlify secret; key validity and `gpt-4o` access were verified on 18 October 2026. A short extract still needs a live teacher scan after deployment. Idea and decisions: [../classroom-tools.md](../classroom-tools.md).
 
 ## What the scan is for
 
@@ -31,7 +31,7 @@ A teacher scans a text block. The scan finds which of the 310 Periodic Table tec
    - Return the raw reply text. `parseTechniqueResult` does the rest.
    - Throw `TextToolError` with a plain message when the key is missing ("The technique scan is not configured (OPENAI_API_KEY).").
 2. [x] **Bump `TEXT_TOOL_VERSION`** in `text-tools.mjs` when the prompt goes in, so no old result is served. Port version: **4**.
-3. [ ] **Add `OPENAI_API_KEY` to the Netlify site** if it is not already set for this function. Adam does this. Do not put it in the repo.
+3. [x] **Add `OPENAI_API_KEY` to the Netlify site.** Configured and verified on 18 October 2026 for production, deploy previews and branch deploys, with Netlify's secret flag enabled. The current Netlify plan requires the standard build/functions/runtime scopes. The key was validated for `gpt-4o`; the temporary local key file was deleted. No key is stored in this repository.
 4. [x] **Tests.** Mock `fetch` for `requestTechniqueScan`. The test network guard blocks real calls. Cover: a good reply, an empty reply that retries once, a missing key, and an upstream error.
 5. [x] **Run `npm run pre-pr-check`** from the repo root. Passed on 18 October 2026 (exit 0), including root tests, the affected Tasks Hub tests and the Professional typecheck. The focused backend tests (18) and teaching technique/spinner tests (32) also pass.
 
