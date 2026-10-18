@@ -1,5 +1,6 @@
 import { getSydneyDateKey, isCalendarDate } from "../core/time.js";
 import { withoutDeleted } from "../../../../packages/design-kit/js/record-liveness.js";
+import { venueUnsure } from "./venue-match.js";
 
 export const MEAL_TYPES = [
   "Breakfast",
@@ -336,7 +337,8 @@ export function tidyImports(journal) {
     if (!visit.import_metadata?.location_from_text) {
       const written = dayOneLocation(visit.notes);
       if (written) {
-        visit.venue = { name: written, address: visit.venue.address || "" };
+        // Keep the point: the venue backfill looks up food places there.
+        visit.venue = { ...visit.venue, name: written };
         visit.import_metadata = {
           ...(visit.import_metadata || {}),
           location_from_text: true,
@@ -510,6 +512,10 @@ export function editorialBasis(visit) {
 export const needsEditorial = (visit) =>
   (!isImport(visit) || visit.reviewed === true) &&
   visit.editorial?.basis !== editorialBasis(visit);
+// Visits whose venue the backfill could not confirm.
+export function venueQueue(journal) {
+  return liveVisits(journal).filter(venueUnsure);
+}
 export function fixupQueue(journal) {
   return liveVisits(journal).filter((v) => isImport(v) && !v.reviewed);
 }

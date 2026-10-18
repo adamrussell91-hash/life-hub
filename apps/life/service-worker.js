@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v213';
+const CACHE_NAME = 'life-hub-shell-v214';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -20,6 +20,7 @@ const SHELL_FILES = [
   'js/food-journal/view.js',
   'js/food-journal/pages.js',
   'js/food-journal/capture.js',
+  'js/food-journal/venue-match.js',
   'packages/design-kit/hub-list.css',
   'packages/design-kit/js/hub-list.js',
   'css/aesthetics.css',
