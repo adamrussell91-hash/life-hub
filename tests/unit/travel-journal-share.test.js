@@ -174,3 +174,37 @@ test('travel-journal-share POST creates scoped token and public GET returns reda
   );
   assert.equal(afterRevoke.status, 404);
 });
+
+test('a share link stops working while its journal is in Trash', async () => {
+  const journal = baseJournal();
+  journal.lifecycle = 'deleted';
+  const token = 'trashed-journal-token';
+  const tokenMap = {
+    [createHash('sha256').update(token).digest('hex')]: {
+      kind: 'journal',
+      trip_id: TRIP,
+      moment_ids: ['mom_share'],
+      leg_ids: []
+    }
+  };
+  const handler = createTravelJournalShareHandler({
+    env,
+    verifySessionToken: () => ({ valid: true }),
+    createTravelRepository: () => ({
+      async getShareTokens() {
+        return { map: structuredClone(tokenMap), version: 'a'.repeat(40) };
+      }
+    }),
+    createTravelJournalRepository: () => ({
+      async getJournal() {
+        return { journal: structuredClone(journal), version: 'b'.repeat(40) };
+      }
+    }),
+    signGet: async ({ key }) => `https://signed.example/${encodeURIComponent(key)}`
+  });
+
+  for (const query of [`token=${token}`, `token=${token}&media=med_share&width=320`]) {
+    const res = await handler(new Request(`https://example.test/api/travel-journal-share?${query}`), {});
+    assert.equal(res.status, 404, query);
+  }
+});

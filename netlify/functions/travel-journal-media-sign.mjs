@@ -66,13 +66,24 @@ export function createTravelJournalMediaSignHandler(deps = {}) {
         return errorResponse(400, 'verify_failed', check.message, false, PRIVATE_CACHE);
       }
 
-      const { journal, version } = await ctx.repo.getJournal(parsed.value.trip_id);
-      const nextJournal = applyVerifiedMedia(journal, parsed.value);
-      const saved = await ctx.repo.saveJournal(
-        nextJournal,
-        parsed.value.if_version,
-        `travel-journal: verify media ${parsed.value.media_id}`
-      );
+      // Verify only stamps one media row, so apply it to the latest journal
+      // rather than the client's version: uploads finish in any order, and
+      // a version moved on by another save must not fail the backup.
+      let saved;
+      for (let attempt = 0; ; attempt += 1) {
+        const { journal, version } = await ctx.repo.getJournal(parsed.value.trip_id);
+        const nextJournal = applyVerifiedMedia(journal, parsed.value);
+        try {
+          saved = await ctx.repo.saveJournal(
+            nextJournal,
+            version,
+            `travel-journal: verify media ${parsed.value.media_id}`
+          );
+          break;
+        } catch (error) {
+          if (error?.code !== 'conflict' || attempt >= 3) throw error;
+        }
+      }
       return okResponse(
         200,
         {

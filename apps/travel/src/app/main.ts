@@ -31,6 +31,7 @@ import { renderPublicTrip } from '@/views/public-trip';
 import { getTrip, listTrips } from '@/api/travel';
 import { pickPrimaryTrip } from '@/lib/pick-trip';
 import { registerServiceWorker, mountOfflineBanner } from '@/lib/offline';
+import { bindJournalOutbox } from '@/journal/journal-outbox';
 
 function journalUseFixture(): boolean {
   return new URLSearchParams(location.search).get('fixture') === '1';
@@ -84,6 +85,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
     }
   });
   mountOfflineBanner(root);
+  // Sends journal edits, photos and voice notes left on this device.
+  bindJournalOutbox();
 
   let routeGeneration = 0;
   let currentTripId: string | null = null;

@@ -16,10 +16,14 @@ export interface JournalQueuedOp {
   action: string;
   payload: unknown;
   ack: JournalOpAck;
+  /** Changes on every enqueue; tells a flush whether the op was replaced mid-send. */
+  stamp?: string;
 }
 
 export interface EnqueueJournalOpInput {
   id?: string;
+  /** Overwrite an op with the same id even if it was already acked (newer content). */
+  replace?: boolean;
   target_id: string;
   base_revision: number;
   action: string;
@@ -223,7 +227,7 @@ function quotaOffer(retryInput: EnqueueJournalOpInput): JournalQuotaFailureOffer
 export async function enqueueJournalOp(input: EnqueueJournalOpInput): Promise<EnqueueJournalOpResult> {
   const id = input.id ?? createJournalOpId();
   const existing = await store().get(id);
-  if (existing?.ack.state === 'acked') {
+  if (existing?.ack.state === 'acked' && !input.replace) {
     return { ok: true, op: existing };
   }
   const op: JournalQueuedOp = {
@@ -232,7 +236,11 @@ export async function enqueueJournalOp(input: EnqueueJournalOpInput): Promise<En
     base_revision: input.base_revision,
     action: input.action,
     payload: input.payload,
-    ack: existing?.ack.state === 'failed' ? pendingAck() : (existing?.ack ?? pendingAck()),
+    stamp: createJournalOpId(),
+    ack:
+      input.replace || existing?.ack.state === 'failed'
+        ? pendingAck()
+        : (existing?.ack ?? pendingAck()),
   };
   try {
     await store().put(op);
@@ -269,7 +277,21 @@ export interface FlushJournalOpsResult {
   failed: { id: string; error: string }[];
 }
 
-export async function flushJournalOps(sender: JournalOpSender): Promise<FlushJournalOpsResult> {
+/** Drop an op (and any blob it carries) from the device. */
+export async function removeJournalOp(id: string): Promise<void> {
+  await store().delete(id);
+  await refreshPendingCount();
+}
+
+export interface FlushJournalOpsOptions {
+  /** Delete ops once acked so queued photos and audio do not linger on the device. */
+  purgeAcked?: boolean;
+}
+
+export async function flushJournalOps(
+  sender: JournalOpSender,
+  options: FlushJournalOpsOptions = {},
+): Promise<FlushJournalOpsResult> {
   const ops = await listJournalOps();
   const sent: string[] = [];
   const skipped: string[] = [];
@@ -283,7 +305,14 @@ export async function flushJournalOps(sender: JournalOpSender): Promise<FlushJou
     try {
       const ack = await sender(op);
       if (ack.state === 'acked') {
-        await ackJournalOp(op.id, ack);
+        // Re-read: a newer edit may have replaced this op while it was sending.
+        const current = await store().get(op.id);
+        const unchanged = current?.stamp === op.stamp;
+        if (options.purgeAcked && current && unchanged) {
+          await store().delete(op.id);
+        } else if (current && unchanged) {
+          await ackJournalOp(op.id, ack);
+        }
         sent.push(op.id);
       } else if (ack.state === 'failed') {
         await ackJournalOp(op.id, ack);

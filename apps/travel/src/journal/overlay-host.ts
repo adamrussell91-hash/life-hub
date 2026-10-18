@@ -44,7 +44,10 @@ let nextId = 1;
 const stack: OverlayEntry[] = [];
 let listening = false;
 /** history.back() calls we issued that have not produced their popstate yet. */
-let pendingPops = 0;
+let pendingPops: number[] = [];
+let nextPopToken = 1;
+/** If a browser never reports our own back(), stop waiting so Back keeps working. */
+const POP_TIMEOUT_MS = 800;
 const deferredPushes: OverlayEntry[] = [];
 let lockedScrollY = 0;
 /** Page scroll restoration while overlay history entries exist (restored after). */
@@ -55,7 +58,7 @@ function top(): OverlayEntry | undefined {
 }
 
 function pushEntry(entry: OverlayEntry): void {
-  if (pendingPops > 0) {
+  if (pendingPops.length > 0) {
     deferredPushes.push(entry);
     return;
   }
@@ -74,28 +77,36 @@ function pushEntry(entry: OverlayEntry): void {
 }
 
 function flushDeferred(): void {
-  while (pendingPops === 0 && deferredPushes.length) {
+  while (pendingPops.length === 0 && deferredPushes.length) {
     const entry = deferredPushes.shift()!;
     if (stack.includes(entry)) pushEntry(entry);
   }
 }
 
 function maybeRestoreScrollRestoration(): void {
-  if (savedScrollRestoration === null || pendingPops > 0) return;
+  if (savedScrollRestoration === null || pendingPops.length > 0) return;
   if (stack.some((e) => e.hasHistory)) return;
   history.scrollRestoration = savedScrollRestoration;
   savedScrollRestoration = null;
 }
 
-function onPopState(): void {
-  if (pendingPops > 0) {
-    pendingPops -= 1;
-    flushDeferred();
-    maybeRestoreScrollRestoration();
+function settlePop(): void {
+  flushDeferred();
+  maybeRestoreScrollRestoration();
+}
+
+function onPopState(ev: PopStateEvent): void {
+  if (pendingPops.length > 0) {
+    pendingPops.shift();
+    settlePop();
     return;
   }
-  const entry = top();
-  if (!entry || !entry.hasHistory) return;
+  // Back (or iOS swipe-back) landed below the newest overlay entry: close
+  // that overlay. Ids only grow, so anything newer than where we landed was
+  // popped by this traversal.
+  const landed = Number((ev.state as Record<string, unknown> | null)?.[HISTORY_KEY] ?? 0);
+  const entry = [...stack].reverse().find((e) => e.hasHistory && e.id > landed);
+  if (!entry) return;
   entry.hasHistory = false;
   entry.dismiss();
   // Guarded dismiss kept it open (e.g. "Keep editing") — restore the entry so
@@ -187,8 +198,15 @@ export function presentJournalOverlay(
       back.remove();
       if (entry.hasHistory && history.state?.[HISTORY_KEY] === entry.id) {
         entry.hasHistory = false;
-        pendingPops += 1;
+        const token = nextPopToken++;
+        pendingPops.push(token);
         history.back();
+        setTimeout(() => {
+          const idx = pendingPops.indexOf(token);
+          if (idx < 0) return;
+          pendingPops.splice(idx, 1);
+          settlePop();
+        }, POP_TIMEOUT_MS);
       }
       if (stack.length === 0) unlockScroll();
       if (entry.returnFocus?.isConnected) entry.returnFocus.focus({ preventScroll: true });
