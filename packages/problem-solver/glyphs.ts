@@ -28,6 +28,9 @@ const SOURCES: Record<string, string> = {
 
 const EMBLEMS: Record<PsToolId, string> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart };
 
+/** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
+export const EMBLEM_SVG: Record<PsToolId, string> = EMBLEMS;
+
 let copy = 0;
 
 /** The glyph's SVG with its internal ids suffixed, so two copies on one page never share a mask. */
