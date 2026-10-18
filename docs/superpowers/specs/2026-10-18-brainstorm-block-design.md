@@ -35,7 +35,7 @@ Safety modes:
 
 - **Instant unless flagged.** A clean answer goes straight onto the board. A flagged answer waits in the teacher's queue.
 - **Teacher approves each.** Every answer waits in the queue until approved.
-- **Hidden until reveal.** Answers collect without text showing anywhere. Shapes still orbit, so the teacher can see how many answers there are. On reveal, every unflagged answer appears together. Flagged answers stay in the queue.
+- **Hidden until reveal.** Answers collect without text showing anywhere. Shapes still orbit, so the teacher can see how many answers there are. On reveal, every unflagged answer appears together, and answering closes, so nobody can copy what they've just seen. Flagged answers stay in the queue.
 
 In every mode, the teacher can remove any answer at any time. A removed answer leaves the board and every student screen.
 
@@ -70,7 +70,7 @@ Start round → join code shown large. Controls while the round runs:
 
 - Join with the code (no account). Device token kept locally, as in peer feedback.
 - Question, answer box, "2 of 3 left" counter, and a list of their own sent answers with each one's status (on the board, waiting, removed shows as "Not shown").
-- In **All answers** mode, they also see the board as the teacher has it, but only answers currently on the board: never held, flagged or removed answers, and never symbols.
+- In **All answers** mode, they also see the board as the teacher has it: neutral dots while the teacher's board is in orbit, and the answer text only once the teacher reveals. Only answers currently on the board, never held, flagged or removed answers, and never symbols.
 - With Show student symbols on, their own symbol appears in the block's corner.
 - Drafts are kept on the device so a reload loses nothing.
 

@@ -364,6 +364,7 @@ describe('blockRegistry', () => {
       'anthology',
       'attachment',
       'audio',
+      'brainstorm',
       'callout',
       'card_stack',
       'chart',
