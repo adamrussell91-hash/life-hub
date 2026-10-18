@@ -51,7 +51,9 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
 
   return {
     async list(owner, { limit = 100, offset = 0 } = {}) {
-      return (await store.list(owner, limit, offset)).map((row) => summaryRow(row.value));
+      const rows = (await store.list(owner, limit, offset)).map((row) => summaryRow(row.value));
+      // Index rows written before frame and skill counts existed: read the session once to fill them in.
+      return Promise.all(rows.map(async (row) => (row.skills ? row : summaryRow((await store.read(owner, row.id))?.value ?? row))));
     },
 
     async get(owner, id) {
