@@ -21,6 +21,10 @@ describe('richTextHtml', () => {
       .toBe('<a href="https://example.com/a?b=1&amp;c=2">go</a>');
     expect(richTextHtml([t('bad', {}, 'javascript:alert(1)')])).toBe('bad');
   });
+  it('keeps relative Notion links by resolving them against notion.so', () => {
+    expect(richTextHtml([t('Other page', {}, '/0123456789abcdef0123456789abcdef')]))
+      .toBe('<a href="https://www.notion.so/0123456789abcdef0123456789abcdef">Other page</a>');
+  });
   it('turns mentions into plain text even when they carry an href', () => {
     expect(richTextHtml([t('Some Page', {}, 'https://www.notion.so/abc', 'mention')])).toBe('Some Page');
   });
