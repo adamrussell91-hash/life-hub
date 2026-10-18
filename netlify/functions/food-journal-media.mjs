@@ -7,7 +7,7 @@ import {
   PRIVATE_CACHE,
 } from "./_shared/travel-http.mjs";
 import {
-  knowledgePresignPut,
+  knowledgePutObject,
   knowledgePresignGet,
 } from "./_shared/knowledge-r2.mjs";
 import { createFoodJournalRepository } from "./_shared/food-journal-repository.mjs";
@@ -26,13 +26,16 @@ export function createFoodJournalMediaHandler(deps = {}) {
           PRIVATE_CACHE,
         );
       checkRateLimit("food-media", { limit: 60, now: ctx.now() });
-      const body = await readJson(request);
-      if (body?.action === "upload") {
+      // A photo arrives as the JPEG itself and the function writes it to R2,
+      // so the upload does not depend on the bucket allowing browser PUTs.
+      if (/^image\/jpeg\b/i.test(request.headers.get("content-type") || "")) {
+        const bytes = new Uint8Array(await request.arrayBuffer());
         if (
-          body.mime !== "image/jpeg" ||
-          !Number.isInteger(body.size) ||
-          body.size <= 0 ||
-          body.size > 4 * 1024 * 1024
+          bytes.length < 3 ||
+          bytes.length > 4 * 1024 * 1024 ||
+          bytes[0] !== 0xff ||
+          bytes[1] !== 0xd8 ||
+          bytes[2] !== 0xff
         )
           return errorResponse(
             400,
@@ -43,13 +46,15 @@ export function createFoodJournalMediaHandler(deps = {}) {
           );
         const id = `photo_${randomUUID()}`,
           key = `food/photos/${id}.jpg`;
-        const url = await knowledgePresignPut(ctx.env, {
+        await knowledgePutObject(ctx.env, {
           key,
+          body: bytes,
           contentType: "image/jpeg",
-          signPut: deps.signPut,
+          putObject: deps.putObject,
         });
-        return okResponse(200, { id, key, url }, PRIVATE_CACHE);
+        return okResponse(200, { id, key }, PRIVATE_CACHE);
       }
+      const body = await readJson(request);
       // One request signs a whole screen of photos, so a long timeline does
       // not trip the rate limit one photo at a time.
       if (

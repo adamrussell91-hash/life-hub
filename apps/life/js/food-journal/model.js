@@ -17,6 +17,41 @@ export const emptyJournal = () => ({
   recipes: [],
 });
 export const today = () => getSydneyDateKey();
+const SMALL_WORDS = new Set(["a", "an", "and", "at", "for", "in", "of", "on", "or", "the", "to", "with"]);
+// Menus are often printed in capitals. Text with no lower case letters comes
+// back as a title (names) or a sentence (descriptions); anything else stays.
+export function unshout(text, { sentence = false } = {}) {
+  const s = String(text ?? "");
+  if (!/\p{Lu}.*\p{Lu}/u.test(s) || /\p{Ll}/u.test(s)) return s;
+  let first = true;
+  return s.replace(/(\p{L}+)|([.!?])/gu, (match, word, stop) => {
+    if (stop) {
+      if (sentence) first = true;
+      return stop;
+    }
+    // Short words with no vowel are codes such as GF, BBQ or VG.
+    if (word.length <= 3 && !/[AEIOUY]/.test(word)) {
+      first = false;
+      return word;
+    }
+    const lower = word.toLowerCase(),
+      lead = first || (!sentence && !SMALL_WORDS.has(lower));
+    first = false;
+    return lead ? lower[0].toUpperCase() + lower.slice(1) : lower;
+  });
+}
+// The capture fields people read as names or prose, unshouted.
+export function unshoutVisit(visit) {
+  if (visit.title) visit.title = unshout(visit.title);
+  if (visit.venue?.name) visit.venue.name = unshout(visit.venue.name);
+  for (const item of visit.menu_items || []) {
+    item.name = unshout(item.name);
+    if (item.description)
+      item.description = unshout(item.description, { sentence: true });
+  }
+  for (const dish of visit.dishes || []) dish.title = unshout(dish.title);
+  return visit;
+}
 export function newDish() {
   return {
     id: newId("dish"),
@@ -251,6 +286,15 @@ export function visitTags(visit) {
   for (const m of String(visit.notes || "").matchAll(HASHTAG)) keys.add(tagKey(m[2]));
   keys.delete("");
   return [...keys];
+}
+// Every tag used before, most used first, for suggesting as people type.
+export function knownTags(journal) {
+  const counts = new Map();
+  for (const visit of liveVisits(journal))
+    for (const key of visitTags(visit)) counts.set(key, (counts.get(key) || 0) + 1);
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([key]) => key);
 }
 // Day One reviews carry the score in the text as "4/5" or "4\\.5/5". Dates
 // such as 21/5/26 are not scores.
