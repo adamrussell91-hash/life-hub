@@ -57,10 +57,12 @@ export const LOOKS = [
   look('striking', 'Mustard yellow + fuchsia pink → striking', ['mustard', 'overshirt'], ['fuchsia', 'tee'], ['navy', 'jeans'], ['white', 'sneakers'], ['black', 'watch strap'], 'corduroy', 'Velvet Underground')
 ];
 
-/** Quick picks for "Snap a piece" when there is no photo to hand. */
+/** Quick picks for "Snap a piece" when there is no photo to hand. `slot` says which piece it is. */
 export const SNAP_SAMPLES = [
-  { colour: 'burgundy', label: 'Burgundy knit' },
-  { colour: 'olive', label: 'Olive jacket' },
-  { colour: 'powder blue', label: 'Blue shirt' },
-  { colour: 'mustard', label: 'Mustard overshirt' }
+  { colour: 'burgundy', label: 'Burgundy knit', slot: 'top', garment: 'knit' },
+  { colour: 'burgundy', label: 'Burgundy pants', slot: 'bottom', garment: 'trousers' },
+  { colour: 'olive', label: 'Olive jacket', slot: 'outer', garment: 'field jacket' },
+  { colour: 'powder blue', label: 'Blue shirt', slot: 'top', garment: 'shirt' },
+  { colour: 'chocolate', label: 'Brown loafers', slot: 'shoes', garment: 'loafers' },
+  { colour: 'mustard', label: 'Mustard overshirt', slot: 'outer', garment: 'overshirt' }
 ];
