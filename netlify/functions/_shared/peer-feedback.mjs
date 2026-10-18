@@ -29,6 +29,7 @@
  * each other. Only the teacher writes the round, the swap and moderation.
  */
 import { randomBytes, randomInt, createHash } from 'node:crypto';
+import { IDENTITIES, claimedIds as claimedFor, claimSymbol, shuffle } from './class-symbols.mjs';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
@@ -42,8 +43,7 @@ export const MAX_FEEDBACK = 2000;
 export const MAX_NOTES = 20;
 export const MAX_ANSWER = 80;
 export const MAX_COMMENT = 300;
-/** "colour-shape" pairs: six colours by six shapes. */
-export const IDENTITIES = Array.from({ length: 36 }, (_, i) => `${i % 6}-${Math.floor(i / 6)}`);
+export { IDENTITIES };
 
 export class PeerError extends Error {
   constructor(status, code, message) {
@@ -104,19 +104,7 @@ function keys(lesson, block, session) {
   };
 }
 
-async function claimedIds(store, k) {
-  const claims = await Promise.all(IDENTITIES.map((id) => read(store, k.claim(id))));
-  return IDENTITIES.filter((_, i) => claims[i]);
-}
-
-function shuffle(list) {
-  const out = [...list];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
+const claimedIds = (store, k) => claimedFor(store, k.claim);
 
 /** Who reviews whom: a shuffled ring, so nobody gets their own and every piece gets one reader. */
 function ring(ids) {
@@ -314,18 +302,9 @@ async function annotateTeacherState(store, k, activity, joined, writing) {
 
 /** Hands out a free symbol for this device's token, or finds the one it already has. */
 async function join(store, k, tokenHash) {
-  const existing = await read(store, k.token(tokenHash));
-  if (existing) return existing.symbol;
-  const taken = new Set(await claimedIds(store, k));
-  for (const id of shuffle(IDENTITIES.filter((x) => !taken.has(x)))) {
-    await store.setJSON(k.claim(id), { token_hash: tokenHash }, { onlyIfNew: true });
-    const claim = await read(store, k.claim(id));
-    if (claim?.token_hash === tokenHash) {
-      await store.setJSON(k.token(tokenHash), { symbol: id }, { onlyIfNew: true });
-      return id;
-    }
-  }
-  reject(409, 'full', 'This activity is full. Ask your teacher.');
+  const id = await claimSymbol(store, k, tokenHash);
+  if (!id) reject(409, 'full', 'This activity is full. Ask your teacher.');
+  return id;
 }
 
 async function studentAction(store, k, activity, body) {

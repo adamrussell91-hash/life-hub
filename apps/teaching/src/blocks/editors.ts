@@ -1,6 +1,7 @@
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
+import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { createCalloutTargetPicker } from '@/blocks/callout-reference';
@@ -2829,6 +2830,8 @@ function createBlockEditorFields(
       return createPeerFeedbackEditor(block, onChange);
     case 'question_drop':
       return createQuestionDropEditor(block, onChange, context.lessonId);
+    case 'brainstorm':
+      return createBrainstormEditor(block, onChange);
     case 'quiz_question':
       return createQuizQuestionEditor(block, onChange, context.getLessonBlocks);
     case 'question_set':

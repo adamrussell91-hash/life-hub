@@ -561,6 +561,7 @@ var BlockTypeSchema = z6.enum([
   "table",
   "peer_feedback",
   "question_drop",
+  "brainstorm",
   "quiz_question",
   "question_set",
   "discern_confirm",
@@ -975,6 +976,22 @@ var PeerFeedbackBlockSchema = z6.object({
     mode: z6.enum(["comments", "annotate"]).default("comments"),
     strength_prompt: z6.string().max(300).default("One thing that works well\u2026"),
     suggestion_prompt: z6.string().max(300).default("One suggestion or question\u2026")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var BrainstormBlockSchema = z6.object({
+  id: z6.string().min(1),
+  type: z6.literal("block"),
+  block_type: z6.literal("brainstorm"),
+  variant: z6.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z6.object({
+    question: z6.string().max(500).default(""),
+    safety: z6.enum(["instant", "approve", "reveal"]).default("approve"),
+    per_student: z6.union([z6.literal(0), z6.literal(1), z6.literal(3), z6.literal(5)]).default(3),
+    max_length: z6.number().int().min(20).max(280).default(140),
+    layout: z6.enum(["grid", "cloud", "groups"]).default("grid")
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1677,6 +1694,7 @@ var leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  BrainstormBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
   QuestionSetBlockSchema,
@@ -1881,6 +1899,7 @@ export {
   AudioBlockSchema,
   BlockSchema,
   BlockTypeSchema,
+  BrainstormBlockSchema,
   CalloutBlockSchema,
   CalloutStyleSchema,
   CardStackBlockSchema,
