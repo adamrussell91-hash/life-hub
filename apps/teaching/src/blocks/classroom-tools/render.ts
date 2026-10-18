@@ -32,7 +32,8 @@ export function renderDividerContent(block: DividerBlock, mode: RenderMode, ctx:
     viewer: viewerFor(mode),
     timerStack: block.content?.timer_stack ?? [],
     lessonId: ctx.lessonId,
-    pageBlocks: ctx.pageBlocks
+    pageBlocks: ctx.pageBlocks,
+    key: block.id
   });
   return host;
 }
@@ -49,7 +50,8 @@ export function renderClassroomToolsContent(block: ToolsBlock, mode: RenderMode,
     timerStack: block.content?.timer_stack ?? [],
     startTool: block.content?.start_tool,
     lessonId: ctx.lessonId,
-    pageBlocks: ctx.pageBlocks
+    pageBlocks: ctx.pageBlocks,
+    key: block.id
   });
   return host;
 }
