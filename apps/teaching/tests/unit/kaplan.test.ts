@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
-import { kaplanSteps, suggestKaplanFocus, withKaplanQualifier, withoutKaplanQualifier } from '@/blocks/kaplan';
+import { kaplanFocusText, kaplanSteps, suggestKaplanFocus, withKaplanQualifier, withoutKaplanQualifier } from '@/blocks/kaplan';
 import { renderBlock } from '@/blocks/render';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { LessonSchema } from '@/schemas/lesson';
@@ -73,6 +73,27 @@ describe('Kaplan attachments and saved lessons', () => {
     expect(BlockSchema.safeParse({ ...questionBlock(), qualifiers: [qualifier, qualifier] }).success).toBe(false);
     expect(KaplanQualifierSchema.safeParse({ ...qualifier, lens: 'invented' }).success).toBe(false);
     expect(KaplanQualifierSchema.safeParse({ ...qualifier, focus: 'x'.repeat(201) }).success).toBe(false);
+  });
+});
+
+describe('Kaplan focus wording', () => {
+  it('keeps a short focus phrase inline in the step prompts', () => {
+    expect(kaplanSteps(qualifier)[0].prompt).toBe('Choose one specific detail from this activity that helps you explore reconciliation.');
+  });
+  it('treats a full statement as an idea to test rather than splicing it mid-sentence', () => {
+    const statement = { ...qualifier, focus: 'People make decisions that affect others based on the knowledge they have at the time..' };
+    const steps = kaplanSteps(statement);
+    for (const step of steps) expect(step.prompt).not.toContain('People make');
+    expect(steps[0].prompt).toBe('Choose one specific detail from this activity that connects to this idea.');
+    expect(kaplanFocusText(statement.focus)).toBe('People make decisions that affect others based on the knowledge they have at the time.');
+  });
+  it('shows the focus once as its own line and keeps the eyebrow to the step count', () => {
+    const block = withKaplanQualifier(questionBlock(), { ...qualifier, focus: 'People make decisions that affect others based on the knowledge they have at the time.' });
+    const view = renderBlock(block, 'student', { lessonId: 'lesson' });
+    document.body.append(view);
+    view.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
+    expect(view.querySelector('.kaplan-eyebrow')!.textContent).toBe('Step 1 of 3');
+    expect(view.querySelector('.kaplan-focus')!.textContent).toContain('People make decisions that affect others');
   });
 });
 

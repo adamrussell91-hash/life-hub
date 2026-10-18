@@ -182,7 +182,7 @@ export function createKaplanEditor<T extends Block>(options: Options<T>): HTMLEl
     focus.type = 'text';
     focus.maxLength = 200;
     focus.value = draft.focus;
-    focus.placeholder = 'For example, reconciliation';
+    focus.placeholder = 'A word, phrase or statement, such as reconciliation';
     focus.addEventListener('input', () => { if (draft) draft.focus = focus.value; });
     const mode = document.createElement('select');
     for (const [value, label] of [['notes', 'Thinking notes'], ['discussion', 'Discussion · no typing']]) {
