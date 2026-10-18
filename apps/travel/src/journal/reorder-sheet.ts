@@ -1,6 +1,7 @@
 import type { JournalDocument } from '@/api/journal';
 import type { JournalMoment } from '@/journal/types';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
 import {
   applyReorderToJournal,
@@ -21,6 +22,7 @@ export interface OpenReorderSheetOptions {
 export function openReorderSheet(options: OpenReorderSheetOptions): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   let orderIds = liveDayMoments(options.journal, options.moment.leg_id, options.moment.local_date).map(
     (m) => m.id,
   );
@@ -28,7 +30,7 @@ export function openReorderSheet(options: OpenReorderSheetOptions): { destroy():
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-reorder-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-reorder-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Reorder moments');
@@ -150,22 +152,11 @@ export function openReorderSheet(options: OpenReorderSheetOptions): { destroy():
   function finishClose(): void {
     if (destroyed) return;
     destroyed = true;
-    document.removeEventListener('keydown', onKey);
-    back.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
   cancelBtn.addEventListener('click', () => finishClose());
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back) finishClose();
-  });
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
-      finishClose();
-    }
-  };
-  document.addEventListener('keydown', onKey);
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -198,9 +189,12 @@ export function openReorderSheet(options: OpenReorderSheetOptions): { destroy():
   actions.append(resetBtn, cancelBtn, saveBtn);
   sheet.append(heading, form);
   back.append(sheet);
-  options.anchor.append(back);
   heading.tabIndex = -1;
-  heading.focus();
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: () => finishClose(),
+    initialFocus: heading,
+  });
 
   return { destroy: () => finishClose() };
 }

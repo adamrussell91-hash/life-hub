@@ -1,6 +1,7 @@
 import { Map as MapLibreMap, NavigationControl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { JournalCoordinates } from '@/journal/types';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
@@ -118,14 +119,19 @@ export function openPinEditor(options: OpenPinEditorOptions): { destroy(): void 
   actions.append(cancelBtn, useBtn);
   panel.append(title, hint, mapShell, advanced, actions);
   backdrop.append(panel);
-  options.anchor.append(backdrop);
+  // Mounted before MapLibre starts so the container has a real size.
+  const overlay: JournalOverlayHandle = presentJournalOverlay(backdrop, {
+    anchor: options.anchor,
+    dismiss: () => finish(false),
+  });
 
   let map: MapLibreMap | null = new MapLibreMap({
     container: mapHost,
     style: STYLE_URL,
     center: [start.lon, start.lat],
     zoom: 14,
-    cooperativeGestures: true,
+    // Inside a modal: one-finger drag must move the map under the crosshair.
+    cooperativeGestures: false,
     attributionControl: { compact: false },
   });
   const nav = new NavigationControl({ showCompass: false });
@@ -163,10 +169,9 @@ export function openPinEditor(options: OpenPinEditorOptions): { destroy(): void 
   function finish(committed: boolean): void {
     if (destroyed) return;
     destroyed = true;
-    document.removeEventListener('keydown', onKey);
     map?.remove();
     map = null;
-    backdrop.remove();
+    overlay.release();
     if (committed) {
       options.onCommit({ coordinates: committedPreview, label: 'Dropped pin' });
     } else {
@@ -174,18 +179,7 @@ export function openPinEditor(options: OpenPinEditorOptions): { destroy(): void 
     }
   }
 
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
-      finish(false);
-    }
-  };
-  document.addEventListener('keydown', onKey);
-
   cancelBtn.addEventListener('click', () => finish(false));
-  backdrop.addEventListener('click', (ev) => {
-    if (ev.target === backdrop) finish(false);
-  });
 
   useBtn.addEventListener('click', () => {
     if (advanced.open && !applyManualCoords()) return;

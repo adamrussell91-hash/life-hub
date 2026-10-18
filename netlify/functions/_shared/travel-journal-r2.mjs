@@ -8,7 +8,28 @@ const TRIP_ID_RE = /^trp_[a-z0-9_]{4,64}$/i;
 const MED_ID_RE = /^med_[a-z0-9_]{4,64}$/i;
 const SHA256_RE = /^[a-f0-9]{64}$/i;
 
-const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif'
+]);
+/** Voice notes: iOS Safari records audio/mp4; Chrome/Firefox record webm/ogg. */
+const AUDIO_TYPES = new Set([
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/aac',
+  'audio/mpeg',
+  'audio/webm',
+  'audio/ogg',
+  'audio/wav'
+]);
+
+function isAllowedOriginalType(contentType) {
+  return IMAGE_TYPES.has(contentType) || AUDIO_TYPES.has(contentType);
+}
 
 function validationError(message) {
   return { error: message };
@@ -121,7 +142,7 @@ export function parseJournalMediaSignRequest(raw) {
   const content_type = normalizeContentType(
     typeof raw.content_type === 'string' ? raw.content_type : ''
   );
-  if (!IMAGE_TYPES.has(content_type)) return validationError('content_type not allowed');
+  if (!isAllowedOriginalType(content_type)) return validationError('content_type not allowed');
 
   let derivative_width;
   if (purpose === 'derivative') {
@@ -192,7 +213,7 @@ export function parseJournalMediaVerifyRequest(raw) {
     raw.content_type === undefined
       ? undefined
       : normalizeContentType(typeof raw.content_type === 'string' ? raw.content_type : '');
-  if (content_type !== undefined && !IMAGE_TYPES.has(content_type)) {
+  if (content_type !== undefined && !isAllowedOriginalType(content_type)) {
     return validationError('content_type not allowed');
   }
 

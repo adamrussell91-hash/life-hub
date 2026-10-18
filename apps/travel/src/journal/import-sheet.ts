@@ -5,41 +5,49 @@ import {
   applyGroupLayout,
   clearImportProposal,
   createImportFile,
-  deriveBatchOutcome,
   deriveBatchSummary,
   duplicateSkipReason,
   importFileNeedsBlob,
-  importFilesPendingUpload,
   loadImportProposal,
   mergeMomentGroups,
-  resolveImportMediaId,
   saveImportProposal,
   splitMomentGroup,
   stableOperationId,
   transitionImportFile,
   type ImportFileEntry,
 } from '@/journal/import-review';
-import { UploadQueue } from '@/journal/upload-queue';
+import type { JournalDocument } from '@/api/journal';
+import type { JournalMedia, JournalMoment } from '@/journal/types';
 import {
-  uploadJournalMediaWithProgress,
-  verifyJournalMedia,
-  type JournalMediaSignInput,
-} from '@/api/journal-media';
+  bootstrapJournalForFirstMoment,
+  resolveCaptureContext,
+} from '@/journal/capture-context';
+import { persistJournalPatch, type PersistedJournal } from '@/journal/journal-sheet-save';
+import { buildJournalMediaRow, makeMediaId, normalizeMediaContentType } from '@/journal/media-upload';
+import {
+  dropQueuedJournalMedia,
+  flushJournalOutbox,
+  queueJournalMedia,
+} from '@/journal/journal-outbox';
+import { rememberLocalJournalMedia } from '@/journal/media-loading';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
+import { makeMomentId } from '@/journal/moment-operations';
+import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
 
 export interface OpenImportSheetOptions {
   fixture: JournalFixture;
   knownChecksums?: string[];
   deletedChecksums?: string[];
-  journalVersion?: string;
+  /** Current journal and version (not the copy from page load). */
+  journal: JournalDocument;
+  version: string;
+  tripTitle?: string;
   anchor: HTMLElement;
   onClose?: () => void;
-  onUploadComplete?: (summary: { complete: number; failed: number }) => void;
+  onSaved?: (envelope: PersistedJournal) => void;
   /** Pre-selected files (e.g. from capture sheet multi-photo handoff). */
   initialFiles?: File[];
-}
-
-function makeMediaId(): string {
-  return `med_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function openImportSheet(options: OpenImportSheetOptions): { destroy(): void } {
@@ -50,6 +58,9 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   let files: ImportFileEntry[] = [];
   let groups: ProposedMoment[] = [];
   let destroyed = false;
+  let committing = false;
+  let overlay: JournalOverlayHandle | null = null;
+  attachVisualViewportInset();
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
@@ -77,7 +88,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   disclosure.append(disclosureSummary, disclosureBody);
 
   const form = document.createElement('form');
-  form.className = 'addform__form';
+  form.className = 'addform__form compose';
   form.noValidate = true;
 
   const scroll = document.createElement('div');
@@ -125,7 +136,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn btn--primary';
-  saveBtn.textContent = 'Upload';
+  saveBtn.textContent = 'Add photos';
 
   function refreshMissingBlobBanner(): void {
     const missing = files.filter((f) => importFileNeedsBlob(f, blobs));
@@ -136,7 +147,6 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   }
 
   function refreshHeader(): void {
-    const uploadable = files.filter((f) => !f.skipReason && f.state !== 'complete');
     const momentCount = groups.length;
     counts.textContent = `${files.length} photo${files.length === 1 ? '' : 's'} · ${momentCount} proposed moment${momentCount === 1 ? '' : 's'}`;
 
@@ -164,27 +174,24 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
     }
 
     const summary = deriveBatchSummary(files);
-    const outcome = deriveBatchOutcome(summary);
     saveBtn.disabled =
-      !files.length ||
+      committing ||
       summary.inspecting > 0 ||
-      summary.uploading > 0 ||
-      files.some((f) => importFileNeedsBlob(f, blobs)) ||
-      (outcome !== 'in_progress' && summary.proposed === 0 && summary.partial === 0 && summary.failed === 0);
-    if (summary.uploading > 0 || summary.partial > 0) {
+      importableFiles().length === 0 ||
+      files.some((f) => importFileNeedsBlob(f, blobs));
+    const count = importableFiles().length;
+    saveBtn.textContent = committing
+      ? 'Adding…'
+      : count === 0
+        ? 'Add photos'
+        : count === 1
+          ? 'Add 1 photo'
+          : `Add ${count} photos`;
+    if (summary.inspecting > 0) {
       progress.hidden = false;
-      progress.textContent = `Uploading… ${summary.complete}/${uploadable.length} complete`;
-    } else if (outcome === 'partial') {
-      progress.hidden = false;
-      progress.textContent = `${summary.complete} saved, ${summary.failed} failed — retry failed`;
-      saveBtn.textContent = 'Retry failed';
-    } else if (outcome === 'all_complete') {
-      progress.hidden = false;
-      progress.textContent = 'All uploads complete';
-      saveBtn.textContent = 'Done';
+      progress.textContent = 'Reading photo dates and places…';
     } else {
       progress.hidden = true;
-      saveBtn.textContent = 'Upload';
     }
     refreshMissingBlobBanner();
   }
@@ -296,104 +303,90 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
     renderGroups();
   }
 
-  async function runUpload(): Promise<void> {
+  function importableFiles(): ImportFileEntry[] {
+    return files.filter((f) => !f.skipReason && f.inspected && f.state !== 'inspecting');
+  }
+
+  /**
+   * Add the reviewed groups to the journal: photo bytes go into the device
+   * outbox first, then one save adds the moments and media rows. Uploading
+   * carries on in the background (and after a reload) until each photo is
+   * verified on the server.
+   */
+  async function commitImport(): Promise<void> {
+    if (committing) return;
     if (files.some((f) => importFileNeedsBlob(f, blobs))) return;
-    files = files.map((f) => resolveImportMediaId(f, makeMediaId));
-    await persist();
-    const queue = new UploadQueue({
-      concurrency: 2,
-      upload: async (task) => {
-        const signInput: JournalMediaSignInput = {
-          trip_id: task.tripId,
-          media_id: task.mediaId,
-          content_type: task.contentType,
-          byte_size: task.byteSize,
-          checksum: task.checksum,
-          purpose: 'original',
-        };
-        const idx = files.findIndex((f) => f.operationId === task.operationId);
-        if (idx >= 0) {
-          files[idx] = transitionImportFile(files[idx]!, { type: 'start_upload' });
-          refreshHeader();
-        }
-        await uploadJournalMediaWithProgress(signInput, task.file, () => {
-          refreshHeader();
-        });
-        if (idx >= 0) {
-          files[idx] = transitionImportFile(files[idx]!, { type: 'upload_put_done' });
-        }
-        if (options.journalVersion) {
-          try {
-            await verifyJournalMedia({
-              ...signInput,
-              if_version: options.journalVersion,
-              action: 'verify',
-            });
-            if (idx >= 0) {
-              files[idx] = transitionImportFile(files[idx]!, { type: 'upload_verified' });
-            }
-          } catch (err) {
-            const message = err instanceof Error ? err.message : 'Verify failed';
-            if (idx >= 0) {
-              files[idx] = transitionImportFile(files[idx]!, {
-                type: 'upload_verify_failed',
-                message,
-              });
-            }
-            throw err;
-          }
-        } else if (idx >= 0) {
-          files[idx] = transitionImportFile(files[idx]!, { type: 'upload_verified' });
-        }
-        queue.markComplete(task.operationId);
-        await persist();
-        refreshHeader();
-      },
-    });
-
-    for (const f of files) {
-      if (f.state === 'complete' && !f.skipReason) {
-        queue.markComplete(f.operationId);
-      }
-    }
-
-    const tasks = importFilesPendingUpload(files).map((f) => {
-        const blob = blobs.get(f.checksum);
-        if (!blob) throw new Error(`Missing blob for ${f.name}`);
-        const withMedia = resolveImportMediaId(f, makeMediaId);
-        if (withMedia.mediaId !== f.mediaId) {
-          const idx = files.findIndex((row) => row.localId === f.localId);
-          if (idx >= 0) files[idx] = withMedia;
-        }
-        return {
-          operationId: withMedia.operationId,
-          checksum: withMedia.checksum,
-          file: blob,
-          tripId,
-          mediaId: withMedia.mediaId!,
-          contentType: withMedia.inspected?.mime ?? blob.type ?? 'image/jpeg',
-          byteSize: blob.size,
-        };
-      });
-
-    saveBtn.disabled = true;
-    const results = await queue.enqueue(tasks);
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i]!;
-      const r = results.get(f.operationId);
-      if (!r || f.skipReason) continue;
-      if (!r.ok && f.state === 'uploading') {
-        files[i] = transitionImportFile(f, {
-          type: 'upload_failed',
-          message: r.error ?? 'Upload failed',
-        });
-      }
-    }
-    await persist();
+    committing = true;
+    status.hidden = true;
     refreshHeader();
-    const summary = deriveBatchSummary(files);
-    options.onUploadComplete?.({ complete: summary.complete, failed: summary.failed });
-    saveBtn.disabled = false;
+
+    const fallback = resolveCaptureContext(options.journal);
+    let journal = options.journal;
+    const queued: string[] = [];
+    const previews: [string, Blob][] = [];
+    try {
+      for (const [gi, group] of groups.entries()) {
+        const groupFiles = importableFiles().filter((f) => f.groupIndex === gi);
+        if (!groupFiles.length) continue;
+        const legId = group.leg_id ?? fallback?.legId;
+        const localDate = group.local_date ?? fallback?.localDate;
+        if (!legId || !localDate) continue;
+        journal = bootstrapJournalForFirstMoment(
+          journal,
+          legId,
+          localDate,
+          options.tripTitle?.trim() || 'Trip',
+        );
+        const media: JournalMedia[] = [];
+        for (const f of groupFiles) {
+          const blob = blobs.get(f.checksum)!;
+          const mediaId = f.mediaId ?? makeMediaId();
+          const contentType = normalizeMediaContentType(blob, f.inspected?.mime || 'image/jpeg');
+          const row = await buildJournalMediaRow(mediaId, blob, contentType);
+          media.push(row);
+          await queueJournalMedia({ tripId, mediaId, blob, contentType }, { flush: false });
+          queued.push(mediaId);
+          previews.push([mediaId, blob]);
+        }
+        const peers = journal.moments.filter(
+          (m) => m.leg_id === legId && m.local_date === localDate,
+        );
+        const moment: JournalMoment = {
+          id: makeMomentId(),
+          leg_id: legId,
+          local_date: localDate,
+          local_time: group.local_time ?? undefined,
+          coordinates: group.coordinates,
+          location_source: group.coordinates ? 'exif' : undefined,
+          media_ids: media.map((m) => m.id),
+          display_order: peers.reduce((max, m) => Math.max(max, m.display_order), 0) + 1,
+          lifecycle: 'live',
+        };
+        journal = {
+          ...journal,
+          media: [...journal.media, ...media],
+          moments: [...journal.moments, moment],
+        };
+      }
+      journal = { ...journal, revision: journal.revision + 1 };
+      const envelope = await persistJournalPatch(tripId, options.version, journal);
+      for (const [id, blob] of previews) rememberLocalJournalMedia(id, blob);
+      void flushJournalOutbox();
+      await clearImportProposal(tripId);
+      options.onSaved?.(envelope);
+      destroy();
+      showHubToast(
+        envelope.queued
+          ? 'Saved on this phone. Photos will upload when you are back online.'
+          : `Added ${previews.length} photo${previews.length === 1 ? '' : 's'}. Uploading in the background…`,
+      );
+    } catch {
+      await dropQueuedJournalMedia(queued);
+      committing = false;
+      status.hidden = false;
+      status.textContent = 'Could not add the photos. Nothing was lost — try again.';
+      refreshHeader();
+    }
   }
 
   pickBtn.addEventListener('click', () => {
@@ -415,12 +408,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
-    const outcome = deriveBatchOutcome(deriveBatchSummary(files));
-    if (outcome === 'all_complete') {
-      destroy();
-      return;
-    }
-    void runUpload();
+    void commitImport();
   });
 
   cancelBtn.addEventListener('click', () => destroy());
@@ -428,21 +416,30 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back) destroy();
-  });
+  const status = document.createElement('p');
+  status.className = 'journal-sheet__status';
+  status.setAttribute('role', 'alert');
+  status.hidden = true;
 
-  scroll.append(missingBanner, pickBtn, groupList, progress, fileInput);
+  scroll.append(missingBanner, pickBtn, groupList, progress, status, fileInput);
   form.append(scroll, actions);
   actions.append(cancelBtn, saveBtn);
   header.append(counts, disclosure);
   sheet.append(title, header, form);
   back.append(sheet);
-  options.anchor.append(back);
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    // Never drop a half-finished import on a stray tap; it is also kept on
+    // the device and offered again next time.
+    dismiss: () => {
+      if (!committing) destroy();
+    },
+    initialFocus: saveBtn,
+  });
 
   void (async () => {
     if (options.initialFiles?.length) {
@@ -457,7 +454,6 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
     renderGroups();
   })();
 
-  saveBtn.focus();
   return { destroy };
 }
 

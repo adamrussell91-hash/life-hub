@@ -11,6 +11,11 @@ export interface JournalCaptureDraft {
   updatedAt: string;
   hasVoice: boolean;
   photoNames: string[];
+  /**
+   * Date the sheet was opened for. The draft is stored under this, not the
+   * edited `localDate`, so changing the date never orphans the draft.
+   */
+  draftKeyDate?: string;
 }
 
 const IDB_NAME = 'lifehub-travel-journal-capture';
@@ -93,7 +98,7 @@ export async function saveCaptureDraft(
   draft: JournalCaptureDraft,
   blobs: { voice: Blob | null; photos: Blob[] }
 ): Promise<boolean> {
-  const key = captureDraftKey(draft.tripId, draft.legId, draft.localDate);
+  const key = captureDraftKey(draft.tripId, draft.legId, draft.draftKeyDate ?? draft.localDate);
   try {
     const db = await openDraftDb();
     await new Promise<void>((resolve, reject) => {

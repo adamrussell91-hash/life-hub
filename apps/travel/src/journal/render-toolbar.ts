@@ -1,3 +1,4 @@
+import { bindDismissableMenu } from '@/journal/menu-dismiss';
 export interface RenderToolbarOptions {
   title: string;
   onChapter: () => void;
@@ -42,7 +43,6 @@ export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
   moreBtn.className = 'btn btn--secondary journal-toolbar__more';
   moreBtn.textContent = 'More';
   moreBtn.setAttribute('aria-haspopup', 'menu');
-  moreBtn.setAttribute('aria-expanded', 'false');
   const menu = document.createElement('div');
   menu.className = 'journal-toolbar__more-menu';
   menu.setAttribute('role', 'menu');
@@ -52,7 +52,6 @@ export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
     { label: 'Import photos', action: options.onImportPhotos, disabled: !options.onImportPhotos },
     { label: 'Search journal', action: options.onSearchJournal, disabled: !options.onSearchJournal },
     { label: 'Souvenirs', action: options.onSouvenirs, disabled: !options.onSouvenirs },
-    { label: 'Pattern appearance', disabled: true },
     { label: 'Print', action: options.onPrintJournal, disabled: !options.onPrintJournal },
     { label: 'Export', action: options.onExportJournal, disabled: !options.onExportJournal },
     { label: 'Share', action: options.onShareJournal, disabled: !options.onShareJournal },
@@ -64,23 +63,18 @@ export function renderToolbar(options: RenderToolbarOptions): HTMLElement {
     btn.type = 'button';
     btn.className = 'journal-toolbar__more-item';
     btn.setAttribute('role', 'menuitem');
-    btn.textContent = item.disabled ? `${item.label} — Coming soon` : item.label;
+    btn.textContent = item.label;
     btn.disabled = Boolean(item.disabled);
     if (item.action) {
       btn.addEventListener('click', () => {
-        menu.hidden = true;
-        moreBtn.setAttribute('aria-expanded', 'false');
+        moreMenu.close();
         item.action?.();
       });
     }
     menu.append(btn);
   }
 
-  moreBtn.addEventListener('click', () => {
-    const open = menu.hidden;
-    menu.hidden = !open;
-    moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
+  const moreMenu = bindDismissableMenu(moreBtn, menu);
 
   moreWrap.append(moreBtn, menu);
   actions.append(chapterBtn, moreWrap);
