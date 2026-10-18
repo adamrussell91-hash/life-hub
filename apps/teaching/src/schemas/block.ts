@@ -40,6 +40,7 @@ export const BlockTypeSchema = z.enum([
   'table',
   'peer_feedback',
   'question_drop',
+  'brainstorm',
   'quiz_question',
   'question_set',
   'flashcards',
@@ -497,6 +498,24 @@ export const PeerFeedbackBlockSchema = z.object({
     mode: z.enum(['comments', 'annotate']).default('comments'),
     strength_prompt: z.string().max(300).default('One thing that works well…'),
     suggestion_prompt: z.string().max(300).default('One suggestion or question…')
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Brainstorm: students send short answers to one question; the teacher's board
+ * shows them as orbiting symbols, then reveals them as a grid, cloud or groups.
+ * `per_student` 0 means unlimited (the server still caps it).
+ */
+export const BrainstormBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('brainstorm'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    question: z.string().max(500).default(''),
+    safety: z.enum(['instant', 'approve', 'reveal']).default('approve'),
+    per_student: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).default(3),
+    max_length: z.number().int().min(20).max(280).default(140),
+    layout: z.enum(['grid', 'cloud', 'groups']).default('grid')
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1291,6 +1310,7 @@ const leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  BrainstormBlockSchema,
   QuizQuestionBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,

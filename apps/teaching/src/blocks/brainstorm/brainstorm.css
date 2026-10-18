@@ -1,0 +1,420 @@
+/* Brainstorm block. Shared pieces (fields, panels, code, tokens) come from peer-feedback.css. */
+
+.bs-run,
+.bs-student,
+.bs-answer {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* ── Teacher controls ──────────────────────────────────────────────── */
+
+.bs-controls {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.bs-controls:empty {
+  display: none;
+}
+
+.bs-bar {
+  justify-content: space-between;
+}
+
+.bs-bar__main,
+.bs-bar__settings,
+.bs-bar__round {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.bs-bar__round {
+  justify-content: flex-end;
+}
+
+.bs-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--shore);
+  border-radius: var(--radius-full);
+}
+
+.bs-seg__option {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-4);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.bs-seg__option[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: var(--elev-1);
+}
+
+/* ── Board: orbit ──────────────────────────────────────────────────── */
+
+.bs-board {
+  min-width: 0;
+}
+
+.bs-board[hidden],
+.bs-orbit[hidden],
+.bs-reveal[hidden] {
+  display: none;
+}
+
+.bs-orbit {
+  position: relative;
+  height: clamp(320px, 52vw, 460px);
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.bs-orbit__centre {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  gap: var(--space-1);
+  width: min(240px, 46%);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.bs-orbit__question {
+  font-family: var(--font-display, inherit);
+  font-size: clamp(var(--text-sm), 2.2vw, var(--text-lg));
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.bs-orbit__hint {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.bs-orbit__item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+.bs-orbit .pf-token {
+  width: 32px;
+  height: 32px;
+}
+
+.bs-orbit--dense .pf-token,
+.bs-orbit--dense .bs-dot {
+  width: 24px;
+  height: 24px;
+}
+
+.bs-dot {
+  display: block;
+  width: 32px;
+  height: 32px;
+  background: var(--shore);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-full);
+}
+
+/* ── Board: revealed ───────────────────────────────────────────────── */
+
+.bs-reveal {
+  min-height: 200px;
+}
+
+.bs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-3);
+}
+
+.bs-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s ease;
+}
+
+.bs-card[draggable='true'] {
+  cursor: grab;
+}
+
+.bs-card--new {
+  animation: bs-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes bs-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.bs-card__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-md, 1rem);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.bs-card__remove {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: -4px -8px 0 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  opacity: 0.4;
+}
+
+.bs-card:hover .bs-card__remove,
+.bs-card__remove:focus-visible {
+  opacity: 1;
+}
+
+.bs-card__remove:hover {
+  color: var(--danger);
+  background: var(--danger-surface);
+}
+
+.bs-card__move {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-1);
+  max-width: 7rem;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  opacity: 0;
+}
+
+.bs-card:hover .bs-card__move,
+.bs-card__move:focus-visible {
+  opacity: 1;
+}
+
+.bs-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-5);
+  padding: var(--space-6) var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.bs-cloud__word {
+  font-weight: var(--weight-semibold);
+  line-height: 1.1;
+  color: var(--marine);
+  animation: bs-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.bs-cloud__word:nth-child(3n + 2) {
+  color: var(--ink);
+}
+
+.bs-cloud__word:nth-child(3n) {
+  color: var(--muted);
+}
+
+.bs-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.bs-group {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--shore);
+  border: 1px dashed transparent;
+  border-radius: var(--radius-lg);
+}
+
+.bs-group--over {
+  border-color: var(--marine);
+}
+
+.bs-group .bs-grid {
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+.bs-group__title,
+.bs-group__name {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.bs-group__name {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.bs-group__name:hover,
+.bs-group__name:focus {
+  background: var(--paper);
+  border-color: var(--line);
+}
+
+.bs-empty {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ── Queue ─────────────────────────────────────────────────────────── */
+
+.bs-queue {
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.bs-queue__summary {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.bs-queue__muted {
+  font-weight: normal;
+  color: var(--muted);
+}
+
+.bs-queue__heading {
+  margin-top: var(--space-3) !important;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.bs-queue__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.bs-queue__text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bs-queue__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* ── Student ───────────────────────────────────────────────────────── */
+
+.bs-mine {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bs-mine__item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.bs-mine__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bs-mine__status {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.bs-mine__item--removed .bs-mine__text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* ── Editor ────────────────────────────────────────────────────────── */
+
+.bs-editor__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-3);
+}
+
+.bs-select {
+  min-height: 40px;
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-card,
+  .bs-card--new,
+  .bs-cloud__word {
+    transition: none;
+    animation: none;
+  }
+}

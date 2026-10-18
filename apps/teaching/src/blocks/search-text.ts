@@ -88,6 +88,9 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'question_drop':
       push(parts, c.prompt);
       break;
+    case 'brainstorm':
+      push(parts, c.question);
+      break;
     case 'quiz_question': {
       const q = (c.question ?? {}) as Record<string, unknown>;
       push(parts, q.prompt);
