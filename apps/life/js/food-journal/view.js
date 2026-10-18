@@ -33,7 +33,7 @@ import {
   tagKey,
 } from "./model.js";
 import { paintMagazine, paintTimeline, paintEntry, paintFixup, paintVenueCheck } from "./pages.js";
-import { hasPoint, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
+import { hasPoint, nameSimilarity, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
 import {
   compressPhoto,
   inspectPhoto,
@@ -557,11 +557,14 @@ export function createFoodJournalView({
     trigger.disabled = true;
     const next = structuredClone(journal);
     const target = next.visits.find((v) => v.id === visit.id);
+    // A candidate brings its own place; a typed name stays at the photo's point.
     target.venue = settleVenue(
       target.venue,
-      candidate
-        ? { name: candidate.name, address: candidate.address, lat: candidate.lat, lon: candidate.lon }
-        : {},
+      !candidate
+        ? {}
+        : hasPoint(candidate)
+          ? { name: candidate.name, address: candidate.address, lat: candidate.lat, lon: candidate.lon }
+          : { name: candidate.name },
     );
     try {
       await persist(next);
@@ -1010,7 +1013,8 @@ export function createFoodJournalView({
         menuSection = menu;
       }
       s.fields.append(el("h3", "food-sheet__label", "The visit"));
-      const where = el("div", "food-pair food-pair--keep");
+      // Find venue sits by the Venue field and searches what is typed there.
+      const where = el("div", "food-pair food-pair--end food-pair--keep");
       where.append(
         field(
           "Venue",
@@ -1020,16 +1024,6 @@ export function createFoodJournalView({
             persistDraft();
           },
           { max: 200 },
-        ),
-        field(
-          "Date",
-          visit.date,
-          (v) => {
-            visit.date = v;
-            dateEdited = true;
-            persistDraft();
-          },
-          { type: "date" },
         ),
       );
       s.fields.append(where);
@@ -1058,16 +1052,29 @@ export function createFoodJournalView({
               photoGps || (Number.isFinite(visit.venue.lat) ? visit.venue : hereGps);
             // Food places at the point, nearest and best-named first; a plain
             // text search only when there is no point at all.
-            const result = hasPoint(point)
-              ? {
-                  places: rankVenues(
-                    (await api.foodPlaces(point, visit.venue.name)).candidates,
-                    point,
-                    visit.venue.name,
-                  ),
-                }
-              : await api.places(visit.venue.name || "restaurant", {});
+            const typed = visit.venue.name.trim();
+            const found = hasPoint(point) ? await api.foodPlaces(point, typed) : null;
+            const result = found
+              ? { places: rankVenues(found.candidates, point, typed) }
+              : await api.places(typed || "restaurant", {});
             suggestions.replaceChildren();
+            // Not every venue is on the map. What Adam typed is always a
+            // choice, at the point the photo was taken.
+            if (typed && !result.places.some((p) => nameSimilarity(typed, p.name) >= 0.6))
+              suggestions.append(
+                button(
+                  `Use ${typed}`,
+                  () => {
+                    visit.venue = settleVenue(visit.venue, {
+                      name: typed,
+                      address: found?.street || visit.venue.address,
+                      ...(hasPoint(point) ? { lat: point.lat, lon: point.lon } : {}),
+                    });
+                    persistDraft();
+                    fields();
+                  },
+                ),
+              );
             for (const p of result.places)
               suggestions.append(
                 button(
@@ -1085,9 +1092,9 @@ export function createFoodJournalView({
                   "ghost",
                 ),
               );
-            if (!result.places.length)
+            if (!result.places.length && !typed)
               s.error.textContent =
-                "No matching venues. Enter the address yourself.";
+                "No venues found here. Type the venue, then Find venue.";
             else if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
               s.error.textContent =
                 "Location is off, so these may be far away. Allow location for Life Hub in Settings, or add the suburb to the venue.";
@@ -1099,7 +1106,8 @@ export function createFoodJournalView({
         },
         "ghost",
       );
-      const address = el("div", "food-pair food-pair--end food-pair--keep");
+      where.append(findVenue);
+      const address = el("div", "food-pair food-pair--keep");
       address.append(
         field(
           "Address",
@@ -1110,9 +1118,18 @@ export function createFoodJournalView({
           },
           { max: 1000 },
         ),
-        findVenue,
+        field(
+          "Date",
+          visit.date,
+          (v) => {
+            visit.date = v;
+            dateEdited = true;
+            persistDraft();
+          },
+          { type: "date" },
+        ),
       );
-      s.fields.append(address, suggestions);
+      s.fields.append(suggestions, address);
       const visitNotes = field(
         "Visit notes",
         visit.notes,
