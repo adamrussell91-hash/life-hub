@@ -1,6 +1,6 @@
 // netlify/functions/_shared/problem-solver/session.mjs
 import { gapRadar } from '../../../../packages/problem-solver/tools/gap-radar.mjs';
-import { addEdge, canEdge, canPlace, isComplete as isRunComplete, newRun, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { addEdge, canEdge, canPlace, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
 
 const TITLE_MAX = 120;
 const TEXT_MAX = 12000;
@@ -63,6 +63,24 @@ export function say(session, text, deps) {
   return queue(touch({ ...session, turns: [...session.turns, userTurn(clean, deps)] }, deps));
 }
 
+/**
+ * What comes after a finished tool: diagnostic, then problem statement, then SMART, then done.
+ * Skips a step the session has already run. Null while the active tool is still short of its minimum.
+ */
+export function followOn(session) {
+  const run = activeRun(session);
+  if (!run || !isRunComplete(run)) return null;
+  const ran = new Set(session.define.runs.map((item) => item.tool));
+  const kind = toolDef(run.tool).kind;
+  if (kind === 'diagnostic' && !ran.has('problem_statement')) {
+    return { kind: 'next_tool', tool: 'problem_statement', reason: 'The causes are on the page; now pin the problem down in one statement.' };
+  }
+  if (kind !== 'objectives' && !ran.has('smart')) {
+    return { kind: 'next_tool', tool: 'smart', reason: 'Turn the problem into a goal you can measure.' };
+  }
+  return { kind: 'finish_define', reason: 'The problem is defined; you can move on when you are ready.' };
+}
+
 function frameComplete(frame) {
   return Boolean(frame.goal && frame.whatIsTrue && frame.whatCanBeDone);
 }
@@ -112,10 +130,13 @@ export function applyCoachTurn(session, turn, deps) {
     }
   }
 
+  // A finished tool always leaves a next step on screen, even when the coach forgets to offer one.
+  const suggestion = session.runner.mode === 'closing' ? null : (turn.suggestion ?? followOn(next));
+
   return touch({
     ...next,
     turns: [...next.turns, coachTurn],
-    suggestion: session.runner.mode === 'closing' ? null : (turn.suggestion ?? null),
+    suggestion,
     summary: turn.summary ?? next.summary
   }, deps);
 }
