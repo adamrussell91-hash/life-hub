@@ -496,11 +496,6 @@ a:hover {
   box-shadow: none;
 }
 
-.context-bar__preview.is-disabled {
-  opacity: 0.55;
-  pointer-events: none;
-}
-
 .teacher-layout__main:has(.teacher-layout__context-bar--editor) .teacher-layout__canvas {
   padding-top: var(--space-5);
 }
@@ -7884,8 +7879,9 @@ input.scope-timeline__note-title:focus-visible {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--hub-glass-fill);
-  box-shadow: var(--hub-elev-card);
+  /* Solid, not glass: the link has to read cleanly over the lesson. */
+  background: var(--paper);
+  box-shadow: var(--elev-4);
   display: none;
   gap: var(--space-2);
 }
@@ -7968,11 +7964,10 @@ input.scope-timeline__note-title:focus-visible {
   min-width: 20.5rem;
   max-width: min(20.5rem, 80vw);
   padding: var(--space-4);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--hub-glass-fill);
-  box-shadow: var(--elev-3);
-  backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
+  background: var(--paper);
+  box-shadow: var(--elev-4);
 }
 
 .classes-index__card,
@@ -12743,4 +12738,31 @@ button.block-annotation__margin-note.is-collapsed:hover {
 @media print {
   .callout--cultural-warning { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .callout__motion-toggle { display: none; }
+}
+
+/* Display view: the projected lesson with the teacher's live controls. */
+.lesson-display__chrome {
+  gap: var(--space-3);
+}
+
+.lesson-display__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.lesson-display__block {
+  position: relative;
+}
+
+/* Showing, not authoring: no "add class example" on the projector. */
+.lesson-display .cx-add {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .lesson-display__action {
+    padding-inline: var(--space-2);
+  }
 }
