@@ -168,3 +168,15 @@ export interface MapContext {
   source_map: Record<string, string>;
   choices: ImportChoices;
 }
+
+/** The slim plan a job carries to the browser: no entity records, no media urls. Apply re-reads Notion. */
+export type PlannedEntityPreview = Omit<PlannedEntity, 'record'>;
+export interface ImportPlanPreview {
+  root_page_id: string;
+  entities: PlannedEntityPreview[];
+  skipped: SkippedPage[];
+  warnings: ImportWarning[];
+  html_apps: HtmlAppCandidate[];
+  new_subjects: NewSubject[];
+  media_count: number;
+}
