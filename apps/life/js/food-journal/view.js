@@ -24,6 +24,7 @@ import {
   editorialBasis,
   needsEditorial,
   fixupQueue,
+  venueQueue,
   applyFixup,
   plainNotes,
   tidyImports,
@@ -31,7 +32,8 @@ import {
   knownTags,
   tagKey,
 } from "./model.js";
-import { paintMagazine, paintTimeline, paintEntry, paintFixup } from "./pages.js";
+import { paintMagazine, paintTimeline, paintEntry, paintFixup, paintVenueCheck } from "./pages.js";
+import { hasPoint, nameSimilarity, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
 import {
   compressPhoto,
   inspectPhoto,
@@ -179,6 +181,7 @@ export function createFoodJournalView({
     mode = "magazine",
     entryId = null,
     fixIndex = 0,
+    venueIndex = 0,
     dialog = null;
   let editorialRunning = false;
   const editorialFailed = new Set();
@@ -548,6 +551,28 @@ export function createFoodJournalView({
     if (trigger.isConnected) trigger.disabled = false;
     editVisit(draft, trigger, { fixup: true });
   }
+  // candidate null keeps the name it has.
+  async function pickVenue(visit, candidate, trigger) {
+    if (busy) return;
+    trigger.disabled = true;
+    const next = structuredClone(journal);
+    const target = next.visits.find((v) => v.id === visit.id);
+    // A candidate brings its own place; a typed name stays at the photo's point.
+    target.venue = settleVenue(
+      target.venue,
+      !candidate
+        ? {}
+        : hasPoint(candidate)
+          ? { name: candidate.name, address: candidate.address, lat: candidate.lat, lon: candidate.lon }
+          : { name: candidate.name },
+    );
+    try {
+      await persist(next);
+    } catch (e) {
+      status(e.message, true);
+      if (trigger.isConnected) trigger.disabled = false;
+    }
+  }
   async function markReviewed(visit, trigger) {
     if (busy) return;
     trigger.disabled = true;
@@ -584,6 +609,11 @@ export function createFoodJournalView({
       fixIndex++;
       render();
     },
+    pickVenue,
+    skipVenue: () => {
+      venueIndex++;
+      render();
+    },
   };
   function render() {
     if (!host) return;
@@ -592,6 +622,8 @@ export function createFoodJournalView({
     host.replaceChildren();
     const queue = loaded ? fixupQueue(journal).length : 0;
     if (mode === "fixup" && !queue) mode = "magazine";
+    const unsure = loaded ? venueQueue(journal).length : 0;
+    if (mode === "venues" && !unsure) mode = "magazine";
     const toolbar = el("div", "food-toolbar"),
       pills = el("div", "hub-pills");
     pills.setAttribute("role", "tablist");
@@ -602,6 +634,7 @@ export function createFoodJournalView({
       ["menu", "Custom Menu"],
     ];
     if (queue) tabs.push(["fixup", `Fix up (${queue})`]);
+    if (unsure) tabs.push(["venues", `Check venues (${unsure})`]);
     for (const [id, label] of tabs) {
       const b = button(label, () => setMode(id), "ghost");
       b.className = "hub-pills__btn";
@@ -667,6 +700,10 @@ export function createFoodJournalView({
     }
     if (mode === "fixup") {
       paintFixup(pageContext, host, fixIndex);
+      return;
+    }
+    if (mode === "venues") {
+      paintVenueCheck(pageContext, host, venueIndex);
       return;
     }
     if (mode === "timeline") {
@@ -976,7 +1013,8 @@ export function createFoodJournalView({
         menuSection = menu;
       }
       s.fields.append(el("h3", "food-sheet__label", "The visit"));
-      const where = el("div", "food-pair food-pair--keep");
+      // Find venue sits by the Venue field and searches what is typed there.
+      const where = el("div", "food-pair food-pair--end food-pair--keep");
       where.append(
         field(
           "Venue",
@@ -986,16 +1024,6 @@ export function createFoodJournalView({
             persistDraft();
           },
           { max: 200 },
-        ),
-        field(
-          "Date",
-          visit.date,
-          (v) => {
-            visit.date = v;
-            dateEdited = true;
-            persistDraft();
-          },
-          { type: "date" },
         ),
       );
       s.fields.append(where);
@@ -1020,31 +1048,53 @@ export function createFoodJournalView({
             // Without photo GPS or a saved venue, search near the phone.
             if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
               hereGps = await whereAmI();
-            const result = await api.places(
-              visit.venue.name || "restaurant",
-              photoGps || (Number.isFinite(visit.venue.lat) ? visit.venue : hereGps) || {},
-            );
+            const point =
+              photoGps || (Number.isFinite(visit.venue.lat) ? visit.venue : hereGps);
+            // Food places at the point, nearest and best-named first; a plain
+            // text search only when there is no point at all.
+            const typed = visit.venue.name.trim();
+            const found = hasPoint(point) ? await api.foodPlaces(point, typed) : null;
+            const result = found
+              ? { places: rankVenues(found.candidates, point, typed) }
+              : await api.places(typed || "restaurant", {});
             suggestions.replaceChildren();
+            // Not every venue is on the map. What Adam typed is always a
+            // choice, at the point the photo was taken.
+            if (typed && !result.places.some((p) => nameSimilarity(typed, p.name) >= 0.6))
+              suggestions.append(
+                button(
+                  `Use ${typed}`,
+                  () => {
+                    visit.venue = settleVenue(visit.venue, {
+                      name: typed,
+                      address: found?.street || visit.venue.address,
+                      ...(hasPoint(point) ? { lat: point.lat, lon: point.lon } : {}),
+                    });
+                    persistDraft();
+                    fields();
+                  },
+                ),
+              );
             for (const p of result.places)
               suggestions.append(
                 button(
-                  p.name,
+                  Number.isFinite(p.distance) ? `${p.name} · ${p.distance} m` : p.name,
                   () => {
-                    visit.venue = {
+                    visit.venue = settleVenue(visit.venue, {
                       name: p.name,
                       address: p.address,
                       lat: p.lat,
                       lon: p.lon,
-                    };
+                    });
                     persistDraft();
                     fields();
                   },
                   "ghost",
                 ),
               );
-            if (!result.places.length)
+            if (!result.places.length && !typed)
               s.error.textContent =
-                "No matching venues. Enter the address yourself.";
+                "No venues found here. Type the venue, then Find venue.";
             else if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
               s.error.textContent =
                 "Location is off, so these may be far away. Allow location for Life Hub in Settings, or add the suburb to the venue.";
@@ -1056,7 +1106,8 @@ export function createFoodJournalView({
         },
         "ghost",
       );
-      const address = el("div", "food-pair food-pair--end food-pair--keep");
+      where.append(findVenue);
+      const address = el("div", "food-pair food-pair--keep");
       address.append(
         field(
           "Address",
@@ -1067,9 +1118,18 @@ export function createFoodJournalView({
           },
           { max: 1000 },
         ),
-        findVenue,
+        field(
+          "Date",
+          visit.date,
+          (v) => {
+            visit.date = v;
+            dateEdited = true;
+            persistDraft();
+          },
+          { type: "date" },
+        ),
       );
-      s.fields.append(address, suggestions);
+      s.fields.append(suggestions, address);
       const visitNotes = field(
         "Visit notes",
         visit.notes,
@@ -1325,6 +1385,13 @@ export function createFoodJournalView({
         e.currentTarget.disabled = true;
         s.error.textContent = "Saving.";
         try {
+          // Typing the venue yourself settles one Check venues was unsure of.
+          if (
+            venueUnsure(visit) &&
+            (visit.venue.name !== original.venue.name ||
+              visit.venue.address !== original.venue.address)
+          )
+            visit.venue = settleVenue(visit.venue);
           const next = structuredClone(journal),
             index = next.visits.findIndex((v) => v.id === visit.id);
           if (index < 0) next.visits.push(visit);

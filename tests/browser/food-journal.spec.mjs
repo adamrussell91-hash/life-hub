@@ -70,7 +70,7 @@ function fixture() {
     ],
   };
 }
-async function pageFor(width = 1440, { editorial = false } = {}) {
+async function pageFor(width = 1440, { editorial = false, seed } = {}) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     reducedMotion: "reduce",
@@ -78,6 +78,7 @@ async function pageFor(width = 1440, { editorial = false } = {}) {
   });
   let journal = fixture(),
     version = "a".repeat(40);
+  seed?.(journal);
   page.setDefaultTimeout(10000);
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -291,7 +292,7 @@ async function pageFor(width = 1440, { editorial = false } = {}) {
   } else {
     await page.locator('.hub-rail [data-section="food-journal"]').click();
   }
-  await page.locator(".food-visit").waitFor();
+  await page.locator(".food-visit").first().waitFor();
   return {
     page,
     errors,
@@ -831,5 +832,104 @@ test("magazine, entry, auto-written headline and Day One fix-up work through the
   assert.equal(await page.locator(".fj-row").count(), 1);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: "/tmp/food-journal-magazine.png", fullPage: true });
+  await page.close();
+});
+
+// An import whose GPS name was a shopping centre and that no food place
+// confirmed: it waits in Check venues with the places near the photo.
+function unsureVenue(journal) {
+  const v = newVisit();
+  v.title = "Laksa";
+  v.date = "2026-09-02";
+  v.source_id = "dayone:venue-check";
+  v.notes = "Laksa with extra tofu. Very good.";
+  v.venue = {
+    name: "Harbourside Shopping Centre",
+    address: "Harbourside",
+    lat: -32.9,
+    lon: 151.7,
+    match: {
+      confidence: "check",
+      basis: "nearby",
+      source: "photo",
+      candidates: [
+        { name: "Two Herons Cafe", address: "4 Quay Street, Harbourside", lat: -32.9001, lon: 151.7, distance: 12 },
+        { name: "Marlo's Noodle Bar", address: "6 Quay Street, Harbourside", lat: -32.9004, lon: 151.7, distance: 44 },
+      ],
+    },
+  };
+  v.dishes = [{ ...newDish(), title: "Laksa" }];
+  journal.visits.push(v);
+}
+for (const width of [1440, 390])
+  test(`check venues ${width}: pick a nearby place or keep the name, then the tab goes`, async () => {
+    const { page, read, errors } = await pageFor(width, { seed: unsureVenue });
+    await page.getByRole("tab", { name: "Check venues (1)" }).click();
+    await page.getByRole("heading", { name: "Check venues" }).waitFor();
+    await page.getByText("Saved as Harbourside Shopping Centre, Harbourside").waitFor();
+    if (width > 720)
+      await page.getByRole("button", { name: "Marlo's Noodle Bar · 44 m", exact: true }).click();
+    else
+      await page.getByRole("button", { name: "Keep Harbourside Shopping Centre", exact: true }).click();
+    await page.getByRole("tab", { name: /^Check venues/ }).waitFor({ state: "detached" });
+    const venue = read().visits.find((v) => v.source_id === "dayone:venue-check").venue;
+    if (width > 720) {
+      assert.equal(venue.name, "Marlo's Noodle Bar");
+      assert.equal(venue.address, "6 Quay Street, Harbourside");
+      assert.equal(venue.lat, -32.9004);
+    } else assert.equal(venue.name, "Harbourside Shopping Centre");
+    assert.deepEqual(venue.match, { confidence: "sure", basis: "picked", source: "photo" });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+test("a venue that is not on the map can be typed in Check venues", async () => {
+  const { page, read, errors } = await pageFor(390, { seed: unsureVenue });
+  await page.getByRole("tab", { name: "Check venues (1)" }).click();
+  await page.getByLabel("Where did you eat?").fill("Hidden Den");
+  await page.getByRole("button", { name: "Use this venue", exact: true }).click();
+  await page.getByRole("tab", { name: /^Check venues/ }).waitFor({ state: "detached" });
+  const venue = read().visits.find((v) => v.source_id === "dayone:venue-check").venue;
+  assert.equal(venue.name, "Hidden Den");
+  // It stays at the photo's point, not at any of the suggested places.
+  assert.equal(venue.lat, -32.9);
+  assert.equal(venue.match.basis, "picked");
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+test("Find venue searches the typed venue and offers it when the map does not know it", async () => {
+  const { page, read, errors } = await pageFor(1440, { seed: unsureVenue });
+  const asked = [];
+  await page.route("**/api/food-places**", async (route) => {
+    asked.push(new URL(route.request().url()).searchParams.get("q"));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        data: {
+          street: "4 Quay Street, Harbourside",
+          candidates: [{ name: "Two Herons Cafe", address: "4 Quay Street, Harbourside", lat: -32.9001, lon: 151.7 }],
+        },
+      }),
+    });
+  });
+  await page.getByRole("tab", { name: "Check venues (1)" }).click();
+  await page.getByRole("button", { name: "Edit visit", exact: true }).click();
+  await page.locator(".food-sheet").waitFor();
+  await page.getByLabel("Venue", { exact: true }).fill("Hidden Den");
+  await page.getByRole("button", { name: "Find venue", exact: true }).click();
+  await page.getByRole("button", { name: "Two Herons Cafe · 11 m", exact: true }).waitFor();
+  assert.deepEqual(asked, ["Hidden Den"]);
+  await page.getByRole("button", { name: "Use Hidden Den", exact: true }).click();
+  assert.equal(await page.getByLabel("Address", { exact: true }).inputValue(), "4 Quay Street, Harbourside");
+  await page.getByRole("button", { name: "Save visit", exact: true }).click();
+  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  const venue = read().visits.find((v) => v.source_id === "dayone:venue-check").venue;
+  assert.equal(venue.name, "Hidden Den");
+  assert.equal(venue.address, "4 Quay Street, Harbourside");
+  assert.equal(venue.match.confidence, "sure");
+  assert.equal(await page.getByRole("tab", { name: /^Check venues/ }).count(), 0);
+  assert.deepEqual(errors, []);
   await page.close();
 });
