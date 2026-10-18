@@ -93,8 +93,12 @@ export {
   MediaTypeSchema,
   MediaSharingSchema,
   MediaSchema,
+  MediaFolderSchema,
+  MediaUsageSchema,
   type Media,
-  type MediaSharing
+  type MediaFolder,
+  type MediaSharing,
+  type MediaUsage
 } from './media';
 export {
   CompositionTemplateSchema,

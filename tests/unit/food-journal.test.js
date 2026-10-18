@@ -878,7 +878,8 @@ test("the Location Adam wrote replaces Day One's GPS place, then same-day entrie
   const { journal: next } = tidyImports(journal);
   const live = liveVisits(next);
   const burgers = live.find((v) => v.source_id === "dayone:a");
-  assert.deepEqual(burgers.venue, { name: "Corner Burgers", address: "Hillside" });
+  // The entry's point stays so the venue backfill can look there.
+  assert.deepEqual(burgers.venue, { name: "Corner Burgers", address: "Hillside", lat: -33.7, lon: 151 });
   assert.deepEqual(burgers.dishes.map((d) => d.title), ["Burger", "Fries", "Shake"]);
   assert.equal(live.find((v) => v.source_id === "dayone:d").venue.name, "Noodle Bar");
   assert.equal(live.find((v) => v.source_id === "dayone:e").venue.name, "Car Park Entrance");

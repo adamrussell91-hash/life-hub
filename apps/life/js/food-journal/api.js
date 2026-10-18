@@ -29,6 +29,11 @@ export function createFoodJournalApi(fetchImpl) {
               : {}),
           }),
       ),
+    foodPlaces: (gps, q = "") =>
+      request(
+        "/api/food-places?" +
+          new URLSearchParams({ lat: String(gps.lat), lon: String(gps.lon), q }),
+      ),
     load: () => request("/api/food-journal"),
     save: (journal, version) =>
       request("/api/food-journal", {
