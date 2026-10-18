@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
-  TECHNIQUE_SCAN_NOT_CONNECTED,
   parseTechniqueResult,
   quoteAppearsIn,
   requestTechniqueScan
@@ -85,8 +85,132 @@ test('quoteAppearsIn ignores case, spacing and curly quotes', () => {
   assert.equal(quoteAppearsIn(PASSAGE, 'winter'), false);
 });
 
-test('the scan call reports it is not connected until the port lands', async () => {
-  await assert.rejects(requestTechniqueScan({ env, text: PASSAGE }), { message: TECHNIQUE_SCAN_NOT_CONNECTED });
+const scanEnv = { OPENAI_API_KEY: 'test-only-placeholder' };
+const configurationMessage = 'The technique scan is not configured (OPENAI_API_KEY).';
+
+function mockOpenAI(t, replies) {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push({ url, ...options, body: JSON.parse(options.body) });
+    assert.ok(calls.length <= replies.length, 'unexpected extra model call');
+    const reply = replies[calls.length - 1];
+    if (reply instanceof Error) throw reply;
+    if (reply instanceof Response) return reply;
+    return Response.json({ choices: [{ message: { content: reply } }] });
+  });
+  return calls;
+}
+
+test('scan calls OpenAI on the server with the widget prompt, chosen model and signal', async (t) => {
+  const calls = mockOpenAI(t, [REPLY]);
+  const signal = new AbortController().signal;
+  assert.equal(await requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'chosen-model', signal }), REPLY);
+  assert.equal(calls.length, 1);
+  const call = calls[0];
+  assert.equal(call.url, 'https://api.openai.com/v1/chat/completions');
+  assert.equal(call.method, 'POST');
+  assert.equal(call.headers.authorization, `Bearer ${scanEnv.OPENAI_API_KEY}`);
+  assert.equal(call.body.model, 'chosen-model');
+  assert.equal(call.body.max_tokens, 1400);
+  assert.equal(call.signal, signal);
+  const prompt = call.body.messages.map((message) => message.content).join('\n');
+  assert.ok(prompt.includes(PASSAGE));
+  for (const phrase of ['MULTIPLE techniques', 'confidence 0-100', 'zero techniques', '"like" is NOT a simile']) {
+    assert.ok(prompt.includes(phrase), phrase);
+  }
+  const table = JSON.parse(readFileSync(new URL('../../apps/teaching/src/data/literary-elements.json', import.meta.url)));
+  assert.equal(table.techniques.length, 310);
+  for (const { name } of table.techniques) assert.ok(prompt.includes(name), name);
+});
+
+test('generated server names stay in step with the teaching table', async () => {
+  const { LITERARY_TECHNIQUE_NAMES } = await import('../../netlify/functions/_shared/literary-technique-names.mjs');
+  const table = JSON.parse(readFileSync(new URL('../../apps/teaching/src/data/literary-elements.json', import.meta.url)));
+  assert.deepEqual(LITERARY_TECHNIQUE_NAMES, table.techniques.map(({ name }) => name));
+});
+
+test('an empty readable scan retries once and returns the successful raw reply', async (t) => {
+  const calls = mockOpenAI(t, ['[]', REPLY]);
+  assert.equal(await requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o' }), REPLY);
+  assert.equal(calls.length, 2);
+});
+
+test('two empty scans return the raw empty result without a third call', async (t) => {
+  const calls = mockOpenAI(t, ['[]', '{"findings":[]}']);
+  const raw = await requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o' });
+  assert.equal(raw, '{"findings":[]}');
+  assert.deepEqual(parseTechniqueResult(raw, PASSAGE), { findings: [] });
+  assert.equal(calls.length, 2);
+});
+
+test('scans with only discarded quotes or low confidence retry', async (t) => {
+  const discarded = JSON.stringify([
+    { quote: 'not in this passage', techniques: [{ technique: 'Simile', confidence: 90 }] },
+    { quote: 'of course', techniques: [{ technique: 'Irony', confidence: 10 }] }
+  ]);
+  const calls = mockOpenAI(t, [discarded, REPLY]);
+  assert.equal(await requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o' }), REPLY);
+  assert.equal(calls.length, 2);
+});
+
+test('a reply containing only unknown table names retries like the widget', async (t) => {
+  const unknown = JSON.stringify([{ quote: 'of course', techniques: [{ technique: 'Invented Device', confidence: 90 }] }]);
+  const calls = mockOpenAI(t, [unknown, REPLY]);
+  assert.equal(await requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o' }), REPLY);
+  assert.equal(calls.length, 2);
+});
+
+test('an unreadable reply is returned raw for the parser without an empty-result retry', async (t) => {
+  const calls = mockOpenAI(t, ['not JSON']);
+  const raw = await requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o' });
+  assert.equal(raw, 'not JSON');
+  assert.throws(() => parseTechniqueResult(raw, PASSAGE), TextToolError);
+  assert.equal(calls.length, 1);
+});
+
+test('a missing or blank key gives a plain configuration error without fetching', async (t) => {
+  const calls = mockOpenAI(t, []);
+  for (const env of [{}, { OPENAI_API_KEY: '  ' }]) {
+    await assert.rejects(requestTechniqueScan({ env, text: PASSAGE }), { name: 'TextToolError', message: configurationMessage });
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('upstream HTTP and network errors give a plain message without leaking the response', async (t) => {
+  const calls = mockOpenAI(t, [new Response('private upstream details', { status: 429 }), new Error('private network details')]);
+  for (let i = 0; i < 2; i++) {
+    await assert.rejects(requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o' }), {
+      name: 'TextToolError', message: 'The AI service did not answer. Try again in a minute.'
+    });
+  }
+  assert.equal(calls.length, 2);
+});
+
+test('an upstream response without text is rejected', async (t) => {
+  mockOpenAI(t, [Response.json({ choices: [] })]);
+  await assert.rejects(requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o' }), TextToolError);
+});
+
+test('cancellation reaches fetch and is not retried', async (t) => {
+  const controller = new AbortController();
+  controller.abort();
+  const abort = controller.signal.reason;
+  const calls = mockOpenAI(t, [abort]);
+  await assert.rejects(requestTechniqueScan({ env: scanEnv, text: PASSAGE, model: 'gpt-4o', signal: controller.signal }), (error) => error === abort);
+  assert.equal(calls.length, 1);
+});
+
+test('scanning the same text twice reuses the completed job and one model call', async (t) => {
+  const calls = mockOpenAI(t, [REPLY]);
+  const store = memoryStore();
+  const first = await startTextToolJob({ store, env: scanEnv, tool: 'techniques', text: PASSAGE });
+  assert.equal(first.kick, true);
+  await runTextToolJob({ store, env: scanEnv, key: first.key });
+  const second = await startTextToolJob({ store, env: scanEnv, tool: 'techniques', text: PASSAGE });
+  assert.equal(second.kick, false);
+  assert.equal(second.job.status, 'done');
+  await runTextToolJob({ store, env: scanEnv, key: second.key });
+  assert.equal(calls.length, 1);
 });
 
 test('techniques jobs: own model setting, own length limit, no Anthropic key needed', async () => {
@@ -114,7 +238,7 @@ test('techniques jobs: own model setting, own length limit, no Anthropic key nee
   const other = await startTextToolJob({ store, env, tool: 'techniques', text: 'Another passage, of course.' });
   const failed = await runTextToolJob({ store, env, key: other.key });
   assert.equal(failed.status, 'error');
-  assert.equal(failed.error, TECHNIQUE_SCAN_NOT_CONNECTED);
+  assert.equal(failed.error, configurationMessage);
   assert.equal((await readTextToolJob(store, other.key)).status, 'error');
 });
 

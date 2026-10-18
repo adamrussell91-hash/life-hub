@@ -30,7 +30,7 @@ export { TextToolError };
 export const TEXT_TOOLS = ['dictionary', 'fry', 'techniques'];
 export const TEXT_TOOL_PREFIX = 'text_tools/';
 /** Bump when a prompt changes so old cached results are not served. */
-export const TEXT_TOOL_VERSION = 3;
+export const TEXT_TOOL_VERSION = 4;
 export const MAX_TEXT_TOOL_CHARS = 12_000;
 export const MAX_DICTIONARY_WORDS = 40;
 /** A job still "working" after this long is treated as dead and may restart. */
