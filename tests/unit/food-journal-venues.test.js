@@ -61,6 +61,10 @@ test("Day One's GPS name counts only when it is a venue, not an address", () => 
   const named = pickVenue({ guess: "Marlos Noodle Bar", point, source: "photo", candidates });
   assert.equal(named.name, "Marlo's Noodle Bar");
   assert.equal(named.match.basis, "dayone");
+  // Partly the same name is not enough without Adam's own words.
+  const partly = pickVenue({ guess: "Late Marlos", point, source: "photo", candidates, current: { name: "Late Marlos", address: "" } });
+  assert.equal(partly.name, "Late Marlos");
+  assert.equal(partly.match.confidence, "check");
   // "Grey Lane" is in a cafe's name, but the GPS name is just an address.
   const address = pickVenue({ guess: "1 Grey Lane", point, source: "photo", candidates, current: { name: "1 Grey Lane", address: "Harbourside" } });
   assert.equal(address.name, "1 Grey Lane");
