@@ -7,7 +7,7 @@ import {
 } from '@/curriculum/with-entity-status';
 import type { CreateKind, CreatedRecord } from '@/teacher/create/types';
 import { fetchCurriculum, type CurriculumResponse } from '@/teacher/nav';
-import type { Class, Media, ScheduledLesson, Lesson, Unit } from '@/schemas';
+import type { Class, Media, MediaFolder, ScheduledLesson, Lesson, Unit } from '@/schemas';
 import type { EntityStatus } from '@/recovery/lifecycle';
 import { createCurriculumCache } from './curriculum-cache';
 
@@ -144,6 +144,23 @@ export function applyCreatedMedia(media: Media): CurriculumResponse | undefined 
   const current = curriculumCache.peek();
   if (!current) return undefined;
   const next = { ...current, media: upsertById(current.media, media) };
+  curriculumCache.replace(next);
+  return next;
+}
+
+/** An edit to a resource that already exists (rename, move to a folder). */
+export function applyPatchedMedia(media: Media): CurriculumResponse | undefined {
+  const current = curriculumCache.peek();
+  if (!current) return undefined;
+  const next = { ...current, media: upsertById(current.media, media) };
+  curriculumCache.replace(next);
+  return next;
+}
+
+export function applyMediaFolders(folders: MediaFolder[]): CurriculumResponse | undefined {
+  const current = curriculumCache.peek();
+  if (!current) return undefined;
+  const next = { ...current, media_folders: folders };
   curriculumCache.replace(next);
   return next;
 }

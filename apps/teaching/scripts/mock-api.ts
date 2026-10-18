@@ -71,6 +71,7 @@ import {
   type ScheduledLesson,
   type ScopeSequence,
   type Media,
+  type MediaFolder,
   type TimelineItem,
   type Unit,
   type UnitTemplate,
@@ -94,6 +95,8 @@ import { createLessonExamplesHandler } from '../../../netlify/functions/lesson-e
 import { createPublishedExamplesHandler } from '../../../netlify/functions/published-examples.mjs';
 import { createPublishedExamplesWriteHandler } from '../../../netlify/functions/published-examples-write.mjs';
 import { createQuizHandler } from '../../../netlify/functions/quiz.mjs';
+import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.mjs';
+import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
@@ -499,6 +502,7 @@ function buildClearedSessionCookie(): string {
 }
 
 const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
+const MEDIA_FOLDERS_KEY = 'meta/media_folders';
 
 type MockUnitNote={id:string;title:string;why:string;excerpt?:string};
 const mockJobs=new Map<string,{status:string;result:unknown;polls:number}>();let mockJobSerial=0;
@@ -578,9 +582,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const units = seedIds.units
       .map((id) => store.getJSON(unitKey(id)))
       .filter((u): u is Record<string, unknown> => Boolean(u));
-    const lessons = seedIds.lessons
+    const lessonDrafts = seedIds.lessons
       .map((id) => store.getJSON<Lesson>(draftLessonKey(id)))
-      .filter((lesson): lesson is Lesson => Boolean(lesson))
+      .filter((lesson): lesson is Lesson => Boolean(lesson));
+    const lessons = lessonDrafts
       .map((lesson) =>
         toCurriculumLessonSummary(lesson, store.get(publishedLessonKey(lesson.id)) !== undefined)
       );
@@ -628,9 +633,32 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       scheduled_lessons,
       scope_sequences,
       media,
+      media_folders: store.getJSON<{ folders: MediaFolder[] }>(MEDIA_FOLDERS_KEY)?.folders ?? [],
+      media_usage: buildMediaUsage({ media, lessons: lessonDrafts, units, classes }),
       outcomes,
       schedule_anchor_date: anchor?.date ?? DEFAULT_SCHEDULE_ANCHOR_DATE
     };
+  }
+
+  function handleMediaFolders(
+    cookie: string | null | undefined,
+    method: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    if (method === 'GET') {
+      return okResponse(200, { folders: store.getJSON<{ folders: MediaFolder[] }>(MEDIA_FOLDERS_KEY)?.folders ?? [] });
+    }
+    const record = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+    let folders: MediaFolder[];
+    try {
+      folders = validateMediaFolders(record.folders) as MediaFolder[];
+    } catch (error) {
+      return errorResponse(400, 'validation_error', error instanceof Error ? error.message : 'Invalid folders');
+    }
+    store.setJSON(MEDIA_FOLDERS_KEY, { folders, updated_at: nowIso() });
+    return okResponse(200, { folders });
   }
 
   function handleAuth(body: unknown): MockResponse {
@@ -3079,7 +3107,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       sharing?: Media['sharing'];
       mime_type?: string;
       file_name?: string;
+      folder_id?: string | null;
     } = {};
+
+    if (record.folder_id !== undefined) {
+      if (record.folder_id !== null && (typeof record.folder_id !== 'string' || !record.folder_id)) {
+        return errorResponse(400, 'validation_error', 'folder_id must be a folder id or null');
+      }
+      patch.folder_id = record.folder_id;
+    }
 
     if (record.title !== undefined) {
       if (typeof record.title !== 'string' || !record.title.trim()) {
@@ -3134,7 +3170,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       patch.provider_file_id === undefined &&
       patch.sharing === undefined &&
       patch.mime_type === undefined &&
-      patch.file_name === undefined
+      patch.file_name === undefined &&
+      patch.folder_id === undefined
     ) {
       return errorResponse(
         400,
@@ -3173,6 +3210,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (patch.sharing !== undefined) merged.sharing = patch.sharing;
     if (patch.mime_type !== undefined) merged.mime_type = patch.mime_type;
     if (patch.file_name !== undefined) merged.file_name = patch.file_name;
+    if (patch.folder_id !== undefined) merged.folder_id = patch.folder_id;
 
     const validated = MediaSchema.safeParse(merged);
     if (!validated.success) {
@@ -3807,6 +3845,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handlePostMediaUpload(cookie, body);
     }
     if (method === 'POST' && path === '/api/media') return handlePostMedia(cookie, body);
+    if ((method === 'GET' || method === 'PUT') && path === '/api/media-folders') {
+      return handleMediaFolders(cookie, method, body);
+    }
 
     const compositionMatch = COMPOSITION_ID_RE.exec(path);
     if (compositionMatch) {

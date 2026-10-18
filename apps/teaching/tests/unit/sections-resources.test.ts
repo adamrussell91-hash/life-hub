@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/teacher/media-api', () => ({
   createMedia: vi.fn().mockResolvedValue({}),
-  patchMedia: vi.fn().mockResolvedValue({}),
+  patchMedia: vi.fn().mockImplementation(async (id: string, body: object) => ({ id, ...body })),
+  saveMediaFolders: vi.fn().mockImplementation(async (folders: unknown) => folders),
   uploadMediaFile: vi.fn().mockResolvedValue({})
 }));
 
@@ -14,7 +15,12 @@ vi.mock('@/api/client', async () => {
   };
 });
 
-import { openUrlForMedia, renderResourcesIndex } from '@/teacher/sections/resources';
+import {
+  openUrlForMedia,
+  renderResourcesIndex,
+  resetResourcesViewForTests
+} from '@/teacher/sections/resources';
+import { patchMedia, saveMediaFolders } from '@/teacher/media-api';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Media } from '@/schemas';
 
@@ -71,6 +77,7 @@ describe('resources section', () => {
   let canvas: HTMLElement;
 
   beforeEach(() => {
+    resetResourcesViewForTests();
     canvas = document.createElement('div');
     vi.spyOn(window, 'alert').mockImplementation(() => undefined);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -226,5 +233,141 @@ describe('resources section', () => {
       );
     });
     expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('resource library folders, views and Used in', () => {
+  let canvas: HTMLElement;
+
+  const filed: Media = { ...mediaWithPreview, folder_id: 'fld_poems' };
+  const library: CurriculumResponse = {
+    ...curriculum,
+    units: [
+      {
+        id: 'unit_poetry',
+        type: 'unit',
+        title: 'Poetry',
+        slug: 'poetry',
+        status: 'active',
+        lesson_ids: ['lesson_one'],
+        created_at: ISO,
+        updated_at: ISO,
+        schema_version: 1
+      } as CurriculumResponse['units'][number]
+    ],
+    lessons: [
+      {
+        id: 'lesson_one',
+        title: 'Reading the extract',
+        slug: 'reading',
+        unit_id: 'unit_poetry',
+        sequence: 1,
+        status: 'active',
+        published: false,
+        planning_status: 'planned',
+        updated_at: ISO
+      }
+    ],
+    classes: [
+      { id: 'class_a', title: '11ENA6', status: 'active', active_unit_ids: ['unit_poetry'] } as CurriculumResponse['classes'][number]
+    ],
+    media: [mediaWithoutUrl, filed],
+    media_folders: [
+      { id: 'fld_texts', name: 'Texts', parent_id: null },
+      { id: 'fld_poems', name: 'Poems', parent_id: 'fld_texts' }
+    ],
+    media_usage: { media_ono_extract: { lesson_ids: ['lesson_one'], unit_ids: [], class_ids: [] } }
+  };
+
+  const view = (key: string): HTMLButtonElement =>
+    canvas.querySelector<HTMLButtonElement>(`.resources-nav [data-resources-view="${key}"]`)!;
+  const titles = (): string[] =>
+    [...canvas.querySelectorAll('.resources-main .lesson-list__title')].map((node) => node.textContent ?? '');
+
+  beforeEach(() => {
+    resetResourcesViewForTests();
+    vi.mocked(patchMedia).mockClear();
+    vi.mocked(saveMediaFolders).mockClear();
+    canvas = document.createElement('div');
+    document.body.append(canvas);
+  });
+
+  afterEach(() => {
+    canvas.remove();
+    document.querySelectorAll('.confirm-card, dialog').forEach((node) => node.remove());
+  });
+
+  it('renders the nested folder tree with counts that include subfolders', () => {
+    renderResourcesIndex(canvas, library);
+    const texts = view('folder:fld_texts');
+    expect(texts.querySelector('.resources-nav__count')?.textContent).toBe('1');
+    expect(texts.closest('li')?.querySelector('[data-resources-view="folder:fld_poems"]')).toBeTruthy();
+  });
+
+  it('views split resources into Unfiled and Not used anywhere', () => {
+    renderResourcesIndex(canvas, library);
+    view('unfiled').click();
+    expect(titles()).toEqual(['Zebra Notes']);
+    view('unused').click();
+    expect(titles()).toEqual(['Zebra Notes']);
+    expect(canvas.querySelector('.resources-used-in--none')?.textContent).toBe('Not used anywhere');
+  });
+
+  it('a folder shows its breadcrumb, subfolders and only its own resources', () => {
+    renderResourcesIndex(canvas, library);
+    view('folder:fld_texts').click();
+    expect(canvas.querySelector('.resources-main__title')?.textContent).toBe('Texts');
+    expect(titles()).toEqual([]);
+    canvas.querySelector<HTMLButtonElement>('.resources-subfolders__tile')!.click();
+    expect(canvas.querySelector('.resources-crumbs')?.textContent).toContain('Texts');
+    expect(titles()).toEqual(['AoTFW Extract']);
+  });
+
+  it('lists Used in links to each lesson, and groups by unit with its classes', () => {
+    renderResourcesIndex(canvas, library);
+    const link = canvas.querySelector<HTMLAnchorElement>('[data-used-in="lesson:lesson_one"]');
+    expect(link?.getAttribute('href')).toBe('/lessons/lesson_one');
+    expect(link?.textContent).toContain('Reading the extract');
+
+    view('by-unit').click();
+    const group = canvas.querySelector('.resources-group');
+    expect(group?.querySelector('a')?.getAttribute('href')).toBe('/units/unit_poetry');
+    expect(group?.textContent).toContain('Taught in 11ENA6');
+    expect(titles()).toEqual(['AoTFW Extract']);
+  });
+
+  it('moves a resource to a folder from its options menu', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    renderResourcesIndex(canvas, library, { refresh });
+    canvas.querySelector<HTMLButtonElement>('[data-resources-move="media_no_url"]')!.click();
+    const select = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLSelectElement>('dialog select, .confirm-card select');
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    select.value = 'fld_texts';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    select.dispatchEvent(new Event('input', { bubbles: true }));
+    select.closest('dialog, .confirm-card')!.querySelector<HTMLButtonElement>('.btn--primary')!.click();
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(patchMedia).toHaveBeenCalledWith('media_no_url', { folder_id: 'fld_texts' });
+  });
+
+  it('deleting a folder moves its resources and subfolders up a level', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    renderResourcesIndex(canvas, library, { refresh });
+    view('folder:fld_poems').click();
+    const deleteItem = [...canvas.querySelectorAll<HTMLButtonElement>('.resources-main__header .page-options__item')].find(
+      (item) => item.textContent === 'Delete folder'
+    )!;
+    deleteItem.click();
+    await vi.waitFor(() => {
+      const confirm = document.querySelector<HTMLButtonElement>('.confirm-card button.btn--primary, dialog button.btn--primary');
+      expect(confirm).toBeTruthy();
+      confirm!.click();
+    });
+    await vi.waitFor(() => expect(saveMediaFolders).toHaveBeenCalled());
+    expect(patchMedia).toHaveBeenCalledWith('media_ono_extract', { folder_id: 'fld_texts' });
+    expect(saveMediaFolders).toHaveBeenCalledWith([{ id: 'fld_texts', name: 'Texts', parent_id: null }]);
   });
 });

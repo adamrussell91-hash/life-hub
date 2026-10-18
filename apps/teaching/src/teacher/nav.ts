@@ -3,7 +3,7 @@ import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
 import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
-import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, CurriculumOutcome } from '@/schemas';
+import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, MediaFolder, MediaUsage, CurriculumOutcome } from '@/schemas';
 
 export interface CurriculumLessonSummary {
   id: string;
@@ -37,6 +37,10 @@ export interface CurriculumResponse {
   scheduled_lessons: ScheduledLesson[];
   scope_sequences: ScopeSequence[];
   media: Media[];
+  /** Resource Library folder tree (flat, nested by parent_id). */
+  media_folders?: MediaFolder[];
+  /** Where each used resource appears; resources missing here are used nowhere. */
+  media_usage?: Record<string, MediaUsage>;
   outcomes?: CurriculumOutcome[];
   schedule_anchor_date: string; // YYYY-MM-DD — demo override (tests / VITE_SCHEDULE_ANCHOR_DATE)
 }

@@ -12,6 +12,7 @@ import {
   getJSON,
   listJSON,
   MEDIA_PREFIX,
+  mediaFoldersKey,
   OUTCOME_PREFIX,
   PUBLISHED_LESSON_PREFIX,
   scheduleAnchorKey,
@@ -22,6 +23,7 @@ import {
   YEAR_PREFIX
 } from './_shared/teaching-blobs.mjs';
 import { isDeletedRecord, withoutDeleted } from './_shared/record-liveness.mjs';
+import { buildMediaUsage } from './_shared/media-usage.mjs';
 
 export const config = { path: '/api/curriculum' };
 
@@ -70,7 +72,8 @@ export async function buildCurriculum(store) {
     scope_sequences,
     mediaRaw,
     outcomes,
-    anchor
+    anchor,
+    mediaFolders
   ] = await Promise.all([
     listJSON(store, YEAR_PREFIX),
     listJSON(store, SUBJECT_PREFIX),
@@ -82,7 +85,8 @@ export async function buildCurriculum(store) {
     listJSON(store, SCOPE_SEQUENCE_PREFIX),
     listJSON(store, MEDIA_PREFIX),
     listJSON(store, OUTCOME_PREFIX),
-    getJSON(store, scheduleAnchorKey())
+    getJSON(store, scheduleAnchorKey()),
+    getJSON(store, mediaFoldersKey())
   ]);
 
   const publishedIds = new Set(
@@ -99,6 +103,8 @@ export async function buildCurriculum(store) {
     liveLessonIds.has(row.lesson_id) && liveUnitIds.has(row.unit_id) && liveClassIds.has(row.class_id)
   );
 
+  const media = mediaRaw.filter(item => item.status === 'active');
+
   return {
     years,
     subjects,
@@ -107,7 +113,9 @@ export async function buildCurriculum(store) {
     classes,
     scheduled_lessons: liveScheduled,
     scope_sequences,
-    media: mediaRaw.filter(item => item.status === 'active'),
+    media,
+    media_folders: Array.isArray(mediaFolders?.folders) ? mediaFolders.folders : [],
+    media_usage: buildMediaUsage({ media, lessons, units, classes }),
     outcomes,
     schedule_anchor_date: typeof anchor?.date === 'string' ? anchor.date : DEFAULT_SCHEDULE_ANCHOR_DATE
   };
