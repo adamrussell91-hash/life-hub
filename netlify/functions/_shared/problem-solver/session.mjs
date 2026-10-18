@@ -186,6 +186,15 @@ export function archive(session, deps) {
 }
 
 /** Small list row. Index rows (no turns) pass through unchanged. */
+const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone'];
+
+/** How often each thinking skill was seen in the user's answers. */
+function skillCounts(turns) {
+  const counts = {};
+  for (const turn of turns) for (const id of turn.skillsSeen ?? []) counts[id] = (counts[id] ?? 0) + 1;
+  return counts;
+}
+
 export function summaryRow(session) {
   if (!Array.isArray(session.turns)) return session;
   const last = session.define.runs.at(-1);
@@ -196,6 +205,8 @@ export function summaryRow(session) {
     phase: session.phase,
     model: session.model?.id ?? null,
     tool: last?.tool ?? null,
+    frame: FRAME_KEYS.filter((key) => Boolean(session.frame?.[key])).length,
+    skills: skillCounts(session.turns),
     links: session.links,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt

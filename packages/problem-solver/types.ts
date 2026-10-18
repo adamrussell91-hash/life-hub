@@ -26,6 +26,6 @@ export type PsSession = {
   updatedAt: string;
 };
 
-export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { model: PsModelId | null; tool: PsToolId | null };
+export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number> };
 
 export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'finish_define' | 'rename' | 'archive' | 'rescore_radar' | 'retry';

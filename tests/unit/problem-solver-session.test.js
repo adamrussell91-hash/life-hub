@@ -88,9 +88,20 @@ test('say appends a user turn and queues; summary rows are small', () => {
   assert.equal(s.turns.at(-1).role, 'user');
   assert.equal(s.runner.status, 'queued');
   const row = summaryRow(s);
-  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'id', 'links', 'model', 'phase', 'status', 'title', 'tool', 'updatedAt']);
+  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'links', 'model', 'phase', 'skills', 'status', 'title', 'tool', 'updatedAt']);
   assert.equal(row.tool, 'five_whys');
   assert.equal(summaryRow(row), row, 'index rows pass through');
+});
+
+test('summary rows count answered frame questions and skills seen', () => {
+  let s = createSession({ title: 'Late rota', text: 'The rota keeps changing late.' }, deps);
+  assert.equal(summaryRow(s).frame, 0);
+  assert.deepEqual(summaryRow(s).skills, {});
+  s = applyCoachTurn(s, coach({ frame: { goal: 'Rota fixed a week ahead' }, skillsSeen: ['analysis', 'inference'] }), deps);
+  s = applyCoachTurn(say(s, 'It changed three weeks out of four.', deps), coach({ frame: { whatIsTrue: 'Changed 3 of 4 weeks' }, skillsSeen: ['analysis'] }), deps);
+  const row = summaryRow(s);
+  assert.equal(row.frame, 2);
+  assert.deepEqual(row.skills, { analysis: 2, inference: 1 });
 });
 
 test('limits: text over 12000 chars, title cap, links cap', () => {

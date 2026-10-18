@@ -3,8 +3,10 @@ import { el } from '@/views/hub-kit';
 import { skillChip, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import type { PsAction, PsSession } from '../../../../../packages/problem-solver/types';
+import { coachAvatar, thinkingDots } from './decor';
 
 export type CoachPanelHandlers = { onSay: (text: string) => void; onAction: (action: PsAction) => void };
+export type CoachPanel = { el: HTMLElement; update(session: PsSession): void };
 
 function actionButton(label: string, action: PsAction, handlers: CoachPanelHandlers, kind = 'btn--ghost'): HTMLButtonElement {
   const button = el('button', `btn ${kind}`, label) as HTMLButtonElement;
@@ -14,16 +16,27 @@ function actionButton(label: string, action: PsAction, handlers: CoachPanelHandl
   return button;
 }
 
-function message(turn: PsSession['turns'][number]): HTMLLIElement {
-  const item = el('li', `chat-message chat-message--${turn.role === 'user' ? 'user' : 'assistant'}`) as HTMLLIElement;
-  const body = el('div', 'chat-message__body', turn.text);
-  item.append(body);
+function message(turn: PsSession['turns'][number], fresh: boolean): HTMLLIElement {
+  const coach = turn.role !== 'user';
+  const item = el('li', `chat-message chat-message--${coach ? 'assistant' : 'user'} ps-msg${fresh ? ' is-new' : ''}`) as HTMLLIElement;
+  item.dataset.turn = turn.id;
+  if (coach) item.append(coachAvatar());
+  item.append(el('div', 'chat-message__body', turn.text));
   const chips = [...(turn.skillsSeen ?? []).map((id) => skillChip(id)), ...(turn.skillsMissing ?? []).map((id) => skillChip(id, { missing: true }))];
   if (chips.length) {
     const row = el('div', 'ps-coach__skills');
+    chips.forEach((chip, i) => chip.style.setProperty('--i', String(i)));
     row.append(...chips);
     item.append(row);
   }
+  return item;
+}
+
+function thinkingBubble(): HTMLLIElement {
+  const item = el('li', 'chat-message chat-message--assistant ps-msg ps-msg--thinking is-new') as HTMLLIElement;
+  const body = el('div', 'chat-message__body ps-thinking');
+  body.append(thinkingDots(), el('span', '', 'Coach is thinking…'));
+  item.append(coachAvatar(), body);
   return item;
 }
 
@@ -41,51 +54,113 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
   return card;
 }
 
-export function renderCoachPanel(session: PsSession, handlers: CoachPanelHandlers): HTMLElement {
+/**
+ * The coach thread. It keeps its DOM between updates: new turns are appended, the thinking
+ * bubble is swapped in place for the reply, and the composer keeps what you typed, so the
+ * page does not jump while the coach is polled.
+ */
+export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
   const panel = el('section', 'ps-coach');
   panel.setAttribute('aria-label', 'Coach');
   const list = el('ul', 'chat-messages ps-coach__messages');
   list.setAttribute('aria-live', 'polite');
-  list.append(...session.turns.map(message));
-  panel.append(list);
+  const extras = el('div', 'ps-coach__extras');
 
-  const busy = session.runner.status === 'queued' || session.runner.status === 'running';
-  if (busy) panel.append(el('p', 'ps-coach__status', 'Coach is thinking…'));
-  if (session.runner.status === 'failed') {
-    const failed = el('div', 'ps-coach__status ps-coach__status--failed');
-    failed.append(el('span', '', session.runner.error ?? 'The coach could not answer.'), actionButton('Try again', 'retry', handlers));
-    panel.append(failed);
-  }
-
-  const card = suggestionCard(session, handlers);
-  if (card) panel.append(card);
-
-  const actions = el('div', 'ps-coach__actions');
-  if (session.pendingKeep && !busy) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
-  if (session.phase === 'define' && !busy) actions.append(actionButton("I've defined it", 'finish_define', handlers));
-  if (actions.childElementCount) panel.append(actions);
-
-  const form = el('form', 'chat-form hub-ai-bar hub-ai-bar--thread') as HTMLFormElement;
+  const form = el('form', 'chat-form hub-ai-bar hub-ai-bar--thread ps-composer') as HTMLFormElement;
+  const now = el('p', 'ps-composer__now');
   const field = el('div', 'hub-ai-bar__field');
   const input = el('textarea', 'chat-input hub-ai-bar__input') as HTMLTextAreaElement;
   input.rows = 2;
-  input.placeholder = session.phase === 'defined' ? 'Add a note for next time…' : 'Your answer…';
   input.setAttribute('aria-label', 'Your answer');
-  input.disabled = busy;
   field.append(input);
   const send = el('button', 'btn btn--primary', 'Send') as HTMLButtonElement;
   send.type = 'submit';
-  send.disabled = busy;
   const tools = el('div', 'chat-form__tools hub-ai-bar__tools');
   tools.append(send);
   const aside = el('div', 'hub-ai-bar__aside');
   aside.append(tools);
-  form.append(field, aside);
+  form.append(now, field, aside);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const text = input.value.trim();
-    if (text) handlers.onSay(text);
+    if (!text) return;
+    handlers.onSay(text);
   });
-  panel.append(form);
-  return panel;
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) form.requestSubmit();
+  });
+  panel.append(list, extras, form);
+
+  const shown = new Set<string>();
+  let thinking: HTMLLIElement | null = null;
+  let first = true;
+
+  const nearBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+
+  return {
+    el: panel,
+    update(session) {
+      const stick = first || nearBottom();
+      const busy = session.runner.status === 'queued' || session.runner.status === 'running';
+
+      for (const turn of session.turns) {
+        if (shown.has(turn.id)) continue;
+        shown.add(turn.id);
+        // Clear the composer once the answer is in the thread, so a failed send keeps the text.
+        if (!first && turn.role === 'user' && input.value.trim() === turn.text.trim()) input.value = '';
+        const node = message(turn, !first);
+        if (thinking && turn.role !== 'user') {
+          thinking.replaceWith(node);
+          thinking = null;
+        } else if (thinking) {
+          list.insertBefore(node, thinking);
+        } else {
+          list.append(node);
+        }
+      }
+      if (busy && !thinking) {
+        thinking = thinkingBubble();
+        list.append(thinking);
+      } else if (!busy && thinking) {
+        thinking.remove();
+        thinking = null;
+      }
+
+      const parts: HTMLElement[] = [];
+      if (session.runner.status === 'failed') {
+        const failed = el('div', 'ps-coach__status ps-coach__status--failed');
+        failed.append(el('span', '', session.runner.error ?? 'The coach could not answer.'), actionButton('Try again', 'retry', handlers));
+        parts.push(failed);
+      }
+      const card = suggestionCard(session, handlers);
+      if (card) parts.push(card);
+      const actions = el('div', 'ps-coach__actions');
+      if (session.pendingKeep && !busy) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
+      if (session.phase === 'define' && !busy) actions.append(actionButton("I've defined it", 'finish_define', handlers));
+      if (actions.childElementCount) parts.push(actions);
+      const sig = parts.map((part) => part.textContent).join('|');
+      if (extras.dataset.sig !== sig) {
+        extras.dataset.sig = sig;
+        extras.replaceChildren(...parts);
+      }
+
+      const question = session.phase === 'frame' ? (['goal', 'whatIsTrue', 'whatCanBeDone'] as const).findIndex((key) => !session.frame[key]) : -1;
+      const prompts = ['What is the goal?', 'What is true?', 'What can be done?'];
+      now.textContent = question >= 0 ? `Answering: ${prompts[question]}` : session.phase === 'defined' ? 'Problem defined' : '';
+      now.dataset.q = String(question);
+      input.placeholder = session.phase === 'defined' ? 'Add a note for next time…' : 'Your answer…';
+      input.disabled = busy;
+      send.disabled = busy;
+
+      if (stick) list.scrollTop = list.scrollHeight;
+      first = false;
+    }
+  };
+}
+
+/** One-shot render, for callers that only need a snapshot. */
+export function renderCoachPanel(session: PsSession, handlers: CoachPanelHandlers): HTMLElement {
+  const panel = mountCoachPanel(handlers);
+  panel.update(session);
+  return panel.el;
 }
