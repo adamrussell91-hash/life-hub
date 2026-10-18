@@ -112,6 +112,9 @@ async function handlePublicGet(request, token, deps) {
       return errorResponse(400, 'validation_error', 'width must be a supported derivative size.', false, PUBLIC_CACHE);
     }
     const { journal } = await journalRepo.getJournal(row.trip_id);
+    if (journal.lifecycle !== 'live') {
+      return errorResponse(404, 'not_found', 'This link has been turned off.', false, PUBLIC_CACHE);
+    }
     const scoped = buildSharedJournalPayload(journal, row);
     const allowed = scoped.media.some((m) => m.id === mediaId);
     if (!allowed) {
@@ -152,6 +155,10 @@ async function handlePublicGet(request, token, deps) {
   }
 
   const { journal } = await journalRepo.getJournal(row.trip_id);
+  // A journal in Trash is not shared, whatever links still exist for it.
+  if (journal.lifecycle !== 'live') {
+    return errorResponse(404, 'not_found', 'This link has been turned off.', false, PUBLIC_CACHE);
+  }
   const sharedJournal = buildSharedJournalPayload(journal, row);
   let media_downloads = [];
   try {

@@ -4,6 +4,7 @@ import { searchPlaces } from '@/api/travel';
 import type { JournalCoordinates, JournalMoment, JournalPlace } from '@/journal/types';
 import { openPinEditor } from '@/journal/pin-editor';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export interface OpenEditMomentSheetOptions {
   tripId: string;
@@ -45,12 +46,13 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   let pendingPin: JournalCoordinates | undefined;
   let dirty = false;
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   let pinOverlay: { destroy(): void } | null = null;
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-edit-moment-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-edit-moment-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Edit moment');
@@ -143,6 +145,28 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     advanced,
     status,
   );
+
+  const discardBar = document.createElement('div');
+  discardBar.className = 'journal-capture__discard confirm-card';
+  discardBar.hidden = true;
+  const discardText = document.createElement('p');
+  discardText.textContent = 'Discard unsaved changes?';
+  const discardActions = document.createElement('div');
+  discardActions.className = 'confirm-card__actions';
+  const keepEditingBtn = document.createElement('button');
+  keepEditingBtn.type = 'button';
+  keepEditingBtn.className = 'btn btn--secondary';
+  keepEditingBtn.textContent = 'Keep editing';
+  const discardBtn = document.createElement('button');
+  discardBtn.type = 'button';
+  discardBtn.className = 'btn btn--ghost';
+  discardBtn.textContent = 'Discard';
+  discardActions.append(keepEditingBtn, discardBtn);
+  discardBar.append(discardText, discardActions);
+  keepEditingBtn.addEventListener('click', () => {
+    discardBar.hidden = true;
+  });
+  discardBtn.addEventListener('click', () => finishClose());
 
   const actions = document.createElement('div');
   actions.className = 'addform__actions';
@@ -272,23 +296,22 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     if (destroyed) return;
     destroyed = true;
     pinOverlay?.destroy();
-    document.removeEventListener('keydown', onKey);
-    back.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
-  cancelBtn.addEventListener('click', () => finishClose());
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back) finishClose();
-  });
-
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
+  /** Backdrop, Escape, Back and Cancel: never drop edits without asking. */
+  function requestDismiss(): void {
+    if (destroyed) return;
+    if (!dirty) {
       finishClose();
+      return;
     }
-  };
-  document.addEventListener('keydown', onKey);
+    discardBar.hidden = false;
+    discardBar.scrollIntoView({ block: 'nearest' });
+  }
+
+  cancelBtn.addEventListener('click', () => requestDismiss());
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -333,14 +356,16 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     }
   }
 
-  form.append(scroll, actions);
+  form.append(scroll, discardBar, actions);
   actions.append(cancelBtn, saveBtn);
   sheet.append(heading, form);
   back.append(sheet);
-  options.anchor.append(back);
-
   heading.tabIndex = -1;
-  heading.focus();
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: () => requestDismiss(),
+    initialFocus: heading,
+  });
 
   return {
     destroy() {

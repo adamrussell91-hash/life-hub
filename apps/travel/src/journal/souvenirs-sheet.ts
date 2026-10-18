@@ -10,6 +10,8 @@ import {
   upsertJournalSouvenir,
 } from '@/journal/souvenirs';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export interface OpenSouvenirsCollectionOptions {
   tripId: string;
@@ -38,13 +40,14 @@ function isFixtureVersion(version: string): boolean {
 export function openAddSouvenirSheet(options: OpenAddSouvenirSheetOptions): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   let title = '';
   let note = '';
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-souvenir-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-souvenir-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Add souvenir');
@@ -101,16 +104,21 @@ export function openAddSouvenirSheet(options: OpenAddSouvenirSheetOptions): { de
   saveBtn.className = 'btn btn--primary';
   saveBtn.textContent = 'Save';
 
+  const status = document.createElement('p');
+  status.className = 'journal-sheet__status';
+  status.setAttribute('role', 'alert');
+  status.hidden = true;
+  scroll.append(status);
+
   actions.append(cancelBtn, saveBtn);
   form.append(scroll, actions);
   sheet.append(heading, rule, form);
   back.append(sheet);
-  options.anchor.append(back);
 
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
@@ -135,13 +143,26 @@ export function openAddSouvenirSheet(options: OpenAddSouvenirSheetOptions): { de
       destroy();
       return;
     }
-    void persistJournalPatch(options.tripId, options.version, next).then((saved) => {
-      options.onSaved?.(saved);
-      destroy();
-    });
+    saveBtn.disabled = true;
+    status.hidden = true;
+    void persistJournalPatch(options.tripId, options.version, next).then(
+      (saved) => {
+        options.onSaved?.(saved);
+        destroy();
+      },
+      () => {
+        saveBtn.disabled = false;
+        status.hidden = false;
+        status.textContent = 'Could not save. Try again.';
+      },
+    );
   });
 
-  titleInput.focus();
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: titleInput,
+  });
   return { destroy };
 }
 
@@ -151,6 +172,8 @@ export function openSouvenirsCollection(
   let journal = options.journal;
   let version = options.version;
   let addOverlay: { destroy(): void } | null = null;
+  let overlay: JournalOverlayHandle | null = null;
+  let destroyed = false;
 
   const backdrop = document.createElement('div');
   backdrop.className = 'journal-chapter-backdrop journal-souvenirs-backdrop';
@@ -232,7 +255,11 @@ export function openSouvenirsCollection(
           onSaved({ journal: next, version });
           return;
         }
-        void persistJournalPatch(options.tripId, version, next).then(onSaved);
+        removeBtn.disabled = true;
+        void persistJournalPatch(options.tripId, version, next).then(onSaved, () => {
+          removeBtn.disabled = false;
+          showHubToast('Could not remove the souvenir. Try again.', { tone: 'danger' });
+        });
       });
       li.append(rowBtn, removeBtn);
       list.append(li);
@@ -256,23 +283,21 @@ export function openSouvenirsCollection(
   renderList();
   panel.append(head, rule, addBtn, list);
   backdrop.append(panel);
-  options.anchor.append(backdrop);
-
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') destroy();
-  };
-  document.addEventListener('keydown', onKey);
   closeBtn.addEventListener('click', () => destroy());
-  backdrop.addEventListener('click', (ev) => {
-    if (ev.target === backdrop) destroy();
-  });
 
   function destroy(): void {
-    document.removeEventListener('keydown', onKey);
+    if (destroyed) return;
+    destroyed = true;
     addOverlay?.destroy();
-    backdrop.remove();
+    overlay?.release();
     options.onClose?.();
   }
+
+  overlay = presentJournalOverlay(backdrop, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: closeBtn,
+  });
 
   return { destroy };
 }

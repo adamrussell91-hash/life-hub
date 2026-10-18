@@ -17,6 +17,9 @@ import {
   regionSvgAttrs,
 } from '@/journal/annotations';
 import { resolveMomentAuthor } from '@/journal/Redacted-perspective';
+import { bindDismissableMenu } from '@/journal/menu-dismiss';
+import { isAudioMedia } from '@/journal/transcripts';
+import { journalAudioSrc } from '@/journal/media-loading';
 
 function mediaById(fixture: JournalFixture): Map<string, JournalMedia> {
   return new Map(fixture.media.map((m) => [m.id, m]));
@@ -51,14 +54,6 @@ function renderEllipsisMenu(
 
   let sheetOverlay: { destroy(): void } | null = null;
 
-  const closeMenu = (): void => {
-    menu.hidden = true;
-  };
-
-  const onDocClick = (ev: MouseEvent) => {
-    if (!wrap.contains(ev.target as Node)) closeMenu();
-  };
-
   for (const item of buildMomentMenuItems(ctx.fixture, moment)) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -69,9 +64,14 @@ function renderEllipsisMenu(
     button.textContent = item.label;
     if (item.disabled && item.title) {
       button.setAttribute('aria-description', item.title);
+      // Touch has no hover tooltip: say why the action is unavailable.
+      const reason = document.createElement('span');
+      reason.className = 'journal-moment__menu-reason';
+      reason.textContent = item.title;
+      button.append(reason);
     }
     button.addEventListener('click', () => {
-      closeMenu();
+      momentMenu.close();
       if (button.disabled) return;
       handleMenuAction(item.action, moment, ctx, (handle) => {
         sheetOverlay = handle;
@@ -80,15 +80,10 @@ function renderEllipsisMenu(
     menu.append(button);
   }
 
-  btn.addEventListener('click', (ev) => {
-    ev.stopPropagation();
-    const opening = menu.hidden;
-    menu.hidden = !opening;
-    if (opening) document.addEventListener('click', onDocClick, { once: true });
-  });
+  const momentMenu = bindDismissableMenu(btn, menu);
 
   article.addEventListener('journal-moment-destroy', () => {
-    document.removeEventListener('click', onDocClick);
+    momentMenu.close();
     sheetOverlay?.destroy();
   });
 
@@ -267,9 +262,23 @@ function renderPhotoGrid(
       const more = document.createElement('button');
       more.type = 'button';
       more.className = 'btn btn--ghost journal-moment__view-all';
-      more.textContent = `View all ${ids.length}`;
-      more.disabled = true;
-      more.title = 'Coming in Phase 3';
+      more.textContent = `View all ${resolved.length}`;
+      more.setAttribute('aria-expanded', 'false');
+      more.addEventListener('click', () => {
+        const rest = document.createElement('div');
+        rest.className = 'journal-moment__photo-rest';
+        for (const m of resolved.slice(3)) {
+          const frame = document.createElement('div');
+          frame.className = 'journal-moment__photo-frame';
+          const img = document.createElement('img');
+          configureJournalImage(img, { tripId, media: m, layout: 'pair', eager: true });
+          frame.append(img);
+          if (journal) mountAnnotationOverlay(frame, m.id, journal, annotationsVisible);
+          rest.append(frame);
+        }
+        more.replaceWith(rest);
+        syncAnnotationVisibility();
+      });
       grid.append(more);
     }
   }
@@ -348,14 +357,20 @@ function renderReflection(host: HTMLElement, text: string): void {
   requestAnimationFrame(syncReadMore);
 }
 
-function renderAudioStub(host: HTMLElement): void {
-  const row = document.createElement('div');
-  row.className = 'journal-moment__audio';
-  row.setAttribute('aria-hidden', 'true');
-  const label = document.createElement('span');
-  label.textContent = 'Voice note — Coming in Phase 3';
-  row.append(label);
-  host.append(row);
+function renderVoiceNotes(host: HTMLElement, voice: JournalMedia[], tripId: string): void {
+  for (const media of voice) {
+    const row = document.createElement('div');
+    row.className = 'journal-moment__audio';
+    const label = document.createElement('span');
+    label.className = 'journal-moment__audio-label';
+    label.textContent = 'Voice note';
+    const player = document.createElement('audio');
+    player.controls = true;
+    player.preload = 'none';
+    player.src = journalAudioSrc(tripId, media);
+    row.append(label, player);
+    host.append(row);
+  }
 }
 
 export interface RenderMomentOptions {
@@ -385,24 +400,26 @@ export function renderMomentArticle(
   }
 
   const mediaMap = mediaById(fixture);
-  const textOnly = moment.media_ids.length === 0;
+  const tripId = ctx?.tripId ?? fixture.trip_id;
+  const attached = moment.media_ids
+    .map((id) => mediaMap.get(id))
+    .filter((m): m is JournalMedia => Boolean(m) && m!.lifecycle === 'live');
+  const voice = attached.filter((m) => isAudioMedia(m));
+  const photoIds = attached.filter((m) => !isAudioMedia(m)).map((m) => m.id);
 
-  if (textOnly) {
-    renderMetadata(article, moment);
-    if (moment.text) renderReflection(article, moment.text);
-  } else {
+  if (photoIds.length) {
     renderPhotoGrid(
       article,
-      moment,
+      { ...moment, media_ids: photoIds },
       mediaMap,
-      ctx?.tripId ?? fixture.trip_id,
+      tripId,
       Boolean(options?.mediaEager),
       ctx?.journal,
     );
-    renderMetadata(article, moment);
-    if (moment.text) renderReflection(article, moment.text);
-    renderAudioStub(article);
   }
+  renderMetadata(article, moment);
+  if (moment.text) renderReflection(article, moment.text);
+  renderVoiceNotes(article, voice, tripId);
 
   if (ctx) renderEllipsisMenu(article, moment, ctx);
   return article;

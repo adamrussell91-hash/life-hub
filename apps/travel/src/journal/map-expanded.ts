@@ -14,6 +14,7 @@ import {
   type PhotoStop,
 } from '@/journal/map-connections';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const SEGMENT_FADE_MS = 420;
@@ -31,6 +32,12 @@ export interface OpenJournalDayMapOptions {
 }
 
 let activeHandle: JournalDayMapHandle | null = null;
+
+/** Hex/rgb value of a CSS custom property, for libraries that cannot read var(). */
+export function resolveCssColor(el: Element, token: string, fallback: string): string {
+  const value = getComputedStyle(el).getPropertyValue(token).trim();
+  return value || fallback;
+}
 
 export function getActiveJournalDayMap(): JournalDayMapHandle | null {
   return activeHandle;
@@ -130,9 +137,18 @@ export function openJournalDayMap(options: OpenJournalDayMapOptions): JournalDay
 
   panel.append(head, mapShell);
   backdrop.append(panel);
-  options.anchor.append(backdrop);
-
   let destroyed = false;
+  // Mounted before MapLibre starts so the container has a real size.
+  const overlay: JournalOverlayHandle = presentJournalOverlay(backdrop, {
+    anchor: options.anchor,
+    dismiss: () => {
+      if (panel.classList.contains('journal-map-panel--fullscreen')) {
+        setFullscreen(false);
+        return;
+      }
+      destroy();
+    },
+  });
   let map: MapLibreMap | null = null;
   const markers: Marker[] = [];
   let currentMoments = options.moments;
@@ -142,7 +158,8 @@ export function openJournalDayMap(options: OpenJournalDayMapOptions): JournalDay
     style: STYLE_URL,
     center: [0, 20],
     zoom: 2,
-    cooperativeGestures: true,
+    // A modal, not a scrolling page: one finger pans, as on any phone map.
+    cooperativeGestures: false,
     attributionControl: { compact: false },
   });
   map = mapInit;
@@ -151,8 +168,6 @@ export function openJournalDayMap(options: OpenJournalDayMapOptions): JournalDay
   function setFullscreen(on: boolean): void {
     panel.classList.toggle('journal-map-panel--fullscreen', on);
     fullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
-    if (on) map?.cooperativeGestures.disable();
-    else map?.cooperativeGestures.enable();
     requestAnimationFrame(() => map?.resize());
   }
 
@@ -229,7 +244,8 @@ export function openJournalDayMap(options: OpenJournalDayMapOptions): JournalDay
           type: 'line',
           source: 'journal-segments',
           paint: {
-            'line-color': 'var(--wave, #2a6f97)',
+            // MapLibre cannot read CSS variables; resolve the token first.
+            'line-color': resolveCssColor(panel, '--wave', '#2a6f97'),
             'line-width': 3,
             'line-opacity': 0.85,
           },
@@ -254,30 +270,15 @@ export function openJournalDayMap(options: OpenJournalDayMapOptions): JournalDay
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    document.removeEventListener('keydown', onKey);
     clearMarkers();
     map?.remove();
     map = null;
-    backdrop.remove();
+    overlay.release();
     if (activeHandle === handle) activeHandle = null;
     options.onClose?.();
   }
 
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') {
-      if (panel.classList.contains('journal-map-panel--fullscreen')) {
-        setFullscreen(false);
-        return;
-      }
-      destroy();
-    }
-  };
-  document.addEventListener('keydown', onKey);
-
   closeBtn.addEventListener('click', () => destroy());
-  backdrop.addEventListener('click', (ev) => {
-    if (ev.target === backdrop) destroy();
-  });
 
   const handle: JournalDayMapHandle = {
     updateMoments(moments) {

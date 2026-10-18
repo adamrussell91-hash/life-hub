@@ -1,6 +1,7 @@
 import type { JournalDocument } from '@/api/journal';
 import type { JournalMoment } from '@/journal/types';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
 import { applyMergeToJournal, liveDayMoments, mergeMoments } from '@/journal/moment-operations';
 
@@ -17,6 +18,7 @@ export interface OpenMergeSheetOptions {
 export function openMergeSheet(options: OpenMergeSheetOptions): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   const peers = liveDayMoments(
     options.journal,
     options.moment.leg_id,
@@ -28,7 +30,7 @@ export function openMergeSheet(options: OpenMergeSheetOptions): { destroy(): voi
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-merge-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-merge-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Merge moments');
@@ -132,22 +134,11 @@ export function openMergeSheet(options: OpenMergeSheetOptions): { destroy(): voi
   function finishClose(): void {
     if (destroyed) return;
     destroyed = true;
-    document.removeEventListener('keydown', onKey);
-    back.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
   cancelBtn.addEventListener('click', () => finishClose());
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back) finishClose();
-  });
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') {
-      ev.preventDefault();
-      finishClose();
-    }
-  };
-  document.addEventListener('keydown', onKey);
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -179,9 +170,12 @@ export function openMergeSheet(options: OpenMergeSheetOptions): { destroy(): voi
   actions.append(cancelBtn, saveBtn);
   sheet.append(heading, form);
   back.append(sheet);
-  options.anchor.append(back);
   heading.tabIndex = -1;
-  heading.focus();
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: () => finishClose(),
+    initialFocus: heading,
+  });
 
   return { destroy: () => finishClose() };
 }

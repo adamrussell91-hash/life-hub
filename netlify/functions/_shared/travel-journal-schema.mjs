@@ -296,10 +296,13 @@ export function validateJournal(doc) {
   return doc;
 }
 
-/** Normal client GET: drop deleted journal rows; archived and live remain. */
+/**
+ * Normal client GET and every share payload: drop deleted journal rows;
+ * archived and live remain. Rows are dropped even when the journal itself is
+ * deleted, so nothing in Trash can reach a share link.
+ */
 export function stripDeletedFromJournal(journal) {
   if (!journal || typeof journal !== 'object') return journal;
-  if (isDeletedRecord(journal)) return journal;
   return {
     ...journal,
     legs: withoutDeleted(journal.legs),

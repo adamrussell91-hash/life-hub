@@ -13,6 +13,8 @@ import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
 import type { JournalDocument, JournalEnvelope } from '@/api/journal';
 import { mountJournalOfflineStatus } from '@/journal/offline-status';
+import { closeAllJournalOverlays } from '@/journal/overlay-host';
+import { onJournalSynced } from '@/journal/journal-outbox';
 import { renderMomentArticle } from '@/journal/render-moment';
 import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
@@ -197,14 +199,16 @@ export function renderJournal(
       fixture: liveFixture,
       knownChecksums,
       deletedChecksums,
-      journalVersion: opts.journalVersion,
+      journal: journalDoc(),
+      version: liveVersion,
+      tripTitle: toolbarTitle(),
       anchor: root,
       initialFiles,
+      onSaved: onJournalSaved,
       onClose: () => {
         importOverlay = null;
       },
     });
-    cleanups.push(() => importOverlay?.destroy());
   }
 
   function openCapture(dayId?: string): void {
@@ -223,11 +227,11 @@ export function renderJournal(
       onClose: () => {
         captureOverlay = null;
       },
-      onSaved: () => {
+      onSaved: (envelope) => {
         captureOverlay = null;
+        onJournalSaved(envelope);
       },
     });
-    cleanups.push(() => captureOverlay?.destroy());
   }
 
   let showCoreyPerspective = readCoreyPerspectiveVisible(liveFixture.trip_id);
@@ -264,7 +268,6 @@ export function renderJournal(
           searchOverlay = null;
         },
       });
-      cleanups.push(() => searchOverlay?.destroy());
     },
     onSouvenirs: () => {
       souvenirsOverlay?.destroy();
@@ -281,7 +284,6 @@ export function renderJournal(
           souvenirsOverlay = null;
         },
       });
-      cleanups.push(() => souvenirsOverlay?.destroy());
     },
     onExportJournal: () => {
       void downloadJournalExportBundle(stripJournalForExport(journalDoc()));
@@ -303,7 +305,6 @@ export function renderJournal(
           shareOverlay = null;
         },
       });
-      cleanups.push(() => shareOverlay?.destroy());
     },
     onTrash: () => {
       trashOverlay?.destroy();
@@ -317,7 +318,6 @@ export function renderJournal(
           trashOverlay = null;
         },
       });
-      cleanups.push(() => trashOverlay?.destroy());
     },
     onChapter: () => {
       chapterOverlay?.destroy();
@@ -331,7 +331,6 @@ export function renderJournal(
           chapterOverlay = null;
         },
       });
-      cleanups.push(() => chapterOverlay?.destroy());
     },
   });
 
@@ -611,6 +610,15 @@ export function renderJournal(
   timeline.append(story);
   root.append(toolbar, timeline);
   cleanups.push(mountJournalOfflineStatus(root));
+  // Background sync finished (queued save or a media upload): adopt the
+  // server copy unless a newer local edit is still on its way.
+  cleanups.push(
+    onJournalSynced(({ tripId, envelope, saveStillPending }) => {
+      if (tripId !== liveFixture.trip_id || saveStillPending) return;
+      if (envelope.journal.revision < liveFixture.revision) return;
+      reconcile(envelope);
+    }),
+  );
   canvas.append(root);
 
   cleanups.push(() => {
@@ -670,10 +678,21 @@ export function renderJournal(
     reconcile,
     destroy() {
       for (const fn of cleanups) fn();
-      chapterOverlay?.destroy();
-      importOverlay?.destroy();
-      captureOverlay?.destroy();
+      for (const overlay of [
+        chapterOverlay,
+        importOverlay,
+        captureOverlay,
+        dayMapOverlay,
+        trashOverlay,
+        searchOverlay,
+        souvenirsOverlay,
+        shareOverlay,
+      ]) {
+        overlay?.destroy();
+      }
       captureOverlay = null;
+      // Sheets opened from a moment's menu are not tracked here.
+      closeAllJournalOverlays();
       canvas.replaceChildren();
     },
   };

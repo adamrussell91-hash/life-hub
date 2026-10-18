@@ -1,5 +1,7 @@
 import type { JournalDocument } from '@/api/journal';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import {
   applyPermanentDelete,
   applyRestore,
@@ -17,16 +19,21 @@ export interface TrashRow {
 export function listTrashRows(journal: JournalDocument): TrashRow[] {
   const rows: TrashRow[] = [];
   for (const moment of journal.moments.filter((m) => m.lifecycle === 'deleted')) {
+    const snippet = moment.text?.trim().replace(/\s+/g, ' ');
+    const photos = moment.media_ids.length;
     rows.push({
       target: { kind: 'moment', id: moment.id },
-      label: moment.place?.name ?? 'Moment',
-      detail: moment.local_date,
+      label:
+        moment.place?.name ??
+        (snippet ? (snippet.length > 60 ? `${snippet.slice(0, 59)}…` : snippet) : null) ??
+        (photos ? `${photos} photo${photos === 1 ? '' : 's'}` : 'Moment'),
+      detail: formatDisplayDate(moment.local_date),
     });
   }
   for (const day of journal.days.filter((d) => d.lifecycle === 'deleted')) {
     rows.push({
       target: { kind: 'day', id: day.id },
-      label: `Day ${day.local_date}`,
+      label: `Day ${formatDisplayDate(day.local_date)}`,
       detail: 'Day section',
     });
   }
@@ -59,13 +66,14 @@ export interface OpenTrashViewOptions {
 export function openTrashView(options: OpenTrashViewOptions): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   let journal = options.journal;
   let version = options.version;
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-trash-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-trash-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Journal trash');
@@ -99,9 +107,29 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
-    sheet.remove();
+    overlay?.release();
     options.onClose?.();
+  }
+
+  let busy = false;
+  async function runRowAction(next: () => JournalDocument, failure: string): Promise<void> {
+    if (busy) return;
+    busy = true;
+    status.hidden = true;
+    list.setAttribute('aria-busy', 'true');
+    try {
+      const saved = await commitJournalDelete(options.tripId, version, next());
+      journal = saved.journal;
+      version = saved.version;
+      options.onSaved(saved);
+      paint();
+    } catch {
+      status.hidden = false;
+      status.textContent = failure;
+    } finally {
+      busy = false;
+      list.removeAttribute('aria-busy');
+    }
   }
 
   function paint(): void {
@@ -130,45 +158,63 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
       restoreBtn.className = 'btn btn--secondary';
       restoreBtn.textContent = 'Restore';
       restoreBtn.addEventListener('click', () => {
-        void (async () => {
-          const next = applyRestore(journal, row.target);
-          const saved = await commitJournalDelete(options.tripId, version, next);
-          journal = saved.journal;
-          version = saved.version;
-          options.onSaved(saved);
-          paint();
-        })();
+        void runRowAction(() => applyRestore(journal, row.target), 'Could not restore. Try again.');
       });
       const purgeBtn = document.createElement('button');
       purgeBtn.type = 'button';
       purgeBtn.className = 'btn btn--danger';
       purgeBtn.textContent = 'Delete permanently';
       purgeBtn.title = PERMANENT_DELETE_EXPLAINER;
+      // Confirm inside the card: a browser confirm() looks foreign on a phone
+      // and some Home Screen apps block it.
+      const confirmRow = document.createElement('div');
+      confirmRow.className = 'journal-trash__confirm confirm-card';
+      confirmRow.hidden = true;
+      const confirmText = document.createElement('p');
+      confirmText.textContent = `${PERMANENT_DELETE_EXPLAINER} Delete “${row.label}” permanently?`;
+      const confirmActions = document.createElement('div');
+      confirmActions.className = 'confirm-card__actions';
+      const keepBtn = document.createElement('button');
+      keepBtn.type = 'button';
+      keepBtn.className = 'btn btn--secondary';
+      keepBtn.textContent = 'Keep';
+      const forgetBtn = document.createElement('button');
+      forgetBtn.type = 'button';
+      forgetBtn.className = 'btn btn--danger';
+      forgetBtn.textContent = 'Delete forever';
+      confirmActions.append(keepBtn, forgetBtn);
+      confirmRow.append(confirmText, confirmActions);
       purgeBtn.addEventListener('click', () => {
-        const ok = window.confirm(`${PERMANENT_DELETE_EXPLAINER}\n\nDelete “${row.label}” permanently?`);
-        if (!ok) return;
-        void (async () => {
-          const { journal: next } = applyPermanentDelete(journal, row.target);
-          const saved = await commitJournalDelete(options.tripId, version, next);
-          journal = saved.journal;
-          version = saved.version;
-          options.onSaved(saved);
-          paint();
-        })();
+        rowActions.hidden = true;
+        confirmRow.hidden = false;
+      });
+      keepBtn.addEventListener('click', () => {
+        confirmRow.hidden = true;
+        rowActions.hidden = false;
+      });
+      forgetBtn.addEventListener('click', () => {
+        void runRowAction(
+          () => applyPermanentDelete(journal, row.target).journal,
+          'Could not delete permanently. Try again.',
+        );
       });
       rowActions.append(restoreBtn, purgeBtn);
-      card.append(title, meta, rowActions);
+      card.append(title, meta, rowActions, confirmRow);
       list.append(card);
     }
   }
 
   closeBtn.addEventListener('click', destroy);
-  back.addEventListener('click', destroy);
   actions.append(closeBtn);
   scroll.append(heading, hint, list, status);
   form.append(scroll, actions);
   sheet.append(form);
-  options.anchor.append(back, sheet);
+  back.append(sheet);
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: closeBtn,
+  });
   paint();
 
   return { destroy };

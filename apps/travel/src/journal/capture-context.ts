@@ -37,6 +37,19 @@ export function resolveCaptureContext(
     const day = fixture.days.find((d) => d.id === dayId);
     if (day) return { legId: day.leg_id, localDate: day.local_date };
   }
+  // Mid-trip, "Add moment" means today, not the first day of the trip.
+  const today = todayLocalIso();
+  const todayDay = fixture.days.find((d) => d.lifecycle === 'live' && d.local_date === today);
+  if (todayDay) return { legId: todayDay.leg_id, localDate: today };
+  const todayLeg = fixture.legs.find(
+    (l) =>
+      l.lifecycle === 'live' &&
+      l.start_date &&
+      l.end_date &&
+      l.start_date <= today &&
+      today <= l.end_date,
+  );
+  if (todayLeg) return { legId: todayLeg.id, localDate: today };
   const empty = fixture.days.find((d) => d.empty_marker);
   if (empty) return { legId: empty.leg_id, localDate: empty.local_date };
   const firstDay = [...fixture.days].sort((a, b) => a.local_date.localeCompare(b.local_date))[0];
@@ -84,4 +97,43 @@ export function bootstrapJournalForFirstMoment(
     legs: [leg],
     days: [day],
   };
+}
+
+/**
+ * The story is drawn day by day, so a live moment whose (leg, date) has no
+ * live day row would be saved but never shown. Add (or revive) the day, and
+ * clear the "no moments yet" marker on days that now have moments.
+ */
+export function ensureMomentDays(journal: JournalDocument): JournalDocument {
+  let days = journal.days;
+  let changed = false;
+  for (const moment of journal.moments) {
+    if (moment.lifecycle !== 'live') continue;
+    const matches = days.filter(
+      (d) => d.leg_id === moment.leg_id && d.local_date === moment.local_date,
+    );
+    const live = matches.find((d) => d.lifecycle === 'live');
+    if (live) {
+      if (live.empty_marker) {
+        days = days.map((d) => (d === live ? { ...d, empty_marker: false } : d));
+        changed = true;
+      }
+      continue;
+    }
+    const deleted = matches[0];
+    if (deleted) {
+      days = days.map((d) =>
+        d === deleted
+          ? { ...d, lifecycle: 'live' as const, deleted_at: undefined, deleted_with: undefined }
+          : d,
+      );
+    } else {
+      days = [
+        ...days,
+        { id: makeDayId(), leg_id: moment.leg_id, local_date: moment.local_date, lifecycle: 'live' },
+      ];
+    }
+    changed = true;
+  }
+  return changed ? { ...journal, days } : journal;
 }
