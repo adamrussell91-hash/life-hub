@@ -1,5 +1,6 @@
 import type { JournalFixture } from '@/journal/types';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export interface ChapterJumpEntry {
   id: string;
@@ -41,7 +42,8 @@ export function openChapterJump(options: OpenChapterJumpOptions): { destroy(): v
   backdrop.setAttribute('role', 'presentation');
 
   const panel = document.createElement('div');
-  panel.className = 'journal-chapter';
+  // .compose: visual-viewport.js keeps the panel above the iOS keyboard.
+  panel.className = 'journal-chapter compose';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
   panel.setAttribute('aria-label', 'Chapters');
@@ -75,8 +77,9 @@ export function openChapterJump(options: OpenChapterJumpOptions): { destroy(): v
       btn.className = `journal-chapter__row journal-chapter__row--${entry.kind}`;
       btn.textContent = entry.label;
       btn.addEventListener('click', () => {
-        options.onSelect(entry.id);
+        // Close first: the page is scroll-locked while the panel is open.
         destroy();
+        options.onSelect(entry.id);
       });
       li.append(btn);
       list.append(li);
@@ -94,23 +97,21 @@ export function openChapterJump(options: OpenChapterJumpOptions): { destroy(): v
 
   panel.append(head, list);
   backdrop.append(panel);
-  options.anchor.append(backdrop);
-
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') destroy();
-  };
-  document.addEventListener('keydown', onKey);
   closeBtn.addEventListener('click', () => destroy());
-  backdrop.addEventListener('click', (ev) => {
-    if (ev.target === backdrop) destroy();
-  });
 
+  let destroyed = false;
   function destroy(): void {
-    document.removeEventListener('keydown', onKey);
-    backdrop.remove();
+    if (destroyed) return;
+    destroyed = true;
+    overlay.release();
     options.onClose?.();
   }
 
-  search.focus();
+  const overlay: JournalOverlayHandle = presentJournalOverlay(backdrop, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    // On touch, opening the keyboard would hide half the chapter list.
+    initialFocus: window.matchMedia?.('(pointer: fine)').matches ? search : closeBtn,
+  });
   return { destroy };
 }

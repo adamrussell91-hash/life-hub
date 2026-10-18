@@ -25,6 +25,8 @@ import {
   verifyJournalMedia,
   type JournalMediaSignInput,
 } from '@/api/journal-media';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
+import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
 
 export interface OpenImportSheetOptions {
   fixture: JournalFixture;
@@ -50,6 +52,8 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   let files: ImportFileEntry[] = [];
   let groups: ProposedMoment[] = [];
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
+  attachVisualViewportInset();
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
@@ -77,7 +81,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   disclosure.append(disclosureSummary, disclosureBody);
 
   const form = document.createElement('form');
-  form.className = 'addform__form';
+  form.className = 'addform__form compose';
   form.noValidate = true;
 
   const scroll = document.createElement('div');
@@ -428,13 +432,9 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
+    overlay?.release();
     options.onClose?.();
   }
-
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back) destroy();
-  });
 
   scroll.append(missingBanner, pickBtn, groupList, progress, fileInput);
   form.append(scroll, actions);
@@ -442,7 +442,11 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
   header.append(counts, disclosure);
   sheet.append(title, header, form);
   back.append(sheet);
-  options.anchor.append(back);
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: () => destroy(),
+    initialFocus: saveBtn,
+  });
 
   void (async () => {
     if (options.initialFiles?.length) {
@@ -457,7 +461,6 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
     renderGroups();
   })();
 
-  saveBtn.focus();
   return { destroy };
 }
 

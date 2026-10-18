@@ -6,6 +6,7 @@ import {
 } from '@/api/journal-share';
 import type { JournalLeg, JournalMoment } from '@/journal/types';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export interface OpenJournalShareSheetOptions {
   tripId: string;
@@ -31,6 +32,7 @@ function liveLegs(journal: JournalDocument): JournalLeg[] {
 export function openJournalShareSheet(options: OpenJournalShareSheetOptions): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   let currentUrl = options.existingUrl ?? '';
   const selectedMoments = new Set<string>();
   const selectedLegs = new Set<string>();
@@ -38,7 +40,7 @@ export function openJournalShareSheet(options: OpenJournalShareSheetOptions): { 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-share-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-share-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Share journal moments');
@@ -138,28 +140,37 @@ export function openJournalShareSheet(options: OpenJournalShareSheetOptions): { 
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
-    sheet.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
   cancelBtn.addEventListener('click', destroy);
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back) destroy();
-  });
 
   copyBtn.addEventListener('click', () => {
-    if (currentUrl) void navigator.clipboard?.writeText(currentUrl);
+    if (!currentUrl) return;
+    void navigator.clipboard?.writeText(currentUrl).then(
+      () => {
+        copyBtn.textContent = 'Copied';
+        window.setTimeout(() => {
+          copyBtn.textContent = 'Copy link';
+        }, 1600);
+      },
+      () => undefined,
+    );
   });
 
   revokeBtn.addEventListener('click', () => {
     void (async () => {
-      await revokeJournalShareLink(options.tripId);
-      currentUrl = '';
-      linkBox.textContent = 'This link has been turned off.';
-      copyBtn.disabled = true;
-      revokeBtn.disabled = true;
-      options.onLinkChange?.(null);
+      try {
+        await revokeJournalShareLink(options.tripId);
+        currentUrl = '';
+        linkBox.textContent = 'This link has been turned off.';
+        copyBtn.disabled = true;
+        revokeBtn.disabled = true;
+        options.onLinkChange?.(null);
+      } catch {
+        linkBox.textContent = 'Could not turn the link off. Try again.';
+      }
     })();
   });
 
@@ -167,13 +178,20 @@ export function openJournalShareSheet(options: OpenJournalShareSheetOptions): { 
     ev.preventDefault();
     const nextScope = scope();
     if (!isJournalShareScopeValid(nextScope)) return;
+    createBtn.disabled = true;
     void (async () => {
-      const { url } = await createJournalShareLink(options.tripId, nextScope);
-      currentUrl = url;
-      linkBox.textContent = url;
-      copyBtn.disabled = false;
-      revokeBtn.disabled = false;
-      options.onLinkChange?.(url);
+      try {
+        const { url } = await createJournalShareLink(options.tripId, nextScope);
+        currentUrl = url;
+        linkBox.textContent = url;
+        copyBtn.disabled = false;
+        revokeBtn.disabled = false;
+        options.onLinkChange?.(url);
+      } catch {
+        linkBox.textContent = 'Could not create a link. Check your connection and try again.';
+      } finally {
+        syncCreateState();
+      }
     })();
   });
 
@@ -181,7 +199,13 @@ export function openJournalShareSheet(options: OpenJournalShareSheetOptions): { 
   scroll.append(heading, intro, linkBox, list);
   form.append(scroll, actions);
   sheet.append(form);
-  options.anchor.append(back, sheet);
+  back.append(sheet);
+  heading.tabIndex = -1;
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: heading,
+  });
 
   return { destroy };
 }

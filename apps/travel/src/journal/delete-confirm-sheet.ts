@@ -1,6 +1,7 @@
 import type { JournalDocument } from '@/api/journal';
 import type { JournalMoment } from '@/journal/types';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import {
   applySoftDelete,
   commitJournalDelete,
@@ -40,13 +41,14 @@ export function openDeleteConfirmSheet(options: OpenDeleteConfirmOptions): { des
 
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   const impact = deleteImpactSummary(options.journal, options.target);
   const copy = impactConfirmCopy(options.target, impact);
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-delete-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-delete-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Confirm delete');
@@ -76,28 +78,44 @@ export function openDeleteConfirmSheet(options: OpenDeleteConfirmOptions): { des
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
-    sheet.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
   cancelBtn.addEventListener('click', destroy);
-  back.addEventListener('click', destroy);
+  const status = document.createElement('p');
+  status.className = 'journal-sheet__status';
+  status.setAttribute('role', 'alert');
+  status.hidden = true;
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
+    if (confirmBtn.disabled) return;
+    confirmBtn.disabled = true;
+    status.hidden = true;
     void (async () => {
-      const next = applySoftDelete(options.journal, options.target);
-      const saved = await commitJournalDelete(options.tripId, options.version, next);
-      options.onSaved(saved);
-      destroy();
+      try {
+        const next = applySoftDelete(options.journal, options.target);
+        const saved = await commitJournalDelete(options.tripId, options.version, next);
+        options.onSaved(saved);
+        destroy();
+      } catch {
+        confirmBtn.disabled = false;
+        status.hidden = false;
+        status.textContent = 'Could not delete. Check your connection and try again.';
+      }
     })();
   });
 
   actions.append(cancelBtn, confirmBtn);
-  scroll.append(heading, body);
+  scroll.append(heading, body, status);
   form.append(scroll, actions);
   sheet.append(form);
-  options.anchor.append(back, sheet);
+  back.append(sheet);
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: cancelBtn,
+  });
 
   return { destroy };
 }

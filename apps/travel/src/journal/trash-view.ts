@@ -1,5 +1,6 @@
 import type { JournalDocument } from '@/api/journal';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import {
   applyPermanentDelete,
   applyRestore,
@@ -59,13 +60,14 @@ export interface OpenTrashViewOptions {
 export function openTrashView(options: OpenTrashViewOptions): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   let journal = options.journal;
   let version = options.version;
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-trash-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-trash-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Journal trash');
@@ -99,9 +101,29 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
-    sheet.remove();
+    overlay?.release();
     options.onClose?.();
+  }
+
+  let busy = false;
+  async function runRowAction(next: () => JournalDocument, failure: string): Promise<void> {
+    if (busy) return;
+    busy = true;
+    status.hidden = true;
+    list.setAttribute('aria-busy', 'true');
+    try {
+      const saved = await commitJournalDelete(options.tripId, version, next());
+      journal = saved.journal;
+      version = saved.version;
+      options.onSaved(saved);
+      paint();
+    } catch {
+      status.hidden = false;
+      status.textContent = failure;
+    } finally {
+      busy = false;
+      list.removeAttribute('aria-busy');
+    }
   }
 
   function paint(): void {
@@ -130,14 +152,7 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
       restoreBtn.className = 'btn btn--secondary';
       restoreBtn.textContent = 'Restore';
       restoreBtn.addEventListener('click', () => {
-        void (async () => {
-          const next = applyRestore(journal, row.target);
-          const saved = await commitJournalDelete(options.tripId, version, next);
-          journal = saved.journal;
-          version = saved.version;
-          options.onSaved(saved);
-          paint();
-        })();
+        void runRowAction(() => applyRestore(journal, row.target), 'Could not restore. Try again.');
       });
       const purgeBtn = document.createElement('button');
       purgeBtn.type = 'button';
@@ -147,14 +162,10 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
       purgeBtn.addEventListener('click', () => {
         const ok = window.confirm(`${PERMANENT_DELETE_EXPLAINER}\n\nDelete “${row.label}” permanently?`);
         if (!ok) return;
-        void (async () => {
-          const { journal: next } = applyPermanentDelete(journal, row.target);
-          const saved = await commitJournalDelete(options.tripId, version, next);
-          journal = saved.journal;
-          version = saved.version;
-          options.onSaved(saved);
-          paint();
-        })();
+        void runRowAction(
+          () => applyPermanentDelete(journal, row.target).journal,
+          'Could not delete permanently. Try again.',
+        );
       });
       rowActions.append(restoreBtn, purgeBtn);
       card.append(title, meta, rowActions);
@@ -163,12 +174,16 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
   }
 
   closeBtn.addEventListener('click', destroy);
-  back.addEventListener('click', destroy);
   actions.append(closeBtn);
   scroll.append(heading, hint, list, status);
   form.append(scroll, actions);
   sheet.append(form);
-  options.anchor.append(back, sheet);
+  back.append(sheet);
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: closeBtn,
+  });
   paint();
 
   return { destroy };

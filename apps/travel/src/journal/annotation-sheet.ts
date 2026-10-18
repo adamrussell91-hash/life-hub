@@ -11,6 +11,7 @@ import {
   upsertMediaPhotoAnnotations,
 } from '@/journal/annotations';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export interface OpenPhotoAnnotationSheetOptions {
   tripId: string;
@@ -32,12 +33,13 @@ export function openPhotoAnnotationSheet(
 ): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   let regions = cloneRegions(getMediaPhotoAnnotations(options.journal, options.media.id));
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-annotation-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-annotation-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Annotate photo');
@@ -93,8 +95,7 @@ export function openPhotoAnnotationSheet(
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
-    sheet.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
@@ -146,30 +147,48 @@ export function openPhotoAnnotationSheet(
   });
 
   cancelBtn.addEventListener('click', destroy);
-  back.addEventListener('click', destroy);
+  const status = document.createElement('p');
+  status.className = 'journal-sheet__status';
+  status.setAttribute('role', 'alert');
+  status.hidden = true;
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
+    if (saveBtn.disabled) return;
+    saveBtn.disabled = true;
+    status.hidden = true;
     void (async () => {
-      const cleaned = regions
-        .map((r) => parsePhotoAnnotationRegion(r))
-        .filter((r): r is PhotoAnnotationRegion => Boolean(r));
-      const nextJournal = upsertMediaPhotoAnnotations(options.journal, {
-        media_id: options.media.id,
-        regions: cleaned,
-        revision: 0,
-      });
-      const saved = await persistJournalPatch(options.tripId, options.version, nextJournal);
-      options.onSaved?.(saved);
-      destroy();
+      try {
+        const cleaned = regions
+          .map((r) => parsePhotoAnnotationRegion(r))
+          .filter((r): r is PhotoAnnotationRegion => Boolean(r));
+        const nextJournal = upsertMediaPhotoAnnotations(options.journal, {
+          media_id: options.media.id,
+          regions: cleaned,
+          revision: 0,
+        });
+        const saved = await persistJournalPatch(options.tripId, options.version, nextJournal);
+        options.onSaved?.(saved);
+        destroy();
+      } catch {
+        saveBtn.disabled = false;
+        status.hidden = false;
+        status.textContent = 'Could not save notes. Try again.';
+      }
     })();
   });
 
   renderRegionEditors();
   actions.append(cancelBtn, saveBtn);
-  scroll.append(heading, hint, preview, addBtn, regionList);
+  scroll.append(heading, hint, preview, addBtn, regionList, status);
   form.append(scroll, actions);
   sheet.append(form);
-  options.anchor.append(back, sheet);
+  back.append(sheet);
+  heading.tabIndex = -1;
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: heading,
+  });
   return { destroy };
 }

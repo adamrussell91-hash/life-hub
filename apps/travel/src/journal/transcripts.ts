@@ -23,7 +23,7 @@ const AUDIO_URL_RE = /\.(webm|m4a|mp3|ogg|wav|aac|flac)(\?|#|$)/i;
 export function isAudioMedia(media: JournalMedia): boolean {
   const extras = media as JournalMediaAudioExtras;
   if (extras.content_type?.toLowerCase().startsWith('audio/')) return true;
-  return AUDIO_URL_RE.test(media.url);
+  return AUDIO_URL_RE.test(media.url ?? '');
 }
 
 export function parseMediaAudioTranscript(raw: unknown): MediaAudioTranscript | null {
