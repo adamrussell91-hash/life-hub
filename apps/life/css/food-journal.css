@@ -206,10 +206,9 @@ html[data-hub="life"] .hub-card.food-dish {
   overflow-wrap: anywhere;
   color: var(--wave);
 }
-/* Add visit: photos first, then tick what you had from the menu. */
+/* Add visit: the menu photo first, then tick what you had from the menu. */
 .food-quick {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
 }
 .food-quick__pick {
