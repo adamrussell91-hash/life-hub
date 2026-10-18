@@ -201,7 +201,7 @@ test('failed image becomes a warning callout with the same id, never the signed 
   assert.equal(block.id, 'blk_1');
   assert.equal(block.block_type, 'callout');
   assert.equal(block.content.style, 'warning');
-  assert.equal(block.content.body, 'i.png couldn\'t be imported (i.png is over 20 MB, so it wasn\'t imported.). Upload it again from Notion.');
+  assert.equal(block.content.body, 'i.png couldn\'t be imported (over 20 MB). Upload it again from Notion.');
   assert.ok(!JSON.stringify(store.read(draftLessonKey('lesson_n_l1'))).includes('files.example'));
   assert.ok(report.warnings.every((w) => !/original file/.test(w.message)));
   assert.ok(report.warnings.some((w) => w.rule === 'file_too_big'));
@@ -261,7 +261,7 @@ test('an archived or binned entity keeps its status and warns', async () => {
   const lesson = store.read(draftLessonKey('lesson_n_l1'));
   assert.deepEqual([lesson.status, lesson.trashed_at, lesson.previous_status, lesson.trash_reason], ['trashed', 't', 'active', 'r']);
   assert.equal(lesson.title, 'L');
-  assert.ok(report.warnings.some((w) => w.message === '“L” is in the bin in the Teaching Hub; it was updated but left there.'));
+  assert.ok(report.warnings.some((w) => w.rule === 'limit' && w.message === '“L” is in the bin in the Teaching Hub; it was updated but left there.'));
 });
 
 test('stale kind, cover and outcome_ids are dropped when Notion no longer has them', async () => {
@@ -309,4 +309,36 @@ test('when the version checkpoint fails the existing entity is not replaced', as
   assert.ok(!report.written.includes('lesson_n_l1'));
   assert.ok(report.skipped.some((s) => s.page_id === 'l1'));
   assert.ok(report.warnings.some((w) => w.message === 'Version history couldn\'t be saved for “L”, so it wasn\'t replaced. Try the import again.'));
+});
+
+test('a new lesson is linked to a stored unit that failed validation this run', async () => {
+  const existingUnit = { ...common('unit_n_u1', 'U'), type: 'unit', year_id: 'year_7', subject_id: 'subject_1', lesson_ids: [], blocks: [] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [unitKey('unit_n_u1')]: existingUnit });
+  await applyPlan(store, unitOnlyBad(), { now, rehost });
+  assert.deepEqual(store.read(unitKey('unit_n_u1')).lesson_ids, ['lesson_n_l1']);
+});
+
+test('a new lesson is linked to a stored unit whose checkpoint failed', async () => {
+  const existingUnit = { ...common('unit_n_u1', 'U'), type: 'unit', year_id: 'year_7', subject_id: 'subject_1', lesson_ids: [], blocks: [] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [unitKey('unit_n_u1')]: existingUnit });
+  const original = store.setJSON;
+  store.setJSON = async (key, value) => { if (key.startsWith('versions/')) throw new Error('nope'); return original(key, value); };
+  const report = await applyPlan(store, plan(), { now, rehost });
+  assert.ok(!report.written.includes('unit_n_u1'));
+  assert.deepEqual(store.read(unitKey('unit_n_u1')).lesson_ids, ['lesson_n_l1']);
+});
+
+test('a failed cover on re-import keeps the existing cover and warns once', async () => {
+  const existing = { ...common('unit_n_u1', 'U'), type: 'unit', year_id: 'year_7', subject_id: 'subject_1', lesson_ids: [], blocks: [], cover: { url: 'https://hub.example/api/media/old/file' } };
+  const p = plan();
+  p.media = [{ ...p.media[0], ref: 'cover1', purpose: 'cover', name: 'cover' }];
+  p.entities[0].record.cover = { url: 'notion-media:cover1' };
+  p.entities[1].record.blocks = [];
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [unitKey('unit_n_u1')]: existing });
+  const report = await applyPlan(store, p, { now, rehost: failRehost });
+  assert.deepEqual(store.read(unitKey('unit_n_u1')).cover, { url: 'https://hub.example/api/media/old/file' });
+  const coverWarnings = report.warnings.filter((w) => /Cover/.test(w.message) || /cover/.test(w.message));
+  assert.equal(coverWarnings.length, 1);
+  assert.ok(coverWarnings[0].message.startsWith('Cover wasn\'t imported:'));
+  assert.ok(!/block was replaced/.test(coverWarnings[0].message));
 });

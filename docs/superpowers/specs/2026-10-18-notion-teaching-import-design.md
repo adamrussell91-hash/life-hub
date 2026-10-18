@@ -254,7 +254,7 @@ One PR, with these steps as commits:
    tabs rule falls back to sections. Write down the result in this spec.
 2. **Schemas.** `source` on lesson, unit and class; `kind: 'program'` on
    unit; the `document` entity (Syllabus); video and HTML types and the
-   200 MB cap for server-side imports only.
+   20 MB cap for server-side imports only.
 3. **Reader and mapper,** with tests.
 4. **Rehoster and applier,** with versioning.
 5. **Preview UI.**
