@@ -27,6 +27,9 @@ import {
   applyFixup,
   plainNotes,
   tidyImports,
+  unshoutVisit,
+  knownTags,
+  tagKey,
 } from "./model.js";
 import { paintMagazine, paintTimeline, paintEntry, paintFixup } from "./pages.js";
 import {
@@ -77,6 +80,89 @@ function field(
   input.maxLength = max;
   input.addEventListener("input", () => change(input.value));
   wrap.append(lab, input);
+  return wrap;
+}
+// The phone's location, or null when it is off or refused.
+function whereAmI() {
+  return new Promise((resolve) => {
+    if (!globalThis.navigator?.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+      () => resolve(null),
+      { timeout: 10000, maximumAge: 600000 },
+    );
+  });
+}
+// Tags as chips. Tags used before show as suggestions, filtered as you type.
+function tagField(tags, known, change) {
+  const wrap = el("div", "hub-field food-tags"),
+    id = `food-field-${crypto.randomUUID()}`,
+    lab = el("label", "hub-label", "Tags"),
+    chips = el("div", "hub-chips food-tags__chips"),
+    input = el("input", "hub-input"),
+    hints = el("div", "hub-chips food-tags__hints");
+  lab.htmlFor = id;
+  input.id = id;
+  input.type = "text";
+  input.maxLength = 100;
+  input.enterKeyHint = "done";
+  input.autocomplete = "off";
+  input.placeholder = known.length ? "Type or pick a tag" : "Spicy, would order again";
+  let current = [...tags];
+  const has = (t) => current.some((c) => tagKey(c) === tagKey(t));
+  const add = (raw) => {
+    for (const part of raw.split(",")) {
+      const t = part.replace(/^#/, "").trim().slice(0, 100);
+      if (t && !has(t) && current.length < 40) current.push(t);
+    }
+    input.value = "";
+    change([...current]);
+    paint();
+  };
+  const paintHints = () => {
+    const q = tagKey(input.value);
+    hints.replaceChildren();
+    for (const key of known.filter((k) => !has(k) && k.includes(q)).slice(0, 8)) {
+      const b = button(key, () => add(key));
+      b.className = "hub-chip food-tags__chip";
+      b.setAttribute("aria-label", `Add tag ${key}`);
+      // Keep focus in the field, so a half-typed tag is not added on blur.
+      b.addEventListener("pointerdown", (e) => e.preventDefault());
+      hints.append(b);
+    }
+    hints.hidden = !hints.childElementCount;
+  };
+  const paint = () => {
+    chips.replaceChildren();
+    for (const t of current) {
+      const b = button(t, () => {
+        current = current.filter((c) => c !== t);
+        change([...current]);
+        paint();
+      });
+      b.className = "hub-chip is-active food-tags__chip";
+      b.setAttribute("aria-label", `Remove tag ${t}`);
+      b.append(el("span", "food-tags__x", "×"));
+      b.lastChild.setAttribute("aria-hidden", "true");
+      chips.append(b);
+    }
+    chips.hidden = !current.length;
+    paintHints();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      if (input.value.trim()) add(input.value);
+    }
+  });
+  input.addEventListener("input", () =>
+    input.value.includes(",") ? add(input.value) : paintHints(),
+  );
+  input.addEventListener("blur", () => {
+    if (input.value.trim()) add(input.value);
+  });
+  paint();
+  wrap.append(lab, chips, input, hints);
   return wrap;
 }
 export function createFoodJournalView({
@@ -138,8 +224,11 @@ export function createFoodJournalView({
       n.classList.toggle("food-error", error);
     }
   }
-  function modal(title, trigger) {
-    const frame = el("section", "food-sheet confirm-card"),
+  function modal(title, trigger, { page = false } = {}) {
+    const frame = el(
+        "section",
+        page ? "food-sheet food-sheet--page confirm-card" : "food-sheet confirm-card",
+      ),
       heading = el("h2", "", title),
       fields = el("div", "food-sheet__fields"),
       error = el("p", "food-error");
@@ -730,7 +819,7 @@ export function createFoodJournalView({
     const baseVersion = Object.hasOwn(original, "__draft_version")
       ? original.__draft_version
       : version;
-    let visit = structuredClone(original);
+    let visit = unshoutVisit(structuredClone(original));
     delete visit.__draft_version;
     // Saving a fix-up takes the import out of the queue, including from a resumed draft.
     if (fixup) visit.reviewed = true;
@@ -739,18 +828,22 @@ export function createFoodJournalView({
         ? journal.visits.find((v) => v.id === visit.id)
         : null;
     let reviewedNewerVisit = !newerSavedVisit;
+    // A full page on a phone: a sheet jumps as the keyboard comes and goes.
     const s = modal(
       fixup ? "Fix up entry" : original.title ? "Edit visit" : "Add visit",
       trigger,
+      { page: true },
     );
     let repaintMenu = () => {};
     let dishList = null,
       captureImages = [],
       pendingPhotos = [],
       photoGps = null,
+      hereGps = null,
       dateEdited = false,
       captureBusy = false;
     const persistDraft = () => writeDraft(visit, baseVersion);
+    const tags = knownTags(journal);
     const fields = () => {
       s.fields.replaceChildren();
       if (newerSavedVisit) {
@@ -833,6 +926,8 @@ export function createFoodJournalView({
       }
       s.fields.append(capture);
       repaintMenu = () => {};
+      // The menu sits just above the dishes it fills, after the visit itself.
+      let menuSection = null;
       if (visit.menu_items?.length) {
         const menu = el("section", "food-onmenu");
         menu.setAttribute("aria-label", "On the menu");
@@ -884,8 +979,9 @@ export function createFoodJournalView({
         }
         repaintMenu();
         menu.append(list);
-        s.fields.append(menu);
+        menuSection = menu;
       }
+      s.fields.append(el("h3", "food-sheet__label", "The visit"));
       const where = el("div", "food-pair food-pair--keep");
       where.append(
         field(
@@ -927,9 +1023,12 @@ export function createFoodJournalView({
         async (e) => {
           e.currentTarget.disabled = true;
           try {
+            // Without photo GPS or a saved venue, search near the phone.
+            if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
+              hereGps = await whereAmI();
             const result = await api.places(
               visit.venue.name || "restaurant",
-              photoGps || visit.venue,
+              photoGps || (Number.isFinite(visit.venue.lat) ? visit.venue : hereGps) || {},
             );
             suggestions.replaceChildren();
             for (const p of result.places)
@@ -952,6 +1051,9 @@ export function createFoodJournalView({
             if (!result.places.length)
               s.error.textContent =
                 "No matching venues. Enter the address yourself.";
+            else if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
+              s.error.textContent =
+                "Location is off, so these may be far away. Allow location for Life Hub in Settings, or add the suburb to the venue.";
           } catch (err) {
             s.error.textContent = err.message;
           } finally {
@@ -974,6 +1076,19 @@ export function createFoodJournalView({
         findVenue,
       );
       s.fields.append(address, suggestions);
+      const visitNotes = field(
+        "Visit notes",
+        visit.notes,
+        (v) => {
+          visit.notes = v;
+          persistDraft();
+        },
+        { type: "textarea" },
+      );
+      visitNotes.querySelector("textarea").placeholder =
+        "The place, the service, the company";
+      s.fields.append(visitNotes);
+      if (menuSection) s.fields.append(menuSection);
       s.fields.append(el("h3", "food-sheet__label", "What you ate"));
       dishList?.dispose();
       dishList = createHubList({
@@ -1021,16 +1136,7 @@ export function createFoodJournalView({
             field("Meal type", d.meal_type, (v) => set("meal_type", v), {
               options: MEAL_TYPES,
             }),
-            field("Tags, separated by commas", d.tags.join(", "), (v) =>
-              set(
-                "tags",
-                v
-                  .split(",")
-                  .map((t) => t.trim())
-                  .filter(Boolean)
-                  .slice(0, 40),
-              ),
-            ),
+            tagField(d.tags, tags, (v) => set("tags", v)),
           );
           block.append(top, notes, more);
           const photos = el("div", "food-thumbnails");
@@ -1081,50 +1187,14 @@ export function createFoodJournalView({
             );
             photos.append(wrap);
           }
+          // Dish photos come in through "Add dish photos" at the top, which
+          // reads them; each photo's menu moves it to another dish.
           block.append(photos);
-          const f = el("label", "food-quick__pick food-quick__pick--small btn btn--ghost"),
-            pick = el("input");
-          pick.type = "file";
-          pick.accept = "image/*";
-          pick.multiple = true;
-          pick.setAttribute("aria-label", "Add photos to this dish");
-          f.append(pick, el("span", "", "Add photo"));
-          pick.addEventListener("change", async (e) => {
-            captureBusy = true;
-            save.disabled = true;
-            try {
-              for (const file of [...e.target.files]) {
-                const blob = await compressPhoto(file),
-                  p = await api.upload(blob);
-                d.photos.push(p);
-                const url = URL.createObjectURL(blob);
-                objectUrls.add(url);
-                photoCache.set(p.key, url);
-                photos.append(photoNode(p));
-              }
-              set("photos", d.photos);
-            } catch (err) {
-              s.error.textContent = err.message;
-            } finally {
-              captureBusy = false;
-              save.disabled = false;
-            }
-          });
-          block.append(f);
           return block;
         },
       });
       s.fields.append(dishList.el);
       s.fields.append(
-        field(
-          "Visit notes",
-          visit.notes,
-          (v) => {
-            visit.notes = v;
-            persistDraft();
-          },
-          { type: "textarea" },
-        ),
         field(
           "Visit title",
           visit.title,

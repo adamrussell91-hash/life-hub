@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   emptyJournal,
   newVisit,
+  unshout,
+  knownTags,
   newDish,
   menuDishes,
   importDayOne,
@@ -279,11 +281,13 @@ test("media reads require a live journal reference and uploads use food namespac
   j.visits[0].dishes[0].photos = [
     { id: "photo_1", key: "food/photos/photo_1.jpg" },
   ];
+  const stored = new Map();
   const h = createFoodJournalMediaHandler(
     deps(repo(j), {
-      signPut: async (o) => {
+      putObject: async (o) => {
         assert.match(o.key, /^food\/photos\//);
-        return "https://r2.test/put";
+        assert.equal(o.contentType, "image/jpeg");
+        stored.set(o.key, o.body);
       },
       signGet: async () => "https://r2.test/get",
       env: {
@@ -319,11 +323,22 @@ test("media reads require a live journal reference and uploads use food namespac
     (await h(req("POST", { action: "read", keys: ["../secret.jpg"] }))).status,
     400,
   );
-  assert.equal(
-    (await h(req("POST", { action: "upload", mime: "image/jpeg", size: 20 })))
-      .status,
-    200,
-  );
+  // The photo goes to the function itself, never a browser PUT to R2.
+  const upload = (bytes) =>
+    h(
+      new Request("https://example.test/api/food-journal-media", {
+        method: "POST",
+        headers: { "content-type": "image/jpeg" },
+        body: bytes,
+      }),
+    );
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const sent = await upload(jpeg);
+  assert.equal(sent.status, 200);
+  const { key } = (await sent.json()).data;
+  assert.match(key, /^food\/photos\/photo_[\w-]+\.jpg$/);
+  assert.deepEqual([...stored.get(key)], [...jpeg]);
+  assert.equal((await upload(new Uint8Array([1, 2, 3, 4]))).status, 400);
 });
 // The page lives on life-hub.adam-russell.com and the API on another host, so
 // Safari reports "Load failed" for any answer that lacks CORS headers.
@@ -1121,4 +1136,39 @@ test("schema checks stored menu items", () => {
     bad.visits[0].menu_items = broken;
     assert.throws(() => validateFoodJournal(bad), /invalid/i);
   }
+});
+test("menu text printed in capitals reads as names and sentences", () => {
+  assert.equal(unshout("CHICKEN SCHNITZEL WRAP"), "Chicken Schnitzel Wrap");
+  assert.equal(unshout("FISH AND CHIPS (GF)"), "Fish and Chips (GF)");
+  assert.equal(
+    unshout("CHICKEN SCHNITZEL, LETTUCE, MAYO", { sentence: true }),
+    "Chicken schnitzel, lettuce, mayo",
+  );
+  assert.equal(unshout("BBQ pork"), "BBQ pork");
+  assert.equal(unshout("Soba noodles"), "Soba noodles");
+  const merged = mergeCapture(newVisit(), {
+    title: "",
+    venue: { name: "THE BAY CAFE", address: "" },
+    menu_text: "",
+    menu_items: [{ name: "PORK GYOZA", description: "FIVE PIECES", price: "9" }],
+    dishes: [{ title: "PORK GYOZA", cuisine: "", meal_type: "Lunch", tags: [], notes: "" }],
+  });
+  assert.equal(merged.venue.name, "The Bay Cafe");
+  assert.deepEqual(merged.menu_items[0], {
+    name: "Pork Gyoza",
+    description: "Five pieces",
+    price: "9",
+  });
+  assert.equal(merged.dishes[0].title, "Pork Gyoza");
+});
+test("known tags come from earlier visits, most used first", () => {
+  const j = fixture();
+  j.visits[0].dishes[0].tags = ["Spicy", "share"];
+  j.visits.push({
+    ...structuredClone(j.visits[0]),
+    id: "visit_2",
+    notes: "",
+    dishes: [{ ...structuredClone(j.visits[0].dishes[0]), id: "dish_2", tags: ["spicy"] }],
+  });
+  assert.deepEqual(knownTags(j).slice(0, 2), ["spicy", "share"]);
 });
