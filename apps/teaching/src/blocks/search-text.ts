@@ -76,6 +76,10 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, c.title);
       push(parts, htmlToPlainText(String(c.html ?? '')));
       break;
+    case 'countdown':
+      push(parts, c.title);
+      push(parts, c.note);
+      break;
     case 'peer_feedback':
       push(parts, c.prompt);
       push(parts, c.strength_prompt);
@@ -127,6 +131,7 @@ function extractBlock(block: Block, parts: string[]): void {
     }
     case 'spacer':
     case 'divider':
+    case 'classroom_tools':
     case 'teacher_note':
       break;
     case 'toolkit_skill':

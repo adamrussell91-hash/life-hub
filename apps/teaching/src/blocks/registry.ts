@@ -14,6 +14,8 @@ import {
   createDefinitionEditor,
   createDiagramEditor,
   createDividerEditor,
+  createClassroomToolsEditor,
+  createCountdownEditor,
   createEmbedEditor,
   createEquationEditor,
   createFlashcardsEditor,
@@ -155,8 +157,16 @@ export const blockRegistry: {
     createEditor: createQuoteEditor
   },
   divider: {
-    render: renderDividerBlock,
+    render: (block, mode) => renderDividerBlock(block, mode),
     createEditor: createDividerEditor
+  },
+  classroom_tools: {
+    render: (block, mode) => renderBlock(block, mode),
+    createEditor: createClassroomToolsEditor
+  },
+  countdown: {
+    render: (block, mode) => renderBlock(block, mode),
+    createEditor: createCountdownEditor
   },
   definition: {
     render: renderDefinitionBlock,

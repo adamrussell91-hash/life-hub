@@ -78,6 +78,8 @@ export const PULSE_OPTION_IDS = PULSE_OPTIONS.map((option) => option.id);
 const EXCLUDED_TYPES = new Set<Block['block_type']>([
   'heading',
   'divider',
+  'classroom_tools',
+  'countdown',
   'spacer',
   'section',
   'columns',

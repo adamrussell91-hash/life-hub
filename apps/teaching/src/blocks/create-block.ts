@@ -24,6 +24,8 @@ export const NEW_BLOCK_TYPES = [
   'callout',
   'quote',
   'divider',
+  'classroom_tools',
+  'countdown',
   'definition',
   'code',
   'html',
@@ -87,6 +89,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   callout: 'Callout',
   quote: 'Quote',
   divider: 'Divider',
+  classroom_tools: 'Classroom tools',
+  countdown: 'Countdown',
   definition: 'Definition',
   code: 'Code',
   html: 'HTML',
@@ -195,7 +199,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Teaching',
-    types: ['outcomes']
+    types: ['outcomes', 'classroom_tools', 'countdown']
   },
   {
     label: 'Thinking Toolkit',
@@ -526,7 +530,21 @@ export function createBlock(type: NewBlockType, id: string): Block {
         ...shared,
         block_type: 'divider',
         variant: 'medium',
-        content: {}
+        content: { tools: true, timer_stack: [] }
+      };
+    case 'classroom_tools':
+      return {
+        ...shared,
+        block_type: 'classroom_tools',
+        variant: 'medium',
+        content: { timer_stack: [] }
+      };
+    case 'countdown':
+      return {
+        ...shared,
+        block_type: 'countdown',
+        variant: 'medium',
+        content: { title: '', due_date: '', due_time: '15:00', set_date: '', note: '' }
       };
     case 'definition':
       return {

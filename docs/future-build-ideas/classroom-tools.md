@@ -64,12 +64,17 @@ Student toolbox: timer, stopwatch, technique spinner, coin and dice.
 
 Not chosen for now: wait-time, traffic light, sentence starter spinner, writing prompt, who's next queue, seat shuffle.
 
-## Technique scan
+## Built (18 Oct 2026)
 
-- **Source:** the Passage Scanner from the Periodic Table widget. It uses the OpenAI API, which is fine.
-- **Teacher checks first.** Adam reviews and ticks the scan's list before students get anything. Unreviewed hits and the model's explanations never reach students.
-- **Plumbing built:** job and poll on `/api/text-tools` (`tool: 'techniques'`), reply parser, save on `settings.technique_scan`, approval, spinner list and the student filter. Tests cover each part.
-- **Left for ChatGPT:** the scan call itself, the teacher review screen and the spinner hook-up. See [classroom-tools/technique-scan-todo.md](classroom-tools/technique-scan-todo.md).
+Adam asked for all of it to be built. It is live in the Teaching Hub:
+
+- **Divider tools.** Every divider has the faint gear unless it is switched off in the divider's settings. The settings also hold the saved timer stack, with presets.
+- **Classroom tools block** (Teaching group). Same toolbox in its own slot, with an optional tool to open on.
+- **Tools:** stacked timer, stopwatch, name picker, random number, groups, technique spinner, team scoreboard, coin and dice. Mute on every tool, full screen for the board.
+- **Student view:** timer (their own copy), stopwatch, technique spinner, coin and dice.
+- **Students section on each class page.** Type or paste the list once. Skip in picker is set only there. The name picker and groups read the class records at run time on the teacher side, so names never sit in a lesson or reach a student page. The published class page never includes the list.
+- **Countdown block** (Teaching group). Assessment header with the task, due day and time, days left counting every day, and a bar of days gone when a set date is given.
+- **Technique scan** button and review screen on text blocks. Only the scan call itself waits on the widget's Passage Scanner: see [classroom-tools/technique-scan-todo.md](classroom-tools/technique-scan-todo.md).
 
 ## Open questions
 
@@ -77,6 +82,7 @@ Not chosen for now: wait-time, traffic light, sentence starter spinner, writing 
 
 ## History
 
+- **2026-10-18:** Built in full: divider tools, Classroom tools block, all chosen tools, Students section on classes, countdown block, technique review screen and spinner. Only the scan call is left for ChatGPT.
 - **2026-10-17:** The technique scan uses the widget's Passage Scanner, and Adam checks the list before students see it. Plumbing built, with a to-do list for ChatGPT. The countdown counts every day, including weekends, holidays and pupil-free days.
 - **2026-10-17:** Adam chose the technique spinner (scan first, relevant techniques only), stopwatch, coin flip, team scoreboard, timer presets, and a countdown header block for the assessment page. Skip applies to the name picker only. No preferred-name field. Mockup updated.
 - **2026-10-17:** Skip in picker lives only in the class Students section, students get their own timer copy, mute switch added. Suggested a list of further tools. Mockup updated.
