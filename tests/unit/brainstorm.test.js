@@ -80,7 +80,11 @@ test('students see only their own answers unless the teacher shares the board, a
   await submit(store, a, 'Guilt');
   await submit(store, b, 'Chaos');
   await submit(store, b, 'you idiot');
-  assert.equal((await learn(store, a)).board, null);
+  const own = (await learn(store, a)).board;
+  assert.deepEqual([own.revealed, own.answers, own.count], [false, [], 2]);
+  await teach(store, { action: 'reveal' });
+  assert.deepEqual((await learn(store, a)).board.answers, [], 'own: no text even after reveal');
+  await teach(store, { action: 'hide' });
   await teach(store, { action: 'students_see', value: 'all' });
   const before = (await learn(store, a)).board;
   assert.deepEqual([before.revealed, before.answers, before.count], [false, [], 2]);
@@ -108,6 +112,25 @@ test('hidden until reveal: nothing leaks before reveal, and revealing closes ans
   assert.equal(revealed.open, false);
   assert.deepEqual((await learn(store, a)).board.answers.map(x => x.text).sort(), ['Humbled', 'Powerless']);
   await assert.rejects(submit(store, a, 'late idea'), /closed/);
+});
+
+test('students always see the orbit as symbols, untraceable to any card', async () => {
+  const store = storeFixture({ safety: 'instant' });
+  const { students: [a, b] } = await startWith(store, 2);
+  await submit(store, a, 'Guilt');
+  await submit(store, b, 'Chaos');
+  const t = await teach(store, {});
+  const symbols = t.answers.map(x => x.symbol).sort();
+  const before = (await learn(store, a)).board;
+  assert.deepEqual(before.orbit.map(o => o.symbol).sort(), symbols);
+  assert.deepEqual(before.orbit, (await learn(store, a)).board.orbit, 'stable between polls');
+  await teach(store, { action: 'students_see', value: 'all' });
+  await teach(store, { action: 'reveal' });
+  const after = (await learn(store, a)).board;
+  const seen = JSON.stringify([after.answers, after.orbit.map(o => o.id)]);
+  for (const x of t.answers) assert.ok(!seen.includes(x.id), 'no real answer id reaches a student');
+  const cardIds = new Set(after.answers.map(x => x.id));
+  assert.ok(after.orbit.every(o => !cardIds.has(o.id)), 'a shape never shares an id with a card');
 });
 
 test('symbols stay hidden from students unless the teacher shows them', async () => {

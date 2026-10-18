@@ -136,7 +136,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
       toggle('Symbols on cards', s.symbols_on_cards, 'Show who wrote each card by their symbol. Turn off to show answers with no hint of who wrote them.', (on) =>
         void send('symbols_on_cards', { show: on })
       ),
-      toggle('Students see all answers', s.students_see === 'all', 'Off: students see only their own answers. On: they see the board as you reveal it, without symbols.', (on) =>
+      toggle('Students see all answers', s.students_see === 'all', 'Students always see the shapes orbiting. Off: they see only their own answers. On: they also see everyone’s answers when you reveal, without symbols.', (on) =>
         void send('students_see', { value: on ? 'all' : 'own' })
       ),
       toggle('Show student symbols', s.show_symbols, 'Each student sees their own symbol in the corner of the block, so you can match a symbol to a student.', (on) =>

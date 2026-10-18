@@ -17,7 +17,14 @@ type StudentState =
       safety?: 'instant' | 'approve' | 'reveal';
       revealed?: boolean;
       mine?: Array<{ text: string; status: Status }>;
-      board?: null | { revealed: boolean; layout: Layout; count: number; answers: Array<{ id: string; text: string }>; groups: BoardGroup[] | null };
+      board?: null | {
+        revealed: boolean;
+        layout: Layout;
+        count: number;
+        orbit?: Array<{ id: string; symbol: string | null }>;
+        answers: Array<{ id: string; text: string }>;
+        groups: BoardGroup[] | null;
+      };
     };
 type Live = Extract<StudentState, { phase: 'live' }>;
 /** What a device keeps: the round it joined and its secret token. Never its symbol. */
@@ -258,6 +265,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
         layout: s.board.layout,
         answers: s.board.answers,
         count: s.board.count,
+        orbit: s.board.orbit,
         symbolsOnCards: false,
         groups: s.board.groups
       });
