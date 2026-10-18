@@ -157,6 +157,8 @@ export const QuestionQuadrantContentSchema = z.object({
   guide: z.string().default(''),
   stimulus: z.string().default(''),
   procedure: z.enum(['sort', 'create']).default('sort'),
+  /** Students send their own questions and place them on the quadrant (live, published lesson). */
+  collect_questions: z.boolean().default(false),
   questions: z
     .array(z.object({ id: z.string().min(1), text: z.string(), quadrant: QuadrantSchema }))
     .max(16)

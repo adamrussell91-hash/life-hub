@@ -15,8 +15,10 @@ import {
 import { analogyMove, type AnalogyMoveBlock, type AnalogyMoveType } from '@/toolkit/analogy-moves';
 import { analogyIconSvg } from '@/toolkit/analogy-icons';
 import { classLabel } from '@/toolkit/class-context';
+import { authoredPoint, mapLayer, mountClassQuestions, mountStudentQuestions, numberMarker } from '@/toolkit/quadrant-live';
 import {
   CONCEPT_CRITERIA,
+  QUADRANT_AXIS_DEFINITION,
   QUADRANT_DEFINITION,
   QUADRANT_LABEL,
   QUADRANT_RESPOND,
@@ -788,7 +790,7 @@ const QUADRANT_AXES: Record<Quadrant, string> = {
   inquiry: 'Intellectual · Open'
 };
 
-function quadrantGrid(): HTMLElement {
+function quadrantGrid(): { wrap: HTMLElement; grid: HTMLElement } {
   const wrap = el('div', 'tk-quadrant');
   wrap.setAttribute('role', 'group');
   wrap.setAttribute('aria-label', 'Question Quadrant');
@@ -809,7 +811,19 @@ function quadrantGrid(): HTMLElement {
     grid.append(tile);
   }
   wrap.append(grid);
-  return wrap;
+  return { wrap, grid };
+}
+
+/** What closed, open, textual and intellectual mean, so students know what they are sorting by. */
+function quadrantAxisKey(): HTMLElement {
+  const key = el('dl', 'tk-axis-key');
+  for (const axis of ['closed', 'open', 'textual', 'intellectual'] as const) {
+    const [term, ...rest] = QUADRANT_AXIS_DEFINITION[axis].split(': ');
+    const row = el('div', 'tk-axis-key__row');
+    row.append(el('dt', undefined, term), el('dd', undefined, rest.join(': ')));
+    key.append(row);
+  }
+  return key;
 }
 
 function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
@@ -823,8 +837,32 @@ function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: T
     wrap.append(quote);
   }
   const scroll = el('div', 'tk-scroll');
-  scroll.append(quadrantGrid());
-  wrap.append(scroll);
+  const { wrap: map, grid } = quadrantGrid();
+  scroll.append(map);
+  wrap.append(scroll, quadrantAxisKey());
+
+  // Your own questions sit on the map by number: always for the teacher, once revealed for students.
+  const authored = mode === 'print' || !c.questions.length ? null : mapLayer(grid, 'tk-quadrant__layer--authored');
+  const markers = new Map<string, HTMLElement>();
+  if (authored) {
+    const seen: Record<string, number> = {};
+    c.questions.forEach((question, i) => {
+      const nth = (seen[question.quadrant] = (seen[question.quadrant] ?? -1) + 1);
+      const marker = numberMarker(i + 1, authoredPoint(question.quadrant, nth), question.text);
+      marker.hidden = mode !== 'teacher';
+      markers.set(question.id, marker);
+      authored.append(marker);
+    });
+  }
+
+  const live = c.collect_questions && !!ctx.lessonId && mode !== 'print';
+  if (live) {
+    const host = el('section', 'tk-class');
+    const layer = mapLayer(grid, mode === 'teacher' ? 'tk-quadrant__layer--class' : 'tk-quadrant__layer--ask');
+    if (mode === 'teacher') mountClassQuestions(host, layer, scroll, { lessonId: ctx.lessonId!, blockId: block.id });
+    else mountStudentQuestions(host, layer, { lessonId: ctx.lessonId!, blockId: block.id });
+    wrap.append(host);
+  }
 
   const test = el('div', 'tk-respond');
   test.append(el('p', 'tk-respond__question', 'What do I need to do to respond to this question?'));
@@ -865,7 +903,11 @@ function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: T
           blockId: block.id,
           part: `${question.id}.where`,
           label: 'Where it goes',
-          body: QUADRANT_LABEL[question.quadrant]
+          body: QUADRANT_LABEL[question.quadrant],
+          onToggle: (open) => {
+            const marker = markers.get(question.id);
+            if (marker && mode !== 'teacher') marker.hidden = !open;
+          }
         })
       );
       list.append(li);
