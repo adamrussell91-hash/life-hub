@@ -118,6 +118,10 @@ export function scheduleAnchorKey() {
   return 'meta/schedule_anchor_date';
 }
 
+export function mediaFoldersKey() {
+  return 'meta/media_folders';
+}
+
 export async function defaultGetContentStore(env = process.env) {
   const { getStore } = await import('@netlify/blobs');
   return getStore(teachingStoreOptions(env));
