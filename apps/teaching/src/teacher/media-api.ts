@@ -1,7 +1,7 @@
-import { apiPatch, apiPost, ApiClientError } from '@/api/client';
+import { apiPatch, apiPost, apiPut, ApiClientError } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import type { ApiResult } from '@/api/types';
-import type { Media } from '@/schemas';
+import type { Media, MediaFolder } from '@/schemas';
 
 export async function createMedia(body: {
   title: string;
@@ -29,9 +29,16 @@ export async function patchMedia(
     sharing: Media['sharing'];
     mime_type: string;
     file_name: string;
+    folder_id: string | null;
   }>
 ): Promise<Media> {
   return apiPatch<Media>(`/api/media/${id}`, body);
+}
+
+/** Replaces the whole Resource Library folder tree. */
+export async function saveMediaFolders(folders: MediaFolder[]): Promise<MediaFolder[]> {
+  const result = await apiPut<{ folders: MediaFolder[] }>('/api/media-folders', { folders });
+  return result.folders;
 }
 
 function isApiResult<T>(value: unknown): value is ApiResult<T> {
