@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyPlan, replacePlaceholders } from '../../netlify/functions/_shared/notion-apply.mjs';
 import { NOTION_SOURCE_MAP_KEY } from '../../netlify/functions/_shared/notion-import-store.mjs';
-import { draftLessonKey, subjectKey, unitKey, versionIndexKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
+import { classKey, draftLessonKey, subjectKey, unitKey, versionIndexKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 
 const now = '2026-10-18T00:00:00.000Z';
 function memoryStore(seed = {}) {
@@ -72,10 +72,10 @@ test('re-import keeps lessons added to the unit in the Teaching Hub', async () =
   assert.deepEqual(store.read(unitKey('unit_n_u1')).lesson_ids, ['lesson_n_l1', 'lesson_hub_only']);
 });
 
-test('a failed download keeps the original url and adds a warning', async () => {
+test('a failed download warns with file_too_big and does not keep the original url', async () => {
   const store = memoryStore({ [subjectKey('subject_1')]: subject });
   const report = await applyPlan(store, plan(), { now, rehost: async () => ({ ok: false, reason: 'too_big', message: 'big' }) });
-  assert.equal(store.read(draftLessonKey('lesson_n_l1')).blocks[0].content.url, 'https://files.example/i.png');
+  assert.ok(!JSON.stringify(store.read(draftLessonKey('lesson_n_l1'))).includes('files.example'));
   assert.ok(report.warnings.some((w) => w.rule === 'file_too_big'));
 });
 
@@ -139,4 +139,174 @@ test('re-import does not duplicate subject unit_ids', async () => {
   await applyPlan(store, plan(), { now, rehost });
   await applyPlan(store, plan(), { now, rehost });
   assert.deepEqual(store.read(subjectKey('subject_1')).unit_ids, ['unit_n_u1']);
+});
+
+// ---- review round: orphans, honest media failures, safe re-import merge ----
+const failRehost = async () => ({ ok: false, reason: 'too_big', message: 'i.png is over 20 MB, so it wasn\'t imported.' });
+const badLesson = () => { const p = plan(); p.entities[1].record.sequence = 'x'; return p; };
+const unitOnlyBad = () => { const p = plan(); p.entities[0].record.year_id = 5; return p; };
+
+test('a lesson whose plan unit failed validation is skipped with a warning', async () => {
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  const report = await applyPlan(store, unitOnlyBad(), { now, rehost });
+  assert.deepEqual(report.written, []);
+  assert.equal(store.read(draftLessonKey('lesson_n_l1')), null);
+  assert.ok(report.warnings.some((w) => w.rule === 'invalid' && w.message === '“L” was not imported because its unit “U” was not imported.'));
+  assert.ok(report.skipped.some((s) => s.page_id === 'l1'));
+});
+
+test('a lesson is kept when its failed plan unit already exists in the store', async () => {
+  const existingUnit = { ...common('unit_n_u1', 'U'), type: 'unit', year_id: 'year_7', subject_id: 'subject_1', lesson_ids: [], blocks: [] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [unitKey('unit_n_u1')]: existingUnit });
+  const report = await applyPlan(store, unitOnlyBad(), { now, rehost });
+  assert.deepEqual(report.written, ['lesson_n_l1']);
+});
+
+test('a unit whose subject does not exist is skipped, and so is its lesson', async () => {
+  const store = memoryStore();
+  const report = await applyPlan(store, plan(), { now, rehost });
+  assert.deepEqual(report.written, []);
+  assert.ok(report.warnings.filter((w) => w.rule === 'invalid').length >= 2);
+});
+
+test('a lesson whose outside unit is not in the store is skipped', async () => {
+  const p = plan({ entities: [plan().entities[1]], media: [] });
+  p.entities[0].record.unit_id = 'unit_gone';
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  const report = await applyPlan(store, p, { now, rehost });
+  assert.deepEqual(report.written, []);
+  assert.ok(report.warnings.some((w) => w.rule === 'invalid'));
+});
+
+test('new subjects are only created when a ready entity uses them', async () => {
+  const p = plan({ new_subjects: [{ id: 'subject_n_unused', title: 'Unused' }] });
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  await applyPlan(store, p, { now, rehost });
+  assert.equal(store.read(subjectKey('subject_n_unused')), null);
+});
+
+test('a new subject is not created when its only unit fails', async () => {
+  const p = unitOnlyBad();
+  p.new_subjects = [{ id: 'subject_n_new', title: 'New' }];
+  p.entities[0].record.subject_id = 'subject_n_new';
+  const store = memoryStore();
+  await applyPlan(store, p, { now, rehost });
+  assert.equal(store.read(subjectKey('subject_n_new')), null);
+});
+
+test('failed image becomes a warning callout with the same id, never the signed url', async () => {
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  const report = await applyPlan(store, plan(), { now, rehost: failRehost });
+  const block = store.read(draftLessonKey('lesson_n_l1')).blocks[0];
+  assert.equal(block.id, 'blk_1');
+  assert.equal(block.block_type, 'callout');
+  assert.equal(block.content.style, 'warning');
+  assert.equal(block.content.body, 'i.png couldn\'t be imported (i.png is over 20 MB, so it wasn\'t imported.). Upload it again from Notion.');
+  assert.ok(!JSON.stringify(store.read(draftLessonKey('lesson_n_l1'))).includes('files.example'));
+  assert.ok(report.warnings.every((w) => !/original file/.test(w.message)));
+  assert.ok(report.warnings.some((w) => w.rule === 'file_too_big'));
+});
+
+test('failed media nested in a section is replaced', async () => {
+  const p = plan();
+  const section = { id: 'sec_1', type: 'block', block_type: 'section', variant: 'medium', visibility: 'student_teacher',
+    content: { title: 'S', blocks: [img] }, layout: {}, print: {}, settings: {}, created_at: now, updated_at: now, schema_version: 1 };
+  p.entities[1].record.blocks = [section];
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  await applyPlan(store, p, { now, rehost: failRehost });
+  const inner = store.read(draftLessonKey('lesson_n_l1')).blocks[0].content.blocks[0];
+  assert.equal(inner.block_type, 'callout');
+  assert.equal(inner.id, 'blk_1');
+});
+
+test('a failed html ref becomes a callout, not an empty html_app', async () => {
+  const p = plan();
+  const html = { ...img, id: 'blk_h', block_type: 'html_app', content: { html: 'notion-media:img1' } };
+  p.entities[1].record.blocks = [html];
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  await applyPlan(store, p, { now, rehost: failRehost });
+  assert.equal(store.read(draftLessonKey('lesson_n_l1')).blocks[0].block_type, 'callout');
+});
+
+test('a failed cover is deleted with a warning', async () => {
+  const p = plan();
+  p.entities[0].record.cover = { url: 'notion-media:img1' };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  const report = await applyPlan(store, p, { now, rehost: failRehost });
+  assert.equal('cover' in store.read(unitKey('unit_n_u1')), false);
+  assert.ok(report.warnings.some((w) => w.message.startsWith('Cover wasn\'t imported:')));
+});
+
+test('a lesson moved to another unit is removed from the old unit', async () => {
+  const oldUnit = { ...common('unit_old', 'Old'), type: 'unit', year_id: 'year_7', subject_id: 'subject_1', lesson_ids: ['lesson_n_l1', 'keep'], blocks: [] };
+  const existing = { ...common('lesson_n_l1', 'L'), type: 'lesson', unit_id: 'unit_old', sequence: 1, blocks: [] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [unitKey('unit_old')]: oldUnit, [draftLessonKey('lesson_n_l1')]: existing });
+  await applyPlan(store, plan(), { now, rehost });
+  assert.deepEqual(store.read(unitKey('unit_old')).lesson_ids, ['keep']);
+});
+
+test('a unit whose subject changed is moved between subject lists', async () => {
+  const other = { ...subject, id: 'subject_old', unit_ids: ['unit_n_u1'] };
+  const existing = { ...common('unit_n_u1', 'U'), type: 'unit', year_id: 'year_7', subject_id: 'subject_old', lesson_ids: [], blocks: [] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [subjectKey('subject_old')]: other, [unitKey('unit_n_u1')]: existing });
+  await applyPlan(store, plan(), { now, rehost });
+  assert.deepEqual(store.read(subjectKey('subject_old')).unit_ids, []);
+  assert.deepEqual(store.read(subjectKey('subject_1')).unit_ids, ['unit_n_u1']);
+});
+
+test('an archived or binned entity keeps its status and warns', async () => {
+  const existing = { ...common('lesson_n_l1', 'Old'), type: 'lesson', unit_id: 'unit_n_u1', sequence: 1, blocks: [], status: 'trashed', trashed_at: 't', previous_status: 'active', trash_reason: 'r' };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [draftLessonKey('lesson_n_l1')]: existing });
+  const report = await applyPlan(store, plan(), { now, rehost });
+  const lesson = store.read(draftLessonKey('lesson_n_l1'));
+  assert.deepEqual([lesson.status, lesson.trashed_at, lesson.previous_status, lesson.trash_reason], ['trashed', 't', 'active', 'r']);
+  assert.equal(lesson.title, 'L');
+  assert.ok(report.warnings.some((w) => w.message === '“L” is in the bin in the Teaching Hub; it was updated but left there.'));
+});
+
+test('stale kind, cover and outcome_ids are dropped when Notion no longer has them', async () => {
+  const existing = { ...common('unit_n_u1', 'U'), type: 'unit', kind: 'program', year_id: 'year_7', subject_id: 'subject_1', lesson_ids: [], blocks: [], cover: { url: 'https://x.example/c.png' }, outcome_ids: ['o1'] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [unitKey('unit_n_u1')]: existing });
+  await applyPlan(store, plan(), { now, rehost });
+  const unit = store.read(unitKey('unit_n_u1'));
+  assert.equal('kind' in unit, false);
+  assert.equal('cover' in unit, false);
+  assert.equal('outcome_ids' in unit, false);
+});
+
+test('an existing class code is kept', async () => {
+  const cls = { ...common('class_n_c1', 'C'), type: 'class', subject_id: 'subject_1', year_id: 'year_7', code: '7SCI1', active_unit_ids: [], homepage: { custom: [], announcements: [], resources: [] } };
+  const planned = { ...cls, code: 'NEW' };
+  const p = plan({ entities: [{ page_id: 'c1', parent_page_id: null, kind: 'class', label: 'Class', id: 'class_n_c1', title: 'C', existing: true, needs: [], suggested: {}, record: planned }], media: [] });
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [classKey('class_n_c1')]: cls });
+  await applyPlan(store, p, { now, rehost });
+  assert.equal(store.read(classKey('class_n_c1')).code, '7SCI1');
+});
+
+test('a lesson that fails on re-import stays linked in its unit', async () => {
+  const existingLesson = { ...common('lesson_n_l1', 'Old'), type: 'lesson', unit_id: 'unit_n_u1', sequence: 1, blocks: [] };
+  const existingUnit = { ...common('unit_n_u1', 'U'), type: 'unit', year_id: 'year_7', subject_id: 'subject_1', lesson_ids: ['lesson_n_l1'], blocks: [] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [unitKey('unit_n_u1')]: existingUnit, [draftLessonKey('lesson_n_l1')]: existingLesson });
+  await applyPlan(store, badLesson(), { now, rehost });
+  assert.deepEqual(store.read(unitKey('unit_n_u1')).lesson_ids, ['lesson_n_l1']);
+  assert.equal(store.read(draftLessonKey('lesson_n_l1')).title, 'Old');
+});
+
+test('a throwing rehost does not abort the apply', async () => {
+  const store = memoryStore({ [subjectKey('subject_1')]: subject });
+  const report = await applyPlan(store, plan(), { now, rehost: async () => { throw new Error('boom'); } });
+  assert.deepEqual(report.written.sort(), ['lesson_n_l1', 'unit_n_u1']);
+  assert.ok(report.warnings.some((w) => w.rule === 'file_failed'));
+});
+
+test('when the version checkpoint fails the existing entity is not replaced', async () => {
+  const existing = { ...common('lesson_n_l1', 'Old'), type: 'lesson', unit_id: 'unit_n_u1', sequence: 1, blocks: [] };
+  const store = memoryStore({ [subjectKey('subject_1')]: subject, [draftLessonKey('lesson_n_l1')]: existing });
+  const original = store.setJSON;
+  store.setJSON = async (key, value) => { if (key.startsWith('versions/')) throw new Error('nope'); return original(key, value); };
+  const report = await applyPlan(store, plan(), { now, rehost });
+  assert.equal(store.read(draftLessonKey('lesson_n_l1')).title, 'Old');
+  assert.ok(!report.written.includes('lesson_n_l1'));
+  assert.ok(report.skipped.some((s) => s.page_id === 'l1'));
+  assert.ok(report.warnings.some((w) => w.message === 'Version history couldn\'t be saved for “L”, so it wasn\'t replaced. Try the import again.'));
 });

@@ -38,7 +38,8 @@ export function createMediaFileHandler(deps = {}) {
       status: 200,
       headers: {
         'content-type': contentType,
-        'cache-control': 'public, max-age=86400'
+        'cache-control': 'public, max-age=86400',
+        'x-content-type-options': 'nosniff'
       }
     }), request, env);
   }, deps);

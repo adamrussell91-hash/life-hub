@@ -20,7 +20,7 @@ brought over again after a fix. It is not a sync.
 | Source | Notion public API, through an integration token held as a Netlify secret. The integration has access to the Teaching database only. |
 | Selection | Per page, with a preview. Child items can be unticked before import. |
 | Re-import | Matched by Notion page ID. Notion wins: the existing copy is saved to version history, then replaced. |
-| Big files | Stored in Netlify Blobs, written by the server. Import cap is 200 MB per file, and video types are allowed for imports only. Files over the cap are skipped, keep their original link and get a warning. Expected to be rare. |
+| Big files | Stored in Netlify Blobs, written by the server. Import cap is 20 MB per file, and video types are allowed for imports only. The cap exists because files are served through a Netlify function, which can stream at most 20 MB per response. Bigger files are skipped with a warning, so re-host them on YouTube, Vimeo or Drive. Expected to be rare. |
 | Synced blocks, mentions, inline comments | Plain text. |
 | Linked databases | Skipped. |
 | Text colour and highlights | Dropped. Text renders in the theme's normal colour. |
@@ -216,8 +216,11 @@ Teaching Hub → Create → **Import from Notion**.
   message with the fix.
 - **Notion rate limit (429):** the reader backs off and retries, respecting
   `Retry-After`.
-- **A file download fails or is too big:** the block stays, pointing at its
-  original URL, with a warning.
+- **A file download fails or is too big:** the block becomes a warning callout
+  (same block id) saying the file couldn't be imported and to upload it again
+  from Notion, with a warning in the report. A failed cover is dropped. Notion's
+  signed file URLs expire within about an hour, so the original link is never
+  kept.
 - **An entity fails its schema check:** that entity is skipped and reported,
   and the others still import.
 - **Crash part-way through:** applying again is safe. Entities are matched by

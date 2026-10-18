@@ -316,3 +316,15 @@ test('html-app-ai stays public, 503s without Blobs, and completes an enabled lan
   assert.equal((await response.json()).data.text, 'hello');
   assert.equal(completed, 1);
 });
+
+test('media file responses are nosniff', async () => {
+  const handler = createMediaFileHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'media/f': { id: 'f', status: 'active', mime_type: 'image/png' },
+      'media_files/f': { data: new Uint8Array([1]).buffer, metadata: {} }
+    })
+  });
+  const response = await handler(jsonRequest('https://api.adam-russell.com/api/media/f/file'));
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+});
