@@ -22,6 +22,7 @@ function blockLabel(block: Block): string {
   if (block.block_type === 'heading') return truncate(block.content.text) || 'Heading';
   if (block.block_type === 'question_set') return truncate(block.content.title ?? '') || 'Question set';
   if (block.block_type === 'self_check') return truncate(block.content.title ?? '') || 'Self check';
+  if (block.block_type === 'discern_confirm') return 'Discern Confirm';
   return NEW_BLOCK_LABEL[block.block_type] ?? block.block_type;
 }
 

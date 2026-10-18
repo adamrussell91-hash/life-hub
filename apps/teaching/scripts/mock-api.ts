@@ -99,6 +99,8 @@ import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
+import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
+import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
@@ -3434,7 +3436,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
     };
     const path = pathWithQuery.split('?')[0]!;
-    const handler = path.startsWith('/api/lessons/')
+    const handler = /\/discern$/.test(path)
+      ? createLessonDiscernHandler(deps)
+      : path.startsWith('/api/published/discern/')
+        ? createPublishedDiscernHandler(deps)
+        : path.startsWith('/api/lessons/')
       ? createQuizHandler(deps)
       : path.startsWith('/api/published/quiz/')
         ? createPublishedQuizHandler(deps)
@@ -3443,7 +3449,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       new Request(`http://mock.local${pathWithQuery}`, {
         method,
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body ?? {})
+        ...(method === 'GET' || method === 'HEAD' ? {} : { body: JSON.stringify(body ?? {}) })
       }),
       {}
     );
@@ -3514,7 +3520,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
-      /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path)
+      /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
+      /^\/api\/published\/discern\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
     }
