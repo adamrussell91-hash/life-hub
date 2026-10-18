@@ -102,11 +102,11 @@ export async function rehostMedia(store, mediaRef, { fetchImpl = fetch, origin, 
       return { ok: false, reason: 'too_big', message: `${mediaRef.name} is over ${Math.round(maxBytes / 1024 / 1024)} MB, so it wasn't imported.` };
     }
     const title = mediaRef.purpose === 'cover' ? 'Cover image' : mediaRef.name || 'Imported file';
-    const slug = slugify(title);
+    const slug = slugify(title.replace(/\.[A-Za-z0-9]{1,5}$/, ''));
     const mediaType = mime.startsWith('video/') ? 'video' : mediaTypeFromMime(mime);
     await store.set(mediaFileKey(id), blob, { metadata: { contentType: mime } });
     await setJSON(store, mediaKey(id), {
-      id, type: 'media', title, slug: slug === 'item' ? 'imported-file' : slug, status: 'active', provider: 'direct',
+      id, type: 'media', title, slug: !slug || slug === 'item' ? 'imported-file' : slug, status: 'active', provider: 'direct',
       media_type: mediaType, mime_type: mime, file_name: mediaRef.name || undefined,
       preview_url: fileUrl, download_url: fileUrl, sharing: 'public_link',
       created_at: now, updated_at: now, schema_version: 1

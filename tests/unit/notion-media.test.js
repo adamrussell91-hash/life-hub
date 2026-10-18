@@ -126,7 +126,7 @@ test('non-Latin names get a usable slug', async () => {
   const store = memoryStore();
   await rehostMedia(store, ref('image', '图片.png'), opts(async () => ok(new Uint8Array([1]), 'image/png')));
   const record = JSON.parse(store.map.get(mediaKey(importMediaId('blk-1', 'https://files.example/a'))).value);
-  assert.equal(record.slug, 'png');
+  assert.equal(record.slug, 'imported-file');
   const store2 = memoryStore();
   await rehostMedia(store2, ref('image', '图片'), opts(async () => ok(new Uint8Array([1]), 'image/png')));
   assert.equal(JSON.parse(store2.map.get(mediaKey(importMediaId('blk-1', 'https://files.example/a'))).value).slug, 'imported-file');
@@ -142,4 +142,10 @@ test('cancels the body on early rejects', async () => {
   await rehostMedia(memoryStore(), ref('attachment', 'x.exe'), opts(async () => mk(200, 'application/x-msdownload')));
   await rehostMedia(memoryStore(), ref('video', 'v.mp4'), opts(async () => mk(200, 'video/mp4', 999), { maxBytes: 5 }));
   assert.equal(cancelled, 3);
+});
+
+test('slug drops the file extension', async () => {
+  const store = memoryStore();
+  await rehostMedia(store, ref('image', 'Lab Diagram.png'), opts(async () => ok(new Uint8Array([1]), 'image/png')));
+  assert.equal(JSON.parse(store.map.get(mediaKey(importMediaId('blk-1', 'https://files.example/a'))).value).slug, 'lab-diagram');
 });
