@@ -15,8 +15,11 @@
  *   reveal   answers go up together when the teacher reveals, which also
  *            closes answering so nobody can copy what they've seen
  *
- * Students never see symbols on the board, and see other students' text only
- * when the teacher shares the board and has revealed it.
+ * Joined students always see the orbit: one symbol per answer on the board,
+ * with no text. They see other students' text only when the teacher shares
+ * the board and has revealed it, and their cards never carry symbols. Ids a
+ * student sees are salted hashes, so neither a card nor an orbiting shape
+ * can be traced back to a symbol.
  */
 import { randomBytes, randomInt, createHash } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
@@ -101,6 +104,8 @@ function keys(lesson, block, session) {
 }
 
 const answerId = (symbol, n) => `${symbol}.${n}`;
+/** An answer id as a student sees it. Rounds started before the salt existed keep their ids. */
+const studentId = (activity, id) => (activity.salt ? createHash('sha256').update(`${activity.salt}:${id}`).digest('hex').slice(0, 16) : id);
 const parseAnswerId = (id) => {
   const m = /^(\d-\d)\.(\d{1,2})$/.exec(String(id ?? ''));
   return m && IDENTITIES.includes(m[1]) && Number(m[2]) < MAX_PER_STUDENT ? { symbol: m[1], n: Number(m[2]) } : null;
@@ -275,18 +280,22 @@ async function studentAction(store, k, activity, setup, body) {
     mine: own.map((a, i) => ({ text: a.text, status: statusOf(a, moderation[i], setup.safety) })),
     board: null
   };
-  if (activity.students_see === 'all') {
-    const { answers } = await allAnswers(store, k, setup.safety);
-    const shown = answers.filter((a) => a.status === 'shown');
-    const groups = activity.revealed ? (await read(store, k.groups))?.groups ?? null : null;
-    state.board = {
-      revealed: !!activity.revealed,
-      layout: activity.layout,
-      count: shown.length,
-      answers: activity.revealed ? shown.map((a) => ({ id: a.id, text: a.text })) : [],
-      groups: groups ? cleanGroups(groups, shown.map((a) => a.id)).map(({ id: gid, name, answer_ids }) => ({ id: gid, name, answer_ids })) : null
-    };
-  }
+  const { answers } = await allAnswers(store, k, setup.safety);
+  const shown = answers.filter((a) => a.status === 'shown');
+  const revealed = activity.students_see === 'all' && !!activity.revealed;
+  const groups = revealed ? (await read(store, k.groups))?.groups ?? null : null;
+  const masked = (id) => studentId(activity, id);
+  state.board = {
+    revealed,
+    layout: activity.layout,
+    count: shown.length,
+    // Shapes and cards use different ids, so a shape never flies into its own card.
+    orbit: shown.map((a) => ({ id: masked(`orbit:${a.id}`), symbol: a.symbol })).sort((x, y) => x.id.localeCompare(y.id)),
+    answers: revealed ? shown.map((a) => ({ id: masked(a.id), text: a.text })) : [],
+    groups: groups
+      ? cleanGroups(groups, shown.map((a) => a.id)).map(({ id: gid, name, answer_ids }) => ({ id: gid, name, answer_ids: answer_ids.map(masked) }))
+      : null
+  };
   return state;
 }
 
@@ -301,6 +310,7 @@ export async function brainstormAction(store, lesson, block, body, opts = {}) {
   if (teacher && body.action === 'start') {
     activity = {
       session: randomBytes(16).toString('hex'),
+      salt: randomBytes(16).toString('hex'),
       code: String(randomInt(100000, 1000000)),
       open: true,
       expires: Date.now() + ACTIVITY_HOURS * 3600_000,
