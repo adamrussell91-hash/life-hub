@@ -827,6 +827,7 @@
                     <button type="button" id="aes-noticed" class="aes-btn">Someone noticed ✦</button>
                   </div>
                   <p id="aes-today-worn" class="aes-stage__worn" aria-live="polite"></p>
+                  <p class="aes-stage__outfit"><span id="aes-today-outfit"></span> <button type="button" id="aes-today-outfit-go" class="aes-linkbtn">Pick an outfit</button></p>
                 </div>
                 <div id="aes-today-flat" class="aes-flatlay aes-flatlay--stage"></div>
               </div>
@@ -894,13 +895,15 @@
             <article class="metric-card aes-card">
               <p class="aes-eyebrow">Snap a piece</p>
               <h2 class="aes-display aes-h2">What goes with this?</h2>
-              <p class="aes-lede">Photograph something in your wardrobe or in a shop. Hyaluronica reads its colour and styles a whole look around it.</p>
+              <p class="aes-lede">Photograph something in your wardrobe or in a shop, then say which piece it is. Burgundy pants and a burgundy knit get different outfits.</p>
               <label class="aes-snap" for="aes-snap-file">
                 <span id="aes-snap-img" class="aes-snap__img"><span id="aes-snap-plus" aria-hidden="true">+</span><span id="aes-snap-swatch" class="aes-snap__swatch" hidden></span></span>
                 <span><b>Add a photo</b><br><span class="aes-meta">From your camera or camera roll. It stays on this device.</span></span>
               </label>
               <input id="aes-snap-file" class="visually-hidden" type="file" accept="image/*">
               <div class="aes-snap__samples"><span class="aes-meta">Or try</span><div id="aes-snap-samples" class="hub-pills hub-pills--loose aes-chips"></div></div>
+              <div class="aes-snap__samples"><span class="aes-meta">It's a</span><div id="aes-snap-slots" class="hub-pills hub-pills--loose aes-chips" role="group" aria-label="Which piece is it?"></div></div>
+              <label class="aes-snap__colour"><span class="aes-meta">Colour</span><select id="aes-snap-colour" class="aes-input" aria-label="Colour of the piece"><option value="">Add a photo or pick a colour</option></select></label>
               <div id="aes-snapres" class="aes-snapres" aria-live="polite"></div>
             </article>
             <article class="metric-card aes-card">
@@ -908,9 +911,15 @@
               <h2 class="aes-display aes-h2">How do you want to come across?</h2>
               <div id="aes-vibes" class="hub-pills hub-pills--loose aes-chips"></div>
               <div id="aes-dress-flat" class="aes-flatlay"></div>
+              <p id="aes-dress-weather" class="aes-meta" hidden></p>
               <div class="aes-lookfoot">
                 <div id="aes-dress-scent" class="aes-pairscent"></div>
                 <button type="button" id="aes-spin" class="aes-btn aes-btn--ink">Surprise me</button>
+              </div>
+              <p id="aes-dress-scent-why" class="aes-meta"></p>
+              <div class="aes-lookfoot">
+                <button type="button" id="aes-wear-look" class="aes-btn aes-btn--primary" aria-pressed="false">Wear this today</button>
+                <p id="aes-dress-worn" class="aes-meta" aria-live="polite"></p>
               </div>
               <p id="aes-dress-quote" class="aes-quote"></p>
             </article>

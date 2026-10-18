@@ -35,8 +35,9 @@ const hoursFor = f => LONGEVITY[f.longevity ?? 2].hours;
 const owned = list => list.filter(f => f.status === 'Owned');
 
 /** Owned bottles ranked for a season, time of day ('D' | 'N') and occasion.
- * Optional `weather` (from classifyWeather) nudges scores for heat, humidity and rain. */
-export function rankScents({ fragrances = FRAGRANCES, season, time, occasion = 'Casual', exclude = [], lastWorn = null, weather = null } = {}) {
+ * Optional `weather` (from classifyWeather) nudges scores for heat, humidity and rain;
+ * optional `look` (an outfit) pulls the scent towards the outfit's register and palette. */
+export function rankScents({ fragrances = FRAGRANCES, season, time, occasion = 'Casual', exclude = [], lastWorn = null, weather = null, look = null } = {}) {
   return owned(fragrances)
     .filter(f => !exclude.includes(f.name))
     .map(f => {
@@ -49,6 +50,7 @@ export function rankScents({ fragrances = FRAGRANCES, season, time, occasion = '
       score += (f.longevity ?? 2) / 20;
       if (lastWorn && f.name === lastWorn) score -= 1.5; // gentle rotation
       if (weather) score += weatherAffinity(f, weather);
+      if (look) score += lookScentAffinity(f, look);
       return { fragrance: f, score };
     })
     .sort((a, b) => b.score - a.score)
@@ -77,11 +79,11 @@ const noteHits = (notes, set) => notes.filter(n => set.has(n)).length;
 const stickyBand = band => band === 'humid-heat' || band === 'warm-humid';
 
 /** Classify a Sydney reading into a band the ranker understands. */
-export function classifyWeather({ tempC, humidity, precipMm = 0, weatherCode = 0 } = {}) {
+export function classifyWeather({ tempC, humidity, precipMm = 0, weatherCode = 0, rainChance = null } = {}) {
   if (tempC == null || Number.isNaN(Number(tempC))) return null;
   const t = Number(tempC);
   const h = Number(humidity ?? 50);
-  const rain = Number(precipMm) >= 0.2 || Number(weatherCode) >= 51;
+  const rain = Number(precipMm) >= 0.2 || Number(weatherCode) >= 51 || Number(rainChance) >= 50;
   let band;
   if (t >= 28) band = h >= 65 ? 'humid-heat' : 'dry-heat';
   else if (t >= 22) band = h >= 70 ? 'warm-humid' : 'mild-warm';
@@ -97,6 +99,40 @@ export function classifyWeather({ tempC, humidity, precipMm = 0, weatherCode = 0
     weatherCode: Number(weatherCode) || 0,
     rain,
     label: weatherLabel({ band, tempC: t, humidity: h, rain })
+  };
+}
+
+/**
+ * Classify the whole day from Open-Meteo `current` + `daily` blocks.
+ * The day is dressed for its high (what the afternoon feels like), the evening for its low.
+ * Without a daily block this is the current reading, as before.
+ */
+export function classifyForecast({ current = {}, daily = {} } = {}) {
+  const first = v => (Array.isArray(v) ? v[0] : v);
+  const nowC = current.temperature_2m;
+  const highC = first(daily.temperature_2m_max);
+  const lowC = first(daily.temperature_2m_min);
+  const rainChance = first(daily.precipitation_probability_max);
+  const dayCode = first(daily.weather_code);
+  const base = {
+    humidity: current.relative_humidity_2m,
+    precipMm: current.precipitation,
+    weatherCode: Math.max(Number(current.weather_code) || 0, Number(dayCode) || 0),
+    rainChance
+  };
+  const peak = highC != null && nowC != null ? Math.max(Number(highC), Number(nowC)) : highC ?? nowC;
+  const day = classifyWeather({ ...base, tempC: peak });
+  if (!day) return null;
+  if (highC == null) return day;
+  const night = lowC == null ? null : classifyWeather({ ...base, tempC: lowC });
+  return {
+    ...day,
+    nowC: nowC == null ? null : Number(nowC),
+    highC: Number(highC),
+    lowC: lowC == null ? null : Number(lowC),
+    rainChance: rainChance == null ? null : Number(rainChance),
+    label: `High ${day.label}${rainChance != null && Number(rainChance) >= 30 ? ` · ${Math.round(rainChance)}% rain` : ''}`,
+    night
   };
 }
 
@@ -180,6 +216,102 @@ export function weatherReason(fragrance, weather) {
   return `${label}: season and calendar still lead; weather is a soft nudge.`;
 }
 
+// ---------------- Outfit × scent ----------------
+// The outfit's vibe sets a register; the scent should speak at the same volume.
+// "Expensive" outfits want refined, quiet-luxury bottles; bold outfits want presence;
+// relaxed ones want easy daytime scents. Warm outfit colours lean to warm families.
+const VIBE_REGISTER = {
+  luxury: 'polished', expensive: 'polished', 'old money': 'polished', rich: 'polished', refined: 'polished',
+  luxurious: 'polished', elevated: 'polished', classic: 'polished', sophisticated: 'polished', richer: 'polished',
+  powerful: 'bold', striking: 'bold', artistic: 'bold',
+  effortless: 'relaxed', chic: 'relaxed', intentional: 'relaxed', clean: 'relaxed'
+};
+const REGISTER_PHRASE = { polished: 'expensive', bold: 'bold', relaxed: 'easy' };
+const REFINED_NOTES = new Set(['Iris', 'Orris Root', 'Sandalwood', 'Saffron', 'Oakmoss', 'Leather', 'Olibanum', 'Incense', 'Vetiver', 'Rose', 'Ambergris', 'Cashmeran', 'Musk', 'Petitgrain', 'Neroli', 'Tea', 'Violet', 'Clary Sage', 'Geranium', 'Cedarwood', 'Aldehydes', 'ISO E Super', 'Ambroxan']);
+const CANDY_NOTES = new Set(['Sour Cherry', 'Praline', 'Cocoa', 'Coconut', 'Raspberry', 'Honey', 'Bitter Almond']);
+const WARM_COLOURS = new Set(['chocolate', 'camel', 'tan', 'cognac', 'burgundy', 'merlot', 'terracotta', 'olive', 'mustard', 'cream']);
+const COOL_COLOURS = new Set(['white', 'powder blue', 'navy', 'blue', 'grey', 'denim', 'Tiffany blue', 'charcoal', 'pistachio']);
+const FAMILY_WARMTH = { fresh: -1, floral: -0.3, woody: 0.3, amber: 1, gourmand: 1 };
+
+export const lookRegister = look => VIBE_REGISTER[look?.vibe] ?? 'relaxed';
+
+/** How expensive a bottle smells, from its tracker occasions and notes (0 to about 6). */
+export function scentPolish(f) {
+  const occ = f.occasions ?? [];
+  const notes = f.notes ?? [];
+  let s = 0;
+  if (occ.includes('Formal')) s += 2;
+  if (occ.includes('Signature Scent')) s += 1.5;
+  if (occ.includes('Office')) s += 1;
+  if (occ.includes('Date Night')) s += 0.3;
+  s += Math.min(2, noteHits(notes, REFINED_NOTES) * 0.5);
+  s -= Math.min(2, noteHits(notes, CANDY_NOTES)) * 0.6;
+  return s;
+}
+
+/** −1 (cool colours) → +1 (warm colours) across the outfit's pieces. */
+export function lookWarmth(look) {
+  const colours = lookPieces(look).map(([c]) => c);
+  const warm = colours.filter(c => WARM_COLOURS.has(c)).length;
+  const cool = colours.filter(c => COOL_COLOURS.has(c)).length;
+  return colours.length ? (warm - cool) / colours.length : 0;
+}
+
+/** Score delta for wearing a bottle with an outfit. */
+export function lookScentAffinity(f, look) {
+  if (!look) return 0;
+  const register = lookRegister(look);
+  const polish = scentPolish(f);
+  const sillage = f.sillage ?? 1;
+  let s = 0;
+  if (register === 'polished') s += polish * 0.7 - Math.max(0, sillage - 2) * 1.2;
+  else if (register === 'bold') s += sillage * 0.7 + polish * 0.3 + (f.family === 'fresh' ? -0.6 : 0.4);
+  else s += ((f.occasions ?? []).includes('Casual') ? 1 : 0) + (f.family === 'fresh' ? 0.6 : 0) - Math.max(0, sillage - 2) * 0.6;
+  s += lookWarmth(look) * (FAMILY_WARMTH[f.family] ?? 0) * 1.2;
+  if (look.scent === f.name) s += 0.8;
+  return s;
+}
+
+/** One plain line on why the bottle suits the outfit (and the weather, if given). */
+export function lookScentReason(f, look, weather = null) {
+  if (!f || !look) return '';
+  const register = lookRegister(look);
+  const warmth = lookWarmth(look);
+  const hot = weather?.band && HEAT_BANDS.has(weather.band);
+  const cold = weather?.band && COLD_BANDS.has(weather.band);
+  const family = FAMILY_LABELS_SHORT[f.family] ?? f.family;
+  let line;
+  if (register === 'polished') {
+    line = hot
+      ? `${anOutfit(look.vibe)} on a hot day wants an expensive ${family} scent: ${f.name} stays clean and quiet.`
+      : cold
+        ? `${anOutfit(look.vibe)} in cooler air: ${f.name} has the depth to read expensive without shouting.`
+        : `${anOutfit(look.vibe)} wants a scent that reads refined, not loud: ${f.name}.`;
+  } else if (register === 'bold') {
+    line = `${f.name} has the presence to stand up to a ${look.vibe} outfit${hot ? ', kept to one spray in the heat' : ''}.`;
+  } else {
+    line = `An easy ${look.vibe} outfit, an easy ${family} scent: ${f.name}.`;
+  }
+  if (warmth >= 0.4 && (FAMILY_WARMTH[f.family] ?? 0) > 0) line += ' Warm browns in the clothes, warm notes on skin.';
+  else if (warmth <= -0.4 && (FAMILY_WARMTH[f.family] ?? 0) < 0) line += ' Cool colours, clean notes.';
+  return line;
+}
+const anOutfit = vibe => `${/^[aeiou]/i.test(vibe) ? 'An' : 'A'} ${vibe} outfit`;
+const FAMILY_LABELS_SHORT = { fresh: 'fresh', floral: 'floral', gourmand: 'sweet', amber: 'amber', woody: 'woody' };
+
+const DAY_OCCASION = { polished: 'Office', bold: 'Date Night', relaxed: 'Casual' };
+/** The tracker occasion a daytime outfit implies; no outfit means a casual day. */
+export const dayOccasionFor = look => (look ? DAY_OCCASION[lookRegister(look)] : 'Casual');
+
+/** The best owned bottle for an outfit today, with its reason. */
+export function scentForLook(look, { date, weather = null, time = 'D', fragrances = FRAGRANCES, lastWorn = null } = {}) {
+  const season = sydneySeason(date);
+  const occasion = dayOccasionFor(look);
+  const w = time === 'N' ? weather?.night ?? weather : weather;
+  const fragrance = rankScents({ fragrances, season, time, occasion, weather: w, look, lastWorn })[0] ?? null;
+  return { fragrance, reason: lookScentReason(fragrance, look, w), register: REGISTER_PHRASE[lookRegister(look)] };
+}
+
 const GYM = /\b(gym|workout|training|run|swim|pilates|yoga|boxing|lift)\b/i;
 const FORMAL = /\b(wedding|gala|formal|ceremony|awards?)\b/i;
 const DATE = /\b(dinner|date|drinks|corey|anniversary|party|bar|restaurant)\b/i;
@@ -222,16 +354,16 @@ export function dayAnchors(events = []) {
  * `index` steps through alternatives ("Not feeling it").
  * Optional `weather` (classifyWeather result) tilts day/night ranking for the climate.
  */
-export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index = 0, lastWorn = null, weather = null } = {}) {
+export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index = 0, lastWorn = null, weather = null, look = null } = {}) {
   const season = sydneySeason(date);
   const anchors = dayAnchors(events);
   const gym = anchors.find(a => a.kind === 'gym');
   const evening = anchors.find(a => a.kind === 'evening');
   const firstDay = anchors.find(a => a.kind !== 'evening');
 
-  const dayRank = rankScents({ fragrances, season, time: 'D', occasion: 'Casual', lastWorn, weather });
+  const dayRank = rankScents({ fragrances, season, time: 'D', occasion: dayOccasionFor(look), lastWorn, weather, look });
   const eveningOccasion = evening ? (FORMAL.test(evening.title) ? 'Formal' : DATE.test(evening.title) ? 'Date Night' : 'Casual') : 'Date Night';
-  const nightRankAll = rankScents({ fragrances, season, time: 'N', occasion: eveningOccasion, weather });
+  const nightRankAll = rankScents({ fragrances, season, time: 'N', occasion: eveningOccasion, weather: weather?.night ?? weather, look });
   // Keep the evening scent for the evening: the day list skips whichever bottle the evening would pick.
   const nightDefault = evening ? nightRankAll[0] : null;
   const dayChoices = dayRank.filter(f => f !== nightDefault);
@@ -263,6 +395,9 @@ export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index
   if (weather?.label) {
     notes.splice(1, 0, { title: `Sydney · ${weather.label}`, body: weatherReason(day, weather) });
   }
+  if (look) {
+    notes.splice(1, 0, { title: `Dressed ${look.vibe}`, body: lookScentReason(day, look, weather) });
+  }
   if (evening && night) {
     notes.push({ title: `${formatHour(swapAt)} · change for ${evening.title}`, body: `${night.name} tonight.${night.quote ? ` ${night.quote}` : ''}` });
   } else {
@@ -293,7 +428,8 @@ export function planScentDay({ date, events = [], fragrances = FRAGRANCES, index
     anchors,
     notes,
     line,
-    weatherLine: weather ? weatherReason(day, weather) : ''
+    weatherLine: weather ? weatherReason(day, weather) : '',
+    lookLine: look ? lookScentReason(day, look, weather) : ''
   };
 }
 

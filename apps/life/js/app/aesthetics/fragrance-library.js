@@ -404,6 +404,7 @@ const MAP_METADATA = [
   }
 ];
 const LONGEVITY_VALUES = ['Fleeting (under 2 hrs)', 'Short (2 to 4 hrs)', 'Moderate (4 to 6 hrs)', 'Long (6 to 8 hrs)', 'All Day (8 to 12 hrs)', 'Eternal (12+ hrs)'];
+const SILLAGE_VALUES = ['Intimate (skin scent)', "Moderate (arm's length)", 'Strong (room presence)', 'Enormous (fills a room)'];
 const SEASON_CODES = { Spring: 'Sp', Summer: 'Su', Autumn: 'Au', Winter: 'Wi' };
 
 export const FRAGRANCES = MAP_METADATA.map(meta => {
@@ -411,6 +412,7 @@ export const FRAGRANCES = MAP_METADATA.map(meta => {
   const p = source.properties;
   const tiers = ['Top Notes', 'Heart Notes', 'Base Notes'].map(key => p[key] ?? []);
   const longevity = LONGEVITY_VALUES.indexOf(p.Longevity);
+  const sillage = SILLAGE_VALUES.indexOf(p.Sillage);
   return {
     ...meta,
     source,
@@ -423,6 +425,7 @@ export const FRAGRANCES = MAP_METADATA.map(meta => {
     time: (p['Time of Day'] ?? []).map(t => t === 'Day' ? 'D' : 'N').join(''),
     occasions: p.Occasion ?? [],
     longevity: longevity < 0 ? null : longevity,
+    sillage: sillage < 0 ? null : sillage,
     rating: p.Rating ?? null,
     notes: tiers.flat(),
     tiers: tiers.map(notes => notes.length),
