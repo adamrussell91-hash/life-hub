@@ -43,6 +43,16 @@ export function validateFoodJournal(j) {
     if (v.source_id != null) text(v.source_id, "Source identifier", 200);
     text(v.notes, "Notes");
     text(v.menu_text, "Menu", 100000);
+    if (v.menu_items != null) {
+      if (!Array.isArray(v.menu_items) || v.menu_items.length > 200)
+        bad("Menu items are invalid.");
+      for (const item of v.menu_items) {
+        if (!item || typeof item !== "object") bad("Menu items are invalid.");
+        text(item.name, "Menu item", 200);
+        text(item.description, "Menu item description", 1000);
+        text(item.price, "Menu item price", 40);
+      }
+    }
     if (v.reviewed != null && typeof v.reviewed !== "boolean")
       bad("Review state is invalid.");
     if (v.editorial != null) {

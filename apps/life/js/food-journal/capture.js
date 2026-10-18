@@ -1,4 +1,4 @@
-import { nearbyVenues } from "./model.js";
+import { nearbyVenues, newDish } from "./model.js";
 export async function inspectPhoto(file, journal) {
   const exifr = await import("../../vendor/exifr.mjs");
   let raw = {};
@@ -54,6 +54,10 @@ export function mergeCapture(visit, draft, photos = []) {
   if (!next.venue.name) next.venue.name = draft.venue.name;
   if (!next.venue.address) next.venue.address = draft.venue.address;
   if (!next.menu_text) next.menu_text = draft.menu_text;
+  const items = next.menu_items || [];
+  for (const item of draft.menu_items || [])
+    if (!items.some((i) => sameName(i.name, item.name))) items.push(item);
+  if (items.length) next.menu_items = items.slice(0, 200);
   for (const found of draft.dishes) {
     const old = next.dishes.find(
       (d) => d.title.trim().toLowerCase() === found.title.trim().toLowerCase(),
@@ -99,10 +103,37 @@ export function mergeCapture(visit, draft, photos = []) {
   return next;
 }
 
+const sameName = (a, b) =>
+  String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+// The dish a menu item became, or -1.
+export const menuDishIndex = (visit, item) =>
+  visit.dishes.findIndex((d) => sameName(d.title, item.name));
+// Ticking a menu item adds it as a dish, using the blank starter dish first.
+// Unticking removes it only while it is untouched: no rating, notes, tags or
+// photos. The last dish turns blank rather than going.
+export function toggleMenuDish(visit, item) {
+  const next = structuredClone(visit),
+    index = menuDishIndex(next, item);
+  if (index < 0) {
+    const blank = next.dishes.find((d) => !d.title.trim());
+    if (blank) blank.title = item.name;
+    else next.dishes.push({ ...newDish(), title: item.name });
+    return next;
+  }
+  const dish = next.dishes[index];
+  if (dish.rating != null || dish.notes.trim() || dish.tags.length || dish.photos.length)
+    return next;
+  if (next.dishes.length > 1) next.dishes.splice(index, 1);
+  else dish.title = "";
+  return next;
+}
+
 export function captureBatches(images) {
-  const menu = images.filter((i) => i.role === "menu").slice(-1);
+  const menus = images.filter((i) => i.role === "menu");
   const dishes = images.filter((i) => i.role === "dish");
-  if (!dishes.length) return menu.length ? [menu] : [];
+  // Every page of a menu is read; with dish photos, the last page names them.
+  if (!dishes.length) return budgeted(menus);
+  const menu = menus.slice(-1);
   const batches = [];
   let batch = [...menu],
     size = menu.reduce((n, i) => n + i.data.length, 0);
@@ -116,5 +147,22 @@ export function captureBatches(images) {
     size += image.data.length;
   }
   if (batch.some((i) => i.role === "dish")) batches.push(batch);
+  return batches;
+}
+
+function budgeted(images) {
+  const batches = [];
+  let batch = [],
+    size = 0;
+  for (const image of images) {
+    if (batch.length && (batch.length >= 6 || size + image.data.length > 3500000)) {
+      batches.push(batch);
+      batch = [];
+      size = 0;
+    }
+    batch.push(image);
+    size += image.data.length;
+  }
+  if (batch.length) batches.push(batch);
   return batches;
 }
