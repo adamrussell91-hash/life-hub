@@ -13,9 +13,22 @@ function capitalise(value) {
   return value ? value[0].toUpperCase() + value.slice(1) : value;
 }
 
-/** A coach-supplied title, trimmed to three words, or null when unusable. */
+const isSmall = (word) => SMALL.has(word.toLowerCase());
+
+/**
+ * A coach-supplied title, trimmed to three words, or null when unusable. A cut never
+ * ends on a joining word: "eating and training" keeps its fourth word when it fits,
+ * otherwise the dangling "and" goes.
+ */
 export function tidyTitle(value) {
-  const words = clean(value).split(' ').filter(Boolean).slice(0, TITLE_MAX_WORDS);
+  const all = clean(value).split(' ').filter(Boolean);
+  let words = all.slice(0, TITLE_MAX_WORDS);
+  if (all.length > words.length && isSmall(words.at(-1)) && !isSmall(all[words.length])) {
+    const longer = all.slice(0, TITLE_MAX_WORDS + 1);
+    if (longer.join(' ').length <= TITLE_MAX_CHARS) words = longer;
+  }
+  while (words.length > 1 && words.join(' ').length > TITLE_MAX_CHARS) words = words.slice(0, -1);
+  while (words.length > 1 && isSmall(words.at(-1))) words = words.slice(0, -1);
   const title = words.join(' ').slice(0, TITLE_MAX_CHARS).trim();
   return title ? capitalise(title) : null;
 }
@@ -29,5 +42,9 @@ export function titleFromText(text) {
 
 /** The title to show for a node. */
 export function nodeTitle(node) {
+  // Titles saved before the joining-word rule may end "eating and"; finish them from the text.
+  const saved = clean(node?.title);
+  const text = clean(node?.text);
+  if (saved && isSmall(saved.split(' ').at(-1)) && text.toLowerCase().startsWith(saved.toLowerCase())) return tidyTitle(text);
   return tidyTitle(node?.title) ?? titleFromText(node?.text);
 }
