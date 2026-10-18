@@ -162,3 +162,29 @@ test('rescore_radar needs a radar run and a define phase', () => {
   assert.throws(() => rescoreRadar(none, { current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
   assert.throws(() => rescoreRadar(radarSession('frame'), { current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
 });
+
+function treeSession() {
+  let s = createSession({ title: 'Evening training', text: 'I keep skipping evening training.' }, deps);
+  s = applyCoachTurn(s, coach({ frame: { goal: 'Train three evenings a week', whatIsTrue: 'Trained once in four weeks', whatCanBeDone: 'Change what happens before training' }, model: { id: 'seven_step', reason: 'Default.' }, suggestion: { kind: 'next_tool', tool: 'problem_tree', reason: 'Several causes.' } }), deps);
+  s = acceptSuggestion(s, deps);
+  for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['effect:1', 'No progress'], ['cause:1', 'Delayed payoff']]) {
+    s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  }
+  return s;
+}
+
+test('a finished tool always leaves a next step, even when the coach offers none', () => {
+  let s = treeSession();
+  assert.equal(s.suggestion, null, 'one cause is short of the tree minimum');
+  s = applyCoachTurn(s, coach({ node: { slot: 'cause:2', text: 'Medication suppresses appetite' } }), deps);
+  assert.equal(s.suggestion.kind, 'next_tool');
+  assert.equal(s.suggestion.tool, 'problem_statement');
+  s = acceptSuggestion(s, deps);
+  assert.equal(activeRun(s).tool, 'problem_statement');
+});
+
+test('the coach\'s own suggestion wins over the fallback', () => {
+  let s = treeSession();
+  s = applyCoachTurn(s, coach({ node: { slot: 'cause:2', text: 'Medication suppresses appetite' }, suggestion: { kind: 'switch_tool', tool: 'concept_map', reason: 'Causes interact.' } }), deps);
+  assert.equal(s.suggestion.tool, 'concept_map');
+});
