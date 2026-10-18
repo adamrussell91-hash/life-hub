@@ -44,6 +44,9 @@ export function buildImportPlan(tree: NotionTree, ctx: MapContext): ImportPlan {
   const plan: ImportPlan = {
     root_page_id: tree.root_id, entities: [], skipped: [], new_subjects: [], media: [], warnings: [], html_apps: []
   };
+  for (const u of tree.unreadable ?? []) {
+    plan.warnings.push({ page_id: u.parent_id, notion_block_id: null, rule: 'skipped', message: `A sub-page could not be read from Notion (${u.code}); share it with the integration or import it separately.` });
+  }
   const excluded = new Set(ctx.choices.excluded_page_ids);
   const byPage = new Map<string, PlannedEntity>();
 

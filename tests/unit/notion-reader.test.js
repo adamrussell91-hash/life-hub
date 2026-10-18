@@ -151,3 +151,158 @@ test('readNotionTree normalises tabs', async () => {
   assert.deepEqual(tabs.children.map((t) => t.data.label), ['Do Now', 'Teach']);
   assert.equal(tabs.children[0].children[0].type, 'paragraph');
 });
+
+test('client retries a thrown fetch error', async () => {
+  let n = 0;
+  const waits = [];
+  const client = createNotionClient({
+    token: 't',
+    sleep: async (ms) => { waits.push(ms); },
+    fetchImpl: async () => { if (++n === 1) throw new TypeError('fetch failed'); return json(200, { ok: true }); }
+  });
+  assert.deepEqual(await client.request('GET', '/v1/users/me'), { ok: true });
+  assert.deepEqual(waits, [500]);
+  assert.equal(client.requestCount, 2);
+});
+
+test('client rethrows a thrown fetch error after maxRetries', async () => {
+  const client = createNotionClient({ token: 't', maxRetries: 1, sleep: async () => {}, fetchImpl: async () => { throw new TypeError('down'); } });
+  await assert.rejects(client.request('GET', '/v1/x'), /down/);
+});
+
+test('client caps Retry-After at 30 seconds', async () => {
+  let n = 0;
+  const waits = [];
+  const client = createNotionClient({
+    token: 't',
+    sleep: async (ms) => { waits.push(ms); },
+    fetchImpl: async () => (++n === 1 ? json(429, {}, { 'retry-after': '600' }) : json(200, {}))
+  });
+  await client.request('GET', '/v1/x');
+  assert.deepEqual(waits, [30000]);
+});
+
+test('client cancels the body of a response it retries', async () => {
+  let cancelled = false;
+  let n = 0;
+  const client = createNotionClient({
+    token: 't',
+    sleep: async () => {},
+    fetchImpl: async () => {
+      if (++n === 1) return { ok: false, status: 503, headers: new Headers(), body: { cancel: async () => { cancelled = true; throw new Error('ignored'); } } };
+      return json(200, {});
+    }
+  });
+  await client.request('GET', '/v1/x');
+  assert.equal(cancelled, true);
+});
+
+test('propertyItems passes an already-encoded property id through as is', async () => {
+  const seen = [];
+  const client = createNotionClient({
+    token: 't', sleep: async () => {},
+    fetchImpl: async (url) => { seen.push(new URL(url).pathname); return json(200, { results: [], has_more: false }); }
+  });
+  await client.propertyItems('p1', '%5EOE%40');
+  assert.ok(seen[0].includes('/properties/%5EOE%40'), seen[0]);
+});
+
+test('relation with has_more fetches the property items by the encoded id', async () => {
+  const body = pageBody('u1', 'U', 'Unit');
+  body.properties['Sub-item'] = { id: '%5EOE%40', type: 'relation', relation: [{ id: 'l1' }], has_more: true };
+  const { fetchImpl, calls } = fakeNotion({
+    'GET /v1/pages/u1': body,
+    'GET /v1/pages/u1/properties/%5EOE%40': { results: [{ relation: { id: 'l1' } }, { relation: { id: 'l2' } }], has_more: false },
+    'GET /v1/pages/l1': pageBody('l1', 'L1', 'Lesson'),
+    'GET /v1/pages/l2': pageBody('l2', 'L2', 'Lesson'),
+    'GET /v1/blocks/u1/children': { results: [], has_more: false },
+    'GET /v1/blocks/l1/children': { results: [], has_more: false },
+    'GET /v1/blocks/l2/children': { results: [], has_more: false }
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  const tree = await readNotionTree(client, 'u1');
+  assert.deepEqual(Object.keys(tree.pages).sort(), ['l1', 'l2', 'u1']);
+  assert.ok(calls.some((c) => c.includes('/properties/%5EOE%40')));
+});
+
+test('nested block that Notion will not return gets children_error', async () => {
+  const { fetchImpl } = fakeNotion({
+    'GET /v1/pages/u1': pageBody('u1', 'U', 'Lesson'),
+    'GET /v1/blocks/u1/children': { results: [
+      { id: 'b1', type: 'toggle', has_children: true, toggle: { rich_text: text('T') } },
+      { id: 'b2', type: 'paragraph', has_children: false, paragraph: { rich_text: text('ok') } }
+    ], has_more: false }
+    // no route for b1 children: 404
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  const blocks = (await readNotionTree(client, 'u1')).pages.u1.blocks;
+  assert.equal(blocks[0].children_error, 'object_not_found');
+  assert.deepEqual(blocks[0].children, []);
+  assert.equal(blocks[1].children_error, undefined);
+});
+
+test('nested 500-class failures still throw', async () => {
+  const { fetchImpl } = fakeNotion({
+    'GET /v1/pages/u1': pageBody('u1', 'U', 'Lesson'),
+    'GET /v1/blocks/u1/children': { results: [{ id: 'b1', type: 'toggle', has_children: true, toggle: { rich_text: text('T') } }], has_more: false },
+    'GET /v1/blocks/b1/children': () => json(401, { code: 'unauthorized', message: 'x' })
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  await assert.rejects(readNotionTree(client, 'u1'), (e) => e instanceof NotionApiError && e.code === 'unauthorized');
+});
+
+test('child page 404 is skipped and recorded as unreadable', async () => {
+  const { fetchImpl } = fakeNotion({
+    'GET /v1/pages/u1': pageBody('u1', 'U', 'Unit', ['l1', 'l2']),
+    'GET /v1/pages/l2': pageBody('l2', 'L2', 'Lesson'),
+    'GET /v1/blocks/u1/children': { results: [], has_more: false },
+    'GET /v1/blocks/l2/children': { results: [], has_more: false }
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  const tree = await readNotionTree(client, 'u1');
+  assert.deepEqual(Object.keys(tree.pages).sort(), ['l2', 'u1']);
+  assert.deepEqual(tree.unreadable, [{ page_id: 'l1', parent_id: 'u1', code: 'object_not_found' }]);
+});
+
+test('root page failure still throws', async () => {
+  const { fetchImpl } = fakeNotion({});
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  await assert.rejects(readNotionTree(client, 'nope'), NotionApiError);
+});
+
+test('trashed or archived child pages are skipped as in_trash', async () => {
+  const gone = pageBody('l1', 'L1', 'Lesson');
+  gone.in_trash = true;
+  const arch = pageBody('l2', 'L2', 'Lesson');
+  arch.archived = true;
+  const { fetchImpl } = fakeNotion({
+    'GET /v1/pages/u1': pageBody('u1', 'U', 'Unit', ['l1', 'l2']),
+    'GET /v1/pages/l1': gone,
+    'GET /v1/pages/l2': arch,
+    'GET /v1/blocks/u1/children': { results: [], has_more: false }
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  const tree = await readNotionTree(client, 'u1');
+  assert.deepEqual(Object.keys(tree.pages), ['u1']);
+  assert.deepEqual(tree.unreadable.map((u) => [u.page_id, u.code]), [['l1', 'in_trash'], ['l2', 'in_trash']]);
+});
+
+test('deadline stops the read partway through', async () => {
+  const { fetchImpl } = fakeNotion({
+    'GET /v1/pages/u1': pageBody('u1', 'U', 'Unit', ['l1']),
+    'GET /v1/pages/l1': pageBody('l1', 'L1', 'Lesson'),
+    'GET /v1/blocks/u1/children': { results: [], has_more: false },
+    'GET /v1/blocks/l1/children': { results: [], has_more: false }
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  let t = 0;
+  const now = () => (t += 1);
+  // checks: page u1 (1), children u1 (2), page l1 (3) -> past deadline 2
+  await assert.rejects(readNotionTree(client, 'u1', { deadlineMs: 2, now }), /Too much to read from Notion in one go\. Import a smaller part \(for example one unit at a time\)\./);
+});
+
+test('missing last_edited_time becomes an empty string', () => {
+  const body = pageBody('u1', 'U', 'Unit');
+  delete body.last_edited_time;
+  assert.equal(normalizePage(body, []).last_edited_time, '');
+});

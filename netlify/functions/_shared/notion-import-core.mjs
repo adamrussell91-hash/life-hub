@@ -527,6 +527,10 @@ function unsupportedNode(n, st) {
   const html = plainParagraphsHtml(deepPlainText(n));
   return html ? [makeBlock("rich_text", st.ids.from(n.id), { html }, st.now)] : [];
 }
+function warnChildrenError(n, st) {
+  if (!n.children_error) return;
+  warn(st, n, "skipped", `Notion would not return the contents of this ${typeLabel(n)} block (${n.children_error}); it was left out.`);
+}
 function mapBlocks(nodes, scope, st) {
   const out = [];
   let i = 0;
@@ -535,6 +539,7 @@ function mapBlocks(nodes, scope, st) {
     if (TEXT_RUN_TYPES.has(n.type)) {
       const run = [];
       while (i < nodes.length && TEXT_RUN_TYPES.has(nodes[i].type)) run.push(nodes[i++]);
+      for (const r2 of run) warnChildrenError(r2, st);
       const r = new Run();
       textRunInto(run, st, r);
       for (const part of r.finish()) {
@@ -543,6 +548,7 @@ function mapBlocks(nodes, scope, st) {
       }
       continue;
     }
+    warnChildrenError(n, st);
     const layout = mapLayout(nodes, i, scope, st);
     if (layout) {
       out.push(...layout.blocks);
@@ -727,6 +733,9 @@ function buildImportPlan(tree, ctx) {
     warnings: [],
     html_apps: []
   };
+  for (const u of tree.unreadable ?? []) {
+    plan.warnings.push({ page_id: u.parent_id, notion_block_id: null, rule: "skipped", message: `A sub-page could not be read from Notion (${u.code}); share it with the integration or import it separately.` });
+  }
   const excluded = new Set(ctx.choices.excluded_page_ids);
   const byPage = /* @__PURE__ */ new Map();
   const resolveYear = (pg) => {

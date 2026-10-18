@@ -24,6 +24,8 @@ export interface NotionNode {
   type: string;
   data: Record<string, any>;
   children: NotionNode[];
+  /** Set by the reader when Notion refused to return this block's children. */
+  children_error?: string;
 }
 
 export interface NotionFileRef {
@@ -53,6 +55,8 @@ export interface NotionPage {
 export interface NotionTree {
   root_id: string;
   pages: Record<string, NotionPage>;
+  /** Sub-item pages the reader could not read. */
+  unreadable?: Array<{ page_id: string; parent_id: string; code: string }>;
 }
 
 export type WarningRule =

@@ -17,22 +17,36 @@ export function createNotionClient({
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   maxRetries = 5
 }) {
+  let requestCount = 0;
+
   async function request(method, path, body) {
     for (let attempt = 0; ; attempt += 1) {
-      const res = await fetchImpl(`${BASE}${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Notion-Version': NOTION_VERSION,
-          ...(body ? { 'content-type': 'application/json' } : {})
-        },
-        body: body ? JSON.stringify(body) : undefined
-      });
+      let res;
+      requestCount += 1;
+      try {
+        res = await fetchImpl(`${BASE}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Notion-Version': NOTION_VERSION,
+            ...(body ? { 'content-type': 'application/json' } : {})
+          },
+          body: body ? JSON.stringify(body) : undefined
+        });
+      } catch (err) {
+        // Network failure (DNS, reset, timeout): retry with backoff.
+        if (attempt < maxRetries) {
+          await sleep(500 * 2 ** attempt);
+          continue;
+        }
+        throw err;
+      }
       if (res.ok) return res.json();
       const retryable = res.status === 429 || res.status >= 500;
       if (retryable && attempt < maxRetries) {
+        try { await res.body?.cancel(); } catch { /* ignore */ }
         const after = Number(res.headers.get('retry-after'));
-        await sleep(Number.isFinite(after) && after > 0 ? after * 1000 : 500 * 2 ** attempt);
+        await sleep(Number.isFinite(after) && after > 0 ? Math.min(after * 1000, 30000) : 500 * 2 ** attempt);
         continue;
       }
       let payload = {};
@@ -58,12 +72,14 @@ export function createNotionClient({
     return results;
   }
 
+  // Property ids arrive from Notion already URL-encoded, so they are used as is.
   return {
+    get requestCount() { return requestCount; },
     request,
     paginate,
     getPage: (id) => request('GET', `/v1/pages/${id}`),
     listChildren: (id) => paginate(`/v1/blocks/${id}/children`),
-    propertyItems: (pageId, propertyId) => paginate(`/v1/pages/${pageId}/properties/${encodeURIComponent(propertyId)}`),
+    propertyItems: (pageId, propertyId) => paginate(`/v1/pages/${pageId}/properties/${propertyId}`),
     queryDataSource: (dataSourceId, body) => request('POST', `/v1/data_sources/${dataSourceId}/query`, body)
   };
 }

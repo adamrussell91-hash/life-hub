@@ -1,9 +1,13 @@
 // netlify/functions/_shared/notion-reader.mjs
+import { NotionApiError } from './notion-client.mjs';
 
 // PROVISIONAL: these are the plan's defaults. They stay provisional until the
 // Task 1 tabs check is run and recorded in the spec ("Tabs check result").
 const TAB_CONTAINER_TYPE = 'tab';
 const TAB_ITEM_TYPE = 'paragraph';
+
+const TOO_MUCH = 'Too much to read from Notion in one go. Import a smaller part (for example one unit at a time).';
+const SOFT_STATUSES = new Set([400, 403, 404]);
 
 const NO_DESCEND = new Set(['child_database', 'link_to_page']);
 
@@ -30,7 +34,7 @@ export function normalizePage(page, blocks, childIds) {
   return {
     id: page.id,
     url: page.url ?? '',
-    last_edited_time: page.last_edited_time,
+    last_edited_time: page.last_edited_time ?? '',
     title: plain(titleProp?.title),
     category: prop(page, 'Category')?.select?.name ?? null,
     subjects: multi('Subject'),
@@ -61,12 +65,27 @@ function normalizeTabs(raw, children) {
   };
 }
 
-async function readBlocks(client, blockId) {
+async function readBlocks(client, blockId, guard) {
+  guard();
   const raws = await client.listChildren(blockId);
   const out = [];
   for (const raw of raws) {
-    const children = raw.has_children && !NO_DESCEND.has(raw.type) ? await readBlocks(client, raw.id) : [];
+    let children = [];
+    let childrenError;
+    if (raw.has_children && !NO_DESCEND.has(raw.type)) {
+      try {
+        children = await readBlocks(client, raw.id, guard);
+      } catch (err) {
+        if (err instanceof NotionApiError && SOFT_STATUSES.has(err.status)) {
+          children = [];
+          childrenError = err.code;
+        } else {
+          throw err;
+        }
+      }
+    }
     const node = { id: raw.id, type: raw.type, data: raw[raw.type] ?? {}, children };
+    if (childrenError) node.children_error = childrenError;
     out.push(normalizeTabs(raw, children) ?? node);
   }
   return out;
@@ -80,25 +99,46 @@ async function subItemIds(client, page) {
   return items.map((item) => item.relation?.id).filter(Boolean);
 }
 
-export async function readNotionTree(client, rootId, { maxPages = 200 } = {}) {
+export async function readNotionTree(client, rootId, { maxPages = 200, deadlineMs, now = Date.now } = {}) {
   const pages = {};
-  const queue = [rootId];
+  const unreadable = [];
+  const queue = [{ id: rootId, parent: null }];
   let rootKey = null;
+  const guard = () => {
+    if (deadlineMs !== undefined && now() > deadlineMs) throw new Error(TOO_MUCH);
+  };
   while (queue.length) {
-    const id = queue.shift();
+    const { id, parent } = queue.shift();
     // Cheap pre-check for ids already in dashed form; also guards relation cycles.
     if (pages[id]) continue;
     if (Object.keys(pages).length >= maxPages) {
       throw new Error(`This import has more than ${maxPages} pages. Import a smaller part.`);
     }
-    const raw = await client.getPage(id);
+    guard();
+    let raw;
+    try {
+      raw = await client.getPage(id);
+    } catch (err) {
+      // The root failing is fatal; an unreadable sub-page is skipped and reported.
+      if (parent !== null && err instanceof NotionApiError && SOFT_STATUSES.has(err.status)) {
+        unreadable.push({ page_id: id, parent_id: parent, code: err.code });
+        continue;
+      }
+      throw err;
+    }
+    if (parent !== null && (raw.in_trash || raw.archived)) {
+      unreadable.push({ page_id: id, parent_id: parent, code: 'in_trash' });
+      continue;
+    }
     // Key by the id Notion returns (dashed), not the id we asked for.
     if (pages[raw.id]) continue;
     const childIds = await subItemIds(client, raw);
-    const blocks = await readBlocks(client, raw.id);
+    const blocks = await readBlocks(client, raw.id, guard);
     pages[raw.id] = normalizePage(raw, blocks, childIds);
     if (rootKey === null) rootKey = raw.id;
-    queue.push(...childIds);
+    queue.push(...childIds.map((cid) => ({ id: cid, parent: raw.id })));
   }
-  return { root_id: rootKey, pages };
+  const tree = { root_id: rootKey, pages };
+  if (unreadable.length) tree.unreadable = unreadable;
+  return tree;
 }

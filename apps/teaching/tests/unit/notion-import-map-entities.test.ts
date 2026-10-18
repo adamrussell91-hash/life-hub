@@ -191,3 +191,15 @@ describe('buildImportPlan', () => {
     expect(plan.warnings.some((w) => w.rule === 'limit' && w.message.includes('changed type'))).toBe(true);
   });
 });
+
+describe('unreadable sub-pages', () => {
+  it('warns on the parent page', () => {
+    const t = tree('p1', page('p1', 'Unit'));
+    t.unreadable = [{ page_id: 'x', parent_id: 'p1', code: 'object_not_found' }];
+    const plan = buildImportPlan(t, ctx());
+    expect(plan.warnings).toContainEqual({
+      page_id: 'p1', notion_block_id: null, rule: 'skipped',
+      message: 'A sub-page could not be read from Notion (object_not_found); share it with the integration or import it separately.'
+    });
+  });
+});
