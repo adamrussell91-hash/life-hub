@@ -232,6 +232,21 @@ describe('nested blocks stay in place', () => {
     expect(valid(blocks)).toBe(true);
   });
 
+  it('continues numbering after a moved block', () => {
+    const one = node('numbered_list_item', { rich_text: rt('one') }, [img()]);
+    const blocks = mapBlocks([one, numbered('two'), numbered('three')], 'top', state()) as any[];
+    expect(blocks.map((b) => b.block_type)).toEqual(['rich_text', 'image', 'rich_text']);
+    expect(blocks[0].content.html).toBe('<ol><li>one</li></ol>');
+    expect(blocks[2].content.html).toBe('<ol start="2"><li>two</li><li>three</li></ol>');
+  });
+
+  it('keeps paragraph children in their original order', () => {
+    const blocks = mapBlocks([node('paragraph', { rich_text: rt('A') }, [img(), p('child')])], 'top', state()) as any[];
+    expect(blocks.map((b) => b.block_type)).toEqual(['rich_text', 'image', 'rich_text']);
+    expect(blocks[0].content.html).toBe('<p>A</p>');
+    expect(blocks[2].content.html).toBe('<p>child</p>');
+  });
+
   it('keeps text children inside the list item', () => {
     const blocks = mapBlocks([bullet('One', [p('extra')])], 'top', state()) as any[];
     expect(blocks).toHaveLength(1);
