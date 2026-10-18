@@ -9,6 +9,7 @@ import {
 } from '@/journal/drafts';
 import { bootstrapJournalForFirstMoment } from '@/journal/capture-context';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export type CaptureMode = CaptureDraftMode;
 
@@ -66,11 +67,12 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   let dirty = false;
   let destroyed = false;
   let discardOpen = false;
+  let overlay: JournalOverlayHandle | null = null;
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-capture-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-capture-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Add moment');
@@ -397,6 +399,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
 
   function requestClose(after?: () => void): void {
     if (destroyed) return;
+    if (discardOpen) return;
     if (
       dirty &&
       isCaptureSaveEnabled({
@@ -414,6 +417,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   function showDiscard(after?: () => void): void {
     discardOpen = true;
     discardBar.hidden = false;
+    discardBar.scrollIntoView({ block: 'nearest' });
     const onKeep = () => {
       discardOpen = false;
       discardBar.hidden = true;
@@ -432,26 +436,15 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   function finishClose(after?: () => void): void {
     if (destroyed) return;
     destroyed = true;
-    document.removeEventListener('keydown', onKey);
     autosave.destroy();
     clearVoicePlayback();
     if (voiceRecording?.state === 'recording') voiceRecording.stop();
-    back.remove();
+    overlay?.release();
     options.onClose?.();
     after?.();
   }
 
   cancelBtn.addEventListener('click', () => requestClose());
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back && !discardOpen) requestClose();
-  });
-
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key !== 'Escape' || discardOpen) return;
-    ev.preventDefault();
-    requestClose();
-  };
-  document.addEventListener('keydown', onKey);
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -505,11 +498,15 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   actions.append(cancelBtn, saveBtn);
   sheet.append(title, context, form);
   back.append(sheet);
-  options.anchor.append(back);
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: () => requestClose(),
+  });
 
   void (async () => {
     const restored = await loadCaptureDraft(options.tripId, options.legId, options.localDate);
-    if (!restored || destroyed) return;
+    // Never clobber what the user typed while the draft was loading.
+    if (!restored || destroyed || dirty) return;
     mode = restored.draft.mode;
     text = restored.draft.text;
     localTime = restored.draft.localTime;
@@ -547,7 +544,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   setMode('text');
   refreshContext();
   refreshSave();
-  textArea.focus();
+  textArea.focus({ preventScroll: true });
 
   return {
     destroy() {

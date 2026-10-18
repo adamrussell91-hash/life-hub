@@ -2,6 +2,7 @@ import type { JournalDocument } from '@/api/journal';
 import { tripRoute } from '@/app/router';
 import type { Item, TicketItem, Trip } from '@/types';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
 import type {
@@ -221,12 +222,13 @@ export function openTransitionLabelSheet(
 ): { destroy(): void } {
   attachVisualViewportInset();
   let destroyed = false;
+  let overlay: JournalOverlayHandle | null = null;
   const labels = resolveTransitionLabels(options.trn, options.ctx);
 
   const back = document.createElement('div');
   back.className = 'sheet-back';
   const sheet = document.createElement('div');
-  sheet.className = 'sheet addform journal-transition-sheet hub-morph-dialog';
+  sheet.className = 'sheet addform journal-transition-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-label', 'Edit transition labels');
@@ -277,14 +279,11 @@ export function openTransitionLabelSheet(
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
-    back.remove();
+    overlay?.release();
     options.onClose?.();
   }
 
   cancelBtn.addEventListener('click', () => destroy());
-  back.addEventListener('click', (ev) => {
-    if (ev.target === back) destroy();
-  });
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -319,8 +318,11 @@ export function openTransitionLabelSheet(
   actions.append(cancelBtn, saveBtn);
   sheet.append(title, form);
   back.append(sheet);
-  options.anchor.append(back);
-  depInput.focus();
+  overlay = presentJournalOverlay(back, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: depInput,
+  });
 
   return { destroy };
 }

@@ -1,9 +1,10 @@
 import { ApiClientError } from '@/api/client';
 import type { JournalDocument } from '@/api/journal';
-import { getJournal, saveJournal } from '@/api/journal';
+import { getJournal, knownJournalAtVersion, saveJournal } from '@/api/journal';
 import type { JournalMoment } from '@/journal/types';
 import { makeMomentId } from '@/journal/moment-operations';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export type MomentConflictField =
   | 'text'
@@ -202,7 +203,7 @@ export function openJournalConflictSheet(options: {
     const back = document.createElement('div');
     back.className = 'sheet-back';
     const sheet = document.createElement('div');
-    sheet.className = 'sheet addform journal-conflict-sheet hub-morph-dialog';
+    sheet.className = 'sheet addform journal-conflict-sheet';
     sheet.setAttribute('role', 'dialog');
     sheet.setAttribute('aria-modal', 'true');
     sheet.setAttribute('aria-label', 'Resolve journal conflict');
@@ -235,23 +236,16 @@ export function openJournalConflictSheet(options: {
     saveBtn.className = 'btn btn--primary';
     saveBtn.textContent = 'Save merged';
 
+    let overlay: JournalOverlayHandle | null = null;
+    let settled = false;
     function finishClose(result: Record<string, MomentConflictResolution> | null): void {
-      document.removeEventListener('keydown', onKey);
-      back.remove();
+      if (settled) return;
+      settled = true;
+      overlay?.release();
       resolve(result);
     }
 
     cancelBtn.addEventListener('click', () => finishClose(null));
-    back.addEventListener('click', (ev) => {
-      if (ev.target === back) finishClose(null);
-    });
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') {
-        ev.preventDefault();
-        finishClose(null);
-      }
-    };
-    document.addEventListener('keydown', onKey);
 
     function fieldLabel(field: MomentConflictField): string {
       const labels: Record<MomentConflictField, string> = {
@@ -384,9 +378,12 @@ export function openJournalConflictSheet(options: {
     actions.append(cancelBtn, saveBtn);
     sheet.append(heading, form);
     back.append(sheet);
-    options.anchor.append(back);
     heading.tabIndex = -1;
-    heading.focus();
+    overlay = presentJournalOverlay(back, {
+      anchor: options.anchor,
+      dismiss: () => finishClose(null),
+      initialFocus: heading,
+    });
   });
 }
 
@@ -431,17 +428,182 @@ async function promptConflictResolutions(
   return picked;
 }
 
+type MergeRow = { id: string };
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return stableJson(a ?? null) === stableJson(b ?? null);
+}
+
+/**
+ * Key-by-key three-way merge of one record. A key changed on one side only
+ * takes that side; a key changed on both sides differently is a conflict
+ * (local wins here; moment conflicts are offered to the owner afterwards).
+ */
+function mergeRecord<T extends object>(
+  base: T | undefined,
+  server: T,
+  local: T,
+  conflicts?: Set<string>,
+): T {
+  const keys = new Set([
+    ...Object.keys(server),
+    ...Object.keys(local),
+    ...(base ? Object.keys(base) : []),
+  ]);
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    const sv = (server as Record<string, unknown>)[key];
+    const lv = (local as Record<string, unknown>)[key];
+    const bv = base ? (base as Record<string, unknown>)[key] : undefined;
+    let value: unknown;
+    if (sameValue(sv, lv)) value = sv;
+    else if (base && sameValue(bv, sv)) value = lv;
+    else if (base && sameValue(bv, lv)) value = sv;
+    else {
+      value = lv;
+      conflicts?.add(key);
+    }
+    if (value !== undefined) out[key] = value;
+  }
+  return out as T;
+}
+
+function mergeRows<T extends MergeRow>(
+  base: T[] | undefined,
+  server: T[],
+  local: T[],
+  mergeBoth: (b: T | undefined, s: T, l: T) => T,
+): T[] {
+  const baseById = new Map((base ?? []).map((r) => [r.id, r]));
+  const localById = new Map(local.map((r) => [r.id, r]));
+  const serverIds = new Set(server.map((r) => r.id));
+  const out: T[] = [];
+  for (const s of server) {
+    const l = localById.get(s.id);
+    const b = baseById.get(s.id);
+    if (l) {
+      out.push(mergeBoth(b, s, l));
+    } else if (!b || !sameValue(b, s)) {
+      // Added on the server, or changed there after the local copy removed it.
+      out.push(s);
+    }
+    // else: removed locally (permanent delete) and untouched on the server.
+  }
+  for (const l of local) {
+    if (serverIds.has(l.id)) continue;
+    const b = baseById.get(l.id);
+    // Added locally, or changed locally after the server removed it.
+    if (!b || !sameValue(b, l)) out.push(l);
+  }
+  return out;
+}
+
+export interface ThreeWayJournalMerge {
+  merged: JournalDocument;
+  plans: MomentConflictPlan[];
+}
+
+/**
+ * Merge a local edit onto the server's latest copy. `base` is the server copy
+ * the edit started from; without it every difference counts as both-changed,
+ * so nothing either side added is dropped and moment clashes are offered.
+ */
+export function threeWayMergeJournal(
+  base: JournalDocument | undefined,
+  server: JournalDocument,
+  local: JournalDocument,
+): ThreeWayJournalMerge {
+  const plans: MomentConflictPlan[] = [];
+  const conflictFieldSet = new Set<string>(MOMENT_CONFLICT_FIELDS);
+  const moments = mergeRows(base?.moments, server.moments, local.moments, (b, s, l) => {
+    const clashes = new Set<string>();
+    const merged = mergeRecord(b, s, l, clashes);
+    const fields = [...clashes].filter((k): k is MomentConflictField => conflictFieldSet.has(k));
+    if (fields.length && s.lifecycle === 'live' && l.lifecycle === 'live') {
+      plans.push({ momentId: s.id, server: s, local: l, fields });
+    }
+    return merged;
+  });
+  const generic = <T extends MergeRow>(b: T | undefined, s: T, l: T) => mergeRecord(b, s, l);
+  const legs = mergeRows(base?.legs, server.legs, local.legs, generic);
+  const days = mergeRows(base?.days, server.days, local.days, generic);
+  const transitions = mergeRows(base?.transitions, server.transitions, local.transitions, generic);
+  let media = mergeRows(base?.media, server.media, local.media, generic);
+
+  // Never leave a moment pointing at a media row the merge dropped.
+  const mediaIds = new Set(media.map((m) => m.id));
+  for (const moment of moments) {
+    for (const id of moment.media_ids) {
+      if (mediaIds.has(id)) continue;
+      const row = server.media.find((m) => m.id === id) ?? local.media.find((m) => m.id === id);
+      if (row) {
+        media = [...media, row];
+        mediaIds.add(id);
+      }
+    }
+  }
+
+  const top = mergeRecord(
+    base as JournalDocument | undefined,
+    server,
+    local,
+  );
+  return {
+    merged: {
+      ...top,
+      revision: Math.max(server.revision, local.revision) + 1,
+      legs,
+      days,
+      moments,
+      media,
+      transitions,
+      operations: server.operations ?? local.operations ?? [],
+    },
+    plans,
+  };
+}
+
+function applyMomentResolutions(
+  journal: JournalDocument,
+  plans: MomentConflictPlan[],
+  resolutions: Record<string, MomentConflictResolution>,
+): JournalDocument {
+  const extra: JournalMoment[] = [];
+  const moments = journal.moments.map((m) => {
+    const plan = plans.find((p) => p.momentId === m.id);
+    if (!plan) return m;
+    const resolution = resolutions[m.id] ?? { mode: 'fields', fields: defaultFieldPicks(plan) };
+    let next = { ...m };
+    if (resolution.mode === 'keep_both') {
+      for (const field of plan.fields) next = { ...next, ...pickField(field, plan.server, plan.local, 'server') };
+      const maxOrder = Math.max(
+        ...journal.moments
+          .filter((o) => o.leg_id === m.leg_id && o.local_date === m.local_date)
+          .map((o) => o.display_order),
+      );
+      extra.push(cloneMomentForKeepBoth(plan.local, maxOrder + 1));
+      return next;
+    }
+    for (const field of plan.fields) {
+      next = { ...next, ...pickField(field, plan.server, plan.local, resolution.fields[field] ?? 'local') };
+    }
+    return next;
+  });
+  return { ...journal, moments: [...moments, ...extra] };
+}
+
 export async function recoverJournalSaveConflict(
   tripId: string,
-  _staleVersion: string,
+  staleVersion: string,
   localJournal: JournalDocument,
 ): Promise<{ journal: JournalDocument; version: string }> {
   const serverEnvelope = await getJournal(tripId);
-  const plans = planMomentConflicts(serverEnvelope.journal, localJournal);
-  if (!plans.length) {
-    return saveJournal(tripId, serverEnvelope.version, localJournal);
+  const base = knownJournalAtVersion(staleVersion);
+  const { merged, plans } = threeWayMergeJournal(base, serverEnvelope.journal, localJournal);
+  let finalJournal = merged;
+  if (plans.length) {
+    const resolutions = await promptConflictResolutions(plans);
+    finalJournal = applyMomentResolutions(merged, plans, resolutions);
   }
-  const resolutions = await promptConflictResolutions(plans);
-  const merged = mergeJournalAfterConflict(serverEnvelope.journal, localJournal, resolutions);
-  return saveJournal(tripId, serverEnvelope.version, merged);
+  return saveJournal(tripId, serverEnvelope.version, finalJournal);
 }

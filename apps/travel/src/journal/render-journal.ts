@@ -13,6 +13,7 @@ import { openImportSheet } from '@/journal/import-sheet';
 import { renderToolbar } from '@/journal/render-toolbar';
 import type { JournalDocument, JournalEnvelope } from '@/api/journal';
 import { mountJournalOfflineStatus } from '@/journal/offline-status';
+import { closeAllJournalOverlays } from '@/journal/overlay-host';
 import { renderMomentArticle } from '@/journal/render-moment';
 import { createDayMapPreview } from '@/journal/map-preview';
 import { getActiveJournalDayMap } from '@/journal/map-expanded';
@@ -204,7 +205,6 @@ export function renderJournal(
         importOverlay = null;
       },
     });
-    cleanups.push(() => importOverlay?.destroy());
   }
 
   function openCapture(dayId?: string): void {
@@ -223,11 +223,11 @@ export function renderJournal(
       onClose: () => {
         captureOverlay = null;
       },
-      onSaved: () => {
+      onSaved: (envelope) => {
         captureOverlay = null;
+        onJournalSaved(envelope);
       },
     });
-    cleanups.push(() => captureOverlay?.destroy());
   }
 
   let showCoreyPerspective = readCoreyPerspectiveVisible(liveFixture.trip_id);
@@ -264,7 +264,6 @@ export function renderJournal(
           searchOverlay = null;
         },
       });
-      cleanups.push(() => searchOverlay?.destroy());
     },
     onSouvenirs: () => {
       souvenirsOverlay?.destroy();
@@ -281,7 +280,6 @@ export function renderJournal(
           souvenirsOverlay = null;
         },
       });
-      cleanups.push(() => souvenirsOverlay?.destroy());
     },
     onExportJournal: () => {
       void downloadJournalExportBundle(stripJournalForExport(journalDoc()));
@@ -303,7 +301,6 @@ export function renderJournal(
           shareOverlay = null;
         },
       });
-      cleanups.push(() => shareOverlay?.destroy());
     },
     onTrash: () => {
       trashOverlay?.destroy();
@@ -317,7 +314,6 @@ export function renderJournal(
           trashOverlay = null;
         },
       });
-      cleanups.push(() => trashOverlay?.destroy());
     },
     onChapter: () => {
       chapterOverlay?.destroy();
@@ -331,7 +327,6 @@ export function renderJournal(
           chapterOverlay = null;
         },
       });
-      cleanups.push(() => chapterOverlay?.destroy());
     },
   });
 
@@ -670,10 +665,21 @@ export function renderJournal(
     reconcile,
     destroy() {
       for (const fn of cleanups) fn();
-      chapterOverlay?.destroy();
-      importOverlay?.destroy();
-      captureOverlay?.destroy();
+      for (const overlay of [
+        chapterOverlay,
+        importOverlay,
+        captureOverlay,
+        dayMapOverlay,
+        trashOverlay,
+        searchOverlay,
+        souvenirsOverlay,
+        shareOverlay,
+      ]) {
+        overlay?.destroy();
+      }
       captureOverlay = null;
+      // Sheets opened from a moment's menu are not tracked here.
+      closeAllJournalOverlays();
       canvas.replaceChildren();
     },
   };

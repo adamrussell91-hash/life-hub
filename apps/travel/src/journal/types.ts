@@ -26,11 +26,21 @@ export interface JournalPlace {
 
 export interface JournalMedia extends JournalDeletedMeta {
   id: string;
-  /** Display URL for Phase 1 fixtures (local path or data URL). */
-  url: string;
-  width: number;
-  height: number;
+  /** Display URL for fixtures (local path or data URL). Live media is served by id. */
+  url?: string;
+  /** Pixel size for photos; absent for voice notes. */
+  width?: number;
+  height?: number;
   lifecycle: JournalLifecycle;
+  /** MIME type of the original (image/jpeg, audio/mp4, …). */
+  content_type?: string;
+  byte_size?: number;
+  original_key?: string;
+  derivative_keys?: Record<string, string>;
+  /** Server-side backup state for the original bytes. */
+  upload_state?: 'pending' | 'uploading' | 'backed_up' | 'failed';
+  /** Voice note length in seconds. */
+  duration_s?: number;
   /** SHA-256 hex of original bytes when known (live API journal). */
   checksum?: string;
   caption?: string;

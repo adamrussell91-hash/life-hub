@@ -6,7 +6,8 @@ export type JournalDerivativeWidth = (typeof JOURNAL_DERIVATIVE_WIDTHS)[number];
 
 export const JOURNAL_MOMENT_PAGE_SIZE = 30;
 
-export function isFixtureMediaUrl(url: string): boolean {
+export function isFixtureMediaUrl(url: string | undefined): url is string {
+  if (!url) return false;
   return (
     url.startsWith('data:') ||
     url.startsWith('blob:') ||
@@ -26,6 +27,33 @@ export function journalMediaDerivativeUrl(
     width: String(width),
   });
   return `/api/travel-journal-media?${params}`;
+}
+
+/** Voice notes play from the original (fixtures keep their own URL). */
+export function journalAudioSrc(tripId: string, media: JournalMedia): string {
+  const local = localJournalMediaUrl(media.id);
+  if (local) return local;
+  if (isFixtureMediaUrl(media.url)) return media.url;
+  const params = new URLSearchParams({ trip: tripId, id: media.id, variant: 'original' });
+  return `/api/travel-journal-media?${params}`;
+}
+
+/**
+ * Object URLs for media captured on this device and not yet backed up, so a
+ * new photo or voice note shows immediately instead of a broken image.
+ */
+const localMediaUrls = new Map<string, string>();
+
+export function rememberLocalJournalMedia(mediaId: string, blob: Blob): string {
+  const existing = localMediaUrls.get(mediaId);
+  if (existing) return existing;
+  const url = URL.createObjectURL(blob);
+  localMediaUrls.set(mediaId, url);
+  return url;
+}
+
+export function localJournalMediaUrl(mediaId: string): string | undefined {
+  return localMediaUrls.get(mediaId);
 }
 
 export function pickDerivativeWidth(
@@ -52,7 +80,7 @@ export function buildJournalImageSrcset(tripId: string, media: JournalMedia): st
 }
 
 export function reserveMediaAspect(img: HTMLImageElement, media: JournalMedia): void {
-  if (media.width > 0 && media.height > 0) {
+  if (media.width && media.height && media.width > 0 && media.height > 0) {
     img.width = media.width;
     img.height = media.height;
     img.style.aspectRatio = `${media.width} / ${media.height}`;
@@ -71,6 +99,13 @@ export function configureJournalImage(img: HTMLImageElement, opts: ConfigureJour
   img.alt = '';
   img.decoding = 'async';
   img.loading = opts.eager ? 'eager' : 'lazy';
+  const local = localJournalMediaUrl(opts.media.id);
+  if (local && opts.media.upload_state !== 'backed_up') {
+    img.removeAttribute('srcset');
+    img.removeAttribute('sizes');
+    img.src = local;
+    return;
+  }
   const srcset = buildJournalImageSrcset(opts.tripId, opts.media);
   if (srcset) {
     img.srcset = srcset;
@@ -83,7 +118,7 @@ export function configureJournalImage(img: HTMLImageElement, opts: ConfigureJour
   } else {
     img.removeAttribute('srcset');
     img.removeAttribute('sizes');
-    img.src = opts.media.url;
+    img.src = opts.media.url ?? '';
   }
 }
 

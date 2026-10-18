@@ -6,6 +6,7 @@ import {
   type JournalSearchIndex,
   type JournalSearchRow,
 } from '@/journal/search-index';
+import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export interface OpenJournalSearchOptions {
   journal: JournalDocument;
@@ -29,7 +30,8 @@ export function openJournalSearch(options: OpenJournalSearchOptions): { destroy(
   backdrop.setAttribute('role', 'presentation');
 
   const panel = document.createElement('div');
-  panel.className = 'journal-chapter journal-search';
+  // .compose: visual-viewport.js keeps the panel above the iOS keyboard.
+  panel.className = 'journal-chapter journal-search compose';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
   panel.setAttribute('aria-label', 'Search journal');
@@ -76,8 +78,9 @@ export function openJournalSearch(options: OpenJournalSearchOptions): { destroy(
     text.textContent = snippet(row.label);
     btn.append(kind, text);
     btn.addEventListener('click', () => {
-      options.onSelect(row.targetId);
+      // Close first: the page is scroll-locked while the panel is open.
       destroy();
+      options.onSelect(row.targetId);
     });
     li.append(btn);
     return li;
@@ -126,7 +129,6 @@ export function openJournalSearch(options: OpenJournalSearchOptions): { destroy(
 
   panel.append(head, status, list);
   backdrop.append(panel);
-  options.anchor.append(backdrop);
 
   void getOrBuildJournalSearchIndex(options.journal).then((built) => {
     if (destroyed) return;
@@ -134,23 +136,20 @@ export function openJournalSearch(options: OpenJournalSearchOptions): { destroy(
     renderList();
   });
 
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') destroy();
-  };
-  document.addEventListener('keydown', onKey);
   closeBtn.addEventListener('click', () => destroy());
-  backdrop.addEventListener('click', (ev) => {
-    if (ev.target === backdrop) destroy();
-  });
 
   function destroy(): void {
+    if (destroyed) return;
     destroyed = true;
-    document.removeEventListener('keydown', onKey);
-    backdrop.remove();
+    overlay.release();
     options.onClose?.();
   }
 
-  search.focus();
+  const overlay: JournalOverlayHandle = presentJournalOverlay(backdrop, {
+    anchor: options.anchor,
+    dismiss: destroy,
+    initialFocus: search,
+  });
   renderList();
   return { destroy };
 }
