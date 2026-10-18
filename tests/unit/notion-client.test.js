@@ -25,3 +25,10 @@ test('a timeout on the first try is retried and can succeed', async () => {
   assert.deepEqual(await client.getPage('p'), { id: 'p' });
   assert.equal(calls, 2);
 });
+
+test('retries a failing request three times by default, then throws', async () => {
+  let calls = 0;
+  const client = createNotionClient({ token: 't', fetchImpl: async () => { calls += 1; return new Response('{}', { status: 500 }); }, sleep: async () => {} });
+  await assert.rejects(() => client.getPage('p'), (e) => e.status === 500);
+  assert.equal(calls, 4);
+});

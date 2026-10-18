@@ -323,3 +323,22 @@ test('tab item whose children 404 keeps children_error after normalisation', asy
   assert.equal(tabs.children[0].children_error, 'object_not_found');
   assert.equal(tabs.children[1].children_error, undefined);
 });
+
+test('readNotionTree awaits onPage after each page with counts', async () => {
+  const { fetchImpl } = fakeNotion({
+    'GET /v1/pages/u1': pageBody('u1', 'U', 'Unit', ['l1', 'l2']),
+    'GET /v1/pages/l1': pageBody('l1', 'L1', 'Workshop'),
+    'GET /v1/pages/l2': pageBody('l2', 'L2', 'Workshop'),
+    'GET /v1/blocks/u1/children': { results: [], has_more: false },
+    'GET /v1/blocks/l1/children': { results: [], has_more: false },
+    'GET /v1/blocks/l2/children': { results: [], has_more: false }
+  });
+  const client = createNotionClient({ token: 't', fetchImpl, sleep: async () => {} });
+  const seen = [];
+  let finished = 0;
+  await readNotionTree(client, 'u1', {
+    onPage: async (p) => { seen.push(p); await new Promise((r) => setTimeout(r, 1)); finished += 1; }
+  });
+  assert.deepEqual(seen, [{ done: 1, total_known: 3 }, { done: 2, total_known: 3 }, { done: 3, total_known: 3 }]);
+  assert.equal(finished, 3);
+});

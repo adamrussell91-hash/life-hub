@@ -81,7 +81,11 @@ export function createNotionImportHandler(deps = {}) {
         id, kind, status: 'queued', page_id: pageId, choices, created_at: at, updated_at: at
       });
       if (!(await kick(request, RUN_PATHS[kind], id, deps.fetchImpl))) {
-        await writeJob(store, id, { status: 'failed', error: 'Could not start the import. Try again.' });
+        // Only if nothing has picked the job up: a slow kick response may hide a started run.
+        const current = await getJSON(store, notionJobKey(id), { consistency: 'strong' });
+        if (current?.status === 'queued') {
+          await writeJob(store, id, { status: 'failed', error: 'Could not start the import. Try again.' });
+        }
         return reply(errorResponse(502, 'start_failed', 'Could not start the import. Try again.', true));
       }
       return reply(okResponse(202, { job_id: id }));
@@ -94,7 +98,7 @@ export function createNotionImportHandler(deps = {}) {
 
     if (jobId) {
       if (!JOB_ID.test(jobId)) return reply(errorResponse(400, 'validation_error', 'Bad job id', false));
-      const job = await getJSON(store, notionJobKey(jobId));
+      const job = await getJSON(store, notionJobKey(jobId), { consistency: 'strong' });
       return reply(job ? okResponse(200, job) : errorResponse(404, 'not_found', 'Job not found', false));
     }
 

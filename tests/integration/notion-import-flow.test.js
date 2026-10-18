@@ -10,9 +10,10 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 
 function memoryStore(seed = {}) {
   const map = new Map(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]));
+  const calls = [];
   return {
-    map, read: (k) => (map.has(k) ? JSON.parse(map.get(k)) : null),
-    async get(key, o) { if (!map.has(key)) return null; return o?.type === 'json' ? JSON.parse(map.get(key)) : map.get(key); },
+    map, calls, read: (k) => (map.has(k) ? JSON.parse(map.get(k)) : null),
+    async get(key, o) { calls.push([key, o]); if (!map.has(key)) return null; return o?.type === 'json' ? JSON.parse(map.get(key)) : map.get(key); },
     async set(key, v) { map.set(key, typeof v === 'string' ? v : JSON.stringify({ bytes: true })); },
     async setJSON(key, v) { map.set(key, JSON.stringify(v)); },
     async delete(key) { map.delete(key); },
@@ -155,7 +156,7 @@ test('each media download gets a bounded abort signal', async () => {
     clock: () => 1_000_000, mediaDeadlineAt: 1_000_000 + 5_000,
     timeoutSignal: (ms) => { asked.push(ms); return new AbortController().signal; }
   });
-  assert.deepEqual(asked, [60000]);
+  assert.deepEqual(asked, [5000]); // bounded by the cutoff itself
   assert.equal(fileSignals.length, 1);
   assert.ok(fileSignals[0] instanceof AbortSignal);
   const near = [];
@@ -178,4 +179,41 @@ test('the injected clock drives the read deadline', async () => {
   const job = store.read(notionJobKey('nij_test0012'));
   assert.equal(job.status, 'failed');
   assert.match(job.error, /Too much to read/);
+});
+
+test('the cutoff bounds each download timeout, between 1s and 60s', async () => {
+  for (const [headroom, expected] of [[120_000, 60000], [200, 1000]]) {
+    const store = seed();
+    const asked = [];
+    queue(store, 'nij_test0013', { kind: 'apply' });
+    await runApply(store, 'nij_test0013', {
+      env, fetchImpl, now, origin: 'https://hub.example', sleep: async () => {},
+      clock: () => 1_000_000, mediaDeadlineAt: 1_000_000 + headroom,
+      timeoutSignal: (ms) => { asked.push(ms); return new AbortController().signal; }
+    });
+    assert.deepEqual(asked, [expected]);
+  }
+});
+
+test('every job read asks for strong consistency', async () => {
+  const store = seed();
+  queue(store, 'nij_test0014');
+  queue(store, 'nij_test0015', { kind: 'apply' });
+  await runPlan(store, 'nij_test0014', { env, fetchImpl, now, sleep: async () => {} });
+  await runApply(store, 'nij_test0015', { env, fetchImpl, now, origin: 'https://hub.example', sleep: async () => {} });
+  const jobReads = store.calls.filter(([k]) => k.startsWith('notion-import/jobs/'));
+  assert.ok(jobReads.length >= 6);
+  assert.ok(jobReads.every(([, o]) => o?.consistency === 'strong'), JSON.stringify(jobReads));
+});
+
+test('reading writes a heartbeat with page counts into the job', async () => {
+  const store = seed();
+  queue(store, 'nij_test0016');
+  const snapshots = [];
+  const realSet = store.setJSON.bind(store);
+  store.setJSON = async (k, v) => { if (k === notionJobKey('nij_test0016')) snapshots.push(structuredClone(v)); return realSet(k, v); };
+  await runPlan(store, 'nij_test0016', { env, fetchImpl, now, sleep: async () => {} });
+  const beats = snapshots.filter((j) => j.status === 'running' && j.progress?.phase === 'reading');
+  assert.deepEqual(beats.map((j) => [j.progress.done, j.progress.total]), [[1, 2], [2, 2]]);
+  assert.ok(beats.every((j) => j.phase === 'reading'));
 });

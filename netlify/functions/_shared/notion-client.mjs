@@ -15,7 +15,7 @@ export function createNotionClient({
   token,
   fetchImpl = fetch,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  maxRetries = 5,
+  maxRetries = 3,
   requestTimeoutMs = 30_000
 }) {
   let requestCount = 0;

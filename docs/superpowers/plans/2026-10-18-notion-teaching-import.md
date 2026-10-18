@@ -3157,10 +3157,17 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ```ts
 // apps/teaching/tests/unit/notion-import-preview.test.ts
-import { describe, expect, it } from 'vitest';
-import { parseNotionPageId } from '@/teacher/notion-import/api';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiClientError, apiGet } from '@/api/client';
+import { parseNotionPageId, waitForJob } from '@/teacher/notion-import/api';
 import { buildRows, choicesFrom, groupWarnings, toggleExcluded } from '@/teacher/notion-import/preview-model';
 import type { ImportPlanPreview } from '@/notion-import/types';
+
+vi.mock('@/api/client', async (original) => ({
+  ...(await original<typeof import('@/api/client')>()),
+  apiGet: vi.fn(),
+  apiPost: vi.fn()
+}));
 
 const entity = (page_id: string, parent_page_id: string | null, label: string, needs: any[] = []) => ({
   page_id, parent_page_id, kind: 'lesson' as const, label, id: `id_${page_id}`, title: `T ${page_id}`,
@@ -3213,6 +3220,45 @@ describe('preview model', () => {
     });
   });
 });
+describe('waitForJob', () => {
+  // Fake time: sleeping advances the clock, so nothing really waits.
+  let t = 0;
+  const opts = (intervalMs = 10_000) => ({ intervalMs, now: () => t, sleep: async (ms: number) => { t += ms; } });
+  const job = (status: string, updated_at = 'a') => ({ id: 'nij_x', kind: 'plan', status, page_id: 'p', updated_at });
+  beforeEach(() => { t = 0; vi.mocked(apiGet).mockReset(); });
+
+  it('returns a planned job', async () => {
+    vi.mocked(apiGet).mockResolvedValueOnce(job('queued')).mockResolvedValueOnce(job('planned', 'b'));
+    expect((await waitForJob('nij_x', () => {}, opts())).status).toBe('planned');
+  });
+
+  it('treats any ApiClientError (for example a 401) as fatal', async () => {
+    vi.mocked(apiGet).mockRejectedValue(new ApiClientError({ code: 'unauthenticated', message: 'Please sign in to continue.' } as never));
+    await expect(waitForJob('nij_x', () => {}, opts())).rejects.toThrow('Please sign in to continue.');
+    expect(apiGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps polling through a network blip', async () => {
+    vi.mocked(apiGet).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(job('done', 'b'));
+    expect((await waitForJob('nij_x', () => {}, opts())).status).toBe('done');
+  });
+
+  it('fails a job left queued for over 60 seconds', async () => {
+    vi.mocked(apiGet).mockResolvedValue(job('queued'));
+    await expect(waitForJob('nij_x', () => {}, opts())).rejects.toThrow("The import didn't start. Try again.");
+  });
+
+  it('keeps polling a running job whose heartbeat keeps updating', async () => {
+    let n = 0;
+    vi.mocked(apiGet).mockImplementation(async () => (++n > 60 ? job('done', 'z') : job('running', `u${n}`)) as never);
+    expect((await waitForJob('nij_x', () => {}, { ...opts(), timeoutMs: 15 * 60 * 1000 })).status).toBe('done');
+  });
+
+  it('fails a running job with no update for over 4 minutes', async () => {
+    vi.mocked(apiGet).mockResolvedValue(job('running', 'same'));
+    await expect(waitForJob('nij_x', () => {}, opts())).rejects.toThrow('The import stopped responding. Try again.');
+  });
+});
 ```
 
 - [ ] **Step 2: Run it and check it fails**
@@ -3240,7 +3286,7 @@ export interface ImportPlanPreview {
 
 ```ts
 // apps/teaching/src/teacher/notion-import/api.ts
-import { apiGet, apiPost } from '@/api/client';
+import { ApiClientError, apiGet, apiPost } from '@/api/client';
 import type { ImportChoices, ImportPlanPreview, ImportWarning } from '@/notion-import/types';
 
 export interface NotionSearchItem { page_id: string; title: string; category: string | null; last_edited_time: string }
@@ -3255,6 +3301,8 @@ export interface NotionImportJob {
   /** 'queued' until the background function picks it up, then 'running'; plan jobs end 'planned', apply jobs 'done'. */
   status: 'queued' | 'running' | 'planned' | 'done' | 'failed';
   page_id: string;
+  /** Server time of the last write. The heartbeat while reading refreshes it. */
+  updated_at: string;
   phase?: string;
   progress?: { phase: string; done: number; total: number };
   /** Slim preview: no entity records, no media urls. Apply re-reads Notion. */
@@ -3297,20 +3345,45 @@ async function startJob(kind: 'plan' | 'apply', pageId: string, choices?: Import
 export const startPlan = (pageId: string, choices?: ImportChoices) => startJob('plan', pageId, choices);
 export const startApply = (pageId: string, choices: ImportChoices) => startJob('apply', pageId, choices);
 
-/** Polls until the job leaves 'queued' and 'running'. */
+const QUEUED_LIMIT_MS = 60_000;
+const SILENT_LIMIT_MS = 4 * 60_000;
+
+/**
+ * Polls until the job finishes. A network blip (not an ApiClientError) means poll again;
+ * any ApiClientError (401, 404, 400) is fatal. Staleness is measured on this device's
+ * clock from when the job record last changed, so clock skew with the server cannot trip it:
+ * 'queued' for over 60 s never started, and 'running' with no update for over 4 minutes
+ * stopped (the server writes a heartbeat while reading and a progress write while applying).
+ */
 export async function waitForJob(
   id: string,
   onUpdate: (job: NotionImportJob) => void,
-  { intervalMs = 1500, timeoutMs = 15 * 60 * 1000, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)) } = {}
+  {
+    intervalMs = 1500, timeoutMs = 15 * 60 * 1000,
+    sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+    now = Date.now
+  } = {}
 ): Promise<NotionImportJob> {
-  const started = Date.now();
+  const started = now();
+  let seen = '';
+  let seenAt = started;
   for (;;) {
-    const job = await getNotionJob(id).catch(() => null);
+    let job: NotionImportJob | null = null;
+    try {
+      job = await getNotionJob(id);
+    } catch (error) {
+      if (error instanceof ApiClientError) throw error;
+    }
     if (job) {
       onUpdate(job);
-      if (job.status !== 'queued' && job.status !== 'running') return job;
+      if (job.status === 'planned' || job.status === 'done' || job.status === 'failed') return job;
+      const stamp = `${job.status}|${job.updated_at}`;
+      if (stamp !== seen) { seen = stamp; seenAt = now(); }
+      const quiet = now() - seenAt;
+      if (job.status === 'queued' && quiet > QUEUED_LIMIT_MS) throw new Error("The import didn't start. Try again.");
+      if (job.status === 'running' && quiet > SILENT_LIMIT_MS) throw new Error('The import stopped responding. Try again.');
     }
-    if (Date.now() - started > timeoutMs) throw new Error('The import is taking too long. Check back shortly.');
+    if (now() - started > timeoutMs) throw new Error('The import is taking too long. Check back shortly.');
     await sleep(intervalMs);
   }
 }

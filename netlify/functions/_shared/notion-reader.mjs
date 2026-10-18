@@ -101,10 +101,10 @@ async function subItemIds(client, page) {
 }
 
 /**
- * @param {{ maxPages?: number, deadlineAt?: number, now?: () => number }} [opts]
+ * @param {{ maxPages?: number, deadlineAt?: number, now?: () => number, onPage?: (p: {done:number,total_known:number}) => Promise<void> }} [opts]
  *   deadlineAt is an absolute epoch-ms time (compared with now(), default Date.now).
  */
-export async function readNotionTree(client, rootId, { maxPages = 200, deadlineAt, now = Date.now } = {}) {
+export async function readNotionTree(client, rootId, { maxPages = 200, deadlineAt, now = Date.now, onPage } = {}) {
   const pages = {};
   const unreadable = [];
   const queue = [{ id: rootId, parent: null }];
@@ -142,6 +142,8 @@ export async function readNotionTree(client, rootId, { maxPages = 200, deadlineA
     pages[raw.id] = normalizePage(raw, blocks, childIds);
     if (rootKey === null) rootKey = raw.id;
     queue.push(...childIds.map((cid) => ({ id: cid, parent: raw.id })));
+    // Heartbeat for the caller (it writes progress into the job record).
+    if (onPage) await onPage({ done: Object.keys(pages).length, total_known: Object.keys(pages).length + queue.length });
   }
   const tree = { root_id: rootKey, pages };
   if (unreadable.length) tree.unreadable = unreadable;
