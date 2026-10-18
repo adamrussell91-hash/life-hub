@@ -104,12 +104,12 @@ export function nearbyCandidates(candidates, point, limit = NEAR_METRES) {
     })
     .sort((a, b) => a.distance - b.distance);
 }
-function agreeing(hint, near, suburb) {
+function agreeing(hint, near, suburb, least = SURE_SIMILARITY) {
   if (!hint) return null;
   let best = null;
   for (const c of near) {
     const s = nameSimilarity(hint, c.name, suburb);
-    if (s >= SURE_SIMILARITY && (!best || s > best.s)) best = { c, s };
+    if (s >= least && (!best || s > best.s)) best = { c, s };
   }
   return best?.c || null;
 }
@@ -137,8 +137,9 @@ export function pickVenue({ written = "", guess = "", suburb = "", point, source
       match: { confidence: "sure", basis: "written", source },
     };
   // Day One's GPS name counts only when nothing was written and a food
-  // place there has that name.
-  const named = !written && !looksLikeAddress(guess) && agreeing(guess, near, suburb);
+  // place there has the same name: "BTB Kirribilli" is not "The Kirribilli
+  // Hotel", even though one name sits inside the other.
+  const named = !written && !looksLikeAddress(guess) && agreeing(guess, near, suburb, 1);
   if (named)
     return {
       name: named.name,
