@@ -4,7 +4,7 @@ import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
-import { createCalloutTargetPicker } from '@/blocks/callout-reference';
+import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
   createAnalogyTypesEditor,
@@ -393,6 +393,7 @@ export function createCalloutEditor(
   styleSelect.setAttribute('aria-label', 'Callout style');
 
   for (const style of [
+    'cultural_warning',
     'information',
     'important',
     'warning',
@@ -404,8 +405,8 @@ export function createCalloutEditor(
   ] as const) {
     const opt = document.createElement('option');
     opt.value = style;
-    opt.textContent = style;
-    opt.selected = block.content.style === style;
+    opt.textContent = style === 'cultural_warning' ? 'Cultural warning' : style;
+    opt.selected = resolvedCalloutStyle(block.content) === style;
     styleSelect.append(opt);
   }
 
