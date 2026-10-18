@@ -160,7 +160,7 @@ export interface MapContext {
   years: Array<{ id: string; year_level: number }>;
   subjects: Array<{ id: string; title: string }>;
   outcomes: Array<{ id: string; code: string }>;
-  /** notion page id (no dashes) → existing Teaching Hub entity id */
+  /** dashed notion page id, as the reader returns it → existing Teaching Hub entity id */
   source_map: Record<string, string>;
   choices: ImportChoices;
 }

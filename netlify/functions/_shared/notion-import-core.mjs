@@ -322,11 +322,13 @@ function listsInto(items, st, r) {
   while (i < items.length) {
     const tag = listTag(items[i]);
     let open = false;
+    const runStart = i;
     while (i < items.length && listTag(items[i]) === tag) {
       const moved = [];
       const li = listItemHtml(items[i], st, moved);
       if (!open) {
-        r.html += `<${tag}>`;
+        const n = i - runStart + 1;
+        r.html += tag === "ol" && n > 1 ? `<ol start="${n}">` : `<${tag}>`;
         open = true;
       }
       r.html += li;
@@ -347,13 +349,27 @@ function textRunInto(run, st, r) {
     if (n.type === "paragraph") {
       const text = richTextHtml(n.data.rich_text);
       if (text) r.html += `<p>${text}</p>`;
-      const textKids = n.children.filter((c) => TEXT_RUN_TYPES.has(c.type));
-      const otherKids = n.children.filter((c) => !TEXT_RUN_TYPES.has(c.type));
-      if (textKids.length) textRunInto(textKids, st, r);
-      if (otherKids.length) {
-        warn(st, n, "flattened", "Blocks nested under a paragraph were moved after it.");
-        r.hoist(otherKids);
+      let buffer = [];
+      let warned = false;
+      let k = 0;
+      while (k < n.children.length) {
+        const c = n.children[k];
+        if (TEXT_RUN_TYPES.has(c.type)) {
+          buffer.push(c);
+          k += 1;
+          continue;
+        }
+        if (buffer.length) textRunInto(buffer, st, r);
+        buffer = [];
+        const blocks = [];
+        while (k < n.children.length && !TEXT_RUN_TYPES.has(n.children[k].type)) blocks.push(n.children[k++]);
+        if (!warned) {
+          warn(st, n, "flattened", "Blocks nested under a paragraph were moved after it.");
+          warned = true;
+        }
+        r.hoist(blocks);
       }
+      if (buffer.length) textRunInto(buffer, st, r);
       i += 1;
       continue;
     }
@@ -732,12 +748,17 @@ function buildImportPlan(tree, ctx) {
     if (!plan.new_subjects.some((s) => s.id === id)) plan.new_subjects.push({ id, title });
     return id;
   };
-  const visit = (pageId, parent, sequence) => {
+  const visit = (pageId, parent, nearestUnit) => {
     const pg = tree.pages[pageId];
     if (!pg || excluded.has(pageId)) return;
+    const displayTitle = pg.title.trim() || "Untitled";
+    if (byPage.has(pageId)) {
+      plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "skipped", message: `\u201C${displayTitle}\u201D appears more than once; imported only under its first parent.` });
+      return;
+    }
     const rule = categoryRule(pg.category);
     if ("skip" in rule) {
-      plan.skipped.push({ page_id: pageId, parent_page_id: parent?.page_id ?? null, title: pg.title, reason: rule.skip });
+      plan.skipped.push({ page_id: pageId, parent_page_id: parent?.page_id ?? null, title: displayTitle, reason: rule.skip });
       return;
     }
     const st = createBlockState(pageId, ctx.now, ctx.choices.html_as_code);
@@ -749,17 +770,34 @@ function buildImportPlan(tree, ctx) {
     });
     const cover = pg.cover ? { url: mediaUrl(st, `cover:${pageId}`, null, pg.cover.url, pg.cover.source === "file", pg.cover.name, "cover") } : void 0;
     const override = ctx.choices.overrides[pageId] ?? {};
-    const existingId = ctx.source_map[pageId];
+    let existingId = ctx.source_map[pageId];
+    if (existingId && !existingId.startsWith(`${ID_PREFIX[rule.kind]}_`)) {
+      plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "limit", message: "This page changed type since it was last imported; it will import as a new item." });
+      existingId = void 0;
+    }
     const id = existingId ?? `${ID_PREFIX[rule.kind]}_n_${pageId.replace(/-/g, "")}`;
-    const title = pg.title.trim() || "Untitled";
+    const title = displayTitle;
     const needs = [];
     const inheritedYear = parent?.record.year_id;
     const inheritedSubject = parent?.record.subject_id;
     const year_id = override.year_id ?? resolveYear(pg) ?? inheritedYear;
     const subject = resolveSubject(pg);
     const subject_id = override.subject_id ?? (override.create_subject_title ? subjectFromCreate(override.create_subject_title) : void 0) ?? subject.id ?? inheritedSubject;
+    if (subject_id && !override.subject_id && !override.create_subject_title && !subject.id && subject.title && subject_id === inheritedSubject) {
+      plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "limit", message: `Subject \u201C${subject.title}\u201D isn't in the Teaching Hub; using the parent's subject.` });
+    }
+    if (pg.years.length && !override.year_id && !resolveYear(pg) && year_id && year_id === inheritedYear) {
+      plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "limit", message: `Year \u201C${pg.years.join(", ")}\u201D isn't in the Teaching Hub; using the parent's year.` });
+    }
+    if (rule.kind === "unit" && parent?.record.kind === "program") {
+      plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "flattened", message: "Units inside a program import as separate units." });
+    }
     const outcome_ids = [];
-    for (const code of pg.outcomes) {
+    const matchOutcomes = rule.kind === "unit" || rule.kind === "lesson";
+    if (!matchOutcomes && pg.outcomes.length) {
+      plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "skipped", message: `Outcomes on ${rule.label} pages are not imported.` });
+    }
+    for (const code of matchOutcomes ? pg.outcomes : []) {
       const hit = ctx.outcomes.find((o) => o.code.toLowerCase() === code.toLowerCase());
       if (hit) outcome_ids.push(hit.id);
       else plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "outcome_unmatched", message: `Outcome ${code} is not in the outcome catalogue.` });
@@ -781,13 +819,15 @@ function buildImportPlan(tree, ctx) {
     };
     let record;
     if (rule.kind === "lesson") {
-      const unit_id = parent?.kind === "unit" ? parent.id : override.unit_id;
+      const unit_id = nearestUnit?.id ?? override.unit_id;
       if (!unit_id) needs.push("unit");
+      const siblings = nearestUnit ? nearestUnit.record.lesson_ids : null;
+      siblings?.push(id);
       record = {
         ...common,
         type: "lesson",
         unit_id: unit_id ?? "",
-        sequence,
+        sequence: siblings ? siblings.length : 1,
         blocks,
         pedagogical_mode: rule.mode,
         review_status: "needs_review",
@@ -845,18 +885,16 @@ function buildImportPlan(tree, ctx) {
     for (const need of needs) {
       plan.warnings.push({ page_id: pageId, notion_block_id: null, rule: "needs_choice", message: `Choose a ${need} for \u201C${title}\u201D.` });
     }
-    let childSeq = 0;
+    const childUnit = rule.kind === "unit" ? entity : rule.kind === "lesson" ? nearestUnit : null;
     for (const childId of pg.child_ids) {
       const before = plan.entities.length;
-      visit(childId, entity, childSeq + 1);
+      visit(childId, entity, childUnit);
       const child = plan.entities[before];
       if (!child || child.parent_page_id !== pageId) continue;
-      childSeq += 1;
-      if (entity.kind === "unit" && child.kind === "lesson") record.lesson_ids.push(child.id);
       if (entity.kind === "class" && child.kind === "unit" && !child.record.kind) record.active_unit_ids.push(child.id);
     }
   };
-  visit(tree.root_id, null, 1);
+  visit(tree.root_id, null, null);
   return plan;
 }
 

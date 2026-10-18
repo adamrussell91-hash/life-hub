@@ -109,11 +109,13 @@ function listsInto(items: NotionNode[], st: BlockState, r: Run): void {
   while (i < items.length) {
     const tag = listTag(items[i]);
     let open = false;
+    const runStart = i;
     while (i < items.length && listTag(items[i]) === tag) {
       const moved: NotionNode[] = [];
       const li = listItemHtml(items[i], st, moved);
       if (!open) {
-        r.html += `<${tag}>`;
+        const n = i - runStart + 1;
+        r.html += tag === 'ol' && n > 1 ? `<ol start="${n}">` : `<${tag}>`;
         open = true;
       }
       r.html += li;
@@ -135,13 +137,27 @@ function textRunInto(run: NotionNode[], st: BlockState, r: Run): void {
     if (n.type === 'paragraph') {
       const text = richTextHtml(n.data.rich_text);
       if (text) r.html += `<p>${text}</p>`;
-      const textKids = n.children.filter((c) => TEXT_RUN_TYPES.has(c.type));
-      const otherKids = n.children.filter((c) => !TEXT_RUN_TYPES.has(c.type));
-      if (textKids.length) textRunInto(textKids, st, r);
-      if (otherKids.length) {
-        warn(st, n, 'flattened', 'Blocks nested under a paragraph were moved after it.');
-        r.hoist(otherKids);
+      let buffer: NotionNode[] = [];
+      let warned = false;
+      let k = 0;
+      while (k < n.children.length) {
+        const c = n.children[k];
+        if (TEXT_RUN_TYPES.has(c.type)) {
+          buffer.push(c);
+          k += 1;
+          continue;
+        }
+        if (buffer.length) textRunInto(buffer, st, r);
+        buffer = [];
+        const blocks: NotionNode[] = [];
+        while (k < n.children.length && !TEXT_RUN_TYPES.has(n.children[k].type)) blocks.push(n.children[k++]);
+        if (!warned) {
+          warn(st, n, 'flattened', 'Blocks nested under a paragraph were moved after it.');
+          warned = true;
+        }
+        r.hoist(blocks);
       }
+      if (buffer.length) textRunInto(buffer, st, r);
       i += 1;
       continue;
     }

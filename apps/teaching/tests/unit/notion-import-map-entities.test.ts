@@ -124,4 +124,70 @@ describe('buildImportPlan', () => {
     const plan = buildImportPlan(tree('u1', page('u1', 'Unit', { date_start: '2027-02-01', date_end: '2027-03-15T00:00:00.000+11:00' })), ctx());
     expect(plan.entities[0].record).toMatchObject({ start_date: '2027-02-01', end_date: '2027-03-15' });
   });
+
+  it('imports a child listed twice once', () => {
+    const plan = buildImportPlan(tree('u1', page('u1', 'Unit', { child_ids: ['l1', 'l1'] }), page('l1', 'Lesson')), ctx());
+    expect(plan.entities).toHaveLength(2);
+    expect(plan.entities[0].record.lesson_ids).toEqual([plan.entities[1].id]);
+    expect(plan.warnings.some((w) => w.rule === 'skipped' && w.message.includes('more than once'))).toBe(true);
+  });
+
+  it('survives a cycle', () => {
+    const plan = buildImportPlan(tree('a', page('a', 'Unit', { child_ids: ['b'] }), page('b', 'Lesson', { child_ids: ['a'] })), ctx());
+    expect(plan.entities.map((e) => e.page_id)).toEqual(['a', 'b']);
+  });
+
+  it('imports a diamond once, under the first parent', () => {
+    const plan = buildImportPlan(tree('c',
+      page('c', 'Class', { child_ids: ['u1', 'u2'] }),
+      page('u1', 'Unit', { child_ids: ['l'] }), page('u2', 'Unit', { child_ids: ['l'] }), page('l', 'Lesson')
+    ), ctx());
+    expect(plan.entities.filter((e) => e.page_id === 'l')).toHaveLength(1);
+    const u1 = plan.entities.find((e) => e.page_id === 'u1')!;
+    const u2 = plan.entities.find((e) => e.page_id === 'u2')!;
+    expect(u1.record.lesson_ids).toHaveLength(1);
+    expect(u2.record.lesson_ids).toEqual([]);
+  });
+
+  it('attaches nested lessons to the nearest unit in order', () => {
+    const plan = buildImportPlan(tree('u',
+      page('u', 'Unit', { child_ids: ['a', 'b'] }),
+      page('a', 'Lesson', { child_ids: ['a1'] }), page('a1', 'Lesson'), page('b', 'Lesson')
+    ), ctx());
+    const byPage = Object.fromEntries(plan.entities.map((e) => [e.page_id, e]));
+    expect(byPage.u.record.lesson_ids).toEqual([byPage.a.id, byPage.a1.id, byPage.b.id]);
+    expect(byPage.a1.record).toMatchObject({ unit_id: byPage.u.id, sequence: 2 });
+    expect(byPage.b.record.sequence).toBe(3);
+    expect(byPage.a1.needs).toEqual([]);
+  });
+
+  it('warns when subject or year is inherited from the parent', () => {
+    const plan = buildImportPlan(tree('c',
+      page('c', 'Class', { child_ids: ['u'] }),
+      page('u', 'Unit', { subjects: ['Made-up Subject'], years: ['Year 99'] })
+    ), ctx());
+    const msgs = plan.warnings.filter((w) => w.rule === 'limit').map((w) => w.message);
+    expect(msgs).toContain("Subject “Made-up Subject” isn't in the Teaching Hub; using the parent's subject.");
+    expect(msgs.some((m) => m.startsWith('Year “Year 99”'))).toBe(true);
+  });
+
+  it('warns about units inside a program', () => {
+    const plan = buildImportPlan(tree('p',
+      page('p', 'Enrichment Program', { child_ids: ['u'] }), page('u', 'Unit')), ctx());
+    expect(plan.warnings.some((w) => w.rule === 'flattened' && w.message === 'Units inside a program import as separate units.')).toBe(true);
+  });
+
+  it('does not match outcomes on class or syllabus pages', () => {
+    const plan = buildImportPlan(tree('s', page('s', 'Syllabus', { outcomes: ['EN4-URA-01'] })), ctx());
+    expect(plan.entities[0].record.outcome_ids).toBeUndefined();
+    expect(plan.warnings.filter((w) => w.rule === 'skipped' && w.message === 'Outcomes on Syllabus pages are not imported.')).toHaveLength(1);
+  });
+
+  it('titles skipped pages and does not reuse an id of the wrong kind', () => {
+    const skipped = buildImportPlan(tree('u1', page('u1', 'Unit', { child_ids: ['m'] }), page('m', 'Curriculum Map', { title: '  ' })), ctx());
+    expect(skipped.skipped[0].title).toBe('Untitled');
+    const plan = buildImportPlan(tree('l1', page('l1', 'Lesson')), ctx({ source_map: { l1: 'unit_old' } }));
+    expect(plan.entities[0]).toMatchObject({ id: 'lesson_n_l1', existing: false });
+    expect(plan.warnings.some((w) => w.rule === 'limit' && w.message.includes('changed type'))).toBe(true);
+  });
 });
