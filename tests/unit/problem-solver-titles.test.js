@@ -23,3 +23,15 @@ test('coach schema carries a tidied node title', () => {
   const fallback = validateCoachTurn({ verdict: 'accept', message: 'Good.', node: { slot: 'why:1', text: 'The rota is finalised on Friday.' } });
   assert.equal(fallback.value.node.title, 'Rota finalised Friday');
 });
+
+test('a three-word cut never ends on a joining word', () => {
+  assert.equal(tidyTitle('Inconsistent eating and training'), 'Inconsistent eating and training');
+  assert.equal(tidyTitle('Inconsistent eating and exercise routines'), 'Inconsistent eating and exercise');
+  assert.equal(tidyTitle('Unpredictable sleeping and exercising'), 'Unpredictable sleeping');
+  assert.equal(tidyTitle('Rota changes late'), 'Rota changes late');
+});
+
+test('nodeTitle finishes a title saved with a dangling joining word', () => {
+  assert.equal(nodeTitle({ title: 'Inconsistent eating and', text: 'Inconsistent eating and training' }), 'Inconsistent eating and training');
+  assert.equal(nodeTitle({ title: 'Inconsistent eating and', text: 'Something else' }), 'Inconsistent eating');
+});
