@@ -3,13 +3,24 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
 import { openImportSheet } from '@/journal/import-sheet';
+import type { JournalDocument } from '@/api/journal';
+
+function openWithFixture(anchor: HTMLElement) {
+  const fixture = klIstanbulFixture();
+  return openImportSheet({
+    fixture,
+    journal: fixture as JournalDocument,
+    version: 'fixture',
+    anchor,
+  });
+}
 
 const css = readFileSync(resolve(__dirname, '../../src/styles/travel.css'), 'utf8');
 
 describe('import sheet docked actions (R4)', () => {
-  it('keeps Upload/Cancel outside the scroll region so they stay tappable', () => {
+  it('keeps Add/Cancel outside the scroll region so they stay tappable', () => {
     const anchor = document.createElement('div');
-    const handle = openImportSheet({ fixture: klIstanbulFixture(), anchor });
+    const handle = openWithFixture(anchor);
 
     const form = anchor.querySelector('form.addform__form');
     const scroll = anchor.querySelector('.addform__scroll');
@@ -22,7 +33,7 @@ describe('import sheet docked actions (R4)', () => {
     expect(form?.lastElementChild).toBe(actions);
 
     const labels = [...actions!.querySelectorAll('button')].map((b) => b.textContent);
-    expect(labels).toEqual(['Cancel', 'Upload']);
+    expect(labels).toEqual(['Cancel', 'Add photos']);
 
     handle.destroy();
   });

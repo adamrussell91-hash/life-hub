@@ -592,17 +592,26 @@ function applyMomentResolutions(
   return { ...journal, moments: [...moments, ...extra] };
 }
 
+export interface RecoverJournalSaveConflictOptions {
+  /** Server copy the local edit started from (defaults to the in-memory copy). */
+  base?: JournalDocument;
+  /** Background sync: keep local values on true clashes instead of asking. */
+  interactive?: boolean;
+}
+
 export async function recoverJournalSaveConflict(
   tripId: string,
   staleVersion: string,
   localJournal: JournalDocument,
+  options: RecoverJournalSaveConflictOptions = {},
 ): Promise<{ journal: JournalDocument; version: string }> {
   const serverEnvelope = await getJournal(tripId);
-  const base = knownJournalAtVersion(staleVersion);
+  const base = options.base ?? knownJournalAtVersion(staleVersion);
   const { merged, plans } = threeWayMergeJournal(base, serverEnvelope.journal, localJournal);
   let finalJournal = merged;
   if (plans.length) {
-    const resolutions = await promptConflictResolutions(plans);
+    const resolutions =
+      options.interactive === false ? {} : await promptConflictResolutions(plans);
     finalJournal = applyMomentResolutions(merged, plans, resolutions);
   }
   return saveJournal(tripId, serverEnvelope.version, finalJournal);

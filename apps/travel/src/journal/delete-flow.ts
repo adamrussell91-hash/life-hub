@@ -6,7 +6,7 @@ import type {
   JournalMedia,
   JournalMoment,
 } from '@/journal/types';
-import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
+import { offerTimedUndo, showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
 import {
   applySouvenirDeleteForMoment,
@@ -478,16 +478,28 @@ export function runMomentDeleteWithUndo(options: {
   const afterDelete = applySoftDelete(before, target);
 
   void (async () => {
-    const saved = await commitJournalDelete(options.tripId, options.version, afterDelete);
+    let saved: { journal: JournalDocument; version: string };
+    try {
+      saved = await commitJournalDelete(options.tripId, options.version, afterDelete);
+    } catch {
+      showHubToast('Could not delete. Check your connection and try again.', { tone: 'danger' });
+      return;
+    }
     options.onSaved(saved);
     offerTimedUndo({
       message: `Deleted “${options.momentLabel}”`,
       durationMs: JOURNAL_UNDO_MS,
       onUndo: () => {
         void (async () => {
-          const restored = applyRestore(saved.journal, target);
-          const undone = await commitJournalDelete(options.tripId, saved.version, restored);
-          options.onSaved(undone);
+          try {
+            const restored = applyRestore(saved.journal, target);
+            const undone = await commitJournalDelete(options.tripId, saved.version, restored);
+            options.onSaved(undone);
+          } catch {
+            showHubToast('Could not undo. The moment is in Trash — restore it from there.', {
+              tone: 'danger',
+            });
+          }
         })();
       },
       onCommit: () => {},

@@ -1,5 +1,14 @@
 import type { JournalDocument } from '@/api/journal';
-import { persistJournalPatch } from '@/journal/journal-sheet-save';
+import { persistJournalPatch, type PersistedJournal } from '@/journal/journal-sheet-save';
+import type { JournalMedia } from '@/journal/types';
+import {
+  buildJournalMediaRow,
+  makeMediaId,
+  normalizeMediaContentType,
+} from '@/journal/media-upload';
+import { dropQueuedJournalMedia, queueJournalMedia } from '@/journal/journal-outbox';
+import { rememberLocalJournalMedia } from '@/journal/media-loading';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import {
   type CaptureDraftMode,
   type JournalCaptureDraft,
@@ -204,6 +213,10 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   cancelBtn.type = 'button';
   cancelBtn.className = 'btn btn--secondary';
   cancelBtn.textContent = 'Cancel';
+  const saveStatus = document.createElement('p');
+  saveStatus.className = 'journal-sheet__status';
+  saveStatus.setAttribute('role', 'alert');
+  saveStatus.hidden = true;
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn btn--primary';
@@ -230,6 +243,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
       updatedAt: new Date().toISOString(),
       hasVoice: voiceAttached,
       photoNames,
+      draftKeyDate: options.localDate,
     };
   }
 
@@ -426,7 +440,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     const onDiscard = () => {
       discardOpen = false;
       discardBar.hidden = true;
-      void clearCaptureDraft(options.tripId, options.legId, localDate).then(() =>
+      void clearCaptureDraft(options.tripId, options.legId, options.localDate).then(() =>
         finishClose(after)
       );
     };
@@ -455,10 +469,47 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
 
   async function submitMoment(): Promise<void> {
     saveBtn.disabled = true;
+    saveStatus.hidden = true;
     const momentId = makeMomentId();
     const legMoments = options.journal.moments.filter((m) => m.leg_id === options.legId);
     const display_order =
       legMoments.reduce((max, m) => Math.max(max, m.display_order), 0) + 1;
+
+    // Photos and the voice note become media rows. Their bytes go into the
+    // device outbox first, so nothing is lost if the phone drops signal or
+    // the tab is killed before the upload finishes.
+    const attachments: { blob: Blob; contentType: string; durationS?: number }[] = [
+      ...photoBlobs.map((blob) => ({ blob, contentType: normalizeMediaContentType(blob) })),
+    ];
+    if (voiceAttached && voiceBlob) {
+      attachments.push({
+        blob: voiceBlob,
+        contentType: normalizeMediaContentType(voiceBlob, 'audio/mp4'),
+        durationS: Number.isFinite(playback.duration) ? playback.duration : undefined,
+      });
+    }
+
+    const mediaRows: JournalMedia[] = [];
+    try {
+      for (const a of attachments) {
+        const mediaId = makeMediaId();
+        mediaRows.push(await buildJournalMediaRow(mediaId, a.blob, a.contentType, a));
+        await queueJournalMedia({
+          tripId: options.tripId,
+          mediaId,
+          blob: a.blob,
+          contentType: a.contentType,
+        });
+      }
+    } catch {
+      await dropQueuedJournalMedia(mediaRows.map((m) => m.id));
+      saveBtn.disabled = false;
+      saveStatus.hidden = false;
+      saveStatus.textContent =
+        'This phone is out of space for the photos. Your draft is still here.';
+      return;
+    }
+
     const baseJournal = bootstrapJournalForFirstMoment(
       options.journal,
       options.legId,
@@ -468,6 +519,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     const nextJournal: JournalDocument = {
       ...baseJournal,
       revision: baseJournal.revision + 1,
+      media: [...baseJournal.media, ...mediaRows],
       moments: [
         ...baseJournal.moments,
         {
@@ -477,25 +529,38 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
           local_time: localTime || undefined,
           place: placeName.trim() ? { name: placeName.trim() } : undefined,
           text: text.trim() || undefined,
-          media_ids: [],
+          media_ids: mediaRows.map((m) => m.id),
           display_order,
           lifecycle: 'live',
         },
       ],
     };
+    let envelope: PersistedJournal;
     try {
-      const envelope = await persistJournalPatch(options.tripId, options.version, nextJournal);
-      await clearCaptureDraft(options.tripId, options.legId, options.localDate);
-      options.onSaved?.(envelope);
-      finishClose();
+      envelope = await persistJournalPatch(options.tripId, options.version, nextJournal);
     } catch {
+      await dropQueuedJournalMedia(mediaRows.map((m) => m.id));
       saveBtn.disabled = false;
-      voiceStatus.textContent = 'Could not save. Try again.';
+      saveStatus.hidden = false;
+      saveStatus.textContent = 'Could not save. Your draft is still here — try again.';
+      return;
+    }
+    attachments.forEach((a, i) => rememberLocalJournalMedia(mediaRows[i]!.id, a.blob));
+    // Only now is everything either on the server or in the outbox.
+    await clearCaptureDraft(options.tripId, options.legId, options.localDate);
+    options.onSaved?.(envelope);
+    finishClose();
+    if (envelope.queued) {
+      showHubToast('Saved on this phone. It will upload when you are back online.');
+    } else if (mediaRows.length) {
+      showHubToast(
+        mediaRows.length === 1 ? 'Saved. Uploading 1 file…' : `Saved. Uploading ${mediaRows.length} files…`,
+      );
     }
   }
 
   scroll.append(modes, ...Object.values(modePanels), draftStatus);
-  form.append(scroll, discardBar, actions);
+  form.append(scroll, saveStatus, discardBar, actions);
   actions.append(cancelBtn, saveBtn);
   sheet.append(title, context, form);
   back.append(sheet);

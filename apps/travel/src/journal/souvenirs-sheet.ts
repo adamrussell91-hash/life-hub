@@ -10,6 +10,7 @@ import {
   upsertJournalSouvenir,
 } from '@/journal/souvenirs';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 
 export interface OpenSouvenirsCollectionOptions {
@@ -254,7 +255,11 @@ export function openSouvenirsCollection(
           onSaved({ journal: next, version });
           return;
         }
-        void persistJournalPatch(options.tripId, version, next).then(onSaved);
+        removeBtn.disabled = true;
+        void persistJournalPatch(options.tripId, version, next).then(onSaved, () => {
+          removeBtn.disabled = false;
+          showHubToast('Could not remove the souvenir. Try again.', { tone: 'danger' });
+        });
       });
       li.append(rowBtn, removeBtn);
       list.append(li);

@@ -190,22 +190,21 @@ function buildMoment(
   let instant: string | undefined;
   let leg_id: string | null = null;
 
-  if (withInstant?.instant && legGuess?.timezone) {
-    instant = withInstant.instant;
+  if (withInstant?.instant) instant = withInstant.instant;
+  // The camera's wall clock is already local time where the photo was taken.
+  // Converting the instant into some leg's timezone would move an Istanbul
+  // 22:00 photo to the next day on a trip that started in Kuala Lumpur.
+  const wall = photos.find((p) => p.capture_wall_time)?.capture_wall_time;
+  const wallParts = wall ? wallToLocalParts(wall) : null;
+  if (wallParts) {
+    local_date = wallParts.local_date;
+    local_time = wallParts.local_time;
+    leg_id = pickLegForLocalDate(ctx.legs, local_date);
+  } else if (instant && legGuess?.timezone) {
     const parts = formatInTimeZone(instant, legGuess.timezone);
     local_date = parts.local_date;
     local_time = parts.local_time;
     leg_id = pickLegForLocalDate(ctx.legs, local_date);
-  } else {
-    const wall = photos.find((p) => p.capture_wall_time)?.capture_wall_time;
-    if (wall) {
-      const parts = wallToLocalParts(wall);
-      if (parts) {
-        local_date = parts.local_date;
-        local_time = parts.local_time;
-        leg_id = pickLegForLocalDate(ctx.legs, local_date);
-      }
-    }
   }
 
   const coords = representativeCoords(photos);
