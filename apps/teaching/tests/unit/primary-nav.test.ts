@@ -16,7 +16,7 @@ describe('primary nav', () => {
     container = document.createElement('div');
   });
 
-  it('renders the section links including Templates', () => {
+  it('renders the section links including Templates and Feedback', () => {
     renderPrimaryNav(container, { activeSection: 'home' });
     const labels = [...container.querySelectorAll('.primary-nav__link')].map(
       (el) => el.querySelector('.primary-nav__label')?.textContent
@@ -30,6 +30,7 @@ describe('primary nav', () => {
       'Lessons',
       'Templates',
       'Resource Library',
+      'Feedback',
       'Trash'
     ]);
     expect(container.querySelector('.hub-rail__majors')).not.toBeNull();
@@ -37,7 +38,7 @@ describe('primary nav', () => {
       [...container.querySelectorAll('.hub-rail__majors .primary-nav__label')].map((el) => el.textContent)
     ).toEqual(['Dashboard', 'Chat']);
     const links = [...container.querySelectorAll('.primary-nav__link')];
-    expect(links).toHaveLength(9);
+    expect(links).toHaveLength(10);
     for (const link of links) {
       expect(link.querySelector('svg.primary-nav__glyph')).not.toBeNull();
     }
