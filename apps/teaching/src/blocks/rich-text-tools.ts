@@ -6,6 +6,10 @@
  *   Fry explainer    Rewrites the block as a Fry explainer. Teacher only. The
  *                    rewrite waits in a preview until the teacher replaces the
  *                    text, and the replace can be undone.
+ *   Technique scan   Finds the Periodic Table techniques in the text. The
+ *                    teacher ticks which ones students may get, saved on
+ *                    `settings.technique_scan`; the classroom tools' technique
+ *                    spinner only lands on those.
  */
 import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
 import type { Block } from '@/schemas/block';
@@ -17,7 +21,10 @@ import {
   wordsPresentIn,
   type WordHelpEntry
 } from '@/blocks/word-help';
-import { rewriteAsFryExplainer, scanWordsAsTeacher } from '@/blocks/text-tools-client';
+import { rewriteAsFryExplainer, scanTechniquesAsTeacher, scanWordsAsTeacher } from '@/blocks/text-tools-client';
+import { loadLiteraryElements } from '@/blocks/literary-elements';
+import { approveTechniques, createTechniqueScan, quoteAppearsIn, readTechniqueScan } from '@/blocks/technique-scan';
+import { openTechniqueReview } from '@/blocks/technique-review';
 
 type RichTextBlock = Extract<Block, { block_type: 'rich_text' }>;
 
@@ -26,6 +33,9 @@ type TiptapLike = {
   getHtml: () => string;
   setHtml: (html: string, emit?: boolean) => void;
 };
+
+const TECHNIQUE_ICON =
+  '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M9 15.5v-7h3.5a2 2 0 0 1 0 4H9M14 15.5l-2-3"/></svg>';
 
 const FRY_ICON =
   '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6l-1 6h-4z"/><path d="M10 8h4v13a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1z"/><path d="M5 3l2 2M19 3l-2 2"/></svg>';
@@ -51,15 +61,19 @@ export function createRichTextTools(options: {
   onChange: (block: RichTextBlock) => void;
   scan?: typeof scanWordsAsTeacher;
   rewrite?: typeof rewriteAsFryExplainer;
+  scanTechniques?: typeof scanTechniquesAsTeacher;
 }): { buttons: HTMLButtonElement[]; status: HTMLElement; strip: HTMLElement } {
   const scan = options.scan ?? scanWordsAsTeacher;
   const rewrite = options.rewrite ?? rewriteAsFryExplainer;
+  const scanTechniques = options.scanTechniques ?? scanTechniquesAsTeacher;
   const { tiptap } = options;
 
   const dictionary = toolButton(DICTIONARY_ICON, 'Dictionary scan', 'Highlight challenging words with dictionary cards for students');
   dictionary.dataset.tool = 'dictionary';
   const fry = toolButton(FRY_ICON, 'Fry explainer', 'Rewrite this block as a Fry explainer (teacher only)');
   fry.dataset.tool = 'fry';
+  const technique = toolButton(TECHNIQUE_ICON, 'Technique scan', 'Find the literary techniques in this text for the technique spinner');
+  technique.dataset.tool = 'techniques';
 
   const status = document.createElement('p');
   status.className = 'text-tools-status';
@@ -68,6 +82,11 @@ export function createRichTextTools(options: {
 
   const strip = document.createElement('div');
   strip.className = 'word-help-strip';
+  const wordStrip = document.createElement('div');
+  wordStrip.className = 'word-help-strip__part';
+  const techniqueStrip = document.createElement('div');
+  techniqueStrip.className = 'word-help-strip__part technique-strip';
+  strip.append(wordStrip, techniqueStrip);
 
   let busy = false;
 
@@ -81,6 +100,7 @@ export function createRichTextTools(options: {
     busy = on;
     dictionary.disabled = on;
     fry.disabled = on;
+    technique.disabled = on;
     tiptap.host.classList.toggle('word-help-scanning', on);
   }
 
@@ -96,8 +116,9 @@ export function createRichTextTools(options: {
   function paintStrip(): void {
     const saved = readWordHelp(options.getLatest());
     const words = wordsPresentIn(plainText(tiptap.getHtml()), saved);
-    strip.replaceChildren();
-    strip.hidden = saved.length === 0;
+    wordStrip.replaceChildren();
+    wordStrip.hidden = saved.length === 0;
+    strip.hidden = wordStrip.hidden && techniqueStrip.hidden;
     if (saved.length === 0) return;
 
     const label = document.createElement('p');
@@ -125,7 +146,61 @@ export function createRichTextTools(options: {
       saveWords(null);
       say('Dictionary words cleared. Students can still run their own scan.');
     });
-    strip.append(label, chips, clear);
+    wordStrip.append(label, chips, clear);
+  }
+
+  function saveTechniques(next: ReturnType<typeof createTechniqueScan> | null): void {
+    const latest = options.getLatest();
+    const settings = { ...(latest.settings ?? {}) } as Record<string, unknown>;
+    if (next) settings.technique_scan = next;
+    else delete settings.technique_scan;
+    options.onChange({ ...latest, settings });
+    void paintTechniqueStrip();
+  }
+
+  async function paintTechniqueStrip(): Promise<void> {
+    const raw = options.getLatest().settings?.technique_scan;
+    techniqueStrip.replaceChildren();
+    techniqueStrip.hidden = !raw;
+    strip.hidden = wordStrip.hidden && techniqueStrip.hidden;
+    if (!raw) return;
+    const table = await loadLiteraryElements();
+    const saved = readTechniqueScan(options.getLatest(), table);
+    if (!saved) {
+      techniqueStrip.hidden = true;
+      strip.hidden = wordStrip.hidden;
+      return;
+    }
+    const text = plainText(tiptap.getHtml());
+    const stale = saved.findings.some((finding) => !quoteAppearsIn(text, finding.quote));
+    const label = document.createElement('p');
+    label.className = 'word-help-strip__label';
+    const names = saved.approved_ids
+      .map((id) => table.techniques.find((t) => t.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
+    label.textContent = !saved.approved_at
+      ? 'Technique scan not reviewed yet. Students get nothing until you tick and save.'
+      : names.length
+        ? `${names.length} ${names.length === 1 ? 'technique' : 'techniques'} for the spinner: ${names.join(', ')}`
+        : 'Technique scan reviewed. Nothing ticked for students.';
+    if (stale) label.textContent += ' The text has changed since the scan. Scan again to refresh.';
+    const review = document.createElement('button');
+    review.type = 'button';
+    review.className = 'btn btn--ghost word-help-strip__clear';
+    review.textContent = 'Review';
+    review.addEventListener('click', () => {
+      const current = readTechniqueScan(options.getLatest(), table);
+      if (current) openTechniqueReview(current, table, (ids) => saveTechniques(approveTechniques(current, ids)));
+    });
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'btn btn--ghost word-help-strip__clear';
+    clear.textContent = 'Clear';
+    clear.addEventListener('click', () => {
+      saveTechniques(null);
+      say('Technique scan cleared. The spinner has nothing from this text.');
+    });
+    techniqueStrip.append(label, review, clear);
   }
 
   dictionary.addEventListener('click', async (event) => {
@@ -176,8 +251,29 @@ export function createRichTextTools(options: {
     }
   });
 
+  technique.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    say('Scanning for literary techniques…');
+    try {
+      const table = await loadLiteraryElements();
+      const findings = await scanTechniques(tiptap.getHtml(), table);
+      say(findings.length ? '' : 'No techniques found in this block.');
+      if (findings.length) {
+        const fresh = createTechniqueScan(findings);
+        openTechniqueReview(fresh, table, (ids) => saveTechniques(approveTechniques(fresh, ids)));
+      }
+    } catch (error) {
+      say(error instanceof Error && error.message ? error.message : 'The scan did not finish. Try again.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  });
+
   paintStrip();
-  return { buttons: [dictionary, fry], status, strip };
+  void paintTechniqueStrip();
+  return { buttons: [dictionary, fry, technique], status, strip };
 }
 
 function wordCount(html: string): number {

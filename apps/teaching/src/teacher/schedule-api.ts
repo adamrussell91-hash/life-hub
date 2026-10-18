@@ -1,5 +1,5 @@
 import { apiPatch, apiPost } from '@/api/client';
-import type { Class, ClassHomepage, Cover, ScheduledLesson, Lesson, Unit } from '@/schemas';
+import type { Class, ClassHomepage, ClassStudent, Cover, ScheduledLesson, Lesson, Unit } from '@/schemas';
 import type { ClassTimetable } from '@/schedule/timetable';
 
 export interface TimetableScheduleResult { class: Class; unit: Unit; lessons: Lesson[]; scheduled_lessons: ScheduledLesson[] }
@@ -40,6 +40,7 @@ export function patchClass(
     homepage?: ClassHomepage;
     cover?: Cover | null;
     title?: string;
+    students?: ClassStudent[];
   }
 ): Promise<Class> {
   return apiPatch(`/api/classes/${id}`, body);

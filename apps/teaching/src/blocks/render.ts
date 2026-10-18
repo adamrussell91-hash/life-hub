@@ -1,4 +1,5 @@
 import { renderPeerFeedback } from '@/blocks/peer-feedback';
+import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
@@ -549,11 +550,10 @@ export function renderQuoteBlock(
 
 export function renderDividerBlock(
   block: Extract<Block, { block_type: 'divider' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
-  const hr = document.createElement('hr');
-  hr.className = 'block-divider';
-  return wrapBlock(hr, block, mode);
+  return wrapBlock(renderDividerContent(block, mode, ctx), block, mode);
 }
 
 export function renderDefinitionBlock(
@@ -2233,7 +2233,11 @@ function renderBlockContent(
     case 'quote':
       return renderQuoteBlock(block, mode);
     case 'divider':
-      return renderDividerBlock(block, mode);
+      return renderDividerBlock(block, mode, ctx);
+    case 'classroom_tools':
+      return wrapBlock(renderClassroomToolsContent(block, mode, ctx), block, mode);
+    case 'countdown':
+      return wrapBlock(renderCountdownContent(block, mode), block, mode);
     case 'definition':
       return renderDefinitionBlock(block, mode);
     case 'code':
