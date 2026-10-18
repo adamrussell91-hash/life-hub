@@ -78,9 +78,11 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   'embed:pdf': 'Embed a PDF document for inline viewing.'
 };
 
+const VECTOR_BLOCK_ICONS = new Set<string>(["analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "question_drop", "quiz_question", "fluid_analogy"]);
+
 /** Line-art block icons live in `public/assets/blocks/`, under the app base. */
 export function blockIconSrc(type: InsertMenuValue): string {
-  return withAppBase(`/assets/blocks/${type.replace(':', '-')}.png`);
+  return withAppBase(`/assets/blocks/${type.replace(':', '-')}.${VECTOR_BLOCK_ICONS.has(type) ? 'svg' : 'png'}`);
 }
 
 /** The palette entry a block came from (embeds keep their provider preset). */
