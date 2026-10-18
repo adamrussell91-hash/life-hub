@@ -10,6 +10,10 @@
 
 /* ── Teacher controls ──────────────────────────────────────────────── */
 
+.bs-run > [hidden] {
+  display: none;
+}
+
 .bs-controls {
   display: grid;
   gap: var(--space-3);
@@ -91,6 +95,7 @@
   display: grid;
   gap: var(--space-1);
   width: min(240px, 46%);
+  max-width: 80%;
   text-align: center;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -117,24 +122,23 @@
   will-change: transform;
 }
 
-.bs-orbit .pf-token {
-  width: 32px;
-  height: 32px;
-}
-
-.bs-orbit--dense .pf-token,
-.bs-orbit--dense .bs-dot {
-  width: 24px;
-  height: 24px;
+.bs-orbit .pf-token,
+.bs-orbit .bs-dot {
+  width: var(--bs-size, 32px);
+  height: var(--bs-size, 32px);
 }
 
 .bs-dot {
   display: block;
-  width: 32px;
-  height: 32px;
   background: var(--shore);
   border: 2px solid var(--line);
   border-radius: var(--radius-full);
+}
+
+@media (max-width: 600px) {
+  .bs-orbit {
+    height: 400px;
+  }
 }
 
 /* ── Board: revealed ───────────────────────────────────────────────── */
