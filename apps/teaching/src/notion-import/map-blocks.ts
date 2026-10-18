@@ -49,29 +49,53 @@ export const TEXT_RUN_TYPES = new Set(['paragraph', ...LIST_TYPES]);
 
 // ---------- text runs ----------
 
-function listItemHtml(item: NotionNode, st: BlockState): string {
+/** Accumulates a text run as HTML parts, with moved-out blocks between them. */
+class Run {
+  parts: Array<{ html: string } | { nodes: NotionNode[] }> = [];
+  html = '';
+  hoist(nodes: NotionNode[]): void {
+    if (this.html) this.parts.push({ html: this.html });
+    this.html = '';
+    this.parts.push({ nodes });
+  }
+  finish(): Array<{ html: string } | { nodes: NotionNode[] }> {
+    if (this.html) this.parts.push({ html: this.html });
+    this.html = '';
+    return this.parts;
+  }
+}
+
+/** `moved` collects blocks nested under the item (or its nested lists) that cannot stay inside it. */
+function listItemHtml(item: NotionNode, st: BlockState, moved: NotionNode[]): string {
   const prefix = item.type === 'to_do' ? (item.data.checked ? '☑ ' : '☐ ') : '';
   let inner = prefix + richTextHtml(item.data.rich_text);
   const nestedLists = item.children.filter((c) => LIST_TYPES.has(c.type));
-  const other = item.children.filter((c) => !LIST_TYPES.has(c.type));
-  if (nestedLists.length) inner += listsHtml(nestedLists, st);
-  if (other.length) {
-    inner += other.map((c) => `<br>${escapeHtml(deepPlainText(c))}`).join('');
+  const rest = item.children.filter((c) => !LIST_TYPES.has(c.type));
+  const textKids = rest.filter(isTextOnly);
+  const blockKids = rest.filter((c) => !isTextOnly(c));
+  if (nestedLists.length) inner += listsHtml(nestedLists, st, moved);
+  if (textKids.length) {
+    inner += textKids.map((c) => `<br>${escapeHtml(deepPlainText(c))}`).join('');
     warn(st, item, 'flattened', 'Content nested under a list item was flattened to text.');
+  }
+  if (blockKids.length) {
+    warn(st, item, 'flattened', 'Blocks nested under a list item were moved after it.');
+    moved.push(...blockKids);
   }
   return `<li>${inner}</li>`;
 }
 
 const listTag = (n: NotionNode) => (n.type === 'numbered_list_item' ? 'ol' : 'ul');
 
-function listsHtml(items: NotionNode[], st: BlockState): string {
+/** Nested lists: blocks that cannot stay are collected in `moved` for the top-level list to place. */
+function listsHtml(items: NotionNode[], st: BlockState, moved: NotionNode[]): string {
   let html = '';
   let i = 0;
   while (i < items.length) {
     const tag = listTag(items[i]);
     let run = '';
     while (i < items.length && listTag(items[i]) === tag) {
-      run += listItemHtml(items[i], st);
+      run += listItemHtml(items[i], st, moved);
       i += 1;
     }
     html += `<${tag}>${run}</${tag}>`;
@@ -79,29 +103,52 @@ function listsHtml(items: NotionNode[], st: BlockState): string {
   return html;
 }
 
-function textRunHtml(run: NotionNode[], st: BlockState, hoisted: NotionNode[]): string {
-  let html = '';
+/** Top-level lists: closes the list after an item with moved blocks, emits them, then reopens. */
+function listsInto(items: NotionNode[], st: BlockState, r: Run): void {
+  let i = 0;
+  while (i < items.length) {
+    const tag = listTag(items[i]);
+    let open = false;
+    while (i < items.length && listTag(items[i]) === tag) {
+      const moved: NotionNode[] = [];
+      const li = listItemHtml(items[i], st, moved);
+      if (!open) {
+        r.html += `<${tag}>`;
+        open = true;
+      }
+      r.html += li;
+      i += 1;
+      if (moved.length) {
+        r.html += `</${tag}>`;
+        open = false;
+        r.hoist(moved);
+      }
+    }
+    if (open) r.html += `</${tag}>`;
+  }
+}
+
+function textRunInto(run: NotionNode[], st: BlockState, r: Run): void {
   let i = 0;
   while (i < run.length) {
     const n = run[i];
     if (n.type === 'paragraph') {
       const text = richTextHtml(n.data.rich_text);
-      if (text) html += `<p>${text}</p>`;
+      if (text) r.html += `<p>${text}</p>`;
       const textKids = n.children.filter((c) => TEXT_RUN_TYPES.has(c.type));
       const otherKids = n.children.filter((c) => !TEXT_RUN_TYPES.has(c.type));
-      if (textKids.length) html += textRunHtml(textKids, st, hoisted);
+      if (textKids.length) textRunInto(textKids, st, r);
       if (otherKids.length) {
         warn(st, n, 'flattened', 'Blocks nested under a paragraph were moved after it.');
-        hoisted.push(...otherKids);
+        r.hoist(otherKids);
       }
       i += 1;
       continue;
     }
     const lists: NotionNode[] = [];
     while (i < run.length && LIST_TYPES.has(run[i].type)) lists.push(run[i++]);
-    html += listsHtml(lists, st);
+    listsInto(lists, st, r);
   }
-  return html;
 }
 
 export function deepPlainText(n: NotionNode): string {
@@ -110,7 +157,7 @@ export function deepPlainText(n: NotionNode): string {
   return [own, ...kids].filter(Boolean).join('\n');
 }
 
-const typeLabel = (n: NotionNode) => n.type.replace(/_/g, ' ');
+const typeLabel = (n: NotionNode) => (n.type === 'pdf' ? 'PDF' : n.type.replace(/_/g, ' '));
 
 function plainParagraphsHtml(text: string): string {
   return text
@@ -146,12 +193,16 @@ export function mediaUrl(st: BlockState, ref: string, node: NotionNode | null, u
   return `${MEDIA_PLACEHOLDER_PREFIX}${ref}`;
 }
 
+function warnNoFile(n: NotionNode, st: BlockState): void {
+  const label = typeLabel(n);
+  warn(st, n, 'skipped', `${label.charAt(0).toUpperCase()}${label.slice(1)} has no file; skipped.`);
+}
+
 /** Resolves a media block's file, or records a skip. Returns the placeholder-or-URL and file name. */
 function mediaFile(n: NotionNode, st: BlockState, purpose: MediaPurpose): { url: string; name: string; hosted: boolean } | null {
   const f = fileUrl(n.data ?? {});
   if (!f) {
-    const label = typeLabel(n);
-    warn(st, n, 'skipped', `${label.charAt(0).toUpperCase()}${label.slice(1)} has no file; skipped.`);
+    warnNoFile(n, st);
     return null;
   }
   const name = fileName(n.data, f.url);
@@ -205,7 +256,7 @@ function mapLeaf(n: NotionNode, st: BlockState): Block[] | null {
     case 'video': {
       const raw = fileUrl(d);
       if (!raw) {
-        mediaFile(n, st, 'video');
+        warnNoFile(n, st);
         return [];
       }
       const caption = plainText(d.caption) || undefined;
@@ -220,11 +271,12 @@ function mapLeaf(n: NotionNode, st: BlockState): Block[] | null {
     }
     case 'file': {
       const raw = fileUrl(d);
-      if (raw && !raw.hosted && /\.html?$/i.test(fileName(d, raw.url))) {
+      const name = raw ? fileName(d, raw.url) : '';
+      const isHtml = /\.html?$/i.test(name);
+      if (raw && !raw.hosted && isHtml) {
         warn(st, n, 'flattened', 'External HTML file kept as a link embed; only uploaded files can run as an interactive.');
         return [makeBlock('embed', id(), { url: raw.url, provider: 'generic', title: plainText(d.caption) || undefined }, now)];
       }
-      const isHtml = !!raw && /\.html?$/i.test(fileName(d, raw.url));
       const f = mediaFile(n, st, isHtml ? 'html' : 'attachment');
       if (!f) return [];
       if (isHtml) {
@@ -281,10 +333,12 @@ export function mapBlocks(nodes: NotionNode[], scope: Scope, st: BlockState): Bl
     if (TEXT_RUN_TYPES.has(n.type)) {
       const run: NotionNode[] = [];
       while (i < nodes.length && TEXT_RUN_TYPES.has(nodes[i].type)) run.push(nodes[i++]);
-      const hoisted: NotionNode[] = [];
-      const html = textRunHtml(run, st, hoisted);
-      if (html) out.push(makeBlock('rich_text', st.ids.from(run[0].id), { html }, st.now));
-      if (hoisted.length) out.push(...mapBlocks(hoisted, scope, st));
+      const r = new Run();
+      textRunInto(run, st, r);
+      for (const part of r.finish()) {
+        if ('html' in part) out.push(makeBlock('rich_text', st.ids.from(run[0].id), { html: part.html }, st.now));
+        else out.push(...mapBlocks(part.nodes, scope, st));
+      }
       continue;
     }
     const layout = mapLayout(nodes, i, scope, st);
