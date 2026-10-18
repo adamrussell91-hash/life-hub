@@ -18,6 +18,8 @@ export type BoardView = {
   /** Answers on the board. Students before reveal get none, only `count`. */
   answers: BoardAnswer[];
   count?: number;
+  /** A student's orbit: one symbol per answer, with ids that match no card. */
+  orbit?: Array<{ id: string; symbol: string | null }>;
   symbolsOnCards: boolean;
   groups: BoardGroup[] | null;
 };
@@ -118,8 +120,9 @@ export function mountBoard(actions: BoardActions = {}): { root: HTMLElement; upd
     return t;
   }
 
-  /** Orbit ids: real answers, or placeholders when only a count is known. */
+  /** Orbit ids: a student's symbol-only orbit, real answers, or placeholders when only a count is known. */
   function orbitAnswers(view: BoardView): BoardAnswer[] {
+    if (view.orbit) return view.orbit.map((o) => ({ id: o.id, text: '', symbol: o.symbol }));
     if (view.answers.length || !view.count) return view.answers;
     return Array.from({ length: view.count }, (_, i) => ({ id: `n${i}`, text: '' }));
   }
