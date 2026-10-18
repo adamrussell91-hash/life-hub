@@ -757,16 +757,36 @@ export function paintVenueCheck(ctx, host, index) {
     );
   if (!near.length)
     card.append(el("p", "fj-meta", "No food places are mapped near the photo."));
+  // Not every venue is mapped: type the one you know and it is settled at
+  // the photo's point.
+  const own = el("form", "food-pair food-pair--end food-pair--keep");
+  const wrap = el("div", "hub-field"),
+    label = el("label", "hub-label", "Where did you eat?"),
+    input = el("input", "hub-input");
+  input.id = `fj-venue-${visit.id}`;
+  label.htmlFor = input.id;
+  input.maxLength = 200;
+  input.autocomplete = "off";
+  wrap.append(label, input);
+  const use = ctx.button("Use this venue", () => {}, "primary");
+  use.type = "submit";
+  own.append(wrap, use);
+  own.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = input.value.trim();
+    if (name) ctx.pickVenue(visit, { name }, use);
+    else input.focus();
+  });
   const actions = el("div", "food-actions");
   if (venue.name)
     actions.append(
       ctx.button(`Keep ${venue.name}`, (e) => ctx.pickVenue(visit, null, e.currentTarget), "ghost"),
     );
   actions.append(
-    ctx.button("Type it", (e) => ctx.editVisit(visit, e.currentTarget), "ghost"),
+    ctx.button("Edit visit", (e) => ctx.editVisit(visit, e.currentTarget), "ghost"),
     ctx.button("Skip for now", () => ctx.skipVenue(), "ghost"),
   );
-  card.append(picks, actions);
+  card.append(picks, own, actions);
   page.append(card);
   host.append(page);
 }
