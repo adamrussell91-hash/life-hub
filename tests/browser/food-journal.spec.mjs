@@ -164,7 +164,11 @@ async function pageFor(width = 1440, { editorial = false } = {}) {
       return JSON.stringify({
         title: "Noodle dinner",
         venue: { name: "Noodle Cafe", address: "Sydney" },
-        menu_text: "Soba noodles $18",
+        menu_text: "Soba noodles $18\nPork gyoza $12",
+        menu_items: [
+          { name: "Soba noodles", description: "", price: "$18" },
+          { name: "Pork gyoza", description: "Pan fried", price: "$12" },
+        ],
         dishes: [
           {
             title: "Soba noodles",
@@ -497,36 +501,34 @@ test("capture, private upload, menu text, backup and restore work through the re
     mimeType: "image/jpeg",
     buffer: Buffer.from(jpeg, "base64"),
   };
+  // Photos are read as soon as they are chosen.
   await page.getByLabel("Dish photos", { exact: true }).setInputFiles(photo);
-  await page
-    .getByText("Photos ready. Extract details or enter fields yourself.", {
-      exact: true,
-    })
-    .waitFor();
+  await page.getByText("Check the details, then save.", { exact: true }).waitFor();
   assert.equal(
     await page.getByLabel("Date", { exact: true }).inputValue(),
     "2026-12-02",
   );
+  assert.equal(
+    await page.getByLabel("Dish title", { exact: true }).inputValue(),
+    "Soba noodles",
+  );
   await page.getByLabel("Date", { exact: true }).fill("2026-10-01");
+  // A menu photo lists its items; ticking one adds it as a dish.
   await page.getByLabel("Menu photo", { exact: true }).setInputFiles(photo);
-  await page
-    .getByText("Photos ready. Extract details or enter fields yourself.", {
-      exact: true,
-    })
-    .waitFor();
+  await page.getByText("Tick what you had.", { exact: true }).waitFor();
   assert.equal(
     await page.getByLabel("Date", { exact: true }).inputValue(),
     "2026-10-01",
   );
-  await page
-    .getByRole("button", { name: "Extract details", exact: true })
-    .click();
-  await page.getByLabel("Dish title", { exact: true }).waitFor();
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll(".food-sheet input")].some(
-      (n) => n.value === "Soba noodles",
-    ),
-  );
+  const onMenu = page.getByRole("region", { name: "On the menu" });
+  assert.equal(await onMenu.getByRole("checkbox", { name: /Soba noodles/ }).isChecked(), true);
+  const gyoza = onMenu.getByRole("checkbox", { name: /Pork gyoza/ });
+  assert.equal(await gyoza.isChecked(), false);
+  await gyoza.check();
+  assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 2);
+  await gyoza.uncheck();
+  assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 1);
+  await gyoza.check();
   assert.match(
     await page.getByLabel("Menu text", { exact: true }).inputValue(),
     /Soba noodles/,
@@ -535,6 +537,11 @@ test("capture, private upload, menu text, backup and restore work through the re
   await page.locator(".food-sheet").waitFor({ state: "detached" });
   assert.equal(read().visits.length, 2);
   assert.equal(read().visits[1].dishes[0].photos.length, 1);
+  assert.deepEqual(
+    read().visits[1].dishes.map((d) => d.title),
+    ["Soba noodles", "Pork gyoza"],
+  );
+  assert.equal(read().visits[1].menu_items.length, 2);
   const photoState = await page.evaluate(() => {
     const node = document.querySelector(".fj-portrait .food-photo");
     const card = node?.closest(".food-visit");

@@ -30,6 +30,8 @@ import {
 } from "../../apps/life/js/food-journal/model.js";
 import {
   mergeCapture,
+  toggleMenuDish,
+  menuDishIndex,
   captureBatches,
 } from "../../apps/life/js/food-journal/capture.js";
 import {
@@ -1019,6 +1021,104 @@ test("schema accepts editorial and review state and rejects malformed ones", () 
   ]) {
     const bad = fixture();
     Object.assign(bad.visits[0], broken);
+    assert.throws(() => validateFoodJournal(bad), /invalid/i);
+  }
+});
+
+// A menu photo is the fast path: it lists every item, and ticking one adds it
+// as a dish.
+test("capture action returns the items on a menu photo, cleaned", async () => {
+  resetRateLimits();
+  const h = createFoodJournalProcessHandler(
+    deps(repo(fixture()), {
+      complete: async () =>
+        JSON.stringify({
+          title: "",
+          venue: { name: "Ibby's", address: "" },
+          menu_text: "The Cheese $16\nOklahoma $18",
+          dishes: [],
+          menu_items: [
+            { name: "The Cheese", description: "Smashed beef, pickles", price: "$16" },
+            { name: "  Oklahoma ", price: 18 },
+            { name: "" },
+            "Fries",
+          ],
+        }),
+    }),
+  );
+  const res = await h(
+    req("POST", {
+      action: "capture",
+      images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }],
+    }),
+  );
+  assert.equal(res.status, 200);
+  const { draft } = (await res.json()).data;
+  assert.deepEqual(draft.menu_items, [
+    { name: "The Cheese", description: "Smashed beef, pickles", price: "$16" },
+    { name: "Oklahoma", description: "", price: "18" },
+  ]);
+});
+test("menu items merge across photos without repeats and are kept on the visit", () => {
+  const v = newVisit();
+  let next = mergeCapture(v, {
+    title: "", venue: { name: "", address: "" }, menu_text: "",
+    dishes: [],
+    menu_items: [{ name: "The Cheese", description: "", price: "$16" }],
+  });
+  next = mergeCapture(next, {
+    title: "", venue: { name: "", address: "" }, menu_text: "",
+    dishes: [],
+    menu_items: [
+      { name: "the cheese", description: "Smashed", price: "$16" },
+      { name: "Oklahoma", description: "", price: "$18" },
+    ],
+  });
+  assert.deepEqual(next.menu_items.map((i) => i.name), ["The Cheese", "Oklahoma"]);
+  assert.equal(next.dishes.length, 1);
+  assert.equal(next.dishes[0].title, "");
+  assert.doesNotThrow(() => validateFoodJournal({ ...emptyJournal(), visits: [{ ...next, dishes: [{ ...next.dishes[0], title: "x" }] }] }));
+});
+test("ticking a menu item adds it as a dish; unticking removes it only if untouched", () => {
+  const v = newVisit();
+  v.menu_items = [
+    { name: "The Cheese", description: "Smashed beef", price: "$16" },
+    { name: "Oklahoma", description: "", price: "$18" },
+  ];
+  // The blank starter dish is used first.
+  let next = toggleMenuDish(v, v.menu_items[0]);
+  assert.deepEqual(next.dishes.map((d) => d.title), ["The Cheese"]);
+  assert.equal(menuDishIndex(next, v.menu_items[0]), 0);
+  next = toggleMenuDish(next, v.menu_items[1]);
+  assert.deepEqual(next.dishes.map((d) => d.title), ["The Cheese", "Oklahoma"]);
+  // Untouched: unticking removes it.
+  next = toggleMenuDish(next, v.menu_items[1]);
+  assert.deepEqual(next.dishes.map((d) => d.title), ["The Cheese"]);
+  assert.equal(menuDishIndex(next, v.menu_items[1]), -1);
+  // Rated: unticking keeps it.
+  next.dishes[0].rating = 4;
+  assert.equal(toggleMenuDish(next, v.menu_items[0]).dishes.length, 1);
+  // The last dish never goes; it becomes blank again instead.
+  const plain = toggleMenuDish(toggleMenuDish(v, v.menu_items[1]), v.menu_items[1]);
+  assert.equal(plain.dishes.length, 1);
+  assert.equal(plain.dishes[0].title, "");
+});
+test("every page of a menu is read when no dish photos are chosen", () => {
+  const menus = Array.from({ length: 3 }, (_, i) => ({ role: "menu", id: `m${i}`, data: "x".repeat(10) }));
+  assert.deepEqual(captureBatches(menus), [menus]);
+});
+test("schema checks stored menu items", () => {
+  const ok = fixture();
+  ok.visits[0].menu_items = [{ name: "Lasagne", description: "", price: "$25" }];
+  assert.doesNotThrow(() => validateFoodJournal(ok));
+  for (const broken of [
+    "Lasagne",
+    [{ name: 4, description: "", price: "" }],
+    [{ name: "x".repeat(201), description: "", price: "" }],
+    Array.from({ length: 201 }, () => ({ name: "a", description: "", price: "" })),
+  ]) {
+    const bad = fixture();
+    bad.visits[0].menu_items = broken;
     assert.throws(() => validateFoodJournal(bad), /invalid/i);
   }
 });

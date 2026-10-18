@@ -35,6 +35,8 @@ import {
   encodedPhoto,
   mergeCapture,
   captureBatches,
+  toggleMenuDish,
+  menuDishIndex,
 } from "./capture.js";
 
 const el = (tag, cls, text) => {
@@ -257,18 +259,27 @@ export function createFoodJournalView({
       n?.append(button("Retry", load));
     }
   }
-  function rating(dish, onRate) {
-    const row = el("div", "food-rating");
+  // Tap a star to rate; tap the same star again to clear.
+  function stars(dish, onRate) {
+    const row = el("div", "fj-rate food-stars");
     row.setAttribute("role", "group");
     row.setAttribute("aria-label", `Rate ${dish.title || "dish"}`);
     for (let n = 1; n <= 5; n++) {
-      const b = button(String(n), () => onRate(n));
+      const fill =
+        dish.rating == null
+          ? ""
+          : n <= dish.rating
+            ? " is-on"
+            : n - 0.5 === dish.rating
+              ? " is-half"
+              : "";
+      const b = el("button", `fj-rate__star${fill}`, "★");
+      b.type = "button";
       b.setAttribute("aria-label", `${n} out of 5`);
       b.setAttribute("aria-pressed", String(dish.rating === n));
+      b.addEventListener("click", () => onRate(dish.rating === n ? null : n));
       row.append(b);
     }
-    if (dish.rating != null)
-      row.append(button("Clear", () => onRate(null), "ghost"));
     return row;
   }
   // Photos that come into view together are signed in one request.
@@ -732,6 +743,7 @@ export function createFoodJournalView({
       fixup ? "Fix up entry" : original.title ? "Edit visit" : "Add visit",
       trigger,
     );
+    let repaintMenu = () => {};
     let dishList = null,
       captureImages = [],
       pendingPhotos = [],
@@ -799,12 +811,88 @@ export function createFoodJournalView({
           label,
         );
       }
-      s.fields.append(
+      // Photos first. A menu photo lists every item to tick off as a dish;
+      // dish photos fill in and attach to the dishes they show.
+      const capture = el("div", "food-quick");
+      for (const [role, label, hint] of [
+        ["menu", "Menu photo", "Photo the menu"],
+        ["dish", "Dish photos", "Add dish photos"],
+      ]) {
+        const pick = el("label", "food-quick__pick btn btn--secondary"),
+          input = el("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.multiple = true;
+        input.setAttribute("aria-label", label);
+        input.addEventListener("change", () => {
+          void captureFiles([...input.files], role);
+          input.value = "";
+        });
+        pick.append(input, el("span", "", hint));
+        capture.append(pick);
+      }
+      s.fields.append(capture);
+      repaintMenu = () => {};
+      if (visit.menu_items?.length) {
+        const menu = el("section", "food-onmenu");
+        menu.setAttribute("aria-label", "On the menu");
+        const head = el("div", "food-onmenu__head");
+        head.append(
+          el("h3", "", "On the menu"),
+          el("span", "food-meta", "Tick what you had"),
+        );
+        const list = el("div", "food-onmenu__list");
+        let query = "";
+        repaintMenu = () => {
+          list.replaceChildren();
+          for (const item of visit.menu_items) {
+            const words = `${item.name} ${item.description}`.toLowerCase();
+            if (query && !words.includes(query)) continue;
+            const row = el("label", "food-onmenu__item"),
+              check = el("input", "hub-check");
+            check.type = "checkbox";
+            check.checked = menuDishIndex(visit, item) >= 0;
+            check.addEventListener("change", () => {
+              const had = menuDishIndex(visit, item) >= 0;
+              visit = toggleMenuDish(visit, item);
+              if (had && menuDishIndex(visit, item) >= 0) {
+                check.checked = true;
+                s.error.textContent = `${item.name} has your rating, notes or photos, so it stays. Remove it from the dishes below.`;
+              }
+              persistDraft();
+              dishList.setItems(visit.dishes);
+            });
+            const text = el("span", "food-onmenu__text");
+            text.append(el("span", "food-onmenu__name", item.name));
+            if (item.description)
+              text.append(el("span", "food-meta", item.description));
+            row.append(check, text);
+            if (item.price) row.append(el("span", "food-onmenu__price", item.price));
+            list.append(row);
+          }
+        };
+        menu.append(head);
+        if (visit.menu_items.length > 12) {
+          const find = el("input", "hub-search");
+          find.placeholder = "Find on the menu";
+          find.setAttribute("aria-label", "Find on the menu");
+          find.addEventListener("input", () => {
+            query = find.value.trim().toLowerCase();
+            repaintMenu();
+          });
+          menu.append(find);
+        }
+        repaintMenu();
+        menu.append(list);
+        s.fields.append(menu);
+      }
+      const where = el("div", "food-pair food-pair--keep");
+      where.append(
         field(
-          "Visit title",
-          visit.title,
+          "Venue",
+          visit.venue.name,
           (v) => {
-            visit.title = v;
+            visit.venue.name = v;
             persistDraft();
           },
           { max: 200 },
@@ -820,28 +908,7 @@ export function createFoodJournalView({
           { type: "date" },
         ),
       );
-      const place = el("div", "food-pair");
-      place.append(
-        field(
-          "Venue",
-          visit.venue.name,
-          (v) => {
-            visit.venue.name = v;
-            persistDraft();
-          },
-          { max: 200 },
-        ),
-        field(
-          "Address",
-          visit.venue.address,
-          (v) => {
-            visit.venue.address = v;
-            persistDraft();
-          },
-          { max: 1000 },
-        ),
-      );
-      s.fields.append(place);
+      s.fields.append(where);
       const suggestions = el("div", "food-actions");
       for (const item of nearbyVenues(journal, photoGps))
         suggestions.append(
@@ -855,130 +922,59 @@ export function createFoodJournalView({
             "ghost",
           ),
         );
-      s.fields.append(
-        suggestions,
-        button(
-          "Find venue",
-          async (e) => {
-            e.currentTarget.disabled = true;
-            try {
-              const result = await api.places(
-                visit.venue.name || "restaurant",
-                photoGps || visit.venue,
+      const findVenue = button(
+        "Find venue",
+        async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            const result = await api.places(
+              visit.venue.name || "restaurant",
+              photoGps || visit.venue,
+            );
+            suggestions.replaceChildren();
+            for (const p of result.places)
+              suggestions.append(
+                button(
+                  p.name,
+                  () => {
+                    visit.venue = {
+                      name: p.name,
+                      address: p.address,
+                      lat: p.lat,
+                      lon: p.lon,
+                    };
+                    persistDraft();
+                    fields();
+                  },
+                  "ghost",
+                ),
               );
-              suggestions.replaceChildren();
-              for (const p of result.places)
-                suggestions.append(
-                  button(
-                    p.name,
-                    () => {
-                      visit.venue = {
-                        name: p.name,
-                        address: p.address,
-                        lat: p.lat,
-                        lon: p.lon,
-                      };
-                      persistDraft();
-                      fields();
-                    },
-                    "ghost",
-                  ),
-                );
-              if (!result.places.length)
-                s.error.textContent =
-                  "No matching venues. Enter the address yourself.";
-            } catch (err) {
-              s.error.textContent = err.message;
-            } finally {
-              e.currentTarget.disabled = false;
-            }
-          },
-          "ghost",
-        ),
+            if (!result.places.length)
+              s.error.textContent =
+                "No matching venues. Enter the address yourself.";
+          } catch (err) {
+            s.error.textContent = err.message;
+          } finally {
+            e.currentTarget.disabled = false;
+          }
+        },
+        "ghost",
       );
-      const capture = el("div", "hub-row food-capture");
-      capture.append(el("h3", "", "Fill from photos"));
-      for (const [role, label] of [
-        ["dish", "Dish photos"],
-        ["menu", "Menu photo"],
-      ]) {
-        const f = field(label, "", () => {}, { type: "file" }),
-          input = f.querySelector("input");
-        input.accept = "image/*";
-        input.multiple = role === "dish";
-        input.addEventListener("change", () =>
-          captureFiles([...input.files], role),
-        );
-        capture.append(f);
-      }
-      const captureStatus = el(
-        "p",
-        "food-meta",
-        `${captureImages.length} photos ready for extraction.`,
-      );
-      capture.append(
-        captureStatus,
-        button(
-          "Extract details",
-          async (e) => {
-            if (captureBusy) return;
-            if (!captureImages.length) {
-              s.error.textContent = "Choose photos first.";
-              return;
-            }
-            captureBusy = true;
-            e.currentTarget.disabled = true;
-            s.error.textContent = "Reading photos and menu.";
-            try {
-              const batches = captureBatches(captureImages),
-                results = [];
-              for (let index = 0; index < batches.length; index++) {
-                s.error.textContent = `Reading photos ${index + 1} of ${batches.length}.`;
-                const draft = (
-                  await api.assist({
-                    action: "capture",
-                    images: batches[index],
-                  })
-                ).draft;
-                results.push(draft);
-              }
-              for (const draft of results)
-                visit = mergeCapture(visit, draft, pendingPhotos);
-              attachPending();
-              persistDraft();
-              fields();
-              s.error.textContent = "Review the extracted fields, then save.";
-            } catch (err) {
-              s.error.textContent = err.message;
-            } finally {
-              captureBusy = false;
-              if (e.currentTarget) e.currentTarget.disabled = false;
-            }
-          },
-          "secondary",
-        ),
-      );
-      s.fields.append(capture);
-      s.fields.append(
+      const address = el("div", "food-pair food-pair--end food-pair--keep");
+      address.append(
         field(
-          "Menu text",
-          visit.menu_text,
+          "Address",
+          visit.venue.address,
           (v) => {
-            visit.menu_text = v;
+            visit.venue.address = v;
             persistDraft();
           },
-          { type: "textarea", max: 100000 },
+          { max: 1000 },
         ),
-        field(
-          "Visit notes",
-          visit.notes,
-          (v) => {
-            visit.notes = v;
-            persistDraft();
-          },
-          { type: "textarea" },
-        ),
+        findVenue,
       );
+      s.fields.append(address, suggestions);
+      s.fields.append(el("h3", "food-sheet__label", "What you ate"));
       dishList?.dispose();
       dishList = createHubList({
         items: visit.dishes,
@@ -990,6 +986,7 @@ export function createFoodJournalView({
         onChange: (rows) => {
           visit.dishes = rows;
           persistDraft();
+          repaintMenu();
         },
         renderItem: (d, ctx) => {
           const block = el("div", "food-dish-editor");
@@ -997,14 +994,34 @@ export function createFoodJournalView({
             d[key] = v;
             ctx.update({ ...d });
             persistDraft();
+            if (key === "title") repaintMenu();
           };
-          block.append(
+          const top = el("div", "food-dish-editor__top");
+          const rates = el("div");
+          const repaint = () => {
+            rates.replaceChildren(
+              stars(d, (v) => {
+                set("rating", v);
+                repaint();
+              }),
+            );
+          };
+          repaint();
+          top.append(
             field("Dish title", d.title, (v) => set("title", v), { max: 200 }),
+            rates,
+          );
+          const notes = field("Dish notes", d.notes, (v) => set("notes", v), {
+            type: "textarea",
+          });
+          notes.classList.add("food-field--short");
+          const more = el("div", "food-pair food-dish-editor__more");
+          more.append(
             field("Cuisine", d.cuisine, (v) => set("cuisine", v), { max: 100 }),
             field("Meal type", d.meal_type, (v) => set("meal_type", v), {
               options: MEAL_TYPES,
             }),
-            field("Indicators, separated by commas", d.tags.join(", "), (v) =>
+            field("Tags, separated by commas", d.tags.join(", "), (v) =>
               set(
                 "tags",
                 v
@@ -1014,21 +1031,8 @@ export function createFoodJournalView({
                   .slice(0, 40),
               ),
             ),
-            field("Dish notes", d.notes, (v) => set("notes", v), {
-              type: "textarea",
-            }),
           );
-          const rates = el("div");
-          const repaint = () => {
-            rates.replaceChildren(
-              rating(d, (v) => {
-                set("rating", v);
-                repaint();
-              }),
-            );
-          };
-          repaint();
-          block.append(rates);
+          block.append(top, notes, more);
           const photos = el("div", "food-thumbnails");
           for (const p of d.photos) {
             const wrap = el("div", "food-photo-wrap");
@@ -1078,12 +1082,14 @@ export function createFoodJournalView({
             photos.append(wrap);
           }
           block.append(photos);
-          const f = field("Add photos to this dish", "", () => {}, {
-            type: "file",
-          });
-          f.querySelector("input").accept = "image/*";
-          f.querySelector("input").multiple = true;
-          f.querySelector("input").addEventListener("change", async (e) => {
+          const f = el("label", "food-quick__pick food-quick__pick--small btn btn--ghost"),
+            pick = el("input");
+          pick.type = "file";
+          pick.accept = "image/*";
+          pick.multiple = true;
+          pick.setAttribute("aria-label", "Add photos to this dish");
+          f.append(pick, el("span", "", "Add photo"));
+          pick.addEventListener("change", async (e) => {
             captureBusy = true;
             save.disabled = true;
             try {
@@ -1109,6 +1115,41 @@ export function createFoodJournalView({
         },
       });
       s.fields.append(dishList.el);
+      s.fields.append(
+        field(
+          "Visit notes",
+          visit.notes,
+          (v) => {
+            visit.notes = v;
+            persistDraft();
+          },
+          { type: "textarea" },
+        ),
+        field(
+          "Visit title",
+          visit.title,
+          (v) => {
+            visit.title = v;
+            persistDraft();
+          },
+          { max: 200 },
+        ),
+      );
+      // The full menu text stays searchable; the ticks above are the fast path.
+      const saved = el("details", "food-menu-fold");
+      saved.append(
+        el("summary", "", visit.menu_text ? "Menu text" : "Paste menu text"),
+        field(
+          "Menu text",
+          visit.menu_text,
+          (v) => {
+            visit.menu_text = v;
+            persistDraft();
+          },
+          { type: "textarea", max: 100000 },
+        ),
+      );
+      s.fields.append(saved);
     };
     function attachPending() {
       for (const p of pendingPhotos) {
@@ -1117,11 +1158,17 @@ export function createFoodJournalView({
         visit.dishes[0].photos.push(p);
       }
     }
+    // Photos are read as soon as they are chosen: no separate extract step.
     async function captureFiles(files, role) {
-      if (captureBusy) return;
+      if (!files.length) return;
+      if (captureBusy) {
+        s.error.textContent = "Still reading the last photos. Try again in a moment.";
+        return;
+      }
       captureBusy = true;
       save.disabled = true;
       s.error.textContent = "Preparing photos.";
+      const added = [];
       try {
         for (const file of files) {
           if (captureImages.length >= 30)
@@ -1129,55 +1176,73 @@ export function createFoodJournalView({
           const metadata = await inspectPhoto(file, journal);
           if (metadata.date && !original.title && !dateEdited)
             visit.date = metadata.date;
-          if (metadata.gps) {
-            photoGps = metadata.gps;
-            for (const item of metadata.suggestions)
-              s.fields.append(
-                button(
-                  `Use ${item.venue.name}`,
-                  () => {
-                    visit.venue = structuredClone(item.venue);
-                    persistDraft();
-                    fields();
-                  },
-                  "ghost",
-                ),
-              );
-          }
+          if (metadata.gps) photoGps = metadata.gps;
           const blob = await compressPhoto(file, 1200);
           const data = await encodedPhoto(blob);
+          let image;
           if (role === "dish") {
             const p = await api.upload(blob);
-            captureImages.push({ role, id: p.id, mime: blob.type, data });
+            image = { role, id: p.id, mime: blob.type, data };
             pendingPhotos.push(p);
             const u = URL.createObjectURL(blob);
             objectUrls.add(u);
             photoCache.set(p.key, u);
-          } else {
-            captureImages.push({
+          } else
+            image = {
               role,
               id: `menu_${crypto.randomUUID()}`,
               mime: blob.type,
               data,
-            });
-          }
+            };
+          captureImages.push(image);
+          added.push(image);
         }
         attachPending();
         persistDraft();
         fields();
-        s.error.textContent =
-          "Photos ready. Extract details or enter fields yourself.";
       } catch (err) {
         s.error.textContent = err.message;
+        return;
       } finally {
         captureBusy = false;
         save.disabled = false;
+      }
+      // Dish photos are read with the last menu page so they get its names.
+      const menu = captureImages.filter((i) => i.role === "menu").slice(-1);
+      const batches = captureBatches(role === "dish" ? [...menu, ...added] : added);
+      captureBusy = true;
+      try {
+        const results = [];
+        for (let index = 0; index < batches.length; index++) {
+          s.error.textContent =
+            role === "menu"
+              ? "Reading the menu. This takes a moment."
+              : `Reading photos ${index + 1} of ${batches.length}.`;
+          results.push((await api.assist({ action: "capture", images: batches[index] })).draft);
+        }
+        if (!s.isOpen()) return;
+        for (const draft of results) visit = mergeCapture(visit, draft, pendingPhotos);
+        attachPending();
+        persistDraft();
+        fields();
+        s.error.textContent =
+          role === "menu" && visit.menu_items?.length
+            ? "Tick what you had."
+            : "Check the details, then save.";
+      } catch (err) {
+        s.error.textContent = `${err.message} You can still fill it in yourself.`;
+      } finally {
+        captureBusy = false;
       }
     }
     const save = button(
       "Save visit",
       async (e) => {
-        if (captureBusy || busy) return;
+        if (busy) return;
+        if (captureBusy) {
+          s.error.textContent = "Still reading your photos. Save when they are done.";
+          return;
+        }
         if (!reviewedNewerVisit) {
           s.error.textContent =
             "Review the current saved visit before replacing its details.";
