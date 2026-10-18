@@ -1093,6 +1093,10 @@ export function createQuestionQuadrantEditor(
           c.stimulus = value;
           api.emit();
         }, { multiline: true, rows: 3 }),
+        checkbox('Students send their own questions and place them on the quadrant', c.collect_questions, (checked) => {
+          c.collect_questions = checked;
+          api.emit();
+        }),
         el('span', 'tk-ed__label', 'Questions to sort'),
         questionList.el,
         empty

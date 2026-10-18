@@ -2521,3 +2521,367 @@ button.tk-chip:focus-visible {
   width: max-content;
   max-width: 100%;
 }
+
+/* ── Question Quadrant, live ─────────────────────────────────────────── */
+
+.tk-quadrant__grid--plotted {
+  position: relative;
+}
+
+.tk-quadrant__grid--plotted .tk-quadrant__tile {
+  min-height: 9rem;
+}
+
+.tk-quadrant__layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tk-quadrant__layer--ask {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.tk-quadrant__layer--ask.is-full {
+  cursor: default;
+}
+
+.tk-quadrant__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.tk-quadrant__lines line {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.tk-qdot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: -0.8rem 0 0 -0.8rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+button.tk-qdot {
+  cursor: grab;
+}
+
+.tk-qdot .pf-token {
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.tk-qdot:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.tk-qdot--authored {
+  background: var(--navy);
+  color: #fff;
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.tk-qdot--authored[hidden] {
+  display: none;
+}
+
+.tk-qdot--draft {
+  background: var(--navy);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--navy);
+}
+
+.tk-qdot--draft[hidden] {
+  display: none;
+}
+
+.tk-qdot--mine {
+  cursor: default;
+}
+
+.tk-qdot--ghost {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.tk-qdot--ghost .pf-token {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--muted);
+}
+
+.tk-qdot.is-chosen .pf-token {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--high-sea-ink);
+}
+
+.tk-qdot.is-selected {
+  z-index: 2;
+}
+
+.tk-qdot.is-selected .pf-token {
+  transform: scale(1.35);
+}
+
+.tk-axis-key {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+.tk-axis-key__row {
+  margin: 0;
+}
+
+.tk-axis-key dt {
+  display: inline;
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+}
+
+.tk-axis-key dt::after {
+  content: ': ';
+}
+
+.tk-axis-key dd {
+  display: inline;
+  margin: 0;
+  color: var(--ink);
+}
+
+.tk-class,
+.tk-ask {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.tk-class__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tk-class__title {
+  margin-right: auto;
+}
+
+.tk-class__count {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.tk-class__view[aria-pressed='true'] {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+.tk-class__check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.tk-class__detail {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.tk-class__detail[hidden],
+.tk-class__columns[hidden],
+.tk-chosen[hidden] {
+  display: none;
+}
+
+.tk-class__detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tk-class__question {
+  margin: 0;
+  font-size: var(--text-lg, 1.125rem);
+  color: var(--ink);
+}
+
+.tk-class__facts {
+  margin: var(--space-2) 0;
+  padding-left: 1.2rem;
+  font-size: var(--text-sm);
+}
+
+.tk-class__disagree {
+  color: var(--high-sea-ink);
+  font-weight: var(--weight-bold);
+}
+
+.tk-class__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tk-class__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-2);
+}
+
+.tk-class__col {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.tk-class__card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tk-class__card.is-selected {
+  border-color: var(--navy);
+}
+
+.tk-class__card.is-chosen {
+  box-shadow: inset 3px 0 0 var(--high-sea-ink);
+}
+
+.tk-ask__text {
+  width: 100%;
+  font: inherit;
+}
+
+.tk-ask__note,
+.tk-ask__where {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.tk-ask__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.tk-ask__error:empty {
+  display: none;
+}
+
+.tk-ask__mine {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-ask__mine li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tk-ask__mine small {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.tk-chosen {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 4px solid var(--high-sea-ink);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--high-sea) 10%, #fff);
+}
+
+.tk-chosen__label {
+  margin: 0 0 var(--space-1);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--high-sea-ink);
+}
+
+.tk-chosen__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-chosen__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tk-chosen__text {
+  font-size: 1.15rem;
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+}
+
+.tk-chosen__remove {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .tk-axis-key {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* A map needs both axes, so a plotted quadrant stays two by two on a phone. */
+  .tk-quadrant__grid.tk-quadrant__grid--plotted {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .tk-quadrant__grid--plotted .tk-quadrant__tile {
+    min-height: 8rem;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .tk-quadrant__grid--plotted .tk-quadrant__name {
+    font-size: var(--text-sm);
+  }
+
+  .tk-quadrant__grid--plotted .tk-quadrant__def {
+    font-size: 12px;
+  }
+}
