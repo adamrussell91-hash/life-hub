@@ -32,6 +32,7 @@ export const QUESTION_MAX = 200;
 const COLUMN_ORDER: Quadrant[] = ['comprehension', 'speculation', 'research', 'inquiry'];
 const STUDENT_POLL_MS = 10_000;
 const TEACHER_POLL_MS = 5_000;
+const CENTRE: Pt = { x: 0.5, y: 0.5 };
 
 /* ── Geometry ──────────────────────────────────────────────────────── */
 
@@ -222,7 +223,10 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
   draft.type = 'button';
   draft.setAttribute('aria-label', 'Your question. Drag it, or use the arrow keys, to place it.');
   draft.hidden = true;
-  layer.append(draft);
+  // Shown on the grid itself while a written question is still waiting for a spot.
+  const prompt = el('p', 'tk-quadrant__prompt', 'Tap where your question belongs');
+  prompt.hidden = true;
+  layer.append(prompt, draft);
 
   const text = el('textarea', 'tk-ask__text');
   text.maxLength = QUESTION_MAX;
@@ -237,33 +241,50 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
   function paintReadout(): void {
     readout.textContent = draftAt
       ? `You placed it in ${describePoint(draftAt)}.`
-      : 'Then tap the quadrant where you think it belongs, and drag the dot to fine-tune.';
+      : 'Then tap the quadrant above where you think it belongs, or move the dot with the arrow keys.';
+  }
+
+  /** Once there is a question to place, put an unplaced dot in the middle of the map to show where it goes. */
+  function syncDraft(): void {
+    const waiting = !draftAt && !!text.value.trim() && !!state?.open && !layer.classList.contains('is-full');
+    draft.hidden = !draftAt && !waiting;
+    draft.classList.toggle('is-pending', waiting);
+    prompt.hidden = !waiting;
+    if (waiting) setAt(draft, CENTRE);
   }
 
   const placeDraft = (p: Pt) => {
     draftAt = p;
-    draft.hidden = false;
     setAt(draft, p);
+    syncDraft();
     paintReadout();
   };
-  draggable(draft, layer, () => draftAt ?? { x: 0.5, y: 0.5 }, { onMove: placeDraft, onDrop: placeDraft });
+  draggable(draft, layer, () => draftAt ?? CENTRE, { onMove: placeDraft, onDrop: placeDraft });
   layer.addEventListener('pointerdown', (event) => {
     if (event.target !== layer || !state?.open || layer.classList.contains('is-full')) return;
     placeDraft(pointFromEvent(layer, event));
   });
-  text.addEventListener('input', () => { error.textContent = ''; });
+  text.addEventListener('input', () => { error.textContent = ''; syncDraft(); });
+
+  function showMap(): void {
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    (layer.parentElement ?? layer).scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center' });
+    draft.focus({ preventScroll: true });
+    draft.classList.remove('is-nudged');
+    void draft.offsetWidth;
+    draft.classList.add('is-nudged');
+  }
 
   async function submit(): Promise<void> {
     if (sending) return;
     if (!text.value.trim()) { error.textContent = 'Write your question first.'; text.focus(); return; }
-    if (!draftAt) { error.textContent = 'Place your question on the quadrant first.'; return; }
+    if (!draftAt) { error.textContent = 'Place your question on the quadrant first.'; showMap(); return; }
     sending = true;
     send.disabled = true;
     try {
       state = await apiPost<StudentState>(url, { ...base, action: 'send', text: text.value.trim(), student: draftAt });
       text.value = '';
       draftAt = null;
-      draft.hidden = true;
       error.textContent = '';
       paint();
     } catch (e) {
@@ -312,6 +333,7 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
       );
     }
     chosenSlot.replaceChildren(chosenPanel(state.chosen));
+    syncDraft();
   }
 
   const refresh = () => apiPost<StudentState>(url, { ...base, action: 'status' }).then((s) => {
