@@ -2,17 +2,15 @@
  * Technique scan on rich text blocks: which Periodic Table techniques a
  * passage uses, with the quote, a confidence and a one-line reason for each.
  *
- * The scan call is being ported from the Periodic Table widget's Passage
- * Scanner (widgets repo). Until it lands, `requestTechniqueScan` reports that
- * the scan is not connected, and the rest of the pipe (job, poll, parse, save
- * on the block, teacher approval, spinner list) already runs.
- * Port checklist: docs/future-build-ideas/classroom-tools/technique-scan-todo.md
- *
- * The server does not know the technique table. It checks the reply's shape
- * and that every quote is really in the passage; the page maps technique
- * names onto table ids and drops any name the table does not have.
+ * Ported from the Periodic Table widget's Passage Scanner (widgets repo).
+ * The server prompt uses a generated names list from the same sync as the
+ * teaching table. The parser checks quotes and reply shape; the page maps
+ * technique names onto table ids and drops unknown names.
  */
 import { TextToolError } from './text-tool-error.mjs';
+import { LITERARY_TECHNIQUE_NAMES } from './literary-technique-names.mjs';
+
+const KNOWN_TECHNIQUES = new Set(LITERARY_TECHNIQUE_NAMES.map((name) => name.toLowerCase()));
 
 /** Same floor as the widget: anything below this is not shown at all. */
 export const TECHNIQUE_CONFIDENCE_FLOOR = 20;
@@ -21,16 +19,73 @@ export const MAX_TECHNIQUES_PER_QUOTE = 6;
 /** The widget scans up to 3000 characters in one pass. */
 export const MAX_TECHNIQUE_SCAN_CHARS = 6_000;
 
-export const TECHNIQUE_SCAN_NOT_CONNECTED = 'The technique scan is not connected yet.';
-
 /**
  * Ask the model for a raw reply in the widget's JSON shape:
  *   [{"quote":"…","techniques":[{"technique":"Name","confidence":85,"explanation":"…"}]}]
  *
- * TODO(technique-scan port): replace this body with the Passage Scanner call.
+ * Uses the Periodic Table widget's Passage Scanner prompt, server-side only.
  */
-export async function requestTechniqueScan({ env, text, model, signal }) {
-  throw new TextToolError(TECHNIQUE_SCAN_NOT_CONNECTED);
+export async function requestTechniqueScan({ env = {}, text, model, signal }) {
+  const key = typeof env.OPENAI_API_KEY === 'string' ? env.OPENAI_API_KEY.trim() : '';
+  if (!key) throw new TextToolError('The technique scan is not configured (OPENAI_API_KEY).');
+  const prompt = `You are a rigorous literary techniques analyst. Scan the passage and identify techniques used for effect, rating your own confidence honestly rather than only reporting certainties.
+
+You MUST only use technique names from this exact list — do not invent, rename, or generalise a technique (e.g. no "Concrete Diction" or "Identity Assertion" if the closest real entry is "Diction" or "Ethos"); pick the closest matching real entry instead: ${LITERARY_TECHNIQUE_NAMES.join(', ')}
+
+RULES:
+1. A single quoted excerpt can and often does exhibit MULTIPLE techniques at once — that's normal in literature, not an error. List each technique you notice for that excerpt as its own entry with its own confidence.
+2. Give every technique a confidence 0-100 reflecting how sure you are it's deliberately at work here, not just resemblance:
+   - 70-100: clearly and unambiguously present
+   - 40-69: a reasonable, defensible reading, but arguable or dependent on how the line is voiced/interpreted
+   - 15-39: a plausible minor or conditional reading (say what condition or context would make it true) — include these, don't self-censor to only "safe" answers
+3. Don't be shy about textbook-obvious devices (e.g. an actual rhetorical question, a clear metaphor, direct repetition) just because the passage is short — brevity is not evidence of absence.
+4. "like" is NOT a simile unless it introduces a genuine comparison.
+5. Don't flag generic word choice as diction without a distinctive pattern.
+6. Don't flag repetition unless something repeats at least twice.
+7. A short or plain passage may genuinely contain zero techniques even at low confidence — that's fine, don't invent something to fill the list.
+
+Passage:
+"""${text}"""
+
+Return ONLY a valid JSON array (no markdown fences), grouped by excerpt, each technique with its own confidence and a short explanation (for lower-confidence reads, say what makes it arguable or what context would strengthen it):
+[{"quote":"exact short excerpt","techniques":[{"technique":"Name","confidence":85,"explanation":"one sentence why"}]}]`;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let raw;
+    try {
+      // Follow html-app-providers.mjs, while forwarding the job's abort signal.
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1400,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        signal
+      });
+      if (!response.ok) throw new Error('OpenAI request failed');
+      const body = await response.json();
+      raw = body.choices?.[0]?.message?.content;
+      if (typeof raw !== 'string') throw new Error('OpenAI reply missing text');
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      throw new TextToolError('The AI service did not answer. Try again in a minute.');
+    }
+
+    // As in the widget, retry only a readable response with no usable findings.
+    // Leave malformed replies to the caller's parser and return the raw text.
+    let findings;
+    try {
+      ({ findings } = parseTechniqueResult(raw, text));
+    } catch {
+      return raw;
+    }
+    const hasKnownTechnique = findings.some(({ techniques }) =>
+      techniques.some(({ technique }) => KNOWN_TECHNIQUES.has(technique.toLowerCase()))
+    );
+    if (hasKnownTechnique || attempt === 1) return raw;
+  }
 }
 
 function clip(value, max) {
