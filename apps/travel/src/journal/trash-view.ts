@@ -165,16 +165,41 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
       purgeBtn.className = 'btn btn--danger';
       purgeBtn.textContent = 'Delete permanently';
       purgeBtn.title = PERMANENT_DELETE_EXPLAINER;
+      // Confirm inside the card: a browser confirm() looks foreign on a phone
+      // and some Home Screen apps block it.
+      const confirmRow = document.createElement('div');
+      confirmRow.className = 'journal-trash__confirm confirm-card';
+      confirmRow.hidden = true;
+      const confirmText = document.createElement('p');
+      confirmText.textContent = `${PERMANENT_DELETE_EXPLAINER} Delete “${row.label}” permanently?`;
+      const confirmActions = document.createElement('div');
+      confirmActions.className = 'confirm-card__actions';
+      const keepBtn = document.createElement('button');
+      keepBtn.type = 'button';
+      keepBtn.className = 'btn btn--secondary';
+      keepBtn.textContent = 'Keep';
+      const forgetBtn = document.createElement('button');
+      forgetBtn.type = 'button';
+      forgetBtn.className = 'btn btn--danger';
+      forgetBtn.textContent = 'Delete forever';
+      confirmActions.append(keepBtn, forgetBtn);
+      confirmRow.append(confirmText, confirmActions);
       purgeBtn.addEventListener('click', () => {
-        const ok = window.confirm(`${PERMANENT_DELETE_EXPLAINER}\n\nDelete “${row.label}” permanently?`);
-        if (!ok) return;
+        rowActions.hidden = true;
+        confirmRow.hidden = false;
+      });
+      keepBtn.addEventListener('click', () => {
+        confirmRow.hidden = true;
+        rowActions.hidden = false;
+      });
+      forgetBtn.addEventListener('click', () => {
         void runRowAction(
           () => applyPermanentDelete(journal, row.target).journal,
           'Could not delete permanently. Try again.',
         );
       });
       rowActions.append(restoreBtn, purgeBtn);
-      card.append(title, meta, rowActions);
+      card.append(title, meta, rowActions, confirmRow);
       list.append(card);
     }
   }

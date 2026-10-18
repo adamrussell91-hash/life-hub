@@ -1510,3 +1510,14 @@ html.vv-keyboard-open .journal-overlay .journal-chapter {
   max-width: 100%;
   height: 40px;
 }
+
+/* V1: `hidden` must win over the display rules on sheet parts
+ * (.journal-trash__actions is a grid, .confirm-card is flex). */
+.journal-overlay [hidden] {
+  display: none !important;
+}
+
+.journal-trash__confirm p {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
