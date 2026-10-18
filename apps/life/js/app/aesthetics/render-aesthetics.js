@@ -10,6 +10,7 @@ import { createFragrancePhoto, fragrancePhotoUrl } from './fragrance-photos.js';
 import { GARMENT_COLOURS, LOOKS, SNAP_SAMPLES } from './dress-looks.js';
 import { renderSourceReference } from './render-source-reference.js';
 import { createWatches } from './render-watches.js';
+import { dressForWeather, SLOTS, slotLabel, styleAround } from './outfit-model.js';
 import {
   combosFor,
   dominantColour,
@@ -20,7 +21,6 @@ import {
   lookForScent,
   lookPieces,
   lookRules,
-  looksForColour,
   mapInsight,
   nearestGarmentColour,
   noteAffinity,
@@ -29,6 +29,7 @@ import {
   planScentDay,
   proseNote,
   resolveQuery,
+  scentForLook,
   seasonName,
   topCombos,
   wheelArcPath,
@@ -44,6 +45,7 @@ const DRESS_VIEW_KEY = 'life-aesthetics-dress-view';
 const DRESS_VIEWS = ['looks', 'watches'];
 const WEAR_KEY = 'life-aesthetics-wear';
 const PRAISE_KEY = 'life-aesthetics-compliments';
+const OUTFIT_KEY = 'life-aesthetics-outfit';
 const WHEEL_SIZE = 440;
 const WHEEL_CX = WHEEL_SIZE / 2;
 const WHEEL_CY = WHEEL_SIZE / 2;
@@ -121,6 +123,8 @@ export function createAesthetics(doc, {
     query: 'Tom Ford Tobacco Vanille',
     vibe: 0,
     snap: null,
+    snapSlot: 'top',
+    styled: null,
     date: null,
     events: [],
     weather: null,
@@ -194,14 +198,29 @@ export function createAesthetics(doc, {
     const before = Object.keys(log).filter(d => d < state.date).sort().at(-1);
     return before ? log[before] : null;
   }
+  // ---------------- today's outfit ----------------
+  const outfitKey = look => SLOTS.map(({ key }) => look[key].join(' ')).join('|');
+  const todayOutfit = () => readJson(storage, OUTFIT_KEY, {})[state.date] ?? null;
+  function wearOutfit(look) {
+    const log = readJson(storage, OUTFIT_KEY, {});
+    // Keep a fortnight of outfits so the log never grows without bound.
+    const kept = Object.fromEntries(Object.entries(log).filter(([d]) => d < state.date).sort().slice(-13));
+    writeJson(storage, OUTFIT_KEY, { ...kept, [state.date]: look });
+  }
+  const pieceList = look => SLOTS.map(({ key }) => `${look[key][0]} ${look[key][1]}`).join(', ');
+
   let plan = null;
+  let todayLook = null;
   function renderToday() {
+    const chosen = todayOutfit();
+    const dressed = chosen ? dressForWeather(chosen, state.weather).look : null;
     plan = planScentDay({
       date: state.date,
       events: state.events,
       index: state.dayIndex,
       lastWorn: lastWorn(),
-      weather: state.weather
+      weather: state.weather,
+      look: dressed
     });
     const f = plan.day;
     const stage = $('#aes-stage');
@@ -223,10 +242,15 @@ export function createAesthetics(doc, {
     wrap.setAttribute('aria-label', `Spray ${f.name}`);
     $('#aes-today-name').textContent = f.name;
     $('#aes-today-by').textContent = `${f.brand} · ${FAMILY_LABELS[f.family]}`;
-    $('#aes-today-line').textContent = plan.weatherLine ? `${plan.line} ${plan.weatherLine}` : plan.line;
+    $('#aes-today-line').textContent = [plan.line, plan.lookLine || plan.weatherLine].filter(Boolean).join(' ');
     const worn = wearLog()[state.date];
     $('#aes-today-worn').textContent = worn ? `Logged: ${worn} today` : '';
-    renderFlat($('#aes-today-flat'), lookForScent(f.name), true);
+    todayLook = { ...(dressed ?? dressForWeather(lookForScent(f.name), state.weather).look), scent: f.name };
+    $('#aes-today-outfit').textContent = chosen
+      ? `Dressed ${chosen.vibe}: ${pieceList(dressed)}.`
+      : 'No outfit picked yet, so this look follows the scent.';
+    $('#aes-today-outfit-go').textContent = chosen ? 'Change outfit' : 'Pick an outfit';
+    renderFlat($('#aes-today-flat'), todayLook, true);
     renderRibbon();
   }
 
@@ -663,45 +687,95 @@ export function createAesthetics(doc, {
   }
 
   // ---------------- DRESS ----------------
+  /** The outfit on the Dress card: a styled snap if one is chosen, else the picked vibe. */
+  const dressBase = () => state.styled?.look ?? LOOKS[state.vibe];
+  function pickVibe(i) {
+    state.vibe = i;
+    state.styled = null;
+    renderVibe();
+    renderSnap();
+  }
   function renderVibe() {
-    const look = LOOKS[state.vibe];
-    $('#aes-vibes').replaceChildren(...LOOKS.map((l, i) => el('button', { type: 'button', class: 'hub-pills__btn', 'aria-pressed': String(i === state.vibe), onclick: () => { state.vibe = i; renderVibe(); renderSnap(); } }, l.vibe)));
-    renderFlat($('#aes-dress-flat'), look);
-    const f = FRAGRANCES.find(x => x.name === look.scent);
+    const base = dressBase();
+    const { look, note } = dressForWeather(base, state.weather);
+    const pick = scentForLook(look, { date: state.date, weather: state.weather, lastWorn: lastWorn() });
+    const f = pick.fragrance ?? FRAGRANCES.find(x => x.name === base.scent);
+    $('#aes-vibes').replaceChildren(...LOOKS.map((l, i) => el('button', { type: 'button', class: 'hub-pills__btn', 'aria-pressed': String(!state.styled && i === state.vibe), onclick: () => pickVibe(i) }, l.vibe)));
+    renderFlat($('#aes-dress-flat'), { ...look, scent: f.name });
+    const weatherNote = $('#aes-dress-weather');
+    weatherNote.textContent = note;
+    weatherNote.hidden = !note;
     $('#aes-dress-scent').replaceChildren(bottle(f, 24), el('span', {}, 'Wear it with ', el('b', { text: f.name })));
-    $('#aes-dress-quote').textContent = `From your notes: “${look.source}”`;
+    $('#aes-dress-scent-why').textContent = pick.reason;
+    $('#aes-dress-quote').textContent = state.styled ? state.styled.reason : `From your notes: “${base.source}”`;
+    const chosen = todayOutfit();
+    const isToday = Boolean(chosen) && outfitKey(chosen) === outfitKey(base) && chosen.vibe === base.vibe;
+    const wear = $('#aes-wear-look');
+    wear.textContent = isToday ? 'Today’s outfit ✓' : 'Wear this today';
+    wear.setAttribute('aria-pressed', String(isToday));
+  }
+  function wearThis() {
+    const base = dressBase();
+    wearOutfit({ vibe: base.vibe, source: base.source, outer: base.outer, top: base.top, bottom: base.bottom, shoes: base.shoes, accent: base.accent, texture: base.texture, scent: base.scent });
+    state.dayIndex = 0;
+    renderToday();
+    renderVibe();
+    renderWatches();
+    $('#aes-dress-worn').textContent = `Set for today. Today’s scent is now ${plan.day.name}.`;
   }
   function spin() {
+    state.styled = null;
     let target = Math.floor(Math.random() * LOOKS.length);
     if (target === state.vibe) target = (target + 4) % LOOKS.length;
-    if (reduceMotion()) { state.vibe = target; renderVibe(); return; }
+    if (reduceMotion()) { state.vibe = target; renderVibe(); renderSnap(); return; }
     let n = 0;
     (function step() {
       state.vibe = (state.vibe + 1) % LOOKS.length;
       renderVibe();
       if (++n < 10 || state.vibe !== target) setTimeout(step, 45 + n * 14);
+      else renderSnap();
     })();
+  }
+  function renderSlots() {
+    const slot = state.snap?.slot ?? state.snapSlot;
+    $('#aes-snap-slots').replaceChildren(...SLOTS.map(s => el('button', { type: 'button', class: 'hub-pills__btn', 'aria-pressed': String(s.key === slot), onclick: () => pickSlot(s.key) }, s.label)));
+  }
+  function pickSlot(slot) {
+    state.snapSlot = slot;
+    if (state.snap) snapColour(state.snap.colour, { slot });
+    else renderSlots();
   }
   function renderSnap() {
     const host = $('#aes-snapres');
+    renderSlots();
+    const select = $('#aes-snap-colour');
+    if (select) select.value = state.snap?.colour ?? '';
     if (!state.snap) { host.replaceChildren(); return; }
-    const { colour, label } = state.snap;
-    const { exact, looks } = looksForColour(colour);
+    const { colour, label, slot, garment } = state.snap;
+    const options = styleAround({ colour, slot, garment });
     $('#aes-snap-swatch').hidden = false;
     $('#aes-snap-swatch').style.background = GARMENT_COLOURS[colour];
+    const piece = `${colour} ${garment ?? slotLabel(slot)}`;
     host.replaceChildren(
       el('div', { class: 'aes-display aes-snapres__name', text: label ? `${label}. Good choice.` : `That reads as ${colour}.` }),
-      el('p', { class: 'aes-meta', text: exact ? `It works in ${looks.length} of your looks. Tap one to lay it out.` : `None of your notes use ${colour} yet. These are the closest by tone.` }),
-      el('div', { class: 'aes-matches' }, looks.map(l => {
-        const i = LOOKS.indexOf(l);
-        return el('button', { type: 'button', class: 'aes-match', 'aria-pressed': String(i === state.vibe), onclick: () => { state.vibe = i; renderVibe(); renderSnap(); } },
-          el('span', { class: 'aes-match__sw', 'aria-hidden': 'true' }, lookPieces(l).slice(0, 3).map(([c]) => el('i', { style: `background:${GARMENT_COLOURS[c]}` }))), l.vibe);
+      el('p', { class: 'aes-meta', text: `Styled around ${piece}. Wrong piece? Change “It's a” above. Tap an outfit to lay it out.` }),
+      el('div', { class: 'aes-matches aes-matches--stack' }, options.map(o => {
+        const on = state.styled && outfitKey(state.styled.look) === outfitKey(o.look);
+        return el('button', { type: 'button', class: 'aes-match', 'aria-pressed': String(Boolean(on)), onclick: () => { state.styled = o; renderVibe(); renderSnap(); } },
+          el('span', { class: 'aes-match__sw', 'aria-hidden': 'true' }, lookPieces(o.look).map(([c]) => el('i', { style: `background:${GARMENT_COLOURS[c]}` }))),
+          el('span', { class: 'aes-match__body' },
+            el('span', { class: 'aes-match__vibe', text: o.look.vibe }),
+            el('span', { class: 'aes-match__pieces', text: pieceList(o.look) }),
+            el('span', { class: 'aes-match__why', text: o.reason })));
       })));
   }
-  function snapColour(colour, label = null) {
-    state.snap = { colour, label };
-    const { looks } = looksForColour(colour);
-    if (!looks.includes(LOOKS[state.vibe])) state.vibe = LOOKS.indexOf(looks[0]);
+  /** `opts.slot` / `opts.garment` say which piece it is; a photo keeps whatever slot is chosen. */
+  function snapColour(colour, { label = null, slot = state.snap?.slot ?? state.snapSlot, garment } = {}) {
+    state.snapSlot = slot;
+    // No garment given: keep the one already named if it is still the same piece.
+    const keepGarment = garment !== undefined ? garment : state.snap?.slot === slot ? state.snap.garment : null;
+    state.snap = { colour, label, slot, garment: keepGarment };
+    state.styled = styleAround({ colour, slot, garment: keepGarment })[0] ?? null;
     renderVibe();
     renderSnap();
   }
@@ -720,7 +794,7 @@ export function createAesthetics(doc, {
       ctx.drawImage(img, 0, 0, 60, 60);
       // The centre of the frame is where the garment usually is.
       const rgb = dominantColour(ctx.getImageData(15, 15, 30, 30).data);
-      if (rgb) snapColour(nearestGarmentColour(rgb));
+      if (rgb) snapColour(nearestGarmentColour(rgb), { garment: null });
     };
     img.onerror = () => { $('#aes-snapres').replaceChildren(el('p', { class: 'aes-meta', text: 'That photo would not open. Try a JPEG or PNG.' })); };
     img.src = url;
@@ -737,6 +811,19 @@ export function createAesthetics(doc, {
     $('#aes-today-bottle').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); spray(); } });
     $('#aes-reroll').addEventListener('click', () => { state.dayIndex += 1; renderToday(); });
     $('#aes-noticed').addEventListener('click', noticed);
+    $('#aes-today-outfit-go').addEventListener('click', () => { showTab('dress'); showDressView('looks'); });
+    $('#aes-wear-look').addEventListener('click', wearThis);
+    $('#aes-snap-colour').append(...Object.keys(GARMENT_COLOURS).map(c => el('option', { value: c, text: c })));
+    $('#aes-snap-colour').addEventListener('change', e => {
+      const colour = e.target.value;
+      if (!colour) return;
+      const tile = $('#aes-snap-img');
+      if (!tile.style.backgroundImage || tile.style.backgroundImage === 'none') {
+        tile.style.background = GARMENT_COLOURS[colour];
+        $('#aes-snap-plus').textContent = '';
+      }
+      snapColour(colour);
+    });
     const ask = $('#aes-ask');
     ask.value = state.query;
     ask.addEventListener('input', () => { state.query = ask.value; renderOracle(); });
@@ -750,7 +837,7 @@ export function createAesthetics(doc, {
       tile.style.backgroundImage = 'none';
       tile.style.background = GARMENT_COLOURS[s.colour];
       $('#aes-snap-plus').textContent = '';
-      snapColour(s.colour, s.label);
+      snapColour(s.colour, { label: s.label, slot: s.slot, garment: s.garment });
     } }, el('i', { class: 'aes-dot', style: `background:${GARMENT_COLOURS[s.colour]}` }), s.label)));
     $('#aes-insight').textContent = mapInsight(FRAGRANCES);
     renderShelf();
@@ -764,7 +851,13 @@ export function createAesthetics(doc, {
     const result = await weatherApi({ storage: sessionStorage });
     state.weather = result?.weather ?? null;
     state.weatherStatus = state.weather ? (result.status ?? 'ok') : 'unavailable';
-    if (state.date) renderToday();
+    if (!state.date) return;
+    renderToday();
+    renderVibe();
+    renderWatches();
+  }
+  function renderWatches() {
+    if (todayLook) watches.render({ date: state.date, look: todayLook });
   }
 
   return {
@@ -782,7 +875,7 @@ export function createAesthetics(doc, {
       showTab(state.tab);
       showDressView(state.dressView);
       renderToday();
-      watches.render({ date, look: lookForScent(plan.day.name) });
+      renderWatches();
       renderMap();
       renderWheel();
       renderOracle();
