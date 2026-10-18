@@ -275,3 +275,149 @@ describe('notion import modal review fixes', () => {
     finish({ id: 'x', kind: 'apply', status: 'failed', error: 'x' });
   });
 });
+
+// ---- Second review fixes ----
+import { reconcileCurriculum } from '@/app/curriculum-state';
+import { buildImportPlan } from '@/notion-import/map-entities';
+import { EMPTY_CHOICES, type NotionPage, type NotionTree } from '@/notion-import/types';
+
+vi.mock('@/app/curriculum-state', () => ({ reconcileCurriculum: vi.fn(async () => ({})) }));
+
+const NOW = '2026-10-18T00:00:00.000Z';
+function npage(id: string, category: string, extra: Partial<NotionPage> = {}): NotionPage {
+  return {
+    id, url: `https://www.notion.so/${id}`, last_edited_time: NOW, title: `Page ${id}`, category,
+    subjects: [], years: [], outcomes: [], date_start: null, date_end: null, files: [], cover: null, blocks: [], child_ids: [], ...extra
+  };
+}
+/** The slim preview the server would send, built by the real mapper. */
+function realPreview(root: string, ...pages: NotionPage[]) {
+  const tree: NotionTree = { root_id: root, pages: Object.fromEntries(pages.map((pg) => [pg.id, pg])) };
+  const plan = buildImportPlan(tree, {
+    now: NOW, years: [{ id: 'year_7', year_level: 7 }], subjects: [{ id: 'subject_1', title: 'Made-up Subject' }],
+    outcomes: [], source_map: {}, choices: EMPTY_CHOICES
+  });
+  return { ...plan, entities: plan.entities.map(({ record: _r, ...e }) => e), media_count: plan.media.length, media: undefined };
+}
+const activeUnits = { ...curriculum, units: [{ id: 'unit_a', title: 'Unit A', status: 'active' }] };
+
+describe('notion import gating mirrors the server', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+
+  it('C: unit > syllabus > lesson still needs a unit chosen for the lesson', async () => {
+    const plan = realPreview('u1',
+      npage('u1', 'Unit', { subjects: ['Made-up Subject'], years: ['Year 7'], child_ids: ['d1'] }),
+      npage('d1', 'Syllabus', { child_ids: ['l1'] }),
+      npage('l1', 'Lesson'));
+    expect(plan.entities.find((e) => e.page_id === 'l1')!.needs).toEqual(['unit']);
+    await openWith(plan, activeUnits);
+    expect(importBtn().disabled).toBe(true);
+    choose('unit:l1', 'unit_a');
+    expect(importBtn().disabled).toBe(false);
+  });
+
+  it('F: a syllabus passes its subject to a child unit, but not a year', async () => {
+    const plan = realPreview('d1',
+      npage('d1', 'Syllabus', { subjects: ['Made-up Subject'], years: ['Year 7'], child_ids: ['u1'] }),
+      npage('u1', 'Unit'));
+    expect(plan.entities.find((e) => e.page_id === 'u1')!.needs).toEqual(['year']);
+    await openWith(plan);
+    expect(importBtn().disabled).toBe(true);
+    choose('year:u1', 'year_7');
+    expect(importBtn().disabled).toBe(false);
+  });
+
+  it('G: a lesson passes neither year nor subject to a child unit', async () => {
+    const plan = realPreview('l1',
+      npage('l1', 'Lesson', { subjects: ['Made-up Subject'], years: ['Year 7'], child_ids: ['u1'] }),
+      npage('u1', 'Unit'));
+    expect(plan.entities.find((e) => e.page_id === 'u1')!.needs).toEqual(['subject', 'year']);
+    await openWith(plan, activeUnits);
+    choose('unit:l1', 'unit_a');
+    expect(importBtn().disabled).toBe(true);
+    choose('year:u1', 'year_7');
+    choose('subject:u1', 'subject_1');
+    expect(importBtn().disabled).toBe(false);
+  });
+});
+
+describe('notion import review round two', () => {
+  beforeEach(() => { document.body.innerHTML = ''; vi.mocked(reconcileCurriculum).mockClear(); });
+  const doneReport = (id: string, onUpdate: (j: any) => void) => {
+    const job: any = { id, kind: 'apply', status: 'done', report: { written: ['unit_n_u1'], skipped: [{ page_id: 'l1', reason: 'Needs a unit.' }], warnings: [] } };
+    onUpdate(job);
+    return job;
+  };
+
+  it('Tab from Done reaches the report summaries', async () => {
+    await openWith(planOf([ent('u1', null, 'unit'), ent('l1', 'u1', 'lesson')]));
+    vi.mocked(waitForJob).mockImplementationOnce(async (id: string, u: any) => doneReport(id, u));
+    importBtn().click();
+    await flush(); await flush();
+    const done = document.querySelector<HTMLButtonElement>('.notion-import__footer .btn')!;
+    done.focus();
+    done.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(document.activeElement?.tagName).toBe('SUMMARY');
+  });
+
+  it('disables Check again while it polls', async () => {
+    await openWith(planOf([ent('u1', null, 'unit')]));
+    vi.mocked(waitForJob).mockRejectedValueOnce(new JobTimeoutError());
+    importBtn().click();
+    await flush(); await flush();
+    vi.mocked(waitForJob).mockImplementationOnce(() => new Promise(() => {}));
+    const again = document.querySelector<HTMLButtonElement>('[data-notion-check-again]')!;
+    again.click();
+    await flush();
+    expect(again.disabled).toBe(true);
+  });
+
+  it('keeps a cleared create-subject choice cleared across re-renders', async () => {
+    await openWith(planOf([
+      ent('u1', null, 'unit', { needs: ['subject'], suggested: { year_id: 'year_7', subject_title: 'Brand new' } }),
+      ent('l1', 'u1', 'lesson')
+    ]));
+    expect(importBtn().disabled).toBe(false);
+    choose('subject:u1', '');
+    expect(importBtn().disabled).toBe(true);
+    const box = document.querySelector<HTMLInputElement>('[data-notion-include="l1"]')!;
+    box.click();
+    document.querySelector<HTMLInputElement>('[data-notion-include="l1"]')!.click();
+    expect(pickerEl('subject:u1').value).toBe('');
+    expect(importBtn().disabled).toBe(true);
+  });
+
+  it('keeps one status node in the DOM across steps', async () => {
+    openNotionImportModal({ curriculum, onDone: vi.fn() });
+    const status = document.querySelector('[role="status"]')!;
+    const parent = status.parentElement!;
+    const spies = [vi.spyOn(parent, 'replaceChildren'), vi.spyOn(parent, 'append')];
+    vi.mocked(waitForJob).mockImplementationOnce(async (id: string, u: any) => {
+      const job: any = { id, kind: 'plan', status: 'planned', plan: planOf([ent('u1', null, 'unit')]) };
+      u(job);
+      return job;
+    });
+    document.querySelector<HTMLInputElement>('[data-notion-link]')!.value = LINK;
+    document.querySelector<HTMLButtonElement>('[data-notion-preview]')!.click();
+    await flush(); await flush();
+    expect(document.querySelector('[role="status"]')).toBe(status);
+    expect(status.parentElement).toBe(parent);
+    // Never re-inserted: nothing hands the node back to its parent.
+    expect(spies.flatMap((spy) => spy.mock.calls.flat())).not.toContain(status);
+  });
+
+  it('refreshes the curriculum when closed while an apply job runs', async () => {
+    await openWith(planOf([ent('u1', null, 'unit')]));
+    vi.mocked(waitForJob).mockImplementationOnce(() => new Promise(() => {}));
+    importBtn().click();
+    await flush();
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(reconcileCurriculum).toHaveBeenCalled();
+  });
+
+  it('does not refresh on a plain close', async () => {
+    await openWith(planOf([ent('u1', null, 'unit')]));
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(reconcileCurriculum).not.toHaveBeenCalled();
+  });
+});
