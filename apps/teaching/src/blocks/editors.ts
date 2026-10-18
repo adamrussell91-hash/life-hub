@@ -392,6 +392,7 @@ export function createCalloutEditor(
   styleSelect.setAttribute('aria-label', 'Callout style');
 
   for (const style of [
+    'cultural_warning',
     'information',
     'important',
     'warning',
@@ -403,7 +404,7 @@ export function createCalloutEditor(
   ] as const) {
     const opt = document.createElement('option');
     opt.value = style;
-    opt.textContent = style;
+    opt.textContent = style === 'cultural_warning' ? 'Cultural warning' : style;
     opt.selected = block.content.style === style;
     styleSelect.append(opt);
   }

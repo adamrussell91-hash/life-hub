@@ -3,7 +3,7 @@ import { renderClassroomToolsContent, renderCountdownContent, renderDividerConte
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
-import { calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
+import { resolvedCalloutStyle, calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
@@ -64,6 +64,7 @@ const HEADING_TAG = {
 
 /** Semantic callout styles mapped to design-token accent classes. */
 export const CALLOUT_STYLE_CLASS = {
+  cultural_warning: 'callout--cultural-warning',
   information: 'callout--wave',
   important: 'callout--high-sea',
   warning: 'callout--high-sea',
@@ -166,12 +167,13 @@ export function renderCalloutBlock(
   mode: RenderMode
 ): HTMLElement {
   const callout = document.createElement('aside');
-  const styleClass = CALLOUT_STYLE_CLASS[block.content.style];
+  const style = resolvedCalloutStyle(block.content) as keyof typeof CALLOUT_STYLE_CLASS;
+  const styleClass = CALLOUT_STYLE_CLASS[style];
   callout.className = `callout ${styleClass}`;
   callout.setAttribute('role', 'note');
   const head = document.createElement('div');
   head.className = 'callout__head';
-  head.append(calloutIdentity(block.content.style));
+  head.append(calloutIdentity(style));
   callout.append(head);
 
   if (block.content.title) {

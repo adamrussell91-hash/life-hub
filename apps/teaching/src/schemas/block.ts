@@ -96,6 +96,7 @@ export type EmbedProvider = z.infer<typeof EmbedProviderSchema>;
 export const HeadingVariantSchema = z.enum(['page', 'section', 'subsection']);
 export const MediaSizeVariantSchema = z.enum(['small', 'medium', 'large']);
 export const CalloutStyleSchema = z.enum([
+  'cultural_warning',
   'information',
   'important',
   'warning',

@@ -584,6 +584,7 @@ var EmbedProviderSchema = z5.enum([
 var HeadingVariantSchema = z5.enum(["page", "section", "subsection"]);
 var MediaSizeVariantSchema = z5.enum(["small", "medium", "large"]);
 var CalloutStyleSchema = z5.enum([
+  "cultural_warning",
   "information",
   "important",
   "warning",

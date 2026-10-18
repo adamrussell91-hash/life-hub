@@ -6,6 +6,7 @@ type Target = CalloutTarget & { label: string; preview: string };
 // A single pictogram family for block headings and every linked badge.
 // Soft filled silhouettes carry the shape; rounded ink strokes carry the detail.
 const ICONS: Record<string, [string, string]> = {
+  cultural_warning: ['Cultural warning', '<path fill="#171717" stroke="none" d="M2 5h20v7H2z"/><path fill="#c33228" stroke="none" d="M2 12h20v7H2z"/><circle cx="12" cy="12" r="4" fill="#f5ce35" stroke="none"/>'],
   information: ['Information', '<path class="callout__icon-wash" d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-5 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M11 10h1v5h1"/><circle cx="12" cy="7" r=".8" fill="currentColor" stroke="none"/>'],
   important: ['Important', '<path class="callout__icon-wash" d="m12 2 3 3 4 .5.5 4 2.5 3-2.5 3-.5 4-4 .5-3 2-3-2-4-.5-.5-4L2 12.5 4.5 9l.5-3.5L9 5Z"/><path d="m12 7 1.5 3 3.5.5-2.5 2.5.5 3.5-3-1.5-3 1.5.5-3.5L7 10.5l3.5-.5L12 7Z"/>'],
   warning: ['Warning', '<path class="callout__icon-wash" d="M10.3 4a2 2 0 0 1 3.4 0l7.5 13a2 2 0 0 1-1.7 3H4.5a2 2 0 0 1-1.7-3L10.3 4Z"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".8" fill="currentColor" stroke="none"/>'],
@@ -15,6 +16,12 @@ const ICONS: Record<string, [string, string]> = {
   remember: ['Remember', '<path class="callout__icon-wash" d="M6 3h12v18l-6-3-6 3V3Z"/><path d="M7 12h10m-5-1c-6-1-5-6-2-4l2 4Zm0 0c6-1 5-6 2-4l-2 4Zm0 1-2 4m2-4 2 4"/>'],
   teacher: ['Teacher', '<path class="callout__icon-wash" d="M3 12c3-2 6-1 9 1 3-2 6-3 9-1v9c-3-2-6-1-9 1-3-2-6-3-9-1v-9Z"/><circle cx="12" cy="6" r="3"/><path d="M3 12c3-2 6-1 9 1 3-2 6-3 9-1m-9 1v9M6 16l3 1m6 0 3-1"/>']
 };
+
+/** Recognise existing explicitly titled warnings without rewriting lesson content. */
+export function resolvedCalloutStyle(content: { style: string; title?: string }): string {
+  return content.style === 'information' && /^cultural warning\b/i.test(content.title?.trim() ?? '')
+    ? 'cultural_warning' : content.style;
+}
 
 export function calloutIdentity(style: string): HTMLElement {
   const [label, paths] = ICONS[style] ?? ICONS.information!;
@@ -212,11 +219,11 @@ export function decorateCalloutReferences(wrapper: HTMLElement, block: Block, mo
         if (prompt) prompt.after(group); else target.append(group);
       }
     }
-    if (mode === 'print') { group.append(marker(ref.callout.content.style)); continue; }
-    const typeName = (ICONS[ref.callout.content.style] ?? ICONS.information!)[0];
+    if (mode === 'print') { group.append(marker(resolvedCalloutStyle(ref.callout.content))); continue; }
+    const typeName = (ICONS[resolvedCalloutStyle(ref.callout.content)] ?? ICONS.information!)[0];
     const title = ref.callout.content.title?.trim() || typeName;
     const destination: Target = { block_id: ref.callout.id, label: title, preview: ref.callout.content.body };
-    const badge = referencePreview(wrapper, ref.callout.content.style, `${typeName}: ${title}. Preview related callout`, title, ref.callout.content.body, destination, blocks, true);
+    const badge = referencePreview(wrapper, resolvedCalloutStyle(ref.callout.content), `${typeName}: ${title}. Preview related callout`, title, ref.callout.content.body, destination, blocks, true);
     badge.dataset.calloutId = ref.callout.id;
     group.append(badge);
   }

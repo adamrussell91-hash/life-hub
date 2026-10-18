@@ -12703,3 +12703,20 @@ button.block-annotation__margin-note.is-collapsed:hover {
 @media print {
   .callout-ref { border-color: currentColor; background: transparent; }
 }
+
+/* Sand contours are abstract texture, not a reproduction of cultural artwork. */
+.callout--cultural-warning {
+  background-color: color-mix(in srgb, var(--sand) 38%, var(--paper));
+  background-image: repeating-radial-gradient(ellipse at 110% 130%, transparent 0 18px, color-mix(in srgb, var(--pastel-peach-ink) 5%, transparent) 19px 20px, transparent 21px 38px);
+  border-color: color-mix(in srgb, var(--pastel-peach-ink) 24%, transparent);
+  border-inline-start: 4px solid var(--pastel-peach-ink);
+}
+.callout--cultural-warning .callout__identity,
+.callout--cultural-warning .callout__title {
+  color: var(--pastel-peach-ink);
+}
+.callout--cultural-warning .callout__body { color: var(--ink); }
+[data-callout-style="cultural_warning"] { color: var(--pastel-peach-ink); }
+@media print {
+  .callout--cultural-warning { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
