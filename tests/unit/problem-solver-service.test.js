@@ -51,6 +51,21 @@ test('list returns summary rows newest first', async () => {
   assert.ok(!('turns' in rows[0]));
 });
 
+test('list fills frame and skill counts for index rows written before they existed', async () => {
+  const store = createMemoryProblemStore();
+  const svc = createProblemSolverService({ store, coach: scriptedCoach, now: () => '2026-10-16T10:00:00.000Z', newId: () => '00000000-0000-4000-8000-000000000001' });
+  const s = await svc.create('op', { text: 'Old problem', requestId: 'a' });
+  const list = store.list.bind(store);
+  store.list = async (...args) => (await list(...args)).map(({ value }) => {
+    const { frame, skills, ...old } = value;
+    return { value: old };
+  });
+  const [row] = await svc.list('op');
+  assert.equal(row.id, s.id);
+  assert.equal(row.frame, 0);
+  assert.deepEqual(row.skills, {});
+});
+
 test('unknown session is 404', async () => {
   await assert.rejects(service().get('op', '00000000-0000-4000-8000-000000000999'), (err) => err.status === 404);
 });

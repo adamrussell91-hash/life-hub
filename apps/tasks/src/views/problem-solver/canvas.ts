@@ -7,7 +7,8 @@ import { createGapRadarView } from '../../../../../packages/problem-solver/rende
 import { createSmartView } from '../../../../../packages/problem-solver/render/smart';
 import { createProblemTreeView } from '../../../../../packages/problem-solver/render/problem-tree';
 import { createProblemStatementView } from '../../../../../packages/problem-solver/render/problem-statement';
-import { toolEmblem } from '../../../../../packages/problem-solver/glyphs';
+import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
+import { FRAME_PIECES } from './decor';
 import { createRecordView, defineRun } from '../../../../../packages/problem-solver/render/record';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { MODELS } from '../../../../../packages/problem-solver/models.mjs';
@@ -30,20 +31,80 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   smart: () => createSmartView()
 };
 
-const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string]> = [
-  ['goal', 'What is the goal?'],
-  ['whatIsTrue', 'What is true?'],
-  ['whatCanBeDone', 'What can be done?']
+const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
+  ['goal', 'What is the goal?', 'top', 'var(--ps-blue)'],
+  ['whatIsTrue', 'What is true?', 'mid', 'var(--ps-yellow)'],
+  ['whatCanBeDone', 'What can be done?', 'bot', 'var(--ps-red)']
 ];
 
-function frameCard(session: PsSession): HTMLElement {
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * The three framing questions as the Gap analysis emblem: each answer fills its piece,
+ * the piece being asked has a marching outline, and once all three are in the suggested
+ * tool spins into the centre. The element persists between updates so the fills animate.
+ */
+function createFrameView(): { el: HTMLElement; update(session: PsSession): void } {
   const card = el('div', 'ps-frame');
-  for (const [key, question] of FRAME_QUESTIONS) {
-    const row = el('div', `ps-frame__row${session.frame[key] ? ' is-answered' : ''}`);
-    row.append(el('p', 'ps-frame__q', question), el('p', 'ps-frame__a', session.frame[key] ?? ''));
-    card.append(row);
-  }
-  return card;
+  const heading = el('h2', 'ps-canvas__title', 'Frame the problem');
+  const count = el('span', 'ps-frame__count');
+  heading.append(count);
+  const medal = el('div', 'ps-frame__medal');
+  const drawing = document.createElementNS(SVG_NS, 'svg');
+  drawing.setAttribute('viewBox', '-4 -10 108 120');
+  drawing.setAttribute('aria-hidden', 'true');
+  drawing.innerHTML =
+    FRAME_QUESTIONS.map(([, , piece, colour]) => `<g class="ps-frame__piece ps-frame__piece--${piece}" style="--c:${colour}"><path class="ps-frame__ghost" d="${FRAME_PIECES[piece]}"/><path class="ps-frame__fill" fill="${colour}" d="${FRAME_PIECES[piece]}"/></g>`).join('') +
+    '<g class="ps-frame__core"><circle cx="50" cy="50" r="22" class="ps-frame__core-bg"/><g transform="translate(32 32) scale(.36)"></g></g>';
+  medal.append(drawing);
+  const answers = el('ol', 'ps-frame__answers');
+  const rows = FRAME_QUESTIONS.map(([, question, piece, colour]) => {
+    const row = el('li', 'ps-frame__row');
+    row.style.setProperty('--c', colour);
+    const mark = document.createElementNS(SVG_NS, 'svg');
+    mark.setAttribute('viewBox', '0 0 100 100');
+    mark.setAttribute('class', 'ps-frame__mark');
+    mark.setAttribute('aria-hidden', 'true');
+    mark.innerHTML = piece === 'mid'
+      ? `<rect x="2" y="38" width="96" height="24" rx="12" fill="${colour}"/>`
+      : `<path fill="${colour}" d="${FRAME_PIECES[piece]}" transform="translate(0 ${piece === 'top' ? 14 : -14})"/>`;
+    const text = el('div', 'ps-frame__text');
+    const q = el('p', 'ps-frame__q', question);
+    const tag = el('span', 'ps-frame__now', 'Now');
+    q.append(tag);
+    text.append(q, el('p', 'ps-frame__a'));
+    row.append(mark, text);
+    answers.append(row);
+    return row;
+  });
+  const body = el('div', 'ps-frame__body');
+  body.append(medal, answers);
+  card.append(heading, body);
+
+  return {
+    el: card,
+    update(session) {
+      const current = FRAME_QUESTIONS.findIndex(([key]) => !session.frame[key]);
+      FRAME_QUESTIONS.forEach(([key, , piece], i) => {
+        const answer = session.frame[key] ?? '';
+        const state = answer ? 'done' : i === current ? 'now' : 'future';
+        rows[i].dataset.state = state;
+        rows[i].classList.toggle('is-answered', Boolean(answer));
+        const a = rows[i].querySelector('.ps-frame__a')!;
+        if (a.textContent !== answer) a.textContent = answer;
+        const group = drawing.querySelector(`.ps-frame__piece--${piece}`) as SVGGElement;
+        group.dataset.state = state;
+      });
+      count.textContent = `${FRAME_QUESTIONS.filter(([key]) => session.frame[key]).length} of 3 answered`;
+      const tool = session.suggestion && session.suggestion.kind !== 'finish_define' ? session.suggestion.tool : null;
+      const coreArt = drawing.querySelector('.ps-frame__core > g')!;
+      if (coreArt.getAttribute('data-tool') !== String(tool)) {
+        coreArt.setAttribute('data-tool', String(tool));
+        coreArt.innerHTML = tool ? EMBLEM_SVG[tool] : '';
+      }
+      medal.classList.toggle('is-done', current === -1 && Boolean(tool));
+    }
+  };
 }
 
 function shownRun(session: PsSession): PsToolRun | null {
@@ -70,6 +131,7 @@ function rectOf(node: Element | null): DOMRect | null {
  */
 export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void } {
   const views = new Map<string, View>();
+  const frame = createFrameView();
   const record = createRecordView();
   let last: PsSession | null = null;
   let mode: 'chart' | 'record' | null = null;
@@ -121,7 +183,8 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
   function render(): HTMLElement | null {
     const session = last!;
     if (!session.define.runs.length) {
-      host.replaceChildren(frameCard(session));
+      frame.update(session);
+      if (frame.el.parentNode !== host || host.childElementCount !== 1) host.replaceChildren(frame.el);
       return null;
     }
     if (mode === 'record' && session.model) {

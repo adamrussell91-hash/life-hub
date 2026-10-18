@@ -1,6 +1,7 @@
 // apps/tasks/tests/unit/problem-solver-view.test.ts
 import { describe, expect, it } from 'vitest';
-import { renderCoachPanel } from '@/views/problem-solver/coach-panel';
+import { mountCoachPanel, renderCoachPanel } from '@/views/problem-solver/coach-panel';
+import { createTrack, problemMedal } from '@/views/problem-solver/decor';
 import { mountCanvas } from '@/views/problem-solver/canvas';
 import type { PsSession } from '../../../../packages/problem-solver/types';
 
@@ -41,6 +42,74 @@ describe('coach panel', () => {
   it('shows the retry action when the coach failed', () => {
     const panel = renderCoachPanel(session({ runner: { status: 'failed', mode: 'turn', error: 'Coach lost the thread, try again.' } }), noop);
     expect(panel.querySelector('[data-action="retry"]')).not.toBeNull();
+  });
+});
+
+describe('coach panel updates in place', () => {
+  it('appends new turns, swaps the thinking bubble for the reply and keeps the composer text', () => {
+    const panel = mountCoachPanel(noop);
+    const base = session({ pendingKeep: null });
+    panel.update(base);
+    const list = panel.el.querySelector('.ps-coach__messages')!;
+    const firstNode = list.firstElementChild;
+    expect(list.querySelector('.is-new')).toBeNull();
+    const input = panel.el.querySelector('textarea') as HTMLTextAreaElement;
+    input.value = 'half typed';
+    const asked = { ...base, turns: [...base.turns, { id: 't3', role: 'user' as const, text: 'Because Friday.', createdAt: '' }], runner: { status: 'running' as const, mode: 'turn' as const, error: null } };
+    panel.update(asked);
+    expect(list.firstElementChild).toBe(firstNode);
+    const thinking = list.querySelector('.ps-msg--thinking')!;
+    expect(thinking).not.toBeNull();
+    expect(list.lastElementChild).toBe(thinking);
+    expect(input.value).toBe('half typed');
+    panel.update({ ...asked, turns: [...asked.turns, { id: 't4', role: 'coach' as const, text: 'Why Friday?', createdAt: '' }], runner: { status: 'idle', mode: 'turn', error: null } });
+    expect(list.querySelector('.ps-msg--thinking')).toBeNull();
+    expect(list.querySelectorAll('.chat-message').length).toBe(4);
+    expect(list.lastElementChild!.classList.contains('is-new')).toBe(true);
+    expect(list.lastElementChild!.querySelector('.ps-avatar')).not.toBeNull();
+  });
+
+  it('clears the composer once the sent answer shows in the thread', () => {
+    const panel = mountCoachPanel(noop);
+    const base = session({ pendingKeep: null });
+    panel.update(base);
+    const input = panel.el.querySelector('textarea') as HTMLTextAreaElement;
+    input.value = 'Because Friday.';
+    panel.update({ ...base, turns: [...base.turns, { id: 't3', role: 'user', text: 'Because Friday.', createdAt: '' }] });
+    expect(input.value).toBe('');
+  });
+});
+
+describe('frame and track', () => {
+  it('fills frame pieces in place and marks the current question', () => {
+    const host = document.createElement('div');
+    const canvas = mountCanvas(host);
+    const empty = { runs: [], finishedEarly: false, exitObjection: null };
+    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it' }, define: empty }));
+    const frame = host.querySelector('.ps-frame');
+    expect(host.querySelectorAll('.ps-frame__row.is-answered').length).toBe(1);
+    expect(host.querySelector('.ps-frame__row[data-state="now"]')!.textContent).toContain('What is true?');
+    expect(host.querySelector('.ps-frame__piece--mid')!.getAttribute('data-state')).toBe('now');
+    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it', whatIsTrue: 'Late 3 of 4 weeks', whatCanBeDone: 'Move the day' }, define: empty, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom.' } }));
+    expect(host.querySelector('.ps-frame')).toBe(frame);
+    expect(host.querySelector('.ps-frame__medal')!.classList.contains('is-done')).toBe(true);
+    expect(host.querySelector('.ps-frame__core [data-tool="five_whys"] path')).not.toBeNull();
+  });
+
+  it('draws Frame then the model steps, with the current one marked', () => {
+    const track = createTrack();
+    track.update(session());
+    const stations = [...track.el.querySelectorAll('.ps-track__stn')];
+    expect(stations[0].querySelector('.ps-track__name')!.textContent).toBe('Frame');
+    expect(stations[0].getAttribute('data-state')).toBe('done');
+    expect(stations[1].querySelector('.ps-track__name')!.textContent).toBe('Define');
+    expect(stations[1].getAttribute('aria-current')).toBe('step');
+  });
+
+  it('medal fills one piece per answered question', () => {
+    const medal = problemMedal(2, 'five_whys');
+    expect(medal.querySelector('.ps-medal__mid')!.getAttribute('fill')).toBe('var(--ps-yellow)');
+    expect(medal.querySelector('.ps-medal__bot')!.getAttribute('fill')).toBe('var(--ps-ghost)');
   });
 });
 
