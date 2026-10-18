@@ -208,3 +208,39 @@ describe('no silent content loss', () => {
     expect(st.warnings[0].message).toBe('Image has no file; skipped.');
   });
 });
+
+describe('nested blocks stay in place', () => {
+  const img = () => node('image', { ...notionFile('https://files.example/i.png'), caption: rt('cap') });
+
+  it('ends the text run at a paragraph that has block children', () => {
+    const st = state();
+    const blocks = mapBlocks([node('paragraph', { rich_text: rt('A') }, [img()]), p('B')], 'top', st) as any[];
+    expect(blocks.map((b) => b.block_type)).toEqual(['rich_text', 'image', 'rich_text']);
+    expect(blocks[0].content.html).toBe('<p>A</p>');
+    expect(blocks[2].content.html).toBe('<p>B</p>');
+    expect(new Set(blocks.map((b) => b.id)).size).toBe(3);
+    expect(valid(blocks)).toBe(true);
+  });
+
+  it('moves blocks under a list item after it and continues the list', () => {
+    const st = state();
+    const blocks = mapBlocks([bullet('One', [bullet('Sub'), img()]), bullet('Two')], 'top', st) as any[];
+    expect(blocks.map((b) => b.block_type)).toEqual(['rich_text', 'image', 'rich_text']);
+    expect(blocks[0].content.html).toBe('<ul><li>One<ul><li>Sub</li></ul></li></ul>');
+    expect(blocks[2].content.html).toBe('<ul><li>Two</li></ul>');
+    expect(st.warnings.map((w) => w.message)).toEqual(['Blocks nested under a list item were moved after it.']);
+    expect(valid(blocks)).toBe(true);
+  });
+
+  it('keeps text children inside the list item', () => {
+    const blocks = mapBlocks([bullet('One', [p('extra')])], 'top', state()) as any[];
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].content.html).toBe('<ul><li>One<br>extra</li></ul>');
+  });
+
+  it('labels a pdf with no file as PDF', () => {
+    const st = state();
+    mapBlocks([node('pdf', {})], 'top', st);
+    expect(st.warnings[0].message).toBe('PDF has no file; skipped.');
+  });
+});
