@@ -101,6 +101,8 @@ import { createPublishedQuizHandler } from '../../../netlify/functions/published
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
 import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
+import { createPublishedQuadrantHandler } from '../../../netlify/functions/published-quadrant.mjs';
+import { createLessonQuadrantHandler } from '../../../netlify/functions/lesson-quadrant.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
@@ -3423,6 +3425,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     };
   }
 
+  /** Offline stand-in for the app's quadrant guess: keyword hints, so the teacher's faint marker shows locally. */
+  async function mockPlaceQuestion({ text }: { text: string }): Promise<{ x: number; y: number }> {
+    const t = text.toLowerCase();
+    const open = /\b(why|should|could|might|would|imagine|if)\b/.test(t) ? 0.75 : 0.25;
+    const intellectual = /\b(people|society|world|always|anyone|history|law|today)\b/.test(t) ? 0.72 : 0.28;
+    return { x: open, y: intellectual };
+  }
+
   /** Quiz lessons and Question drop run the real Functions against the mock store. */
   async function handleQuiz(
     method: string,
@@ -3436,7 +3446,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
     };
     const path = pathWithQuery.split('?')[0]!;
-    const handler = /\/discern$/.test(path)
+    const handler = /\/quadrant$/.test(path)
+      ? createLessonQuadrantHandler(deps)
+      : path.startsWith('/api/published/quadrant/')
+        ? createPublishedQuadrantHandler({ ...deps, placeQuestion: mockPlaceQuestion })
+      : /\/discern$/.test(path)
       ? createLessonDiscernHandler(deps)
       : path.startsWith('/api/published/discern/')
         ? createPublishedDiscernHandler(deps)
@@ -3522,7 +3536,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
-      /^\/api\/published\/discern\/[^/]+$/.test(path)
+      /^\/api\/published\/discern\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/quadrant$/.test(path) ||
+      /^\/api\/published\/quadrant\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
     }

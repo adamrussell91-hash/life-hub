@@ -405,6 +405,8 @@ var QuestionQuadrantContentSchema = z5.object({
   guide: z5.string().default(""),
   stimulus: z5.string().default(""),
   procedure: z5.enum(["sort", "create"]).default("sort"),
+  /** Students send their own questions and place them on the quadrant (live, published lesson). */
+  collect_questions: z5.boolean().default(false),
   questions: z5.array(z5.object({ id: z5.string().min(1), text: z5.string(), quadrant: QuadrantSchema })).max(16).default([]),
   converters: z5.array(z5.object({ id: z5.string().min(1), closed: z5.string(), open: z5.string() })).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
