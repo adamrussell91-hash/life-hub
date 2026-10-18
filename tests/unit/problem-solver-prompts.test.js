@@ -35,3 +35,19 @@ test('define prompt lists the tool steps and open slots', () => {
 test('rubric says frame answers use "frame", not "node"', () => {
   assert.ok(RUBRIC.includes('In phase frame, use "frame" for accepted answers instead of "node"; "node" is only for phase define.'));
 });
+
+test('define prompt says when the tool has met its minimum and what comes next', () => {
+  let s = createSession({ text: 'Skipping training.' }, deps);
+  s = applyCoachTurn(s, { verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: 'seven_step', reason: 'r' }, suggestion: { kind: 'next_tool', tool: 'problem_tree', reason: 'r' }, summary: null, exitObjection: null }, deps);
+  s = acceptSuggestion(s, deps);
+  assert.match(buildCoachPrompt(s).user, /Progress: not yet at the minimum/);
+  for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['effect:1', 'No progress'], ['cause:1', 'Delayed payoff'], ['cause:2', 'Appetite suppressed']]) {
+    s = applyCoachTurn(s, { verdict: 'accept', message: 'ok', node: { slot, text }, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null }, deps);
+  }
+  assert.match(buildCoachPrompt(s).user, /Progress: MINIMUM MET\. Next step to suggest: next_tool problem_statement\./);
+});
+
+test('rubric forbids ending a message without a next step', () => {
+  assert.ok(RUBRIC.includes('Never end on agreement or praise alone.'));
+  assert.ok(RUBRIC.includes('MINIMUM MET'));
+});
