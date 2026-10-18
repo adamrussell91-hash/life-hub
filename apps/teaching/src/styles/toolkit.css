@@ -861,11 +861,47 @@ button.tk-chip:focus-visible {
 
 /* Thinking intentions and reflection ----------------------------------------- */
 
+.tk-intent__lead {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--high-sea);
+  border-radius: var(--radius-sm);
+}
+
+.tk-intent__focus {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.35;
+  color: var(--navy);
+}
+
 .tk-intent__row {
   display: grid;
   grid-template-columns: 11rem minmax(0, 1fr);
   gap: var(--space-2) var(--space-3);
   align-items: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+/* Labels sit on the first pill's midline, not its top edge. */
+.tk-intent__row > .tk-intent__label {
+  padding-top: 7px;
+}
+
+.tk-intent__row > .tk-checks {
+  margin: 0;
+  padding-top: 4px;
+}
+
+.tk-intent__lead + .tk-intent__row {
+  border-top: 0;
+  padding-top: var(--space-1);
 }
 
 .tk-intent__label {
@@ -886,18 +922,30 @@ button.tk-chip:focus-visible {
   list-style: none;
 }
 
+/* Pills in one fixed-width column so every description starts on the same line. */
 .tk-described__item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px var(--space-2);
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  align-items: start;
+  gap: 4px var(--space-3);
   font-family: var(--font-ui);
   line-height: 1.5;
 }
 
+.tk-described__item > .tk-chip {
+  justify-self: start;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 3px var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  white-space: normal;
+  text-align: left;
+}
+
 .tk-described__text {
-  flex: 1 1 14rem;
   min-width: 0;
+  padding-top: 4px;
   color: var(--ink);
 }
 
@@ -2393,6 +2441,18 @@ button.tk-chip:focus-visible {
 
   .tk-intent__row {
     gap: 4px;
+  }
+
+  .tk-intent__row > .tk-intent__label {
+    padding-top: 0;
+  }
+
+  .tk-described__item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tk-described__text {
+    padding-top: 0;
   }
 
   .tk-values {
