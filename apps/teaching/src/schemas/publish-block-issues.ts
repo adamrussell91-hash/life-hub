@@ -20,6 +20,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   html_app: 'HTML app',
   question_set: 'Question set',
   question_drop: 'Question drop',
+  brainstorm: 'Brainstorm',
   quiz_question: 'Quiz question',
   self_check: 'Self check',
   mind_map: 'Mind map',
@@ -182,6 +183,9 @@ function ownIssue(block: Block): string | null {
   }
   if (block.block_type === 'question_drop' && !block.content.target_quiz_id) {
     return 'Choose the quiz this Question drop feeds into';
+  }
+  if (block.block_type === 'brainstorm' && !block.content.question.trim()) {
+    return 'Write the question for this Brainstorm';
   }
   if (block.block_type === 'quiz_question') {
     const checked = checkQuestion(block.content.question);
