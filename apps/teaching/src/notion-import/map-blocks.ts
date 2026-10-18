@@ -3,6 +3,7 @@ import type { Block } from '../schemas/block';
 import { parseVideoInput } from '../blocks/video-url';
 import { parseEmbedInput } from '../blocks/embed-url';
 import { BlockIds, makeBlock } from './block-factory';
+import { columnPreset, columnWidths } from './columns';
 import { escapeHtml, plainText, richTextHtml } from './rich-text';
 import {
   MEDIA_PLACEHOLDER_PREFIX,
@@ -281,7 +282,118 @@ export function mapBlocks(nodes: NotionNode[], scope: Scope, st: BlockState): Bl
   return out;
 }
 
-/** Layout blocks; filled in by Task 6. Returns null when `nodes[i]` is not a layout block. */
-function mapLayout(_nodes: NotionNode[], _i: number, _scope: Scope, _st: BlockState): { blocks: Block[]; next: number } | null {
+const CALLOUT_BY_COLOUR: Record<string, string> = {
+  red: 'warning',
+  orange: 'warning',
+  yellow: 'important',
+  blue: 'information',
+  green: 'remember',
+  purple: 'extension',
+  pink: 'extension'
+};
+const CALLOUT_BY_EMOJI: Record<string, string> = {
+  '⚠️': 'warning', '❗': 'warning', 'ℹ️': 'information', '📋': 'information',
+  '📅': 'information', '✅': 'remember', '🚀': 'extension'
+};
+
+export function calloutStyle(data: Record<string, any>): string {
+  const colour = String(data.color ?? '').replace(/_background$/, '');
+  if (CALLOUT_BY_COLOUR[colour]) return CALLOUT_BY_COLOUR[colour];
+  const emoji = data.icon?.type === 'emoji' ? data.icon.emoji : '';
+  return CALLOUT_BY_EMOJI[emoji] ?? 'information';
+}
+
+function isTextOnly(n: NotionNode): boolean {
+  return TEXT_RUN_TYPES.has(n.type) && n.children.every(isTextOnly);
+}
+
+function isTextOnlyToggle(n: NotionNode): boolean {
+  return n.type === 'toggle' && n.children.every(isTextOnly);
+}
+
+function isToggleHeading(n: NotionNode): boolean {
+  return /^heading_[123]$/.test(n.type) && n.data?.is_toggleable === true;
+}
+
+function boldLine(text: string, st: BlockState, notionId: string): Block {
+  return makeBlock('rich_text', st.ids.from(notionId), { html: `<p><strong>${escapeHtml(text)}</strong></p>` }, st.now);
+}
+
+/** A titled group of blocks, shaped to fit the scope it lands in. */
+function titledGroup(title: string, children: NotionNode[], scope: Scope, st: BlockState, notionId: string): Block[] {
+  if (scope === 'top') {
+    return [makeBlock('section', st.ids.from(notionId), {
+      title,
+      collapsed_in_editor: true,
+      blocks: mapBlocks(children, 'section', st) as any
+    }, st.now)];
+  }
+  const inner = mapBlocks(children, scope, st);
+  if (scope === 'column') return [boldLine(title, st, notionId), ...inner];
+  return [makeBlock('heading', st.ids.from(notionId), { text: title }, st.now, 'subsection'), ...inner];
+}
+
+function mapCallout(n: NotionNode, scope: Scope, st: BlockState): Block[] {
+  const textKids = n.children.filter(isTextOnly);
+  const otherKids = n.children.filter((c) => !isTextOnly(c));
+  const body = [plainText(n.data.rich_text), ...textKids.map(deepPlainText)].filter(Boolean).join('\n');
+  const callout = makeBlock('callout', st.ids.from(n.id), { style: calloutStyle(n.data) as any, body }, st.now);
+  if (!otherKids.length) return [callout];
+  warn(st, n, 'flattened', 'Images or other blocks inside a callout were placed after it.');
+  return [callout, ...mapBlocks(otherKids, scope, st)];
+}
+
+function mapColumns(n: NotionNode, scope: Scope, st: BlockState): Block[] {
+  const cols = n.children.filter((c) => c.type === 'column');
+  if (scope === 'column' || cols.length > 12) {
+    warn(st, n, 'flattened', 'Columns inside a column were stacked.');
+    return cols.flatMap((c) => mapBlocks(c.children, 'column', st));
+  }
+  if (cols.length <= 1) return cols.flatMap((c) => mapBlocks(c.children, scope, st));
+  const widths = columnWidths(cols.map((c) => c.data?.width_ratio));
+  return [makeBlock('columns', st.ids.from(n.id), {
+    preset: columnPreset(widths),
+    columns: cols.map((c, k) => ({ width: widths[k], blocks: mapBlocks(c.children, 'column', st) as any }))
+  }, st.now)];
+}
+
+function mapTabs(n: NotionNode, scope: Scope, st: BlockState): Block[] {
+  const items = n.children.filter((c) => c.type === 'tab');
+  const label = (t: NotionNode, k: number) => String(t.data?.label ?? '').trim() || `Tab ${k + 1}`;
+  const fits = items.length >= 2 && items.length <= 8;
+  if (fits && (scope === 'top' || scope === 'section')) {
+    return [makeBlock('tabs', st.ids.from(n.id), {
+      tabs: items.map((t, k) => ({ id: `${st.ids.from(t.id)}`, label: label(t, k), blocks: mapBlocks(t.children, 'tabs', st) as any }))
+    }, st.now)];
+  }
+  if (scope !== 'top' || !fits) {
+    warn(st, n, 'flattened', fits
+      ? 'Tabs inside tabs or columns became headings.'
+      : `${items.length} tab(s) cannot be a tabs block; each became its own group.`);
+  }
+  return items.flatMap((t, k) => titledGroup(label(t, k), t.children, scope, st, t.id));
+}
+
+function mapLayout(nodes: NotionNode[], i: number, scope: Scope, st: BlockState): { blocks: Block[]; next: number } | null {
+  const n = nodes[i];
+  if (isTextOnlyToggle(n)) {
+    const run: NotionNode[] = [];
+    let j = i;
+    while (j < nodes.length && isTextOnlyToggle(nodes[j])) run.push(nodes[j++]);
+    const items = run.map((t) => ({ title: plainText(t.data.rich_text), body: t.children.map(deepPlainText).join('\n') }));
+    return { blocks: [makeBlock('accordion', st.ids.from(run[0].id), { items }, st.now)], next: j };
+  }
+  if (n.type === 'toggle' || isToggleHeading(n)) {
+    if (scope !== 'top') warn(st, n, 'flattened', 'A toggle inside a layout was opened out.');
+    return { blocks: titledGroup(plainText(n.data.rich_text), n.children, scope, st, n.id), next: i + 1 };
+  }
+  if (n.type === 'callout') return { blocks: mapCallout(n, scope, st), next: i + 1 };
+  if (n.type === 'column_list') return { blocks: mapColumns(n, scope, st), next: i + 1 };
+  if (n.type === 'tabs') return { blocks: mapTabs(n, scope, st), next: i + 1 };
+  if (n.type === 'child_page') {
+    warn(st, n, 'flattened', `Sub-page “${n.data.title ?? ''}” was placed inline.`);
+    const heading = makeBlock('heading', st.ids.from(n.id), { text: String(n.data.title ?? 'Untitled') }, st.now, 'section');
+    return { blocks: [heading, ...mapBlocks(n.children, scope, st)], next: i + 1 };
+  }
   return null;
 }
