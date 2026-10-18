@@ -200,6 +200,8 @@ export function prefetchMomentLeadImage(
   if (!leadId) return;
   const media = fixture.media.find((m) => m.id === leadId && m.lifecycle === 'live');
   if (!media) return;
+  // Not uploaded yet: the photo shows from this device, nothing to fetch.
+  if (media.upload_state !== 'backed_up' && localJournalMediaUrl(media.id)) return;
   const key = `${tripId}:${leadId}`;
   if (prefetched.has(key)) return;
   prefetched.add(key);

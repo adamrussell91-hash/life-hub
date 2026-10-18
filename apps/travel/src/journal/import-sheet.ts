@@ -24,7 +24,11 @@ import {
 } from '@/journal/capture-context';
 import { persistJournalPatch, type PersistedJournal } from '@/journal/journal-sheet-save';
 import { buildJournalMediaRow, makeMediaId, normalizeMediaContentType } from '@/journal/media-upload';
-import { dropQueuedJournalMedia, queueJournalMedia } from '@/journal/journal-outbox';
+import {
+  dropQueuedJournalMedia,
+  flushJournalOutbox,
+  queueJournalMedia,
+} from '@/journal/journal-outbox';
 import { rememberLocalJournalMedia } from '@/journal/media-loading';
 import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
@@ -340,7 +344,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
           const contentType = normalizeMediaContentType(blob, f.inspected?.mime || 'image/jpeg');
           const row = await buildJournalMediaRow(mediaId, blob, contentType);
           media.push(row);
-          await queueJournalMedia({ tripId, mediaId, blob, contentType });
+          await queueJournalMedia({ tripId, mediaId, blob, contentType }, { flush: false });
           queued.push(mediaId);
           previews.push([mediaId, blob]);
         }
@@ -367,6 +371,7 @@ export function openImportSheet(options: OpenImportSheetOptions): { destroy(): v
       journal = { ...journal, revision: journal.revision + 1 };
       const envelope = await persistJournalPatch(tripId, options.version, journal);
       for (const [id, blob] of previews) rememberLocalJournalMedia(id, blob);
+      void flushJournalOutbox();
       await clearImportProposal(tripId);
       options.onSaved?.(envelope);
       destroy();
