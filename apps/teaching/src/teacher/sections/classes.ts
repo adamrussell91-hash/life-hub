@@ -269,7 +269,7 @@ export function renderClassPage(
 
   const activeUnits = cls.active_unit_ids
     .map((id) => unitsById.get(id))
-    .filter((unit): unit is Unit => unit?.status === 'active');
+    .filter((unit): unit is Unit => unit?.status === 'active' && unit.kind !== 'program');
   const currentActiveUnitId = activeUnits.some((unit) => unit.id === cls.current_unit_id)
     ? (cls.current_unit_id ?? '')
     : (activeUnits[0]?.id ?? '');

@@ -29,6 +29,7 @@ import { renderClassesIndex, renderClassPage, type ClassPageOptions } from '@/te
 import { openScheduleUnitModal } from '@/teacher/sections/schedule-unit-modal';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { renderUnitsIndex, renderUnitPage } from '@/teacher/sections/units';
+import { renderDocumentPage } from '@/teacher/sections/documents';
 import { renderLessonsIndex } from '@/teacher/sections/lessons';
 import { renderTemplatesPage } from '@/teacher/sections/templates';
 import { renderTrashSection } from '@/teacher/sections/trash';
@@ -776,6 +777,15 @@ function renderTeacherUnitsRoute(token: number): void {
     remount(curriculum);  });
 }
 
+function renderTeacherDocumentRoute(documentId: string, token: number): void {
+  const refs = mountTeacherShell();
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading…');
+  void loadNavAndHandleErrors(refs, token, 'units', undefined, (curriculum) => {
+    renderDocumentPage(refs.canvas, curriculum, documentId);
+  });
+}
+
 function renderTeacherUnitRoute(unitId: string, token: number): void {
   const refs = mountTeacherShell();
   renderRailStatus(refs.railNav, 'Loading curriculum…');
@@ -987,6 +997,9 @@ function renderRoute(match: RouteMatch, token: number): void {
       break;
     case 'teacher-unit':
       renderTeacherUnitRoute(match.params.unitId, token);
+      break;
+    case 'teacher-document':
+      renderTeacherDocumentRoute(match.params.documentId, token);
       break;
     case 'teacher-lessons':
       renderTeacherLessonsRoute(token);
