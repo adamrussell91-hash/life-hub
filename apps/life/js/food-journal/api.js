@@ -56,20 +56,13 @@ export function createFoodJournalApi(fetchImpl) {
       throw new Error("Research took too long. Try again.");
     },
     media: (body) => post("/api/food-journal-media", body),
-    async upload(blob) {
-      const { id, key, url } = await post("/api/food-journal-media", {
-        action: "upload",
-        mime: blob.type,
-        size: blob.size,
-      });
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "content-type": blob.type },
+    // The function stores the photo, so no browser PUT to R2 is needed.
+    upload: (blob) =>
+      request("/api/food-journal-media", {
+        method: "POST",
+        headers: { "content-type": "image/jpeg" },
         body: blob,
         signal: AbortSignal.timeout(60000),
-      });
-      if (!res.ok) throw new Error("Photo upload failed. Try again.");
-      return { id, key };
-    },
+      }),
   };
 }

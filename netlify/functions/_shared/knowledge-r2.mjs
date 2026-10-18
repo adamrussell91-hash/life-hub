@@ -40,6 +40,18 @@ export async function knowledgePresignPut(env, { key, contentType, signPut, expi
   );
 }
 
+// Writes from the function, so the browser never needs the bucket's CORS rules.
+export async function knowledgePutObject(env, { key, body, contentType, putObject } = {}) {
+  const config = knowledgeR2Config(env);
+  if (!config) throw knowledgeR2Unbound();
+  if (typeof putObject === 'function') return putObject({ ...config, key, body, contentType });
+  const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const client = new S3Client(knowledgeR2ClientOptions(config));
+  await client.send(
+    new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: body, ContentType: contentType })
+  );
+}
+
 export async function knowledgePresignGet(env, { key, signGet, expiresIn = 300 } = {}) {
   const config = knowledgeR2Config(env);
   if (!config) throw knowledgeR2Unbound();

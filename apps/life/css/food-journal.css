@@ -438,6 +438,64 @@ html[data-hub="life"] .hub-card.food-dish {
   }
 }
 
+/* Add and edit visit: a full page on a phone, not a sheet. The sheet tracked
+   the keyboard's height from the bottom, so the whole form jumped each time
+   the keyboard came or went. The page keeps its top fixed, puts Close and
+   Save in a bar above the fields, and only trims its bottom edge while the
+   keyboard is open. */
+@media (max-width: 720px) {
+  .hub-morph-dialog:has(.food-sheet--page) {
+    inset: 0;
+    height: 100dvh;
+    padding: 0;
+    align-items: stretch;
+  }
+  html.vv-keyboard-open .hub-morph-dialog:has(.food-sheet--page) {
+    inset: var(--vv-offset-top, 0px) 0 auto;
+    height: var(--vv-height, 100dvh);
+  }
+  .food-sheet--page.hub-morph-dialog__frame {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + var(--space-2)) var(--space-4) 0;
+  }
+  /* Close and Save, the title, the status line, then the fields. */
+  .food-sheet--page > .food-sheet__actions {
+    order: -2;
+    padding: 0 0 var(--space-2);
+    border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.08));
+  }
+  .food-sheet--page > h2 {
+    order: -1;
+  }
+  .food-sheet--page > .food-sheet__fields {
+    order: 1;
+    flex: 1;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-6));
+  }
+}
+.food-tags__chips,
+.food-tags__hints {
+  padding-block: var(--space-1);
+}
+.food-tags__chip {
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  font-size: var(--text-sm);
+  gap: var(--space-1);
+}
+.food-tags__hints .food-tags__chip {
+  background: none;
+  border: 1px dashed var(--line, rgba(0, 0, 0, 0.16));
+  color: var(--navy);
+}
+.food-tags__x {
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
 /* ── Editorial journal (magazine, timeline, entry, fix-up) ─────────────────
    Bodoni Moda is the same deliberate exception Aesthetics uses (css/aesthetics.css):
    Adam approved the editorial voice from the Food Journal redesign mockups,
@@ -455,8 +513,7 @@ html[data-hub="life"] .hub-card.food-dish {
   margin: 0;
   font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--pastel-peach-ink);
 }
 .fj-meta {
@@ -505,8 +562,7 @@ html[data-hub="life"] .hub-card.food-dish {
   font: inherit;
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
@@ -561,8 +617,7 @@ html[data-hub="life"] .hub-card.food-dish {
   margin: var(--space-4) 0 0;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--orca);
 }
 
@@ -968,8 +1023,7 @@ html[data-hub="life"] .hub-card.food-dish {
   padding: var(--space-2);
   font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   background: linear-gradient(
     180deg,
     transparent,
@@ -1027,8 +1081,7 @@ html[data-hub="life"] .hub-card.food-dish {
 .fj-facts dt {
   font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 .fj-facts dd {
@@ -1129,8 +1182,7 @@ html[data-hub="life"] .hub-card.food-dish {
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--pastel-peach-ink);
 }
 .fj-prose__label:first-child {
@@ -1193,8 +1245,7 @@ html[data-hub="life"] .hub-card.food-dish {
   margin: 0;
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--navy);
 }
 .fj-menu__sub {

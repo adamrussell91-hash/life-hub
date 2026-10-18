@@ -1,4 +1,4 @@
-import { nearbyVenues, newDish } from "./model.js";
+import { nearbyVenues, newDish, unshoutVisit } from "./model.js";
 export async function inspectPhoto(file, journal) {
   const exifr = await import("../../vendor/exifr.mjs");
   let raw = {};
@@ -50,6 +50,7 @@ export async function encodedPhoto(blob) {
 }
 export function mergeCapture(visit, draft, photos = []) {
   const next = structuredClone(visit);
+  draft = unshoutVisit(structuredClone(draft));
   if (!next.title) next.title = draft.title;
   if (!next.venue.name) next.venue.name = draft.venue.name;
   if (!next.venue.address) next.venue.address = draft.venue.address;
