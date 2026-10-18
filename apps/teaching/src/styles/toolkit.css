@@ -2610,6 +2610,52 @@ button.tk-qdot {
   display: none;
 }
 
+/* Written but not yet placed: an outlined dot in the middle that invites a tap. */
+.tk-qdot--draft.is-pending {
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--navy);
+  animation: tk-qdot-wait 1.6s ease-in-out infinite;
+}
+
+.tk-qdot--draft.is-nudged {
+  animation: tk-qdot-nudge 0.5s ease-in-out 2;
+}
+
+@keyframes tk-qdot-wait {
+  50% { box-shadow: 0 0 0 2px var(--navy), 0 0 0 9px rgb(27 54 93 / 0.18); }
+}
+
+@keyframes tk-qdot-nudge {
+  50% { transform: scale(1.5); }
+}
+
+.tk-quadrant__prompt {
+  position: absolute;
+  top: calc(50% + 1.4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-full);
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tk-quadrant__prompt[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-qdot--draft.is-pending,
+  .tk-qdot--draft.is-nudged {
+    animation: none;
+  }
+}
+
 .tk-qdot--mine {
   cursor: default;
 }
