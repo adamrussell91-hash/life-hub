@@ -4,6 +4,7 @@ import {
   okResponse,
   errorResponse,
   readUmbrellaSessionCookie,
+  withCors,
 } from "./_shared/http.mjs";
 import {
   defaultGetChatJobStore,
@@ -14,7 +15,11 @@ import { checkRateLimit } from "./_shared/travel-rate-limit.mjs";
 const PRIVATE = { "cache-control": "private, no-store" };
 export const config = { path: "/api/food-journal-assist" };
 export function createFoodJournalAssistHandler(deps = {}) {
-  return createSessionOriginHandler(async (request) => {
+  const env = deps.env ?? process.env;
+  // The session gate adds CORS headers to its own refusals only. The page is
+  // on another origin, so every answer here needs them too, or Safari reports
+  // "Load failed" even though the research started.
+  const handle = createSessionOriginHandler(async (request) => {
     const store = await (deps.getStore ?? defaultGetChatJobStore)();
     const owner = chatJobOwnerKey(readUmbrellaSessionCookie(request));
     if (request.method === "GET") {
@@ -94,10 +99,14 @@ export function createFoodJournalAssistHandler(deps = {}) {
         PRIVATE,
       );
     // Background headlines get their own budget so they never block research.
-    checkRateLimit(
-      `${input.action === "editorial" ? "food-editorial" : "food-start"}:${owner}`,
-      { limit: input.action === "editorial" ? 20 : 8, now: (deps.now ?? Date.now)() },
-    );
+    try {
+      checkRateLimit(
+        `${input.action === "editorial" ? "food-editorial" : "food-start"}:${owner}`,
+        { limit: input.action === "editorial" ? 20 : 8, now: (deps.now ?? Date.now)() },
+      );
+    } catch (err) {
+      return errorResponse(429, "rate_limited", err.message, true, PRIVATE);
+    }
     const id = randomUUID();
     await store.create(id, {
       owner,
@@ -120,6 +129,8 @@ export function createFoodJournalAssistHandler(deps = {}) {
       );
     return okResponse(202, { id }, PRIVATE);
   }, deps);
+  return async (request, context) =>
+    withCors(await handle(request, context), request, env);
 }
 // The browser cannot start the background function itself: its preflight
 // answers 202 with no CORS headers, so Safari reports "Load failed". Start it
