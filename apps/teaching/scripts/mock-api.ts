@@ -625,6 +625,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       years,
       subjects,
       units,
+      documents: [],
       lessons,
       classes,
       scheduled_lessons,

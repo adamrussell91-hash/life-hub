@@ -5,6 +5,7 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
+import { DOCUMENT_PREFIX } from './_shared/notion-import-store.mjs';
 import {
   CLASS_PREFIX,
   DEFAULT_SCHEDULE_ANCHOR_DATE,
@@ -70,6 +71,7 @@ export async function buildCurriculum(store) {
     scope_sequences,
     mediaRaw,
     outcomes,
+    documents,
     anchor
   ] = await Promise.all([
     listJSON(store, YEAR_PREFIX),
@@ -82,6 +84,7 @@ export async function buildCurriculum(store) {
     listJSON(store, SCOPE_SEQUENCE_PREFIX),
     listJSON(store, MEDIA_PREFIX),
     listJSON(store, OUTCOME_PREFIX),
+    listJSON(store, DOCUMENT_PREFIX),
     getJSON(store, scheduleAnchorKey())
   ]);
 
@@ -103,6 +106,7 @@ export async function buildCurriculum(store) {
     years,
     subjects,
     units,
+    documents: documents.filter(doc => doc.status === 'active'),
     lessons: lessons.filter(lesson => lesson.id).map(lesson => lessonSummary(lesson, publishedIds)),
     classes,
     scheduled_lessons: liveScheduled,

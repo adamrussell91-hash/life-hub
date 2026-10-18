@@ -119,7 +119,9 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
       'lessons/lesson-1': { id: 'lesson-1', title: 'Draft', unit_id: 'unit-1' },
       'published/lessons/lesson-1': { lesson_id: 'lesson-1' },
       'media/file-1': { id: 'file-1', status: 'archived' },
-      'media/file-2': { id: 'file-2', status: 'active', mime_type: 'image/png' }
+      'media/file-2': { id: 'file-2', status: 'active', mime_type: 'image/png' },
+      'documents/doc-1': { id: 'doc-1', type: 'document', kind: 'syllabus', status: 'active', subject_id: 'subject-1', blocks: [] },
+      'documents/doc-2': { id: 'doc-2', type: 'document', kind: 'syllabus', status: 'trashed', subject_id: 'subject-1', blocks: [] }
     })
   });
   const response = await handler(request());
@@ -138,6 +140,7 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
     updated_at: ''
   }]);
   assert.deepEqual(body.data.media.map(item => item.id), ['file-2']);
+  assert.deepEqual(body.data.documents.map(doc => doc.id), ['doc-1']);
   assert.equal(body.data.schedule_anchor_date, '2026-08-12');
 });
 
