@@ -4,7 +4,7 @@
 
 **Goal:** An "Import from Notion" picker in the Teaching Hub. It reads one page from Adam's Notion Teaching database, along with its Sub-item tree, previews what it will become, and writes native Teaching Hub units, programs, lessons, classes and syllabus documents. Files are stored again in Netlify Blobs. Re-imports replace the existing copy after saving a version.
 
-**Architecture:** A pure TypeScript mapper (`apps/teaching/src/notion-import/`) turns a normalised `NotionTree` into an `ImportPlan`. It's tested with vitest, and esbuild bundles it into `netlify/functions/_shared/notion-import-core.mjs` the same way the block schema is already bundled. Plain `.mjs` server modules do the I/O: a Notion API reader, a media rehoster and an applier. Two background functions (`/api/notion-import/plan` and `/api/notion-import/apply`) do the work and record progress in a job record in Blobs. The preview modal polls that record.
+**Architecture:** A pure TypeScript mapper (`apps/teaching/src/notion-import/`) turns a normalised `NotionTree` into an `ImportPlan`. It's tested with vitest, and esbuild bundles it into `netlify/functions/_shared/notion-import-core.mjs` the same way the block schema is already bundled. Plain `.mjs` server modules do the I/O: a Notion API reader, a media rehoster and an applier. A sync `POST /api/notion-import/jobs` validates the request, mints a job id, writes a `queued` job record in Blobs and kicks one of two background functions (`/api/notion-import/plan` or `/api/notion-import/apply`), passing only the job id. The background function runs the job and records progress in the same record. The preview modal polls `GET /api/notion-import/jobs/:id`. The stored plan is a slim preview (no entity records, no media urls); apply re-reads Notion.
 
 **Tech stack:** TypeScript + zod (schemas), vitest + happy-dom (`apps/teaching`), Node 22 ESM + `node:test` (root `tests/`), Netlify Functions v2 with `config.background: true`, `@netlify/blobs`, Notion REST API version `2025-09-03`.
 
@@ -38,9 +38,9 @@
 - `_shared/notion-media.mjs`: downloads files and stores them in Blobs.
 - `_shared/notion-apply.mjs`: validates, versions and writes entities.
 - `_shared/notion-import-run.mjs`: the shared steps the endpoints call (environment, context loading, plan and apply).
-- `notion-import.mjs`: `GET /api/notion-import/search`, `GET /api/notion-import/jobs/:id`.
-- `notion-import-plan.mjs`: background `POST /api/notion-import/plan`.
-- `notion-import-apply.mjs`: background `POST /api/notion-import/apply`.
+- `notion-import.mjs`: `GET /api/notion-import/search`, `POST /api/notion-import/jobs` (queues a job), `GET /api/notion-import/jobs/:id`.
+- `notion-import-plan.mjs`: background `POST /api/notion-import/plan` (body `{ job_id }`, kicked by the jobs endpoint).
+- `notion-import-apply.mjs`: background `POST /api/notion-import/apply` (body `{ job_id }`, kicked by the jobs endpoint).
 - Modify `curriculum.mjs`: also returns `documents`.
 
 **UI, in `apps/teaching/src/teacher/notion-import/`**
@@ -2852,6 +2852,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 12: Endpoints
 
+> **Superseded in part (queued-job rework).** The code below was written first. The shipped version differs: server-minted job ids and a sync `POST /api/notion-import/jobs` that queues the job (see Task 13 `api.ts` for the contract), background functions that take `{ job_id }` and read the job record, slim stored previews, and per-request timeouts. Read `netlify/functions/notion-import*.mjs` and `_shared/notion-import-run.mjs` for the real code.
+
 **Files:**
 - Create: `netlify/functions/_shared/notion-import-run.mjs`
 - Create: `netlify/functions/notion-import.mjs`
@@ -3158,17 +3160,17 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 import { describe, expect, it } from 'vitest';
 import { parseNotionPageId } from '@/teacher/notion-import/api';
 import { buildRows, choicesFrom, groupWarnings, toggleExcluded } from '@/teacher/notion-import/preview-model';
-import type { ImportPlan } from '@/notion-import/types';
+import type { ImportPlanPreview } from '@/notion-import/types';
 
 const entity = (page_id: string, parent_page_id: string | null, label: string, needs: any[] = []) => ({
   page_id, parent_page_id, kind: 'lesson' as const, label, id: `id_${page_id}`, title: `T ${page_id}`,
-  existing: page_id === 'l2', needs, suggested: {}, record: {}
+  existing: page_id === 'l2', needs, suggested: {}
 });
-const plan: ImportPlan = {
+const plan: ImportPlanPreview = {
   root_page_id: 'u1',
   entities: [entity('u1', null, 'Unit'), entity('l1', 'u1', 'Lesson'), entity('l2', 'u1', 'Workshop')],
   skipped: [{ page_id: 'm1', parent_page_id: 'u1', title: 'Map', reason: 'Curriculum Map pages are not imported.' }],
-  new_subjects: [], media: [], html_apps: [{ page_id: 'l1', notion_block_id: 'c1', preview: '<html>' }],
+  new_subjects: [], media_count: 0, html_apps: [{ page_id: 'l1', notion_block_id: 'c1', preview: '<html>' }],
   warnings: [
     { page_id: 'l1', notion_block_id: 'b', rule: 'flattened', message: 'a' },
     { page_id: 'l1', notion_block_id: 'c', rule: 'file_too_big', message: 'b' },
@@ -3220,36 +3222,59 @@ Expected: FAIL, because the modules aren't found.
 
 - [ ] **Step 3: Write `api.ts`**
 
+First add the preview type to `apps/teaching/src/notion-import/types.ts` (it is what `job.plan` holds; the full `ImportPlan` never leaves the server):
+
+```ts
+export type PlannedEntityPreview = Omit<PlannedEntity, 'record'>;
+export interface ImportPlanPreview {
+  root_page_id: string;
+  entities: PlannedEntityPreview[];
+  skipped: SkippedPage[];
+  warnings: ImportWarning[];
+  html_apps: HtmlAppCandidate[];
+  new_subjects: NewSubject[];
+  media_count: number;
+}
+```
+
+
 ```ts
 // apps/teaching/src/teacher/notion-import/api.ts
 import { apiGet, apiPost } from '@/api/client';
-import type { ImportChoices, ImportPlan } from '@/notion-import/types';
+import type { ImportChoices, ImportPlanPreview, ImportWarning } from '@/notion-import/types';
 
 export interface NotionSearchItem { page_id: string; title: string; category: string | null; last_edited_time: string }
 export interface NotionImportReport {
   written: string[];
   skipped: Array<{ page_id: string; reason: string }>;
-  warnings: ImportPlan['warnings'];
+  warnings: ImportWarning[];
 }
 export interface NotionImportJob {
   id: string;
   kind: 'plan' | 'apply';
-  status: 'running' | 'planned' | 'done' | 'failed';
+  /** 'queued' until the background function picks it up, then 'running'; plan jobs end 'planned', apply jobs 'done'. */
+  status: 'queued' | 'running' | 'planned' | 'done' | 'failed';
+  page_id: string;
   phase?: string;
   progress?: { phase: string; done: number; total: number };
-  plan?: ImportPlan;
+  /** Slim preview: no entity records, no media urls. Apply re-reads Notion. */
+  plan?: ImportPlanPreview;
   report?: NotionImportReport;
   error?: string;
 }
 
+/** The server accepts links, `?p=` peek links and bare ids, and answers 400 "Choose a Notion page to import." otherwise. This only gives instant feedback. */
 export function parseNotionPageId(input: string): string | null {
-  const hex = input.replace(/-/g, '').match(/[0-9a-f]{32}/i)?.[0]?.toLowerCase();
+  let text = input.trim();
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+    const fromP = url.searchParams.get('p');
+    text = fromP ?? url.pathname; // never the query: ?v= is a database view id
+  } catch { /* a bare id */ }
+  const found = text.match(/(?<![0-9a-f])[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}(?![0-9a-f])/gi);
+  const hex = found?.[found.length - 1]?.replace(/-/g, '').toLowerCase();
   if (!hex) return null;
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-export function newJobId(): string {
-  return `nij_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export const searchNotion = (q: string) =>
@@ -3257,19 +3282,22 @@ export const searchNotion = (q: string) =>
 
 export const getNotionJob = (id: string) => apiGet<NotionImportJob>(`/api/notion-import/jobs/${id}`);
 
-export async function startPlan(pageId: string, choices?: ImportChoices): Promise<string> {
-  const job_id = newJobId();
-  await apiPost('/api/notion-import/plan', { job_id, page_id: pageId, choices });
+/**
+ * POST /api/notion-import/jobs   { kind: 'plan' | 'apply', page_id: string, choices?: ImportChoices }
+ *   202 { job_id }   the server mints the id (nij_...) and queues the job
+ *   400 validation_error   "Choose a Notion page to import." (or bad kind / choices)
+ *   503 not_configured     NOTION_TEACHING_TOKEN missing; retryable false
+ *   502 start_failed       the background function could not be kicked; retryable true
+ */
+async function startJob(kind: 'plan' | 'apply', pageId: string, choices?: ImportChoices): Promise<string> {
+  const { job_id } = await apiPost<{ job_id: string }>('/api/notion-import/jobs', { kind, page_id: pageId, choices });
   return job_id;
 }
 
-export async function startApply(pageId: string, choices: ImportChoices): Promise<string> {
-  const job_id = newJobId();
-  await apiPost('/api/notion-import/apply', { job_id, page_id: pageId, choices });
-  return job_id;
-}
+export const startPlan = (pageId: string, choices?: ImportChoices) => startJob('plan', pageId, choices);
+export const startApply = (pageId: string, choices: ImportChoices) => startJob('apply', pageId, choices);
 
-/** Polls until the job leaves 'running'. A background function returns 202 at once, so the job may not exist yet. */
+/** Polls until the job leaves 'queued' and 'running'. */
 export async function waitForJob(
   id: string,
   onUpdate: (job: NotionImportJob) => void,
@@ -3280,7 +3308,7 @@ export async function waitForJob(
     const job = await getNotionJob(id).catch(() => null);
     if (job) {
       onUpdate(job);
-      if (job.status !== 'running') return job;
+      if (job.status !== 'queued' && job.status !== 'running') return job;
     }
     if (Date.now() - started > timeoutMs) throw new Error('The import is taking too long. Check back shortly.');
     await sleep(intervalMs);
@@ -3294,7 +3322,7 @@ Check `apiPost`'s signature in `src/api/client.ts` (around line 91). If it takes
 
 ```ts
 // apps/teaching/src/teacher/notion-import/preview-model.ts
-import type { EntityOverride, ImportChoices, ImportPlan, ImportWarning, WarningRule } from '@/notion-import/types';
+import type { EntityOverride, ImportChoices, ImportPlanPreview, ImportWarning, WarningRule } from '@/notion-import/types';
 
 export interface PreviewRow {
   page_id: string;
@@ -3323,14 +3351,14 @@ const RULE_TITLES: Partial<Record<WarningRule, string>> = {
   invalid: 'Not imported'
 };
 
-function childrenOf(plan: ImportPlan, pageId: string): string[] {
+function childrenOf(plan: ImportPlanPreview, pageId: string): string[] {
   return [
     ...plan.entities.filter((e) => e.parent_page_id === pageId).map((e) => e.page_id),
     ...plan.skipped.filter((s) => s.parent_page_id === pageId).map((s) => s.page_id)
   ];
 }
 
-export function buildRows(plan: ImportPlan, excluded: Set<string>): PreviewRow[] {
+export function buildRows(plan: ImportPlanPreview, excluded: Set<string>): PreviewRow[] {
   const rows: PreviewRow[] = [];
   const walk = (pageId: string, depth: number) => {
     const entity = plan.entities.find((e) => e.page_id === pageId);
@@ -3350,7 +3378,7 @@ export function buildRows(plan: ImportPlan, excluded: Set<string>): PreviewRow[]
   return rows;
 }
 
-export function toggleExcluded(plan: ImportPlan, excluded: Set<string>, pageId: string): Set<string> {
+export function toggleExcluded(plan: ImportPlanPreview, excluded: Set<string>, pageId: string): Set<string> {
   const next = new Set(excluded);
   const subtree: string[] = [];
   const collect = (id: string) => { subtree.push(id); childrenOf(plan, id).forEach(collect); };
@@ -3363,7 +3391,7 @@ export function toggleExcluded(plan: ImportPlan, excluded: Set<string>, pageId: 
   return next;
 }
 
-export function groupWarnings(plan: ImportPlan, excluded: Set<string>): Array<{ rule: WarningRule; title: string; items: ImportWarning[] }> {
+export function groupWarnings(plan: ImportPlanPreview, excluded: Set<string>): Array<{ rule: WarningRule; title: string; items: ImportWarning[] }> {
   const groups = new Map<WarningRule, ImportWarning[]>();
   for (const w of plan.warnings) {
     if (excluded.has(w.page_id) || w.rule === 'needs_choice') continue;
@@ -3491,7 +3519,7 @@ Use the overlay helpers found in Step 1 where they exist. The version below is s
 ```ts
 // apps/teaching/src/teacher/notion-import/modal.ts
 import type { CurriculumResponse } from '@/teacher/nav';
-import type { EntityOverride, ImportPlan } from '@/notion-import/types';
+import type { EntityOverride, ImportPlanPreview } from '@/notion-import/types';
 import { parseNotionPageId, searchNotion, startApply, startPlan, waitForJob, type NotionImportReport } from './api';
 import { buildRows, choicesFrom, groupWarnings, toggleExcluded } from './preview-model';
 
@@ -3520,7 +3548,7 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
   backdrop.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
   let pageId = '';
-  let plan: ImportPlan | null = null;
+  let plan: ImportPlanPreview | null = null;
   let excluded = new Set<string>();
   const overrides: Record<string, EntityOverride> = {};
   const htmlAsCode = new Set<string>();
@@ -3760,7 +3788,7 @@ Expected: PASS. If a test counts menu items, update its expected count by one an
 
 In `apps/teaching/scripts/mock-api.ts`, find how other `/api/...` routes are registered and add:
 - `GET /api/notion-import/search` → `{ items: [] }`
-- `POST /api/notion-import/plan` and `POST /api/notion-import/apply` → `202 {}`, storing a job in memory that is `planned` (with a two-entity made-up plan, the same shape as the modal test) or `done`
+- `POST /api/notion-import/jobs` (`{ kind, page_id, choices }`) → `202 { job_id }`, storing a job in memory that is `planned` (with a two-entity made-up plan, the same shape as the modal test) or `done`
 - `GET /api/notion-import/jobs/:id` → that job
 
 - [ ] **Step 8: Check it in the browser**
@@ -3882,7 +3910,7 @@ Open it as ready, not draft. Enable auto-merge (merge commit) per `CLAUDE.md`, t
 - [ ] **Step 3: Live check on the deploy preview (with Adam)**
 
 Adam adds the two environment variables (Functions scope) and redeploys the preview. Then, on the deploy preview:
-1. Confirm the background function routes respond. A `POST /api/notion-import/plan` returns 202 and the job appears at `/api/notion-import/jobs/<id>`.
+1. Confirm the background function routes respond. A `POST /api/notion-import/jobs` with `{ kind: 'plan', page_id }` returns 202 with a `job_id`, the job moves `queued` → `running` → `planned`, and it can be read at `/api/notion-import/jobs/<id>`.
 2. Import one real unit Adam chooses. Compare the Notion page and the imported lessons side by side: tabs, columns, callouts, toggles, images, files and one HTML embed.
 3. Re-import the same unit. Confirm there are no duplicates and that the version history has a "notion_import" entry.
 

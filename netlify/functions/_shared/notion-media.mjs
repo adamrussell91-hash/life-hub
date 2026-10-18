@@ -68,7 +68,7 @@ async function readCapped(res, maxBytes) {
 /**
  * @returns {Promise<{ok:true,url?:string,text?:string,media_id?:string}|{ok:false,reason:'too_big'|'type'|'failed',message:string}>}
  */
-export async function rehostMedia(store, mediaRef, { fetchImpl = fetch, origin, now, maxBytes = IMPORT_MAX_BYTES }) {
+export async function rehostMedia(store, mediaRef, { fetchImpl = fetch, origin, now, maxBytes = IMPORT_MAX_BYTES, signal }) {
   const id = importMediaId(mediaRef.ref, mediaRef.url);
   const fileUrl = new URL(`/api/media/${id}/file`, origin).href;
   if (mediaRef.purpose !== 'html' && (await getJSON(store, mediaKey(id)))) {
@@ -76,7 +76,7 @@ export async function rehostMedia(store, mediaRef, { fetchImpl = fetch, origin, 
   }
   let res;
   try {
-    res = await fetchImpl(mediaRef.url);
+    res = await fetchImpl(mediaRef.url, signal ? { signal } : undefined);
   } catch (error) {
     return { ok: false, reason: 'failed', message: `Could not download ${mediaRef.name}: ${error.message}` };
   }

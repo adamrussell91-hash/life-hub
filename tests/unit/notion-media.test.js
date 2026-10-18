@@ -149,3 +149,11 @@ test('slug drops the file extension', async () => {
   await rehostMedia(store, ref('image', 'Lab Diagram.png'), opts(async () => ok(new Uint8Array([1]), 'image/png')));
   assert.equal(JSON.parse(store.map.get(mediaKey(importMediaId('blk-1', 'https://files.example/a'))).value).slug, 'lab-diagram');
 });
+
+test('passes an abort signal to the download', async () => {
+  const store = memoryStore();
+  const signal = AbortSignal.timeout(60000);
+  let seen;
+  await rehostMedia(store, ref('image'), opts(async (_url, init) => { seen = init?.signal; return ok(new Uint8Array([1]), 'image/png'); }, { signal }));
+  assert.equal(seen, signal);
+});

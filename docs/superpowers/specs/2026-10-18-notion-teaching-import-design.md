@@ -50,14 +50,22 @@ file is downloaded during the same run that reads it.
 Teaching Hub: Create → Import from Notion
   │ paste link / search
   ▼
-POST /api/notion-import/plan    (background function)
+POST /api/notion-import/jobs    { kind: 'plan', page_id, choices? }   (sync)
+  validates, writes job { status: 'queued' } in Blobs, kicks the
+  background function with only the job id → 202 { job_id }
+  ▼
+POST /api/notion-import/plan    (background function, { job_id })
   notion-reader  → NotionTree (raw blocks + properties, whole Sub-item tree)
   mapper         → ImportPlan
-  plan stored in Blobs under notion-import/plans/<plan_id>
+  job record gets a slim preview (entities without records, counts, warnings;
+  no media urls)
   ▼
-Preview screen (polls the plan)
+Preview screen (polls GET /api/notion-import/jobs/:id)
   ▼
-POST /api/notion-import/apply   (background function, plan_id + choices)
+POST /api/notion-import/jobs    { kind: 'apply', page_id, choices }   (sync)
+  → queued job, 202 { job_id }
+  ▼
+POST /api/notion-import/apply   (background function, { job_id })
   re-reads Notion for fresh file URLs
   media-rehoster → Blobs
   applier        → version-snapshot existing copies, write entities,
