@@ -511,8 +511,8 @@ test("capture, private upload, menu text, backup and restore work through the re
   assert.ok(Math.abs(layout.sheet.width - layout.width) < 2, JSON.stringify(layout));
   assert.ok(Math.abs(layout.sheet.height - layout.height) < 2, JSON.stringify(layout));
   assert.ok(layout.actions.bottom <= layout.fields.top + 1, JSON.stringify(layout));
-  // One way in for dish photos.
-  assert.equal(await page.getByLabel("Add photos to this dish").count(), 0);
+  // Dish photos are added inside each dish; the top only reads a menu.
+  assert.equal(await page.getByLabel("Dish photos", { exact: true }).count(), 0);
   const jpeg =
     "/9j/4AAQSkZJRgABAQAAAQABAAD/4QBIRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAZADAAIAAAAUAAAALAAAAAAyMDI2OjEyOjAyIDE4OjMwOjAwAP/bAEMACAYGBwYFCAcHBwkJCAoMFA0MCwsMGRITDxQdGh8eHRocHCAkLicgIiwjHBwoNyksMDE0NDQfJzk9ODI8LjM0Mv/bAEMBCQkJDAsMGA0NGDIhHCEyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMv/AABEIABAAEAMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AO0ooooA/9k=";
   const photo = {
@@ -520,27 +520,16 @@ test("capture, private upload, menu text, backup and restore work through the re
     mimeType: "image/jpeg",
     buffer: Buffer.from(jpeg, "base64"),
   };
-  // Photos are read as soon as they are chosen.
-  await page.getByLabel("Dish photos", { exact: true }).setInputFiles(photo);
-  await page.getByText("Check the details, then save.", { exact: true }).waitFor();
-  assert.equal(
-    await page.getByLabel("Date", { exact: true }).inputValue(),
-    "2026-12-02",
-  );
-  assert.equal(
-    await page.getByLabel("Dish title", { exact: true }).inputValue(),
-    "Soba noodles",
-  );
-  await page.getByLabel("Date", { exact: true }).fill("2026-10-01");
-  // A menu photo lists its items; ticking one adds it as a dish.
+  // A menu photo is read as soon as it is chosen and lists its items.
   await page.getByLabel("Menu photo", { exact: true }).setInputFiles(photo);
   await page.getByText("Tick what you had.", { exact: true }).waitFor();
   assert.equal(
     await page.getByLabel("Date", { exact: true }).inputValue(),
-    "2026-10-01",
+    "2026-12-02",
   );
   const onMenu = page.getByRole("region", { name: "On the menu" });
-  assert.equal(await onMenu.getByRole("checkbox", { name: /Soba noodles/ }).isChecked(), true);
+  const soba = onMenu.getByRole("checkbox", { name: /Soba noodles/ });
+  if (!(await soba.isChecked())) await soba.check();
   const gyoza = onMenu.getByRole("checkbox", { name: /Pork gyoza/ });
   assert.equal(await gyoza.isChecked(), false);
   await gyoza.check();
@@ -548,6 +537,18 @@ test("capture, private upload, menu text, backup and restore work through the re
   await gyoza.uncheck();
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 1);
   await gyoza.check();
+  // A photo added inside a dish stays on that dish and never adds a dish.
+  await page.getByLabel("Date", { exact: true }).fill("2026-10-01");
+  await page
+    .getByLabel("Add photos to this dish")
+    .nth(1)
+    .setInputFiles([photo, { ...photo, name: "dish-2.jpg" }]);
+  await page.locator(".food-dish-editor").nth(1).locator(".food-photo").nth(1).waitFor();
+  assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 2);
+  assert.equal(
+    await page.getByLabel("Date", { exact: true }).inputValue(),
+    "2026-10-01",
+  );
   const tags = page.getByLabel("Tags", { exact: true }).first();
   await tags.fill("Spicy");
   await tags.press("Enter");
@@ -560,10 +561,12 @@ test("capture, private upload, menu text, backup and restore work through the re
   await page.getByRole("button", { name: "Save visit", exact: true }).click();
   await page.locator(".food-sheet").waitFor({ state: "detached" });
   assert.equal(read().visits.length, 2);
-  assert.equal(read().visits[1].dishes[0].photos.length, 1);
   assert.deepEqual(
-    read().visits[1].dishes.map((d) => d.title),
-    ["Soba noodles", "Pork gyoza"],
+    read().visits[1].dishes.map((d) => [d.title, d.photos.length]),
+    [
+      ["Soba noodles", 0],
+      ["Pork gyoza", 2],
+    ],
   );
   assert.equal(read().visits[1].menu_items.length, 2);
   assert.ok(read().visits[1].dishes[0].tags.includes("Spicy"));
@@ -587,7 +590,7 @@ test("capture, private upload, menu text, backup and restore work through the re
   ]);
   const backup = JSON.parse(await readFile(await download.path(), "utf8"));
   assert.equal(backup.format, "life-food-backup");
-  assert.equal(Object.keys(backup.assets).length, 1);
+  assert.equal(Object.keys(backup.assets).length, 2);
   assert.ok(!JSON.stringify(backup).includes("https://food-media.test"));
   await journalMenu(page, "Restore");
   await page.getByLabel("Food Journal backup").setInputFiles({
