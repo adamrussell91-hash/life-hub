@@ -2940,6 +2940,15 @@ function createBlockEditorFields(
       return createAnalogyTypesEditor(block, onChange, latest as () => Extract<Block, { block_type: 'analogy_types' }>);
     case 'teacher_note':
       return createTeacherNoteBlockEditor(block, onChange, latest as () => Extract<Block, { block_type: 'teacher_note' }>);
+    case 'discern_confirm': {
+      const fields = document.createElement('div');
+      fields.className = 'block-editor__fields';
+      const note = document.createElement('p');
+      note.className = 'discern-caption';
+      note.textContent = 'Students finish their Discern tail here. It stays linked to its activity wherever you drag it. To remove it, remove Discern from that activity.';
+      fields.append(note);
+      return editorShell(block, onChange, fields, latest as () => Extract<Block, { block_type: 'discern_confirm' }>);
+    }
   }
 }
 

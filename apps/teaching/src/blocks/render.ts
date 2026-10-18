@@ -3,6 +3,9 @@ import { renderClassroomToolsContent, renderCountdownContent, renderDividerConte
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
+import { canHaveDiscern } from '@/blocks/discern';
+import { renderDiscern } from '@/blocks/discern-view';
+import { renderDiscernConfirm } from '@/blocks/discern-confirm';
 import { calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
@@ -2254,6 +2257,8 @@ function renderBlockContent(
       return wrapBlock(renderPeerFeedback(block, mode, ctx), block, mode);
     case 'question_drop':
       return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
+    case 'discern_confirm':
+      return wrapBlock(renderDiscernConfirm(block, mode, ctx), block, mode);
     case 'quiz_question':
       return wrapBlock(renderQuizQuestion(block, mode, ctx), block, mode);
     case 'question_set':
@@ -2327,18 +2332,26 @@ function renderBlockContent(
 export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const wrapper = renderBlockContent(block, mode, ctx);
   decorateCalloutReferences(wrapper, block, mode, ctx.pageBlocks ?? []);
+  const attachments: HTMLElement[] = [];
   if (block.qualifiers?.length) {
-    const qualifiers = renderKaplanQualifiers(block.qualifiers, {
+    attachments.push(renderKaplanQualifiers(block.qualifiers, {
       mode, blockId: block.id, lessonId: ctx.lessonId
-    });
+    }));
+  }
+  if (block.discern && canHaveDiscern(block)) {
+    attachments.push(renderDiscern(block.discern, { mode, blockId: block.id, lessonId: ctx.lessonId }));
+  }
+  if (attachments.length) {
     // A question keeps its process next to its prompt, before the response space.
     // Other blocks carry the same optional attachment beneath their content.
     const question = block.block_type === 'question_set' && block.content.questions.length === 1
       ? wrapper.querySelector('.block-question-set__question') : null;
     const response = question?.querySelector('.block-question-set__answer-label, .block-question-set__response-lines');
-    if (response) question!.insertBefore(qualifiers, response);
-    else if (question) question.append(qualifiers);
-    else wrapper.append(qualifiers);
+    for (const attachment of attachments) {
+      if (response) question!.insertBefore(attachment, response);
+      else if (question) question.append(attachment);
+      else wrapper.append(attachment);
+    }
   }
   return wrapper;
 }

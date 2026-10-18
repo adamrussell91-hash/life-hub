@@ -96,6 +96,7 @@ export function blockInsertValue(block: Block): InsertMenuValue {
 }
 
 export function blockTypeLabel(block: Block): string {
+  if (block.block_type === 'discern_confirm') return 'Discern Confirm';
   return INSERT_MENU_LABEL[blockInsertValue(block)] ?? block.block_type.replace(/_/g, ' ');
 }
 

@@ -5,6 +5,8 @@ import {
   kaplanSteps, kaplanSymbol, suggestKaplanFocus, withKaplanQualifier, withoutKaplanQualifier
 } from './kaplan';
 import { renderKaplanQualifiers } from './kaplan-view';
+import { canHaveDiscern } from './discern';
+import { createDiscernAuthor } from './discern-editor';
 
 type Options<T extends Block> = { getBlock: () => T; onChange: (block: T) => void };
 
@@ -12,7 +14,7 @@ type Options<T extends Block> = { getBlock: () => T; onChange: (block: T) => voi
 export function createKaplanEditor<T extends Block>(options: Options<T>): HTMLElement {
   const root = document.createElement('div');
   root.className = 'kaplan-author';
-  if (!canHaveKaplanQualifier(options.getBlock())) return root;
+  if (!canHaveKaplanQualifier(options.getBlock()) && !canHaveDiscern(options.getBlock())) return root;
   const bar = document.createElement('div');
   bar.className = 'kaplan-author__bar';
   const attached = document.createElement('div');
@@ -34,7 +36,15 @@ export function createKaplanEditor<T extends Block>(options: Options<T>): HTMLEl
   const status = document.createElement('p');
   status.className = 'kaplan-caption';
   status.setAttribute('role', 'status');
-  root.append(bar, panel, status);
+  // Discern shares this options menu and attached strip; its setup is its own panel.
+  const discern = createDiscernAuthor({
+    getBlock: options.getBlock,
+    onChange: options.onChange,
+    setupVisibility: (open) => setupVisibility(open),
+    status,
+    refresh: () => renderBar()
+  });
+  root.append(bar, panel, discern.panel, status);
   root.addEventListener('click', (event) => event.stopPropagation());
   menu.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') { menu.open = false; summary.focus(); }
@@ -89,7 +99,7 @@ export function createKaplanEditor<T extends Block>(options: Options<T>): HTMLEl
     attached.replaceChildren();
     entries.replaceChildren();
     const qualifiers = options.getBlock().qualifiers ?? [];
-    if (qualifiers.length < 3) item('Add Kaplan qualifier', chooseLens);
+    if (canHaveKaplanQualifier(options.getBlock()) && qualifiers.length < 3) item('Add Kaplan qualifier', chooseLens);
     for (const qualifier of qualifiers) {
       const chip = button(KAPLAN_LABELS[qualifier.lens], () => edit(qualifier));
       chip.className = 'kaplan-chip';
@@ -99,6 +109,9 @@ export function createKaplanEditor<T extends Block>(options: Options<T>): HTMLEl
       item(`Edit ${KAPLAN_LABELS[qualifier.lens]} qualifier`, () => edit(qualifier), qualifier.lens);
       item(`Remove ${KAPLAN_LABELS[qualifier.lens]} qualifier`, () => remove(qualifier.lens));
     }
+    const discernChip = discern.chip();
+    if (discernChip) attached.append(discernChip);
+    for (const entry of discern.items()) item(entry.label, entry.action);
   }
   function title(text: string, lens?: KaplanLens): void {
     panel.replaceChildren();
