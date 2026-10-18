@@ -10,6 +10,7 @@ import {
   type NotionImportJob,
   type NotionImportReport
 } from './api';
+import { reconcileCurriculum } from '@/app/curriculum-state';
 import { buildRows, choicesFrom, groupWarningList, groupWarnings, toggleExcluded } from './preview-model';
 
 export interface NotionImportOptions {
@@ -17,7 +18,7 @@ export interface NotionImportOptions {
   onDone: (report: NotionImportReport) => void;
 }
 
-const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)';
+const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -61,6 +62,7 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
   title.id = 'notion-import-title';
   title.tabIndex = -1;
   const body = el('div', 'notion-import__body');
+  const step = el('div', 'notion-import__step');
   const footer = el('div', 'create-modal__footer notion-import__footer');
   dialog.append(title, body, footer);
   backdrop.append(dialog);
@@ -78,12 +80,17 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
     error.textContent = message;
     error.hidden = !message;
   };
+  // Step content swaps inside `step`; the status and error nodes stay put so screen readers keep their live regions.
+  body.append(step, status, error);
 
   const abort = new AbortController();
+  let applying = false;
   const close = (): void => {
     if (closed) return;
     closed = true;
     abort.abort();
+    // The apply job carries on server side, so what the app holds may already be stale.
+    if (applying) void reconcileCurriculum().catch(() => {});
     document.removeEventListener('keydown', onKeyDown);
     backdrop.remove();
     returnFocus?.focus?.();
@@ -121,7 +128,7 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
 
   function setStep(content: Node[], actions: HTMLElement[], statusText = '', keepFocus = false): void {
     setStatus(statusText);
-    body.replaceChildren(...content, status, error);
+    step.replaceChildren(...content);
     footer.replaceChildren(...actions);
     if (!keepFocus) focusFirst();
   }
@@ -213,11 +220,13 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
   /** Polls one job to its end and shows the result. Used for first runs and for Check again. */
   async function follow(kind: 'plan' | 'apply', jobId: string): Promise<void> {
     lastJob = { id: jobId, kind };
+    if (kind === 'apply') applying = true;
     const waiting = kind === 'plan' ? 'Reading from Notion…' : 'Importing…';
     if (kind === 'apply') setStep([], [cancelBtn('Close')], waiting);
     else setStatus(waiting);
     try {
       const job = await waitForJob(jobId, (j) => { if (!closed) setStatus(progressText(j) ?? waiting); }, { signal: abort.signal });
+      if (kind === 'apply') applying = false;
       if (closed) return;
       if (kind === 'plan') {
         if (job.status === 'failed' || !job.plan) { renderPick(); showError(job.error ?? 'Could not read that page.'); return; }
@@ -233,6 +242,7 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
       options.onDone(job.report);
       if (!closed) renderDone(job.report);
     } catch (e) {
+      if (kind === 'apply' && !(e instanceof JobTimeoutError) && !isAbort(e)) applying = false;
       if (closed || isAbort(e)) return;
       const message = e instanceof Error ? e.message : kind === 'plan' ? 'Could not read that page.' : 'The import failed.';
       if (e instanceof JobTimeoutError) { renderTimeout(message); return; }
@@ -242,7 +252,7 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
 
   function renderTimeout(message: string): void {
     const again = button('Check again', 'btn btn--decisive', 'data-notion-check-again');
-    again.addEventListener('click', () => { showError(''); if (lastJob) void follow(lastJob.kind, lastJob.id); });
+    again.addEventListener('click', () => { again.disabled = true; showError(''); if (lastJob) void follow(lastJob.kind, lastJob.id); });
     setStep([], [cancelBtn('Close'), again]);
     showError(message);
   }
@@ -258,25 +268,20 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
     return false;
   }
 
-  /** Mirrors map-entities: override, then the page's own suggestion, then the parent's effective value. */
+  /**
+   * Mirrors map-entities: override, then the page's own suggestion, then the parent's record value.
+   * A unit or class parent passes year and subject, a document passes only its subject, a lesson neither.
+   */
   function effective(entity: PlannedEntityPreview, field: 'year' | 'subject'): string | undefined {
-    const byId = planById();
     const o = overrides[entity.page_id] ?? {};
     const own = field === 'year'
       ? o.year_id ?? entity.suggested.year_id
       : o.subject_id ?? o.create_subject_title ?? entity.suggested.subject_id;
     if (own) return own;
-    const parent = entity.parent_page_id ? byId.get(entity.parent_page_id) : undefined;
-    return parent ? effective(parent, field) : undefined;
-  }
-
-  function hasUnitAncestor(entity: PlannedEntityPreview): boolean {
-    const byId = planById();
-    for (let p = entity.parent_page_id; p; p = byId.get(p)?.parent_page_id ?? null) {
-      const parent = byId.get(p);
-      if (parent?.kind === 'unit' && !excluded.has(p)) return true;
-    }
-    return false;
+    const parent = entity.parent_page_id ? planById().get(entity.parent_page_id) : undefined;
+    if (!parent || parent.kind === 'lesson') return undefined;
+    if (parent.kind === 'document' && field === 'year') return undefined;
+    return effective(parent, field);
   }
 
   function unmet(entity: PlannedEntityPreview): boolean {
@@ -284,7 +289,7 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
     return entity.needs.some((need) =>
       need === 'year' ? !effective(entity, 'year')
         : need === 'subject' ? !effective(entity, 'subject')
-          : !o.unit_id && !hasUnitAncestor(entity));
+          : !o.unit_id);
   }
 
   function fieldWrap(text: string, control: HTMLElement): HTMLLabelElement {
@@ -329,17 +334,20 @@ export function openNotionImportModal(options: NotionImportOptions): { close: ()
       const subjects = options.curriculum.subjects.filter(isActive).sort((a, b) => a.title.localeCompare(b.title))
         .map((s) => ({ id: s.id, title: s.display_title || s.title }));
       const current = overrides[entity.page_id];
-      const createTitle = current?.create_subject_title
-        ?? (current?.subject_id || entity.suggested.subject_id ? undefined : entity.suggested.subject_title);
-      const select = optionSelect(`subject:${entity.page_id}`, `Subject for ${entity.title}`, 'Choose a subject', subjects, current?.subject_id ?? entity.suggested.subject_id);
-      if (createTitle) {
-        const opt = el('option', '', `Create “${createTitle}”`);
-        opt.value = `create:${createTitle}`;
-        select.append(opt);
-        select.value = opt.value;
+      // An entry for either field, even a cleared one, means the user has already decided.
+      const touched = Boolean(current) && ('subject_id' in current! || 'create_subject_title' in current!);
+      if (!touched && !entity.suggested.subject_id && entity.suggested.subject_title) {
         // The default is a real choice, so record it; otherwise Import would wait on a picker already showing it.
-        o().create_subject_title = createTitle;
-        delete o().subject_id;
+        o().create_subject_title = entity.suggested.subject_title;
+      }
+      const chosen = overrides[entity.page_id];
+      const offer = chosen?.create_subject_title ?? entity.suggested.subject_title;
+      const select = optionSelect(`subject:${entity.page_id}`, `Subject for ${entity.title}`, 'Choose a subject', subjects, chosen?.subject_id ?? entity.suggested.subject_id);
+      if (offer) {
+        const opt = el('option', '', `Create “${offer}”`);
+        opt.value = `create:${offer}`;
+        select.append(opt);
+        if (chosen?.create_subject_title) select.value = opt.value;
       }
       select.addEventListener('change', () => {
         if (select.value.startsWith('create:')) { o().create_subject_title = select.value.slice(7); delete o().subject_id; }
