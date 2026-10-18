@@ -201,6 +201,7 @@ export const blockRegistry: {
   brainstorm: { render: renderBrainstorm, createEditor: createBrainstormEditor },
   question_drop: { render: renderQuestionDrop, createEditor: (block, onChange) => createQuestionDropEditor(block, onChange) },
   quiz_question: { render: renderQuizQuestion, createEditor: (block, onChange) => createQuizQuestionEditor(block, onChange) },
+  discern_confirm: { render: (block, mode) => renderBlock(block, mode), createEditor: (block, onChange) => createBlockEditor(block, onChange as BlockChangeHandler) },
   question_set: {
     render: renderQuestionSetBlock,
     createEditor: createQuestionSetEditor

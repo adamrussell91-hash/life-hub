@@ -19,6 +19,7 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'POST', pattern: /^\/api\/published\/examples\/[^/]+\/(?:unlock|submit)$/ },
   { method: 'GET', pattern: /^\/api\/media\/[^/]+\/file$/ },
   { method: 'POST', pattern: /^\/api\/published\/pulse\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/published\/discern\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/html-app-ai$/ },
   { method: 'POST', pattern: /^\/api\/published\/word-help\/[^/]+$/ },
   { method: 'GET', pattern: /^\/api\/published\/word-help\/[^/]+\/[a-f0-9]{64}$/ },

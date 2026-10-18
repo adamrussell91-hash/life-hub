@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
+import { DiscernQualifierSchema } from './discern';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -43,6 +44,7 @@ export const BlockTypeSchema = z.enum([
   'brainstorm',
   'quiz_question',
   'question_set',
+  'discern_confirm',
   'flashcards',
   'cloze',
   'self_check',
@@ -124,6 +126,7 @@ const blockTimestamps = {
 
 const blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
+  discern: DiscernQualifierSchema.optional(),
   layout: z.record(z.unknown()).default({}),
   print: z.record(z.unknown()).default({}),
   settings: z.record(z.unknown()).default({})
@@ -535,6 +538,20 @@ export const QuestionDropBlockSchema = z.object({
     marks_max: z.number().int().min(1).max(20).default(3),
     per_student: z.number().int().min(1).max(5).default(1),
     accepting: z.boolean().default(true)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Discern Confirm: the closing step of a Discern qualifier. Created after the
+ * block it belongs to and linked back by id; the teacher can drag it anywhere
+ * later in the lesson.
+ */
+export const DiscernConfirmBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('discern_confirm'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    target_block_id: z.string().max(120).default('')
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1312,6 +1329,7 @@ const leafBlockSchemas = [
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
   QuizQuestionBlockSchema,
+  DiscernConfirmBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,
