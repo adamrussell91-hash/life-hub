@@ -322,6 +322,46 @@ test("media reads require a live journal reference and uploads use food namespac
     200,
   );
 });
+// The page lives on life-hub.adam-russell.com and the API on another host, so
+// Safari reports "Load failed" for any answer that lacks CORS headers.
+test("research start and poll answer the Life Hub origin with CORS headers", async () => {
+  resetRateLimits();
+  const store = createMemoryChatJobStore();
+  const origin = "https://life-hub.adam-russell.com";
+  const handler = createFoodJournalAssistHandler(
+    deps(repo(), { getStore: async () => store, invokeRun: async () => true }),
+  );
+  const started = await handler(
+    new Request("https://example.test/api/food-journal-assist", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ action: "recipe", dish_id: "dish_1" }),
+    }),
+  );
+  assert.equal(started.status, 202);
+  assert.equal(started.headers.get("access-control-allow-origin"), origin);
+  assert.equal(started.headers.get("access-control-allow-credentials"), "true");
+  const { id } = (await started.json()).data;
+  const polled = await handler(
+    new Request(`https://example.test/api/food-journal-assist?id=${id}`, {
+      headers: { origin },
+    }),
+  );
+  assert.equal(polled.status, 200);
+  assert.equal(polled.headers.get("access-control-allow-origin"), origin);
+  let limited;
+  for (let i = 0; i < 8; i++)
+    limited = await handler(
+      new Request("https://example.test/api/food-journal-assist", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin },
+        body: JSON.stringify({ action: "recipe", dish_id: "dish_1" }),
+      }),
+    );
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get("access-control-allow-origin"), origin);
+  assert.match((await limited.json()).error.message, /Try again in a minute/);
+});
 test("background capture lifecycle polls a result and strips input image payloads", async () => {
   resetRateLimits();
   const store = createMemoryChatJobStore();
