@@ -1,6 +1,7 @@
 // netlify/functions/_shared/problem-solver/coach.mjs
 import { completeMessage } from '../anthropic-client.mjs';
-import { canEdge, canPlace, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { addEdge, canEdge, canPlace, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { activeRun } from './session.mjs';
@@ -26,26 +27,38 @@ export function fitWords(text, limit = WORD_LIMIT) {
   return wordCount(out) <= limit ? out : out.split(/\s+/).slice(0, limit).join(' ');
 }
 
-function problemWith(session, value) {
+/** A bare slot name (`effect`) takes its next open index (`effect:1`). */
+function fitSlot(run, slot) {
+  if (canPlace(run, slot) || parseSlot(slot)?.index != null) return slot;
+  return nextSlots(run).find((open) => parseSlot(open)?.name === slot) ?? slot;
+}
+
+/** Fit the node to its open slot and keep only the links the tool allows; the turn survives a bad link. */
+function fitToRun(session, value) {
   const run = activeRun(session);
-  if (session.phase !== 'define' || !run || !value.node) return null;
-  if (!canPlace(run, value.node.slot)) return `Slot ${value.node.slot} is not open for ${run.tool}.`;
-  if (value.verdict === 'accept' && value.edges?.length) {
-    const placed = placeNode(run, { id: '__candidate__', slot: value.node.slot, text: value.node.text, state: 'accepted' });
-    for (const edge of value.edges) {
-      const from = placed.nodes.find((node) => node.slot === edge.from)?.id ?? null;
-      const to = placed.nodes.find((node) => node.slot === edge.to)?.id ?? null;
-      if (!canEdge(placed, from, to, edge.kind)) return `Link ${edge.from} to ${edge.to} (${edge.kind}) is not allowed; link only placed slots with a valid kind.`;
-    }
+  if (session.phase !== 'define' || !run || !value.node) return { value };
+  const slot = fitSlot(run, value.node.slot);
+  if (!canPlace(run, slot)) return { error: `Slot ${value.node.slot} is not open for ${run.tool}. Open slots: ${nextSlots(run).join(', ') || 'none'}.` };
+  const rename = (name) => (name === value.node.slot ? slot : name);
+  const node = { ...value.node, slot };
+  if (value.verdict !== 'accept') return { value: { ...value, node, edges: [] } };
+  let placed = placeNode(run, { id: '__candidate__', slot, text: node.text, state: 'accepted' });
+  const edges = [];
+  for (const edge of value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }))) {
+    const from = placed.nodes.find((n) => n.slot === edge.from)?.id ?? null;
+    const to = placed.nodes.find((n) => n.slot === edge.to)?.id ?? null;
+    if (!canEdge(placed, from, to, edge.kind)) continue;
+    placed = addEdge(placed, { from, to, kind: edge.kind });
+    edges.push(edge);
   }
-  return null;
+  return { value: { ...value, node, edges } };
 }
 
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
-  const slotError = problemWith(session, result.value);
-  return slotError ? { ok: false, error: slotError } : result;
+  const fitted = fitToRun(session, result.value);
+  return fitted.error ? { ok: false, error: fitted.error } : { ok: true, value: fitted.value };
 }
 
 export function createModelCoach(model) {

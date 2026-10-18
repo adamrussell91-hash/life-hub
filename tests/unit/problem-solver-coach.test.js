@@ -91,13 +91,40 @@ test('scripted coach: a switch: answer suggests switching to Problem tree', asyn
   assert.deepEqual(s.define.runs.map((run) => [run.tool, run.status]), [['five_whys', 'switched'], ['problem_tree', 'active']]);
 });
 
-test('an edge to an unplaced slot triggers repair instead of failing the turn', async () => {
-  const bad = reply({ verdict: 'accept', node: { slot: 'problem', text: 'Rota changes late.' }, edges: [{ from: 'problem', to: 'why:1', kind: 'relates' }] });
-  const replies = [bad, reply({ verdict: 'accept', node: { slot: 'problem', text: 'Rota changes late.' } })];
+test('an edge to an unplaced slot is dropped without a repair call', async () => {
+  const replies = [reply({ verdict: 'accept', node: { slot: 'problem', text: 'Rota changes late.' }, edges: [{ from: 'problem', to: 'why:1', kind: 'relates' }] })];
   const coach = createModelCoach(async () => replies.shift());
   const turn = await coach(inDefine());
   assert.equal(replies.length, 0);
+  assert.equal(turn.node.slot, 'problem');
   assert.deepEqual(turn.edges, []);
+});
+
+function inProblemTree() {
+  const accept = (node, edges = []) => ({ verdict: 'accept', message: 'ok', node, edges, skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null });
+  let s = createSession({ text: 'Inconsistent eating and training.' }, deps);
+  s = acceptSuggestion(applyCoachTurn(s, { ...accept(null), frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: 'seven_step', reason: 'r' }, suggestion: { kind: 'next_tool', tool: 'problem_tree', reason: 'r' } }, deps), deps);
+  s = applyCoachTurn(s, accept({ slot: 'trunk', text: 'Inconsistent eating and training.' }), deps);
+  return applyCoachTurn(s, accept({ slot: 'cause:1', text: 'Delayed payoff boredom.' }), deps);
+}
+
+test('problem tree: an effect linked to the trunk keeps the effect and drops the link', async () => {
+  const calls = [];
+  const coach = createModelCoach(async (prompt) => {
+    calls.push(prompt);
+    return reply({ verdict: 'accept', message: 'That loop is real: no progress feeds the boredom. What else does it cost you?', node: { slot: 'effect:1', text: 'No visible progress, which demotivates.' }, edges: [{ from: 'effect:1', to: 'trunk', kind: 'relates' }, { from: 'effect:1', to: 'cause:1', kind: 'feeds' }, { from: 'effect:1', to: 'cause:1', kind: 'relates' }] });
+  });
+  const turn = await coach(inProblemTree());
+  assert.equal(calls.length, 1);
+  assert.equal(turn.node.slot, 'effect:1');
+  assert.deepEqual(turn.edges, [{ from: 'effect:1', to: 'cause:1', kind: 'relates' }]);
+});
+
+test('problem tree: a bare slot name takes the next open index', async () => {
+  const coach = createModelCoach(async () => reply({ verdict: 'accept', node: { slot: 'effect', text: 'No visible progress.' }, edges: [{ from: 'effect', to: 'cause:1', kind: 'relates' }] }));
+  const turn = await coach(inProblemTree());
+  assert.equal(turn.node.slot, 'effect:1');
+  assert.deepEqual(turn.edges, [{ from: 'effect:1', to: 'cause:1', kind: 'relates' }]);
 });
 
 test('applyCoachTurn drops an edge that cannot be added', () => {
