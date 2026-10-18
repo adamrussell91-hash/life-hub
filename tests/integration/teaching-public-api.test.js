@@ -261,6 +261,23 @@ test('media file is public for active media and 404 when archived', async () => 
   assert.equal(missing.status, 404);
 });
 
+test('media file streams large video blobs with the stored content type', async () => {
+  const stream = new Response(new Uint8Array([1, 2, 3, 4])).body;
+  const requested = [];
+  const store = memoryStore({
+    'media/vid-1': { id: 'vid-1', status: 'active', mime_type: 'video/mp4' },
+    'media_files/vid-1': { data: stream, metadata: { contentType: 'video/mp4' } }
+  });
+  const getWithMetadata = store.getWithMetadata;
+  store.getWithMetadata = async (key, options) => { requested.push(options?.type); return getWithMetadata(key, options); };
+  const handler = createMediaFileHandler({ env, getContentStore: async () => store });
+  const response = await handler(jsonRequest('https://api.adam-russell.com/api/media/vid-1/file'));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'video/mp4');
+  assert.deepEqual(requested, ['stream']);
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3, 4]);
+});
+
 test('html-app-ai stays public, 503s without Blobs, and completes an enabled lane', async () => {
   const unbound = createHtmlAppAiHandler({
     env,

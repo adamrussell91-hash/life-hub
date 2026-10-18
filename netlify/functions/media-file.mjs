@@ -25,7 +25,7 @@ export function createMediaFileHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Media file not found', false), request, env);
     }
 
-    const result = await store.getWithMetadata(mediaFileKey(id), { type: 'arrayBuffer' });
+    const result = await store.getWithMetadata(mediaFileKey(id), { type: 'stream' });
     if (!result?.data) {
       return withCors(errorResponse(404, 'not_found', 'Media file not found', false), request, env);
     }
