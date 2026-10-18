@@ -883,3 +883,53 @@ for (const width of [1440, 390])
     assert.deepEqual(errors, []);
     await page.close();
   });
+test("a venue that is not on the map can be typed in Check venues", async () => {
+  const { page, read, errors } = await pageFor(390, { seed: unsureVenue });
+  await page.getByRole("tab", { name: "Check venues (1)" }).click();
+  await page.getByLabel("Where did you eat?").fill("Hidden Den");
+  await page.getByRole("button", { name: "Use this venue", exact: true }).click();
+  await page.getByRole("tab", { name: /^Check venues/ }).waitFor({ state: "detached" });
+  const venue = read().visits.find((v) => v.source_id === "dayone:venue-check").venue;
+  assert.equal(venue.name, "Hidden Den");
+  // It stays at the photo's point, not at any of the suggested places.
+  assert.equal(venue.lat, -32.9);
+  assert.equal(venue.match.basis, "picked");
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+test("Find venue searches the typed venue and offers it when the map does not know it", async () => {
+  const { page, read, errors } = await pageFor(1440, { seed: unsureVenue });
+  const asked = [];
+  await page.route("**/api/food-places**", async (route) => {
+    asked.push(new URL(route.request().url()).searchParams.get("q"));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        data: {
+          street: "4 Quay Street, Harbourside",
+          candidates: [{ name: "Two Herons Cafe", address: "4 Quay Street, Harbourside", lat: -32.9001, lon: 151.7 }],
+        },
+      }),
+    });
+  });
+  await page.getByRole("tab", { name: "Check venues (1)" }).click();
+  await page.getByRole("button", { name: "Edit visit", exact: true }).click();
+  await page.locator(".food-sheet").waitFor();
+  await page.getByLabel("Venue", { exact: true }).fill("Hidden Den");
+  await page.getByRole("button", { name: "Find venue", exact: true }).click();
+  await page.getByRole("button", { name: "Two Herons Cafe · 11 m", exact: true }).waitFor();
+  assert.deepEqual(asked, ["Hidden Den"]);
+  await page.getByRole("button", { name: "Use Hidden Den", exact: true }).click();
+  assert.equal(await page.getByLabel("Address", { exact: true }).inputValue(), "4 Quay Street, Harbourside");
+  await page.getByRole("button", { name: "Save visit", exact: true }).click();
+  await page.locator(".food-sheet").waitFor({ state: "detached" });
+  const venue = read().visits.find((v) => v.source_id === "dayone:venue-check").venue;
+  assert.equal(venue.name, "Hidden Den");
+  assert.equal(venue.address, "4 Quay Street, Harbourside");
+  assert.equal(venue.match.confidence, "sure");
+  assert.equal(await page.getByRole("tab", { name: /^Check venues/ }).count(), 0);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
