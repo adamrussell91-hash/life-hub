@@ -3,7 +3,7 @@ import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
 import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
 import { nextSlots } from '../../../../packages/problem-solver/machine.mjs';
-import { activeRun } from './session.mjs';
+import { activeRun, followOn } from './session.mjs';
 
 const skillLines = SKILLS.map((skill) => `- ${skill.id} (${skill.name}): ${skill.description}`).join('\n');
 const modelLines = Object.values(MODELS).map((model) => `- ${model.id}: ${model.name}. Use when: ${model.when}`).join('\n');
@@ -14,6 +14,7 @@ export const RUBRIC = `You are the Problem Solver coach. You coach one person th
 VOICE
 - Every message is between 25 and 60 words, usually two or three sentences.
 - Ask at most one question per message, and end with it when you ask one.
+- Every message leaves the person knowing what to do next: end with a question or a clear next step. Never end on agreement or praise alone.
 - When an answer is good, say so in one short clause and name the skill it shows. No praise beyond that.
 - Plain words. No lists, headings or markdown in the message.
 
@@ -55,7 +56,7 @@ If they argue back with a good reason, change your verdict and accept. If they p
 
 SWITCHING AND CHECK-INS
 - If the same slot has been challenged twice, or causes start branching or interacting, suggest a better tool with "switch_tool" and a one-sentence reason.
-- When a tool's steps are complete, ask one metacognitive check-in tied to a stage, for example "How confident are you that this is the real root, and what would change your mind?"
+- When the state says MINIMUM MET, the tool has enough to stop (more slots stay open only so the person can add more). In that reply, ask one metacognitive check-in tied to a stage, for example "How confident are you that this is the real root, and what would change your mind?", and put the named next step in "suggestion". If the person asks what to do next, tell them plainly.
 
 OUTPUT
 Reply with one JSON object and nothing else:
@@ -69,7 +70,7 @@ function transcript(session) {
   return session.turns.slice(-RECENT_TURNS).map((turn) => `${turn.role === 'user' ? 'PERSON' : 'COACH'}: ${turn.text}`).join('\n');
 }
 
-function runLines(run) {
+function runLines(session, run) {
   const def = TOOLS[run.tool];
   const nodes = run.nodes.map((node) => `  ${node.slot}${node.state === 'contested' ? ' (contested)' : ''}: ${node.text}`).join('\n') || '  (none yet)';
   const edges = run.edges.length ? `\nLinks:\n${run.edges.map((e) => `  ${run.nodes.find((n) => n.id === e.from)?.slot} -> ${run.nodes.find((n) => n.id === e.to)?.slot} (${e.kind})`).join('\n')}` : '';
@@ -79,8 +80,16 @@ function runLines(run) {
     `Slot meanings: ${Object.entries(def.slots).map(([k, v]) => `${k} = ${v}`).join('; ')}`,
     `Link kinds: ${def.edgeKinds.join(', ') || 'none'}`,
     `Placed:\n${nodes}${edges}`,
-    `Open slots: ${nextSlots(run).join(', ') || 'none (tool complete)'}`
+    `Open slots: ${nextSlots(run).join(', ') || 'none (tool complete)'}`,
+    progressLine(session)
   ].join('\n');
+}
+
+function progressLine(session) {
+  const next = followOn(session);
+  if (!next) return 'Progress: not yet at the minimum for this tool; keep working its steps.';
+  const step = next.kind === 'finish_define' ? 'finish_define (the person can say they have defined it)' : `next_tool ${next.tool}`;
+  return `Progress: MINIMUM MET. Next step to suggest: ${step}.`;
 }
 
 /** @returns {{ system: string, user: string }} */
@@ -97,7 +106,7 @@ export function buildCoachPrompt(session) {
     parts.push(`Earlier tool ${run.tool}: ${run.status}${run.switchReason ? ` (${run.switchReason})` : ''}; ${run.nodes.map((node) => `${node.slot}: ${node.text}`).join(' | ')}`);
   }
   const run = activeRun(session);
-  if (run) parts.push(runLines(run));
+  if (run) parts.push(runLines(session, run));
   if (session.pendingKeep) parts.push(`Last challenged answer (${session.pendingKeep.slot}): ${session.pendingKeep.text}`);
   if (session.summary) parts.push(`Summary so far: ${session.summary}`);
   const coachTurns = session.turns.filter((turn) => turn.role === 'coach').length;
