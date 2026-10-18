@@ -18,6 +18,8 @@ import {
   type BlockEditorContext
 } from '@/blocks/editors';
 import { findBlockById } from '@/blocks/find-block';
+import { createDiscernConfirmBlock, findDiscernConfirm, insertDiscernConfirm, removeDiscernConfirms } from '@/blocks/discern';
+import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-editor';
 import { renderBlock } from '@/blocks/render';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
 import { createTeacherBlockPulse } from '@/teacher/block-pulse';
@@ -250,6 +252,18 @@ export function mountBlockCanvas(
   root.addEventListener('callout-reference-jump', event => {
     event.stopPropagation();
     select(null);
+  });
+
+  // Discern's Confirm card is its own block: added after its activity on attach,
+  // removed with it on detach. The teacher drags it later in the lesson.
+  root.addEventListener(DISCERN_ATTACH_EVENT, event => {
+    const hostId = (event as CustomEvent<{ blockId: string }>).detail.blockId;
+    if (findDiscernConfirm(blocks, hostId)) return;
+    emit(insertDiscernConfirm(blocks, hostId, createDiscernConfirmBlock(options.idFactory(), hostId)));
+  });
+  root.addEventListener(DISCERN_DETACH_EVENT, event => {
+    const hostId = (event as CustomEvent<{ blockId: string }>).detail.blockId;
+    if (findDiscernConfirm(blocks, hostId)) emit(removeDiscernConfirms(blocks, hostId));
   });
 
   function clearDnd(): void {
