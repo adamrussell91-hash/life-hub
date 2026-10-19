@@ -34,6 +34,8 @@ const RENDERERS = {
   lotus_blossom: ['lotus-blossom', 'createLotusBlossomView'],
   duncker: ['duncker', 'createDunckerView'],
   contradiction: ['contradiction', 'createContradictionView'],
+  decision_matrix: ['decision-matrix', 'createDecisionMatrixView'],
+  decision_matrix_unscored: ['decision-matrix', 'createDecisionMatrixView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
@@ -114,7 +116,10 @@ for (const width of widths) {
     const source = `(${auditChart.toString()})`;
     const found = await tab.evaluate((src) => eval(src)(), source);
     const shapes = await tab.$$('[data-shape] button, button[data-shape]');
-    for (const shape of shapes.slice(0, 16)) {
+    // Shapes a layout hides (a phone shows one option at a time) cannot be hovered.
+    const visible = [];
+    for (const shape of shapes) if (await shape.isVisible()) visible.push(shape);
+    for (const shape of visible.slice(0, 16)) {
       await shape.hover();
       await tab.waitForTimeout(80);
       found.push(...(await tab.evaluate(([src, el]) => eval(src)(el.closest('[data-shape]') ?? el), [source, shape])).map((p) => `hover: ${p}`));

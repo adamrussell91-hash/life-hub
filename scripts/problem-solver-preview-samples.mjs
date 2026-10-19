@@ -473,3 +473,25 @@ SAMPLES.contradiction = run('contradiction', [
   node('w', 'worsening', 'The share of repaired bikes that come back within a month with the same fault.', 'Repeat repairs', { state: 'contested', objection: 'Does rushing cause the repeats, or do they come from cheap parts?' }),
   node('s', 'statement', 'The faster we turn repairs round, the more bikes come back with the same fault, because the final safety check is the step that gets squeezed.', 'Speed against quality')
 ]);
+
+// Decision matrix: a repair café choosing where to meet each week. Five criteria (one contested),
+// three options, percentage weights, then the chosen option. The next snapshot reweights after a
+// visit to the arcade unit, so the totals count up and the lead moves to option 3.
+const matrixNodes = [
+  node('c1', 'criterion:1', 'Room hire for one evening, heating included.', 'Weekly cost'),
+  node('c2', 'criterion:2', 'Room for six repair benches and a queue that does not block the door.', 'Bench space'),
+  node('c3', 'criterion:3', 'Close to the bus stop, with step-free access.', 'Easy to reach'),
+  node('c4', 'criterion:4', 'Open until nine on a weekday evening.', 'Evening access'),
+  node('c5', 'criterion:5', 'Somewhere to unload heavy items such as lawnmowers.', 'Parking', { state: 'contested', objection: 'Most visitors walk in; does parking deserve a place here?' }),
+  node('o1', 'option:1', 'The meeting room at the town library.', 'Library hall'),
+  node('o2', 'option:2', 'The scout hut behind the playing field.', 'Scout hut'),
+  node('o3', 'option:3', 'An empty unit in the market arcade, offered at a low rent.', 'Arcade unit'),
+  node('ch', 'choice', 'Meet at the scout hut on Thursday evenings: it costs least per week, holds every bench and stays open late. Revisit the arcade unit if its rent offer is confirmed.', 'Scout hut')
+];
+const matrixFirst = { at: '2026-10-05T18:00:00Z', mode: 'percent', weights: [30, 25, 20, 15, 10], ratings: [[6, 7, 9, 5, 4], [8, 8, 6, 8, 7], [9, 6, 7, 6, 6]] };
+SAMPLES.decision_matrix = { ...run('decision_matrix', matrixNodes), scores: { snapshots: [matrixFirst] } };
+SAMPLES['decision_matrix:next'] = {
+  ...run('decision_matrix', matrixNodes),
+  scores: { snapshots: [matrixFirst, { at: '2026-10-12T18:00:00Z', mode: 'percent', weights: [20, 25, 25, 20, 10], ratings: [[6, 7, 9, 5, 4], [8, 8, 6, 8, 7], [9, 8, 8, 7, 6]] }] }
+};
+SAMPLES.decision_matrix_unscored = run('decision_matrix', matrixNodes.filter((n) => n.slot !== 'choice'));
