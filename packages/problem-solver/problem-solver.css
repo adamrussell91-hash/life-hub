@@ -4123,3 +4123,343 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-canvas__aim { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; margin: calc(var(--space-2) * -1) 0 var(--space-3); color: var(--ink); font-size: var(--text-sm); }
 .ps-canvas__aim-meta { flex: none; color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: 0.04em; text-transform: uppercase; }
 .ps-canvas__aim-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Decision matrix (toolkit p.105, Decide): a red header band whose left end rises into a large
+   red dome over the criteria and a smaller one over the weight (a scalloped left end), a yellow
+   arch over each option column with the option's name, and "Rating" and "Score" sub-heads in the
+   band under each arch, their labels tilted as the book sets them. The body is yellow with paper
+   rules between rows and between option columns (none between criteria and weight, or between an
+   option's rating and score). Each criterion row has a red half-disc tab bulging from its left
+   edge. The option columns run one row deeper; a blue Total tag hangs in that foot under the
+   score, overhanging it a little. One CSS grid: a tab gutter, criteria, weight, then two tracks
+   per option. Rows take the columns as a subgrid; option columns take both axes as a subgrid.
+   Phone: one option at a time, picked with pill tabs; a totals strip lists every option. */
+.ps-matrix {
+  /* Named, so every phone query measures this root box. */
+  container: matrix / inline-size;
+  --ps-matrix-gutter: 26px;
+  --ps-matrix-row: 54px;
+  --ps-matrix-band: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  /* The book's proportions: an option column about twice as wide as a row is tall. */
+  max-width: 640px;
+  margin-inline: auto;
+}
+
+.ps-matrix__grid { display: grid; width: 100%; padding-bottom: 10px; }
+
+/* The scalloped left end of the header: two half-discs standing on the band. */
+.ps-matrix__dome { grid-row: 1; align-self: end; aspect-ratio: 2 / 1; border-radius: 999px 999px 0 0; background: var(--ps-red); transform-origin: 50% 100%; }
+.ps-matrix__dome--big { grid-column: 2; width: 100%; }
+.ps-matrix__dome--small { grid-column: 3; width: 92%; justify-self: start; margin-left: -6%; }
+
+.ps-matrix__band {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  grid-row: 2;
+  min-width: 0;
+  min-height: var(--ps-matrix-band);
+  padding: 4px;
+  background: var(--ps-red);
+  color: #fff;
+}
+.ps-matrix__band--criteria { grid-column: 2; justify-content: flex-start; padding-left: 12px; }
+.ps-matrix__band--weight { grid-column: 3; }
+.ps-matrix__band--rating { grid-column: 1; }
+.ps-matrix__band--score { grid-column: 2; }
+.ps-matrix__band-label { font: var(--weight-semibold) 13px / 1.2 var(--font-ui); white-space: nowrap; }
+.ps-matrix__band-label--tilt { display: inline-block; transform: rotate(-16deg); }
+
+/* Criterion rows: the red tab in the gutter, the title, then the weight. */
+.ps-matrix__row { position: relative; display: grid; grid-column: 1 / 4; grid-template-columns: subgrid; min-width: 0; }
+.ps-matrix__row:not([data-row='1'])::before { content: ''; z-index: 1; grid-row: 1; grid-column: 2 / 4; align-self: start; height: 2px; background: var(--ps-paper); pointer-events: none; }
+.ps-matrix__row-tab { grid-row: 1; grid-column: 1; border-radius: 999px 0 0 999px; background: var(--ps-red); }
+.ps-matrix__row:has(:focus-visible),
+.ps-matrix__row:has([aria-expanded='true']) { z-index: 2; }
+
+.ps-matrix__criterion {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  grid-row: 1;
+  grid-column: 2;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px 8px 12px;
+  border: 0;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-matrix__code { flex: none; font: var(--weight-regular) 13px / 1 Georgia, 'Times New Roman', serif; }
+.ps-matrix__words { display: flex; flex-direction: column; align-items: inherit; gap: 2px; min-width: 0; }
+.ps-matrix__criterion .ps-matrix__words { align-items: flex-start; }
+.ps-matrix__title {
+  display: -webkit-box;
+  overflow: hidden;
+  font: var(--weight-semibold) 14px / 1.25 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-matrix__words .ps-objection { margin-top: 0; color: var(--ps-on-yellow); }
+
+.ps-matrix__cell {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 4px;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+}
+.ps-matrix__cell--weight { grid-row: 1; grid-column: 3; }
+.ps-matrix__cell--rating { grid-column: 1; box-shadow: inset 2px 0 0 var(--ps-paper), inset 0 2px 0 var(--ps-paper); }
+.ps-matrix__cell--score { grid-column: 2; box-shadow: inset 0 2px 0 var(--ps-paper); }
+.ps-matrix__cell--rating[data-line='1'] { box-shadow: inset 2px 0 0 var(--ps-paper); }
+.ps-matrix__cell--score[data-line='1'] { box-shadow: none; }
+.ps-matrix__value { font: var(--weight-semibold) 14px / 1.2 var(--font-ui); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Before scoring a faint dash, drawn (not text), so it reads as an empty cell. */
+.ps-matrix__value:empty::before { content: '–'; opacity: 0.45; }
+
+/* Option columns: the yellow arch, the band's two sub-heads, a cell per row and the foot. */
+.ps-matrix__option {
+  position: relative;
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+  min-width: 0;
+  transition: transform 320ms var(--ps-ease);
+}
+.ps-matrix__option[hidden] { display: none; }
+.ps-matrix__option.is-leading { transform: translateY(-4px); }
+.ps-matrix__option:has(:focus-visible),
+.ps-matrix__option:has([aria-expanded='true']) { z-index: 2; }
+
+.ps-matrix__head {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  grid-row: 1;
+  grid-column: 1 / -1;
+  align-self: end;
+  min-width: 0;
+  min-height: 56px;
+  aspect-ratio: 2 / 1;
+  padding: 10px 15% 8px;
+  border: 0;
+  border-radius: 999px 999px 0 0;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: inherit;
+  text-align: center;
+  transform-origin: 50% 100%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-matrix__head .ps-matrix__words { align-items: center; max-width: 100%; }
+.ps-matrix__meta { font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-matrix__head .ps-matrix__title { font-size: 13px; }
+
+.ps-matrix__criterion:hover,
+.ps-matrix__head:hover { filter: brightness(1.05); }
+.ps-matrix__criterion:focus-visible,
+.ps-matrix__criterion[aria-expanded='true'],
+.ps-matrix__head:focus-visible,
+.ps-matrix__head[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+.ps-matrix__foot {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  min-height: var(--ps-matrix-row);
+  background: var(--ps-yellow);
+  box-shadow: inset 2px 0 0 var(--ps-paper), inset 0 2px 0 var(--ps-paper);
+}
+/* The Total tag hangs in the foot under the score, a little below the yellow. */
+.ps-matrix__total {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  grid-column: 2;
+  min-width: 0;
+  margin: 8px 0 -8px;
+  padding: 5px 2px;
+  background: var(--ps-blue);
+  color: #fff;
+}
+.ps-matrix__tag { font: var(--weight-bold) 10px / 1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-matrix__total-value { font: var(--weight-bold) 16px / 1.15 var(--font-ui); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ps-matrix__note { margin: 12px 0 0; color: var(--ink); font: var(--weight-semibold) var(--text-sm) / 1.4 var(--font-ui); text-align: center; }
+.ps-matrix__note:empty { margin: 0; }
+
+.ps-matrix__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-matrix__after { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; margin-top: 16px; }
+
+/* Phone tabs (one option at a time) and the totals strip. */
+.ps-matrix__tabs { display: flex; gap: 6px; width: 100%; margin-bottom: 14px; }
+.ps-matrix__tabs[hidden],
+.ps-matrix__strip[hidden] { display: none; }
+.ps-matrix__tab {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--ps-card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-sm) / 1.2 var(--font-ui);
+  cursor: pointer;
+}
+.ps-matrix__tab[aria-selected='true'] { background: var(--ps-yellow); box-shadow: none; color: var(--ps-on-yellow); }
+.ps-matrix__tab:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-matrix__tab-code,
+.ps-matrix__strip-code {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: var(--weight-bold) 13px / 1 var(--font-ui);
+}
+.ps-matrix__tab[aria-selected='true'] .ps-matrix__tab-code { background: var(--ps-on-yellow); color: var(--ps-yellow); }
+.ps-matrix__tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ps-matrix__strip { display: grid; gap: 6px; width: 100%; margin-top: 14px; }
+.ps-matrix__strip-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 40px; padding: 0 6px; border-radius: var(--radius-sm); color: var(--ink); font: var(--weight-medium) var(--text-sm) / 1.3 var(--font-ui); }
+.ps-matrix__strip-item.is-selected { background: var(--ps-card); }
+.ps-matrix__strip-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-matrix__strip-total { min-width: 3.2em; padding: 4px 8px; background: var(--ps-blue); color: #fff; font: var(--weight-bold) 14px / 1.2 var(--font-ui); font-variant-numeric: tabular-nums; text-align: center; }
+.ps-matrix__strip-total:empty { display: none; }
+.ps-matrix__strip-item.is-leading .ps-matrix__strip-title { font-weight: var(--weight-bold); }
+
+/* Scoring: the toggle, then the weights and a fieldset of 1-to-10 ratings per option. */
+.ps-matrix__scoring { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+.ps-matrix__score,
+.ps-matrix__save,
+.ps-matrix__cancel {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  font: var(--weight-semibold) var(--text-sm) / 1 var(--font-ui);
+  cursor: pointer;
+}
+.ps-matrix__score { background: var(--ink); color: var(--paper); }
+.ps-matrix__save { background: var(--ps-red); color: #fff; }
+.ps-matrix__save:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+.ps-matrix__cancel { background: none; color: var(--muted); }
+.ps-matrix__score:focus-visible,
+.ps-matrix__save:focus-visible,
+.ps-matrix__cancel:focus-visible,
+.ps-matrix__input:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-matrix__form {
+  box-sizing: border-box;
+  display: grid;
+  gap: 12px;
+  width: min(100%, 560px);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--glass);
+  box-shadow: inset 0 3px 0 var(--ps-red);
+}
+.ps-matrix__form[hidden] { display: none; }
+.ps-matrix__form-body { display: grid; gap: 12px; }
+.ps-matrix__modes,
+.ps-matrix__group { display: grid; gap: 2px; min-width: 0; margin: 0; padding: 0 0 8px; border: 0; border-bottom: 1px solid var(--line); }
+.ps-matrix__modes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+.ps-matrix__modes legend,
+.ps-matrix__group legend { float: left; width: 100%; padding: 0; margin-bottom: 2px; color: var(--muted); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-matrix__mode { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--ink); font: var(--weight-semibold) 14px / 1 var(--font-ui); cursor: pointer; }
+.ps-matrix__mode input { width: 18px; height: 18px; margin: 0; accent-color: var(--ps-red); }
+.ps-matrix__field { display: grid; grid-template-columns: minmax(0, 1fr) 5rem; align-items: center; gap: 12px; min-height: 48px; }
+.ps-matrix__field-name { overflow: hidden; color: var(--ink); font: var(--weight-semibold) 14px / 1.3 var(--font-ui); text-overflow: ellipsis; white-space: pre; }
+.ps-matrix__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--cotton);
+  color: var(--ink);
+  font: var(--weight-semibold) 15px / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.ps-matrix__sum { margin: 4px 0 0; color: var(--muted); font: var(--weight-medium) var(--text-sm) / 1.4 var(--font-ui); }
+.ps-matrix__message { margin: 0; color: var(--danger); font: var(--weight-semibold) var(--text-sm) / 1.4 var(--font-ui); }
+.ps-matrix__message[hidden] { display: none; }
+.ps-matrix__form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Phone: one option at a time beside the criteria and weight; the arch shows just the name. */
+@container matrix (max-width: 560px) {
+  .ps-matrix { --ps-matrix-gutter: 20px; --ps-matrix-row: 46px; --ps-matrix-band: 40px; }
+  .ps-matrix__criterion { gap: 8px; padding: 6px 8px; }
+  .ps-matrix__title { font-size: 13px; }
+  .ps-matrix__head { min-height: 52px; padding: 10px 12% 7px; }
+  .ps-matrix__head .ps-matrix__meta { display: none; }
+  /* One column shows, so a lift would only misalign its rows; the strip marks the leader. */
+  .ps-matrix__option.is-leading { transform: none; }
+  .ps-matrix__band-label { font-size: 12px; }
+  .ps-matrix__band--criteria { padding-left: 8px; }
+  .ps-matrix__value { font-size: 13px; }
+  .ps-matrix__form { padding: var(--space-4); }
+  .ps-matrix__field { grid-template-columns: minmax(0, 1fr) 4.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-matrix__option { transition: none; }
+}
+
+/* Chosen option: the card every Decide chart ends with, the choice in full. */
+.ps-choice {
+  box-sizing: border-box;
+  width: min(100%, 560px);
+  padding: 14px 18px 10px;
+  border-top: 3px solid var(--ps-blue);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-choice__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ps-choice__meta { color: var(--ps-ink); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-choice .ps-objection { margin-top: 0; color: var(--ps-ink); opacity: 1; }
+.ps-choice__text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+.ps-choice__more {
+  min-width: 44px;
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ps-choice__more:focus-visible { outline: 2px solid transparent; border-radius: 4px; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-choice .ps-details__card { margin-top: 0; padding: 4px 0 8px; background: transparent; box-shadow: none; }
