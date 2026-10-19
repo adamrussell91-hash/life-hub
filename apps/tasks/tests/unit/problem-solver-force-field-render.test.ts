@@ -237,6 +237,18 @@ describe('Force field view', () => {
       done();
     });
 
+    it('moves focus to the first slider when the focused force is removed', () => {
+      const { view, form, input, done } = mounted();
+      input('f1').value = '4';
+      input('f2').focus();
+      view.update(field(sample.filter((n) => n.id !== 'f2')));
+      expect(form.hidden).toBe(false);
+      expect(input('f2')).toBeNull();
+      expect(input('f1').value).toBe('4');
+      expect(document.activeElement).toBe(form.querySelector('input'));
+      done();
+    });
+
     it('closes on Escape and returns focus to the toggle', () => {
       const { toggle, form, input, done } = mounted();
       input('f1').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
