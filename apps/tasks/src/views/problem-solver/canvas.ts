@@ -25,6 +25,7 @@ import { createMorphologicalView } from '../../../../../packages/problem-solver/
 import { createParetoView } from '../../../../../packages/problem-solver/render/pareto';
 import { createDmaicView } from '../../../../../packages/problem-solver/render/dmaic';
 import { createFifteenPercentView } from '../../../../../packages/problem-solver/render/fifteen-percent';
+import { createKanbanView } from '../../../../../packages/problem-solver/render/kanban';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -43,7 +44,7 @@ export type RunScores = { runId: string; [series: string]: unknown };
  * A tool's chart. `destroy` (views with a size watch, a frame loop or long motion) is called when the canvas drops it.
  * `setTasks` receives the run's confirmed tasks with their live status (charts whose items can become tasks).
  */
-type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void; setTasks?(links: PsTaskLink[]): void; destroy?(): void };
+type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void; setTasks?(links: PsTaskLink[]): void; setProposed?(nodeIds: string[]): void; destroy?(): void };
 export type CanvasHandlers = { onScore?: (scores: RunScores) => void };
 
 /** Tools that draw their own chart. Anything else falls back to the outline. */
@@ -72,7 +73,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   morphological: () => createMorphologicalView(),
   pareto: () => createParetoView(),
   dmaic: () => createDmaicView(),
-  fifteen_percent: () => createFifteenPercentView()
+  fifteen_percent: () => createFifteenPercentView(),
+  kanban: () => createKanbanView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
@@ -210,6 +212,8 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       .filter((p) => p.taskId && p.source.runId === runId && (p.status === 'confirmed' || (p.status === 'dismissed' && p.removed)))
       .map((p) => ({ nodeId: p.source.nodeId, taskId: p.taskId!, status: p.status === 'dismissed' ? 'removed' : statuses[p.taskId!] ?? 'unknown' }));
     view.setTasks(links);
+    // Charts that mark a pending proposal on its item (Kanban) also get the waiting node ids.
+    view.setProposed?.((last.proposedTasks ?? []).filter((p) => p.status === 'proposed' && p.source.runId === runId).map((p) => p.source.nodeId));
   }
 
   /** Implement charts carry the option chosen in Decide as their aim. */

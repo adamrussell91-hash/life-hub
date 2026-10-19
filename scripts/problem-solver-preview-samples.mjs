@@ -669,3 +669,40 @@ SAMPLES['fifteen_percent:next'] = {
   ]
 };
 SAMPLES.fifteen_percent_now = run('fifteen_percent', fifteenActions);
+
+// A school fete board: eleven cards across the four places, a WIP limit, one contested card, three
+// linked tasks (k1 open, k5 started, k8 a review not yet started) and a pending proposal on k3.
+// kanban:next starts k2 and the review k8 (both move into Doing, over the limit) and deletes k1's task.
+const kanbanCards = [
+  node('k1', 'card:1', 'Book the school hall for the fete on the second Saturday in June.', 'Book the hall', { tag: 'todo' }),
+  node('k2', 'card:2', 'Ask the bakery on the high street whether they will donate two trays of cakes.', 'Ask for cakes', { tag: 'todo' }),
+  node('k3', 'card:3', 'Print twenty posters and put them up in the library, the surgery and the corner shop.', 'Print posters', { tag: 'todo' }),
+  node('k4', 'card:4', 'Borrow three trestle tables from the scout hut.', 'Borrow tables', { tag: 'todo', state: 'contested', objection: 'The scout hut is shut until June; is this one you can do in time?' }),
+  node('k5', 'card:5', 'Draw the stall map so every stall has a pitch and the cake stall is near a power point.', 'Stall map', { tag: 'doing' }),
+  node('k6', 'card:6', 'Make up a float of coins for the five stalls that take cash.', 'Cash float', { tag: 'doing' }),
+  node('k7', 'card:7', 'Collect the raffle prizes promised on the parents\' list.', 'Raffle prizes', { tag: 'doing' }),
+  node('k8', 'card:8', 'Go through the risk assessment with the head before it goes to the governors.', 'Risk assessment', { tag: 'review' }),
+  node('k9', 'card:9', 'Agree the date with the parents\' committee.', 'Pick the date', { tag: 'done' }),
+  node('k10', 'card:10', 'Open a shared sign-up sheet for stall holders.', 'Sign-up sheet', { tag: 'done' }),
+  node('k11', 'card:11', 'Ask for helpers in the Friday newsletter.', 'Ask for helpers', { tag: 'done' }),
+  node('kw', 'wip', 'No more than 3 cards in Doing at once, so each one gets finished.', 'Three at once')
+];
+SAMPLES.kanban = {
+  ...run('kanban', kanbanCards),
+  tasks: [
+    { nodeId: 'k1', taskId: 'task-sample-k1', status: 'open' },
+    { nodeId: 'k5', taskId: 'task-sample-k5', status: 'in_progress' },
+    { nodeId: 'k8', taskId: 'task-sample-k8', status: 'open' }
+  ],
+  proposed: ['k3']
+};
+SAMPLES['kanban:next'] = {
+  ...run('kanban', kanbanCards),
+  tasks: [
+    { nodeId: 'k1', taskId: 'task-sample-k1', status: 'removed' },
+    { nodeId: 'k2', taskId: 'task-sample-k2', status: 'in_progress' },
+    { nodeId: 'k5', taskId: 'task-sample-k5', status: 'in_progress' },
+    { nodeId: 'k8', taskId: 'task-sample-k8', status: 'in_progress' }
+  ],
+  proposed: []
+};
