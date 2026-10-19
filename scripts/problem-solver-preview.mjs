@@ -18,6 +18,7 @@ const RENDERERS = {
   gap_basic: ['gap-basic', 'createGapBasicView'],
   gap_radar: ['gap-radar', 'createGapRadarView'],
   smart: ['smart', 'createSmartView'],
+  causal_map: ['causal-map', 'createCausalMapView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

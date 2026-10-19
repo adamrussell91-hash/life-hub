@@ -104,7 +104,38 @@ export const SAMPLES = {
     node('s', 's', 'Dispatch team, all warehouse orders, two runs a day.', 'Two daily runs'),
     node('m', 'm', 'Late share falls from 25 to 10 percent.', 'Late share', { state: 'contested', objection: 'Which baseline month?' }),
     node('a', 'a', 'Within current courier contracts and staffing.', 'Within contracts')
-  ])
+  ]),
+  causal_map: run(
+    'causal_map',
+    [
+      node('p', 'problem', 'The community garden loses most of its volunteers by midsummer.', 'Volunteers drift away'),
+      node('c1', 'cause:1', 'Volunteers never know which beds need them on a given day.', 'Unclear daily jobs'),
+      node('c2', 'cause:2', 'Watering falls to the same three people every week.', 'Uneven watering rota', { state: 'contested', objection: 'Is that a cause or a result of people leaving?' }),
+      node('c3', 'cause:3', 'New starters get no welcome or tour.', 'No welcome'),
+      node('i1', 'influence:1', 'Long summer evenings compete with holidays and sport.', 'Summer distractions'),
+      node('i2', 'influence:2', 'The group chat is busy and important messages get lost.', 'Noisy group chat'),
+      node('i3', 'influence:3', 'The tool shed key is held by one person.', 'Single shed key'),
+      node('i4', 'influence:4', 'Council grants require logged volunteer hours.', 'Grant hour rules')
+    ],
+    [
+      { from: 'c1', to: 'p', kind: 'plus' },
+      { from: 'c2', to: 'p', kind: 'plus_strong' },
+      { from: 'c3', to: 'p', kind: 'plus' },
+      { from: 'i2', to: 'c1', kind: 'plus' },
+      { from: 'i1', to: 'c2', kind: 'plus' },
+      { from: 'i3', to: 'c2', kind: 'plus_strong' },
+      { from: 'i4', to: 'c3', kind: 'minus' },
+      { from: 'i2', to: 'c3', kind: 'plus' },
+      { from: 'c3', to: 'c1', kind: 'plus' }
+    ]
+  )
+};
+
+// The causal map after one more turn: a fourth cause that eases the problem, and its links.
+SAMPLES['causal_map:next'] = {
+  ...SAMPLES.causal_map,
+  nodes: [...SAMPLES.causal_map.nodes, node('c4', 'cause:4', 'Monthly harvest days bring everyone together.', 'Shared harvest days')],
+  edges: [...SAMPLES.causal_map.edges, { from: 'c4', to: 'p', kind: 'minus_strong' }, { from: 'i1', to: 'c4', kind: 'minus' }]
 };
 
 const session = (model, phase, steps) => ({

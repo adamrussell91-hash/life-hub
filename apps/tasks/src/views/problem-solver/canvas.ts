@@ -1,5 +1,6 @@
 // apps/tasks/src/views/problem-solver/canvas.ts
 import { el } from '@/views/hub-kit';
+import { createCausalMapView } from '../../../../../packages/problem-solver/render/causal-map';
 import { createConceptMapView } from '../../../../../packages/problem-solver/render/concept-map';
 import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
 import { createGapBasicView } from '../../../../../packages/problem-solver/render/gap-basic';
@@ -30,7 +31,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   problem_statement: () => createProblemStatementView(),
   gap_basic: () => createGapBasicView(),
   gap_radar: () => createGapRadarView(),
-  smart: () => createSmartView()
+  smart: () => createSmartView(),
+  causal_map: () => createCausalMapView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

@@ -1083,6 +1083,206 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-chart-reveal { animation: none; }
 }
 
+/* Causal map (toolkit, Analyse): a red problem circle on the left, a column of
+   yellow half-discs (dome up) for causes, and a blue strip of interlocking downward
+   arrowheads for influences on the right. Thin arrows with +/− badges run right to
+   left in an SVG layer behind the shapes. Each button lets clicks through to its
+   coloured fill, so the hit area is the shape itself (arrowheads overlap). */
+.ps-causal {
+  container-type: inline-size;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  --causal-prob: min(24cqw, 172px);
+  --causal-cause: min(29cqw, 204px);
+  --causal-inf: min(26cqw, 180px);
+  --causal-gap: clamp(26px, 9cqw, 86px);
+}
+
+.ps-causal__map {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--causal-prob) var(--causal-cause) var(--causal-inf);
+  justify-content: center;
+  align-items: center;
+  column-gap: var(--causal-gap);
+  padding-block: 10px;
+  overflow-x: clip; /* the link layer is sized from the map; never let it widen the page */
+}
+
+.ps-causal__lines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* every link stays inside the map; masks must not widen the page */
+  pointer-events: none;
+}
+
+.ps-causal__region { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.ps-causal__region--causes { gap: clamp(16px, 4.5cqw, 30px); }
+.ps-causal__item { display: flex; justify-content: center; width: 100%; }
+
+.ps-causal__shape {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: none; /* the fill takes the clicks */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ps-causal__shape:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 1px var(--wave)) drop-shadow(0 0 1px var(--wave)) drop-shadow(0 0 1.5px var(--wave));
+}
+
+.ps-causal__body, .ps-causal__fill { position: absolute; inset: 0; display: block; }
+.ps-causal__fill { pointer-events: auto; transition: filter 240ms var(--ps-ease); }
+.ps-causal__fill:hover,
+.ps-causal__item.is-open .ps-causal__fill { filter: brightness(1.08) saturate(1.06); }
+
+.ps-causal__label {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.ps-causal__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.78;
+}
+
+.ps-causal__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font: var(--weight-semibold) clamp(12px, 2.3cqw, 15px) / 1.2 var(--font-ui);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+/* The problem: a red circle, title in the middle. */
+.ps-causal__item--problem .ps-causal__shape { width: var(--causal-prob); aspect-ratio: 1; }
+.ps-causal__item--problem .ps-causal__fill { border-radius: 50%; background: var(--ps-red); }
+.ps-causal__item--problem .ps-causal__label { top: 50%; width: 74%; transform: translate(-50%, -50%); }
+
+/* Causes: yellow half-discs, dome up, title low where the shape is widest. */
+.ps-causal__item--cause .ps-causal__shape { width: var(--causal-cause); aspect-ratio: 2 / 1; color: var(--ps-on-yellow); }
+.ps-causal__item--cause .ps-causal__fill { border-radius: 50% 50% 0 0 / 100% 100% 0 0; background: var(--ps-yellow); transform-origin: 50% 100%; }
+.ps-causal__item--cause .ps-causal__label { bottom: 10%; width: 72%; }
+
+/* Influences: blue downward arrowheads. Each one tucks under the next, so the
+   column reads as one jagged strip; the top edges tilt in turn (see ARROWHEAD). */
+.ps-causal__item--influence { position: relative; }
+.ps-causal__item--influence + .ps-causal__item--influence { margin-top: calc(var(--causal-inf) * -0.46); }
+.ps-causal__item--influence .ps-causal__shape { width: var(--causal-inf); aspect-ratio: 1 / 1.06; }
+.ps-causal__item--influence .ps-causal__fill { background: var(--ps-blue); clip-path: polygon(0% 0%, 100% 14%, 56% 100%); }
+.ps-causal__item--influence.is-even .ps-causal__fill { clip-path: polygon(0% 14%, 100% 0%, 44% 100%); }
+.ps-causal__item--influence .ps-causal__label { top: 13%; width: 62%; }
+.ps-causal__item--influence.is-odd .ps-causal__label { left: 49%; top: 15%; }
+.ps-causal__item--influence.is-even .ps-causal__label { left: 51%; top: 15%; }
+
+/* Links */
+.ps-causal__edge { transition: opacity 220ms var(--ps-ease); }
+.ps-causal__reveal { fill: none; stroke: #fff; stroke-width: 22; stroke-linecap: round; stroke-dasharray: 1 2; }
+.ps-causal__path { fill: none; stroke: var(--ps-yellow); stroke-width: 1.5; stroke-linecap: round; }
+.ps-causal__head { fill: var(--ps-yellow); }
+.ps-causal__edge[data-strength='strong'] .ps-causal__path { stroke-width: 3; }
+.ps-causal__edge[data-sign='minus'] .ps-causal__path { stroke: var(--ps-ink); stroke-dasharray: 4 3; stroke-linecap: butt; }
+.ps-causal__edge[data-sign='minus'] .ps-causal__head { fill: var(--ps-ink); }
+.ps-causal__badge circle { fill: var(--ps-yellow); }
+.ps-causal__badge text { fill: var(--ps-on-yellow); font: 700 13px / 1 var(--font-ui); }
+.ps-causal__edge[data-sign='minus'] .ps-causal__badge circle { fill: var(--ps-ink); }
+.ps-causal__edge[data-sign='minus'] .ps-causal__badge text { fill: #fff; }
+.ps-causal__badge-pop { transform-box: fill-box; transform-origin: center; }
+.ps-causal.has-open .ps-causal__edge:not(.is-active) { opacity: 0.28; }
+
+/* Legend, bottom left as in the book */
+.ps-causal__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 14px;
+  padding-inline: max(0px, calc((100% - var(--causal-prob) - var(--causal-cause) - var(--causal-inf) - 2 * var(--causal-gap)) / 2));
+  color: var(--muted);
+  font: var(--weight-regular) var(--text-sm) / 1.3 var(--font-ui);
+}
+
+.ps-causal__key { display: inline-flex; align-items: center; gap: 6px; }
+.ps-causal__key-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font: 700 12px / 1 var(--font-ui);
+}
+.ps-causal__key--plus .ps-causal__key-mark { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-causal__key--minus .ps-causal__key-mark { background: var(--ps-ink); color: #fff; }
+.ps-causal__key-line { width: 16px; height: 1.5px; border-radius: 1px; background: var(--ps-yellow); }
+.ps-causal__key-line--strong { height: 3px; }
+
+.ps-causal__panel { display: flex; flex-direction: column; align-items: center; }
+.ps-causal__panel .ps-details { width: min(100%, 480px); }
+
+/* Phone: the three columns stay, narrower, with tighter type. */
+@container (max-width: 520px) {
+  .ps-causal > * { --causal-prob: 25cqw; --causal-cause: 28cqw; --causal-inf: 33cqw; --causal-gap: 5cqw; }
+  .ps-causal__item--cause .ps-causal__shape { aspect-ratio: 1.45 / 1; }
+  .ps-causal__item--cause .ps-causal__label { bottom: 7%; width: 86%; }
+  .ps-causal__item--influence .ps-causal__label,
+  .ps-causal__item--influence.is-odd .ps-causal__label,
+  .ps-causal__item--influence.is-even .ps-causal__label { top: 12%; width: 74%; }
+  .ps-causal__item--influence .ps-causal__title { font-size: 12px; }
+  .ps-causal__meta { font-size: 9px; letter-spacing: 0.06em; }
+  .ps-causal__title { font-size: 12.5px; line-height: 1.15; }
+  .ps-causal__item--problem .ps-causal__label { width: 86%; }
+  .ps-causal__item--problem .ps-causal__meta { letter-spacing: 0.02em; }
+  .ps-causal .ps-objection { margin-top: 1px; padding: 0 4px; font-size: 8px; }
+  .ps-causal__legend { gap: 6px 14px; font-size: var(--text-xs); }
+}
+
+/* Very narrow: stack. Influences become a strip of arrowheads along the top, then
+   the causes, then the problem; the links run downwards. */
+@container (max-width: 339px) {
+  .ps-causal > * { --causal-prob: 42cqw; --causal-cause: 47cqw; --causal-inf: 47cqw; }
+  .ps-causal__map { grid-template-columns: 1fr; row-gap: 40px; }
+  .ps-causal__region--influences { grid-row: 1; flex-direction: row; flex-wrap: wrap; justify-content: center; row-gap: 4px; }
+  .ps-causal__region--causes { grid-row: 2; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 22px 4cqw; }
+  .ps-causal__region--problem { grid-row: 3; }
+  .ps-causal__item { width: auto; }
+  .ps-causal__item--influence + .ps-causal__item--influence { margin-top: 0; }
+  .ps-causal__item--influence .ps-causal__shape { aspect-ratio: 1 / 0.82; }
+  .ps-causal__item--influence .ps-causal__label,
+  .ps-causal__item--influence.is-odd .ps-causal__label,
+  .ps-causal__item--influence.is-even .ps-causal__label { top: 10%; width: 64%; }
+  .ps-causal__item--cause .ps-causal__shape { aspect-ratio: 2 / 1; }
+  .ps-causal__item--cause .ps-causal__label { bottom: 6%; width: 88%; }
+  .ps-causal__item--cause .ps-causal__meta { display: none; } /* the dome is too low for three lines */
+  .ps-causal__legend { padding-inline: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-causal__fill, .ps-causal__edge { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
