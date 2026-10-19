@@ -2,6 +2,7 @@ import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
+import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
@@ -85,6 +86,8 @@ export type BlockEditorContext = {
   getLessonBlocks?: () => Block[];
   setLessonBlocks?: (blocks: Block[]) => void;
   lessonId?: string;
+  /** The unit's lessons, for blocks that link to them (Curriculum lines). */
+  unitLessons?: Array<{ id: string; title: string; href: string }>;
 };
 
 const VISIBILITY_OPTIONS = [
@@ -2833,6 +2836,8 @@ function createBlockEditorFields(
       return createQuestionDropEditor(block, onChange, context.lessonId);
     case 'brainstorm':
       return createBrainstormEditor(block, onChange);
+    case 'curriculum_lines':
+      return createCurriculumLinesEditor(block, onChange, context.unitLessons);
     case 'quiz_question':
       return createQuizQuestionEditor(block, onChange, context.getLessonBlocks);
     case 'question_set':

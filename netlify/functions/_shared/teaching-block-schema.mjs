@@ -562,6 +562,7 @@ var BlockTypeSchema = z6.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "curriculum_lines",
   "quiz_question",
   "question_set",
   "discern_confirm",
@@ -993,6 +994,61 @@ var BrainstormBlockSchema = z6.object({
     per_student: z6.union([z6.literal(0), z6.literal(1), z6.literal(3), z6.literal(5)]).default(3),
     max_length: z6.number().int().min(20).max(280).default(140),
     layout: z6.enum(["grid", "cloud", "groups"]).default("grid")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var CurriculumLinesColourSchema = z6.enum([
+  "wave",
+  "wave_deep",
+  "green",
+  "green_deep",
+  "amber",
+  "amber_deep",
+  "lilac",
+  "lilac_deep",
+  "navy",
+  "navy_deep"
+]);
+var CurriculumLinesLevelSchema = z6.enum(["introduced", "reinforced", "mastered"]);
+var CurriculumLinesStrandSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  name: z6.string().max(60).default(""),
+  colour: CurriculumLinesColourSchema.default("wave")
+});
+var CurriculumLinesStationSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  strand_id: z6.string().min(1).max(64),
+  week: z6.number().int().min(1).max(20),
+  level: CurriculumLinesLevelSchema.default("reinforced"),
+  label: z6.string().max(120).default(""),
+  lesson_id: z6.string().min(1).max(64).optional()
+});
+var CurriculumLinesCheckpointSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  week: z6.number().int().min(1).max(20),
+  label: z6.string().max(80).default(""),
+  lesson_id: z6.string().min(1).max(64).optional(),
+  strand_ids: z6.array(z6.string().min(1).max(64)).min(1).max(8)
+});
+var CurriculumLinesBlockSchema = z6.object({
+  id: z6.string().min(1),
+  type: z6.literal("block"),
+  block_type: z6.literal("curriculum_lines"),
+  variant: z6.string().default("large"),
+  visibility: VisibilitySchema,
+  content: z6.object({
+    title: z6.string().max(120).optional(),
+    weeks: z6.number().int().min(1).max(20).default(8),
+    strands: z6.array(CurriculumLinesStrandSchema).min(1).max(8),
+    stations: z6.array(CurriculumLinesStationSchema).max(160).default([]),
+    checkpoints: z6.array(CurriculumLinesCheckpointSchema).max(20).default([]),
+    terminus: z6.object({
+      label: z6.string().max(80).default("Assessment task"),
+      detail: z6.string().max(160).optional(),
+      when: z6.string().max(24).optional(),
+      lesson_id: z6.string().min(1).max(64).optional()
+    }).default({ label: "Assessment task" })
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1696,6 +1752,7 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
   QuestionSetBlockSchema,
@@ -1923,6 +1980,12 @@ export {
   ConceptFeaturesBlockSchema,
   ConceptMapBlockSchema,
   CountdownBlockSchema,
+  CurriculumLinesBlockSchema,
+  CurriculumLinesCheckpointSchema,
+  CurriculumLinesColourSchema,
+  CurriculumLinesLevelSchema,
+  CurriculumLinesStationSchema,
+  CurriculumLinesStrandSchema,
   DIAGRAM_IMAGE_PUBLISH_URL_ISSUE,
   DefinitionBlockSchema,
   DiagramBlockSchema,
