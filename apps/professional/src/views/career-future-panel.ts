@@ -276,7 +276,15 @@ export function renderFutureDetail(
   host.append(panel);
 }
 
-export function openAddFutureSheet(root: HTMLElement, onSaved: () => void): void {
+/**
+ * `existingCount` = futures already on file (active + parked), so each new
+ * branch gets its own colour and lane instead of all sharing slot 1 / lane 0.
+ */
+export function openAddFutureSheet(
+  root: HTMLElement,
+  onSaved: () => void,
+  existingCount = 0
+): void {
   const sheet = el('div', 'career-sheet');
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-label', 'Add a future');
@@ -364,8 +372,8 @@ export function openAddFutureSheet(root: HTMLElement, onSaved: () => void): void
           aliases: draft?.aliases ?? [],
           criteria,
           status: 'active',
-          colour_slot: 1,
-          lane_order: 0,
+          colour_slot: (existingCount % 6) + 1,
+          lane_order: existingCount,
           target_date: null,
           suggested_reason: null,
           dismissed_until: null

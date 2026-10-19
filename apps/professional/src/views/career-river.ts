@@ -1,24 +1,30 @@
 import {
+  approxLabelWidth,
   assignEmploymentLanes,
   axisYearTicks,
   branchColour,
   branchPolyline,
   clampZoom,
   clusterMarks,
+  layoutRoleSwimlanes,
+  pastShareFor,
   pathFromPoints,
+  placeBarLabel,
   riverHeightPx,
-  ROLE_LANE_HEIGHT_PX,
-  roleBandExtraPx,
   riverJobShortLabel,
+  SWIMLANE_BAR_PX,
+  SWIMLANE_GROUP_GAP_PX,
+  SWIMLANE_ROW_PX,
+  swimlaneBlockPx,
   timeToUnit,
+  truncateRiverLabel,
   yearFraction,
   type RiverOrientation,
-  type RiverZoom
+  type RiverZoom,
+  type SwimlaneLayout
 } from '@/domain/career-river-geometry';
 import type { CareerModel } from '@/domain/career-model';
 import { careerFutureRoute } from '@/app/router';
-
-const ROLE_BAR_HEIGHT_PX = 18;
 
 type RiverState = {
   zoom: RiverZoom;
@@ -102,46 +108,284 @@ function jobTip(job: CareerModel['employment'][number]): string {
   );
 }
 
-function jobRoleLabel(job: CareerModel['employment'][number]): string {
+type RiverJob = CareerModel['employment'][number] & { valid_from: string };
+
+function workplaceName(job: RiverJob): string {
+  return (job.display_label || job.label || '').trim();
+}
+
+/** Label candidates, longest first; placement takes the first that fits. */
+function roleLabelCandidates(job: RiverJob, withWorkplace: boolean): string[] {
   const role = (job.role || '').trim();
-  return riverJobShortLabel(role || (job.display_label || job.label || 'Role').trim());
+  const short = riverJobShortLabel(role || workplaceName(job) || 'Role');
+  const place = workplaceName(job);
+  const out: string[] = [];
+  if (withWorkplace && place) {
+    if (role) out.push(`${role} · ${place}`, `${short} · ${place}`);
+    else out.push(place);
+  }
+  if (role) out.push(role);
+  out.push(short);
+  return [...new Set(out)];
 }
 
-type RoleLabelBox = { x: number; y: number; w: number; h: number };
-
-function roleLabelsOverlap(a: RoleLabelBox, b: RoleLabelBox): boolean {
-  return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+function svgTitle(node: SVGElement, text: string): void {
+  const title = svgEl('title');
+  title.textContent = text;
+  node.appendChild(title);
 }
 
-/** Full short label; hide when the box collides with an earlier one. */
-function appendRoleLabel(args: {
-  group: SVGElement;
-  boxes: RoleLabelBox[];
-  text: string;
-  tip: string;
-  x: number;
-  y: number;
-  place: 'below' | 'beside';
-}): void {
-  const { group, boxes, text, tip, x, y, place } = args;
-  if (!text) return;
-  const w = text.length * 6.2;
-  const box: RoleLabelBox =
-    place === 'below' ? { x: x - w / 2, y: y - 10, w, h: 12 } : { x, y: y - 10, w, h: 12 };
-  if (boxes.some((b) => roleLabelsOverlap(box, b))) return;
-  const attrs: Record<string, string | number> = {
-    x,
-    y,
-    class: 'career-river__role-label career-river__role-label--below',
-    'data-part': 'role-label',
-    'data-place': place
+function roleDates(job: RiverJob): string {
+  const fmt = (iso: string) => {
+    const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+    return d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric', timeZone: 'UTC' });
   };
-  if (place === 'below') attrs['text-anchor'] = 'middle';
-  const label = svgEl('text', attrs);
-  label.textContent = text;
-  label.setAttribute('title', tip);
-  group.appendChild(label);
-  boxes.push(box);
+  return `${fmt(job.valid_from)} – ${job.valid_to ? fmt(job.valid_to) : 'now'}`;
+}
+
+type RoleSpan = {
+  job: RiverJob;
+  index: number;
+  group: string;
+  x0: number;
+  x1: number;
+  /** First role at its workplace: its label also names the workplace. */
+  firstInGroup: boolean;
+  /** x1 plus room for a beside-the-bar label, so rows only share when labels fit. */
+  reserveEnd: number;
+};
+
+function roleSpans(jobs: RiverJob[], T: (year: number) => number, lengthPx: number): RoleSpan[] {
+  const now = new Date().toISOString().slice(0, 10);
+  const groupKey = (job: RiverJob) => job.ref || job.display_label || job.label || '';
+  const firstOf = new Map<string, number>();
+  jobs.forEach((job, index) => {
+    const key = groupKey(job);
+    const prev = firstOf.get(key);
+    if (prev === undefined || job.valid_from < jobs[prev]!.valid_from) firstOf.set(key, index);
+  });
+  return jobs.map((job, index) => {
+    const x0 = Math.max(0, Math.min(lengthPx, T(yearFraction(job.valid_from)) * lengthPx));
+    const rawX1 = T(yearFraction(job.valid_to || now)) * lengthPx;
+    const x1 = Math.max(x0 + 4, Math.min(lengthPx, rawX1));
+    const firstInGroup = firstOf.get(groupKey(job)) === index;
+    const shortest = roleLabelCandidates(job, false).pop() || '';
+    const w = approxLabelWidth(shortest);
+    const fitsInside = x1 - x0 >= w + 12;
+    // A workplace's first bar labels to its left (always free in its row),
+    // unless the bar starts at the river's edge.
+    const leftFree = firstInGroup && x0 - 6 - approxLabelWidth(roleLabelCandidates(job, true)[0] || '') >= 2;
+    const reserveEnd = fitsInside || leftFree ? x1 : x1 + 6 + w + 8;
+    return { job, index, group: groupKey(job), x0, x1, firstInGroup, reserveEnd };
+  });
+}
+
+/**
+ * Desktop past: one swimlane group per workplace under the trunk, concurrent
+ * roles stacked in their group. Labels sit inside the bar, else in free row
+ * space beside it, else only in the tooltip — never overlapping.
+ */
+function paintSwimlanes(
+  svg: SVGElement,
+  spans: RoleSpan[],
+  swim: SwimlaneLayout,
+  geo: { lengthPx: number; lanesTop: number; width: number }
+): void {
+  if (!spans.length) return;
+  const rowTop = (row: number) =>
+    geo.lanesTop + row * SWIMLANE_ROW_PX + (swim.rowGroup[row] ?? 0) * SWIMLANE_GROUP_GAP_PX;
+  for (let row = 1; row < swim.rowCount; row++) {
+    if (!swim.rowStartsGroup[row]) continue;
+    const y = rowTop(row) - SWIMLANE_GROUP_GAP_PX / 2;
+    svg.appendChild(
+      svgEl('line', {
+        x1: 0,
+        y1: y,
+        x2: geo.lengthPx,
+        y2: y,
+        class: 'career-river__lane-rule',
+        'data-part': 'lane-rule'
+      })
+    );
+  }
+  const placedSpans = spans.map((span) => ({ ...span, row: swim.jobRow[span.index] ?? 0 }));
+  for (let row = 0; row < swim.rowCount; row++) {
+    const inRow = placedSpans.filter((s) => s.row === row).sort((a, b) => a.x0 - b.x0);
+    const blocked: Array<[number, number]> = inRow.map((s) => [s.x0, s.x1]);
+    const y = rowTop(row) + (SWIMLANE_ROW_PX - SWIMLANE_BAR_PX) / 2;
+    const side = !swim.rowStartsGroup[row];
+    for (const span of inRow) {
+      const { job } = span;
+      const current = !job.valid_to;
+      const group = svgEl('g', { class: 'career-river__role', 'data-part': 'role-span' });
+      const bar = svgEl('rect', {
+        x: span.x0,
+        y,
+        width: span.x1 - span.x0,
+        height: SWIMLANE_BAR_PX,
+        rx: 4,
+        class: `career-river__role-bar${side ? ' career-river__role-bar--side' : ''}${
+          current ? ' career-river__role-bar--current' : ''
+        }`,
+        'data-part': 'role-bar'
+      });
+      const tip = `${jobTip(job)} · ${roleDates(job)}`;
+      svgTitle(bar, tip);
+      group.appendChild(bar);
+      const otherBlocked = blocked.filter(([a, b]) => !(a === span.x0 && b === span.x1));
+      for (const text of roleLabelCandidates(job, span.firstInGroup)) {
+        const textW = approxLabelWidth(text);
+        const place = placeBarLabel({
+          x0: span.x0,
+          x1: span.x1,
+          textW,
+          maxX: geo.width - 4,
+          minX: 2,
+          blocked: otherBlocked,
+          preferLeft: span.firstInGroup
+        });
+        if (!place) continue;
+        const label = svgEl('text', {
+          x: place.x,
+          y: y + SWIMLANE_BAR_PX / 2 + 4,
+          'text-anchor': place.anchor,
+          class: `career-river__role-label${place.inside ? ' career-river__role-label--inside' : ''}${
+            place.inside && (side || current) ? ` career-river__role-label--on-${current ? 'current' : 'side'}` : ''
+          }`,
+          'data-part': 'role-label',
+          'data-place': place.inside ? 'inside' : place.anchor === 'start' ? 'right' : 'left'
+        });
+        label.textContent = text;
+        svgTitle(label, tip);
+        group.appendChild(label);
+        if (!place.inside) {
+          const a = place.anchor === 'start' ? place.x : place.x - textW;
+          blocked.push([a, a + textW]);
+        }
+        break;
+      }
+      svg.appendChild(group);
+    }
+  }
+}
+
+/**
+ * Phone past: thin role columns beside the left-hand trunk (concurrent roles
+ * side by side) with callout labels stacked so they never overlap.
+ */
+function paintRoleColumns(
+  svg: SVGElement,
+  jobs: RiverJob[],
+  geo: { along: (u: number) => number; trunkX: number; width: number },
+  T: (year: number) => number
+): void {
+  if (!jobs.length) return;
+  const lanes = assignEmploymentLanes(jobs);
+  const laneCount = Math.max(...lanes) + 1;
+  const colX = (lane: number) => geo.trunkX + 16 + lane * 9;
+  const labelX = colX(laneCount) + 10;
+  const avail = geo.width - labelX - 4;
+  const now = new Date().toISOString().slice(0, 10);
+  const items = jobs
+    .map((job, index) => {
+      const yTop = geo.along(Math.min(1, T(yearFraction(job.valid_to || now))));
+      const yBottom = geo.along(Math.max(0, T(yearFraction(job.valid_from))));
+      return { job, lane: lanes[index] ?? 0, yTop, yBottom: Math.max(yBottom, yTop + 4) };
+    })
+    .filter((item) => item.yBottom > 0);
+  for (const item of items) {
+    const bar = svgEl('rect', {
+      x: colX(item.lane) - 3,
+      y: item.yTop,
+      width: 6,
+      height: item.yBottom - item.yTop,
+      rx: 3,
+      class: `career-river__role-bar${item.job.valid_to ? '' : ' career-river__role-bar--current'}`,
+      'data-part': 'role-bar'
+    });
+    svgTitle(bar, `${jobTip(item.job)} · ${roleDates(item.job)}`);
+    svg.appendChild(bar);
+  }
+  // Callouts: newest at the top, pushed apart by at least one line.
+  const LINE = 14;
+  const placed = items
+    .map((item) => ({ item, want: (item.yTop + item.yBottom) / 2 }))
+    .sort((a, b) => a.want - b.want);
+  let last = -Infinity;
+  for (const p of placed) {
+    const y = Math.max(p.want, last + LINE);
+    last = y;
+    const text =
+      roleLabelCandidates(p.item.job, true).find((t) => approxLabelWidth(t) <= avail) ??
+      truncateRiverLabel(roleLabelCandidates(p.item.job, false).pop() || 'Role', avail);
+    if (!text) continue;
+    const anchorX = colX(p.item.lane) + 3;
+    svg.appendChild(
+      svgEl('path', {
+        d: `M${anchorX} ${p.want} L${labelX - 6} ${y - 4} L${labelX - 2} ${y - 4}`,
+        fill: 'none',
+        class: 'career-river__role-callout',
+        'data-part': 'role-callout'
+      })
+    );
+    const label = svgEl('text', {
+      x: labelX,
+      y,
+      class: 'career-river__role-label',
+      'data-part': 'role-label',
+      'data-place': 'callout'
+    });
+    label.textContent = text;
+    svgTitle(label, `${jobTip(p.item.job)} · ${roleDates(p.item.job)}`);
+    svg.appendChild(label);
+  }
+}
+
+/** No futures yet: two dashed stubs from Now and an "Add a future" action. */
+function paintStarterBranches(
+  svg: SVGElement,
+  args: {
+    isHorizontal: boolean;
+    start: { x: number; y: number };
+    reach: number;
+    spread: number;
+    onAdd?: () => void;
+  }
+): void {
+  const { isHorizontal, start, reach, spread } = args;
+  for (const dir of [-1, 1]) {
+    const d = isHorizontal
+      ? `M${start.x} ${start.y} C${start.x + reach * 0.4} ${start.y} ${start.x + reach * 0.4} ${
+          start.y + dir * spread
+        } ${start.x + reach} ${start.y + dir * spread}`
+      : `M${start.x} ${start.y} C${start.x} ${start.y - reach * 0.4} ${start.x + spread * (dir + 2) * 0.5} ${
+          start.y - reach * 0.4
+        } ${start.x + spread * (dir + 2) * 0.5} ${start.y - reach}`;
+    svg.appendChild(
+      svgEl('path', { d, fill: 'none', class: 'career-river__starter', 'data-part': 'starter-branch' })
+    );
+  }
+  const add = svgEl('text', {
+    x: isHorizontal ? start.x + reach + 10 : start.x + spread * 1.5 + 8,
+    y: isHorizontal ? start.y + 4 : start.y - reach + 4,
+    class: 'career-river__starter-label',
+    'data-part': 'starter-add',
+    role: 'button',
+    tabindex: 0
+  });
+  add.textContent = 'Add a future';
+  if (args.onAdd) {
+    const go = () => args.onAdd?.();
+    add.addEventListener('click', go);
+    add.addEventListener('keydown', (event) => {
+      const key = (event as KeyboardEvent).key;
+      if (key === 'Enter' || key === ' ') {
+        event.preventDefault();
+        go();
+      }
+    });
+  }
+  svg.appendChild(add);
 }
 
 /**
@@ -150,14 +394,18 @@ function appendRoleLabel(args: {
 export function mountCareerRiver(
   host: HTMLElement,
   model: CareerModel,
-  options: { selectedFutureId?: string | null; onSelectFuture?: (id: string | null) => void } = {}
+  options: {
+    selectedFutureId?: string | null;
+    onSelectFuture?: (id: string | null) => void;
+    onAddFuture?: () => void;
+  } = {}
 ): { destroy: () => void } {
   const nowYear = yearFraction(model.now);
   const bounds = careerBounds(model, nowYear);
   let state = stateByHost.get(host);
   if (!state) {
     state = {
-      zoom: clampZoom(presetZoom('pm3', bounds, nowYear), bounds.from, bounds.to),
+      zoom: clampZoom(presetZoom('whole', bounds, nowYear), bounds.from, bounds.to),
       orientation: window.matchMedia('(min-width: 720px)').matches ? 'horizontal' : 'vertical',
       width: 0,
       selectedId: options.selectedFutureId ?? null,
@@ -349,25 +597,48 @@ export function mountCareerRiver(
     const width = Math.max(320, svgHost.clientWidth || state!.width || 800);
     state!.width = width;
     const futures = model.futures;
+    const hasFutures = futures.length > 0;
+    // Phone rivers are tall: the past keeps more of the length for role callouts.
+    const share = state!.orientation === 'vertical'
+      ? Math.max(pastShareFor(futures.length), 0.6)
+      : pastShareFor(futures.length);
+    const T = (year: number) => timeToUnit(year, state!.zoom, nowYear, share);
     const yearsInView = Math.max(1, state!.zoom.to - state!.zoom.from);
     const isHorizontal = state!.orientation === 'horizontal';
-    const employmentJobs = isHorizontal
-      ? model.employment.filter(
-          (job): job is typeof job & { valid_from: string } => Boolean(job.valid_from)
-        )
-      : [];
-    const employmentLanes = assignEmploymentLanes(employmentJobs);
-    const laneCount = employmentLanes.length ? Math.max(...employmentLanes) + 1 : 0;
-    const bandExtra = roleBandExtraPx(laneCount);
-    const height =
-      riverHeightPx(state!.orientation, futures.length, yearsInView) + bandExtra;
-    const labelGutter = isHorizontal ? 200 : 48;
-    const lengthPx = isHorizontal
-      ? Math.max(100, width - labelGutter)
-      : Math.max(100, height - 80);
-    const midPx = isHorizontal ? (height - bandExtra) / 2 : width / 2;
-    const nowU = timeToUnit(nowYear, state!.zoom, nowYear);
+    const jobs = model.employment.filter(
+      (job): job is typeof job & { valid_from: string } => Boolean(job.valid_from)
+    );
+
+    // Horizontal: frame row · branch zone · trunk · branch zone · swimlanes · axis.
+    // Vertical (phone): time bottom → top, trunk on the left, roles as columns
+    // beside it with callout labels, branches fanning right above Now.
+    const branchHalf = hasFutures ? Math.max(56, futures.length * 28) : 34;
+    const TOP = 44;
+    const V_TOP = 40;
+    let height: number;
+    let lengthPx: number;
+    let midPx: number;
+    let lanesTop = 0;
+    let axisTop = 0;
+    let spans: RoleSpan[] = [];
+    let swim: SwimlaneLayout = layoutRoleSwimlanes([]);
+    if (isHorizontal) {
+      lengthPx = Math.max(100, width - (hasFutures ? 200 : 130));
+      spans = roleSpans(jobs, T, lengthPx);
+      swim = layoutRoleSwimlanes(spans.map((span) => ({ group: span.group, start: span.x0, end: span.reserveEnd })));
+      midPx = TOP + branchHalf;
+      lanesTop = midPx + branchHalf + 18;
+      axisTop = lanesTop + swimlaneBlockPx(swim) + 10;
+      height = axisTop + 30;
+    } else {
+      height = riverHeightPx('vertical', futures.length, yearsInView) + V_TOP;
+      lengthPx = Math.max(100, height - V_TOP - 24);
+      midPx = 44;
+    }
+    const nowU = T(nowYear);
     const focusId = state!.hoverId || state!.selectedId;
+    /** Position along the time axis (x when horizontal, y when vertical). */
+    const along = (u: number) => (isHorizontal ? u * lengthPx : V_TOP + (1 - u) * lengthPx);
 
     const svg = svgEl('svg', {
       width,
@@ -380,8 +651,8 @@ export function mountCareerRiver(
 
     // Frame: What happened / What could (mockup + Tasks axis job)
     const pastLabel = svgEl('text', {
-      x: isHorizontal ? 8 : 8,
-      y: isHorizontal ? 18 : height - 10,
+      x: 8,
+      y: isHorizontal ? 18 : height - 8,
       class: 'career-river__frame-label',
       'text-anchor': 'start',
       'data-part': 'frame-past'
@@ -389,7 +660,7 @@ export function mountCareerRiver(
     pastLabel.textContent = 'What happened';
     svg.appendChild(pastLabel);
     const futureLabel = svgEl('text', {
-      x: isHorizontal ? Math.min(width - 8, nowU * lengthPx + 12) : 8,
+      x: isHorizontal ? Math.min(width - 90, nowU * lengthPx + 12) : 8,
       y: 18,
       class: 'career-river__frame-label',
       'text-anchor': 'start',
@@ -399,9 +670,8 @@ export function mountCareerRiver(
     svg.appendChild(futureLabel);
 
     // Year grid + axis ruler (Tasks gantt ticks / grid)
-    const yearTicks = axisYearTicks(state!.zoom);
-    for (const year of yearTicks) {
-      const u = timeToUnit(year, state!.zoom, nowYear);
+    for (const year of axisYearTicks(state!.zoom)) {
+      const u = T(year);
       if (u < -0.02 || u > 1.02) continue;
       if (isHorizontal) {
         const x = u * lengthPx;
@@ -410,7 +680,7 @@ export function mountCareerRiver(
             x1: x,
             y1: 28,
             x2: x,
-            y2: height - 28,
+            y2: axisTop,
             class: 'career-river__year-grid',
             'data-part': 'year-grid'
           })
@@ -418,16 +688,16 @@ export function mountCareerRiver(
         svg.appendChild(
           svgEl('line', {
             x1: x,
-            y1: height - 26,
+            y1: axisTop,
             x2: x,
-            y2: height - 20,
+            y2: axisTop + 6,
             class: 'career-river__axis-tick',
             'data-part': 'axis-tick'
           })
         );
         const label = svgEl('text', {
           x,
-          y: height - 8,
+          y: axisTop + 20,
           'text-anchor': 'middle',
           'data-part': 'axis-year',
           class: 'career-river__axis-year'
@@ -435,19 +705,19 @@ export function mountCareerRiver(
         label.textContent = String(year);
         svg.appendChild(label);
       } else {
-        const y = (1 - u) * lengthPx;
+        const y = along(u);
         svg.appendChild(
           svgEl('line', {
-            x1: 28,
+            x1: 34,
             y1: y,
-            x2: width - 12,
+            x2: width - 8,
             y2: y,
             class: 'career-river__year-grid',
             'data-part': 'year-grid'
           })
         );
         const label = svgEl('text', {
-          x: 6,
+          x: 2,
           y: y + 4,
           'data-part': 'axis-year',
           class: 'career-river__axis-year'
@@ -457,136 +727,29 @@ export function mountCareerRiver(
       }
     }
 
-    // Role band: labeled duration bars (Tasks gantt-bar-text parity). Work list = dates detail.
-    const roleLabelBoxes: RoleLabelBox[] = [];
-    const employmentAll = model.employment.filter(
-      (job): job is typeof job & { valid_from: string } => Boolean(job.valid_from)
-    );
-    const lanesAll = isHorizontal ? employmentLanes : assignEmploymentLanes(employmentAll);
-    if (isHorizontal) {
-      const bandBaseY = midPx + 22;
-      for (let index = 0; index < employmentJobs.length; index++) {
-        const job = employmentJobs[index]!;
-        const u0 = timeToUnit(yearFraction(job.valid_from), state!.zoom, nowYear);
-        const u1 = timeToUnit(
-          yearFraction(job.valid_to || model.now),
-          state!.zoom,
-          nowYear
-        );
-        const x0 = Math.max(0, Math.min(lengthPx, u0 * lengthPx));
-        const x1 = Math.max(0, Math.min(lengthPx, u1 * lengthPx));
-        const barW = x1 - x0;
-        if (barW < 4) continue;
-        const lane = employmentLanes[index] ?? 0;
-        const y = bandBaseY + lane * ROLE_LANE_HEIGHT_PX;
-        const group = svgEl('g', {
-          class: 'career-river__role',
-          'data-part': 'role-span'
-        });
-        const bar = svgEl('rect', {
-          x: x0,
-          y,
-          width: barW,
-          height: ROLE_BAR_HEIGHT_PX,
-          rx: ROLE_BAR_HEIGHT_PX / 2,
-          class: 'career-river__role-bar',
-          'data-part': 'role-bar'
-        });
-        const tip = jobTip(job);
-        const title = svgEl('title');
-        title.textContent = tip;
-        bar.appendChild(title);
-        group.appendChild(bar);
-
-        // Full short label centered below the bar; collision → hide (tip keeps full role).
-        const labelText = jobRoleLabel(job);
-        const half = (labelText.length * 6.2) / 2;
-        const lx = Math.min(
-          Math.max(x0 + barW / 2, half + 2),
-          Math.max(half + 2, lengthPx - half - 2)
-        );
-        appendRoleLabel({
-          group,
-          boxes: roleLabelBoxes,
-          text: labelText,
-          tip,
-          x: lx,
-          y: y + ROLE_BAR_HEIGHT_PX + 12,
-          place: 'below'
-        });
-        svg.appendChild(group);
-      }
-    } else {
-      // Phone: labeled ticks beside the trunk; lane stagger + collision-hide.
-      for (let index = 0; index < employmentAll.length; index++) {
-        const job = employmentAll[index]!;
-        const u0 = timeToUnit(yearFraction(job.valid_from), state!.zoom, nowYear);
-        const u1 = timeToUnit(
-          yearFraction(job.valid_to || model.now),
-          state!.zoom,
-          nowYear
-        );
-        const y0 = Math.max(0, Math.min(lengthPx, (1 - u1) * lengthPx));
-        const y1 = Math.max(0, Math.min(lengthPx, (1 - u0) * lengthPx));
-        if (y1 - y0 < 6) continue;
-        const lane = lanesAll[index] ?? 0;
-        const barW = 10;
-        const x = midPx + 18 + lane * (barW + 6);
-        const group = svgEl('g', {
-          class: 'career-river__role career-river__role--vertical',
-          'data-part': 'role-span'
-        });
-        const bar = svgEl('rect', {
-          x: x - barW / 2,
-          y: y0,
-          width: barW,
-          height: y1 - y0,
-          rx: barW / 2,
-          class: 'career-river__role-bar',
-          'data-part': 'role-bar'
-        });
-        const tip = jobTip(job);
-        const title = svgEl('title');
-        title.textContent = tip;
-        bar.appendChild(title);
-        group.appendChild(bar);
-        appendRoleLabel({
-          group,
-          boxes: roleLabelBoxes,
-          text: jobRoleLabel(job),
-          tip,
-          x: x + 8,
-          y: Math.min(y1 - 4, Math.max(y0 + 12, (y0 + y1) / 2 + 4 + lane * 14)),
-          place: 'beside'
-        });
-        svg.appendChild(group);
-      }
-    }
+    if (isHorizontal) paintSwimlanes(svg, spans, swim, { lengthPx, lanesTop, width });
+    else paintRoleColumns(svg, jobs, { along, trunkX: midPx, width }, T);
 
     // Trunk spine — career so far (thick navy path ending at Now)
     const trunkStart = Math.min(
-      ...[
-        nowYear - 1,
-        ...model.employment.map((e) => (e.valid_from ? yearFraction(e.valid_from) : nowYear))
-      ].filter(Number.isFinite)
+      ...[nowYear - 1, ...jobs.map((e) => yearFraction(e.valid_from))].filter(Number.isFinite)
     );
-    const trunkU0 = timeToUnit(trunkStart, state!.zoom, nowYear);
-    const trunkPts =
-      state!.orientation === 'horizontal'
-        ? [
-            { x: trunkU0 * lengthPx, y: midPx },
-            { x: nowU * lengthPx, y: midPx }
-          ]
-        : [
-            { x: midPx, y: (1 - trunkU0) * lengthPx },
-            { x: midPx, y: (1 - nowU) * lengthPx }
-          ];
+    const trunkU0 = Math.max(0, T(trunkStart));
+    const trunkPts = isHorizontal
+      ? [
+          { x: trunkU0 * lengthPx, y: midPx },
+          { x: nowU * lengthPx, y: midPx }
+        ]
+      : [
+          { x: midPx, y: along(trunkU0) },
+          { x: midPx, y: along(nowU) }
+        ];
     svg.appendChild(
       svgEl('path', {
         d: pathFromPoints(trunkPts),
         fill: 'none',
         stroke: 'var(--navy)',
-        'stroke-width': state!.orientation === 'vertical' ? 11 : 13,
+        'stroke-width': isHorizontal ? 13 : 11,
         'stroke-linecap': 'round',
         class: 'career-river__trunk',
         'data-part': 'trunk'
@@ -604,10 +767,9 @@ export function mountCareerRiver(
     );
 
     // Now marker (Tasks gantt-today weight) — label at top; years keep the bottom row
-    const nowLine =
-      state!.orientation === 'horizontal'
-        ? `M${nowU * lengthPx} 24 L${nowU * lengthPx} ${height - 28}`
-        : `M28 ${(1 - nowU) * lengthPx} L${width - 24} ${(1 - nowU) * lengthPx}`;
+    const nowLine = isHorizontal
+      ? `M${nowU * lengthPx} 24 L${nowU * lengthPx} ${axisTop}`
+      : `M34 ${along(nowU)} L${width - 8} ${along(nowU)}`;
     svg.appendChild(
       svgEl('path', {
         d: nowLine,
@@ -617,8 +779,9 @@ export function mountCareerRiver(
       })
     );
     const nowText = svgEl('text', {
-      x: state!.orientation === 'horizontal' ? nowU * lengthPx + 6 : 32,
-      y: state!.orientation === 'horizontal' ? 34 : (1 - nowU) * lengthPx - 8,
+      x: isHorizontal ? nowU * lengthPx + 6 : width - 8,
+      y: isHorizontal ? 34 : along(nowU) - 6,
+      'text-anchor': isHorizontal ? 'start' : 'end',
       class: 'career-river__now-label',
       'data-part': 'now-label'
     });
@@ -633,6 +796,18 @@ export function mountCareerRiver(
     nowText.textContent = `Now · ${nowTerm}`;
     svg.appendChild(nowText);
 
+    if (!hasFutures) {
+      paintStarterBranches(svg, {
+        isHorizontal,
+        start: trunkTip,
+        reach: isHorizontal
+          ? Math.max(40, Math.min(90, lengthPx - nowU * lengthPx - 10))
+          : Math.max(36, Math.min(90, along(nowU) - V_TOP - 10)),
+        spread: isHorizontal ? branchHalf * 0.7 : 46,
+        onAdd: options.onAddFuture
+      });
+    }
+
     // Branch paths + labels
     const labelBoxes: Array<{ x: number; y: number; w: number; h: number; el: SVGElement }> = [];
     const sorted = [...futures].sort((a, b) => a.lane_order - b.lane_order);
@@ -643,17 +818,19 @@ export function mountCareerRiver(
           : branchColour(future.colour_slot);
       const readiness = future.readiness ?? 0;
       const strokeW = 2 + (readiness / 100) * 9;
-      const splitU = timeToUnit(yearFraction(future.split_date), state!.zoom, nowYear);
+      const splitU = T(yearFraction(future.split_date));
       const arrivalU = future.arrival_date
-        ? timeToUnit(yearFraction(future.arrival_date), state!.zoom, nowYear)
+        ? T(yearFraction(future.arrival_date))
         : Math.min(1, splitU + 0.2);
-      const half = (state!.orientation === 'horizontal' ? height : width) / 2;
-      const laneY =
-        sorted.length <= 1
+      // Horizontal: lanes spread ± around the trunk inside the branch zone.
+      // Vertical: branches fan to the right of the left-hand trunk.
+      const laneY = isHorizontal
+        ? sorted.length <= 1
           ? 0
-          : ((index / Math.max(1, sorted.length - 1)) * 2 - 1) * 0.86 * (half * 0.7);
-      const bundleY = (index + 1) * 0.022 * half;
-      const pts = branchPolyline({
+          : ((index / Math.max(1, sorted.length - 1)) * 2 - 1) * 0.86 * branchHalf
+        : ((index + 1) / sorted.length) * Math.max(40, width - midPx - 80);
+      const bundleY = index * 3;
+      const rawPts = branchPolyline({
         orientation: state!.orientation,
         lengthPx,
         midPx,
@@ -663,6 +840,7 @@ export function mountCareerRiver(
         laneY,
         bundleY
       });
+      const pts = isHorizontal ? rawPts : rawPts.map((p) => ({ x: p.x, y: p.y + V_TOP }));
       const op = focusId && focusId !== future.id ? 0.28 : future.fading ? 0.38 : 1;
       const path = svgEl('path', {
         d: pathFromPoints(pts),
@@ -692,7 +870,7 @@ export function mountCareerRiver(
       // Stones on this branch
       for (const stone of model.stones.filter((s) => s.future_ids.includes(future.id))) {
         if (!stone.target_term_start) continue;
-        const su = timeToUnit(yearFraction(stone.target_term_start), state!.zoom, nowYear);
+        const su = T(yearFraction(stone.target_term_start));
         const t = Math.min(
           1,
           Math.max(0, (su - splitU) / Math.max(0.001, arrivalU - splitU))
@@ -704,7 +882,7 @@ export function mountCareerRiver(
         const sy =
           state!.orientation === 'horizontal'
             ? midPx + bundleY + (laneY - bundleY) * Math.min(1, Math.max(0, (su - splitU) / Math.max(0.001, arrivalU - splitU)))
-            : (1 - su) * lengthPx;
+            : along(su);
         if (stone.shared) {
           svg.appendChild(
             svgEl('circle', {
@@ -739,39 +917,53 @@ export function mountCareerRiver(
         }
       }
 
-      // Label
-      const isVert = state!.orientation === 'vertical';
-      let labelText = isVert
-        ? `${riverJobShortLabel(future.title)} · ${future.readiness_label}`
+      // Label: real-width boxes, kept inside the SVG, nudged until clear of
+      // earlier labels; shortened before it is dropped into the tooltip.
+      const isVert = !isHorizontal;
+      const shortText = `${riverJobShortLabel(future.title)} · ${future.readiness_label}`;
+      const longText = isVert
+        ? shortText
         : `${future.title} · ${future.readiness_label}${future.arrival_label ? ` · ${future.arrival_label}` : ''}`;
-      let lx = isVert ? tip.x : tip.x + 10;
-      let ly = isVert ? tip.y - 10 : tip.y + 4;
-      const approxW = Math.min(isVert ? 90 : 190, labelText.length * 6.2);
-      for (const box of labelBoxes) {
-        if (Math.abs(ly - box.y) < 14 && Math.abs(lx - box.x) < approxW) {
-          ly = box.y + (ly >= box.y ? 14 : -14);
+      const boxFor = (text: string, y: number) => {
+        const w = approxLabelWidth(text);
+        let x0 = isVert ? tip.x - w / 2 : tip.x + 10;
+        x0 = Math.max(4, Math.min(width - 4 - w, x0));
+        return { x: x0, y: y - 11, w, h: 14 };
+      };
+      const clear = (box: { x: number; y: number; w: number; h: number }) =>
+        box.y >= 2 &&
+        box.y + box.h <= height - 2 &&
+        labelBoxes.every(
+          (o) => box.x + box.w <= o.x || o.x + o.w <= box.x || box.y + box.h <= o.y || o.y + o.h <= box.y
+        );
+      const baseY = isVert ? tip.y - 10 : tip.y + 4;
+      let placed: { text: string; box: { x: number; y: number; w: number; h: number } } | null = null;
+      for (const text of longText === shortText ? [longText] : [longText, shortText]) {
+        for (const dy of [0, -16, 16, -32, 32]) {
+          const box = boxFor(text, baseY + dy);
+          if (clear(box)) {
+            placed = { text, box };
+            break;
+          }
         }
+        if (placed) break;
       }
-      if (lx + approxW > width - 4) {
-        labelText = `${riverJobShortLabel(future.title)} · ${future.readiness_label}`;
-      }
-      if (ly < 12 || ly > height - 8) {
-        // hide into title attribute only
-      } else {
+      if (placed) {
         const label = svgEl('text', {
-          x: lx,
-          y: ly,
+          x: placed.box.x,
+          y: placed.box.y + 11,
           fill: colour,
           'font-size': 11,
           'font-family': 'inherit',
           'font-weight': 600,
           'fill-opacity': op,
-          'text-anchor': isVert ? 'middle' : 'start'
+          'text-anchor': 'start',
+          'data-part': 'branch-label'
         });
-        label.textContent = labelText;
-        label.setAttribute('title', future.title);
+        label.textContent = placed.text;
+        svgTitle(label, future.title);
         svg.appendChild(label);
-        labelBoxes.push({ x: lx, y: ly, w: approxW, h: 12, el: label });
+        labelBoxes.push({ ...placed.box, el: label });
       }
 
       const hit = svgEl('path', {
@@ -806,15 +998,14 @@ export function mountCareerRiver(
     // Skill dots + clusters
     const marks = model.trunk_items.map((item) => ({
       id: item.id,
-      unit: timeToUnit(yearFraction(item.occurred_on), state!.zoom, nowYear),
+      unit: T(yearFraction(item.occurred_on)),
       title: item.title,
       future_ids: item.future_ids ?? []
     }));
     const clusters = clusterMarks(marks, lengthPx, 10);
     for (const cluster of clusters) {
       const cx = state!.orientation === 'horizontal' ? cluster.unit * lengthPx : midPx;
-      const cy =
-        state!.orientation === 'horizontal' ? midPx : (1 - cluster.unit) * lengthPx;
+      const cy = isHorizontal ? midPx : along(cluster.unit);
       const supportsFocus =
         focusId &&
         cluster.ids.some((id) => {
@@ -877,9 +1068,9 @@ export function mountCareerRiver(
 
     // Fork marker
     if (model.fork?.date) {
-      const fu = timeToUnit(yearFraction(model.fork.date), state!.zoom, nowYear);
-      const fx = state!.orientation === 'horizontal' ? fu * lengthPx : midPx;
-      const fy = state!.orientation === 'horizontal' ? midPx : (1 - fu) * lengthPx;
+      const fu = T(yearFraction(model.fork.date));
+      const fx = isHorizontal ? fu * lengthPx : midPx;
+      const fy = isHorizontal ? midPx : along(fu);
       svg.appendChild(
         svgEl('circle', {
           cx: fx,

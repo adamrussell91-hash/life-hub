@@ -4940,11 +4940,66 @@
   pointer-events: auto;
 }
 
+.career-river__role-bar--side {
+  fill: var(--pastel-sage);
+  stroke: var(--career-branch-3);
+}
+
+.career-river__role-bar--current {
+  fill: var(--navy);
+  stroke: var(--navy);
+  stroke-opacity: 1;
+}
+
 .career-river__role-label {
   fill: var(--ink);
   font-size: 11px;
   font-weight: var(--weight-semibold);
   pointer-events: none;
+}
+
+.career-river__role-label--inside {
+  fill: var(--navy);
+}
+
+.career-river__role-label--on-current {
+  fill: var(--paper);
+}
+
+.career-river__lane-rule {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  pointer-events: none;
+}
+
+.career-river__role-callout {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-opacity: 0.5;
+  pointer-events: none;
+}
+
+.career-river__starter {
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-dasharray: 4 5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.career-river__starter-label {
+  fill: var(--navy);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.career-river__starter-label:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
 }
 
 .career-river__axis-note {
@@ -5205,6 +5260,17 @@
   gap: var(--space-2);
 }
 
+.career-sheet__field[hidden] {
+  display: none;
+}
+
+.career-sheet__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
 .career-scan__list {
   display: flex;
   flex-direction: column;
@@ -5363,9 +5429,22 @@
 
 .career-page__panel,
 .career-page__applications,
-.career-page__ledger {
+.career-page__ledger,
+.career-page__whatif {
   padding: var(--space-4);
   min-width: 0;
+}
+
+.career-page__whatif {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.career-page__whatif textarea {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .career-page__heading {
@@ -5383,6 +5462,35 @@
 }
 
 .career-page__section-head .career-page__heading {
+  margin: 0;
+}
+
+.career-page__section--empty {
+  padding-block: var(--space-3);
+}
+
+.career-page__section--empty .career-page__section-head {
+  justify-content: flex-start;
+  margin-bottom: 0;
+  column-gap: var(--space-3);
+}
+
+.career-page__section--empty .career-page__section-head .career-page__meta {
+  margin: 0;
+}
+
+.career-page__section--empty .career-page__section-head > .btn {
+  margin-left: auto;
+}
+
+.career-page__head-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.career-page__head-end .career-page__meta {
   margin: 0;
 }
 
@@ -5426,11 +5534,20 @@
 }
 
 .career-page__ledger-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
   align-items: baseline;
-  gap: var(--space-2) var(--space-3);
-  max-height: 56px;
+  gap: 2px var(--space-3);
+}
+
+.career-page__ledger-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.career-page__ledger-merged {
+  grid-column: 2;
+  margin: 0;
 }
 
 .career-page__ledger-date {
@@ -5461,11 +5578,6 @@
     order: -1;
   }
 
-  .career-page__ledger-row {
-    flex-direction: column;
-    align-items: flex-start;
-    max-height: 72px;
-  }
 }
 
 /* Ties to confirm (Network Ecology tie inference) */
@@ -6406,4 +6518,9 @@ button.org-chart__unit-label:focus-visible {
   .page-header:has(+ .hub-canvas__body :is(.event-page, .event-compose)) { flex-wrap: wrap; }
   .page-header:has(+ .hub-canvas__body :is(.event-page, .event-compose)) .page-header__copy { flex-basis: 100%; }
   .event-form.event-compose .event-compose__sr { width: 1px; min-width: 1px; max-width: 1px; min-height: 1px; padding: 0; }
+}
+
+/* Phone: zoom presets live behind the Zoom button until it is pressed. */
+.career-river__pills[hidden] {
+  display: none;
 }
