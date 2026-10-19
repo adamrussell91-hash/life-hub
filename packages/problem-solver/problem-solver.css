@@ -4080,3 +4080,40 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
 .ps-outline__slot { color: var(--muted); font-size: var(--text-xs); margin-right: var(--space-2); }
+
+/* Task confirm cards: the coach proposes, the person creates. Same card look as the
+   coach's suggestion; every field and button is a 44px target, and fields stack when
+   the coach column is narrow. */
+.ps-taskcards { display: grid; gap: var(--space-3); container: taskcards / inline-size; }
+.ps-taskcards[hidden] { display: none; }
+.ps-scope .ps-taskcard,
+.ps-scope .ps-reviewcard { display: grid; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-lg); background: var(--ps-card); box-shadow: inset 0 0 0 2px var(--ps-yellow); animation: ps-msg-in 600ms var(--ps-spring); }
+.ps-scope .ps-reviewcard { box-shadow: inset 0 0 0 2px var(--ps-blue); }
+.ps-taskcard__meta { margin: 0; color: var(--ink); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.ps-taskcard__fields { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); }
+.ps-taskcard__field { display: grid; gap: var(--space-1); min-width: 0; }
+.ps-taskcard__label { color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+.ps-taskcard__input { min-height: 44px; min-width: 0; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--cotton); color: var(--ink); font: inherit; }
+.ps-taskcard__input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-taskcard__reason { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+.ps-taskcard__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ps-taskcard__actions .btn { min-height: 44px; }
+.ps-taskcard__hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
+.ps-taskcard__hint[hidden] { display: none; }
+.ps-taskcard__error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
+.ps-taskcard__error:empty { display: none; }
+
+@container taskcards (max-width: 420px) {
+  .ps-taskcard__fields { grid-template-columns: minmax(0, 1fr); }
+  .ps-taskcard__actions .btn { flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-scope .ps-taskcard,
+  .ps-scope .ps-reviewcard { animation: none; }
+}
+
+/* Implement aim: the option chosen in Decide, under the chart heading. */
+.ps-canvas__aim { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; margin: calc(var(--space-2) * -1) 0 var(--space-3); color: var(--ink); font-size: var(--text-sm); }
+.ps-canvas__aim-meta { flex: none; color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: 0.04em; text-transform: uppercase; }
+.ps-canvas__aim-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -26,6 +26,16 @@ function session(extra: Partial<PsSession> = {}): PsSession {
 const noop = { onSay: () => undefined, onAction: () => undefined };
 
 describe('coach panel', () => {
+  it('keeps the task cards slot between the extras and the composer across updates', () => {
+    const cards = document.createElement('section');
+    const panel = mountCoachPanel(noop, { cards });
+    panel.update(session());
+    panel.update(session({ pendingKeep: null, suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: 'Causes branch.' } }));
+    expect(cards.parentElement).toBe(panel.el);
+    expect(cards.previousElementSibling?.classList.contains('ps-coach__extras')).toBe(true);
+    expect(cards.nextElementSibling?.tagName).toBe('FORM');
+  });
+
   it('renders turns with missing-skill chips and the keep button', () => {
     const panel = renderCoachPanel(session(), noop);
     expect(panel.querySelectorAll('.chat-message').length).toBe(2);

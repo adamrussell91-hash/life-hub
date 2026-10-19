@@ -13,11 +13,17 @@ import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../pa
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
+import { createTaskBridge } from './task-bridge';
+import { mountTaskCards } from './task-cards';
+import { tasksApi } from '@/services/client-api';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
 
 let poll: AbortController | null = null;
 /** The open session's canvas, dropped (observers, frame loops) when the page changes. */
 let diagramNow: { destroy(): void } | null = null;
+/** The open session's Tasks listeners (live statuses), removed when the page changes. */
+let unsubscribeNow: Array<() => void> = [];
 
 const phaseLabel = (row: PsSummary): string => (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
 const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--ps-blue)' : phase === 'finished' ? 'var(--ps-red)' : 'var(--ps-yellow)');
@@ -258,7 +264,13 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const canvasHost = el('div', 'ps-canvas');
   const tray = createSkillTray();
   bench.append(canvasHost, tray.el);
-  const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) });
+  const cards = mountTaskCards({
+    create: (proposal, edits) => bridge.create(session, proposal, edits),
+    dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
+    createReview: (edits) => bridge.createReview(session, edits),
+    dismissReview: () => confirmed('dismiss_review', {})
+  });
+  const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el });
   const coachHost = el('div', 'ps-coach-host');
   coachHost.append(coach.el);
   board.append(bench, coachHost);
@@ -273,6 +285,10 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     coach.el.querySelector('.ps-coach__extras')?.prepend(note);
   };
 
+  /** Sorted confirmed task ids last fetched, so statuses refresh only when the set changes. */
+  let confirmedKey = '';
+  const confirmedIds = () => (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed' && p.taskId).map((p) => p.taskId!).sort().join(',');
+
   const paint = (next: PsSession) => {
     session = next;
     if (title.textContent !== session.title) title.textContent = session.title;
@@ -280,17 +296,89 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     diagram.update(session);
     tray.update(session);
     coach.update(session);
-  };
-
-  const settle = async () => {
-    poll?.abort();
-    poll = new AbortController();
-    try {
-      paint(await pollUntilSettled(session.id, paint, { signal: poll.signal }));
-    } catch {
-      /* aborted on navigation */
+    cards.update(session);
+    const key = confirmedIds();
+    if (key !== confirmedKey) {
+      confirmedKey = key;
+      void refreshStatuses();
     }
   };
+
+  /** One poll at a time: a second caller waits on the poll already running. */
+  let settling: Promise<void> | null = null;
+  const settle = (): Promise<void> => {
+    settling ??= (async () => {
+      poll?.abort();
+      poll = new AbortController();
+      try {
+        paint(await pollUntilSettled(session.id, paint, { signal: poll.signal }));
+      } catch {
+        /* aborted on navigation */
+      } finally {
+        settling = null;
+      }
+    })();
+    return settling;
+  };
+
+  /**
+   * Post a task action once the coach has settled (Decision 10: a save during a coach turn
+   * would lose that turn). A stale revision refetches and posts once more; any other error
+   * is rethrown so the card shows it.
+   */
+  async function confirmed(action: PsAction, payload: Record<string, unknown>): Promise<void> {
+    while (isBusy(session)) {
+      if (!page.isConnected) throw new Error('Problem Solver was closed.');
+      await settle();
+    }
+    let next: PsSession;
+    try {
+      next = await problemSolverApi.actWith(session, action, payload);
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'conflict') throw err;
+      paint(await problemSolverApi.get(session.id));
+      next = await problemSolverApi.actWith(session, action, payload);
+    }
+    paint(next);
+  }
+
+  /** The linked task's domain if the problem links one, else life (Decision 1); one fetch per session. */
+  let domain: Promise<string> | null = null;
+  function domainFor(s: PsSession): Promise<string> {
+    const linked = s.links.find((link) => link.kind === 'task')?.id;
+    if (!linked) return Promise.resolve('life');
+    domain ??= tasksApi.getTask(linked).then((task) => task.domain || 'life', () => {
+      domain = null;
+      return 'life';
+    });
+    return domain;
+  }
+
+  const bridge = createTaskBridge({
+    createTask: (body) => tasksApi.createTask(body),
+    getTask: (taskId) => tasksApi.getTask(taskId),
+    domainFor: (s) => domainFor(s),
+    confirm: (proposalId, taskId) => confirmed('confirm_task', { proposalId, taskId }),
+    dismiss: (proposalId, reason) => confirmed('dismiss_task', { proposalId, ...(reason ? { reason } : {}) }),
+    setReview: (taskId, due) => confirmed('set_review_task', { taskId, due })
+  });
+
+  /** Fetch live statuses for the confirmed tasks; a newer refresh wins over a slower older one. */
+  let statusRound = 0;
+  async function refreshStatuses(): Promise<void> {
+    const round = ++statusRound;
+    const map = await bridge.statuses(session.proposedTasks ?? []);
+    if (round === statusRound && page.isConnected) diagram.setTaskStatuses(map);
+  }
+  const onVisible = () => {
+    if (document.visibilityState === 'visible' && confirmedKey) void refreshStatuses();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  unsubscribeNow.push(
+    onTasksChanged(() => void (confirmedKey && refreshStatuses())),
+    onTasksDeleted(() => void (confirmedKey && refreshStatuses())),
+    () => document.removeEventListener('visibilitychange', onVisible)
+  );
 
   async function act(action: PsAction, text?: string): Promise<void> {
     try {
@@ -327,6 +415,8 @@ export async function renderProblemSolverView(canvas: HTMLElement): Promise<void
   poll?.abort();
   diagramNow?.destroy();
   diagramNow = null;
+  for (const off of unsubscribeNow) off();
+  unsubscribeNow = [];
   canvas.replaceChildren(el('p', 'canvas-status', 'Loading…'));
   const id = hashQuery().get('id');
   try {
