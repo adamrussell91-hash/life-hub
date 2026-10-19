@@ -25,15 +25,19 @@ import { createRecordView } from '../../../../../packages/problem-solver/render/
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { MODELS } from '../../../../../packages/problem-solver/models.mjs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { chosenOption } from '../../../../../packages/problem-solver/steps.mjs';
 import { morphFromRect } from '../../../design-kit/js/morphing-dialog.js';
-import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
+import type { PsSession, PsTaskLink, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
 
-/** A scored tool's payload: the radar sends {current, objective}, the force field {for, against}. */
-type Scores = Record<string, number[]>;
+/** A scored tool's payload: the radar sends {current, objective}, the force field {for, against}, the decision matrix a mode and a matrix. */
+type Scores = Record<string, unknown>;
 /** Scores for the run on screen, which may not be the step's active run (opened from the record). */
-export type RunScores = { runId: string; [series: string]: string | number[] };
-/** A tool's chart. `destroy` (views with a size watch, a frame loop or long motion) is called when the canvas drops it. */
-type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void; destroy?(): void };
+export type RunScores = { runId: string; [series: string]: unknown };
+/**
+ * A tool's chart. `destroy` (views with a size watch, a frame loop or long motion) is called when the canvas drops it.
+ * `setTasks` receives the run's confirmed tasks with their live status (charts whose items can become tasks).
+ */
+type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void; setTasks?(links: PsTaskLink[]): void; destroy?(): void };
 export type CanvasHandlers = { onScore?: (scores: RunScores) => void };
 
 /** Tools that draw their own chart. Anything else falls back to the outline. */
@@ -168,7 +172,7 @@ function rectOf(node: Element | null): DOMRect | null {
  * Record toggle; once defined the canvas opens on the black-and-white record, and a
  * step or filmstrip card morphs into that run's coloured chart (read-only).
  */
-export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void; destroy(): void } {
+export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void; setTaskStatuses(statuses: Record<string, string>): void; destroy(): void } {
   const views = new Map<string, View>();
   const frame = createFrameView();
   const record = createRecordView();
@@ -179,6 +183,32 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
   let hadActive = false;
   /** The run whose chart is on screen, or null when the frame card or record shows. */
   let displayed: string | null = null;
+  /** Live Tasks status per confirmed task id, fetched by the page (never stored on the session). */
+  let statuses: Record<string, string> = {};
+
+  /** Hand the chart on screen its confirmed tasks and their live status. */
+  function pushTasks(): void {
+    if (!last || !displayed) return;
+    const runId = displayed;
+    const run = allRunsOf(last).find((item) => item.id === runId);
+    const view = run ? views.get(run.id) : undefined;
+    if (!view?.setTasks) return;
+    const links = (last.proposedTasks ?? [])
+      .filter((p) => p.status === 'confirmed' && p.taskId && p.source.runId === runId)
+      .map((p) => ({ nodeId: p.source.nodeId, taskId: p.taskId!, status: statuses[p.taskId!] ?? 'unknown' }));
+    view.setTasks(links);
+  }
+
+  /** Implement charts carry the option chosen in Decide as their aim. */
+  function aimCaption(session: PsSession, run: PsToolRun): HTMLElement | null {
+    if (TOOLS[run.tool]?.step !== 'implement') return null;
+    const choice = chosenOption(session);
+    if (!choice) return null;
+    const aim = el('p', 'ps-canvas__aim');
+    aim.title = choice.text;
+    aim.append(el('span', 'ps-canvas__aim-meta', 'Aim'), el('span', 'ps-canvas__aim-text', choice.title));
+    return aim;
+  }
 
   function viewFor(run: PsToolRun): View | null {
     const make = RENDERERS[run.tool];
@@ -219,8 +249,11 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
     } else {
       chart.append(renderOutline(run));
     }
-    host.replaceChildren(heading, chart);
+    const aim = aimCaption(session, run);
+    if (aim) host.replaceChildren(heading, aim, chart);
+    else host.replaceChildren(heading, chart);
     displayed = run.id;
+    pushTasks();
     return chart;
   }
 
@@ -289,6 +322,11 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       hadActive = hasActive;
       prune(session);
       render();
+    },
+    /** The page fetched live statuses for the session's confirmed tasks. */
+    setTaskStatuses(next) {
+      statuses = next;
+      pushTasks();
     },
     /** The page is going away: drop every view. */
     destroy() {

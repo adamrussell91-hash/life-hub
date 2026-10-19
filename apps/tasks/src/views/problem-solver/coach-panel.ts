@@ -61,9 +61,10 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
 /**
  * The coach thread. It keeps its DOM between updates: new turns are appended, the thinking
  * bubble is swapped in place for the reply, and the composer keeps what you typed, so the
- * page does not jump while the coach is polled.
+ * page does not jump while the coach is polled. `slots.cards` (the task confirm cards) sits
+ * between the extras and the composer and keeps its own DOM when the extras are replaced.
  */
-export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
+export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: HTMLElement } = {}): CoachPanel {
   const panel = el('section', 'ps-coach');
   panel.setAttribute('aria-label', 'Coach');
   const list = el('ul', 'chat-messages ps-coach__messages');
@@ -94,6 +95,7 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) form.requestSubmit();
   });
   panel.append(list, extras, form);
+  if (slots.cards) panel.insertBefore(slots.cards, form);
 
   const shown = new Set<string>();
   let thinking: HTMLLIElement | null = null;
