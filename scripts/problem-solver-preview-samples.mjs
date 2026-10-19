@@ -465,3 +465,11 @@ SAMPLES.duncker = run(
     { from: 's7', to: 'pa3', kind: 'under' }
   ]
 );
+
+// Contradiction: a small bike-repair co-op that wants quicker turnarounds, but rushing
+// means more bikes come back. The worsening side is contested.
+SAMPLES.contradiction = run('contradiction', [
+  node('i', 'improving', 'How quickly a repaired bike is ready for collection, counted in days from drop-off.', 'Turnaround time'),
+  node('w', 'worsening', 'The share of repaired bikes that come back within a month with the same fault.', 'Repeat repairs', { state: 'contested', objection: 'Does rushing cause the repeats, or do they come from cheap parts?' }),
+  node('s', 'statement', 'The faster we turn repairs round, the more bikes come back with the same fault, because the final safety check is the step that gets squeezed.', 'Speed against quality')
+]);

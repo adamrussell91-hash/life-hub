@@ -3906,6 +3906,176 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-duncker__box { transition: none; }
 }
 
+/* Contradiction (TRIZ's general problem): no book chart, so the tool's emblem. On a yellow
+   ground, a blue triangle pointing up (what should improve) beside a red triangle pointing
+   down (what gets worse), joined by a thin double-headed tension line once both exist. The
+   statement sits in full in a card beneath. The triangles are inline SVG; the focus and open
+   ring is two wide strokes on copies of the triangle behind the fill (paper 2px, then ink 2px),
+   so it follows the slanted sides and is never clipped.
+   Phone: the triangles stay side by side, smaller; below 400px their words go beneath. */
+.ps-contra {
+  /* Named, so every phone query measures this root box. */
+  container: contra / inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+}
+
+.ps-contra__stage {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+  grid-template-areas: 'improving . worsening';
+  align-items: center;
+  width: min(100%, 600px);
+  padding: 32px 40px;
+  border-radius: 32px;
+  background: var(--ps-yellow);
+}
+
+.ps-contra__links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+/* Ink on the yellow ground, 9:1. */
+.ps-contra__line { fill: none; stroke: var(--ps-ink); stroke-width: 2; stroke-dasharray: 1; }
+.ps-contra__head { fill: var(--ps-ink); }
+.ps-contra__tension[hidden],
+.ps-contra__tension.is-cramped { display: none; }
+
+.ps-contra__region--improving { grid-area: improving; }
+.ps-contra__region--worsening { grid-area: worsening; }
+
+.ps-contra__item { --fill: var(--ps-blue); position: relative; z-index: 1; }
+.ps-contra__item--worsening { --fill: var(--ps-red); }
+/* The focused or open triangle rises above the line so its whole ring shows. */
+.ps-contra__item:has(:focus-visible),
+.ps-contra__item.is-open { z-index: 2; }
+
+.ps-contra__shape {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-contra__shape:focus-visible { outline: 2px solid transparent; }
+
+.ps-contra__art { display: block; width: 100%; height: auto; aspect-ratio: 100 / 86; overflow: visible; }
+.ps-contra__fill { fill: var(--fill); transition: fill 240ms var(--ps-ease); }
+/* Hover deepens the fill, so the white words gain contrast rather than lose it. */
+.ps-contra__shape:hover .ps-contra__fill { fill: color-mix(in srgb, var(--fill) 90%, var(--ps-ink)); }
+.ps-contra__ink,
+.ps-contra__paper { display: none; fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: miter; stroke-miterlimit: 8; }
+.ps-contra__ink { stroke: var(--ps-ink); stroke-width: 8px; }
+.ps-contra__paper { stroke: var(--ps-paper); stroke-width: 4px; }
+.ps-contra__shape:focus-visible .ps-contra__ink,
+.ps-contra__shape:focus-visible .ps-contra__paper,
+.ps-contra__item.is-open .ps-contra__ink,
+.ps-contra__item.is-open .ps-contra__paper { display: inline; }
+/* Open but not focused: a slimmer ink line. */
+.ps-contra__item.is-open .ps-contra__shape:not(:focus-visible) .ps-contra__ink { stroke-width: 7px; }
+
+/* The words sit in the wide part of each triangle, never wider than its narrowest line there. */
+.ps-contra__words {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 52%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.ps-contra__item--improving .ps-contra__words { bottom: 7%; }
+.ps-contra__item--worsening .ps-contra__words { top: 7%; }
+
+.ps-contra__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  /* .78 keeps 5.1:1 on blue; white on red needs full strength (5:1). */
+  opacity: 0.78;
+}
+.ps-contra__item--worsening .ps-contra__meta { opacity: 1; }
+
+.ps-contra__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-width: 100%;
+  font: var(--weight-semibold) 15px / 1.18 var(--font-ui);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Full strength, so the tag keeps its contrast on red and blue. */
+.ps-contra .ps-objection { margin-top: 2px; font-size: 9px; line-height: 1.5; opacity: 1; }
+
+/* Details cards, under the ground. */
+.ps-contra__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-contra .ps-details { width: min(100%, 560px); }
+
+/* The statement, in full (like the composed problem statement). */
+.ps-contra__region--statement { width: min(100%, 600px); margin-top: 16px; }
+.ps-contra__statement {
+  padding: 14px 18px 10px;
+  border-top: 3px solid var(--ps-red);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-contra__statement-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ps-contra__statement-meta {
+  color: var(--ps-ink);
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.ps-contra__statement .ps-objection { margin-top: 0; color: var(--ps-ink); }
+.ps-contra__statement-text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+.ps-contra__more {
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ps-contra__more:focus-visible { outline: 2px solid transparent; border-radius: 4px; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
+.ps-contra__statement .ps-details__card { margin-top: 0; padding: 4px 0 8px; background: transparent; box-shadow: none; }
+
+/* Phone: still side by side, smaller. */
+@container contra (max-width: 520px) {
+  .ps-contra__stage { grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); padding: 20px 14px; border-radius: 24px; }
+  .ps-contra__words { width: 54%; }
+  .ps-contra__title { -webkit-line-clamp: 2; font-size: 13px; }
+}
+
+/* Narrow: the words leave the triangles and sit beneath them, ink on the yellow ground
+   (inside, a contested tag would reach the slanted sides). */
+@container contra (max-width: 400px) {
+  .ps-contra__stage { align-items: start; }
+  .ps-contra__words { position: static; width: 100%; margin-top: 8px; transform: none; color: var(--ps-on-yellow); }
+  .ps-contra__item .ps-contra__meta { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-contra__fill { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
