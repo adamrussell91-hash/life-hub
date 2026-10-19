@@ -105,3 +105,17 @@ test('awaiting-learning line for a finished session has no orient clause', () =>
   assert.ok(line);
   assert.doesNotMatch(line, /orient/);
 });
+
+test('slot meanings show tag choices and placed nodes show their tag', async () => {
+  const { TOOLS: T } = await import('../../packages/problem-solver/tools/index.mjs');
+  T.fake_tagged = { id: 'fake_tagged', name: 'Fake', kind: 'diagnostic', step: 'define', when: 'w', failureModes: ['a', 'b'], steps: [{ id: 's', title: 'S', prompt: 'p' }], edgeKinds: [], slots: { pick: 'A pick' }, nodeTags: { pick: ['up', 'down'] }, nextSlots: () => ['pick'], complete: () => false };
+  try {
+    let s = inTool('five_whys');
+    s = { ...s, steps: { ...s.steps, define: { ...s.steps.define, runs: [{ id: 'f', tool: 'fake_tagged', status: 'active', nodes: [{ id: 'n', slot: 'pick', text: 'Rising', tag: 'up', state: 'accepted', skills: [], turnId: 't' }], edges: [] }] } } };
+    const { user } = buildCoachPrompt(s);
+    assert.match(user, /pick = A pick \(tag: up\|down\)/);
+    assert.match(user, /pick \[up\]: Rising/);
+  } finally {
+    delete T.fake_tagged;
+  }
+});

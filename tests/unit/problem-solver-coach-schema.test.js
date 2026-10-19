@@ -52,3 +52,9 @@ test('learning is kept as trimmed text, else null', () => {
   assert.equal(validateCoachTurn({ verdict: 'clarify', message: 'Noted.', learning: '  Rushes to fixes.  ' }).value.learning, 'Rushes to fixes.');
   assert.equal(validateCoachTurn({ verdict: 'clarify', message: 'Noted.' }).value.learning, null);
 });
+
+test('node.tag is kept, trimmed and lowercased', () => {
+  const v = validateCoachTurn({ verdict: 'accept', message: 'ok', node: { slot: 'trend:1', text: 'Fewer walk-ins', tag: ' Declining ' } }).value;
+  assert.equal(v.node.tag, 'declining');
+  assert.equal(validateCoachTurn({ verdict: 'accept', message: 'ok', node: { slot: 'problem', text: 'x' } }).value.node.tag, undefined);
+});

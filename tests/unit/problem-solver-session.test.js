@@ -276,3 +276,12 @@ test('moving on from an archived session is refused', () => {
   const s = archive(framed(), deps);
   assert.throws(() => moveOn(s, deps), (err) => err.status === 409 && err.code === 'action_not_allowed' && err.message === 'This problem is archived.');
 });
+
+test('a placed node keeps its tag, and so does a kept challenged node', () => {
+  let s = framed('seven_step', 'problem_tree');
+  s = applyCoachTurn(s, coach({ node: { slot: 'trunk', text: 'Late deliveries', tag: 'x' } }), deps);
+  assert.equal(activeRun(s).nodes[0].tag, 'x');
+  s = applyCoachTurn(s, coach({ verdict: 'challenge', message: 'Symptom.', node: { slot: 'cause:1', text: 'Busy', tag: 'y' } }), deps);
+  s = keepAnyway(s, deps);
+  assert.equal(activeRun(s).nodes[1].tag, 'y');
+});
