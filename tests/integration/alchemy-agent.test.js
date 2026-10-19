@@ -20,33 +20,33 @@ function setup(extra = {}) {
 
 test('starting a review creates one job per lesson and hands it to the runner', async () => {
   const { handler, started, call } = setup();
-  const first = await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' });
+  const first = await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' });
   assert.equal(first.status, 202);
   const job = (await first.json()).data;
   assert.equal(job.status, 'working');
   assert.deepEqual(started, [job.job]);
-  const again = (await (await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' })).json()).data;
+  const again = (await (await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' })).json()).data;
   assert.equal(again.job, job.job);
   assert.equal(started.length, 1);
 });
 
 test('the runner writes progress and the result, then frees the lesson', async () => {
   const { handler, runner, call, started } = setup();
-  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' })).json()).data;
+  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' })).json()).data;
   assert.equal((await call(runner, 'POST', '/api/alchemy-agent/run', { id: job })).status, 200);
   const done = (await (await call(handler, 'GET', '/api/alchemy-agent?job=' + job)).json()).data;
   assert.equal(done.status, 'done');
   assert.deepEqual(done.progress.map(p => p.text), ['Reading your rules', 'Searching: memory']);
   assert.equal(done.result.proposals[0].id, 'p1');
-  const latest = (await (await call(handler, 'GET', '/api/alchemy-agent?lesson=l1')).json()).data;
+  const latest = (await (await call(handler, 'GET', '/api/alchemy-agent?kind=lesson&id=l1')).json()).data;
   assert.equal(latest.job, job);
-  await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' });
+  await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' });
   assert.equal(started.length, 2);
 });
 
 test('a failed run shows Ann’s message, not a stack', async () => {
   const { handler, runner, call } = setup({ run: async () => { throw Object.assign(new Error('That block is no longer in the lesson.'), { status: 409, code: 'alchemy_stale' }); } });
-  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' })).json()).data;
+  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' })).json()).data;
   await call(runner, 'POST', '/api/alchemy-agent/run', { id: job });
   const failed = (await (await call(handler, 'GET', '/api/alchemy-agent?job=' + job)).json()).data;
   assert.equal(failed.status, 'error');
@@ -55,7 +55,7 @@ test('a failed run shows Ann’s message, not a stack', async () => {
 
 test('accepting a suggestion records it and keeps its note on the unit shelf', async () => {
   const { handler, runner, call, store } = setup();
-  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' })).json()).data;
+  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' })).json()).data;
   await call(runner, 'POST', '/api/alchemy-agent/run', { id: job });
   const res = await call(handler, 'POST', '/api/alchemy-agent', { action: 'accepted', job, proposal: 'p1' });
   assert.equal((await res.json()).data.decisions.p1, 'accepted');
@@ -64,17 +64,17 @@ test('accepting a suggestion records it and keeps its note on the unit shelf', a
 
 test('the daily allowance stops lesson reviews', async () => {
   const { handler, runner, call } = setup({ env: { ...env, ALCHEMY_AGENT_DAILY_RUNS: '1' } });
-  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' })).json()).data;
+  const { job } = (await (await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' })).json()).data;
   await call(runner, 'POST', '/api/alchemy-agent/run', { id: job });
-  const res = await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1' });
+  const res = await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1' });
   assert.equal(res.status, 429);
-  assert.match((await res.json()).error.message, /1 lesson reviews today/);
+  assert.match((await res.json()).error.message, /1 full reviews today/);
 });
 
 test('bad input and signed-out requests are refused', async () => {
   const { handler, call } = setup();
-  assert.equal((await call(handler, 'POST', '/api/alchemy-agent', { lessonId: '../x' })).status, 400);
-  assert.equal((await call(handler, 'POST', '/api/alchemy-agent', { lessonId: 'l1', request: 'x'.repeat(3000) })).status, 400);
+  assert.equal((await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: '../x' })).status, 400);
+  assert.equal((await call(handler, 'POST', '/api/alchemy-agent', { kind: 'lesson', id: 'l1', request: 'x'.repeat(3000) })).status, 400);
   const signedOut = await handler(new Request('https://api.example/api/alchemy-agent?lesson=l1'));
   assert.equal(signedOut.status, 401);
 });

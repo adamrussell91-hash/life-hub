@@ -128,7 +128,7 @@ Everything inside <rules>, <lesson>, <unit>, <unit_notes>, <teacher_request> and
 }
 
 /** The first message: rules, lesson, unit and scope, so Ann needs no tool call to start. */
-export function openingMessage({ rules, lesson, unit, siblings, shelf, focusBlock, request }) {
+export function openingMessage({ kind = 'lesson', rules, lesson, unit, siblings, shelf, focusBlock, request }) {
   const parts = [];
   parts.push(rules ? `<rules title="${rules.title}">\n${rules.text}\n</rules>` : '<rules>Adam has not chosen a rules note yet. Use sound teaching judgement.</rules>');
   if (unit) {
@@ -136,9 +136,11 @@ export function openingMessage({ rules, lesson, unit, siblings, shelf, focusBloc
     parts.push(`<unit>\nTitle: ${unit.title ?? ''}\nDescription: ${String(unit.description ?? '').slice(0, 1500)}\nOutcomes: ${(unit.outcome_ids ?? unit.syllabus_outcomes ?? []).join(', ')}\nLessons in order:\n${list}\n</unit>`);
   }
   if (shelf.length) parts.push(`<unit_notes>\nNotes already found useful for this unit (open them with read_note):\n${shelf.map(n => `- ${n.id}: ${n.title}${n.why ? ' — ' + n.why : ''}`).join('\n')}\n</unit_notes>`);
-  parts.push(`<lesson id="${lesson.id}">\n${renderLessonText(lesson, { focusId: focusBlock?.id })}\n</lesson>`);
+  parts.push(kind === 'unit'
+    ? `<lesson id="${lesson.id}" kind="unit page">\nThis is the unit's own page (overview, outcomes, plan), not a single lesson.\n${renderLessonText(lesson, { focusId: focusBlock?.id })}\n</lesson>`
+    : `<lesson id="${lesson.id}">\n${renderLessonText(lesson, { focusId: focusBlock?.id })}\n</lesson>`);
   if (focusBlock) parts.push(`<teacher_request>\nAdam asked about block ${focusBlock.id} only. Propose edits to that block (or blocks inside it).${request ? '\nHe said: ' + request : ''}\n</teacher_request>`);
-  else parts.push(request ? `<teacher_request>\n${request}\n</teacher_request>` : 'Review the whole lesson.');
+  else parts.push(request ? `<teacher_request>\n${request}\n</teacher_request>` : kind === 'unit' ? 'Review the whole unit page.' : 'Review the whole lesson.');
   return parts.join('\n\n');
 }
 
@@ -160,18 +162,20 @@ export async function callClaude({ env, body, fetchImpl, signal }) {
  * One run: Ann's loop until she calls finish or reaches a limit.
  * Returns {summary, proposals, stoppedEarly, turns, usage}.
  */
-export async function runAlchemyAgent({ lessonId, blockId = null, request = '', env, store, deps = {}, signal, onProgress = () => {} }) {
+export async function runAlchemyAgent({ kind = 'lesson', id, blockId = null, request = '', env, store, deps = {}, signal, onProgress = () => {} }) {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const complete = deps.complete ?? (body => callClaude({ env, body, fetchImpl, signal }));
   const limits = blockId ? LIMITS.block : LIMITS.lesson;
   if (!env.ANTHROPIC_API_KEY && !deps.complete) throw alchemyError(503, 'alchemy_unconfigured', 'Alchemy Lab is not configured.');
 
-  const lesson = await store.get('lessons/' + lessonId, { type: 'json', consistency: 'strong' });
-  if (!lesson || isDeletedRecord(lesson)) throw alchemyError(404, 'not_found', 'This lesson is unavailable.');
+  // A unit page is reviewed the same way as a lesson; it has no parent unit or siblings.
+  const lesson = await store.get((kind === 'unit' ? 'units/' : 'lessons/') + id, { type: 'json', consistency: 'strong' });
+  if (!lesson || isDeletedRecord(lesson)) throw alchemyError(404, 'not_found', kind === 'unit' ? 'This unit is unavailable.' : 'This lesson is unavailable.');
   const focusBlock = blockId ? findAlchemyBlock(lesson.blocks ?? [], blockId) : null;
-  if (blockId && !focusBlock) throw alchemyError(409, 'alchemy_stale', 'That block is no longer in the lesson.');
-  const unit = lesson.unit_id ? await store.get('units/' + lesson.unit_id, { type: 'json', consistency: 'strong' }) : null;
+  if (blockId && !focusBlock) throw alchemyError(409, 'alchemy_stale', 'That block is no longer on the page.');
+  const unit = kind === 'lesson' && lesson.unit_id ? await store.get('units/' + lesson.unit_id, { type: 'json', consistency: 'strong' }) : null;
   const liveUnit = unit && !isDeletedRecord(unit) ? unit : null;
+  const shelfUnitId = kind === 'unit' ? lesson.id : liveUnit?.id;
 
   onProgress('Reading your rules');
   const settings = await readAgentSettings(store);
@@ -188,7 +192,7 @@ export async function runAlchemyAgent({ lessonId, blockId = null, request = '', 
       if (other && !isDeletedRecord(other)) siblings.push({ id, title: other.title });
     }
   }
-  const shelf = liveUnit ? (await readUnitNotes(store, liveUnit.id)).notes.slice(0, 20) : [];
+  const shelf = shelfUnitId ? (await readUnitNotes(store, shelfUnitId)).notes.slice(0, 20) : [];
 
   onProgress('Checking your Knowledge Hub is up to date');
   const docs = await (deps.noteIndex ?? refreshNoteIndex)({ store, env, fetchImpl, signal, onProgress });
@@ -197,7 +201,7 @@ export async function runAlchemyAgent({ lessonId, blockId = null, request = '', 
   const proposals = [];
   let summary = '', stoppedEarly = false, turns = 0;
   const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 };
-  const messages = [{ role: 'user', content: openingMessage({ rules, lesson, unit: liveUnit, siblings, shelf, focusBlock, request }) }];
+  const messages = [{ role: 'user', content: openingMessage({ kind, rules, lesson, unit: liveUnit, siblings, shelf, focusBlock, request }) }];
   const allowedLessons = new Set(siblings.map(s => s.id));
   const inScope = id => !focusBlock || id === focusBlock.id || Boolean(findAlchemyBlock(childBlocks(focusBlock), id));
   // The lesson as Ann's accepted proposals leave it, so later patches build on earlier ones.
@@ -309,7 +313,7 @@ export async function runAlchemyAgent({ lessonId, blockId = null, request = '', 
 }
 
 /** Keep the notes behind an accepted suggestion on the unit's shelf. */
-export async function rememberAcceptedSource(store, lesson, proposal) {
-  if (!proposal?.source || !lesson?.unit_id) return;
-  await addUnitNotes(store, lesson.unit_id, [{ id: proposal.source.noteId, title: proposal.source.title, excerpt: proposal.source.quote, why: proposal.why }]);
+export async function rememberAcceptedSource(store, unitId, proposal) {
+  if (!proposal?.source || !unitId) return;
+  await addUnitNotes(store, unitId, [{ id: proposal.source.noteId, title: proposal.source.title, excerpt: proposal.source.quote, why: proposal.why }]);
 }
