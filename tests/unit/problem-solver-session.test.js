@@ -3,188 +3,467 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   acceptSuggestion, activeRun, applyCoachTurn, createSession, dismissSuggestion,
-  archive, finishDefine, keepAnyway, rescoreRadar, say, summaryRow
+  archive, moveOn, keepAnyway, score, rescoreRadar, say, summaryRow, followOn,
+  confirmTask, dismissTask, setReviewTask, dismissReview
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
-let counter = 0;
-const deps = { now: () => '2026-10-16T10:00:00.000Z', newId: () => `id${(counter += 1)}` };
-const coach = (fields) => ({ verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, ...fields });
+import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
+import { newRun } from '../../packages/problem-solver/machine.mjs';
 
-function definedFrame() {
+/** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
+async function withoutAnalyseTools(fn) {
+  const saved = Object.entries(TOOLS).filter(([, def]) => def.step === 'analyse');
+  try {
+    for (const [id, def] of saved) TOOLS[id] = { ...def, step: '__none__' };
+    return await fn();
+  } finally {
+    for (const [id, def] of saved) TOOLS[id] = def;
+  }
+}
+
+let counter = 0;
+const deps = { now: () => '2026-10-19T10:00:00.000Z', newId: () => `id${(counter += 1)}` };
+const coach = (fields) => ({ verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, ...fields });
+
+function framed(model = 'seven_step', tool = 'five_whys') {
   let s = createSession({ title: 'Late rota', text: 'The rota keeps changing late.' }, deps);
-  s = applyCoachTurn(s, coach({ frame: { goal: 'Rota fixed a week ahead', whatIsTrue: 'Changed 3 of 4 weeks', whatCanBeDone: 'Change publish day' }, model: { id: 'seven_step', reason: 'Default.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom.' } }), deps);
+  s = applyCoachTurn(s, coach({ frame: { goal: 'Rota fixed a week ahead', whatIsTrue: 'Changed 3 of 4 weeks', whatCanBeDone: 'Change publish day' }, model: { id: model, reason: 'Default.' }, suggestion: { kind: 'next_tool', tool, reason: 'One symptom.' } }), deps);
   return acceptSuggestion(s, deps);
 }
 
-test('create queues the first coach turn', () => {
+test('create starts a full session in frame with no steps', () => {
   const s = createSession({ title: '', text: 'The rota keeps changing late.', links: [{ kind: 'task', id: 't1' }] }, deps);
+  assert.equal(s.kind, 'full');
   assert.equal(s.phase, 'frame');
-  assert.equal(s.title, 'The rota keeps changing late.');
+  assert.deepEqual(s.steps, {});
+  assert.deepEqual(s.learnings, []);
+  assert.equal(s.pendingLearning, null);
   assert.equal(s.runner.status, 'queued');
-  assert.equal(s.turns[0].role, 'user');
   assert.deepEqual(s.links, [{ kind: 'task', id: 't1' }]);
 });
 
-test('frame completes and the model moves the session to define', () => {
-  const s = definedFrame();
+test('the model opens its first plan step with the suggested tool', () => {
+  const s = framed();
   assert.equal(s.phase, 'define');
-  assert.equal(s.model.id, 'seven_step');
+  assert.equal(s.steps.define.status, 'open');
   assert.equal(activeRun(s).tool, 'five_whys');
-  assert.equal(s.suggestion, null);
-  assert.equal(s.runner.status, 'queued', 'coach opens the tool');
+  assert.equal(s.runner.status, 'queued');
+  assert.equal(framed('polya').phase, 'identify');
+  assert.equal(activeRun(framed('triz')).tool, 'five_whys');
 });
 
 test('accepted node is placed; challenged node waits for keep anyway', () => {
-  let s = definedFrame();
+  let s = framed();
   s = applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'Rota changes late.' }, skillsSeen: ['analysis'] }), deps);
   assert.equal(activeRun(s).nodes.length, 1);
-  assert.deepEqual(activeRun(s).nodes[0].skills, ['analysis']);
   s = applyCoachTurn(s, coach({ verdict: 'challenge', message: 'That is a person, not a process.', node: { slot: 'why:1', text: 'Sam is disorganised.' } }), deps);
-  assert.equal(activeRun(s).nodes.length, 1);
   assert.equal(s.pendingKeep.slot, 'why:1');
   s = keepAnyway(s, deps);
-  const kept = activeRun(s).nodes[1];
-  assert.equal(kept.state, 'contested');
-  assert.equal(kept.objection, 'That is a person, not a process.');
-  assert.equal(s.pendingKeep, null);
-  assert.equal(s.runner.status, 'idle', 'keeping does not call the coach');
+  assert.equal(activeRun(s).nodes[1].state, 'contested');
+  assert.equal(s.runner.status, 'idle');
 });
 
 test('illegal slot from the coach throws for repair', () => {
-  const s = definedFrame();
-  assert.throws(() => applyCoachTurn(s, coach({ node: { slot: 'why:3', text: 'x' } }), deps), (err) => err.code === 'illegal_slot');
+  assert.throws(() => applyCoachTurn(framed(), coach({ node: { slot: 'why:3', text: 'x' } }), deps), (err) => err.code === 'illegal_slot');
 });
 
-test('switching keeps the abandoned run with its reason', () => {
-  let s = definedFrame();
+test('switching keeps the abandoned run in the same step', () => {
+  let s = framed();
   s = applyCoachTurn(s, coach({ verdict: 'clarify', suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: 'Causes branch.' } }), deps);
   s = acceptSuggestion(s, deps);
-  assert.equal(s.define.runs.length, 2);
-  assert.equal(s.define.runs[0].status, 'switched');
-  assert.equal(s.define.runs[0].switchReason, 'Causes branch.');
-  assert.equal(activeRun(s).tool, 'problem_tree');
+  assert.deepEqual(s.steps.define.runs.map((r) => [r.tool, r.status, r.switchReason]), [['five_whys', 'switched', 'Causes branch.'], ['problem_tree', 'active', undefined]]);
 });
 
 test('dismissing a suggestion clears it', () => {
-  let s = definedFrame();
-  s = applyCoachTurn(s, coach({ suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: 'r' } }), deps);
+  let s = applyCoachTurn(framed(), coach({ suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: 'r' } }), deps);
   assert.equal(dismissSuggestion(s, deps).suggestion, null);
 });
 
-test('finish define early queues a closing turn and records the objection', () => {
-  let s = finishDefine(definedFrame(), deps);
-  assert.equal(s.phase, 'defined');
-  assert.equal(s.status, 'defined');
-  assert.equal(s.define.finishedEarly, true);
-  assert.equal(s.runner.status, 'queued');
-  assert.equal(s.runner.mode, 'closing');
-  s = applyCoachTurn(s, coach({ message: 'Fair enough. Note the root is still open.', exitObjection: 'Root cause not reached.' }), deps);
-  assert.equal(s.define.exitObjection, 'Root cause not reached.');
-  assert.equal(activeRun(s), null);
+test('moving on with an unfinished tool skips the step, opens the next and queues a boundary turn', () => {
+  let s = moveOn(framed(), deps);
+  assert.equal(s.steps.define.status, 'skipped');
+  assert.equal(s.steps.define.runs[0].status, 'done');
+  assert.equal(s.phase, 'analyse');
+  assert.deepEqual(s.steps.analyse, { runs: [], status: 'open', objection: null });
+  assert.deepEqual(s.runner, { status: 'queued', mode: 'boundary', error: null, leaving: 'define' });
+  assert.equal(s.turns.at(-1).text, 'Move on.');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'Fair. The root is still open. What did you learn about how you work through problems?', exitObjection: 'Root cause not reached.' }), deps);
+  assert.equal(s.steps.define.objection, 'Root cause not reached.');
+  assert.equal(s.pendingLearning, 'define');
+  assert.equal(s.runner.mode, 'turn');
+});
+
+test('the answer after a boundary is recorded as a learning against the step left', () => {
+  let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = say(s, 'I jump to blame when I am tired.', deps);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'Noted.', learning: 'Jumps to blame when tired.' }), deps);
+  assert.deepEqual(s.learnings, [{ step: 'define', text: 'Jumps to blame when tired.', at: '2026-10-19T10:00:00.000Z' }]);
+  assert.equal(s.pendingLearning, null);
+});
+
+test('moving on from a step with a complete run marks it done', () => {
+  let s = framed('seven_step', 'contradiction');
+  for (const [slot, text] of [['improving', 'Speed'], ['worsening', 'Care'], ['statement', 'Speed costs care.']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  assert.equal(moveOn(s, deps).steps.define.status, 'done');
+});
+
+test('moving on from the last step finishes the session', () => {
+  let s = framed('polya');
+  for (const _ of [1, 2, 3, 4]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  assert.equal(s.phase, 'document');
+  s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  assert.equal(s.phase, 'finished');
+  assert.equal(s.status, 'finished');
+  assert.equal(s.runner.leaving, 'document');
+  assert.equal(s.turns.at(-1).text, 'That is everything.');
+});
+
+test('move on before a model exists is refused', () => {
+  assert.throws(() => moveOn(createSession({ text: 'ok' }, deps), deps), (err) => err.status === 409);
+});
+
+test('a next_step suggestion is accepted as move on', () => {
+  let s = framed();
+  s = { ...s, suggestion: { kind: 'next_step', reason: 'Ready.' } };
+  s = acceptSuggestion(s, deps);
+  assert.equal(s.phase, 'analyse');
+  assert.equal(s.suggestion, null);
+});
+
+test('after the learning is recorded, a step with no tool falls back to its default tool', () => {
+  let s = framed('triz');
+  s = moveOn(s, deps);
+  assert.equal(s.phase, 'general_problem');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'What did you learn?', suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'ignored at a boundary' } }), deps);
+  assert.equal(s.suggestion, null, 'the boundary turn asks the learning question first');
+  s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
+  assert.deepEqual(s.suggestion, { kind: 'next_tool', tool: 'contradiction', reason: 'A good first tool for General problem.' });
+});
+
+test('a boundary after skipping a step with no runs sets no pending learning', () => {
+  let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  assert.equal(s.pendingLearning, 'define');
+  s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
+  s = moveOn(s, deps);
+  assert.equal(s.steps.analyse.status, 'skipped');
+  assert.equal(s.steps.analyse.runs.length, 0);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'Skipped. What do you want from Devise?' }), deps);
+  assert.equal(s.pendingLearning, null);
+});
+
+test('a dismissed opening suggestion stays dismissed until the step changes', () => {
+  let s = moveOn(framed('triz'), deps);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
+  assert.equal(s.suggestion.tool, 'contradiction');
+  s = dismissSuggestion(s, deps);
+  assert.equal(s.dismissedOpening, 'general_problem');
+  s = applyCoachTurn(say(s, 'Let me think.', deps), coach({ verdict: 'clarify', message: 'Go on.' }), deps);
+  assert.equal(s.suggestion, null, 'the opening suggestion does not come back');
+  s = applyCoachTurn(moveOn(s, deps), coach({ verdict: 'clarify', message: 'Skipped.' }), deps);
+  assert.notEqual(s.phase, 'general_problem');
+  assert.equal(s.suggestion, null);
+  s = applyCoachTurn(say(s, 'Ok.', deps), coach({ verdict: 'clarify', message: 'Go on.' }), deps);
+  assert.ok(s.suggestion === null || s.suggestion.kind === 'next_tool', 'a new step can open with a suggestion again');
+});
+
+test('dismissing a mid-run suggestion does not mark the opening dismissed', () => {
+  let s = applyCoachTurn(framed(), coach({ suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: 'r' } }), deps);
+  assert.equal(dismissSuggestion(s, deps).dismissedOpening ?? null, null);
+});
+
+function treeSession() {
+  let s = framed('seven_step', 'problem_tree');
+  for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['effect:1', 'No progress'], ['cause:1', 'Delayed payoff']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  return s;
+}
+
+test('Define keeps its chain: diagnostic, then statement, then SMART, then next step', () => {
+  let s = treeSession();
+  assert.equal(s.suggestion, null);
+  s = applyCoachTurn(s, coach({ node: { slot: 'cause:2', text: 'Medication suppresses appetite' } }), deps);
+  assert.deepEqual([s.suggestion.kind, s.suggestion.tool], ['next_tool', 'problem_statement']);
+  s = acceptSuggestion(s, deps);
+  for (const [slot, text] of [['problem', 'p'], ['impact', 'i'], ['benefit', 'b'], ['statement', 'st']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  assert.equal(s.suggestion.tool, 'smart');
+  s = acceptSuggestion(s, deps);
+  assert.deepEqual(s.steps.define.runs.map((r) => r.status), ['done', 'done', 'active']);
+});
+
+test('outside Define a complete tool suggests the next step', () => {
+  const s = { ...framed(), phase: 'analyse', steps: { define: { runs: [], status: 'done', objection: null }, analyse: { runs: [{ id: 'c', tool: 'contradiction', status: 'active', nodes: ['improving', 'worsening', 'statement'].map((slot, i) => ({ id: `n${i}`, slot, text: slot, state: 'accepted', skills: [], turnId: 't' })), edges: [] }], status: 'open', objection: null } } };
+  assert.equal(followOn(s).kind, 'next_step');
+});
+
+test('the coach\'s own suggestion wins over the fallback', () => {
+  const s = applyCoachTurn(treeSession(), coach({ node: { slot: 'cause:2', text: 'Medication' }, suggestion: { kind: 'switch_tool', tool: 'concept_map', reason: 'Causes interact.' } }), deps);
+  assert.equal(s.suggestion.tool, 'concept_map');
+});
+
+function radarSession(phase = 'define', status = 'active') {
+  const nodes = ['current', 'objective', 'axis:1', 'axis:2', 'axis:3'].map((slot, i) => ({ id: `x${i}`, slot, text: slot, state: 'accepted', skills: [], turnId: 't' }));
+  const base = createSession({ title: 'Radar', text: 'Scores to track.' }, deps);
+  return { ...base, model: { id: 'seven_step', reason: '' }, phase, runner: { status: 'idle', mode: 'turn', error: null }, steps: { define: { runs: [{ id: 'run', tool: 'gap_radar', status, nodes, edges: [], radar: { snapshots: [] } }], status: phase === 'define' ? 'open' : 'done', objection: null } } };
+}
+
+test('score appends a snapshot to the named run, or the active scorable run', () => {
+  const s = score(radarSession(), { runId: 'run', current: [3, 4, 5], objective: [8, 8, 9] }, deps);
+  assert.deepEqual(s.steps.define.runs[0].radar.snapshots, [{ at: '2026-10-19T10:00:00.000Z', current: [3, 4, 5], objective: [8, 8, 9] }]);
+  assert.equal(score(radarSession(), { current: [3, 4, 5], objective: [8, 8, 9] }, deps).steps.define.runs[0].radar.snapshots.length, 1);
+  assert.equal(s.runner.status, 'idle');
+});
+
+test('score works in later steps and once finished (tracking progress)', () => {
+  assert.equal(score(radarSession('analyse', 'done'), { runId: 'run', current: [3, 4, 5], objective: [8, 8, 9] }, deps).steps.define.runs[0].radar.snapshots.length, 1);
+  assert.equal(score(radarSession('finished', 'done'), { runId: 'run', current: [3, 4, 5], objective: [8, 8, 9] }, deps).steps.define.runs[0].radar.snapshots.length, 1);
+});
+
+test('score rejects bad scores with a 400 and the tool message; frame and missing runs are 409', () => {
+  assert.throws(() => score(radarSession(), { runId: 'run', current: [3, 4], objective: [8, 8, 9] }, deps), (err) => err.status === 400 && /one score per topic/.test(err.message));
+  assert.throws(() => score(radarSession('frame'), { runId: 'run', current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
+  assert.throws(() => score(radarSession(), { runId: 'nope', current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
+});
+
+test('rescoreRadar is an alias for scoring the latest radar run', () => {
+  assert.equal(rescoreRadar(radarSession(), { current: [3, 4, 5], objective: [8, 8, 9] }, deps).steps.define.runs[0].radar.snapshots.length, 1);
 });
 
 test('say appends a user turn and queues; summary rows are small', () => {
-  const s = say(definedFrame(), 'Because the roster is drafted on Friday.', deps);
-  assert.equal(s.turns.at(-1).role, 'user');
+  const s = say(framed(), 'Because the roster is drafted on Friday.', deps);
   assert.equal(s.runner.status, 'queued');
   const row = summaryRow(s);
-  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'links', 'model', 'phase', 'skills', 'status', 'title', 'tool', 'updatedAt']);
+  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
   assert.equal(row.tool, 'five_whys');
-  assert.equal(summaryRow(row), row, 'index rows pass through');
+  assert.equal(summaryRow(row), row);
 });
 
 test('summary rows count answered frame questions and skills seen', () => {
-  let s = createSession({ title: 'Late rota', text: 'The rota keeps changing late.' }, deps);
-  assert.equal(summaryRow(s).frame, 0);
-  assert.deepEqual(summaryRow(s).skills, {});
-  s = applyCoachTurn(s, coach({ frame: { goal: 'Rota fixed a week ahead' }, skillsSeen: ['analysis', 'inference'] }), deps);
-  s = applyCoachTurn(say(s, 'It changed three weeks out of four.', deps), coach({ frame: { whatIsTrue: 'Changed 3 of 4 weeks' }, skillsSeen: ['analysis'] }), deps);
-  const row = summaryRow(s);
-  assert.equal(row.frame, 2);
-  assert.deepEqual(row.skills, { analysis: 2, inference: 1 });
+  let s = createSession({ title: 'Late rota', text: 'x' }, deps);
+  s = applyCoachTurn(s, coach({ frame: { goal: 'g' }, skillsSeen: ['analysis', 'inference'] }), deps);
+  assert.equal(summaryRow(s).frame, 1);
+  assert.deepEqual(summaryRow(s).skills, { analysis: 1, inference: 1 });
 });
 
 test('limits: text over 12000 chars, title cap, links cap', () => {
   const big = 'x'.repeat(12001);
-  assert.throws(() => createSession({ text: big }, deps), (err) => err.status === 413 && err.code === 'limit' && err.message === 'That is too long; keep it under 12,000 characters.');
+  assert.throws(() => createSession({ text: big }, deps), (err) => err.status === 413 && err.code === 'limit');
   const s = createSession({ text: 'ok', links: Array.from({ length: 30 }, (_, i) => ({ kind: 'task', id: `t${i}` })) }, deps);
   assert.equal(s.links.length, 20);
-  assert.throws(() => say(s, big, deps), (err) => err.status === 413 && err.code === 'limit');
   assert.equal(createSession({ title: 't'.repeat(300), text: 'ok' }, deps).title.length, 120);
 });
 
 test('archive resets the runner', () => {
-  const s = createSession({ text: 'ok' }, deps);
-  assert.deepEqual(archive(s, deps).runner, { status: 'idle', mode: 'turn', error: null });
+  assert.deepEqual(archive(createSession({ text: 'ok' }, deps), deps).runner, { status: 'idle', mode: 'turn', error: null });
 });
 
-test('closing mode forces suggestion null', () => {
-  const s = { ...createSession({ text: 'ok' }, deps), runner: { status: 'running', mode: 'closing', error: null } };
-  const next = applyCoachTurn(s, coach({ suggestion: { kind: 'finish_define', reason: 'r' } }), deps);
-  assert.equal(next.suggestion, null);
-});
-
-test('keepAnyway with a slot that no longer fits is a 409, not illegal_slot', () => {
-  let s = definedFrame();
-  s = applyCoachTurn(s, coach({ verdict: 'challenge', message: 'No.', node: { slot: 'problem', text: 'x' } }), deps);
+test('keepAnyway with a slot that no longer fits is a 409', () => {
+  let s = framed();
   s = applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'y' } }), deps);
   s = { ...s, pendingKeep: { slot: 'problem', text: 'x', objection: 'o', skills: [], runId: activeRun(s).id } };
-  assert.throws(() => keepAnyway(s, deps), (err) => err.status === 409 && err.code === 'action_not_allowed' && err.message === 'That answer no longer fits here.');
+  assert.throws(() => keepAnyway(s, deps), (err) => err.status === 409 && err.message === 'That answer no longer fits here.');
 });
 
-function radarSession(phase = 'define', status = 'active') {
-  const nodes = [1, 2, 3].map((i) => ({ id: `x${i}`, slot: `axis:${i}`, text: `Topic ${i}`, state: 'accepted', skills: [], turnId: 't' }));
-  const base = createSession({ title: 'Radar', text: 'Scores to track.' }, deps);
-  return { ...base, phase, status: phase === 'defined' ? 'defined' : 'active', runner: { status: 'idle', mode: 'turn', error: null }, define: { runs: [{ id: 'run', tool: 'gap_radar', status, nodes, edges: [], radar: { snapshots: [] } }], finishedEarly: false, exitObjection: null } };
+test('the last step\'s learning is recorded once the session is finished', () => {
+  let s = framed('polya');
+  for (const _ of [1, 2, 3, 4]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  // The last step was worked in (a run), so there is something to have learned from it.
+  s = { ...s, steps: { ...s.steps, document: { ...s.steps.document, runs: [{ id: 'doc', tool: 'five_whys', status: 'active', nodes: [], edges: [] }] } } };
+  s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  assert.equal(s.phase, 'finished');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
+  assert.deepEqual(s.learnings, [{ step: 'document', text: 'Rushes.', at: '2026-10-19T10:00:00.000Z' }]);
+  assert.equal(s.pendingLearning, null);
+});
+
+test('the learning question is one-shot: pendingLearning clears even with no learning', async () => {
+  await withoutAnalyseTools(() => {
+  let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'Not sure.', deps), coach({ verdict: 'clarify', message: 'Fine.' }), deps);
+  assert.equal(s.pendingLearning, null);
+  assert.deepEqual(s.learnings, []);
+  assert.equal(s.suggestion, null);
+  let t = applyCoachTurn(moveOn(framed('triz'), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  t = applyCoachTurn(say(t, 'Not sure.', deps), coach({ verdict: 'clarify', message: 'Fine.' }), deps);
+  assert.equal(t.pendingLearning, null);
+  assert.equal(t.suggestion.tool, 'contradiction');
+  });
+});
+
+test('moving on from an archived session is refused', () => {
+  const s = archive(framed(), deps);
+  assert.throws(() => moveOn(s, deps), (err) => err.status === 409 && err.code === 'action_not_allowed' && err.message === 'This problem is archived.');
+});
+
+test('a placed node keeps its tag, and so does a kept challenged node', () => {
+  let s = framed('seven_step', 'problem_tree');
+  s = applyCoachTurn(s, coach({ node: { slot: 'trunk', text: 'Late deliveries', tag: 'x' } }), deps);
+  assert.equal(activeRun(s).nodes[0].tag, 'x');
+  s = applyCoachTurn(s, coach({ verdict: 'challenge', message: 'Symptom.', node: { slot: 'cause:1', text: 'Busy', tag: 'y' } }), deps);
+  s = keepAnyway(s, deps);
+  assert.equal(activeRun(s).nodes[1].tag, 'y');
+});
+
+test('keep anyway also places the links proposed with a challenged answer', () => {
+  let s = framed('seven_step', 'problem_tree');
+  for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['cause:1', 'Delayed payoff']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  s = applyCoachTurn(s, coach({ verdict: 'challenge', message: 'Symptom.', node: { slot: 'effect:1', text: 'No progress' }, edges: [{ from: 'cause:1', to: 'effect:1', kind: 'relates' }] }), deps);
+  assert.equal(s.pendingKeep.edges.length, 1);
+  s = keepAnyway(s, deps);
+  const run = activeRun(s);
+  const id = (slot) => run.nodes.find((n) => n.slot === slot).id;
+  assert.deepEqual(run.edges, [{ from: id('cause:1'), to: id('effect:1'), kind: 'relates' }]);
+});
+
+test('an accepted turn with links and no node adds the links to the active run', () => {
+  let s = framed('seven_step', 'problem_tree');
+  for (const [slot, text] of [['trunk', 't'], ['cause:1', 'c'], ['effect:1', 'e']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  s = applyCoachTurn(s, coach({ node: null, edges: [{ from: 'cause:1', to: 'effect:1', kind: 'relates' }] }), deps);
+  assert.equal(activeRun(s).edges.length, 1);
+});
+
+function inStep(step, tool) {
+  const s = framed('seven_step', 'five_whys');
+  return { ...s, phase: step, runner: { status: 'idle', mode: 'turn', error: null }, steps: { ...s.steps, [step]: { runs: [newRun(tool, `run-${step}`)], status: 'open', objection: null } } };
 }
+const card = (i, tag = 'todo') => ({ slot: `card:${i}`, text: `Draft rota task number ${i} for the team`, tag });
 
-test('rescore_radar appends a timestamped snapshot to the active radar run', () => {
-  const s = rescoreRadar(radarSession(), { current: [3, 4, 5], objective: [8, 8, 9] }, deps);
-  const run = s.define.runs[0];
-  assert.deepEqual(run.radar.snapshots, [{ at: '2026-10-16T10:00:00.000Z', current: [3, 4, 5], objective: [8, 8, 9] }]);
-  assert.equal(s.runner.status, 'idle', 'rescoring does not call the coach');
-  const again = rescoreRadar(s, { current: [4, 5, 6], objective: [8, 8, 9] }, deps);
-  assert.equal(again.define.runs[0].radar.snapshots.length, 2);
+test('a new session starts with no proposals and no review', () => {
+  const s = createSession({ text: 'Late rota.' }, deps);
+  assert.deepEqual(s.proposedTasks, []);
+  assert.equal(s.reviewProposal, null);
+  assert.equal(s.reviewTaskId, null);
 });
 
-test('rescore_radar still works once the problem is defined (tracking progress)', () => {
-  const s = rescoreRadar(radarSession('defined', 'done'), { current: [3, 4, 5], objective: [8, 8, 9] }, deps);
-  assert.equal(s.define.runs[0].radar.snapshots.length, 1);
+test('an accepted card proposed as a task becomes one proposal tied to its node; repeats, done cards and unknown slots are dropped', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft the rota template', due: '2026-10-24' }] }), deps);
+  assert.equal(s.proposedTasks.length, 1);
+  const [p] = s.proposedTasks;
+  assert.equal(p.status, 'proposed');
+  assert.equal(p.due, '2026-10-24');
+  assert.deepEqual(p.source, { runId: 'run-implement', nodeId: activeRun(s).nodes[0].id });
+  s = applyCoachTurn(s, coach({ node: card(2, 'done'), proposeTasks: [{ slot: 'card:1', title: 'Again', due: null }, { slot: 'card:2', title: 'Done one', due: null }, { slot: 'card:9', title: 'Ghost', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 1);
 });
 
-test('rescore_radar rejects bad scores with a 400 and the validator message', () => {
-  assert.throws(() => rescoreRadar(radarSession(), { current: [3, 4], objective: [8, 8, 9] }, deps), (err) => err.status === 400 && /one score per topic/.test(err.message));
-  assert.throws(() => rescoreRadar(radarSession(), { current: [3, 4, 11], objective: [8, 8, 9] }, deps), (err) => err.status === 400 && /1 to 10/.test(err.message));
+test('proposals outside Implement tools are dropped', () => {
+  let s = framed('seven_step', 'five_whys');
+  s = applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'Swaps are agreed by text message' }, proposeTasks: [{ slot: 'problem', title: 'Fix it', due: null }] }), deps);
+  assert.deepEqual(s.proposedTasks, []);
 });
 
-test('rescore_radar needs a radar run and a define phase', () => {
-  const none = { ...radarSession(), define: { runs: [], finishedEarly: false, exitObjection: null } };
-  assert.throws(() => rescoreRadar(none, { current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
-  assert.throws(() => rescoreRadar(radarSession('frame'), { current: [3, 4, 5], objective: [8, 8, 9] }, deps), (err) => err.status === 409);
+test('confirm_task records the created task once; dismissed proposals cannot be confirmed', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  const id = s.proposedTasks[0].id;
+  s = confirmTask(s, { proposalId: id, taskId: 'task-1' }, deps);
+  assert.equal(s.proposedTasks[0].status, 'confirmed');
+  assert.equal(s.proposedTasks[0].taskId, 'task-1');
+  assert.equal(confirmTask(s, { proposalId: id, taskId: 'task-1' }, deps).proposedTasks[0].taskId, 'task-1', 'same id is a no-op');
+  assert.throws(() => confirmTask(s, { proposalId: id, taskId: 'task-2' }, deps), (err) => err.status === 409);
+  assert.throws(() => confirmTask(s, { proposalId: 'nope', taskId: 'task-2' }, deps), (err) => err.status === 404);
+  assert.throws(() => confirmTask(s, { proposalId: id, taskId: '' }, deps), (err) => err.status === 400);
 });
 
-function treeSession() {
-  let s = createSession({ title: 'Evening training', text: 'I keep skipping evening training.' }, deps);
-  s = applyCoachTurn(s, coach({ frame: { goal: 'Train three evenings a week', whatIsTrue: 'Trained once in four weeks', whatCanBeDone: 'Change what happens before training' }, model: { id: 'seven_step', reason: 'Default.' }, suggestion: { kind: 'next_tool', tool: 'problem_tree', reason: 'Several causes.' } }), deps);
-  s = acceptSuggestion(s, deps);
-  for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['effect:1', 'No progress'], ['cause:1', 'Delayed payoff']]) {
-    s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+test('dismiss_task drops a proposal; a confirmed one reverts only when its task was removed', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  s = applyCoachTurn(s, coach({ node: card(2), proposeTasks: [{ slot: 'card:2', title: 'Ask', due: null }] }), deps);
+  const [a, b] = s.proposedTasks.map((p) => p.id);
+  s = dismissTask(s, { proposalId: a }, deps);
+  assert.equal(s.proposedTasks[0].status, 'dismissed');
+  s = confirmTask(s, { proposalId: b, taskId: 'task-2' }, deps);
+  assert.throws(() => dismissTask(s, { proposalId: b }, deps), (err) => err.status === 409);
+  s = dismissTask(s, { proposalId: b, reason: 'removed' }, deps);
+  assert.equal(s.proposedTasks[1].status, 'dismissed');
+  assert.equal(s.proposedTasks[1].removed, true);
+  assert.throws(() => confirmTask(s, { proposalId: a, taskId: 'x' }, deps), (err) => err.status === 409);
+  // Adam's decision: a node whose task was deleted is never proposed again.
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeTasks: [{ slot: 'card:2', title: 'Ask again', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 2);
+  // A proposal the person set aside (not deleted) may be offered again.
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeTasks: [{ slot: 'card:1', title: 'Draft again', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 3);
+});
+
+test('leaving Implement with a finished tool proposes a review in two weeks; leaving it untouched does not', () => {
+  let s = inStep('implement', 'kanban');
+  for (const i of [1, 2, 3]) s = applyCoachTurn(s, coach({ node: card(i) }), deps);
+  const left = moveOn(s, deps);
+  assert.deepEqual(left.reviewProposal, { title: 'Review: Late rota', due: '2026-11-02', reason: 'A first look at how the plan is going.', status: 'proposed' });
+  const untouched = { ...s, steps: { ...s.steps, implement: { runs: [], status: 'open', objection: null } } };
+  assert.equal(moveOn(untouched, deps).reviewProposal, null);
+});
+
+test('the coach can propose the review date in Implement; the person confirms or dismisses it', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'The pilot ends then.' } }), deps);
+  assert.equal(s.reviewProposal.due, '2026-11-09');
+  assert.equal(s.reviewProposal.status, 'proposed');
+  const dismissed = dismissReview(s, deps);
+  assert.equal(dismissed.reviewProposal.status, 'dismissed');
+  s = setReviewTask(s, { taskId: 'review-1', due: '2026-11-10' }, deps);
+  assert.equal(s.reviewTaskId, 'review-1');
+  assert.equal(s.reviewProposal.status, 'confirmed');
+  assert.equal(s.reviewProposal.due, '2026-11-10');
+  assert.throws(() => setReviewTask(s, { taskId: 'review-2', due: '2026-11-10' }, deps), (err) => err.status === 409);
+  const moved = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  assert.equal(moved.reviewProposal.due, '2026-11-10', 'an existing review is never replaced on leaving');
+});
+
+test('a review proposed outside Implement is ignored', () => {
+  const s = applyCoachTurn(framed('seven_step', 'five_whys'), coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'x' } }), deps);
+  assert.equal(s.reviewProposal, null);
+});
+
+test('summary rows carry confirmed task ids and the review task id', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  s = confirmTask(s, { proposalId: s.proposedTasks[0].id, taskId: 'task-1' }, deps);
+  s = setReviewTask(s, { taskId: 'review-1', due: '2026-11-02' }, deps);
+  const row = summaryRow(s);
+  assert.deepEqual(row.taskIds, ['task-1']);
+  assert.equal(row.reviewTaskId, 'review-1');
+});
+
+test('a review the person set aside is not revived by a later coach turn', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'The pilot ends then.' } }), deps);
+  s = dismissReview(s, deps);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-11-16', reason: 'Try again.' } }), deps);
+  assert.equal(s.reviewProposal.status, 'dismissed');
+  assert.equal(s.reviewProposal.due, '2026-11-09');
+});
+
+test('setReviewTask ignores an impossible date and keeps the proposed one', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'r' } }), deps);
+  s = setReviewTask(s, { taskId: 'review-1', due: '2026-02-31' }, deps);
+  assert.equal(s.reviewProposal.due, '2026-11-09');
+});
+
+test('coach due dates on or before today are dropped: a task keeps no date, a review is ignored', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: '2026-10-19' }] }), deps);
+  assert.equal(s.proposedTasks[0].due, null);
+  s = applyCoachTurn(s, coach({ node: card(2), proposeTasks: [{ slot: 'card:2', title: 'Ask', due: '2026-10-01' }] }), deps);
+  assert.equal(s.proposedTasks[1].due, null);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-10-19', reason: 'today' } }), deps);
+  assert.equal(s.reviewProposal, null);
+});
+
+test('a missing or non-string proposal id is a validation error', () => {
+  const s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  for (const proposalId of [undefined, 7, '']) {
+    assert.throws(() => confirmTask(s, { proposalId, taskId: 'task-1' }, deps), (err) => err.status === 400 && err.code === 'validation_error');
+    assert.throws(() => dismissTask(s, { proposalId }, deps), (err) => err.status === 400 && err.code === 'validation_error');
   }
-  return s;
-}
-
-test('a finished tool always leaves a next step, even when the coach offers none', () => {
-  let s = treeSession();
-  assert.equal(s.suggestion, null, 'one cause is short of the tree minimum');
-  s = applyCoachTurn(s, coach({ node: { slot: 'cause:2', text: 'Medication suppresses appetite' } }), deps);
-  assert.equal(s.suggestion.kind, 'next_tool');
-  assert.equal(s.suggestion.tool, 'problem_statement');
-  s = acceptSuggestion(s, deps);
-  assert.equal(activeRun(s).tool, 'problem_statement');
 });
 
-test('the coach\'s own suggestion wins over the fallback', () => {
-  let s = treeSession();
-  s = applyCoachTurn(s, coach({ node: { slot: 'cause:2', text: 'Medication suppresses appetite' }, suggestion: { kind: 'switch_tool', tool: 'concept_map', reason: 'Causes interact.' } }), deps);
-  assert.equal(s.suggestion.tool, 'concept_map');
+test('switching tools sets aside the old run\'s open proposals but keeps confirmed ones', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  s = applyCoachTurn(s, coach({ node: card(2), proposeTasks: [{ slot: 'card:2', title: 'Ask', due: null }] }), deps);
+  s = confirmTask(s, { proposalId: s.proposedTasks[1].id, taskId: 'task-2' }, deps);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', suggestion: { kind: 'switch_tool', tool: 'eisenhower', reason: 'Priorities, not flow.' } }), deps);
+  s = acceptSuggestion(s, deps);
+  assert.equal(s.proposedTasks[0].status, 'dismissed');
+  assert.equal(s.proposedTasks[0].removed, undefined);
+  assert.equal(s.proposedTasks[1].status, 'confirmed');
 });

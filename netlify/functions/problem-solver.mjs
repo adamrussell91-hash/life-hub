@@ -44,6 +44,7 @@ export function createProblemSolverHandler(deps = {}) {
       const service = await problemSolverServiceFor(env, deps);
       if (request.method === 'GET') {
         const url = new URL(request.url);
+        if (url.searchParams.has('linked')) return withCors(okResponse(200, { sessions: await service.linked(owner(env), url.searchParams.get('linked')) }), request, env);
         if (url.searchParams.has('list')) return withCors(okResponse(200, { sessions: await service.list(owner(env)) }), request, env);
         return withCors(okResponse(200, { session: await service.get(owner(env), url.searchParams.get('id')) }), request, env);
       }

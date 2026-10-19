@@ -8,7 +8,7 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -144,7 +144,8 @@ export function createSmartView(doc: Document = document): SmartView {
         item = kind === 'problem' ? addProblem(node) : addLetter(node, kind);
         drawn.set(node.id, item);
       }
-      item.classList.toggle('is-contested', node.state === 'contested');
+      const btn = item.querySelector('button[aria-controls]');
+      syncContested(item, node, btn, btn);
     }
   }
 

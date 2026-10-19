@@ -8,7 +8,7 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const RINGS = 10;
@@ -17,7 +17,7 @@ const MORPH_MS = 600;
 const MIN_AXES = 3;
 
 export type RadarScores = { current: number[]; objective: number[] };
-export type GapRadarView = { el: HTMLDivElement; update(run: PsToolRun): void; onScore(cb: (scores: RadarScores) => void): void };
+export type GapRadarView = { el: HTMLDivElement; update(run: PsToolRun): void; onScore(cb: (scores: RadarScores) => void): void; destroy(): void };
 
 type Series = 'current' | 'objective';
 const SERIES: Series[] = ['objective', 'current']; // objective underneath so the gap reads as a blue band
@@ -306,7 +306,8 @@ export function createGapRadarView(doc: Document = document): GapRadarView {
         item = name === 'axis' ? addAxis(node) : addKey(node, name as Series);
         drawn.add(node.id);
       }
-      item.classList.toggle('is-contested', byId.get(node.id)?.state === 'contested');
+      const button = item.querySelector('button[aria-controls]');
+      syncContested(item, byId.get(node.id) ?? node, button, button);
     }
 
     axes = run.nodes.filter((node) => parseSlot(node.slot)?.name === 'axis').sort((a, b) => indexOf(a) - indexOf(b));
@@ -344,6 +345,12 @@ export function createGapRadarView(doc: Document = document): GapRadarView {
     update,
     onScore(cb) {
       handler = cb;
+    },
+    /** Stop the score morph and any fade still running once the canvas drops this view. */
+    destroy() {
+      if (frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+      frame = 0;
+      cancelAnimations(root);
     }
   };
 }
