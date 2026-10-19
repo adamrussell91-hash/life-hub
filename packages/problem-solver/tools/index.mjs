@@ -18,6 +18,10 @@ import { analogicalReasoning } from './analogical-reasoning.mjs';
 import { solutionTree } from './solution-tree.mjs';
 import { lotusBlossom } from './lotus-blossom.mjs';
 import { duncker } from './duncker.mjs';
+import { decisionMatrix } from './decision-matrix.mjs';
+import { swot } from './swot.mjs';
+import { morphological } from './morphological.mjs';
+import { pareto } from './pareto.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -39,7 +43,11 @@ export const TOOLS = {
   analogical_reasoning: analogicalReasoning,
   solution_tree: solutionTree,
   lotus_blossom: lotusBlossom,
-  duncker
+  duncker,
+  decision_matrix: decisionMatrix,
+  swot,
+  morphological,
+  pareto
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
