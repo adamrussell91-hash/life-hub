@@ -8,7 +8,7 @@ import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js
 import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
-import { BOOK_STEPS, stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { BOOK_STEPS, nextStepAfter, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
@@ -253,6 +253,13 @@ function createSkillTray(): { el: HTMLElement; update(session: PsSession): void 
   };
 }
 
+/** The plan step a deep link (`step=<book step>`) points at, only when it is the very next step of the session. */
+export function resumeTarget(session: PsSession, wanted: string | null): string | null {
+  if (!wanted || !session.model) return null;
+  const step = planStepForBook(session.model.id, wanted);
+  return step && step === nextStepAfter(session.model.id, session.phase) ? step : null;
+}
+
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await problemSolverApi.get(id);
   const page = el('div', 'ps-page ps-session ps-scope');
@@ -275,7 +282,21 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const coachHost = el('div', 'ps-coach-host');
   coachHost.append(coach.el);
   board.append(bench, coachHost);
-  page.append(back, title, track.el, board);
+  const resume = resumeTarget(session, hashQuery().get('step'));
+  let banner: HTMLElement | null = null;
+  if (resume) {
+    const name = stepName(session.model!.id, resume);
+    banner = el('div', 'ps-resume');
+    banner.setAttribute('role', 'status');
+    const go = el('button', 'ps-resume__go', `Move on to ${name}`) as HTMLButtonElement;
+    go.type = 'button';
+    go.addEventListener('click', () => {
+      banner?.remove();
+      void act('move_on');
+    });
+    banner.append(el('span', 'ps-resume__text', `This review picks up at ${name}.`), go);
+  }
+  page.append(back, title, track.el, ...(banner ? [banner] : []), board);
   canvas.replaceChildren(page);
   const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
   diagramNow = diagram;
