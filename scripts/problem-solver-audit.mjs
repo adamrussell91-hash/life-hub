@@ -54,7 +54,10 @@ export function auditChart(scope = null) {
     const mix = { r: fg.r * alpha + bg.r * (1 - alpha), g: fg.g * alpha + bg.g * (1 - alpha), b: fg.b * alpha + bg.b * (1 - alpha) };
     const [hi, lo] = [lum(mix), lum(bg)].sort((x, y) => y - x);
     const ratio = (hi + 0.05) / (lo + 0.05);
-    if (ratio < 4.5) problems.push(`contrast ${ratio.toFixed(2)}:1 on ${fill}: ${label(el)}`);
+    // Large text (24px, or 18.66px bold) needs 3:1, as WCAG sets it; everything else 4.5:1.
+    const weight = Number(getComputedStyle(el).fontWeight) || 400;
+    const need = size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5;
+    if (ratio < need) problems.push(`contrast ${ratio.toFixed(2)}:1 on ${fill}: ${label(el)}`);
   }
   if (!scope) {
     for (const el of root.querySelectorAll('button, a[href], [role="button"], [role="tab"]')) {

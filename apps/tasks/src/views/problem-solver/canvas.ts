@@ -24,6 +24,7 @@ import { createSwotView } from '../../../../../packages/problem-solver/render/sw
 import { createMorphologicalView } from '../../../../../packages/problem-solver/render/morphological';
 import { createParetoView } from '../../../../../packages/problem-solver/render/pareto';
 import { createDmaicView } from '../../../../../packages/problem-solver/render/dmaic';
+import { createFifteenPercentView } from '../../../../../packages/problem-solver/render/fifteen-percent';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -70,7 +71,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   swot: () => createSwotView(),
   morphological: () => createMorphologicalView(),
   pareto: () => createParetoView(),
-  dmaic: () => createDmaicView()
+  dmaic: () => createDmaicView(),
+  fifteen_percent: () => createFifteenPercentView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

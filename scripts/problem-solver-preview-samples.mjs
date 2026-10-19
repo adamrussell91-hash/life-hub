@@ -633,3 +633,39 @@ SAMPLES.dmaic = run('dmaic', [
   node('c', 'control', 'A weekly waste tally on the board by the ovens. The owner reviews it each month and resets the plan every season.', 'Weekly waste tally')
 ]);
 SAMPLES.dmaic_first = run('dmaic', dmaicPass1);
+
+// 15% solutions: a volunteer repair café whose queue at the door runs long, where bigger changes
+// wait on the committee. The sign-in volunteer looks for what is theirs to change now. Two actions
+// are chosen and became tasks (one in progress, one to do). One contested node.
+// fifteen_percent_now has the actions but nothing chosen yet; fifteen_percent:next picks a third.
+const fifteenActions = [
+  node('w', 'reflect', 'I run the sign-in desk on Saturdays, so how people are greeted, sorted and queued is mine to change without asking anyone.', 'The sign-in desk is mine'),
+  node('a1', 'action:1', 'Sort arrivals by kind of repair at the door, so electrics, textiles and bikes queue for the right bench.', 'Sort at the door'),
+  node('a2', 'action:2', 'Put a roll of numbered tickets on the desk so nobody has to hold a place in the line.', 'Numbered tickets'),
+  node('a3', 'action:3', 'Text the regular fixers on Thursday with the items already booked in.', 'Thursday heads-up'),
+  node('a4', 'action:4', 'Move the tea urn away from the door so the queue has room to stand.', 'Move the tea urn', { state: 'contested', objection: 'The hall keeper set the urn up; is it yours to move?' }),
+  node('a5', 'action:5', 'Chalk the expected wait on the board by the door every half hour.', 'Chalk the wait time')
+];
+const fifteenChosen = [
+  node('c1', 'chosen:1', 'Buy a ticket roll this week and hand out numbers from opening on Saturday.', 'From Saturday'),
+  node('c2', 'chosen:2', 'Print a card of repair kinds and start sorting at the door at the next session.', 'Next session')
+];
+const fifteenEdges = [
+  { from: 'c1', to: 'a2', kind: 'picks' },
+  { from: 'c2', to: 'a1', kind: 'picks' }
+];
+SAMPLES.fifteen_percent = {
+  ...run('fifteen_percent', [...fifteenActions, ...fifteenChosen], fifteenEdges),
+  tasks: [
+    { nodeId: 'c1', taskId: 'task-sample-1', status: 'in_progress' },
+    { nodeId: 'c2', taskId: 'task-sample-2', status: 'open' }
+  ]
+};
+SAMPLES['fifteen_percent:next'] = {
+  ...run('fifteen_percent', [...fifteenActions, ...fifteenChosen, node('c3', 'chosen:3', 'Chalk the first wait time at ten on Saturday, then every half hour.', 'Saturday at ten')], [...fifteenEdges, { from: 'c3', to: 'a5', kind: 'picks' }]),
+  tasks: [
+    { nodeId: 'c1', taskId: 'task-sample-1', status: 'done' },
+    { nodeId: 'c2', taskId: 'task-sample-2', status: 'removed' }
+  ]
+};
+SAMPLES.fifteen_percent_now = run('fifteen_percent', fifteenActions);

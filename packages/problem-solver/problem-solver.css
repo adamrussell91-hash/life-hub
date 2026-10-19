@@ -5467,3 +5467,180 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-dmaic__badge { bottom: 3px; left: calc(12px + var(--ps-dmaic-disc) / 2); padding: 0 6px; }
   .ps-dmaic__repeat { width: 100%; }
 }
+
+/* 15% solutions (toolkit p.123, Implement): three large discs stacked and touching. What is red
+   with its top-right quarter blue, Now yellow with a red ring inside, Go blue with its top-left
+   quarter red; the words are yellow on What and Go, blue on Now. Beside What, the note on where
+   you are free to act; beside Now, the actions as yellow pills (odd slots left, even right);
+   beside Go, the chosen actions as blue pills (odd notes left, even right), each with its note
+   and any task mark. Details open
+   in one panel under the discs. Contrast: the book's yellow word on red is 2.89:1, so the words
+   use a slightly lighter yellow (3.1:1 on red, 4.1:1 on blue); the red ring is a touch deeper
+   (3.1:1 on the yellow). Phone: the discs shrink with the container and each disc's items move
+   under it, in slot order. */
+.ps-fifteen {
+  /* Named, so every phone query measures this root box. */
+  container: fifteen / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+.ps-fifteen__chart {
+  --ps-fifteen-disc: clamp(150px, 30cqw, 210px);
+  --ps-fifteen-word: #f4c446;
+  --ps-fifteen-ring: #cc2529;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Each row is a disc with a lane either side; a row is at least a disc tall, so the discs touch. */
+.ps-fifteen__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ps-fifteen-disc) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 18px;
+  min-height: var(--ps-fifteen-disc);
+}
+.ps-fifteen__lane { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-block: 6px; }
+.ps-fifteen__lane--start { align-items: flex-end; }
+.ps-fifteen__lane--end { align-items: flex-start; }
+
+.ps-fifteen__disc {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--ps-fifteen-disc);
+  height: var(--ps-fifteen-disc);
+  border-radius: 50%;
+}
+/* The quarters are flat fills: hard stops, no blend. */
+.ps-fifteen__disc--what { background: conic-gradient(var(--ps-blue) 0 25%, var(--ps-red) 0); }
+.ps-fifteen__disc--now { background: var(--ps-yellow); }
+.ps-fifteen__disc--go { background: conic-gradient(var(--ps-blue) 0 75%, var(--ps-red) 0); }
+.ps-fifteen__ring {
+  position: absolute;
+  inset: 15%;
+  border: max(3px, calc(var(--ps-fifteen-disc) * 0.03)) solid var(--ps-fifteen-ring);
+  border-radius: 50%;
+}
+.ps-fifteen__word {
+  position: relative;
+  color: var(--ps-fifteen-word);
+  font: 900 calc(var(--ps-fifteen-disc) * 0.25) / 1 var(--font-ui);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.ps-fifteen__disc--now .ps-fifteen__word { color: var(--ps-blue); }
+
+/* Titles: shared by the What note and the pills. */
+.ps-fifteen__head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.ps-fifteen__title {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-semibold) 14px / 1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-fifteen__head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+
+/* What: the note beside the disc, a card with a red top edge like the disc. */
+.ps-fifteen__note {
+  position: relative;
+  width: min(100%, 260px);
+  border-top: 3px solid var(--ps-red);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--ps-card);
+  color: var(--ps-ink);
+}
+.ps-fifteen__note:has(:focus-visible),
+.ps-fifteen__note:has([aria-expanded='true']) { z-index: 2; }
+.ps-fifteen__note-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px 8px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ps-fifteen__note-button:hover { box-shadow: inset 0 0 0 1px var(--line); }
+.ps-fifteen__note-button:focus-visible,
+.ps-fifteen__note-button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-fifteen__more { font: var(--weight-semibold) 12px / 1.3 var(--font-ui); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Pills: yellow beside Now, blue once chosen. The colour lies on the button inside the roll
+   wrapper, so the whole pill turns when it rolls to Go. */
+.ps-fifteen__pill { position: relative; max-width: 100%; border-radius: var(--radius-full); }
+.ps-fifteen__pill:has(:focus-visible),
+.ps-fifteen__pill:has([aria-expanded='true']) { z-index: 2; }
+.ps-fifteen__roll { display: block; border-radius: inherit; }
+.ps-fifteen__pill-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: inherit;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 320ms var(--ps-ease), color 320ms var(--ps-ease);
+}
+.ps-fifteen__pill.is-picked .ps-fifteen__pill-button { background: var(--ps-blue); color: #fff; border-radius: 22px; }
+.ps-fifteen__pill-button:hover { box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.16); }
+.ps-fifteen__pill-button:focus-visible,
+.ps-fifteen__pill-button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-fifteen__meta { font: var(--weight-medium) 12px / 1.3 var(--font-ui); overflow-wrap: anywhere; }
+.ps-fifteen__meta[hidden] { display: none; }
+
+/* The task mark: a small yellow tag on a chosen pill, "Task" and its live status. */
+.ps-fifteen__task {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+}
+.ps-fifteen__tag { font: var(--weight-bold) 10px / 1.5 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; white-space: nowrap; }
+.ps-fifteen__task-status { font-weight: var(--weight-semibold); }
+.ps-fifteen__task-status::before { content: '·'; margin-right: 6px; }
+.ps-fifteen__task-status[hidden] { display: none; }
+.ps-fifteen__task.is-removed { background: var(--ps-card); color: var(--ps-ink); }
+
+.ps-fifteen__action-text { margin: 0 0 8px; color: var(--ink); font: var(--weight-semibold) var(--text-sm) / 1.5 var(--font-ui); }
+.ps-fifteen__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-fifteen__panel:empty { display: none; }
+
+/* Phone: discs shrink with the container; each disc's items follow it, in slot order. */
+@container fifteen (max-width: 480px) {
+  .ps-fifteen__chart { --ps-fifteen-disc: min(56cqw, 200px); }
+  .ps-fifteen__row { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 0; }
+  .ps-fifteen__row + .ps-fifteen__row { margin-top: 14px; }
+  .ps-fifteen__lane { display: contents; }
+  .ps-fifteen__disc { order: -1; }
+  .ps-fifteen__note { width: 100%; }
+  .ps-fifteen__pill { align-self: stretch; }
+  .ps-fifteen__pill-button { width: 100%; }
+}
