@@ -3,6 +3,14 @@ import { defineStepOf } from '../../../../packages/problem-solver/models.mjs';
 import { nextStepAfter } from '../../../../packages/problem-solver/steps.mjs';
 import { isComplete } from '../../../../packages/problem-solver/machine.mjs';
 
+function completeSafely(run) {
+  try {
+    return Boolean(isComplete(run));
+  } catch {
+    return false;
+  }
+}
+
 const emptyStep = () => ({ runs: [], status: 'open', objection: null });
 
 function defineFor(modelId) {
@@ -30,13 +38,13 @@ export function migrateSession(session) {
     phase = defineStep;
     steps[defineStep] = { runs, status: 'open', objection: define.exitObjection ?? null };
   } else if (phase === 'defined') {
-    const kept = runs.some((run) => run.status !== 'switched' && isComplete(run));
+    const kept = runs.some((run) => run.status !== 'switched' && completeSafely(run));
     steps[defineStep] = { runs, status: kept ? 'done' : 'skipped', objection: define.exitObjection ?? null };
     phase = afterDefine(modelId);
     if (phase !== 'finished') steps[phase] = emptyStep();
   }
   const runner = rest.runner?.mode === 'closing'
-    ? { status: rest.runner.status, mode: 'boundary', error: rest.runner.error ?? null, leaving: defineStep }
+    ? { ...rest.runner, mode: 'boundary', error: rest.runner.error ?? null, leaving: defineStep }
     : { ...rest.runner, mode: 'turn' };
   const suggestion = rest.suggestion?.kind === 'finish_define' ? { kind: 'next_step', reason: rest.suggestion.reason ?? '' } : rest.suggestion ?? null;
   return {
