@@ -42,6 +42,12 @@ export const gapRadar = Object.freeze({
     }
     return null;
   },
+  /** Where snapshots live on the run (kept as `radar` for v1 data). */
+  scoreKey: 'radar',
+  /** The score fields this tool keeps from a payload. */
+  pickScores(payload) {
+    return { current: payload?.current, objective: payload?.objective };
+  },
   complete(run) {
     return countSlots(run, 'axis') >= 3 && (run.radar?.snapshots?.length ?? 0) >= 1;
   }

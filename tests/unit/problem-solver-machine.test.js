@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TOOL_IDS } from '../../packages/problem-solver/tools/index.mjs';
-import { addEdge, canEdge, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
+import { addEdge, applyScores, canEdge, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
@@ -42,4 +42,16 @@ test('edges must be a known kind between existing distinct nodes', () => {
   run = addEdge(run, { from: 't', to: 'c1', kind: 'hierarchical' });
   assert.ok(!canEdge(run, 't', 'c1', 'hierarchical'), 'no duplicates');
   assert.ok(!isComplete(run));
+});
+
+test('applyScores appends a snapshot under the tool score key, validated by the tool', () => {
+  let run = newRun('gap_radar', 'r');
+  for (const [i, slot] of ['current', 'objective', 'axis:1', 'axis:2', 'axis:3'].entries()) run = placeNode(run, { id: `n${i}`, slot, text: slot, state: 'accepted' });
+  const next = applyScores(run, { current: [3, 4, 5], objective: [8, 8, 9], junk: 1 }, '2026-10-19T09:00:00.000Z');
+  assert.deepEqual(next.radar.snapshots, [{ at: '2026-10-19T09:00:00.000Z', current: [3, 4, 5], objective: [8, 8, 9] }]);
+  assert.throws(() => applyScores(run, { current: [3], objective: [8] }, 'x'), (err) => err.code === 'invalid_scores' && /one score per topic/.test(err.message));
+});
+
+test('applyScores refuses tools that take no scores', () => {
+  assert.throws(() => applyScores(newRun('five_whys', 'r'), {}, 'x'), (err) => err.code === 'invalid_scores');
 });
