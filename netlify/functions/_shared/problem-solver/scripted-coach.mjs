@@ -1,15 +1,22 @@
 // netlify/functions/_shared/problem-solver/scripted-coach.mjs
-import { canEdge, checkNode, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
+import { canEdge, canPropose, checkNode, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
 import { countSlots, parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { petalsOf } from '../../../../packages/problem-solver/tools/lotus-blossom.mjs';
+import { CHOICE_SLOT } from '../../../../packages/problem-solver/tools/choice.mjs';
+import { matrixTotals, options } from '../../../../packages/problem-solver/tools/decision-matrix.mjs';
+import { attributesOf, contradictionPairs, subjectsOf } from '../../../../packages/problem-solver/tools/morphological.mjs';
+import { KANBAN_COLUMNS } from '../../../../packages/problem-solver/tools/kanban.mjs';
+import { QUADRANTS } from '../../../../packages/problem-solver/tools/swot.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
-import { defaultToolFor } from '../../../../packages/problem-solver/steps.mjs';
+import { chosenOption, defaultToolFor } from '../../../../packages/problem-solver/steps.mjs';
 import { activeRun } from './session.mjs';
 
 /**
  * Deterministic coach for local dev and tests. Short answers (under six words) are challenged.
  * An answer starting `switch:` suggests switching to Problem tree (the browser walk uses it).
  * An answer like `link: cause 1 to problem, plus` adds that link between nodes already placed.
+ * An answer like `option: …` places in that open slot (a Kanban card may use a column instead,
+ * `doing: …`). Once a Decide tool can take its choice, an answer with no hint is the choice.
  */
 const FRAME = [
   ['goal', 'What is the goal, as an ideal state rather than a fix? Say what good looks like.'],
@@ -35,11 +42,42 @@ function linksFor(run, slot) {
     const pathway = nodesNamed(run, 'pathway').at(-1);
     return pathway ? [{ from: slot, to: pathway.slot, kind: 'under' }] : [];
   }
+  if (run.tool === 'swot' && QUADRANTS.includes(name)) {
+    const option = nodesNamed(run, 'option').at(-1);
+    return option ? [{ from: slot, to: option.slot, kind: 'of' }] : [];
+  }
+  if (run.tool === 'morphological') return morphLinks(run, slot, name);
+  if (run.tool === 'fifteen_percent' && name === 'chosen') {
+    const picked = new Set(run.edges.filter((edge) => edge.kind === 'picks').map((edge) => edge.to));
+    const action = nodesNamed(run, 'action').find((node) => !picked.has(node.id));
+    return action ? [{ from: slot, to: action.slot, kind: 'picks' }] : [];
+  }
+  return [];
+}
+
+function morphLinks(run, slot, name) {
+  const subjects = subjectsOf(run);
+  if (name === 'attribute') {
+    const thinnest = subjects.reduce((best, subject) => (!best || attributesOf(run, subject.id).length < attributesOf(run, best.id).length ? subject : best), null);
+    return thinnest ? [{ from: slot, to: thinnest.slot, kind: 'of' }] : [];
+  }
+  if (name === 'contradiction') {
+    const firsts = subjects.slice(0, 2).map((subject) => attributesOf(run, subject.id)[0]).filter(Boolean);
+    return firsts.length === 2 ? firsts.map((attr) => ({ from: slot, to: attr.slot, kind: 'pair' })) : [];
+  }
+  if (name === 'scenario') {
+    const paired = new Set(contradictionPairs(run).flat());
+    return subjects.flatMap((subject) => {
+      const attrs = attributesOf(run, subject.id);
+      const pick = attrs.find((attr) => !paired.has(attr.id)) ?? attrs[0];
+      return pick ? [{ from: slot, to: pick.slot, kind: 'picks' }] : [];
+    });
+  }
   return [];
 }
 
 /** The node and links for an answer, with a tag and text the tool will accept. */
-function fillNode(run, slot, text) {
+function fillNode(run, slot, text, tag = null) {
   const name = parseSlot(slot)?.name;
   const edges = linksFor(run, slot);
   const node = { slot, text };
@@ -47,8 +85,36 @@ function fillNode(run, slot, text) {
     node.text = Array.from({ length: countSlots(run, 'sub') }, (_, i) => i + 1).join(', ');
   }
   const tags = TOOLS[run.tool].nodeTags?.[name];
-  if (tags) node.tag = tags.find((tag) => !checkNode(run, { ...node, tag }, edges)) ?? tags[0];
-  return { node, edges };
+  if (tags) node.tag = tag ?? tags.find((t) => !checkNode(run, { ...node, tag: t }, edges)) ?? tags[0];
+  const proposeTasks = canPropose(run, node) ? [{ slot, title: text.split(/\s+/).slice(0, 8).join(' '), due: null }] : [];
+  return { node, edges, proposeTasks };
+}
+
+/**
+ * The slot, text and tag an answer goes to: a `<slot name>:` hint for an open slot (or a
+ * Kanban column for the next card), else the choice when a Decide tool can take it, else
+ * the first open slot.
+ */
+function placement(run, answer) {
+  const open = nextSlots(run);
+  const hint = /^([a-z_]+):\s*(.*)$/is.exec(answer);
+  if (hint) {
+    const name = hint[1].toLowerCase();
+    const text = hint[2].trim();
+    const slot = open.find((s) => parseSlot(s)?.name === name);
+    if (slot) return { slot, text, tag: null };
+    const card = open.find((s) => parseSlot(s)?.name === 'card');
+    if (run.tool === 'kanban' && card && KANBAN_COLUMNS.includes(name)) return { slot: card, text, tag: name };
+  }
+  if (open.includes(CHOICE_SLOT)) return { slot: CHOICE_SLOT, text: answer, tag: null };
+  return { slot: open.find((s) => s !== 'root') ?? 'root', text: answer, tag: null };
+}
+
+/** What the coach says when the choice is placed: the leader, when the tool can tell. */
+function choiceMessage(run) {
+  const leader = run.tool === 'decision_matrix' ? matrixTotals(run)?.leader : null;
+  const option = leader != null ? options(run)[leader] : null;
+  return option ? `The scores lead with ${option.title ?? option.text}; carrying your choice into Implement.` : 'Carrying your choice into Implement.';
 }
 
 /** `cause 1` → `cause:1`, `problem` → `problem`. */
@@ -97,7 +163,9 @@ export async function scriptedCoach(session) {
   if (!run) return { ...base, verdict: 'clarify', message: 'Pick a tool to start this step, and we will work through it one question at a time together.' };
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
-    return { ...base, verdict: 'clarify', message: `Let's start the ${TOOLS[run.tool].name}. ${first.title}: ${first.prompt}` };
+    const chosen = TOOLS[run.tool].step === 'implement' ? chosenOption(session) : null;
+    const carry = chosen ? `We are carrying forward: ${chosen.title}. ` : '';
+    return { ...base, verdict: 'clarify', message: `${carry}Let's start the ${TOOLS[run.tool].name}. ${first.title}: ${first.prompt}` };
   }
   if (/^link:/i.test(last)) {
     const edge = parseLink(last);
@@ -110,9 +178,10 @@ export async function scriptedCoach(session) {
   if (/^switch:/i.test(last) && run.tool !== 'problem_tree') {
     return { ...base, verdict: 'clarify', suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: last.replace(/^switch:\s*/i, '') || 'The causes branch.' }, message: 'Then a single chain will not hold it. A problem tree lets the causes branch; shall we switch?' };
   }
-  const slot = nextSlots(run).find((s) => s !== 'root') ?? 'root';
-  if (last.split(/\s+/).filter(Boolean).length < 6) {
-    return { ...base, verdict: 'challenge', ...fillNode(run, slot, last), skillsMissing: ['analysis'], message: 'That is too thin to stand on yet. It reads like a symptom rather than a cause. Can you say what specifically happens, and when?' };
+  const { slot, text, tag } = placement(run, last);
+  if (text.split(/\s+/).filter(Boolean).length < 6) {
+    return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['analysis'], message: 'That is too thin to stand on yet. It reads like a symptom rather than a cause. Can you say what specifically happens, and when?' };
   }
-  return { ...base, verdict: 'accept', ...fillNode(run, slot, last), skillsSeen: ['analysis'], message: 'That holds up: it names a process, not a person. Now, why does that happen? Base your answer on what you just said.' };
+  const message = slot === CHOICE_SLOT ? choiceMessage(run) : 'That holds up: it names a process, not a person. Now, why does that happen? Base your answer on what you just said.';
+  return { ...base, verdict: 'accept', ...fillNode(run, slot, text, tag), skillsSeen: ['analysis'], message };
 }
