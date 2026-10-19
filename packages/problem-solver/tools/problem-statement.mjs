@@ -8,6 +8,12 @@ export const problemStatement = Object.freeze({
   name: 'Problem statement',
   kind: 'statement',
   when: 'After a diagnostic tool: summarise the problem, its impacts and the benefits of solving it.',
+  step: 'define',
+  failureModes: [
+    'A statement that hides a solution.',
+    'Impacts that are not quantified where they could be.',
+    'Benefits with no beneficiary named.'
+  ],
   steps: [
     { id: 'problem', title: 'State the problem', prompt: 'Identify the gap or issue that currently exists, with essential context. When and where is it occurring? Does it reflect any trends?' },
     { id: 'impact', title: 'Describe the impact', prompt: 'Describe the cost of doing nothing, or the impacts of leaving it unresolved. Quantify impacts with numeric or measurable data where possible.' },

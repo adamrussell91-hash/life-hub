@@ -7,17 +7,27 @@ import { errorMessage, renderLoadError } from '@/views/feedback';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
-import { TOOLS, TOOL_IDS } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { BOOK_STEPS, nextStepAfter, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
-import { mountCanvas } from './canvas';
+import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
+import { createTaskBridge } from './task-bridge';
+import { mountTaskCards } from './task-cards';
+import { createSessionSync } from './session-sync';
+import { tasksApi } from '@/services/client-api';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
 
 let poll: AbortController | null = null;
+/** The open session's canvas, dropped (observers, frame loops) when the page changes. */
+let diagramNow: { destroy(): void } | null = null;
+/** The open session's Tasks listeners (live statuses), removed when the page changes. */
+let unsubscribeNow: Array<() => void> = [];
 
-const PHASE_LABEL: Record<PsSession['phase'], string> = { frame: 'Framing', define: 'Defining', defined: 'Defined' };
-const PHASE_COLOUR: Record<PsSession['phase'], string> = { frame: 'var(--ps-blue)', define: 'var(--ps-yellow)', defined: 'var(--ps-red)' };
+const phaseLabel = (row: PsSummary): string => (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
+const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--ps-blue)' : phase === 'finished' ? 'var(--ps-red)' : 'var(--ps-yellow)');
 const COLOURS = ['var(--ps-red)', 'var(--ps-yellow)', 'var(--ps-blue)'];
 
 function section(title: string, aside: string, ...body: Node[]): HTMLElement {
@@ -76,8 +86,8 @@ function problemCard(row: PsSummary, index: number): HTMLLIElement {
   medal.append(problemMedal(frame, row.tool));
   const body = el('span', 'ps-prob__body');
   const meta = el('span', 'ps-prob__meta');
-  const phase = el('span', 'ps-prob__phase', PHASE_LABEL[row.phase]);
-  phase.style.setProperty('--c', PHASE_COLOUR[row.phase]);
+  const phase = el('span', 'ps-prob__phase', phaseLabel(row));
+  phase.style.setProperty('--c', phaseColour(row.phase));
   meta.append(phase, el('span', '', row.tool ? TOOLS[row.tool].name : row.phase === 'frame' ? `Question ${Math.min(frame + 1, 3)} of 3` : ''), el('span', '', formatDisplayDate(row.updatedAt.slice(0, 10))));
   body.append(el('span', 'ps-prob__title', row.title), meta);
   const seen = Object.keys(row.skills ?? {});
@@ -128,14 +138,25 @@ function cyclingEmblem(): HTMLElement {
   return holder;
 }
 
-function toolShelf(): HTMLElement {
-  const shelf = el('ul', 'ps-shelf');
-  for (const id of TOOL_IDS as PsToolId[]) {
-    const item = el('li', 'ps-shelf__tool');
-    item.append(toolEmblem(id), el('span', 'ps-shelf__name', TOOLS[id].name), el('span', 'ps-shelf__when', TOOLS[id].when));
-    shelf.append(item);
+/** Every registered tool, one group per book step (TRIZ's contradiction step is left out). */
+export function toolShelf(): HTMLElement {
+  const groups = el('div', 'ps-shelves');
+  for (const step of BOOK_STEPS) {
+    if (step.id === 'contradiction') continue;
+    const ids = toolsForBookStep(step.id) as PsToolId[];
+    if (!ids.length) continue;
+    const group = el('section', 'ps-shelves__step');
+    group.dataset.step = step.id;
+    const shelf = el('ul', 'ps-shelf');
+    for (const id of ids) {
+      const item = el('li', 'ps-shelf__tool');
+      item.append(toolEmblem(id), el('span', 'ps-shelf__name', TOOLS[id].name), el('span', 'ps-shelf__when', TOOLS[id].when));
+      shelf.append(item);
+    }
+    group.append(el('h3', 'ps-shelves__title', step.name), shelf);
+    groups.append(group);
   }
-  return shelf;
+  return groups;
 }
 
 function skillsRibbon(sessions: PsSummary[]): HTMLElement {
@@ -188,7 +209,7 @@ async function renderList(canvas: HTMLElement): Promise<void> {
   page.append(
     section('Problems', sessions.length ? 'Each badge fills in as you go. Blue, yellow and red are the three framing questions; the centre is the tool in use.' : 'Nothing yet. Start with the problem that is bugging you most.', problems),
     section('How a session builds', 'The order follows the toolkit’s problem solving process.', buildSteps()),
-    section('The toolkit', 'Seven Define tools. The coach chooses, and this is what each one is for.', toolShelf()),
+    section('The toolkit', 'The coach picks from these for each step. Here is what each one is for.', toolShelf()),
     section('Thinking skills you have used', 'Totals across your problems. Faint marks have not come up yet.', skillsRibbon(sessions))
   );
   canvas.replaceChildren(page);
@@ -232,6 +253,13 @@ function createSkillTray(): { el: HTMLElement; update(session: PsSession): void 
   };
 }
 
+/** The plan step a deep link (`step=<book step>`) points at, only when it is the very next step of the session. */
+export function resumeTarget(session: PsSession, wanted: string | null): string | null {
+  if (!wanted || !session.model) return null;
+  const step = planStepForBook(session.model.id, wanted);
+  return step && step === nextStepAfter(session.model.id, session.phase) ? step : null;
+}
+
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await problemSolverApi.get(id);
   const page = el('div', 'ps-page ps-session ps-scope');
@@ -244,13 +272,34 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const canvasHost = el('div', 'ps-canvas');
   const tray = createSkillTray();
   bench.append(canvasHost, tray.el);
-  const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) });
+  const cards = mountTaskCards({
+    create: (proposal, edits) => bridge.create(session, proposal, edits),
+    dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
+    createReview: (edits) => bridge.createReview(session, edits),
+    dismissReview: () => confirmed('dismiss_review', {})
+  }, { fallbackFocus: () => coach.el.querySelector('textarea') });
+  const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el });
   const coachHost = el('div', 'ps-coach-host');
   coachHost.append(coach.el);
   board.append(bench, coachHost);
-  page.append(back, title, track.el, board);
+  const resume = resumeTarget(session, hashQuery().get('step'));
+  let banner: HTMLElement | null = null;
+  if (resume) {
+    const name = stepName(session.model!.id, resume);
+    banner = el('div', 'ps-resume');
+    banner.setAttribute('role', 'status');
+    const go = el('button', 'ps-resume__go', `Move on to ${name}`) as HTMLButtonElement;
+    go.type = 'button';
+    go.addEventListener('click', () => {
+      banner?.remove();
+      void act('move_on');
+    });
+    banner.append(el('span', 'ps-resume__text', `This review picks up at ${name}.`), go);
+  }
+  page.append(back, title, track.el, ...(banner ? [banner] : []), board);
   canvas.replaceChildren(page);
   const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
+  diagramNow = diagram;
 
   const flash = (err: unknown) => {
     coachHost.querySelector('.ps-coach__status--failed.is-transient')?.remove();
@@ -258,24 +307,88 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     coach.el.querySelector('.ps-coach__extras')?.prepend(note);
   };
 
-  const paint = (next: PsSession) => {
+  /** Sorted confirmed task ids last fetched, so statuses refresh only when the set changes. */
+  let confirmedKey = '';
+  const confirmedIds = () => (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed' && p.taskId).map((p) => p.taskId!).sort().join(',');
+
+  /** Draw a snapshot. Only reached through `sync.paint`, which drops older revisions. */
+  const render = (next: PsSession) => {
     session = next;
     if (title.textContent !== session.title) title.textContent = session.title;
     track.update(session);
     diagram.update(session);
     tray.update(session);
     coach.update(session);
-  };
-
-  const settle = async () => {
-    poll?.abort();
-    poll = new AbortController();
-    try {
-      paint(await pollUntilSettled(session.id, paint, { signal: poll.signal }));
-    } catch {
-      /* aborted on navigation */
+    cards.update(session);
+    const key = confirmedIds();
+    if (key !== confirmedKey) {
+      confirmedKey = key;
+      void refreshStatuses();
     }
   };
+
+  const sync = createSessionSync({
+    initial: session,
+    render,
+    actWith: (s, action, payload) => problemSolverApi.actWith(s, action, payload),
+    get: (sessionId) => problemSolverApi.get(sessionId),
+    poll: (sessionId, onUpdate) => {
+      poll?.abort();
+      poll = new AbortController();
+      return pollUntilSettled(sessionId, onUpdate, { signal: poll.signal });
+    },
+    alive: () => page.isConnected
+  });
+  const paint = (next: PsSession) => void sync.paint(next);
+  const settle = () => sync.settle();
+  /** Task writes: after the coach settles, one at a time, a stale revision retried once. */
+  const confirmed = (action: PsAction, payload: Record<string, unknown>) => sync.confirmed(action, payload);
+
+  /**
+   * The linked task's domain if the problem links one, else life (Decision 1); one fetch per
+   * session. A failed fetch is not cached and is passed on, so the card shows it and a retry
+   * asks again rather than filing the task under the wrong domain.
+   */
+  let domain: Promise<string> | null = null;
+  function domainFor(s: PsSession): Promise<string> {
+    const linked = s.links.find((link) => link.kind === 'task')?.id;
+    if (!linked) return Promise.resolve('life');
+    if (!domain) {
+      const fetching = tasksApi.getTask(linked).then((task) => task.domain || 'life');
+      fetching.catch(() => {
+        if (domain === fetching) domain = null;
+      });
+      domain = fetching;
+    }
+    return domain;
+  }
+
+  const bridge = createTaskBridge({
+    createTask: (body) => tasksApi.createTask(body),
+    getTask: (taskId) => tasksApi.getTask(taskId),
+    domainFor: (s) => domainFor(s),
+    confirm: (proposalId, taskId) => confirmed('confirm_task', { proposalId, taskId }),
+    dismiss: (proposalId, reason) => confirmed('dismiss_task', { proposalId, ...(reason ? { reason } : {}) }),
+    setReview: (taskId, due) => confirmed('set_review_task', { taskId, due })
+  });
+
+  /** Fetch live statuses for the confirmed tasks; a newer refresh wins over a slower older one. */
+  let statusRound = 0;
+  async function refreshStatuses(): Promise<void> {
+    if (!page.isConnected) return;
+    const round = ++statusRound;
+    const map = await bridge.statuses(session.proposedTasks ?? []);
+    if (round === statusRound && page.isConnected) diagram.setTaskStatuses(map);
+  }
+  const onVisible = () => {
+    if (document.visibilityState === 'visible' && confirmedKey) void refreshStatuses();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  unsubscribeNow.push(
+    onTasksChanged(() => void (confirmedKey && refreshStatuses())),
+    onTasksDeleted(() => void (confirmedKey && refreshStatuses())),
+    () => document.removeEventListener('visibilitychange', onVisible)
+  );
 
   async function act(action: PsAction, text?: string): Promise<void> {
     try {
@@ -291,9 +404,10 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     if (isBusy(session)) await settle();
   }
 
-  async function rescore(scores: { current: number[]; objective: number[] }): Promise<void> {
+  /** Any scored tool's payload passes through as it is, with the run it belongs to. */
+  async function rescore({ runId, ...scores }: RunScores): Promise<void> {
     try {
-      paint(await problemSolverApi.rescore(session, scores));
+      paint(await problemSolverApi.score(session, { runId, ...scores }));
     } catch (err) {
       if ((err as { code?: string }).code === 'conflict') {
         paint(await problemSolverApi.get(session.id));
@@ -303,12 +417,22 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     }
   }
 
-  paint(session);
+  render(session);
   if (isBusy(session)) await settle();
 }
 
-export async function renderProblemSolverView(canvas: HTMLElement): Promise<void> {
+/** Leaving Problem Solver (or opening another problem): stop polling, drop the chart and the Tasks listeners. */
+export function unmountProblemSolverView(): void {
   poll?.abort();
+  poll = null;
+  diagramNow?.destroy();
+  diagramNow = null;
+  for (const off of unsubscribeNow) off();
+  unsubscribeNow = [];
+}
+
+export async function renderProblemSolverView(canvas: HTMLElement): Promise<void> {
+  unmountProblemSolverView();
   canvas.replaceChildren(el('p', 'canvas-status', 'Loading…'));
   const id = hashQuery().get('id');
   try {

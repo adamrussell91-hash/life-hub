@@ -432,6 +432,7 @@ export function createMockApi({ seed }: MockApiOptions) {
     if (path === '/api/problem-solver') {
       try {
         if (method === 'GET') {
+          if (url.searchParams.has('linked')) return json(200, { ok: true, data: { sessions: await problemSolver.linked('operator', url.searchParams.get('linked') ?? '') } });
           if (url.searchParams.has('list')) return json(200, { ok: true, data: { sessions: await problemSolver.list('operator') } });
           return json(200, { ok: true, data: { session: await problemSolver.get('operator', url.searchParams.get('id') ?? '') } });
         }

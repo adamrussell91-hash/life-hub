@@ -1,9 +1,10 @@
 // netlify/functions/_shared/problem-solver/service.mjs
 import { randomUUID } from 'node:crypto';
 import {
-  acceptSuggestion, applyCoachTurn, archive, createSession, dismissSuggestion,
-  finishDefine, keepAnyway, rename, rescoreRadar, say, summaryRow
+  acceptSuggestion, applyCoachTurn, archive, confirmTask, createSession, dismissReview, dismissSuggestion, dismissTask,
+  keepAnyway, moveOn, rename, rescoreRadar, say, score, setReviewTask, summaryRow
 } from './session.mjs';
+import { migrateRow, migrateSession } from './migrate.mjs';
 
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const REQUEST_IDS_KEPT = 50;
@@ -18,13 +19,13 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
   const deps = { now, newId };
 
   const isStale = (s) => s.runner.status === 'running' && Date.parse(now()) > (s.runner.leaseUntil ?? 0);
-  const unstale = (s) => (isStale(s) ? { ...s, runner: { status: 'failed', mode: s.runner.mode ?? 'turn', error: STALE_ERROR } } : s);
+  const unstale = (s) => (isStale(s) ? { ...s, runner: { ...s.runner, status: 'failed', error: STALE_ERROR } } : s);
 
   async function load(owner, id) {
     if (!ID_RE.test(String(id ?? ''))) throw httpError(400, 'validation_error', 'Valid session id required.');
     const row = await store.read(owner, id);
     if (!row) throw httpError(404, 'not_found', 'Problem not found.');
-    return row;
+    return { ...row, value: migrateSession(row.value) };
   }
 
   async function save(owner, value, etag) {
@@ -39,21 +40,42 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     keep_anyway: (s) => keepAnyway(s, deps),
     accept_suggestion: (s) => acceptSuggestion(s, deps),
     dismiss_suggestion: (s) => dismissSuggestion(s, deps),
-    finish_define: (s) => finishDefine(s, deps),
+    move_on: (s) => moveOn(s, deps),
+    finish_define: (s) => moveOn(s, deps),
     rename: (s, body) => rename(s, body.text, deps),
+    score: (s, body) => score(s, body.payload ?? {}, deps),
     rescore_radar: (s, body) => rescoreRadar(s, { current: body.current, objective: body.objective }, deps),
+    confirm_task: (s, body) => confirmTask(s, body.payload ?? {}, deps),
+    dismiss_task: (s, body) => dismissTask(s, body.payload ?? {}, deps),
+    set_review_task: (s, body) => setReviewTask(s, body.payload ?? {}, deps),
+    dismiss_review: (s) => dismissReview(s, deps),
     archive: (s) => archive(s, deps),
     retry: (s) => {
       if (s.runner.status !== 'failed') throw httpError(409, 'action_not_allowed', 'Nothing to retry.');
-      return { ...s, runner: { status: 'queued', mode: s.runner.mode ?? 'turn', error: null } };
+      return { ...s, runner: { ...s.runner, status: 'queued', error: null } };
     }
   };
 
+  async function listRows(owner, { limit = 100, offset = 0 } = {}) {
+    const rows = (await store.list(owner, limit, offset)).map((row) => migrateRow(summaryRow(row.value)));
+    return Promise.all(rows.map(async (row) => (row.skills ? row : migrateRow(summaryRow(migrateSession((await store.read(owner, row.id))?.value ?? row))))));
+  }
+
   return {
-    async list(owner, { limit = 100, offset = 0 } = {}) {
-      const rows = (await store.list(owner, limit, offset)).map((row) => summaryRow(row.value));
-      // Index rows written before frame and skill counts existed: read the session once to fill them in.
-      return Promise.all(rows.map(async (row) => (row.skills ? row : summaryRow((await store.read(owner, row.id))?.value ?? row))));
+    list: listRows,
+
+    /** Sessions that link to, created, or review a task or project, for the chips on its page. */
+    async linked(owner, ref) {
+      const match = /^(task|project):(.{1,200})$/.exec(String(ref ?? ''));
+      if (!match) throw httpError(400, 'validation_error', 'linked must be task:<id> or project:<id>.');
+      const [, kind, id] = match;
+      const rows = await listRows(owner, { limit: 500 });
+      return rows.filter((row) => row.status !== 'archived').flatMap((row) => {
+        const role = kind === 'task' && row.reviewTaskId === id ? 'review'
+          : kind === 'task' && (row.taskIds ?? []).includes(id) ? 'task'
+            : (row.links ?? []).some((l) => l.kind === kind && l.id === id) ? 'link' : null;
+        return role ? [{ id: row.id, title: row.title, phase: row.phase, model: row.model, role }] : [];
+      });
     },
 
     async get(owner, id) {
@@ -81,6 +103,9 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
       const act = ACTIONS[body.action];
       if (!act) throw httpError(400, 'validation_error', `Unknown action: ${body.action}`);
       if (['queued', 'running'].includes(value.runner.status) && body.action !== 'archive') throw httpError(409, 'busy', 'The coach is still thinking.');
+      if (value.runner.status === 'failed' && value.runner.mode === 'boundary' && !['retry', 'archive'].includes(body.action)) {
+        throw httpError(409, 'action_not_allowed', 'The coach did not finish wrapping up that step. Try again first.');
+      }
       const next = act(value, body);
       next.revision = value.revision + 1;
       next.requestIds = [...value.requestIds, String(body.requestId ?? '')].filter(Boolean).slice(-REQUEST_IDS_KEPT);
@@ -96,7 +121,7 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
       try {
         next = applyCoachTurn(value, await coach(value), deps);
       } catch (error) {
-        next = { ...value, runner: { status: 'failed', mode: value.runner.mode ?? 'turn', error: error.message || 'The coach could not answer.' } };
+        next = { ...value, runner: { ...value.runner, status: 'failed', error: error.message || 'The coach could not answer.' } };
       }
       next.revision = value.revision + 1;
       return save(owner, next, etag);

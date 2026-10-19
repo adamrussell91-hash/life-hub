@@ -1,5 +1,6 @@
 // apps/tasks/src/views/problem-solver/canvas.ts
 import { el } from '@/views/hub-kit';
+import { createCausalMapView } from '../../../../../packages/problem-solver/render/causal-map';
 import { createConceptMapView } from '../../../../../packages/problem-solver/render/concept-map';
 import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
 import { createGapBasicView } from '../../../../../packages/problem-solver/render/gap-basic';
@@ -7,18 +8,45 @@ import { createGapRadarView } from '../../../../../packages/problem-solver/rende
 import { createSmartView } from '../../../../../packages/problem-solver/render/smart';
 import { createProblemTreeView } from '../../../../../packages/problem-solver/render/problem-tree';
 import { createProblemStatementView } from '../../../../../packages/problem-solver/render/problem-statement';
+import { createPerspectiveShiftView } from '../../../../../packages/problem-solver/render/perspective-shift';
+import { createRadialTreeView } from '../../../../../packages/problem-solver/render/radial-tree';
+import { createForceFieldView } from '../../../../../packages/problem-solver/render/force-field';
+import { createFromToView } from '../../../../../packages/problem-solver/render/from-to';
+import { createIntentStatementView } from '../../../../../packages/problem-solver/render/intent-statement';
+import { createProblemReductionView } from '../../../../../packages/problem-solver/render/problem-reduction';
+import { createAnalogicalReasoningView } from '../../../../../packages/problem-solver/render/analogical-reasoning';
+import { createSolutionTreeView } from '../../../../../packages/problem-solver/render/solution-tree';
+import { createLotusBlossomView } from '../../../../../packages/problem-solver/render/lotus-blossom';
+import { createDunckerView } from '../../../../../packages/problem-solver/render/duncker';
+import { createContradictionView } from '../../../../../packages/problem-solver/render/contradiction';
+import { createDecisionMatrixView } from '../../../../../packages/problem-solver/render/decision-matrix';
+import { createSwotView } from '../../../../../packages/problem-solver/render/swot';
+import { createMorphologicalView } from '../../../../../packages/problem-solver/render/morphological';
+import { createParetoView } from '../../../../../packages/problem-solver/render/pareto';
+import { createDmaicView } from '../../../../../packages/problem-solver/render/dmaic';
+import { createFifteenPercentView } from '../../../../../packages/problem-solver/render/fifteen-percent';
+import { createKanbanView } from '../../../../../packages/problem-solver/render/kanban';
+import { createEisenhowerView } from '../../../../../packages/problem-solver/render/eisenhower';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
-import { createRecordView, defineRun } from '../../../../../packages/problem-solver/render/record';
+import { createRecordView } from '../../../../../packages/problem-solver/render/record';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { MODELS } from '../../../../../packages/problem-solver/models.mjs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { chosenOption } from '../../../../../packages/problem-solver/steps.mjs';
 import { morphFromRect } from '../../../design-kit/js/morphing-dialog.js';
-import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
+import type { PsSession, PsTaskLink, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
 
-type Scores = { current: number[]; objective: number[] };
-type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void };
-export type CanvasHandlers = { onScore?: (scores: Scores) => void };
+/** A scored tool's payload: the radar sends {current, objective}, the force field {for, against}, the decision matrix a mode and a matrix, Pareto its counts. */
+type Scores = Record<string, unknown>;
+/** Scores for the run on screen, which may not be the step's active run (opened from the record). */
+export type RunScores = { runId: string; [series: string]: unknown };
+/**
+ * A tool's chart. `destroy` (views with a size watch, a frame loop or long motion) is called when the canvas drops it.
+ * `setTasks` receives the run's confirmed tasks with their live status (charts whose items can become tasks).
+ */
+type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void; setTasks?(links: PsTaskLink[]): void; setProposed?(nodeIds: string[]): void; destroy?(): void };
+export type CanvasHandlers = { onScore?: (scores: RunScores) => void };
 
 /** Tools that draw their own chart. Anything else falls back to the outline. */
 const RENDERERS: Partial<Record<PsToolId, () => View>> = {
@@ -28,7 +56,27 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   problem_statement: () => createProblemStatementView(),
   gap_basic: () => createGapBasicView(),
   gap_radar: () => createGapRadarView(),
-  smart: () => createSmartView()
+  smart: () => createSmartView(),
+  causal_map: () => createCausalMapView(),
+  perspective_shift: () => createPerspectiveShiftView(),
+  radial_tree: () => createRadialTreeView(),
+  force_field: () => createForceFieldView(),
+  from_to: () => createFromToView(),
+  intent_statement: () => createIntentStatementView(),
+  problem_reduction: () => createProblemReductionView(),
+  analogical_reasoning: () => createAnalogicalReasoningView(),
+  solution_tree: () => createSolutionTreeView(),
+  lotus_blossom: () => createLotusBlossomView(),
+  duncker: () => createDunckerView(),
+  contradiction: () => createContradictionView(),
+  decision_matrix: () => createDecisionMatrixView(),
+  swot: () => createSwotView(),
+  morphological: () => createMorphologicalView(),
+  pareto: () => createParetoView(),
+  dmaic: () => createDmaicView(),
+  fifteen_percent: () => createFifteenPercentView(),
+  kanban: () => createKanbanView(),
+  eisenhower: () => createEisenhowerView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
@@ -96,7 +144,7 @@ function createFrameView(): { el: HTMLElement; update(session: PsSession): void 
         group.dataset.state = state;
       });
       count.textContent = `${FRAME_QUESTIONS.filter(([key]) => session.frame[key]).length} of 3 answered`;
-      const tool = session.suggestion && session.suggestion.kind !== 'finish_define' ? session.suggestion.tool : null;
+      const tool = session.suggestion && session.suggestion.kind !== 'next_step' ? session.suggestion.tool : null;
       const coreArt = drawing.querySelector('.ps-frame__core > g')!;
       if (coreArt.getAttribute('data-tool') !== String(tool)) {
         coreArt.setAttribute('data-tool', String(tool));
@@ -107,9 +155,20 @@ function createFrameView(): { el: HTMLElement; update(session: PsSession): void 
   };
 }
 
+/** The run the chart shows: the current step's active run, else its last run, else the last run anywhere. */
 function shownRun(session: PsSession): PsToolRun | null {
-  const runs = session.define.runs;
-  return runs.find((run) => run.status === 'active') ?? runs.at(-1) ?? null;
+  const runs = session.steps?.[session.phase]?.runs ?? [];
+  return runs.find((run) => run.status === 'active') ?? runs.at(-1) ?? allRunsOf(session).at(-1) ?? null;
+}
+
+function allRunsOf(session: PsSession): PsToolRun[] {
+  return Object.values(session.steps ?? {}).flatMap((step) => step.runs);
+}
+
+/** A step with no runs yet (just entered) shows the record; otherwise the chart. */
+function defaultMode(session: PsSession): 'chart' | 'record' {
+  if (session.phase === 'finished') return 'record';
+  return (session.steps?.[session.phase]?.runs.length ?? 0) > 0 ? 'chart' : 'record';
 }
 
 function toggle(label: string, onClick: () => void): HTMLButtonElement {
@@ -129,14 +188,46 @@ function rectOf(node: Element | null): DOMRect | null {
  * Record toggle; once defined the canvas opens on the black-and-white record, and a
  * step or filmstrip card morphs into that run's coloured chart (read-only).
  */
-export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void } {
+export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void; setTaskStatuses(statuses: Record<string, string>): void; destroy(): void } {
   const views = new Map<string, View>();
   const frame = createFrameView();
   const record = createRecordView();
   let last: PsSession | null = null;
   let mode: 'chart' | 'record' | null = null;
   let pinned: { runId: string; via: 'step' | 'film' } | null = null;
-  let phase: PsSession['phase'] | null = null;
+  let phase: string | null = null;
+  let hadActive = false;
+  /** The run whose chart is on screen, or null when the frame card or record shows. */
+  let displayed: string | null = null;
+  /** Live Tasks status per confirmed task id, fetched by the page (never stored on the session). */
+  let statuses: Record<string, string> = {};
+
+  /** Hand the chart on screen its confirmed tasks with their live status, and its removed ones. */
+  function pushTasks(): void {
+    if (!last || !displayed) return;
+    const runId = displayed;
+    const run = allRunsOf(last).find((item) => item.id === runId);
+    const view = run ? views.get(run.id) : undefined;
+    if (!view?.setTasks) return;
+    // A task deleted in Tasks stays on the chart as removed (Decision 8); its status is never re-fetched.
+    const links = (last.proposedTasks ?? [])
+      .filter((p) => p.taskId && p.source.runId === runId && (p.status === 'confirmed' || (p.status === 'dismissed' && p.removed)))
+      .map((p) => ({ nodeId: p.source.nodeId, taskId: p.taskId!, status: p.status === 'dismissed' ? 'removed' : statuses[p.taskId!] ?? 'unknown' }));
+    view.setTasks(links);
+    // Charts that mark a pending proposal on its item (Kanban, Eisenhower) also get the waiting node ids.
+    view.setProposed?.((last.proposedTasks ?? []).filter((p) => p.status === 'proposed' && p.source.runId === runId).map((p) => p.source.nodeId));
+  }
+
+  /** Implement charts carry the option chosen in Decide as their aim. */
+  function aimCaption(session: PsSession, run: PsToolRun): HTMLElement | null {
+    if (TOOLS[run.tool]?.step !== 'implement') return null;
+    const choice = chosenOption(session);
+    if (!choice) return null;
+    const aim = el('p', 'ps-canvas__aim');
+    aim.title = choice.text;
+    aim.append(el('span', 'ps-canvas__aim-meta', 'Aim'), el('span', 'ps-canvas__aim-text', choice.title));
+    return aim;
+  }
 
   function viewFor(run: PsToolRun): View | null {
     const make = RENDERERS[run.tool];
@@ -146,7 +237,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       view = make();
       const runId = run.id;
       view.onScore?.((scores) => {
-        if (last && shownRun(last)?.id === runId) handlers.onScore?.(scores);
+        if (displayed === runId) handlers.onScore?.({ ...scores, runId });
       });
       views.set(run.id, view);
     }
@@ -155,13 +246,14 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
 
   function showRecord(session: PsSession): void {
     const heading = el('h2', 'ps-canvas__title', session.model ? MODELS[session.model.id].name : 'Process record');
-    if (session.phase === 'define') heading.append(toggle('Back to chart', () => openChart(null)));
+    if ((session.steps?.[session.phase]?.runs.length ?? 0) > 0) heading.append(toggle('Back to chart', () => openChart(null)));
     record.update(session);
+    displayed = null;
     host.replaceChildren(heading, record.el);
   }
 
   function showChart(session: PsSession): HTMLElement | null {
-    const run = (pinned && session.define.runs.find((item) => item.id === pinned!.runId)) || shownRun(session);
+    const run = (pinned && allRunsOf(session).find((item) => item.id === pinned!.runId)) || shownRun(session);
     if (!run) return null;
     const heading = el('h2', 'ps-canvas__title', TOOLS[run.tool].name);
     heading.prepend(toolEmblem(run.tool));
@@ -176,13 +268,18 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
     } else {
       chart.append(renderOutline(run));
     }
-    host.replaceChildren(heading, chart);
+    const aim = aimCaption(session, run);
+    if (aim) host.replaceChildren(heading, aim, chart);
+    else host.replaceChildren(heading, chart);
+    displayed = run.id;
+    pushTasks();
     return chart;
   }
 
   function render(): HTMLElement | null {
     const session = last!;
-    if (!session.define.runs.length) {
+    if (!allRunsOf(session).length && session.phase !== 'finished' && !(session.model && session.steps?.[session.phase])) {
+      displayed = null;
       frame.update(session);
       if (frame.el.parentNode !== host || host.childElementCount !== 1) host.replaceChildren(frame.el);
       return null;
@@ -191,11 +288,12 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       showRecord(session);
       return null;
     }
-    return showChart(session);
+    return showChart(session) ?? (showRecord(session), null);
   }
 
   function openChart(target: { runId: string; via: 'step' | 'film'; from: HTMLElement } | null): void {
-    const from = rectOf(target?.from ?? host.querySelector('.ps-record__step[data-state]:not([data-state="future"])'));
+    const back = last ? shownRun(last)?.id ?? '' : '';
+    const from = rectOf(target?.from ?? record.anchor(back, 'step') ?? host.querySelector('.ps-record__step[data-state="current"]'));
     mode = 'chart';
     pinned = target ? { runId: target.runId, via: target.via } : null;
     const chart = render();
@@ -210,21 +308,48 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
     mode = 'record';
     pinned = null;
     render();
-    const to = record.anchor(back?.runId ?? (last ? defineRun(last)?.id ?? '' : ''), back?.via ?? 'step');
+    const to = record.anchor(back?.runId ?? (last ? shownRun(last)?.id ?? '' : ''), back?.via ?? 'step');
     if (from && to) morphFromRect(from, to);
   }
 
   record.onOpenStep((runId, from) => openChart({ runId, via: from.hasAttribute('data-run') ? 'film' : 'step', from }));
 
+  function drop(runId: string): void {
+    views.get(runId)?.destroy?.();
+    views.delete(runId);
+  }
+
+  /** Views for runs the session no longer has (an undo, another session) are dropped. */
+  function prune(session: PsSession): void {
+    const live = new Set(allRunsOf(session).map((run) => run.id));
+    for (const runId of [...views.keys()]) if (!live.has(runId)) drop(runId);
+    if (pinned && !live.has(pinned.runId)) pinned = null;
+  }
+
   return {
     update(session) {
       last = session;
-      if (mode === null || (session.phase !== phase && session.phase === 'defined')) {
-        mode = session.phase === 'defined' ? 'record' : 'chart';
+      const hasActive = session.steps?.[session.phase]?.runs.some((run) => run.status === 'active') ?? false;
+      if (mode === null || session.phase !== phase) {
+        mode = defaultMode(session);
         pinned = null;
+      } else if (mode === 'record' && hasActive && !hadActive && !pinned) {
+        // A tool just started in this step: follow it to the chart. A Record the person chose stays.
+        mode = 'chart';
       }
       phase = session.phase;
+      hadActive = hasActive;
+      prune(session);
       render();
+    },
+    /** The page fetched live statuses for the session's confirmed tasks. */
+    setTaskStatuses(next) {
+      statuses = next;
+      pushTasks();
+    },
+    /** The page is going away: drop every view. */
+    destroy() {
+      for (const runId of [...views.keys()]) drop(runId);
     }
   };
 }
