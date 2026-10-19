@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PedagogicalModeSchema } from '@/curriculum/pedagogical-mode';
 import type { Lesson } from '@/schemas/lesson';
+import { LineStopSchema } from '@/schemas/block';
 
 export const LessonLibraryPatchSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).max(24).optional(),
@@ -9,7 +10,8 @@ export const LessonLibraryPatchSchema = z.object({
   outcome_ids: z.array(z.string().min(1).max(64)).max(24).optional(),
   unit_id: z.string().min(1).optional(),
   author_id: z.string().min(1).nullable().optional(),
-  pedagogical_mode: PedagogicalModeSchema.optional()
+  pedagogical_mode: PedagogicalModeSchema.optional(),
+  line_stops: z.array(LineStopSchema).max(16).optional()
 });
 
 export type LessonLibraryPatch = z.infer<typeof LessonLibraryPatchSchema>;
@@ -34,7 +36,8 @@ export function parseLessonLibraryPatch(
     ...(record.author_id !== undefined ? { author_id: record.author_id } : {}),
     ...(record.pedagogical_mode !== undefined
       ? { pedagogical_mode: record.pedagogical_mode }
-      : {})
+      : {}),
+    ...(record.line_stops !== undefined ? { line_stops: record.line_stops } : {})
   };
   const parsed = LessonLibraryPatchSchema.safeParse(subset);
   if (!parsed.success) {
@@ -58,5 +61,6 @@ export function applyLessonLibraryPatch(lesson: Lesson, patch: LessonLibraryPatc
     else next.author_id = patch.author_id;
   }
   if (patch.pedagogical_mode !== undefined) next.pedagogical_mode = patch.pedagogical_mode;
+  if (patch.line_stops !== undefined) next.line_stops = patch.line_stops;
   return next;
 }

@@ -1,28 +1,33 @@
-import type { CurriculumLinesBlock } from '@/schemas/block';
-import { COLOUR_LABEL, COLOUR_ORDER, LEVEL_WORD, nextColour, strandColour, type LinesContent, type LinesLesson, type LinesLevel } from './model';
-import { renderCurriculumLines } from './render';
+import {
+  isCurriculumLinesV2,
+  type CurriculumGate,
+  type CurriculumLinesBlock,
+  type CurriculumLinesV2Content,
+  type CurriculumRailStop,
+  type LineStop,
+  type NetworkLine
+} from '@/schemas/block';
+import type { UnitNetworkContext } from '@/blocks/render';
+import { lineColour } from '@/network/colour';
+import { drawNetwork, networkLegend } from '@/network/draw';
+import { chooseNetworkOrientation, layoutNetwork, liveNudges } from '@/network/layout';
+import { el, ghostButton, mountLinesEditor, networkId, selectOf, textInput } from '@/network/lines-editor';
+import { LEVEL_ORDER, MODE_LABEL, convertV1, orderLines, type NetLesson } from '@/network/model';
+import { unitNetworkInput } from './render';
 
-type Station = LinesContent['stations'][number];
-type Checkpoint = LinesContent['checkpoints'][number];
+/** What the unit page gives the editor: the network, plus how to save the parts that live elsewhere. */
+export type UnitNetworkEditorContext = UnitNetworkContext & {
+  saveLines?: (lines: NetworkLine[]) => Promise<void>;
+  saveLessonStops?: (lessonId: string, stops: LineStop[]) => Promise<void>;
+  /** The blocks of one lesson, for stops that point at an activity. */
+  lessonBlocks?: (lessonId: string) => Promise<Array<{ id: string; label: string }>>;
+};
 
-const LEVELS: LinesLevel[] = ['introduced', 'reinforced', 'mastered'];
-const LEVEL_LETTER: Record<LinesLevel, string> = { introduced: 'I', reinforced: 'R', mastered: 'M' };
-const TEXT_ONLY = '';
+type Kind = CurriculumRailStop['kind'];
+const KIND_LABEL: Record<Kind, string> = { stop: 'Stop', extension: 'Extension (optional spur)', support: 'Support (loop)' };
+const LEVEL_LETTER = { introduced: 'I', reinforced: 'R', mastered: 'M' } as const;
+const BEFORE_FIRST = '';
 
-let seq = 0;
-function uid(prefix: string): string {
-  seq += 1;
-  return `${prefix}_${Date.now().toString(36)}${seq.toString(36)}`;
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, textContent?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (textContent !== undefined) node.textContent = textContent;
-  return node;
-}
-
-/** A <label> for one input; a named group for a set of buttons or checkboxes (a label would forward their clicks). */
 function field(label: string, control: HTMLElement, grow = false): HTMLElement {
   const single = control instanceof HTMLInputElement || control instanceof HTMLSelectElement;
   const wrap = el(single ? 'label' : 'div', `cl-editor__field${grow ? ' cl-editor__field--grow' : ''}`);
@@ -34,293 +39,367 @@ function field(label: string, control: HTMLElement, grow = false): HTMLElement {
   return wrap;
 }
 
-function textInput(value: string, maxLength: number, placeholder = ''): HTMLInputElement {
-  const input = el('input');
-  input.type = 'text';
-  input.value = value;
-  input.maxLength = maxLength;
-  input.placeholder = placeholder;
-  return input;
-}
-
-function button(label: string, onClick: () => void, aria?: string): HTMLButtonElement {
-  const b = el('button', 'btn btn--ghost', label);
-  b.type = 'button';
-  if (aria) b.setAttribute('aria-label', aria);
-  b.addEventListener('click', onClick);
-  return b;
-}
-
-function selectOf(options: Array<{ value: string; label: string }>, value: string): HTMLSelectElement {
-  const select = el('select');
-  for (const o of options) {
-    const opt = el('option', undefined, o.label);
-    opt.value = o.value;
-    opt.selected = o.value === value;
-    select.append(opt);
-  }
-  return select;
-}
-
-function lessonSelect(lessons: readonly LinesLesson[], value: string | undefined): HTMLSelectElement {
-  const options = [{ value: TEXT_ONLY, label: 'Text label (no link)' }, ...lessons.map((l) => ({ value: l.id, label: l.title || 'Untitled lesson' }))];
-  if (value && !lessons.some((l) => l.id === value)) options.push({ value, label: 'A lesson no longer in this unit' });
-  return selectOf(options, value ?? TEXT_ONLY);
+function section(heading: string, hint?: string): HTMLElement {
+  const s = el('div', 'cl-editor__section');
+  s.append(el('h4', 'cl-editor__heading', heading));
+  if (hint) s.append(el('p', 'cl-editor__hint', hint));
+  return s;
 }
 
 /**
- * Grid editor: strands are rows, weeks are columns. A cell is one station
- * (level plus a lesson link or a text label). The live map sits underneath.
+ * Unit map editor. Lines belong to the subject and stops to each lesson, so
+ * this edits them where they live (through the context's save functions); the
+ * block itself keeps light-rail stops, gates, nudges and the terminus. Drag a
+ * stop or gate on the preview to nudge it.
  */
 export function createCurriculumLinesEditor(
   block: CurriculumLinesBlock,
   onChange: (block: CurriculumLinesBlock) => void,
-  lessons: readonly LinesLesson[] = []
+  context: UnitNetworkEditorContext | undefined = undefined
 ): HTMLElement {
   let current = block;
-  let selected: { strandId: string; week: number } | null = null;
+  let lines: NetworkLine[] = orderLines(context?.lines ?? []);
+  let lessons: NetLesson[] = [...(context?.lessons ?? [])];
   const root = el('div', 'cl-editor');
+  const blockCache = new Map<string, Promise<Array<{ id: string; label: string }>>>();
 
-  const content = () => current.content;
-  const commit = (next: Partial<LinesContent>, repaint = true) => {
-    current = { ...current, content: { ...current.content, ...next } };
+  const network = (): UnitNetworkContext => ({ lines, lessons, ...(context?.bands ? { bands: context.bands } : {}) });
+  const v2 = (): CurriculumLinesV2Content => current.content as CurriculumLinesV2Content;
+  const emit = (content: CurriculumLinesBlock['content']) => {
+    current = { ...current, content };
     onChange(current);
+  };
+  const commit = (patch: Partial<CurriculumLinesV2Content>, repaint = true) => {
+    emit({ ...v2(), ...patch });
     if (repaint) paint();
     else paintPreview();
   };
 
+  /* Preview, with drag to nudge. */
   const preview = el('div', 'cl-editor__preview');
-  const paintPreview = () => preview.replaceChildren(renderCurriculumLines(current, 'teacher', { unitLessons: [...lessons] }));
-
-  function settings(): HTMLElement {
-    const row = el('div', 'cl-editor__row');
-    const title = textInput(content().title ?? '', 120, 'e.g. Texts and Human Experiences');
-    title.addEventListener('input', () => commit({ title: title.value || undefined }, false));
-    const weeks = el('input');
-    weeks.type = 'number';
-    weeks.min = '1';
-    weeks.max = '20';
-    weeks.value = String(content().weeks);
-    weeks.addEventListener('change', () => {
-      const n = Math.min(20, Math.max(1, Math.round(Number(weeks.value) || 1)));
-      commit({ weeks: n });
+  function paintPreview(): void {
+    const input = unitNetworkInput(current, { network: network() });
+    const width = Math.max(320, Math.floor(root.getBoundingClientRect().width) || 900);
+    const orientation = chooseNetworkOrientation(width, input);
+    const editable = isCurriculumLinesV2(current.content);
+    const svg = drawNetwork(layoutNetwork(input, orientation), {
+      label: 'Unit curriculum map preview',
+      ...(editable ? {
+        onNudge: (key: string, across: number, along: number) => {
+          const was = v2().nudges[key] ?? { dx: 0, dy: 0 };
+          const ids = [...v2().rail_stops.map((s) => s.id), ...v2().gates.map((g) => g.id)];
+          commit({ nudges: liveNudges({ ...v2().nudges, [key]: { dx: was.dx + across, dy: was.dy + along } }, ids) }, false);
+        }
+      } : {})
     });
-    row.append(field('Title (optional)', title, true), field('Teaching weeks', weeks));
+    const frame = el('div', orientation === 'vertical' ? 'cl-editor__map' : 'cl-editor__map net-scroll');
+    frame.append(svg);
+    const tools = el('div', 'cl-editor__row');
+    if (editable) {
+      tools.append(el('span', 'cl-editor__hint', 'Drag a stop or gate on the map to tidy it.'));
+      const reset = ghostButton('Reset positions', () => commit({ nudges: {} }, false));
+      reset.disabled = !Object.keys(v2().nudges).length;
+      tools.append(reset);
+    }
+    preview.replaceChildren(el('h4', 'cl-editor__heading', 'Map'), tools, frame, networkLegend('unit'));
+  }
+
+  /* Version 1: one step converts and saves. */
+  function upgradeBar(): HTMLElement {
+    const bar = el('div', 'cl-editor__upgrade');
+    bar.append(el('p', undefined, 'This map uses the old strands and weeks. Upgrade it to the network: strands become the subject’s lines and stations become stops on their lessons.'));
+    const go = el('button', 'btn btn--primary', 'Upgrade this map');
+    go.type = 'button';
+    const status = el('span', 'cl-editor__hint');
+    status.setAttribute('role', 'status');
+    go.addEventListener('click', async () => {
+      if (isCurriculumLinesV2(current.content)) return;
+      if (!context?.saveLines || !context.saveLessonStops) {
+        status.textContent = 'Open this unit from the Teaching hub to upgrade it.';
+        return;
+      }
+      go.disabled = true;
+      status.textContent = 'Upgrading…';
+      const out = convertV1(current.content, lines, lessons, current.id);
+      try {
+        if (out.added.length) await context.saveLines(out.lines);
+        for (const [lessonId, stops] of out.lessonStops) await context.saveLessonStops(lessonId, stops);
+      } catch {
+        go.disabled = false;
+        status.textContent = 'Could not upgrade. Try again; the map itself has not changed.';
+        return;
+      }
+      lines = orderLines(out.lines);
+      lessons = lessons.map((l) => (out.lessonStops.has(l.id) ? { ...l, line_stops: out.lessonStops.get(l.id) } : l));
+      emit(out.content);
+      paint();
+    });
+    bar.append(go, status);
+    return bar;
+  }
+
+  function titleRow(): HTMLElement {
+    const row = el('div', 'cl-editor__row');
+    const title = textInput(current.content.title ?? '', 120, 'e.g. Texts and Human Experiences');
+    title.addEventListener('input', () => {
+      emit({ ...current.content, title: title.value || undefined });
+      paintPreview();
+    });
+    row.append(field('Title (optional)', title, true));
     return row;
   }
 
-  function strandsSection(): HTMLElement {
-    const section = el('div', 'cl-editor__section');
-    section.append(el('h4', 'cl-editor__heading', 'Strands'), el('p', 'cl-editor__hint', 'One line per strand of learning, in the colours of the transit map.'));
-    const strands = content().strands;
-    strands.forEach((strand, i) => {
-      const row = el('div', 'cl-editor__strand');
-      const swatch = el('span', 'cl-editor__swatch');
-      swatch.style.background = strandColour(strand.colour);
-      const name = textInput(strand.name, 60, 'Strand name');
-      name.setAttribute('aria-label', `Strand ${i + 1} name`);
-      name.addEventListener('input', () => {
-        commit({ strands: content().strands.map((s) => (s.id === strand.id ? { ...s, name: name.value } : s)) }, false);
-        grid.replaceWith((grid = gridSection()));
+  /* Lines: the subject's, edited in place. */
+  function lineChips(): HTMLElement {
+    const chips = el('div', 'cl-editor__chips');
+    for (const line of lines) {
+      const chip = el('span', `cl-editor__chip cl-editor__chip--${line.mode}`, line.name || 'Untitled line');
+      chip.style.setProperty('--net-colour', lineColour(line.colour));
+      chips.append(chip);
+    }
+    if (!lines.length) chips.append(el('span', 'cl-editor__hint', 'No lines yet.'));
+    return chips;
+  }
+
+  function linesSection(): HTMLElement {
+    const s = section('Lines', 'Lines belong to the subject, so every unit map and the year network share them. Trains are syllabus groupings, metro lines are concepts, light rail is skills.');
+    let chips = lineChips();
+    s.append(chips);
+    if (context?.saveLines) {
+      const host = el('div', 'cl-editor__lines');
+      host.hidden = true;
+      const toggle = ghostButton(lines.length ? 'Edit lines' : 'Add lines', () => {
+        host.hidden = !host.hidden;
+        toggle.setAttribute('aria-expanded', String(!host.hidden));
       });
-      const colour = selectOf(COLOUR_ORDER.map((c) => ({ value: c, label: COLOUR_LABEL[c] })), strand.colour);
-      colour.setAttribute('aria-label', `Strand ${i + 1} colour`);
-      colour.addEventListener('change', () =>
-        commit({ strands: content().strands.map((s) => (s.id === strand.id ? { ...s, colour: colour.value as typeof s.colour } : s)) }));
-      const move = (delta: number) => {
-        const list = [...content().strands];
-        const j = i + delta;
-        if (j < 0 || j >= list.length) return;
-        [list[i], list[j]] = [list[j]!, list[i]!];
-        commit({ strands: list });
-      };
-      const up = button('↑', () => move(-1), `Move ${strand.name || 'strand'} up`);
-      up.disabled = i === 0;
-      const down = button('↓', () => move(1), `Move ${strand.name || 'strand'} down`);
-      down.disabled = i === strands.length - 1;
-      const remove = button('Remove', () => {
-        if (content().strands.length <= 1) return;
-        commit({
-          strands: content().strands.filter((s) => s.id !== strand.id),
-          stations: content().stations.filter((st) => st.strand_id !== strand.id),
-          checkpoints: content().checkpoints
-            .map((cp) => ({ ...cp, strand_ids: cp.strand_ids.filter((id) => id !== strand.id) }))
-            .filter((cp) => cp.strand_ids.length > 0)
-        });
-      }, `Remove ${strand.name || 'strand'}`);
-      remove.disabled = strands.length <= 1;
-      row.append(swatch, name, colour, up, down, remove);
-      section.append(row);
-    });
-    const add = button('Add strand', () => {
-      const list = content().strands;
-      if (list.length >= 8) return;
-      commit({ strands: [...list, { id: uid('strand'), name: '', colour: nextColour(list.map((s) => s.colour)) }] });
-    });
-    add.disabled = strands.length >= 8;
-    section.append(add);
-    return section;
+      toggle.setAttribute('aria-expanded', 'false');
+      mountLinesEditor(host, {
+        lines,
+        onSave: async (next) => {
+          await context.saveLines!(next);
+          lines = orderLines(next);
+          const fresh = lineChips();
+          chips.replaceWith(fresh);
+          chips = fresh;
+          paintStops();
+          paintPreview();
+        },
+        usage: (lineId) => [
+          ...lessons.filter((l) => l.line_stops?.some((x) => x.line_id === lineId)).map((l) => l.title || 'Untitled lesson'),
+          ...v2().rail_stops.filter((r) => r.line_id === lineId).map((r) => `Stop on this map: ${r.label || 'untitled'}`)
+        ]
+      });
+      s.append(toggle, host);
+    }
+    return s;
   }
 
-  function stationAt(strandId: string, week: number): Station | undefined {
-    return content().stations.find((st) => st.strand_id === strandId && st.week === week);
-  }
-
-  function cellText(st: Station): string {
-    if (st.lesson_id) return st.label || lessons.find((l) => l.id === st.lesson_id)?.title || 'Lesson';
-    return st.label || 'Untitled';
-  }
-
-  function gridSection(): HTMLElement {
-    const section = el('div', 'cl-editor__section');
-    section.append(el('h4', 'cl-editor__heading', 'Map'), el('p', 'cl-editor__hint', 'Pick a cell to set its depth and its lesson or label. Strands that link the same lesson in the same week join into an interchange.'));
+  /* Which lines each lesson serves (saved on the lesson). */
+  function stopsSection(): HTMLElement {
+    const s = section('Stations', 'Each lesson is a station. Tap a line to say the lesson serves it; tap again to step the depth (introduced, reinforced, mastered), then off. The lesson’s settings show the same line chips.');
+    if (!lessons.length) {
+      s.append(el('p', 'cl-editor__hint', 'Add lessons to this unit first.'));
+      return s;
+    }
+    if (!lines.length) {
+      s.append(el('p', 'cl-editor__hint', 'Add lines first.'));
+      return s;
+    }
     const wrap = el('div', 'cl-editor__grid-wrap');
     const table = el('table', 'cl-editor__grid');
     const head = el('tr');
-    head.append(el('th', undefined, 'Strand'));
-    for (let w = 1; w <= content().weeks; w++) head.append(el('th', undefined, `Wk ${w}`));
+    head.append(el('th', undefined, 'Lesson'));
+    for (const line of lines) {
+      const th = el('th', `cl-editor__col cl-editor__col--${line.mode}`, line.short?.trim() || line.name.slice(0, 4) || '?');
+      th.title = `${MODE_LABEL[line.mode]}: ${line.name}`;
+      th.style.setProperty('--net-colour', lineColour(line.colour));
+      head.append(th);
+    }
     table.append(head);
-    for (const strand of content().strands) {
-      const row = el('tr');
-      row.style.setProperty('--cl-colour', strandColour(strand.colour));
-      row.append(el('th', undefined, strand.name || 'Untitled strand'));
-      for (let w = 1; w <= content().weeks; w++) {
-        const st = stationAt(strand.id, w);
+    for (const lesson of lessons) {
+      const tr = el('tr');
+      tr.append(el('th', undefined, lesson.title || 'Untitled lesson'));
+      for (const line of lines) {
+        const stop = lesson.line_stops?.find((x) => x.line_id === line.id);
         const td = el('td');
-        const cell = el('button', `cl-editor__cell${st ? '' : ' cl-editor__cell--empty'}`);
+        const cell = el('button', `cl-editor__cell${stop ? '' : ' cl-editor__cell--empty'}`);
         cell.type = 'button';
-        cell.setAttribute('aria-pressed', String(selected?.strandId === strand.id && selected.week === w));
-        cell.setAttribute('aria-label', `${strand.name || 'Strand'}, week ${w}${st ? `, ${LEVEL_WORD[st.level]}: ${cellText(st)}` : ', empty'}`);
-        if (st) {
-          cell.append(el('span', 'cl-editor__cell-level', LEVEL_LETTER[st.level]), el('span', 'cl-editor__cell-text', cellText(st)));
-        } else {
-          cell.append(el('span', undefined, '+'));
-        }
-        cell.addEventListener('click', () => {
-          selected = selected?.strandId === strand.id && selected.week === w ? null : { strandId: strand.id, week: w };
-          paint();
-        });
+        cell.style.setProperty('--cl-colour', lineColour(line.colour));
+        cell.textContent = stop ? (line.mode === 'light_rail' ? '●' : LEVEL_LETTER[stop.level ?? 'reinforced']) : '·';
+        cell.setAttribute('aria-label', `${lesson.title || 'Lesson'} on ${line.name || 'line'}: ${stop ? (line.mode === 'light_rail' ? 'stops' : stop.level ?? 'reinforced') : 'passes'}`);
+        cell.disabled = !context?.saveLessonStops;
+        cell.addEventListener('click', () => void cycle(lesson.id, line));
         td.append(cell);
-        row.append(td);
+        tr.append(td);
       }
-      table.append(row);
+      table.append(tr);
     }
     wrap.append(table);
-    section.append(wrap);
-    if (selected) section.append(cellPanel(selected.strandId, selected.week));
-    return section;
+    s.append(wrap);
+    return s;
   }
 
-  function cellPanel(strandId: string, week: number): HTMLElement {
-    const panel = el('div', 'cl-editor__panel');
-    const strand = content().strands.find((s) => s.id === strandId);
-    const st = stationAt(strandId, week);
-    panel.append(el('h4', 'cl-editor__heading', `${strand?.name || 'Strand'} · week ${week}`));
-
-    const setStation = (patch: Partial<Station> | null) => {
-      const others = content().stations.filter((s) => !(s.strand_id === strandId && s.week === week));
-      if (!patch) return commit({ stations: others });
-      const base: Station = st ?? { id: uid('station'), strand_id: strandId, week, level: 'reinforced', label: '' };
-      commit({ stations: [...others, { ...base, ...patch }] });
-    };
-
-    const levels = el('div', 'cl-editor__levels');
-    const none = button('Empty', () => setStation(null));
-    none.setAttribute('aria-pressed', String(!st));
-    levels.append(none);
-    for (const level of LEVELS) {
-      const b = button(`${LEVEL_LETTER[level]} · ${LEVEL_WORD[level]}`, () => setStation({ level }));
-      b.setAttribute('aria-pressed', String(st?.level === level));
-      if (st?.level === level) b.className = 'btn btn--secondary';
-      levels.append(b);
+  async function cycle(lessonId: string, line: NetworkLine): Promise<void> {
+    const lesson = lessons.find((l) => l.id === lessonId);
+    if (!lesson || !context?.saveLessonStops) return;
+    const list = [...(lesson.line_stops ?? [])];
+    const at = list.findIndex((x) => x.line_id === line.id);
+    if (line.mode === 'light_rail') {
+      if (at < 0) list.push({ line_id: line.id });
+      else list.splice(at, 1);
+    } else if (at < 0) {
+      list.push({ line_id: line.id, level: 'introduced' });
+    } else {
+      const next = LEVEL_ORDER[LEVEL_ORDER.indexOf(list[at]!.level ?? 'reinforced') + 1];
+      if (next) list[at] = { line_id: line.id, level: next };
+      else list.splice(at, 1);
     }
-    panel.append(field('Depth', levels));
-
-    const row = el('div', 'cl-editor__row');
-    const lesson = lessonSelect(lessons, st?.lesson_id);
-    const label = textInput(st?.label ?? '', 120, st?.lesson_id ? 'Uses the lesson title' : 'e.g. Thesis workshop');
-    lesson.addEventListener('change', () => {
-      const id = lesson.value || undefined;
-      setStation({ lesson_id: id, label: label.value });
-    });
-    label.addEventListener('input', () => {
-      const others = content().stations.filter((s) => !(s.strand_id === strandId && s.week === week));
-      const base: Station = stationAt(strandId, week) ?? { id: uid('station'), strand_id: strandId, week, level: 'reinforced', label: '' };
-      current = { ...current, content: { ...current.content, stations: [...others, { ...base, label: label.value }] } };
-      onChange(current);
+    const before = lessons;
+    lessons = lessons.map((l) => (l.id === lessonId ? { ...l, line_stops: list } : l));
+    paintStops();
+    paintPreview();
+    try {
+      await context.saveLessonStops(lessonId, list.slice(0, 16));
+    } catch {
+      lessons = before;
+      paintStops();
       paintPreview();
-    });
-    row.append(field('Lesson', lesson, true), field(st?.lesson_id ? 'Short label (optional)' : 'Label', label, true));
-    panel.append(row);
-    if (!lessons.length) panel.append(el('p', 'cl-editor__hint', 'Add lessons to this unit to link stations to them.'));
-    return panel;
+      window.alert('Could not save that stop. Try again.');
+    }
   }
 
-  function checkpointsSection(): HTMLElement {
-    const section = el('div', 'cl-editor__section');
-    section.append(el('h4', 'cl-editor__heading', 'Checkpoints'), el('p', 'cl-editor__hint', 'Interchanges you add by hand, such as a formative task that joins several strands.'));
-    const update = (id: string, patch: Partial<Checkpoint>, repaint = true) =>
-      commit({ checkpoints: content().checkpoints.map((cp) => (cp.id === id ? { ...cp, ...patch } : cp)) }, repaint);
-    for (const cp of content().checkpoints) {
-      const row = el('div', 'cl-editor__checkpoint');
-      const week = selectOf(Array.from({ length: content().weeks }, (_, i) => ({ value: String(i + 1), label: `Week ${i + 1}` })), String(cp.week));
-      week.addEventListener('change', () => update(cp.id, { week: Number(week.value) }));
-      const label = textInput(cp.label, 80, 'e.g. Timed check');
-      label.addEventListener('input', () => update(cp.id, { label: label.value }, false));
-      const lesson = lessonSelect(lessons, cp.lesson_id);
-      lesson.addEventListener('change', () => update(cp.id, { lesson_id: lesson.value || undefined }));
+  const positionOptions = () => [
+    { value: BEFORE_FIRST, label: 'Before the first lesson' },
+    ...lessons.map((l) => ({ value: l.id, label: `After ${l.title || 'untitled lesson'}` }))
+  ];
+  const lessonOptions = (none: string) => [{ value: '', label: none }, ...lessons.map((l) => ({ value: l.id, label: l.title || 'Untitled lesson' }))];
+
+  /* Light-rail stops, extensions and support loops (saved in the block). */
+  function railSection(): HTMLElement {
+    const s = section('Light-rail stops', 'Practice points, optional extension spurs and support loops on a skill line. A stop can link a lesson, one activity in a lesson, or be a text label.');
+    const rails = lines.filter((l) => l.mode === 'light_rail');
+    if (!rails.length) {
+      s.append(el('p', 'cl-editor__hint', 'Add a light-rail line to place stops.'));
+      return s;
+    }
+    const update = (id: string, patch: Partial<CurriculumRailStop>, repaint = true) =>
+      commit({ rail_stops: v2().rail_stops.map((r) => (r.id === id ? { ...r, ...patch } : r)) }, repaint);
+    for (const stop of v2().rail_stops) {
+      const row = el('div', 'cl-editor__item');
+      const line = selectOf(rails.map((l) => ({ value: l.id, label: l.name || 'Untitled line' })), stop.line_id, 'Line');
+      if (!rails.some((l) => l.id === stop.line_id)) line.prepend(new Option('A line no longer on this subject', stop.line_id, true, true));
+      line.addEventListener('change', () => update(stop.id, { line_id: line.value }));
+      const pos = selectOf(positionOptions(), stop.after_lesson_id ?? BEFORE_FIRST, 'Position');
+      pos.addEventListener('change', () => update(stop.id, { after_lesson_id: pos.value || undefined }));
+      const kind = selectOf((['stop', 'extension', 'support'] as Kind[]).map((k) => ({ value: k, label: KIND_LABEL[k] })), stop.kind, 'Kind');
+      kind.addEventListener('change', () => update(stop.id, { kind: kind.value as Kind }));
+      const lesson = selectOf(lessonOptions('Text label (no link)'), stop.lesson_id ?? '', 'Links to');
+      lesson.addEventListener('change', () => update(stop.id, { lesson_id: lesson.value || undefined, block_id: undefined }));
+      const label = textInput(stop.label, 120, stop.lesson_id ? 'Uses the lesson or activity title' : 'e.g. Paragraph drill', 'Label');
+      label.addEventListener('input', () => update(stop.id, { label: label.value }, false));
+      const remove = ghostButton('Remove', () => commit({ rail_stops: v2().rail_stops.filter((r) => r.id !== stop.id) }), `Remove stop ${stop.label}`);
+      row.append(field('Line', line), field('Position', pos, true), field('Kind', kind), field('Links to', lesson, true));
+      if (stop.lesson_id && context?.lessonBlocks) {
+        row.append(field('Activity', activitySelect(stop, (blockId, blockLabel) => {
+          update(stop.id, { block_id: blockId, ...(blockId && !stop.label ? { label: blockLabel } : {}) });
+        }), true));
+      }
+      row.append(field('Label', label, true), remove);
+      s.append(row);
+    }
+    const add = ghostButton('Add light-rail stop', () => {
+      const last = lessons[lessons.length - 1];
+      commit({ rail_stops: [...v2().rail_stops, { id: networkId('stop'), line_id: rails[0]!.id, ...(last ? { after_lesson_id: last.id } : {}), kind: 'stop', label: '' }] });
+    });
+    add.disabled = v2().rail_stops.length >= 60;
+    s.append(add);
+    return s;
+  }
+
+  function activitySelect(stop: CurriculumRailStop, onPick: (blockId: string | undefined, label: string) => void): HTMLSelectElement {
+    const select = selectOf([{ value: '', label: 'The whole lesson' }], '', 'Activity');
+    if (stop.block_id) select.append(new Option('Loading…', stop.block_id, true, true));
+    const lessonId = stop.lesson_id!;
+    if (!blockCache.has(lessonId)) blockCache.set(lessonId, context!.lessonBlocks!(lessonId).catch(() => []));
+    void blockCache.get(lessonId)!.then((blocks) => {
+      select.replaceChildren(new Option('The whole lesson', '', !stop.block_id, !stop.block_id));
+      for (const b of blocks) select.append(new Option(b.label, b.id, false, b.id === stop.block_id));
+      if (stop.block_id && !blocks.some((b) => b.id === stop.block_id)) select.append(new Option('An activity no longer in the lesson', stop.block_id, true, true));
+    });
+    select.addEventListener('change', () => onPick(select.value || undefined, select.selectedOptions[0]?.textContent ?? ''));
+    return select;
+  }
+
+  /* Gates: diagnostic and checkpoint quizzes. */
+  function gatesSection(): HTMLElement {
+    const s = section('Gates', 'A diagnostic at the start or a checkpoint quiz, drawn as a heavy capsule across the lines it checks.');
+    const update = (id: string, patch: Partial<CurriculumGate>, repaint = true) =>
+      commit({ gates: v2().gates.map((g) => (g.id === id ? { ...g, ...patch } : g)) }, repaint);
+    for (const gate of v2().gates) {
+      const row = el('div', 'cl-editor__item');
+      const pos = selectOf(positionOptions(), gate.after_lesson_id ?? BEFORE_FIRST, 'Position');
+      pos.addEventListener('change', () => update(gate.id, { after_lesson_id: pos.value || undefined }));
+      const label = textInput(gate.label, 80, 'e.g. Diagnostic', 'Label');
+      label.addEventListener('input', () => update(gate.id, { label: label.value }, false));
+      const lesson = selectOf(lessonOptions('No quiz lesson'), gate.lesson_id ?? '', 'Quiz lesson');
+      lesson.addEventListener('change', () => update(gate.id, { lesson_id: lesson.value || undefined }));
       const checks = el('div', 'cl-editor__checks');
-      for (const strand of content().strands) {
+      for (const line of lines) {
         const box = el('label');
         const input = el('input');
         input.type = 'checkbox';
-        input.checked = cp.strand_ids.includes(strand.id);
+        input.checked = gate.line_ids.includes(line.id);
         input.addEventListener('change', () => {
-          const ids = content().strands.map((s) => s.id).filter((id) => (id === strand.id ? input.checked : cp.strand_ids.includes(id)));
-          if (ids.length) update(cp.id, { strand_ids: ids });
-          else input.checked = true;
+          const ids = lines.map((l) => l.id).filter((id) => (id === line.id ? input.checked : gate.line_ids.includes(id)));
+          update(gate.id, { line_ids: ids });
         });
-        box.append(input, document.createTextNode(` ${strand.name || 'Untitled strand'}`));
+        box.append(input, document.createTextNode(` ${line.name || 'Untitled line'}`));
         checks.append(box);
       }
-      const remove = button('Remove', () => commit({ checkpoints: content().checkpoints.filter((c) => c.id !== cp.id) }), `Remove checkpoint ${cp.label}`);
-      row.append(field('Week', week), field('Label', label, true), field('Lesson', lesson, true), field('Strands', checks, true), remove);
-      section.append(row);
+      const remove = ghostButton('Remove', () => commit({ gates: v2().gates.filter((g) => g.id !== gate.id) }), `Remove gate ${gate.label}`);
+      row.append(field('Position', pos, true), field('Label', label, true), field('Quiz lesson', lesson, true), field('Checks', checks, true), remove);
+      s.append(row);
     }
-    const add = button('Add checkpoint', () => {
-      const strands = content().strands;
-      commit({ checkpoints: [...content().checkpoints, { id: uid('checkpoint'), week: 1, label: '', strand_ids: strands.slice(0, 2).map((s) => s.id) }] });
+    const add = ghostButton('Add gate', () => {
+      commit({ gates: [...v2().gates, { id: networkId('gate'), label: 'Diagnostic', line_ids: lines.filter((l) => l.mode !== 'light_rail').map((l) => l.id) }] });
     });
-    add.disabled = content().checkpoints.length >= 20;
-    section.append(add);
-    return section;
+    add.disabled = v2().gates.length >= 12;
+    s.append(add);
+    return s;
   }
 
   function terminusSection(): HTMLElement {
-    const section = el('div', 'cl-editor__section');
-    section.append(el('h4', 'cl-editor__heading', 'Terminus'), el('p', 'cl-editor__hint', 'The assessment every line runs into.'));
-    const t = content().terminus;
-    const set = (patch: Partial<LinesContent['terminus']>, repaint = false) => commit({ terminus: { ...content().terminus, ...patch } }, repaint);
-    const label = textInput(t.label, 80, 'Assessment task');
+    const s = section('Terminus', 'The assessment every line runs into.');
+    const t = v2().terminus;
+    const set = (patch: Partial<CurriculumLinesV2Content['terminus']>, repaint = false) => commit({ terminus: { ...v2().terminus, ...patch } }, repaint);
+    const label = textInput(t.label, 80, 'Assessment task', 'Terminus label');
     label.addEventListener('input', () => set({ label: label.value }));
-    const detail = textInput(t.detail ?? '', 160, 'e.g. Extended response · short answers');
+    const detail = textInput(t.detail ?? '', 160, 'e.g. Extended response · short answers', 'Terminus detail');
     detail.addEventListener('input', () => set({ detail: detail.value || undefined }));
-    const when = textInput(t.when ?? '', 24, 'Task');
+    const when = textInput(t.when ?? '', 24, 'Task', 'When');
     when.addEventListener('input', () => set({ when: when.value || undefined }));
-    const lesson = lessonSelect(lessons, t.lesson_id);
+    const lesson = selectOf(lessonOptions('No lesson'), t.lesson_id ?? '', 'Terminus lesson');
     lesson.addEventListener('change', () => set({ lesson_id: lesson.value || undefined }, true));
     const row = el('div', 'cl-editor__row');
     row.append(field('Label', label, true), field('Detail', detail, true), field('When', when), field('Lesson', lesson, true));
-    section.append(row);
-    return section;
+    s.append(row);
+    return s;
   }
 
-  let grid = gridSection();
+  const stopsHost = el('div', 'cl-editor__stack');
+  const paintStops = () => stopsHost.replaceChildren(stopsSection(), railSection(), gatesSection());
   function paint(): void {
-    grid = gridSection();
-    root.replaceChildren(settings(), strandsSection(), grid, checkpointsSection(), terminusSection(), preview);
+    if (!isCurriculumLinesV2(current.content)) {
+      root.replaceChildren(upgradeBar(), titleRow(), preview);
+      paintPreview();
+      return;
+    }
+    paintStops();
+    root.replaceChildren(titleRow(), linesSection(), stopsHost, terminusSection(), preview);
     paintPreview();
   }
   paint();
+  // The first paint happens before the editor is in the page; redraw once it has a width.
+  if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => paintPreview());
   return root;
 }

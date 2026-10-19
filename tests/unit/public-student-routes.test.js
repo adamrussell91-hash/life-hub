@@ -6,6 +6,7 @@ test('published Teaching student APIs are public', () => {
   assert.equal(isPublicStudentApi('GET', '/api/published/lessons/week-1'), true);
   assert.equal(isPublicStudentApi('GET', '/api/published/units/unit-1'), true);
   assert.equal(isPublicStudentApi('GET', '/api/published/classes/11psycha'), true);
+  assert.equal(isPublicStudentApi('GET', '/api/published/networks/11psycha'), true);
   assert.equal(isPublicStudentApi('GET', '/api/published/feedback/tok_abc'), true);
   assert.equal(isPublicStudentApi('GET', '/api/published/feedback/tok_abc/audio'), true);
   assert.equal(isPublicStudentApi('GET', '/api/media/file-1/file'), true);
