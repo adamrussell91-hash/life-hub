@@ -13,13 +13,19 @@ const FRAME = [
   ['whatCanBeDone', 'That is evidence, not opinion. What can be done: can this be solved as it stands, or should we reframe it to something more achievable?']
 ];
 
-const base = { node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null };
+const base = { node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null };
 
 export async function scriptedCoach(session) {
   const latest = session.turns.at(-1);
   const last = latest?.role === 'user' ? latest.text : '';
-  if (session.runner?.mode === 'closing') {
-    return { ...base, verdict: 'clarify', message: 'Fair enough, that is your call. You have a clear problem on the page; keep the open questions in mind when you come back to analyse it.' };
+  if (session.runner?.mode === 'boundary') {
+    return { ...base, verdict: 'clarify', message: 'Fair enough, that step is behind us now. Before we go on: what did you learn about how you tend to work through problems in that step?' };
+  }
+  if (session.pendingLearning) {
+    return { ...base, verdict: 'clarify', learning: last || 'No answer given.', message: session.phase === 'finished' ? 'Thank you, that is worth keeping. The whole problem is on the record now; come back to it whenever you need to.' : 'Thank you, that is worth keeping. Let us open the next step with a tool that fits; start it when you are ready.' };
+  }
+  if (session.phase === 'finished') {
+    return { ...base, verdict: 'clarify', message: 'The whole problem is on the record. Anything you add now is a note for next time; what would you want to remember?' };
   }
   if (session.phase === 'frame') {
     if (session.turns.length === 1) return { ...base, verdict: 'clarify', message: FRAME[0][1] };
@@ -32,7 +38,7 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   }
   const run = activeRun(session);
-  if (!run) return { ...base, verdict: 'clarify', message: 'Pick a tool to start defining this problem, and we will work through it one step at a time together.' };
+  if (!run) return { ...base, verdict: 'clarify', message: 'Pick a tool to start this step, and we will work through it one question at a time together.' };
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
     return { ...base, verdict: 'clarify', message: `Let's start the ${TOOLS[run.tool].name}. ${first.title}: ${first.prompt}` };
