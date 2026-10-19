@@ -4,6 +4,19 @@ import assert from 'node:assert/strict';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
 import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
+import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
+
+/** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
+async function withoutAnalyseTools(fn) {
+  const saved = Object.entries(TOOLS).filter(([, def]) => def.step === 'analyse');
+  try {
+    for (const [id, def] of saved) TOOLS[id] = { ...def, step: '__none__' };
+    return await fn();
+  } finally {
+    for (const [id, def] of saved) TOOLS[id] = def;
+  }
+}
+
 let n = 0;
 const deps = { now: () => '2026-10-19T10:00:00.000Z', newId: () => `id${(n += 1)}` };
 const step = async (s) => applyCoachTurn(s, await scriptedCoach(s), deps);
@@ -15,18 +28,15 @@ async function intoDefine() {
 }
 
 test('boundary asks what was learned, then records it', async () => {
-  // Analyse and Devise have tools now; Decide is the first step without any.
-  const idle = (x) => ({ ...x, runner: { status: 'idle', mode: 'turn', error: null } });
-  let s = await intoDefine();
-  for (const _ of [1, 2]) s = moveOn(idle(s), deps);
-  s = { ...s, steps: { ...s.steps, devise: { ...s.steps.devise, runs: [{ id: 'dev', tool: 'five_whys', status: 'active', nodes: [], edges: [] }] } } };
-  s = await step(moveOn(idle(s), deps));
-  assert.equal(s.pendingLearning, 'devise');
+  await withoutAnalyseTools(async () => {
+  let s = await step(moveOn(await intoDefine(), deps));
+  assert.equal(s.pendingLearning, 'define');
   assert.match(s.turns.at(-1).text, /learn/);
   s = await step(say(s, 'I blame people when I am tired.', deps));
-  assert.deepEqual(s.learnings.map((l) => l.step), ['devise']);
+  assert.deepEqual(s.learnings.map((l) => l.step), ['define']);
   assert.match(s.turns.at(-1).text, /no tool for this step yet/);
   assert.equal(s.suggestion, null);
+  });
 });
 
 test('when the next step has a tool, the learning turn suggests it', async () => {

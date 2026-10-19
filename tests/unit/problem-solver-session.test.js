@@ -6,6 +6,19 @@ import {
   archive, moveOn, keepAnyway, score, rescoreRadar, say, summaryRow, followOn
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
+import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
+
+/** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
+async function withoutAnalyseTools(fn) {
+  const saved = Object.entries(TOOLS).filter(([, def]) => def.step === 'analyse');
+  try {
+    for (const [id, def] of saved) TOOLS[id] = { ...def, step: '__none__' };
+    return await fn();
+  } finally {
+    for (const [id, def] of saved) TOOLS[id] = def;
+  }
+}
+
 let counter = 0;
 const deps = { now: () => '2026-10-19T10:00:00.000Z', newId: () => `id${(counter += 1)}` };
 const coach = (fields) => ({ verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, ...fields });
@@ -127,6 +140,7 @@ test('after the learning is recorded, a step with no tool falls back to its defa
 
 test('a boundary after skipping a step with no runs sets no pending learning', () => {
   let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  assert.equal(s.pendingLearning, 'define');
   s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
   s = moveOn(s, deps);
   assert.equal(s.steps.analyse.status, 'skipped');
@@ -260,11 +274,9 @@ test('the last step\'s learning is recorded once the session is finished', () =>
   assert.equal(s.pendingLearning, null);
 });
 
-// Analyse and Devise have tools now; Decide is the first step of the seven-step model that does not.
-const toDecide = (s) => [1, 2, 3].reduce((acc) => moveOn({ ...acc, runner: { status: 'idle', mode: 'turn', error: null } }, deps), s);
-
-test('the learning question is one-shot: pendingLearning clears even with no learning', () => {
-  let s = applyCoachTurn(toDecide(framed()), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+test('the learning question is one-shot: pendingLearning clears even with no learning', async () => {
+  await withoutAnalyseTools(() => {
+  let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
   s = applyCoachTurn(say(s, 'Not sure.', deps), coach({ verdict: 'clarify', message: 'Fine.' }), deps);
   assert.equal(s.pendingLearning, null);
   assert.deepEqual(s.learnings, []);
@@ -273,6 +285,7 @@ test('the learning question is one-shot: pendingLearning clears even with no lea
   t = applyCoachTurn(say(t, 'Not sure.', deps), coach({ verdict: 'clarify', message: 'Fine.' }), deps);
   assert.equal(t.pendingLearning, null);
   assert.equal(t.suggestion.tool, 'contradiction');
+  });
 });
 
 test('moving on from an archived session is refused', () => {
@@ -298,4 +311,11 @@ test('keep anyway also places the links proposed with a challenged answer', () =
   const run = activeRun(s);
   const id = (slot) => run.nodes.find((n) => n.slot === slot).id;
   assert.deepEqual(run.edges, [{ from: id('cause:1'), to: id('effect:1'), kind: 'relates' }]);
+});
+
+test('an accepted turn with links and no node adds the links to the active run', () => {
+  let s = framed('seven_step', 'problem_tree');
+  for (const [slot, text] of [['trunk', 't'], ['cause:1', 'c'], ['effect:1', 'e']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  s = applyCoachTurn(s, coach({ node: null, edges: [{ from: 'cause:1', to: 'effect:1', kind: 'relates' }] }), deps);
+  assert.equal(activeRun(s).edges.length, 1);
 });

@@ -90,7 +90,7 @@ export function toolsForPlanStep(modelId, stepId) {
 
 export function defaultToolFor(modelId, stepId) {
   for (const book of planStep(modelId, stepId)?.book ?? []) {
-    const id = (DEFAULTS[book] ?? []).find((tool) => TOOLS[tool]);
+    const id = (DEFAULTS[book] ?? []).find((tool) => TOOLS[tool]?.step === book);
     if (id) return id;
   }
   return toolsForPlanStep(modelId, stepId)[0] ?? null;

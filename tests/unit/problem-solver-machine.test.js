@@ -6,7 +6,7 @@ import { addEdge, applyScores, canEdge, checkNode, canPlace, isComplete, newRun,
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
-test('registry lists all eight tools', () => {
+test('registry lists every tool in order', () => {
   assert.deepEqual(TOOL_IDS, ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction', 'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker']);
   assert.throws(() => toolDef('nope'), /Unknown tool/);
 });

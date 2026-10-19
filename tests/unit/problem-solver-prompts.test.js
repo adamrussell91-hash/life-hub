@@ -4,6 +4,19 @@ import assert from 'node:assert/strict';
 import { RUBRIC, buildCoachPrompt } from '../../netlify/functions/_shared/problem-solver/prompts.mjs';
 import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
+import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
+
+/** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
+async function withoutAnalyseTools(fn) {
+  const saved = Object.entries(TOOLS).filter(([, def]) => def.step === 'analyse');
+  try {
+    for (const [id, def] of saved) TOOLS[id] = { ...def, step: '__none__' };
+    return await fn();
+  } finally {
+    for (const [id, def] of saved) TOOLS[id] = def;
+  }
+}
+
 let n = 0;
 const deps = { now: () => '2026-10-19T10:00:00.000Z', newId: () => `id${(n += 1)}` };
 const turn = (fields) => ({ verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, ...fields });
@@ -85,15 +98,18 @@ test('finished sessions get a closing instruction', () => {
   assert.match(buildCoachPrompt(s).system[1], /The session is finished/);
 });
 
-test('a step with no tools says so and never lists or suggests tools', () => {
-  // Decide is the first step of the seven-step model with no tools.
-  const analyse = [1, 2].reduce((acc) => moveOn({ ...acc, runner: { status: 'idle', mode: 'turn', error: null } }, deps), moveOn(inTool(), deps));
-  const { system, user } = buildCoachPrompt(analyse);
-  assert.doesNotMatch(system[1], /TOOLS FOR THIS STEP/);
-  assert.match(system[1], /Do not suggest a tool/);
-  assert.doesNotMatch(user, /No tool is open in this step yet/);
-  const learning = buildCoachPrompt(applyCoachTurn(analyse, turn({ verdict: 'clarify' }), deps));
-  assert.doesNotMatch(learning.user, /next_tool/);
+test('a step with no tools says so and never lists or suggests tools', async () => {
+  await withoutAnalyseTools(() => {
+    const analyse = moveOn(inTool(), deps);
+    const { system, user } = buildCoachPrompt(analyse);
+    assert.doesNotMatch(system[1], /TOOLS FOR THIS STEP/);
+    assert.match(system[1], /Do not suggest a tool/);
+    assert.doesNotMatch(user, /No tool is open in this step yet/);
+    const learning = buildCoachPrompt(applyCoachTurn(analyse, turn({ verdict: 'clarify' }), deps));
+    assert.equal(learning.system.length > 0, true);
+    assert.match(learning.user, /AWAITING LEARNING/);
+    assert.doesNotMatch(learning.user, /next_tool/);
+  });
 });
 
 test('awaiting-learning line for a finished session has no orient clause', () => {
@@ -119,4 +135,23 @@ test('slot meanings show tag choices and placed nodes show their tag', async () 
   } finally {
     delete T.fake_tagged;
   }
+});
+
+test('run lines say what a tool is waiting on and never call an unfinished tool complete', () => {
+  let s = inTool('force_field');
+  for (const [slot, text] of [['current', 'c'], ['goal', 'g'], ['for:1', 'f'], ['against:1', 'a']]) s = applyCoachTurn(s, turn({ node: { slot, text } }), deps);
+  const user = buildCoachPrompt(s).user;
+  assert.match(user, /Waiting on: The person scores each force 1 to 5/);
+  assert.match(user, /Open slots: for:2, against:2/);
+  assert.match(RUBRIC, /reply accept with node null and the links in "edges"/);
+});
+
+test('open slots none says tool complete only when it is', () => {
+  let s = inTool('intent_statement');
+  for (const slot of ['problem', 'stakeholders', 'failures', 'approach', 'opportunity']) s = applyCoachTurn(s, turn({ node: { slot, text: 'x' } }), deps);
+  s = applyCoachTurn(s, turn({ node: { slot: 'risk', text: 'x' } }), deps);
+  assert.match(buildCoachPrompt(s).user, /Open slots: none \(tool complete\)/);
+  let t = inTool('causal_map');
+  for (const [slot, text] of [['problem', 'p'], ['cause:1', 'a'], ['cause:2', 'b'], ['cause:3', 'c']]) t = applyCoachTurn(t, turn({ node: { slot, text } }), deps);
+  assert.doesNotMatch(buildCoachPrompt(t).user, /none \(tool complete\)/);
 });
