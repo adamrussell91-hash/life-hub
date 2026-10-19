@@ -274,3 +274,16 @@ SAMPLES.intent_statement = run('intent_statement', [
   node('op', 'opportunity', 'More families growing food, a shorter waiting list and less weed spread for everyone.', 'Shorter waiting list'),
   node('ri', 'risk', 'Buddies may drop off by August (fairly likely); a shared rota and a mid-season check-in reduce the gap.', 'Buddy drop-off')
 ]);
+
+// Problem reduction: a primary school's lost-property pile that grows every term.
+SAMPLES.problem_reduction = run('problem_reduction', [
+  node('p', 'problem', 'Lost property piles up in the school hall every term, and most of it is binned unclaimed at the holidays while parents keep buying replacements.', 'Lost property pile-up'),
+  node('s1', 'sub:1', 'Most jumpers and coats carry no name, so staff cannot return them.', 'Unnamed uniform'),
+  node('s2', 'sub:2', 'Found items are left in three different places around the school.', 'Scattered drop points', { state: 'contested', objection: 'Is this a separate part, or just how the pile-up shows itself?' }),
+  node('s3', 'sub:3', 'Parents do not know the box exists or when they can look through it.', 'Parents unaware'),
+  node('o', 'priority', '2, 3, 1: one drop point first, since it is cheap and makes the rest possible; then tell parents; naming takes longest.', 'Cheapest first'),
+  node('v1', 'solution:1', 'Offer iron-on name labels at cost through the parents\' association each September.', 'Labels at cost'),
+  node('v2', 'solution:2', 'One labelled rail by the office, emptied into it by the cleaners each evening.', 'One office rail'),
+  node('v3', 'solution:3', 'A photo of the rail in the Friday newsletter, and the rail wheeled out at pick-up on the last Friday of each month.', 'Friday photo and pick-up'),
+  node('w', 'integrated', 'A single rail that everyone knows about, shown weekly and opened monthly, with more items named each year so staff can return them straight away.', 'One known rail')
+]);
