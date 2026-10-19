@@ -234,3 +234,33 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 - `career-moves` keep/coverage still thin — deltas light up once moves exist
 
 **Remaining polish:** 1440/390 screenshots, hub-ui-guardian, 5.6 Career evidence inverse lists, referee briefings.
+
+---
+
+## River fix (19 Oct 2026)
+
+**Status:** done
+**Why:** live page was unreadable — role pills overlapped, the future half sat
+blank with no futures, all skill cards collapsed into one bubble at Now, and
+the ledger repeated cards.
+
+- **Past as swimlanes.** One row group per workplace under the trunk;
+  concurrent roles stack inside their group. Row packing reserves label room,
+  so every role keeps a label (inside the bar, beside it, or tooltip only —
+  never overlapping). Workplace name labels the first role in each group.
+- **No futures, no blank half.** Past share is 84% with no futures (40% once
+  any exist, per §3.2); Now shows two dashed starter branches and an
+  "Add a future" action. Phone keeps at least 60% for the past.
+- **Height** is sized to what is drawn (branch zone + swimlanes + axis).
+- **Phone** (<720px): trunk on the left, roles as thin columns with stacked
+  callout labels; branch labels collision-checked and kept on screen; zoom
+  presets hide behind Zoom.
+- **Add a role** on the Work card writes the `employee_at` link the river reads
+  (self Person → organisation, role, start; ended at the finish date unless
+  "I still do this role"). Overview now returns `self_ref`.
+- **New futures** get their own colour slot and lane (were all slot 1 / lane 0).
+- **Skills scan** dates a card from its latest source record, skips titles
+  already kept or pending, and Keep folds a same-title proposal into the
+  existing card. Existing duplicates fold into one ledger row ("Kept 2 times").
+- Empty Futures / Applications cards collapse to one line.
+- Mock API and Career tests now use invented workplaces only.

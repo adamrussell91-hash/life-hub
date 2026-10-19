@@ -391,6 +391,8 @@ export async function assembleCareerOverview(deps = {}) {
     stone_actions,
     scan,
     application_records: applicationRecords,
-    employment_items: employment.status === 'ok' ? employment.items : []
+    employment_items: employment.status === 'ok' ? employment.items : [],
+    // Career → Add a role writes employee_at links from this Person.
+    self_ref: selfRef
   };
 }

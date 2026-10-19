@@ -2,6 +2,7 @@ import { renderRelationshipTimeline } from '@/components/relationship-timeline';
 import type { CareerModel } from '@/domain/career-model';
 import type { TimelineEntry } from '@/domain/types';
 import { yearFraction } from '@/domain/career-river-geometry';
+import { openAddRoleSheet } from '@/views/career-role-form';
 
 function plural(n: number, unit: string): string {
   return n === 1 ? `1 ${unit}` : `${n} ${unit}s`;
@@ -58,7 +59,11 @@ export function employmentToTimeline(
 }
 
 /** Readable Work history — reuses relationship-timeline (not SVG pills). */
-export function renderCareerEmployment(host: HTMLElement, model: CareerModel): void {
+export function renderCareerEmployment(
+  host: HTMLElement,
+  model: CareerModel,
+  options: { selfRef?: string | null; onReload?: () => void } = {}
+): void {
   const section = document.createElement('section');
   section.className = 'career-page__work';
   section.setAttribute('aria-label', 'Work history');
@@ -74,8 +79,19 @@ export function renderCareerEmployment(host: HTMLElement, model: CareerModel): v
   note.setAttribute('data-part', 'work-companion');
   const years =
     model.stats.years_behind != null ? ` · ${model.stats.years_behind} years behind you` : '';
-  note.textContent = `Full dates & duration${years}`;
-  head.append(note);
+  note.textContent = `Full dates and duration${years}`;
+  const headEnd = document.createElement('div');
+  headEnd.className = 'career-page__head-end';
+  const addRole = document.createElement('button');
+  addRole.type = 'button';
+  addRole.className = 'btn btn--secondary';
+  addRole.textContent = 'Add a role';
+  addRole.setAttribute('data-part', 'add-role');
+  addRole.addEventListener('click', () =>
+    openAddRoleSheet(document.body, options.selfRef ?? null, () => options.onReload?.())
+  );
+  headEnd.append(note, addRole);
+  head.append(headEnd);
   section.append(head);
 
   const timeline = employmentToTimeline(model.employment, model.now);

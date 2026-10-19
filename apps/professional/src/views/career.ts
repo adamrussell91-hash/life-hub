@@ -32,10 +32,15 @@ function surface(node: HTMLElement): void {
   node.style.boxShadow = 'var(--elev-1)';
 }
 
+function futureCount(model: CareerModel): number {
+  return model.futures.length + model.parked_futures.length;
+}
+
 function renderRiver(
   host: HTMLElement,
   model: CareerModel,
-  selectedFutureId: string | null
+  selectedFutureId: string | null,
+  onReload: () => void
 ): void {
   const section = el('section', 'career-page__river');
   section.setAttribute('aria-label', 'Career river');
@@ -49,7 +54,8 @@ function renderRiver(
       else if (parseRoute(location.hash).name === 'career-future') {
         location.hash = '#/career';
       }
-    }
+    },
+    onAddFuture: () => openAddFutureSheet(document.body, onReload, futureCount(model))
   });
 }
 
@@ -75,14 +81,18 @@ function renderFuturePanel(
   head.append(el('h2', 'career-page__heading', 'Futures'));
   const add = el('button', 'btn btn--secondary', 'Add a future') as HTMLButtonElement;
   add.type = 'button';
-  add.addEventListener('click', () => openAddFutureSheet(document.body, onReload));
+  add.addEventListener('click', () =>
+    openAddFutureSheet(document.body, onReload, futureCount(model))
+  );
   head.append(add);
   panel.append(head);
 
   const active = model.futures.filter((f) => f.status === 'active');
   if (!active.length) {
-    panel.append(
-      el('p', 'empty-state', 'No futures yet. Add a target role to start a branch.')
+    // Empty: one compact line, so a section with nothing in it doesn't dominate.
+    panel.classList.add('career-page__section--empty');
+    head.querySelector('.career-page__heading')?.after(
+      el('p', 'career-page__meta', 'No futures yet. Add a target role to start a branch.')
     );
   } else {
     const list = el('ul', 'career-page__future-list');
@@ -183,8 +193,8 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   const stats = el('p', 'career-page__stats', model.stats_line);
   page.append(stats);
 
-  renderRiver(page, model, selectedFutureId);
-  renderCareerEmployment(page, model);
+  renderRiver(page, model, selectedFutureId, reload);
+  renderCareerEmployment(page, model, { selfRef: overview.self_ref ?? null, onReload: reload });
 
   const columns = el('div', 'career-page__columns');
   renderFuturePanel(columns, model, selectedFutureId, reload);
@@ -255,6 +265,12 @@ function renderSkillsLedger(host: HTMLElement, model: CareerModel, onReload: () 
               card.occurred_on.slice(0, 7)
             : formatDisplayDate(card.occurred_on) ?? card.occurred_on;
       li.append(el('span', 'career-page__ledger-date', date), link);
+      if (card.merged_ids.length) {
+        const kept = card.merged_ids.length + 1;
+        const note = el('span', 'career-page__meta career-page__ledger-merged', `Kept ${kept} times`);
+        note.title = 'The scan kept this skill more than once; it now shows as one card.';
+        li.append(note);
+      }
       list.append(li);
     }
     section.append(list);
