@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>]
+// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>] [--audit]
+// --audit runs scripts/problem-solver-audit.mjs at each width (and on hover) and prints problems or "audit: clean".
 // --click clicks a control first (such as a layout toggle); --name adds -<suffix> to the PNG names.
 // --widths 900,390,320 shoots those viewport widths instead of the default 900 and 390.
 // --next applies SAMPLES['<tool>:next'] after load and shoots <tool>-next-<width>.png (radar morph end state).
@@ -45,6 +46,9 @@ const openNode = openIndex >= 0 ? args.splice(openIndex, 2)[1] : null;
 const nextIndex = args.indexOf('--next');
 const applyNext = nextIndex >= 0;
 if (applyNext) args.splice(nextIndex, 1);
+const auditIndex = args.indexOf('--audit');
+const audit = auditIndex >= 0;
+if (audit) args.splice(auditIndex, 1);
 const clickIndex = args.indexOf('--click');
 const clickSelector = clickIndex >= 0 ? args.splice(clickIndex, 2)[1] : null;
 const nameIndex = args.indexOf('--name');
@@ -53,7 +57,7 @@ const widthsIndex = args.indexOf('--widths');
 const widths = widthsIndex >= 0 ? args.splice(widthsIndex, 2)[1].split(',').map(Number).filter(Boolean) : [900, 390];
 const [tool, outDir] = args;
 if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
-  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>] [--widths <w,w>]`);
+  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>] [--widths <w,w>] [--audit]`);
   process.exit(2);
 }
 mkdirSync(outDir, { recursive: true });
@@ -105,6 +109,18 @@ for (const width of widths) {
   const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (overflow > 0) console.warn(`horizontal overflow at ${width}px: ${overflow}px`);
   await tab.screenshot({ path: join(outDir, `${tool}${applyNext ? '-next' : ''}${suffix}-${width}.png`), fullPage: true });
+  if (audit) {
+    const { auditChart } = await import('./problem-solver-audit.mjs');
+    const source = `(${auditChart.toString()})`;
+    const found = await tab.evaluate((src) => eval(src)(), source);
+    const shapes = await tab.$$('[data-shape] button, button[data-shape]');
+    for (const shape of shapes.slice(0, 16)) {
+      await shape.hover();
+      await tab.waitForTimeout(80);
+      found.push(...(await tab.evaluate(([src, el]) => eval(src)(el.closest('[data-shape]') ?? el), [source, shape])).map((p) => `hover: ${p}`));
+    }
+    console.log(found.length ? `audit at ${width}px: ${found.length} problems\n  ${found.join('\n  ')}` : `audit at ${width}px: clean`);
+  }
   await ctx.close();
 }
 await browser.close();
