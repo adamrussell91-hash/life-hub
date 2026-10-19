@@ -1,4 +1,5 @@
 import { blankQuestion } from '@/quiz/core';
+import { starterCurriculumLinesContent } from '@/blocks/curriculum-lines/starter';
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider } from '@/schemas/block';
 import { analogyTypesContent, fluidAnalogyContent } from '@/toolkit/analogy';
@@ -51,6 +52,7 @@ export const NEW_BLOCK_TYPES = [
   'diagram',
   'mind_map',
   'concept_map',
+  'curriculum_lines',
   'whiteboard',
   'columns',
   'section',
@@ -117,6 +119,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   diagram: 'Diagram',
   mind_map: 'Mind map',
   concept_map: 'Concept map',
+  curriculum_lines: 'Curriculum lines',
   whiteboard: 'Whiteboard',
   columns: 'Columns',
   section: 'Section',
@@ -235,7 +238,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Visualisation',
-    types: ['chart', 'table', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'whiteboard']
+    types: ['chart', 'table', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'curriculum_lines', 'whiteboard']
   },
   {
     label: 'Layout',
@@ -254,6 +257,8 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
 ];
 
 const PAGE_ONLY_TYPES = new Set(['collection', 'anthology']);
+/** Unit plan pages only: it maps the unit's lessons. */
+const UNIT_ONLY_TYPES = new Set(['curriculum_lines']);
 const TOOLKIT_GROUP_TYPES = [
   'thinking_intentions',
   'toolkit_skill',
@@ -275,6 +280,7 @@ const TOOLKIT_GROUP_TYPES = [
 ];
 
 const HOMEPAGE_EXCLUDED = new Set([
+  ...UNIT_ONLY_TYPES,
   'peer_feedback',
   'brainstorm',
   'question_drop',
@@ -306,14 +312,10 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   )
 })).filter((group) => group.types.length > 0);
 
-export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) =>
-  group.label === 'Layout'
-    ? {
-        ...group,
-        types: group.types.filter((t) => !PAGE_ONLY_TYPES.has(t))
-      }
-    : group
-);
+export const LESSON_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
+  ...group,
+  types: group.types.filter((t) => !UNIT_ONLY_TYPES.has(t) && (group.label !== 'Layout' || !PAGE_ONLY_TYPES.has(t)))
+}));
 
 /** Block types allowed inside a columns cell */
 export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
@@ -598,6 +600,8 @@ export function createBlock(type: NewBlockType, id: string): Block {
       return { ...shared, block_type: 'peer_feedback', variant: 'medium', content: {
         prompt: '', mode: 'comments', strength_prompt: 'One thing that works well…', suggestion_prompt: 'One suggestion or question…'
       } };
+    case 'curriculum_lines':
+      return { ...shared, block_type: 'curriculum_lines', variant: 'large', content: starterCurriculumLinesContent() };
     case 'brainstorm':
       return { ...shared, block_type: 'brainstorm', variant: 'medium', content: {
         question: '', safety: 'approve', per_student: 3, max_length: 140, layout: 'grid'

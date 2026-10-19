@@ -42,6 +42,7 @@ export const BlockTypeSchema = z.enum([
   'peer_feedback',
   'question_drop',
   'brainstorm',
+  'curriculum_lines',
   'quiz_question',
   'question_set',
   'discern_confirm',
@@ -522,6 +523,58 @@ export const BrainstormBlockSchema = z.object({
     layout: z.enum(['grid', 'cloud', 'groups']).default('grid')
   }), ...blockLayout, ...blockTimestamps
 });
+
+/**
+ * Curriculum lines: a unit's curriculum map drawn as a transit map. Each strand
+ * of learning is a line, each station is one week's work on that strand at a
+ * depth (introduced, reinforced, mastered), and every line runs into the
+ * assessment terminus. A station is a lesson link or a text label; stations on
+ * several strands that link the same lesson in the same week join into an
+ * interchange. Checkpoints are interchanges made by hand.
+ */
+export const CurriculumLinesColourSchema = z.enum([
+  'wave', 'wave_deep', 'green', 'green_deep', 'amber', 'amber_deep', 'lilac', 'lilac_deep', 'navy', 'navy_deep'
+]);
+export const CurriculumLinesLevelSchema = z.enum(['introduced', 'reinforced', 'mastered']);
+export const CurriculumLinesStrandSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().max(60).default(''),
+  colour: CurriculumLinesColourSchema.default('wave')
+});
+export const CurriculumLinesStationSchema = z.object({
+  id: z.string().min(1).max(64),
+  strand_id: z.string().min(1).max(64),
+  week: z.number().int().min(1).max(20),
+  level: CurriculumLinesLevelSchema.default('reinforced'),
+  label: z.string().max(120).default(''),
+  lesson_id: z.string().min(1).max(64).optional()
+});
+export const CurriculumLinesCheckpointSchema = z.object({
+  id: z.string().min(1).max(64),
+  week: z.number().int().min(1).max(20),
+  label: z.string().max(80).default(''),
+  lesson_id: z.string().min(1).max(64).optional(),
+  strand_ids: z.array(z.string().min(1).max(64)).min(1).max(8)
+});
+export const CurriculumLinesBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('curriculum_lines'), variant: z.string().default('large'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().max(120).optional(),
+    weeks: z.number().int().min(1).max(20).default(8),
+    strands: z.array(CurriculumLinesStrandSchema).min(1).max(8),
+    stations: z.array(CurriculumLinesStationSchema).max(160).default([]),
+    checkpoints: z.array(CurriculumLinesCheckpointSchema).max(20).default([]),
+    terminus: z.object({
+      label: z.string().max(80).default('Assessment task'),
+      detail: z.string().max(160).optional(),
+      when: z.string().max(24).optional(),
+      lesson_id: z.string().min(1).max(64).optional()
+    }).default({ label: 'Assessment task' })
+  }), ...blockLayout, ...blockTimestamps
+});
+export type CurriculumLinesBlock = z.infer<typeof CurriculumLinesBlockSchema>;
 
 /**
  * Question drop: students write a question that feeds a quiz lesson in the
@@ -1329,6 +1382,7 @@ const leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
   QuestionSetBlockSchema,

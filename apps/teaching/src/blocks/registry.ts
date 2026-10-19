@@ -88,6 +88,7 @@ import {
 import { renderPeerFeedback, createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { renderQuestionDrop, createQuestionDropEditor } from '@/blocks/question-drop';
 import { renderBrainstorm, createBrainstormEditor } from '@/blocks/brainstorm';
+import { renderCurriculumLines, createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion, createQuizQuestionEditor } from '@/blocks/quiz-question';
 import type { Block } from '@/schemas/block';
 import {
@@ -199,6 +200,7 @@ export const blockRegistry: {
   },
   peer_feedback: { render: renderPeerFeedback, createEditor: createPeerFeedbackEditor },
   brainstorm: { render: renderBrainstorm, createEditor: createBrainstormEditor },
+  curriculum_lines: { render: renderCurriculumLines, createEditor: (block, onChange) => createCurriculumLinesEditor(block, onChange) },
   question_drop: { render: renderQuestionDrop, createEditor: (block, onChange) => createQuestionDropEditor(block, onChange) },
   quiz_question: { render: renderQuizQuestion, createEditor: (block, onChange) => createQuizQuestionEditor(block, onChange) },
   discern_confirm: { render: (block, mode) => renderBlock(block, mode), createEditor: (block, onChange) => createBlockEditor(block, onChange as BlockChangeHandler) },

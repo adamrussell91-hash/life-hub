@@ -3,6 +3,7 @@ import { mountCulturalWarningTracks } from '@/blocks/cultural-warning-tracks';
 import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderBrainstorm } from '@/blocks/brainstorm';
+import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
 import { canHaveDiscern } from '@/blocks/discern';
@@ -55,6 +56,8 @@ export type RenderContext = {
   openNoteId?: string;
   /** Every block on the page, for blocks that read the whole lesson (Thinking reflection). */
   pageBlocks?: Block[];
+  /** Lessons a unit plan block may link to, resolved for this viewer (Curriculum lines). */
+  unitLessons?: Array<{ id: string; title: string; href: string }>;
   onMakeAnthologyCards?: (request: {
     items: AnthologyData['items'];
     view: 'text' | 'theme' | 'technique' | 'connections';
@@ -2264,6 +2267,8 @@ function renderBlockContent(
       return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
     case 'brainstorm':
       return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
+    case 'curriculum_lines':
+      return wrapBlock(renderCurriculumLines(block, mode, ctx), block, mode);
     case 'discern_confirm':
       return wrapBlock(renderDiscernConfirm(block, mode, ctx), block, mode);
     case 'quiz_question':
