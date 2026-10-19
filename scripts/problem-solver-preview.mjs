@@ -43,6 +43,8 @@ const RENDERERS = {
   pareto: ['pareto', 'createParetoView'],
   pareto_unscored: ['pareto', 'createParetoView'],
   pareto_many: ['pareto', 'createParetoView'],
+  dmaic: ['dmaic', 'createDmaicView'],
+  dmaic_first: ['dmaic', 'createDmaicView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
