@@ -40,7 +40,7 @@ const nameIndex = args.indexOf('--name');
 const suffix = nameIndex >= 0 ? `-${args.splice(nameIndex, 2)[1]}` : '';
 const [tool, outDir] = args;
 if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
-  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next]`);
+  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>]`);
   process.exit(2);
 }
 mkdirSync(outDir, { recursive: true });

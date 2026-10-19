@@ -2,6 +2,9 @@
 import { hasSlot, nextIndexed, open } from '../slots.mjs';
 import { canParent, levels } from './hierarchy.mjs';
 
+/** Deepest level the chart can draw (the rim). */
+export const MAX_LEVEL = 5;
+
 export const radialTree = Object.freeze({
   id: 'radial_tree',
   name: 'Radial tree',
@@ -26,7 +29,9 @@ export const radialTree = Object.freeze({
     return open(nextIndexed(run, 'node', 40), deep && !hasSlot(run, 'review') ? 'review' : null);
   },
   canEdge(run, from, to) {
-    return canParent(run, from, to, 'root', 'node');
+    // The book's chart stops at five levels: the rim holds level 5, so nothing hangs below it.
+    if (!canParent(run, from, to, 'root', 'node')) return false;
+    return (levels(run, 'root', 'node').get(to) ?? 1) + 1 <= MAX_LEVEL;
   },
   complete(run) {
     return hasSlot(run, 'review') && [...levels(run, 'root', 'node').values()].some((level) => level >= 3);

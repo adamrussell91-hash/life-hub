@@ -1629,7 +1629,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   text-align: left;
   transition: background-color 600ms var(--ps-ease), color 600ms var(--ps-ease), opacity 160ms var(--ps-ease);
 }
-.ps-radial[data-layout='vertical'] .ps-radial__label:not(.is-tip) { background: var(--ps-paper); color: var(--ps-ink); }
+.ps-radial[data-layout='vertical'] .ps-radial__label:not(.is-tip, .is-beside, [data-side='inside']) { background: var(--ps-paper); color: var(--ps-ink); }
 
 /* The label hangs off the circle's box: 50% is the node's centre, 100% its far edge. */
 .ps-radial__label[data-side='inside'] { left: 50%; top: 50%; align-items: center; background: none; color: #fff; text-align: center; transform: translate(-50%, -50%); }
@@ -1642,7 +1642,9 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-radial__label[data-side='above-right'] { left: calc(50% + var(--rp) * 0.72 + 2px); bottom: calc(50% + var(--rp) * 0.72 + 2px); }
 .ps-radial__label[data-side='above-left'] { right: calc(50% + var(--rp) * 0.72 + 2px); bottom: calc(50% + var(--rp) * 0.72 + 2px); align-items: flex-end; text-align: right; }
 
-.ps-radial__meta:empty { display: none; }
+/* The code and level line only belongs in a tip. */
+.ps-radial__meta:empty,
+.ps-radial__label:not(.is-tip, .is-beside) .ps-radial__meta { display: none; }
 .ps-radial__meta {
   font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
   letter-spacing: var(--tracking-caps);
@@ -1660,11 +1662,72 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
-.ps-radial__item[data-level='1'] .ps-radial__title { font-size: 14px; }
+.ps-radial__item[data-level='1'] .ps-radial__title { font-size: var(--lf, 14px); overflow-wrap: normal; }
+/* The centre's title inside it, or (when it won't fit in two lines) in the caption instead. */
+.ps-radial__label[data-side='caption'] { display: none; }
+.ps-radial__caption {
+  display: block;
+  overflow: hidden; /* while it opens or closes */
+  max-width: min(100%, 420px);
+  margin: 0 auto 6px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) var(--text-base) / 1.3 var(--font-ui);
+  text-align: center;
+  text-wrap: balance;
+  cursor: pointer;
+}
+.ps-radial__caption::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: var(--ps-red); vertical-align: 0.05em; }
+.ps-radial[data-layout='vertical'] .ps-radial__caption::before { background: var(--ps-blue); }
+
+/* Codes: a branch letter in each level-2 node and A1, A2… in each level-3 node, always
+   shown; dots too small to hold one carry it just beside them. */
+.ps-radial__code {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font: 700 10px / 1 var(--font-ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ps-radial[data-layout='vertical'] .ps-radial__item.is-deep .ps-radial__code { color: var(--ps-on-yellow); }
+.ps-radial__item.is-code-out .ps-radial__code { padding: 1px 3px; border-radius: 4px; background: var(--ps-yellow); color: var(--ps-on-yellow); line-height: 11px; transform: none; }
+.ps-radial[data-layout='vertical'] .ps-radial__item.is-code-out .ps-radial__code { background: var(--ps-paper); color: var(--ps-ink); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='right'] { left: calc(100% + 2px); top: 50%; transform: translateY(-50%); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='left'] { left: auto; right: calc(100% + 2px); top: 50%; transform: translateY(-50%); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='below'] { top: calc(100% + 1px); transform: translateX(-50%); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='above'] { top: auto; bottom: calc(100% + 1px); transform: translateX(-50%); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='below-right'] { left: calc(50% + var(--rp) * 0.72 + 2px); top: calc(50% + var(--rp) * 0.72 + 2px); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='below-left'] { left: auto; right: calc(50% + var(--rp) * 0.72 + 2px); top: calc(50% + var(--rp) * 0.72 + 2px); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='above-right'] { left: calc(50% + var(--rp) * 0.72 + 2px); top: auto; bottom: calc(50% + var(--rp) * 0.72 + 2px); }
+.ps-radial__item.is-code-out .ps-radial__code[data-side='above-left'] { left: auto; right: calc(50% + var(--rp) * 0.72 + 2px); top: auto; bottom: calc(50% + var(--rp) * 0.72 + 2px); }
+
+/* A faint leader ties a label to its node when it sits off to a corner or slid along. */
+.ps-radial__leader {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: none;
+  width: var(--len, 0px);
+  height: 1px;
+  background: var(--ps-ink);
+  opacity: 0.5;
+  transform: rotate(var(--angle, 0deg)) translateX(var(--from, 0px));
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+.ps-radial__leader.is-on { display: block; }
 .ps-radial__label .ps-objection { margin-top: 2px; padding: 0 5px; font-size: 9px; line-height: 1.5; }
 
-/* Deeper levels: the title is a tip that shows on hover, focus or while open. */
-.ps-radial__label.is-tip {
+/* Deeper levels: the title is a tip that shows on hover, focus or while open. A level-3
+   title placed beside its node is a tip too until the container is wide enough. */
+.ps-radial__label.is-tip,
+.ps-radial__label.is-beside {
   z-index: 1;
   padding: 3px 8px 4px;
   border-radius: 6px;
@@ -1675,10 +1738,75 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   pointer-events: none;
   transition: opacity 160ms var(--ps-ease), visibility 0s linear 160ms;
 }
-.ps-radial__item:hover .ps-radial__label.is-tip,
-.ps-radial__item:focus-within .ps-radial__label.is-tip,
-.ps-radial__item.is-open .ps-radial__label.is-tip { opacity: 1; visibility: visible; transition: opacity 160ms var(--ps-ease), visibility 0s; }
-.ps-radial__label.is-tip .ps-objection { color: var(--ps-paper); }
+.ps-radial__item:hover .ps-radial__label:is(.is-tip, .is-beside),
+.ps-radial__item:focus-within .ps-radial__label:is(.is-tip, .is-beside),
+.ps-radial__item.is-open .ps-radial__label:is(.is-tip, .is-beside) { opacity: 1; visibility: visible; transition: opacity 160ms var(--ps-ease), visibility 0s; }
+.ps-radial__label:is(.is-tip, .is-beside) .ps-objection { color: var(--ps-paper); }
+.ps-radial__leader.is-beside { display: none; }
+
+@container (min-width: 600px) {
+  .ps-radial__label.is-beside {
+    padding: 2px 6px;
+    background: var(--ps-yellow);
+    color: var(--ps-on-yellow);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .ps-radial[data-layout='vertical'] .ps-radial__label.is-beside { background: var(--ps-paper); color: var(--ps-ink); }
+  .ps-radial__label.is-beside .ps-radial__meta { display: none; }
+  .ps-radial__label.is-beside .ps-objection { color: inherit; }
+  .ps-radial__leader.is-beside.is-on { display: block; }
+  .ps-radial__key-row.is-labelled,
+  .ps-radial__key-group.is-covered,
+  .ps-radial__key.is-covered { display: none; }
+}
+
+/* The key: codes and titles, grouped by branch, under the chart. */
+.ps-radial__key {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px 18px;
+  box-sizing: border-box;
+  width: min(100%, 580px);
+  margin-top: 10px;
+}
+.ps-radial__key-group { display: flex; flex-direction: column; min-width: 0; }
+.ps-radial__key-head,
+.ps-radial__key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: var(--weight-regular) var(--text-sm) / 1.25 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ps-radial__key-head { font-weight: var(--weight-semibold); }
+.ps-radial__key-head:hover, .ps-radial__key-row:hover, .ps-radial__key-row[aria-expanded='true'], .ps-radial__key-head[aria-expanded='true'] { background: var(--glass); }
+.ps-radial__key-head:focus-visible, .ps-radial__key-row:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+.ps-radial__key-code {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
+  background: var(--ps-blue);
+  color: #fff;
+  font: 700 10px / 1 var(--font-ui);
+}
+.ps-radial__key-head .ps-radial__key-code { background: var(--ps-red); }
+.ps-radial[data-layout='vertical'] .ps-radial__key-row .ps-radial__key-code { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-radial__key-title { min-width: 0; overflow-wrap: anywhere; }
+.ps-radial__key-row.is-contested .ps-radial__key-title::after { content: ' · contested'; color: var(--muted); font-size: var(--text-xs); }
 
 .ps-radial__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
 .ps-radial__panel .ps-details { width: min(100%, 480px); }
@@ -1704,12 +1832,13 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-radial__review .ps-details__card { margin-top: 0; padding: 0 0 8px; background: transparent; box-shadow: none; }
 
 @container (max-width: 520px) {
-  .ps-radial__item[data-level='1'] .ps-radial__title { font-size: 13px; }
+  .ps-radial__key { grid-template-columns: 1fr 1fr; gap: 6px 10px; }
   .ps-radial__toggle { padding: 0 14px; font-size: var(--text-xs); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ps-radial__stage, .ps-radial__disc, .ps-radial__shape, .ps-radial__label, .ps-radial__link, .ps-radial__toggle { transition: none; }
+  .ps-radial__label:is(.is-tip, .is-beside) { transition: none; }
 }
 
 /* Outline (accessible alternative and fallback) */

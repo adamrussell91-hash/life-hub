@@ -67,6 +67,17 @@ test('radial tree: nodes hang from the root or another node, one parent each; le
   assert.equal(isComplete(r), true);
 });
 
+test('radial tree: a parent link may not make a node deeper than level 5, as the book stops there', () => {
+  let r = newRun('radial_tree', 'r');
+  r = put(r, 'root');
+  for (const s of ['node:1', 'node:2', 'node:3', 'node:4', 'node:5']) r = put(r, s);
+  r = link(r, 'node:2', 'node:1', 'parent'); // level 3
+  r = link(r, 'node:3', 'node:2', 'parent'); // level 4
+  r = link(r, 'node:4', 'node:3', 'parent'); // level 5
+  assert.equal(canEdge(r, idOf(r, 'node:5'), idOf(r, 'node:4'), 'parent'), false, 'level 6 is refused');
+  assert.equal(canEdge(r, idOf(r, 'node:5'), idOf(r, 'node:3'), 'parent'), true, 'level 5 is fine');
+});
+
 test('force field: current, goal, then forces; scores 1 to 5 per force; totals from the latest snapshot', () => {
   let r = newRun('force_field', 'r');
   assert.deepEqual(nextSlots(r), ['current']);
