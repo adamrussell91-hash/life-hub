@@ -278,6 +278,32 @@ describe('schedule compose', () => {
     expect(result.proposed.reduce((s, b) => s + b.duration_minutes, 0)).toBe(90);
   });
 
+  it('does not double-book a task that already has a confirmed block', () => {
+    const input = {
+      date: '2026-09-08',
+      workday: { start: '08:00', end: '16:30', source: 'profile' },
+      tasks: [
+        { id: 't1', title: 'Collect library card', estimated_duration: 30 },
+        { id: 't2', title: 'Return the drill', estimated_duration: 30 }
+      ]
+    };
+    const first = composeDaySchedule(input);
+    const t1 = first.proposed.find((b) => b.task_id === 't1')!;
+    const start = Number(t1.start_time.slice(0, 2)) * 60 + Number(t1.start_time.slice(3));
+    const confirmed = [{ start, end: start + t1.duration_minutes, title: t1.title, kind: 'locked' as const, task_id: 't1', work_block_id: 'wb1' }];
+
+    const second = composeDaySchedule({ ...input, confirmed_blocks: confirmed });
+    expect(second.proposed.filter((b) => b.task_id === 't1')).toHaveLength(0);
+    expect(second.proposed.filter((b) => b.task_id === 't2')).toHaveLength(1);
+    expect(second.already_scheduled).toEqual([
+      { task_id: 't1', title: 'Collect library card', work_block_id: 'wb1', start_time: t1.start_time, duration_minutes: 30 }
+    ]);
+
+    const extra = composeDaySchedule({ ...input, confirmed_blocks: confirmed, extra_block_task_ids: ['t1'] });
+    expect(extra.proposed.filter((b) => b.task_id === 't1')).toHaveLength(1);
+    expect(extra.already_scheduled).toHaveLength(0);
+  });
+
   it('returns partial and impossible states', () => {
     const partial = composeDaySchedule({
       date: '2026-09-08',
