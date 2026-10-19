@@ -40,6 +40,8 @@ const RENDERERS = {
   morphological: ['morphological', 'createMorphologicalView'],
   morphological_clash: ['morphological', 'createMorphologicalView'],
   morphological_scenarios: ['morphological', 'createMorphologicalView'],
+  pareto: ['pareto', 'createParetoView'],
+  pareto_unscored: ['pareto', 'createParetoView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

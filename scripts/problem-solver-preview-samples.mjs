@@ -576,3 +576,26 @@ SAMPLES.morphological = run('morphological', [
 ], morphEdges);
 SAMPLES.morphological_scenarios = run('morphological', morphNodes, morphEdges);
 SAMPLES.morphological_clash = run('morphological', morphNodes.filter((n) => n.id !== 'sc2'), morphEdges.filter((e) => e.from !== 'sc2'));
+
+// Pareto analysis: a corner café counting complaints over eight weeks. Six items, one contested;
+// three of them carry 81% of the total. pareto:next is a later count that re-orders the bars
+// (four of six now reach 86%); pareto_unscored is the chart waiting for its figures.
+const paretoNodes = [
+  node('t', 'target', 'Complaints at the till and online, counted over eight weeks from the start of September.', 'Complaints, eight weeks'),
+  node('i1', 'item:1', 'Customers wait more than ten minutes in the lunch queue.', 'Long lunch queue'),
+  node('i2', 'item:2', 'Takeaway coffee is lukewarm by the time it is collected.', 'Cold coffee'),
+  node('i3', 'item:3', 'The order handed over is not the one that was placed.', 'Wrong order'),
+  node('i4', 'item:4', 'The card reader drops out and only cash is taken.', 'Card reader down', { state: 'contested', objection: 'Is this a complaint about the café or about the bank network?' }),
+  node('i5', 'item:5', 'Oat milk has run out before noon.', 'No oat milk'),
+  node('i6', 'item:6', 'Tables are not cleared between customers.', 'Tables not cleared')
+];
+const paretoFirst = { at: '2026-10-28T17:00:00Z', counts: [42, 8, 25, 14, 6, 5] };
+SAMPLES.pareto = {
+  ...run('pareto', [...paretoNodes, node('ch', 'choice', 'Start with the lunch queue: a second till from twelve to two, and pre-orders by text for regulars.', 'Second till at lunch')]),
+  scores: { snapshots: [paretoFirst] }
+};
+SAMPLES['pareto:next'] = {
+  ...SAMPLES.pareto,
+  scores: { snapshots: [paretoFirst, { at: '2026-11-25T17:00:00Z', counts: [30, 12, 34, 10, 6, 8] }] }
+};
+SAMPLES.pareto_unscored = run('pareto', paretoNodes);
