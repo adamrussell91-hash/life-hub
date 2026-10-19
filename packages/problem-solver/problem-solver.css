@@ -4084,7 +4084,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 /* Task confirm cards: the coach proposes, the person creates. Same card look as the
    coach's suggestion; every field and button is a 44px target, and fields stack when
    the coach column is narrow. */
-.ps-taskcards { display: grid; gap: var(--space-3); container: taskcards / inline-size; }
+.ps-taskcards { position: relative; display: grid; gap: var(--space-3); container: taskcards / inline-size; }
 .ps-taskcards[hidden] { display: none; }
 .ps-scope .ps-taskcard,
 .ps-scope .ps-reviewcard { display: grid; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-lg); background: var(--ps-card); box-shadow: inset 0 0 0 2px var(--ps-yellow); animation: ps-msg-in 600ms var(--ps-spring); }
@@ -4099,7 +4099,13 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-taskcard__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .ps-taskcard__actions .btn { min-height: 44px; }
 .ps-taskcard__hint { margin: 0; color: var(--muted); font-size: var(--text-xs); }
-.ps-taskcard__hint[hidden] { display: none; }
+/* The hint is a live region, so it stays in the tree when empty; it just takes no room. */
+.ps-taskcard__hint:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.ps-taskcard__link { color: inherit; font-weight: var(--weight-semibold); text-decoration: underline; }
+.ps-taskcards__notices { display: grid; gap: var(--space-2); }
+.ps-taskcards__notices:empty { display: none; }
+.ps-taskcards__notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: var(--ps-card); box-shadow: inset 0 0 0 2px var(--ps-red); color: var(--ink); font-size: var(--text-sm); }
+.ps-taskcards__notice .btn { min-height: 44px; margin-left: auto; }
 .ps-taskcard__error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
 .ps-taskcard__error:empty { display: none; }
 
