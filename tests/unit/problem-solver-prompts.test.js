@@ -179,3 +179,14 @@ test('a tool\'s scoreLine shows under its run and in earlier steps', async () =>
     delete T.fake_scored;
   }
 });
+
+test('the decide step layer carries its guide, tools, triggers and carry-forward', () => {
+  let s = inTool();
+  for (let i = 0; i < 3; i += 1) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  const layer = buildCoachPrompt(s).system[1];
+  assert.match(layer, /CURRENT STEP: Decide/);
+  assert.match(layer, /decision_matrix \(Decision matrix\)/);
+  assert.match(layer, /CHALLENGE IN THIS STEP:/);
+  assert.match(layer, /CARRY FORWARD:/);
+  assert.match(layer, /choice slot/);
+});

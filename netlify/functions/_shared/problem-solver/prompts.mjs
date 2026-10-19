@@ -81,6 +81,11 @@ function toolKnowledge(id) {
   return `- ${tool.id} (${tool.name}): ${tool.when}\n  Steps: ${tool.steps.map((s) => s.title).join('; ')}.\n  Watch for: ${tool.failureModes.join(' ')}`;
 }
 
+const CARRY = {
+  decide: 'CARRY FORWARD: seed options from Devise (preferred lotus ideas, solution-tree branches, Duncker solutions, the integrated reduction) and confirm each with the person before placing it.',
+  implement: 'CARRY FORWARD: the CHOSEN OPTION from Decide is the aim of Implement. Open by confirming it in one sentence, then seed it into DMAIC\'s Define, the 15% Reflect or the first Kanban cards. If none is recorded, ask what was decided before placing anything. SMART measures from Define seed DMAIC\'s Measure. Confirm before placing.'
+};
+
 /** Step layer: stable for the whole of a step, so it caches between turns. */
 function stepLayer(session) {
   if (session.phase === 'finished') return 'The session is finished. Recap briefly when asked and help the person carry the learning forward. Do not suggest tools.';
@@ -105,7 +110,8 @@ function stepLayer(session) {
     `CURRENT STEP: ${stepName(session.model.id, session.phase)} (tool families: ${books.join(', ')})`,
     books.map((id) => SELECTION[id]).filter(Boolean).join('\n') || 'Pick the tool that best fits the problem\'s shape from the list below.',
     `TOOLS FOR THIS STEP:\n${tools.map(toolKnowledge).join('\n')}`,
-    ...(triggers.length ? [`CHALLENGE IN THIS STEP:\n${triggers.map((line) => `- ${line}`).join('\n')}`] : [])
+    ...(triggers.length ? [`CHALLENGE IN THIS STEP:\n${triggers.map((line) => `- ${line}`).join('\n')}`] : []),
+    ...books.map((id) => CARRY[id]).filter(Boolean)
   ].join('\n\n');
 }
 

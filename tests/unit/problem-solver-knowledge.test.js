@@ -52,14 +52,14 @@ import { STEP_TRIGGERS } from '../../netlify/functions/_shared/problem-solver/kn
 
 test('selection guides for analyse and devise name every one of their tools', async () => {
   const { toolsForBookStep } = await import('../../packages/problem-solver/tools/index.mjs');
-  for (const step of ['analyse', 'devise']) {
+  for (const step of ['analyse', 'devise', 'decide', 'implement']) {
     for (const id of toolsForBookStep(step)) assert.ok(SELECTION[step].includes(`\`${id}\``), `${step} guide names ${id}`);
   }
 });
 
 test('step triggers exist for analyse and devise as short lines', () => {
-  for (const step of ['analyse', 'devise']) {
-    assert.ok(Array.isArray(STEP_TRIGGERS[step]) && STEP_TRIGGERS[step].length >= 3, step);
+  for (const step of ['analyse', 'devise', 'decide', 'implement']) {
+    assert.ok(Array.isArray(STEP_TRIGGERS[step]) && STEP_TRIGGERS[step].length >= 4, step);
     for (const line of STEP_TRIGGERS[step]) assert.ok(line.length < 200, line);
   }
 });
