@@ -75,6 +75,8 @@ export function createPerspectiveShiftView(doc: Document = document): Perspectiv
   let panel: HTMLDivElement | null = null;
   let reframe: HTMLElement | null = null;
   let current = -1;
+  /** The fade-out running on a leaving set, so a quick switch back can cancel it. */
+  const fades = new Map<Page, Animation>();
 
   function ensureFrame(): void {
     if (stage) return;
@@ -181,6 +183,11 @@ export function createPerspectiveShiftView(doc: Document = document): Perspectiv
     // The whole triangle is the stakeholder's hit area.
     fill.addEventListener('click', () => button.click());
 
+    // Deliberate order: meta, title, then the prompt line. The plan put the prompt between
+    // meta and title, but the prompt line becomes the view's own button once the view is
+    // noted (its dot sits beside it), and a button cannot sit inside the stakeholder's
+    // button. Keeping it after the title lets the view stay reachable even after the
+    // insight arrives under it.
     const prompt = span(doc, 'ps-persp__prompt', PROMPT[where]);
     col.append(item, prompt);
     quadrant.append(body, col);
@@ -283,14 +290,22 @@ export function createPerspectiveShiftView(doc: Document = document): Perspectiv
     const previous = pages[current];
     current = n;
     const next = pages[n];
+    const hadFocus = !!previous && previous.el.contains(doc.activeElement);
     if (previous) closeOpenOn(previous);
+    // A set coming back before its fade-out finished: stop the fade so it doesn't flicker.
+    fades.get(next)?.cancel();
+    fades.delete(next);
     next.el.hidden = false;
     next.el.classList.remove('is-leaving');
     if (previous) {
+      fades.get(previous)?.cancel();
+      fades.delete(previous);
       if (animate && canAnimate(previous.el)) {
         previous.el.classList.add('is-leaving');
         const fade = previous.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, easing: EASE });
+        fades.set(previous, fade);
         fade.onfinish = () => {
+          fades.delete(previous);
           previous.el.classList.remove('is-leaving');
           if (pages[current] !== previous) previous.el.hidden = true;
         };
@@ -301,6 +316,14 @@ export function createPerspectiveShiftView(doc: Document = document): Perspectiv
       if (cell) animateCell(cell, 80 + i * 90);
     });
     syncPager();
+    syncFrame();
+    // Focus was inside the set that just left: keep it on the chart, at this set's pager dot.
+    if (hadFocus) (pager?.children[n] as HTMLElement | undefined)?.focus();
+  }
+
+  /** The dashed outline only guides a set with gaps; a full set hides it. */
+  function syncFrame(): void {
+    stage?.classList.toggle('is-complete', (pages[current]?.cells.size ?? 0) === PER_PAGE);
   }
 
   function syncPager(): void {
@@ -308,6 +331,7 @@ export function createPerspectiveShiftView(doc: Document = document): Perspectiv
     if (!pager) {
       pager = doc.createElement('div');
       pager.className = 'ps-persp__pager';
+      pager.setAttribute('role', 'group');
       pager.setAttribute('aria-label', 'Perspective sets');
       stage!.after(pager);
       if (canAnimate(pager)) pager.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: EASE, fill: 'backwards' });
@@ -402,6 +426,7 @@ export function createPerspectiveShiftView(doc: Document = document): Perspectiv
         }
       }
     }
+    syncFrame();
     syncOpen();
   }
 
