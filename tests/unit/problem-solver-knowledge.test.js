@@ -26,3 +26,19 @@ test('selection guides exist for define and contradiction and name only register
     for (const match of text.matchAll(/`([a-z_]+)`/g)) assert.ok(TOOL_IDS.includes(match[1]), `${step} names unknown tool ${match[1]}`);
   }
 });
+
+import { STEP_TRIGGERS } from '../../netlify/functions/_shared/problem-solver/knowledge/triggers.mjs';
+
+test('selection guides for analyse and devise name every one of their tools', async () => {
+  const { toolsForBookStep } = await import('../../packages/problem-solver/tools/index.mjs');
+  for (const step of ['analyse', 'devise']) {
+    for (const id of toolsForBookStep(step)) assert.ok(SELECTION[step].includes(`\`${id}\``), `${step} guide names ${id}`);
+  }
+});
+
+test('step triggers exist for analyse and devise as short lines', () => {
+  for (const step of ['analyse', 'devise']) {
+    assert.ok(Array.isArray(STEP_TRIGGERS[step]) && STEP_TRIGGERS[step].length >= 3, step);
+    for (const line of STEP_TRIGGERS[step]) assert.ok(line.length < 200, line);
+  }
+});
