@@ -1,8 +1,8 @@
 // netlify/functions/_shared/problem-solver/service.mjs
 import { randomUUID } from 'node:crypto';
 import {
-  acceptSuggestion, applyCoachTurn, archive, createSession, dismissSuggestion,
-  keepAnyway, moveOn, rename, rescoreRadar, say, score, summaryRow
+  acceptSuggestion, applyCoachTurn, archive, confirmTask, createSession, dismissReview, dismissSuggestion, dismissTask,
+  keepAnyway, moveOn, rename, rescoreRadar, say, score, setReviewTask, summaryRow
 } from './session.mjs';
 import { migrateRow, migrateSession } from './migrate.mjs';
 
@@ -45,6 +45,10 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     rename: (s, body) => rename(s, body.text, deps),
     score: (s, body) => score(s, body.payload ?? {}, deps),
     rescore_radar: (s, body) => rescoreRadar(s, { current: body.current, objective: body.objective }, deps),
+    confirm_task: (s, body) => confirmTask(s, body.payload ?? {}, deps),
+    dismiss_task: (s, body) => dismissTask(s, body.payload ?? {}, deps),
+    set_review_task: (s, body) => setReviewTask(s, body.payload ?? {}, deps),
+    dismiss_review: (s) => dismissReview(s, deps),
     archive: (s) => archive(s, deps),
     retry: (s) => {
       if (s.runner.status !== 'failed') throw httpError(409, 'action_not_allowed', 'Nothing to retry.');
@@ -52,10 +56,26 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     }
   };
 
+  async function listRows(owner, { limit = 100, offset = 0 } = {}) {
+    const rows = (await store.list(owner, limit, offset)).map((row) => migrateRow(summaryRow(row.value)));
+    return Promise.all(rows.map(async (row) => (row.skills ? row : migrateRow(summaryRow(migrateSession((await store.read(owner, row.id))?.value ?? row))))));
+  }
+
   return {
-    async list(owner, { limit = 100, offset = 0 } = {}) {
-      const rows = (await store.list(owner, limit, offset)).map((row) => migrateRow(summaryRow(row.value)));
-      return Promise.all(rows.map(async (row) => (row.skills ? row : migrateRow(summaryRow(migrateSession((await store.read(owner, row.id))?.value ?? row))))));
+    list: listRows,
+
+    /** Sessions that link to, created, or review a task or project, for the chips on its page. */
+    async linked(owner, ref) {
+      const match = /^(task|project):(.{1,200})$/.exec(String(ref ?? ''));
+      if (!match) throw httpError(400, 'validation_error', 'linked must be task:<id> or project:<id>.');
+      const [, kind, id] = match;
+      const rows = await listRows(owner, { limit: 500 });
+      return rows.filter((row) => row.status !== 'archived').flatMap((row) => {
+        const role = kind === 'task' && row.reviewTaskId === id ? 'review'
+          : kind === 'task' && (row.taskIds ?? []).includes(id) ? 'task'
+            : (row.links ?? []).some((l) => l.kind === kind && l.id === id) ? 'link' : null;
+        return role ? [{ id: row.id, title: row.title, phase: row.phase, model: row.model, role }] : [];
+      });
     },
 
     async get(owner, id) {
