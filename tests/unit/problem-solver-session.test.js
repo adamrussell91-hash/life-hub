@@ -489,7 +489,7 @@ function implementDone() {
   return idle(applyCoachTurn(s, coach({ node: { slot: 'chosen:1', text: 'Move publish day now' }, edges: [{ from: 'chosen:1', to: 'action:1', kind: 'picks' }] }), deps));
 }
 
-const snapshot = { byStatus: { open: 1, done: 2, bogus: 9 }, overdue: ['Ask for swaps by Tuesday', 7] };
+const snapshot = { byStatus: { open: 1, done: 2, bogus: 9 }, overdue: ['Ask for swaps by Tuesday', 7, 'Ask for swaps by Tuesday'] };
 
 test('leaving a finished Implement opens Improve waiting for the review', () => {
   const s = idle(moveOn(implementDone(), deps));
@@ -619,6 +619,58 @@ test('reopen is refused while waiting and before double-loop names a governing a
 });
 
 test('the summary row carries the review date while waiting', () => {
-  assert.equal(summaryRow(idle(moveOn(implementDone(), deps))).reviewDue, idle(moveOn(implementDone(), deps)).reviewProposal.due);
+  const waiting = idle(moveOn(implementDone(), deps));
+  assert.equal(summaryRow(waiting).reviewDue, waiting.reviewProposal.due);
   assert.equal(summaryRow(at('decide')).reviewDue, null);
+});
+
+test('snapshot counts clamp to 500', () => {
+  const s = taskStatus(dismissReview(idle(moveOn(implementDone(), deps)), deps), { snapshot: { byStatus: { open: 9000, done: -1 }, overdue: [] } }, deps);
+  assert.equal(s.taskSnapshot.byStatus.open, 500);
+  assert.equal(s.taskSnapshot.byStatus.done, 0);
+});
+
+test('task_status is refused on an archived problem', () => {
+  assert.throws(() => taskStatus(archive(at('improve'), deps), { snapshot }, deps), /archived/);
+});
+
+test('leaving a waiting Improve asks no learning question', () => {
+  const left = moveOn(idle(moveOn(implementDone(), deps)), deps);
+  const s = applyCoachTurn(left, coach({}), deps);
+  assert.equal(s.pendingLearning, null);
+});
+
+test('setting the review aside after leaving Improve resolves the waiting step', () => {
+  const s = dismissReview(idle(moveOn(idle(moveOn(implementDone(), deps)), deps)), deps);
+  assert.equal(s.steps.improve.status, 'skipped');
+  assert.equal(s.reviewState, null);
+});
+
+test('start_review is refused once the review is done, and during a detour', () => {
+  let s = idle(startReview(idle(moveOn(implementDone(), deps)), {}, deps));
+  s = idle(moveOn(s, deps));
+  assert.equal(s.reviewState.status, 'done');
+  assert.throws(() => startReview(s, {}, deps), /already done/);
+
+  const loop = inDoubleLoop();
+  const reviewing = { ...loop, reviewProposal: { title: 'r', due: '2026-11-02', reason: '', status: 'confirmed' } };
+  const detour = acceptSuggestion({ ...reviewing, suggestion: { kind: 'reopen_step', step: 'define', reason: 'Why.' } }, deps);
+  assert.throws(() => startReview(idle(detour), {}, deps), /reopened step/);
+});
+
+test('a reopen during a late review returns to Improve, then to where the session was', () => {
+  let s = idle(moveOn(idle(moveOn(implementDone(), deps)), deps));
+  s = idle(startReview(s, {}, deps));
+  assert.equal(s.reviewState.returnTo, 'document');
+  s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'double_loop', reason: 'r' } }, deps));
+  for (const [slot, text, tag] of [['problem', 'The rota is still late'], ['single', 'We moved the publish day'], ['recurs', 'Late again in week four', 'yes'], ['governing:1', 'Only the manager may sign it off']]) {
+    s = idle(applyCoachTurn(s, coach({ node: { slot, text, ...(tag ? { tag } : {}) } }), deps));
+  }
+  s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'reopen_step', step: 'define', reason: 'Why.' } }, deps));
+  assert.equal(s.phase, 'define');
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'improve');
+  assert.equal(nextPhase(s), 'document');
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'document');
 });

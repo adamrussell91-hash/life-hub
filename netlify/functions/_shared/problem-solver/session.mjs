@@ -67,11 +67,11 @@ export function waitingForReview(session) {
 function cleanSnapshot(raw, deps) {
   if (raw == null) return null;
   if (typeof raw !== 'object' || Array.isArray(raw)) throw fail(400, 'validation_error', 'A task snapshot must be an object.');
-  const count = (value) => (Number.isInteger(value) && value >= 0 && value <= 500 ? value : 0);
+  const count = (value) => (Number.isInteger(value) && value >= 0 ? Math.min(value, 500) : 0);
   return {
     at: deps.now(),
     byStatus: Object.fromEntries(SNAPSHOT_STATUSES.map((key) => [key, count(raw.byStatus?.[key])])),
-    overdue: (Array.isArray(raw.overdue) ? raw.overdue : []).filter((title) => typeof title === 'string' && title.trim()).slice(0, 10).map((title) => title.trim().slice(0, TITLE_MAX))
+    overdue: (Array.isArray(raw.overdue) ? raw.overdue : []).filter((title) => typeof title === 'string' && title.trim()).map((title) => title.trim().slice(0, TITLE_MAX)).filter((title, i, all) => all.indexOf(title) === i).slice(0, 10)
   };
 }
 
@@ -199,7 +199,7 @@ function openingSuggestion(session) {
 
 /** A step left without any tool run: there is nothing to have learned from it. */
 export function skippedUntouched(step) {
-  return Boolean(step) && step.status === 'skipped' && step.runs.length === 0;
+  return Boolean(step) && (step.status === 'skipped' || step.status === 'waiting') && step.runs.length === 0;
 }
 
 /** Apply a validated coach turn. Throws `illegal_slot` so the coach can be asked to repair. */
@@ -309,11 +309,14 @@ export function startReview(session, payload, deps) {
   const improve = session.model ? planStepForBook(session.model.id, 'improve') : null;
   if (!improve) throw fail(409, 'action_not_allowed', 'This problem has no Improve step.');
   if (session.reviewState?.status === 'reviewing' && session.phase === improve) return session;
+  if (session.reviewState?.status === 'done') throw fail(409, 'action_not_allowed', 'This review is already done.');
   if (!reviewLive(session)) throw fail(409, 'action_not_allowed', 'There is no review to start.');
   if (session.detour) throw fail(409, 'action_not_allowed', 'Finish the reopened step first.');
   const snap = cleanSnapshot(payload?.snapshot, deps);
   let next = snap ? { ...session, taskSnapshot: snap } : session;
   if (session.phase !== 'finished' && nextPhase(session) === improve) return moveOn(next, deps, { review: true });
+  // A late review deliberately leaves the interrupted step's active run alone so it resumes on return
+  // (unlike reopenStep, which closes Improve's run because the detour starts fresh work elsewhere).
   const due = session.reviewProposal?.due ?? null;
   const returnTo = session.phase === improve ? null : session.phase;
   if (returnTo && !pastStep(session, improve)) throw fail(409, 'action_not_allowed', 'The review opens once Implement is done.');
@@ -325,6 +328,7 @@ export function startReview(session, payload, deps) {
 
 /** The page's latest snapshot of the problem's tasks. No coach call; an unchanged snapshot is a no-op. */
 export function taskStatus(session, payload, deps) {
+  if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
   if (!session.model) throw fail(409, 'action_not_allowed', 'There are no tasks yet.');
   if (payload?.snapshot == null) throw fail(400, 'validation_error', 'A task snapshot is required.');
   const snap = cleanSnapshot(payload.snapshot, deps);
@@ -338,7 +342,7 @@ export function reopenProblem(session, book) {
   if (waitingForReview(session)) return 'Improve is waiting for the review; do not reopen now.';
   const target = planStepForBook(session.model.id, book);
   if (!target || !session.steps[target]) return `There is no ${book} step in this problem to reopen.`;
-  const named = currentStep(session).runs.some((run) => run.tool === 'double_loop' && run.nodes.some((node) => parseSlot(node.slot)?.name === 'governing'));
+  const named = currentStep(session).runs.some((run) => run.tool === 'double_loop' && run.status !== 'switched' && run.nodes.some((node) => parseSlot(node.slot)?.name === 'governing'));
   return named ? null : 'Reopen only after double-loop learning has named a governing assumption.';
 }
 
@@ -449,7 +453,14 @@ export function dismissReview(session, deps) {
   let next = { ...session, reviewProposal: { ...session.reviewProposal, status: 'dismissed' } };
   if (session.reviewState?.status === 'waiting') {
     next = { ...next, reviewState: null };
-    if (currentStep(next) && inBook(next, next.phase, 'improve') && !activeRun(next)) next = { ...next, suggestion: openingSuggestion(next) };
+    if (currentStep(next) && inBook(next, next.phase, 'improve')) {
+      if (!activeRun(next) && !next.pendingLearning) next = { ...next, suggestion: openingSuggestion(next) };
+    } else if (session.model) {
+      // Left Improve while it waited: the waiting status resolves now.
+      const improve = planStepForBook(session.model.id, 'improve');
+      const step = improve && next.steps[improve];
+      if (step?.status === 'waiting') next = withStep(next, improve, { status: step.runs.some((run) => run.status !== 'switched' && isRunComplete(run)) ? 'done' : 'skipped' });
+    }
   }
   return touch(next, deps);
 }
