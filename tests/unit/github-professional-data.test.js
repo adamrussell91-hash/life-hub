@@ -122,7 +122,7 @@ const PEOPLE = [
   { legacy_id: 'leg-person-2', display_name: 'Notion Import', sort_name: null, aliases: ['Notey'] }
 ];
 const ORGANISATIONS = [
-  { legacy_id: 'leg-org-1', display_name: 'St. Aloysius College', legal_name: null, aliases: [] }
+  { legacy_id: 'leg-org-1', display_name: 'Tallowwood College', legal_name: null, aliases: [] }
 ];
 const RELATIONSHIPS = [
   {
@@ -418,7 +418,7 @@ test('Contents API empty body for oversized people.json still loads orgs via Git
 
   const organisations = await listGithubOrganisationCandidates({ env, fetchImpl });
   assert.equal(organisations.length, 1);
-  assert.equal(organisations[0].display_name, 'St. Aloysius College');
+  assert.equal(organisations[0].display_name, 'Tallowwood College');
 
   const people = await listGithubPersonCandidates({ env, fetchImpl });
   assert.equal(people.length, 2);
@@ -443,7 +443,7 @@ test('listGithubRelationshipEntries hides student counterparts from org and adul
         original_category: STUDENT_ORIGINAL_CATEGORY
       }
     ],
-    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College' }],
     relationships: [
       {
         person_legacy_id: 'leg-adult',

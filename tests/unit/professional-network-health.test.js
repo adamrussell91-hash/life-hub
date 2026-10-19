@@ -18,7 +18,7 @@ const PEOPLE = [
     is_self: false,
     professional_profile: {
       last_contacted: '2025-02-21',
-      current_workplace: ['St. Aloysius College']
+      current_workplace: ['Tallowwood College']
     }
   },
   {
@@ -27,7 +27,7 @@ const PEOPLE = [
     is_self: false,
     professional_profile: {
       last_contacted: '21 February 2025',
-      current_workplace: ['St. Aloysius College']
+      current_workplace: ['Tallowwood College']
     }
   },
   {
@@ -42,13 +42,13 @@ const PEOPLE = [
 ];
 
 const ORGANISATIONS = [
-  { legacy_id: 'o-aloysius', display_name: 'St. Aloysius College', aliases: [] }
+  { legacy_id: 'o-tallowwood', display_name: 'Tallowwood College', aliases: [] }
 ];
 
 const RELATIONSHIPS = [
   {
     person_legacy_id: 'p-linked',
-    organisation_legacy_id: 'o-aloysius',
+    organisation_legacy_id: 'o-tallowwood',
     relationship_type: 'employee_at',
     role: null,
     valid_from: null,
@@ -72,7 +72,7 @@ const RELATIONSHIPS = [
   },
   {
     person_legacy_id: 'p-linked',
-    organisation_legacy_id: 'o-aloysius',
+    organisation_legacy_id: 'o-tallowwood',
     relationship_type: 'mentors',
     role: null,
     valid_from: null,
@@ -102,7 +102,7 @@ test('health report counts, zero-link people, workplaces, drops, self, last_cont
 
   assert.equal(report.workplace_text_without_org_link.count, 2);
   const matching = report.workplace_text_without_org_link.matching_existing_organisation;
-  assert.ok(matching.some((row) => row.workplace === 'St. Aloysius College' && row.matched_organisation === 'St. Aloysius College'));
+  assert.ok(matching.some((row) => row.workplace === 'Tallowwood College' && row.matched_organisation === 'Tallowwood College'));
   const none = report.workplace_text_without_org_link.matching_none;
   assert.ok(none.some((row) => row.workplace === 'Unknown School'));
 

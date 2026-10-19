@@ -29,7 +29,7 @@ test('public seed is a structural template without personal records', () => {
   const text = loadCentralNodeSeed();
   assert.match(text, /Public structural template only/);
   assert.match(text, /adamrussell91-hash\/life-hub-data/);
-  assert.doesNotMatch(text, /Crohn|Vyvanse|Stelara|calprotectin|honeymoon|St Aloysius|Corey/);
+  assert.doesNotMatch(text, /Crohn|Vyvanse|Stelara|calprotectin|honeymoon|Tallowwood|Corey/);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {

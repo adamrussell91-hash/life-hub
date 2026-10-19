@@ -1608,7 +1608,7 @@ export function createMockApi() {
       });
       const ready = [
         { kind: 'copy', remove: p(1, 'Rohan'), into: [p(2, 'Rohan Arianayagam')], student: true, links: 2, blocked: null },
-        { kind: 'combined', remove: p(3, 'Joseph Histon, Thierry King'), into: [p(4, 'Joseph Histon'), p(5, 'Thierry King')], student: true, links: 1, blocked: null }
+        { kind: 'combined', remove: p(3, 'Wynn Fernleigh, Fern Redgum'), into: [p(4, 'Wynn Fernleigh'), p(5, 'Fern Redgum')], student: true, links: 1, blocked: null }
       ].filter((a) => !mockDedupeDone.has(a.remove.id));
       if (input.action === 'plan_people_dedupe') {
         return json(200, {
