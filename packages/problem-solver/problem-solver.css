@@ -5644,3 +5644,194 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-fifteen__pill { align-self: stretch; }
   .ps-fifteen__pill-button { width: 100%; }
 }
+
+/* Kanban (toolkit p.127, Implement): three tall rounded columns side by side. To do is red with a
+   yellow right-pointing triangle under its heading, Doing blue with a yellow triangle, Done yellow
+   with a blue triangle; the heading sits at the top, right of the triangle's thin edge. Cards are
+   rounded pills: yellow in To do and Doing, blue in Done. Inside Doing, below its cards, the
+   Review stop: its word, a red downward triangle and red pills. The book sets DONE in white on
+   the yellow (about 1.8:1), so here it is the dark on-yellow ink. The yellow on To do's red is a
+   touch lighter (3.1:1). The red Review pill on the blue is the book's (1.3:1): the pill is told
+   by its white words (5.4:1) and the stop by its "Review" word, the triangle is decoration. A linked card carries a small
+   link mark and its live status; a deleted task's card is struck through. The WIP badge sits on
+   the Doing heading and changes its words, not only its colour, when Doing is over the limit.
+   Details open in one panel under the board. Phone: the columns stack, each a heading over a
+   wrapping row of pills (44px tall). */
+.ps-kanban {
+  /* Named, so every phone query measures this root box. */
+  container: kanban / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+.ps-kanban__board {
+  --ps-kanban-arrow-w: 44px;
+  --ps-kanban-arrow-h: 76px;
+  /* The book's yellow on its red is 2.89:1; a touch lighter gives the pills 3.1:1. */
+  --ps-kanban-on-red: #f4c446;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 3.6cqw, 26px);
+  width: 100%;
+  max-width: 620px;
+  margin-inline: auto;
+}
+
+.ps-kanban__col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: clamp(380px, 78cqw, 540px);
+  padding: 12px 12px 18px;
+  border-radius: 14px;
+  color: #fff;
+}
+.ps-kanban__col--todo { background: var(--ps-red); }
+.ps-kanban__col--doing { background: var(--ps-blue); }
+.ps-kanban__col--done { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+
+/* The heading at the top, right of the triangle's thin left edge; the triangle hangs below it. */
+.ps-kanban__head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: var(--ps-kanban-arrow-h);
+  padding-left: calc(var(--ps-kanban-arrow-w) * 0.62);
+}
+.ps-kanban__name {
+  position: relative;
+  font: 800 15px / 1.25 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ps-kanban__arrow { display: block; flex: none; }
+.ps-kanban__head > .ps-kanban__arrow {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: var(--ps-kanban-arrow-w);
+  height: var(--ps-kanban-arrow-h);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.ps-kanban__arrow--todo { background: var(--ps-kanban-on-red); }
+.ps-kanban__arrow--doing { background: var(--ps-yellow); }
+.ps-kanban__arrow--done { background: var(--ps-blue); }
+.ps-kanban__arrow--review {
+  width: 70px;
+  height: 38px;
+  background: var(--ps-red);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.ps-kanban__lane { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* Review: inside Doing, under its cards. */
+.ps-kanban__review { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 12px; }
+.ps-kanban__review > .ps-kanban__lane { align-self: stretch; }
+
+/* Pills: the colour follows the column (yellow in To do and Doing, red in Review, blue in Done). */
+.ps-kanban__card { position: relative; min-width: 0; border-radius: 22px; }
+.ps-kanban__card:has(:focus-visible),
+.ps-kanban__card:has([aria-expanded='true']) { z-index: 2; }
+.ps-kanban__pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: inherit;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 320ms var(--ps-ease), color 320ms var(--ps-ease);
+}
+.ps-kanban__lane--todo .ps-kanban__pill { background: var(--ps-kanban-on-red); }
+.ps-kanban__card[data-fill='red'] .ps-kanban__pill { background: var(--ps-red); color: #fff; }
+.ps-kanban__card[data-fill='blue'] .ps-kanban__pill { background: var(--ps-blue); color: #fff; }
+.ps-kanban__pill:hover { box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.16); }
+.ps-kanban__pill:focus-visible,
+.ps-kanban__pill[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-kanban__card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 6px; min-width: 0; max-width: 100%; }
+.ps-kanban__card-head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-kanban__title {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-semibold) 13px / 1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-kanban__card.is-removed .ps-kanban__title { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.ps-kanban__meta { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+.ps-kanban__meta[hidden] { display: none; }
+.ps-kanban__meta-text { font: var(--weight-bold) 10px / 1.4 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; overflow-wrap: anywhere; }
+.ps-kanban__link { flex: none; width: 12px; height: 12px; }
+
+/* WIP: a badge on the Doing heading, clear of the triangle's tip; the button keeps a 44px target. */
+.ps-kanban__wip {
+  display: inline-flex;
+  margin-left: calc(var(--ps-kanban-arrow-w) * 0.38 + 6px);
+  align-items: center;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ps-kanban__badge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+}
+.ps-kanban__tag { font: var(--weight-bold) 10px / 1.4 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-kanban__wip.is-over .ps-kanban__badge { background: var(--ps-card); color: var(--ps-ink); }
+.ps-kanban__wip.is-over .ps-kanban__tag::before { content: '!'; display: inline-block; margin-right: 5px; color: var(--ps-red); font-weight: 900; }
+.ps-kanban__badge .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-kanban__wip:hover .ps-kanban__badge { box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.16); }
+.ps-kanban__wip:focus-visible { outline: 2px solid transparent; }
+.ps-kanban__wip:focus-visible .ps-kanban__badge,
+.ps-kanban__wip[aria-expanded='true'] .ps-kanban__badge { box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+.ps-kanban__panel { display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 8px; }
+.ps-kanban__panel:empty { display: none; }
+
+/* Phone: the columns stack; each is a heading over a wrapping row of pills. */
+@container kanban (max-width: 560px) {
+  .ps-kanban__board { --ps-kanban-arrow-w: 20px; --ps-kanban-arrow-h: 34px; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .ps-kanban__col { min-height: 0; padding: 10px 12px 14px; gap: 10px; }
+  .ps-kanban__head { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 10px; padding-left: calc(var(--ps-kanban-arrow-w) + 10px); }
+  .ps-kanban__head > .ps-kanban__arrow { top: 0; }
+  .ps-kanban__wip { margin-left: 0; }
+  .ps-kanban__lane { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .ps-kanban__card { flex: 1 1 auto; max-width: 100%; }
+  .ps-kanban__pill { padding-inline: 16px; }
+  .ps-kanban__review { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; margin-top: 4px; gap: 8px 10px; }
+  .ps-kanban__arrow--review { width: 26px; height: 14px; }
+  .ps-kanban__review > .ps-kanban__lane { flex-basis: 100%; }
+}

@@ -4,7 +4,8 @@
 // --click clicks a control first (such as a layout toggle); --name adds -<suffix> to the PNG names.
 // --widths 900,390,320 shoots those viewport widths instead of the default 900 and 390.
 // --next applies SAMPLES['<tool>:next'] after load and shoots <tool>-next-<width>.png (radar morph end state).
-// A sample's `tasks` (task links, as the canvas sends them) go to the view's setTasks after update.
+// A sample's `tasks` (task links, as the canvas sends them) go to the view's setTasks after update,
+// and its `proposed` (node ids with a pending task proposal) to setProposed.
 // Bundles a renderer with a synthetic sample run, then screenshots it at 900px and 390px.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -48,6 +49,7 @@ const RENDERERS = {
   dmaic_first: ['dmaic', 'createDmaicView'],
   fifteen_percent: ['fifteen-percent', 'createFifteenPercentView'],
   fifteen_percent_now: ['fifteen-percent', 'createFifteenPercentView'],
+  kanban: ['kanban', 'createKanbanView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
@@ -86,7 +88,7 @@ const rawPlugin = {
 };
 const bundle = await build({
   stdin: {
-    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(document);\nview.update(run);\nif (run.tasks && view.setTasks) view.setTasks(run.tasks);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
+    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(document);\nview.update(run);\nif (run.tasks && view.setTasks) view.setTasks(run.tasks);\nif (run.proposed && view.setProposed) view.setProposed(run.proposed);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
     resolveDir: join(root, 'packages/problem-solver'),
     loader: 'ts'
   },
@@ -120,6 +122,7 @@ for (const width of widths) {
     await tab.evaluate(() => {
       window.__view.update(window.__next);
       if (window.__next.tasks && window.__view.setTasks) window.__view.setTasks(window.__next.tasks);
+      if (window.__next.proposed && window.__view.setProposed) window.__view.setProposed(window.__next.proposed);
     });
     await tab.waitForTimeout(1200);
   }

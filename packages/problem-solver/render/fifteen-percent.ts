@@ -15,6 +15,7 @@
 import type { PsNode, PsTaskLink, PsToolRun } from '../types';
 import { nodeTitle } from '../titles.mjs';
 import { parseSlot } from '../slots.mjs';
+import { taskStatusLabel } from './task-status';
 import { EASE, canAnimate, cancelAnimations, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type FifteenPercentView = { el: HTMLDivElement; update(run: PsToolRun): void; setTasks(links: PsTaskLink[]): void; destroy(): void };
@@ -23,9 +24,6 @@ type Region = 'what' | 'now' | 'go';
 const REGIONS: readonly Region[] = ['what', 'now', 'go'];
 const WORD: Record<Region, string> = { what: 'What', now: 'Now', go: 'Go' };
 const LABEL: Record<Region, string> = { what: 'What: where you are free to act', now: 'Now: actions you can take', go: 'Go: actions chosen' };
-
-/** Tasks hub status ids, and the two the canvas adds, as the board names them. */
-const STATUS: Record<string, string> = { open: 'To do', todo: 'To do', in_progress: 'Doing', done: 'Done', deferred: 'Deferred', dead: 'Dead', removed: 'Task removed' };
 
 type Row = { region: Region; item: HTMLDivElement; disc: HTMLSpanElement; start: HTMLDivElement; end: HTMLDivElement };
 type Note = { node: PsNode; item: HTMLDivElement; button: HTMLButtonElement; head: HTMLSpanElement; title: HTMLSpanElement; card: HTMLDivElement; cardKey: string };
@@ -66,11 +64,6 @@ const indexOf = (node: PsNode): number => parseSlot(node.slot)?.index ?? 0;
 const bySlot = (a: PsNode, b: PsNode): number => indexOf(a) - indexOf(b);
 const contested = (node: PsNode): string => (node.state === 'contested' ? ', contested' : '');
 const keyOf = (...nodes: (PsNode | null)[]): string => nodes.map((node) => (node ? `${node.id}\u0000${node.text}\u0000${node.state}\u0000${(node.skills ?? []).join(',')}` : '')).join('\u0001');
-
-/** The label a task link shows: its board status, "Task removed", or nothing when unknown. */
-export function fifteenTaskStatus(status: string): string {
-  return STATUS[status] ?? '';
-}
 
 export function createFifteenPercentView(doc: Document = document): FifteenPercentView {
   const root = doc.createElement('div');
@@ -243,7 +236,7 @@ export function createFifteenPercentView(doc: Document = document): FifteenPerce
 
     // The task mark: only a chosen note can become a task.
     const status = chosen ? links.get(chosen.id) : undefined;
-    const label = status === undefined ? null : fifteenTaskStatus(status);
+    const label = status === undefined ? null : taskStatusLabel(status);
     if (label === null) {
       pill.task?.remove();
       pill.task = null;

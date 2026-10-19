@@ -6,8 +6,9 @@ import type { PsSession, PsTaskLink, PsToolRun } from '../../../../packages/prob
 vi.mock('../../design-kit/js/morphing-dialog.js', () => ({ morphFromRect: vi.fn() }));
 /** A stand-in chart that records the task links the canvas forwards. */
 const setTasks = vi.hoisted(() => vi.fn());
+const setProposed = vi.hoisted(() => vi.fn());
 vi.mock('../../../../packages/problem-solver/render/five-whys', () => ({
-  createFiveWhysView: () => ({ el: document.createElement('div'), update: () => undefined, setTasks })
+  createFiveWhysView: () => ({ el: document.createElement('div'), update: () => undefined, setTasks, setProposed })
 }));
 
 const swot: PsToolRun = {
@@ -71,6 +72,8 @@ describe('canvas task statuses', () => {
     });
     canvas.update(s);
     expect(setTasks).toHaveBeenLastCalledWith([{ nodeId: 'n1', taskId: 'task-1', status: 'unknown' }]);
+    // Pending proposals of this run reach the chart separately, so it can mark them.
+    expect(setProposed).toHaveBeenLastCalledWith(['n2']);
     canvas.setTaskStatuses({ 'task-1': 'in_progress' });
     expect(setTasks).toHaveBeenLastCalledWith([{ nodeId: 'n1', taskId: 'task-1', status: 'in_progress' }] satisfies PsTaskLink[]);
   });
