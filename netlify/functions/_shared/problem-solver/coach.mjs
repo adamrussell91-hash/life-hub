@@ -1,9 +1,11 @@
 // netlify/functions/_shared/problem-solver/coach.mjs
 import { completeMessage } from '../anthropic-client.mjs';
-import { addEdge, canEdge, canPlace, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { addEdge, canEdge, canPlace, checkNode, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
+import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
+import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun } from './session.mjs';
 
 const WORD_LIMIT = 60;
@@ -36,27 +38,62 @@ function fitSlot(run, slot) {
 /** Fit the node to its open slot and keep only the links the tool allows; the turn survives a bad link. */
 function fitToRun(session, value) {
   const run = activeRun(session);
-  if (session.phase !== 'define' || !run || !value.node) return { value };
+  if (!session.steps?.[session.phase] || !run) return { value };
+  if (!value.node) return { value: value.verdict === 'accept' && value.edges.length ? { ...value, edges: existingEdges(run, value.edges) } : value };
   const slot = fitSlot(run, value.node.slot);
   if (!canPlace(run, slot)) return { error: `Slot ${value.node.slot} is not open for ${run.tool}. Open slots: ${nextSlots(run).join(', ') || 'none'}.` };
   const rename = (name) => (name === value.node.slot ? slot : name);
   const node = { ...value.node, slot };
-  if (value.verdict !== 'accept') return { value: { ...value, node, edges: [] } };
-  let placed = placeNode(run, { id: '__candidate__', slot, text: node.text, state: 'accepted' });
+  if (node.tag != null && !TOOLS[run.tool]?.nodeTags?.[parseSlot(slot)?.name]) delete node.tag;
+  const renamedEdges = value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }));
+  const problem = checkNode(run, node, renamedEdges);
+  if (problem) return { error: problem };
+  if (value.verdict !== 'accept' && value.verdict !== 'challenge') return { value: { ...value, node, edges: [] } };
+  return { value: { ...value, node, edges: allowedEdges(run, node, renamedEdges), proposeTasks: value.proposeTasks.map((p) => ({ ...p, slot: rename(p.slot) })) } };
+}
+
+/** Links between nodes already placed (slot form) that the tool allows, applied in order. */
+function existingEdges(run, proposed) {
+  let current = run;
   const edges = [];
-  for (const edge of value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }))) {
+  for (const edge of proposed) {
+    const from = current.nodes.find((n) => n.slot === edge.from)?.id ?? null;
+    const to = current.nodes.find((n) => n.slot === edge.to)?.id ?? null;
+    if (!canEdge(current, from, to, edge.kind)) continue;
+    current = addEdge(current, { from, to, kind: edge.kind });
+    edges.push(edge);
+  }
+  return edges;
+}
+
+/** The proposed links (slot form) the tool allows once the candidate node is placed. */
+function allowedEdges(run, node, proposed) {
+  let placed = placeNode(run, { id: '__candidate__', slot: node.slot, text: node.text, state: 'accepted' });
+  const edges = [];
+  for (const edge of proposed) {
     const from = placed.nodes.find((n) => n.slot === edge.from)?.id ?? null;
     const to = placed.nodes.find((n) => n.slot === edge.to)?.id ?? null;
     if (!canEdge(placed, from, to, edge.kind)) continue;
     placed = addEdge(placed, { from, to, kind: edge.kind });
     edges.push(edge);
   }
-  return { value: { ...value, node, edges } };
+  return edges;
 }
 
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
+  if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null, proposeTasks: [], proposeReview: null } };
+  // In frame a suggestion only means something on the turn that sets the model (the frame
+  // completes and the first step opens); otherwise accepting it would be refused.
+  if (session.phase === 'frame' && (!result.value.model || result.value.suggestion?.kind === 'next_step')) {
+    result.value = { ...result.value, suggestion: null };
+  }
+  const suggested = result.value.suggestion;
+  if (suggested && (suggested.kind === 'next_tool' || suggested.kind === 'switch_tool')) {
+    const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);
+    if (!allowed.includes(suggested.tool)) return { ok: false, error: `Tool ${suggested.tool} is not available in this step. Available: ${allowed.join(', ') || 'none, so do not suggest a tool'}.` };
+  }
   const fitted = fitToRun(session, result.value);
   return fitted.error ? { ok: false, error: fitted.error } : { ok: true, value: fitted.value };
 }
@@ -76,15 +113,16 @@ export function createModelCoach(model) {
   };
 }
 
-/** Production model: one non-streaming call with the rubric cached. */
+/** Production model: one non-streaming call; every system layer is its own cached block. */
 export function anthropicModel(env, fetchImpl = fetch) {
   return async ({ system, user, maxTokens }) => {
     if (!env.ANTHROPIC_API_KEY) throw Object.assign(new Error('The coach needs ANTHROPIC_API_KEY.'), { code: 'provider_unavailable', status: 503 });
+    const layers = (Array.isArray(system) ? system : [system]).filter(Boolean);
     return completeMessage({
       apiKey: env.ANTHROPIC_API_KEY,
       fetchImpl,
       maxTokens,
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      system: layers.map((text) => ({ type: 'text', text, cache_control: { type: 'ephemeral' } })),
       messages: [{ role: 'user', content: user }]
     });
   };

@@ -20,6 +20,12 @@ export const gapBasic = Object.freeze({
   name: 'Gap analysis',
   kind: 'diagnostic',
   when: 'A clear present state and a desired state; the work is the distance between them.',
+  step: 'define',
+  failureModes: [
+    'A current state described as opinion rather than fact.',
+    'An objective that cannot be measured.',
+    'Actions proposed before the gap is clear.'
+  ],
   steps: GAP_STEPS,
   slots: { current: 'The current state', objective: 'The objective', known: 'Currently known', done: 'Currently done', must_know: 'Must know', must_do: 'Must do', action: 'An action that bridges a gap' },
   edgeKinds: [],

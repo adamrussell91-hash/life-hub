@@ -438,3 +438,18 @@ test('stored catalogue programs pick up catalogue dates until dates are saved on
   assert.equal(created.dates_source_url, 'https://example.org');
   assert.equal(created.dates_checked_on, null);
 });
+
+test('a new task keeps a known source and falls back to manual', async () => {
+  const store = memoryStore();
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+  const create = async (source) => (await (await handler(
+    request({ method: 'POST', url: 'https://api.adam-russell.com/api/tasks', body: { title: 'Draw the stall map', domain: 'life', source } })
+  )).json()).data.source;
+  assert.equal(await create('problem_solver'), 'problem_solver');
+  assert.equal(await create('made_up'), 'manual');
+  assert.equal(await create(undefined), 'manual');
+});
