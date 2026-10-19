@@ -125,6 +125,37 @@ test('after the learning is recorded, a step with no tool falls back to its defa
   assert.deepEqual(s.suggestion, { kind: 'next_tool', tool: 'contradiction', reason: 'A good first tool for General problem.' });
 });
 
+test('a boundary after skipping a step with no runs sets no pending learning', () => {
+  let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
+  s = moveOn(s, deps);
+  assert.equal(s.steps.analyse.status, 'skipped');
+  assert.equal(s.steps.analyse.runs.length, 0);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'Skipped. What do you want from Devise?' }), deps);
+  assert.equal(s.pendingLearning, null);
+});
+
+test('a dismissed opening suggestion stays dismissed until the step changes', () => {
+  let s = moveOn(framed('triz'), deps);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
+  assert.equal(s.suggestion.tool, 'contradiction');
+  s = dismissSuggestion(s, deps);
+  assert.equal(s.dismissedOpening, 'general_problem');
+  s = applyCoachTurn(say(s, 'Let me think.', deps), coach({ verdict: 'clarify', message: 'Go on.' }), deps);
+  assert.equal(s.suggestion, null, 'the opening suggestion does not come back');
+  s = applyCoachTurn(moveOn(s, deps), coach({ verdict: 'clarify', message: 'Skipped.' }), deps);
+  assert.notEqual(s.phase, 'general_problem');
+  assert.equal(s.suggestion, null);
+  s = applyCoachTurn(say(s, 'Ok.', deps), coach({ verdict: 'clarify', message: 'Go on.' }), deps);
+  assert.ok(s.suggestion === null || s.suggestion.kind === 'next_tool', 'a new step can open with a suggestion again');
+});
+
+test('dismissing a mid-run suggestion does not mark the opening dismissed', () => {
+  let s = applyCoachTurn(framed(), coach({ suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: 'r' } }), deps);
+  assert.equal(dismissSuggestion(s, deps).dismissedOpening ?? null, null);
+});
+
 function treeSession() {
   let s = framed('seven_step', 'problem_tree');
   for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['effect:1', 'No progress'], ['cause:1', 'Delayed payoff']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
@@ -218,7 +249,10 @@ test('keepAnyway with a slot that no longer fits is a 409', () => {
 
 test('the last step\'s learning is recorded once the session is finished', () => {
   let s = framed('polya');
-  for (const _ of [1, 2, 3, 4, 5]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  for (const _ of [1, 2, 3, 4]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  // The last step was worked in (a run), so there is something to have learned from it.
+  s = { ...s, steps: { ...s.steps, document: { ...s.steps.document, runs: [{ id: 'doc', tool: 'five_whys', status: 'active', nodes: [], edges: [] }] } } };
+  s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
   assert.equal(s.phase, 'finished');
   s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
   s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);

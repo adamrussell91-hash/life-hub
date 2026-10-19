@@ -60,6 +60,11 @@ function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
   if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null } };
+  // In frame a suggestion only means something on the turn that sets the model (the frame
+  // completes and the first step opens); otherwise accepting it would be refused.
+  if (session.phase === 'frame' && (!result.value.model || result.value.suggestion?.kind === 'next_step')) {
+    result.value = { ...result.value, suggestion: null };
+  }
   const suggested = result.value.suggestion;
   if (suggested && (suggested.kind === 'next_tool' || suggested.kind === 'switch_tool')) {
     const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);

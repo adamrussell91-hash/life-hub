@@ -26,9 +26,14 @@ function afterDefine(modelId) {
  * v2 stores `steps[stepId]` and phase = the current plan step. Index rows (no turns) and
  * v2 sessions pass through untouched. Pure; the store is not written.
  */
+const ASSUMED_MODEL = Object.freeze({ id: 'seven_step', reason: 'Assumed when this problem was upgraded.' });
+
 export function migrateSession(session) {
   if (!session || !Array.isArray(session.turns) || session.steps) return session;
   const { define = { runs: [], finishedEarly: false, exitObjection: null }, ...rest } = session;
+  // v1 let a tool suggestion be accepted before a model was chosen; without one the step
+  // engine could never move on, so such a session is assumed to be on the seven-step model.
+  if ((rest.phase === 'define' || rest.phase === 'defined') && !rest.model) rest.model = { ...ASSUMED_MODEL };
   const modelId = rest.model?.id ?? null;
   const defineStep = defineFor(modelId);
   const runs = define.runs ?? [];

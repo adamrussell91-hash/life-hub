@@ -138,7 +138,7 @@ test('move_on and score are actions; finish_define is kept as an alias for move_
   const store = createMemoryProblemStore();
   const service = createProblemSolverService({ store, coach: async () => ({ verdict: 'clarify', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null }), now: () => '2026-10-19T10:00:00.000Z' });
   let s = await service.create('operator', { text: 'Late rota.' });
-  s = { ...s, model: { id: 'seven_step', reason: '' }, phase: 'define', steps: { define: { runs: [], status: 'open', objection: null } }, runner: { status: 'idle', mode: 'turn', error: null } };
+  s = { ...s, model: { id: 'seven_step', reason: '' }, phase: 'define', steps: { define: { runs: [{ id: 'r', tool: 'five_whys', status: 'active', nodes: [], edges: [] }], status: 'open', objection: null } }, runner: { status: 'idle', mode: 'turn', error: null } };
   const { etag } = await store.read('operator', s.id);
   await store.write('operator', s.id, s, etag);
   const moved = await service.action('operator', { id: s.id, revision: s.revision, action: 'move_on' });
@@ -156,7 +156,7 @@ test('retry after a failed boundary turn keeps leaving, so the objection and lea
   const ok = { verdict: 'clarify', message: 'What did you learn?', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: 'Root cause not reached.', learning: null };
   const service = createProblemSolverService({ store, coach: async () => { calls += 1; if (calls === 1) throw new Error('boom'); return ok; }, now: () => '2026-10-19T10:00:00.000Z' });
   let s = await service.create('operator', { text: 'Late rota.' });
-  s = { ...s, model: { id: 'seven_step', reason: '' }, phase: 'define', steps: { define: { runs: [], status: 'open', objection: null } }, runner: { status: 'idle', mode: 'turn', error: null } };
+  s = { ...s, model: { id: 'seven_step', reason: '' }, phase: 'define', steps: { define: { runs: [{ id: 'r', tool: 'five_whys', status: 'active', nodes: [], edges: [] }], status: 'open', objection: null } }, runner: { status: 'idle', mode: 'turn', error: null } };
   const { etag } = await store.read('operator', s.id);
   await store.write('operator', s.id, s, etag);
   const moved = await service.action('operator', { id: s.id, revision: s.revision, action: 'move_on' });

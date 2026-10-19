@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { migrateSession, migrateRow } from '../../netlify/functions/_shared/problem-solver/migrate.mjs';
+import { moveOn } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 const runs = [
   { id: 'r1', tool: 'five_whys', status: 'switched', switchReason: 'Branches', nodes: [], edges: [] },
@@ -55,6 +56,18 @@ test('a queued v1 closing turn becomes a boundary turn leaving define', () => {
 test('a stored finish_define suggestion becomes next_step', () => {
   const s = migrateSession(v1({ phase: 'define', status: 'active', suggestion: { kind: 'finish_define', reason: 'Done.' } }));
   assert.deepEqual(s.suggestion, { kind: 'next_step', reason: 'Done.' });
+});
+
+test('a v1 define session with no model is given the seven-step model and can move on', () => {
+  const deps = { now: () => 'n', newId: () => 'nid' };
+  const s = migrateSession(v1({ phase: 'define', status: 'active', model: null }));
+  assert.deepEqual(s.model, { id: 'seven_step', reason: 'Assumed when this problem was upgraded.' });
+  assert.equal(s.phase, 'define');
+  assert.equal(moveOn(s, deps).phase, 'analyse');
+  const d = migrateSession(v1({ model: null }));
+  assert.deepEqual(d.model, { id: 'seven_step', reason: 'Assumed when this problem was upgraded.' });
+  assert.equal(d.phase, 'analyse');
+  assert.equal(moveOn(d, deps).phase, 'devise');
 });
 
 test('v2 sessions and index rows pass through unchanged', () => {

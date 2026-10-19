@@ -4,7 +4,7 @@ import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { isComplete, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
 import { planStep, stepName, stepPlan, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
-import { activeRun, currentStep, followOn } from './session.mjs';
+import { activeRun, currentStep, followOn, skippedUntouched } from './session.mjs';
 import { PROCESS } from './knowledge/process.mjs';
 import { CHAPTERS } from './knowledge/chapters.mjs';
 import { FINAL_WORDS } from './knowledge/final-words.mjs';
@@ -149,8 +149,12 @@ export function buildCoachPrompt(session) {
   const parts = [`PROBLEM: ${session.title}`];
   if (session.runner?.mode === 'boundary') {
     const left = session.model && session.runner.leaving ? stepName(session.model.id, session.runner.leaving) : 'the last step';
-    const status = session.steps?.[session.runner.leaving]?.status;
-    parts.push(`MODE: boundary. The person has just left ${left} (${status ?? 'unknown'}). In one message: a one-sentence recap of what ${left} established; if it was left unfinished in a way that matters, say so once, kindly, and put a one-sentence reason in exitObjection; then ask one question about what they learned about how they solve problems in that step. No tool suggestion yet.`);
+    const leftStep = session.steps?.[session.runner.leaving];
+    const status = leftStep?.status;
+    if (skippedUntouched(leftStep)) {
+      const ahead = session.phase === 'finished' ? 'what they want to take forward from this problem' : `what they want from ${session.model ? stepName(session.model.id, session.phase) : 'the next step'}`;
+      parts.push(`MODE: boundary. The person has skipped ${left} without using any tool. In one message: acknowledge the skip in one line, without a recap; if skipping it matters, say so once, kindly, and put a one-sentence reason in exitObjection; then ask one question about ${ahead}. Do not ask a learning question. No tool suggestion yet.`);
+    } else parts.push(`MODE: boundary. The person has just left ${left} (${status ?? 'unknown'}). In one message: a one-sentence recap of what ${left} established; if it was left unfinished in a way that matters, say so once, kindly, and put a one-sentence reason in exitObjection; then ask one question about what they learned about how they solve problems in that step. No tool suggestion yet.`);
   }
   parts.push(`PHASE: ${session.phase}`);
   const missing = ['goal', 'whatIsTrue', 'whatCanBeDone'].filter((key) => !session.frame[key]);

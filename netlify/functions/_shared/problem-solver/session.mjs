@@ -124,9 +124,15 @@ function placeAccepted(next, turn, coachTurnId, deps) {
 
 /** The tool suggestion a new step opens with when the coach forgets to give one. */
 function openingSuggestion(session) {
+  if (session.dismissedOpening === session.phase) return null;
   if (!session.model || !currentStep(session) || activeRun(session)) return null;
   const tool = defaultToolFor(session.model.id, session.phase);
   return tool ? { kind: 'next_tool', tool, reason: `A good first tool for ${stepName(session.model.id, session.phase)}.` } : null;
+}
+
+/** A step left without any tool run: there is nothing to have learned from it. */
+export function skippedUntouched(step) {
+  return Boolean(step) && step.status === 'skipped' && step.runs.length === 0;
 }
 
 /** Apply a validated coach turn. Throws `illegal_slot` so the coach can be asked to repair. */
@@ -145,7 +151,7 @@ export function applyCoachTurn(session, turn, deps) {
   if (mode === 'boundary') {
     const leaving = session.runner.leaving;
     if (leaving && next.steps[leaving]) next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
-    next = { ...next, pendingLearning: leaving ?? null };
+    next = { ...next, pendingLearning: leaving && !skippedUntouched(next.steps[leaving]) ? leaving : null };
   } else if (next.phase === 'frame') {
     if (turn.verdict === 'accept' && turn.frame) next = { ...next, frame: { ...next.frame, ...turn.frame } };
     if (frameComplete(next.frame) && turn.model) {
@@ -211,7 +217,8 @@ export function acceptSuggestion(session, deps) {
 }
 
 export function dismissSuggestion(session, deps) {
-  return touch({ ...session, suggestion: null }, deps);
+  const opening = session.suggestion?.kind === 'next_tool' && currentStep(session) && !activeRun(session);
+  return touch({ ...session, suggestion: null, ...(opening ? { dismissedOpening: session.phase } : {}) }, deps);
 }
 
 /**

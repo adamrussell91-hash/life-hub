@@ -31,6 +31,8 @@ export type PsSession = {
   turns: PsTurn[];
   summary: string;
   suggestion: PsSuggestion | null;
+  /** The step whose opening tool suggestion was dismissed with Not now; it stays away there. */
+  dismissedOpening?: string | null;
   pendingKeep: { slot: string; text: string; objection: string } | null;
   runner: { status: 'idle' | 'queued' | 'running' | 'failed'; mode: 'turn' | 'boundary'; error: string | null; leaving?: string };
   createdAt: string;

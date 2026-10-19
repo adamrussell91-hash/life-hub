@@ -48,6 +48,21 @@ describe('coach panel', () => {
     const panel = renderCoachPanel(session({ runner: { status: 'failed', mode: 'turn', error: 'Coach lost the thread, try again.' } }), noop);
     expect(panel.querySelector('[data-action="retry"]')).not.toBeNull();
   });
+
+  it('a failed boundary turn shows only the failure note with Try again', () => {
+    const panel = renderCoachPanel(session({
+      phase: 'analyse',
+      steps: { define: { runs: [], status: 'skipped', objection: null }, analyse: { runs: [], status: 'open', objection: null } },
+      suggestion: { kind: 'next_tool', tool: 'problem_tree', reason: 'r' },
+      runner: { status: 'failed', mode: 'boundary', error: 'Coach lost the thread, try again.', leaving: 'define' }
+    }), noop);
+    expect(panel.querySelector('[data-action="retry"]')).not.toBeNull();
+    expect(panel.querySelector('[data-action="move_on"]')).toBeNull();
+    expect(panel.querySelector('[data-action="keep_anyway"]')).toBeNull();
+    expect(panel.querySelector('.ps-suggestion')).toBeNull();
+    expect((panel.querySelector('textarea') as HTMLTextAreaElement).disabled).toBe(true);
+    expect((panel.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+  });
 });
 
 describe('coach panel updates in place', () => {
