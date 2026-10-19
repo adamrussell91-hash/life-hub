@@ -406,6 +406,7 @@ describe('projects view rebuild', () => {
     expect(menu).not.toBeNull();
     expect([...menu!.querySelectorAll('.hub-menu__opt')].map((item) => item.textContent)).toEqual([
       'Full page',
+      'Mark as NSW HALT',
       'Delete'
     ]);
     expect(menu?.querySelector('[data-card-menu-item="delete"]')?.classList.contains('hub-menu__opt--danger')).toBe(
@@ -494,6 +495,40 @@ describe('projects view rebuild', () => {
     const labels = [...canvas.querySelectorAll<HTMLElement>('.roadmap-row__label')];
     expect(labels.length).toBeGreaterThan(0);
     expect(labels.every((node) => node.title && node.title === node.textContent)).toBe(true);
+  });
+
+  it('badges NSW HALT board projects and filters the board by job', async () => {
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([
+      ...Object.values(fixtures).filter((item) => item.id !== 'proj_plan'),
+      { ...fixtures.plan, job: 'halt_board' }
+    ]);
+    vi.mocked(tasksApi.updateProject).mockResolvedValue({ ...fixtures.plan, job: 'teaching' });
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderProjectsView(canvas);
+
+    const card = (id: string) => canvas.querySelector<HTMLElement>(`.pcard[data-project-id="${id}"]`);
+    expect(card('proj_plan')?.querySelector('.halt-badge')?.getAttribute('aria-label')).toBe('NSW HALT');
+    expect(card('proj_go')?.querySelector('.halt-badge')).toBeNull();
+
+    const jobPill = (label: string) =>
+      [...canvas.querySelectorAll<HTMLButtonElement>('[aria-label="Job"] button')].find(
+        (button) => button.textContent === label
+      );
+    jobPill('NSW HALT')?.click();
+    expect([...canvas.querySelectorAll<HTMLElement>('.pcard')].map((item) => item.dataset.projectId)).toEqual([
+      'proj_plan'
+    ]);
+    jobPill('Teaching')?.click();
+    expect(card('proj_plan')).toBeNull();
+    expect(card('proj_go')).not.toBeNull();
+    jobPill('All jobs')?.click();
+
+    card('proj_plan')?.querySelector<HTMLButtonElement>('.card-menu')?.click();
+    document.querySelector<HTMLButtonElement>('[data-card-menu-item="job"]')?.click();
+    await vi.waitFor(() =>
+      expect(tasksApi.updateProject).toHaveBeenCalledWith('proj_plan', { job: 'teaching' })
+    );
   });
 
   it('nests the due-for-review retro inside the projects bento', async () => {
