@@ -19,27 +19,27 @@ Branch: `cursor/people-redesign-phase-1-a983` · rebased onto `main` including t
 - [x] 1.1–1.6 (prior commits)
 - [x] W2 `people-page.test.ts`
 - [x] hub-ui-guardian PASS (Phase 1)
-- [ ] P1/D3 screenshots on **real** Henry data (mock only)
+- [ ] P1/D3 screenshots on **real** Isla data (mock only)
 
 ### Phase 2 — link proposals
 - [x] 2.1 Proposal store (`link-proposal-schema` / repository)
 - [x] 2.2 Deterministic pass (`link-inference-rules`) + “Check for links”
 - [x] 2.3 Dashed chips ✓/✕; Needs-you filter counts proposals
-- [x] D4 Henry fixtures (Accreditation Mentor + mentoring task)
+- [x] D4 Isla fixtures (Accreditation Mentor + mentoring task)
 - checked: V4 D4 D5 I3
 
 ### Phase 3 — warmth score
 - [x] `warmthFor` / half-life tiers (Inner/Current/Former/Wider)
 - [x] Directory + person model + ring from one score
 - [x] Band word only in chip; number in tooltip
-- [x] Henry Inner / Bianca Former tests
+- [x] Isla Inner / Fern Former tests
 - checked: V4 D1 D4 C2
 
 ### Phase 4 — Clare ledger
 - [x] Derived you_owe / they_owe + stored Clare items
 - [x] Clare button + “Clare is reading…” + patch path
 - [x] Inline edit / done / dismiss; → Comms disabled
-- [x] Henry mentoring task under You owe (unit)
+- [x] Isla mentoring task under You owe (unit)
 - checked: V4 L2 I4 D5
 
 ## Named W2 tests

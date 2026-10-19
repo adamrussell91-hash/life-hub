@@ -5,14 +5,14 @@
 Replace `#/people`, `#/people/<id>` and the separate Person Brief with one page:
 a directory on the left and the selected person on the right, as in
 `mockups/04-directory-plus.png`. The page must know what the hub already
-knows. Henry McLennan is the acceptance case:
+knows. Isla Emberly is the acceptance case:
 
-> Adam opens People → Henry. The page says **Your mentee · Accreditation
-> Mentor** and **Colleague · St. Redacted**. It shows the open "set up
-> mentoring meeting" task under **You owe Henry**, and each fact names its source.
+> Adam opens People → Isla. The page says **Your mentee · Accreditation
+> Mentor** and **Colleague · Tallowwood**. It shows the open "set up
+> mentoring meeting" task under **You owe Isla**, and each fact names its source.
 
 Today none of that shows. The brief reads only explicit Universal Links, and
-nothing links Henry to his task, his project or his school.
+nothing links Isla to his task, his project or his school.
 
 Read first: `DECISIONS.md` (who owns what), `mockups/04-directory-plus.html`,
 and `docs/CURSOR-UI-FAILURES.md` (the UI failure register, currently on
@@ -24,8 +24,8 @@ starts, or copy it in with Phase 1).
 - Branch every phase from fresh `main` (P2). A PR touches only the files its phase names, plus tests and docs.
 - Every phase ships alone and leaves the page working. Agent features must degrade to a
   visible empty state with a manual trigger, never a blank area (I3).
-- Screenshots at 1440 and 390 on **real data** (D3). They must show Henry
-  McLennan, St. Redacted College and Trinity Catholic College. Put them in
+- Screenshots at 1440 and 390 on **real data** (D3). They must show Isla
+  McLennan, Tallowwood College and Banksia College. Put them in
   `docs/professional-hub/people-redesign/screens/phase-N/` with a written diff
   against the mockup (P1).
 - The progress ledger records, for each ticked item, the failure-register IDs
@@ -127,7 +127,7 @@ collision check (C1), and the line is drawn from real points (C2).
 
 ## Phase 2: Relationships the hub infers (link proposals)
 
-Fixes the Henry problem. There are two sources: a deterministic pass now, and
+Fixes the Isla problem. There are two sources: a deterministic pass now, and
 Clare's sweep once it runs (Phase 8). Both write to the same store.
 
 **2.1 Proposal store.** Add `_shared/link-proposal-schema.mjs` and `-repository.mjs`, one Blob per proposal:
@@ -148,9 +148,9 @@ Clare's sweep once it runs (Phase 8). Both write to the same store.
 
 **Failure modes: Phase 2:** V4 (the chip count, directory badge and
 Needs-you filter count come from one proposals query), D4 (the rules are
-tested against **real** task/project titles, including Henry's task and
+tested against **real** task/project titles, including Isla's task and
 Project: Accreditation Mentor), D5 (proposal text reads as a sentence), I3
-(no proposals shows "Nothing to confirm"), P3 (**acceptance: the Henry
+(no proposals shows "Nothing to confirm"), P3 (**acceptance: the Isla
 scenario in Outcome, run live**).
 
 ---
@@ -197,7 +197,7 @@ meetings, tasks and notes" under the ring tooltip.
 **Failure modes: Phase 3:** V4 (ring, row text, sort and state from one
 `warmthFor(person)`; test asserts all four), D1 (no fake precision: show the
 band word, and put the number only in the tooltip), D4 (tiers tested against
-real links: Henry is Inner, Bianca Gambrill is Former), C2 (the ring arc equals
+real links: Isla is Inner, Fern Fairlie is Former), C2 (the ring arc equals
 the score; no decorative ring).
 
 ---
@@ -227,7 +227,7 @@ A dismissed Clare item isn't re-proposed from the same source.
 **Failure modes: Phase 4:** V4 (the directory "You owe 2" and the pane's two
 columns come from one ledger query), L2 (item ≤ 56px), I4 (item actions are
 icon buttons on hover/focus, not squeezing the text), D5, P3 (acceptance:
-Henry's mentoring task appears under You owe Henry with its source).
+Isla's mentoring task appears under You owe Isla with its source).
 
 ---
 
@@ -258,7 +258,7 @@ Henry's mentoring task appears under You owe Henry with its source).
 - It shows the next school day's slots from your own sources: meetings/events with attendees, scheduled lessons with `start_time`, work blocks, and free periods (gaps in your teaching day).
 - **Faces.** Each slot shows the people you'll see; for a meeting or event, that's its attendees.
 - **Suggested time.** For a person with an open "meet" item, the strip highlights your free slot that best matches **when past meetings with them happened** (weekday + time-of-day histogram).
-- **Wording.** It reads "You usually meet Henry after lunch", never "Henry is free".
+- **Wording.** It reads "You usually meet Isla after lunch", never "Isla is free".
 - **Next card.** The person pane's Next card uses the same suggestion, from one model (V4).
 - **Failure modes:** R2 (the strip scrolls inside its own box at 390), L2 (slot ≤ 96px), D1 (no suggested time when there's no meeting history; say "No pattern yet"), D2 (slots sorted by start time).
 

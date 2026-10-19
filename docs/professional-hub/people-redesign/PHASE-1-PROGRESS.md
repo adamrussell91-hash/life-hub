@@ -19,7 +19,7 @@ Progress: **Phase 1 complete for review** (guardian PASS). Later phases ship alo
 - [x] 1.6 Phone 390 push + Filters sheet with sort/group
 - [x] W2 `people-page.test.ts`
 - [x] hub-ui-guardian PASS
-- [ ] P1/D3 screenshots on **real** Henry data (mock only in this agent)
+- [ ] P1/D3 screenshots on **real** Isla data (mock only in this agent)
 
 ## Named W2 test
 `apps/professional/tests/unit/people-page.test.ts` → `renderPeoplePage`

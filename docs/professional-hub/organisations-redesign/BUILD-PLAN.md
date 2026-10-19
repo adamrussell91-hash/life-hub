@@ -12,9 +12,9 @@ Replace the search-only `#/organisations` page and the generic
 
 The design is in `mockups/01–03`, and `DECISIONS.md` says who owns what.
 
-**St. Redacted College is the acceptance case:**
+**Tallowwood College is the acceptance case:**
 
-> Adam opens Organisations → St. Redacted. The chips say **Workplace · 2025–now**
+> Adam opens Organisations → Tallowwood. The chips say **Workplace · 2025–now**
 > and **Event venue**. **How it is run** shows Adam in three containers
 > (English faculty, Learning Enrichment, Accreditation mentors), linked as one
 > person. It draws three bold reporting lines: to the Head of English, to the
@@ -73,8 +73,8 @@ is deliberately unlike the People build.
   This plan reuses its crests, `sectionHost` pattern and arc.
 - **Screenshots** at 1440 and 390 on **real data** (D3), taken per phase. They
   must show:
-  - St. Redacted College, with Adam's three memberships;
-  - Trinity Catholic College.
+  - Tallowwood College, with Adam's three memberships;
+  - Banksia College.
   
   Put them in `docs/professional-hub/organisations-redesign/screens/phase-N/`,
   with a written diff against the mockup (P1).
@@ -183,7 +183,7 @@ own section host, loading, empty and error states (I3):
 | R1/R2 | 390 → 1440 → 390 without reload; `scrollWidth === innerWidth` at 390 |
 | C1/C2/C3 | Arc `getBBox` test at 390/1440; the people line passes real points; height formula measured |
 | D1/D5 | Month-only dates render as "Oct 2026"; read every chip aloud |
-| D4 | Chip derivation tested against **real** St. Redacted and Trinity links from the store |
+| D4 | Chip derivation tested against **real** Tallowwood and Banksia links from the store |
 | I2 | Tiles are anchors; Tab + Enter opens the organisation |
 | W1/W2 | No relative fetch; one test drives the real `organisations` route controller |
 | P3 | The generic entity page no longer renders at `#/organisations/<id>` |
@@ -241,7 +241,7 @@ with a `derived | explicit` flag:
 - Every write patches the section in place (the People 1.4 pattern). No full re-render.
 
 **Failure modes: Phase 2**
-- **D4 / P3:** `deriveReportingGraph` is tested on **Adam's real St. Redacted
+- **D4 / P3:** `deriveReportingGraph` is tested on **Adam's real Tallowwood
   memberships**: English faculty, Learning Enrichment and Accreditation mentors
   give three distinct lines ending at the Head of English, the Leader of Learning
   Enrichment and the Director of Professional Learning.
@@ -320,8 +320,8 @@ organisation, sortable by unit, warmth and role, from the same model (V4).
 | R1/R2 | 390 → 1440 → 390 keeps the view and highlight; page never scrolls sideways at 390 |
 | C4 | Pan/zoom tested in Safari; buttons work without gestures |
 | I2 | Every card is a `<a>` to the person, or a `<button>` for a vacant role; Tab reaches each |
-| D4 | Rendered from **real** St. Redacted structure, not a fixture |
-| P3 | **Acceptance: the St. Redacted scenario in Outcome, run live** |
+| D4 | Rendered from **real** Tallowwood structure, not a fixture |
+| P3 | **Acceptance: the Tallowwood scenario in Outcome, run live** |
 | Perf | Layout of 120 nodes finishes in < 500ms on the umbrella; `elkjs` isn't in the main bundle (check the build output) |
 
 ---
@@ -373,7 +373,7 @@ organisation, sortable by unit, warmth and role, from the same model (V4).
   - meetings whose attendees include people there (for "real power", only with a meeting as source);
   - open opportunities.
 - **Agent context integrity** (`agent-context-integrity.mdc`):
-  - *Availability*: the job's context builder returns all six inputs for St. Redacted.
+  - *Availability*: the job's context builder returns all six inputs for Tallowwood.
   - *Delivery*: a deterministic test on the final request string asserts the
     structure block and Adam's three memberships are present.
   - *Interpretation*: Ann's instructions say what each block means and that
@@ -384,7 +384,7 @@ organisation, sortable by unit, warmth and role, from the same model (V4).
   - Exercise **Ann's** real route, not a generic agent.
 - **Failure modes:**
   - I1: no kinetic text on editable threads.
-  - I3: before the first run, "Ann hasn't read St. Redacted yet. Run now". A failed
+  - I3: before the first run, "Ann hasn't read Tallowwood yet. Run now". A failed
     run shows the failure, never an empty card that looks complete.
   - D5: each thread reads as a sentence with a source label.
   - L2: the card height is its content.
@@ -422,17 +422,17 @@ organisation, sortable by unit, warmth and role, from the same model (V4).
   
   Everything else is counted as "N more hidden", and **All links** shows them.
 - **Reasons.** Each shown bridge gets a number and a rule-written reason. The
-  reasons are deterministic text, not model output (D5), e.g. "Henry is your
-  warmest way back into Trinity's HSIE faculty, not you."
+  reasons are deterministic text, not model output (D5), e.g. "Isla is your
+  warmest way back into Banksia's HSIE faculty, not you."
 - **Drawing.** Ghost lines are drawn between the facing edges of the two flowcharts.
 - **Failure modes:**
-  - D4: the rule is tested against real St. Redacted / Trinity links.
+  - D4: the rule is tested against real Tallowwood / Banksia links.
   - V4: the numbered badges equal the reasons list, and the hidden count is correct.
   - C1: badges don't overlap.
   - S4.
   - R2: at 390 the list replaces lines.
-  - P3: live Compare of St. Redacted and Trinity shows the Henry → Bianca route
-    only while Bianca is cold.
+  - P3: live Compare of Tallowwood and Banksia shows the Isla → Fern route
+    only while Fern is cold.
 
 ## Phase 8: Sweeps and Hammond: ships in the People Phase 8 PR
 

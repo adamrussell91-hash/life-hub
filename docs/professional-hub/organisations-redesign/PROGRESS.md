@@ -24,7 +24,7 @@ and are reopened:
 - C1: count labels pile up on the tiles, and timeline labels are clipped and
   collide.
 - C2: the tile line is placed by list position, not by real points.
-- D4 / P3: the St. Redacted acceptance case fails.
+- D4 / P3: the Tallowwood acceptance case fails.
 - Warmth: everyone is banded cold (D6).
 - Ongoing role drawn as a dot (C6).
 - Dead buttons and roadmap copy (P4).
@@ -35,7 +35,7 @@ and are reopened:
 - [x] Registry keys: member_of_unit, holds_position, part_of, reports_to, shares_authority_with, works_with, answers_to
 - [x] `deriveReportingGraph` + org-structure repository/handler (`/api/org-structure`)
 - [x] Edit structure sheet on organisation page (Add unit / position / member / reports-to)
-- [x] Tests: Redacted three lines; multi-parent; symmetric pair; cycle; temporal; W2 handler factory
+- [x] Tests: Tallowwood three lines; multi-parent; symmetric pair; cycle; temporal; W2 handler factory
 - Checks: D4 P3 V4 I3 W2
 - Diff vs mockup: structure starts empty on live Blob until Adam edits (no GitHub seed yet)
 
@@ -46,7 +46,7 @@ and are reopened:
 - [x] Your lines highlight + `?line=` (V2); Outline / Flow / People list
 - [x] Phone Outline default; Flow pan box
 - Checks: S4 V2 V3 V4 R1 D4 Perf (elk chunk split)
-- Screens: `screens/fix-01/part-b-*` (see Part B ledger)
+- Screens: `screens/fix-01/` (removed 19 Oct 2026: live screenshots and directory dumps showed real colleagues; this repo is public) (see Part B ledger)
 
 ## Phase 4 — Opportunities
 
@@ -87,11 +87,11 @@ synthetic link's `created_at`) and `assembleOrganisationsDirectory` /
 environment; Organisations on the live umbrella also loads GitHub for these
 records. **No Part A code changes in this commit.**
 
-### 1. `first_link_at` — St. Redacted and Trinity
+### 1. `first_link_at` — Tallowwood and Banksia
 
 Directory rule (unchanged): `valid_from || occurred_at || created_at`.
 
-**St. Redacted College — 56 people**
+**Tallowwood College — 56 people**
 
 | Field source | Count |
 |---|---|
@@ -106,63 +106,63 @@ are import timestamps, not "when Adam got to know them".**
 | Person | `first_link_at` | Field |
 |---|---|---|
 | Adam Russell | 2025-01-22 | `valid_from` |
-| Alison DeSousa | 2026-09-15T00:00:00.000Z | `created_at` |
-| Carmel Cordaro | 2026-09-15T00:00:00.000Z | `created_at` |
-| Carolyn Muir | 2026-09-15T00:00:00.000Z | `created_at` |
-| Chris Dobell-Brown | 2026-09-15T00:00:00.000Z | `created_at` |
-| Claire Smith | 2026-09-15T00:00:00.000Z | `created_at` |
-| Dallas Davies | 2026-09-15T00:00:00.000Z | `created_at` |
-| Daniel Heyman | 2026-09-15T00:00:00.000Z | `created_at` |
-| Daniel Levitt | 2026-09-15T00:00:00.000Z | `created_at` |
-| Daniel Ronchetti | 2026-09-15T00:00:00.000Z | `created_at` |
-| David Comito | 2026-09-15T00:00:00.000Z | `created_at` |
-| Dr Georgia Macbeth | 2026-09-15T00:00:00.000Z | `created_at` |
-| Eileen Quinane | 2026-09-15T00:00:00.000Z | `created_at` |
-| Elizabeth Phipps | 2026-09-15T00:00:00.000Z | `created_at` |
-| Erin Webb | 2026-09-15T00:00:00.000Z | `created_at` |
-| Felipe Basioli | 2026-09-15T00:00:00.000Z | `created_at` |
-| Fr Ross Jones SJ | 2026-09-15T00:00:00.000Z | `created_at` |
-| Grant Smith | 2026-09-15T00:00:00.000Z | `created_at` |
-| Hamish Bragg | 2026-09-15T00:00:00.000Z | `created_at` |
-| Hanna Lucas | 2026-09-15T00:00:00.000Z | `created_at` |
-| Heidi Quinn | 2026-09-15T00:00:00.000Z | `created_at` |
-| Isabella Talliano | 2026-09-15T00:00:00.000Z | `created_at` |
-| Jennifer Walker | 2026-09-15T00:00:00.000Z | `created_at` |
-| Joe El-Khoury | 2026-09-15T00:00:00.000Z | `created_at` |
-| John Browne | 2026-09-15T00:00:00.000Z | `created_at` |
-| John Powell | 2026-09-15T00:00:00.000Z | `created_at` |
-| John Tzantzaris | 2026-09-15T00:00:00.000Z | `created_at` |
-| Joseph Histon | 2026-09-15T00:00:00.000Z | `created_at` |
-| Joseph Lee | 2026-09-15T00:00:00.000Z | `created_at` |
-| Joshua Levy | 2026-09-15T00:00:00.000Z | `created_at` |
-| Justyn Ambrose | 2026-09-15T00:00:00.000Z | `created_at` |
-| Kate Quinane | 2026-09-15T00:00:00.000Z | `created_at` |
-| Kathleen Esser | 2026-09-15T00:00:00.000Z | `created_at` |
-| Kelly Ryu | 2026-09-15T00:00:00.000Z | `created_at` |
-| Lisa Gascoigne | 2026-09-15T00:00:00.000Z | `created_at` |
-| Marcel Kennedy | 2026-09-15T00:00:00.000Z | `created_at` |
-| Martin Corcoran | 2026-09-15T00:00:00.000Z | `created_at` |
-| Matt Fanning | 2026-09-15T00:00:00.000Z | `created_at` |
-| Michelle O'Connor | 2026-09-15T00:00:00.000Z | `created_at` |
-| Mitchell Chriss | 2026-09-15T00:00:00.000Z | `created_at` |
-| Natalie Shih | 2026-09-15T00:00:00.000Z | `created_at` |
-| Nick Lah | 2026-09-15T00:00:00.000Z | `created_at` |
-| Nina Radice | 2026-09-15T00:00:00.000Z | `created_at` |
-| Paul Monteleone | 2026-09-15T00:00:00.000Z | `created_at` |
-| Phillip Merchant | 2026-09-15T00:00:00.000Z | `created_at` |
-| Pier Milanoli | 2026-09-15T00:00:00.000Z | `created_at` |
-| Richard Steele | 2026-09-15T00:00:00.000Z | `created_at` |
-| Seth Fitisemanu | 2026-09-15T00:00:00.000Z | `created_at` |
-| Simone Salle | 2026-09-15T00:00:00.000Z | `created_at` |
-| Sinclair Watson | 2026-09-15T00:00:00.000Z | `created_at` |
-| Sophie Unsworth | 2026-09-15T00:00:00.000Z | `created_at` |
-| Sue Gough | 2026-09-15T00:00:00.000Z | `created_at` |
-| Tamara Dabic | 2026-09-15T00:00:00.000Z | `created_at` |
-| Thierry King | 2026-09-15T00:00:00.000Z | `created_at` |
-| Tom Spencer | 2026-09-15T00:00:00.000Z | `created_at` |
-| Vanessa Wadih | 2026-09-15T00:00:00.000Z | `created_at` |
+| Bree Harrowby | 2026-09-15T00:00:00.000Z | `created_at` |
+| Hope Tamberlin | 2026-09-15T00:00:00.000Z | `created_at` |
+| Kit Kestrel | 2026-09-15T00:00:00.000Z | `created_at` |
+| Milo Zephyrine | 2026-09-15T00:00:00.000Z | `created_at` |
+| Nell Brindle | 2026-09-15T00:00:00.000Z | `created_at` |
+| Pia Pemberly | 2026-09-15T00:00:00.000Z | `created_at` |
+| Quin Wexcombe | 2026-09-15T00:00:00.000Z | `created_at` |
+| Rhea Fernleigh | 2026-09-15T00:00:00.000Z | `created_at` |
+| Sol Glenholm | 2026-09-15T00:00:00.000Z | `created_at` |
+| Tess Northam | 2026-09-15T00:00:00.000Z | `created_at` |
+| Dr Vic Dorrigo | 2026-09-15T00:00:00.000Z | `created_at` |
+| Wren Elwood | 2026-09-15T00:00:00.000Z | `created_at` |
+| Xan Larkspur | 2026-09-15T00:00:00.000Z | `created_at` |
+| Zed Bellbird | 2026-09-15T00:00:00.000Z | `created_at` |
+| Bo Jarrahdale | 2026-09-15T00:00:00.000Z | `created_at` |
+| Fr Cleo Quorrobolong SJ | 2026-09-15T00:00:00.000Z | `created_at` |
+| Dev Yarrowee | 2026-09-15T00:00:00.000Z | `created_at` |
+| Esme Ashgrove | 2026-09-15T00:00:00.000Z | `created_at` |
+| Finn Harrowby | 2026-09-15T00:00:00.000Z | `created_at` |
+| Gia Oakhurst | 2026-09-15T00:00:00.000Z | `created_at` |
+| Jem Fairlie | 2026-09-15T00:00:00.000Z | `created_at` |
+| Oona Kestrel | 2026-09-15T00:00:00.000Z | `created_at` |
+| Per Redgum | 2026-09-15T00:00:00.000Z | `created_at` |
+| Rafe Zephyrine | 2026-09-15T00:00:00.000Z | `created_at` |
+| Suki Brindle | 2026-09-15T00:00:00.000Z | `created_at` |
+| Theo Inverell | 2026-09-15T00:00:00.000Z | `created_at` |
+| Wynn Fernleigh | 2026-09-15T00:00:00.000Z | `created_at` |
+| Ari Glenholm | 2026-09-15T00:00:00.000Z | `created_at` |
+| Dana Dorrigo | 2026-09-15T00:00:00.000Z | `created_at` |
+| Fern Larkspur | 2026-09-15T00:00:00.000Z | `created_at` |
+| Gus Saltash | 2026-09-15T00:00:00.000Z | `created_at` |
+| Hope Bellbird | 2026-09-15T00:00:00.000Z | `created_at` |
+| Ivo Calloway | 2026-09-15T00:00:00.000Z | `created_at` |
+| Otis Oakhurst | 2026-09-15T00:00:00.000Z | `created_at` |
+| Quin Emberly | 2026-09-15T00:00:00.000Z | `created_at` |
+| Sol Merriwa | 2026-09-15T00:00:00.000Z | `created_at` |
+| Uma Coolabah | 2026-09-15T00:00:00.000Z | `created_at` |
+| Vic Dunmore | 2026-09-15T00:00:00.000Z | `created_at` |
+| Wren Kestrel | 2026-09-15T00:00:00.000Z | `created_at` |
+| Yara Zephyrine | 2026-09-15T00:00:00.000Z | `created_at` |
+| Ada Inverell | 2026-09-15T00:00:00.000Z | `created_at` |
+| Bo Pemberly | 2026-09-15T00:00:00.000Z | `created_at` |
+| Dev Fernleigh | 2026-09-15T00:00:00.000Z | `created_at` |
+| Gia Ulladulla | 2026-09-15T00:00:00.000Z | `created_at` |
+| Hal Dorrigo | 2026-09-15T00:00:00.000Z | `created_at` |
+| Lux Bellbird | 2026-09-15T00:00:00.000Z | `created_at` |
+| Rafe Ashgrove | 2026-09-15T00:00:00.000Z | `created_at` |
+| Theo Oakhurst | 2026-09-15T00:00:00.000Z | `created_at` |
+| Una Varley | 2026-09-15T00:00:00.000Z | `created_at` |
+| Vale Emberly | 2026-09-15T00:00:00.000Z | `created_at` |
+| Bree Tamberlin | 2026-09-15T00:00:00.000Z | `created_at` |
+| Cal Coolabah | 2026-09-15T00:00:00.000Z | `created_at` |
+| Fern Redgum | 2026-09-15T00:00:00.000Z | `created_at` |
+| Hope Brindle | 2026-09-15T00:00:00.000Z | `created_at` |
+| Ivo Inverell | 2026-09-15T00:00:00.000Z | `created_at` |
 
-**Trinity Catholic College — 20 people**
+**Banksia College — 20 people**
 
 | Field source | Count |
 |---|---|
@@ -174,33 +174,33 @@ are import timestamps, not "when Adam got to know them".**
 
 | Person | `first_link_at` | Field |
 |---|---|---|
-| Bianca Gambrill | 2026-09-15T00:00:00.000Z | `created_at` |
-| Cait Grey | 2026-09-15T00:00:00.000Z | `created_at` |
-| Carmel Wright | 2026-09-15T00:00:00.000Z | `created_at` |
-| Cherie Borger | 2026-09-15T00:00:00.000Z | `created_at` |
-| Helen Davies | 2026-09-15T00:00:00.000Z | `created_at` |
-| Jonathan Reynolds | 2026-09-15T00:00:00.000Z | `created_at` |
-| Jordan Fulmer | 2026-09-15T00:00:00.000Z | `created_at` |
-| Justine Webb | 2026-09-15T00:00:00.000Z | `created_at` |
-| Kerrie Sellers | 2026-09-15T00:00:00.000Z | `created_at` |
-| Natalie Adams | 2026-09-15T00:00:00.000Z | `created_at` |
-| Olivia Slevin | 2026-09-15T00:00:00.000Z | `created_at` |
-| Rachel Logan | 2026-09-15T00:00:00.000Z | `created_at` |
-| Rachel Moore | 2026-09-15T00:00:00.000Z | `created_at` |
-| Renai Thirlway | 2026-09-15T00:00:00.000Z | `created_at` |
-| Robert Emery | 2026-09-15T00:00:00.000Z | `created_at` |
-| Ruby Wyker | 2026-09-15T00:00:00.000Z | `created_at` |
-| Simon Pearse | 2026-09-15T00:00:00.000Z | `created_at` |
-| Stephanie Strachan | 2026-09-15T00:00:00.000Z | `created_at` |
-| Tania Hough | 2026-09-15T00:00:00.000Z | `created_at` |
-| Taylah Grainger | 2026-09-15T00:00:00.000Z | `created_at` |
+| Fern Fairlie | 2026-09-15T00:00:00.000Z | `created_at` |
+| Gus Merriwa | 2026-09-15T00:00:00.000Z | `created_at` |
+| Ivo Coolabah | 2026-09-15T00:00:00.000Z | `created_at` |
+| Lark Redgum | 2026-09-15T00:00:00.000Z | `created_at` |
+| Hal Varley | 2026-09-15T00:00:00.000Z | `created_at` |
+| Una Pemberly | 2026-09-15T00:00:00.000Z | `created_at` |
+| Vale Wexcombe | 2026-09-15T00:00:00.000Z | `created_at` |
+| Eli Elwood | 2026-09-15T00:00:00.000Z | `created_at` |
+| Kit Quorrobolong | 2026-09-15T00:00:00.000Z | `created_at` |
+| Xan Redgum | 2026-09-15T00:00:00.000Z | `created_at` |
+| Cleo Wexcombe | 2026-09-15T00:00:00.000Z | `created_at` |
+| Isla Elwood | 2026-09-15T00:00:00.000Z | `created_at` |
+| Jem Larkspur | 2026-09-15T00:00:00.000Z | `created_at` |
+| Kai Saltash | 2026-09-15T00:00:00.000Z | `created_at` |
+| Mae Calloway | 2026-09-15T00:00:00.000Z | `created_at` |
+| Nico Jarrahdale | 2026-09-15T00:00:00.000Z | `created_at` |
+| Suki Harrowby | 2026-09-15T00:00:00.000Z | `created_at` |
+| Ari Merriwa | 2026-09-15T00:00:00.000Z | `created_at` |
+| Dana Dunmore | 2026-09-15T00:00:00.000Z | `created_at` |
+| Eli Kestrel | 2026-09-15T00:00:00.000Z | `created_at` |
 
 **A1 / A8 implication:** a tile spark / people line that trusts `first_link_at`
 as-is will stack almost everyone on 15/09/26. Header "first Jan 2025" on
-St. Redacted is Adam's own `valid_from`, not the organisation's first touch
+Tallowwood is Adam's own `valid_from`, not the organisation's first touch
 with other people. Directory people count is **56**, not the build-plan's 82.
 
-### 2. Warmth bands — St. Redacted (defect A2)
+### 2. Warmth bands — Tallowwood (defect A2)
 
 | Source | warm | cooling | cold | total |
 |---|---|---|---|---|
@@ -213,7 +213,7 @@ absent: the org directory still calls `warmthFor()` with touchpoints from
 `FIX-BRIEF-01.md`). People uses the person's full relationship list (and the
 person page later patches from overview meetings/events when those exist). On
 this GitHub dataset there are no meeting/event/comms touchpoints and 55/56
-Redacted people have only that one org link, so both paths score cold. The
+Tallowwood people have only that one org link, so both paths score cold. The
 architectural second computation remains; do not restyle the bar warmer.
 
 ### 3. Relationship-type counts (all organisations)
@@ -253,12 +253,12 @@ would still not reach the directory until that importer is extended.
 **Why Events & PD / Study & placement / Prospects are 0:** there are **no**
 `venue`, `provider`, `presenter`, `studied_at`, `placement_at`, or
 `applies_to` links in the store. Chip derivation cannot invent Event venue /
-PD provider / Studied / Placement / Applied chips. St. Redacted has no Event
+PD provider / Studied / Placement / Applied chips. Tallowwood has no Event
 venue chip because no venue links exist (A7 — data absence, not a missed
 derivation on present links). Work = 8 is Adam's `employee_at` workplaces;
 bodies = 4 is his `member_of` orgs.
 
-### 4. Adam → St. Redacted links
+### 4. Adam → Tallowwood links
 
 Exactly **one** link in `relationships.json`:
 
@@ -266,7 +266,7 @@ Exactly **one** link in `relationships.json`:
 |---|---|---|
 | Gifted Education Teacher | 2025-01-22 | `null` (open / current) |
 
-Directory chips for St. Redacted: **Workplace · Gifted Education Teacher · 2025–now**.
+Directory chips for Tallowwood: **Workplace · Gifted Education Teacher · 2025–now**.
 Timeline lane from the assembler: `kind: work_study`, `start: 2025-01-22`,
 `end: null`.
 
@@ -288,14 +288,14 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 - [x] Undated people omitted from spark; tile `aria-label` includes undated count
 - [x] Unit: different orgs → different path; shared-scale x; spark text = `2019`/`now` only
 - Checks: C5 C1 C2 D1 W2
-- Screens: `screens/fix-01/live-wall-1440.png`, `live-wall-390.png` (plus harness wall PNGs)
-- Diff vs mockup: see `screens/fix-01/DIFF.md` (1 dated person on Redacted; Trinity empty)
+- Screens: `screens/fix-01/` (removed 19 Oct 2026: live screenshots and directory dumps showed real colleagues; this repo is public)
+- Diff vs mockup: see `screens/fix-01/` (removed 19 Oct 2026: live screenshots and directory dumps showed real colleagues; this repo is public) (1 dated person on Tallowwood; Banksia empty)
 
 ### A2. Warmth from People source (D6, V4)
 
 - [x] Handler loads people + `buildPersonWarmthById` (same `warmthFor` path as People directory)
 - [x] Test: org bands equal People bands for same ids
-- [x] **Real St. Redacted spread remains 0 warm / 0 cooling / 56 cold** — ledgered; not restyled
+- [x] **Real Tallowwood spread remains 0 warm / 0 cooling / 56 cold** — ledgered; not restyled
 - Checks: D6 V4
 - Screen: wall tiles show single grey cold segment (honest)
 
@@ -303,13 +303,13 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 
 - [x] Work/roles `end: null` → bar to domain end (now); events stay points
 - [x] Unit: bar right edge = now x
-- Screen: `screens/fix-01/live-Redacted-1440.png`, `live-Redacted-timeline-390.png`
+- Screen: `screens/fix-01/` (removed 19 Oct 2026: live screenshots and directory dumps showed real colleagues; this repo is public)
 
 ### A4. Timeline labels + people area (C1, C3)
 
 - [x] Labels inside bars (or beside when too long); axis row below; stepped people area; count label; no per-person dots
 - [x] getBBox non-overlap at 900 and 390; height = rows×32+24
-- Screens: timeline live 1440 / 390 (`live-Redacted-*.png`); `preserveAspectRatio=xMinYMid meet` + minWidth so 390 scrolls instead of squashing (C1)
+- Screens: timeline live 1440 / 390 (`live-tallowwood-*.png`); `preserveAspectRatio=xMinYMid meet` + minWidth so 390 scrolls instead of squashing (C1)
 
 ### A5. Dead buttons / roadmap copy (I3, P4)
 
@@ -328,14 +328,14 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 ### A7. Filter / chip counts (D4, V4)
 
 - [x] Phase 0: venue/study/etc. counts are **0** — data absence, not chip bug
-- [x] Model test: St. Redacted real links → Workplace only, no Event venue
+- [x] Model test: Tallowwood real links → Workplace only, no Event venue
 - [x] No invented chips
 - Ledger: Events & PD 0, Study & placement 0, Prospects 0 (114 orgs in Phase 0; this evidence pass 113 after identity dedupe)
 
 ### A8. Header first date (D5)
 
 - [x] `first_touch_kind: you_started | first_contact`
-- [x] Redacted meta: **"56 people · you started Jan 2025"**
+- [x] Tallowwood meta: **"56 people · you started Jan 2025"**
 - Check: D5; screen in wall/timeline captures
 
 ### Part A status
@@ -352,9 +352,9 @@ PR: draft (do not mark ready until ledger + guardian + pre-pr-check).
 
 ### Must / Must-not / Verify
 
-- **Must:** St. Redacted page shows Edit / Add structure / Run now / Add opportunity / Compare with… wired; structure editor writes units; flowchart/outline when structure exists; no roadmap copy.
+- **Must:** Tallowwood page shows Edit / Add structure / Run now / Add opportunity / Compare with… wired; structure editor writes units; flowchart/outline when structure exists; no roadmap copy.
 - **Must-not:** Disabled placeholder buttons; Phase/arrives copy; elkjs in main bundle; invented venue chips; PR marked ready before Part B ticks.
-- **Verify:** unit tests + professional tests + live 1440/390 screens in `screens/fix-01/` + hub-ui-guardian PASS + `npm run pre-pr-check`.
+- **Verify:** unit tests + professional tests + live 1440/390 screens in `screens/fix-01/` (removed 19 Oct 2026: live screenshots and directory dumps showed real colleagues; this repo is public) + hub-ui-guardian PASS + `npm run pre-pr-check`.
 
 ### Ledger
 
@@ -364,17 +364,17 @@ PR: draft (do not mark ready until ledger + guardian + pre-pr-check).
 | 3 Flowchart | [x] | S4 V1 V2 V3 V4 R1 C1 C4 I2 D4 Perf | org page How section | Kit surfaces; ELK order not drag-pin; collapse + vacant buttons |
 | 4 Opportunities | [x] | D1 D2 I3 I4 S3 V4 W2 | Add to Applications / Events + dismiss | Empty until manual add; org page actions live |
 | 5 Ann's read | [x] | I3 D5 L2 context-integrity | Run now → organisation-read | Scheduled tick deferred; Run now live |
-| 7 Compare | [x] | D4 V4 R2 P3 | `#/organisations/compare` + org-bridges POST | Marcel→Bianca warm→cold bridge live |
+| 7 Compare | [x] | D4 V4 R2 P3 | `#/organisations/compare` + org-bridges POST | Quin→Fern warm→cold bridge live |
 
 ### Part B status
 
 - [x] Phases 2→3→4→5→7 implemented
 - [x] hub-ui-guardian **PASS** (r2 — all r1 HIGHs closed)
-- [x] Screens in `screens/fix-01/part-b-*` + `DIFF-part-b.md`
+- [x] Screens in `screens/fix-01/` (removed 19 Oct 2026: live screenshots and directory dumps showed real colleagues; this repo is public) + `DIFF-part-b.md`
 - [x] `npm run pre-pr-check` exit 0
 - [x] PR stays **draft** until Adam marks ready
 
 Failure-register checked (Part B): L1 L2 L5 L6 S2 S3 S4 V1 V2 V3 V4 R1 R2 C1 C4 D1 D4 D5 I2 I3 I4 W1 W2 P1 P3 P4
-Live evidence: Redacted structure + Flow/Outline; vacant → editor; unit collapse; Add to Applications/Events; Compare Marcel→Bianca.
+Live evidence: Tallowwood structure + Flow/Outline; vacant → editor; unit collapse; Add to Applications/Events; Compare Quin→Fern.
 Guardian: `/cursor/stores/self/internal/orgs-fix-01-part-b-guardian-r2.md` (via store symlink).
 elkjs: separate `elk.bundled-*.js` chunk (not main bundle).
