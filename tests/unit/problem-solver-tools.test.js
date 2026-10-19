@@ -7,6 +7,9 @@ import { gapBasic } from '../../packages/problem-solver/tools/gap-basic.mjs';
 import { gapRadar } from '../../packages/problem-solver/tools/gap-radar.mjs';
 import { problemStatement } from '../../packages/problem-solver/tools/problem-statement.mjs';
 import { smart } from '../../packages/problem-solver/tools/smart.mjs';
+import { TOOLS, toolsForBookStep } from '../../packages/problem-solver/tools/index.mjs';
+import { BOOK_STEP_IDS } from '../../packages/problem-solver/steps.mjs';
+import { newRun, placeNode, nextSlots, isComplete } from '../../packages/problem-solver/machine.mjs';
 
 const run = (tool, slots, extra = {}) => ({ id: 'r', tool, status: 'active', edges: [], nodes: slots.map((slot, i) => ({ id: `n${i}`, slot, text: slot })), ...extra });
 
@@ -60,12 +63,6 @@ test('smart: problem, then the five letters in any order', () => {
   assert.deepEqual(smart.nextSlots(run('smart', ['problem', 'm'])), ['s', 'a', 'r', 't']);
   assert.ok(smart.complete(run('smart', ['problem', 's', 'm', 'a', 'r', 't'])));
 });
-
-// Task 2 additions
-import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
-import { BOOK_STEP_IDS } from '../../packages/problem-solver/steps.mjs';
-import { toolsForBookStep } from '../../packages/problem-solver/tools/index.mjs';
-import { newRun, placeNode, nextSlots, isComplete } from '../../packages/problem-solver/machine.mjs';
 
 test('every tool names its book step and at least two failure modes', () => {
   for (const tool of Object.values(TOOLS)) {

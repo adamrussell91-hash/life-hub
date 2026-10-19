@@ -12,6 +12,7 @@ import metacognition from './glyphs/skills/metacognition.svg?raw';
 import reflective_thinking from './glyphs/skills/reflective_thinking.svg?raw';
 import searching from './glyphs/skills/searching.svg?raw';
 import synthesis from './glyphs/skills/synthesis.svg?raw';
+import contradiction from './glyphs/tools/contradiction.svg?raw';
 import concept_map from './glyphs/tools/concept_map.svg?raw';
 import five_whys from './glyphs/tools/five_whys.svg?raw';
 import gap_basic from './glyphs/tools/gap_basic.svg?raw';
@@ -26,7 +27,7 @@ const SOURCES: Record<string, string> = {
   learning, logical_reasoning, metacognition, reflective_thinking, searching, synthesis
 };
 
-const EMBLEMS: Record<PsToolId, string> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart };
+const EMBLEMS: Record<PsToolId, string> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction };
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
 export const EMBLEM_SVG: Record<PsToolId, string> = EMBLEMS;
