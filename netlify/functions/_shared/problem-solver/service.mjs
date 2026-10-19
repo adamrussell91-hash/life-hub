@@ -2,8 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import {
   acceptSuggestion, applyCoachTurn, archive, createSession, dismissSuggestion,
-  finishDefine, keepAnyway, rename, rescoreRadar, say, summaryRow
+  keepAnyway, moveOn, rename, rescoreRadar, say, score, summaryRow
 } from './session.mjs';
+import { migrateRow, migrateSession } from './migrate.mjs';
 
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const REQUEST_IDS_KEPT = 50;
@@ -18,13 +19,13 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
   const deps = { now, newId };
 
   const isStale = (s) => s.runner.status === 'running' && Date.parse(now()) > (s.runner.leaseUntil ?? 0);
-  const unstale = (s) => (isStale(s) ? { ...s, runner: { status: 'failed', mode: s.runner.mode ?? 'turn', error: STALE_ERROR } } : s);
+  const unstale = (s) => (isStale(s) ? { ...s, runner: { ...s.runner, status: 'failed', error: STALE_ERROR } } : s);
 
   async function load(owner, id) {
     if (!ID_RE.test(String(id ?? ''))) throw httpError(400, 'validation_error', 'Valid session id required.');
     const row = await store.read(owner, id);
     if (!row) throw httpError(404, 'not_found', 'Problem not found.');
-    return row;
+    return { ...row, value: migrateSession(row.value) };
   }
 
   async function save(owner, value, etag) {
@@ -39,8 +40,10 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     keep_anyway: (s) => keepAnyway(s, deps),
     accept_suggestion: (s) => acceptSuggestion(s, deps),
     dismiss_suggestion: (s) => dismissSuggestion(s, deps),
-    finish_define: (s) => finishDefine(s, deps),
+    move_on: (s) => moveOn(s, deps),
+    finish_define: (s) => moveOn(s, deps),
     rename: (s, body) => rename(s, body.text, deps),
+    score: (s, body) => score(s, body.payload ?? {}, deps),
     rescore_radar: (s, body) => rescoreRadar(s, { current: body.current, objective: body.objective }, deps),
     archive: (s) => archive(s, deps),
     retry: (s) => {
@@ -51,9 +54,8 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
 
   return {
     async list(owner, { limit = 100, offset = 0 } = {}) {
-      const rows = (await store.list(owner, limit, offset)).map((row) => summaryRow(row.value));
-      // Index rows written before frame and skill counts existed: read the session once to fill them in.
-      return Promise.all(rows.map(async (row) => (row.skills ? row : summaryRow((await store.read(owner, row.id))?.value ?? row))));
+      const rows = (await store.list(owner, limit, offset)).map((row) => migrateRow(summaryRow(row.value)));
+      return Promise.all(rows.map(async (row) => (row.skills ? row : migrateRow(summaryRow(migrateSession((await store.read(owner, row.id))?.value ?? row))))));
     },
 
     async get(owner, id) {
@@ -96,7 +98,7 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
       try {
         next = applyCoachTurn(value, await coach(value), deps);
       } catch (error) {
-        next = { ...value, runner: { status: 'failed', mode: value.runner.mode ?? 'turn', error: error.message || 'The coach could not answer.' } };
+        next = { ...value, runner: { ...value.runner, status: 'failed', error: error.message || 'The coach could not answer.' } };
       }
       next.revision = value.revision + 1;
       return save(owner, next, etag);
