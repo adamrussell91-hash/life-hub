@@ -80,6 +80,22 @@ function similarity(a, b) {
   return (2 * shared) / (left.length + right.length);
 }
 
+const SHORT_DAY = new Intl.DateTimeFormat('en-AU', { weekday: 'short', timeZone: 'UTC' });
+
+/**
+ * One task split over several blocks reads as one linked task:
+ * "part 1 of 2 · continues Tue 5 pm" (or "· from Mon 3:30 pm" on the last part).
+ */
+export function splitPartMeta(record) {
+  if (record?.type !== 'work_block' || !(record.session_count > 1) || !Array.isArray(record.sessions)) return '';
+  const index = Number(record.session_index) || 1;
+  const label = `part ${index} of ${record.session_count}`;
+  const near = record.sessions[index] ?? record.sessions[index - 2];
+  if (!near?.date || !/^\d{2}:\d{2}$/.test(String(near.time ?? ''))) return label;
+  const when = `${near.date === record.date ? '' : `${SHORT_DAY.format(new Date(`${near.date}T00:00:00Z`))} `}${clockMeta(toHour(near.time))}`;
+  return `${label} · ${record.sessions[index] ? 'continues' : 'from'} ${when}`;
+}
+
 function clockMeta(start, end) {
   const fmt = hour => {
     const h = Math.floor(hour);
@@ -183,7 +199,7 @@ export function chipFromEvent(event) {
       : [record.class_title && record.title && record.class_title !== record.title
         ? `${record.class_title} · ${clockMeta(start, end)}`
         : record.class_title || clockMeta(start, end), part].filter(Boolean).join(' · ')
-    : clockMeta(start, end);
+    : [clockMeta(start, end), splitPartMeta(record)].filter(Boolean).join(' · ');
   return {
     id: record.id || event.path,
     date: record.date,

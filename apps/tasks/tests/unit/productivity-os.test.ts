@@ -276,6 +276,9 @@ describe('schedule compose', () => {
     expect(result.proposed.length).toBeGreaterThanOrEqual(2);
     expect(result.proposed.every((b) => b.task_id === 't1')).toBe(true);
     expect(result.proposed.reduce((s, b) => s + b.duration_minutes, 0)).toBe(90);
+    // The parts are one linked split, not lookalike duplicates.
+    expect(new Set(result.proposed.map((b) => b.split_group)).size).toBe(1);
+    expect(result.proposed[0].split_group).toBe('split_t1_2026-09-08');
   });
 
   it('does not double-book a task that already has a confirmed block', () => {

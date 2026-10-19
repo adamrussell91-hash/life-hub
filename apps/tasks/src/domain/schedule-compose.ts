@@ -37,6 +37,8 @@ export type ProposedBlock = {
   duration_minutes: number;
   depth: 'deep' | 'shallow' | 'admin';
   selected: boolean;
+  /** Set when one task is split over several blocks: every part shares it. */
+  split_group?: string;
 };
 
 export type UnscheduledItem = {
@@ -243,6 +245,12 @@ function placeTaskBlocks(
       kind: 'work_block'
     });
     remaining -= chunk;
+  }
+
+  // Several chunks of one task are parts of one split (one task card), not duplicates.
+  if (proposed.length > 1) {
+    const group = `split_${task.id}_${opts.date}`;
+    for (const block of proposed) block.split_group = group;
   }
 
   return {

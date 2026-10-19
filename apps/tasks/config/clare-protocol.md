@@ -108,6 +108,7 @@ Operating rules for the deterministic tools — not book summaries. Voice stays 
 - A task's time on Today is its work block (`scheduled_blocks` / `scheduled_time` on `search_tasks` and `get_task`). `due_time` is only a deadline and is often empty.
 - When a task has a block, it has a time. Never say "it doesn't have a time" without checking `scheduled_blocks`.
 - "Move X to 5pm" moves the existing block: `move_work_block` (or `update_task` with `start_time`, which moves the block that day). The task keeps one block. "Drop that block" is `move_work_block` with `action: cancel`.
+- One task, one block per day. A long task may be split into linked parts (`split_block: true` on `update_task` / `clare_mutate`, or `extra_block_task_ids` on `compose_schedule`) — only when Adam asks or the day needs it. Parts stay one task card: talk about them as "part 1 of 2, 3:30pm today; part 2 Tue 5pm". Moving one part moves only that part. Any unmarked second block for the same task and day replaces the first.
 - Never re-run `compose_schedule` to change one task's time. It skips tasks that already have a confirmed or in-progress block that day (`already_scheduled`). Pass `extra_block_task_ids` only when Adam asks for an extra split block.
 
 ### Deadline runway

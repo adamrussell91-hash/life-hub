@@ -10,6 +10,7 @@ import {
 } from '../tasks-blobs.mjs';
 import { deleteKey as deleteTeachingKey, getJSON as getTeachingJSON, setJSON as setTeachingJSON } from '../teaching-blobs.mjs';
 import { mergeHubPrefsPatch } from '../hub-prefs-agent.mjs';
+import { supersedeDuplicateBlocks } from '../work-block-guard.mjs';
 
 const BLOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 const TASKS_PROJECTS_INDEX = 'projects/_index';
@@ -774,6 +775,7 @@ async function executeBlobWrite(write, target, {
   }
   return {
     ok: true,
+    record,
     result: { path: write.path, mode: write.mode, id: target.id, updated_at: timestamp }
   };
 }
@@ -927,6 +929,11 @@ export async function executeProposeActionWrites(client, proposal, {
           && ['task', 'project', 'work_block', 'work_session'].includes(target.kind)
       });
       if (!applied.ok) return { ...applied, results };
+      if (target.store === 'tasks' && target.kind === 'work_block') {
+        // One block per task per day, whichever proposal wrote it (see work-block-guard).
+        const superseded = await supersedeDuplicateBlocks(store, applied.record, { nowIso });
+        if (superseded.length) applied.result.superseded = superseded;
+      }
       results.push(applied.result);
       state[write.path] = { record: { id: target.id, updated_at: applied.result.updated_at } };
       continue;
