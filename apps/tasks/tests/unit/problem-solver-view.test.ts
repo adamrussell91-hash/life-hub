@@ -158,6 +158,57 @@ describe('canvas', () => {
   });
 });
 
+describe('canvas drops views', () => {
+  class StubObserver {
+    static made: StubObserver[] = [];
+    disconnected = false;
+    constructor() {
+      StubObserver.made.push(this);
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {
+      this.disconnected = true;
+    }
+  }
+  const treeRun = (id: string) => ({ id, tool: 'problem_tree' as const, status: 'active' as const, nodes: [{ id: `${id}-t`, slot: 'trunk', text: 'Late rota', state: 'accepted' as const, skills: [], turnId: 't' }], edges: [] });
+
+  it('destroys a view whose run the session no longer has, and keeps the rest', () => {
+    StubObserver.made = [];
+    vi.stubGlobal('ResizeObserver', StubObserver);
+    try {
+      const host = document.createElement('div');
+      const canvas = mountCanvas(host);
+      canvas.update(session({ steps: { define: { runs: [{ ...treeRun('a'), status: 'done' }, treeRun('b')], status: 'open', objection: null } } }));
+      const [first] = StubObserver.made;
+      expect(first.disconnected).toBe(false);
+      // An undo takes the active run away: the chart falls back to run a, and b's view is dropped.
+      canvas.update(session({ steps: { define: { runs: [{ ...treeRun('a'), status: 'done' }], status: 'open', objection: null } } }));
+      expect(StubObserver.made.filter((o) => o.disconnected)).toHaveLength(1);
+      expect(host.querySelector('.ps-tree')).not.toBeNull();
+      canvas.destroy();
+      expect(StubObserver.made.every((o) => o.disconnected)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('calls destroy on every view it drops', () => {
+    StubObserver.made = [];
+    vi.stubGlobal('ResizeObserver', StubObserver);
+    try {
+      const host = document.createElement('div');
+      const canvas = mountCanvas(host);
+      canvas.update(session({ steps: { define: { runs: [treeRun('a')], status: 'open', objection: null } } }));
+      expect(StubObserver.made).toHaveLength(1);
+      canvas.update(session({ steps: { define: { runs: [{ id: 'w', tool: 'five_whys', status: 'active', nodes: [], edges: [] }], status: 'open', objection: null } } }));
+      expect(StubObserver.made[0].disconnected).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('canvas record', () => {
   const runs = (status: 'active' | 'done'): PsSession['steps'] => ({
     define: { runs: [

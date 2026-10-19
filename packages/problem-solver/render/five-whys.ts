@@ -9,7 +9,7 @@ import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { slotLabel } from './outline';
-import { type Accent, contestedTag, createDisclosureGroup, detailsCard, nextId, reducedMotion } from './details';
+import { type Accent, contestedTag, createDisclosureGroup, detailsCard, nextId, reducedMotion, syncContested } from './details';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -117,7 +117,7 @@ export function createFiveWhysView(doc: Document = document): FiveWhysView {
         root.append(item);
         animateIn(item, kind);
       }
-      item.classList.toggle('is-contested', node.state === 'contested');
+      syncContested(item, node, item.querySelector('.ps-whys__label'), item.querySelector('.ps-whys__shape'));
     }
     // Keep DOM order equal to chain order; only move items that are out of place.
     nodes.forEach((node, index) => {

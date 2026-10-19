@@ -12,12 +12,12 @@ import type { PsEdge, PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { slotLabel } from './outline';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const MINUS = '−';
 
-export type CausalMapView = { el: HTMLDivElement; update(run: PsToolRun): void };
+export type CausalMapView = { el: HTMLDivElement; update(run: PsToolRun): void; destroy(): void };
 
 type Kind = 'problem' | 'cause' | 'influence';
 type RegionName = 'problem' | 'causes' | 'influences';
@@ -501,7 +501,7 @@ export function createCausalMapView(doc: Document = document): CausalMapView {
           item = addNode(node, kind);
           added.push(node.id);
         }
-        item.classList.toggle('is-contested', node.state === 'contested');
+        syncContested(item, node, item.querySelector('.ps-causal__label'), item.querySelector('.ps-causal__shape'));
         const region = regions[REGION[kind]];
         if (region.children[index] !== item) region.insertBefore(item, region.children[index] ?? null);
       });
@@ -561,7 +561,17 @@ export function createCausalMapView(doc: Document = document): CausalMapView {
     if (added.length || moved) settle(820);
   }
 
-  if (typeof ResizeObserver === 'function') new ResizeObserver(() => layout()).observe(root);
+  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => layout()) : null;
+  observer?.observe(root);
 
-  return { el: root, update };
+  /** Stop the size watch, the link-settling loop and any glide still running once the canvas drops this view. */
+  function destroy(): void {
+    observer?.disconnect();
+    if (frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+    frame = 0;
+    settleUntil = 0;
+    cancelAnimations(root);
+  }
+
+  return { el: root, update, destroy };
 }

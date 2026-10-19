@@ -10,9 +10,9 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
-export type IntentStatementView = { el: HTMLDivElement; update(run: PsToolRun): void };
+export type IntentStatementView = { el: HTMLDivElement; update(run: PsToolRun): void; destroy(): void };
 
 type Part = 'problem' | 'stakeholders' | 'failures' | 'approach' | 'opportunity' | 'risk';
 
@@ -144,7 +144,7 @@ export function createIntentStatementView(doc: Document = document): IntentState
         band = addBand(node, name);
         fresh.push(band);
       }
-      band.item.classList.toggle('is-contested', node.state === 'contested');
+      syncContested(band.item, node, band.button.querySelector('.ps-intent__title-line'), band.button);
     }
     fresh.sort((a, b) => PARTS.indexOf(a.part) - PARTS.indexOf(b.part));
     // Keep a whole statement arriving at once under about a second.
@@ -152,5 +152,11 @@ export function createIntentStatementView(doc: Document = document): IntentState
     fresh.forEach((band, i) => unfurl(band, Math.round(i * step)));
   }
 
-  return { el: root, update };
+  /** Stop the per-band size watch and any unfurl still running once the canvas drops this view. */
+  function destroy(): void {
+    sizes?.disconnect();
+    cancelAnimations(root);
+  }
+
+  return { el: root, update, destroy };
 }

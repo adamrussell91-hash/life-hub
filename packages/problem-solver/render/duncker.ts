@@ -14,9 +14,9 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
-export type DunckerView = { el: HTMLDivElement; update(run: PsToolRun): void };
+export type DunckerView = { el: HTMLDivElement; update(run: PsToolRun): void; destroy(): void };
 
 type Kind = 'problem' | 'pathway' | 'solution' | 'redefinition' | 'desired';
 type Family = 'opposite' | 'direct';
@@ -75,7 +75,7 @@ function div(doc: Document, className: string): HTMLDivElement {
   return el;
 }
 
-type Shape = { item: HTMLDivElement; button: HTMLButtonElement; meta: HTMLSpanElement; title: HTMLSpanElement; tag: HTMLSpanElement | null; card: HTMLElement; kind: Kind; node: PsNode };
+type Shape = { item: HTMLDivElement; button: HTMLButtonElement; meta: HTMLSpanElement; title: HTMLSpanElement; card: HTMLElement; kind: Kind; node: PsNode };
 type Group = { el: HTMLDivElement; solutions: HTMLDivElement; family: Family };
 type FamilyEl = { el: HTMLDivElement; head: HTMLDivElement; paths: HTMLDivElement };
 /** holder: the element whose CSS says comb or rail; kin: the shapes the link fans out to, with this one. */
@@ -101,7 +101,7 @@ export function createDunckerView(doc: Document = document): DunckerView {
   let howCaption: HTMLDivElement | null = null;
   let bottom: HTMLDivElement | null = null;
   let panel: HTMLDivElement | null = null;
-  let evaluation: { item: HTMLDivElement; text: HTMLParagraphElement; head: HTMLDivElement; tag: HTMLSpanElement | null; node: PsNode } | null = null;
+  let evaluation: { item: HTMLDivElement; text: HTMLParagraphElement; head: HTMLDivElement; more: HTMLButtonElement; node: PsNode } | null = null;
   let evalRegion: HTMLDivElement | null = null;
   let observer: ResizeObserver | null = null;
 
@@ -217,7 +217,7 @@ export function createDunckerView(doc: Document = document): DunckerView {
     panel!.append(card);
     group.register(item, button);
     button.addEventListener('click', syncOpen);
-    const shape: Shape = { item, button, meta, title, tag: null, card, kind, node };
+    const shape: Shape = { item, button, meta, title, card, kind, node };
     shapes.set(node.id, shape);
     return shape;
   }
@@ -236,13 +236,7 @@ export function createDunckerView(doc: Document = document): DunckerView {
     if (shape.meta.textContent !== meta) shape.meta.textContent = meta;
     const title = nodeTitle(node);
     if (shape.title.textContent !== title) shape.title.textContent = title;
-    const contested = node.state === 'contested';
-    shape.item.classList.toggle('is-contested', contested);
-    if (contested) {
-      shape.tag ??= contestedTag(doc, node);
-      shape.tag.title = node.objection ?? '';
-      if (!shape.tag.isConnected) shape.title.after(shape.tag);
-    } else shape.tag?.remove();
+    syncContested(shape.item, node, shape.title.parentElement, shape.button);
     const label = labelFor(shape);
     if (shape.button.getAttribute('aria-label') !== label) shape.button.setAttribute('aria-label', label);
   }
@@ -279,7 +273,7 @@ export function createDunckerView(doc: Document = document): DunckerView {
     group.register(item, more);
     evalRegion.append(item);
     root.append(evalRegion);
-    evaluation = { item, text, head, tag: null, node };
+    evaluation = { item, text, head, more, node };
     return true;
   }
 
@@ -287,13 +281,7 @@ export function createDunckerView(doc: Document = document): DunckerView {
     if (!evaluation) return;
     evaluation.node = node;
     if (evaluation.text.textContent !== node.text) evaluation.text.textContent = node.text;
-    const contested = node.state === 'contested';
-    evaluation.item.classList.toggle('is-contested', contested);
-    if (contested) {
-      evaluation.tag ??= contestedTag(doc, node);
-      evaluation.tag.title = node.objection ?? '';
-      if (!evaluation.tag.isConnected) evaluation.head.append(evaluation.tag);
-    } else evaluation.tag?.remove();
+    syncContested(evaluation.item, node, evaluation.head, evaluation.more);
   }
 
   function removeEvaluation(): void {
@@ -565,5 +553,13 @@ export function createDunckerView(doc: Document = document): DunckerView {
     drawn.forEach(({ link, depth }) => drawIn(link, Math.max(0, (startAt.get(depth) ?? 0) - 120)));
   }
 
-  return { el: root, update };
+  /** Stop the size watch and any connector or pop-in still running once the canvas drops this view. */
+  function destroy(): void {
+    observer?.disconnect();
+    observer = null;
+    for (const link of links.values()) for (const anim of link.anims) anim.cancel();
+    cancelAnimations(root);
+  }
+
+  return { el: root, update, destroy };
 }

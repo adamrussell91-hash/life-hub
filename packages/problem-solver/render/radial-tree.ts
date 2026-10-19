@@ -20,9 +20,9 @@ import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { parentEdge } from '../tools/hierarchy.mjs';
 import { MAX_LEVEL } from '../tools/radial-tree.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
-export type RadialTreeView = { el: HTMLDivElement; update(run: PsToolRun): void; layout(width: number): void };
+export type RadialTreeView = { el: HTMLDivElement; update(run: PsToolRun): void; layout(width: number): void; destroy(): void };
 
 type Layout = 'radial' | 'vertical';
 type Pos = { x: number; y: number; r: number };
@@ -1070,8 +1070,9 @@ export function createRadialTreeView(doc: Document = document): RadialTreeView {
         added.push(entry);
       }
       entry.parent = model.parent.get(node.id) ?? null;
+      entry.contested = node.state === 'contested';
       syncEntry(entry, model.level.get(node.id)!, model.code.get(node.id) ?? '');
-      entry.item.classList.toggle('is-contested', node.state === 'contested');
+      syncContested(entry.item, node, entry.label, entry.button);
       if (entry.parent && !links.has(node.id)) {
         const path = svgEl(doc, 'path');
         path.setAttribute('class', 'ps-radial__link');
@@ -1117,7 +1118,7 @@ export function createRadialTreeView(doc: Document = document): RadialTreeView {
     const reviewNode = run.nodes.find((n) => nameOf(n) === 'review');
     if (reviewNode && !review) review = addReview(reviewNode);
     if (review) {
-      review.classList.toggle('is-contested', reviewNode?.state === 'contested');
+      if (reviewNode) syncContested(review, reviewNode, review.querySelector('.ps-radial__review-head'), review.querySelector('.ps-radial__more'));
       if (root.lastElementChild !== review) root.append(review);
     }
     syncOpen();
@@ -1173,19 +1174,29 @@ export function createRadialTreeView(doc: Document = document): RadialTreeView {
   }
 
   // A width change moves the vertical columns and the label sides; lines follow.
-  if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(() => {
-      if (widthOverride !== null) return;
-      const w = root.getBoundingClientRect().width;
-      if (!stage || Math.abs(w - width) < 0.5) return;
-      width = w;
-      if (layout === 'vertical') render(false, true);
-      else {
-        placeLabels(unit());
-        drawLinks(false);
-      }
-    }).observe(root);
+  const observer = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(() => {
+        if (widthOverride !== null) return;
+        const w = root.getBoundingClientRect().width;
+        if (!stage || Math.abs(w - width) < 0.5) return;
+        width = w;
+        if (layout === 'vertical') render(false, true);
+        else {
+          placeLabels(unit());
+          drawLinks(false);
+        }
+      })
+    : null;
+  observer?.observe(root);
+
+  /** Stop the size watch, the line-settling loop and any glide still running once the canvas drops this view. */
+  function destroy(): void {
+    observer?.disconnect();
+    if (frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+    frame = 0;
+    settleUntil = 0;
+    cancelAnimations(root);
   }
 
-  return { el: root, update, layout: layoutFor };
+  return { el: root, update, layout: layoutFor, destroy };
 }

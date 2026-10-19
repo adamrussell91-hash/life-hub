@@ -13,7 +13,7 @@ import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { priorityOrder } from '../tools/problem-reduction.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type ProblemReductionView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
@@ -321,7 +321,7 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
       const relabel = shape.node.state !== node.state || nodeTitle(shape.node) !== nodeTitle(node);
       shape.node = node;
       if (relabel) shape.button.setAttribute('aria-label', label(shape));
-      shape.item.classList.toggle('is-contested', node.state === 'contested');
+      syncContested(shape.item, node, shape.button.querySelector('.ps-reduce__words'), shape.button);
     }
 
     // Chevrons, each once both its ends exist.

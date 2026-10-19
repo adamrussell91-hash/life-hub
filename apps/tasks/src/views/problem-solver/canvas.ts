@@ -32,7 +32,8 @@ import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/pro
 type Scores = Record<string, number[]>;
 /** Scores for the run on screen, which may not be the step's active run (opened from the record). */
 export type RunScores = { runId: string; [series: string]: string | number[] };
-type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void };
+/** A tool's chart. `destroy` (views with a size watch, a frame loop or long motion) is called when the canvas drops it. */
+type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void; destroy?(): void };
 export type CanvasHandlers = { onScore?: (scores: RunScores) => void };
 
 /** Tools that draw their own chart. Anything else falls back to the outline. */
@@ -167,7 +168,7 @@ function rectOf(node: Element | null): DOMRect | null {
  * Record toggle; once defined the canvas opens on the black-and-white record, and a
  * step or filmstrip card morphs into that run's coloured chart (read-only).
  */
-export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void } {
+export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void; destroy(): void } {
   const views = new Map<string, View>();
   const frame = createFrameView();
   const record = createRecordView();
@@ -261,6 +262,18 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
 
   record.onOpenStep((runId, from) => openChart({ runId, via: from.hasAttribute('data-run') ? 'film' : 'step', from }));
 
+  function drop(runId: string): void {
+    views.get(runId)?.destroy?.();
+    views.delete(runId);
+  }
+
+  /** Views for runs the session no longer has (an undo, another session) are dropped. */
+  function prune(session: PsSession): void {
+    const live = new Set(allRunsOf(session).map((run) => run.id));
+    for (const runId of [...views.keys()]) if (!live.has(runId)) drop(runId);
+    if (pinned && !live.has(pinned.runId)) pinned = null;
+  }
+
   return {
     update(session) {
       last = session;
@@ -274,7 +287,12 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       }
       phase = session.phase;
       hadActive = hasActive;
+      prune(session);
       render();
+    },
+    /** The page is going away: drop every view. */
+    destroy() {
+      for (const runId of [...views.keys()]) drop(runId);
     }
   };
 }

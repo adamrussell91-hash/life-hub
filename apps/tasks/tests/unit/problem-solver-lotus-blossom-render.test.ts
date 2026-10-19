@@ -171,6 +171,23 @@ describe('Lotus blossom view', () => {
     view.el.remove();
   });
 
+  it('Escape closes an open idea card first, then a second Escape zooms out', () => {
+    const view = createLotusBlossomView();
+    document.body.append(view.el);
+    view.update(run([problem, ...solutions, ...ideas], ideaEdges));
+    view.el.querySelector<HTMLButtonElement>('[data-flower="s5"] .ps-lotus__bloom')!.click();
+    button(view, 'i3').click();
+    expect(view.el.querySelector('[data-node="i3"]')!.classList.contains('is-open')).toBe(true);
+    button(view, 'i3').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    // The card's own handler is innermost: it closes the card and stops there, so the flower stays zoomed.
+    expect(view.el.querySelector('[data-node="i3"]')!.classList.contains('is-open')).toBe(false);
+    expect(view.el.getAttribute('data-zoom')).toBe('s5');
+    expect(document.activeElement).toBe(button(view, 'i3'));
+    button(view, 'i3').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(view.el.hasAttribute('data-zoom')).toBe(false);
+    view.el.remove();
+  });
+
   it('rings a preferred idea and lists the pick under the chart', () => {
     const view = createLotusBlossomView();
     const pick = node('f1', 'preferred:1', { title: 'Cheap and quick', text: 'This one costs least and can start next week.' });

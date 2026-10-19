@@ -11,9 +11,9 @@
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
-export type ContradictionView = { el: HTMLDivElement; update(run: PsToolRun): void };
+export type ContradictionView = { el: HTMLDivElement; update(run: PsToolRun): void; destroy(): void };
 
 type Side = 'improving' | 'worsening';
 
@@ -27,9 +27,9 @@ const GAP = 6;
 const HEAD_LEN = 9;
 const HEAD_HALF = 5;
 
-type Shape = { side: Side; region: HTMLDivElement; item: HTMLDivElement; button: HTMLButtonElement; title: HTMLSpanElement; tag: HTMLSpanElement | null; card: HTMLElement; node: PsNode };
+type Shape = { side: Side; region: HTMLDivElement; item: HTMLDivElement; button: HTMLButtonElement; title: HTMLSpanElement; card: HTMLElement; node: PsNode };
 type Tension = { g: SVGGElement; halves: SVGPathElement[]; heads: SVGPathElement[]; anims: Animation[] };
-type Statement = { region: HTMLDivElement; item: HTMLDivElement; head: HTMLDivElement; text: HTMLParagraphElement; tag: HTMLSpanElement | null; node: PsNode };
+type Statement = { region: HTMLDivElement; item: HTMLDivElement; head: HTMLDivElement; text: HTMLParagraphElement; more: HTMLButtonElement; node: PsNode };
 
 function span(doc: Document, className: string, value = ''): HTMLSpanElement {
   const el = doc.createElement('span');
@@ -135,7 +135,7 @@ export function createContradictionView(doc: Document = document): Contradiction
     panel!.append(card);
     group.register(item, button);
     button.addEventListener('click', syncOpen);
-    const shape: Shape = { side, region, item, button, title, tag: null, card, node };
+    const shape: Shape = { side, region, item, button, title, card, node };
     shapes.set(side, shape);
     return shape;
   }
@@ -144,14 +144,8 @@ export function createContradictionView(doc: Document = document): Contradiction
     shape.node = node;
     const title = nodeTitle(node);
     if (shape.title.textContent !== title) shape.title.textContent = title;
-    const contested = node.state === 'contested';
-    shape.item.classList.toggle('is-contested', contested);
-    if (contested) {
-      shape.tag ??= contestedTag(doc, node);
-      shape.tag.title = node.objection ?? '';
-      if (!shape.tag.isConnected) shape.title.after(shape.tag);
-    } else shape.tag?.remove();
-    const label = `${LABEL[shape.side]}: ${title}${contested ? ', contested' : ''}. Show details`;
+    syncContested(shape.item, node, shape.title.parentElement, shape.button);
+    const label = `${LABEL[shape.side]}: ${title}${node.state === 'contested' ? ', contested' : ''}. Show details`;
     if (shape.button.getAttribute('aria-label') !== label) shape.button.setAttribute('aria-label', label);
   }
 
@@ -286,7 +280,7 @@ export function createContradictionView(doc: Document = document): Contradiction
     group.register(item, more);
     region.append(item);
     root.append(region);
-    statement = { region, item, head, text, tag: null, node };
+    statement = { region, item, head, text, more, node };
     return true;
   }
 
@@ -294,13 +288,7 @@ export function createContradictionView(doc: Document = document): Contradiction
     if (!statement) return;
     statement.node = node;
     if (statement.text.textContent !== node.text) statement.text.textContent = node.text;
-    const contested = node.state === 'contested';
-    statement.item.classList.toggle('is-contested', contested);
-    if (contested) {
-      statement.tag ??= contestedTag(doc, node);
-      statement.tag.title = node.objection ?? '';
-      if (!statement.tag.isConnected) statement.head.append(statement.tag);
-    } else statement.tag?.remove();
+    syncContested(statement.item, node, statement.head, statement.more);
   }
 
   function update(run: PsToolRun): void {
@@ -363,5 +351,13 @@ export function createContradictionView(doc: Document = document): Contradiction
     }
   }
 
-  return { el: root, update };
+  /** Stop the size watch and any line or shape still moving once the canvas drops this view. */
+  function destroy(): void {
+    observer?.disconnect();
+    observer = null;
+    for (const anim of tension?.anims ?? []) anim.cancel();
+    cancelAnimations(root);
+  }
+
+  return { el: root, update, destroy };
 }
