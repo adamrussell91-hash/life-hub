@@ -5242,6 +5242,12 @@
   background: var(--glass);
   color: var(--ink);
   text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.career-scan__source-chip:hover,
+a.career-scan__source-chip:focus-visible {
+  border-color: var(--ink);
 }
 
 .career-scan__title {
