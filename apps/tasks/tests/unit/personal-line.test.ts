@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Program } from '@/schemas/program';
 import { catalogPrograms } from '@/domain/programs-seed';
 import { buildLineSnapshot } from '@/personal-line/model';
 import { linesForSubjects, yearLineName } from '@/personal-line/lines';
@@ -44,6 +45,19 @@ describe('personal line', () => {
       ['basis', 'close', 'cost', 'description', 'due', 'entry', 'entry_route', 'format', 'id', 'length', 'level', 'link', 'location', 'matched', 'name', 'on', 'organiser', 'provider', 'run', 'settings', 'subjects', 'type', 'window', 'years'].sort()
     );
     expect(terms.map((term) => term.id)).toEqual(['T1', 'T2', 'T3', 'T4']);
+  });
+
+  it('copes with stored programs saved before subjects, settings or age groups existed', () => {
+    const programs = catalogPrograms().map((program, i) => {
+      const old: Record<string, unknown> = { ...program };
+      delete old.settings;
+      if (i === 0) delete old.subjects;
+      if (i === 1) delete old.age_groups;
+      return old as unknown as Program;
+    });
+    const snap = buildLineSnapshot(programs, { studentYear: 10, subjects: ['Economics'], year: 2026, terms });
+    expect(snap.items.length).toBeGreaterThan(0);
+    expect(snap.items.every((item) => Array.isArray(item.settings) && item.settings.length === 0)).toBe(true);
   });
 });
 
