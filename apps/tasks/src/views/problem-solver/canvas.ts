@@ -144,7 +144,7 @@ function createFrameView(): { el: HTMLElement; update(session: PsSession): void 
         group.dataset.state = state;
       });
       count.textContent = `${FRAME_QUESTIONS.filter(([key]) => session.frame[key]).length} of 3 answered`;
-      const tool = session.suggestion && session.suggestion.kind !== 'next_step' ? session.suggestion.tool : null;
+      const tool = session.suggestion?.kind === 'next_tool' || session.suggestion?.kind === 'switch_tool' ? session.suggestion.tool : null;
       const coreArt = drawing.querySelector('.ps-frame__core > g')!;
       if (coreArt.getAttribute('data-tool') !== String(tool)) {
         coreArt.setAttribute('data-tool', String(tool));

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mountCoachPanel, renderCoachPanel } from '@/views/problem-solver/coach-panel';
 import { createTrack, problemMedal } from '@/views/problem-solver/decor';
 import { mountCanvas } from '@/views/problem-solver/canvas';
-import { resumeTarget } from '@/views/problem-solver/view';
+import { reviewEntry } from '@/views/problem-solver/view';
 import type { PsSession } from '../../../../packages/problem-solver/types';
 
 const morph = vi.hoisted(() => vi.fn());
@@ -402,15 +402,36 @@ describe('session page scores', () => {
   });
 });
 
-describe('resumeTarget', () => {
-  it('returns the plan step only when it is the next step', () => {
-    expect(resumeTarget(session({ phase: 'implement' }), 'improve')).toBe('improve');
-    expect(resumeTarget(session({ phase: 'implement', model: { id: 'polya', reason: '' } }), 'improve')).toBe('evaluate');
+describe('reviewEntry', () => {
+  const live = { reviewTaskId: 'task-r' };
+  const waiting = { status: 'waiting' as const, due: '2026-11-02', returnTo: null, startedAt: null };
+  it('moves on into Improve from Implement when a review is live', () => {
+    expect(reviewEntry(session({ phase: 'implement', ...live }), 'improve')).toEqual({ kind: 'move', step: 'improve' });
   });
-  it('returns null when already there, past it, or not next', () => {
-    expect(resumeTarget(session({ phase: 'improve' }), 'improve')).toBeNull();
-    expect(resumeTarget(session({ phase: 'define' }), 'improve')).toBeNull();
-    expect(resumeTarget(session({ phase: 'implement' }), null)).toBeNull();
-    expect(resumeTarget(session({ model: null, phase: 'implement' }), 'improve')).toBeNull();
+  it('uses the polya Improve step', () => {
+    expect(reviewEntry(session({ phase: 'implement', model: { id: 'polya', reason: '' }, ...live }), 'improve')).toEqual({ kind: 'move', step: 'evaluate' });
+  });
+  it('starts the review in a waiting Improve', () => {
+    expect(reviewEntry(session({ phase: 'improve', reviewState: waiting, ...live }), 'improve')).toEqual({ kind: 'start', step: 'improve' });
+  });
+  it('reopens Improve from Document and once finished', () => {
+    expect(reviewEntry(session({ phase: 'document', ...live }), 'improve')).toEqual({ kind: 'reopen', step: 'improve' });
+    expect(reviewEntry(session({ phase: 'finished', status: 'finished', ...live }), 'improve')).toEqual({ kind: 'reopen', step: 'improve' });
+  });
+  it('counts a proposed or confirmed review proposal as live', () => {
+    const proposal = (status: 'proposed' | 'confirmed' | 'dismissed') => ({ reviewProposal: { title: 'Review', due: '2026-11-02', reason: '', status } });
+    expect(reviewEntry(session({ phase: 'implement', ...proposal('proposed') }), 'improve')?.kind).toBe('move');
+    expect(reviewEntry(session({ phase: 'implement', ...proposal('confirmed') }), 'improve')?.kind).toBe('move');
+    expect(reviewEntry(session({ phase: 'implement', ...proposal('dismissed') }), 'improve')).toBeNull();
+  });
+  it('returns null otherwise', () => {
+    expect(reviewEntry(session({ phase: 'implement', ...live }), 'define')).toBeNull();
+    expect(reviewEntry(session({ phase: 'implement', ...live }), null)).toBeNull();
+    expect(reviewEntry(session({ phase: 'implement' }), 'improve')).toBeNull();
+    expect(reviewEntry(session({ phase: 'improve', reviewState: { ...waiting, status: 'reviewing' }, ...live }), 'improve')).toBeNull();
+    expect(reviewEntry(session({ phase: 'document', reviewState: { ...waiting, status: 'done' }, ...live }), 'improve')).toBeNull();
+    expect(reviewEntry(session({ phase: 'define', detour: { from: 'improve', to: 'define', reason: 'r', at: '' }, ...live }), 'improve')).toBeNull();
+    expect(reviewEntry(session({ phase: 'decide', ...live }), 'improve')).toBeNull();
+    expect(reviewEntry(session({ phase: 'frame', model: null, ...live }), 'improve')).toBeNull();
   });
 });

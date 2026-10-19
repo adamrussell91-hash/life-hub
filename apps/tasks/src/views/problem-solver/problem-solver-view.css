@@ -259,5 +259,5 @@
   .ps-scope *, .ps-scope *::before, .ps-scope *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
 
-.ps-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 12px; background: var(--card); }
-.ps-resume__go { min-height: 44px; padding: 0 16px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--card); font: inherit; cursor: pointer; }
+.ps-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 12px; background: var(--ps-card); }
+.ps-resume__go { min-height: 44px; padding: 0 16px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--ps-paper); font: inherit; cursor: pointer; }
