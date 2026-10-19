@@ -158,3 +158,31 @@ test('a unit page is reviewed with its own notes shelf and no parent unit', asyn
   assert.doesNotMatch(seen[0].messages[0].content, /<unit>/);
   assert.equal(result.proposals[0].blockId, 'uh');
 });
+
+test('Ann opens a PDF attached to a note and quotes it; a PDF she did not open cannot be cited', async () => {
+  const { store, docs } = fixture();
+  const article = { id: 'article', title: 'Reading notes', body: 'My short summary.', area: 'notes', tags: [], origins: [], attachments: [{ id: 'attachment_study', kind: 'pdf', r2_key: 'notes/article/study.pdf', filename: 'study.pdf' }] };
+  const fetchImpl = async (url, init) => {
+    if (String(url).endsWith('/capture')) return new Response(JSON.stringify({ text: 'Pupils who drew a quokkaplane before reading recalled more of the passage.' }));
+    const id = decodeURIComponent(String(url).split('/contents/')[1] ?? '').replace(/^pages\/|\.json$/g, '');
+    return id === 'article' ? new Response(JSON.stringify({ sha: 's', encoding: 'base64', content: Buffer.from(JSON.stringify(article)).toString('base64') })) : new Response('{}', { status: 404 });
+  };
+  const quote = 'Pupils who drew a quokkaplane before reading recalled more';
+  const edit = { blockId: 'h1', path: 'content.text', oldStr: 'Warm up', newStr: 'Sketch it first', why: 'Drawing first helps recall.', source: { noteId: 'article', quote } };
+  const { complete, seen } = scripted([
+    [['read_note', { id: 'article' }]],
+    [['propose_edit', edit]],
+    [['read_note', { id: 'article', attachment: 'attachment_study' }]],
+    [['propose_edit', edit]],
+    [['finish', { summary: 'Grounded in the attached study.' }]]
+  ]);
+  const env = { GITHUB_TOKEN: 't', RESEARCH_KERNEL_SHARED_SECRET: 'k' };
+  const result = await runAlchemyAgent({ kind: 'lesson', id: 'l1', env, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
+  assert.match(toolResults(seen[1])[0].content, /"attachments":\[\{"id":"attachment_study","filename":"study.pdf"\}\]/);
+  const refused = toolResults(seen[2])[0];
+  assert.equal(refused.is_error, true);
+  assert.match(refused.content, /quote is not in the note or the PDFs/);
+  assert.match(toolResults(seen[3])[0].content, /drew a quokkaplane/);
+  assert.equal(result.proposals.length, 1);
+  assert.deepEqual(result.proposals[0].source, { noteId: 'article', title: 'Reading notes · study.pdf', quote });
+});

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { plainText, tarEntries, refreshNoteIndex, searchNotes, noteFilters, bestPassage, readNoteText, NOTE_INDEX_KEY } from '../../netlify/functions/_shared/alchemy-notes-index.mjs';
+import { plainText, tarEntries, refreshNoteIndex, searchNotes, noteFilters, bestPassage, readNoteText, readAttachmentText, NOTE_INDEX_KEY } from '../../netlify/functions/_shared/alchemy-notes-index.mjs';
 import { memoryAlchemyStore } from '../helpers/alchemy-store.js';
 
 /** A minimal ustar archive with a top folder, as GitHub's tarball has. */
@@ -113,4 +113,91 @@ test('reading a note returns live text in pages and refuses deleted notes', asyn
   assert.equal(second.text.length, 3000);
   assert.equal(second.next, null);
   assert.equal(await readNoteText('gone', { env, fetchImpl }), null);
+});
+
+// PDF attachments: the kernel's /capture stands in for Workers AI reading the file in R2.
+const kernelEnv = { GITHUB_TOKEN: 'test', RESEARCH_KERNEL_SHARED_SECRET: 'k' };
+const pdf = (pageId, filename) => ({ id: 'attachment_' + filename.replace(/\W/g, ''), kind: 'pdf', r2_key: `notes/${pageId}/${filename}`, filename, content_type: 'application/pdf' });
+const ARTICLE = 'Abstract. Students who sketched a quokkaplane diagram before reading recalled more. The effect held across three invented schools.';
+
+function withKernel({ fetchImpl }, texts, { fail = [] } = {}) {
+  const extracted = [];
+  const wrapped = async (url, init) => {
+    if (String(url).endsWith('/capture')) {
+      const { r2_key } = JSON.parse(init.body);
+      extracted.push(r2_key);
+      if (fail.includes(r2_key)) return new Response(JSON.stringify({ error: 'unreadable' }), { status: 502 });
+      return new Response(JSON.stringify({ text: texts[r2_key] ?? '' }));
+    }
+    return fetchImpl(url, init);
+  };
+  return { fetchImpl: wrapped, extracted };
+}
+
+test('a note is found by words only in its PDF, and the PDF is extracted once', async () => {
+  const pages = [
+    page('article', 'Reading notes', 'My summary of the drawing study.', { attachments: [pdf('article', 'study.pdf'), { id: 'img', kind: 'image', r2_key: 'notes/article/pic.png', filename: 'pic.png' }] }),
+    page('other', 'Other note', 'Nothing about diagrams here.')
+  ];
+  const store = memoryAlchemyStore();
+  const kernel = withKernel(archive(pages), { 'notes/article/study.pdf': ARTICLE });
+  const progress = [];
+  const docs = await refreshNoteIndex({ store, env: kernelEnv, fetchImpl: kernel.fetchImpl, onProgress: p => progress.push(p) });
+  assert.deepEqual(kernel.extracted, ['notes/article/study.pdf']);
+  assert.ok(progress.includes('Reading the PDFs attached to your notes'));
+  const [hit] = searchNotes(docs, { query: 'quokkaplane' });
+  assert.equal(hit.id, 'article');
+  assert.match(hit.passage, /sketched a quokkaplane diagram/);
+  assert.deepEqual(hit.passage_from, { attachment: 'attachment_studypdf', filename: 'study.pdf' });
+  assert.deepEqual(hit.attachments, [{ id: 'attachment_studypdf', filename: 'study.pdf', readable: true }]);
+  assert.equal(searchNotes(docs, { query: 'summary drawing' })[0].passage_from, undefined);
+
+  // Unchanged notes: no second extraction. A re-read note keeps its PDF text.
+  const again = withKernel(archive(pages), {});
+  await refreshNoteIndex({ store, env: kernelEnv, fetchImpl: again.fetchImpl });
+  pages[0] = { ...pages[0], body: 'Edited summary.', updated_at: '2026-10-09T00:00:00.000Z' };
+  const edited = withKernel(archive(pages), {});
+  const docs2 = await refreshNoteIndex({ store, env: kernelEnv, fetchImpl: edited.fetchImpl });
+  assert.deepEqual([...again.extracted, ...edited.extracted], []);
+  assert.equal(searchNotes(docs2, { query: 'quokkaplane' })[0].id, 'article');
+});
+
+test('PDF text waits when the kernel is unbound and a failed PDF is retried a day later', async () => {
+  const pages = [page('a', 'Note with PDFs', 'Short note.', { attachments: [pdf('a', 'good.pdf'), pdf('a', 'bad.pdf')] })];
+  const store = memoryAlchemyStore();
+  const unbound = withKernel(archive(pages), {});
+  const docs = await refreshNoteIndex({ store, env, fetchImpl: unbound.fetchImpl, now: Date.parse('2026-10-10T00:00:00Z') });
+  assert.deepEqual(unbound.extracted, []);
+  assert.deepEqual(docs[0].attachments.map(a => a.state), ['pending', 'pending']);
+
+  const texts = { 'notes/a/good.pdf': 'The zebrafinch protocol uses two prompts.' };
+  const first = withKernel(archive(pages), texts, { fail: ['notes/a/bad.pdf'] });
+  const filled = await refreshNoteIndex({ store, env: kernelEnv, fetchImpl: first.fetchImpl, now: Date.parse('2026-10-10T01:00:00Z') });
+  assert.deepEqual(filled[0].attachments.map(a => a.state), ['ok', 'failed']);
+  assert.equal(searchNotes(filled, { query: 'zebrafinch' })[0].id, 'a');
+
+  const soon = withKernel(archive(pages), texts);
+  await refreshNoteIndex({ store, env: kernelEnv, fetchImpl: soon.fetchImpl, now: Date.parse('2026-10-10T05:00:00Z') });
+  assert.deepEqual(soon.extracted, []);
+  const later = withKernel(archive(pages), { 'notes/a/bad.pdf': 'Recovered words.' });
+  const retried = await refreshNoteIndex({ store, env: kernelEnv, fetchImpl: later.fetchImpl, now: Date.parse('2026-10-11T02:00:00Z') });
+  assert.deepEqual(later.extracted, ['notes/a/bad.pdf']);
+  assert.deepEqual(retried[0].attachments.map(a => a.state), ['ok', 'ok']);
+});
+
+test('reading a PDF returns its text in pages, extracting it on demand', async () => {
+  const long = 'Invented article sentence. '.repeat(600);
+  const pages = [page('n', 'Note', 'Note body.', { attachments: [pdf('n', 'long.pdf')] }), page('gone', 'Gone', 'x', { status: 'trashed', attachments: [pdf('gone', 'x.pdf')] })];
+  const store = memoryAlchemyStore();
+  const kernel = withKernel(archive(pages), { 'notes/n/long.pdf': long });
+  const note = await readNoteText('n', { env: kernelEnv, fetchImpl: kernel.fetchImpl });
+  assert.deepEqual(note.attachments, [{ id: 'attachment_longpdf', filename: 'long.pdf' }]);
+  const first = await readAttachmentText('n', 'attachment_longpdf', { store, env: kernelEnv, fetchImpl: kernel.fetchImpl });
+  assert.deepEqual(first.attachment, { id: 'attachment_longpdf', filename: 'long.pdf' });
+  assert.equal(first.text.length, 12000);
+  const second = await readAttachmentText('n', 'long.pdf', { store, env: kernelEnv, fetchImpl: kernel.fetchImpl, offset: first.next });
+  assert.equal(second.offset, 12000);
+  assert.equal(kernel.extracted.length, 1);
+  assert.match((await readAttachmentText('n', 'missing', { store, env: kernelEnv, fetchImpl: kernel.fetchImpl })).error, /no PDF/);
+  assert.equal(await readAttachmentText('gone', 'attachment_xpdf', { store, env: kernelEnv, fetchImpl: kernel.fetchImpl }), null);
 });
