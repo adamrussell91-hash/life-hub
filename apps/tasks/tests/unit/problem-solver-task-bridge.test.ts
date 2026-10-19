@@ -12,6 +12,26 @@ describe('task bodies', () => {
       title: 'Draft the rota template', domain: 'life', due_date: '2026-10-24', description: 'From Problem Solver: Late rota', source: 'problem_solver', tags: ['problem-solver'], parent_project_id: 'proj-1'
     });
   });
+  it('a Kanban card tagged Doing becomes a task already in progress; other cards start open', () => {
+    const board = { id: 'k', tool: 'kanban', status: 'active', edges: [], nodes: [
+      { id: 'n1', slot: 'card:1', text: 'a', tag: 'doing', state: 'accepted', skills: [], turnId: 't' },
+      { id: 'n2', slot: 'card:2', text: 'b', tag: 'review', state: 'accepted', skills: [], turnId: 't' },
+      { id: 'n3', slot: 'card:3', text: 'c', tag: 'todo', state: 'accepted', skills: [], turnId: 't' }
+    ] };
+    const withBoard = { ...session, steps: { implement: { runs: [board], status: 'open', objection: null } } } as unknown as PsSession;
+    const edits = { title: 'Draft', due: null };
+    expect(taskBody(withBoard, edits, 'life', { runId: 'k', nodeId: 'n1' }).status).toBe('in_progress');
+    expect(taskBody(withBoard, edits, 'life', { runId: 'k', nodeId: 'n2' }).status).toBeUndefined();
+    expect(taskBody(withBoard, edits, 'life', { runId: 'k', nodeId: 'n3' }).status).toBeUndefined();
+  });
+  it('create sends the in-progress status for a Doing card', async () => {
+    const board = { id: 'k', tool: 'kanban', status: 'active', edges: [], nodes: [{ id: 'n1', slot: 'card:1', text: 'a', tag: 'doing', state: 'accepted', skills: [], turnId: 't' }] };
+    const withBoard = { ...session, steps: { implement: { runs: [board], status: 'open', objection: null } } } as unknown as PsSession;
+    const createTask = vi.fn().mockResolvedValue({ id: 'task-1' });
+    const bridge = createTaskBridge({ createTask, getTask: vi.fn(), domainFor: async () => 'life', confirm: vi.fn().mockResolvedValue(undefined), dismiss: vi.fn(), setReview: vi.fn() });
+    await bridge.create(withBoard, proposal, { title: 'Draft', due: null });
+    expect(createTask.mock.calls[0][0]).toMatchObject({ status: 'in_progress' });
+  });
   it('the review task carries review_at and the review tag', () => {
     expect(reviewBody(session, { title: 'Review: Late rota', due: '2026-11-02' }, 'life')).toMatchObject({ title: 'Review: Late rota', due_date: '2026-11-02', review_at: '2026-11-02', tags: ['problem-solver', 'review'] });
   });

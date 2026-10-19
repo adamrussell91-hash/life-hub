@@ -338,6 +338,9 @@ export function createFifteenPercentView(doc: Document = document): FifteenPerce
     // Reads first: where each pill stands now, before anything moves.
     const before = new Map<string, DOMRect>();
     if (painted) for (const [id, pill] of pills) if (wanted.has(id) && pill.item.isConnected) before.set(id, pill.item.getBoundingClientRect());
+    // Moving an element drops its focus: remember what had it, to give it back after the writes.
+    const active = doc.activeElement;
+    const focused = active instanceof HTMLElement && active !== root && root.contains(active) ? active : null;
 
     for (const id of [...pills.keys()]) if (!wanted.has(id)) dropPill(id);
 
@@ -384,20 +387,20 @@ export function createFifteenPercentView(doc: Document = document): FifteenPerce
     cards.forEach((card, i) => {
       if (panel.children[i] !== card) panel.insertBefore(card, panel.children[i] ?? null);
     });
+    if (focused?.isConnected && doc.activeElement !== focused) focused.focus({ preventScroll: true });
 
     if (painted) {
-      // Reads, all of them, before any motion is written.
+      // An interrupted roll still offsets its pill: stop every one first (the before rects already
+      // hold where they are drawn), then read all the new places, then write the motion.
+      const moving = [...before.keys()].map((id) => pills.get(id)).filter(Boolean) as Pill[];
+      for (const pill of moving) cancelAnimations(pill.item);
       const after = new Map<Pill, DOMRect>();
-      for (const [id, rect] of before) {
-        const pill = pills.get(id);
-        if (pill) after.set(pill, pill.item.getBoundingClientRect());
-      }
+      for (const pill of moving) after.set(pill, pill.item.getBoundingClientRect());
       for (const [pill, rect] of after) {
         const was = before.get(pill.node.id)!;
         const dx = was.left + was.width / 2 - (rect.left + rect.width / 2);
         const dy = was.top + was.height / 2 - (rect.top + rect.height / 2);
         if ((Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) || !canAnimate(pill.item)) continue;
-        cancelAnimations(pill.item);
         pill.item.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 620, easing: EASE });
         // Rolling between Now and Go: a quarter turn on the inner wrapper.
         if (moved.has(pill)) pill.roll.animate([{ transform: `rotate(${pill.chosen ? -90 : 90}deg)` }, { transform: 'none' }], { duration: 620, easing: EASE });

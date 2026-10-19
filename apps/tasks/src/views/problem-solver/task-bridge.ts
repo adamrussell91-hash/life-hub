@@ -15,8 +15,22 @@ type Deps = {
 
 const projectOf = (session: PsSession) => session.links.find((link) => link.kind === 'project')?.id ?? null;
 
-export function taskBody(session: PsSession, edits: TaskEdits, domain: string): Record<string, unknown> {
+/**
+ * The status a new task starts in. A Kanban card the coach placed in Doing is work already under
+ * way, so its task starts in progress (and stays in Doing on the chart); every other card, Review
+ * included (the Tasks hub has no review status), starts open.
+ */
+function startStatus(session: PsSession, source: PsProposedTask['source'] | undefined): string | null {
+  if (!source) return null;
+  const run = Object.values(session.steps ?? {}).flatMap((step) => step.runs).find((item) => item.id === source.runId);
+  const node = run?.tool === 'kanban' ? run.nodes.find((item) => item.id === source.nodeId) : undefined;
+  return node?.tag === 'doing' ? 'in_progress' : null;
+}
+
+export function taskBody(session: PsSession, edits: TaskEdits, domain: string, source?: PsProposedTask['source']): Record<string, unknown> {
+  const status = startStatus(session, source);
   return {
+    ...(status ? { status } : {}),
     title: edits.title.trim().slice(0, 120),
     domain,
     due_date: edits.due,
@@ -78,7 +92,7 @@ export function createTaskBridge(deps: Deps) {
     async create(session: PsSession, proposal: PsProposedTask, edits: TaskEdits): Promise<void> {
       let taskId = created.get(proposal.id);
       if (!taskId) {
-        taskId = (await deps.createTask(taskBody(session, edits, await deps.domainFor(session)))).id;
+        taskId = (await deps.createTask(taskBody(session, edits, await deps.domainFor(session), proposal.source))).id;
         created.set(proposal.id, taskId);
       }
       try {

@@ -12,6 +12,7 @@
 // through, with "Task removed"; an unknown status keeps the last known place. Unlinked cards
 // stay where the coach put them. A card with a pending proposal (setProposed) says so.
 // With `wip` placed, a badge on the Doing heading gives the limit, and says when Doing is over it.
+// Only Doing's own cards count: Review cards wait at the review stop and are not in progress.
 // Details open in one panel under the board, so an open card never stretches a column.
 // Phone (the root up to 560px wide): the columns stack, each a heading over a wrapping row of pills.
 import type { PsNode, PsTaskLink, PsToolRun } from '../types';
@@ -238,9 +239,9 @@ export function createKanbanView(doc: Document = document): KanbanView {
 
     const taskWords = removed ? ', task removed' : linked ? (label ? `, task: ${label}` : ', task') : waiting ? ', proposed task' : '';
     setAttr(card.button, 'aria-label', `Card ${indexOf(node)}: ${nodeTitle(node)}${taskWords}${contested(node)}. Show details`);
-    const key = keyOf(node);
+    const key = `${keyOf(node)}\u0001${column}`;
     if (card.cardKey !== key) {
-      card.card.replaceChildren(...detailsCard(doc, node, PILL_FILL[tagOf(node)], card.card.id).childNodes);
+      card.card.replaceChildren(...detailsCard(doc, node, PILL_FILL[column], card.card.id).childNodes);
       card.cardKey = key;
     }
     syncContested(card.item, node, card.head, card.button);
@@ -287,7 +288,7 @@ export function createKanbanView(doc: Document = document): KanbanView {
     // Never colour alone: the words change when Doing is over the limit (the count never splits).
     const words = limit === null ? nodeTitle(node) : over ? `Over limit (${doing}\u00a0of\u00a0${limit})` : `Limit ${limit}`;
     setText(wip.text, words);
-    setAttr(wip.button, 'aria-label', `Work in progress: ${words}${limit !== null && !over ? `, ${doing} in Doing` : ''}${contested(node)}. Show details`);
+    setAttr(wip.button, 'aria-label', `Work in progress: ${words}${limit !== null && !over ? `, ${doing} in Doing` : ''}, Review cards not counted${contested(node)}. Show details`);
     const key = keyOf(node);
     if (wip.cardKey !== key) {
       wip.card.replaceChildren(...detailsCard(doc, node, 'blue', wip.card.id).childNodes);
@@ -313,6 +314,9 @@ export function createKanbanView(doc: Document = document): KanbanView {
     // Reads first: where each card stands now, before anything moves.
     const before = new Map<Card, DOMRect>();
     if (painted) for (const [id, card] of cards) if (wanted.has(id) && card.item.isConnected) before.set(card, card.item.getBoundingClientRect());
+    // Moving an element drops its focus: remember what had it, to give it back after the writes.
+    const active = doc.activeElement;
+    const focused = active instanceof HTMLElement && active !== root && root.contains(active) ? active : null;
 
     for (const id of [...cards.keys()]) if (!wanted.has(id)) dropCard(id);
 
@@ -320,7 +324,6 @@ export function createKanbanView(doc: Document = document): KanbanView {
     /** Cards placed by their first known status: they arrive there still. */
     const still = new Set<Card>();
     let moved = false;
-    const touched = new Set<HTMLDivElement>();
     for (const node of nodes) {
       let card = cards.get(node.id);
       if (!card) {
@@ -336,11 +339,10 @@ export function createKanbanView(doc: Document = document): KanbanView {
         if (snap) still.add(card);
         else if (card.item.parentElement) moved = true;
         target.append(card.item);
-        touched.add(target);
       }
     }
-    // Keep each lane in slot order (only lanes that changed).
-    for (const target of touched) {
+    // Keep each lane in slot order (a card can also change slot on another device).
+    for (const target of lanes.values()) {
       const items = [...target.children] as HTMLDivElement[];
       const sorted = [...items].sort((a, b) => Number(a.style.order) - Number(b.style.order));
       const at = sorted.findIndex((item, i) => items[i] !== item);
@@ -354,19 +356,22 @@ export function createKanbanView(doc: Document = document): KanbanView {
     order.forEach((card, i) => {
       if (panel.children[i] !== card) panel.insertBefore(card, panel.children[i] ?? null);
     });
+    if (focused?.isConnected && doc.activeElement !== focused) focused.focus({ preventScroll: true });
 
     // A change made only of first-known statuses (a saved board's statuses arriving) draws still.
     const quiet = still.size > 0 && !moved && !fresh.length;
     if (painted && !quiet) {
-      // Reads, all of them, before any motion is written.
+      // An interrupted move still offsets its card: stop every one first (the before rects already
+      // hold where they are drawn), then read all the new places, then write the motion.
+      const moving = [...before.keys()].filter((card) => !still.has(card));
+      for (const card of moving) cancelAnimations(card.item);
       const after = new Map<Card, DOMRect>();
-      for (const card of before.keys()) if (!still.has(card)) after.set(card, card.item.getBoundingClientRect());
+      for (const card of moving) after.set(card, card.item.getBoundingClientRect());
       for (const [card, rect] of after) {
         const was = before.get(card)!;
         const dx = was.left + was.width / 2 - (rect.left + rect.width / 2);
         const dy = was.top + was.height / 2 - (rect.top + rect.height / 2);
         if ((Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) || !canAnimate(card.item)) continue;
-        cancelAnimations(card.item);
         card.item.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 520, easing: EASE });
       }
       for (const card of fresh) {
