@@ -49,3 +49,22 @@ export function addEdge(run, edge) {
 export function isComplete(run) {
   return toolDef(run.tool).complete(run);
 }
+
+function invalidScores(message) {
+  return Object.assign(new Error(message), { code: 'invalid_scores' });
+}
+
+/**
+ * Returns a new run with a timestamped score snapshot appended under the tool's
+ * `scoreKey` (default `scores`). Throws `invalid_scores` with the tool's message.
+ */
+export function applyScores(run, payload, at) {
+  const def = toolDef(run.tool);
+  if (typeof def.validateScores !== 'function') throw invalidScores(`${def.name} takes no scores.`);
+  const data = typeof def.pickScores === 'function' ? def.pickScores(payload) : { ...payload };
+  const problem = def.validateScores(run, data);
+  if (problem) throw invalidScores(problem);
+  const key = def.scoreKey ?? 'scores';
+  const prior = run[key]?.snapshots ?? [];
+  return { ...run, [key]: { ...(run[key] ?? {}), snapshots: [...prior, { at, ...structuredClone(data) }] } };
+}
