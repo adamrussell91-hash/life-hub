@@ -8,6 +8,12 @@ export const smart = Object.freeze({
   name: 'SMART objectives',
   kind: 'objectives',
   when: 'Last in Define: turn the defined problem into goals that can be acted on.',
+  step: 'define',
+  failureModes: [
+    'Attainable and Relevant asserted rather than tested.',
+    'A measure with no baseline or target number.',
+    'No date, or a date with no reason.'
+  ],
   steps: [
     { id: 'define', title: 'Define the problem', prompt: 'Make the problem statement specific and measurable, including the issue scope and impact.' },
     { id: 'goals', title: 'Set SMART goals', prompt: 'Specific: who is involved, what, where. Measurable: concrete indicators of progress and success. Attainable: within resources and timeframe. Relevant: aligned with wider objectives and values. Time-based: deadlines.' }
