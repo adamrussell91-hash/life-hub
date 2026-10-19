@@ -1,4 +1,3 @@
-import { startPassiveAlchemyApp } from '@/alchemy/passive-app';
 import 'katex/dist/katex.min.css';
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { apiGet, ApiClientError } from '@/api/client';
@@ -1099,7 +1098,6 @@ async function handleRoute(match: RouteMatch): Promise<void> {
 }
 
 async function init(): Promise<void> {
-  startPassiveAlchemyApp(() => session.authenticated);
   try {
     session = await fetchSession();
   } catch {

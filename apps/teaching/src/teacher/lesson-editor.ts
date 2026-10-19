@@ -674,7 +674,21 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     });
 
     alchemyLab = mountAlchemyLabPanel(labHost, {
-      onHide: () => setChatShelved(true)
+      onHide: () => setChatShelved(true),
+      agent: {
+        kind: 'lesson',
+        id: lesson.id,
+        getEntity: () => lesson,
+        flush: async () => {
+          await saveController?.flush();
+          if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes before asking Ann.');
+        },
+        apply: async (next) => {
+          assignLesson(next as Lesson); page?.update(lesson); markDirty();
+          await saveController?.saveNow({ checkpointReason: 'ai_accepted' });
+          if (saveController?.getState() === 'save_failed') throw new Error('The edit is on the page but could not be saved. Retry Save.');
+        }
+      }
     });
 
     syncAiSelection();
@@ -837,7 +851,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     blockAssistant = mountBlockAssistant({
       host: builder, kind: 'lesson', id: lesson.id, getEntity: () => lesson,
-      unit: curriculum.units.find(unit => unit.id === lesson.unit_id),
       flush: async () => {
         await saveController?.flush();
         if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes before asking Ann.');
