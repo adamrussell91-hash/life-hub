@@ -130,7 +130,7 @@ describe('Double-loop learning view', () => {
     button(view, 'governing').click();
     for (const id of ['g2', 'rf', 'm']) expect(view.el.querySelectorAll(`[data-for="${id}"]`).length).toBeGreaterThan(0);
     view.update(dl([P, S, RY, G1]));
-    for (const id of ['g2', 'rf', 'st', 't', 'm']) expect(view.el.querySelectorAll(`[data-node="${id}"], [data-for="${id}"], [data-edge*="${id}"]`).length).toBe(0);
+    for (const id of ['g2', 'rf', 'st', 't', 'm']) expect(view.el.querySelectorAll(`[data-node~="${id}"], [data-for="${id}"], [data-edge*="${id}"]`).length).toBe(0);
     expect(box(view, 'governing').getAttribute('data-node')).toBe('g1');
     expect(box(view, 'solution').hasAttribute('data-node')).toBe(false);
     expect(button(view, 'solution').disabled).toBe(true);
@@ -146,6 +146,15 @@ describe('Double-loop learning view', () => {
     expect(loop(view, 'outer').getAttribute('data-drawn')).toBe('true');
     expect(arrow(view, 'mismatch').getAttribute('data-lit')).toBe('true');
     expect(arrow(view, 'match').getAttribute('data-lit')).toBe('false');
+  });
+
+  it('lights the Match arrow once the recurring branch reaches its monitor, not before', () => {
+    const view = createDoubleLoopView();
+    view.update(dl(FULL.slice(0, -1)));
+    expect(arrow(view, 'match').getAttribute('data-lit')).toBe('false');
+    view.update(dl(FULL));
+    expect(view.el.querySelector('[data-arrow="match"][data-lit="true"]')).not.toBeNull();
+    expect(loop(view, 'outer').getAttribute('data-drawn')).toBe('true');
   });
 
   it('lights the Match arrow and leaves the outer loop faint when it held', () => {
@@ -236,8 +245,11 @@ describe('Double-loop learning view', () => {
     expect(items.map((item) => item.querySelector('.ps-dloop__key-code')!.textContent)).toEqual(['P', 'A', 'C', 'G', 'S']);
     expect(items[1].querySelector('.ps-dloop__key-title')!.textContent).toBe('Fixed by hand');
     expect(items[2].disabled).toBe(true);
+    document.body.append(view.el);
     items[1].click();
     expect(button(view, 'action').getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(button(view, 'action'));
+    view.el.remove();
     expect(items[1].classList.contains('is-open')).toBe(true);
   });
 
