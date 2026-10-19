@@ -214,7 +214,8 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
   }
 
   function openChart(target: { runId: string; via: 'step' | 'film'; from: HTMLElement } | null): void {
-    const from = rectOf(target?.from ?? host.querySelector('.ps-record__step[data-state]:not([data-state="future"])'));
+    const back = last ? shownRun(last)?.id ?? '' : '';
+    const from = rectOf(target?.from ?? record.anchor(back, 'step') ?? host.querySelector('.ps-record__step[data-state="current"]'));
     mode = 'chart';
     pinned = target ? { runId: target.runId, via: target.via } : null;
     const chart = render();

@@ -5,6 +5,9 @@ import { createTrack, problemMedal } from '@/views/problem-solver/decor';
 import { mountCanvas } from '@/views/problem-solver/canvas';
 import type { PsSession } from '../../../../packages/problem-solver/types';
 
+const morph = vi.hoisted(() => vi.fn());
+vi.mock('../../design-kit/js/morphing-dialog.js', () => ({ morphFromRect: morph }));
+
 function session(extra: Partial<PsSession> = {}): PsSession {
   return {
     id: 's1', title: 'Late rota', revision: 3, kind: 'full', status: 'active', phase: 'define',
@@ -167,6 +170,25 @@ describe('canvas record', () => {
     host.querySelector<HTMLButtonElement>('[data-run="r1"] button')!.click();
     expect(host.querySelector('.ps-whys')).not.toBeNull();
     expect(host.querySelector('.ps-canvas__toggle')!.textContent).toBe('Back to record');
+  });
+
+  it('morphs Back to chart from the current step box, not the first done step', () => {
+    const host = document.createElement('div');
+    const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return { width: 10, height: 10, top: 0, left: 0, right: 10, bottom: 10, x: 0, y: 0, el: this, toJSON: () => ({}) } as unknown as DOMRect;
+    });
+    try {
+      const canvas = mountCanvas(host);
+      canvas.update(session({ phase: 'analyse', steps: { ...runs('done'), analyse: { runs: [{ id: 'r9', tool: 'problem_tree', status: 'active', nodes: [], edges: [] }], status: 'open', objection: null } } }));
+      host.querySelector<HTMLButtonElement>('.ps-canvas__toggle')!.click();
+      expect(host.querySelector('.ps-record')).not.toBeNull();
+      morph.mockClear();
+      host.querySelector<HTMLButtonElement>('.ps-canvas__toggle')!.click();
+      expect(morph).toHaveBeenCalledTimes(1);
+      expect((morph.mock.calls[0]![0] as unknown as { el: Element }).el.getAttribute('data-step')).toBe('analyse');
+    } finally {
+      rect.mockRestore();
+    }
   });
 
   it('shows the active chart during define with a Record toggle, and switches to the record when defined', () => {

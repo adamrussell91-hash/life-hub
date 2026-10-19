@@ -145,20 +145,26 @@ export function createRecordView(doc: Document = document): RecordView {
     item.setAttribute('data-state', state);
     position?.(item);
     const words = { done: 'Done', skipped: 'Skipped', current: 'In progress', future: 'Not started' }[state];
-    const label = `${step.name}: ${step.detail}. ${words}`;
-    const target = stepRun(session, step.id);
     const objection = session.steps?.[step.id]?.objection;
+    const objected = objection ? `Coach objected: ${objection}` : '';
+    const label = `${step.name}: ${step.detail}. ${words}${objected ? `. ${objected}` : ''}`;
+    const target = stepRun(session, step.id);
     const box = doc.createElement(target ? 'button' : 'div') as HTMLElement;
     box.className = 'ps-record__box';
     if (target) {
+      // A button names itself; the list item stays unlabelled so the step is not read twice.
       (box as HTMLButtonElement).type = 'button';
       box.setAttribute('aria-label', `${label}. Show the chart`);
       box.addEventListener('click', () => open(target.id, item));
     } else {
-      box.setAttribute('aria-label', label);
+      // A plain div's aria-label is ignored by screen readers, so the list item carries it.
+      item.setAttribute('aria-label', label);
     }
-    if (objection) box.setAttribute('title', `Coach objected: ${objection}`);
     box.append(span('ps-record__name', step.name), span('ps-record__detail', step.detail));
+    if (objected) {
+      box.setAttribute('title', objected);
+      box.append(span('ps-record__objection', objected));
+    }
     item.append(box);
     return item;
   }
@@ -174,7 +180,6 @@ export function createRecordView(doc: Document = document): RecordView {
     map.setAttribute('aria-label', model.name);
     map.style.aspectRatio = `${W} / ${layout.h}`;
     map.append(arrowsSvg(layout));
-    stepEls.clear();
     for (const box of layout.boxes) {
       const step = model.steps.find((s: { id: string }) => s.id === box.step);
       if (!step) continue;
@@ -222,7 +227,6 @@ export function createRecordView(doc: Document = document): RecordView {
 
   function paintFilm(session: PsSession): HTMLElement | null {
     cards.clear();
-    runStep.clear();
     if (!session.model) return null;
     const modelId = session.model.id;
     const wrap = doc.createElement('div');
@@ -263,9 +267,15 @@ export function createRecordView(doc: Document = document): RecordView {
   }
 
   function update(session: PsSession): void {
-    const signature = JSON.stringify([session.model?.id, session.phase, Object.entries(session.steps ?? {}).map(([id, st]) => [id, st.status, st.objection, st.runs.map((run) => [run.id, run.status, run.switchReason, run.nodes.length])])]);
+    const signature = JSON.stringify([session.model?.id, session.phase, Object.entries(session.steps ?? {}).map(([id, st]) => [id, st.status, st.objection, st.runs.map((run) => [run.id, run.tool, run.status, run.switchReason, run.nodes.length])])]);
     if (signature === painted) return;
     painted = signature;
+    stepEls.clear();
+    runStep.clear();
+    const layout = session.model ? LAYOUTS[session.model.id] : undefined;
+    const inset = layout ? Math.min(...layout.boxes.map((box) => box.x)) : 0;
+    // A fraction of the grid width; the CSS multiplies it by the diagram's rendered width.
+    root.style.setProperty('--ps-record-inset', (inset / W).toFixed(4));
     const parts = [paintMap(session), paintExtras(session), paintFilm(session)].filter((part): part is HTMLElement => !!part);
     root.replaceChildren(...parts);
   }
