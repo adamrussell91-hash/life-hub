@@ -74,6 +74,23 @@ describe('process record', () => {
   it('shows a skipped step\'s objection as its tooltip', () => {
     const view = createRecordView();
     view.update(session());
-    expect(view.el.querySelector('[data-step="analyse"] .ps-record__box')!.getAttribute('title')).toBe('Coach objected: No causes mapped.');
+    const step = view.el.querySelector('[data-step="analyse"]')!;
+    const box = step.querySelector('.ps-record__box')!;
+    expect(box.getAttribute('title')).toBe('Coach objected: No causes mapped.');
+    expect(box.querySelector('.ps-record__objection')!.textContent).toBe('Coach objected: No causes mapped.');
+    expect(box.hasAttribute('aria-label')).toBe(false);
+    expect(step.getAttribute('aria-label')).toBe('Analyse: Problem analysis. Skipped. Coach objected: No causes mapped.');
+  });
+
+  it('repaints when a run changes tool, and indents extras and strips to the diagram column', () => {
+    const view = createRecordView();
+    const s = session();
+    view.update(s);
+    expect(view.el.style.getPropertyValue('--ps-record-inset')).toBe((10 / 360).toFixed(4));
+    const swapped = { ...s, steps: { ...s.steps, devise: { ...s.steps.devise!, runs: [run('r4', 'smart', 'active')] } } } as PsSession;
+    view.update(swapped);
+    expect(view.el.querySelector('[data-run="r4"]')!.textContent).toContain('SMART');
+    view.update(session({ model: { id: 'polya', reason: '' }, phase: 'identify', steps: {} }));
+    expect(view.el.style.getPropertyValue('--ps-record-inset')).toBe((60 / 360).toFixed(4));
   });
 });

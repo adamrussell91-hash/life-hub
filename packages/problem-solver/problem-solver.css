@@ -950,7 +950,14 @@
 /* Process record (toolkit p.37, p.21, p.23): black and white only. Step boxes are
    HTML placed in % over an SVG of arrows on the same grid; text scales with the
    container (cqw) and never drops below 12px. */
-.ps-record { display: flex; flex-direction: column; gap: var(--space-5); color: var(--ink); }
+.ps-record {
+  --ps-record-map-width: min(100cqw, 460px); /* matches .ps-record__map's width */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  container-type: inline-size;
+  color: var(--ink);
+}
 
 .ps-record__map {
   position: relative;
@@ -1040,13 +1047,27 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-record__card.is-switched .ps-record__card-button { border-style: dashed; opacity: 0.5; }
 .ps-record__step.is-skipped .ps-record__box { border-style: dashed; opacity: 0.45; }
 .ps-record__step.is-skipped .ps-record__name { text-decoration: line-through; text-decoration-thickness: 1px; }
-.ps-record__extras { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-record__objection {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: max(11px, 2.9cqw);
+  line-height: 1.2;
+  opacity: 0.8;
+}
+/* Diagram boxes hold about three lines, so the objection takes the detail's place
+   (the detail stays in the step's accessible label). */
+.ps-record__box:has(.ps-record__objection) .ps-record__detail { display: none; }
+/* Extras and filmstrips line up with the diagram's step column (set from the layout). */
+.ps-record__extras { display: flex; flex-wrap: wrap; gap: 8px; padding-inline-start: calc(var(--ps-record-map-width) * var(--ps-record-inset, 0)); }
 .ps-record__extras .ps-record__step { position: static; width: auto; height: auto; }
 .ps-record__extras .ps-record__box { padding: 8px 14px; }
 /* The extras row sits outside the map's container, so cqw sizes would follow the viewport. */
 .ps-record__extras .ps-record__name { font-size: 14px; }
 .ps-record__extras .ps-record__detail { font-size: 12px; }
-.ps-record__films { display: grid; gap: 14px; }
+.ps-record__extras .ps-record__objection { font-size: 11px; }
+.ps-record__films { display: grid; gap: 14px; padding-inline-start: calc(var(--ps-record-map-width) * var(--ps-record-inset, 0)); }
 .ps-record__strip-title { margin: 0 0 6px; font-size: 12px; letter-spacing: var(--tracking-caps); text-transform: uppercase; opacity: 0.78; }
 
 /* The chart opened from the record: colours fade in once the morph has landed. */
