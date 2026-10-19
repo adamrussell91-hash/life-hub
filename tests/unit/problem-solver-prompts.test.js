@@ -222,3 +222,11 @@ test('a review the person set aside reads as set aside, not to be proposed again
   const s = { ...inTool('five_whys'), updatedAt: '2026-10-19T10:00:00.000Z', proposedTasks: [], reviewProposal: { title: 'Review: x', due: '2026-11-02', reason: 'r', status: 'dismissed' }, reviewTaskId: null };
   assert.match(buildCoachPrompt(s).user, /REVIEW TASK: set aside by the person; do not propose again/);
 });
+
+test('a tool\'s promptNote reaches the coach under the active run', () => {
+  let s = inTool('after_action_review');
+  for (const [slot, text] of [['intended', 'Publish the rota a week ahead'], ['achieved', 'Three weeks out of four'], ['differences', 'One sick day stopped the sign-off']]) {
+    s = applyCoachTurn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, turn({ node: { slot, text } }), deps);
+  }
+  assert.match(buildCoachPrompt(s).user, /Note: .*longer than 6 words/);
+});

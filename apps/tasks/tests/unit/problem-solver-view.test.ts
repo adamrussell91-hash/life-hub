@@ -347,7 +347,7 @@ describe('landing tool shelf', () => {
     const { toolShelf } = await import('@/views/problem-solver/view');
     const shelf = toolShelf();
     const steps = [...shelf.querySelectorAll<HTMLElement>('[data-step]')].map((group) => group.dataset.step);
-    expect(steps).toEqual(['define', 'analyse', 'devise', 'decide', 'implement']);
+    expect(steps).toEqual(['define', 'analyse', 'devise', 'decide', 'implement', 'improve']);
     const analyse = shelf.querySelector('[data-step="analyse"]')!;
     expect(analyse.querySelector('h3')!.textContent).toBe('Analyse');
     const names = [...analyse.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
