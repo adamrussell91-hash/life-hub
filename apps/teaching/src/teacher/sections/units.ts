@@ -51,6 +51,7 @@ import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
+import { unitNetworkContext } from '@/teacher/network-context';
 
 export const UNITS_INDEX_GROUP_STORAGE_KEY = 'teaching-hub.units-index-group';
 export type UnitsIndexGroupBy = 'subject' | 'year';
@@ -916,15 +917,18 @@ function mountUnitPlanEditor(
     .filter((row): row is NonNullable<typeof row> => Boolean(row) && row!.status !== 'trashed')
     .map((row) => ({ id: row.id, title: row.title, href: withAppBase(`/lessons/${row.id}`) }));
 
+  const network = unitNetworkContext(options.curriculum, options.unit);
+
   const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
     blocks,
     allowCollectionAtRoot: true,
-    editorContext: { unitLessons },
+    editorContext: { unitLessons, network },
     idFactory: () => nextId(),
     renderPreview: (block) =>
       renderBlock(block, 'teacher', {
         pageBlocks: blocks,
         unitLessons,
+        network: unitNetworkContext(options.curriculum, options.unit),
         attachedOutcomes,
         anthology: anthologyData,
         onMakeAnthologyCards: (request) => {

@@ -77,8 +77,8 @@ export type NetLayout = {
 /* ── Geometry constants ─────────────────────────────────────────────── */
 
 export const NET_G = {
-  trunkStep: 34,
-  trunkPad: 17,
+  trunkStep: 40,
+  trunkPad: 18,
   detourGap: 12,
   detourStep: 14,
   lrGap: 24,
@@ -456,14 +456,16 @@ export function layoutNetwork(input: NetInput, orientation: Orientation): NetLay
     const r = Math.max(0, Math.min(rowCount - 1, input.now.row));
     const from = rowA[r]!;
     const to = rowA[r + 1] ?? termTop;
-    const along = from + Math.max(0, Math.min(1, input.now.frac)) * (to - from);
+    // Just past the unit's station, moving toward the next as the unit goes on.
+    const clear = half + 12;
+    const along = from + clear + Math.max(0, Math.min(1, input.now.frac)) * Math.max(0, to - from - 2 * clear);
     const mid = (corridorL + corridorR) / 2 + sh(r);
     const pt = P(along, mid);
     now = {
       x: pt.x, y: pt.y,
       label: vertical
         ? { x: corridorR + sh(r) + 10, y: pt.y + 4.5, anchor: 'start', text: input.now.label, maxW: 140, wrap: false }
-        : { x: pt.x, y: pt.y - 26, anchor: 'middle', text: input.now.label, maxW: 120, wrap: false }
+        : { x: pt.x + 12, y: pt.y - 12, anchor: 'start', text: input.now.label, maxW: 120, wrap: false }
     };
   }
 

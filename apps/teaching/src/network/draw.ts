@@ -23,7 +23,7 @@ const FONT = 'Inter, ui-sans-serif, sans-serif';
 const FONT_LABEL = `500 13px ${FONT}`;
 const FONT_UNIT = `650 14px ${FONT}`;
 const FONT_SMALL = `500 12px ${FONT}`;
-const FONT_BADGE = `700 10.5px ${FONT}`;
+const FONT_BADGE = `700 10px ${FONT}`;
 
 /* Same text fitting as the Tasks Lines chart kit. */
 const measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
@@ -138,7 +138,7 @@ function label(parent: Element, view: LabelView, font: string, fill: string, ext
 function badge(parent: Element, x: number, y: number, short: string, name: string, colour: string, mode: string, anchor: 'middle' | 'end'): void {
   const g = s('g', { class: 'net-badge' }, parent);
   s('title', {}, g).textContent = name;
-  const w = Math.max(22, Math.ceil(measureText(short, FONT_BADGE)) + 10);
+  const w = Math.max(22, Math.ceil(measureText(short, FONT_BADGE)) + 8);
   const left = anchor === 'middle' ? x - w / 2 : x - w;
   const style = mode === 'metro'
     ? `fill:${PAPER};stroke:${colour};stroke-width:2.4`
