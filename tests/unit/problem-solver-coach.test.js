@@ -50,6 +50,25 @@ test('over-long message is rewritten once, then trimmed', async () => {
   assert.ok(wordCount(turn.message) <= 60);
 });
 
+test('in frame, a suggestion without a model is dropped without a repair', async () => {
+  const calls = [];
+  const coach = createModelCoach(async (prompt) => { calls.push(prompt); return reply({ suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }); });
+  const turn = await coach(createSession({ text: 'Late work.' }, deps));
+  assert.equal(turn.suggestion, null);
+  assert.equal(calls.length, 1);
+});
+
+test('in frame, a next_step suggestion is dropped even when the model is set', async () => {
+  const model = { id: 'seven_step', reason: 'r' };
+  const frame = { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' };
+  const coach = createModelCoach(async () => reply({ frame, model, suggestion: { kind: 'next_step', reason: 'r' } }));
+  const turn = await coach(createSession({ text: 'Late work.' }, deps));
+  assert.equal(turn.suggestion, null);
+  assert.deepEqual(turn.model, model);
+  const keeps = createModelCoach(async () => reply({ frame, model, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }));
+  assert.deepEqual((await keeps(createSession({ text: 'Late work.' }, deps))).suggestion, { kind: 'next_tool', tool: 'five_whys', reason: 'r' });
+});
+
 test('scripted coach: asks the goal, fills the frame, then gatekeeps 5 Whys', async () => {
   let s = createSession({ text: 'The rota keeps changing late.' }, deps);
   s = applyCoachTurn(s, await scriptedCoach(s), deps);

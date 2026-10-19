@@ -106,6 +106,9 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
     update(session) {
       const stick = first || nearBottom();
       const busy = session.runner.status === 'queued' || session.runner.status === 'running';
+      // A failed boundary turn must be retried before anything else: the step has already moved.
+      const boundaryFailed = session.runner.status === 'failed' && session.runner.mode === 'boundary';
+      const locked = busy || boundaryFailed;
 
       for (const turn of session.turns) {
         if (shown.has(turn.id)) continue;
@@ -136,12 +139,12 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
         failed.append(el('span', '', session.runner.error ?? 'The coach could not answer.'), actionButton('Try again', 'retry', handlers));
         parts.push(failed);
       }
-      const card = suggestionCard(session, handlers);
+      const card = boundaryFailed ? null : suggestionCard(session, handlers);
       if (card) parts.push(card);
       const actions = el('div', 'ps-coach__actions');
-      if (session.pendingKeep && !busy) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
+      if (session.pendingKeep && !locked) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
       const inStep = Boolean(session.model && session.steps?.[session.phase]);
-      if (inStep && !busy) {
+      if (inStep && !locked) {
         const after = nextStepAfter(session.model!.id, session.phase);
         actions.append(actionButton(after ? `Move on to ${stepName(session.model!.id, after)}` : 'Finish', 'move_on', handlers));
       }
@@ -158,8 +161,8 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
       now.textContent = question >= 0 ? `Answering: ${prompts[question]}` : session.phase === 'finished' ? 'Problem finished' : stepLabel;
       now.dataset.q = String(question);
       input.placeholder = session.phase === 'finished' ? 'Add a note for next time…' : 'Your answer…';
-      input.disabled = busy;
-      send.disabled = busy;
+      input.disabled = locked;
+      send.disabled = locked;
 
       if (stick) list.scrollTop = list.scrollHeight;
       first = false;

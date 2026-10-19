@@ -54,6 +54,17 @@ test('boundary prompt names the step left and asks for the learning question', (
   assert.match(user, /PHASE: analyse/);
 });
 
+test('boundary prompt after skipping a step with no runs asks about the next step, not a learning', () => {
+  let s = applyCoachTurn(moveOn(inTool(), deps), turn({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'I rush.', deps), turn({ verdict: 'clarify', message: 'Noted.' }), deps);
+  s = moveOn(s, deps);
+  const { user } = buildCoachPrompt(s);
+  assert.match(user, /MODE: boundary/);
+  assert.doesNotMatch(user, /what they learned/i);
+  assert.match(user, /acknowledge/i);
+  assert.match(user, /what they want from Devise/);
+});
+
 test('after a boundary the prompt asks the coach to record the learning and open the step', () => {
   let s = applyCoachTurn(moveOn(inTool(), deps), turn({ verdict: 'clarify', message: 'What did you learn?' }), deps);
   s = say(s, 'I rush.', deps);
@@ -86,7 +97,9 @@ test('a step with no tools says so and never lists or suggests tools', () => {
 
 test('awaiting-learning line for a finished session has no orient clause', () => {
   let s = inTool('five_whys', 'polya');
-  for (const _ of [1, 2, 3, 4, 5]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  for (const _ of [1, 2, 3, 4]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  s = { ...s, steps: { ...s.steps, document: { ...s.steps.document, runs: [{ id: 'doc', tool: 'five_whys', status: 'active', nodes: [], edges: [] }] } } };
+  s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
   s = applyCoachTurn(s, turn({ verdict: 'clarify' }), deps);
   const line = buildCoachPrompt(s).user.split('\n').find((l) => l.startsWith('AWAITING LEARNING'));
   assert.ok(line);
