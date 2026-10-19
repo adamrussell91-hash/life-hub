@@ -2888,7 +2888,16 @@ export function createMockApi() {
             draft: {
               title: typeof input.title === 'string' ? input.title : 'Draft future',
               where: typeof input.where === 'string' ? input.where : null,
-              criteria: Array.isArray(input.criteria) ? input.criteria : []
+              // Mirrors the server's no-key fallback: starter criteria, marked Ann's.
+              criteria:
+                Array.isArray(input.criteria) && input.criteria.length
+                  ? input.criteria
+                  : [
+                      'Demonstrated leadership of teaching and learning practice',
+                      'Capacity to lead policy, programs and staff development',
+                      'Strong stakeholder communication with families and leaders'
+                    ].map((text, order) => ({ text, order, source: 'ann' })),
+              fallback: true
             }
           }
         });
