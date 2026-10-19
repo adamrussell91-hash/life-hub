@@ -146,7 +146,43 @@ export const SAMPLES = {
     node('n4', 'insight:4', 'It helps when the booking matches how long the hall is really used.', 'Honest bookings'),
     node('v5', 'view:5', 'Engines idle and car doors slam late into the evening.', 'Late noise'),
     node('r', 'reframe', 'How might the last session of the evening end, kit packed and hall empty, by the time the cleaner\'s shift begins, without cutting the children\'s playing time?')
-  ])
+  ]),
+  // A centre, four branches and nine items below them, one of them contested, and a review.
+  radial_tree: run(
+    'radial_tree',
+    [
+      node('root', 'root', 'Everything that goes into running the weekly repair café, broken down by area.', 'Repair café'),
+      node('b1', 'node:1', 'Getting broken items logged and matched to a fixer.', 'Intake'),
+      node('b2', 'node:2', 'The volunteer fixers and what they can mend.', 'Fixers'),
+      node('b3', 'node:3', 'The hall, tables, power and tools.', 'Venue and kit'),
+      node('b4', 'node:4', 'Telling people when and where it runs.', 'Publicity'),
+      node('d1', 'node:5', 'A paper queue at the door that no one keeps in order.', 'Door queue'),
+      node('d2', 'node:6', 'A sheet saying what was wrong and what was tried.', 'Repair notes'),
+      node('d3', 'node:7', 'Two electricians who can test lamps and kettles.', 'Electrical'),
+      node('d4', 'node:8', 'Menders who do clothes, bags and zips.', 'Sewing', { state: 'contested', objection: 'Sewing is a skill; the other items here are people. Mixing kinds blurs the level.' }),
+      node('d5', 'node:9', 'Bike repairs, which need the yard outside.', 'Bikes'),
+      node('d6', 'node:10', 'Extension leads, testers and the tool box.', 'Tools'),
+      node('d7', 'node:11', 'Notices in the library and the corner shop.', 'Posters'),
+      node('e1', 'node:12', 'A portable appliance tester borrowed each month.', 'PAT tester'),
+      node('e2', 'node:13', 'Spare fuses and plugs bought from the café tin.', 'Spare parts'),
+      node('rv', 'review', 'Fixers carry most of the tree and the venue hangs on one box of tools; publicity is thin, which may be why the same faces come each week.')
+    ],
+    [
+      { from: 'b1', to: 'root', kind: 'parent' },
+      { from: 'b2', to: 'root', kind: 'parent' },
+      { from: 'b3', to: 'root', kind: 'parent' },
+      { from: 'b4', to: 'root', kind: 'parent' },
+      { from: 'd1', to: 'b1', kind: 'parent' },
+      { from: 'd2', to: 'b1', kind: 'parent' },
+      { from: 'd3', to: 'b2', kind: 'parent' },
+      { from: 'd4', to: 'b2', kind: 'parent' },
+      { from: 'd5', to: 'b2', kind: 'parent' },
+      { from: 'd6', to: 'b3', kind: 'parent' },
+      { from: 'd7', to: 'b4', kind: 'parent' },
+      { from: 'e1', to: 'd6', kind: 'parent' },
+      { from: 'e2', to: 'd6', kind: 'parent' }
+    ]
+  )
 };
 
 // The causal map after one more turn: a fourth cause that eases the problem, and its links.
@@ -170,3 +206,13 @@ const step = (runs, status = 'done', objection = null) => ({ runs, status, objec
 SAMPLES.record = session('seven_step', 'devise', { define: step(chain), analyse: step([], 'skipped', 'No causes mapped.'), devise: step([], 'open') });
 SAMPLES.record_polya = session('polya', 'identify', { identify: step([chain[0], { ...chain[1], status: 'active' }], 'open') });
 SAMPLES.record_triz = session('triz', 'general_problem', { specific_problem: step(chain.slice(1)), general_problem: step([], 'open') });
+
+// The radial tree after one more turn: a new item under the fixers, so that branch widens.
+SAMPLES['radial_tree:next'] = {
+  ...SAMPLES.radial_tree,
+  nodes: [
+    ...SAMPLES.radial_tree.nodes,
+    node('d8', 'node:14', 'A volunteer who can sharpen knives and garden tools.', 'Sharpening')
+  ],
+  edges: [...SAMPLES.radial_tree.edges, { from: 'd8', to: 'b2', kind: 'parent' }]
+};
