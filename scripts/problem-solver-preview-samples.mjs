@@ -242,3 +242,25 @@ SAMPLES['force_field:next'] = {
     ]
   }
 };
+
+// From…to: a small lending library looking ahead. One row per trend direction, plus a
+// second growing trend, then the insight across the rows.
+SAMPLES.from_to = run('from_to', [
+  node('a1', 'aspect:1', 'Who comes through the door on a weekday.', 'Weekday visitors'),
+  node('t1', 'trend:1', 'More people work from home and want somewhere quiet nearby.', 'Remote workers', { tag: 'growing' }),
+  node('f1', 'from:1', 'Mostly retired readers in the mornings.', 'Morning readers'),
+  node('o1', 'to:1', 'A daytime quiet room for people working from home.', 'Quiet workspace'),
+  node('a2', 'aspect:2', 'How books reach readers.', 'Lending'),
+  node('t2', 'trend:2', 'Loans of printed books have held steady for five years.', 'Steady print loans', { tag: 'stable' }),
+  node('f2', 'from:2', 'Shelves arranged by subject, borrowed at the desk.', 'Desk lending'),
+  node('o2', 'to:2', 'Self-service lending with a small, rotating front shelf.', 'Self-service shelf'),
+  node('a3', 'aspect:3', 'Where the running money comes from.', 'Funding'),
+  node('t3', 'trend:3', 'The council grant shrinks a little every year.', 'Shrinking grant', { tag: 'declining', state: 'contested', objection: 'Is there a source for that, or is it last year only?' }),
+  node('f3', 'from:3', 'Almost all funding is the yearly council grant.', 'One grant'),
+  node('o3', 'to:3', 'A mix of grant, room hire and a friends scheme.', 'Mixed income'),
+  node('a4', 'aspect:4', 'What volunteers do.', 'Volunteers'),
+  node('t4', 'trend:4', 'Younger neighbours offer short, skilled stints.', 'Skilled short stints', { tag: 'growing' }),
+  node('f4', 'from:4', 'A small rota of long-serving volunteers at the desk.', 'Desk rota'),
+  node('o4', 'to:4', 'Short project roles: repair cafe, code club, story time.', 'Project roles'),
+  node('i', 'insight', 'Home working and skilled volunteers are both growing: a quiet room run by short-stint volunteers could earn room-hire income and offset the shrinking grant.', 'Grow into the gap')
+]);

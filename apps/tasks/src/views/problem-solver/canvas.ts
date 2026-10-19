@@ -11,6 +11,7 @@ import { createProblemStatementView } from '../../../../../packages/problem-solv
 import { createPerspectiveShiftView } from '../../../../../packages/problem-solver/render/perspective-shift';
 import { createRadialTreeView } from '../../../../../packages/problem-solver/render/radial-tree';
 import { createForceFieldView } from '../../../../../packages/problem-solver/render/force-field';
+import { createFromToView } from '../../../../../packages/problem-solver/render/from-to';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -39,7 +40,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   causal_map: () => createCausalMapView(),
   perspective_shift: () => createPerspectiveShiftView(),
   radial_tree: () => createRadialTreeView(),
-  force_field: () => createForceFieldView()
+  force_field: () => createForceFieldView(),
+  from_to: () => createFromToView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
