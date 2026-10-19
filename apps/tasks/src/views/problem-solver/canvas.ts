@@ -186,16 +186,17 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
   /** Live Tasks status per confirmed task id, fetched by the page (never stored on the session). */
   let statuses: Record<string, string> = {};
 
-  /** Hand the chart on screen its confirmed tasks and their live status. */
+  /** Hand the chart on screen its confirmed tasks with their live status, and its removed ones. */
   function pushTasks(): void {
     if (!last || !displayed) return;
     const runId = displayed;
     const run = allRunsOf(last).find((item) => item.id === runId);
     const view = run ? views.get(run.id) : undefined;
     if (!view?.setTasks) return;
+    // A task deleted in Tasks stays on the chart as removed (Decision 8); its status is never re-fetched.
     const links = (last.proposedTasks ?? [])
-      .filter((p) => p.status === 'confirmed' && p.taskId && p.source.runId === runId)
-      .map((p) => ({ nodeId: p.source.nodeId, taskId: p.taskId!, status: statuses[p.taskId!] ?? 'unknown' }));
+      .filter((p) => p.taskId && p.source.runId === runId && (p.status === 'confirmed' || (p.status === 'dismissed' && p.removed)))
+      .map((p) => ({ nodeId: p.source.nodeId, taskId: p.taskId!, status: p.status === 'dismissed' ? 'removed' : statuses[p.taskId!] ?? 'unknown' }));
     view.setTasks(links);
   }
 
