@@ -519,6 +519,13 @@ test('moving on while waiting marks Improve waiting and keeps the review open', 
   assert.equal(s.reviewState.status, 'waiting');
 });
 
+test('a boundary turn never records an objection on a waiting step', () => {
+  const left = moveOn(idle(moveOn(implementDone(), deps)), deps);
+  const s = applyCoachTurn(left, coach({ exitObjection: 'You skipped Improve.' }), deps);
+  assert.equal(s.steps.improve.status, 'waiting');
+  assert.equal(s.steps.improve.objection, null);
+});
+
 test('start_review in a waiting Improve starts it with the task snapshot', () => {
   let s = idle(moveOn(implementDone(), deps));
   s = startReview(s, { snapshot }, deps);
