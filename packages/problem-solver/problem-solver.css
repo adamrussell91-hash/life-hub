@@ -2219,6 +2219,194 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-force__bar, .ps-force__shape, .ps-force__tip { transition: none; }
 }
 
+/* From…to exploration (toolkit, Analyse): a blue square field with a row of red header
+   circles (Aspect, Trend, From…, To) and a row of yellow circles per aspect under them.
+   Circles touch edge to edge across and down, as in the book. The trend circle holds a red
+   arrow, axis-aligned as the book draws it (up growing, right stable, down declining), with
+   the trend's title in small type under it. The insight sits in full in a card below.
+   Phone: four smaller columns, titles clamped; a very narrow panel stacks each row as a card. */
+.ps-fromto {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+/* The field is square, as in the book, and grows past square once rows outrun it. */
+.ps-fromto__field {
+  container: fromto-field / inline-size;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 560px);
+  aspect-ratio: 1;
+  padding: 2.5%;
+  background: var(--ps-blue);
+}
+
+.ps-fromto__head,
+.ps-fromto__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.ps-fromto__head-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--ps-red);
+  color: #fff;
+  font: var(--weight-semibold) clamp(12px, 3.6cqw, 17px) / 1.2 var(--font-ui);
+}
+
+/* Each cell keeps its own column, so a row with a gap still lines up under its headers. */
+.ps-fromto__item { position: relative; grid-row: 1; min-width: 0; }
+.ps-fromto__item[data-col='aspect'] { grid-column: 1; }
+.ps-fromto__item[data-col='trend'] { grid-column: 2; }
+.ps-fromto__item[data-col='from'] { grid-column: 3; }
+.ps-fromto__item[data-col='to'] { grid-column: 4; }
+/* The focused or open circle rises above its neighbours so its whole ring shows. */
+.ps-fromto__item:has(.ps-fromto__cell:focus-visible),
+.ps-fromto__item.is-open { z-index: 2; }
+
+.ps-fromto__cell {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 10%;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 240ms var(--ps-ease);
+}
+
+.ps-fromto__cell:hover { filter: brightness(1.06); }
+.ps-fromto__cell:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.ps-fromto__item.is-open .ps-fromto__cell { box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+.ps-fromto__words { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; max-width: 100%; }
+
+.ps-fromto__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  opacity: 0.78;
+  white-space: nowrap;
+}
+
+.ps-fromto__title,
+.ps-fromto__trend-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-width: 100%;
+  font: var(--weight-semibold) clamp(12px, 2.8cqw, 15px) / 1.18 var(--font-ui);
+  text-wrap: balance;
+  /* Hyphenate a long word first; break it bare only when hyphenation can't. */
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.ps-fromto__trend-title { -webkit-line-clamp: 2; font-size: 12px; }
+
+/* The arrow turns to its direction; a change of tag turns it again. */
+.ps-fromto__arrow {
+  --turn: 0deg;
+  display: block;
+  width: 36%;
+  min-width: 22px;
+  aspect-ratio: 1;
+  /* A touch deeper than the header red, so the arrow keeps 3:1 against the yellow. */
+  color: color-mix(in srgb, var(--ps-red) 90%, #000);
+  transform: rotate(var(--turn));
+  transition: transform 480ms var(--ps-ease);
+}
+
+.ps-fromto__arrow svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.ps-fromto__item[data-direction='growing'] .ps-fromto__arrow { --turn: -90deg; }
+.ps-fromto__item[data-direction='declining'] .ps-fromto__arrow { --turn: 90deg; }
+/* No direction yet: a faint ink arrow pointing right, so it never reads as a red trend. */
+.ps-fromto__item--trend:not([data-direction]) .ps-fromto__arrow { color: var(--ps-on-yellow); opacity: 0.4; }
+
+.ps-fromto .ps-objection { margin-top: 2px; font-size: 9px; line-height: 1.5; }
+
+/* Details cards for the cells, under the field. */
+.ps-fromto__panel { display: contents; }
+.ps-fromto .ps-details { width: min(100%, 560px); }
+
+/* The insight, in full under the field. */
+.ps-fromto__insight {
+  box-sizing: border-box;
+  width: min(100%, 560px);
+  margin-top: 14px;
+  padding: 14px 18px 10px;
+  border-top: 3px solid var(--ps-red);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-fromto__insight-head { display: flex; align-items: center; gap: var(--space-2); }
+.ps-fromto__insight-meta { color: var(--muted); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-fromto__insight .ps-objection { margin-top: 0; color: var(--muted); }
+.ps-fromto__insight-text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+.ps-fromto__more { min-height: 44px; margin-top: 2px; padding: 0 2px; border: 0; background: none; color: var(--muted); font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui); cursor: pointer; }
+.ps-fromto__more:hover { color: var(--ink); }
+.ps-fromto__more:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; border-radius: 3px; }
+.ps-fromto__insight .ps-details { width: 100%; }
+.ps-fromto__insight .ps-details__card { margin-top: 0; padding: 0 0 8px; background: transparent; box-shadow: none; }
+
+/* Phone: four smaller circles. The headers name the columns, so the cells drop their meta
+   line; titles clamp to two lines, and a contested cell shows a small ink dot (the details
+   card and the button's name carry the objection). */
+@container (max-width: 520px) {
+  .ps-fromto__meta { display: none; }
+  .ps-fromto__cell { padding: 7%; }
+  .ps-fromto__title { -webkit-line-clamp: 2; font-size: 12px; }
+  .ps-fromto__arrow { width: 32%; }
+  .ps-fromto__cell .ps-objection {
+    width: 7px;
+    height: 7px;
+    margin-top: 3px;
+    padding: 0;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: none;
+    font-size: 0;
+    opacity: 1;
+  }
+}
+
+/* Very narrow: each row is a stacked card, aspect, then trend, then from → to. */
+@container (max-width: 339px) {
+  .ps-fromto__field { aspect-ratio: auto; gap: 10px; padding: 8px; }
+  .ps-fromto__head { display: none; }
+  .ps-fromto__row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: 'aspect aspect aspect' 'trend trend trend' 'from arrow to'; gap: 4px; }
+  .ps-fromto__row::after { content: '→'; grid-area: arrow; align-self: center; color: #fff; font: var(--weight-semibold) 16px / 1 var(--font-ui); }
+  .ps-fromto__item[data-col] { display: grid; grid-row: auto; grid-column: auto; }
+  .ps-fromto__item[data-col='aspect'] { grid-area: aspect; }
+  .ps-fromto__item[data-col='trend'] { grid-area: trend; }
+  .ps-fromto__item[data-col='from'] { grid-area: from; }
+  .ps-fromto__item[data-col='to'] { grid-area: to; }
+  .ps-fromto__cell { aspect-ratio: auto; min-height: 44px; padding: 8px 14px; border-radius: 22px; }
+  .ps-fromto__meta { display: block; }
+  .ps-fromto__item--trend .ps-fromto__words { flex-direction: row; gap: 8px; }
+  .ps-fromto__arrow { width: 22px; }
+  /* There is room for the full tag again. */
+  .ps-fromto__cell .ps-objection { width: auto; height: auto; margin-top: 2px; padding: 0 6px; border-radius: var(--radius-full); background: none; box-shadow: inset 0 0 0 1px currentColor; font-size: 9px; opacity: 0.8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-fromto__cell, .ps-fromto__arrow { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
