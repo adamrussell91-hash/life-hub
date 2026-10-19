@@ -18,19 +18,27 @@ import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nex
 export type ProblemReductionView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
 type Kind = 'problem' | 'priority' | 'sub' | 'solution' | 'integrated';
-type Region = Kind | 'in' | 'down' | 'out';
+type Region = 'problem' | 'priority' | 'lanes' | 'integrated';
 type ChevronKind = 'in' | 'down' | 'out';
+type LaneSlot = ChevronKind | 'sub' | 'solution';
 
-/** Book order, top to bottom: each region is a display: contents wrapper inside the chart grid. */
-const REGIONS: Region[] = ['problem', 'priority', 'in', 'sub', 'down', 'solution', 'out', 'integrated'];
-const REGION_NAME: Partial<Record<Region, string>> = { problem: 'problem', priority: 'priority', sub: 'subs', solution: 'solutions', integrated: 'integrated' };
-const REGION_LABEL: Partial<Record<Region, string>> = {
+/**
+ * Book order, top to bottom. Every region, lane and holder is a display: contents wrapper,
+ * so all circles and chevrons sit in the one chart grid. Each lane holds its sub, its
+ * solution and their chevrons in flow order, and the lanes sort by priority, so the DOM
+ * (and tab order) runs sub 1st, solution 1st, sub 2nd… on the phone's rows as on the wide chart.
+ */
+const REGIONS: Region[] = ['problem', 'priority', 'lanes', 'integrated'];
+const LANE_SLOTS: LaneSlot[] = ['in', 'sub', 'down', 'solution', 'out'];
+const REGION_NAME: Record<Region, string> = { problem: 'problem', priority: 'priority', lanes: 'lanes', integrated: 'integrated' };
+const REGION_LABEL: Record<Region, string> = {
   problem: 'The whole problem',
   priority: 'Order to tackle the parts',
-  sub: 'Smaller parts',
-  solution: 'Solutions to the parts',
+  lanes: 'Parts and their solutions',
   integrated: 'The whole solution'
 };
+/** Each sub and solution sits in a holder that names its row of the chart. */
+const HOLDER: Record<'sub' | 'solution', [string, string]> = { sub: ['subs', 'Smaller part'], solution: ['solutions', 'Solution to the part'] };
 const ACCENT: Record<Kind, Accent> = { problem: 'red', priority: 'yellow', sub: 'yellow', solution: 'blue', integrated: 'blue' };
 const KINDS: Kind[] = ['problem', 'priority', 'sub', 'solution', 'integrated'];
 const FLIP_MS = 600;
@@ -65,7 +73,7 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
   const group = createDisclosureGroup();
   const shapes = new Map<string, Shape>();
   const cards = new Map<string, HTMLElement>();
-  const lanes = new Map<number, { sub?: Shape; solution?: Shape }>();
+  const lanes = new Map<number, { el: HTMLDivElement; sub?: Shape; solution?: Shape }>();
   const chevrons = new Map<string, Chevron>();
   const regions = new Map<Region, HTMLDivElement>();
   const places = new Map<HTMLElement, Place>();
@@ -91,17 +99,33 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
     if (el) return el;
     el = doc.createElement('div');
     el.className = `ps-reduce__region ps-reduce__region--${region}`;
-    const name = REGION_NAME[region];
-    if (name) {
-      el.setAttribute('data-region', name);
-      el.setAttribute('aria-label', REGION_LABEL[region]!);
-    } else {
-      el.setAttribute('aria-hidden', 'true');
-    }
+    el.setAttribute('data-region', REGION_NAME[region]);
+    el.setAttribute('aria-label', REGION_LABEL[region]);
     const later = REGIONS.slice(REGIONS.indexOf(region) + 1).map((r) => regions.get(r)).find(Boolean) ?? null;
     ensureChart().insertBefore(el, later);
     regions.set(region, el);
     return el;
+  }
+
+  function ensureLane(index: number): { el: HTMLDivElement; sub?: Shape; solution?: Shape } {
+    let lane = lanes.get(index);
+    if (lane) return lane;
+    const el = doc.createElement('div');
+    el.className = 'ps-reduce__lane';
+    el.setAttribute('data-row', String(index));
+    ensureRegion('lanes').append(el);
+    lane = { el };
+    lanes.set(index, lane);
+    return lane;
+  }
+
+  /** Put a child into its lane in flow order: in-chevron, sub, down-chevron, solution, out-chevron. */
+  function placeInLane(index: number, slot: LaneSlot, child: HTMLElement): void {
+    const lane = ensureLane(index).el;
+    child.setAttribute('data-slot', slot);
+    const later = new Set(LANE_SLOTS.slice(LANE_SLOTS.indexOf(slot) + 1));
+    const after = [...lane.children].find((kid) => later.has(kid.getAttribute('data-slot') as LaneSlot)) ?? null;
+    lane.insertBefore(child, after);
   }
 
   const contested = (node: PsNode): string => (node.state === 'contested' ? ', contested' : '');
@@ -152,7 +176,16 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
     if (node.state === 'contested') words.append(contestedTag(doc, node));
     button.append(words);
     item.append(button);
-    ensureRegion(kind).append(item);
+    if (kind === 'sub' || kind === 'solution') {
+      const holder = doc.createElement('div');
+      holder.className = 'ps-reduce__holder';
+      holder.setAttribute('data-region', HOLDER[kind][0]);
+      holder.setAttribute('aria-label', `${HOLDER[kind][1]} ${index}`);
+      holder.append(item);
+      placeInLane(index, kind, holder);
+    } else {
+      ensureRegion(kind as Region).append(item);
+    }
 
     const card = detailsCard(doc, node, ACCENT[kind], detailsId);
     card.setAttribute('data-for', node.id);
@@ -170,8 +203,9 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
     el.setAttribute('data-from', from.node.id);
     el.setAttribute('data-to', to.node.id);
     el.setAttribute('data-row', String(index));
+    el.setAttribute('aria-hidden', 'true');
     el.append(span(doc, 'ps-reduce__tip'));
-    ensureRegion(kind).append(el);
+    placeInLane(index, kind, el);
     const chevron = { el, kind, index };
     chevrons.set(`${kind}:${index}`, chevron);
     return chevron;
@@ -224,9 +258,9 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
     places.set(el, { pos, count });
   }
 
-  /** Keep each lane region's DOM in display order, so reading and tab order follow the chart. */
-  function sortRegion(region: Region, position: Map<number, number>): void {
-    const el = regions.get(region);
+  /** Keep the lanes in display order, so reading and tab order follow the chart. */
+  function sortLanes(position: Map<number, number>): void {
+    const el = regions.get('lanes');
     if (!el) return;
     const kids = [...el.children] as HTMLElement[];
     const sorted = [...kids].sort((a, b) => (position.get(Number(a.getAttribute('data-row'))) ?? 0) - (position.get(Number(b.getAttribute('data-row'))) ?? 0));
@@ -251,14 +285,14 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
     const position = new Map(order.map((index, i) => [index, i + 1]));
     const ranks = priorityOrder(run) as number[] | null;
 
-    // FLIP, first: read where every existing lane element that will move sits now.
-    const movers = laneElements().filter(({ el, index }) => {
-      const place = places.get(el);
-      return place && (place.pos !== position.get(index) || place.count !== count);
-    });
+    // FLIP, first: one read of where every existing lane element sits now (in-flight
+    // transforms included). Anything can move it: a re-order, a new lane, or the Order pill
+    // arriving above the subs, so the measured delta decides, not the logical place.
+    const movers = laneElements();
     const animate = movers.length > 0 && canAnimate(root);
     const first = animate ? movers.map(({ el }) => el.getBoundingClientRect()) : [];
-    if (animate) for (const { el } of movers) { flips.get(el)?.cancel(); flips.delete(el); }
+    for (const flip of flips.values()) flip.cancel();
+    flips.clear();
 
     // Writes.
     const chartEl = ensureChart();
@@ -273,11 +307,9 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
         if (slot.name === 'priority' && priority) continue;
         if (laned(slot.name)) {
           if (!index) continue;
-          const lane = lanes.get(index) ?? {};
-          if (lane[slot.name as 'sub' | 'solution']) continue;
+          if (lanes.get(index)?.[slot.name as 'sub' | 'solution']) continue;
           shape = addShape(node, slot.name, index);
-          lane[slot.name as 'sub' | 'solution'] = shape;
-          lanes.set(index, lane);
+          ensureLane(index)[slot.name as 'sub' | 'solution'] = shape;
         } else {
           shape = addShape(node, slot.name, 0);
           if (slot.name === 'problem') problem = shape;
@@ -286,11 +318,9 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
         }
         fresh.push(shape);
       }
-      if (shape.node.state !== node.state || nodeTitle(shape.node) !== nodeTitle(node)) {
-        shape.node = node;
-        shape.button.setAttribute('aria-label', label(shape));
-      }
+      const relabel = shape.node.state !== node.state || nodeTitle(shape.node) !== nodeTitle(node);
       shape.node = node;
+      if (relabel) shape.button.setAttribute('aria-label', label(shape));
       shape.item.classList.toggle('is-contested', node.state === 'contested');
     }
 
@@ -315,14 +345,18 @@ export function createProblemReductionView(doc: Document = document): ProblemRed
       const place = places.get(el);
       if (!place || place.pos !== pos || place.count !== count) setPlace(el, pos, count);
     }
-    for (const region of ['in', 'sub', 'down', 'solution', 'out'] as Region[]) sortRegion(region, position);
+    sortLanes(position);
 
     // FLIP, last and invert: one read of the new places, then animate each from the old.
+    // Centres, not edges: a chevron stretches to its lane, so its edges move with the width.
     if (animate) {
       const last = movers.map(({ el }) => el.getBoundingClientRect());
+      const centre = (r: DOMRect): [number, number] => [r.left + r.width / 2, r.top + r.height / 2];
       movers.forEach(({ el }, i) => {
-        const dx = first[i].left - last[i].left;
-        const dy = first[i].top - last[i].top;
+        const [fx, fy] = centre(first[i]);
+        const [lx, ly] = centre(last[i]);
+        const dx = fx - lx;
+        const dy = fy - ly;
         if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
         const flip = el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: FLIP_MS, easing: EASE });
         flips.set(el, flip);

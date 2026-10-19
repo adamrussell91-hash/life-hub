@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createProblemReductionView } from '../../../../packages/problem-solver/render/problem-reduction';
 import type { PsEdge, PsNode, PsToolRun } from '../../../../packages/problem-solver/types';
 
@@ -72,9 +72,11 @@ describe('Problem reduction view', () => {
   it('renders the sub-problems in the subs region', () => {
     const view = createProblemReductionView();
     view.update(run([problem, ...subs]));
-    const region = view.el.querySelector('[data-region="subs"]')!;
-    expect(region.getAttribute('aria-label')).toBeTruthy();
-    expect([...region.querySelectorAll('[data-node]')].map((el) => el.getAttribute('data-node'))).toEqual(['s1', 's2', 's3']);
+    // Each sub sits in its own subs holder inside its lane, so the phone's tab order runs
+    // sub, solution, next sub; the holders together make the subs region.
+    const holders = [...view.el.querySelectorAll('[data-region="subs"]')];
+    expect(holders.every((holder) => holder.getAttribute('aria-label'))).toBe(true);
+    expect([...view.el.querySelectorAll('[data-region="subs"] [data-node]')].map((el) => el.getAttribute('data-node'))).toEqual(['s1', 's2', 's3']);
     expect(view.el.querySelector('[data-region="problem"] [data-node="p"]')).not.toBeNull();
     expect(view.el.querySelector('[data-region="solutions"] [data-node]')).toBeNull();
   });
@@ -121,5 +123,59 @@ describe('Problem reduction view', () => {
     view.update(run([problem, ...subs, priority, ...solutions, integrated]));
     expect(view.el.querySelector('[data-region="integrated"] [data-node="w"]')).not.toBeNull();
     expect(view.el.querySelectorAll('.ps-reduce__chevron--out').length).toBe(3);
+  });
+
+  it('orders the DOM lane by lane: sub, then its solution, then the next sub', () => {
+    const view = createProblemReductionView();
+    view.update(run([problem, ...subs, priority, ...solutions]));
+    const order = [...view.el.querySelectorAll('.ps-reduce__item--sub, .ps-reduce__item--solution')].map((el) => el.getAttribute('data-node'));
+    expect(order).toEqual(['s2', 'v2', 's3', 'v3', 's1', 'v1']);
+  });
+
+  describe('FLIP', () => {
+    // happy-dom has no Web Animations, so the fake is added for these tests and removed after.
+    const proto = HTMLElement.prototype as unknown as { animate?: unknown };
+    afterEach(() => {
+      vi.restoreAllMocks();
+      delete proto.animate;
+    });
+
+    /** Fake geometry: each lane element sits 60px lower once the Order pill is in the chart. */
+    function fakeMotion() {
+      const made: Array<{ el: Element; keyframes: Keyframe[]; cancel: ReturnType<typeof vi.fn> }> = [];
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const top = this.closest('.ps-reduce__chart')?.querySelector('.ps-reduce__item--priority') ? 60 : 0;
+        return { left: 0, top, width: 100, height: 100, right: 100, bottom: top + 100, x: 0, y: top, toJSON() {} } as DOMRect;
+      });
+      proto.animate = () => null;
+      vi.spyOn(HTMLElement.prototype, 'animate').mockImplementation(function (this: HTMLElement, keyframes) {
+        const fake = { el: this, keyframes: keyframes as Keyframe[], cancel: vi.fn(), onfinish: null };
+        made.push(fake);
+        return fake as unknown as Animation;
+      });
+      return made;
+    }
+
+    it('moves the lanes when a priority that keeps the order pushes them down', () => {
+      const made = fakeMotion();
+      const view = createProblemReductionView();
+      view.update(run([problem, ...subs]));
+      made.length = 0;
+      view.update(run([problem, ...subs, node('o', 'priority', { text: '1, 2, 3' })]));
+      const flips = made.filter((a) => String(a.keyframes[0]?.transform ?? '').startsWith('translate('));
+      expect(flips.map((a) => (a.el as HTMLElement).getAttribute('data-node') ?? a.el.className)).toEqual(expect.arrayContaining(['s1', 's2', 's3']));
+      expect(flips.every((a) => a.keyframes[0].transform === 'translate(0px, -60px)')).toBe(true);
+    });
+
+    it('cancels every in-flight flip before the next update writes', () => {
+      const made = fakeMotion();
+      const view = createProblemReductionView();
+      view.update(run([problem, ...subs]));
+      view.update(run([problem, ...subs, priority]));
+      const flips = made.filter((a) => String(a.keyframes[0]?.transform ?? '').startsWith('translate('));
+      expect(flips.length).toBeGreaterThan(0);
+      view.update(run([problem, ...subs, priority, ...solutions]));
+      expect(flips.every((a) => a.cancel.mock.calls.length === 1)).toBe(true);
+    });
   });
 });

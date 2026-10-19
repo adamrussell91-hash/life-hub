@@ -2562,8 +2562,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
    circle, yellow chevrons leaning out to a row of yellow sub-problem circles, a chevron down
    from each to its blue solution, chevrons leaning back in to a large blue whole solution.
    Each sub and its solution share a lane (--pos from the script); once the priority exists
-   the lanes re-order by it and each sub carries an ink rank badge. Every region is a
-   display: contents wrapper, so all circles and chevrons sit in the one chart grid.
+   the lanes re-order by it and each sub carries an ink rank badge. Every region, lane and
+   holder is a display: contents wrapper, so all circles and chevrons sit in the one chart grid.
    Phone: each lane becomes a row, sub left, chevron pointing right, solution right. */
 .ps-reduce {
   /* Named, so every phone query measures this root box. */
@@ -2586,7 +2586,10 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   justify-items: center;
 }
 
-.ps-reduce__region { display: contents; }
+/* Regions, lanes and holders only group the DOM (lanes sort by priority for tab order). */
+.ps-reduce__region,
+.ps-reduce__lane,
+.ps-reduce__holder { display: contents; }
 
 .ps-reduce__item { --d: 140px; position: relative; width: min(100%, var(--d)); min-width: 0; }
 .ps-reduce__item--problem,
