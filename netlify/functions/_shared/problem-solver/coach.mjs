@@ -49,7 +49,7 @@ function fitToRun(session, value) {
   const problem = checkNode(run, node, renamedEdges);
   if (problem) return { error: problem };
   if (value.verdict !== 'accept' && value.verdict !== 'challenge') return { value: { ...value, node, edges: [] } };
-  return { value: { ...value, node, edges: allowedEdges(run, node, renamedEdges) } };
+  return { value: { ...value, node, edges: allowedEdges(run, node, renamedEdges), proposeTasks: value.proposeTasks.map((p) => ({ ...p, slot: rename(p.slot) })) } };
 }
 
 /** Links between nodes already placed (slot form) that the tool allows, applied in order. */
@@ -83,7 +83,7 @@ function allowedEdges(run, node, proposed) {
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
-  if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null } };
+  if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null, proposeTasks: [], proposeReview: null } };
   // In frame a suggestion only means something on the turn that sets the model (the frame
   // completes and the first step opens); otherwise accepting it would be refused.
   if (session.phase === 'frame' && (!result.value.model || result.value.suggestion?.kind === 'next_step')) {

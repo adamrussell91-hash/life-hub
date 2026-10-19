@@ -190,3 +190,30 @@ test('the decide step layer carries its guide, tools, triggers and carry-forward
   assert.match(layer, /CARRY FORWARD:/);
   assert.match(layer, /choice slot/);
 });
+
+test('implement prompts show TODAY, nodes that can become tasks, and the task and review state', () => {
+  let s = { ...inTool('five_whys'), updatedAt: '2026-10-19T10:00:00.000Z' };
+  s = { ...s, phase: 'implement', steps: { ...s.steps, implement: { runs: [{ id: 'k', tool: 'kanban', status: 'active', nodes: [{ id: 'n1', slot: 'card:1', text: 'Draft the template', tag: 'todo', state: 'accepted', skills: [], turnId: 't' }, { id: 'n2', slot: 'card:2', text: 'Ask the team', tag: 'todo', state: 'accepted', skills: [], turnId: 't' }], edges: [] }], status: 'open', objection: null } } };
+  s.steps.implement.runs[0].nodes.push({ id: 'n3', slot: 'card:3', text: 'Old removed task', tag: 'todo', state: 'accepted', skills: [], turnId: 't' });
+  s = { ...s, proposedTasks: [{ id: 'p1', title: 'Draft the template', status: 'confirmed', due: null, taskId: 'task-1', source: { runId: 'k', nodeId: 'n1' } }, { id: 'p3', title: 'Old removed task', status: 'dismissed', removed: true, due: null, taskId: 'task-3', source: { runId: 'k', nodeId: 'n3' } }], reviewProposal: null, reviewTaskId: null };
+  const { user, system } = buildCoachPrompt(s);
+  assert.match(user, /TODAY: 2026-10-19/);
+  assert.match(user, /Can become tasks: card:2/);
+  assert.doesNotMatch(user, /Can become tasks: card:1/);
+  assert.match(user, /TASKS FROM THIS PROBLEM:\n  confirmed: "Draft the template"/);
+  assert.match(user, /REVIEW TASK: none yet/);
+  assert.match(system[0], /"proposeTasks"/);
+  assert.match(system[0], /"proposeReview"/);
+  assert.doesNotMatch(user, /TASKS FROM THIS PROBLEM:[\s\S]*Old removed task/, 'the coach is not told about deleted tasks');
+  assert.doesNotMatch(user, /Can become tasks:[^\n]*card:3/, 'nor offered them again');
+});
+
+test('outside Decide the chosen option is shown as the aim; in Implement without one, the coach asks', () => {
+  const base = { ...inTool('five_whys'), updatedAt: '2026-10-19T10:00:00.000Z' };
+  const choice = { id: 'd', tool: 'decision_matrix', status: 'done', nodes: [{ id: 'c', slot: 'choice', text: 'Publish the rota on Wednesdays', title: 'Wednesday rota', state: 'accepted', skills: [], turnId: 't' }], edges: [] };
+  const implement = { runs: [], status: 'open', objection: null };
+  const withChoice = { ...base, phase: 'implement', steps: { ...base.steps, decide: { runs: [choice], status: 'done', objection: null }, implement } };
+  assert.match(buildCoachPrompt(withChoice).user, /CHOSEN OPTION \(the aim for Implement\): Publish the rota on Wednesdays/);
+  const without = { ...base, phase: 'implement', steps: { ...base.steps, implement } };
+  assert.match(buildCoachPrompt(without).user, /CHOSEN OPTION: none recorded/);
+});

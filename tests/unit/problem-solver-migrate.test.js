@@ -29,6 +29,7 @@ test('a defined v1 session moves on to the step after define', () => {
   assert.deepEqual(s.steps.analyse, { runs: [], status: 'open', objection: null });
   assert.deepEqual(s.learnings, []);
   assert.equal(s.pendingLearning, null);
+  assert.deepEqual(s.proposedTasks, []);
 });
 
 test('a v1 session defined early with no complete run is a skipped define step', () => {
@@ -93,4 +94,13 @@ test('an unreadable stored run does not stop a session migrating', () => {
   const bad = { id: 'x', tool: 'retired_tool', status: 'done', nodes: [], edges: [] };
   const s = migrateSession(v1({ define: { runs: [bad], finishedEarly: false, exitObjection: null } }));
   assert.equal(s.steps.define.status, 'skipped');
+});
+
+test('a v2 session saved before tasks existed gains empty task fields on read', () => {
+  const old = { id: 'x', turns: [], steps: {}, phase: 'frame', title: 't' };
+  const read = migrateSession(old);
+  assert.deepEqual(read.proposedTasks, []);
+  assert.equal(read.reviewProposal, null);
+  assert.equal(read.reviewTaskId, null);
+  assert.equal(old.proposedTasks, undefined, 'the input is not mutated');
 });

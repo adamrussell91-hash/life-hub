@@ -232,3 +232,23 @@ test('a challenge on a tagged slot without a tag also gets one repair', async ()
     delete TOOLS.fake_tagged;
   }
 });
+
+function inKanban() {
+  const base = inDefine();
+  return { ...base, phase: 'implement', runner: { status: 'queued', mode: 'turn', error: null }, steps: { ...base.steps, implement: { runs: [{ id: 'k', tool: 'kanban', status: 'active', nodes: [], edges: [] }], status: 'open', objection: null } } };
+}
+
+test('a proposed task on a bare slot name follows the node to its numbered slot', async () => {
+  const coach = createModelCoach(async () => reply({ verdict: 'accept', message: 'That card is specific enough to start. Shall I make it a real task due Friday?', node: { slot: 'card', text: 'Draft the rota template for next month', tag: 'todo' }, proposeTasks: [{ slot: 'card', title: 'Draft' }] }));
+  const turn = await coach(inKanban());
+  assert.equal(turn.node.slot, 'card:1');
+  assert.equal(turn.proposeTasks[0].slot, 'card:1');
+});
+
+test('boundary turns carry no task or review proposals', async () => {
+  const boundary = moveOn(inKanban(), deps);
+  const coach = createModelCoach(async () => reply({ proposeTasks: [{ slot: 'card:1', title: 'Draft' }], proposeReview: { due: '2026-11-02', reason: 'r' } }));
+  const turn = await coach(boundary);
+  assert.deepEqual(turn.proposeTasks, []);
+  assert.equal(turn.proposeReview, null);
+});

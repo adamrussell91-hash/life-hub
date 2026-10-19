@@ -1,7 +1,7 @@
 // tests/unit/problem-solver-steps.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BOOK_STEP_IDS, stepPlan, planStep, firstStep, nextStepAfter, stepName, defaultToolFor } from '../../packages/problem-solver/steps.mjs';
+import { BOOK_STEP_IDS, stepPlan, planStep, firstStep, nextStepAfter, stepName, defaultToolFor, planStepForBook, chosenOption } from '../../packages/problem-solver/steps.mjs';
 import { MODELS } from '../../packages/problem-solver/models.mjs';
 
 test('book steps follow the seven-step process, plus the TRIZ contradiction step', () => {
@@ -51,4 +51,18 @@ test('lookups', () => {
 test('default tool is the first registered tool for the plan step', () => {
   assert.equal(defaultToolFor('seven_step', 'define'), 'five_whys');
   assert.equal(defaultToolFor('triz', 'general_problem'), 'contradiction');
+});
+
+test('planStepForBook finds the plan step that uses a book step', () => {
+  assert.equal(planStepForBook('seven_step', 'improve'), 'improve');
+  assert.equal(planStepForBook('polya', 'improve'), 'evaluate');
+  assert.equal(planStepForBook('polya', 'decide'), 'devise');
+  assert.equal(planStepForBook('triz', 'nothing'), null);
+});
+
+test('chosenOption is the choice of the latest kept Decide run', () => {
+  const run = (id, text, status = 'done') => ({ id, tool: 'swot', status, nodes: [{ id: `${id}-c`, slot: 'choice', text, title: text, state: 'accepted', skills: [], turnId: 't' }], edges: [] });
+  assert.equal(chosenOption({ steps: {} }), null);
+  const session = { steps: { decide: { runs: [run('a', 'Publish the rota on Wednesdays'), run('b', 'Swap shifts in a shared app'), run('c', 'Switched away', 'switched')], status: 'done', objection: null } } };
+  assert.deepEqual(chosenOption(session), { text: 'Swap shifts in a shared app', title: 'Swap shifts in a shared app', contested: false, runId: 'b', tool: 'swot' });
 });

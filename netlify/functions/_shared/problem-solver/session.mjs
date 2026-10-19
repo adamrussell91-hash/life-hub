@@ -1,11 +1,14 @@
 // netlify/functions/_shared/problem-solver/session.mjs
-import { addEdge, applyScores, canEdge, canPlace, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
-import { defaultToolFor, firstStep, nextStepAfter, stepName } from '../../../../packages/problem-solver/steps.mjs';
+import { addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
+import { defaultToolFor, firstStep, nextStepAfter, planStep, stepName } from '../../../../packages/problem-solver/steps.mjs';
 
 const TITLE_MAX = 120;
 const TEXT_MAX = 12000;
 const LINKS_MAX = 20;
 const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone'];
+const PROPOSALS_MAX = 40;
+const REVIEW_AFTER_DAYS = 14;
+const DAY_MS = 86_400_000;
 
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
 
@@ -43,6 +46,26 @@ function withStep(session, id, patch) {
   return { ...session, steps: { ...session.steps, [id]: { ...(session.steps[id] ?? emptyStep()), ...patch } } };
 }
 
+const reviewTitle = (session) => `Review: ${session.title}`.slice(0, TITLE_MAX);
+const addDays = (iso, days) => new Date(Date.parse(iso) + days * DAY_MS).toISOString().slice(0, 10);
+const inBook = (session, stepId, book) => Boolean(session.model && planStep(session.model.id, stepId)?.book.includes(book));
+
+/** Add the coach's proposals for placed nodes the tool lets become tasks, once per node. */
+function addProposals(session, items, deps) {
+  const run = activeRun(session);
+  if (!run || !items?.length) return session;
+  let list = session.proposedTasks ?? [];
+  for (const item of items) {
+    const node = run.nodes.find((n) => n.slot === item.slot);
+    if (!node || !canPropose(run, node)) continue;
+    // One live proposal per node. A node whose task was deleted in Tasks is never proposed again.
+    if (list.some((p) => p.source.nodeId === node.id && (p.status !== 'dismissed' || p.removed))) continue;
+    if (list.length >= PROPOSALS_MAX) break;
+    list = [...list, { id: deps.newId(), title: item.title.slice(0, TITLE_MAX), status: 'proposed', due: item.due ?? null, source: { runId: run.id, nodeId: node.id } }];
+  }
+  return { ...session, proposedTasks: list };
+}
+
 function replaceRun(session, run) {
   const steps = Object.fromEntries(Object.entries(session.steps).map(([id, step]) => [id, { ...step, runs: step.runs.map((item) => (item.id === run.id ? run : item)) }]));
   return { ...session, steps };
@@ -70,6 +93,9 @@ export function createSession({ title = '', text, links = [] }, deps) {
     summary: '',
     suggestion: null,
     pendingKeep: null,
+    proposedTasks: [],
+    reviewProposal: null,
+    reviewTaskId: null,
     requestIds: [],
     runner: { status: 'queued', mode: 'turn', error: null },
     createdAt: at,
@@ -180,6 +206,13 @@ export function applyCoachTurn(session, turn, deps) {
     }
   }
 
+  if (mode !== 'boundary' && currentStep(next)) {
+    next = addProposals(next, turn.proposeTasks, deps);
+    if (turn.proposeReview && inBook(next, next.phase, 'implement') && !next.reviewTaskId) {
+      next = { ...next, reviewProposal: { title: reviewTitle(next), due: turn.proposeReview.due, reason: turn.proposeReview.reason, status: 'proposed' } };
+    }
+  }
+
   // A boundary turn asks the learning question first, so it carries no suggestion.
   // Afterwards a finished tool, or a step with no tool open, always leaves a next step.
   const quiet = next.phase === 'finished' || mode === 'boundary';
@@ -216,6 +249,9 @@ export function moveOn(session, deps) {
   const status = runs.some((run) => run.status !== 'switched' && isRunComplete(run)) ? 'done' : 'skipped';
   const nextId = nextStepAfter(session.model.id, leaving);
   let next = withStep({ ...session, suggestion: null, pendingKeep: null }, leaving, { runs, status });
+  if (inBook(session, leaving, 'implement') && status === 'done' && !session.reviewTaskId && !session.reviewProposal) {
+    next = { ...next, reviewProposal: { title: reviewTitle(session), due: addDays(deps.now(), REVIEW_AFTER_DAYS), reason: 'A first look at how the plan is going.', status: 'proposed' } };
+  }
   next = { ...next, turns: [...next.turns, userTurn(nextId ? 'Move on.' : 'That is everything.', deps)] };
   next = nextId ? withStep({ ...next, phase: nextId }, nextId, {}) : { ...next, phase: 'finished', status: 'finished' };
   return queue(touch(next, deps), 'boundary', leaving);
@@ -264,6 +300,52 @@ export function rescoreRadar(session, payload, deps) {
   return score(session, { ...payload, runId: run?.id ?? '__none__' }, deps);
 }
 
+const findProposal = (session, id) => {
+  const proposal = (session.proposedTasks ?? []).find((p) => p.id === id);
+  if (!proposal) throw fail(404, 'not_found', 'That proposed task is gone.');
+  return proposal;
+};
+const withProposal = (session, id, patch) => ({ ...session, proposedTasks: session.proposedTasks.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+
+/** The page created the task through the Tasks API; record its id. Same id again is a no-op. */
+export function confirmTask(session, payload, deps) {
+  const taskId = typeof payload?.taskId === 'string' ? payload.taskId.trim() : '';
+  if (!taskId || taskId.length > 200) throw fail(400, 'validation_error', 'A task id is required.');
+  const proposal = findProposal(session, payload.proposalId);
+  if (proposal.status === 'confirmed' && proposal.taskId === taskId) return session;
+  if (proposal.status !== 'proposed') throw fail(409, 'action_not_allowed', proposal.status === 'confirmed' ? 'That task is already created.' : 'That proposal was set aside.');
+  return touch(withProposal(session, proposal.id, { status: 'confirmed', taskId }), deps);
+}
+
+/**
+ * Set a proposal aside; a confirmed one only reverts when its task was deleted in Tasks.
+ * Deleted tasks (Adam's decision): the Kanban card shows "Task removed", the proposal is
+ * dismissed with `removed: true`, the coach is not told (it never appears in the prompt)
+ * and the node is never proposed again.
+ */
+export function dismissTask(session, payload, deps) {
+  const proposal = findProposal(session, payload?.proposalId);
+  if (proposal.status === 'dismissed') return session;
+  if (proposal.status === 'confirmed' && payload?.reason !== 'removed') throw fail(409, 'action_not_allowed', 'That task already exists; change it in Tasks.');
+  return touch(withProposal(session, proposal.id, { status: 'dismissed', ...(proposal.status === 'confirmed' ? { removed: true } : {}) }), deps);
+}
+
+/** The page created the review task; record it with the date the person picked. */
+export function setReviewTask(session, payload, deps) {
+  const taskId = typeof payload?.taskId === 'string' ? payload.taskId.trim() : '';
+  if (!taskId || taskId.length > 200) throw fail(400, 'validation_error', 'A task id is required.');
+  if (session.reviewTaskId && session.reviewTaskId !== taskId) throw fail(409, 'action_not_allowed', 'This problem already has a review task.');
+  if (session.reviewTaskId === taskId) return session;
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(payload?.due ?? '') ? payload.due : session.reviewProposal?.due ?? addDays(deps.now(), REVIEW_AFTER_DAYS);
+  const proposal = session.reviewProposal ?? { title: reviewTitle(session), reason: '', due };
+  return touch({ ...session, reviewTaskId: taskId, reviewProposal: { ...proposal, due, status: 'confirmed' } }, deps);
+}
+
+export function dismissReview(session, deps) {
+  if (!session.reviewProposal || session.reviewProposal.status !== 'proposed') throw fail(409, 'action_not_allowed', 'There is no review to set aside.');
+  return touch({ ...session, reviewProposal: { ...session.reviewProposal, status: 'dismissed' } }, deps);
+}
+
 export function rename(session, title, deps) {
   const clean = String(title ?? '').trim().slice(0, TITLE_MAX);
   if (!clean) throw fail(400, 'validation_error', 'Title required.');
@@ -295,6 +377,8 @@ export function summaryRow(session) {
     frame: FRAME_KEYS.filter((key) => Boolean(session.frame?.[key])).length,
     skills: skillCounts(session.turns),
     links: session.links,
+    taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
+    reviewTaskId: session.reviewTaskId ?? null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   };

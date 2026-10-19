@@ -95,3 +95,22 @@ export function defaultToolFor(modelId, stepId) {
   }
   return toolsForPlanStep(modelId, stepId)[0] ?? null;
 }
+
+/** The plan step of a model whose tool families include `book`, or null. */
+export function planStepForBook(modelId, book) {
+  return stepPlan(modelId).find((s) => s.book.includes(book))?.step ?? null;
+}
+
+/**
+ * The option chosen in Decide and carried into Implement as its aim: the `choice` node of
+ * the latest Decide run that was not switched away from, or null. Read by the prompt, the
+ * canvas aim caption and (Plan 6) Improve.
+ */
+export function chosenOption(session) {
+  const runs = Object.values(session.steps ?? {}).flatMap((step) => step.runs).filter((run) => run.status !== 'switched' && TOOLS[run.tool]?.step === 'decide');
+  for (const run of runs.reverse()) {
+    const node = run.nodes.find((item) => item.slot === 'choice');
+    if (node) return { text: node.text, title: node.title ?? node.text, contested: node.state === 'contested', runId: run.id, tool: run.tool };
+  }
+  return null;
+}

@@ -2,8 +2,8 @@
 import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
 import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
-import { isComplete, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
-import { planStep, stepName, stepPlan, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
+import { canPropose, isComplete, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
+import { chosenOption, planStep, stepName, stepPlan, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { activeRun, currentStep, followOn, skippedUntouched } from './session.mjs';
 import { PROCESS } from './knowledge/process.mjs';
 import { CHAPTERS } from './knowledge/chapters.mjs';
@@ -45,6 +45,7 @@ SESSION SHAPE
 4. In a tool, work its steps in order. Each answer that holds up becomes a node in the open slot it belongs to. Only use slot names from "Open slots". Never invent slots. Use the full slot name with its number (effect:1, not effect). Links join the node you are placing to slots already placed, using only the listed link kinds.
 5. Carry forward: use what earlier steps established (listed under EARLIER STEPS) as the starting point for the current tool, and say so. Do not copy it in without the person agreeing.
 6. The person can move on at any time. Never block them.
+7. Tasks: in Implement, when a card, a do-first item or a chosen 15% action is specific enough to start (a clear action, ideally an owner and a date), offer it as a real task in "proposeTasks" with its slot and a short task title. Only slots listed under "Can become tasks" qualify. The person confirms each one on a card; never say a task exists until TASKS shows it confirmed. Before Implement ends, propose a dated review in "proposeReview", timed for when the first results should show (a date after TODAY).
 
 GATEKEEPING
 In phase frame, use "frame" for accepted answers instead of "node"; "node" is only used inside a tool.
@@ -70,8 +71,8 @@ SWITCHING AND CHECK-INS
 
 OUTPUT
 Reply with one JSON object and nothing else:
-{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"...","tag":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|next_step","tool":"...","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null,"learning":"..."|null}
-Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.`;
+{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"...","tag":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|next_step","tool":"...","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null,"learning":"..."|null,"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}],"proposeReview":{"due":"YYYY-MM-DD","reason":"..."}|null}
+Include "proposeTasks" and "proposeReview" only in Implement. Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.`;
 
 const RECENT_TURNS = 12;
 const SUMMARY_EVERY = 6;
@@ -138,8 +139,29 @@ function runLines(session, run) {
     `Open slots: ${nextSlots(run).join(', ') || (isComplete(run) ? 'none (tool complete)' : 'none open, but the tool is not complete: see Waiting on or add links')}`,
     ...(def.scoreLine?.(run) ? [`Scores: ${def.scoreLine(run)}`] : []),
     ...(def.awaiting?.(run) ? [`Waiting on: ${def.awaiting(run)}`] : []),
+    ...(def.taskSlots ? [`Can become tasks: ${proposable(session, run).join(', ') || 'none yet'}`] : []),
     progressLine(session)
   ].join('\n');
+}
+
+/**
+ * Slots of placed nodes the tool lets become tasks and that have no live proposal. A node
+ * whose task was deleted in Tasks is never offered again (Adam's decision).
+ */
+function proposable(session, run) {
+  const proposals = session.proposedTasks ?? [];
+  return run.nodes
+    .filter((node) => canPropose(run, node) && !proposals.some((p) => p.source.nodeId === node.id && (p.status !== 'dismissed' || p.removed)))
+    .map((node) => node.slot);
+}
+
+function taskLines(session) {
+  // Proposals whose task was deleted in Tasks are left out: the coach is not told about them.
+  const tasks = (session.proposedTasks ?? []).filter((p) => !p.removed);
+  if (!tasks.length && !session.reviewProposal && !session.reviewTaskId) return null;
+  const lines = tasks.map((p) => `  ${p.status}: "${p.title}"${p.due ? ` due ${p.due}` : ''}`);
+  const review = session.reviewTaskId ? `created for ${session.reviewProposal?.due ?? 'its date'}` : session.reviewProposal ? `${session.reviewProposal.status} for ${session.reviewProposal.due}` : 'none yet';
+  return `TASKS FROM THIS PROBLEM:\n${lines.join('\n') || '  none'}\nREVIEW TASK: ${review}`;
 }
 
 function progressLine(session) {
@@ -175,11 +197,17 @@ export function buildCoachPrompt(session) {
     } else parts.push(`MODE: boundary. The person has just left ${left} (${status ?? 'unknown'}). In one message: a one-sentence recap of what ${left} established; if it was left unfinished in a way that matters, say so once, kindly, and put a one-sentence reason in exitObjection; then ask one question about what they learned about how they solve problems in that step. No tool suggestion yet.`);
   }
   parts.push(`PHASE: ${session.phase}`);
+  parts.push(`TODAY: ${String(session.updatedAt ?? '').slice(0, 10)}`);
   const missing = ['goal', 'whatIsTrue', 'whatCanBeDone'].filter((key) => !session.frame[key]);
   parts.push(`Frame: ${JSON.stringify(session.frame)}${missing.length ? `\nMissing frame answers: ${missing.join(', ')}` : ''}`);
   if (session.model) parts.push(`MODEL: ${session.model.id} (${session.model.reason})`);
   const earlier = earlierSteps(session);
   if (earlier) parts.push(earlier);
+  const chosen = chosenOption(session);
+  const books = session.model ? planStep(session.model.id, session.phase)?.book ?? [] : [];
+  // Inside a Decide step the run lines already show the `choice` slot, so it is not repeated.
+  if (chosen && !books.includes('decide')) parts.push(`CHOSEN OPTION (the aim for Implement): ${chosen.text}${chosen.contested ? ' (kept against the coach\'s objection)' : ''}`);
+  else if (!chosen && books.includes('implement')) parts.push('CHOSEN OPTION: none recorded. Ask what was decided and confirm it as the aim before placing anything.');
   if (session.pendingLearning && session.runner?.mode !== 'boundary') {
     const from = stepName(session.model.id, session.pendingLearning);
     const hasTools = session.model && session.phase !== 'finished' && toolsForPlanStep(session.model.id, session.phase).length > 0;
@@ -195,6 +223,8 @@ export function buildCoachPrompt(session) {
   const run = activeRun(session);
   if (run) parts.push(runLines(session, run));
   else if (step && !session.pendingLearning && session.runner?.mode !== 'boundary' && toolsForPlanStep(session.model.id, session.phase).length) parts.push('No tool is open in this step yet: orient them and suggest one with next_tool.');
+  const tasks = taskLines(session);
+  if (tasks) parts.push(tasks);
   if (session.pendingKeep) parts.push(`Last challenged answer (${session.pendingKeep.slot}): ${session.pendingKeep.text}`);
   if (session.summary) parts.push(`Summary so far: ${session.summary}`);
   const coachTurns = session.turns.filter((t) => t.role === 'coach').length;
