@@ -5,20 +5,16 @@
 [data-alchemy-assistant] .lesson-page__block > .alchemy-block-button { display: inline-grid; place-items: center; position: absolute; top: var(--space-4); right: calc(var(--space-2) + var(--space-8) + 2px); z-index: 2; width: var(--space-8); height: var(--space-8); margin: 0; padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--muted); cursor: pointer; opacity: 0; -webkit-tap-highlight-color: transparent; transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease; }
 /* No hover on touch: keep it findable but faint. */
 @media (hover: none) { [data-alchemy-assistant] .lesson-page__block > .alchemy-block-button { opacity: .45; } }
-.lesson-page__block:hover > .alchemy-block-button, .lesson-page__block:focus-within > .alchemy-block-button, .lesson-page__block--selected > .alchemy-block-button, .alchemy-block-button.has-suggestion { opacity: 1; }
+.lesson-page__block:hover > .alchemy-block-button, .lesson-page__block:focus-within > .alchemy-block-button, .lesson-page__block--selected > .alchemy-block-button { opacity: 1; }
 .alchemy-block-button:hover { color: var(--alchemy-accent); background: color-mix(in srgb, var(--alchemy-accent) 8%, transparent); }
 .alchemy-block-button:focus-visible { opacity: 1; outline: 2px solid var(--wave); outline-offset: 2px; }
-.alchemy-block-button__badge { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--alchemy-accent); }
-.alchemy-block-button__badge[hidden] { display: none; }
-.alchemy-block-button.has-suggestion { color: var(--alchemy-accent); }
-.alchemy-review { padding: var(--space-4); width: min(640px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); border: 1px solid var(--line); border-radius: var(--radius-lg); color: var(--ink); }
+.alchemy-review { background: var(--paper); padding: var(--space-4); width: min(640px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); border: 1px solid var(--line); border-radius: var(--radius-lg); color: var(--ink); }
 .alchemy-review[open] { display: flex; flex-direction: column; }
 .alchemy-review::backdrop { background: rgb(0 0 0 / .3); backdrop-filter: blur(4px); }
 .alchemy-review h2 { flex-shrink: 0; margin: 0 0 var(--space-3); font-size: 1.1rem; }
 .alchemy-review__body { overflow-y: auto; min-height: 0; flex: 1 1 auto; padding: var(--space-1); }
-.alchemy-review__preview { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: var(--space-3); margin: var(--space-3) 0; }
 .alchemy-review__composer { flex-shrink: 0; display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-3); }
-.alchemy-review__composer textarea { min-height: 64px; max-height: 120px; width: 100%; box-sizing: border-box; resize: vertical; }
+.alchemy-review__composer textarea { font: inherit; font-size: 16px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: var(--space-2); min-height: 64px; max-height: 120px; width: 100%; box-sizing: border-box; resize: vertical; }
 .alchemy-review__composer button { align-self: flex-end; min-height: 44px; }
 .alchemy-review__actions { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-3); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .alchemy-review__actions button { min-height: 44px; flex: 1; }
@@ -39,3 +35,49 @@
 .unit-notes__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .unit-notes__actions .btn { min-height: 44px; }
 @media print { .unit-notes { display: none; } }
+/* Ann's lesson review in the Alchemy Lab column. */
+.alchemy-agent { display: flex; flex-direction: column; gap: var(--space-3); color: var(--ink); }
+.alchemy-agent [hidden] { display: none !important; }
+.alchemy-agent__intro { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.alchemy-agent__title { margin: 0; font-size: 1.05rem; }
+.alchemy-agent__blurb, .alchemy-agent__muted { margin: 0; color: var(--muted); font-size: .9rem; }
+.alchemy-agent__rules { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: .9rem; }
+.alchemy-agent__rules-line { margin: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
+.alchemy-agent__rules-change { min-height: 44px; }
+.alchemy-agent__start { align-self: flex-start; min-height: 44px; }
+.alchemy-agent__picker { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; }
+.alchemy-agent__picker label { display: flex; flex-direction: column; gap: var(--space-1); font-size: .9rem; }
+.alchemy-agent__picker input { min-height: 44px; font: inherit; font-size: 16px; padding: 0 var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink); }
+.alchemy-agent__picker-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; max-height: 14rem; overflow-y: auto; }
+.alchemy-agent__picker-option { width: 100%; min-height: 44px; text-align: left; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink); font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.alchemy-agent__picker-option:hover { border-color: var(--wave); }
+.alchemy-agent__picker-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.alchemy-agent__error { margin: 0; color: var(--danger); font-size: .9rem; }
+.alchemy-agent__working { margin: 0; font-size: .9rem; }
+.alchemy-agent__progress { margin: 0; padding-left: 1.25rem; display: grid; gap: var(--space-1); color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
+.alchemy-agent__progress li:last-child { color: var(--ink); }
+.alchemy-agent__summary { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.alchemy-agent__summary p { margin: 0; }
+.alchemy-agent__eyebrow { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.alchemy-agent__results { display: flex; flex-direction: column; gap: var(--space-2); }
+.alchemy-agent__accept-all { align-self: flex-end; min-height: 44px; }
+.alchemy-agent-card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.alchemy-agent-card--accepted, .alchemy-agent-card--dismissed, .alchemy-agent-card--stale { opacity: .6; }
+.alchemy-agent-card p { margin: 0; }
+.alchemy-agent-card__block { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; overflow-wrap: anywhere; }
+.alchemy-agent-card__diff { display: flex; flex-direction: column; gap: var(--space-1); font-size: .95rem; overflow-wrap: anywhere; }
+.alchemy-agent-card__diff del { color: var(--muted); text-decoration-thickness: 1px; }
+.alchemy-agent-card__diff ins { text-decoration: none; padding: var(--space-1) var(--space-2); border-left: 3px solid var(--alchemy-accent, var(--wave)); background: color-mix(in srgb, var(--alchemy-accent, var(--wave)) 7%, transparent); border-radius: var(--radius-xs); }
+.alchemy-agent-card__why { font-size: .9rem; }
+.alchemy-agent-card__quote { margin: 0; padding-left: var(--space-2); border-left: 2px solid var(--line); color: var(--muted); font-size: .85rem; font-style: italic; overflow-wrap: anywhere; }
+.alchemy-agent-card__source { font-size: .85rem; font-weight: 600; overflow-wrap: anywhere; }
+.alchemy-agent-card__own { color: var(--muted); font-size: .85rem; font-style: italic; }
+.alchemy-agent-card__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.alchemy-agent-card__actions .btn { min-height: 44px; }
+.alchemy-agent-card__state { color: var(--muted); font-size: .85rem; }
+.alchemy-lab__connections { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.alchemy-lab__connections > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-size: .85rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.alchemy-lab__connections[open] > summary { margin-bottom: var(--space-2); }
+@media print { .alchemy-agent { display: none !important; } }
+/* On a phone the column is a full-screen sheet; the Lab needs its own surface so the lesson does not show through. */
+@media (max-width: 720px) { .lesson-builder__chat:has(> .alchemy-lab:not([hidden])) { background: var(--paper); overflow-y: auto; overscroll-behavior: contain; } }
