@@ -706,3 +706,38 @@ SAMPLES['kanban:next'] = {
   ],
   proposed: []
 };
+
+// A week of demands on a village choir's secretary before the spring concert: nine items over the
+// four quadrants, one contested, two Do first items linked to tasks (e1 started, e2 open) and a
+// pending proposal on e3. eisenhower:next finishes e1, deletes e2's task, adds a Do first item and
+// moves e7 (once Eliminate) into Delegate.
+const eisenItems = [
+  node('e1', 'item:1', 'Send the venue the final seating plan; they need it by Thursday to set out the chairs.', 'Send seating plan', { tag: 'do' }),
+  node('e2', 'item:2', 'Collect the hired scores from the library before it shuts for the bank holiday.', 'Collect hired scores', { tag: 'do' }),
+  node('e3', 'item:3', 'Ring the accompanist to confirm the rehearsal time has moved to seven.', 'Confirm accompanist', { tag: 'do' }),
+  node('e4', 'item:4', 'Write next season\'s grant application, due at the end of next month.', 'Grant application', { tag: 'schedule' }),
+  node('e5', 'item:5', 'Plan the summer social so the date is in diaries before the holidays.', 'Plan summer social', { tag: 'schedule' }),
+  node('e6', 'item:6', 'Print the programmes; the treasurer has the printer\'s account and offered to do it.', 'Print the programmes', { tag: 'delegate' }),
+  node('e7', 'item:7', 'Answer the newsletter thread about the colour of the concert folders.', 'Folder colour thread', { tag: 'eliminate', state: 'contested', objection: 'Some members feel strongly about this; is dropping it fair to them?' }),
+  node('e8', 'item:8', 'Re-sort the music cupboard by composer.', 'Re-sort the cupboard', { tag: 'eliminate' }),
+  node('e9', 'item:9', 'Book the interval tea urn from the village hall.', 'Book tea urn', { tag: 'delegate' })
+];
+SAMPLES.eisenhower = {
+  ...run('eisenhower', eisenItems),
+  tasks: [
+    { nodeId: 'e1', taskId: 'task-sample-e1', status: 'in_progress' },
+    { nodeId: 'e2', taskId: 'task-sample-e2', status: 'open' }
+  ],
+  proposed: ['e3']
+};
+SAMPLES['eisenhower:next'] = {
+  ...run('eisenhower', [
+    ...eisenItems.map((item) => (item.id === 'e7' ? { ...item, tag: 'delegate' } : item)),
+    node('e10', 'item:10', 'Email the soloists the running order tonight.', 'Send running order', { tag: 'do' })
+  ]),
+  tasks: [
+    { nodeId: 'e1', taskId: 'task-sample-e1', status: 'done' },
+    { nodeId: 'e2', taskId: 'task-sample-e2', status: 'removed' }
+  ],
+  proposed: ['e3']
+};

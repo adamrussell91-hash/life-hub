@@ -26,6 +26,7 @@ import { createParetoView } from '../../../../../packages/problem-solver/render/
 import { createDmaicView } from '../../../../../packages/problem-solver/render/dmaic';
 import { createFifteenPercentView } from '../../../../../packages/problem-solver/render/fifteen-percent';
 import { createKanbanView } from '../../../../../packages/problem-solver/render/kanban';
+import { createEisenhowerView } from '../../../../../packages/problem-solver/render/eisenhower';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -74,7 +75,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   pareto: () => createParetoView(),
   dmaic: () => createDmaicView(),
   fifteen_percent: () => createFifteenPercentView(),
-  kanban: () => createKanbanView()
+  kanban: () => createKanbanView(),
+  eisenhower: () => createEisenhowerView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
@@ -212,7 +214,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       .filter((p) => p.taskId && p.source.runId === runId && (p.status === 'confirmed' || (p.status === 'dismissed' && p.removed)))
       .map((p) => ({ nodeId: p.source.nodeId, taskId: p.taskId!, status: p.status === 'dismissed' ? 'removed' : statuses[p.taskId!] ?? 'unknown' }));
     view.setTasks(links);
-    // Charts that mark a pending proposal on its item (Kanban) also get the waiting node ids.
+    // Charts that mark a pending proposal on its item (Kanban, Eisenhower) also get the waiting node ids.
     view.setProposed?.((last.proposedTasks ?? []).filter((p) => p.status === 'proposed' && p.source.runId === runId).map((p) => p.source.nodeId));
   }
 

@@ -5835,3 +5835,161 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-kanban__arrow--review { width: 26px; height: 14px; }
   .ps-kanban__review > .ps-kanban__lane { flex-basis: 100%; }
 }
+
+/* Eisenhower matrix (toolkit p.129, Implement): a yellow header band split into "Urgent" and "Not
+   urgent" over a 2x2 grid, and a yellow side band down the left split into "Important" and "Not
+   important", the words running up it; the corner where they meet is yellow too. Blue Do first
+   with a large yellow tick, yellow Schedule with a blue pie (its top-right quarter red), yellow
+   Delegate with a red right-pointing triangle, red Eliminate with a blue square crossed by a
+   yellow X. Thin paper rules part every piece; the quadrants are near square, the bands about a
+   fourteenth of the chart. The book sets every band word and heading in white, which is about
+   1.8:1 on its yellow, so on yellow they are the dark on-yellow ink here. The blue square on the
+   red is the book's (1.3:1); the yellow X and the heading tell it, the square is decoration.
+   Items are pills under the icon, a deeper tint of the quadrant; a linked Do first item carries a
+   small Task tag with its live status. Details open in one panel under the chart.
+   Phone (480px): the 2x2 stays, icons shrink and pills wrap. Under 340px the bands go and the
+   quadrants stack, each with its urgency and importance as meta. */
+.ps-eisen {
+  /* Named, so every phone query measures this root box. */
+  container: eisen / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+}
+
+.ps-eisen__chart {
+  --ps-eisen-band: clamp(30px, 7cqi, 42px);
+  --ps-eisen-icon: clamp(52px, 17cqi, 92px);
+  display: grid;
+  grid-template-columns: var(--ps-eisen-band) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: var(--ps-eisen-band) repeat(2, minmax(calc((100cqi - var(--ps-eisen-band)) / 2 * 1.04), auto));
+  gap: 2px;
+}
+
+.ps-eisen__corner,
+.ps-eisen__band,
+.ps-eisen__side { display: grid; place-items: center; min-width: 0; background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-eisen__corner { grid-column: 1; grid-row: 1; }
+.ps-eisen__band--urgent { grid-column: 2; grid-row: 1; }
+.ps-eisen__band--not-urgent { grid-column: 3; grid-row: 1; }
+.ps-eisen__side--important { grid-column: 1; grid-row: 2; }
+.ps-eisen__side--not-important { grid-column: 1; grid-row: 3; }
+.ps-eisen__band-word { font: var(--weight-semibold) 14px / 1 var(--font-ui); white-space: nowrap; }
+.ps-eisen__band-word:empty { display: none; }
+.ps-eisen__side .ps-eisen__band-word { writing-mode: vertical-rl; transform: rotate(180deg); }
+
+.ps-eisen__quadrant {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: clamp(22px, 7cqi, 40px) 14px 16px;
+  text-align: center;
+}
+.ps-eisen__quadrant--do { grid-column: 2; grid-row: 2; background: var(--ps-blue); color: #fff; }
+.ps-eisen__quadrant--schedule { grid-column: 3; grid-row: 2; background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-eisen__quadrant--delegate { grid-column: 2; grid-row: 3; background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-eisen__quadrant--eliminate { grid-column: 3; grid-row: 3; background: var(--ps-red); color: #fff; }
+
+.ps-eisen__head { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ps-eisen__heading { font: var(--weight-bold) 16px / 1.2 var(--font-ui); letter-spacing: 0.02em; text-transform: uppercase; }
+.ps-eisen__meta { font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-eisen__axes { display: none; }
+.ps-eisen__icon { flex: none; width: var(--ps-eisen-icon); height: var(--ps-eisen-icon); margin-top: clamp(14px, 5cqi, 30px); }
+/* The triangle is narrower than its box in the book; the tick stands a touch shorter than the pie. */
+.ps-eisen__icon--do { width: calc(var(--ps-eisen-icon) * 0.92); height: calc(var(--ps-eisen-icon) * 0.92); }
+
+.ps-eisen__items { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; margin-top: 16px; }
+.ps-eisen__items:empty { display: none; }
+.ps-eisen__item { position: relative; display: flex; max-width: 100%; border-radius: var(--radius-full); }
+.ps-eisen__item:has(:focus-visible),
+.ps-eisen__item:has([aria-expanded='true']) { z-index: 2; }
+.ps-eisen__pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 22px;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* A deeper tint of the quadrant, so the words keep (or gain) contrast. */
+.ps-eisen__item[data-fill='blue'] .ps-eisen__pill { background: rgb(0 0 0 / 0.2); color: #fff; }
+.ps-eisen__item[data-fill='yellow'] .ps-eisen__pill { background: rgb(42 34 16 / 0.12); color: var(--ps-on-yellow); }
+.ps-eisen__item[data-fill='red'] .ps-eisen__pill { background: rgb(0 0 0 / 0.16); color: #fff; }
+.ps-eisen__item[data-fill='blue'] .ps-eisen__pill:hover { background: rgb(0 0 0 / 0.3); }
+.ps-eisen__item[data-fill='yellow'] .ps-eisen__pill:hover { background: rgb(42 34 16 / 0.2); }
+.ps-eisen__item[data-fill='red'] .ps-eisen__pill:hover { background: rgb(0 0 0 / 0.26); }
+.ps-eisen__pill:focus-visible,
+.ps-eisen__pill[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-eisen__pill-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 6px; min-width: 0; max-width: 100%; }
+.ps-eisen__pill-head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-eisen__title {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-semibold) 13px / 1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-eisen__item.is-removed .ps-eisen__title { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.ps-eisen__proposed[hidden] { display: none; }
+
+/* The task tag: "Task" and its live status, yellow on the blue (blue on a yellow quadrant). */
+.ps-eisen__task {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 6px;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+}
+.ps-eisen__task[data-fill='blue'] { background: var(--ps-blue); color: #fff; }
+.ps-eisen__task.is-removed { background: var(--ps-card); color: var(--ps-ink); }
+.ps-eisen__tag { font: var(--weight-bold) 10px / 1.5 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; white-space: nowrap; }
+.ps-eisen__task-status { font-weight: var(--weight-semibold); }
+.ps-eisen__task-status::before { content: '·'; margin-right: 6px; }
+.ps-eisen__task-status[hidden] { display: none; }
+
+.ps-eisen__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-eisen__panel:empty { display: none; }
+
+/* Phone: the 2x2 stays, with smaller icons and wrapping pills. */
+@container eisen (max-width: 480px) {
+  .ps-eisen__chart { --ps-eisen-band: 30px; --ps-eisen-icon: clamp(38px, 13cqi, 56px); grid-template-rows: var(--ps-eisen-band) repeat(2, minmax(calc((100cqi - var(--ps-eisen-band)) / 2), auto)); }
+  .ps-eisen__band-word { font-size: 13px; }
+  .ps-eisen__quadrant { padding: 16px 8px 12px; }
+  .ps-eisen__heading { font-size: 14px; }
+  .ps-eisen__icon { margin-top: 10px; }
+  .ps-eisen__items { margin-top: 12px; }
+  .ps-eisen__item { flex: 1 1 auto; }
+  .ps-eisen__pill { width: 100%; padding-inline: 10px; }
+}
+
+/* Very narrow: the bands go and the quadrants stack, each carrying its urgency and importance. */
+@container eisen (max-width: 340px) {
+  .ps-eisen__chart { display: flex; flex-direction: column; gap: 2px; }
+  .ps-eisen__corner,
+  .ps-eisen__band,
+  .ps-eisen__side { display: none; }
+  .ps-eisen__quadrant { min-height: 0; padding: 14px 12px; }
+  .ps-eisen__axes { display: block; }
+}

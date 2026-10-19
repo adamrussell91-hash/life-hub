@@ -50,6 +50,7 @@ const RENDERERS = {
   fifteen_percent: ['fifteen-percent', 'createFifteenPercentView'],
   fifteen_percent_now: ['fifteen-percent', 'createFifteenPercentView'],
   kanban: ['kanban', 'createKanbanView'],
+  eisenhower: ['eisenhower', 'createEisenhowerView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
