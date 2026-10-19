@@ -1,6 +1,7 @@
 // netlify/functions/_shared/problem-solver/scripted-coach.mjs
 import { nextSlots } from '../../../../packages/problem-solver/machine.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
+import { defaultToolFor } from '../../../../packages/problem-solver/steps.mjs';
 import { activeRun } from './session.mjs';
 
 /**
@@ -22,7 +23,13 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'clarify', message: 'Fair enough, that step is behind us now. Before we go on: what did you learn about how you tend to work through problems in that step?' };
   }
   if (session.pendingLearning) {
-    return { ...base, verdict: 'clarify', learning: last || 'No answer given.', message: session.phase === 'finished' ? 'Thank you, that is worth keeping. The whole problem is on the record now; come back to it whenever you need to.' : 'Thank you, that is worth keeping. Let us open the next step with a tool that fits; start it when you are ready.' };
+    const hasTool = session.phase !== 'finished' && session.model && defaultToolFor(session.model.id, session.phase);
+    const message = session.phase === 'finished'
+      ? 'Thank you, that is worth keeping. The whole problem is on the record now; come back to it whenever you need to.'
+      : hasTool
+        ? 'Thank you, that is worth keeping. Let us open the next step with a tool that fits; start it when you are ready.'
+        : 'Thank you, that is worth keeping. There is no tool for this step yet, so tell me what you notice here, or move on when you are ready.';
+    return { ...base, verdict: 'clarify', learning: last || null, message };
   }
   if (session.phase === 'finished') {
     return { ...base, verdict: 'clarify', message: 'The whole problem is on the record. Anything you add now is a note for next time; what would you want to remember?' };
@@ -38,6 +45,7 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   }
   const run = activeRun(session);
+  if (!run && !defaultToolFor(session.model.id, session.phase)) return { ...base, verdict: 'clarify', message: 'There is no tool for this step yet. Tell me what you notice, or move on when you are ready.' };
   if (!run) return { ...base, verdict: 'clarify', message: 'Pick a tool to start this step, and we will work through it one question at a time together.' };
   if (!last) {
     const first = TOOLS[run.tool].steps[0];

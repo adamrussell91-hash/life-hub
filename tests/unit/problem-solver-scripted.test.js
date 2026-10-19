@@ -14,12 +14,22 @@ async function intoDefine() {
   return acceptSuggestion(s, deps);
 }
 
-test('boundary asks what was learned, then records it and suggests the next step\'s tool when there is one', async () => {
+test('boundary asks what was learned, then records it', async () => {
   let s = await step(moveOn(await intoDefine(), deps));
   assert.equal(s.pendingLearning, 'define');
   assert.match(s.turns.at(-1).text, /learn/);
   s = await step(say(s, 'I blame people when I am tired.', deps));
   assert.deepEqual(s.learnings.map((l) => l.step), ['define']);
+  assert.match(s.turns.at(-1).text, /no tool for this step yet/);
+  assert.equal(s.suggestion, null);
+});
+
+test('when the next step has a tool, the learning turn suggests it', async () => {
+  let s = createSession({ text: 'Late rota.' }, deps);
+  s = applyCoachTurn(s, { ...(await scriptedCoach(s)), verdict: 'accept', frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: 'triz', reason: 'r' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }, deps);
+  s = await step(moveOn(acceptSuggestion(s, deps), deps));
+  s = await step(say(s, 'I rush.', deps));
+  assert.equal(s.suggestion?.tool, 'contradiction');
 });
 
 test('finished sessions get a closing line', async () => {

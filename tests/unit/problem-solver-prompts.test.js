@@ -34,7 +34,9 @@ test('frame prompt asks for the missing frame questions and has an empty step la
   const prompt = buildCoachPrompt(createSession({ text: 'Students hand in work late.' }, deps));
   assert.match(prompt.user, /PHASE: frame/);
   assert.match(prompt.user, /Missing frame answers: goal, whatIsTrue, whatCanBeDone/);
-  assert.match(prompt.system[1], /No step yet/);
+  assert.match(prompt.system[1], /NEXT STEP AFTER FRAMING/);
+  assert.match(prompt.system[1], /five_whys \(5 Whys\)/);
+  assert.match(prompt.system[1], /`problem_tree`/);
 });
 
 test('tool prompt lists the tool steps, open slots and progress', () => {
@@ -62,7 +64,7 @@ test('earlier steps are summarised for carry-forward', () => {
   let s = inTool();
   s = applyCoachTurn(s, turn({ node: { slot: 'problem', text: 'Reports are late.' } }), deps);
   s = moveOn(s, deps);
-  assert.match(buildCoachPrompt(s).user, /EARLIER STEPS:\nDefine \(skipped\): 5 Whys done; problem: Reports are late\./);
+  assert.match(buildCoachPrompt(s).user, /EARLIER STEPS:\nDefine \(skipped\): 5 Whys incomplete; problem: Reports are late\./);
 });
 
 test('finished sessions get a closing instruction', () => {
@@ -70,4 +72,23 @@ test('finished sessions get a closing instruction', () => {
   for (const _ of [1, 2, 3, 4, 5]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
   assert.match(buildCoachPrompt(s).user, /PHASE: finished/);
   assert.match(buildCoachPrompt(s).system[1], /The session is finished/);
+});
+
+test('a step with no tools says so and never lists or suggests tools', () => {
+  const analyse = moveOn(inTool(), deps);
+  const { system, user } = buildCoachPrompt(analyse);
+  assert.doesNotMatch(system[1], /TOOLS FOR THIS STEP/);
+  assert.match(system[1], /Do not suggest a tool/);
+  assert.doesNotMatch(user, /No tool is open in this step yet/);
+  const learning = buildCoachPrompt(applyCoachTurn(analyse, turn({ verdict: 'clarify' }), deps));
+  assert.doesNotMatch(learning.user, /next_tool/);
+});
+
+test('awaiting-learning line for a finished session has no orient clause', () => {
+  let s = inTool('five_whys', 'polya');
+  for (const _ of [1, 2, 3, 4, 5]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  s = applyCoachTurn(s, turn({ verdict: 'clarify' }), deps);
+  const line = buildCoachPrompt(s).user.split('\n').find((l) => l.startsWith('AWAITING LEARNING'));
+  assert.ok(line);
+  assert.doesNotMatch(line, /orient/);
 });
