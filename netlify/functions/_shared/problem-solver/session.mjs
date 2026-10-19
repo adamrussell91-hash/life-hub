@@ -1,6 +1,7 @@
 // netlify/functions/_shared/problem-solver/session.mjs
 import { addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
 import { defaultToolFor, firstStep, nextStepAfter, planStep, stepName } from '../../../../packages/problem-solver/steps.mjs';
+import { isDate } from './coach-schema.mjs';
 
 const TITLE_MAX = 120;
 const TEXT_MAX = 12000;
@@ -48,6 +49,8 @@ function withStep(session, id, patch) {
 
 const reviewTitle = (session) => `Review: ${session.title}`.slice(0, TITLE_MAX);
 const addDays = (iso, days) => new Date(Date.parse(iso) + days * DAY_MS).toISOString().slice(0, 10);
+/** A coach date counts only when it is after today; a date in the past cannot be a plan. */
+const afterToday = (due, deps) => typeof due === 'string' && due > deps.now().slice(0, 10);
 const inBook = (session, stepId, book) => Boolean(session.model && planStep(session.model.id, stepId)?.book.includes(book));
 
 /** Add the coach's proposals for placed nodes the tool lets become tasks, once per node. */
@@ -61,7 +64,7 @@ function addProposals(session, items, deps) {
     // One live proposal per node. A node whose task was deleted in Tasks is never proposed again.
     if (list.some((p) => p.source.nodeId === node.id && (p.status !== 'dismissed' || p.removed))) continue;
     if (list.length >= PROPOSALS_MAX) break;
-    list = [...list, { id: deps.newId(), title: item.title.slice(0, TITLE_MAX), status: 'proposed', due: item.due ?? null, source: { runId: run.id, nodeId: node.id } }];
+    list = [...list, { id: deps.newId(), title: item.title.slice(0, TITLE_MAX), status: 'proposed', due: afterToday(item.due, deps) ? item.due : null, source: { runId: run.id, nodeId: node.id } }];
   }
   return { ...session, proposedTasks: list };
 }
@@ -208,7 +211,9 @@ export function applyCoachTurn(session, turn, deps) {
 
   if (mode !== 'boundary' && currentStep(next)) {
     next = addProposals(next, turn.proposeTasks, deps);
-    if (turn.proposeReview && inBook(next, next.phase, 'implement') && !next.reviewTaskId) {
+    // A review the person set aside stays aside; a date that is not after today is no review.
+    const reviewOpen = !next.reviewTaskId && next.reviewProposal?.status !== 'dismissed';
+    if (turn.proposeReview && reviewOpen && afterToday(turn.proposeReview.due, deps) && inBook(next, next.phase, 'implement')) {
       next = { ...next, reviewProposal: { title: reviewTitle(next), due: turn.proposeReview.due, reason: turn.proposeReview.reason, status: 'proposed' } };
     }
   }
@@ -265,6 +270,10 @@ export function acceptSuggestion(session, deps) {
   const current = activeRun(session);
   let next = { ...session, suggestion: null, pendingKeep: null };
   if (current) next = replaceRun(next, suggestion.kind === 'switch_tool' ? { ...current, status: 'switched', switchReason: suggestion.reason } : { ...current, status: 'done' });
+  // A run switched away from is no longer the plan: its open proposals are set aside (not removed).
+  if (current && suggestion.kind === 'switch_tool' && next.proposedTasks?.length) {
+    next = { ...next, proposedTasks: next.proposedTasks.map((p) => (p.source.runId === current.id && p.status === 'proposed' ? { ...p, status: 'dismissed' } : p)) };
+  }
   const step = currentStep(next);
   next = withStep(next, next.phase, { runs: [...step.runs, newRun(suggestion.tool, deps.newId())] });
   return queue(touch(next, deps));
@@ -301,6 +310,7 @@ export function rescoreRadar(session, payload, deps) {
 }
 
 const findProposal = (session, id) => {
+  if (typeof id !== 'string' || !id) throw fail(400, 'validation_error', 'A proposal id is required.');
   const proposal = (session.proposedTasks ?? []).find((p) => p.id === id);
   if (!proposal) throw fail(404, 'not_found', 'That proposed task is gone.');
   return proposal;
@@ -336,7 +346,7 @@ export function setReviewTask(session, payload, deps) {
   if (!taskId || taskId.length > 200) throw fail(400, 'validation_error', 'A task id is required.');
   if (session.reviewTaskId && session.reviewTaskId !== taskId) throw fail(409, 'action_not_allowed', 'This problem already has a review task.');
   if (session.reviewTaskId === taskId) return session;
-  const due = /^\d{4}-\d{2}-\d{2}$/.test(payload?.due ?? '') ? payload.due : session.reviewProposal?.due ?? addDays(deps.now(), REVIEW_AFTER_DAYS);
+  const due = isDate(payload?.due) ? payload.due : session.reviewProposal?.due ?? addDays(deps.now(), REVIEW_AFTER_DAYS);
   const proposal = session.reviewProposal ?? { title: reviewTitle(session), reason: '', due };
   return touch({ ...session, reviewTaskId: taskId, reviewProposal: { ...proposal, due, status: 'confirmed' } }, deps);
 }
