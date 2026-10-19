@@ -7,8 +7,8 @@ import { errorMessage, renderLoadError } from '@/views/feedback';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
-import { TOOLS, TOOL_IDS } from '../../../../../packages/problem-solver/tools/index.mjs';
-import { stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { BOOK_STEPS, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
@@ -118,7 +118,7 @@ function cyclingEmblem(): HTMLElement {
   const order: PsToolId[] = ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'smart'];
   let i = 0;
   const show = () => {
-    const drawing = art(EMBLEM_SVG[order[i % order.length]] ?? '', 'ps-pop');
+    const drawing = art(EMBLEM_SVG[order[i % order.length]], 'ps-pop');
     holder.replaceChildren(drawing);
     i += 1;
   };
@@ -129,14 +129,25 @@ function cyclingEmblem(): HTMLElement {
   return holder;
 }
 
-function toolShelf(): HTMLElement {
-  const shelf = el('ul', 'ps-shelf');
-  for (const id of TOOL_IDS as PsToolId[]) {
-    const item = el('li', 'ps-shelf__tool');
-    item.append(toolEmblem(id), el('span', 'ps-shelf__name', TOOLS[id].name), el('span', 'ps-shelf__when', TOOLS[id].when));
-    shelf.append(item);
+/** Every registered tool, one group per book step (TRIZ's contradiction step is left out). */
+export function toolShelf(): HTMLElement {
+  const groups = el('div', 'ps-shelves');
+  for (const step of BOOK_STEPS) {
+    if (step.id === 'contradiction') continue;
+    const ids = toolsForBookStep(step.id) as PsToolId[];
+    if (!ids.length) continue;
+    const group = el('section', 'ps-shelves__step');
+    group.dataset.step = step.id;
+    const shelf = el('ul', 'ps-shelf');
+    for (const id of ids) {
+      const item = el('li', 'ps-shelf__tool');
+      item.append(toolEmblem(id), el('span', 'ps-shelf__name', TOOLS[id].name), el('span', 'ps-shelf__when', TOOLS[id].when));
+      shelf.append(item);
+    }
+    group.append(el('h3', 'ps-shelves__title', step.name), shelf);
+    groups.append(group);
   }
-  return shelf;
+  return groups;
 }
 
 function skillsRibbon(sessions: PsSummary[]): HTMLElement {
@@ -189,7 +200,7 @@ async function renderList(canvas: HTMLElement): Promise<void> {
   page.append(
     section('Problems', sessions.length ? 'Each badge fills in as you go. Blue, yellow and red are the three framing questions; the centre is the tool in use.' : 'Nothing yet. Start with the problem that is bugging you most.', problems),
     section('How a session builds', 'The order follows the toolkit’s problem solving process.', buildSteps()),
-    section('The toolkit', 'Seven Define tools. The coach chooses, and this is what each one is for.', toolShelf()),
+    section('The toolkit', 'The coach picks from these for each step. Here is what each one is for.', toolShelf()),
     section('Thinking skills you have used', 'Totals across your problems. Faint marks have not come up yet.', skillsRibbon(sessions))
   );
   canvas.replaceChildren(page);

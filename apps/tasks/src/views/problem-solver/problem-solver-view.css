@@ -79,7 +79,10 @@
 .ps-spin--fast { animation-duration: 5s; }
 @keyframes ps-spin { to { transform: rotate(360deg); } }
 
-/* Toolkit shelf */
+/* Toolkit shelf, one group per book step */
+.ps-shelves { display: grid; gap: var(--space-6); }
+.ps-shelves__step { display: grid; gap: var(--space-3); }
+.ps-scope .ps-shelves__title { margin: 0; color: var(--muted); font-size: var(--text-2xs); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
 .ps-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr)); gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
 .ps-shelf__tool { display: grid; align-content: start; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line); transition: background 220ms var(--ps-ease); }
 .ps-shelf__tool:hover { background: var(--ps-card); }
