@@ -18,6 +18,7 @@ import { createAnalogicalReasoningView } from '../../../../../packages/problem-s
 import { createSolutionTreeView } from '../../../../../packages/problem-solver/render/solution-tree';
 import { createLotusBlossomView } from '../../../../../packages/problem-solver/render/lotus-blossom';
 import { createDunckerView } from '../../../../../packages/problem-solver/render/duncker';
+import { createContradictionView } from '../../../../../packages/problem-solver/render/contradiction';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -53,7 +54,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   analogical_reasoning: () => createAnalogicalReasoningView(),
   solution_tree: () => createSolutionTreeView(),
   lotus_blossom: () => createLotusBlossomView(),
-  duncker: () => createDunckerView()
+  duncker: () => createDunckerView(),
+  contradiction: () => createContradictionView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
