@@ -1789,7 +1789,7 @@ describe('SD33/SD34 queue failure and ghost gate (LEVEL 2/4)', () => {
 });
 
 describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
-  async function proposeScheduleViaChat(tasks, github, teaching, label = 'sd') {
+  async function proposeScheduleViaChat(tasks, github, teaching, label = 'sd', taskIds = ['task_a']) {
     const chat = createChatHandler({
       env: validEnv,
       now: () => NOW_MS,
@@ -1801,7 +1801,7 @@ describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
           await args.executeTools({
             id: `call_${label}`,
             name: 'compose_schedule',
-            input: { date: DAY, task_ids: ['task_a'] }
+            input: { date: DAY, task_ids: taskIds }
           });
           yield { type: 'done' };
         }
@@ -2004,6 +2004,15 @@ describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
         estimated_duration: 45,
         depth: 'shallow'
       },
+      // Workflow A's partial confirm lands task_a's block, so B composes other work:
+      // compose skips a task that already holds a confirmed block that day.
+      'tasks/task_b': {
+        id: 'task_b',
+        title: 'Plan Year 9 unit',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
       'meta/planning_profile': planningProfile()
     });
     const teaching = memoryStore();
@@ -2031,7 +2040,7 @@ describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
     assert.equal(failed.status, 503);
 
     blockConfirmed = false;
-    const idB = await proposeScheduleViaChat(tasks, github, teaching, 'sd38b');
+    const idB = await proposeScheduleViaChat(tasks, github, teaching, 'sd38b', ['task_b']);
     assert.notEqual(idA, idB);
     const wfB = await loadWorkflowState(tasks, 'schedule_diff:current');
     assert.equal(wfB?.status, 'awaiting_confirm');

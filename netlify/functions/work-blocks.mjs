@@ -17,6 +17,7 @@ import {
   TASK_PREFIX,
   writeIndex
 } from './_shared/tasks-blobs.mjs';
+import { supersedeDuplicateBlocks } from './_shared/work-block-guard.mjs';
 
 export const config = { path: '/api/work-blocks' };
 
@@ -101,10 +102,15 @@ export function createWorkBlocksHandler(deps = {}) {
           created_at: stamp,
           updated_at: stamp
         });
+        if (typeof parsed.value.split_group === 'string' && parsed.value.split_group.trim()) {
+          block.split_group = parsed.value.split_group.trim();
+        }
         await setJSON(store, workBlockKey(id), block);
         const ids = await readIndex(store, WORK_BLOCKS_INDEX);
         await writeIndex(store, WORK_BLOCKS_INDEX, [...ids, id]);
-        return withCors(okResponse(201, block), request, env);
+        // One block per task per day: a new one replaces the old, unless both are split parts.
+        const superseded = await supersedeDuplicateBlocks(store, block);
+        return withCors(okResponse(201, superseded.length ? { ...block, superseded } : block), request, env);
       }
 
       if (request.method === 'PATCH' || request.method === 'DELETE') {
@@ -132,7 +138,8 @@ export function createWorkBlocksHandler(deps = {}) {
           updated_at: new Date().toISOString()
         });
         await setJSON(store, workBlockKey(id), next);
-        return withCors(okResponse(200, next), request, env);
+        const superseded = await supersedeDuplicateBlocks(store, next);
+        return withCors(okResponse(200, superseded.length ? { ...next, superseded } : next), request, env);
       }
 
       return withCors(methodNotAllowed('GET, POST, PATCH, DELETE, OPTIONS'), request, env);

@@ -177,34 +177,76 @@ export function tasksEventsFromTasks(tasks) {
     })), ...context];
 }
 
+const blockOrder = (a, b) => a.date.localeCompare(b.date) || String(a.start_time ?? '').localeCompare(String(b.start_time ?? ''));
+
+/**
+ * One task split over several blocks, like one lesson taught over several slots
+ * (teaching-calendar lessonLinks). Parts share a split_group; a part may name an
+ * unmarked first block as split_<its id>. Each part learns which part it is and every
+ * part of its task, so the calendar shows one linked task, not lookalike duplicates.
+ */
+function splitParts(blocks) {
+  const live = blocks.filter(block => block.status !== 'cancelled' && typeof block.task_id === 'string' && block.task_id);
+  const ids = new Set(live.map(block => block.id));
+  const named = new Set(live.map(block => block.split_group).filter(group => typeof group === 'string' && group));
+  const groupOf = block => {
+    if (typeof block.split_group === 'string' && block.split_group) {
+      const first = block.split_group.startsWith('split_') ? block.split_group.slice(6) : '';
+      return ids.has(first) ? `split_${first}` : block.split_group;
+    }
+    return named.has(`split_${block.id}`) ? `split_${block.id}` : '';
+  };
+  const byGroup = new Map();
+  for (const block of live) {
+    const group = groupOf(block);
+    if (group) byGroup.set(group, [...(byGroup.get(group) ?? []), block]);
+  }
+  const out = new Map();
+  for (const [group, parts] of byGroup) {
+    if (parts.length < 2) continue;
+    const ordered = [...parts].sort(blockOrder);
+    const sessions = ordered.map(part => ({
+      id: part.id,
+      date: part.date,
+      time: part.start_time,
+      status: typeof part.status === 'string' ? part.status : 'confirmed'
+    }));
+    ordered.forEach((part, index) => {
+      out.set(part.id, { split_group: group, session_index: index + 1, session_count: ordered.length, sessions });
+    });
+  }
+  return out;
+}
+
 /** Emit planned work blocks with time — distinct from hard deadlines. */
 export function tasksEventsFromWorkBlocks(blocks) {
-  return (blocks ?? [])
-    .filter(
-      (block) =>
-        block &&
-        typeof block.id === 'string' &&
-        DATE_KEY.test(block.date) &&
-        TIME_KEY.test(block.start_time) &&
-        block.status !== 'cancelled'
-    )
-    .map((block) => ({
-      path: `work_block:${block.id}`,
-      record: {
-        type: 'work_block',
-        id: block.id,
-        date: block.date,
-        time: block.start_time,
-        duration_min: Number(block.duration_minutes) || 60,
-        title: typeof block.title === 'string' && block.title ? block.title : block.id,
-        status: typeof block.status === 'string' ? block.status : undefined,
-        depth: block.depth,
-        task_id: typeof block.task_id === 'string' && block.task_id ? block.task_id : undefined,
-        ...(typeof block.outcome === 'string' ? { outcome: block.outcome } : {}),
-        ghost: block.status === 'proposed' || Boolean(block.ghost)
-      },
-      body: ''
-    }));
+  const timed = (blocks ?? []).filter(
+    (block) =>
+      block &&
+      typeof block.id === 'string' &&
+      DATE_KEY.test(block.date) &&
+      TIME_KEY.test(block.start_time) &&
+      block.status !== 'cancelled'
+  );
+  const parts = splitParts(timed);
+  return timed.map((block) => ({
+    path: `work_block:${block.id}`,
+    record: {
+      type: 'work_block',
+      id: block.id,
+      date: block.date,
+      time: block.start_time,
+      duration_min: Number(block.duration_minutes) || 60,
+      title: typeof block.title === 'string' && block.title ? block.title : block.id,
+      status: typeof block.status === 'string' ? block.status : undefined,
+      depth: block.depth,
+      task_id: typeof block.task_id === 'string' && block.task_id ? block.task_id : undefined,
+      ...(typeof block.outcome === 'string' ? { outcome: block.outcome } : {}),
+      ...(parts.get(block.id) ?? {}),
+      ghost: block.status === 'proposed' || Boolean(block.ghost)
+    },
+    body: ''
+  }));
 }
 
 const SYDNEY = new Intl.DateTimeFormat('en-CA', {
