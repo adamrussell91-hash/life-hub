@@ -3,10 +3,11 @@
 // red current-state bar in the middle. Forces for change are blue arrows coming in from
 // the left, forces against are yellow arrows coming in from the right, each under its own
 // header with a score pill at the foot of the column. Before scoring every arrow sits at
-// a neutral length, faint and without a number; once scored, its length follows its score
+// a neutral length with a hollow head and no number; once scored, its length follows its score
 // (1 to 5), the number sits in the arrowhead and the rows run largest first. A rescore
 // morphs the lengths and totals from what is on screen and slides rows to their new
-// places. On a phone the sides stack, for above against, around a flat current-state bar.
+// places. On a phone the sides stack, for above against, around a flat current-state bar,
+// and the arrows turn to point down (for) and up (against) at it, words still horizontal.
 // The renderer never calls the API: the page wires `onScore`.
 import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
@@ -170,13 +171,19 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
     const button = makeButton(`ps-force__arrow ps-force__arrow--${side}`, '', detailsId);
     const shape = span(doc, 'ps-force__shape');
     shape.setAttribute('aria-hidden', 'true');
+    // Unscored arrows keep a solid shaft (for contrast) and show this hollow head instead of a number.
+    const tip = span(doc, 'ps-force__tip');
+    tip.setAttribute('aria-hidden', 'true');
     const words = span(doc, 'ps-force__words');
     const title = span(doc, 'ps-force__title', nodeTitle(node));
-    words.append(span(doc, 'ps-force__meta', `${SIDE_META[side]} ${index}`), title);
-    if (node.state === 'contested') words.append(contestedTag(doc, node));
+    // The contested chip shares the meta line, so a contested arrow is no taller than the rest.
+    const metaRow = span(doc, 'ps-force__meta-row');
+    metaRow.append(span(doc, 'ps-force__meta', `${SIDE_META[side]} ${index}`));
+    if (node.state === 'contested') metaRow.append(contestedTag(doc, node));
+    words.append(metaRow, title);
     const num = span(doc, 'ps-force__num');
     num.setAttribute('aria-hidden', 'true');
-    button.append(shape, words, num);
+    button.append(shape, tip, words, num);
     item.append(button);
     const card = detailsCard(doc, node, SIDE_ACCENT[side], detailsId);
     panel.append(card);
@@ -191,7 +198,8 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
   /** A new arrow grows out from its tail to its head, then its words fade in. */
   function animateArrow(arrow: Arrow, delay: number): void {
     if (!canAnimate(arrow.button)) return;
-    const from = arrow.side === 'for' ? 'inset(0 100% 0 0)' : 'inset(0 0 0 100%)';
+    const upright = getComputedStyle(arrow.button).getPropertyValue('--force-flow').trim() === 'column';
+    const from = upright ? (arrow.side === 'for' ? 'inset(0 0 100% 0)' : 'inset(100% 0 0 0)') : arrow.side === 'for' ? 'inset(0 100% 0 0)' : 'inset(0 0 0 100%)';
     arrow.button.animate([{ clipPath: from }, { clipPath: 'inset(0 0 0 0)' }], { duration: 480, delay, easing: EASE, fill: 'backwards' });
     for (const el of [arrow.button.querySelector('.ps-force__words'), arrow.num]) {
       (el as HTMLElement | null)?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: delay + 260, easing: EASE, fill: 'backwards' });
@@ -279,23 +287,21 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
     if (canAnimate(pill)) pill.animate([{ opacity: 0, transform: 'scale(0.85)' }, { opacity: 1, transform: 'none' }], { duration: 360, delay: 200, easing: EASE, fill: 'backwards' });
   }
 
+  /** The live region exists (empty) from the start, so its first message is announced. */
   function syncBadge(totals: Totals | null): void {
-    if (!totals) {
-      badge?.remove();
-      badge = null;
-      return;
-    }
-    const drivers = totals.for > totals.against;
     if (!badge) {
       badge = doc.createElement('p');
       badge.className = 'ps-force__badge';
       badge.setAttribute('role', 'status');
       stage!.after(badge);
-      if (canAnimate(badge)) badge.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 360, delay: 420, easing: EASE, fill: 'backwards' });
     }
+    const drivers = !!totals && totals.for > totals.against;
+    const text = !totals ? '' : drivers ? 'Drivers outweigh restrainers' : 'Restrainers hold';
     badge.classList.toggle('is-drivers', drivers);
-    const text = drivers ? 'Drivers outweigh restrainers' : 'Restrainers hold';
-    if (badge.textContent !== text) badge.textContent = text;
+    if (badge.textContent === text) return;
+    const appearing = !badge.textContent && !!text;
+    badge.textContent = text;
+    if (appearing && canAnimate(badge)) badge.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 360, delay: 420, easing: EASE, fill: 'backwards' });
   }
 
   // Score form: one 1-to-5 slider per force, grouped by side, in slot order.
@@ -310,9 +316,12 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
       fieldset.append(legend);
       order[side].forEach((node, i) => {
         const id = nextId(`ps-force-${side}`);
+        const field = doc.createElement('div');
+        field.className = 'ps-force__field';
         const label = doc.createElement('label');
-        label.className = 'ps-force__field';
+        label.className = 'ps-force__field-name';
         label.htmlFor = id;
+        label.textContent = nodeTitle(node);
         const input = doc.createElement('input');
         input.type = 'range';
         input.min = '1';
@@ -326,13 +335,14 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
         input.value = keep.get(node.id) ?? String(Number.isInteger(prior) ? prior : NEUTRAL);
         const out = doc.createElement('output');
         out.className = 'ps-force__value';
-        out.setAttribute('for', id);
+        // The slider announces its own value; the visible number would only repeat it.
+        out.setAttribute('aria-hidden', 'true');
         out.textContent = input.value;
         input.addEventListener('input', () => {
           out.textContent = input.value;
         });
-        label.append(span(doc, 'ps-force__field-name', nodeTitle(node)), input, out);
-        fieldset.append(label);
+        field.append(label, input, out);
+        fieldset.append(field);
       });
       return fieldset;
     });
@@ -344,16 +354,16 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
     return SIDES.map((side) => order[side].map((node) => node.id).join()).join('|');
   }
 
+  /** Opening focuses the first slider; closing (save, cancel, Escape) always returns to the toggle. */
   function setOpen(open: boolean): void {
     if (!form || !toggle) return;
-    const hadFocus = form.contains(doc.activeElement);
     form.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
     if (open) {
       buildForm(new Map());
       formKey = keyOfForces();
       form.querySelector<HTMLInputElement>('input')?.focus();
-    } else if (hadFocus) toggle.focus();
+    } else toggle.focus();
   }
 
   function ensureScoring(): void {
@@ -475,10 +485,14 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
       // The forces changed under an open form: rebuild it, keeping what was entered.
       if (form && !form.hidden && formKey !== keyOfForces()) {
         const keep = new Map([...form.querySelectorAll<HTMLInputElement>('input[type="range"]')].map((input) => [input.getAttribute('data-for-node')!, input.value]));
-        const hadFocus = form.contains(doc.activeElement);
+        const active = doc.activeElement as HTMLElement | null;
+        // closest() rather than form.contains(): happy-dom's form.contains misses its own fields.
+        const inForm = !!active && active.closest('form') === form;
+        const focused = inForm ? active!.getAttribute('data-for-node') : null;
         buildForm(keep);
         formKey = keyOfForces();
-        if (hadFocus) form.querySelector<HTMLInputElement>('input')?.focus();
+        if (focused) form.querySelector<HTMLInputElement>(`input[data-for-node="${focused}"]`)?.focus();
+        else if (inForm && !active!.isConnected) form.querySelector<HTMLInputElement>('input')?.focus();
       }
     }
 
