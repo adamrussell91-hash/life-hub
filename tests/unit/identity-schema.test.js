@@ -135,14 +135,14 @@ test('validatePersonFieldUpdate accepts professional_profile notes, LinkedIn, wo
     professional_profile: {
       summary: ' Mentors in gifted ed ',
       linkedin_url: 'https://www.linkedin.com/in/joe',
-      current_workplace: 'Redacted College'
+      current_workplace: 'Tallowwood College'
     }
   });
   assert.deepEqual(patch, {
     professional_profile: {
       summary: 'Mentors in gifted ed',
       linkedin_url: 'https://www.linkedin.com/in/joe',
-      current_workplace: ['Redacted College']
+      current_workplace: ['Tallowwood College']
     }
   });
 });

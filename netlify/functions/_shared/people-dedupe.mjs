@@ -77,7 +77,7 @@ export function indexImportedPeople(imported) {
 
 /**
  * "Hector and Hugo Standen" → ["Hector Standen", "Hugo Standen"];
- * "Joseph Histon, Thierry King" → both. Returns null for a single name.
+ * "Wynn Fernleigh, Fern Redgum" → both. Returns null for a single name.
  */
 export function splitCombinedName(raw) {
   const text = cleanIdentityDisplayName(raw).replace(/<br\s*\/?>/gi, ',');

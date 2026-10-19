@@ -11,7 +11,7 @@ function overviewFixture(overrides: Partial<EntityOverview> = {}): EntityOvervie
       schema_version: 1,
       id: PERSON_ID,
       kind: 'person',
-      display_name: 'Henry McLennan',
+      display_name: 'Isla Emberly',
       sort_name: 'McLennan, Henry',
       aliases: [],
       lifecycle_status: 'active',
@@ -68,7 +68,7 @@ function overviewFixture(overrides: Partial<EntityOverview> = {}): EntityOvervie
         endpoint: {
           ref: `shared:organisation:${ORG_ID}`,
           kind: 'organisation',
-          display_label: 'St. Redacted College',
+          display_label: 'Tallowwood College',
           supporting_label: null,
           href: null,
           lifecycle_status: 'active',
@@ -99,11 +99,11 @@ function overviewFixture(overrides: Partial<EntityOverview> = {}): EntityOvervie
 function briefFixture(): PersonBrief {
   return {
     header: {
-      person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Henry McLennan', href: null },
+      person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Isla Emberly', href: null },
       role: 'Mentee',
       organisation: {
         ref: `shared:organisation:${ORG_ID}`,
-        display_name: 'St. Redacted College',
+        display_name: 'Tallowwood College',
         href: null
       },
       next_interaction: null
@@ -130,7 +130,7 @@ describe('buildPersonModel', () => {
     expect(model.ledgerYouOwe).toHaveLength(1);
     expect(model.ledgerYouOwe[0]?.text).toBe('Set up mentoring meeting');
     expect(model.chips.some((c) => /mentee/i.test(c.label))).toBe(true);
-    expect(model.organisation?.displayName).toBe('St. Redacted College');
+    expect(model.organisation?.displayName).toBe('Tallowwood College');
     const warmthChip = model.chips.find((c) => c.kind === 'warmth');
     expect(warmthChip?.label).toMatch(/Warming|Cooling|Cold/);
     expect(warmthChip?.label).not.toMatch(/\d/);
@@ -171,9 +171,9 @@ describe('buildPersonModel', () => {
   it('strips Notion p/ debris from display name and initials', () => {
     const overview = overviewFixture();
     if (overview.entity.kind !== 'person') throw new Error('expected person');
-    overview.entity.display_name = 'p/Carmel Cordaro';
+    overview.entity.display_name = 'p/Hope Tamberlin';
     const model = buildPersonModel({ overview, brief: null });
-    expect(model.displayName).toBe('Carmel Cordaro');
-    expect(model.initials).toBe('CC');
+    expect(model.displayName).toBe('Hope Tamberlin');
+    expect(model.initials).toBe('HT');
   });
 });

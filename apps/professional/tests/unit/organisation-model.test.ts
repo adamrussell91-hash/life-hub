@@ -18,14 +18,14 @@ describe('organisations-query', () => {
   it('parses and serializes omitting defaults (V2)', () => {
     expect(parseOrgsQuery('')).toEqual(defaultOrgsQuery());
     expect(serializeOrgsQuery(defaultOrgsQuery())).toBe('');
-    const q = parseOrgsQuery('?filter=work&sort=az&group=relationship&q=Redacted');
+    const q = parseOrgsQuery('?filter=work&sort=az&group=relationship&q=tallowwood');
     expect(q).toEqual({
       filter: 'work',
       sort: 'az',
       group: 'relationship',
-      q: 'Redacted'
+      q: 'tallowwood'
     });
-    expect(serializeOrgsQuery(q)).toBe('?filter=work&sort=az&group=relationship&q=Redacted');
+    expect(serializeOrgsQuery(q)).toBe('?filter=work&sort=az&group=relationship&q=tallowwood');
   });
 });
 
@@ -34,7 +34,7 @@ describe('buildOrganisationModel', () => {
     const model = buildOrganisationModel({
       id: 'organisation_00000000-0000-4000-8000-000000000002',
       ref: 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002',
-      displayName: 'St. Redacted College',
+      displayName: 'Tallowwood College',
       chips: [
         { kind: 'workplace', label: 'Workplace', detail: '2025–now', filterBucket: 'work' },
         { kind: 'event_venue', label: 'Event venue', detail: '4 events', filterBucket: 'events' }
@@ -51,7 +51,7 @@ describe('buildOrganisationModel', () => {
     expect(model.isCurrentWorkplace).toBe(true);
     expect(chipMatchesFilter(model.chips, 'work')).toBe(true);
     expect(chipMatchesFilter(model.chips, 'study')).toBe(false);
-    expect(orgMonogram('St. Redacted College')).toBe('SAC');
+    expect(orgMonogram('Tallowwood College')).toBe('TC');
   });
 
   it('builds people steps from first-link dates', () => {

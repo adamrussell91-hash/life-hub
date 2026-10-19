@@ -11,24 +11,24 @@ function fixture(): WorldApi {
       { ref: 'shared:person:bob', kind: 'person', display_name: 'Bob', is_self: false, last_contacted: null },
       { ref: 'shared:person:carol', kind: 'person', display_name: 'Carol', is_self: false, last_contacted: null },
       { ref: 'shared:person:drift', kind: 'person', display_name: 'Drift', is_self: false, last_contacted: null },
-      { ref: 'shared:organisation:Redacted', kind: 'organisation', display_name: "Redacted" },
-      { ref: 'shared:organisation:trinity', kind: 'organisation', display_name: 'Trinity' },
+      { ref: 'shared:organisation:tallowwood', kind: 'organisation', display_name: "Tallowwood" },
+      { ref: 'shared:organisation:banksia', kind: 'organisation', display_name: 'Banksia' },
       { ref: 'shared:organisation:buoy', kind: 'organisation', display_name: 'Lone Org' }
     ],
     edges: [],
     clusters: [
       {
-        id: 'shared:organisation:Redacted',
+        id: 'shared:organisation:tallowwood',
         kind: 'organisation',
-        label: "Redacted",
+        label: "Tallowwood",
         member_refs: ['shared:person:adam', 'shared:person:alice', 'shared:person:bob'],
         habitat: 'savannah',
         since: 2018
       },
       {
-        id: 'shared:organisation:trinity',
+        id: 'shared:organisation:banksia',
         kind: 'organisation',
-        label: 'Trinity',
+        label: 'Banksia',
         member_refs: ['shared:person:adam', 'shared:person:carol'],
         habitat: 'island',
         since: 2020
@@ -38,14 +38,14 @@ function fixture(): WorldApi {
       {
         ref: 'shared:person:adam',
         display_name: 'Adam',
-        organisation_refs: ['shared:organisation:Redacted', 'shared:organisation:trinity'],
-        description: 'Connects Redacted and Trinity'
+        organisation_refs: ['shared:organisation:tallowwood', 'shared:organisation:banksia'],
+        description: 'Connects Tallowwood and Banksia'
       }
     ],
     links: [
       {
         source_ref: 'shared:person:adam',
-        target_ref: 'shared:organisation:Redacted',
+        target_ref: 'shared:organisation:tallowwood',
         relationship_type: 'employee_at',
         role: null,
         valid_from: '2018-01-01',
@@ -54,7 +54,7 @@ function fixture(): WorldApi {
       },
       {
         source_ref: 'shared:person:alice',
-        target_ref: 'shared:organisation:Redacted',
+        target_ref: 'shared:organisation:tallowwood',
         relationship_type: 'employee_at',
         role: null,
         valid_from: '2019-01-01',
@@ -63,7 +63,7 @@ function fixture(): WorldApi {
       },
       {
         source_ref: 'shared:person:bob',
-        target_ref: 'shared:organisation:Redacted',
+        target_ref: 'shared:organisation:tallowwood',
         relationship_type: 'employee_at',
         role: null,
         valid_from: '2020-01-01',
@@ -72,7 +72,7 @@ function fixture(): WorldApi {
       },
       {
         source_ref: 'shared:person:adam',
-        target_ref: 'shared:organisation:trinity',
+        target_ref: 'shared:organisation:banksia',
         relationship_type: 'employee_at',
         role: null,
         valid_from: '2020-01-01',
@@ -81,7 +81,7 @@ function fixture(): WorldApi {
       },
       {
         source_ref: 'shared:person:carol',
-        target_ref: 'shared:organisation:trinity',
+        target_ref: 'shared:organisation:banksia',
         relationship_type: 'employee_at',
         role: null,
         valid_from: '2020-01-01',
@@ -111,9 +111,9 @@ function fixture(): WorldApi {
       '2018': {
         clusters: [
           {
-            id: 'shared:organisation:Redacted',
+            id: 'shared:organisation:tallowwood',
             kind: 'organisation',
-            label: "Redacted",
+            label: "Tallowwood",
             member_refs: ['shared:person:adam'],
             habitat: 'savannah',
             since: 2018
@@ -124,17 +124,17 @@ function fixture(): WorldApi {
       '2020': {
         clusters: [
           {
-            id: 'shared:organisation:Redacted',
+            id: 'shared:organisation:tallowwood',
             kind: 'organisation',
-            label: "Redacted",
+            label: "Tallowwood",
             member_refs: ['shared:person:adam', 'shared:person:alice', 'shared:person:bob'],
             habitat: 'savannah',
             since: 2018
           },
           {
-            id: 'shared:organisation:trinity',
+            id: 'shared:organisation:banksia',
             kind: 'organisation',
-            label: 'Trinity',
+            label: 'Banksia',
             member_refs: ['shared:person:adam', 'shared:person:carol'],
             habitat: 'island',
             since: 2020
@@ -144,25 +144,25 @@ function fixture(): WorldApi {
           {
             ref: 'shared:person:adam',
             display_name: 'Adam',
-            organisation_refs: ['shared:organisation:Redacted', 'shared:organisation:trinity'],
-            description: 'Connects Redacted and Trinity'
+            organisation_refs: ['shared:organisation:tallowwood', 'shared:organisation:banksia'],
+            description: 'Connects Tallowwood and Banksia'
           }
         ]
       },
       '2026': {
         clusters: [
           {
-            id: 'shared:organisation:Redacted',
+            id: 'shared:organisation:tallowwood',
             kind: 'organisation',
-            label: "Redacted",
+            label: "Tallowwood",
             member_refs: ['shared:person:adam', 'shared:person:alice', 'shared:person:bob'],
             habitat: 'savannah',
             since: 2018
           },
           {
-            id: 'shared:organisation:trinity',
+            id: 'shared:organisation:banksia',
             kind: 'organisation',
-            label: 'Trinity',
+            label: 'Banksia',
             member_refs: ['shared:person:adam', 'shared:person:carol'],
             habitat: 'island',
             since: 2020
@@ -172,8 +172,8 @@ function fixture(): WorldApi {
           {
             ref: 'shared:person:adam',
             display_name: 'Adam',
-            organisation_refs: ['shared:organisation:Redacted', 'shared:organisation:trinity'],
-            description: 'Connects Redacted and Trinity'
+            organisation_refs: ['shared:organisation:tallowwood', 'shared:organisation:banksia'],
+            description: 'Connects Tallowwood and Banksia'
           }
         ]
       }
@@ -188,9 +188,9 @@ describe('buildWorldModel', () => {
 
   it('counts per community match the members', () => {
     const model = buildWorldModel(fixture(), 2026, today, { isNow: true });
-    const Redacted = model.communities.find((c) => c.id === 'shared:organisation:Redacted')!;
-    expect(Redacted.stats.memberCount).toBe(Redacted.memberRefs.length);
-    expect(Redacted.stats.memberCount).toBe(3);
+    const tallowwood = model.communities.find((c) => c.id === 'shared:organisation:tallowwood')!;
+    expect(tallowwood.stats.memberCount).toBe(tallowwood.memberRefs.length);
+    expect(tallowwood.stats.memberCount).toBe(3);
   });
 
   it('ecotone count equals the number of shared people', () => {
@@ -224,17 +224,17 @@ describe('buildWorldModel', () => {
 
   it('organisation clusters keep orgCount 1 even when members bridge elsewhere (D5)', () => {
     const model = buildWorldModel(fixture(), 2026, today, { isNow: true });
-    const Redacted = model.communities.find((c) => c.id === 'shared:organisation:Redacted')!;
-    expect(Redacted.stats.orgCount).toBe(1);
-    expect(Redacted.why).not.toMatch(/across \d+ organisations/);
+    const tallowwood = model.communities.find((c) => c.id === 'shared:organisation:tallowwood')!;
+    expect(tallowwood.stats.orgCount).toBe(1);
+    expect(tallowwood.why).not.toMatch(/across \d+ organisations/);
   });
 
   it('person in two clusters keeps both homes', () => {
     const model = buildWorldModel(fixture(), 2026, today, { isNow: true });
     const adam = model.people.find((p) => p.ref === 'shared:person:adam')!;
     expect(adam.homeIds.sort()).toEqual([
-      'shared:organisation:Redacted',
-      'shared:organisation:trinity'
+      'shared:organisation:tallowwood',
+      'shared:organisation:banksia'
     ].sort());
   });
 
@@ -258,10 +258,10 @@ describe('layoutCommunities', () => {
     const api = fixture();
     // Layout uses every year — scrubbing must not move islands.
     const layout = layoutCommunities(api);
-    const trinity = layout.communities.find((c) => c.id === 'shared:organisation:trinity')!;
-    const again = layoutCommunities(api).communities.find((c) => c.id === 'shared:organisation:trinity')!;
-    expect(trinity).toEqual(again);
-    expect(Number.isFinite(trinity.x)).toBe(true);
+    const banksia = layout.communities.find((c) => c.id === 'shared:organisation:banksia')!;
+    const again = layoutCommunities(api).communities.find((c) => c.id === 'shared:organisation:banksia')!;
+    expect(banksia).toEqual(again);
+    expect(Number.isFinite(banksia.x)).toBe(true);
   });
 
   it('radius grows with peak members but caps at 260', () => {

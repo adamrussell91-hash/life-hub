@@ -132,8 +132,8 @@ export async function assembleCareerOverview(deps = {}) {
       const { outgoing } = await linkRepo.listForEntity(selfRef, accessContext);
       const items = [];
       // Career river needs the full employee_at period history (BUILD-PLAN §3.3
-      // Roles). Filtering to status=current left only Redacted and collapsed
-      // multi-role employers (e.g. St Pius X) to one band because seen keyed
+      // Roles). Filtering to status=current left only Tallowwood and collapsed
+      // multi-role employers (e.g. Wattle Grove) to one band because seen keyed
       // on org ref. Dedupe by link id so concurrent/stacked roles survive.
       const seen = new Set();
       for (const entry of outgoing) {

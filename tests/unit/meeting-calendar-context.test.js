@@ -47,13 +47,13 @@ test('Notion rows name attendees and the student, without the emoji or the opera
     student_name: 'Aden D.',
     attendees: [
       { name: '👤 Adam Russell' },
-      { name: '👤 Tania Hough' }
+      { name: '👤 Dana Dunmore' }
     ]
   };
-  assert.deepEqual(notionRowPeople(row, 'Adam Russell'), ['Tania Hough', 'Aden D.']);
+  assert.deepEqual(notionRowPeople(row, 'Adam Russell'), ['Dana Dunmore', 'Aden D.']);
   const projection = projectNotionCommunicationSchedule(row, { selfName: 'Adam Russell' });
   assert.equal(projection.location, 'Library');
-  assert.deepEqual(projection.with, ['Tania Hough', 'Aden D.']);
+  assert.deepEqual(projection.with, ['Dana Dunmore', 'Aden D.']);
 });
 
 test('meeting chips read time · with · where', () => {
