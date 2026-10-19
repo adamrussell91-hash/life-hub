@@ -758,3 +758,32 @@ SAMPLES['after_action_review:next'] = run('after_action_review', [
   node('v4', 'learned', 'Label every packet the week before, and plan for more people.', 'Label early, plan for more')
 ]);
 SAMPLES.after_action_review_first = run('after_action_review', aarNodes.slice(0, 2));
+
+// Double-loop learning: a community café keeps running out of milk on Saturdays. The first fix
+// (an extra order on Fridays) held for a fortnight, then it came back, so the run goes round the
+// outer loop: two governing assumptions, a reframe, a new strategy, a small test and a monitor.
+// One contested node. double_loop:next adds a second strategy, so the marker moves back to Action
+// strategy and the box counts "+1". double_loop_held stops at a fix that held: the Match arrow
+// lights and the outer loop stays faint.
+const loopNodes = [
+  node('d1', 'problem', 'The café runs out of milk by eleven most Saturdays, and the late-morning queue gets turned away.', 'Out of milk by eleven'),
+  node('d2', 'single', 'Whoever closes on Friday adds two extra crates to the standing order.', 'Two extra crates on Friday'),
+  node('d3', 'recurs', 'It held for two weekends, then ran short again on the next three, even with the extra crates.', 'Short again within a month', { tag: 'yes' }),
+  node('d4', 'governing:1', 'The order is set from last week\'s sales, so a busy week always follows a quiet one short.', 'Orders follow last week'),
+  node('d5', 'governing:2', 'Volunteers are told never to over-order, because waste is counted and shortages are not.', 'Waste counts, shortages do not', { state: 'contested', objection: 'Is that a rule anyone wrote down, or how one person reads it?' }),
+  node('d6', 'reframe', 'The problem is not the size of the order but that nobody plans Saturday from what is happening that weekend.', 'Nobody plans the weekend'),
+  node('d7', 'strategy:1', 'Set Saturday\'s order on Thursday from the village events list and the weather, and log every shortage as well as waste.', 'Plan from the weekend ahead'),
+  node('d8', 'test', 'Try it for four Saturdays; success is no turned-away queue and no more than one crate thrown away.', 'Four Saturdays, one crate'),
+  node('d9', 'monitor', 'The Thursday volunteer keeps the log, and the committee looks at it at the end of each month.', 'Monthly look at the log')
+];
+SAMPLES.double_loop = run('double_loop', loopNodes);
+SAMPLES['double_loop:next'] = run('double_loop', [
+  ...loopNodes,
+  node('d10', 'strategy:2', 'Keep a reserve crate in the back fridge that only opens after ten on a Saturday.', 'A reserve crate after ten')
+]);
+SAMPLES.double_loop_held = run('double_loop', [
+  loopNodes[0],
+  loopNodes[1],
+  node('d3', 'recurs', 'No shortage in the six Saturdays since, and waste stayed under a crate a week.', 'Six clear Saturdays', { tag: 'no' }),
+  node('d9', 'monitor', 'The Friday closer checks the fridge each week and flags any short Saturday.', 'Weekly fridge check')
+]);

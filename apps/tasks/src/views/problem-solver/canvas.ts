@@ -28,6 +28,7 @@ import { createFifteenPercentView } from '../../../../../packages/problem-solver
 import { createKanbanView } from '../../../../../packages/problem-solver/render/kanban';
 import { createEisenhowerView } from '../../../../../packages/problem-solver/render/eisenhower';
 import { createAfterActionReviewView } from '../../../../../packages/problem-solver/render/after-action-review';
+import { createDoubleLoopView } from '../../../../../packages/problem-solver/render/double-loop';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -78,7 +79,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   fifteen_percent: () => createFifteenPercentView(),
   kanban: () => createKanbanView(),
   eisenhower: () => createEisenhowerView(),
-  after_action_review: () => createAfterActionReviewView()
+  after_action_review: () => createAfterActionReviewView(),
+  double_loop: () => createDoubleLoopView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

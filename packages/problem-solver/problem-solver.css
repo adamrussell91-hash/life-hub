@@ -6168,3 +6168,199 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-aar__answer { font-size: 13px; }
   .ps-aar__share { margin-top: 16px; }
 }
+
+/* Double-loop learning (toolkit p.135, Improve): a square stage with a tall blue outer loop
+   running clockwise and a flatter blue inner loop across its middle; they meet at Action strategy
+   (left) and Problem (right). Yellow Consequences at the top, yellow Governing variables at the
+   bottom, red Problem with a "Start here" pointer, and blue Solution outside the loops at the top
+   right, reached by a curved Match arrow. Loops and arrows show as faint tracks and light as the
+   run goes; boxes stay pale until they hold an entry. A small ink marker sits on the latest box.
+   Phone: boxes show a code and their heading, and a key under the stage carries the entries. */
+.ps-dloop {
+  /* Named, so every phone query measures this root box. */
+  container: dloop / inline-size;
+  --ps-dloop-line: 5px;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+  color: var(--ps-ink);
+}
+.ps-dloop__stage { position: relative; width: 100%; aspect-ratio: 1 / 1; }
+.ps-dloop__loops { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+
+/* The loops: a faint track, and a lit line over it that a mask draws in along the path. */
+.ps-dloop__faint,
+.ps-dloop__line {
+  fill: none;
+  stroke: var(--ps-blue);
+  stroke-width: var(--ps-dloop-line);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.ps-dloop__faint { opacity: 0.2; }
+.ps-dloop__track:not(.is-on) .ps-dloop__line { visibility: hidden; }
+.ps-dloop__arrowhead { fill: var(--ps-blue); opacity: 0.25; }
+.ps-dloop__track.is-on .ps-dloop__arrowhead { opacity: 1; }
+/* The book's Match and Mismatch run a little lighter than the loops. */
+.ps-dloop__track--match :is(.ps-dloop__faint, .ps-dloop__line),
+.ps-dloop__track--mismatch :is(.ps-dloop__faint, .ps-dloop__line) { stroke-width: calc(var(--ps-dloop-line) * 0.8); }
+.ps-dloop__pointer { fill: none; stroke: var(--ps-ink); stroke-width: 1.2px; vector-effect: non-scaling-stroke; }
+.ps-dloop__pointer-head { fill: var(--ps-ink); }
+
+/* Labels: small ink words on the paper, placed where the book puts them. */
+.ps-dloop__labels { position: absolute; inset: 0; pointer-events: none; }
+.ps-dloop__label { position: absolute; }
+.ps-dloop__meta { font: var(--weight-semibold) 10px / 1.25 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-dloop__label--match { transform: translateX(-50%); }
+.ps-dloop__label--match,
+.ps-dloop__label--mismatch { font: var(--weight-regular) 13px / 1.2 var(--font-ui); letter-spacing: 0; text-transform: none; }
+.ps-dloop__label--start { font: italic var(--weight-regular) 13px / 1.2 var(--font-ui); letter-spacing: 0; text-transform: none; transform: translateX(-100%); white-space: nowrap; }
+.ps-dloop__label--single { width: 17%; text-align: center; transform: translate(-50%, -50%); }
+.ps-dloop__label--double { width: 17%; }
+
+/* Boxes: placed by their centre in percent of the stage; height follows the words. */
+.ps-dloop__boxes { position: absolute; inset: 0; }
+.ps-dloop__item { position: absolute; transform: translate(-50%, -50%); }
+.ps-dloop__item:has(:focus-visible),
+.ps-dloop__item.is-open { z-index: 2; }
+.ps-dloop__shape {
+  --ps-dloop-tone: var(--ps-yellow);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ps-dloop-tone) 14%, var(--ps-paper));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-dloop-tone) 55%, transparent);
+  color: var(--ps-ink);
+}
+.ps-dloop__shape[data-tone='red'] { --ps-dloop-tone: var(--ps-red); }
+.ps-dloop__shape[data-tone='blue'] { --ps-dloop-tone: var(--ps-blue); }
+.ps-dloop__shape.is-filled { background: var(--ps-dloop-tone); box-shadow: none; }
+.ps-dloop__shape.is-filled[data-tone='yellow'] { color: var(--ps-on-yellow); }
+.ps-dloop__shape.is-filled:is([data-tone='red'], [data-tone='blue']) { color: #fff; }
+
+.ps-dloop__button {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 10px 11px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-dloop__button:disabled { cursor: default; }
+/* Hover darkens under white text and lightens under ink, so contrast only rises. */
+.ps-dloop__shape.is-filled:is([data-tone='red'], [data-tone='blue']) .ps-dloop__button:hover { background: rgb(0 0 0 / 0.08); }
+.ps-dloop__shape.is-filled[data-tone='yellow'] .ps-dloop__button:hover { background: rgb(255 255 255 / 0.16); }
+.ps-dloop__button:focus-visible,
+.ps-dloop__button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+.ps-dloop__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 6px; max-width: 100%; }
+.ps-dloop__head .ps-dloop__meta { overflow-wrap: anywhere; }
+.ps-dloop__head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-dloop__code { display: none; font: var(--weight-bold) 13px / 1.1 var(--font-ui); }
+.ps-dloop__count { font: var(--weight-bold) 10px / 1.25 var(--font-ui); }
+.ps-dloop__count:empty { display: none; }
+.ps-dloop__title {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  font: var(--weight-semibold) 15px / 1.25 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-dloop__title:empty,
+.ps-dloop__tag:empty { display: none; }
+.ps-dloop__tag { font: italic var(--weight-semibold) 11px / 1.25 var(--font-ui); }
+
+/* The marker: an ink dot with a paper ring, on the top edge of the latest box. */
+.ps-dloop__marker {
+  position: absolute;
+  top: 0;
+  left: 82%;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--ps-ink);
+  box-shadow: 0 0 0 2px var(--ps-paper);
+  pointer-events: none;
+}
+
+/* Details cards, under the stage; each entry in a box has its own card, headed by what it is. */
+.ps-dloop__panel { margin-top: 12px; }
+.ps-dloop .ps-details { width: min(100%, 560px); }
+.ps-dloop .ps-details__card + .ps-details__card { margin-top: 6px; }
+.ps-dloop__card-head { margin: 0 0 4px; color: var(--ink); font: var(--weight-semibold) var(--text-sm) / 1.35 var(--font-ui); }
+
+/* The key: only on a phone. */
+.ps-dloop__key { display: none; }
+
+/* Phone: boxes carry a code and their heading; the key under the stage carries each latest entry
+   and is the touch target. Thinner loops. */
+@container dloop (max-width: 480px) {
+  .ps-dloop { --ps-dloop-line: 3.5px; }
+  .ps-dloop__button { min-height: 0; padding: 6px 4px 7px; gap: 1px; }
+  .ps-dloop__code { display: block; }
+  .ps-dloop__head { flex-direction: column; gap: 1px; }
+  .ps-dloop__head .ps-dloop__meta { letter-spacing: 0.02em; text-transform: none; font-size: 11px; }
+  .ps-dloop__head .ps-objection,
+  .ps-dloop__count,
+  .ps-dloop__title,
+  .ps-dloop__tag { display: none; }
+  .ps-dloop__label--match,
+  .ps-dloop__label--mismatch,
+  .ps-dloop__label--start { font-size: 11px; }
+  .ps-dloop__label--single,
+  .ps-dloop__label--double { width: 25%; letter-spacing: 0.02em; }
+  .ps-dloop__marker { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
+
+  .ps-dloop__key { display: grid; gap: 6px; margin-top: 14px; }
+  .ps-dloop__key-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 10px 6px 6px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--ps-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ps-dloop__key-item:disabled { cursor: default; }
+  .ps-dloop__key-item.is-open { box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+  .ps-dloop__key-code {
+    --ps-dloop-tone: var(--ps-yellow);
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ps-dloop-tone) 14%, var(--ps-paper));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-dloop-tone) 55%, transparent);
+    font: var(--weight-bold) 13px / 1 var(--font-ui);
+  }
+  .ps-dloop__key-item[data-tone='red'] .ps-dloop__key-code { --ps-dloop-tone: var(--ps-red); }
+  .ps-dloop__key-item[data-tone='blue'] .ps-dloop__key-code { --ps-dloop-tone: var(--ps-blue); }
+  .ps-dloop__key-item.is-filled .ps-dloop__key-code { background: var(--ps-dloop-tone); box-shadow: none; color: #fff; }
+  .ps-dloop__key-item.is-filled[data-tone='yellow'] .ps-dloop__key-code { color: var(--ps-on-yellow); }
+  .ps-dloop__key-words { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .ps-dloop__key-tag { font: italic var(--weight-semibold) 12px / 1.3 var(--font-ui); }
+  .ps-dloop__key-tag:empty { display: none; }
+  .ps-dloop__key-meta { font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+  .ps-dloop__key-title { min-width: 0; font: var(--weight-semibold) 14px / 1.3 var(--font-ui); overflow-wrap: anywhere; }
+  .ps-dloop__key-item .ps-objection { align-self: flex-start; margin-top: 2px; }
+}
