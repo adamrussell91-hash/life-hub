@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next]
+// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>]
+// --click clicks a control first (such as a layout toggle); --name adds -<suffix> to the PNG names.
 // --next applies SAMPLES['<tool>:next'] after load and shoots <tool>-next-<width>.png (radar morph end state).
 // Bundles a renderer with a synthetic sample run, then screenshots it at 900px and 390px.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -20,6 +21,7 @@ const RENDERERS = {
   smart: ['smart', 'createSmartView'],
   causal_map: ['causal-map', 'createCausalMapView'],
   perspective_shift: ['perspective-shift', 'createPerspectiveShiftView'],
+  radial_tree: ['radial-tree', 'createRadialTreeView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
@@ -32,6 +34,10 @@ const openNode = openIndex >= 0 ? args.splice(openIndex, 2)[1] : null;
 const nextIndex = args.indexOf('--next');
 const applyNext = nextIndex >= 0;
 if (applyNext) args.splice(nextIndex, 1);
+const clickIndex = args.indexOf('--click');
+const clickSelector = clickIndex >= 0 ? args.splice(clickIndex, 2)[1] : null;
+const nameIndex = args.indexOf('--name');
+const suffix = nameIndex >= 0 ? `-${args.splice(nameIndex, 2)[1]}` : '';
 const [tool, outDir] = args;
 if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
   console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next]`);
@@ -71,6 +77,10 @@ for (const width of [900, 390]) {
   tab.on('pageerror', (e) => console.error('page error:', e.message));
   await tab.goto(`file://${page}`);
   await tab.waitForTimeout(900);
+  if (clickSelector) {
+    await tab.click(clickSelector);
+    await tab.waitForTimeout(1000);
+  }
   if (openNode) {
     await tab.click(`[data-node="${openNode}"] button`);
     await tab.waitForTimeout(500);
@@ -81,8 +91,9 @@ for (const width of [900, 390]) {
   }
   const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (overflow > 0) console.warn(`horizontal overflow at ${width}px: ${overflow}px`);
-  await tab.screenshot({ path: join(outDir, `${tool}${applyNext ? '-next' : ''}-${width}.png`), fullPage: true });
+  await tab.screenshot({ path: join(outDir, `${tool}${applyNext ? '-next' : ''}${suffix}-${width}.png`), fullPage: true });
   await ctx.close();
 }
 await browser.close();
-console.log(`wrote ${outDir}/${tool}-900.png and ${tool}-390.png`);
+const stem = `${tool}${applyNext ? '-next' : ''}${suffix}`;
+console.log(`wrote ${outDir}/${stem}-900.png and ${stem}-390.png`);
