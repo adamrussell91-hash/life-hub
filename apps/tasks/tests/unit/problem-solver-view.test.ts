@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mountCoachPanel, renderCoachPanel } from '@/views/problem-solver/coach-panel';
 import { createTrack, problemMedal } from '@/views/problem-solver/decor';
 import { mountCanvas } from '@/views/problem-solver/canvas';
+import { resumeTarget } from '@/views/problem-solver/view';
 import type { PsSession } from '../../../../packages/problem-solver/types';
 
 const morph = vi.hoisted(() => vi.fn());
@@ -385,5 +386,18 @@ describe('session page scores', () => {
     get.mockRestore();
     score.mockRestore();
     location.hash = '';
+  });
+});
+
+describe('resumeTarget', () => {
+  it('returns the plan step only when it is the next step', () => {
+    expect(resumeTarget(session({ phase: 'implement' }), 'improve')).toBe('improve');
+    expect(resumeTarget(session({ phase: 'implement', model: { id: 'polya', reason: '' } }), 'improve')).toBe('evaluate');
+  });
+  it('returns null when already there, past it, or not next', () => {
+    expect(resumeTarget(session({ phase: 'improve' }), 'improve')).toBeNull();
+    expect(resumeTarget(session({ phase: 'define' }), 'improve')).toBeNull();
+    expect(resumeTarget(session({ phase: 'implement' }), null)).toBeNull();
+    expect(resumeTarget(session({ model: null, phase: 'implement' }), 'improve')).toBeNull();
   });
 });
