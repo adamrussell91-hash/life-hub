@@ -7,10 +7,13 @@
 // in proportion to each branch's leaves, so a busy branch gets a wider slice.
 // Words: the aim's title sits inside it near the base, or just under the base when it
 // will not fit. Every how carries a code (A, A1, A2…, as in the radial tree) inside its
-// triangle, or just outside when the triangle is too small to hold it. On a wide panel a
-// how's title sits beside its triangle where it covers nothing and clearly reads as that
-// triangle's; any other title is a tip on hover, focus or while open, and the key under
-// the chart lists it. On a narrow panel every title moves to the key.
+// triangle, or just outside when the triangle is too small to hold it (a phone keeps a lane
+// after the red ring for those). Triangles are sized by ring, not by slice: red smallest,
+// then yellow, then blue. On a wide panel every how's title sits beside its triangle when
+// all of them can (covering nothing and clearly reading as their own); otherwise none do,
+// every title goes to the key under the chart, and the fan grows into the room they left.
+// A title not beside its triangle is a tip on hover, focus or while open. On a narrow panel
+// every title is in the key.
 // A how exists only once accepted; a new one grows out of its parent's outer edge (the
 // aim's point for the first ring), and triangles that move because of it glide.
 import type { Accent } from './details';
@@ -36,9 +39,12 @@ const FAN_PHONE: [number, number] = [-150, -30];
 /** The aim, in chart units: height and base half-width. */
 const AIM_H = 76;
 const AIM_HW = 30;
-/** Base half-width caps per level (2, 3, 4+), and the gap kept between neighbours. */
-const HW_CAP = [13, 15, 18];
+/** Base half-width caps per level (2, 3, 4+): red smallest, yellow middle, blue largest, as in the book. */
+const HW_CAP = [11, 14, 17];
+/** The gap kept between neighbours on a ring (chart units). */
 const GAP = 1.4;
+/** The extra gap (chart units) after the first ring on a phone, where the red wedges' codes sit. */
+const CODE_LANE = 12;
 const MAX_U = 2.6;
 const MAX_STAGE = 680;
 /** Room kept either side of the fan for titles on a wide panel (px), and above it. */
@@ -71,10 +77,13 @@ function letter(i: number): string {
 }
 
 /** Where a level's triangles start and end, out from the aim's point (chart units). */
-function band(level: number): [number, number] {
-  if (level <= 2) return [0, 34];
-  const start = 38 + (level - 3) * 34;
-  return [start, start + 28];
+function band(level: number, lane = 0): [number, number] {
+  // Lengths grow outward (30, 32, 38…), and each ring starts clear of the corners of the one inside it.
+  // `lane` widens the gap after the first ring, where a phone puts the red wedges' codes.
+  if (level <= 2) return [0, 30];
+  if (level === 3) return [34 + lane, 66 + lane];
+  const start = 70 + lane + (level - 4) * 42;
+  return [start, start + 38];
 }
 
 // Plane geometry, all in stage pixels.
@@ -237,8 +246,14 @@ function buildModel(run: PsToolRun, rootId: string): Model {
   return { root: rootId, parent, kids, level, code, order };
 }
 
-/** Each subtree takes a slice of the fan in proportion to its leaves; each how sits mid-slice. */
-function fanLayout(model: Model, [from, to]: [number, number]): Map<string, Geo> {
+/**
+ * Each subtree takes a slice of the fan in proportion to its leaves; each how sits mid-slice.
+ * Size goes by level, not by slice: every triangle on a ring takes the size the narrowest slice
+ * on that ring allows (up to the ring's cap), and no ring is wider than the one outside it, so
+ * red stays smallest and blue largest. Each triangle stays inside its own slice, and each ring
+ * starts beyond the corners of the one inside it, so no two triangles overlap.
+ */
+function fanLayout(model: Model, [from, to]: [number, number], lane = 0): Map<string, Geo> {
   const leaves = new Map<string, number>();
   const count = (id: string): number => {
     const kids = model.kids.get(id) ?? [];
@@ -247,16 +262,16 @@ function fanLayout(model: Model, [from, to]: [number, number]): Map<string, Geo>
     return n;
   };
   count(model.root);
-  const out = new Map<string, Geo>();
+  const slices = new Map<string, { a: number; sweep: number; level: number }>();
+  const room = new Map<number, number>();
   const place = (id: string, start: number, sweep: number, level: number) => {
     if (level > 1) {
-      const a = start + sweep / 2;
-      const [ra, rb] = band(level);
+      slices.set(id, { a: start + sweep / 2, sweep, level });
+      const rb = band(level, lane)[1];
       const half = Math.tan(rad(Math.min(sweep, 170) / 2));
       // Level-2 wedges share the aim's point, so they keep a slim angle apart; deeper ones keep a gap.
-      const room = level === 2 ? rb * half * 0.9 : rb * half - GAP;
-      const hw = Math.max(2.5, Math.min(HW_CAP[Math.min(level, 4) - 2], room));
-      out.set(id, { x: ra * Math.cos(rad(a)), y: ra * Math.sin(rad(a)), a, len: rb - ra, hw });
+      const r = level === 2 ? rb * half * 0.9 : rb * half - GAP;
+      room.set(level, Math.min(room.get(level) ?? Infinity, r));
     }
     let s = start;
     for (const kid of model.kids.get(id) ?? []) {
@@ -266,6 +281,17 @@ function fanLayout(model: Model, [from, to]: [number, number]): Map<string, Geo>
     }
   };
   place(model.root, from, to - from, 1);
+  const hw = new Map<number, number>();
+  const deepest = Math.max(1, ...room.keys());
+  for (let level = deepest; level >= 2; level -= 1) {
+    const own = Math.max(0.8, Math.min(HW_CAP[Math.min(level, 4) - 2], room.get(level) ?? Infinity));
+    hw.set(level, Math.min(own, hw.get(level + 1) ?? Infinity));
+  }
+  const out = new Map<string, Geo>();
+  for (const [id, { a, level }] of slices) {
+    const [ra, rb] = band(level, lane);
+    out.set(id, { x: ra * Math.cos(rad(a)), y: ra * Math.sin(rad(a)), a, len: rb - ra, hw: hw.get(level)! });
+  }
   return out;
 }
 
@@ -286,7 +312,11 @@ type Entry = {
   /** Its code's centre and its label box, relative to its point, in px. */
   codeAt: Point | null;
   labelAt: Point | null;
+  /** Which spot its title took (out, a corner, a side), so a fade only follows a real move. */
+  spot: string | null;
   beside: boolean;
+  /** The aim only: a hidden copy of its words set as they would sit under the base, for measuring. */
+  probe: HTMLSpanElement | null;
   anims: Animation[];
 };
 
@@ -389,7 +419,14 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
       label.addEventListener('click', () => button.click());
     }
     if (node.state === 'contested') label.append(contestedTag(doc, node));
-    if (isAim) button.append(label);
+    let probe: HTMLSpanElement | null = null;
+    if (isAim) {
+      probe = label.cloneNode(true) as HTMLSpanElement;
+      probe.classList.add('is-probe');
+      probe.setAttribute('data-side', 'below');
+      probe.setAttribute('aria-hidden', 'true');
+      button.append(label, probe);
+    }
     item.append(rot);
     if (code) item.append(code, label);
 
@@ -402,7 +439,7 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
     const entry: Entry = {
       id: node.id, item, rot, button, code, label, card,
       title: nodeTitle(node), contested: node.state === 'contested',
-      level: 0, parent: null, geo: null, codeAt: null, labelAt: null, beside: false, anims: []
+      level: 0, parent: null, geo: null, codeAt: null, labelAt: null, spot: null, beside: false, probe, anims: []
     };
     entries.set(node.id, entry);
     return entry;
@@ -450,9 +487,10 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
   /**
    * Places the aim's words, every code and every title. Writes widths first, reads every
    * size in one pass, scores in plain arithmetic, then writes places; no layout is forced
-   * between writes. Returns the extra height the aim's words need under the chart.
+   * between writes. `beside` asks for titles beside their triangles; the result says whether
+   * they all fit (else they are all tips) and the extra height the aim's words need under the chart.
    */
-  function placeWords(u: number, W: number, H: number, compact: boolean): number {
+  function placeWords(u: number, W: number, H: number, tryBeside: boolean): { extra: number; allBeside: boolean } {
     const hows = model!.order.map((id) => entries.get(id)!).filter((e) => e.geo);
     const aim = entries.get(model!.root)!;
     const insideW = 2 * AIM_HW * u * 0.52;
@@ -462,13 +500,15 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
     // 1. Writes.
     aim.label.setAttribute('data-side', 'inside');
     aim.label.style.setProperty('--ww', `${f(insideW)}px`);
+    aim.probe!.style.setProperty('--ww', `${f(belowW)}px`);
     for (const e of hows) e.label.style.setProperty('--lw', `${LABEL_W}px`);
 
     // 2. Reads.
     const aimTitle = aim.label.querySelector<HTMLElement>('.ps-soltree__title')!;
     const aimSize = {
       h: aim.label.offsetHeight,
-      clamped: aimTitle.scrollHeight > aimTitle.clientHeight + 1 || aimTitle.scrollWidth > aimTitle.clientWidth + 1
+      clamped: aimTitle.scrollHeight > aimTitle.clientHeight + 1 || aimTitle.scrollWidth > aimTitle.clientWidth + 1,
+      below: aim.probe!.offsetHeight
     };
     const sizes = new Map(hows.map((e) => [e.id, { w: e.label.offsetWidth, h: e.label.offsetHeight, cw: e.code!.offsetWidth, ch: e.code!.offsetHeight }]));
 
@@ -477,8 +517,9 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
     const fits = aimSize.h > 0
       ? !aimSize.clamped && aimSize.h <= insideH
       : est.lines <= 3 && !est.tooWide && est.h + 14 + (aim.contested ? 16 : 0) <= insideH;
-    const below = estimate(aim.title, 15, belowW);
-    const extra = fits ? 0 : below.h + 18 + (aim.contested ? 18 : 0) + 6;
+    // Under the base: the probe's measured height plus its 8px gap (an estimate where the page has no layout).
+    const below = aimSize.below || estimate(aim.title, 15, belowW).h + 14 + (aim.contested ? 18 : 0);
+    const extra = fits ? 0 : below + 8 + 6;
 
     const tris = new Map<string, Tri>();
     for (const e of [aim, ...hows]) tris.set(e.id, triangle(e, u));
@@ -507,7 +548,7 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
     };
 
     type Spot = { key: string; anchor: Point; dir: Point };
-    const spots = (e: Entry): Spot[] => {
+    const spots = (e: Entry, forCode = false): Spot[] => {
       const [p, c1, c2] = tris.get(e.id)!;
       const g = { x: (p.x + c1.x + c2.x) / 3, y: (p.y + c1.y + c2.y) / 3 };
       const base = { x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 };
@@ -526,11 +567,12 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
         s1: side(p, c1),
         s2: side(p, c2)
       };
-      const leaf = !(model!.kids.get(e.id)?.length);
+      // Codes and leaves' titles go straight out first; a parent's title tries its sides first.
+      const leaf = forCode || !(model!.kids.get(e.id)?.length);
       return (leaf ? ['out', 'c1', 'c2', 's1', 's2'] : ['s1', 's2', 'c1', 'c2', 'out']).map((k) => ({ ...all[k], key: k }));
     };
 
-    const result = new Map<string, { code: Point; codeOut: boolean; label: Box; align: string; beside: boolean }>();
+    const result = new Map<string, { code: Point; codeOut: boolean; label: Box; align: string; spot: string | null; beside: boolean }>();
     // Codes: inside, at the triangle's incentre, when the whole code fits; otherwise just outside.
     for (const e of hows) {
       const s = sizes.get(e.id)!;
@@ -541,67 +583,102 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
       const L = e.geo!.len * u;
       const h = e.geo!.hw * u;
       const r = (L * h) / (Math.hypot(L, h) + h);
-      const at = add(p, unitOf(sub({ x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 }, p)), L - r);
-      const box = { x: at.x - cw / 2, y: at.y - ch / 2, w: cw, h: ch };
-      if (corners(box).every((c) => inTri(c, tris.get(e.id)!, 1))) {
-        result.set(e.id, { code: at, codeOut: false, label: box, align: 'start', beside: false });
+      const axis = unitOf(sub({ x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 }, p));
+      // The incentre first; a slim wedge may still hold the code nearer its base, where it is wider.
+      const along = [L - r, ...Array.from({ length: 14 }, (_, i) => L * (0.94 - i * 0.04))];
+      const inside = along
+        .map((d) => add(p, axis, d))
+        .find((at) => corners({ x: at.x - cw / 2, y: at.y - ch / 2, w: cw, h: ch }).every((c) => inTri(c, tris.get(e.id)!, 1)));
+      if (inside) {
+        result.set(e.id, { code: inside, codeOut: false, label: { x: inside.x - cw / 2, y: inside.y - ch / 2, w: cw, h: ch }, align: 'start', spot: null, beside: false });
         continue;
       }
       let best: { box: Box; n: number; i: number } | null = null;
-      spots(e).forEach((spot, i) => {
-        // A little further out than a title, so the chip clears the focus and open ring.
-        const b = boxAt(add(spot.anchor, spot.dir, 3), spot.dir, cw - 2, ch - 2).box;
-        const n = faults(b, e.id, 1, 3);
-        if (!best || n < best.n || (n === best.n && i < best.i)) best = { box: b, n, i };
+      // A little further out than a title, so the chip clears the focus and open ring; where
+      // that is crowded, a step or two further along the same direction.
+      [1, 6, 12].forEach((gap, step) => {
+        spots(e, true).forEach((spot, i) => {
+          const b = boxAt(add(spot.anchor, spot.dir, gap), spot.dir, cw - 2, ch - 2).box;
+          const n = faults(b, e.id, 1, 3);
+          const rank = step * 10 + i;
+          if (!best || n < best.n || (n === best.n && rank < best.i)) best = { box: b, n, i: rank };
+        });
       });
       const b = (best as { box: Box } | null)!.box;
       placed.push(b);
-      result.set(e.id, { code: { x: b.x + b.w / 2, y: b.y + b.h / 2 }, codeOut: true, label: b, align: 'start', beside: false });
+      result.set(e.id, { code: { x: b.x + b.w / 2, y: b.y + b.h / 2 }, codeOut: true, label: b, align: 'start', spot: null, beside: false });
     }
 
-    // Titles beside their triangles (wide only), inner rings first.
+    // Titles beside their triangles (wide only), inner rings first. It is all or nothing: if any
+    // title cannot sit cleanly beside its own triangle, every title moves to the key (the codes stay
+    // on the chart), so the chart never mixes the two and one new how cannot reshuffle the rest.
     const byLevel = [...hows].sort((a, b) => a.level - b.level);
-    for (const e of byLevel) {
+    const boxSize = (e: Entry): { w: number; h: number } => {
       const s = sizes.get(e.id)!;
       const est = estimate(e.title, 12, LABEL_W - 12);
-      const w = s.w || Math.max(est.w, e.contested ? 70 : 0) + 30;
-      const h = s.h || Math.min(est.lines, 2) * 14.4 + 4 + (e.contested ? 16 : 0);
-      const r = result.get(e.id)!;
-      let chosen: { box: Box; align: string } | null = null;
-      if (!compact) {
+      return {
+        w: s.w || Math.max(est.w, e.contested ? 70 : 0) + 12,
+        // The code chip's line, then the title (two lines at most), then any tag.
+        h: s.h || 15 + 1 + Math.min(est.lines, 2) * 14.4 + 4 + (e.contested ? 16 : 0)
+      };
+    };
+    const beside = new Map<string, { box: Box; align: string; spot: string }>();
+    if (tryBeside) {
+      for (const e of byLevel) {
+        const { w, h } = boxSize(e);
+        let chosen: { box: Box; align: string; spot: string } | null = null;
         let bestCost = Infinity;
         spots(e).forEach((spot, i) => {
           const { box, align } = boxAt(spot.anchor, spot.dir, w, h);
           if (faults(box, e.id, 3, 8)) return;
-          // A small bonus for the place it already has, so titles don't hop.
-          const was = e.labelAt && e.geo ? Math.hypot(box.x - (tris.get(e.id)![0].x + e.labelAt.x), box.y - (tris.get(e.id)![0].y + e.labelAt.y)) < 2 : false;
-          const cost = i * 10 - (was ? 15 : 0);
+          // A small bonus for the spot it already has, so titles don't hop.
+          const cost = i * 10 - (e.beside && e.spot === spot.key ? 15 : 0);
           if (cost < bestCost) {
             bestCost = cost;
-            chosen = { box, align };
+            chosen = { box, align, spot: spot.key };
           }
         });
+        if (!chosen) break;
+        beside.set(e.id, chosen);
+        placed.push((chosen as { box: Box }).box);
       }
-      if (chosen) {
-        const c = chosen as { box: Box; align: string };
-        placed.push(c.box);
-        result.set(e.id, { ...r, label: c.box, align: c.align, beside: true });
-      } else {
-        // A tip floats over the rest: it keeps to the stage and clear of every triangle where it can, its own at least.
-        const own = tris.get(e.id)!;
-        const options = spots(e).map((spot) => boxAt(spot.anchor, spot.dir, w, h));
-        const clear = (o: { box: Box }, t: Tri) => !boxHitsTri(grow(o.box, 2), t);
-        const tip = options.find((o) => inStage(o.box) && [...tris.values()].every((t) => clear(o, t)))
-          ?? options.find((o) => inStage(o.box) && clear(o, own))
-          ?? options[0];
-        const box = { ...tip.box, x: Math.max(2, Math.min(W - 2 - tip.box.w, tip.box.x)), y: Math.max(0, Math.min(stageBox.h - tip.box.h, tip.box.y)) };
-        result.set(e.id, { ...r, label: box, align: tip.align, beside: false });
+    }
+    const allBeside = tryBeside && beside.size === hows.length;
+    for (const e of byLevel) {
+      const r = result.get(e.id)!;
+      const b = allBeside ? beside.get(e.id)! : null;
+      if (b) {
+        result.set(e.id, { ...r, label: b.box, align: b.align, spot: b.spot, beside: true });
+        continue;
       }
+      // A tip floats over the rest. It keeps to the stage and clear of every triangle where it can;
+      // otherwise clear of its own and crossing as few others as possible.
+      const { w, h } = boxSize(e);
+      const own = tris.get(e.id)!;
+      const options = spots(e).map((spot) => ({ ...boxAt(spot.anchor, spot.dir, w, h), spot: spot.key }));
+      const crossings = (box: Box) => [...tris.values()].filter((t) => boxHitsTri(grow(box, 2), t)).length;
+      const ranked = options
+        .map((o, i) => ({ o, i, n: crossings(o.box), ok: inStage(o.box), mine: boxHitsTri(grow(o.box, 2), own) }))
+        .sort((a, b) => Number(b.ok) - Number(a.ok) || Number(a.mine) - Number(b.mine) || a.n - b.n || a.i - b.i);
+      const tip = ranked[0].o;
+      const box = { ...tip.box, x: Math.max(2, Math.min(W - 2 - tip.box.w, tip.box.x)), y: Math.max(0, Math.min(stageBox.h - tip.box.h, tip.box.y)) };
+      result.set(e.id, { ...r, label: box, align: tip.align, spot: tip.spot, beside: false });
+    }
+
+    // Hit halos: a triangle's pointer area widens toward its base by at most half the gap to its
+    // nearest neighbour (and never more than 6px); its point is never widened.
+    const halo = new Map<string, number>();
+    for (const e of [aim, ...hows]) {
+      const [, c1, c2] = tris.get(e.id)!;
+      let gap = 12;
+      for (const [id, t] of tris) if (id !== e.id) gap = Math.min(gap, pointTriDistance(c1, t), pointTriDistance(c2, t));
+      halo.set(e.id, Math.max(0, Math.min(6, gap / 2)));
     }
 
     // 4. Writes.
     aim.label.setAttribute('data-side', fits ? 'inside' : 'below');
     if (!fits) aim.label.style.setProperty('--ww', `${f(belowW)}px`);
+    for (const e of [aim, ...hows]) e.item.style.setProperty('--halo', `${f(halo.get(e.id)!)}px`);
     for (const e of hows) {
       const r = result.get(e.id)!;
       const p = tris.get(e.id)![0];
@@ -616,8 +693,9 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
       e.label.classList.toggle('is-beside', r.beside);
       e.label.classList.toggle('is-tip', !r.beside);
       e.beside = r.beside;
+      e.spot = r.spot;
     }
-    return extra;
+    return { extra, allBeside };
   }
 
   /** The key: every how whose title is not beside its triangle, in tree order, indented by level. */
@@ -695,16 +773,35 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
     // Reads: the width, and where every triangle is drawn now (mid-glide included).
     const cw = containerWidth();
     const stageRect = animate ? stage!.getBoundingClientRect() : null;
-    const before = new Map<string, { p: Point; a: number }>();
+    // A triangle still moving is read as drawn: its turn, its scale, and where its code and
+    // title sit, so a new glide starts from there instead of snapping back.
+    type Live = { p: Point; a: number; sx: number; sy: number; codeAt: Point | null; labelAt: Point | null };
+    const before = new Map<string, Live>();
     if (stageRect) {
       for (const entry of entries.values()) {
         const r = entry.item.getBoundingClientRect();
-        const turning = entry.anims.length > 0 && entry.level > 1;
-        const a = turning ? parseFloat(getComputedStyle(entry.rot).rotate) : NaN;
-        before.set(entry.id, { p: { x: r.left - stageRect.left, y: r.top - stageRect.top }, a: Number.isFinite(a) ? a : entry.geo?.a ?? 0 });
+        const live: Live = { p: { x: r.left - stageRect.left, y: r.top - stageRect.top }, a: entry.geo?.a ?? 0, sx: 1, sy: 1, codeAt: entry.codeAt, labelAt: entry.labelAt };
+        if (entry.anims.length) {
+          const a = parseFloat(getComputedStyle(entry.rot).rotate);
+          if (entry.level > 1 && Number.isFinite(a)) live.a = a;
+          const sc = getComputedStyle(entry.button).scale;
+          if (sc && sc !== 'none') {
+            const [sx, sy = sx] = sc.split(/\s+/).map(Number);
+            if (Number.isFinite(sx) && Number.isFinite(sy)) Object.assign(live, { sx, sy });
+          }
+          if (entry.code) {
+            const c = entry.code.getBoundingClientRect();
+            live.codeAt = { x: c.left + c.width / 2 - r.left, y: c.top + c.height / 2 - r.top };
+          }
+          if (entry.level > 1) {
+            const l = entry.label.getBoundingClientRect();
+            live.labelAt = { x: l.left - r.left, y: l.top - r.top };
+          }
+        }
+        before.set(entry.id, live);
       }
     }
-    const was = new Map([...entries.values()].map((e) => [e.id, { geo: e.geo, codeAt: e.codeAt, labelAt: e.labelAt, beside: e.beside }]));
+    const was = new Map([...entries.values()].map((e) => [e.id, { geo: e.geo, spot: e.spot, beside: e.beside }]));
     const wasScale = scale;
 
     model = buildModel(run, aimNode.id);
@@ -732,7 +829,8 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
     // Geometry, then the scale: the fan (and room for titles on a wide panel) fills the stage.
     const compact = cw < WIDE;
     root.setAttribute('data-compact', String(compact));
-    const geos = fanLayout(model, compact ? FAN_PHONE : FAN_WIDE);
+    // On a phone the red wedges are too slim to hold their codes, so a lane after the first ring takes them.
+    const geos = fanLayout(model, compact ? FAN_PHONE : FAN_WIDE, compact ? CODE_LANE : 0);
     let reach = AIM_HW;
     let top = 0;
     for (const g of geos.values()) {
@@ -745,12 +843,14 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
       }
     }
     const W = Math.min(cw, MAX_STAGE);
-    const room = compact ? 6 : LABEL_ROOM;
-    const u = Math.max(0.6, Math.min(MAX_U, (W - 2 * room) / (2 * reach)));
-    const topPad = compact ? 8 : 52;
-    origin = { x: W / 2, y: topPad - top * u };
-    const H = origin.y + AIM_H * u + 4;
-    scale = u;
+    const writeGeometry = (room: number, topPad: number): number => {
+      const u = Math.max(0.6, Math.min(MAX_U, (W - 2 * room) / (2 * reach)));
+      origin = { x: W / 2, y: topPad - top * u };
+      scale = u;
+      stage!.style.setProperty('--u', `${round(u)}px`);
+      stage!.style.setProperty('--oy', `${round(origin.y)}px`);
+      return u;
+    };
 
     for (const [id, entry] of entries) {
       const g = geos.get(id) ?? null;
@@ -762,11 +862,17 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
       entry.item.style.setProperty('--len', round(g.len));
       entry.item.style.setProperty('--hw', round(g.hw));
     }
-    stage!.style.setProperty('--u', `${round(u)}px`);
-    stage!.style.setProperty('--oy', `${round(origin.y)}px`);
     stage!.style.setProperty('--w', `${round(W)}px`);
-    const extra = placeWords(u, W, H, compact);
-    stage!.style.setProperty('--h', `${round(H + extra)}px`);
+    // A wide panel first keeps room round the fan for titles. If they don't all fit, every title
+    // goes to the key, and the fan is laid out again without that room, so it fills the stage.
+    let u = writeGeometry(compact ? 6 : LABEL_ROOM, compact ? 8 : 52);
+    let words = placeWords(u, W, origin.y + AIM_H * u + 4, !compact);
+    if (!compact && !words.allBeside) {
+      // Room above stays, so a tip over the top ring can sit above it instead of over a neighbour.
+      u = writeGeometry(12, 48);
+      words = placeWords(u, W, origin.y + AIM_H * u + 4, false);
+    }
+    stage!.style.setProperty('--h', `${round(origin.y + AIM_H * u + 4 + words.extra)}px`);
     syncKey();
     syncOpen();
 
@@ -799,26 +905,37 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
       const dy = old.p.y - to.y;
       if (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5) moves.push([entry.item, [{ translate: `${f(dx)}px ${f(dy)}px` }, { translate: '0px 0px' }]]);
       const g = entry.geo;
+      // Size: from the scale drawn now times the old size over the new.
+      let sx = old.sx;
+      let sy = old.sy;
       if (entry.level === 1) {
-        if (wasScale && Math.abs(wasScale / u - 1) > 0.005) moves.push([entry.button, [{ scale: r3(wasScale / u) }, { scale: '1' }]]);
+        if (wasScale) {
+          sx *= wasScale / u;
+          sy *= wasScale / u;
+        }
       } else if (g && prev.geo) {
+        sx *= (prev.geo.len * wasScale) / (g.len * u);
+        sy *= (prev.geo.hw * wasScale) / (g.hw * u);
         if (Math.abs(old.a - g.a) >= 0.1) moves.push([entry.rot, [{ rotate: `${f(old.a)}deg` }, { rotate: `${f(g.a)}deg` }]]);
-        const sx = (prev.geo.len * wasScale) / (g.len * u);
-        const sy = (prev.geo.hw * wasScale) / (g.hw * u);
-        if (Math.abs(sx - 1) > 0.005 || Math.abs(sy - 1) > 0.005) moves.push([entry.button, [{ scale: `${r3(sx)} ${r3(sy)}` }, { scale: '1 1' }]]);
-        if (prev.codeAt && entry.codeAt) {
-          const cx = prev.codeAt.x - entry.codeAt.x;
-          const cy = prev.codeAt.y - entry.codeAt.y;
+        if (old.codeAt && entry.codeAt) {
+          const cx = old.codeAt.x - entry.codeAt.x;
+          const cy = old.codeAt.y - entry.codeAt.y;
           if (Math.abs(cx) >= 0.5 || Math.abs(cy) >= 0.5) moves.push([entry.code!, [{ transform: `translate(${f(cx)}px, ${f(cy)}px)` }, { transform: 'none' }]]);
         }
       }
-      const labelMoved = entry.level > 1 && (prev.beside !== entry.beside || !prev.labelAt || !entry.labelAt
-        || Math.abs(prev.labelAt.x - entry.labelAt.x) >= 1 || Math.abs(prev.labelAt.y - entry.labelAt.y) >= 1);
-      if (!moves.length && !labelMoved) continue;
+      if (Math.abs(sx - 1) > 0.005 || Math.abs(sy - 1) > 0.005) moves.push([entry.button, [{ scale: `${r3(sx)} ${r3(sy)}` }, { scale: '1 1' }]]);
+      // A title that keeps its spot glides with its triangle; one that changes spot, or moves
+      // between beside and tip, fades in at its new place once the glide lands.
+      const respot = entry.level > 1 && (prev.beside !== entry.beside || prev.spot !== entry.spot);
+      if (entry.level > 1 && !respot && old.labelAt && entry.labelAt) {
+        const lx = old.labelAt.x - entry.labelAt.x;
+        const ly = old.labelAt.y - entry.labelAt.y;
+        if (Math.abs(lx) >= 0.5 || Math.abs(ly) >= 0.5) moves.push([entry.label, [{ transform: `translate(${f(lx)}px, ${f(ly)}px)` }, { transform: 'none' }]]);
+      }
+      if (!moves.length && !respot) continue;
       stop(entry);
       for (const [el, frames] of moves) track(entry, el.animate(frames, { duration: GLIDE, easing: EASE }));
-      // A title that changes place fades in at its new one once the glide lands.
-      if (labelMoved && entry.beside) track(entry, entry.label.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: GLIDE - 200, easing: EASE, fill: 'backwards' }));
+      if (respot && entry.beside) track(entry, entry.label.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: GLIDE - 200, easing: EASE, fill: 'backwards' }));
     }
   }
 
