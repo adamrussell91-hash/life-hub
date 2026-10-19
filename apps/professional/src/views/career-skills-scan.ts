@@ -11,9 +11,9 @@ type ScanProposal = {
   skills?: string[];
   apst?: string[];
   source_refs?: string[];
-  source_labels?: Array<{ ref: string; label: string; href?: string | null }>;
+  source_labels?: Array<{ ref: string; label: string | null; href?: string | null }>;
   witness_refs?: string[];
-  witness_labels?: Array<{ ref: string; label: string }>;
+  witness_labels?: Array<{ ref: string; label: string | null; href?: string | null }>;
   future_matches?: Array<{ future_id: string; criterion_ids: string[]; strength: string }>;
   why?: string;
   origin?: string;
@@ -171,8 +171,17 @@ function renderCard(
 
   const sources = el('div', 'career-scan__sources');
   for (const ref of proposal.source_refs ?? []) {
-    const chip = el('span', 'career-scan__source-chip', `From ${labelForRef(ref)}`);
-    sources.append(chip);
+    const resolved = proposal.source_labels?.find((entry) => entry.ref === ref);
+    const text = resolved?.label
+      ? `From ${labelForRef(ref)} · ${resolved.label}`
+      : `From ${labelForRef(ref)}`;
+    if (resolved?.href) {
+      const link = el('a', 'career-scan__source-chip', text);
+      link.href = resolved.href;
+      sources.append(link);
+    } else {
+      sources.append(el('span', 'career-scan__source-chip', text));
+    }
   }
   if (proposal.origin === 'you') {
     sources.append(el('span', 'career-scan__source-chip', 'You added'));
@@ -211,7 +220,8 @@ function renderCard(
   if (proposal.witness_refs?.length) {
     const witnesses = el('div', 'career-scan__witnesses');
     for (const ref of proposal.witness_refs) {
-      witnesses.append(el('span', 'career-scan__witness', labelForRef(ref)));
+      const resolved = proposal.witness_labels?.find((entry) => entry.ref === ref);
+      witnesses.append(el('span', 'career-scan__witness', resolved?.label || labelForRef(ref)));
     }
     card.append(witnesses);
   }
