@@ -4,6 +4,7 @@
 // --click clicks a control first (such as a layout toggle); --name adds -<suffix> to the PNG names.
 // --widths 900,390,320 shoots those viewport widths instead of the default 900 and 390.
 // --next applies SAMPLES['<tool>:next'] after load and shoots <tool>-next-<width>.png (radar morph end state).
+// A sample's `tasks` (task links, as the canvas sends them) go to the view's setTasks after update.
 // Bundles a renderer with a synthetic sample run, then screenshots it at 900px and 390px.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -45,6 +46,8 @@ const RENDERERS = {
   pareto_many: ['pareto', 'createParetoView'],
   dmaic: ['dmaic', 'createDmaicView'],
   dmaic_first: ['dmaic', 'createDmaicView'],
+  fifteen_percent: ['fifteen-percent', 'createFifteenPercentView'],
+  fifteen_percent_now: ['fifteen-percent', 'createFifteenPercentView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
@@ -83,7 +86,7 @@ const rawPlugin = {
 };
 const bundle = await build({
   stdin: {
-    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(document);\nview.update(run);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
+    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(document);\nview.update(run);\nif (run.tasks && view.setTasks) view.setTasks(run.tasks);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
     resolveDir: join(root, 'packages/problem-solver'),
     loader: 'ts'
   },
@@ -114,7 +117,10 @@ for (const width of widths) {
     await tab.waitForTimeout(500);
   }
   if (applyNext) {
-    await tab.evaluate(() => window.__view.update(window.__next));
+    await tab.evaluate(() => {
+      window.__view.update(window.__next);
+      if (window.__next.tasks && window.__view.setTasks) window.__view.setTasks(window.__next.tasks);
+    });
     await tab.waitForTimeout(1200);
   }
   const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
