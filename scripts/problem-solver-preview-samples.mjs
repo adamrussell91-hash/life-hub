@@ -343,8 +343,77 @@ SAMPLES['solution_tree:next'] = {
 };
 
 // Lotus blossom: a small town theatre with empty seats midweek. Eight solutions round the
-// problem; five of them grow ideas (eight on cheaper tickets), one idea is still unplaced,
-// and two ideas are picked. One idea is contested.
+// problem; seven grow ideas, most of them six to eight, and one (membership) only two, so
+// its flower shows ghost slots. One idea is still unplaced, two are picked, one is contested.
+const LOTUS_IDEAS = {
+  s1: [
+    ['Let people choose what to pay on Tuesdays, from a floor of three pounds.', 'Choose your price'],
+    ['Five-pound seats for anyone under twenty-six.', 'Under-26 fiver'],
+    ['Release unsold seats at half price through a text alert at four o\'clock.', 'Four o\'clock alert'],
+    ['Two tickets for the price of one on Wednesdays.', 'Two for one'],
+    ['A discount for anyone living within a mile of the theatre.', 'Neighbour rate', { state: 'contested', objection: 'Who counts as a neighbour, and how would the box office check it at the door?' }],
+    ['A standby queue at the door half an hour before curtain.', 'Standby queue'],
+    ['Carers come free with the person they support.', 'Carers go free'],
+    ['A second visit within a month costs half.', 'Half-price return']
+  ],
+  s2: [
+    ['A teachers\' preview night before each run opens.', 'Teachers\' preview'],
+    ['Study packs for the set texts we stage.', 'Study packs'],
+    ['Coach costs shared with the next town\'s schools.', 'Shared coaches'],
+    ['A drama workshop folded into the ticket price.', 'Workshop included'],
+    ['Midweek matinees timed to the school day.', 'School-day matinee'],
+    ['College students usher in return for free seats.', 'Student ushers'],
+    ['A free seat for every tenth pupil booked.', 'Tenth seat free']
+  ],
+  s3: [
+    ['Invite a director or actor to talk for twenty minutes before curtain.', 'Meet the director'],
+    ['Short backstage tours before the show, booked with the ticket.', 'Backstage tour'],
+    ['A reading group that meets in the bar before each new play.', 'Play reading club'],
+    ['A local historian on the story behind the play.', 'History corner'],
+    ['A costume designer shows the sketches.', 'Costume sketches'],
+    ['The audience asks the cast questions afterwards.', 'Cast questions']
+  ],
+  s4: [
+    ['A soup-and-bread supper served in the foyer before the show.', 'Foyer soup supper'],
+    ['A set menu with the café over the road.', 'Café set menu'],
+    ['Pre-order interval drinks with the ticket.', 'Interval pre-order'],
+    ['A tasting night with the local brewery.', 'Brewery tasting'],
+    ['Cake and tea at Wednesday matinees.', 'Matinee tea'],
+    ['A pudding after the show for late diners.', 'Late pudding']
+  ],
+  s6: [
+    ['A free ticket for every regular who brings a first-timer.', 'Free seat for you'],
+    ['A postcard regulars can hand to a friend, worth a discount.', 'Friend postcard'],
+    ['A first-timers\' night with a welcome at the door.', 'First-timers night'],
+    ['A loyalty card stamped for each new face brought along.', 'Stamp card'],
+    ['A group rate for four or more friends.', 'Group of four'],
+    ['Work teams book a whole row at a team rate.', 'Team night out'],
+    ['A neighbour swap: regulars pass on seats they cannot use.', 'Pass it on'],
+    ['A friends\' bench in the foyer to meet before curtain.', 'Meeting bench']
+  ],
+  s7: [
+    ['A one-hour play at six, done by seven.', 'Done by seven'],
+    ['Comedy shorts on Thursday after work.', 'Thursday shorts'],
+    ['A rehearsed reading of a new play.', 'New play reading'],
+    ['A lunchtime show for office workers.', 'Lunchtime show'],
+    ['A double bill of two short plays.', 'Double bill'],
+    ['Standing tickets near the back for early shows.', 'Standing room']
+  ],
+  s8: [
+    ['Ten midweek shows for the price of six, spread over a season.', 'Ten for six'],
+    ['Members can swap a night they cannot make for another.', 'Free night swaps']
+  ]
+};
+let lotusN = 0;
+const lotusIdeas = [];
+const lotusEdges = [];
+for (const [sol, ideas] of Object.entries(LOTUS_IDEAS)) {
+  for (const [text, title, extra] of ideas) {
+    lotusN += 1;
+    lotusIdeas.push(node(`i${lotusN}`, `idea:${lotusN}`, text, title, extra));
+    lotusEdges.push({ from: `i${lotusN}`, to: sol, kind: 'petal' });
+  }
+}
 SAMPLES.lotus_blossom = run(
   'lotus_blossom',
   [
@@ -357,35 +426,10 @@ SAMPLES.lotus_blossom = run(
     node('s6', 'solution:6', 'Ask regulars to bring someone who has never been.', 'Bring a friend'),
     node('s7', 'solution:7', 'Put on shorter shows that start at six, for people going home from work.', 'Early short shows'),
     node('s8', 'solution:8', 'A membership that only covers midweek nights.', 'Midweek membership'),
-    node('i1', 'idea:1', 'Let people choose what to pay on Tuesdays, from a floor of three pounds.', 'Choose your price'),
-    node('i2', 'idea:2', 'Five-pound seats for anyone under twenty-six.', 'Under-26 fiver'),
-    node('i3', 'idea:3', 'Release unsold seats at half price through a text alert at four o\'clock.', 'Four o\'clock alert'),
-    node('i4', 'idea:4', 'Two tickets for the price of one on Wednesdays.', 'Two for one'),
-    node('i5', 'idea:5', 'A discount for anyone living within a mile of the theatre.', 'Neighbour rate', { state: 'contested', objection: 'Who counts as a neighbour, and how would the box office check it at the door?' }),
-    node('i6', 'idea:6', 'A standby queue at the door half an hour before curtain.', 'Standby queue'),
-    node('i7', 'idea:7', 'Carers come free with the person they support.', 'Carers go free'),
-    node('i8', 'idea:8', 'A second visit within a month costs half.', 'Half-price return'),
-    node('i9', 'idea:9', 'Invite a director or actor to talk for twenty minutes before curtain.', 'Meet the director'),
-    node('i10', 'idea:10', 'Short backstage tours before the show, booked with the ticket.', 'Backstage tour'),
-    node('i11', 'idea:11', 'A reading group that meets in the bar before each new play.', 'Play reading club'),
-    node('i12', 'idea:12', 'A soup-and-bread supper served in the foyer before the show.', 'Foyer soup supper'),
-    node('i13', 'idea:13', 'A free ticket for every regular who brings a first-timer.', 'Free seat for you'),
-    node('i14', 'idea:14', 'A postcard regulars can hand to a friend, worth a discount.', 'Friend postcard'),
-    node('i15', 'idea:15', 'A first-timers\' night with a welcome at the door.', 'First-timers night'),
-    node('i16', 'idea:16', 'A loyalty card stamped for each new face brought along.', 'Stamp card'),
-    node('i17', 'idea:17', 'Ten midweek shows for the price of six, spread over a season.', 'Ten for six'),
-    node('i18', 'idea:18', 'Members can swap a night they cannot make for another.', 'Free night swaps'),
-    node('i19', 'idea:19', 'Swap season tickets with the arts centre in the next town.', 'Season ticket swap'),
-    node('f1', 'preferred:1', 'Cheap to run, fills seats that would be empty anyway, and the text list grows on its own.', 'Fills empty seats cheaply'),
+    ...lotusIdeas,
+    node('i99', 'idea:99', 'Swap season tickets with the arts centre in the next town.', 'Season ticket swap'),
+    node('f1', 'preferred:1', 'Cheap to run, fills seats that would be empty anyway, and the text list grows on its own.', 'Fills empty seats'),
     node('f2', 'preferred:2', 'Brings in exactly the people who have never been, using the regulars we already have.', 'Regulars become hosts')
   ],
-  [
-    ...['i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8'].map((id) => ({ from: id, to: 's1', kind: 'petal' })),
-    ...['i9', 'i10', 'i11'].map((id) => ({ from: id, to: 's3', kind: 'petal' })),
-    { from: 'i12', to: 's4', kind: 'petal' },
-    ...['i13', 'i14', 'i15', 'i16'].map((id) => ({ from: id, to: 's6', kind: 'petal' })),
-    ...['i17', 'i18'].map((id) => ({ from: id, to: 's8', kind: 'petal' })),
-    { from: 'f1', to: 'i3', kind: 'marks' },
-    { from: 'f2', to: 'i14', kind: 'marks' }
-  ]
+  [...lotusEdges, { from: 'f1', to: 'i3', kind: 'marks' }, { from: 'f2', to: 'i29', kind: 'marks' }]
 );

@@ -125,6 +125,40 @@ describe('Lotus blossom view', () => {
     view.el.remove();
   });
 
+  it('frames every flower with eight slots, ghosts where no idea has grown', () => {
+    const view = createLotusBlossomView();
+    view.update(run([problem, ...solutions, ...ideas], ideaEdges));
+    const flower = view.el.querySelector('[data-flower="s3"]')!;
+    const ghosts = flower.querySelector('.ps-lotus__ghosts')!;
+    expect(ghosts.getAttribute('aria-hidden')).toBe('true');
+    expect(ghosts.querySelectorAll('.ps-lotus__ghost').length).toBe(8);
+    expect(ghosts.querySelector('button, [role="listitem"], [data-node]')).toBeNull();
+    // Each idea sits on its slot: the same direction as the ghost with its petal number.
+    const idea = flower.querySelector<HTMLElement>('[data-node="i2"]')!;
+    const slot = ghosts.querySelector<HTMLElement>('[data-slot="2"]')!;
+    expect(idea.style.getPropertyValue('--dx')).toBe(slot.style.getPropertyValue('--dx'));
+    expect(idea.style.getPropertyValue('--dy')).toBe(slot.style.getPropertyValue('--dy'));
+  });
+
+  it('closes a card opened inside a flower when zooming out', () => {
+    const view = createLotusBlossomView();
+    document.body.append(view.el);
+    view.update(run([problem, ...solutions, ...ideas], ideaEdges));
+    view.el.querySelector<HTMLButtonElement>('[data-flower="s3"] .ps-lotus__bloom')!.click();
+    button(view, 'i2').click();
+    expect(view.el.querySelector('[data-node="i2"]')!.classList.contains('is-open')).toBe(true);
+    view.el.querySelector<HTMLButtonElement>('.ps-lotus__back')!.click();
+    expect(view.el.querySelector('[data-node="i2"]')!.classList.contains('is-open')).toBe(false);
+    expect(button(view, 'i2').getAttribute('aria-expanded')).toBe('false');
+    expect(view.el.querySelectorAll('.ps-details.is-open').length).toBe(0);
+    // A card opened outside the flower (a solution) is left alone.
+    view.el.querySelector<HTMLButtonElement>('[data-flower="s3"] .ps-lotus__bloom')!.click();
+    view.el.querySelector<HTMLButtonElement>('[data-key="s1"]')!.click();
+    view.el.querySelector<HTMLButtonElement>('.ps-lotus__back')!.click();
+    expect(view.el.querySelector('[data-node="s1"]')!.classList.contains('is-open')).toBe(true);
+    view.el.remove();
+  });
+
   it('zooms out on Escape', () => {
     const view = createLotusBlossomView();
     document.body.append(view.el);
@@ -151,5 +185,19 @@ describe('Lotus blossom view', () => {
     expect(view.el.querySelector('[data-node="i2"]')!.classList.contains('is-highlit')).toBe(false);
     button(view, 'f1').click();
     expect(view.el.querySelector('[data-node="f1"]')!.classList.contains('is-open')).toBe(true);
+  });
+
+  it('does not highlight an idea in a flower dimmed by another zoom', () => {
+    const view = createLotusBlossomView();
+    document.body.append(view.el);
+    const pick = node('f1', 'preferred:1');
+    view.update(run([problem, ...solutions, ...ideas, pick], [...ideaEdges, marks('f1', 'i3')]));
+    view.el.querySelector<HTMLButtonElement>('[data-flower="s3"] .ps-lotus__bloom')!.click();
+    const card = view.el.querySelector('.ps-lotus__picks [data-node="f1"]')!;
+    card.dispatchEvent(new MouseEvent('mouseenter'));
+    expect(view.el.querySelector('[data-node="i3"]')!.classList.contains('is-highlit')).toBe(false);
+    view.el.querySelector<HTMLButtonElement>('.ps-lotus__back')!.click();
+    expect(view.el.querySelector('[data-node="i3"]')!.classList.contains('is-highlit')).toBe(true);
+    view.el.remove();
   });
 });
