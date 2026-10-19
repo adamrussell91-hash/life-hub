@@ -21,15 +21,24 @@ function afterDefine(modelId) {
   return (modelId && nextStepAfter(modelId, defineFor(modelId))) || 'finished';
 }
 
+const TASK_FIELDS = Object.freeze({ proposedTasks: [], reviewProposal: null, reviewTaskId: null });
+
+/** Sessions saved before Plan 5 gain the task fields; nothing is written until the next save. */
+function withTaskFields(session) {
+  if (!session || !Array.isArray(session.turns) || Object.keys(TASK_FIELDS).every((key) => key in session)) return session;
+  return { ...structuredClone(TASK_FIELDS), ...session };
+}
+
 /**
  * v1 stored `define: { runs, finishedEarly, exitObjection }` and phases frame/define/defined.
  * v2 stores `steps[stepId]` and phase = the current plan step. Index rows (no turns) and
- * v2 sessions pass through untouched. Pure; the store is not written.
+ * v2 sessions pass through untouched, apart from gaining the Plan 5 task fields. Pure; the
+ * store is not written.
  */
 const ASSUMED_MODEL = Object.freeze({ id: 'seven_step', reason: 'Assumed when this problem was upgraded.' });
 
 export function migrateSession(session) {
-  if (!session || !Array.isArray(session.turns) || session.steps) return session;
+  if (!session || !Array.isArray(session.turns) || session.steps) return withTaskFields(session);
   const { define = { runs: [], finishedEarly: false, exitObjection: null }, ...rest } = session;
   // v1 let a tool suggestion be accepted before a model was chosen; without one the step
   // engine could never move on, so such a session is assumed to be on the seven-step model.
@@ -52,7 +61,7 @@ export function migrateSession(session) {
     ? { ...rest.runner, mode: 'boundary', error: rest.runner.error ?? null, leaving: defineStep }
     : { ...rest.runner, mode: 'turn' };
   const suggestion = rest.suggestion?.kind === 'finish_define' ? { kind: 'next_step', reason: rest.suggestion.reason ?? '' } : rest.suggestion ?? null;
-  return {
+  return withTaskFields({
     ...rest,
     kind: 'full',
     status: rest.status === 'defined' ? (phase === 'finished' ? 'finished' : 'active') : rest.status,
@@ -62,7 +71,7 @@ export function migrateSession(session) {
     pendingLearning: null,
     suggestion,
     runner
-  };
+  });
 }
 
 /** List index rows written by v1 carry phase define/defined. */

@@ -3,10 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   acceptSuggestion, activeRun, applyCoachTurn, createSession, dismissSuggestion,
-  archive, moveOn, keepAnyway, score, rescoreRadar, say, summaryRow, followOn
+  archive, moveOn, keepAnyway, score, rescoreRadar, say, summaryRow, followOn,
+  confirmTask, dismissTask, setReviewTask, dismissReview
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
+import { newRun } from '../../packages/problem-solver/machine.mjs';
 
 /** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
 async function withoutAnalyseTools(fn) {
@@ -230,7 +232,7 @@ test('say appends a user turn and queues; summary rows are small', () => {
   const s = say(framed(), 'Because the roster is drafted on Friday.', deps);
   assert.equal(s.runner.status, 'queued');
   const row = summaryRow(s);
-  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'skills', 'status', 'title', 'tool', 'updatedAt']);
+  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
   assert.equal(row.tool, 'five_whys');
   assert.equal(summaryRow(row), row);
 });
@@ -318,4 +320,106 @@ test('an accepted turn with links and no node adds the links to the active run',
   for (const [slot, text] of [['trunk', 't'], ['cause:1', 'c'], ['effect:1', 'e']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
   s = applyCoachTurn(s, coach({ node: null, edges: [{ from: 'cause:1', to: 'effect:1', kind: 'relates' }] }), deps);
   assert.equal(activeRun(s).edges.length, 1);
+});
+
+function inStep(step, tool) {
+  const s = framed('seven_step', 'five_whys');
+  return { ...s, phase: step, runner: { status: 'idle', mode: 'turn', error: null }, steps: { ...s.steps, [step]: { runs: [newRun(tool, `run-${step}`)], status: 'open', objection: null } } };
+}
+const card = (i, tag = 'todo') => ({ slot: `card:${i}`, text: `Draft rota task number ${i} for the team`, tag });
+
+test('a new session starts with no proposals and no review', () => {
+  const s = createSession({ text: 'Late rota.' }, deps);
+  assert.deepEqual(s.proposedTasks, []);
+  assert.equal(s.reviewProposal, null);
+  assert.equal(s.reviewTaskId, null);
+});
+
+test('an accepted card proposed as a task becomes one proposal tied to its node; repeats, done cards and unknown slots are dropped', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft the rota template', due: '2026-10-24' }] }), deps);
+  assert.equal(s.proposedTasks.length, 1);
+  const [p] = s.proposedTasks;
+  assert.equal(p.status, 'proposed');
+  assert.equal(p.due, '2026-10-24');
+  assert.deepEqual(p.source, { runId: 'run-implement', nodeId: activeRun(s).nodes[0].id });
+  s = applyCoachTurn(s, coach({ node: card(2, 'done'), proposeTasks: [{ slot: 'card:1', title: 'Again', due: null }, { slot: 'card:2', title: 'Done one', due: null }, { slot: 'card:9', title: 'Ghost', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 1);
+});
+
+test('proposals outside Implement tools are dropped', () => {
+  let s = framed('seven_step', 'five_whys');
+  s = applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'Swaps are agreed by text message' }, proposeTasks: [{ slot: 'problem', title: 'Fix it', due: null }] }), deps);
+  assert.deepEqual(s.proposedTasks, []);
+});
+
+test('confirm_task records the created task once; dismissed proposals cannot be confirmed', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  const id = s.proposedTasks[0].id;
+  s = confirmTask(s, { proposalId: id, taskId: 'task-1' }, deps);
+  assert.equal(s.proposedTasks[0].status, 'confirmed');
+  assert.equal(s.proposedTasks[0].taskId, 'task-1');
+  assert.equal(confirmTask(s, { proposalId: id, taskId: 'task-1' }, deps).proposedTasks[0].taskId, 'task-1', 'same id is a no-op');
+  assert.throws(() => confirmTask(s, { proposalId: id, taskId: 'task-2' }, deps), (err) => err.status === 409);
+  assert.throws(() => confirmTask(s, { proposalId: 'nope', taskId: 'task-2' }, deps), (err) => err.status === 404);
+  assert.throws(() => confirmTask(s, { proposalId: id, taskId: '' }, deps), (err) => err.status === 400);
+});
+
+test('dismiss_task drops a proposal; a confirmed one reverts only when its task was removed', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  s = applyCoachTurn(s, coach({ node: card(2), proposeTasks: [{ slot: 'card:2', title: 'Ask', due: null }] }), deps);
+  const [a, b] = s.proposedTasks.map((p) => p.id);
+  s = dismissTask(s, { proposalId: a }, deps);
+  assert.equal(s.proposedTasks[0].status, 'dismissed');
+  s = confirmTask(s, { proposalId: b, taskId: 'task-2' }, deps);
+  assert.throws(() => dismissTask(s, { proposalId: b }, deps), (err) => err.status === 409);
+  s = dismissTask(s, { proposalId: b, reason: 'removed' }, deps);
+  assert.equal(s.proposedTasks[1].status, 'dismissed');
+  assert.equal(s.proposedTasks[1].removed, true);
+  assert.throws(() => confirmTask(s, { proposalId: a, taskId: 'x' }, deps), (err) => err.status === 409);
+  // Adam's decision: a node whose task was deleted is never proposed again.
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeTasks: [{ slot: 'card:2', title: 'Ask again', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 2);
+  // A proposal the person set aside (not deleted) may be offered again.
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeTasks: [{ slot: 'card:1', title: 'Draft again', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 3);
+});
+
+test('leaving Implement with a finished tool proposes a review in two weeks; leaving it untouched does not', () => {
+  let s = inStep('implement', 'kanban');
+  for (const i of [1, 2, 3]) s = applyCoachTurn(s, coach({ node: card(i) }), deps);
+  const left = moveOn(s, deps);
+  assert.deepEqual(left.reviewProposal, { title: 'Review: Late rota', due: '2026-11-02', reason: 'A first look at how the plan is going.', status: 'proposed' });
+  const untouched = { ...s, steps: { ...s.steps, implement: { runs: [], status: 'open', objection: null } } };
+  assert.equal(moveOn(untouched, deps).reviewProposal, null);
+});
+
+test('the coach can propose the review date in Implement; the person confirms or dismisses it', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'The pilot ends then.' } }), deps);
+  assert.equal(s.reviewProposal.due, '2026-11-09');
+  assert.equal(s.reviewProposal.status, 'proposed');
+  const dismissed = dismissReview(s, deps);
+  assert.equal(dismissed.reviewProposal.status, 'dismissed');
+  s = setReviewTask(s, { taskId: 'review-1', due: '2026-11-10' }, deps);
+  assert.equal(s.reviewTaskId, 'review-1');
+  assert.equal(s.reviewProposal.status, 'confirmed');
+  assert.equal(s.reviewProposal.due, '2026-11-10');
+  assert.throws(() => setReviewTask(s, { taskId: 'review-2', due: '2026-11-10' }, deps), (err) => err.status === 409);
+  const moved = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  assert.equal(moved.reviewProposal.due, '2026-11-10', 'an existing review is never replaced on leaving');
+});
+
+test('a review proposed outside Implement is ignored', () => {
+  const s = applyCoachTurn(framed('seven_step', 'five_whys'), coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'x' } }), deps);
+  assert.equal(s.reviewProposal, null);
+});
+
+test('summary rows carry confirmed task ids and the review task id', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  s = confirmTask(s, { proposalId: s.proposedTasks[0].id, taskId: 'task-1' }, deps);
+  s = setReviewTask(s, { taskId: 'review-1', due: '2026-11-02' }, deps);
+  const row = summaryRow(s);
+  assert.deepEqual(row.taskIds, ['task-1']);
+  assert.equal(row.reviewTaskId, 'review-1');
 });

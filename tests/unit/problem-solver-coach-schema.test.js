@@ -58,3 +58,17 @@ test('node.tag is kept, trimmed and lowercased', () => {
   assert.equal(v.node.tag, 'declining');
   assert.equal(validateCoachTurn({ verdict: 'accept', message: 'ok', node: { slot: 'problem', text: 'x' } }).value.node.tag, undefined);
 });
+
+test('proposeTasks needs a slot and a title; bad dates become null; at most five', () => {
+  const ok = validateCoachTurn({ verdict: 'accept', message: 'ok', proposeTasks: [{ slot: 'card:1', title: ' Draft the rota template ', due: '2026-10-24' }, { slot: 'card:2', title: 'Ask the team', due: '24/10' }] }).value;
+  assert.deepEqual(ok.proposeTasks, [{ slot: 'card:1', title: 'Draft the rota template', due: '2026-10-24' }, { slot: 'card:2', title: 'Ask the team', due: null }]);
+  assert.equal(validateCoachTurn({ verdict: 'accept', message: 'ok', proposeTasks: [{ slot: 'card:1' }] }).ok, false);
+  const many = Array.from({ length: 7 }, (_, i) => ({ slot: `card:${i + 1}`, title: `Task ${i + 1}` }));
+  assert.equal(validateCoachTurn({ verdict: 'accept', message: 'ok', proposeTasks: many }).value.proposeTasks.length, 5);
+  assert.deepEqual(validateCoachTurn({ verdict: 'clarify', message: 'ok' }).value.proposeTasks, []);
+});
+
+test('proposeReview needs a real date', () => {
+  assert.deepEqual(validateCoachTurn({ verdict: 'clarify', message: 'ok', proposeReview: { due: '2026-11-02', reason: 'First results by then.' } }).value.proposeReview, { due: '2026-11-02', reason: 'First results by then.' });
+  assert.equal(validateCoachTurn({ verdict: 'clarify', message: 'ok', proposeReview: { due: '2026-02-31' } }).value.proposeReview, null);
+});

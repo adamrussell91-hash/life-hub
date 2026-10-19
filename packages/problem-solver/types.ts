@@ -13,6 +13,20 @@ export type PsSuggestion =
   | { kind: 'next_tool' | 'switch_tool'; tool: PsToolId; reason: string }
   | { kind: 'next_step'; reason: string };
 
+export type PsProposedTask = {
+  id: string;
+  title: string;
+  status: 'proposed' | 'confirmed' | 'dismissed';
+  due: string | null;
+  taskId?: string;
+  /** Set when a confirmed task was deleted in Tasks and the proposal reverted. */
+  removed?: boolean;
+  source: { runId: string; nodeId: string };
+};
+export type PsReviewProposal = { title: string; due: string; reason: string; status: 'proposed' | 'confirmed' | 'dismissed' };
+/** A confirmed task's live state, passed from the page to a chart (never stored). */
+export type PsTaskLink = { nodeId: string; taskId: string; status: string };
+
 export type PsSession = {
   id: string;
   title: string;
@@ -35,10 +49,14 @@ export type PsSession = {
   dismissedOpening?: string | null;
   pendingKeep: { slot: string; text: string; objection: string } | null;
   runner: { status: 'idle' | 'queued' | 'running' | 'failed'; mode: 'turn' | 'boundary'; error: string | null; leaving?: string };
+  /** Tasks the coach proposed from Implement nodes; the page creates them in Tasks. */
+  proposedTasks: PsProposedTask[];
+  reviewProposal: PsReviewProposal | null;
+  reviewTaskId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full'; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number> };
+export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full'; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null };
 
-export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry';
+export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review';
