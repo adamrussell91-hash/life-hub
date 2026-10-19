@@ -15,6 +15,7 @@ import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
 import { createTaskBridge } from './task-bridge';
 import { mountTaskCards } from './task-cards';
+import { createSessionSync } from './session-sync';
 import { tasksApi } from '@/services/client-api';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
@@ -269,7 +270,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
     createReview: (edits) => bridge.createReview(session, edits),
     dismissReview: () => confirmed('dismiss_review', {})
-  });
+  }, { fallbackFocus: () => coach.el.querySelector('textarea') });
   const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el });
   const coachHost = el('div', 'ps-coach-host');
   coachHost.append(coach.el);
@@ -289,7 +290,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let confirmedKey = '';
   const confirmedIds = () => (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed' && p.taskId).map((p) => p.taskId!).sort().join(',');
 
-  const paint = (next: PsSession) => {
+  /** Draw a snapshot. Only reached through `sync.paint`, which drops older revisions. */
+  const render = (next: PsSession) => {
     session = next;
     if (title.textContent !== session.title) title.textContent = session.title;
     track.update(session);
@@ -304,53 +306,39 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     }
   };
 
-  /** One poll at a time: a second caller waits on the poll already running. */
-  let settling: Promise<void> | null = null;
-  const settle = (): Promise<void> => {
-    settling ??= (async () => {
+  const sync = createSessionSync({
+    initial: session,
+    render,
+    actWith: (s, action, payload) => problemSolverApi.actWith(s, action, payload),
+    get: (sessionId) => problemSolverApi.get(sessionId),
+    poll: (sessionId, onUpdate) => {
       poll?.abort();
       poll = new AbortController();
-      try {
-        paint(await pollUntilSettled(session.id, paint, { signal: poll.signal }));
-      } catch {
-        /* aborted on navigation */
-      } finally {
-        settling = null;
-      }
-    })();
-    return settling;
-  };
+      return pollUntilSettled(sessionId, onUpdate, { signal: poll.signal });
+    },
+    alive: () => page.isConnected
+  });
+  const paint = (next: PsSession) => void sync.paint(next);
+  const settle = () => sync.settle();
+  /** Task writes: after the coach settles, one at a time, a stale revision retried once. */
+  const confirmed = (action: PsAction, payload: Record<string, unknown>) => sync.confirmed(action, payload);
 
   /**
-   * Post a task action once the coach has settled (Decision 10: a save during a coach turn
-   * would lose that turn). A stale revision refetches and posts once more; any other error
-   * is rethrown so the card shows it.
+   * The linked task's domain if the problem links one, else life (Decision 1); one fetch per
+   * session. A failed fetch is not cached and is passed on, so the card shows it and a retry
+   * asks again rather than filing the task under the wrong domain.
    */
-  async function confirmed(action: PsAction, payload: Record<string, unknown>): Promise<void> {
-    while (isBusy(session)) {
-      if (!page.isConnected) throw new Error('Problem Solver was closed.');
-      await settle();
-    }
-    let next: PsSession;
-    try {
-      next = await problemSolverApi.actWith(session, action, payload);
-    } catch (err) {
-      if ((err as { code?: string }).code !== 'conflict') throw err;
-      paint(await problemSolverApi.get(session.id));
-      next = await problemSolverApi.actWith(session, action, payload);
-    }
-    paint(next);
-  }
-
-  /** The linked task's domain if the problem links one, else life (Decision 1); one fetch per session. */
   let domain: Promise<string> | null = null;
   function domainFor(s: PsSession): Promise<string> {
     const linked = s.links.find((link) => link.kind === 'task')?.id;
     if (!linked) return Promise.resolve('life');
-    domain ??= tasksApi.getTask(linked).then((task) => task.domain || 'life', () => {
-      domain = null;
-      return 'life';
-    });
+    if (!domain) {
+      const fetching = tasksApi.getTask(linked).then((task) => task.domain || 'life');
+      fetching.catch(() => {
+        if (domain === fetching) domain = null;
+      });
+      domain = fetching;
+    }
     return domain;
   }
 
@@ -366,6 +354,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   /** Fetch live statuses for the confirmed tasks; a newer refresh wins over a slower older one. */
   let statusRound = 0;
   async function refreshStatuses(): Promise<void> {
+    if (!page.isConnected) return;
     const round = ++statusRound;
     const map = await bridge.statuses(session.proposedTasks ?? []);
     if (round === statusRound && page.isConnected) diagram.setTaskStatuses(map);
@@ -407,16 +396,22 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     }
   }
 
-  paint(session);
+  render(session);
   if (isBusy(session)) await settle();
 }
 
-export async function renderProblemSolverView(canvas: HTMLElement): Promise<void> {
+/** Leaving Problem Solver (or opening another problem): stop polling, drop the chart and the Tasks listeners. */
+export function unmountProblemSolverView(): void {
   poll?.abort();
+  poll = null;
   diagramNow?.destroy();
   diagramNow = null;
   for (const off of unsubscribeNow) off();
   unsubscribeNow = [];
+}
+
+export async function renderProblemSolverView(canvas: HTMLElement): Promise<void> {
+  unmountProblemSolverView();
   canvas.replaceChildren(el('p', 'canvas-status', 'Loading…'));
   const id = hashQuery().get('id');
   try {

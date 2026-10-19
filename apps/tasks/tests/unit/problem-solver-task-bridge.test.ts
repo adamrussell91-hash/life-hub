@@ -1,6 +1,6 @@
 // apps/tasks/tests/unit/problem-solver-task-bridge.test.ts
 import { describe, expect, it, vi } from 'vitest';
-import { createTaskBridge, reviewBody, taskBody } from '../../src/views/problem-solver/task-bridge';
+import { createTaskBridge, reviewBody, taskBody, TaskNotLinkedError } from '../../src/views/problem-solver/task-bridge';
 import type { PsProposedTask, PsSession } from '../../../../packages/problem-solver/types';
 
 const session = { id: 's1', title: 'Late rota', revision: 4, links: [{ kind: 'project', id: 'proj-1' }], proposedTasks: [], reviewProposal: null, reviewTaskId: null } as unknown as PsSession;
@@ -53,5 +53,60 @@ describe('removed tasks', () => {
     const bridge = createTaskBridge({ createTask: vi.fn(), getTask, domainFor: async () => 'life', confirm: vi.fn(), dismiss: vi.fn(), setReview: vi.fn() });
     expect(await bridge.statuses([{ ...proposal, status: 'dismissed', removed: true, taskId: 'gone' }])).toEqual({});
     expect(getTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('review fixes', () => {
+  const confirmed = (id: string, taskId: string): PsProposedTask => ({ ...proposal, id, status: 'confirmed', taskId });
+  const gone = async () => { throw Object.assign(new Error('Task not found'), { status: 404 }); };
+
+  it('statuses returns while a dismissal is still pending, and dismissals go one after another', async () => {
+    let release!: () => void;
+    const dismiss = vi.fn().mockImplementationOnce(() => new Promise<void>((r) => (release = r))).mockResolvedValue(undefined);
+    const bridge = createTaskBridge({ createTask: vi.fn(), getTask: vi.fn(gone), domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
+    const statuses = await bridge.statuses([confirmed('a', 'x'), confirmed('b', 'y')]);
+    expect(statuses).toEqual({ x: 'removed', y: 'removed' });
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    release();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dismiss).toHaveBeenCalledTimes(2);
+    expect(dismiss).toHaveBeenLastCalledWith('b', 'removed');
+  });
+
+  it('a dismissal already on its way is not sent again by a second refresh', async () => {
+    const dismiss = vi.fn(() => new Promise<void>(() => undefined));
+    const bridge = createTaskBridge({ createTask: vi.fn(), getTask: vi.fn(gone), domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
+    await bridge.statuses([confirmed('a', 'x')]);
+    await bridge.statuses([confirmed('a', 'x')]);
+    expect(dismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('a confirm the server refuses leaves the created task in place and says it is not linked', async () => {
+    const createTask = vi.fn().mockResolvedValue({ id: 'task-7' });
+    const confirm = vi.fn().mockRejectedValue(Object.assign(new Error('That proposal was set aside.'), { code: 'action_not_allowed', status: 409 }));
+    const bridge = createTaskBridge({ createTask, getTask: vi.fn(), domainFor: async () => 'life', confirm, dismiss: vi.fn(), setReview: vi.fn() });
+    const err = await bridge.create(session, proposal, { title: 'Draft', due: null }).catch((e) => e);
+    expect(err).toBeInstanceOf(TaskNotLinkedError);
+    expect(err.taskId).toBe('task-7');
+    expect(err.message).toContain('not linked');
+  });
+
+  it('a network failure on confirm keeps the task for a retry', async () => {
+    const createTask = vi.fn().mockResolvedValue({ id: 'task-7' });
+    const confirm = vi.fn().mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'network_error' })).mockResolvedValue(undefined);
+    const bridge = createTaskBridge({ createTask, getTask: vi.fn(), domainFor: async () => 'life', confirm, dismiss: vi.fn(), setReview: vi.fn() });
+    await expect(bridge.create(session, proposal, { title: 'Draft', due: null })).rejects.toThrow('offline');
+    await bridge.create(session, proposal, { title: 'Draft', due: null });
+    expect(createTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('a refused review link says the review task was created but not linked', async () => {
+    const bridge = createTaskBridge({
+      createTask: vi.fn().mockResolvedValue({ id: 'task-8' }), getTask: vi.fn(), domainFor: async () => 'life', confirm: vi.fn(), dismiss: vi.fn(),
+      setReview: vi.fn().mockRejectedValue(Object.assign(new Error('This problem already has a review task.'), { code: 'action_not_allowed', status: 409 }))
+    });
+    const err = await bridge.createReview(session, { title: 'Review', due: '2026-11-02' }).catch((e) => e);
+    expect(err).toBeInstanceOf(TaskNotLinkedError);
+    expect(err.taskId).toBe('task-8');
   });
 });
