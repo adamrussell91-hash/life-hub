@@ -4,7 +4,7 @@
 
 **Goal:** Add the four Decide tools and four Implement tools (definitions, coach knowledge, emblems and animated book-faithful diagrams), and connect Implement to the Tasks hub: the coach proposes real tasks, the person confirms each on a card before anything is created, a dated Review task is proposed at the end of Implement, and linked tasks show their live status on the Kanban and a Problem Solver chip on their page.
 
-**Architecture:** Each tool is a pure definition in `packages/problem-solver/tools/`, registered in the tool index and so available to the step engine (Plan 3). Two small generic hooks come first: `taskSlots` (which nodes may become tasks) and `scoreLine` (a one-line summary of computed scores for the coach). The session gains `proposedTasks`, `reviewProposal` and `reviewTaskId` and four actions; the server records proposals and confirmations but never writes Tasks. The page creates tasks through the existing `tasksApi.createTask` and then posts `confirm_task`. Each diagram is a renderer in `packages/problem-solver/render/` following the v1 contract plus the addendum below, registered in the canvas and the preview harness.
+**Architecture:** Each tool is a pure definition in `packages/problem-solver/tools/`, registered in the tool index and so available to the step engine (Plan 3). Two small generic hooks come first: `taskSlots` (which nodes may become tasks) and `scoreLine` (a one-line summary of computed scores for the coach). Every Decide tool ends with a `choice` slot (the chosen option), added by one shared wrapper, `withChoice`; Implement reads the latest choice as its aim. The session gains `proposedTasks`, `reviewProposal` and `reviewTaskId` and four actions; the server records proposals and confirmations but never writes Tasks. The page creates tasks through the existing `tasksApi.createTask` and then posts `confirm_task`. Each diagram is a renderer in `packages/problem-solver/render/` following the v1 contract plus the addendum below, registered in the canvas and the preview harness.
 
 **Tech Stack:** Plain ESM with JSDoc (tools, machine, server), TypeScript renderers and page code (Vite, Tasks app), Web Animations API, `node:test` for root tests, Vitest + happy-dom for renderer and page tests, the preview harness (`scripts/problem-solver-preview.mjs`) with a new `--audit` pass for visual QA, Playwright on the Tasks mock API for the walk.
 
@@ -32,7 +32,7 @@
   - **Full review** (spec-compliance reviewer, then code-quality reviewer, then fixes): Task 7 (session proposals), Task 9 (Tasks bridge and confirm cards), Task 11 (decision matrix), Task 13 (morphological), Task 14 (Pareto), Task 17 (Kanban).
   - **Single controller check** (the controller reads the diff, runs the task's tests, looks at both preview PNGs next to the book page and reads the audit output; no reviewer subagents): every other task.
 - **Human checkpoint:** Task 5 (emblems). Renderer tasks may proceed while Adam looks.
-- **Defaults taken where the spec is open** are listed under "Open questions" at the end. Build with the defaults; change them if Adam decides otherwise.
+- **Adam's decisions** on the points the spec left open are listed under "Decisions" at the end. The plan is written to them.
 
 ---
 
@@ -41,7 +41,8 @@
 | File | Responsibility | Change |
 | --- | --- | --- |
 | `packages/problem-solver/machine.mjs` | `canPropose(run, node)` | Modify |
-| `packages/problem-solver/steps.mjs` | `planStepForBook(modelId, book)` | Modify |
+| `packages/problem-solver/steps.mjs` | `planStepForBook(modelId, book)`, `chosenOption(session)` | Modify |
+| `packages/problem-solver/tools/choice.mjs` | `withChoice`: the chosen-option slot every Decide tool ends with | Create |
 | `packages/problem-solver/tools/{decision-matrix,swot,morphological,pareto}.mjs` | Decide tools | Create |
 | `packages/problem-solver/tools/{dmaic,fifteen-percent,kanban,eisenhower}.mjs` | Implement tools | Create |
 | `packages/problem-solver/tools/index.mjs` | Register 8 tools | Modify |
@@ -297,9 +298,17 @@ Add `--audit` to the usage comment and message.
 ### Task 3: The four Decide tools
 
 **Files:**
-- Create: `packages/problem-solver/tools/decision-matrix.mjs`, `swot.mjs`, `morphological.mjs`, `pareto.mjs`
+- Create: `packages/problem-solver/tools/choice.mjs`, `decision-matrix.mjs`, `swot.mjs`, `morphological.mjs`, `pareto.mjs`
 - Modify: `packages/problem-solver/tools/index.mjs`, `packages/problem-solver/types.ts`, `packages/problem-solver/glyphs.ts` (temporary `Partial`, as Plan 4 Task 2 did)
 - Test: `tests/unit/problem-solver-decide-tools.test.js`
+
+**The chosen option (Adam's decision: both).** Decide ends with an explicit chosen option, *and* the coach names the leading option in conversation and confirms it as the Implement aim. The slot lives on each Decide tool as its final slot, `choice`, added by one wrapper so the rule is written once:
+- `choice` opens once the tool's own minimum is met (a scored matrix; a full SWOT option and the synthesis; an evaluated morphological scenario; Pareto with data);
+- the tool's other slots stay open after it, so a rescore or a new item is still possible;
+- the tool is complete only when its own minimum is met *and* `choice` is placed, so Decide is `done` only with a chosen option;
+- in Polya, whose Devise step uses both Devise and Decide tools, the same applies to the Decide tools there.
+
+A step-level node was considered and rejected: it would need its own placement path, record rendering and migration, while a final slot reuses the machine, the coach's slot contract, contested handling and the renderers.
 
 - [ ] **Step 1: Failing tests**
 
@@ -313,6 +322,7 @@ import { matrixTotals } from '../../packages/problem-solver/tools/decision-matri
 import { quadrantsOf } from '../../packages/problem-solver/tools/swot.mjs';
 import { consistent } from '../../packages/problem-solver/tools/morphological.mjs';
 import { paretoRows } from '../../packages/problem-solver/tools/pareto.mjs';
+import { CHOICE_SLOT } from '../../packages/problem-solver/tools/choice.mjs';
 
 let n = 0;
 const put = (run, slot, extra = {}) => placeNode(run, { id: `c${(n += 1)}`, slot, text: slot, title: slot, state: 'accepted', ...extra });
@@ -321,6 +331,15 @@ const link = (run, from, to, kind) => addEdge(run, { from: idOf(run, from), to: 
 
 test('decide step lists its four tools in order', () => {
   assert.deepEqual(toolsForBookStep('decide'), ['decision_matrix', 'swot', 'morphological', 'pareto']);
+});
+
+test('every Decide tool, and only Decide tools, end with the choice slot and a Choose step', () => {
+  for (const [id, def] of Object.entries(TOOLS)) {
+    const decide = def.step === 'decide';
+    assert.equal(CHOICE_SLOT in def.slots, decide, id);
+    assert.equal(def.steps.at(-1).id === 'choose', decide, id);
+    assert.ok(Object.isFrozen(def), id);
+  }
 });
 
 test('decision matrix: criteria and options open together; weights and ratings validated; totals and leader', () => {
@@ -335,8 +354,13 @@ test('decision matrix: criteria and options open together; weights and ratings v
   assert.throws(() => applyScores(r, { mode: 'guess', weights: [60, 40], ratings: [[8, 5], [6, 9]] }, 't'), /percentage weights or ranks/);
   r = applyScores(r, { mode: 'percent', weights: [60, 40], ratings: [[8, 5], [6, 9]] }, 't1');
   assert.deepEqual(matrixTotals(r), { totals: [6.8, 7.2], leader: 1 });
-  assert.equal(isComplete(r), true);
+  assert.equal(isComplete(r), false, 'scored, but no option chosen yet');
+  assert.deepEqual(nextSlots(r), ['criterion:3', 'option:3', 'choice']);
   assert.match(TOOLS.decision_matrix.scoreLine(r), /option:2 7\.2 \(leading\)/);
+  r = put(r, 'choice');
+  assert.equal(isComplete(r), true);
+  assert.ok(!nextSlots(r).includes('choice'), 'one choice per run');
+  assert.ok(nextSlots(r).includes('criterion:3'), 'other slots stay open after the choice');
   r = applyScores(r, { mode: 'rank', weights: [2, 1], ratings: [[8, 5], [6, 9]] }, 't2');
   assert.deepEqual(matrixTotals(r), { totals: [21, 21], leader: null });
   r = put(r, 'criterion:3');
@@ -363,6 +387,9 @@ test('swot: goal, options, quadrant items linked to their option, synthesis once
   assert.equal(canEdge(r, idOf(r, 'threat:1'), idOf(r, 'option:1'), 'of'), false, 'one option per item');
   assert.ok(nextSlots(r).includes('synthesis'));
   r = put(r, 'synthesis');
+  assert.equal(isComplete(r), false);
+  assert.deepEqual(nextSlots(r), ['choice']);
+  r = put(r, 'choice');
   assert.equal(isComplete(r), true);
   assert.deepEqual(nextSlots(r), []);
 });
@@ -405,6 +432,9 @@ test('morphological: subjects with linked attributes; contradictions pair two su
   assert.equal(consistent(r, idOf(r, 'scenario:2')), true);
   assert.ok(nextSlots(r).includes('evaluation'));
   r = put(r, 'evaluation');
+  assert.equal(isComplete(r), false);
+  assert.deepEqual(nextSlots(r), ['choice'], 'evaluation closes the grid; only the choice remains');
+  r = put(r, 'choice');
   assert.equal(isComplete(r), true);
 });
 
@@ -423,6 +453,9 @@ test('pareto: target, items, one figure per item; rows ranked with percent, cumu
   assert.deepEqual(rows.map((x) => x.percent), [45, 30, 15, 10]);
   assert.deepEqual(rows.map((x) => x.cumulative), [45, 75, 90, 100]);
   assert.deepEqual(rows.map((x) => x.vital), [true, true, true, false]);
+  assert.equal(isComplete(r), false);
+  assert.ok(nextSlots(r).includes('choice'));
+  r = put(r, 'choice');
   assert.equal(isComplete(r), true);
   assert.match(TOOLS.pareto.scoreLine(r), /Vital few: item:2, item:3, item:4 \(90%\)/);
   r = put(r, 'item:5');
@@ -435,8 +468,39 @@ test('pareto: target, items, one figure per item; rows ranked with percent, cumu
 - [ ] **Step 3: Implement**
 
 ```js
+// packages/problem-solver/tools/choice.mjs
+import { hasSlot } from '../slots.mjs';
+
+/** The slot every Decide tool ends with: the option carried into Implement as its aim. */
+export const CHOICE_SLOT = 'choice';
+
+/**
+ * Wraps a Decide tool definition so it ends with the chosen option. `choice` opens once the
+ * tool's own minimum is met; the tool's other slots stay open; the tool is complete only
+ * with a choice. Returns a frozen definition.
+ */
+export function withChoice(def) {
+  return Object.freeze({
+    ...def,
+    steps: Object.freeze([...def.steps, { id: 'choose', title: 'Choose', prompt: 'Name the option to carry into Implement, and why, in light of what this tool showed. The coach names the leading option first; the choice is yours.' }]),
+    slots: Object.freeze({ ...def.slots, [CHOICE_SLOT]: 'The option chosen to carry into Implement as its aim, and why' }),
+    nextSlots(run) {
+      const base = def.nextSlots(run);
+      return !hasSlot(run, CHOICE_SLOT) && def.complete(run) ? [...base, CHOICE_SLOT] : base;
+    },
+    complete(run) {
+      return def.complete(run) && hasSlot(run, CHOICE_SLOT);
+    }
+  });
+}
+```
+
+Each Decide tool below imports `withChoice` from `./choice.mjs` and is written `withChoice({ … })` instead of `Object.freeze({ … })`. Its own `nextSlots` and `complete` describe only the tool's minimum; the wrapper adds the choice. The base definitions never call `this`, so spreading them is safe.
+
+```js
 // packages/problem-solver/tools/decision-matrix.mjs
 import { countSlots, nextIndexed, open, parseSlot } from '../slots.mjs';
+import { withChoice } from './choice.mjs';
 
 const ordered = (run, name) => run.nodes.filter((node) => parseSlot(node.slot)?.name === name).sort((a, b) => parseSlot(a.slot).index - parseSlot(b.slot).index);
 const latest = (run) => run.scores?.snapshots?.at(-1) ?? null;
@@ -466,7 +530,7 @@ export function matrixTotals(run) {
   return { totals, leader: totals.filter((t) => t === top).length === 1 ? totals.indexOf(top) : null };
 }
 
-export const decisionMatrix = Object.freeze({
+export const decisionMatrix = withChoice({
   id: 'decision_matrix',
   name: 'Decision matrix',
   kind: 'decision',
@@ -529,6 +593,7 @@ export const decisionMatrix = Object.freeze({
 ```js
 // packages/problem-solver/tools/swot.mjs
 import { countSlots, hasSlot, nextIndexed, open, parseSlot } from '../slots.mjs';
+import { withChoice } from './choice.mjs';
 
 export const QUADRANTS = Object.freeze(['strength', 'weakness', 'opportunity', 'threat']);
 const PER_QUADRANT = 6;
@@ -548,7 +613,7 @@ export function quadrantsOf(run, optionId) {
 
 const fullOption = (run) => run.nodes.some((node) => parseSlot(node.slot)?.name === 'option' && QUADRANTS.every((q) => quadrantsOf(run, node.id)[q].length > 0));
 
-export const swot = Object.freeze({
+export const swot = withChoice({
   id: 'swot',
   name: 'SWOT analysis',
   kind: 'decision',
@@ -596,6 +661,7 @@ export const swot = Object.freeze({
 ```js
 // packages/problem-solver/tools/morphological.mjs
 import { countSlots, hasSlot, nextIndexed, open, parseSlot } from '../slots.mjs';
+import { withChoice } from './choice.mjs';
 
 const PER_SUBJECT = 8;
 const nameOf = (run, id) => parseSlot(run.nodes.find((node) => node.id === id)?.slot)?.name;
@@ -632,7 +698,7 @@ const gridReady = (run) => {
   return subjects.length >= 3 && subjects.every((subject) => attributesOf(run, subject.id).length >= 2);
 };
 
-export const morphological = Object.freeze({
+export const morphological = withChoice({
   id: 'morphological',
   name: 'Morphological analysis',
   kind: 'decision',
@@ -711,6 +777,7 @@ export const morphological = Object.freeze({
 ```js
 // packages/problem-solver/tools/pareto.mjs
 import { countSlots, hasSlot, nextIndexed, parseSlot } from '../slots.mjs';
+import { withChoice } from './choice.mjs';
 
 const CUT = 80;
 const latest = (run) => run.scores?.snapshots?.at(-1) ?? null;
@@ -739,7 +806,7 @@ export function paretoRows(run) {
   });
 }
 
-export const pareto = Object.freeze({
+export const pareto = withChoice({
   id: 'pareto',
   name: 'Pareto analysis',
   kind: 'decision',
@@ -1173,6 +1240,7 @@ test('the decide step layer carries its guide, tools, triggers and carry-forward
   assert.match(layer, /decision_matrix \(Decision matrix\)/);
   assert.match(layer, /CHALLENGE IN THIS STEP:/);
   assert.match(layer, /CARRY FORWARD:/);
+  assert.match(layer, /choice slot/);
 });
 ```
 
@@ -1183,7 +1251,7 @@ test('the decide step layer carries its guide, tools, triggers and carry-forward
 Add to `SELECTION`:
 
 ```js
-  decide: 'Choose from what the decision turns on. Several options against several factors of unequal importance: `decision_matrix`. One or two options to weigh against a goal, inside and outside your control: `swot`. A solution made of several parts, each with alternatives, where some combinations clash: `morphological`. Many contributing items and limited effort, with data available: `pareto`. Name whether this decision suits fast judgement or slow analysis, and say so.',
+  decide: 'Choose from what the decision turns on. Several options against several factors of unequal importance: `decision_matrix`. One or two options to weigh against a goal, inside and outside your control: `swot`. A solution made of several parts, each with alternatives, where some combinations clash: `morphological`. Many contributing items and limited effort, with data available: `pareto`. Name whether this decision suits fast judgement or slow analysis, and say so. Every Decide tool ends with the choice slot: when the tool\'s minimum is met, name the leading option from the scores or the evaluation in one sentence, ask which option the person will carry into Implement, and place their answer in the choice slot. The choice is theirs; if it is not the leader, ask for the reason once and accept it.',
   implement: 'Choose from what stands between the plan and action. A measurable process to improve with data and a pilot: `dmaic`. Stuck waiting for others or for resources: `fifteen_percent`. Several tasks to move through stages: `kanban`. Too many demands competing for time: `eisenhower`. Small, specific actions with an owner and a date beat a large plan; offer concrete ones as real tasks.'
 ```
 
@@ -1195,7 +1263,8 @@ Add to `STEP_TRIGGERS`:
     'Weights all equal, or not adding to 100, with no reason (analysis).',
     'A rating that contradicts evidence already given (logical_reasoning).',
     'A Pareto ranking or 80/20 claim with no figures behind it (critical_thinking).',
-    'The answer decided before the analysis, with numbers fitted afterwards (metacognition).'
+    'The answer decided before the analysis, with numbers fitted afterwards (metacognition).',
+    'A chosen option that goes against the scores with no reason given (decision_making).'
   ],
   implement: [
     'A task too large to start this week (decision_making).',
@@ -1213,7 +1282,7 @@ In `prompts.mjs` `stepLayer`, after the triggers block, add a carry-forward line
 ```js
 const CARRY = {
   decide: 'CARRY FORWARD: seed options from Devise (preferred lotus ideas, solution-tree branches, Duncker solutions, the integrated reduction) and confirm each with the person before placing it.',
-  implement: 'CARRY FORWARD: the option Decide favoured (the leading matrix total, the SWOT synthesis or the chosen scenario) is the aim; SMART measures from Define seed DMAIC\'s Measure. Confirm before placing.'
+  implement: 'CARRY FORWARD: the CHOSEN OPTION from Decide is the aim of Implement. Open by confirming it in one sentence, then seed it into DMAIC\'s Define, the 15% Reflect or the first Kanban cards. If none is recorded, ask what was decided before placing anything. SMART measures from Define seed DMAIC\'s Measure. Confirm before placing.'
 };
 ```
 
@@ -1225,7 +1294,7 @@ and push `...books.map((id) => CARRY[id]).filter(Boolean)` into the returned lis
 
 ---
 
-### Task 7: Session: proposed tasks and the review proposal (FULL REVIEW)
+### Task 7: Session: proposed tasks, the review proposal and the chosen option as Implement's aim (FULL REVIEW)
 
 **Files:**
 - Modify: `packages/problem-solver/types.ts`, `packages/problem-solver/steps.mjs`
@@ -1258,7 +1327,7 @@ Add to `PsSession`: `proposedTasks: PsProposedTask[]; reviewProposal: PsReviewPr
 
 - [ ] **Step 2: Failing tests**
 
-`tests/unit/problem-solver-steps.test.js`:
+`tests/unit/problem-solver-steps.test.js` (add `planStepForBook` and `chosenOption` to its import from steps.mjs):
 
 ```js
 test('planStepForBook finds the plan step that uses a book step', () => {
@@ -1266,6 +1335,13 @@ test('planStepForBook finds the plan step that uses a book step', () => {
   assert.equal(planStepForBook('polya', 'improve'), 'evaluate');
   assert.equal(planStepForBook('polya', 'decide'), 'devise');
   assert.equal(planStepForBook('triz', 'nothing'), null);
+});
+
+test('chosenOption is the choice of the latest kept Decide run', () => {
+  const run = (id, text, status = 'done') => ({ id, tool: 'swot', status, nodes: [{ id: `${id}-c`, slot: 'choice', text, title: text, state: 'accepted', skills: [], turnId: 't' }], edges: [] });
+  assert.equal(chosenOption({ steps: {} }), null);
+  const session = { steps: { decide: { runs: [run('a', 'Publish the rota on Wednesdays'), run('b', 'Swap shifts in a shared app'), run('c', 'Switched away', 'switched')], status: 'done', objection: null } } };
+  assert.deepEqual(chosenOption(session), { text: 'Swap shifts in a shared app', title: 'Swap shifts in a shared app', contested: false, runId: 'b', tool: 'swot' });
 });
 ```
 
@@ -1345,6 +1421,12 @@ test('dismiss_task drops a proposal; a confirmed one reverts only when its task 
   assert.equal(s.proposedTasks[1].status, 'dismissed');
   assert.equal(s.proposedTasks[1].removed, true);
   assert.throws(() => confirmTask(s, { proposalId: a, taskId: 'x' }, deps), (err) => err.status === 409);
+  // Adam's decision: a node whose task was deleted is never proposed again.
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeTasks: [{ slot: 'card:2', title: 'Ask again', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 2);
+  // A proposal the person set aside (not deleted) may be offered again.
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeTasks: [{ slot: 'card:1', title: 'Draft again', due: null }] }), deps);
+  assert.equal(s.proposedTasks.length, 3);
 });
 
 test('leaving Implement with a finished tool proposes a review in two weeks; leaving it untouched does not', () => {
@@ -1410,7 +1492,8 @@ Also assert in the existing v1 fixture test that the migrated session has `propo
 test('implement prompts show TODAY, nodes that can become tasks, and the task and review state', () => {
   let s = { ...inTool('five_whys'), updatedAt: '2026-10-19T10:00:00.000Z' };
   s = { ...s, phase: 'implement', steps: { ...s.steps, implement: { runs: [{ id: 'k', tool: 'kanban', status: 'active', nodes: [{ id: 'n1', slot: 'card:1', text: 'Draft the template', tag: 'todo', state: 'accepted', skills: [], turnId: 't' }, { id: 'n2', slot: 'card:2', text: 'Ask the team', tag: 'todo', state: 'accepted', skills: [], turnId: 't' }], edges: [] }], status: 'open', objection: null } } };
-  s = { ...s, proposedTasks: [{ id: 'p1', title: 'Draft the template', status: 'confirmed', due: null, taskId: 'task-1', source: { runId: 'k', nodeId: 'n1' } }], reviewProposal: null, reviewTaskId: null };
+  s.steps.implement.runs[0].nodes.push({ id: 'n3', slot: 'card:3', text: 'Old removed task', tag: 'todo', state: 'accepted', skills: [], turnId: 't' });
+  s = { ...s, proposedTasks: [{ id: 'p1', title: 'Draft the template', status: 'confirmed', due: null, taskId: 'task-1', source: { runId: 'k', nodeId: 'n1' } }, { id: 'p3', title: 'Old removed task', status: 'dismissed', removed: true, due: null, taskId: 'task-3', source: { runId: 'k', nodeId: 'n3' } }], reviewProposal: null, reviewTaskId: null };
   const { user, system } = buildCoachPrompt(s);
   assert.match(user, /TODAY: 2026-10-19/);
   assert.match(user, /Can become tasks: card:2/);
@@ -1419,6 +1502,18 @@ test('implement prompts show TODAY, nodes that can become tasks, and the task an
   assert.match(user, /REVIEW TASK: none yet/);
   assert.match(system[0], /"proposeTasks"/);
   assert.match(system[0], /"proposeReview"/);
+  assert.doesNotMatch(user, /TASKS FROM THIS PROBLEM:[\s\S]*Old removed task/, 'the coach is not told about deleted tasks');
+  assert.doesNotMatch(user, /Can become tasks:[^\n]*card:3/, 'nor offered them again');
+});
+
+test('outside Decide the chosen option is shown as the aim; in Implement without one, the coach asks', () => {
+  const base = { ...inTool('five_whys'), updatedAt: '2026-10-19T10:00:00.000Z' };
+  const choice = { id: 'd', tool: 'decision_matrix', status: 'done', nodes: [{ id: 'c', slot: 'choice', text: 'Publish the rota on Wednesdays', title: 'Wednesday rota', state: 'accepted', skills: [], turnId: 't' }], edges: [] };
+  const implement = { runs: [], status: 'open', objection: null };
+  const withChoice = { ...base, phase: 'implement', steps: { ...base.steps, decide: { runs: [choice], status: 'done', objection: null }, implement } };
+  assert.match(buildCoachPrompt(withChoice).user, /CHOSEN OPTION \(the aim for Implement\): Publish the rota on Wednesdays/);
+  const without = { ...base, phase: 'implement', steps: { ...base.steps, implement } };
+  assert.match(buildCoachPrompt(without).user, /CHOSEN OPTION: none recorded/);
 });
 ```
 
@@ -1432,6 +1527,20 @@ test('implement prompts show TODAY, nodes that can become tasks, and the task an
 /** The plan step of a model whose tool families include `book`, or null. */
 export function planStepForBook(modelId, book) {
   return stepPlan(modelId).find((s) => s.book.includes(book))?.step ?? null;
+}
+
+/**
+ * The option chosen in Decide and carried into Implement as its aim: the `choice` node of
+ * the latest Decide run that was not switched away from, or null. Read by the prompt, the
+ * canvas aim caption and (Plan 6) Improve.
+ */
+export function chosenOption(session) {
+  const runs = Object.values(session.steps ?? {}).flatMap((step) => step.runs).filter((run) => run.status !== 'switched' && TOOLS[run.tool]?.step === 'decide');
+  for (const run of runs.reverse()) {
+    const node = run.nodes.find((item) => item.slot === 'choice');
+    if (node) return { text: node.text, title: node.title ?? node.text, contested: node.state === 'contested', runId: run.id, tool: run.tool };
+  }
+  return null;
 }
 ```
 
@@ -1484,7 +1593,8 @@ function addProposals(session, items, deps) {
   for (const item of items) {
     const node = run.nodes.find((n) => n.slot === item.slot);
     if (!node || !canPropose(run, node)) continue;
-    if (list.some((p) => p.source.nodeId === node.id && p.status !== 'dismissed')) continue;
+    // One live proposal per node. A node whose task was deleted in Tasks is never proposed again.
+    if (list.some((p) => p.source.nodeId === node.id && (p.status !== 'dismissed' || p.removed))) continue;
     if (list.length >= PROPOSALS_MAX) break;
     list = [...list, { id: deps.newId(), title: item.title.slice(0, TITLE_MAX), status: 'proposed', due: item.due ?? null, source: { runId: run.id, nodeId: node.id } }];
   }
@@ -1532,7 +1642,12 @@ export function confirmTask(session, payload, deps) {
   return touch(withProposal(session, proposal.id, { status: 'confirmed', taskId }), deps);
 }
 
-/** Set a proposal aside; a confirmed one only reverts when its task was deleted in Tasks. */
+/**
+ * Set a proposal aside; a confirmed one only reverts when its task was deleted in Tasks.
+ * Deleted tasks (Adam's decision): the Kanban card shows "Task removed", the proposal is
+ * dismissed with `removed: true`, the coach is not told (it never appears in the prompt)
+ * and the node is never proposed again.
+ */
 export function dismissTask(session, payload, deps) {
   const proposal = findProposal(session, payload?.proposalId);
   if (proposal.status === 'dismissed') return session;
@@ -1577,14 +1692,25 @@ Wrap both exits of `migrateSession`: the early `return session` for v2 sessions 
 - `RUBRIC`, SESSION SHAPE, add item 7:
   `7. Tasks: in Implement, when a card, a do-first item or a chosen 15% action is specific enough to start (a clear action, ideally an owner and a date), offer it as a real task in "proposeTasks" with its slot and a short task title. Only slots listed under "Can become tasks" qualify. The person confirms each one on a card; never say a task exists until TASKS shows it confirmed. Before Implement ends, propose a dated review in "proposeReview", timed for when the first results should show (a date after TODAY).`
 - `RUBRIC`, OUTPUT: add `,"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}],"proposeReview":{"due":"YYYY-MM-DD","reason":"..."}|null` to the JSON shape, and the sentence `Include "proposeTasks" and "proposeReview" only in Implement.`
-- `runLines`: when `def.taskSlots` exists, add `Can become tasks: ${open.join(', ') || 'none yet'}` where `open` is the slots of nodes with `canPropose(run, node)` and no proposal for that node that is not dismissed. Import `canPropose` from machine.mjs.
+- `runLines`: when `def.taskSlots` exists, add `Can become tasks: ${open.join(', ') || 'none yet'}` where `open` is the slots of nodes with `canPropose(run, node)`, no proposal for that node that is not dismissed, and no removed proposal for it. Import `canPropose` from machine.mjs.
+- `buildCoachPrompt`: after the EARLIER STEPS part, push the chosen option. Import `chosenOption` and `planStep` from steps.mjs:
+
+```js
+  const chosen = chosenOption(session);
+  const books = session.model ? planStep(session.model.id, session.phase)?.book ?? [] : [];
+  if (chosen && !books.includes('decide')) parts.push(`CHOSEN OPTION (the aim for Implement): ${chosen.text}${chosen.contested ? ' (kept against the coach\'s objection)' : ''}`);
+  else if (!chosen && books.includes('implement')) parts.push('CHOSEN OPTION: none recorded. Ask what was decided and confirm it as the aim before placing anything.');
+```
+
+  (Inside a Decide step the run lines already show the `choice` slot, so the line is not repeated there.)
 - `buildCoachPrompt`: push `TODAY: ${String(session.updatedAt ?? '').slice(0, 10)}` after the PHASE line, and push `taskLines(session)` when it is non-null:
 
 ```js
 function taskLines(session) {
-  const tasks = session.proposedTasks ?? [];
+  // Proposals whose task was deleted in Tasks are left out: the coach is not told about them.
+  const tasks = (session.proposedTasks ?? []).filter((p) => !p.removed);
   if (!tasks.length && !session.reviewProposal && !session.reviewTaskId) return null;
-  const lines = tasks.map((p) => `  ${p.status}${p.removed ? ' (deleted in Tasks)' : ''}: "${p.title}"${p.due ? ` due ${p.due}` : ''}`);
+  const lines = tasks.map((p) => `  ${p.status}: "${p.title}"${p.due ? ` due ${p.due}` : ''}`);
   const review = session.reviewTaskId ? `created for ${session.reviewProposal?.due ?? 'its date'}` : session.reviewProposal ? `${session.reviewProposal.status} for ${session.reviewProposal.due}` : 'none yet';
   return `TASKS FROM THIS PROBLEM:\n${lines.join('\n') || '  none'}\nREVIEW TASK: ${review}`;
 }
@@ -1937,6 +2063,7 @@ describe('task cards', () => {
   - Add `setTasks?(links: PsTaskLink[]): void` to `View`.
   - Add `setTaskStatuses(statuses: Record<string, string>)` to the returned canvas object. It stores the map and calls `pushTasks()`, which, for the run on screen, calls `view.setTasks?.(links)` with `links = last.proposedTasks.filter((p) => p.status === 'confirmed' && p.source.runId === run.id).map((p) => ({ nodeId: p.source.nodeId, taskId: p.taskId!, status: statuses[p.taskId!] ?? 'unknown' }))`.
   - Call `pushTasks()` at the end of `showChart` as well.
+  - **Aim caption.** When the run on screen belongs to an Implement tool (`TOOLS[run.tool].step === 'implement'`) and `chosenOption(session)` is not null, `showChart` puts `p.ps-canvas__aim` under the heading: a small "Aim" meta and the choice's title, with the full text in its `title` attribute. It is absent otherwise. Test it in `apps/tasks/tests/unit/problem-solver-canvas-aim.test.ts`: mount the canvas on a host with a session in `implement` holding an active kanban run and a Decide run with a `choice` node; `.ps-canvas__aim` contains the choice title. Remove the Decide run and update; the caption is gone.
 - `view.ts`, in `renderSession`:
   - Build the bridge:
 
@@ -1957,7 +2084,7 @@ const bridge = createTaskBridge({
     - on a `conflict` error, refetch the session and post once more with the new revision;
     - `paint` the result;
     - rethrow any other error, so the card shows it.
-  - `domainFor(session)`: when the session links a task, fetch that task once and use its `domain`; otherwise use `'life'` (see Open questions). Cache the result per session.
+  - `domainFor(session)`: when the session links a task, fetch that task once and use its `domain`; otherwise use `'life'` (Decision 1). Cache the result per session.
   - `mountTaskCards({ create: (p, e) => bridge.create(session, p, e), dismiss: (p) => confirmed('dismiss_task', { proposalId: p.id }), createReview: (e) => bridge.createReview(session, e), dismissReview: () => confirmed('dismiss_review', {}) })`. Pass its `el` as `cards` to `mountCoachPanel`, and call `cards.update(session)` in `paint`.
   - Live statuses: in `paint`, when the sorted list of confirmed task ids changes, call `refreshStatuses()`. It runs `bridge.statuses(session.proposedTasks)` and then `diagram.setTaskStatuses(map)`.
   - Also refresh on `onTasksChanged`, on `onTasksDeleted` (from `@/services/task-cache`) and on `visibilitychange` to visible. Store the unsubscribe functions beside `diagramNow`, and call them in `renderProblemSolverView` when the page changes.
@@ -2029,6 +2156,8 @@ In `problem-solver-view.test.ts`, add a test for the exported `resumeTarget(sess
 ## Renderer tasks (11–18)
 
 Each task gives the book page, the class prefix and container name, the composition, how it builds, the phone layout and the tool-specific tests on top of the eight baseline tests. Follow the shared contract and the addendum for everything else. Each renderer registers in `canvas.ts` `RENDERERS`, in `scripts/problem-solver-preview.mjs` `RENDERERS`, and adds an invented sample to `SAMPLES` (no real names, one contested node, a full run, scores where the tool has them, and a `<tool>:next` sample for scored tools so `--next` shows the morph). Each preview must pass `--audit` at 900 and 390.
+
+**The chosen option in the four Decide renderers (Tasks 11–14).** Each one renders the `choice` node as a composed "Chosen option" card under its chart (`[data-choice]`), with a 3px blue top border like Problem statement's card, the full text, a details button and the contested tag when contested. It appears with the node, rising in, and never before. Where the choice names an option shown on the chart, do not try to match it automatically; the card is the record. Each of Tasks 11–14 adds this test: the `[data-choice]` card is absent until `choice` exists, then shows its full text; removing the node removes the card. Each sample in `SAMPLES` includes a `choice` node.
 
 ### Task 11: Decision matrix renderer with scoring (`render/decision-matrix.ts`, `createDecisionMatrixView`, prefix `ps-matrix`, container `matrix`) — FULL REVIEW
 
@@ -2272,6 +2401,7 @@ Each task gives the book page, the class prefix and container name, the composit
   - **15% links:** `chosen` picks the first unpicked action.
   - **Kanban proposals:** in an active kanban run, a long answer places `card:1` with tag `todo` and returns `proposeTasks: [{ slot: 'card:1', title: <the first 8 words>, due: null }]`.
   - **No proposal for done cards:** a `done:` hint places a card tagged `done` and proposes nothing.
+  - **Choice:** after a scored decision matrix (scores applied with `score()` in the test), an answer with no hint places `choice` (the choice takes priority over the still-open criterion and option slots), the run is complete, and the message names the leading option's title from `matrixTotals`. The answer `choice: Publish the rota every Wednesday morning` does the same through the hint.
 
 - [ ] **Step 2: Implement in the scripted coach** (deterministic, local dev and tests only):
   - **Slot hint:** an answer beginning `<name>:` where `<name>` is the name of an open slot (not `link` or `switch`) places in that slot, with the prefix stripped. For a Kanban card, the hint may instead be a column tag (`todo:`, `doing:`, `review:`, `done:`): it places the next card with that tag.
@@ -2283,6 +2413,8 @@ Each task gives the book page, the class prefix and container name, the composit
     - A 15% `chosen` links `picks` to the first unpicked action.
   - **Proposals:** when the placed node would pass `canPropose`, add `proposeTasks: [{ slot, title: text.split(/\s+/).slice(0, 8).join(' '), due: null }]`.
   - Count the six-word challenge threshold on the text after any prefix.
+  - **Choice:** when `choice` is among the open slots and the answer has no slot hint, place it in `choice`. The accept message names the leader when the tool can tell: for the decision matrix, "The scores lead with <title of the leading option>; carrying your choice into Implement."; for the others, "Carrying your choice into Implement."
+  - **Implement opening:** when the scripted coach starts an Implement tool and `chosenOption(session)` exists, its first message begins "We are carrying forward: <choice title>." 
 
 - [ ] **Step 3: Browser walk.** Extend the spec after the causal map part:
   - **Leave Analyse and skip Devise:**
@@ -2291,8 +2423,9 @@ Each task gives the book page, the class prefix and container name, the composit
   - **Decide:**
     - Start the decision matrix. Answer `criterion: Staff can plan their week well ahead`, `criterion: The manager spends less time on swaps`, `option: Publish the rota every Wednesday morning` and `option: Let staff swap shifts in a shared app`. Expect `.ps-matrix [data-row]` ×2 and `[data-option]` ×2.
     - Click "Score the options", choose Percent, and enter weights 60 and 40 and ratings 8, 5, 6 and 9. Save. Expect `[data-total]` ×2 and one `.is-leading`.
+    - Answer `choice: Let staff swap shifts in a shared app`. Expect `.ps-matrix [data-choice]` containing that text, and the record's Decide step `data-state="done"` after moving on.
   - **Implement:**
-    - Click "Move on to Implement". Answer the learning question. Expect "Next: Kanban". Start it.
+    - Click "Move on to Implement". Answer the learning question. Expect "Next: Kanban". Start it. Expect the coach's message to contain "We are carrying forward" and `.ps-canvas__aim` to contain "swap shifts".
     - Answer `Draft the new Wednesday rota template for the team`. Expect `.ps-taskcard` with that title prefix.
     - Click "Create task". The card disappears. A fetch to `/api/tasks` contains a task with that title, `source` `problem_solver` and the tag `problem-solver`. Expect `.ps-kanban [data-task-status="open"]` ×1 in `[data-column="todo"]`.
   - **Live status:** PATCH that task to `in_progress` with `fetch` in `page.evaluate` (the mock API supports PATCH), then trigger a refresh by dispatching `visibilitychange`, or reload. Expect the card in `[data-column="doing"]`.
@@ -2331,22 +2464,20 @@ Each task gives the book page, the class prefix and container name, the composit
   - `session.links` plus `proposedTasks[].taskId` give the candidate targets.
 - **Plan 8 (Lightning):** nothing in this plan blocks it. An escalated session starts with empty task fields.
 
-## Open questions (defaults used in this plan)
+## Decisions (Adam, 19 October 2026)
 
-1. **Task domain.** Tasks require a domain. Default: the linked task's domain if the problem links a task; otherwise `life`.
-2. **Review timing.** Default: proposed automatically 14 days after leaving Implement with a finished tool, unless the coach proposed a date earlier. The person can change the date on the card.
-3. **Review with Implement skipped.** Default: no review is proposed when Implement was skipped untouched.
-4. **Which items can become tasks.** Default:
-   - Kanban cards not tagged Done;
-   - Eisenhower "Do first" items only (not "Schedule");
-   - 15% chosen actions.
+These were open questions; Adam has answered them and the plan above is built to the answers.
 
-   DMAIC Improve steps cannot.
-5. **Kanban columns.** The spec says editable columns. Default: the book's fixed four (To do, Doing, Review, Done) as tags.
-6. **WIP badge.** The spec puts the WIP badge on To do. Default: on Doing, where work in progress is.
-7. **Unlinked Kanban cards.** Default: cards that are not real tasks stay in the column the coach placed them in; only linked tasks move.
-8. **A deleted task.** Default: its proposal reverts to dismissed and the card shows "Task removed". Should the coach be told, and offer to re-propose it?
-9. **An explicit chosen option.** Default: Decide has no explicit "chosen option" slot. The coach names the leader and confirms the Implement aim in conversation.
+1. **Task domain. Decided:** the linked task's domain if the problem links a task; otherwise `life`.
+2. **Review timing. Decided:** proposed automatically 14 days after leaving Implement with a finished tool, unless the coach proposed a date earlier. The person can change the date on the card.
+3. **Review with Implement skipped. Decided:** no review is proposed when Implement was skipped untouched.
+4. **Which items can become tasks. Decided:** Kanban cards not tagged Done; Eisenhower "Do first" items only (not "Schedule"); 15% chosen actions. DMAIC Improve steps cannot.
+5. **Kanban columns. Decided:** the book's fixed four (To do, Doing, Review, Done) as tags, not editable columns.
+6. **WIP badge. Decided:** on Doing, where work in progress is.
+7. **Unlinked Kanban cards. Decided:** cards that are not real tasks stay in the column the coach placed them in; only linked tasks move.
+8. **A deleted task. Decided:** the Kanban card shows "Task removed" and the proposal reverts to dismissed (`removed: true`). The coach is **not** told: removed proposals never appear in the prompt's task lines or in "Can become tasks", and the coach does **not** offer to re-propose. The session drops any later proposal for that node (Task 7 tests both).
+9. **The chosen option. Decided: both.** Every Decide tool ends with a `choice` slot (Task 3, via `withChoice`), and a Decide tool is complete only with it. The coach also names the leading option in conversation, asks which option the person will carry forward, and confirms it as the Implement aim (Task 6). Implement reads `chosenOption(session)` as its aim: the prompt's CHOSEN OPTION line (Task 7), the canvas aim caption (Task 9), and the coach's carry-forward into DMAIC Define, 15% Reflect or the first Kanban cards.
+10. **Confirming while the coach is thinking. Decided:** confirmations wait until the coach has settled, because a save during a coach turn would lose that turn. The task itself is created at once, and a retry never creates a duplicate.
 
 ## Done when
 
@@ -2355,9 +2486,12 @@ Each task gives the book page, the class prefix and container name, the composit
   - an emblem matching the book, with the checkpoint sent to Adam;
   - a renderer that matches its book chart, animates only on change, works at 390px, passes its tests and passes `--audit`.
 - The decision matrix and Pareto take scores through their own forms, and the coach sees their computed results as score lines.
+- Every Decide tool ends with a `choice` slot and is complete only with it; each Decide chart shows the chosen-option card.
+- The coach names the leading option and confirms the choice; Implement shows it as its aim (prompt line and canvas caption) and the coach carries it into the first Implement tool.
+- A task deleted in Tasks shows "Task removed" on its card, its proposal is dismissed, and the coach is neither told nor allowed to propose it again.
 - The coach proposes tasks only from qualifying Implement nodes.
 - Every real task is created by the page through `tasksApi.createTask`, only after the person confirms its card.
 - The Review task is proposed with a date, created on confirm, linked back with a chip that opens the problem at Improve.
 - Kanban cards follow their tasks' live status.
-- The scripted coach and the browser walk reach Implement, create a task and the review task, and follow the chip, at both widths.
+- The scripted coach and the browser walk choose an option in Decide, see it as the aim in Implement, create a task and the review task, and follow the chip, at both widths.
 - All gates pass.
