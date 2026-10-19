@@ -15,6 +15,27 @@ test('process layer covers the models and the metacognitive frame', () => {
   for (const phrase of ['seven-step', 'Polya', 'TRIZ', 'orientation', 'verification', 'impulsive']) assert.ok(PROCESS.includes(phrase), phrase);
 });
 
+test('process layer stays under 900 words (sent on every coach turn)', () => {
+  const words = PROCESS.split(/\s+/).filter(Boolean).length;
+  assert.ok(words < 900, `PROCESS is ${words} words`);
+});
+
+test('process layer keeps its headings and adds the opening-chapter sections', () => {
+  const headings = ['THE PROCESS', 'HOW TO USE THE TOOLKIT', 'THINKING SKILLS', 'COGNITIVE AND METACOGNITIVE FRAME', 'STRATEGIES', 'MODELS'];
+  const lines = PROCESS.split('\n');
+  for (const heading of headings) assert.ok(lines.some((line) => line.startsWith(heading)), heading);
+  for (const phrase of ['Self-regulation', 'Algorithms', 'Heuristics', 'Trial and error', 'feed back to Define', 'or to Devise', 'go straight to Decide', 'nobody has to use every tool']) {
+    assert.ok(PROCESS.includes(phrase), phrase);
+  }
+});
+
+test('thinking skills section names every registered skill id and no others', async () => {
+  const { SKILL_IDS } = await import('../../packages/problem-solver/skills.mjs');
+  const section = PROCESS.split('THINKING SKILLS')[1].split('\n\n')[0];
+  const named = [...section.matchAll(/^- ([a-z_]+):/gm)].map((match) => match[1]);
+  assert.deepEqual([...named].sort(), [...SKILL_IDS].sort());
+});
+
 test('final words layer covers skill, emotion and Polya\'s heuristic, with guidance on when', () => {
   for (const phrase of ['skill', 'emotion', 'determination, hope and success', 'curiosity', 'WHEN']) assert.ok(FINAL_WORDS.includes(phrase), phrase);
 });
