@@ -22,6 +22,7 @@ import { createContradictionView } from '../../../../../packages/problem-solver/
 import { createDecisionMatrixView } from '../../../../../packages/problem-solver/render/decision-matrix';
 import { createSwotView } from '../../../../../packages/problem-solver/render/swot';
 import { createMorphologicalView } from '../../../../../packages/problem-solver/render/morphological';
+import { createParetoView } from '../../../../../packages/problem-solver/render/pareto';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -32,7 +33,7 @@ import { chosenOption } from '../../../../../packages/problem-solver/steps.mjs';
 import { morphFromRect } from '../../../design-kit/js/morphing-dialog.js';
 import type { PsSession, PsTaskLink, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
 
-/** A scored tool's payload: the radar sends {current, objective}, the force field {for, against}, the decision matrix a mode and a matrix. */
+/** A scored tool's payload: the radar sends {current, objective}, the force field {for, against}, the decision matrix a mode and a matrix, Pareto its counts. */
 type Scores = Record<string, unknown>;
 /** Scores for the run on screen, which may not be the step's active run (opened from the record). */
 export type RunScores = { runId: string; [series: string]: unknown };
@@ -66,7 +67,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   contradiction: () => createContradictionView(),
   decision_matrix: () => createDecisionMatrixView(),
   swot: () => createSwotView(),
-  morphological: () => createMorphologicalView()
+  morphological: () => createMorphologicalView(),
+  pareto: () => createParetoView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

@@ -4995,3 +4995,253 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 @media (prefers-reduced-motion: reduce) {
   .ps-morph__oval { transition: none; }
 }
+
+/* Pareto analysis (toolkit p.115 and the 80/20 square on p.113, Decide): a red field with paper
+   rules at every tenth, a figure axis on the left and a cumulative percent axis on the right, in
+   the book's serif; yellow bars side by side with thin red gaps, largest first, each figure
+   inside the bar's top (on top of a bar too short to hold it) and a letter code under it; a blue
+   cumulative line with dots through the bar centres, edged in paper; a dashed blue guide from 80%
+   on the right axis across to the line, then down. The 80/20 square follows: a red rim, a yellow
+   field with the vital few's share, a blue inset in its lower right. The key (code, title, figure,
+   share) sits beside the square, and is the reading surface and the targets on a phone. */
+.ps-pareto {
+  /* Named, so every phone query measures this root box. */
+  container: pareto / inline-size;
+  --ps-pareto-serif: Georgia, 'Times New Roman', serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+}
+
+/* Target: a composed card above the chart, the answer in full. */
+.ps-pareto__card {
+  box-sizing: border-box;
+  width: min(100%, 560px);
+  margin-bottom: 18px;
+  padding: 14px 18px 10px;
+  border-top: 3px solid var(--ps-red);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-pareto__card-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ps-pareto__card-meta { color: var(--ps-ink); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-pareto__card .ps-objection { margin-top: 0; color: var(--ps-ink); opacity: 1; }
+.ps-pareto__card-text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+.ps-pareto__more {
+  min-width: 44px;
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ps-pareto__more:focus-visible { outline: 2px solid transparent; border-radius: 4px; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-pareto__card .ps-details__card { margin-top: 0; padding: 4px 0 8px; background: transparent; box-shadow: none; }
+
+/* The chart: axis titles, then axis | field | axis, then the codes and the foot line. */
+.ps-pareto__chart {
+  --ps-pareto-axis: 40px;
+  display: grid;
+  grid-template-columns: var(--ps-pareto-axis) minmax(0, 1fr) var(--ps-pareto-axis);
+  column-gap: 8px;
+  width: 100%;
+}
+.ps-pareto__axis-title { grid-row: 1; margin-bottom: 10px; color: var(--ink); font: var(--weight-bold) 13px / 1.2 var(--ps-pareto-serif); }
+.ps-pareto__axis-title--count { grid-column: 1 / 3; justify-self: start; }
+.ps-pareto__axis-title--share { grid-column: 2 / 4; justify-self: end; }
+.ps-pareto__axis { position: relative; grid-row: 2; }
+.ps-pareto__axis--count { grid-column: 1; }
+.ps-pareto__axis--share { grid-column: 3; }
+.ps-pareto__tick { position: absolute; transform: translateY(50%); color: var(--ink); font: var(--weight-regular) 12px / 1 var(--ps-pareto-serif); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ps-pareto__axis--count .ps-pareto__tick { right: 0; }
+.ps-pareto__axis--share .ps-pareto__tick { left: 0; }
+.ps-pareto__tick:empty { display: none; }
+
+/* The red field; paper rules at every tenth from 10 to 90 (the top edge carries none). */
+.ps-pareto__field { position: relative; grid-row: 2; grid-column: 2; aspect-ratio: 40 / 42; background: var(--ps-red); }
+.ps-pareto__field::before {
+  content: '';
+  position: absolute;
+  inset: 10% 0 0;
+  background: repeating-linear-gradient(to top, transparent 0 calc(100% / 9 - 1.5px), var(--ps-paper) calc(100% / 9 - 1.5px) calc(100% / 9));
+  pointer-events: none;
+}
+
+/* Bars stand on the floor in front of the rules; the line, dots and guide come after them. */
+.ps-pareto__bars { position: absolute; inset: 0; }
+.ps-pareto__bar { position: absolute; bottom: 0; height: 100%; pointer-events: none; }
+.ps-pareto__fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-pareto__fill:hover { box-shadow: inset 0 0 0 2px var(--ps-paper); }
+.ps-pareto__fill:focus-visible,
+.ps-pareto__fill[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-pareto__value { padding-top: 6px; font: var(--weight-semibold) 13px / 1 var(--ps-pareto-serif); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* A bar too short for its figure carries it on top, white on the red. */
+.ps-pareto__value.is-above { position: absolute; left: 50%; padding: 0 0 4px; transform: translateX(-50%); color: #fff; }
+
+.ps-pareto__overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.ps-pareto__overlay[hidden] { display: none; }
+.ps-pareto__halo,
+.ps-pareto__line { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.ps-pareto__halo { stroke: var(--ps-paper); stroke-width: 5px; }
+.ps-pareto__line { stroke: var(--ps-blue); stroke-width: 2.5px; }
+.ps-pareto__dots { position: absolute; inset: 0; pointer-events: none; }
+.ps-pareto__dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--ps-blue); transform: translate(-50%, 50%); }
+.ps-pareto__cut { position: absolute; pointer-events: none; }
+.ps-pareto__cut[hidden] { display: none; }
+.ps-pareto__cut--down { bottom: 0; width: 0; border-left: 2px dashed var(--ps-blue); transform: translateX(-1px); }
+.ps-pareto__cut--across { height: 0; border-top: 2px dashed var(--ps-blue); transform: translateY(1px); }
+
+.ps-pareto__codes { position: relative; grid-row: 3; grid-column: 2; height: 24px; }
+.ps-pareto__code { position: absolute; top: 6px; transform: translateX(-50%); color: var(--ink); font: var(--weight-regular) 13px / 1 var(--ps-pareto-serif); }
+.ps-pareto__axis-foot { grid-row: 4; grid-column: 2; justify-self: center; margin-top: 4px; color: var(--ink); font: italic var(--weight-regular) 12px / 1.3 var(--ps-pareto-serif); }
+
+.ps-pareto__note { margin: 10px 0 0; color: var(--muted); font: var(--weight-medium) var(--text-sm) / 1.4 var(--font-ui); text-align: center; }
+.ps-pareto__note[hidden] { display: none; }
+
+/* Under the chart: the 80/20 square beside the key. */
+.ps-pareto__below { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 24px; width: 100%; margin-top: 20px; }
+.ps-pareto__below > :only-child { grid-column: 1 / -1; }
+.ps-pareto__summary { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ps-pareto__square { box-sizing: border-box; width: 150px; aspect-ratio: 1; padding: 11px; background: var(--ps-red); }
+.ps-pareto__square-field { position: relative; width: 100%; height: 100%; background: var(--ps-yellow); }
+/* The book sets these in white; dark on the yellow keeps the figure readable. */
+.ps-pareto__share { position: absolute; top: 12%; left: 10%; color: var(--ps-on-yellow); font: var(--weight-regular) 34px / 1 var(--ps-pareto-serif); font-variant-numeric: tabular-nums; }
+.ps-pareto__inset { position: absolute; right: 0; bottom: 0; display: grid; place-items: center; width: 50%; height: 40%; background: var(--ps-blue); }
+.ps-pareto__few { color: #fff; font: var(--weight-regular) 15px / 1 var(--ps-pareto-serif); white-space: nowrap; }
+.ps-pareto__caption { margin: 0; color: var(--ink); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+
+/* The key: code (a bar swatch), title, figure and share per row, largest first. */
+.ps-pareto__key { display: grid; gap: 2px; align-content: start; min-width: 0; }
+.ps-pareto__key-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto 3.6em;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink);
+  font: var(--weight-medium) var(--text-sm) / 1.3 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ps-pareto__key-code {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: color-mix(in srgb, var(--ps-yellow) 45%, #fff);
+  color: var(--ps-on-yellow);
+  font: var(--weight-regular) 14px / 1 var(--ps-pareto-serif);
+}
+.ps-pareto__key-row.is-vital .ps-pareto__key-code { background: var(--ps-yellow); }
+.ps-pareto__key-row.is-vital .ps-pareto__key-title { font-weight: var(--weight-semibold); }
+.ps-pareto__key-words { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.ps-pareto__key-title { overflow: hidden; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+.ps-pareto__key-words .ps-objection { margin-top: 0; color: var(--ps-ink); opacity: 1; }
+.ps-pareto__key-figure { font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.ps-pareto__key-share { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.ps-pareto__key-row:hover,
+.ps-pareto__key-row[aria-expanded='true'] { background: var(--ps-card); }
+.ps-pareto__key-row:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+.ps-pareto__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+
+/* The data form: one figure per item. */
+.ps-pareto__scoring { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; margin-top: 16px; }
+.ps-pareto__data,
+.ps-pareto__save,
+.ps-pareto__cancel {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  font: var(--weight-semibold) var(--text-sm) / 1 var(--font-ui);
+  cursor: pointer;
+}
+.ps-pareto__data { background: var(--ink); color: var(--paper); }
+.ps-pareto__save { background: var(--ps-red); color: #fff; }
+.ps-pareto__save:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+.ps-pareto__cancel { background: none; color: var(--muted); }
+.ps-pareto__data:focus-visible,
+.ps-pareto__save:focus-visible,
+.ps-pareto__cancel:focus-visible,
+.ps-pareto__input:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-pareto__form {
+  box-sizing: border-box;
+  display: grid;
+  gap: 12px;
+  width: min(100%, 520px);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--glass);
+  box-shadow: inset 0 3px 0 var(--ps-yellow);
+}
+.ps-pareto__form[hidden] { display: none; }
+.ps-pareto__form-body { display: grid; gap: 4px; }
+.ps-pareto__field-row { display: grid; grid-template-columns: minmax(0, 1fr) 6rem; align-items: center; gap: 12px; min-height: 48px; }
+.ps-pareto__field-name { overflow: hidden; color: var(--ink); font: var(--weight-semibold) 14px / 1.3 var(--font-ui); text-overflow: ellipsis; white-space: nowrap; }
+.ps-pareto__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--cotton);
+  color: var(--ink);
+  font: var(--weight-semibold) 15px / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.ps-pareto__message { margin: 0; color: var(--danger); font: var(--weight-semibold) var(--text-sm) / 1.4 var(--font-ui); }
+.ps-pareto__message[hidden] { display: none; }
+.ps-pareto__form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.ps-pareto__after { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; margin-top: 16px; }
+.ps-pareto__after:empty { display: none; }
+
+/* Phone: the chart keeps its proportions at full width, the key comes first under it. */
+@container pareto (max-width: 520px) {
+  .ps-pareto__chart { --ps-pareto-axis: 28px; column-gap: 5px; }
+  .ps-pareto__axis-title { font-size: 12px; }
+  .ps-pareto__tick { font-size: 10px; }
+  .ps-pareto__value { padding-top: 4px; font-size: 11px; }
+  .ps-pareto__code { font-size: 12px; }
+  .ps-pareto__dot { width: 7px; height: 7px; }
+  .ps-pareto__below { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .ps-pareto__summary { order: 2; }
+  .ps-pareto__square { width: 132px; padding: 10px; }
+  .ps-pareto__share { font-size: 30px; }
+  .ps-pareto__few { font-size: 13px; }
+  .ps-pareto__card { padding: 12px 14px 8px; }
+  .ps-pareto__form { padding: var(--space-4); }
+  .ps-pareto__field-row { grid-template-columns: minmax(0, 1fr) 5rem; }
+}
