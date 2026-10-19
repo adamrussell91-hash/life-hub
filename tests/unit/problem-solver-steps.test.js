@@ -1,7 +1,7 @@
 // tests/unit/problem-solver-steps.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BOOK_STEP_IDS, stepPlan, planStep, firstStep, nextStepAfter, stepName, defaultToolFor, planStepForBook, chosenOption } from '../../packages/problem-solver/steps.mjs';
+import { BOOK_STEP_IDS, stepPlan, planStep, firstStep, nextStepAfter, stepName, defaultToolFor, planStepForBook, chosenOption, nextPhase, pastStep } from '../../packages/problem-solver/steps.mjs';
 import { MODELS } from '../../packages/problem-solver/models.mjs';
 
 test('book steps follow the seven-step process, plus the TRIZ contradiction step', () => {
@@ -65,4 +65,31 @@ test('chosenOption is the choice of the latest kept Decide run', () => {
   assert.equal(chosenOption({ steps: {} }), null);
   const session = { steps: { decide: { runs: [run('a', 'Publish the rota on Wednesdays'), run('b', 'Swap shifts in a shared app'), run('c', 'Switched away', 'switched')], status: 'done', objection: null } } };
   assert.deepEqual(chosenOption(session), { text: 'Swap shifts in a shared app', title: 'Swap shifts in a shared app', contested: false, runId: 'b', tool: 'swot' });
+});
+
+const at = (phase, extra = {}) => ({ model: { id: 'seven_step' }, phase, steps: {}, reviewState: null, detour: null, ...extra });
+
+test('nextPhase: the next plan step, null at the end', () => {
+  assert.equal(nextPhase(at('implement')), 'improve');
+  assert.equal(nextPhase(at('document')), null);
+  assert.equal(nextPhase({ model: null, phase: 'frame' }), null);
+});
+
+test('nextPhase: a reopened step returns to where it was reopened from', () => {
+  assert.equal(nextPhase(at('define', { detour: { from: 'improve', to: 'define', reason: 'r', at: 't' } })), 'improve');
+});
+
+test('nextPhase: a late review returns to where it began, or finishes', () => {
+  const review = (returnTo) => at('improve', { reviewState: { status: 'reviewing', due: null, returnTo, startedAt: 't' } });
+  assert.equal(nextPhase(review('document')), 'document');
+  assert.equal(nextPhase(review('finished')), null);
+  assert.equal(nextPhase(review(null)), 'document');
+  assert.equal(nextPhase(at('evaluate', { model: { id: 'polya' } })), 'document');
+});
+
+test('pastStep: true once the session is beyond a step, or finished', () => {
+  assert.equal(pastStep(at('document'), 'improve'), true);
+  assert.equal(pastStep(at('finished'), 'improve'), true);
+  assert.equal(pastStep(at('improve'), 'improve'), false);
+  assert.equal(pastStep(at('implement'), 'improve'), false);
 });

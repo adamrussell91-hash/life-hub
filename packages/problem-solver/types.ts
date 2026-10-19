@@ -6,12 +6,20 @@ export type PsEdge = { from: string; to: string; kind: string };
 export type PsToolRun = { id: string; tool: PsToolId; status: 'active' | 'done' | 'switched'; switchReason?: string; nodes: PsNode[]; edges: PsEdge[]; radar?: { snapshots: { at: string; current: number[]; objective: number[] }[] }; scores?: { snapshots: Array<{ at: string } & Record<string, unknown>> } };
 export type PsTurn = { id: string; role: 'user' | 'coach'; text: string; verdict?: 'accept' | 'challenge' | 'clarify'; skillsSeen?: string[]; skillsMissing?: string[]; createdAt: string };
 
-export type PsStepStatus = 'open' | 'done' | 'skipped';
+export type PsStepStatus = 'open' | 'done' | 'skipped' | 'waiting';
+
+/** Improve's review: waiting for results, under way, or done. `returnTo` is where a late review goes back to. */
+export type PsReviewState = { status: 'waiting' | 'reviewing' | 'done'; due: string | null; returnTo: string | null; startedAt: string | null };
+/** Counts of the problem's tasks by live status, and overdue titles. Posted by the page; deleted tasks are left out. */
+export type PsTaskSnapshot = { at: string; byStatus: Record<'open' | 'in_progress' | 'deferred' | 'done' | 'dead' | 'unknown', number>; overdue: string[] };
+/** A step reopened from Improve; Move on returns to `from`. */
+export type PsDetour = { from: string; to: string; reason: string; at: string };
 export type PsStepState = { runs: PsToolRun[]; status: PsStepStatus; objection: string | null };
 
 export type PsSuggestion =
   | { kind: 'next_tool' | 'switch_tool'; tool: PsToolId; reason: string }
-  | { kind: 'next_step'; reason: string };
+  | { kind: 'next_step'; reason: string }
+  | { kind: 'reopen_step'; step: 'define' | 'analyse'; reason: string };
 
 export type PsProposedTask = {
   id: string;
@@ -53,10 +61,13 @@ export type PsSession = {
   proposedTasks: PsProposedTask[];
   reviewProposal: PsReviewProposal | null;
   reviewTaskId: string | null;
+  reviewState: PsReviewState | null;
+  taskSnapshot: PsTaskSnapshot | null;
+  detour: PsDetour | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full'; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null };
+export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full'; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null };
 
-export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review';
+export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status';
