@@ -196,9 +196,8 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
   }
 
   /** A new arrow grows out from its tail to its head, then its words fade in. */
-  function animateArrow(arrow: Arrow, delay: number): void {
+  function animateArrow(arrow: Arrow, delay: number, upright: boolean): void {
     if (!canAnimate(arrow.button)) return;
-    const upright = getComputedStyle(arrow.button).getPropertyValue('--force-flow').trim() === 'column';
     const from = upright ? (arrow.side === 'for' ? 'inset(0 0 100% 0)' : 'inset(100% 0 0 0)') : arrow.side === 'for' ? 'inset(0 100% 0 0)' : 'inset(0 0 0 100%)';
     arrow.button.animate([{ clipPath: from }, { clipPath: 'inset(0 0 0 0)' }], { duration: 480, delay, easing: EASE, fill: 'backwards' });
     for (const el of [arrow.button.querySelector('.ps-force__words'), arrow.num]) {
@@ -338,9 +337,13 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
         // The slider announces its own value; the visible number would only repeat it.
         out.setAttribute('aria-hidden', 'true');
         out.textContent = input.value;
-        input.addEventListener('input', () => {
+        // --pct drives the filled part of the track (WebKit has no range progress pseudo-element).
+        const fill = (): void => {
           out.textContent = input.value;
-        });
+          input.style.setProperty('--pct', `${((Number(input.value) - 1) / (MAX - 1)) * 100}%`);
+        };
+        fill();
+        input.addEventListener('input', fill);
         field.append(label, input, out);
         fieldset.append(field);
       });
@@ -476,7 +479,11 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
     if (!targetTotals) for (const side of SIDES) if (totalEl.has(side)) totalEl.get(side)!.value.textContent = '–';
 
     reorder(wanted, new Set(fresh.map((arrow) => arrow.item)));
-    for (const side of SIDES) wanted[side].filter((el) => fresh.some((arrow) => arrow.item === el)).forEach((el, i) => animateArrow(arrows.get(el.getAttribute('data-node')!)!, i * 70));
+    if (fresh.length) {
+      // One style read for the batch: on a phone (--force-flow: column) the arrows grow vertically.
+      const upright = getComputedStyle(fresh[0].button).getPropertyValue('--force-flow').trim() === 'column';
+      for (const side of SIDES) wanted[side].filter((el) => fresh.some((arrow) => arrow.item === el)).forEach((el, i) => animateArrow(arrows.get(el.getAttribute('data-node')!)!, i * 70, upright));
+    }
 
     if (stage) syncBadge(targetTotals);
 
@@ -491,8 +498,9 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
         const focused = inForm ? active!.getAttribute('data-for-node') : null;
         buildForm(keep);
         formKey = keyOfForces();
-        if (focused) form.querySelector<HTMLInputElement>(`input[data-for-node="${focused}"]`)?.focus();
-        else if (inForm && !active!.isConnected) form.querySelector<HTMLInputElement>('input')?.focus();
+        // Back to the same force; if it was removed, or focus sat on a field the rebuild dropped, the
+        // first slider. Focus on Save or Cancel stays put (those buttons survive the rebuild).
+        if (focused || (inForm && !active!.isConnected)) ((focused ? form.querySelector<HTMLInputElement>(`input[data-for-node="${focused}"]`) : null) ?? form.querySelector<HTMLInputElement>('input'))?.focus();
       }
     }
 
