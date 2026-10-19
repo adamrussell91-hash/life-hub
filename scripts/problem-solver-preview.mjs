@@ -31,6 +31,7 @@ const RENDERERS = {
   analogical_reasoning: ['analogical-reasoning', 'createAnalogicalReasoningView'],
   solution_tree: ['solution-tree', 'createSolutionTreeView'],
   lotus_blossom: ['lotus-blossom', 'createLotusBlossomView'],
+  duncker: ['duncker', 'createDunckerView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

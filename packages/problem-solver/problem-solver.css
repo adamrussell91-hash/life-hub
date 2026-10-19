@@ -3662,6 +3662,250 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-lotus__flower > .ps-lotus__item--idea, .ps-lotus__flower .ps-lotus__words, .ps-lotus__shape, .ps-lotus__ghost { transition: none !important; }
 }
 
+/* Duncker diagram (toolkit, Devise): top to bottom as in the book. A red problem box; two
+   yellow family boxes under it, functionally opposite (left) and direct (right); each family's
+   yellow pathways, then each pathway's yellow solutions; a foot row with the yellow
+   redefinition on the left and a wide blue desired state on the right. Thin ochre bracket
+   connectors in an SVG overlay join each parent to its children. The evaluation sits in full
+   in a card under the diagram.
+   A pathway's solutions sit in a row when they fit its column (each pathway is a container,
+   queried by its solution count), else in an indented list fed by a rail. The CSS tells the
+   script which connector each holder wants through --ps-duncker-link (comb or rail).
+   Phone: the families stack, opposite first, and the whole diagram is an indented tree. */
+.ps-duncker {
+  /* Named, so every phone query measures this root box. */
+  container: duncker / inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.ps-duncker__chart { position: relative; display: flex; flex-direction: column; width: 100%; }
+
+.ps-duncker__links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+/* Ochre, 3.9:1 on the paper: the book's yellow lines, dark enough to follow. */
+.ps-duncker__link { fill: none; stroke: color-mix(in srgb, var(--ps-yellow) 60%, var(--ps-ink)); stroke-width: 1.5; stroke-dasharray: 1; stroke-linejoin: miter; }
+.ps-duncker__link[hidden] { display: none; }
+
+/* Regions only group the DOM; the shapes are measured against the chart. */
+.ps-duncker__region--problem { display: flex; justify-content: center; }
+
+/* Flex, so a box fills its item: boxes in one row share the tallest one's height. */
+.ps-duncker__item { --fill: var(--ps-yellow); --on: var(--ps-on-yellow); position: relative; z-index: 1; display: flex; min-width: 0; }
+.ps-duncker__item--problem { --fill: var(--ps-red); --on: #fff; width: min(100%, 240px); }
+.ps-duncker__item--desired { --fill: var(--ps-blue); --on: #fff; }
+/* The focused or open shape rises above its neighbours so its whole ring shows. */
+.ps-duncker__item:has(:focus-visible),
+.ps-duncker__item.is-open { z-index: 2; }
+
+.ps-duncker__box {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--on);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 240ms var(--ps-ease), box-shadow 200ms var(--ps-ease);
+}
+/* Hover deepens the fill a touch: white on red and blue gains contrast, ink on yellow keeps 7:1. */
+.ps-duncker__box:hover { background: color-mix(in srgb, var(--fill) 90%, var(--ps-ink)); }
+/* A paper-and-ink double ring: it reads on the paper and on every fill. */
+.ps-duncker__box:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
+.ps-duncker__item.is-open .ps-duncker__box:not(:focus-visible) { box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+.ps-duncker__words { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+
+.ps-duncker__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  /* Wraps rather than run past a narrow box's edge. */
+  overflow-wrap: break-word;
+  /* .78 keeps 5.5:1 on yellow and 5.1:1 on blue; white on red needs full strength (5:1). */
+  opacity: 0.78;
+}
+.ps-duncker__item--problem .ps-duncker__meta { opacity: 1; }
+
+.ps-duncker__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-width: 100%;
+  font: var(--weight-semibold) 15px / 1.2 var(--font-ui);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.ps-duncker__item--problem .ps-duncker__title { font-size: 16px; }
+.ps-duncker__item--solution .ps-duncker__title { font-size: 13px; }
+
+.ps-duncker .ps-objection { margin-top: 2px; font-size: 9px; line-height: 1.5; }
+/* Full strength, so the tag keeps its contrast on red and blue. */
+.ps-duncker__item--problem .ps-objection,
+.ps-duncker__item--desired .ps-objection { opacity: 1; }
+
+/* The book's small row labels, on a patch of paper so a connector passes behind them. */
+.ps-duncker__caption { display: flex; align-items: flex-end; justify-content: center; min-height: 46px; padding-bottom: 5px; box-sizing: border-box; }
+.ps-duncker__caption[hidden] { display: none; }
+/* With one family a connector runs straight down the middle, so the labels wait for both. */
+.ps-duncker__chart:not(.has-both) .ps-duncker__caption-text { visibility: hidden; }
+.ps-duncker__caption-text {
+  position: relative;
+  z-index: 1;
+  padding: 0 6px;
+  background: var(--ps-paper);
+  color: var(--ps-ink);
+  font: italic var(--weight-regular) 12px / 1.3 var(--font-ui);
+}
+
+/* Families: side by side, each as wide as its pathways need (columns set by the script).
+   Subgrid rows keep both heads, and both rows of pathways, level. */
+.ps-duncker__region--families {
+  --ps-duncker-link: comb;
+  display: grid;
+  grid-template-rows: auto 46px auto;
+  column-gap: 28px;
+}
+.ps-duncker__family { display: grid; grid-row: 1 / -1; grid-template-rows: subgrid; min-width: 0; }
+/* Centred on the gap between the families, clear of every pathway's connector. */
+.ps-duncker__caption--how { grid-row: 2; grid-column: 1; justify-self: end; min-height: 0; transform: translateX(calc(50% + 14px)); }
+
+.ps-duncker__head {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: grid;
+  grid-row: 1;
+  place-items: center;
+  width: min(100%, 300px);
+  min-height: 52px;
+  margin-inline: auto;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  text-align: center;
+  font: var(--weight-semibold) 14px / 1.25 var(--font-ui);
+}
+
+.ps-duncker__paths { --ps-duncker-link: comb; display: flex; grid-row: 3; align-items: flex-start; gap: 16px; min-width: 0; }
+
+/* Each pathway is a container, so its solutions can choose a row or a list by its own width. */
+.ps-duncker__path { container: duncker-path / inline-size; display: flex; flex: var(--count, 1) 1 0px; flex-direction: column; min-width: 0; }
+
+/* Default: a list, indented under a full-width pathway, fed by a rail. */
+.ps-duncker__solutions { --ps-duncker-link: rail; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-left: 22px; }
+.ps-duncker__solutions:empty { display: none; }
+.ps-duncker__item--solution .ps-duncker__box { min-height: 60px; padding: 8px 6px; }
+
+/* A row, as in the book, when every solution gets at least 86px. */
+.ps-duncker__path[data-count='0'] > .ps-duncker__item--pathway,
+.ps-duncker__path[data-count='1'] > .ps-duncker__item--pathway { width: min(100%, 200px); margin-inline: auto; }
+.ps-duncker__path[data-count='1'] > .ps-duncker__solutions { --ps-duncker-link: comb; margin-top: 26px; padding-left: 0; }
+@container duncker-path (min-width: 178px) {
+  .ps-duncker__path[data-count='2'] > .ps-duncker__item--pathway { width: min(100%, 200px); margin-inline: auto; }
+  .ps-duncker__path[data-count='2'] > .ps-duncker__solutions { --ps-duncker-link: comb; flex-direction: row; margin-top: 26px; padding-left: 0; }
+}
+@container duncker-path (min-width: 270px) {
+  .ps-duncker__path[data-count='3'] > .ps-duncker__item--pathway { width: min(100%, 200px); margin-inline: auto; }
+  .ps-duncker__path[data-count='3'] > .ps-duncker__solutions { --ps-duncker-link: comb; flex-direction: row; margin-top: 26px; padding-left: 0; }
+}
+@container duncker-path (min-width: 362px) {
+  .ps-duncker__path[data-count='4'] > .ps-duncker__item--pathway { width: min(100%, 200px); margin-inline: auto; }
+  .ps-duncker__path[data-count='4'] > .ps-duncker__solutions { --ps-duncker-link: comb; flex-direction: row; margin-top: 26px; padding-left: 0; }
+}
+@container duncker-path (min-width: 454px) {
+  .ps-duncker__path[data-count='5'] > .ps-duncker__item--pathway { width: min(100%, 200px); margin-inline: auto; }
+  .ps-duncker__path[data-count='5'] > .ps-duncker__solutions { --ps-duncker-link: comb; flex-direction: row; margin-top: 26px; padding-left: 0; }
+}
+.ps-duncker__solutions > .ps-duncker__item { flex: 1 1 0px; }
+
+/* The foot: the redefinition in the left third, the desired state across the rest. */
+.ps-duncker__region--bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; margin-top: 36px; }
+.ps-duncker__item--redefinition { grid-column: 1; }
+.ps-duncker__item--desired { grid-column: 2; }
+.ps-duncker__region--bottom .ps-duncker__box { min-height: 60px; }
+
+/* Details cards, under the chart. */
+.ps-duncker__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-duncker .ps-details { width: min(100%, 560px); }
+
+/* The evaluation, in full under the diagram (like the composed problem statement). */
+.ps-duncker__region--evaluation { width: min(100%, 560px); margin-top: 18px; }
+.ps-duncker__evaluation {
+  padding: 14px 18px 10px;
+  border-top: 3px solid var(--ps-blue);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-duncker__eval-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ps-duncker__eval-meta {
+  color: var(--ps-ink);
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.ps-duncker__evaluation .ps-objection { margin-top: 0; color: var(--ps-ink); opacity: 1; }
+.ps-duncker__eval-text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+.ps-duncker__more {
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ps-duncker__more:focus-visible { outline: 2px solid transparent; border-radius: 4px; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
+.ps-duncker__evaluation .ps-details__card { margin-top: 0; padding: 4px 0 8px; background: transparent; box-shadow: none; }
+
+/* Phone: an indented tree. The problem, then each family (opposite first) with its pathways
+   and their solutions indented beneath, each level fed by a rail. Row labels go. */
+@container duncker (max-width: 520px) {
+  .ps-duncker__caption { display: none; }
+  .ps-duncker__item--problem { width: 100%; }
+  .ps-duncker__box { min-height: 52px; padding: 8px 12px; place-items: center start; text-align: left; }
+  .ps-duncker__words { align-items: flex-start; }
+  .ps-duncker__title { font-size: 14px; }
+  .ps-duncker__item--problem .ps-duncker__title { font-size: 15px; }
+  .ps-duncker__region--families { --ps-duncker-link: rail; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-left: 22px; }
+  .ps-duncker__family { display: flex; flex-direction: column; }
+  .ps-duncker__head { width: 100%; min-height: 44px; margin: 0; place-items: center start; text-align: left; font-size: 13px; }
+  .ps-duncker__paths { --ps-duncker-link: rail; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 8px; padding-left: 22px; }
+  .ps-duncker__path { flex: none; }
+  .ps-duncker .ps-duncker__path[data-count] > .ps-duncker__item--pathway { width: 100%; margin-inline: 0; }
+  .ps-duncker .ps-duncker__path[data-count] > .ps-duncker__solutions { --ps-duncker-link: rail; flex-direction: column; margin-top: 6px; padding-left: 22px; }
+  .ps-duncker__item--solution .ps-duncker__box { min-height: 48px; padding: 6px 10px; }
+  .ps-duncker__region--bottom { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); margin-top: 22px; }
+  .ps-duncker__region--bottom .ps-duncker__box { min-height: 56px; }
+}
+
+/* Very narrow: the foot stacks too, the redefinition first as on the wide chart. */
+@container duncker (max-width: 340px) {
+  .ps-duncker__region--bottom { grid-template-columns: minmax(0, 1fr); }
+  .ps-duncker__item--desired { grid-column: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-duncker__box { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }

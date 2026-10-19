@@ -433,3 +433,35 @@ SAMPLES.lotus_blossom = run(
   ],
   [...lotusEdges, { from: 'f1', to: 'i3', kind: 'marks' }, { from: 'f2', to: 'i29', kind: 'marks' }]
 );
+
+// Duncker diagram: a village hall whose winter heating bill keeps climbing. Two direct
+// pathways (keep the heat in, buy heat for less) and one functionally opposite pathway
+// (need less heat), which leads to a redefined problem; then the evaluation.
+SAMPLES.duncker = run(
+  'duncker',
+  [
+    node('p', 'problem', 'The village hall\'s heating bill has doubled in two winters, and the committee may have to raise hire charges that the playgroup cannot afford.', 'Heating bill doubled'),
+    node('d', 'desired', 'The hall stays warm enough for every regular group all winter, on a heating budget the hire charges already cover.', 'Affordable warm hall'),
+    node('pa1', 'pathway:1', 'Stop the heat we pay for from escaping.', 'Keep heat in', { tag: 'direct' }),
+    node('pa2', 'pathway:2', 'Pay less for each unit of heat.', 'Cheaper heat', { tag: 'direct' }),
+    node('pa3', 'pathway:3', 'Make it fine for the main hall not to be heated much at all.', 'Need less heat', { tag: 'opposite' }),
+    node('s1', 'solution:1', 'Fit brush strips to the double doors and the fire exit.', 'Draught strips'),
+    node('s2', 'solution:2', 'Lay insulation in the loft over the main hall.', 'Loft insulation'),
+    node('s3', 'solution:3', 'Hang lined curtains over the tall windows.', 'Lined curtains'),
+    node('s4', 'solution:4', 'Move to a fixed winter tariff agreed in summer.', 'Fixed tariff'),
+    node('s5', 'solution:5', 'Apply for a community grant towards an air-source heat pump.', 'Heat pump grant', { state: 'contested', objection: 'Is a grant a way to pay less per unit, or only a way to fund one?' }),
+    node('s6', 'solution:6', 'Run the small groups in the side room from November to February.', 'Winter side room'),
+    node('s7', 'solution:7', 'Offer blankets and hot drinks at evening events instead of heating ahead.', 'Blankets and drinks'),
+    node('rd', 'redefinition', 'How do we keep people warm in the hall, rather than how do we heat the whole building?', 'Warm the people'),
+    node('ev', 'evaluation', 'Draught strips and the side room are cheap and quick; together they cut the bill by about a third. The heat pump is the biggest saving but needs a grant and a year. Warming people rather than the building still reaches the desired state for every group except the dance class, which keeps the main hall heated.', 'Strips and side room first')
+  ],
+  [
+    { from: 's1', to: 'pa1', kind: 'under' },
+    { from: 's2', to: 'pa1', kind: 'under' },
+    { from: 's3', to: 'pa1', kind: 'under' },
+    { from: 's4', to: 'pa2', kind: 'under' },
+    { from: 's5', to: 'pa2', kind: 'under' },
+    { from: 's6', to: 'pa3', kind: 'under' },
+    { from: 's7', to: 'pa3', kind: 'under' }
+  ]
+);
