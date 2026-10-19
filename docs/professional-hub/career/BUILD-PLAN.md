@@ -606,6 +606,9 @@ and the output is validated against the input.
 
 ## Phase 7: People who got there (ghost paths)
 
+> **Not built yet (19 Oct 2026).** The page showed a placeholder for this with no data or
+> backend behind it, so it was taken off the Career page. Build this phase before it returns.
+
 - **Who.** People whose **current** `employee_at` role text matches the
   future's title or aliases. Matching is case-insensitive and normalised: "&"
   equals "and", and punctuation is stripped. Take up to 3, preferring warmer
@@ -653,6 +656,9 @@ and the output is validated against the input.
 - Show at most one suggestion at a time.
 
 ## Phase 9: What if…
+
+> **Not built yet (19 Oct 2026).** The page showed a placeholder for this with no data or
+> backend behind it, so it was taken off the Career page. Build this phase before it returns.
 
 - **Suggested moves.** Ann suggests up to 5, built from red and amber
   criteria across the futures (for example "Acting Head of Department, T1 2027").
