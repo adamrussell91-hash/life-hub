@@ -174,4 +174,43 @@ describe('Solution tree view', () => {
     view.layout(900);
     expect(view.el.getAttribute('data-compact')).toBe('false');
   });
+  it('on a wide panel puts every title beside its triangle, or none: all go to the key if any cannot fit', () => {
+    const view = createSolutionTreeView();
+    view.layout(900);
+    view.update(run([node('a', 'aim'), node('h1', 'how:1')], [parent('h1', 'a')]));
+    expect(view.el.getAttribute('data-compact')).toBe('false');
+    expect(item(view, 'h1').querySelector('.ps-soltree__label')!.classList.contains('is-beside')).toBe(true);
+    expect(view.el.querySelector('button[data-key="h1"]')!.classList.contains('is-labelled')).toBe(true);
+    expect(view.el.querySelector('.ps-soltree__key')!.classList.contains('is-covered')).toBe(true);
+
+    // Fourteen hows on the first ring: their titles cannot all sit beside, so none do.
+    const crowd = Array.from({ length: 14 }, (_, i) => node(`h${i + 1}`, `how:${i + 1}`));
+    view.update(run([node('a', 'aim'), ...crowd], crowd.map((n) => parent(n.id, 'a'))));
+    expect(view.el.querySelectorAll('.ps-soltree__label.is-beside').length).toBe(0);
+    expect(view.el.querySelectorAll('.ps-soltree__label.is-tip').length).toBe(14);
+    const rows = [...view.el.querySelectorAll<HTMLButtonElement>('button[data-key]')];
+    expect(rows.length).toBe(14);
+    for (const row of rows) expect(row.classList.contains('is-labelled')).toBe(false);
+    expect(view.el.querySelector('.ps-soltree__key')!.classList.contains('is-covered')).toBe(false);
+    // The codes stay on the chart.
+    for (const n of crowd) expect(item(view, n.id).querySelector('.ps-soltree__code')!.textContent).toBeTruthy();
+  });
+
+  it('sizes triangles by level: every wedge on a ring is the same size, growing outward', () => {
+    const view = createSolutionTreeView();
+    view.layout(900);
+    // h1 carries three leaves, h2 one: their angles differ but their sizes do not.
+    const nodes = [node('a', 'aim'), node('h1', 'how:1'), node('h2', 'how:2'), node('h3', 'how:3'), node('h4', 'how:4'), node('h5', 'how:5'), node('h6', 'how:6')];
+    const edges = [parent('h1', 'a'), parent('h2', 'a'), parent('h3', 'h1'), parent('h4', 'h1'), parent('h5', 'h1'), parent('h6', 'h3')];
+    view.update(run(nodes, edges));
+    const v = (id: string, prop: string) => Number(item(view, id).style.getPropertyValue(prop));
+    expect(v('h1', '--hw')).toBe(v('h2', '--hw'));
+    expect(v('h1', '--len')).toBe(v('h2', '--len'));
+    expect(v('h3', '--hw')).toBe(v('h4', '--hw'));
+    expect(v('h3', '--hw')).toBe(v('h5', '--hw'));
+    expect(v('h1', '--hw')).toBeLessThanOrEqual(v('h3', '--hw'));
+    expect(v('h3', '--hw')).toBeLessThanOrEqual(v('h6', '--hw'));
+    expect(v('h1', '--len')).toBeLessThan(v('h3', '--len'));
+    expect(v('h3', '--len')).toBeLessThan(v('h6', '--len'));
+  });
 });

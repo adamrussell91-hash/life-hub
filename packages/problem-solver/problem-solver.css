@@ -3054,8 +3054,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 }
 .ps-soltree__item.is-red { --fill: var(--ps-red); }
 .ps-soltree__item.is-yellow { --fill: var(--ps-yellow); --fill-hover: color-mix(in srgb, var(--fill), #fff 18%); --on: var(--ps-on-yellow); }
-/* The focused, hovered or open triangle rises above its neighbours so its whole ring and tip show. */
-.ps-soltree__item:hover,
+/* The focused or open triangle rises above its neighbours so its whole ring and tip show.
+   (Not on hover: a raised hit area would keep the pointer from its neighbours.) */
 .ps-soltree__item:has(:focus-visible),
 .ps-soltree__item.is-open { z-index: 3; }
 
@@ -3084,8 +3084,14 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-soltree__fill { background: var(--fill); transition: background-color 200ms var(--ps-ease); }
 /* Hover deepens red and blue and lightens yellow, so the words on them keep their contrast. */
 .ps-soltree__shape:hover .ps-soltree__fill { background: var(--fill-hover); }
-/* A slightly larger triangle takes the pointer, so a small wedge is still easy to hit. */
-.ps-soltree__hit { inset: -6px; pointer-events: auto; cursor: pointer; }
+/* A slightly larger triangle takes the pointer, so a small wedge is still easy to hit. It keeps
+   the same point and widens toward the base by --halo (at most half the gap to the nearest
+   neighbour, set by the script), so it never reaches over a neighbour's fill. */
+.ps-soltree__hit {
+  pointer-events: auto;
+  cursor: pointer;
+  clip-path: polygon(0 50%, calc(100% + var(--halo, 0px)) calc(var(--halo, 0px) * -1), calc(100% + var(--halo, 0px)) calc(100% + var(--halo, 0px)));
+}
 
 .ps-soltree__ring { position: absolute; inset: 0; display: none; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .ps-soltree__ring polygon { fill: none; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
@@ -3099,7 +3105,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 /* The aim: point up at the fan's centre, base at the foot (76 by 60 units, as AIM_H and AIM_HW). */
 .ps-soltree__item.is-aim .ps-soltree__shape { left: calc(-30 * var(--u)); top: 0; width: calc(60 * var(--u)); height: calc(76 * var(--u)); transform-origin: 50% 0; }
 .ps-soltree__item.is-aim :is(.ps-soltree__fill, .ps-soltree__hit) { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.ps-soltree__item.is-aim .ps-soltree__hit { inset: -4px; }
+.ps-soltree__item.is-aim .ps-soltree__hit { clip-path: polygon(50% 0, calc(100% + var(--halo, 0px)) calc(100% + var(--halo, 0px)), calc(var(--halo, 0px) * -1) calc(100% + var(--halo, 0px))); }
 
 /* The aim's words: low in the triangle where it is widest, or just under its base when they won't fit. */
 .ps-soltree__words {
@@ -3118,6 +3124,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 }
 .ps-soltree__words[data-side='inside'] { top: 60%; }
 .ps-soltree__words[data-side='below'] { top: calc(100% + 8px); width: max-content; max-width: var(--ww, 280px); color: var(--ps-ink); }
+/* A hidden copy of the aim's words, set as they would sit under the base, so the script can measure them. */
+.ps-soltree__words.is-probe { visibility: hidden; pointer-events: none; }
 
 .ps-soltree__meta {
   font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
@@ -3245,7 +3253,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 /* Phone: every title is in the key (the open row is highlighted), so tips stay hidden;
    the key takes the full width with tighter indents. */
-@container soltree (max-width: 559px) {
+@container soltree (width < 560px) {
   .ps-soltree__label { display: none; }
   .ps-soltree__key { width: 100%; margin-top: 8px; }
   .ps-soltree__key-row[data-level='3'] { padding-left: 20px; }
