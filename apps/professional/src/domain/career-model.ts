@@ -605,8 +605,8 @@ export function buildCareerModel(
     stats_line: (() => {
       const parts: string[] = [];
       if (yearsBehind != null) parts.push(`${yearsBehind} years behind you`);
-      parts.push(`${activeCount} futures ahead`);
-      parts.push(`${trunkItems.length} skill cards`);
+      parts.push(`${activeCount} ${activeCount === 1 ? 'future' : 'futures'} ahead`);
+      parts.push(`${trunkItems.length} skill ${trunkItems.length === 1 ? 'card' : 'cards'}`);
       return parts.join(' · ');
     })(),
     trunk_items: trunkItems,
@@ -618,7 +618,10 @@ export function buildCareerModel(
           date: forkDate,
           label: roughTermLabel(forkDate, { estimated: false }),
           futures_count: forkCount,
-          caption: `${forkCount} futures share the road until here`
+          caption:
+            forkCount === 1
+              ? 'Your future branches from here'
+              : `${forkCount} futures share the road until here`
         }
       : null,
     ghost_paths: overview?.ghost_paths ?? [],

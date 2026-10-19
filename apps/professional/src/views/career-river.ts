@@ -398,8 +398,11 @@ export function mountCareerRiver(
     selectedFutureId?: string | null;
     onSelectFuture?: (id: string | null) => void;
     onAddFuture?: () => void;
+    /** A future with no criteria was picked: its label reads "Add criteria". */
+    onAddCriteria?: (id: string) => void;
+    onRestoreFuture?: (id: string) => void;
   } = {}
-): { destroy: () => void } {
+): { destroy: () => void; setSelected: (id: string | null) => void } {
   const nowYear = yearFraction(model.now);
   const bounds = careerBounds(model, nowYear);
   let state = stateByHost.get(host);
@@ -459,6 +462,25 @@ export function mountCareerRiver(
     if (navigate && id) location.hash = careerFutureRoute(id);
     else if (navigate && !id) location.hash = '#/career';
     paint();
+  }
+
+  /** Chip or branch click: toggles the locked selection. */
+  function pickFuture(id: string): void {
+    const future = model.futures.find((f) => f.id === id);
+    if (future && !future.criteria.length) {
+      // Its label says "Add criteria", so a click always means that.
+      state!.locked = true;
+      if (state!.selectedId !== id) selectFuture(id, true);
+      options.onAddCriteria?.(id);
+      return;
+    }
+    if (state!.locked && state!.selectedId === id) {
+      state!.locked = false;
+      selectFuture(null, true);
+      return;
+    }
+    state!.locked = true;
+    selectFuture(id, true);
   }
 
   function paintToolbar(): void {
@@ -538,17 +560,10 @@ export function mountCareerRiver(
       if (future.status === 'suggested') chip.classList.add('career-river__chip--suggested');
       if (future.fading) chip.classList.add('career-river__chip--fading');
       chip.classList.toggle('is-selected', state!.selectedId === future.id);
+      chip.setAttribute('aria-pressed', state!.selectedId === future.id ? 'true' : 'false');
       const fadingNote = future.fading ? ' · fading' : '';
       chip.textContent = `${riverJobShortLabel(future.title)} · ${future.readiness_label}${fadingNote}`;
-      chip.addEventListener('click', () => {
-        if (state!.locked && state!.selectedId === future.id) {
-          state!.locked = false;
-          selectFuture(null, true);
-          return;
-        }
-        state!.locked = true;
-        selectFuture(future.id, true);
-      });
+      chip.addEventListener('click', () => pickFuture(future.id));
       chip.addEventListener('mouseenter', () => {
         if (state!.locked) return;
         state!.hoverId = future.id;
@@ -567,6 +582,15 @@ export function mountCareerRiver(
       chip.type = 'button';
       chip.className = 'career-river__chip career-river__chip--parked';
       chip.textContent = `Parked: ${parked.title} · restore`;
+      const parkedId = (parked as { id?: string }).id;
+      if (parkedId && options.onRestoreFuture) {
+        chip.addEventListener('click', () => {
+          chip.disabled = true;
+          options.onRestoreFuture?.(parkedId);
+        });
+      } else {
+        chip.disabled = true;
+      }
       legend.append(chip);
     }
     legend.onkeydown = (event: KeyboardEvent) => {
@@ -962,6 +986,8 @@ export function mountCareerRiver(
         });
         label.textContent = placed.text;
         svgTitle(label, future.title);
+        label.style.cursor = 'pointer';
+        label.addEventListener('click', () => pickFuture(future.id));
         svg.appendChild(label);
         labelBoxes.push({ ...placed.box, el: label });
       }
@@ -973,15 +999,7 @@ export function mountCareerRiver(
         'stroke-width': Math.max(18, strokeW + 10)
       });
       hit.style.cursor = 'pointer';
-      hit.addEventListener('click', () => {
-        if (state!.locked && state!.selectedId === future.id) {
-          state!.locked = false;
-          selectFuture(null, true);
-          return;
-        }
-        state!.locked = true;
-        selectFuture(future.id, true);
-      });
+      hit.addEventListener('click', () => pickFuture(future.id));
       hit.addEventListener('mouseenter', () => {
         if (state!.locked) return;
         state!.hoverId = future.id;
@@ -1280,6 +1298,12 @@ export function mountCareerRiver(
   svgHost.addEventListener('dragstart', onDragStart);
 
   return {
+    setSelected(id: string | null) {
+      if (state!.selectedId === id) return;
+      state!.selectedId = id;
+      state!.locked = id != null;
+      paint();
+    },
     destroy() {
       mq.removeEventListener?.('change', onMq);
       ro.disconnect();
