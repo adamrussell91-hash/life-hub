@@ -29,6 +29,7 @@ const RENDERERS = {
   intent_statement: ['intent-statement', 'createIntentStatementView'],
   problem_reduction: ['problem-reduction', 'createProblemReductionView'],
   analogical_reasoning: ['analogical-reasoning', 'createAnalogicalReasoningView'],
+  solution_tree: ['solution-tree', 'createSolutionTreeView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

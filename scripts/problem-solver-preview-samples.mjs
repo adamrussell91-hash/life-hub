@@ -305,3 +305,39 @@ SAMPLES.analogical_reasoning = run('analogical_reasoning', [
   node('a2', 'assess:2', 'Solved: in a two-week trial the queue fell to ten minutes and nobody walked away.', 'Queue down to ten minutes', { tag: 'solved' }),
   node('k', 'retain', 'Move the work that can be done in advance out of the line entirely, and let it serve itself.', 'Move work out of the line')
 ]);
+
+// Solution tree: a town library wants a quiet evening study room. Three ways in, each
+// broken into actions, one of them taken a level further; one action is contested.
+SAMPLES.solution_tree = run(
+  'solution_tree',
+  [
+    node('a', 'aim', 'Students can revise in a quiet room at the town library every weekday evening during exam season.', 'Quiet evening study'),
+    node('h1', 'how:1', 'Find a room that is free from six until closing.', 'Free up a room'),
+    node('h2', 'how:2', 'Agree how the room is used so it stays quiet.', 'Set quiet rules'),
+    node('h3', 'how:3', 'Make sure someone is on hand each evening.', 'Staff the evenings'),
+    node('h4', 'how:4', 'Move the toddler music group from Tuesday evenings to Saturday mornings.', 'Move toddler group'),
+    node('h5', 'how:5', 'Book the upstairs meeting room for study after six on weekdays.', 'Book meeting room'),
+    node('h6', 'how:6', 'Put a sign and a sign-in sheet on the door.', 'Sign at the door', { state: 'contested', objection: 'A sign says what the rule is; it is not a way of keeping the room quiet.' }),
+    node('h7', 'how:7', 'Fit a rack of phone pouches by the door, used on the honour system.', 'Phone pouches'),
+    node('h8', 'how:8', 'Set up a rota of volunteers to open and close the room.', 'Volunteer rota'),
+    node('h9', 'how:9', 'Ask the sixth-form college to count the evenings towards students\' volunteering hours.', 'Sixth-form helpers')
+  ],
+  [
+    { from: 'h1', to: 'a', kind: 'parent' },
+    { from: 'h2', to: 'a', kind: 'parent' },
+    { from: 'h3', to: 'a', kind: 'parent' },
+    { from: 'h4', to: 'h1', kind: 'parent' },
+    { from: 'h5', to: 'h1', kind: 'parent' },
+    { from: 'h6', to: 'h2', kind: 'parent' },
+    { from: 'h7', to: 'h2', kind: 'parent' },
+    { from: 'h8', to: 'h3', kind: 'parent' },
+    { from: 'h9', to: 'h8', kind: 'parent' }
+  ]
+);
+
+// The solution tree after one more turn: another action under the quiet rules, so that branch widens.
+SAMPLES['solution_tree:next'] = {
+  ...SAMPLES.solution_tree,
+  nodes: [...SAMPLES.solution_tree.nodes, node('h10', 'how:10', 'Lay carpet tiles under the tables to soften chair noise.', 'Carpet tiles')],
+  edges: [...SAMPLES.solution_tree.edges, { from: 'h10', to: 'h2', kind: 'parent' }]
+};

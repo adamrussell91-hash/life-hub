@@ -15,6 +15,7 @@ import { createFromToView } from '../../../../../packages/problem-solver/render/
 import { createIntentStatementView } from '../../../../../packages/problem-solver/render/intent-statement';
 import { createProblemReductionView } from '../../../../../packages/problem-solver/render/problem-reduction';
 import { createAnalogicalReasoningView } from '../../../../../packages/problem-solver/render/analogical-reasoning';
+import { createSolutionTreeView } from '../../../../../packages/problem-solver/render/solution-tree';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -47,7 +48,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   from_to: () => createFromToView(),
   intent_statement: () => createIntentStatementView(),
   problem_reduction: () => createProblemReductionView(),
-  analogical_reasoning: () => createAnalogicalReasoningView()
+  analogical_reasoning: () => createAnalogicalReasoningView(),
+  solution_tree: () => createSolutionTreeView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
