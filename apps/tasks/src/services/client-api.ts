@@ -12,7 +12,7 @@ import {
   restoreDeletedTask
 } from '@/services/task-cache';
 import type { TransitMap } from '@/schemas/map';
-import type { Program } from '@/schemas/program';
+import { withProgramDefaults, type Program } from '@/schemas/program';
 import type {
   FrameworkEntry,
   ExcursionTemplate,
@@ -338,8 +338,10 @@ export const tasksApi = {
     apiPatch<TransitMap>(`/api/maps?id=${encodeURIComponent(id)}`, body),
   deleteMap: (id: string) => apiDelete<{ deleted: boolean }>(`/api/maps?id=${encodeURIComponent(id)}`),
 
-  listPrograms: () => apiGet<{ programs: Program[] }>('/api/programs').then((r) => r.programs),
-  getProgram: (id: string) => apiGet<Program>(`/api/programs?id=${encodeURIComponent(id)}`),
+  listPrograms: () =>
+    apiGet<{ programs: Program[] }>('/api/programs').then((r) => r.programs.map(withProgramDefaults)),
+  getProgram: (id: string) =>
+    apiGet<Program>(`/api/programs?id=${encodeURIComponent(id)}`).then(withProgramDefaults),
   createProgram: (body: unknown) => apiPost<Program>('/api/programs', body),
   updateProgram: (id: string, body: unknown) =>
     apiPatch<Program>(`/api/programs?id=${encodeURIComponent(id)}`, body),
