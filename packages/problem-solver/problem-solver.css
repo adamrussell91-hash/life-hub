@@ -1122,7 +1122,12 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 .ps-causal__region { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .ps-causal__region--causes { gap: clamp(16px, 4.5cqw, 30px); }
-.ps-causal__item { display: flex; justify-content: center; width: 100%; }
+.ps-causal__item { position: relative; display: flex; justify-content: center; width: 100%; }
+/* The focused or open shape rises above its neighbours so its whole outline shows;
+   every title stays above every shape, so a raised arrowhead never hides the next title. */
+.ps-causal__item:focus-within,
+.ps-causal__item.is-open { z-index: 2; }
+.ps-causal__label { z-index: 3; }
 
 .ps-causal__shape {
   position: relative;
@@ -1195,9 +1200,10 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-causal__item--influence .ps-causal__shape { width: var(--causal-inf); aspect-ratio: 1 / 1.06; }
 .ps-causal__item--influence .ps-causal__fill { background: var(--ps-blue); clip-path: polygon(0% 0%, 100% 14%, 56% 100%); }
 .ps-causal__item--influence.is-even .ps-causal__fill { clip-path: polygon(0% 14%, 100% 0%, 44% 100%); }
-.ps-causal__item--influence .ps-causal__label { top: 13%; width: 62%; }
-.ps-causal__item--influence.is-odd .ps-causal__label { left: 49%; top: 15%; }
-.ps-causal__item--influence.is-even .ps-causal__label { left: 51%; top: 15%; }
+/* Labels lean toward the tip so every line stays inside the slanted sides. */
+.ps-causal__item--influence .ps-causal__label { top: 15%; width: 60%; }
+.ps-causal__item--influence.is-odd .ps-causal__label { left: 54%; }
+.ps-causal__item--influence.is-even .ps-causal__label { left: 46%; }
 
 /* Links */
 .ps-causal__edge { transition: opacity 220ms var(--ps-ease); }
@@ -1244,38 +1250,36 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 /* Phone: the three columns stay, narrower, with tighter type. */
 @container (max-width: 520px) {
-  .ps-causal > * { --causal-prob: 25cqw; --causal-cause: 28cqw; --causal-inf: 33cqw; --causal-gap: 5cqw; }
+  .ps-causal > * { --causal-prob: 24cqw; --causal-cause: 27cqw; --causal-inf: 35cqw; --causal-gap: 5cqw; }
   .ps-causal__item--cause .ps-causal__shape { aspect-ratio: 1.45 / 1; }
   .ps-causal__item--cause .ps-causal__label { bottom: 7%; width: 86%; }
-  .ps-causal__item--influence .ps-causal__label,
-  .ps-causal__item--influence.is-odd .ps-causal__label,
-  .ps-causal__item--influence.is-even .ps-causal__label { top: 12%; width: 74%; }
+  /* The arrowheads are too narrow for a meta line as well; it stays in the aria-label. */
+  .ps-causal__item--influence .ps-causal__meta { display: none; }
+  .ps-causal__item--influence .ps-causal__label { top: 13%; width: 64%; }
   .ps-causal__item--influence .ps-causal__title { font-size: 12px; }
-  .ps-causal__meta { font-size: 9px; letter-spacing: 0.06em; }
+  .ps-causal__meta { font-size: 10px; letter-spacing: 0.04em; }
   .ps-causal__title { font-size: 12.5px; line-height: 1.15; }
   .ps-causal__item--problem .ps-causal__label { width: 86%; }
   .ps-causal__item--problem .ps-causal__meta { letter-spacing: 0.02em; }
-  .ps-causal .ps-objection { margin-top: 1px; padding: 0 4px; font-size: 8px; }
+  .ps-causal .ps-objection { margin-top: 1px; padding: 0 4px; font-size: 9px; }
   .ps-causal__legend { gap: 6px 14px; font-size: var(--text-xs); }
 }
 
 /* Very narrow: stack. Influences become a strip of arrowheads along the top, then
    the causes, then the problem; the links run downwards. */
 @container (max-width: 339px) {
-  .ps-causal > * { --causal-prob: 42cqw; --causal-cause: 47cqw; --causal-inf: 47cqw; }
+  .ps-causal > * { --causal-prob: 42cqw; --causal-cause: 58cqw; --causal-inf: 47cqw; }
   .ps-causal__map { grid-template-columns: 1fr; row-gap: 40px; }
   .ps-causal__region--influences { grid-row: 1; flex-direction: row; flex-wrap: wrap; justify-content: center; row-gap: 4px; }
-  .ps-causal__region--causes { grid-row: 2; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 22px 4cqw; }
+  /* One cause per row, leaving gutters either side for links that must pass the column. */
+  .ps-causal__region--causes { grid-row: 2; gap: 22px; }
   .ps-causal__region--problem { grid-row: 3; }
   .ps-causal__item { width: auto; }
   .ps-causal__item--influence + .ps-causal__item--influence { margin-top: 0; }
   .ps-causal__item--influence .ps-causal__shape { aspect-ratio: 1 / 0.82; }
-  .ps-causal__item--influence .ps-causal__label,
-  .ps-causal__item--influence.is-odd .ps-causal__label,
-  .ps-causal__item--influence.is-even .ps-causal__label { top: 10%; width: 64%; }
+  .ps-causal__item--influence .ps-causal__label { top: 11%; width: 62%; }
   .ps-causal__item--cause .ps-causal__shape { aspect-ratio: 2 / 1; }
   .ps-causal__item--cause .ps-causal__label { bottom: 6%; width: 88%; }
-  .ps-causal__item--cause .ps-causal__meta { display: none; } /* the dome is too low for three lines */
   .ps-causal__legend { padding-inline: 0; }
 }
 
