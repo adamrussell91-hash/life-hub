@@ -2413,14 +2413,18 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 /* Intent statement (toolkit, Analyse): six bands stacked, red, yellow, blue, red, yellow,
    blue. Each band is an arrow pointing right with a flat left edge; the notch in that edge
    holds a triangle in the next band's colour, as in the book. Heading left, title right.
-   The arrow is clipped on an inner layer; the button's focus and open ring is a filter
-   outline round the button's silhouette, so it follows the arrow and is never clipped.
+   The fill and notch are clipped on an inner layer. The focus and open ring is two more
+   clipped arrows behind the fill, outset 2px (paper) and 4px (ink), so it traces the arrow
+   and the words are never clipped or filtered.
    Phone: the heading sits above the title and the point and notch shrink. */
 .ps-intent {
   /* Named, so every phone query measures this root box. */
   container: intent / inline-size;
   --ps-intent-point: 34px;
   --ps-intent-notch: 30px;
+  /* Slant factors for a band at its minimum height (see the ring). */
+  --ps-intent-tip: 1.4142;
+  --ps-intent-run: 1;
   width: 100%;
   max-width: 640px;
   margin-inline: auto;
@@ -2476,13 +2480,33 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 .ps-intent__band:hover .ps-intent__shape { filter: brightness(1.06); }
 
-/* A paper-and-ink double ring traced round the arrow by an SVG dilate filter (see
-   ringFilters in the renderer): one pass, exact on the slanted edges, never clipped. */
-.ps-intent__defs { position: absolute; width: 0; height: 0; overflow: hidden; }
-.ps-intent__flood--paper { flood-color: var(--ps-paper); }
-.ps-intent__flood--ink { flood-color: var(--ps-ink); }
-.ps-intent__band:focus-visible { outline: 2px solid transparent; filter: var(--ps-intent-ring-focus); }
-.ps-intent__item.is-open .ps-intent__band:not(:focus-visible) { filter: var(--ps-intent-ring-open); }
+/* The ring: arrows outset by --d round the fill, ink 4px under paper 2px. Each layer
+   reaches --d past the band on three sides and a little further on the right, where its
+   tip sits. On the slants a true --d outset moves the tip out by --d / sin(slant) and the
+   shoulders back by --d x point / half-height; the renderer measures each band and sets
+   both factors (--ps-intent-tip, --ps-intent-run), and the defaults fit the minimum height. */
+.ps-intent__ring { position: absolute; inset: 0; display: none; pointer-events: none; }
+.ps-intent__ring::before,
+.ps-intent__ring::after {
+  --reach: calc(var(--d) + 6px);
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--d)) calc(-1 * var(--reach)) calc(-1 * var(--d)) calc(-1 * var(--d));
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--reach) - var(--ps-intent-point) + var(--d) * var(--ps-intent-tip) - var(--d) * var(--ps-intent-run)) 0,
+    calc(100% - var(--reach) + var(--d) * var(--ps-intent-tip)) 50%,
+    calc(100% - var(--reach) - var(--ps-intent-point) + var(--d) * var(--ps-intent-tip) - var(--d) * var(--ps-intent-run)) 100%,
+    0 100%
+  );
+}
+.ps-intent__ring::before { --d: 4px; background: var(--ps-ink); }
+.ps-intent__ring::after { --d: 2px; background: var(--ps-paper); }
+.ps-intent__band:focus-visible { outline: 2px solid transparent; }
+.ps-intent__band:focus-visible .ps-intent__ring,
+.ps-intent__item.is-open .ps-intent__ring { display: block; }
+/* Open but not focused: a slimmer ink line. */
+.ps-intent__item.is-open .ps-intent__band:not(:focus-visible) .ps-intent__ring::before { --d: 3.5px; }
 
 .ps-intent__words {
   position: relative;
@@ -2524,7 +2548,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 /* Phone: heading above title, smaller point and notch. */
 @container intent (max-width: 520px) {
   /* Set on the bands: a container query cannot restyle the container itself. */
-  .ps-intent__band { --ps-intent-point: 22px; --ps-intent-notch: 18px; min-height: 64px; padding-block: 10px; padding-left: calc(var(--ps-intent-notch) + 12px); padding-right: calc(var(--ps-intent-point) + 10px); }
+  .ps-intent__band { --ps-intent-point: 22px; --ps-intent-notch: 18px; --ps-intent-tip: 1.2135; --ps-intent-run: 0.6875; min-height: 64px; padding-block: 10px; padding-left: calc(var(--ps-intent-notch) + 12px); padding-right: calc(var(--ps-intent-point) + 10px); }
   .ps-intent__words { grid-template-columns: minmax(0, 1fr); row-gap: 2px; align-content: center; }
   .ps-intent__heading { font-size: 10px; }
   .ps-intent__title { -webkit-line-clamp: 3; font-size: 14px; }
