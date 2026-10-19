@@ -149,3 +149,24 @@ test('move_on and score are actions; finish_define is kept as an alias for move_
   const again = await service.action('operator', { id: s.id, revision: ran.revision, action: 'finish_define' });
   assert.equal(again.phase, 'devise');
 });
+
+test('retry after a failed boundary turn keeps leaving, so the objection and learning are recorded', async () => {
+  const store = createMemoryProblemStore();
+  let calls = 0;
+  const ok = { verdict: 'clarify', message: 'What did you learn?', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: 'Root cause not reached.', learning: null };
+  const service = createProblemSolverService({ store, coach: async () => { calls += 1; if (calls === 1) throw new Error('boom'); return ok; }, now: () => '2026-10-19T10:00:00.000Z' });
+  let s = await service.create('operator', { text: 'Late rota.' });
+  s = { ...s, model: { id: 'seven_step', reason: '' }, phase: 'define', steps: { define: { runs: [], status: 'open', objection: null } }, runner: { status: 'idle', mode: 'turn', error: null } };
+  const { etag } = await store.read('operator', s.id);
+  await store.write('operator', s.id, s, etag);
+  const moved = await service.action('operator', { id: s.id, revision: s.revision, action: 'move_on' });
+  const failed = await service.run('operator', s.id);
+  assert.deepEqual([failed.runner.status, failed.runner.mode, failed.runner.leaving], ['failed', 'boundary', 'define']);
+  await assert.rejects(service.action('operator', { id: s.id, revision: failed.revision, action: 'say', text: 'hi' }), (err) => err.status === 409 && err.code === 'action_not_allowed' && err.message === 'The coach did not finish wrapping up that step. Try again first.');
+  const retried = await service.action('operator', { id: s.id, revision: failed.revision, action: 'retry' });
+  assert.equal(retried.runner.leaving, 'define');
+  const done = await service.run('operator', s.id);
+  assert.equal(done.pendingLearning, 'define');
+  assert.equal(done.steps.define.objection, 'Root cause not reached.');
+  assert.ok(moved);
+});

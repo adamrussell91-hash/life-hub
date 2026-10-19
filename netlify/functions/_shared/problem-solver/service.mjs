@@ -48,7 +48,7 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     archive: (s) => archive(s, deps),
     retry: (s) => {
       if (s.runner.status !== 'failed') throw httpError(409, 'action_not_allowed', 'Nothing to retry.');
-      return { ...s, runner: { status: 'queued', mode: s.runner.mode ?? 'turn', error: null } };
+      return { ...s, runner: { ...s.runner, status: 'queued', error: null } };
     }
   };
 
@@ -83,6 +83,9 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
       const act = ACTIONS[body.action];
       if (!act) throw httpError(400, 'validation_error', `Unknown action: ${body.action}`);
       if (['queued', 'running'].includes(value.runner.status) && body.action !== 'archive') throw httpError(409, 'busy', 'The coach is still thinking.');
+      if (value.runner.status === 'failed' && value.runner.mode === 'boundary' && !['retry', 'archive'].includes(body.action)) {
+        throw httpError(409, 'action_not_allowed', 'The coach did not finish wrapping up that step. Try again first.');
+      }
       const next = act(value, body);
       next.revision = value.revision + 1;
       next.requestIds = [...value.requestIds, String(body.requestId ?? '')].filter(Boolean).slice(-REQUEST_IDS_KEPT);
