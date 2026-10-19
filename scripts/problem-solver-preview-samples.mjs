@@ -613,3 +613,23 @@ SAMPLES.pareto_many = {
   ]),
   scores: { snapshots: [{ at: '2026-06-01T12:00:00Z', counts: spend.map(([, n]) => n) }] }
 };
+
+// DMAIC cycle: a village bakery cutting end-of-day bread waste. Pass 1 cut the waste but sold out
+// of sourdough early, so the cycle went round again; pass 2 planned by loaf type, then Control.
+// One contested node. dmaic_first is part way through pass 1 (Improve still to come, so faint).
+const dmaicPass1 = [
+  node('d1', 'define:1', 'Unsold loaves are binned at closing. The aim is to halve that in six weeks without running out before four. The owner and two counter staff are involved.', 'Halve binned bread'),
+  node('m1', 'measure:1', 'Over two weeks, 31 loaves a day were binned on average; the time each loaf type sold out was logged daily.', '31 binned daily'),
+  node('a1', 'analyse:1', 'Waste peaks on Mondays and on wet days, yet the bake plan is the same every day.', 'Identical daily bake')
+];
+SAMPLES.dmaic = run('dmaic', [
+  ...dmaicPass1,
+  node('i1', 'improve:1', 'Pilot for three weeks: bake a fifth less on Mondays and whenever rain is forecast.', 'Smaller wet-day bake'),
+  node('r1', 'repeat:1', 'Waste fell to 22 a day, but sourdough sold out by one o’clock twice a week. Next pass, plan each loaf type on its own.', 'Sourdough sold out'),
+  node('d2', 'define:2', 'Keep the gain on white loaves and stop sourdough selling out before three.', 'Plan per loaf'),
+  node('m2', 'measure:2', 'Count waste and sell-out time per loaf type, every day for three weeks.', 'Count per loaf', { state: 'contested', objection: 'Three weeks takes in a bank holiday; will that skew the count?' }),
+  node('a2', 'analyse:2', 'Sourdough sells steadily all day; white loaves go mostly before noon.', 'Sourdough sells steadily'),
+  node('i2', 'improve:2', 'A second small sourdough bake at eleven, and the white bake trimmed on wet days.', 'Second sourdough bake'),
+  node('c', 'control', 'A weekly waste tally on the board by the ovens. The owner reviews it each month and resets the plan every season.', 'Weekly waste tally')
+]);
+SAMPLES.dmaic_first = run('dmaic', dmaicPass1);

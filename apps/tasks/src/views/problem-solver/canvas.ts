@@ -23,6 +23,7 @@ import { createDecisionMatrixView } from '../../../../../packages/problem-solver
 import { createSwotView } from '../../../../../packages/problem-solver/render/swot';
 import { createMorphologicalView } from '../../../../../packages/problem-solver/render/morphological';
 import { createParetoView } from '../../../../../packages/problem-solver/render/pareto';
+import { createDmaicView } from '../../../../../packages/problem-solver/render/dmaic';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -68,7 +69,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   decision_matrix: () => createDecisionMatrixView(),
   swot: () => createSwotView(),
   morphological: () => createMorphologicalView(),
-  pareto: () => createParetoView()
+  pareto: () => createParetoView(),
+  dmaic: () => createDmaicView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

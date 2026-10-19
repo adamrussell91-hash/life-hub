@@ -5252,3 +5252,218 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-pareto__form { padding: var(--space-4); }
   .ps-pareto__field-row { grid-template-columns: minmax(0, 1fr) 5rem; }
 }
+
+/* DMAIC cycle (toolkit p.121, Implement): five rounded blue bands stacked with even paper gaps.
+   Each band, from the left: a red disc with its large yellow letter, a yellow right-pointing
+   triangle, the phase name in white, then the node's title for the pass shown over a short
+   description. A dashed yellow loop runs down the bands' right padding from Improve back up to
+   Define (a triangle at Improve points into it, an arrowhead at Define points back into the band);
+   blue under the dashes keeps them clear of the paper in the gaps. A band with nothing placed for
+   the pass shown is faint: pale blue, ink text, the disc and triangle dimmed. Phone: the
+   description moves under the phase name, the title under that, and the loop's padding narrows. */
+.ps-dmaic {
+  /* Named, so every phone query measures this root box. */
+  container: dmaic / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+}
+
+.ps-dmaic__tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ps-dmaic__tabs[hidden] { display: none; }
+.ps-dmaic__tab {
+  flex: 1 1 0;
+  min-width: 5.5rem;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--ps-card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-sm) / 1.2 var(--font-ui);
+  cursor: pointer;
+}
+.ps-dmaic__tab[aria-selected='true'] { background: var(--ps-blue); box-shadow: none; color: #fff; }
+.ps-dmaic__tab:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+/* The chart holds the bands and the loop over them. The book's gap between bands is about a
+   tenth of a band's height. */
+.ps-dmaic__chart {
+  --ps-dmaic-disc: 70px;
+  --ps-dmaic-tri: 28px;
+  /* The loop's lane down the bands' right edge. */
+  --ps-dmaic-gutter: 48px;
+  position: relative;
+}
+.ps-dmaic__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ps-dmaic__band {
+  position: relative;
+  min-height: 96px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ps-blue) 16%, var(--ps-paper));
+  color: var(--ps-ink);
+}
+.ps-dmaic__band.is-placed { color: #fff; }
+.ps-dmaic__band:has(:focus-visible),
+.ps-dmaic__band:has([aria-expanded='true']) { z-index: 2; }
+.ps-dmaic__fill { position: absolute; inset: 0; border-radius: inherit; background: var(--ps-blue); opacity: 0; }
+.ps-dmaic__band.is-placed .ps-dmaic__fill { opacity: 1; }
+
+.ps-dmaic__button {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: var(--ps-dmaic-disc) var(--ps-dmaic-tri) minmax(0, 6.6em) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 3px;
+  width: 100%;
+  min-height: 96px;
+  padding: 12px var(--ps-dmaic-gutter) 12px 20px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-dmaic__button:disabled { cursor: default; }
+.ps-dmaic__band.is-placed .ps-dmaic__button:hover { background: rgb(0 0 0 / 0.08); }
+.ps-dmaic__button:focus-visible,
+.ps-dmaic__button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+/* The disc and its letter (set from data-letter: decorative, the phase name says it in words). */
+.ps-dmaic__disc {
+  display: grid;
+  place-items: center;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: var(--ps-dmaic-disc);
+  height: var(--ps-dmaic-disc);
+  border-radius: 50%;
+  background: var(--ps-red);
+}
+.ps-dmaic__disc::before {
+  content: attr(data-letter);
+  color: var(--ps-yellow);
+  font: 900 calc(var(--ps-dmaic-disc) * 0.56) / 1 var(--font-ui);
+}
+.ps-dmaic__triangle {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  width: var(--ps-dmaic-tri);
+  height: calc(var(--ps-dmaic-tri) * 1.8);
+  background: var(--ps-yellow);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.ps-dmaic__band:not(.is-placed) .ps-dmaic__disc,
+.ps-dmaic__band:not(.is-placed) .ps-dmaic__triangle { opacity: 0.4; }
+
+.ps-dmaic__name { grid-column: 3; grid-row: 1 / -1; font: var(--weight-bold) 17px / 1.2 var(--font-ui); overflow-wrap: anywhere; }
+.ps-dmaic__head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; grid-column: 4; grid-row: 1; min-width: 0; }
+.ps-dmaic__head[hidden] { display: none; }
+.ps-dmaic__title {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-semibold) 15px / 1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-dmaic__head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+/* Full strength: the description is small, and on the faint band it is ink on pale blue. */
+.ps-dmaic__desc { grid-column: 4; grid-row: 2; font: var(--weight-regular) 12.5px / 1.35 var(--font-ui); }
+.ps-dmaic__head[hidden] + .ps-dmaic__desc { grid-row: 1 / -1; }
+
+/* "Pass N" under the D disc, a yellow tab cut clear of the red by the band's blue. */
+.ps-dmaic__badge {
+  position: absolute;
+  bottom: 5px;
+  left: calc(20px + var(--ps-dmaic-disc) / 2);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--ps-yellow);
+  box-shadow: 0 0 0 2px var(--ps-blue);
+  color: var(--ps-on-yellow);
+  font: var(--weight-bold) 10px / 1.4 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* The loop sits over the bands (it never takes a z-index fight with a raised band's ring). */
+.ps-dmaic__loop { position: absolute; inset: 0; z-index: 3; overflow: visible; pointer-events: none; }
+.ps-dmaic__loop-reveal { fill: none; stroke: #fff; stroke-width: 14; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.ps-dmaic__loop-edge,
+.ps-dmaic__loop-line { fill: none; stroke-dasharray: 6 5; stroke-linejoin: miter; }
+.ps-dmaic__loop-edge { stroke: var(--ps-blue); stroke-width: 4.5; }
+.ps-dmaic__loop-line { stroke: var(--ps-yellow); stroke-width: 2; }
+.ps-dmaic__loop-head { fill: var(--ps-yellow); stroke: var(--ps-blue); stroke-width: 1.5; stroke-linejoin: round; paint-order: stroke; }
+
+/* Why the cycle went round again: a small card under the loop, at the right. */
+.ps-dmaic__repeats { display: flex; flex-direction: column; align-items: flex-end; margin-top: 12px; }
+.ps-dmaic__repeats:not(:has(.ps-dmaic__repeat:not([hidden]))) { display: none; }
+.ps-dmaic__repeat {
+  box-sizing: border-box;
+  width: min(100%, 360px);
+  padding: 12px 16px 6px;
+  border-top: 3px solid var(--ps-yellow);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-dmaic__repeat[hidden] { display: none; }
+.ps-dmaic__repeat-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ps-dmaic__meta { color: var(--ps-ink); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-dmaic__repeat .ps-objection { margin-top: 0; color: var(--ps-ink); opacity: 1; }
+.ps-dmaic__repeat-text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-sm) / 1.5 var(--font-ui); }
+.ps-dmaic__more {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ps-dmaic__more:focus-visible { outline: 2px solid transparent; border-radius: 4px; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-dmaic__repeat .ps-details__card { margin-top: 0; padding: 4px 0 8px; background: transparent; box-shadow: none; }
+
+.ps-dmaic__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+
+/* Phone: name, description and title stack beside the disc; the loop's lane narrows. */
+@container dmaic (max-width: 480px) {
+  .ps-dmaic__chart { --ps-dmaic-disc: 46px; --ps-dmaic-tri: 16px; --ps-dmaic-gutter: 34px; }
+  .ps-dmaic__stack { gap: 8px; }
+  .ps-dmaic__band,
+  .ps-dmaic__button { min-height: 84px; }
+  .ps-dmaic__button {
+    grid-template-columns: var(--ps-dmaic-disc) var(--ps-dmaic-tri) minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    column-gap: 10px;
+    padding: 10px var(--ps-dmaic-gutter) 10px 12px;
+  }
+  .ps-dmaic__name { grid-column: 3; grid-row: 1; font-size: 16px; }
+  .ps-dmaic__desc,
+  .ps-dmaic__head[hidden] + .ps-dmaic__desc { grid-column: 3; grid-row: 2; font-size: 12px; }
+  .ps-dmaic__head { grid-column: 3; grid-row: 3; margin-top: 3px; }
+  .ps-dmaic__title { font-size: 14px; }
+  .ps-dmaic__badge { bottom: 3px; left: calc(12px + var(--ps-dmaic-disc) / 2); padding: 0 6px; }
+  .ps-dmaic__repeat { width: 100%; }
+}
