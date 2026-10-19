@@ -1531,6 +1531,7 @@ test('an accepted turn with links and no node adds the links to the active run',
 
 - [ ] Run all root Problem Solver tests, all Tasks Problem Solver tests, the type gate, `npm run pre-pr-check` (exit 0) and the browser walk at both widths.
 - [ ] Render every new sample at 900 and 390 and look at them all once more as a set: consistent type sizes, palette and motion feel across tools.
+- [ ] Shared renderer debt raised in reviews, fixed once for every renderer (v1 and new): Escape closes the open details card (in `createDisclosureGroup`, details.ts); the contested tag and aria label update if a node's state changes after creation; any view with a ResizeObserver or rAF loop gets a `destroy()` that the canvas calls when it drops a view.
 - [ ] Commit any fixes: `Problem Solver: Analyse and Devise polish`.
 
 ## Done when
