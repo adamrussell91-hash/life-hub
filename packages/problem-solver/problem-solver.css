@@ -2410,6 +2410,130 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-fromto__cell, .ps-fromto__arrow { transition: none; }
 }
 
+/* Intent statement (toolkit, Analyse): six bands stacked, red, yellow, blue, red, yellow,
+   blue. Each band is an arrow pointing right with a flat left edge; the notch in that edge
+   holds a triangle in the next band's colour, as in the book. Heading left, title right.
+   The arrow is clipped on an inner layer; the button's focus and open ring is a filter
+   outline round the button's silhouette, so it follows the arrow and is never clipped.
+   Phone: the heading sits above the title and the point and notch shrink. */
+.ps-intent {
+  /* Named, so every phone query measures this root box. */
+  container: intent / inline-size;
+  --ps-intent-point: 34px;
+  --ps-intent-notch: 30px;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+}
+
+.ps-intent__stack { display: flex; flex-direction: column; gap: 3px; }
+
+.ps-intent__item { position: relative; }
+/* The focused or open band rises above its neighbours so its whole ring shows. */
+.ps-intent__item:has(.ps-intent__band:focus-visible),
+.ps-intent__item.is-open { z-index: 2; }
+
+.ps-intent__band {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 68px;
+  padding: 12px calc(var(--ps-intent-point) + 14px) 12px calc(var(--ps-intent-notch) + 16px);
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ps-intent__shape {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 0, calc(100% - var(--ps-intent-point)) 0, 100% 50%, calc(100% - var(--ps-intent-point)) 100%, 0 100%);
+  transition: filter 240ms var(--ps-ease);
+}
+
+.ps-intent__notch {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--ps-intent-notch);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.ps-intent__item.is-red .ps-intent__shape,
+.ps-intent__notch.is-red { background: var(--ps-red); }
+.ps-intent__item.is-yellow .ps-intent__shape,
+.ps-intent__notch.is-yellow { background: var(--ps-yellow); }
+.ps-intent__item.is-blue .ps-intent__shape,
+.ps-intent__notch.is-blue { background: var(--ps-blue); }
+
+/* White on red (5.1:1) and blue (6.6:1), dark ink on yellow (9:1), all at full opacity. */
+.ps-intent__item.is-red .ps-intent__band,
+.ps-intent__item.is-blue .ps-intent__band { color: #fff; }
+.ps-intent__item.is-yellow .ps-intent__band { color: var(--ps-on-yellow); }
+
+.ps-intent__band:hover .ps-intent__shape { filter: brightness(1.06); }
+
+/* A paper-and-ink double ring traced round the arrow by an SVG dilate filter (see
+   ringFilters in the renderer): one pass, exact on the slanted edges, never clipped. */
+.ps-intent__defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ps-intent__flood--paper { flood-color: var(--ps-paper); }
+.ps-intent__flood--ink { flood-color: var(--ps-ink); }
+.ps-intent__band:focus-visible { outline: 2px solid transparent; filter: var(--ps-intent-ring-focus); }
+.ps-intent__item.is-open .ps-intent__band:not(:focus-visible) { filter: var(--ps-intent-ring-open); }
+
+.ps-intent__words {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 32%) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 14px;
+  min-height: 44px;
+}
+
+.ps-intent__heading {
+  font: var(--weight-semibold) 11px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+
+.ps-intent__title-line { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+
+.ps-intent__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+  font: var(--weight-semibold) 15px / 1.25 var(--font-ui);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Full strength, so the tag keeps its contrast on the red band. */
+.ps-intent .ps-objection { margin-top: 0; opacity: 1; }
+
+/* Details cards open under their band. */
+.ps-intent .ps-details { width: 100%; }
+.ps-intent .ps-details__card { margin-top: 6px; margin-bottom: 4px; }
+
+/* Phone: heading above title, smaller point and notch. */
+@container intent (max-width: 520px) {
+  /* Set on the bands: a container query cannot restyle the container itself. */
+  .ps-intent__band { --ps-intent-point: 22px; --ps-intent-notch: 18px; min-height: 64px; padding-block: 10px; padding-left: calc(var(--ps-intent-notch) + 12px); padding-right: calc(var(--ps-intent-point) + 10px); }
+  .ps-intent__words { grid-template-columns: minmax(0, 1fr); row-gap: 2px; align-content: center; }
+  .ps-intent__heading { font-size: 10px; }
+  .ps-intent__title { -webkit-line-clamp: 3; font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-intent__shape { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }

@@ -264,3 +264,13 @@ SAMPLES.from_to = run('from_to', [
   node('o4', 'to:4', 'Short project roles: repair cafe, code club, story time.', 'Project roles'),
   node('i', 'insight', 'Home working and skilled volunteers are both growing: a quiet room run by short-stint volunteers could earn room-hire income and offset the shrinking grant.', 'Grow into the gap')
 ]);
+
+// Intent statement: a community allotment that keeps losing plots to neglect.
+SAMPLES.intent_statement = run('intent_statement', [
+  node('pr', 'problem', 'A third of the allotment plots go untended each summer, and the waiting list keeps growing while weeds spread to the neighbouring beds.', 'Neglected plots'),
+  node('st', 'stakeholders', 'Plot holders, the people on the waiting list, the committee that allocates plots, and the parish that leases the land.', 'Holders, waitlist, committee', { state: 'contested', objection: 'Does the parish need to act, or is it only affected?' }),
+  node('fa', 'failures', 'Warning letters went unread, and a yearly inspection came too late to save the season.', 'Unread warnings'),
+  node('ap', 'approach', 'Monthly walk-rounds by volunteer buddies, with half-plots offered to people on the waiting list straight away.', 'Buddies and half-plots'),
+  node('op', 'opportunity', 'More families growing food, a shorter waiting list and less weed spread for everyone.', 'Shorter waiting list'),
+  node('ri', 'risk', 'Buddies may drop off by August (fairly likely); a shared rota and a mid-season check-in reduce the gap.', 'Buddy drop-off')
+]);
