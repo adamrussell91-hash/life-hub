@@ -81,6 +81,8 @@ export const ProjectStatusSchema = z.enum([
   'paused',
   'completed'
 ]);
+/** Which of Adam's jobs a project belongs to. Teaching is the default. */
+export const ProjectJobSchema = z.enum(['teaching', 'halt_board']);
 export const QualityBarSchema = z.enum(['good_enough', 'high_quality', 'exceptional']);
 
 /**
@@ -109,6 +111,7 @@ export const ProjectSchema = z.object({
   /** When the project should return for review. */
   review_at: z.string().nullable().default(null),
   type: ProjectTypeSchema.default('standard'),
+  job: ProjectJobSchema.optional().default('teaching'),
   milestones: z.array(MilestoneSchema).nullish().transform((value) => value ?? []),
   status: ProjectStatusSchema.default('active'),
   baseline_end_date: z.string().nullable().default(null),
@@ -161,6 +164,7 @@ export const ProjectSchema = z.object({
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 export type ProjectType = z.infer<typeof ProjectTypeSchema>;
+export type ProjectJob = z.infer<typeof ProjectJobSchema>;
 export type QualityBar = z.infer<typeof QualityBarSchema>;
 export type Milestone = z.infer<typeof MilestoneSchema>;
 export type PermissionNote = z.infer<typeof PermissionNoteSchema>;

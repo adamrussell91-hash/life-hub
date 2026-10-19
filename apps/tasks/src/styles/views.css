@@ -8687,6 +8687,35 @@ button.column-bar--row.is-active {
   line-height: var(--leading-snug);
 }
 
+/* NSW HALT board projects. Colours from the association logo; white type
+   keeps it legible on both light and dark cards. */
+.halt-badge {
+  display: inline-flex;
+  align-items: stretch;
+  align-self: flex-start;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.halt-badge__halt,
+.halt-badge__nsw {
+  padding: 3px 5px;
+}
+
+.halt-badge__halt {
+  background: #27418f;
+}
+
+.halt-badge__nsw {
+  background: #a0218b;
+}
+
 .pcard--compact .pcard__title {
   font-size: var(--text-sm);
 }
