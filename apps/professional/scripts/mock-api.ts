@@ -59,6 +59,8 @@ async function loadNotionListCaches(): Promise<NotionListCaches | null> {
 }
 
 const LOCAL_PASSPHRASE = 'professional-hub-local';
+/** The operator's own Person in the mock (Career → Add a role links from here). */
+const MOCK_SELF_REF = 'shared:person:person_self_demo';
 /** Local-only: Blob copies the Duplicates sheet has merged this session. */
 const mockDedupeDone = new Set<string>();
 
@@ -2693,115 +2695,63 @@ export function createMockApi() {
           href: `/professional/#/event/${event.id}`
         }));
       const pendingScan = [...scanProposals.values()].filter((p) => p.status === 'pending');
-      // Seeded from life-hub-data relationships.json (Adam / derived:person:adam-russell)
-      // so local Career river shows the real past role band during development.
-      const employmentItems = [
-        {
-          ref: 'shared:organisation:org_kooringal',
-          kind: 'organisation',
-          display_label: 'Kooringal High School',
-          role: 'English Teacher',
-          valid_from: '2012-12-02',
-          valid_to: '2014-12-19',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_xavier',
-          kind: 'organisation',
-          display_label: 'Xavier High School',
-          role: 'English/HSIE Teacher',
-          valid_from: '2015-01-26',
-          valid_to: '2018-10-01',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_all_areas',
-          kind: 'organisation',
-          display_label: 'All Areas Education',
-          role: 'Senior Education Project Officer',
-          valid_from: '2018-10-01',
-          valid_to: '2019-05-03',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_st_josephs',
-          kind: 'organisation',
-          display_label: "St Joseph's High School",
-          role: 'HSIE and Business Studies Teacher',
-          valid_from: '2019-05-01',
-          valid_to: '2019-12-31',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_st_pius',
-          kind: 'organisation',
-          display_label: 'St Pius X High School',
-          role: 'English Teacher',
-          valid_from: '2021-01-25',
-          valid_to: '2024-08-16',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_st_pius',
-          kind: 'organisation',
-          display_label: 'St Pius X High School',
-          role: 'Psychology Teacher',
-          valid_from: '2023-01-23',
-          valid_to: '2024-08-16',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_mcauley',
-          kind: 'organisation',
-          display_label: 'Catherine McAuley Catholic College',
-          role: 'English Teacher',
-          valid_from: '2024-08-19',
-          valid_to: '2024-12-20',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Gifted Education Teacher',
-          valid_from: '2025-01-22',
-          valid_to: null,
-          link_status: 'current'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Leader of Learning Enrichment',
-          valid_from: '2025-01-22',
-          valid_to: null,
-          link_status: 'current'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Curriculum Leader',
-          valid_from: '2024-01-01',
-          valid_to: '2024-12-20',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Professional Learning Coordinator',
-          valid_from: '2024-08-19',
-          valid_to: '2024-12-20',
-          link_status: 'ended'
-        }
+      // Invented role history (public repo: no real people or workplaces).
+      // Shape matches career-overview employment items; roles added through
+      // Career → Add a role (employee_at links from MOCK_SELF_REF) join it.
+      const role = (
+        id: string,
+        display_label: string,
+        roleTitle: string,
+        valid_from: string,
+        valid_to: string | null
+      ) => ({
+        ref: `shared:organisation:${id}`,
+        kind: 'organisation',
+        display_label,
+        role: roleTitle,
+        valid_from,
+        valid_to,
+        link_status: valid_to ? 'ended' : 'current'
+      });
+      const employmentItems: Array<Record<string, unknown>> = [
+        role('org_demo_ridgeway', 'Ridgeway High School', 'English Teacher', '2012-12-03', '2014-12-19'),
+        role('org_demo_banksia', 'Banksia College', 'English/HSIE Teacher', '2015-01-27', '2018-09-28'),
+        role('org_demo_lakeside', 'Lakeside High School', 'English Teacher', '2017-05-01', '2017-12-15'),
+        role('org_demo_harbour', 'Harbour Education', 'Senior Project Officer', '2018-10-01', '2019-05-03'),
+        role('org_demo_hillcrest', 'Hillcrest High School', 'HSIE and Business Studies Teacher', '2019-05-06', '2019-12-18'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'HSIE Teacher', '2020-01-28', '2020-12-18'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Gifted Education Mentor', '2020-05-04', '2020-12-18'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'English Teacher', '2021-01-27', '2024-08-16'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Leader of Wellbeing (Special Projects)', '2021-05-03', '2021-12-17'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Psychology Teacher', '2023-01-30', '2024-08-16'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Curriculum Committee Coordinator', '2023-05-01', '2024-02-29'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Professional Experience Organiser', '2024-01-29', '2024-08-16'),
+        role('org_demo_seaview', 'Seaview College', 'English Teacher', '2024-08-19', '2024-12-20'),
+        role('org_demo_tallowwood', 'Tallowwood College', 'Gifted Education Teacher', '2025-01-28', null)
       ];
+      for (const link of relationships) {
+        if (link.source_ref !== MOCK_SELF_REF || link.relationship_type !== 'employee_at') continue;
+        if (link.status !== 'current' && link.status !== 'ended') continue;
+        const target = findByRef(link.target_ref);
+        employmentItems.push({
+          ref: link.target_ref,
+          kind: 'organisation',
+          display_label: target
+            ? endpointFor(target as PersonRecord | OrganisationRecord | CommunicationRecord).display_label
+            : link.target_ref,
+          role: link.role ?? null,
+          valid_from: link.valid_from ? String(link.valid_from).slice(0, 10) : null,
+          valid_to: link.valid_to ? String(link.valid_to).slice(0, 10) : null,
+          link_status: link.status
+        });
+      }
       return json(200, {
         ok: true,
         data: {
           applications: { status: 'ok', items: appItems },
           employment: { status: 'ok', items: employmentItems },
           employment_items: employmentItems,
+          self_ref: MOCK_SELF_REF,
           professional_development: { status: 'ok', items: pdItems },
           people: { status: 'ok', items: [] },
           organisations: { status: 'ok', items: [] },
@@ -2924,7 +2874,13 @@ export function createMockApi() {
 
     if (path === '/api/career-futures' && method === 'POST') {
       const action = url.searchParams.get('action');
-      const input = body as { title?: string; where?: string; criteria?: unknown[] };
+      const input = body as {
+        title?: string;
+        where?: string;
+        criteria?: unknown[];
+        colour_slot?: number;
+        lane_order?: number;
+      };
       if (action === 'draft') {
         return json(200, {
           ok: true,
@@ -2945,7 +2901,12 @@ export function createMockApi() {
         where: typeof input.where === 'string' ? input.where : null,
         status: 'active',
         criteria: Array.isArray(input.criteria) ? input.criteria : [],
-        colour_slot: futures.size % 6,
+        // Same contract as career-schema: the client picks slot and lane.
+        colour_slot:
+          Number.isInteger(input.colour_slot) && input.colour_slot! >= 1 && input.colour_slot! <= 6
+            ? input.colour_slot
+            : (futures.size % 6) + 1,
+        lane_order: Number.isInteger(input.lane_order) ? input.lane_order : futures.size,
         created_at: nowIso,
         updated_at: nowIso
       };
@@ -3099,10 +3060,11 @@ export function createMockApi() {
           link.source_ref === input.source_ref &&
           link.target_ref === input.target_ref &&
           link.relationship_type === input.relationship_type &&
+          (link.role ?? null) === (input.role ?? null) &&
+          (link.valid_from ?? null) === (input.valid_from ?? null) &&
           link.status === 'current'
       );
       if (existing) {
-        if (input.role !== undefined) existing.role = input.role;
         return json(200, {
           ok: true,
           data: {
@@ -3118,9 +3080,7 @@ export function createMockApi() {
           }
         });
       }
-      const id = `ul_${Buffer.from(`${input.source_ref}|${input.target_ref}|${input.relationship_type}`)
-        .toString('hex')
-        .slice(0, 24)}`;
+      const id = `ul_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
       relationships.push({
         id,
         source_ref: input.source_ref,
