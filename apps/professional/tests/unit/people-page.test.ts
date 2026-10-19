@@ -37,13 +37,13 @@ describe('renderPeoplePage (W2 real entry)', () => {
               {
                 id: PERSON_ID,
                 ref: `shared:person:${PERSON_ID}`,
-                display_name: 'Henry McLennan',
+                display_name: 'Isla Emberly',
                 initials: 'HM',
                 role_line: 'Mentee',
                 relationship_roles: [{ role: 'mentee', label: 'Mentee', current: true }],
                 organisation: {
                   ref: 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002',
-                  display_name: 'St. Aloysius College',
+                  display_name: 'Tallowwood College',
                   monogram: 'SAC',
                   logo_key: null,
                   current: true
@@ -71,7 +71,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
               schema_version: 1,
               id: PERSON_ID,
               kind: 'person',
-              display_name: 'Henry McLennan',
+              display_name: 'Isla Emberly',
               sort_name: null,
               aliases: [],
               lifecycle_status: 'active',
@@ -91,7 +91,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
         if (url.includes('/api/people/brief')) {
           return jsonResponse({
             header: {
-              person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Henry McLennan', href: null },
+              person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Isla Emberly', href: null },
               role: null,
               organisation: null,
               next_interaction: null
@@ -202,7 +202,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
     document.body.append(canvas);
     const loading = renderPeoplePage(canvas, {selectedId: PERSON_ID});
     try {
-      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__name')?.textContent).toBe('Henry McLennan'), {timeout:300});
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__name')?.textContent).toBe('Isla Emberly'), {timeout:300});
       canvas.querySelector<HTMLButtonElement>('.people-pane__edit')!.click();
       expect(canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')?.hidden).toBe(false);
       expect(canvas.querySelector('[data-section="ledger"] .people-pane__loading')).toBeTruthy();
@@ -314,7 +314,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
 
   it('merging a selected duplicate removes the deleted profile from the pane', async () => {
     const original = vi.mocked(fetch).getMockImplementation()!;
-    const action = {kind:'twin',remove:{id:PERSON_ID,ref:`shared:person:${PERSON_ID}`,name:'Henry McLennan'},into:[{id:'survivor',ref:'shared:person:survivor',name:'Henry McLennan'}],student:false,links:1,blocked:null};
+    const action = {kind:'twin',remove:{id:PERSON_ID,ref:`shared:person:${PERSON_ID}`,name:'Isla Emberly'},into:[{id:'survivor',ref:'shared:person:survivor',name:'Isla Emberly'}],student:false,links:1,blocked:null};
     let merged=false;
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const url=String(input);
@@ -363,7 +363,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);
     await renderPeoplePage(canvas, { selectedId: PERSON_ID });
-    const edit = canvas.querySelector<HTMLButtonElement>('button.people-pane__edit, [aria-label="Edit Henry McLennan"]');
+    const edit = canvas.querySelector<HTMLButtonElement>('button.people-pane__edit, [aria-label="Edit Isla Emberly"]');
     expect(edit).toBeTruthy();
     const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]');
     expect(form).toBeTruthy();

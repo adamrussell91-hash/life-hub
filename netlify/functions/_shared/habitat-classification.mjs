@@ -229,7 +229,7 @@ function joinWithAnd(labels) {
  *
  * Each result carries a plain-language `description` citing WHICH
  * organisations/clusters the person bridges (e.g. "Connects UNSW and St
- * Aloysius") — per Principle 6, never a ranking/score, just a factual
+ * Tallowwood") — per Principle 6, never a ranking/score, just a factual
  * description of what connects where.
  */
 export function computeBridgePeople(organisationGroups) {

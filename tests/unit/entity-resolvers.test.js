@@ -273,7 +273,7 @@ test('resolvePerson/resolveOrganisation fall back to the GitHub-canonical import
       return body([{ legacy_id: 'leg-person-1', display_name: 'Lauren Stuart', sort_name: null, aliases: [] }]);
     }
     if (href.endsWith('/data/professional/organisations.json')) {
-      return body([{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College', legal_name: null, aliases: [] }]);
+      return body([{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College', legal_name: null, aliases: [] }]);
     }
     if (href.endsWith('/data/professional/relationships.json')) {
       return body([]);
@@ -294,7 +294,7 @@ test('resolvePerson/resolveOrganisation fall back to the GitHub-canonical import
     env: { GITHUB_TOKEN: 'token' },
     fetchImpl
   });
-  assert.equal(organisationProjection.display_label, 'St. Aloysius College');
+  assert.equal(organisationProjection.display_label, 'Tallowwood College');
 });
 
 test('resolvePerson prefers a native Blob record over a GitHub-canonical one sharing the same derived id', async () => {

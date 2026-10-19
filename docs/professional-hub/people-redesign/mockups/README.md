@@ -9,7 +9,7 @@ Replaces the live `#/people` page. Fixes it has to make in every option:
 - Organisation crests. Shield monograms here are placeholders; Adam will
   supply real crests and logos.
 
-Henry McLennan's workplace (St. Aloysius) and the other people's roles are
+Isla Emberly's workplace (Tallowwood) and the other people's roles are
 placeholder data.
 
 | File | Direction |
