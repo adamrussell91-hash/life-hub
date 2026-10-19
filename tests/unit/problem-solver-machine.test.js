@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TOOL_IDS, TOOLS as REGISTRY } from '../../packages/problem-solver/tools/index.mjs';
-import { addEdge, applyScores, canEdge, checkNode, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
+import { addEdge, applyScores, canEdge, canPropose, checkNode, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
@@ -76,5 +76,23 @@ test('checkNode requires a listed tag on tagged slots and rejects tags elsewhere
     assert.equal(checkNode(run, { slot: 'item:1', text: 'x' }, [{ from: 'item:1', to: 'pick', kind: 'link' }]), null);
   } finally {
     delete REGISTRY.fake_tagged;
+  }
+});
+
+test('canPropose follows the tool\'s taskSlots and is false without them', () => {
+  REGISTRY.fake_tasks = {
+    id: 'fake_tasks', name: 'Fake', kind: 'plan', step: 'implement', when: 'w', failureModes: ['a', 'b'], steps: [], edgeKinds: [],
+    slots: { card: 'A card', note: 'A note' },
+    taskSlots: { card: (node) => node.tag !== 'done' },
+    nextSlots: () => ['card:1', 'note'], complete: () => false
+  };
+  try {
+    const run = { id: 'r', tool: 'fake_tasks', status: 'active', nodes: [], edges: [] };
+    assert.equal(canPropose(run, { slot: 'card:1', text: 'x', tag: 'todo' }), true);
+    assert.equal(canPropose(run, { slot: 'card:2', text: 'x', tag: 'done' }), false);
+    assert.equal(canPropose(run, { slot: 'note', text: 'x' }), false);
+    assert.equal(canPropose({ ...run, tool: 'five_whys' }, { slot: 'why:1', text: 'x' }), false);
+  } finally {
+    delete REGISTRY.fake_tasks;
   }
 });

@@ -113,6 +113,11 @@ function transcript(session) {
   return session.turns.slice(-RECENT_TURNS).map((t) => `${t.role === 'user' ? 'PERSON' : 'COACH'}: ${t.text}`).join('\n');
 }
 
+const scoreNote = (run) => {
+  const line = TOOLS[run.tool].scoreLine?.(run);
+  return line ? `; ${line}` : '';
+};
+
 function runLines(session, run) {
   const def = TOOLS[run.tool];
   const nodes = run.nodes.map((node) => `  ${node.slot}${node.tag ? ` [${node.tag}]` : ''}${node.state === 'contested' ? ' (contested)' : ''}: ${node.text}`).join('\n') || '  (none yet)';
@@ -125,6 +130,7 @@ function runLines(session, run) {
     `Link kinds: ${def.edgeKinds.join(', ') || 'none'}`,
     `Placed:\n${nodes}${edges}`,
     `Open slots: ${nextSlots(run).join(', ') || (isComplete(run) ? 'none (tool complete)' : 'none open, but the tool is not complete: see Waiting on or add links')}`,
+    ...(def.scoreLine?.(run) ? [`Scores: ${def.scoreLine(run)}`] : []),
     ...(def.awaiting?.(run) ? [`Waiting on: ${def.awaiting(run)}`] : []),
     progressLine(session)
   ].join('\n');
@@ -144,7 +150,7 @@ function earlierSteps(session) {
     const state = session.steps[step];
     if (!state || step === session.phase) continue;
     const runs = state.runs.filter((run) => run.status !== 'switched' && run.nodes.length);
-    const body = runs.map((run) => `${TOOLS[run.tool].name} ${isComplete(run) ? 'complete' : 'incomplete'}; ${run.nodes.map((n) => `${n.slot}: ${n.text}`).join(' | ')}`).join(' // ') || 'nothing kept';
+    const body = runs.map((run) => `${TOOLS[run.tool].name} ${isComplete(run) ? 'complete' : 'incomplete'}; ${run.nodes.map((n) => `${n.slot}: ${n.text}`).join(' | ')}${scoreNote(run)}`).join(' // ') || 'nothing kept';
     lines.push(`${stepName(session.model.id, step)} (${state.status}${state.objection ? `, coach objected: ${state.objection}` : ''}): ${body}`);
   }
   return lines.length ? `EARLIER STEPS:\n${lines.join('\n')}` : null;
@@ -177,7 +183,7 @@ export function buildCoachPrompt(session) {
   const step = currentStep(session);
   if (step) {
     for (const run of step.runs.filter((item) => item.status !== 'active')) {
-      parts.push(`Earlier tool in this step ${run.tool}: ${run.status}${run.switchReason ? ` (${run.switchReason})` : ''}; ${run.nodes.map((node) => `${node.slot}: ${node.text}`).join(' | ')}`);
+      parts.push(`Earlier tool in this step ${run.tool}: ${run.status}${run.switchReason ? ` (${run.switchReason})` : ''}; ${run.nodes.map((node) => `${node.slot}: ${node.text}`).join(' | ')}${scoreNote(run)}`);
     }
   }
   const run = activeRun(session);

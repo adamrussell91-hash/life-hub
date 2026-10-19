@@ -165,3 +165,17 @@ test('the analyse step layer carries its selection guide, tools and challenge tr
   assert.match(layer, /CHALLENGE IN THIS STEP:/);
   assert.doesNotMatch(layer, /No tools are available/);
 });
+
+test('a tool\'s scoreLine shows under its run and in earlier steps', async () => {
+  const { TOOLS: T } = await import('../../packages/problem-solver/tools/index.mjs');
+  T.fake_scored = { id: 'fake_scored', name: 'Fake scored', kind: 'decision', step: 'define', when: 'w', failureModes: ['a', 'b'], steps: [{ id: 's', title: 'S', prompt: 'p' }], edgeKinds: [], slots: { item: 'An item' }, nextSlots: () => ['item:1'], complete: () => true, scoreLine: () => 'Totals: A 7.2 (leading), B 6.8' };
+  try {
+    let s = inTool('five_whys');
+    s = { ...s, steps: { define: { ...s.steps.define, runs: [{ id: 'f', tool: 'fake_scored', status: 'active', nodes: [{ id: 'n', slot: 'item:1', text: 'Thing', state: 'accepted', skills: [], turnId: 't' }], edges: [] }] } } };
+    assert.match(buildCoachPrompt(s).user, /Scores: Totals: A 7\.2 \(leading\), B 6\.8/);
+    const moved = moveOn(s, deps);
+    assert.match(buildCoachPrompt(moved).user, /EARLIER STEPS:[\s\S]*Totals: A 7\.2/);
+  } finally {
+    delete T.fake_scored;
+  }
+});
