@@ -8,9 +8,11 @@ export const problemSolverApi = {
     apiPost<{ session: PsSession }>('/api/problem-solver', { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
   act: (session: PsSession, action: PsAction, text?: string) =>
     apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),
+  /** Score a run (radar now; force field, decision matrix and Pareto later). */
+  score: (session: PsSession, payload: Record<string, unknown> & { runId?: string }) =>
+    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: 'score', payload }).then((r) => r.session),
   /** Score the topics of the Gap analysis (advanced) radar; one 1 to 10 score per topic for each overlay. */
-  rescore: (session: PsSession, payload: { current: number[]; objective: number[] }) =>
-    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: 'rescore_radar', current: payload.current, objective: payload.objective }).then((r) => r.session)
+  rescore: (session: PsSession, payload: { current: number[]; objective: number[] }): Promise<PsSession> => problemSolverApi.score(session, payload)
 };
 
 export function isBusy(session: PsSession): boolean {

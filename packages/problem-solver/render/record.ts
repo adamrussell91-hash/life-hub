@@ -67,16 +67,25 @@ export type RecordView = {
   anchor(runId: string, via: 'step' | 'film'): HTMLElement | null;
 };
 
+type LegacySession = PsSession & { define?: { runs: PsToolRun[] } };
+
+/** The define step's runs. Reads `steps`, falling back to the pre-step `define` shape (Task 16 rewrites this file). */
+function defineRuns(session: PsSession): PsToolRun[] {
+  const id = session.model ? MODELS[session.model.id].define : 'define';
+  return session.steps?.[id]?.runs ?? (session as LegacySession).define?.runs ?? [];
+}
+
 /** The define step's state from the session phase; every later step is still ahead. */
 export function stepState(session: PsSession, step: string): StepState {
   if (!session.model || step !== MODELS[session.model.id].define) return 'future';
-  if (session.phase === 'defined') return 'done';
-  return session.phase === 'define' ? 'current' : 'future';
+  const status = session.steps?.[step]?.status;
+  if (session.phase === 'defined' || status === 'done' || status === 'skipped') return 'done';
+  return session.phase === 'define' || session.phase === step ? 'current' : 'future';
 }
 
 /** The run the define step opens: the last run of the chain that was not switched away. */
 export function defineRun(session: PsSession): PsToolRun | null {
-  const runs = session.define.runs;
+  const runs = defineRuns(session);
   return [...runs].reverse().find((run) => run.status !== 'switched') ?? runs.at(-1) ?? null;
 }
 
@@ -192,7 +201,7 @@ export function createRecordView(doc: Document = document): RecordView {
 
   function paintFilm(session: PsSession): HTMLElement | null {
     cards.clear();
-    const runs = session.define.runs;
+    const runs = defineRuns(session);
     if (!runs.length) return null;
     const film = doc.createElement('ol');
     film.className = 'ps-record__film';
@@ -217,7 +226,7 @@ export function createRecordView(doc: Document = document): RecordView {
   }
 
   function update(session: PsSession): void {
-    const signature = JSON.stringify([session.model?.id, session.phase, session.define.runs.map((run) => [run.id, run.status, run.switchReason, run.nodes.length])]);
+    const signature = JSON.stringify([session.model?.id, session.phase, defineRuns(session).map((run) => [run.id, run.status, run.switchReason, run.nodes.length])]);
     if (signature === painted) return;
     painted = signature;
     const parts = [paintMap(session), paintFilm(session)].filter((part): part is HTMLElement => !!part);

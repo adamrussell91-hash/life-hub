@@ -9,7 +9,7 @@ import { createProblemTreeView } from '../../../../../packages/problem-solver/re
 import { createProblemStatementView } from '../../../../../packages/problem-solver/render/problem-statement';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
-import { createRecordView, defineRun } from '../../../../../packages/problem-solver/render/record';
+import { createRecordView } from '../../../../../packages/problem-solver/render/record';
 import { renderOutline } from '../../../../../packages/problem-solver/render/outline';
 import { MODELS } from '../../../../../packages/problem-solver/models.mjs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
@@ -96,7 +96,7 @@ function createFrameView(): { el: HTMLElement; update(session: PsSession): void 
         group.dataset.state = state;
       });
       count.textContent = `${FRAME_QUESTIONS.filter(([key]) => session.frame[key]).length} of 3 answered`;
-      const tool = session.suggestion && session.suggestion.kind !== 'finish_define' ? session.suggestion.tool : null;
+      const tool = session.suggestion && session.suggestion.kind !== 'next_step' ? session.suggestion.tool : null;
       const coreArt = drawing.querySelector('.ps-frame__core > g')!;
       if (coreArt.getAttribute('data-tool') !== String(tool)) {
         coreArt.setAttribute('data-tool', String(tool));
@@ -107,9 +107,20 @@ function createFrameView(): { el: HTMLElement; update(session: PsSession): void 
   };
 }
 
+/** The run the chart shows: the current step's active run, else its last run, else the last run anywhere. */
 function shownRun(session: PsSession): PsToolRun | null {
-  const runs = session.define.runs;
-  return runs.find((run) => run.status === 'active') ?? runs.at(-1) ?? null;
+  const runs = session.steps?.[session.phase]?.runs ?? [];
+  return runs.find((run) => run.status === 'active') ?? runs.at(-1) ?? allRunsOf(session).at(-1) ?? null;
+}
+
+function allRunsOf(session: PsSession): PsToolRun[] {
+  return Object.values(session.steps ?? {}).flatMap((step) => step.runs);
+}
+
+/** A step with no runs yet (just entered) shows the record; otherwise the chart. */
+function defaultMode(session: PsSession): 'chart' | 'record' {
+  if (session.phase === 'finished') return 'record';
+  return (session.steps?.[session.phase]?.runs.length ?? 0) > 0 ? 'chart' : 'record';
 }
 
 function toggle(label: string, onClick: () => void): HTMLButtonElement {
@@ -136,7 +147,8 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
   let last: PsSession | null = null;
   let mode: 'chart' | 'record' | null = null;
   let pinned: { runId: string; via: 'step' | 'film' } | null = null;
-  let phase: PsSession['phase'] | null = null;
+  let phase: string | null = null;
+  let hadActive = false;
 
   function viewFor(run: PsToolRun): View | null {
     const make = RENDERERS[run.tool];
@@ -155,13 +167,13 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
 
   function showRecord(session: PsSession): void {
     const heading = el('h2', 'ps-canvas__title', session.model ? MODELS[session.model.id].name : 'Process record');
-    if (session.phase === 'define') heading.append(toggle('Back to chart', () => openChart(null)));
+    if ((session.steps?.[session.phase]?.runs.length ?? 0) > 0) heading.append(toggle('Back to chart', () => openChart(null)));
     record.update(session);
     host.replaceChildren(heading, record.el);
   }
 
   function showChart(session: PsSession): HTMLElement | null {
-    const run = (pinned && session.define.runs.find((item) => item.id === pinned!.runId)) || shownRun(session);
+    const run = (pinned && allRunsOf(session).find((item) => item.id === pinned!.runId)) || shownRun(session);
     if (!run) return null;
     const heading = el('h2', 'ps-canvas__title', TOOLS[run.tool].name);
     heading.prepend(toolEmblem(run.tool));
@@ -182,7 +194,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
 
   function render(): HTMLElement | null {
     const session = last!;
-    if (!session.define.runs.length) {
+    if (!allRunsOf(session).length && !(session.model && session.steps?.[session.phase])) {
       frame.update(session);
       if (frame.el.parentNode !== host || host.childElementCount !== 1) host.replaceChildren(frame.el);
       return null;
@@ -191,7 +203,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       showRecord(session);
       return null;
     }
-    return showChart(session);
+    return showChart(session) ?? (showRecord(session), null);
   }
 
   function openChart(target: { runId: string; via: 'step' | 'film'; from: HTMLElement } | null): void {
@@ -210,7 +222,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
     mode = 'record';
     pinned = null;
     render();
-    const to = record.anchor(back?.runId ?? (last ? defineRun(last)?.id ?? '' : ''), back?.via ?? 'step');
+    const to = record.anchor(back?.runId ?? (last ? shownRun(last)?.id ?? '' : ''), back?.via ?? 'step');
     if (from && to) morphFromRect(from, to);
   }
 
@@ -219,11 +231,16 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
   return {
     update(session) {
       last = session;
-      if (mode === null || (session.phase !== phase && session.phase === 'defined')) {
-        mode = session.phase === 'defined' ? 'record' : 'chart';
+      const hasActive = session.steps?.[session.phase]?.runs.some((run) => run.status === 'active') ?? false;
+      if (mode === null || session.phase !== phase) {
+        mode = defaultMode(session);
         pinned = null;
+      } else if (mode === 'record' && hasActive && !hadActive && !pinned) {
+        // A tool just started in this step: follow it to the chart. A Record the person chose stays.
+        mode = 'chart';
       }
       phase = session.phase;
+      hadActive = hasActive;
       render();
     }
   };

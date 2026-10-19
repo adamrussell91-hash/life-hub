@@ -1,5 +1,5 @@
 // apps/tasks/tests/unit/problem-solver-view.test.ts
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mountCoachPanel, renderCoachPanel } from '@/views/problem-solver/coach-panel';
 import { createTrack, problemMedal } from '@/views/problem-solver/decor';
 import { mountCanvas } from '@/views/problem-solver/canvas';
@@ -7,9 +7,10 @@ import type { PsSession } from '../../../../packages/problem-solver/types';
 
 function session(extra: Partial<PsSession> = {}): PsSession {
   return {
-    id: 's1', title: 'Late rota', revision: 3, status: 'active', phase: 'define',
-    frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: 'seven_step', reason: 'r' }, links: [],
-    define: { runs: [{ id: 'r1', tool: 'five_whys', status: 'active', nodes: [], edges: [] }], finishedEarly: false, exitObjection: null },
+    id: 's1', title: 'Late rota', revision: 3, kind: 'full', status: 'active', phase: 'define',
+    frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: 'seven_step', reason: '' }, links: [],
+    steps: { define: { runs: [{ id: 'r1', tool: 'five_whys', status: 'active', nodes: [], edges: [] }], status: 'open', objection: null } },
+    learnings: [], pendingLearning: null,
     turns: [
       { id: 't1', role: 'user', text: 'Late rota.', createdAt: '' },
       { id: 't2', role: 'coach', text: 'That is a person, not a process. What happens?', verdict: 'challenge', skillsSeen: [], skillsMissing: ['analysis'], createdAt: '' }
@@ -27,7 +28,8 @@ describe('coach panel', () => {
     expect(panel.querySelectorAll('.chat-message').length).toBe(2);
     expect(panel.querySelector('.ps-skill--missing')).not.toBeNull();
     expect(panel.querySelector('[data-action="keep_anyway"]')).not.toBeNull();
-    expect(panel.querySelector('[data-action="finish_define"]')).not.toBeNull();
+    expect(panel.querySelector('[data-action="move_on"]')).not.toBeNull();
+    expect(panel.querySelector('[data-action="move_on"]')!.textContent).toBe('Move on to Analyse');
   });
 
   it('shows a suggestion card and disables the composer while thinking', () => {
@@ -84,13 +86,12 @@ describe('frame and track', () => {
   it('fills frame pieces in place and marks the current question', () => {
     const host = document.createElement('div');
     const canvas = mountCanvas(host);
-    const empty = { runs: [], finishedEarly: false, exitObjection: null };
-    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it' }, define: empty }));
+    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it' }, steps: {} }));
     const frame = host.querySelector('.ps-frame');
     expect(host.querySelectorAll('.ps-frame__row.is-answered').length).toBe(1);
     expect(host.querySelector('.ps-frame__row[data-state="now"]')!.textContent).toContain('What is true?');
     expect(host.querySelector('.ps-frame__piece--mid')!.getAttribute('data-state')).toBe('now');
-    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it', whatIsTrue: 'Late 3 of 4 weeks', whatCanBeDone: 'Move the day' }, define: empty, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom.' } }));
+    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it', whatIsTrue: 'Late 3 of 4 weeks', whatCanBeDone: 'Move the day' }, steps: {}, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom.' } }));
     expect(host.querySelector('.ps-frame')).toBe(frame);
     expect(host.querySelector('.ps-frame__medal')!.classList.contains('is-done')).toBe(true);
     expect(host.querySelector('.ps-frame__core [data-tool="five_whys"] path')).not.toBeNull();
@@ -117,7 +118,7 @@ describe('canvas', () => {
   it('shows the frame card in frame phase and the 5 Whys svg in define', () => {
     const host = document.createElement('div');
     const canvas = mountCanvas(host);
-    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it' }, define: { runs: [], finishedEarly: false, exitObjection: null } }));
+    canvas.update(session({ phase: 'frame', frame: { goal: 'Ship it' }, steps: {} }));
     expect(host.querySelector('.ps-frame')!.textContent).toContain('Ship it');
     canvas.update(session());
     expect(host.querySelector('.ps-whys')).not.toBeNull();
@@ -133,26 +134,24 @@ describe('canvas', () => {
     ['smart', 'problem', '.ps-smart']
   ] as const)('draws %s with its own chart', (tool, slot, selector) => {
     const host = document.createElement('div');
-    mountCanvas(host).update(session({ define: { runs: [{ id: `r-${tool}`, tool, status: 'active', nodes: [{ id: 'n', slot, text: 'Something specific', state: 'accepted', skills: [], turnId: 't' }], edges: [], ...(tool === 'gap_radar' ? { radar: { snapshots: [] } } : {}) }], finishedEarly: false, exitObjection: null } }));
+    mountCanvas(host).update(session({ steps: { define: { runs: [{ id: `r-${tool}`, tool, status: 'active', nodes: [{ id: 'n', slot, text: 'Something specific', state: 'accepted', skills: [], turnId: 't' }], edges: [], ...(tool === 'gap_radar' ? { radar: { snapshots: [] } } : {}) }], status: 'open', objection: null } } }));
     expect(host.querySelector(selector)).not.toBeNull();
     expect(host.querySelector('.ps-canvas__title .ps-emblem svg')).not.toBeNull();
   });
 });
 
 describe('canvas record', () => {
-  const runs = (status: 'active' | 'done'): PsSession['define'] => ({
-    runs: [
+  const runs = (status: 'active' | 'done'): PsSession['steps'] => ({
+    define: { runs: [
       { id: 'r1', tool: 'five_whys', status: 'switched', switchReason: 'Branches', nodes: [{ id: 'n', slot: 'problem', text: 'Late rota', state: 'accepted', skills: [], turnId: 't' }], edges: [] },
       { id: 'r2', tool: 'problem_tree', status, nodes: [{ id: 'n', slot: 'trunk', text: 'Late rota', state: 'accepted', skills: [], turnId: 't' }], edges: [] }
-    ],
-    finishedEarly: false,
-    exitObjection: null
+    ], status: status === 'done' ? 'done' : 'open', objection: null }
   });
 
-  it('opens on the record once defined and shows the chart from the define step', () => {
+  it('opens on the record when a new step has no tool yet and shows the chart from the define step', () => {
     const host = document.createElement('div');
     const canvas = mountCanvas(host);
-    canvas.update(session({ phase: 'defined', status: 'defined', define: runs('done') }));
+    canvas.update(session({ phase: 'analyse', steps: { ...runs('done'), analyse: { runs: [], status: 'open', objection: null } } }));
     expect(host.querySelector('[data-step="define"]')!.getAttribute('data-state')).toBe('done');
     expect(host.querySelector('.ps-tree')).toBeNull();
     host.querySelector<HTMLButtonElement>('[data-step="define"] button')!.click();
@@ -164,7 +163,7 @@ describe('canvas record', () => {
   it('opens a switched run from its filmstrip card', () => {
     const host = document.createElement('div');
     const canvas = mountCanvas(host);
-    canvas.update(session({ phase: 'defined', status: 'defined', define: runs('done') }));
+    canvas.update(session({ phase: 'analyse', steps: { ...runs('done'), analyse: { runs: [], status: 'open', objection: null } } }));
     host.querySelector<HTMLButtonElement>('[data-run="r1"] button')!.click();
     expect(host.querySelector('.ps-whys')).not.toBeNull();
     expect(host.querySelector('.ps-canvas__toggle')!.textContent).toBe('Back to record');
@@ -173,14 +172,30 @@ describe('canvas record', () => {
   it('shows the active chart during define with a Record toggle, and switches to the record when defined', () => {
     const host = document.createElement('div');
     const canvas = mountCanvas(host);
-    canvas.update(session({ define: runs('active') }));
+    canvas.update(session({ steps: runs('active') }));
     expect(host.querySelector('.ps-tree')).not.toBeNull();
     expect(host.querySelector('.ps-canvas__toggle')!.textContent).toBe('Record');
     host.querySelector<HTMLButtonElement>('.ps-canvas__toggle')!.click();
     expect(host.querySelector('[data-step="define"]')!.getAttribute('data-state')).toBe('current');
-    canvas.update(session({ define: runs('active') }));
+    canvas.update(session({ steps: runs('active') }));
     expect(host.querySelector('.ps-record')).not.toBeNull();
-    canvas.update(session({ phase: 'defined', status: 'defined', define: runs('done') }));
+    canvas.update(session({ phase: 'analyse', steps: { ...runs('done'), analyse: { runs: [], status: 'open', objection: null } } }));
     expect(host.querySelector('[data-step="define"]')!.getAttribute('data-state')).toBe('done');
+  });
+
+  it('offers a next step card that moves on', () => {
+    const onAction = vi.fn();
+    const panel = mountCoachPanel({ onSay: () => undefined, onAction });
+    panel.update(session({ suggestion: { kind: 'next_step', reason: 'Enough here.' } }));
+    expect(panel.el.querySelector('.ps-suggestion__title')!.textContent).toBe('Next step: Analyse');
+    panel.el.querySelector<HTMLButtonElement>('.ps-suggestion [data-action="accept_suggestion"]')!.click();
+    expect(onAction).toHaveBeenCalledWith('accept_suggestion');
+  });
+
+  it('labels the last step\'s button Finish and shows the step being worked', () => {
+    const panel = mountCoachPanel(noop);
+    panel.update(session({ model: { id: 'seven_step', reason: '' }, phase: 'document', steps: { document: { runs: [], status: 'open', objection: null } } }));
+    expect(panel.el.querySelector('[data-action="move_on"]')!.textContent).toBe('Finish');
+    expect(panel.el.querySelector('.ps-composer__now')!.textContent).toBe('Step: Document');
   });
 });

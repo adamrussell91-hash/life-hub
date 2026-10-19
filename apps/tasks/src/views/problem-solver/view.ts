@@ -8,6 +8,7 @@ import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js
 import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, TOOL_IDS } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas } from './canvas';
@@ -16,8 +17,8 @@ import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from '
 
 let poll: AbortController | null = null;
 
-const PHASE_LABEL: Record<PsSession['phase'], string> = { frame: 'Framing', define: 'Defining', defined: 'Defined' };
-const PHASE_COLOUR: Record<PsSession['phase'], string> = { frame: 'var(--ps-blue)', define: 'var(--ps-yellow)', defined: 'var(--ps-red)' };
+const phaseLabel = (row: PsSummary): string => (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
+const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--ps-blue)' : phase === 'finished' ? 'var(--ps-red)' : 'var(--ps-yellow)');
 const COLOURS = ['var(--ps-red)', 'var(--ps-yellow)', 'var(--ps-blue)'];
 
 function section(title: string, aside: string, ...body: Node[]): HTMLElement {
@@ -76,8 +77,8 @@ function problemCard(row: PsSummary, index: number): HTMLLIElement {
   medal.append(problemMedal(frame, row.tool));
   const body = el('span', 'ps-prob__body');
   const meta = el('span', 'ps-prob__meta');
-  const phase = el('span', 'ps-prob__phase', PHASE_LABEL[row.phase]);
-  phase.style.setProperty('--c', PHASE_COLOUR[row.phase]);
+  const phase = el('span', 'ps-prob__phase', phaseLabel(row));
+  phase.style.setProperty('--c', phaseColour(row.phase));
   meta.append(phase, el('span', '', row.tool ? TOOLS[row.tool].name : row.phase === 'frame' ? `Question ${Math.min(frame + 1, 3)} of 3` : ''), el('span', '', formatDisplayDate(row.updatedAt.slice(0, 10))));
   body.append(el('span', 'ps-prob__title', row.title), meta);
   const seen = Object.keys(row.skills ?? {});
