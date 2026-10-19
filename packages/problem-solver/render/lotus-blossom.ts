@@ -1,11 +1,13 @@
 // packages/problem-solver/render/lotus-blossom.ts
 // Lotus blossom (toolkit, Devise), drawn as the book does: a red problem disc ringed by
 // eight overlapping yellow solution petals, the first at the top and the rest clockwise.
-// Out along each petal's direction sits that solution's own flower: a small yellow heart
-// carrying the solution's number, ringed by up to eight blue idea petals (idea 1 at the top).
-// A flower appears once its solution has an idea; ideas attach by their `petal` link.
+// All nine flowers share one size and sit on a 3×3 grid, as in the book: each solution's
+// own flower sits in the cell its petal points to, a yellow heart carrying the solution's
+// number ringed by eight petal slots (idea 1 at the top). A flower appears once its solution
+// has an idea; ideas attach by their `petal` link and fill their slot, and the slots still
+// empty show as pale ghost discs, so a partial flower keeps its shape.
 // Overview: solution petals and hearts carry numbers and a key under the chart gives the
-// titles (the problem's title sits in its disc when the disc is wide enough). Idea petals
+// titles (on a wide panel the problem disc also says "Problem"). Idea petals
 // are plain blue; each whole flower is one button that zooms the chart into it.
 // Zoomed: a CSS transform on the inner wrapper scales the chart about that flower; its
 // petals spread apart so none overlap and become buttons carrying their titles, and the
@@ -25,11 +27,13 @@ type Kind = 'problem' | 'solution' | 'idea' | 'preferred';
 
 /** Chart units: the chart is 200 across with the problem at (0, 0). Mirrored in the CSS. */
 const PETALS = 8;
-/** Solution petals sit this far out from the problem; flowers this far. */
-const PETAL_AT = 25;
-const FLOWER_AT = 70;
-/** Idea petals sit this far from their flower's heart in the overview. */
-const IDEA_AT = 17;
+/**
+ * One geometry for all nine flowers, as in the book: petals 21 across sit 21 out from a
+ * centre 25 across, so each flower reaches 31.5. Flowers sit on a 3×3 grid, 64 apart.
+ */
+const PETAL_AT = 21;
+const IDEA_AT = 21;
+const GRID = 64;
 const POP = 'cubic-bezier(0.34, 1.4, 0.64, 1)';
 
 const KINDS: Kind[] = ['problem', 'solution', 'idea', 'preferred'];
@@ -41,6 +45,12 @@ function direction(i: number): { x: number; y: number } {
   const a = ((-90 + (i - 1) * 45) * Math.PI) / 180;
   const r = (n: number) => Math.round(n * 10000) / 10000;
   return { x: r(Math.cos(a)), y: r(Math.sin(a)) };
+}
+
+/** Grid cell of solution i's flower: the sign of its direction, each axis -1, 0 or 1. */
+function cell(i: number): { x: number; y: number } {
+  const d = direction(i);
+  return { x: Math.sign(Math.round(d.x)), y: Math.sign(Math.round(d.y)) };
 }
 
 function span(doc: Document, className: string, value = ''): HTMLSpanElement {
@@ -95,6 +105,8 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
   /** Preferred note id → the idea it marks. */
   const marked = new Map<string, string>();
   const anims = new Map<Element, Animation>();
+  const hovered = new Set<string>();
+  const focused = new Set<string>();
   let problem: Shape | null = null;
   let zoomed: string | null = null;
 
@@ -235,6 +247,8 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
       item.setAttribute('data-petal', String(index));
       item.style.setProperty('--x', String(d.x * PETAL_AT));
       item.style.setProperty('--y', String(d.y * PETAL_AT));
+      item.style.setProperty('--dx', String(d.x));
+      item.style.setProperty('--dy', String(d.y));
       meta.textContent = `Solution ${index}`;
       words.append(meta, title);
       button.append(span(doc, 'ps-lotus__code', String(index)), words);
@@ -256,10 +270,14 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
       words.append(ideaMeta, ideaTitle, title);
       button.append(words);
       item.append(button, card);
-      item.addEventListener('mouseenter', () => highlight(node.id, true));
-      item.addEventListener('mouseleave', () => highlight(node.id, false));
-      item.addEventListener('focusin', () => highlight(node.id, true));
-      item.addEventListener('focusout', () => highlight(node.id, false));
+      // Hover and focus are tracked apart, so leaving with the mouse keeps a focused card's highlight.
+      item.addEventListener('mouseenter', () => { hovered.add(node.id); highlight(node.id); });
+      item.addEventListener('mouseleave', () => { hovered.delete(node.id); highlight(node.id); });
+      item.addEventListener('focusin', () => { focused.add(node.id); highlight(node.id); });
+      item.addEventListener('focusout', (event) => {
+        if (!item.contains(event.relatedTarget as Node | null)) focused.delete(node.id);
+        highlight(node.id);
+      });
       ensurePicks().append(item);
       picks.set(node.id, { card: item, ideaMeta, ideaTitle });
     }
@@ -273,9 +291,12 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
     return shape;
   }
 
-  function highlight(pickId: string, on: boolean): void {
+  function highlight(pickId: string): void {
     const idea = shapes.get(marked.get(pickId) ?? '');
-    idea?.item.classList.toggle('is-highlit', on);
+    if (!idea) return;
+    // Not while another flower is zoomed: this idea is dimmed and out of reach.
+    const away = !!zoomed && !!idea.flower && idea.flower !== zoomed;
+    idea.item.classList.toggle('is-highlit', !away && (hovered.has(pickId) || focused.has(pickId)));
   }
 
   function ensurePicks(): HTMLDivElement {
@@ -310,14 +331,14 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
   function ensureFlower(sol: Shape): Flower {
     let flower = flowers.get(sol.id);
     if (flower) return flower;
-    const d = direction(sol.index);
+    const c = cell(sol.index);
     const el = doc.createElement('div');
     el.className = 'ps-lotus__flower';
     el.setAttribute('data-flower', sol.id);
     el.setAttribute('role', 'group');
     el.setAttribute('aria-label', `Ideas for solution ${sol.index}`);
-    el.style.setProperty('--x', String(d.x * FLOWER_AT));
-    el.style.setProperty('--y', String(d.y * FLOWER_AT));
+    el.style.setProperty('--x', String(c.x * GRID));
+    el.style.setProperty('--y', String(c.y * GRID));
     const bloom = doc.createElement('button');
     bloom.type = 'button';
     bloom.className = 'ps-lotus__bloom';
@@ -329,7 +350,19 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
     const heartWords = span(doc, 'ps-lotus__words');
     heartWords.append(heartMeta, heartTitle);
     heart.append(span(doc, 'ps-lotus__code', String(sol.index)), heartWords);
-    el.append(bloom, heart);
+    // All eight slots, as a frame: a pale ghost disc where no idea has grown yet.
+    const ghosts = doc.createElement('span');
+    ghosts.className = 'ps-lotus__ghosts';
+    ghosts.setAttribute('aria-hidden', 'true');
+    for (let i = 1; i <= PETALS; i += 1) {
+      const g = direction(i);
+      const ghost = span(doc, 'ps-lotus__ghost');
+      ghost.setAttribute('data-slot', String(i));
+      ghost.style.setProperty('--dx', String(g.x));
+      ghost.style.setProperty('--dy', String(g.y));
+      ghosts.append(ghost);
+    }
+    el.append(bloom, ghosts, heart);
     const later = [...flowers.values()].filter((f) => f.index > sol.index).sort((a, b) => a.index - b.index)[0]?.el ?? null;
     flowerLayer!.insertBefore(el, later);
     flower = { id: sol.id, index: sol.index, el, bloom, heart, heartMeta, heartTitle, heartTag: null };
@@ -446,6 +479,7 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
       if (shape.kind !== 'idea') continue;
       shape.button.tabIndex = !shape.flower || shape.flower === zoomed ? 0 : -1;
     }
+    for (const id of picks.keys()) highlight(id);
   }
 
   function zoomIn(id: string): void {
@@ -458,7 +492,10 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
   function zoomOut(): void {
     if (!zoomed) return;
     const flower = flowers.get(zoomed);
+    // A card opened inside the flower would outlive its (now unreachable) button: close it.
+    for (const idea of ideasOf(zoomed)) if (idea.item.classList.contains('is-open')) idea.button.click();
     zoomed = null;
+    syncOpen();
     syncFocusable();
     flower?.bloom.focus({ preventScroll: true });
   }
@@ -565,9 +602,12 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
     if (petals.length) delay += Math.round((petals.length - 1) * step) + 10;
     const freshFlowerIds = new Set(freshFlowers.map((f) => f.id));
     freshFlowers.forEach((f) => {
+      // From its solution petal to its grid cell.
       const d = direction(f.index);
-      const out = (FLOWER_AT - PETAL_AT) * u;
-      play(f.heart, [{ opacity: 0, transform: `translate(${(-d.x * out).toFixed(1)}px, ${(-d.y * out).toFixed(1)}px) scale(0.4)` }, { opacity: 1, transform: 'none' }], { duration: 420, delay, easing: EASE });
+      const c = cell(f.index);
+      const ox = (c.x * GRID - d.x * PETAL_AT) * u;
+      const oy = (c.y * GRID - d.y * PETAL_AT) * u;
+      play(f.heart, [{ opacity: 0, transform: `translate(${(-ox).toFixed(1)}px, ${(-oy).toFixed(1)}px) scale(0.4)` }, { opacity: 1, transform: 'none' }], { duration: 420, delay, easing: EASE });
     });
     const ideas = [...shapes.values()].filter((s) => s.kind === 'idea' && s.flower && (freshIds.has(s.id) || freshFlowerIds.has(s.flower)));
     // Every new flower opens at once, petal by petal round its heart, so a full chart settles inside a second.
