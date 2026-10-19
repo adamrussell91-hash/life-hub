@@ -156,6 +156,14 @@ describe('taskSnapshot', () => {
     ] as PsProposedTask[];
     expect(taskSnapshot(proposals, { t1: 'unknown', t2: { status: 'weird' } }, '2026-11-02').byStatus.unknown).toBe(2);
   });
+  it('cleans overdue titles as the server does: trimmed, no repeats, at most 10', () => {
+    const proposals = Array.from({ length: 14 }, (_, i) => ({ id: `p${i}`, title: `T${i}`, status: 'confirmed', taskId: `t${i}` })) as PsProposedTask[];
+    const details = Object.fromEntries(proposals.map((p, i) => [p.taskId!, { status: 'open', due_date: '2026-10-01', title: i < 2 ? '  Same title ' : `Task ${i}` }]));
+    const { overdue } = taskSnapshot(proposals, details, '2026-11-02');
+    expect(overdue[0]).toBe('Same title');
+    expect(overdue.filter((t) => t === 'Same title')).toHaveLength(1);
+    expect(overdue).toHaveLength(10);
+  });
 });
 
 describe('bridge.details', () => {

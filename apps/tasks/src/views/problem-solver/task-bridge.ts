@@ -1,7 +1,8 @@
 // apps/tasks/src/views/problem-solver/task-bridge.ts
 // The only place Problem Solver writes to Tasks. The server never does: the page creates
 // the task through tasksApi, then tells the session its id (confirm_task / set_review_task).
-import type { PsProposedTask, PsSession } from '../../../../../packages/problem-solver/types';
+import type { PsProposedTask, PsSession, PsTaskSnapshot } from '../../../../../packages/problem-solver/types';
+import { cleanOverdue, SNAPSHOT_STATUSES } from '../../../../../packages/problem-solver/review.mjs';
 
 export type TaskEdits = { title: string; due: string | null };
 type Deps = {
@@ -14,10 +15,12 @@ type Deps = {
 };
 
 export type TaskDetail = { status: string; due_date?: string | null; title?: string } | 'removed' | 'unknown';
-const SNAPSHOT_STATUSES = ['open', 'in_progress', 'deferred', 'done', 'dead', 'unknown'] as const;
-type SnapshotStatus = (typeof SNAPSHOT_STATUSES)[number];
+type SnapshotStatus = keyof PsTaskSnapshot['byStatus'];
 
-/** Counts by live status and overdue titles for the coach. Deleted tasks are never counted (Plan 5, Decision 8). */
+/**
+ * Counts by live status and overdue titles for the coach, cleaned as the server cleans them.
+ * Deleted tasks are never counted (Plan 5, Decision 8).
+ */
 export function taskSnapshot(proposals: PsProposedTask[], details: Record<string, TaskDetail>, today: string): { byStatus: Record<SnapshotStatus, number>; overdue: string[] } {
   const byStatus = Object.fromEntries(SNAPSHOT_STATUSES.map((key) => [key, 0])) as Record<SnapshotStatus, number>;
   const overdue: string[] = [];
@@ -26,11 +29,11 @@ export function taskSnapshot(proposals: PsProposedTask[], details: Record<string
     const detail = details[p.taskId];
     if (!detail || detail === 'removed') continue;
     if (detail === 'unknown') { byStatus.unknown += 1; continue; }
-    const key = (SNAPSHOT_STATUSES as readonly string[]).includes(detail.status) ? (detail.status as SnapshotStatus) : 'unknown';
+    const key = SNAPSHOT_STATUSES.includes(detail.status) ? (detail.status as SnapshotStatus) : 'unknown';
     byStatus[key] += 1;
     if (detail.due_date && detail.due_date < today && !['done', 'dead'].includes(detail.status)) overdue.push(detail.title || p.title);
   }
-  return { byStatus, overdue };
+  return { byStatus, overdue: cleanOverdue(overdue) };
 }
 
 const projectOf = (session: PsSession) => session.links.find((link) => link.kind === 'project')?.id ?? null;

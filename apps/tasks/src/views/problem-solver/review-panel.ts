@@ -3,6 +3,7 @@
 // review task's link opens with. Both start the review through the page's `start`.
 import { el } from '@/views/hub-kit';
 import { planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
 import type { PsSession } from '../../../../../packages/problem-solver/types';
 
 /** How a review link enters the session: move into Improve, start it there, or reopen it after. */
@@ -14,10 +15,9 @@ export function improveStep(session: PsSession): string | null {
   return session.model ? planStepForBook(session.model.id, 'improve') : null;
 }
 
-/** True while Improve is open and waiting for its review. */
+/** True while Improve is open and waiting for its review (the server's own rule). */
 export function waitingInImprove(session: PsSession): boolean {
-  const improve = improveStep(session);
-  return Boolean(improve) && session.phase === improve && session.reviewState?.status === 'waiting';
+  return waitingForReview(session);
 }
 
 function dueLabel(due: string | null | undefined): string {

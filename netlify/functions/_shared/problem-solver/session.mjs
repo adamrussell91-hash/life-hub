@@ -1,8 +1,11 @@
 // netlify/functions/_shared/problem-solver/session.mjs
 import { addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
-import { defaultToolFor, firstStep, nextPhase, pastStep, planStep, planStepForBook, stepName } from '../../../../packages/problem-solver/steps.mjs';
+import { defaultToolFor, firstStep, nextPhase, planStep, planStepForBook, stepName } from '../../../../packages/problem-solver/steps.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
+import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
+
+export { waitingForReview };
 
 const TITLE_MAX = 120;
 const TEXT_MAX = 12000;
@@ -54,15 +57,6 @@ const addDays = (iso, days) => new Date(Date.parse(iso) + days * DAY_MS).toISOSt
 const afterToday = (due, deps) => typeof due === 'string' && due > deps.now().slice(0, 10);
 const inBook = (session, stepId, book) => Boolean(session.model && planStep(session.model.id, stepId)?.book.includes(book));
 
-const SNAPSHOT_STATUSES = ['open', 'in_progress', 'deferred', 'done', 'dead', 'unknown'];
-
-/** A review exists to wait for: created, or proposed and not set aside. */
-const reviewLive = (session) => Boolean(session.reviewTaskId) || ['proposed', 'confirmed'].includes(session.reviewProposal?.status);
-
-export function waitingForReview(session) {
-  return session.reviewState?.status === 'waiting' && inBook(session, session.phase, 'improve');
-}
-
 /** A clean snapshot, or null when none was sent. Unknown statuses are dropped; removed tasks are never counted. */
 function cleanSnapshot(raw, deps) {
   if (raw == null) return null;
@@ -71,7 +65,7 @@ function cleanSnapshot(raw, deps) {
   return {
     at: deps.now(),
     byStatus: Object.fromEntries(SNAPSHOT_STATUSES.map((key) => [key, count(raw.byStatus?.[key])])),
-    overdue: (Array.isArray(raw.overdue) ? raw.overdue : []).filter((title) => typeof title === 'string' && title.trim()).map((title) => title.trim().slice(0, TITLE_MAX)).filter((title, i, all) => all.indexOf(title) === i).slice(0, 10)
+    overdue: cleanOverdue(raw.overdue)
   };
 }
 
@@ -314,13 +308,14 @@ export function startReview(session, payload, deps) {
   if (!reviewLive(session)) throw fail(409, 'action_not_allowed', 'There is no review to start.');
   if (session.detour) throw fail(409, 'action_not_allowed', 'Finish the reopened step first.');
   const snap = cleanSnapshot(payload?.snapshot, deps);
+  const kind = reviewStart(session);
+  if (!kind) throw fail(409, 'action_not_allowed', 'The review opens once Implement is done.');
   let next = snap ? { ...session, taskSnapshot: snap } : session;
-  if (session.phase !== 'finished' && nextPhase(session) === improve) return moveOn(next, deps, { review: true });
+  if (kind === 'move') return moveOn(next, deps, { review: true });
   // A late review deliberately leaves the interrupted step's active run alone so it resumes on return
   // (unlike reopenStep, which closes Improve's run because the detour starts fresh work elsewhere).
   const due = session.reviewProposal?.due ?? null;
-  const returnTo = session.phase === improve ? null : session.phase;
-  if (returnTo && !pastStep(session, improve)) throw fail(409, 'action_not_allowed', 'The review opens once Implement is done.');
+  const returnTo = kind === 'reopen' ? session.phase : null;
   next = { ...next, status: 'active', phase: improve, suggestion: null, pendingKeep: null, reviewState: { status: 'reviewing', due, returnTo, startedAt: deps.now() } };
   next = withStep(next, improve, { status: 'open' });
   const text = returnTo ? 'Time to review how it went.' : 'Let\'s review how it went.';
