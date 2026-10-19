@@ -3264,6 +3264,383 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-soltree__fill, .ps-soltree__label.is-tip { transition: none; }
 }
 
+/* Lotus blossom (toolkit, Devise): as the book draws it, a red problem disc ringed by eight
+   overlapping yellow solution petals (the first at the top, then clockwise), and out along
+   each petal's line that solution's flower: a yellow heart ringed by up to eight blue idea
+   petals. Positions come from the script in chart units (--x, --y; the chart is 200 across,
+   so a unit is 0.5cqw of the art). Overview: numbers in petals and hearts, titles in the key;
+   each flower is one zoom button. Zoomed: the art scales about that flower (a CSS transform
+   on the art wrapper), its petals spread apart and carry their titles, and the rest dims.
+   Sizes inside a zoomed flower are divided by --k (the zoom) so they read at their stated px. */
+.ps-lotus {
+  /* Named, so every phone query measures this root box. */
+  container: lotus / inline-size;
+  --zs: 2.9;
+  --soft: color-mix(in srgb, var(--ps-ink) 72%, var(--ps-paper));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+/* The bar: a hint in the overview, Back while zoomed; the same height either way, so the chart never jumps. */
+.ps-lotus__bar { display: flex; align-items: center; justify-content: center; min-height: 44px; width: min(100%, 560px); margin-bottom: 4px; }
+.ps-lotus__hint { color: var(--soft); font: var(--weight-regular) 13px / 1.4 var(--font-ui); text-align: center; }
+.ps-lotus__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--ps-ink);
+  color: var(--ps-paper);
+  font: var(--weight-semibold) 14px / 1.2 var(--font-ui);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-lotus__back[hidden], .ps-lotus__hint[hidden] { display: none; }
+.ps-lotus__back:hover { filter: brightness(1.15); }
+.ps-lotus__back:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
+
+.ps-lotus__stage { --fx: 0; --fy: 0; position: relative; width: min(100%, 560px); aspect-ratio: 1; overflow: clip; }
+.ps-lotus__art {
+  container: lotusart / inline-size;
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  transition: transform 520ms var(--ps-ease);
+}
+/* Scale about the centre after moving the flower there: the flower lands in the middle. */
+.ps-lotus[data-zoom] .ps-lotus__art { transform: scale(var(--zs)) translate(calc(var(--fx) * -0.5%), calc(var(--fy) * -0.5%)); }
+
+.ps-lotus__centre,
+.ps-lotus__flowers { position: absolute; inset: 0; pointer-events: none; transition: opacity 420ms var(--ps-ease); }
+.ps-lotus__flowers { z-index: 1; }
+.ps-lotus[data-zoom] .ps-lotus__centre,
+.ps-lotus[data-zoom] .ps-lotus__flower:not(.is-zoomed) { opacity: 0.25; }
+.ps-lotus__flower { transition: opacity 420ms var(--ps-ease); }
+
+/* Every chart shape is a circle placed by its centre. */
+.ps-lotus__centre > .ps-lotus__item {
+  --r: 12.5;
+  position: absolute;
+  left: calc(50cqw + (var(--x, 0) - var(--r)) * 0.5cqw);
+  top: calc(50cqw + (var(--y, 0) - var(--r)) * 0.5cqw);
+  width: calc(var(--r) * 1cqw);
+  height: calc(var(--r) * 1cqw);
+  z-index: 1;
+}
+.ps-lotus__centre > .ps-lotus__item--problem { --r: 15; z-index: 3; }
+
+.ps-lotus__shape {
+  /* Sizes the words in cqw. */
+  container-type: inline-size;
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 240ms var(--ps-ease);
+}
+.ps-lotus__item--problem .ps-lotus__shape { background: var(--ps-red); color: #fff; }
+.ps-lotus__item--idea .ps-lotus__shape { background: var(--ps-blue); color: #fff; }
+.ps-lotus__shape:hover { filter: brightness(1.06); }
+
+/* The paper-and-ink double ring reads on the paper and on every fill. Sizes divide by --k,
+   the zoom of the flower the shape sits in (1 elsewhere). */
+.ps-lotus { --k: 1; }
+.ps-lotus__shape:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 calc(2px / var(--k)) var(--ps-paper), 0 0 0 calc(4px / var(--k)) var(--ps-ink); }
+.ps-lotus__item.is-open > .ps-lotus__shape { box-shadow: 0 0 0 calc(2px / var(--k)) var(--ps-paper), 0 0 0 calc(3.5px / var(--k)) var(--ps-ink); }
+.ps-lotus__item.is-open > .ps-lotus__shape:focus-visible { box-shadow: 0 0 0 calc(2px / var(--k)) var(--ps-paper), 0 0 0 calc(4px / var(--k)) var(--ps-ink); }
+/* The focused or open shape rises above its overlapping neighbours so its whole ring shows. */
+.ps-lotus__centre > .ps-lotus__item:has(:focus-visible),
+.ps-lotus__centre > .ps-lotus__item.is-open { z-index: 4; }
+
+.ps-lotus__words { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; max-width: 74%; }
+.ps-lotus__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* .78 keeps 5.1:1 on blue and 5.5:1 on yellow; white on red needs full strength (5:1). */
+  opacity: 0.78;
+}
+.ps-lotus__item--problem .ps-lotus__meta { opacity: 1; }
+.ps-lotus__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-width: 100%;
+  font: var(--weight-semibold) 15px / 1.18 var(--font-ui);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  hyphens: manual;
+}
+.ps-lotus__code { font: var(--weight-semibold) clamp(12px, 36cqw, 18px) / 1 var(--font-ui); font-variant-numeric: tabular-nums; }
+.ps-lotus__shape .ps-objection { display: none; }
+/* A contested shape whose tag has no room (every petal) carries a small paper dot ringed in ink;
+   the key, the zoomed heart and the details carry the words. */
+.ps-lotus__item.is-contested > .ps-lotus__shape::after {
+  content: '';
+  position: absolute;
+  top: 7%;
+  left: calc(50% - 3.5px / var(--k));
+  width: calc(7px / var(--k));
+  height: calc(7px / var(--k));
+  border-radius: 50%;
+  background: var(--ps-paper);
+  box-shadow: 0 0 0 calc(1.5px / var(--k)) var(--ps-ink);
+}
+
+/* The problem: its title inside when the disc is wide enough (wide panels); the key has it always. */
+.ps-lotus__item--problem .ps-lotus__title { -webkit-line-clamp: 3; font-size: clamp(12px, 14cqw, 15px); }
+.ps-lotus__item--problem .ps-objection { display: inline-block; margin-top: 2px; opacity: 1; }
+@container lotus (min-width: 520px) {
+  .ps-lotus__item--problem.is-contested > .ps-lotus__shape::after { display: none; }
+}
+/* Below 520px the disc is under 76px across: too small for its words. */
+@container lotus (max-width: 519.98px) {
+  .ps-lotus__item--problem .ps-lotus__words { display: none; }
+}
+/* Solution petals: the number only (the book's "Solution 1"); the title is in the key. */
+.ps-lotus__item--solution .ps-lotus__words { display: none; }
+
+/* Flowers: a point at the flower's centre; heart, ideas and the zoom button hang from it. */
+.ps-lotus__flower {
+  --dist: 17;
+  --hr: 9;
+  --ir: 8.5;
+  position: absolute;
+  left: calc(50cqw + var(--x) * 0.5cqw);
+  top: calc(50cqw + var(--y) * 0.5cqw);
+  width: 0;
+  height: 0;
+}
+.ps-lotus__flower.is-zoomed { --dist: 24; --hr: 14; --k: var(--zs); z-index: 2; }
+
+.ps-lotus__bloom {
+  position: absolute;
+  left: -12.75cqw;
+  top: -12.75cqw;
+  z-index: 3;
+  width: 25.5cqw;
+  height: 25.5cqw;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: zoom-in;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow 200ms var(--ps-ease);
+}
+.ps-lotus__bloom:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ps-ink) 30%, transparent); }
+.ps-lotus__bloom:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
+.ps-lotus__flower.is-zoomed .ps-lotus__bloom { display: none; }
+
+.ps-lotus__heart {
+  container-type: inline-size;
+  position: absolute;
+  left: calc(var(--hr) * -0.5cqw);
+  top: calc(var(--hr) * -0.5cqw);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: calc(var(--hr) * 1cqw);
+  height: calc(var(--hr) * 1cqw);
+  border-radius: 50%;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  text-align: center;
+  transition: left 520ms var(--ps-ease), top 520ms var(--ps-ease), width 520ms var(--ps-ease), height 520ms var(--ps-ease);
+}
+.ps-lotus__heart .ps-lotus__code { grid-area: 1 / 1; font-size: clamp(12px, 40cqw, 18px); transition: opacity 200ms var(--ps-ease); }
+/* The words float over the middle, so while hidden they never push the number off centre. */
+.ps-lotus__heart .ps-lotus__words { position: absolute; top: 50%; left: 50%; width: 78%; max-width: 78%; translate: -50% -50%; opacity: 0; visibility: hidden; }
+.ps-lotus__flower.is-zoomed .ps-lotus__heart .ps-lotus__code { opacity: 0; }
+.ps-lotus__flower.is-zoomed .ps-lotus__heart .ps-lotus__words { opacity: 1; visibility: visible; transition: opacity 260ms var(--ps-ease) 300ms; }
+.ps-lotus__flower.is-zoomed .ps-lotus__heart .ps-lotus__meta { font-size: calc(10px / var(--k)); }
+.ps-lotus__flower.is-zoomed .ps-lotus__heart .ps-lotus__title { font-size: clamp(calc(12px / var(--k)), 11cqw, calc(16px / var(--k))); }
+/* Scaled up, a pill's thin outline drifts off its tiny text, so here the tag is plain caps. */
+.ps-lotus__heart .ps-objection {
+  margin-top: calc(3px / var(--k));
+  padding: 0;
+  box-shadow: none;
+  font-size: calc(10px / var(--k));
+  opacity: 1;
+}
+
+.ps-lotus__flower > .ps-lotus__item--idea {
+  position: absolute;
+  left: calc((var(--dx) * var(--dist) - var(--ir)) * 0.5cqw);
+  top: calc((var(--dy) * var(--dist) - var(--ir)) * 0.5cqw);
+  z-index: 1;
+  width: calc(var(--ir) * 1cqw);
+  height: calc(var(--ir) * 1cqw);
+  transition: left 520ms var(--ps-ease), top 520ms var(--ps-ease);
+}
+/* In the overview the flower's zoom button takes every tap; ideas are plain petals. */
+.ps-lotus__flower:not(.is-zoomed) .ps-lotus__item--idea .ps-lotus__shape { pointer-events: none; }
+.ps-lotus__flower .ps-lotus__item--idea .ps-lotus__words { opacity: 0; visibility: hidden; max-width: 76%; }
+.ps-lotus__flower.is-zoomed .ps-lotus__item--idea .ps-lotus__words { opacity: 1; visibility: visible; transition: opacity 260ms var(--ps-ease) 320ms; }
+.ps-lotus__flower.is-zoomed .ps-lotus__item--idea .ps-lotus__meta { font-size: calc(10px / var(--k)); }
+.ps-lotus__flower.is-zoomed .ps-lotus__item--idea .ps-lotus__title { font-size: clamp(calc(12px / var(--k)), 15cqw, calc(15px / var(--k))); }
+.ps-lotus__flower > .ps-lotus__item--idea:has(:focus-visible),
+.ps-lotus__flower > .ps-lotus__item--idea.is-open { z-index: 4; }
+
+/* Preferred: the book's circling, an ink ring standing off the petal, raised over its neighbours. */
+.ps-lotus__item--idea.is-preferred { z-index: 2; }
+.ps-lotus__flower > .ps-lotus__item--idea.is-preferred::before {
+  content: '';
+  position: absolute;
+  inset: calc(-6px / var(--k));
+  border: calc(2px / var(--k)) solid var(--ps-ink);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.ps-lotus__flower > .ps-lotus__item--idea.is-highlit { z-index: 3; }
+.ps-lotus__flower > .ps-lotus__item--idea.is-highlit::before { border-width: calc(3.5px / var(--k)); }
+.ps-lotus__item--idea.is-highlit .ps-lotus__shape { filter: brightness(1.2); }
+
+/* Details cards, between the chart and the key. */
+.ps-lotus__panel { display: contents; }
+.ps-lotus .ps-details { width: min(100%, 520px); }
+
+/* The key: the problem and each solution by number, with its title and idea count. */
+.ps-lotus__key {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 2px 14px;
+  width: min(100%, 560px);
+  margin-top: 14px;
+}
+.ps-lotus__key-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) 14px / 1.25 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-lotus__key-row:hover,
+.ps-lotus__key-row[aria-expanded='true'] { background: var(--glass); }
+.ps-lotus__key-row[aria-expanded='true'] { box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+.ps-lotus__key-row:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
+.ps-lotus__key-code {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ps-yellow);
+  color: var(--ps-on-yellow);
+  font: var(--weight-semibold) 12px / 1 var(--font-ui);
+}
+.ps-lotus__key-row--problem .ps-lotus__key-code { background: var(--ps-red); }
+.ps-lotus__key-title { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.ps-lotus__key-count { flex: none; color: var(--soft); font: var(--weight-regular) 12px / 1.3 var(--font-ui); white-space: nowrap; }
+.ps-lotus__key-row .ps-objection { flex: none; margin-top: 0; color: var(--soft); opacity: 1; }
+
+/* Preferred cards and unplaced ideas, under the key. */
+.ps-lotus__picks,
+.ps-lotus__orphans { width: min(100%, 560px); margin-top: 18px; }
+.ps-lotus__orphans[hidden] { display: none; }
+.ps-lotus__heading {
+  display: block;
+  margin: 0 0 8px 8px;
+  color: var(--soft);
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.ps-lotus__pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.ps-lotus__picks .ps-lotus__item {
+  position: relative;
+  border-radius: var(--radius-md);
+  background: var(--glass);
+  box-shadow: inset 3px 0 0 var(--ps-ink);
+}
+.ps-lotus__pick-button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px 10px 15px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ps-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-lotus__pick-button:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
+.ps-lotus__picks .ps-lotus__item.is-open { box-shadow: inset 3px 0 0 var(--ps-ink), inset 0 0 0 1.5px var(--ps-ink); }
+.ps-lotus__pick-button .ps-lotus__words { align-items: flex-start; max-width: 100%; gap: 2px; }
+.ps-lotus__pick-button .ps-lotus__meta { color: var(--soft); opacity: 1; }
+.ps-lotus__pick-idea { font: var(--weight-semibold) 15px / 1.25 var(--font-ui); }
+.ps-lotus__pick-idea[hidden] { display: none; }
+.ps-lotus__pick-button .ps-lotus__title { display: block; font: var(--weight-regular) 13px / 1.4 var(--font-ui); color: var(--soft); }
+.ps-lotus__pick-button .ps-objection { color: var(--soft); opacity: 1; }
+.ps-lotus__picks .ps-details { width: 100%; padding: 0 10px 10px; box-sizing: border-box; }
+
+.ps-lotus__orphan-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.ps-lotus__orphan-list .ps-lotus__shape {
+  /* A pill sized by its words, so no inline-size containment here. */
+  container-type: normal;
+  width: auto;
+  min-height: 44px;
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+}
+.ps-lotus__orphan-list .ps-lotus__words { max-width: 100%; flex-direction: row; align-items: center; gap: 8px; }
+.ps-lotus__orphan-list .ps-lotus__meta { display: none; }
+.ps-lotus__orphan-list .ps-lotus__title { -webkit-line-clamp: 2; font-size: 14px; }
+.ps-lotus__orphan-list .ps-objection { display: inline-block; margin-top: 0; opacity: 1; }
+.ps-lotus__orphan-list .is-contested > .ps-lotus__shape::after { display: none; }
+
+/* Very narrow: a zoomed idea gives its "Idea n" line to the title. */
+@container lotus (max-width: 360px) {
+  /* Smaller heart, larger petals: the same reach, with a little more room per title. */
+  .ps-lotus__flower.is-zoomed { --dist: 23.6; --hr: 12; --ir: 9; }
+  .ps-lotus__flower.is-zoomed .ps-lotus__item--idea .ps-lotus__meta { display: none; }
+  /* Three lines at most, all near the middle where the petal is widest. */
+  .ps-lotus__flower.is-zoomed .ps-lotus__item--idea .ps-lotus__words { max-width: 84%; }
+  /* A word wider than the smallest petals breaks with a hyphen rather than anywhere. */
+  .ps-lotus__flower.is-zoomed .ps-lotus__item--idea .ps-lotus__title { hyphens: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-lotus__art, .ps-lotus__centre, .ps-lotus__flowers, .ps-lotus__flower, .ps-lotus__heart,
+  .ps-lotus__heart .ps-lotus__code, .ps-lotus__heart .ps-lotus__words,
+  .ps-lotus__flower > .ps-lotus__item--idea, .ps-lotus__flower .ps-lotus__words, .ps-lotus__shape { transition: none !important; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
