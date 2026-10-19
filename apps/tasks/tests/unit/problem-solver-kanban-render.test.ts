@@ -208,6 +208,7 @@ describe('Kanban view', () => {
     const wip = view.el.querySelector<HTMLButtonElement>('[data-region="doing"] .ps-kanban__head .ps-kanban__wip')!;
     expect(words(wip)).toBe('Limit 2');
     expect(wip.classList.contains('is-over')).toBe(false);
+    expect(wip.getAttribute('aria-label')).toContain('Review cards not counted');
     view.setTasks([
       { nodeId: 'k1', taskId: 't1', status: 'in_progress' },
       { nodeId: 'k2', taskId: 't2', status: 'in_progress' }
@@ -241,6 +242,64 @@ describe('Kanban view', () => {
     const index = animate.mock.contexts.indexOf(k1);
     expect(index).toBeGreaterThanOrEqual(0);
     expect((animate.mock.calls[index][0] as Keyframe[])[0].transform).toBe('translate(-200px, 0px)');
+  });
+
+  it('starts a move from where an interrupted move left the card', () => {
+    const animate = spyAnimate();
+    const view = createKanbanView();
+    document.body.append(view.el);
+    view.update(kanban([]));
+    view.update(kanban(BASE));
+    view.setTasks([{ nodeId: 'k1', taskId: 't1', status: 'open' }]);
+    const k1 = item(view, 'k1');
+    // Layout x by column; a running move adds its offset (the card is drawn where the move is).
+    const X: Record<string, number> = { todo: 0, doing: 200, done: 400 };
+    let offset = 0;
+    const running = { cancel() { offset = 0; }, finish() {}, onfinish: null } as unknown as Animation;
+    (k1 as unknown as { getAnimations(): Animation[] }).getAnimations = () => (offset ? [running] : []);
+    vi.spyOn(k1, 'getBoundingClientRect').mockImplementation(() => {
+      const left = X[k1.parentElement!.getAttribute('data-column')!] + offset;
+      return { left, top: 100, width: 150, height: 44, right: left + 150, bottom: 144, x: left, y: 100, toJSON() {} } as DOMRect;
+    });
+    animate.mockImplementation(function (this: Element, frames: Keyframe[] | PropertyIndexedKeyframes | null) {
+      const m = this === k1 ? /translate\((-?[\d.]+)px/.exec(String((frames as Keyframe[])[0].transform)) : null;
+      if (m) offset = Number(m[1]); // the move starts at its first frame
+      return running;
+    } as never);
+    view.setTasks([{ nodeId: 'k1', taskId: 't1', status: 'in_progress' }]);
+    animate.mockClear();
+    // Interrupted at its first frame: the card is drawn at x 0, and is now headed for Done.
+    view.setTasks([{ nodeId: 'k1', taskId: 't1', status: 'done' }]);
+    const index = animate.mock.contexts.indexOf(k1);
+    expect((animate.mock.calls[index][0] as Keyframe[])[0].transform).toBe('translate(-400px, 0px)');
+  });
+
+  it('keeps focus on a pill that a status update moves', () => {
+    const view = createKanbanView();
+    document.body.append(view.el);
+    view.update(kanban(BASE));
+    button(view, 'k2').focus();
+    view.setTasks([{ nodeId: 'k2', taskId: 't2', status: 'open' }]);
+    view.setTasks([{ nodeId: 'k2', taskId: 't2', status: 'in_progress' }]);
+    expect(columnOf(view, 'k2')).toBe('doing');
+    expect(document.activeElement).toBe(button(view, 'k2'));
+  });
+
+  it('re-sorts a lane when a card changes slot', () => {
+    const view = createKanbanView();
+    view.update(kanban([card('k1', 1, 'todo'), card('k2', 2, 'todo')]));
+    view.update(kanban([card('k1', 3, 'todo'), card('k2', 2, 'todo')]));
+    expect([...view.el.querySelectorAll('[data-column="todo"] [data-node]')].map((e) => e.getAttribute('data-node'))).toEqual(['k2', 'k1']);
+  });
+
+  it('colours the details by the place the card is in now', () => {
+    const view = createKanbanView();
+    view.update(kanban(BASE));
+    const details = () => view.el.querySelector(`.ps-details[data-for="k1"] .ps-details__card`)!.outerHTML;
+    const before = details();
+    view.setTasks([{ nodeId: 'k1', taskId: 't1', status: 'done' }]);
+    expect(details()).not.toBe(before);
+    expect(details()).toContain('ps-details__card--blue');
   });
 
   it('drops a new card in from above, after the first paint only', () => {

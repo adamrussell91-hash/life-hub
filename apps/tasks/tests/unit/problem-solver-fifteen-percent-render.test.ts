@@ -176,6 +176,44 @@ describe('15% solutions view', () => {
     expect(roll!.frames[0].transform).toBe('rotate(-90deg)');
   });
 
+  it('starts a roll from where an interrupted roll left the pill', () => {
+    const animate = spyAnimate();
+    const view = createFifteenPercentView();
+    document.body.append(view.el);
+    view.update(fifteen([]));
+    view.update(fifteen(BASE));
+    const a2 = pill(view, 'a2');
+    // Layout y by disc row; a running move adds its offset (the pill is drawn where the move is).
+    const Y: Record<string, number> = { now: 100, go: 300 };
+    let offset = 0;
+    const running = { cancel() { offset = 0; }, finish() {}, onfinish: null } as unknown as Animation;
+    (a2 as unknown as { getAnimations(): Animation[] }).getAnimations = () => (offset ? [running] : []);
+    vi.spyOn(a2, 'getBoundingClientRect').mockImplementation(() => {
+      const top = Y[a2.closest('[data-region]')!.getAttribute('data-region')!] + offset;
+      return { left: 300, top, width: 120, height: 44, right: 420, bottom: top + 44, x: 300, y: top, toJSON() {} } as DOMRect;
+    });
+    animate.mockImplementation(function (this: Element, frames: Keyframe[] | PropertyIndexedKeyframes | null) {
+      const m = this === a2 ? /translate\([-\d.]+px, (-?[\d.]+)px/.exec(String((frames as Keyframe[])[0].transform)) : null;
+      if (m) offset = Number(m[1]);
+      return running;
+    } as never);
+    view.update(fifteen(FULL.nodes, FULL.edges));
+    expect(offset).toBe(-200);
+    animate.mockClear();
+    // Undone at the roll's first frame: the pill is still drawn beside Now, where it is going.
+    view.update(fifteen(BASE));
+    expect(animate.mock.contexts.indexOf(a2)).toBe(-1);
+  });
+
+  it('keeps focus on a pill that rolls to Go', () => {
+    const view = createFifteenPercentView();
+    document.body.append(view.el);
+    view.update(fifteen(BASE));
+    pillButton(view, 'a2').focus();
+    view.update(fifteen(FULL.nodes, FULL.edges));
+    expect(document.activeElement).toBe(pillButton(view, 'a2'));
+  });
+
   it('shows the task mark with its live status, and "Task removed" for a deleted task', () => {
     const view = createFifteenPercentView();
     view.update(fifteen(FULL.nodes, FULL.edges));
