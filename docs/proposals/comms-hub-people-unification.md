@@ -162,7 +162,7 @@ A Person or Organisation does not have one permanent category. Roles are multipl
 
 Examples for one Person:
 
-- colleague at St Aloysius' College from February 2025 to present
+- colleague at Tallowwood College from February 2025 to present
 - NORTH+ participant from June 2025 to present
 - Tournament of Minds collaborator from July 2025 to August 2025
 - Everyday Magis coach from March 2026 to present
@@ -314,7 +314,7 @@ Examples:
 
 Search results are grouped by entity type and show enough context to prevent mistakes:
 
-- Seth Dunn, Person, colleague, St Aloysius' College
+- Seth Dunn, Person, colleague, Tallowwood College
 - UNSW, Organisation, study institution and event venue
 - Tournament of Minds, Program
 - State Final, Event
