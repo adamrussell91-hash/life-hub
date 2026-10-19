@@ -62,7 +62,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
 const page = join(outDir, `${tool}.html`);
 writeFileSync(page, html);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: process.env.PS_PREVIEW_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 for (const width of [900, 390]) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 2 });
   const tab = await ctx.newPage();
