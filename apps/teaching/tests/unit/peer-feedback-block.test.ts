@@ -32,4 +32,25 @@ describe('Peer feedback block integration', () => {
     expect(printed.textContent).toContain('One suggestion or question');
     expect(printed.querySelector('button')).toBeNull();
   });
+  it('shows a calm not-live panel, not Loading and a red error, before the lesson is published', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: false, error: { code: 'not_published', message: 'Publish this lesson and block before starting an activity.' } }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const block = createBlock('peer_feedback', 'peer-unpublished');
+      const view = renderBlock(block, 'teacher', { lessonId: 'lesson-unpublished' });
+      document.body.append(view);
+      await vi.waitFor(() => expect(view.textContent).toContain('Not live yet'));
+      expect(view.textContent).not.toContain('Loading…');
+      const alert = view.querySelector<HTMLElement>('.pf-alert');
+      expect(alert?.hidden).toBe(true);
+      view.remove();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

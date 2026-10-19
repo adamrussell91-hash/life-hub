@@ -94,6 +94,21 @@ export function writeJSON(key: string, value: unknown): boolean {
   }
 }
 
+/** The lesson or block isn't published yet, so there is no round to run. */
+export function isNotPublished(error: unknown): boolean {
+  return error instanceof ApiClientError && error.code === 'not_published';
+}
+
+/** Calm stand-in for the teacher's controls until the lesson is published. */
+export function notLivePanel(): HTMLElement {
+  const box = el('div', 'pf-panel pf-panel--quiet');
+  box.append(
+    el('p', 'pf-panel__title', 'Not live yet'),
+    el('p', 'pf-panel__text', 'Publish this lesson and block, then Start activity appears here.')
+  );
+  return box;
+}
+
 export function errorText(error: unknown): string {
   if (error instanceof ApiClientError) {
     if (error.code === 'network_error') return 'Couldn’t reach the server. Check your connection and try again. Your writing is still here.';
