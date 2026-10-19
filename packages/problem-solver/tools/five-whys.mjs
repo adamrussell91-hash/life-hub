@@ -9,6 +9,13 @@ export const fiveWhys = Object.freeze({
   name: '5 Whys',
   kind: 'diagnostic',
   when: 'One clear symptom with a likely single chain of cause.',
+  step: 'define',
+  failureModes: [
+    'Stopping at a symptom instead of a process, occurrence or activity.',
+    'A single chain when the causes clearly branch (switch to a problem tree).',
+    'Blaming a person rather than a process.',
+    'Whys that are not checked against evidence.'
+  ],
   steps: [
     { id: 'state', title: 'State the problem', prompt: 'Define the problem clearly in one sentence or statement.' },
     { id: 'ask', title: 'Ask why?', prompt: 'Ask why a minimum of five times. Base each why on the answer before it, until you reach the root cause. Seven or eight may be needed; usually five is enough.' },

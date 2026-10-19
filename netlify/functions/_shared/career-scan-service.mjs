@@ -586,12 +586,48 @@ export async function runCareerScanPass(deps = {}) {
   };
 }
 
-export async function getScanPanelPayload(store) {
+/**
+ * Attach source_labels / witness_labels ({ ref, label, href }) so the panel
+ * chips can name and open their records. Unreachable refs keep href null.
+ */
+export async function labelScanProposals(proposals, deps = {}) {
+  const resolveEntity = deps.resolveEntity ?? defaultResolveEntity;
+  const accessContext = createAccessContext({ workflow: 'life' });
+  const cache = new Map();
+  const labelFor = (ref) => {
+    if (!cache.has(ref)) {
+      cache.set(
+        ref,
+        Promise.resolve()
+          .then(() => resolveEntity(ref, accessContext))
+          .then((entity) => ({
+            ref,
+            label: typeof entity?.display_label === 'string' ? entity.display_label : null,
+            href: typeof entity?.href === 'string' && entity.href ? entity.href : null
+          }))
+          .catch(() => ({ ref, label: null, href: null }))
+      );
+    }
+    return cache.get(ref);
+  };
+  return Promise.all(
+    proposals.map(async (proposal) => ({
+      ...proposal,
+      source_labels: await Promise.all((proposal.source_refs ?? []).map(labelFor)),
+      witness_labels: await Promise.all((proposal.witness_refs ?? []).map(labelFor))
+    }))
+  );
+}
+
+export async function getScanPanelPayload(store, deps = {}) {
   const state = (await getJSON(store, CAREER_SCAN_STATE_KEY)) ?? {
     last_run_at: null,
     last_success_week: null
   };
-  const proposals = await listScanProposals(store, { status: 'pending' });
+  const proposals = await labelScanProposals(
+    await listScanProposals(store, { status: 'pending' }),
+    deps
+  );
   return {
     proposals,
     scan_state: state,

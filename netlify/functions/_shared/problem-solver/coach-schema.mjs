@@ -34,6 +34,13 @@ const text = (value, max = TEXT_MAX) => (typeof value === 'string' && value.trim
 const skills = (value) => (Array.isArray(value) ? [...new Set(value.filter(isSkillId))] : []);
 const fail = (error) => ({ ok: false, error });
 
+/** A real calendar date as YYYY-MM-DD (rejects 2026-02-31 and 2026-13-01). */
+export function isDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function suggestionOf(raw) {
   if (!raw || typeof raw !== 'object') return { value: null };
   const reason = text(raw.reason, 300) ?? '';
@@ -41,7 +48,7 @@ function suggestionOf(raw) {
     if (!TOOL_IDS.includes(raw.tool)) return { error: `Unknown tool in suggestion: ${raw.tool}` };
     return { value: { kind: raw.kind, tool: raw.tool, reason } };
   }
-  if (raw.kind === 'finish_define') return { value: { kind: 'finish_define', reason } };
+  if (raw.kind === 'next_step' || raw.kind === 'finish_define') return { value: { kind: 'next_step', reason } };
   return { value: null };
 }
 
@@ -58,7 +65,7 @@ export function validateCoachTurn(raw) {
     const nodeText = text(raw.node.text);
     if (!parseSlot(slot)) return fail(`node.slot "${slot}" is not a slot name.`);
     if (!nodeText) return fail('node.text is required.');
-    node = { slot, text: nodeText, title: tidyTitle(raw.node.title) ?? titleFromText(nodeText) };
+    node = { slot, text: nodeText, title: tidyTitle(raw.node.title) ?? titleFromText(nodeText), ...(typeof raw.node.tag === 'string' && raw.node.tag.trim() ? { tag: raw.node.tag.trim().toLowerCase().slice(0, 40) } : {}) };
   }
 
   const edges = [];
@@ -82,6 +89,14 @@ export function validateCoachTurn(raw) {
   const suggestion = suggestionOf(raw.suggestion);
   if (suggestion.error) return fail(suggestion.error);
 
+  const proposeTasks = [];
+  for (const item of Array.isArray(raw.proposeTasks) ? raw.proposeTasks.slice(0, 5) : []) {
+    const title = text(item?.title, 120);
+    if (!parseSlot(item?.slot) || !title) return fail('Each proposed task needs a slot and a title.');
+    proposeTasks.push({ slot: item.slot, title, due: isDate(item.due) ? item.due : null });
+  }
+  const proposeReview = raw.proposeReview && isDate(raw.proposeReview.due) ? { due: raw.proposeReview.due, reason: text(raw.proposeReview.reason, 300) ?? '' } : null;
+
   return {
     ok: true,
     value: {
@@ -95,7 +110,10 @@ export function validateCoachTurn(raw) {
       model,
       suggestion: suggestion.value,
       summary: text(raw.summary, 1200),
-      exitObjection: text(raw.exitObjection, 400)
+      exitObjection: text(raw.exitObjection, 400),
+      learning: text(raw.learning, 600),
+      proposeTasks,
+      proposeReview
     }
   };
 }

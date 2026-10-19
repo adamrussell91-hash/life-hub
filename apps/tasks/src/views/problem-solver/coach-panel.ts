@@ -2,6 +2,7 @@
 import { el } from '@/views/hub-kit';
 import { skillChip, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { nextStepAfter, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession } from '../../../../../packages/problem-solver/types';
 import { coachAvatar, thinkingDots } from './decor';
 
@@ -44,12 +45,15 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
   const suggestion = session.suggestion;
   if (!suggestion) return null;
   const card = el('div', 'ps-suggestion confirm-card');
-  const title = suggestion.kind === 'finish_define' ? 'Ready to move on' : `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
+  const nextName = session.model ? nextStepAfter(session.model.id, session.phase) : null;
+  const title = suggestion.kind === 'next_step'
+    ? (nextName ? `Next step: ${stepName(session.model!.id, nextName)}` : 'Ready to finish')
+    : `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
   const heading = el('p', 'ps-suggestion__title', title);
-  if (suggestion.kind !== 'finish_define') heading.prepend(toolEmblem(suggestion.tool));
+  if (suggestion.kind !== 'next_step') heading.prepend(toolEmblem(suggestion.tool));
   card.append(heading, el('p', 'ps-suggestion__reason', suggestion.reason));
   const row = el('div', 'ps-suggestion__actions');
-  row.append(actionButton(suggestion.kind === 'finish_define' ? 'Move on' : 'Start it', 'accept_suggestion', handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
+  row.append(actionButton(suggestion.kind === 'next_step' ? 'Move on' : 'Start it', 'accept_suggestion', handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
   card.append(row);
   return card;
 }
@@ -57,9 +61,10 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
 /**
  * The coach thread. It keeps its DOM between updates: new turns are appended, the thinking
  * bubble is swapped in place for the reply, and the composer keeps what you typed, so the
- * page does not jump while the coach is polled.
+ * page does not jump while the coach is polled. `slots.cards` (the task confirm cards) sits
+ * between the extras and the composer and keeps its own DOM when the extras are replaced.
  */
-export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
+export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: HTMLElement } = {}): CoachPanel {
   const panel = el('section', 'ps-coach');
   panel.setAttribute('aria-label', 'Coach');
   const list = el('ul', 'chat-messages ps-coach__messages');
@@ -90,6 +95,7 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) form.requestSubmit();
   });
   panel.append(list, extras, form);
+  if (slots.cards) panel.insertBefore(slots.cards, form);
 
   const shown = new Set<string>();
   let thinking: HTMLLIElement | null = null;
@@ -102,6 +108,9 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
     update(session) {
       const stick = first || nearBottom();
       const busy = session.runner.status === 'queued' || session.runner.status === 'running';
+      // A failed boundary turn must be retried before anything else: the step has already moved.
+      const boundaryFailed = session.runner.status === 'failed' && session.runner.mode === 'boundary';
+      const locked = busy || boundaryFailed;
 
       for (const turn of session.turns) {
         if (shown.has(turn.id)) continue;
@@ -132,11 +141,15 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
         failed.append(el('span', '', session.runner.error ?? 'The coach could not answer.'), actionButton('Try again', 'retry', handlers));
         parts.push(failed);
       }
-      const card = suggestionCard(session, handlers);
+      const card = boundaryFailed ? null : suggestionCard(session, handlers);
       if (card) parts.push(card);
       const actions = el('div', 'ps-coach__actions');
-      if (session.pendingKeep && !busy) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
-      if (session.phase === 'define' && !busy) actions.append(actionButton("I've defined it", 'finish_define', handlers));
+      if (session.pendingKeep && !locked) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
+      const inStep = Boolean(session.model && session.steps?.[session.phase]);
+      if (inStep && !locked) {
+        const after = nextStepAfter(session.model!.id, session.phase);
+        actions.append(actionButton(after ? `Move on to ${stepName(session.model!.id, after)}` : 'Finish', 'move_on', handlers));
+      }
       if (actions.childElementCount) parts.push(actions);
       const sig = parts.map((part) => part.textContent).join('|');
       if (extras.dataset.sig !== sig) {
@@ -146,11 +159,12 @@ export function mountCoachPanel(handlers: CoachPanelHandlers): CoachPanel {
 
       const question = session.phase === 'frame' ? (['goal', 'whatIsTrue', 'whatCanBeDone'] as const).findIndex((key) => !session.frame[key]) : -1;
       const prompts = ['What is the goal?', 'What is true?', 'What can be done?'];
-      now.textContent = question >= 0 ? `Answering: ${prompts[question]}` : session.phase === 'defined' ? 'Problem defined' : '';
+      const stepLabel = session.model && session.steps?.[session.phase] ? `Step: ${stepName(session.model.id, session.phase)}` : '';
+      now.textContent = question >= 0 ? `Answering: ${prompts[question]}` : session.phase === 'finished' ? 'Problem finished' : stepLabel;
       now.dataset.q = String(question);
-      input.placeholder = session.phase === 'defined' ? 'Add a note for next time…' : 'Your answer…';
-      input.disabled = busy;
-      send.disabled = busy;
+      input.placeholder = session.phase === 'finished' ? 'Add a note for next time…' : 'Your answer…';
+      input.disabled = locked;
+      send.disabled = locked;
 
       if (stick) list.scrollTop = list.scrollHeight;
       first = false;

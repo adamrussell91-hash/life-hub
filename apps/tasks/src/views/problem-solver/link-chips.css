@@ -1,0 +1,10 @@
+.ps-linkchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-linkchips[hidden] { display: none; }
+.ps-linkchip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--line, #1a1a1a); border-radius: 999px; background: var(--paper, #fff); color: var(--ink, #1a1a1a); font-size: var(--text-sm, 0.875rem); text-decoration: none; }
+.ps-linkchip:hover { background: var(--shore, #f6f4ef); }
+.ps-linkchip:focus-visible { outline: 2px solid var(--ink, #1a1a1a); outline-offset: 2px; }
+.ps-linkchip__dot { display: inline-flex; flex: none; gap: 2px; }
+.ps-linkchip__dot i { width: 7px; height: 7px; border-radius: 50%; }
+.ps-linkchip__dot i:nth-child(1) { background: #c8372d; }
+.ps-linkchip__dot i:nth-child(2) { background: #e8b923; }
+.ps-linkchip__dot i:nth-child(3) { background: #2a5da8; }

@@ -32,6 +32,7 @@ import {
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 import { projectNextActionHealth } from '@/views/projects';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
+import { problemSolverChips } from '@/views/problem-solver/link-chips';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -200,6 +201,7 @@ function paintTaskPage(
   const card = el('article', 'hub-card page-card');
   const head = el('header', 'task-card__head');
   head.append(backLink('#/board', '← Dashboard'));
+  head.append(problemSolverChips({ kind: 'task', id: task.id }));
 
   const fields = el('div', 'page-card__fields hub-toolbar');
   const status = pageFilter(
@@ -423,6 +425,7 @@ function paintProjectPage(
   const card = el('article', 'hub-card page-card');
   const head = el('header', 'task-card__head');
   head.append(backLink('#/projects', '← Projects'));
+  head.append(problemSolverChips({ kind: 'project', id: project.id }));
 
   const fields = el('div', 'page-card__fields hub-toolbar');
   const status = pageFilter(
