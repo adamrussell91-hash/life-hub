@@ -20,6 +20,7 @@ import { createLotusBlossomView } from '../../../../../packages/problem-solver/r
 import { createDunckerView } from '../../../../../packages/problem-solver/render/duncker';
 import { createContradictionView } from '../../../../../packages/problem-solver/render/contradiction';
 import { createDecisionMatrixView } from '../../../../../packages/problem-solver/render/decision-matrix';
+import { createSwotView } from '../../../../../packages/problem-solver/render/swot';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -62,7 +63,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   lotus_blossom: () => createLotusBlossomView(),
   duncker: () => createDunckerView(),
   contradiction: () => createContradictionView(),
-  decision_matrix: () => createDecisionMatrixView()
+  decision_matrix: () => createDecisionMatrixView(),
+  swot: () => createSwotView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

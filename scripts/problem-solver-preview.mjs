@@ -36,6 +36,7 @@ const RENDERERS = {
   contradiction: ['contradiction', 'createContradictionView'],
   decision_matrix: ['decision-matrix', 'createDecisionMatrixView'],
   decision_matrix_unscored: ['decision-matrix', 'createDecisionMatrixView'],
+  swot: ['swot', 'createSwotView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

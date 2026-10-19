@@ -4470,3 +4470,209 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 }
 .ps-choice__more:focus-visible { outline: 2px solid transparent; border-radius: 4px; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
 .ps-choice .ps-details__card { margin-top: 0; padding: 4px 0 8px; background: transparent; box-shadow: none; }
+
+/* SWOT analysis (toolkit p.107, Decide): two full-width blue bands on top, "Goal" then "Option",
+   each with its answer after the label; a blue side band down the left split into "Internal" and
+   "External", the words running up it; and a 2x2 grid beside it, yellow Strengths and red
+   Weaknesses above, yellow Opportunities and red Threats below. Thin paper rules between every
+   piece. Each quadrant: a heading, a short description, then the shown option's items as pills.
+   The quadrants are near square, as in the book. Phone: no side band; small "Internal" and
+   "External" headings above the stacked quadrants, S, W, O, T. */
+.ps-swot {
+  /* Named, so every phone query measures this root box. */
+  container: swot / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+}
+
+.ps-swot__tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ps-swot__tabs[hidden] { display: none; }
+.ps-swot__tab {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: min(100%, 9rem);
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--ps-card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-sm) / 1.2 var(--font-ui);
+  cursor: pointer;
+}
+.ps-swot__tab[aria-selected='true'] { background: var(--ps-blue); box-shadow: none; color: #fff; }
+.ps-swot__tab:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-swot__tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The Goal and Option bands: the label, then the answer, on one line where it fits. */
+.ps-swot__band { position: relative; display: flex; min-height: 62px; margin-bottom: 2px; background: var(--ps-blue); color: #fff; }
+.ps-swot__band:has(:focus-visible),
+.ps-swot__band:has([aria-expanded='true']) { z-index: 2; }
+.ps-swot__band-button {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 62px;
+  padding: 8px 18px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-swot__band-button[hidden] { display: none; }
+.ps-swot__band-button:hover { background: rgb(0 0 0 / 0.08); }
+.ps-swot__band-button:focus-visible,
+.ps-swot__band-button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-swot__words { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.ps-swot__band-label { flex: none; font: var(--weight-bold) 14px / 1.3 var(--font-ui); }
+.ps-swot__band-label::after { content: ':'; }
+.ps-swot__title {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-semibold) 14px / 1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-swot__band .ps-swot__title { font-weight: var(--weight-regular); }
+.ps-swot__band .ps-objection { align-self: center; margin-top: 0; color: #fff; opacity: 1; }
+
+/* The grid: a side strip, then two quadrant columns; two near-square rows. */
+.ps-swot__grid {
+  /* The book's side strip is about an eighth of the chart's width. */
+  --ps-swot-side: clamp(44px, 11cqi, 66px);
+  display: grid;
+  grid-template-columns: var(--ps-swot-side) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(calc((100cqi - var(--ps-swot-side)) / 2 * 0.94), auto));
+  gap: 2px;
+  touch-action: pan-y;
+}
+.ps-swot__side { display: grid; place-items: center; grid-column: 1; background: var(--ps-blue); color: #fff; }
+.ps-swot__side--internal { grid-row: 1; }
+.ps-swot__side--external { grid-row: 2; }
+.ps-swot__side-label { font: var(--weight-semibold) 14px / 1 var(--font-ui); writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+.ps-swot__group { display: none; }
+
+.ps-swot__quadrant {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 26px 14px 16px;
+  text-align: center;
+}
+.ps-swot__quadrant--strength { grid-column: 2; grid-row: 1; }
+.ps-swot__quadrant--weakness { grid-column: 3; grid-row: 1; }
+.ps-swot__quadrant--opportunity { grid-column: 2; grid-row: 2; }
+.ps-swot__quadrant--threat { grid-column: 3; grid-row: 2; }
+.ps-swot__quadrant--strength,
+.ps-swot__quadrant--opportunity { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-swot__quadrant--weakness,
+.ps-swot__quadrant--threat { background: var(--ps-red); color: #fff; }
+.ps-swot__heading { margin: 0; font: var(--weight-bold) 16px / 1.2 var(--font-ui); letter-spacing: 0.02em; text-transform: uppercase; }
+/* Full strength: at .78 the 12px description would fall under 4.5:1 on red. */
+.ps-swot__desc { max-width: 15em; margin: 4px 0 0; font: var(--weight-medium) 13px / 1.35 var(--font-ui); }
+
+.ps-swot__items { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; margin-top: 14px; }
+.ps-swot__item { position: relative; display: flex; max-width: 100%; }
+.ps-swot__item[hidden] { display: none; }
+.ps-swot__item:has(:focus-visible),
+.ps-swot__item:has([aria-expanded='true']) { z-index: 2; }
+.ps-swot__pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 6px;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* A deeper tint of the quadrant, so the words keep (or gain) contrast. */
+.ps-swot__pill[data-fill='yellow'] { background: rgb(42 34 16 / 0.12); color: var(--ps-on-yellow); }
+.ps-swot__pill[data-fill='red'] { background: rgb(0 0 0 / 0.16); color: #fff; }
+.ps-swot__pill[data-fill='yellow']:hover { background: rgb(42 34 16 / 0.2); }
+.ps-swot__pill[data-fill='red']:hover { background: rgb(0 0 0 / 0.26); }
+.ps-swot__pill:focus-visible,
+.ps-swot__pill[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-swot__pill .ps-swot__title { font-size: 13px; }
+.ps-swot__pill .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+
+/* Items no option claims, under the grid on the paper. */
+.ps-swot__unplaced { display: flex; flex-direction: column; align-items: center; margin-top: 14px; }
+.ps-swot__unplaced-label { margin: 0; color: var(--muted); }
+.ps-swot__unplaced .ps-swot__items { margin-top: 6px; }
+.ps-swot__unplaced .ps-swot__pill[data-fill='yellow'] { background: var(--ps-yellow); }
+.ps-swot__unplaced .ps-swot__pill[data-fill='red'] { background: var(--ps-red); }
+
+.ps-swot__meta { font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+
+.ps-swot__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-swot__after { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; margin-top: 16px; }
+.ps-swot__after:empty { display: none; }
+
+/* Synthesis: four moves above the text, like the composed problem statement. */
+.ps-swot__synthesis {
+  box-sizing: border-box;
+  width: min(100%, 560px);
+  padding: 14px 18px 10px;
+  border-top: 3px solid var(--ps-yellow);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-swot__synthesis-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ps-swot__synthesis-meta { color: var(--ps-ink); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-swot__synthesis .ps-objection { margin-top: 0; color: var(--ps-ink); opacity: 1; }
+.ps-swot__moves { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ps-swot__move { padding: 3px 9px; font: var(--weight-bold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-swot__move--yellow { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-swot__move--red { background: var(--ps-red); color: #fff; }
+.ps-swot__synthesis-text { margin: 8px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+.ps-swot__more {
+  min-width: 44px;
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ps-ink);
+  font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ps-swot__more:focus-visible { outline: 2px solid transparent; border-radius: 4px; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-swot__synthesis .ps-details__card { margin-top: 0; padding: 4px 0 8px; background: transparent; box-shadow: none; }
+
+/* Phone: the side strip gives way to small headings above the stacked quadrants, S, W, O, T. */
+@container swot (max-width: 520px) {
+  .ps-swot__grid { display: flex; flex-direction: column; gap: 2px; }
+  .ps-swot__side { display: none; }
+  .ps-swot__group { display: block; margin: 10px 0 4px; color: var(--ink); }
+  .ps-swot__group--internal { margin-top: 6px; }
+  .ps-swot__quadrant { min-height: 132px; padding: 18px 12px 14px; }
+  .ps-swot__heading { font-size: 15px; }
+  .ps-swot__band,
+  .ps-swot__band-button { min-height: 52px; }
+  .ps-swot__band-button { padding: 8px 14px; }
+  .ps-swot__tab { flex-basis: 100%; }
+}

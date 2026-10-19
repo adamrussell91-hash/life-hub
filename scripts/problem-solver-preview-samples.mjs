@@ -495,3 +495,28 @@ SAMPLES['decision_matrix:next'] = {
   scores: { snapshots: [matrixFirst, { at: '2026-10-12T18:00:00Z', mode: 'percent', weights: [20, 25, 25, 20, 10], ratings: [[6, 7, 9, 5, 4], [8, 8, 6, 8, 7], [9, 8, 8, 7, 6]] }] }
 };
 SAMPLES.decision_matrix_unscored = run('decision_matrix', matrixNodes.filter((n) => n.slot !== 'choice'));
+
+// SWOT: a neighbourhood bakery weighing two ways to earn more outside the weekday rush. Option 2
+// is the newest with items, so it shows by default; one weakness is contested.
+const of = (from, to) => ({ from, to, kind: 'of' });
+SAMPLES.swot = run(
+  'swot',
+  [
+    node('g', 'goal', 'Bring in steady income on the quiet days without hiring more staff.', 'Steady quiet-day income'),
+    node('o1', 'option:1', 'Open the shop on Sunday mornings as well.', 'Open on Sundays'),
+    node('s1', 'strength:1', 'Regulars already ask for Sunday bread.', 'Regulars ask for it'),
+    node('w1', 'weakness:1', 'The oven would need a seventh early start.', 'Another early start'),
+    node('o2', 'option:2', 'Run a stall at the Saturday farmers market in the square.', 'Market stall'),
+    node('s2', 'strength:2', 'The sourdough keeps well for a day out of the shop.', 'Bread that travels'),
+    node('s3', 'strength:3', 'Two of the team have run stalls before.', 'Stall experience'),
+    node('w2', 'weakness:2', 'No van; trays would go by hand cart.', 'No van', { state: 'contested', objection: 'Is the hand cart a real limit for one stall?' }),
+    node('w3', 'weakness:3', 'The shop would be short-handed on Saturday mornings.', 'Thin Saturday cover'),
+    node('p1', 'opportunity:1', 'The market is adding a covered food aisle in spring.', 'New covered aisle'),
+    node('p2', 'opportunity:2', 'Visitors from the next town could find the shop.', 'New customers'),
+    node('t1', 'threat:1', 'Two bakeries already trade at the market.', 'Established rivals'),
+    node('t2', 'threat:2', 'Rain cuts the market crowd by half.', 'Wet weekends'),
+    node('syn', 'synthesis', 'Build on bread that travels and the new covered aisle; shrink the cover problem with a rota; counter the rivals with sourdough they do not sell; turn the hand cart into a slow-start trial of four weeks.', 'Trial a covered stall'),
+    node('ch', 'choice', 'Take a covered market stall for a four-week trial from March, with a Saturday rota so the shop stays covered.', 'Market stall trial')
+  ],
+  [of('s1', 'o1'), of('w1', 'o1'), of('s2', 'o2'), of('s3', 'o2'), of('w2', 'o2'), of('w3', 'o2'), of('p1', 'o2'), of('p2', 'o2'), of('t1', 'o2'), of('t2', 'o2')]
+);
