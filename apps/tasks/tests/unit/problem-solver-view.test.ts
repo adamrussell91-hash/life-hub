@@ -364,6 +364,19 @@ describe('landing tool shelf', () => {
     expect(names).toHaveLength(4);
     expect(implement.querySelectorAll('.ps-emblem svg')).toHaveLength(4);
   });
+
+  it('shelves the three Improve tools, each with its own emblem', async () => {
+    const { toolShelf } = await import('@/views/problem-solver/view');
+    const { EMBLEM_SVG } = await import('../../../../packages/problem-solver/glyphs');
+    const improve = toolShelf().querySelector('[data-step="improve"]')!;
+    expect(improve.querySelector('h3')!.textContent).toBe('Improve');
+    const names = [...improve.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
+    expect(names).toEqual(expect.arrayContaining(['After action review', 'Double-loop learning', 'Feedback matrix']));
+    expect(names).toHaveLength(3);
+    expect(improve.querySelectorAll('.ps-emblem svg')).toHaveLength(3);
+    const emblems = new Set([EMBLEM_SVG.after_action_review, EMBLEM_SVG.double_loop, EMBLEM_SVG.feedback_matrix, EMBLEM_SVG.eisenhower]);
+    expect(emblems.size).toBe(4);
+  });
 });
 
 describe('session page scores', () => {
