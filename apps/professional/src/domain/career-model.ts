@@ -240,7 +240,18 @@ export type CareerTrunkItem = {
   occurred_on: string;
   date_precision: string;
   future_ids: string[];
+  /** Other kept cards with the same title, folded into this one. */
+  merged_ids: string[];
 };
+
+/** Same normalisation as the Skills scan's `skillTitleKey`. */
+export function skillTitleKey(title: string | null | undefined): string {
+  return String(title ?? '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
 
 export type CareerWhatIfDelta = {
   future_id: string;
@@ -528,15 +539,32 @@ export function buildCareerModel(
     futuresByAchievement.set(sourceId, list);
   }
 
-  const trunkItems = achievements
+  // One card per skill: cards kept twice under the same title (before the
+  // scan deduped by title) fold into the earliest, pooling their futures.
+  const trunkByTitle = new Map<string, CareerTrunkItem>();
+  const activeAchievements = achievements
     .filter((a) => a.lifecycle_status === 'active')
-    .map((a) => ({
+    .slice()
+    .sort((a, b) => String(a.occurred_on).localeCompare(String(b.occurred_on)));
+  for (const a of activeAchievements) {
+    const key = skillTitleKey(a.title) || a.id;
+    const futureIds = futuresByAchievement.get(a.id) ?? [];
+    const kept = trunkByTitle.get(key);
+    if (kept) {
+      kept.merged_ids.push(a.id);
+      for (const id of futureIds) if (!kept.future_ids.includes(id)) kept.future_ids.push(id);
+      continue;
+    }
+    trunkByTitle.set(key, {
       id: a.id,
       title: a.title,
       occurred_on: a.occurred_on,
       date_precision: a.date_precision,
-      future_ids: futuresByAchievement.get(a.id) ?? []
-    }));
+      future_ids: [...futureIds],
+      merged_ids: []
+    });
+  }
+  const trunkItems = [...trunkByTitle.values()];
 
   const yearsBehind = (() => {
     const starts = employment.map((e) => e.valid_from).filter(Boolean).sort() as string[];
@@ -595,7 +623,7 @@ export function buildCareerModel(
       : null,
     ghost_paths: overview?.ghost_paths ?? [],
     scan: overview?.scan ?? { pending_count: 0, last_run_at: null },
-    ledger: trunkItems,
+    ledger: [...trunkItems].reverse(),
     applications: applicationModels,
     employment,
     what_if_deltas: whatIfDeltas,

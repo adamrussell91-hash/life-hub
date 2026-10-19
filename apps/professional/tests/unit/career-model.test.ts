@@ -158,3 +158,24 @@ describe('buildCareerModel (V4 single source)', () => {
     expect(withMoves.what_if_deltas[0].readiness_delta).toBe(50);
   });
 });
+
+describe('skill cards with the same title', () => {
+  it('fold into one ledger row and one trunk dot', () => {
+    const model = buildCareerModel(
+      {
+        achievements: [
+          { id: 'a1', title: 'Mentoring new staff', occurred_on: '2026-03-01', date_precision: 'day', lifecycle_status: 'active' },
+          { id: 'a2', title: 'mentoring  new staff.', occurred_on: '2026-06-01', date_precision: 'day', lifecycle_status: 'active' },
+          { id: 'a3', title: 'Assessment design', occurred_on: '2026-05-01', date_precision: 'day', lifecycle_status: 'active' }
+        ],
+        supports_future: [{ source_id: 'a2', target_id: 'fut_1' }]
+      },
+      { now: '2026-10-19' }
+    );
+    expect(model.stats.skill_cards).toBe(2);
+    expect(model.ledger.map((c) => c.id)).toEqual(['a3', 'a1']);
+    const mentoring = model.ledger.find((c) => c.id === 'a1')!;
+    expect(mentoring.merged_ids).toEqual(['a2']);
+    expect(mentoring.future_ids).toEqual(['fut_1']);
+  });
+});

@@ -47,14 +47,25 @@ export function clampZoom(zoom: RiverZoom, careerFrom: number, careerTo: number)
   return { from, to };
 }
 
+/** Past share of the river length while Now is in view and futures exist. */
+export const PAST_SHARE_WITH_FUTURES = 0.4;
+/** With no futures the past earns the room; Now keeps a short starter stub. */
+export const PAST_SHARE_NO_FUTURES = 0.84;
+
+export function pastShareFor(visibleFutures: number): number {
+  return visibleFutures > 0 ? PAST_SHARE_WITH_FUTURES : PAST_SHARE_NO_FUTURES;
+}
+
 /**
  * Map a fractional year to 0…1 along the river length.
- * While Now is in [from, to], past gets 40% and future 60%.
+ * While Now is in [from, to], the past gets `pastShare` (40% by default) and
+ * the future the rest.
  */
 export function timeToUnit(
   year: number,
   zoom: RiverZoom,
-  nowYear: number
+  nowYear: number,
+  pastShare = PAST_SHARE_WITH_FUTURES
 ): number {
   const { from, to } = zoom;
   if (to <= from) return 0;
@@ -64,22 +75,15 @@ export function timeToUnit(
   }
   if (year <= nowYear) {
     if (nowYear === from) return 0;
-    return 0.4 * ((year - from) / (nowYear - from));
+    return pastShare * ((year - from) / (nowYear - from));
   }
   if (to === nowYear) return 1;
-  return 0.4 + 0.6 * ((year - nowYear) / (to - nowYear));
+  return pastShare + (1 - pastShare) * ((year - nowYear) / (to - nowYear));
 }
 
-export function riverHeightPx(
-  orientation: RiverOrientation,
-  visibleFutures: number,
-  yearsInView: number
-): number {
-  if (orientation === 'horizontal') {
-    return Math.max(440, 120 + visibleFutures * 64);
-  }
-  // Phone river: denser than 150px/yr so past roles sit near Now in the first viewport.
-  return Math.min(2400, Math.max(640, yearsInView * 100));
+/** Phone river height: denser than 150px/yr so past roles sit near Now in the first viewport. */
+export function riverHeightPx(_orientation: RiverOrientation, _visibleFutures: number, yearsInView: number): number {
+  return Math.min(1600, Math.max(560, yearsInView * 60));
 }
 
 export function laneOffset(
@@ -179,39 +183,148 @@ export type EmploymentSpan = {
 };
 
 /**
+ * Greedy interval lanes: each interval takes the first lane that is free by
+ * its start. Returns one lane index per input (stable order).
+ */
+export function assignIntervalLanes(intervals: Array<{ start: number; end: number }>): number[] {
+  const indexed = intervals.map((iv, index) => ({ index, start: iv.start, end: iv.end }));
+  indexed.sort((a, b) => a.start - b.start || a.end - b.end);
+  const laneEnds: number[] = [];
+  const lanes = new Array<number>(intervals.length).fill(0);
+  for (const iv of indexed) {
+    if (!Number.isFinite(iv.start)) continue;
+    let lane = laneEnds.findIndex((end) => end <= iv.start + 1e-6);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(iv.end);
+    } else {
+      laneEnds[lane] = iv.end;
+    }
+    lanes[iv.index] = lane;
+  }
+  return lanes;
+}
+
+/**
  * Greedy interval lanes so concurrent roles (same school, overlapping dates)
  * stack instead of painting on one overlapping line.
  * Returns one lane index per input item (stable order).
  */
 export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
-  const indexed = jobs.map((job, index) => {
-    const start = yearFraction(job.valid_from);
-    const rawEnd = job.valid_to ? yearFraction(job.valid_to) : Infinity;
-    return { index, start, end: Number.isFinite(rawEnd) ? rawEnd : Infinity };
-  });
-  indexed.sort((a, b) => a.start - b.start || a.end - b.end);
-  const laneEnds: number[] = [];
-  const lanes = new Array<number>(jobs.length).fill(0);
-  for (const job of indexed) {
-    if (!Number.isFinite(job.start)) continue;
-    let lane = laneEnds.findIndex((end) => end <= job.start + 1e-6);
-    if (lane < 0) {
-      lane = laneEnds.length;
-      laneEnds.push(job.end);
-    } else {
-      laneEnds[lane] = job.end;
-    }
-    lanes[job.index] = lane;
-  }
-  return lanes;
+  return assignIntervalLanes(
+    jobs.map((job) => {
+      const start = yearFraction(job.valid_from);
+      const rawEnd = job.valid_to ? yearFraction(job.valid_to) : Infinity;
+      return { start, end: Number.isFinite(rawEnd) ? rawEnd : Infinity };
+    })
+  );
 }
 
-/** Lane pitch for labeled role bars (bar + below-bar label air). */
-export const ROLE_LANE_HEIGHT_PX = 40;
+/** Height of one swimlane row (bar plus air). */
+export const SWIMLANE_ROW_PX = 26;
+/** Extra air between two workplaces' rows. */
+export const SWIMLANE_GROUP_GAP_PX = 6;
+/** Role bar height inside a swimlane row. */
+export const SWIMLANE_BAR_PX = 20;
 
-/** Extra SVG height for stacked role-band lanes under the trunk. */
-export function roleBandExtraPx(laneCount: number): number {
-  return laneCount <= 0 ? 0 : 16 + laneCount * ROLE_LANE_HEIGHT_PX + 10;
+export type SwimlaneInput = {
+  /** Workplace key — roles with the same key share a swimlane group. */
+  group: string;
+  /** Interval along the time axis, in any one unit (the river passes pixels). */
+  start: number;
+  /** End including any room reserved for a label beside the bar. */
+  end: number;
+};
+
+export type SwimlaneLayout = {
+  /** Row index for each input job (stable order). */
+  jobRow: number[];
+  /** Group index for each row. */
+  rowGroup: number[];
+  /** True for the first row of each workplace group. */
+  rowStartsGroup: boolean[];
+  rowCount: number;
+  groupCount: number;
+};
+
+/**
+ * Past roles as swimlanes: one group per workplace (ordered by first start),
+ * and inside a group one row per concurrent role (greedy interval lanes).
+ * Callers pass `end` with label room added, so a row is only shared when
+ * every role in it keeps a readable label.
+ */
+export function layoutRoleSwimlanes(jobs: SwimlaneInput[]): SwimlaneLayout {
+  const groups = new Map<string, number[]>();
+  jobs.forEach((job, index) => {
+    const key = job.group || `job:${index}`;
+    const list = groups.get(key) ?? [];
+    list.push(index);
+    groups.set(key, list);
+  });
+  const ordered = [...groups.values()].sort((a, b) => {
+    const start = (ids: number[]) => Math.min(...ids.map((i) => jobs[i]!.start));
+    return start(a) - start(b);
+  });
+  const jobRow = new Array<number>(jobs.length).fill(0);
+  const rowGroup: number[] = [];
+  const rowStartsGroup: boolean[] = [];
+  let row = 0;
+  ordered.forEach((ids, groupIndex) => {
+    const lanes = assignIntervalLanes(ids.map((i) => jobs[i]!));
+    const laneCount = lanes.length ? Math.max(...lanes) + 1 : 1;
+    ids.forEach((jobIndex, k) => {
+      jobRow[jobIndex] = row + (lanes[k] ?? 0);
+    });
+    for (let lane = 0; lane < laneCount; lane++) {
+      rowGroup.push(groupIndex);
+      rowStartsGroup.push(lane === 0);
+    }
+    row += laneCount;
+  });
+  return { jobRow, rowGroup, rowStartsGroup, rowCount: row, groupCount: ordered.length };
+}
+
+/** Pixel height of a swimlane block (0 when there are no roles). */
+export function swimlaneBlockPx(layout: Pick<SwimlaneLayout, 'rowCount' | 'groupCount'>): number {
+  if (!layout.rowCount) return 0;
+  return layout.rowCount * SWIMLANE_ROW_PX + Math.max(0, layout.groupCount - 1) * SWIMLANE_GROUP_GAP_PX;
+}
+
+export type LabelPlacement = { x: number; anchor: 'start' | 'end'; inside: boolean };
+
+/**
+ * Place a bar's label: inside when it fits, else in free space to the right,
+ * else to the left, else null (the tooltip carries it). `blocked` holds the
+ * x-ranges already taken in the same row (other bars and placed labels).
+ */
+export function placeBarLabel(args: {
+  x0: number;
+  x1: number;
+  textW: number;
+  maxX: number;
+  minX?: number;
+  pad?: number;
+  blocked?: Array<[number, number]>;
+  /** Try the left side before the right (a workplace's first bar). */
+  preferLeft?: boolean;
+}): LabelPlacement | null {
+  const { x0, x1, textW, maxX } = args;
+  const minX = args.minX ?? 0;
+  const pad = args.pad ?? 6;
+  const blocked = args.blocked ?? [];
+  if (x1 - x0 >= textW + pad * 2) return { x: x0 + pad, anchor: 'start', inside: true };
+  const free = (a: number, b: number) =>
+    a >= minX && b <= maxX && blocked.every(([c, d]) => b <= c || a >= d);
+  const right = (): LabelPlacement | null =>
+    free(x1 + pad, x1 + pad + textW) ? { x: x1 + pad, anchor: 'start', inside: false } : null;
+  const left = (): LabelPlacement | null =>
+    free(x0 - pad - textW, x0 - pad) ? { x: x0 - pad, anchor: 'end', inside: false } : null;
+  return args.preferLeft ? left() ?? right() : right() ?? left();
+}
+
+/** Approximate rendered width of an 11px label. */
+export function approxLabelWidth(text: string): number {
+  return text.length * 6.2;
 }
 
 /**
