@@ -120,7 +120,7 @@ function cyclingEmblem(): HTMLElement {
   const order: PsToolId[] = ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'smart'];
   let i = 0;
   const show = () => {
-    const drawing = art(EMBLEM_SVG[order[i % order.length]] ?? '', 'ps-pop');
+    const drawing = art(EMBLEM_SVG[order[i % order.length]], 'ps-pop');
     holder.replaceChildren(drawing);
     i += 1;
   };
