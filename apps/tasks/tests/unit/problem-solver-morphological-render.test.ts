@@ -235,6 +235,57 @@ describe('Morphological analysis view', () => {
     expect(row.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('clears a key row when Escape closes the card it opened', () => {
+    const view = createMorphologicalView();
+    view.layout(360);
+    view.update(morph(FULL, FULL_EDGES));
+    const row = q(view, '.ps-morph__key [data-for="a22"]') as HTMLButtonElement;
+    row.click();
+    expect(row.getAttribute('aria-expanded')).toBe('true');
+    const card = q(view, '.ps-details.is-open')!;
+    card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(button(view, 'a22').getAttribute('aria-expanded')).toBe('false');
+    expect(row.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('marks each clashing oval with a badge and ring for the contradiction, not a floating cross', () => {
+    const view = createMorphologicalView();
+    view.update(morph(FULL, FULL_EDGES));
+    const badges = [...view.el.querySelectorAll<HTMLElement>('[data-clash-marker]')];
+    expect(badges.length).toBe(2);
+    expect(badges.map((b) => b.closest('[data-node]')!.getAttribute('data-node')).sort()).toEqual(['a12', 'a21']);
+    for (const b of badges) expect(b.getAttribute('data-for')).toBe('c1');
+    expect(item(view, 'a12').querySelector('.ps-morph__ring[data-for="c1"]')).not.toBeNull();
+    expect(view.el.querySelector('svg [data-clash-marker]')).toBeNull();
+    tabs(view)[0].click();
+    expect(view.el.querySelectorAll('[data-clash-marker], .ps-morph__ring').length).toBe(0);
+  });
+
+  it('hides a chip whose pair has lost an attribute', () => {
+    const view = createMorphologicalView();
+    view.update(morph([...GRID, ...CONTRA], [...GRID_EDGES, ...CONTRA_EDGES]));
+    expect(item(view, 'c1').hidden).toBe(false);
+    view.update(morph([...GRID.filter((n) => n.id !== 'a21'), ...CONTRA], [...GRID_EDGES, ...CONTRA_EDGES].filter((e) => e.from !== 'a21' && e.to !== 'a21')));
+    expect(item(view, 'c1').hidden).toBe(true);
+    expect(item(view, 'c1').textContent).not.toContain('?');
+  });
+
+  it('lays out for the attached width on the first update, with no wide flash', () => {
+    const view = createMorphologicalView();
+    vi.spyOn(view.el, 'getBoundingClientRect').mockReturnValue({ width: 360, height: 0, top: 0, left: 0, right: 360, bottom: 0, x: 0, y: 0, toJSON() {} } as DOMRect);
+    view.update(morph(FULL, FULL_EDGES));
+    expect(view.el.getAttribute('data-compact')).toBe('true');
+    expect(q(view, '.ps-morph__key')!.hidden).toBe(false);
+  });
+
+  it('ignores chip hovers after destroy', () => {
+    const view = createMorphologicalView();
+    view.update(morph([...GRID, ...CONTRA], [...GRID_EDGES, ...CONTRA_EDGES]));
+    view.destroy();
+    item(view, 'c1').dispatchEvent(new Event('mouseenter'));
+    expect(item(view, 'a12').classList.contains('is-flagged')).toBe(false);
+  });
+
   it('shows the problem above the grid and the evaluation below it', () => {
     const view = createMorphologicalView();
     view.update(morph(FULL.map((n) => (n.id === 'ev' ? { ...n, text: 'Library with paid fixer holds together.' } : n)), FULL_EDGES));
