@@ -135,6 +135,13 @@ export function applyCoachTurn(session, turn, deps) {
   let next = { ...session, runner: idle() };
   const coachTurn = { id: deps.newId(), role: 'coach', text: turn.message, verdict: turn.verdict, skillsSeen: turn.skillsSeen, skillsMissing: turn.skillsMissing, createdAt: deps.now() };
 
+  // The learning question is one-shot: the first turn-mode coach turn after a boundary
+  // records the answer (if any) and always clears it, so a step can never stall on it.
+  if (mode !== 'boundary' && next.pendingLearning) {
+    if (turn.learning) next = { ...next, learnings: [...next.learnings, { step: next.pendingLearning, text: turn.learning, at: deps.now() }] };
+    next = { ...next, pendingLearning: null };
+  }
+
   if (mode === 'boundary') {
     const leaving = session.runner.leaving;
     if (leaving && next.steps[leaving]) next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
@@ -146,9 +153,6 @@ export function applyCoachTurn(session, turn, deps) {
       next = { ...next, model: turn.model, phase: first, steps: { [first]: emptyStep() } };
     }
   } else if (currentStep(next)) {
-    if (turn.learning && next.pendingLearning) {
-      next = { ...next, learnings: [...next.learnings, { step: next.pendingLearning, text: turn.learning, at: deps.now() }], pendingLearning: null };
-    }
     const run = activeRun(next);
     if (run && turn.node && turn.verdict === 'accept') {
       next = placeAccepted(next, turn, coachTurn.id, deps);
@@ -180,6 +184,7 @@ export function keepAnyway(session, deps) {
  * "what did you learn about how you solve problems" question.
  */
 export function moveOn(session, deps) {
+  if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
   const step = currentStep(session);
   if (!session.model || !step) throw fail(409, 'action_not_allowed', 'Nothing to move on from yet.');
   const leaving = session.phase;

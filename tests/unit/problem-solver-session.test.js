@@ -215,3 +215,30 @@ test('keepAnyway with a slot that no longer fits is a 409', () => {
   s = { ...s, pendingKeep: { slot: 'problem', text: 'x', objection: 'o', skills: [], runId: activeRun(s).id } };
   assert.throws(() => keepAnyway(s, deps), (err) => err.status === 409 && err.message === 'That answer no longer fits here.');
 });
+
+test('the last step\'s learning is recorded once the session is finished', () => {
+  let s = framed('polya');
+  for (const _ of [1, 2, 3, 4, 5]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  assert.equal(s.phase, 'finished');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'I rush.', deps), coach({ verdict: 'clarify', message: 'Noted.', learning: 'Rushes.' }), deps);
+  assert.deepEqual(s.learnings, [{ step: 'document', text: 'Rushes.', at: '2026-10-19T10:00:00.000Z' }]);
+  assert.equal(s.pendingLearning, null);
+});
+
+test('the learning question is one-shot: pendingLearning clears even with no learning', () => {
+  let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = applyCoachTurn(say(s, 'Not sure.', deps), coach({ verdict: 'clarify', message: 'Fine.' }), deps);
+  assert.equal(s.pendingLearning, null);
+  assert.deepEqual(s.learnings, []);
+  assert.equal(s.suggestion, null);
+  let t = applyCoachTurn(moveOn(framed('triz'), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  t = applyCoachTurn(say(t, 'Not sure.', deps), coach({ verdict: 'clarify', message: 'Fine.' }), deps);
+  assert.equal(t.pendingLearning, null);
+  assert.equal(t.suggestion.tool, 'contradiction');
+});
+
+test('moving on from an archived session is refused', () => {
+  const s = archive(framed(), deps);
+  assert.throws(() => moveOn(s, deps), (err) => err.status === 409 && err.code === 'action_not_allowed' && err.message === 'This problem is archived.');
+});
