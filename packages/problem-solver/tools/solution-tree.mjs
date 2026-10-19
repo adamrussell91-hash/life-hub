@@ -27,7 +27,9 @@ export const solutionTree = Object.freeze({
     return canParent(run, from, to, 'aim', 'how');
   },
   complete(run) {
-    const families = [...childrenOf(run, 'aim', 'how').values()];
-    return hasSlot(run, 'aim') && families.flat().length >= 3 && families.some((kids) => kids.length >= 2);
+    const families = childrenOf(run, 'aim', 'how');
+    const hows = new Set([...families.values()].flat());
+    const nested = [...families.keys()].some((parent) => hows.has(parent));
+    return hasSlot(run, 'aim') && hows.size >= 3 && nested && [...families.values()].some((kids) => kids.length >= 2);
   }
 });

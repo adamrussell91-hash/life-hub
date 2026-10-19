@@ -111,6 +111,17 @@ function frameComplete(frame) {
 
 const slotToId = (run, slot) => run.nodes.find((node) => node.slot === slot)?.id ?? null;
 
+/** Add the links the tool allows between nodes already placed. */
+function addAllowedEdges(run, edges) {
+  let placed = run;
+  for (const edge of edges) {
+    const from = slotToId(placed, edge.from);
+    const to = slotToId(placed, edge.to);
+    if (canEdge(placed, from, to, edge.kind)) placed = addEdge(placed, { from, to, kind: edge.kind });
+  }
+  return placed;
+}
+
 function placeAccepted(next, turn, coachTurnId, deps) {
   const run = activeRun(next);
   let placed = placeNode(run, { id: deps.newId(), slot: turn.node.slot, text: turn.node.text, title: turn.node.title, ...(turn.node.tag ? { tag: turn.node.tag } : {}), state: 'accepted', skills: turn.skillsSeen, turnId: coachTurnId });
@@ -162,6 +173,8 @@ export function applyCoachTurn(session, turn, deps) {
     const run = activeRun(next);
     if (run && turn.node && turn.verdict === 'accept') {
       next = placeAccepted(next, turn, coachTurn.id, deps);
+    } else if (run && !turn.node && turn.verdict === 'accept' && turn.edges?.length) {
+      next = replaceRun(next, addAllowedEdges(run, turn.edges));
     } else if (run && turn.node && turn.verdict === 'challenge') {
       next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, tag: turn.node.tag, edges: turn.edges ?? [], objection: turn.message, skills: turn.skillsSeen, runId: run.id } };
     }

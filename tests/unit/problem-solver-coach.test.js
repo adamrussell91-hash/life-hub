@@ -147,6 +147,15 @@ test('problem tree: a bare slot name takes the next open index', async () => {
   assert.deepEqual(turn.edges, [{ from: 'effect:1', to: 'cause:1', kind: 'relates' }]);
 });
 
+test('problem tree: a links-only accept keeps just the links the tool allows', async () => {
+  const coach = createModelCoach(async () => reply({ verdict: 'accept', node: null, edges: [{ from: 'effect:1', to: 'trunk', kind: 'relates' }, { from: 'effect:1', to: 'cause:9', kind: 'relates' }, { from: 'effect:1', to: 'cause:1', kind: 'relates' }] }));
+  let s = inProblemTree();
+  s = applyCoachTurn(s, { verdict: 'accept', message: 'ok', node: { slot: 'effect:1', text: 'e' }, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null }, deps);
+  const turn = await coach(s);
+  assert.equal(turn.node, null);
+  assert.deepEqual(turn.edges, [{ from: 'effect:1', to: 'cause:1', kind: 'relates' }]);
+});
+
 test('applyCoachTurn drops an edge that cannot be added', () => {
   const s = applyCoachTurn(inDefine(), { verdict: 'accept', message: 'ok', node: { slot: 'problem', text: 'x' }, edges: [{ from: 'problem', to: 'why:1', kind: 'relates' }], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null }, deps);
   assert.equal(s.steps.define.runs[0].nodes.length, 1);

@@ -48,6 +48,11 @@ export const gapRadar = Object.freeze({
   pickScores(payload) {
     return { current: payload?.current, objective: payload?.objective };
   },
+  awaiting(run) {
+    return countSlots(run, 'axis') >= 3 && !(run.radar?.snapshots?.length)
+      ? 'The person scores each topic with the Score each topic button; ask them to, and wait.'
+      : null;
+  },
   complete(run) {
     return countSlots(run, 'axis') >= 3 && (run.radar?.snapshots?.length ?? 0) >= 1;
   }

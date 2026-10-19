@@ -5,6 +5,7 @@ import { addEdge, applyScores, canEdge, checkNode, isComplete, newRun, nextSlots
 import { toolsForBookStep } from '../../packages/problem-solver/tools/index.mjs';
 import { levels } from '../../packages/problem-solver/tools/hierarchy.mjs';
 import { forceTotals } from '../../packages/problem-solver/tools/force-field.mjs';
+import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 
 let n = 0;
 const put = (run, slot, extra = {}) => placeNode(run, { id: `n${(n += 1)}`, slot, text: slot, state: 'accepted', ...extra });
@@ -105,4 +106,53 @@ test('intent statement: six parts in order', () => {
     r = put(r, s);
   }
   assert.equal(isComplete(r), true);
+});
+
+test('causal map: a loop among causes is not complete until something leads into the problem', () => {
+  let r = newRun('causal_map', 'r');
+  r = put(r, 'problem');
+  for (const s of ['cause:1', 'cause:2', 'cause:3']) r = put(r, s);
+  r = link(r, 'cause:1', 'cause:2', 'plus');
+  r = link(r, 'cause:2', 'cause:3', 'plus');
+  r = link(r, 'cause:3', 'cause:1', 'plus');
+  assert.equal(isComplete(r), false);
+  r = link(r, 'cause:1', 'problem', 'plus');
+  assert.equal(isComplete(r), true);
+});
+
+test('hierarchy: a parent must be the root or placed earlier, so there are no cycles', () => {
+  let r = newRun('radial_tree', 'r');
+  r = put(r, 'root');
+  for (const s of ['node:1', 'node:2', 'node:3']) r = put(r, s);
+  assert.equal(canEdge(r, idOf(r, 'node:1'), idOf(r, 'node:3'), 'parent'), false, 'a later node cannot be a parent');
+  r = link(r, 'node:3', 'node:1', 'parent');
+  assert.equal(canEdge(r, idOf(r, 'node:1'), idOf(r, 'node:3'), 'parent'), false, 'no cycle');
+  assert.equal(canEdge(r, idOf(r, 'node:2'), idOf(r, 'node:1'), 'parent'), true);
+});
+
+test('force field: scoring needs a force on each side, and a stale snapshot is not complete', () => {
+  let r = newRun('force_field', 'r');
+  r = put(r, 'current');
+  r = put(r, 'goal');
+  r = put(r, 'for:1');
+  assert.throws(() => applyScores(r, { for: [3], against: [] }, 't'), /at least one force on each side/);
+  assert.equal(TOOLS.force_field.awaiting(r), null);
+  r = put(r, 'against:1');
+  assert.match(TOOLS.force_field.awaiting(r), /Score the forces button/);
+  r = applyScores(r, { for: [3], against: [2] }, 't1');
+  assert.equal(isComplete(r), true);
+  assert.equal(TOOLS.force_field.awaiting(r), null);
+  r = put(r, 'for:2');
+  assert.equal(isComplete(r), false, 'the snapshot no longer covers every force');
+  assert.match(TOOLS.force_field.awaiting(r), /Score the forces button/);
+});
+
+test('gap radar waits for scores once there are three topics', () => {
+  let r = newRun('gap_radar', 'r');
+  r = put(r, 'current');
+  r = put(r, 'objective');
+  for (const s of ['axis:1', 'axis:2']) r = put(r, s);
+  assert.equal(TOOLS.gap_radar.awaiting(r), null);
+  r = put(r, 'axis:3');
+  assert.match(TOOLS.gap_radar.awaiting(r), /Score each topic button/);
 });

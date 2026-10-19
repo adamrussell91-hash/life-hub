@@ -4,7 +4,8 @@ import { countSlots, hasSlot, nextIndexed, open } from '../slots.mjs';
 const has = (run, slot) => run.nodes.some((node) => node.slot === slot);
 
 function orderFrom(text, count) {
-  const numbers = (String(text).match(/\d+/g) ?? []).map(Number);
+  // Numbers beyond the sub count are part of the sentence ("affects 30 people"), not the order.
+  const numbers = (String(text).match(/\d+/g) ?? []).map(Number).filter((value) => value >= 1 && value <= count);
   const valid = numbers.length === count && new Set(numbers).size === count && numbers.every((value) => value >= 1 && value <= count);
   return valid ? numbers : null;
 }

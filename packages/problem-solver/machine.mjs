@@ -73,7 +73,7 @@ export function applyScores(run, payload, at) {
 /**
  * Checks a proposed node against its tool before it is placed:
  * a tag from the tool's list where the slot needs one (and none elsewhere),
- * then the tool's own `validateNode(run, node, edges)`. `edges` are the proposed
+ * then the tool's `requiredLinks` (a link of the named kind that `canEdge` allows), then its own `validateNode(run, node, edges)`. `edges` are the proposed
  * links in slot form ({ from, to, kind } with slot names). Returns an error
  * message for the coach to repair, or null.
  */
@@ -83,5 +83,19 @@ export function checkNode(run, node, edges = []) {
   const tags = def.nodeTags?.[name];
   if (tags && !tags.includes(node.tag)) return `Slot ${name} needs a tag: one of ${tags.join(', ')}.`;
   if (!tags && node.tag != null) return `Slot ${name} takes no tag.`;
+  const required = def.requiredLinks?.[name];
+  if (required && !hasRequiredLink(run, node, edges, required.kind)) return required.message;
   return typeof def.validateNode === 'function' ? def.validateNode(run, node, edges) : null;
+}
+
+/** True when a proposed link of `kind` touching the candidate node would be allowed once it is placed. */
+function hasRequiredLink(run, node, edges, kind) {
+  const candidate = { ...run, nodes: [...run.nodes, { id: '__candidate__', slot: node.slot, text: node.text, state: 'accepted' }] };
+  const idOf = (slot) => candidate.nodes.find((item) => item.slot === slot)?.id ?? null;
+  return edges.some((edge) => {
+    if (edge.kind !== kind) return false;
+    const from = idOf(edge.from);
+    const to = idOf(edge.to);
+    return (from === '__candidate__' || to === '__candidate__') && canEdge(candidate, from, to, kind);
+  });
 }

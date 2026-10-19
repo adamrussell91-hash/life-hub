@@ -10,7 +10,11 @@ export function parentEdge(run, id) {
 
 /** A child may take one parent: the root or another child node. */
 export function canParent(run, from, to, rootName, childName) {
-  return nameOf(run, from) === childName && [rootName, childName].includes(nameOf(run, to)) && !parentEdge(run, from);
+  if (nameOf(run, from) !== childName || parentEdge(run, from)) return false;
+  if (nameOf(run, to) === rootName) return true;
+  // A parent must have been placed before its child, which rules out loops.
+  const order = run.nodes.map((node) => node.id);
+  return nameOf(run, to) === childName && order.indexOf(to) < order.indexOf(from);
 }
 
 /**

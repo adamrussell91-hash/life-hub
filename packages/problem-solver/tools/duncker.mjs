@@ -2,6 +2,7 @@
 import { countSlots, hasSlot, nextIndexed, open, parseSlot } from '../slots.mjs';
 
 const nameOf = (run, id) => parseSlot(run.nodes.find((node) => node.id === id)?.slot)?.name;
+const PATHWAYS = 4;
 const pathways = (run) => run.nodes.filter((node) => parseSlot(node.slot)?.name === 'pathway');
 
 export const duncker = Object.freeze({
@@ -31,9 +32,12 @@ export const duncker = Object.freeze({
   },
   nodeTags: { pathway: ['direct', 'opposite'] },
   edgeKinds: ['under'],
-  validateNode(run, node, edges) {
-    if (parseSlot(node.slot)?.name !== 'solution') return null;
-    return edges.some((edge) => edge.kind === 'under' && edge.from === node.slot) ? null : 'Put each solution under its pathway (link kind "under", from the solution to the pathway).';
+  requiredLinks: {
+    solution: { kind: 'under', message: 'Put each solution under its pathway (link kind "under", from the solution to the pathway).' }
+  },
+  validateNode(run, node) {
+    if (parseSlot(node.slot)?.name !== 'pathway' || pathways(run).length < PATHWAYS - 1) return null;
+    return pathways(run).some((path) => path.tag === 'opposite') || node.tag === 'opposite' ? null : 'Make this last pathway the functionally opposite one (tag "opposite").';
   },
   nextSlots(run) {
     if (!hasSlot(run, 'problem')) return ['problem'];
@@ -43,8 +47,8 @@ export const duncker = Object.freeze({
     const covered = paths.length >= 2 && paths.every((path) => run.edges.some((edge) => edge.kind === 'under' && edge.to === path.id));
     const kinds = new Set(paths.map((path) => path.tag));
     return open(
-      nextIndexed(run, 'pathway', 4),
-      paths.length ? nextIndexed(run, 'solution', 12) : null,
+      nextIndexed(run, 'pathway', PATHWAYS),
+      paths.length ? nextIndexed(run, 'solution', 16) : null,
       kinds.has('opposite') && !hasSlot(run, 'redefinition') ? 'redefinition' : null,
       covered && kinds.has('direct') && kinds.has('opposite') ? 'evaluation' : null
     );

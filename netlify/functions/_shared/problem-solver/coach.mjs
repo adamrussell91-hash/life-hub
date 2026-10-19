@@ -38,7 +38,8 @@ function fitSlot(run, slot) {
 /** Fit the node to its open slot and keep only the links the tool allows; the turn survives a bad link. */
 function fitToRun(session, value) {
   const run = activeRun(session);
-  if (!session.steps?.[session.phase] || !run || !value.node) return { value };
+  if (!session.steps?.[session.phase] || !run) return { value };
+  if (!value.node) return { value: value.verdict === 'accept' && value.edges.length ? { ...value, edges: existingEdges(run, value.edges) } : value };
   const slot = fitSlot(run, value.node.slot);
   if (!canPlace(run, slot)) return { error: `Slot ${value.node.slot} is not open for ${run.tool}. Open slots: ${nextSlots(run).join(', ') || 'none'}.` };
   const rename = (name) => (name === value.node.slot ? slot : name);
@@ -49,6 +50,20 @@ function fitToRun(session, value) {
   if (problem) return { error: problem };
   if (value.verdict !== 'accept' && value.verdict !== 'challenge') return { value: { ...value, node, edges: [] } };
   return { value: { ...value, node, edges: allowedEdges(run, node, renamedEdges) } };
+}
+
+/** Links between nodes already placed (slot form) that the tool allows, applied in order. */
+function existingEdges(run, proposed) {
+  let current = run;
+  const edges = [];
+  for (const edge of proposed) {
+    const from = current.nodes.find((n) => n.slot === edge.from)?.id ?? null;
+    const to = current.nodes.find((n) => n.slot === edge.to)?.id ?? null;
+    if (!canEdge(current, from, to, edge.kind)) continue;
+    current = addEdge(current, { from, to, kind: edge.kind });
+    edges.push(edge);
+  }
+  return edges;
 }
 
 /** The proposed links (slot form) the tool allows once the candidate node is placed. */

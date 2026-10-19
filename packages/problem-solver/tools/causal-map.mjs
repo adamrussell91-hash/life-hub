@@ -32,6 +32,7 @@ export const causalMap = Object.freeze({
   },
   complete(run) {
     const causes = run.nodes.filter((node) => parseSlot(node.slot)?.name === 'cause');
-    return hasSlot(run, 'problem') && causes.length >= 3 && causes.every((cause) => run.edges.some((edge) => edge.from === cause.id));
+    const problem = run.nodes.find((node) => parseSlot(node.slot)?.name === 'problem');
+    return Boolean(problem) && run.edges.some((edge) => edge.to === problem.id) && causes.length >= 3 && causes.every((cause) => run.edges.some((edge) => edge.from === cause.id));
   }
 });

@@ -2,6 +2,7 @@
 import { countSlots, hasSlot, nextIndexed, open, parseSlot } from '../slots.mjs';
 
 const MAX_TARGETS = 3;
+const MAX_RULES = 8;
 const nodeAt = (run, slot) => run.nodes.find((node) => node.slot === slot) ?? null;
 
 /** The current round: its target number, rules placed since that target, and its filter and assessment. */
@@ -49,7 +50,7 @@ export const analogicalReasoning = Object.freeze({
       return round < MAX_TARGETS ? [`target:${round + 1}`] : [];
     }
     if (filtered) return [`assess:${round}`];
-    return open(nextIndexed(run, 'rule', 24), rules.length >= 1 ? `filtered:${round}` : null);
+    return open(nextIndexed(run, 'rule', countSlots(run, 'rule') + (MAX_RULES - rules.length)), rules.length >= 1 ? `filtered:${round}` : null);
   },
   complete(run) {
     const { round, assess } = currentRound(run);

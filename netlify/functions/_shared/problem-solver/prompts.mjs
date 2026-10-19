@@ -50,6 +50,7 @@ In phase frame, use "frame" for accepted answers instead of "node"; "node" is on
 - verdict "accept": the answer holds up. Put it in "node" with the slot, a tidy version of their words (keep their meaning; add no ideas), and a "title" of two or three words naming the point.
 - verdict "challenge": the answer does not hold up. Include its tag and links as you would on accept. Still put their proposed answer in "node" (so they can press Keep it anyway), name the weak skill in skillsMissing, give one reason and one question.
 - verdict "clarify": you need more before judging, or you are suggesting something. No node.
+- To add links between nodes already placed, reply accept with node null and the links in "edges".
 - When a slot lists tag choices, put exactly one of them in node.tag; otherwise leave tag out.
 Challenge when:
 - a symptom is offered as a cause (analysis)
@@ -120,7 +121,8 @@ function runLines(session, run) {
     `Slot meanings: ${Object.entries(def.slots).map(([k, v]) => `${k} = ${v}${def.nodeTags?.[k] ? ` (tag: ${def.nodeTags[k].join('|')})` : ''}`).join('; ')}`,
     `Link kinds: ${def.edgeKinds.join(', ') || 'none'}`,
     `Placed:\n${nodes}${edges}`,
-    `Open slots: ${nextSlots(run).join(', ') || 'none (tool complete)'}`,
+    `Open slots: ${nextSlots(run).join(', ') || (isComplete(run) ? 'none (tool complete)' : 'none open, but the tool is not complete: see Waiting on or add links')}`,
+    ...(def.awaiting?.(run) ? [`Waiting on: ${def.awaiting(run)}`] : []),
     progressLine(session)
   ].join('\n');
 }

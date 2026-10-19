@@ -33,11 +33,9 @@ export const lotusBlossom = Object.freeze({
   ],
   slots: { problem: 'The problem at the centre', solution: 'One of eight possible solutions', idea: 'An idea that grows from one solution', preferred: 'A preferred idea and why' },
   edgeKinds: ['petal', 'marks'],
-  validateNode(run, node, edges) {
-    const name = parseSlot(node.slot)?.name;
-    if (name === 'idea' && !edges.some((edge) => edge.kind === 'petal' && edge.from === node.slot)) return 'Link each idea to the solution it grows from (link kind "petal", from the idea to the solution).';
-    if (name === 'preferred' && !edges.some((edge) => edge.kind === 'marks' && edge.from === node.slot)) return 'Link each preferred note to the idea it picks (link kind "marks").';
-    return null;
+  requiredLinks: {
+    idea: { kind: 'petal', message: 'Link each idea to the solution it grows from (link kind "petal", from the idea to the solution).' },
+    preferred: { kind: 'marks', message: 'Link each preferred note to the idea it picks (link kind "marks").' }
   },
   nextSlots(run) {
     if (!hasSlot(run, 'problem')) return ['problem'];
