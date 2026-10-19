@@ -120,13 +120,16 @@ describe('Force field view', () => {
   it('shows the totals from the latest snapshot and says which side wins', () => {
     const view = createForceFieldView();
     view.update(field(sample));
-    expect(view.el.querySelector('.ps-force__badge')).toBeNull();
+    const badge = view.el.querySelector('.ps-force__badge')!;
+    expect(badge.getAttribute('role')).toBe('status');
+    expect(badge.textContent).toBe('');
     view.update(field(sample, [snap([4, 2], [5])]));
     expect(view.el.querySelector('[data-total="for"] .ps-force__total-value')!.textContent).toBe('6');
     expect(view.el.querySelector('[data-total="against"] .ps-force__total-value')!.textContent).toBe('5');
     expect(view.el.querySelector('.ps-force__badge')!.textContent).toBe('Drivers outweigh restrainers');
     view.update(field(sample, [snap([4, 2], [5]), snap([2, 3], [5], 'b')]));
     expect(view.el.querySelector('.ps-force__badge')!.textContent).toBe('Restrainers hold');
+    expect(view.el.querySelector('.ps-force__badge')).toBe(badge);
   });
 
   it('offers scoring only once each side has a force', () => {
@@ -184,5 +187,76 @@ describe('Force field view', () => {
     const f3 = view.el.querySelector<HTMLElement>('[data-node="f3"]')!;
     expect(f3.classList.contains('is-unscored')).toBe(true);
     expect(ids(view, 'for')).toEqual(['f1', 'f2', 'f3']);
+  });
+
+  it('marks unscored arrows with a hollow head, and keeps the contested chip on the meta row', () => {
+    const view = createForceFieldView();
+    view.update(field([...base, node('f1', 'for:1', { state: 'contested', objection: 'Guess?' }), node('a1', 'against:1')]));
+    expect(view.el.querySelectorAll('.ps-force__arrow .ps-force__tip').length).toBe(2);
+    expect(view.el.querySelector('[data-node="f1"] .ps-force__meta-row .ps-objection')).not.toBeNull();
+  });
+
+  it('keeps each slider value out of its label', () => {
+    const view = createForceFieldView();
+    view.update(field(sample));
+    view.el.querySelector<HTMLButtonElement>('.ps-force__score')!.click();
+    const input = view.el.querySelector<HTMLInputElement>('input[name="for"]')!;
+    const label = view.el.querySelector<HTMLLabelElement>(`label[for="${input.id}"]`)!;
+    expect(label.textContent).toBe('For:1 title');
+    expect(label.querySelector('output')).toBeNull();
+    expect(view.el.querySelector('.ps-force__value')!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  describe('score form focus and rebuild', () => {
+    const mounted = () => {
+      const view = createForceFieldView();
+      document.body.append(view.el);
+      view.update(field(sample));
+      const toggle = view.el.querySelector<HTMLButtonElement>('.ps-force__score')!;
+      toggle.click();
+      const form = view.el.querySelector<HTMLFormElement>('.ps-force__form')!;
+      const input = (id: string) => form.querySelector<HTMLInputElement>(`input[data-for-node="${id}"]`)!;
+      return { view, toggle, form, input, done: () => view.el.remove() };
+    };
+
+    it('focuses the first slider when it opens', () => {
+      const { form, done } = mounted();
+      expect(document.activeElement).toBe(form.querySelector('input'));
+      done();
+    });
+
+    it('keeps entered values and the focused field when the forces change while open', () => {
+      const { view, form, input, done } = mounted();
+      input('f1').value = '5';
+      input('f2').focus();
+      view.update(field([...sample, node('f3', 'for:3')]));
+      expect(form.hidden).toBe(false);
+      expect(input('f1').value).toBe('5');
+      expect(input('f3').value).toBe('3');
+      expect(document.activeElement).toBe(input('f2'));
+      done();
+    });
+
+    it('closes on Escape and returns focus to the toggle', () => {
+      const { toggle, form, input, done } = mounted();
+      input('f1').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      expect(form.hidden).toBe(true);
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(toggle);
+      done();
+    });
+
+    it('returns focus to the toggle after cancel or submit', () => {
+      const { toggle, form, done } = mounted();
+      (document.activeElement as HTMLElement).blur();
+      form.querySelector<HTMLButtonElement>('.ps-force__cancel')!.click();
+      expect(document.activeElement).toBe(toggle);
+      toggle.click();
+      (document.activeElement as HTMLElement).blur();
+      submit(form);
+      expect(form.hidden).toBe(true);
+      expect(document.activeElement).toBe(toggle);
+      done();
+    });
   });
 });
