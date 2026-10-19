@@ -1,8 +1,9 @@
 import type { Block } from '@/schemas/block';
 import { apiPost, ApiClientError } from '@/api/client';
-import { button, el, errorText, field, identityName, readJSON, token, writeJSON } from '@/blocks/peer-feedback-ui';
+import { button, el, errorText, field, isNotPublished, notLivePanel, identityName, readJSON, token, writeJSON } from '@/blocks/peer-feedback-ui';
 import { giveView, receivedView as annotatedView, teacherLayers, type Code, type Piece, type ReceivedLayer, type TeacherLayer } from '@/blocks/peer-annotate';
 import { mountBankEditor } from '@/blocks/peer-annotate-bank';
+import { taskCard } from '@/blocks/peer-feedback-task';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import './peer-feedback.css';
 
@@ -168,8 +169,8 @@ export function renderPeerFeedback(block: PeerBlock, mode: RenderMode, ctx: Rend
   const root = el('section', 'peer-feedback');
   root.dataset.blockId = block.id;
   const head = el('header', 'pf-head');
-  head.append(el('p', 'pf-eyebrow', 'Peer feedback'));
-  head.append(el('h3', 'pf-prompt', block.content.prompt.trim() || 'Write a short answer, swap it, and give each other feedback.'));
+  head.append(el('h3', 'pf-eyebrow', 'Peer feedback'));
+  head.append(taskCard(block.content.prompt.trim() || 'Write a short answer, swap it, and give each other feedback.'));
   root.append(head);
 
   if (mode === 'print') {
@@ -253,7 +254,11 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
       alert.hidden = true;
       paint();
     } catch (error) {
-      if (action !== 'status' || !state) {
+      if (!state && isNotPublished(error)) {
+        alert.hidden = true;
+        painted = '';
+        body.replaceChildren(notLivePanel());
+      } else if (action !== 'status' || !state) {
         alert.textContent = errorText(error);
         alert.hidden = false;
       }
