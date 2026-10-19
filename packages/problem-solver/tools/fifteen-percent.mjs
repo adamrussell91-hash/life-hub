@@ -22,8 +22,8 @@ export const fifteenPercent = Object.freeze({
     'Choosing an action and setting no time to do it.'
   ],
   steps: [
-    { id: 'reflect', title: 'Reflect', prompt: 'Look at the problem and the plan so far: where do you have freedom to act?' },
-    { id: 'what', title: 'Find your 15%', prompt: 'List the actions you could take now, on your own authority, with what you already have.' },
+    { id: 'reflect', title: 'What', prompt: 'Look at the problem and the plan so far: where do you have freedom to act?' },
+    { id: 'what', title: 'Now', prompt: 'List the actions you could take now, on your own authority, with what you already have.' },
     { id: 'go', title: 'Go', prompt: 'Pick the action with most effect and do it now; it can become a task.' }
   ],
   slots: { reflect: 'Where you have freedom to act', action: 'Something you can do now, on your own authority', chosen: 'The action picked to do now, and when' },
