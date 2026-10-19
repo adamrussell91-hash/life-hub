@@ -1,5 +1,5 @@
 import { apiPost } from '@/api/client';
-import { button, el, errorText } from '@/blocks/peer-feedback-ui';
+import { button, el, errorText, isNotPublished, notLivePanel } from '@/blocks/peer-feedback-ui';
 import { mountBoard, type BoardGroup, type Layout } from './board';
 import { poller, formatCode, showCodeOverlay, type BrainstormBlock } from './shared';
 
@@ -48,7 +48,9 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
     rename: (group, name) => void send('rename_group', { group, name })
   });
   const idle = el('div', 'pf-panel pf-panel--start');
-  root.append(controls, alert, idle, board.root, queue);
+  const notLive = notLivePanel();
+  notLive.hidden = true;
+  root.append(controls, alert, notLive, idle, board.root, queue);
 
   let state = lastState.get(endpoint) ?? null;
   let busy = false;
@@ -70,7 +72,12 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
       alert.hidden = true;
       paint();
     } catch (error) {
-      if (action !== 'status' || !state) {
+      if (!state && isNotPublished(error)) {
+        alert.hidden = true;
+        idle.hidden = true;
+        board.root.hidden = true;
+        notLive.hidden = false;
+      } else if (action !== 'status' || !state) {
         alert.textContent = errorText(error);
         alert.hidden = false;
       }
@@ -195,6 +202,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
   }
 
   function paint(): void {
+    notLive.hidden = true;
     if (!state) {
       idle.hidden = false;
       idle.replaceChildren(el('p', 'pf-note', 'Loading…'));
