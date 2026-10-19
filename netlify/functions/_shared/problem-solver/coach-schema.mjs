@@ -35,7 +35,7 @@ const skills = (value) => (Array.isArray(value) ? [...new Set(value.filter(isSki
 const fail = (error) => ({ ok: false, error });
 
 /** A real calendar date as YYYY-MM-DD (rejects 2026-02-31 and 2026-13-01). */
-function isDate(value) {
+export function isDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;

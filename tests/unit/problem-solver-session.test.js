@@ -423,3 +423,47 @@ test('summary rows carry confirmed task ids and the review task id', () => {
   assert.deepEqual(row.taskIds, ['task-1']);
   assert.equal(row.reviewTaskId, 'review-1');
 });
+
+test('a review the person set aside is not revived by a later coach turn', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'The pilot ends then.' } }), deps);
+  s = dismissReview(s, deps);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-11-16', reason: 'Try again.' } }), deps);
+  assert.equal(s.reviewProposal.status, 'dismissed');
+  assert.equal(s.reviewProposal.due, '2026-11-09');
+});
+
+test('setReviewTask ignores an impossible date and keeps the proposed one', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ verdict: 'clarify', proposeReview: { due: '2026-11-09', reason: 'r' } }), deps);
+  s = setReviewTask(s, { taskId: 'review-1', due: '2026-02-31' }, deps);
+  assert.equal(s.reviewProposal.due, '2026-11-09');
+});
+
+test('coach due dates on or before today are dropped: a task keeps no date, a review is ignored', () => {
+  let s = inStep('implement', 'kanban');
+  s = applyCoachTurn(s, coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: '2026-10-19' }] }), deps);
+  assert.equal(s.proposedTasks[0].due, null);
+  s = applyCoachTurn(s, coach({ node: card(2), proposeTasks: [{ slot: 'card:2', title: 'Ask', due: '2026-10-01' }] }), deps);
+  assert.equal(s.proposedTasks[1].due, null);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', proposeReview: { due: '2026-10-19', reason: 'today' } }), deps);
+  assert.equal(s.reviewProposal, null);
+});
+
+test('a missing or non-string proposal id is a validation error', () => {
+  const s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  for (const proposalId of [undefined, 7, '']) {
+    assert.throws(() => confirmTask(s, { proposalId, taskId: 'task-1' }, deps), (err) => err.status === 400 && err.code === 'validation_error');
+    assert.throws(() => dismissTask(s, { proposalId }, deps), (err) => err.status === 400 && err.code === 'validation_error');
+  }
+});
+
+test('switching tools sets aside the old run\'s open proposals but keeps confirmed ones', () => {
+  let s = applyCoachTurn(inStep('implement', 'kanban'), coach({ node: card(1), proposeTasks: [{ slot: 'card:1', title: 'Draft', due: null }] }), deps);
+  s = applyCoachTurn(s, coach({ node: card(2), proposeTasks: [{ slot: 'card:2', title: 'Ask', due: null }] }), deps);
+  s = confirmTask(s, { proposalId: s.proposedTasks[1].id, taskId: 'task-2' }, deps);
+  s = applyCoachTurn(s, coach({ verdict: 'clarify', suggestion: { kind: 'switch_tool', tool: 'eisenhower', reason: 'Priorities, not flow.' } }), deps);
+  s = acceptSuggestion(s, deps);
+  assert.equal(s.proposedTasks[0].status, 'dismissed');
+  assert.equal(s.proposedTasks[0].removed, undefined);
+  assert.equal(s.proposedTasks[1].status, 'confirmed');
+});

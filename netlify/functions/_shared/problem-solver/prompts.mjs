@@ -160,7 +160,12 @@ function taskLines(session) {
   const tasks = (session.proposedTasks ?? []).filter((p) => !p.removed);
   if (!tasks.length && !session.reviewProposal && !session.reviewTaskId) return null;
   const lines = tasks.map((p) => `  ${p.status}: "${p.title}"${p.due ? ` due ${p.due}` : ''}`);
-  const review = session.reviewTaskId ? `created for ${session.reviewProposal?.due ?? 'its date'}` : session.reviewProposal ? `${session.reviewProposal.status} for ${session.reviewProposal.due}` : 'none yet';
+  const proposal = session.reviewProposal;
+  const review = session.reviewTaskId
+    ? `created for ${proposal?.due ?? 'its date'}`
+    : proposal?.status === 'dismissed'
+      ? 'set aside by the person; do not propose again'
+      : proposal ? `${proposal.status} for ${proposal.due}` : 'none yet';
   return `TASKS FROM THIS PROBLEM:\n${lines.join('\n') || '  none'}\nREVIEW TASK: ${review}`;
 }
 

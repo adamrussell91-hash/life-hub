@@ -217,3 +217,8 @@ test('outside Decide the chosen option is shown as the aim; in Implement without
   const without = { ...base, phase: 'implement', steps: { ...base.steps, implement } };
   assert.match(buildCoachPrompt(without).user, /CHOSEN OPTION: none recorded/);
 });
+
+test('a review the person set aside reads as set aside, not to be proposed again', () => {
+  const s = { ...inTool('five_whys'), updatedAt: '2026-10-19T10:00:00.000Z', proposedTasks: [], reviewProposal: { title: 'Review: x', due: '2026-11-02', reason: 'r', status: 'dismissed' }, reviewTaskId: null };
+  assert.match(buildCoachPrompt(s).user, /REVIEW TASK: set aside by the person; do not propose again/);
+});
