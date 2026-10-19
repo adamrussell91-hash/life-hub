@@ -2226,7 +2226,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
    the trend's title in small type under it. The insight sits in full in a card below.
    Phone: four smaller columns, titles clamped; a very narrow panel stacks each row as a card. */
 .ps-fromto {
-  container-type: inline-size;
+  /* Named, so every phone query measures this root box, never the narrower field. */
+  container: fromto / inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2237,7 +2238,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 /* The field is square, as in the book, and grows past square once rows outrun it. */
 .ps-fromto__field {
-  container: fromto-field / inline-size;
+  /* Sizes the circle text in cqw; the layout queries all ask the named root. */
+  container-type: inline-size;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -2289,7 +2291,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 }
 
 .ps-fromto__cell:hover { filter: brightness(1.06); }
-.ps-fromto__cell:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+/* A paper-and-ink double ring: it reads on both the blue field and the yellow circle. */
+.ps-fromto__cell:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 4px var(--ps-ink); }
 .ps-fromto__item.is-open .ps-fromto__cell { box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
 
 .ps-fromto__words { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; max-width: 100%; }
@@ -2366,7 +2369,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 /* Phone: four smaller circles. The headers name the columns, so the cells drop their meta
    line; titles clamp to two lines, and a contested cell shows a small ink dot (the details
    card and the button's name carry the objection). */
-@container (max-width: 520px) {
+@container fromto (max-width: 520px) {
   .ps-fromto__meta { display: none; }
   .ps-fromto__cell { padding: 7%; }
   .ps-fromto__title { -webkit-line-clamp: 2; font-size: 12px; }
@@ -2385,11 +2388,11 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 }
 
 /* Very narrow: each row is a stacked card, aspect, then trend, then from → to. */
-@container (max-width: 339px) {
+@container fromto (max-width: 339px) {
   .ps-fromto__field { aspect-ratio: auto; gap: 10px; padding: 8px; }
   .ps-fromto__head { display: none; }
   .ps-fromto__row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: 'aspect aspect aspect' 'trend trend trend' 'from arrow to'; gap: 4px; }
-  .ps-fromto__row::after { content: '→'; grid-area: arrow; align-self: center; color: #fff; font: var(--weight-semibold) 16px / 1 var(--font-ui); }
+  .ps-fromto__row:has([data-col='from']):has([data-col='to'])::after { content: '→'; grid-area: arrow; align-self: center; color: #fff; font: var(--weight-semibold) 16px / 1 var(--font-ui); }
   .ps-fromto__item[data-col] { display: grid; grid-row: auto; grid-column: auto; }
   .ps-fromto__item[data-col='aspect'] { grid-area: aspect; }
   .ps-fromto__item[data-col='trend'] { grid-area: trend; }
