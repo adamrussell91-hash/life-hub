@@ -6,7 +6,7 @@ import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
-import { activeRun } from './session.mjs';
+import { activeRun, reopenProblem, waitingForReview } from './session.mjs';
 
 const WORD_LIMIT = 60;
 const REWRITE_OVER = 70;
@@ -94,6 +94,9 @@ function parse(session, text) {
     const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);
     if (!allowed.includes(suggested.tool)) return { ok: false, error: `Tool ${suggested.tool} is not available in this step. Available: ${allowed.join(', ') || 'none, so do not suggest a tool'}.` };
   }
+  // A reopen the session would refuse, or any tool suggestion while Improve waits, is dropped; the turn survives.
+  if (suggested?.kind === 'reopen_step' && reopenProblem(session, suggested.step)) result.value = { ...result.value, suggestion: null };
+  if (waitingForReview(session) && result.value.suggestion && result.value.suggestion.kind !== 'next_step') result.value = { ...result.value, suggestion: null };
   const fitted = fitToRun(session, result.value);
   return fitted.error ? { ok: false, error: fitted.error } : { ok: true, value: fitted.value };
 }

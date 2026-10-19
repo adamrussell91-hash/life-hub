@@ -49,6 +49,10 @@ function suggestionOf(raw) {
     return { value: { kind: raw.kind, tool: raw.tool, reason } };
   }
   if (raw.kind === 'next_step' || raw.kind === 'finish_define') return { value: { kind: 'next_step', reason } };
+  if (raw.kind === 'reopen_step') {
+    if (!['define', 'analyse'].includes(raw.step)) return { error: 'reopen_step needs step define or analyse.' };
+    return { value: { kind: 'reopen_step', step: raw.step, reason } };
+  }
   return { value: null };
 }
 
