@@ -12,5 +12,20 @@ export const STEP_TRIGGERS = Object.freeze({
     'Only obvious options, with no contrary or unusual route considered (creative_thinking).',
     'In a group, pooling ideas before each person has generated their own (creative_thinking).',
     'An option that is a restatement of the problem rather than a way to solve it (logical_reasoning).'
+  ],
+  decide: [
+    'A criterion too vague to rate, such as "good" or "works" (critical_thinking).',
+    'Weights all equal, or not adding to 100, with no reason (analysis).',
+    'A rating that contradicts evidence already given (logical_reasoning).',
+    'A Pareto ranking or 80/20 claim with no figures behind it (critical_thinking).',
+    'The answer decided before the analysis, with numbers fitted afterwards (metacognition).',
+    'A chosen option that goes against the scores with no reason given (decision_making).'
+  ],
+  implement: [
+    'A task too large to start this week (decision_making).',
+    'A task with no owner or no date (decision_making).',
+    'Status quo, loss or regret talk left unexamined ("we have always done it this way") (metacognition).',
+    'No measure of success, so nobody will know whether it worked (critical_thinking).',
+    'Rolling out everywhere when a cheap pilot was possible (decision_making).'
   ]
 });
