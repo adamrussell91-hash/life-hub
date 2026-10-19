@@ -21,7 +21,7 @@ async function answer(page, text) {
 }
 
 for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
-  test(`5 Whys, a switch to Problem tree and the record at ${viewport.width}px`, async ({ page }) => {
+  test(`5 Whys, a switch to Problem tree, the record and a causal map at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await signIn(page);
     await page.getByLabel('Describe the problem').fill('The weekly rota keeps changing at the last minute');
@@ -65,11 +65,11 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await expect(page.locator('.ps-tree [data-node]')).toHaveCount(2);
     await page.getByRole('button', { name: 'Move on to Analyse' }).click();
 
-    // The boundary turn asks what was learned; the answer is kept and Analyse opens with no tool yet.
+    // The boundary turn asks what was learned; the answer is kept and Analyse opens with a causal map suggested.
     await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
     const learning = `I reach for blame when I am tired (${viewport.width}px).`;
     await answer(page, learning);
-    await expect(page.locator('.ps-coach__messages')).toContainText(/no tool for this step yet/i);
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Causal map');
     const learnings = await page.evaluate(async () => {
       const list = await fetch('/api/problem-solver?list=1').then((res) => res.json());
       const all = await Promise.all(list.data.sessions.map((item) => fetch(`/api/problem-solver?id=${encodeURIComponent(item.id)}`).then((res) => res.json())));
@@ -95,5 +95,22 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await expect(define).toBeVisible();
     await page.locator('.ps-record__card.is-switched button').click();
     await expect(page.locator('.ps-whys [data-node]')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Back to record' }).click();
+
+    // Analyse: start the causal map, place the problem and three causes, then link one to the problem.
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Causal map');
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-causal')).toBeAttached();
+    await answer(page, 'The weekly rota is changed at the last minute');
+    await answer(page, 'Shift swaps are agreed privately by text message');
+    await answer(page, 'The manager signs off the rota only on Fridays');
+    await answer(page, 'Holiday requests arrive after the rota is drafted');
+    await expect(page.locator('.ps-causal .ps-causal__shape')).toHaveCount(4);
+    await answer(page, 'link: cause 1 to problem, plus');
+    await expect(page.locator('.ps-causal [data-edge]')).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    if (process.env.PS_SHOT_DIR) {
+      await page.screenshot({ path: `${process.env.PS_SHOT_DIR}/ps-causal-${viewport.width > 600 ? 'desktop' : 'mobile'}.png`, fullPage: true });
+    }
   });
 }
