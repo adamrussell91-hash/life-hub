@@ -1,13 +1,15 @@
 /**
- * Public class host. Serves published Teaching pages only.
- * Anything else — including sign-in and the umbrella root — is a dead page.
+ * Public class host. Serves published Teaching pages and the published
+ * personal line (`/line#<code>`, Tasks hub) only. Anything else — including sign-in and the umbrella root — is a dead page.
  *
- * ponytail: asset allow-list is flat `/teaching/assets/<file>` names Vite emits
+ * ponytail: asset allow-list is flat `/teaching/assets/<file>` and `/tasks/assets/<file>` names Vite emits
  * today. A nested asset path would 404 until the pattern grows a segment.
  */
 
 export const UPSTREAM_ORIGIN = 'https://life-hub.adam-russell.com';
 export const SHELL_PATH = '/teaching/index.html';
+export const LINE_PATH = '/line';
+export const LINE_SHELL_PATH = '/tasks/line.html';
 
 const STUDENT_PATHS = [
   /^\/s\/lessons\/[^/]+$/,
@@ -17,7 +19,7 @@ const STUDENT_PATHS = [
 ];
 
 const ASSET_PATH =
-  /^\/teaching\/assets\/[A-Za-z0-9._-]+\.(?:js|css|woff2?|ttf|otf|svg|png|jpe?g|gif|webp|avif|ico)$/;
+  /^\/(?:teaching|tasks)\/assets\/[A-Za-z0-9._-]+\.(?:js|css|woff2?|ttf|otf|svg|png|jpe?g|gif|webp|avif|ico)$/;
 
 const REDIRECT_SCRIPT =
   /<script>\s*\(function \(\) \{\s*var key = 'life-hub-spa-redirect';[\s\S]*?\}\)\(\);\s*<\/script>\s*/;
@@ -79,6 +81,10 @@ export function studentPath(pathname) {
   return STUDENT_PATHS.some((pattern) => pattern.test(path)) ? path : null;
 }
 
+export function isLinePath(pathname) {
+  return normalisePath(pathname) === LINE_PATH;
+}
+
 export function isTeachingAsset(pathname) {
   const path = normalisePath(pathname);
   return Boolean(path && ASSET_PATH.test(path));
@@ -121,8 +127,9 @@ export async function handleClassSiteRequest(request, fetchImpl = fetch) {
     return deadPage();
   }
 
-  if (studentPath(url.pathname)) {
-    const upstream = await fetchUpstream(SHELL_PATH, fetchImpl);
+  const line = isLinePath(url.pathname);
+  if (line || studentPath(url.pathname)) {
+    const upstream = await fetchUpstream(line ? LINE_SHELL_PATH : SHELL_PATH, fetchImpl);
     if (!upstream) return deadPage(502);
     const html = scrubTeachingShell(await upstream.text());
     return new Response(request.method === 'HEAD' ? null : html, {
