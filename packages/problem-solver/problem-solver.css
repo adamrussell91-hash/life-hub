@@ -3013,6 +3013,249 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-analogy__shape, .ps-analogy__line, .ps-analogy__head, .ps-analogy__tab { transition: none; }
 }
 
+/* Solution tree (toolkit, Devise): a large blue aim triangle at the foot, point up, and a
+   fan of "how" wedges opening out of that point: red, then yellow, then blue further out.
+   Each wedge's point touches the item it serves and its base faces outward, as in the book.
+   Positions are in chart units: --u is one unit in px and --oy the aim's point, both set by
+   the script, which also sizes each wedge (--len, --hw) and turns it (--a, in degrees).
+   The fill is a clipped layer; the focus and open ring is an SVG outline behind it (ink
+   8px stroke under paper 4px, so 4px and 2px show outside the fill), never clipped.
+   Phone: a narrower fan, and every title moves to the key under the chart. */
+.ps-soltree {
+  /* Named, so every phone query measures this root box. */
+  container: soltree / inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  overflow-x: clip; /* titles are placed to stay inside; never let one widen the page */
+}
+
+.ps-soltree__stage {
+  position: relative;
+  width: var(--w, 100%);
+  max-width: 100%;
+  height: var(--h, 0px);
+}
+
+/* Each item is a point at its triangle's tip; the wedge, its code and its title hang from it. */
+.ps-soltree__item {
+  --fill: var(--ps-blue);
+  --fill-hover: color-mix(in srgb, var(--fill), var(--ps-ink) 14%);
+  --on: #fff;
+  position: absolute;
+  left: calc(50% + var(--x, 0) * var(--u));
+  top: calc(var(--oy) + var(--y, 0) * var(--u));
+  z-index: 1;
+  width: 0;
+  height: 0;
+}
+.ps-soltree__item.is-red { --fill: var(--ps-red); }
+.ps-soltree__item.is-yellow { --fill: var(--ps-yellow); --fill-hover: color-mix(in srgb, var(--fill), #fff 18%); --on: var(--ps-on-yellow); }
+/* The focused, hovered or open triangle rises above its neighbours so its whole ring and tip show. */
+.ps-soltree__item:hover,
+.ps-soltree__item:has(:focus-visible),
+.ps-soltree__item.is-open { z-index: 3; }
+
+.ps-soltree__rot { position: absolute; left: 0; top: 0; width: 0; height: 0; rotate: calc(var(--a, 0) * 1deg); }
+
+/* The button is the wedge's box; only its hit layer takes the pointer, so neighbours' empty corners don't. */
+.ps-soltree__shape {
+  position: absolute;
+  left: 0;
+  top: calc(var(--hw) * var(--u) * -1);
+  width: calc(var(--len) * var(--u));
+  height: calc(var(--hw) * var(--u) * 2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--on);
+  font: inherit;
+  transform-origin: 0 50%;
+  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-soltree__shape:focus-visible { outline: 2px solid transparent; }
+
+.ps-soltree__fill,
+.ps-soltree__hit { position: absolute; inset: 0; clip-path: polygon(0 50%, 100% 0, 100% 100%); }
+.ps-soltree__fill { background: var(--fill); transition: background-color 200ms var(--ps-ease); }
+/* Hover deepens red and blue and lightens yellow, so the words on them keep their contrast. */
+.ps-soltree__shape:hover .ps-soltree__fill { background: var(--fill-hover); }
+/* A slightly larger triangle takes the pointer, so a small wedge is still easy to hit. */
+.ps-soltree__hit { inset: -6px; pointer-events: auto; cursor: pointer; }
+
+.ps-soltree__ring { position: absolute; inset: 0; display: none; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.ps-soltree__ring polygon { fill: none; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ps-soltree__ring-ink { stroke: var(--ps-ink); stroke-width: 8px; }
+.ps-soltree__ring-paper { stroke: var(--ps-paper); stroke-width: 4px; }
+.ps-soltree__shape:focus-visible .ps-soltree__ring,
+.ps-soltree__item.is-open .ps-soltree__ring { display: block; }
+/* Open but not focused: a slimmer ink line. */
+.ps-soltree__item.is-open .ps-soltree__shape:not(:focus-visible) .ps-soltree__ring-ink { stroke-width: 7px; }
+
+/* The aim: point up at the fan's centre, base at the foot (76 by 60 units, as AIM_H and AIM_HW). */
+.ps-soltree__item.is-aim .ps-soltree__shape { left: calc(-30 * var(--u)); top: 0; width: calc(60 * var(--u)); height: calc(76 * var(--u)); transform-origin: 50% 0; }
+.ps-soltree__item.is-aim :is(.ps-soltree__fill, .ps-soltree__hit) { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.ps-soltree__item.is-aim .ps-soltree__hit { inset: -4px; }
+
+/* The aim's words: low in the triangle where it is widest, or just under its base when they won't fit. */
+.ps-soltree__words {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  box-sizing: border-box;
+  width: var(--ww, 80px);
+  translate: -50% 0;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.ps-soltree__words[data-side='inside'] { top: 60%; }
+.ps-soltree__words[data-side='below'] { top: calc(100% + 8px); width: max-content; max-width: var(--ww, 280px); color: var(--ps-ink); }
+
+.ps-soltree__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* .78 keeps 4.8:1 white on blue; on the paper the ink stays at full strength. */
+  opacity: 0.78;
+}
+.ps-soltree__words[data-side='below'] .ps-soltree__meta { opacity: 1; }
+
+.ps-soltree__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+  font: var(--weight-semibold) 12px / 1.2 var(--font-ui);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.ps-soltree__words .ps-soltree__title { -webkit-line-clamp: 3; font-size: 14px; line-height: 1.18; }
+.ps-soltree__words[data-side='below'] .ps-soltree__title { -webkit-line-clamp: 2; font-size: 15px; }
+
+/* Codes: A, A1, A2… inside the wedge at its incentre, or on a small chip just outside it. */
+.ps-soltree__code {
+  position: absolute;
+  left: var(--cx, 0px);
+  top: var(--cy, 0px);
+  display: inline-flex;
+  align-items: center;
+  color: var(--on);
+  font: 700 10px / 1 var(--font-ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+.ps-soltree__item.is-code-out .ps-soltree__code { padding: 1px 3px; border-radius: 4px; background: var(--ps-paper); color: var(--ps-ink); box-shadow: inset 0 0 0 1.5px var(--fill); line-height: 11px; }
+/* A contested how carries a small ink dot after its code. */
+.ps-soltree__item.is-contested .ps-soltree__code::after { content: ''; width: 6px; height: 6px; margin-left: 3px; border-radius: 50%; background: var(--ps-ink); box-shadow: 0 0 0 1.5px var(--ps-paper); }
+
+/* A how's title, beside its wedge: its code on a chip in the wedge's colour, then the title. */
+.ps-soltree__label {
+  position: absolute;
+  left: var(--lx, 0px);
+  top: var(--ly, 0px);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: var(--lw, 116px);
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--ps-paper);
+  color: var(--ps-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ps-soltree__label[data-align='end'] { align-items: flex-end; text-align: right; }
+.ps-soltree__label[data-align='center'] { align-items: center; text-align: center; }
+.ps-soltree__label-code { padding: 0 4px; border-radius: 3px; background: var(--fill); color: var(--on); font: 700 10px / 14px var(--font-ui); letter-spacing: 0.02em; }
+.ps-soltree__label .ps-objection { margin-top: 2px; padding: 0 5px; font-size: 9px; line-height: 1.5; opacity: 1; }
+
+/* A title not beside its wedge is a tip on hover, focus or while open; the key carries it too. */
+.ps-soltree__label.is-tip {
+  background: var(--ps-ink);
+  color: var(--ps-paper);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 160ms var(--ps-ease), visibility 0s linear 160ms;
+}
+.ps-soltree__item:hover .ps-soltree__label.is-tip,
+.ps-soltree__item:has(:focus-visible) .ps-soltree__label.is-tip,
+.ps-soltree__item.is-open .ps-soltree__label.is-tip { opacity: 1; visibility: visible; transition: opacity 160ms var(--ps-ease), visibility 0s; }
+
+/* The key: codes and titles in tree order, indented by level, each row opening its wedge. */
+.ps-soltree__key { display: flex; flex-direction: column; gap: 2px; box-sizing: border-box; width: min(100%, 520px); margin-top: 12px; }
+.ps-soltree__key.is-covered,
+.ps-soltree__key-row.is-labelled { display: none; }
+.ps-soltree__key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px; /* touch target */
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: var(--weight-regular) var(--text-sm) / 1.25 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ps-soltree__key-row[data-level='2'] { font-weight: var(--weight-semibold); }
+.ps-soltree__key-row[data-level='3'] { padding-left: 26px; }
+.ps-soltree__key-row:not([data-level='2'], [data-level='3']) { padding-left: 46px; }
+.ps-soltree__key-row:hover,
+.ps-soltree__key-row[aria-expanded='true'] { background: var(--glass); }
+.ps-soltree__key-row:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+.ps-soltree__key-code {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  background: var(--ps-blue);
+  color: #fff;
+  font: 700 10px / 1 var(--font-ui);
+}
+.ps-soltree__key-row[data-level='2'] .ps-soltree__key-code { background: var(--ps-red); }
+.ps-soltree__key-row[data-level='3'] .ps-soltree__key-code { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-soltree__key-title { min-width: 0; overflow-wrap: anywhere; }
+.ps-soltree__key-row.is-contested .ps-soltree__key-title::after { content: ' · contested'; color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-regular); }
+
+.ps-soltree__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-soltree__panel .ps-details { width: min(100%, 480px); }
+
+/* Phone: every title is in the key (the open row is highlighted), so tips stay hidden;
+   the key takes the full width with tighter indents. */
+@container soltree (max-width: 559px) {
+  .ps-soltree__label { display: none; }
+  .ps-soltree__key { width: 100%; margin-top: 8px; }
+  .ps-soltree__key-row[data-level='3'] { padding-left: 20px; }
+  .ps-soltree__key-row:not([data-level='2'], [data-level='3']) { padding-left: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-soltree__fill, .ps-soltree__label.is-tip { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }
