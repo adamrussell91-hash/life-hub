@@ -7,7 +7,10 @@ import {
   clusterMarks,
   riverHeightPx,
   riverJobShortLabel,
-  roleBandExtraPx,
+  layoutRoleSwimlanes,
+  pastShareFor,
+  placeBarLabel,
+  swimlaneBlockPx,
   timeToUnit,
   truncateRiverLabel,
   yearFraction
@@ -33,9 +36,72 @@ describe('career-river-geometry', () => {
     expect(clamped.to - clamped.from).toBeGreaterThanOrEqual(1);
   });
 
-  it('sizes height from the Phase 3 formula', () => {
-    expect(riverHeightPx('horizontal', 3, 10)).toBe(Math.max(440, 120 + 3 * 64));
-    expect(riverHeightPx('vertical', 3, 10)).toBe(Math.max(640, 10 * 100));
+  it('sizes the phone river from years in view, within bounds', () => {
+    expect(riverHeightPx('vertical', 3, 10)).toBe(600);
+    expect(riverHeightPx('vertical', 0, 2)).toBe(560);
+    expect(riverHeightPx('vertical', 0, 60)).toBe(1600);
+  });
+
+  it('gives the past most of the river when there are no futures', () => {
+    const zoom = { from: 2012, to: 2029 };
+    expect(pastShareFor(0)).toBeGreaterThan(0.8);
+    expect(pastShareFor(2)).toBe(0.4);
+    expect(timeToUnit(2026, zoom, 2026, pastShareFor(0))).toBeCloseTo(pastShareFor(0), 5);
+    expect(timeToUnit(2029, zoom, 2026, pastShareFor(0))).toBeCloseTo(1, 5);
+  });
+
+  it('lays out swimlanes by workplace with concurrent roles stacked inside', () => {
+    const layout = layoutRoleSwimlanes([
+      { group: 'org:wattle', start: 2021, end: 2024.6 },
+      { group: 'org:ridgeway', start: 2012.9, end: 2015 },
+      { group: 'org:wattle', start: 2023, end: 2024.6 },
+      { group: 'org:wattle', start: 2020, end: 2021 },
+      { group: 'org:seaview', start: 2025, end: 2026.8 }
+    ]);
+    // Groups ordered by first start: ridgeway, wattle (2 rows), seaview.
+    expect(layout.groupCount).toBe(3);
+    expect(layout.rowCount).toBe(4);
+    expect(layout.jobRow[1]).toBe(0);
+    expect(layout.jobRow[3]).toBe(1);
+    expect(layout.jobRow[0]).toBe(1);
+    expect(layout.jobRow[2]).toBe(2);
+    expect(layout.jobRow[4]).toBe(3);
+    expect(layout.rowStartsGroup).toEqual([true, true, false, true]);
+    // Label room reserved past a bar's end stops a later role sharing its row.
+    const reserved = layoutRoleSwimlanes([
+      { group: 'g', start: 0, end: 160 },
+      { group: 'g', start: 120, end: 200 }
+    ]);
+    expect(reserved.rowCount).toBe(2);
+    expect(swimlaneBlockPx(layout)).toBeGreaterThan(swimlaneBlockPx({ rowCount: 3, groupCount: 3 }));
+    expect(swimlaneBlockPx({ rowCount: 0, groupCount: 0 })).toBe(0);
+  });
+
+  it('places bar labels inside, beside, or not at all — never over another bar', () => {
+    expect(placeBarLabel({ x0: 0, x1: 200, textW: 80, maxX: 600 })).toEqual({
+      x: 6,
+      anchor: 'start',
+      inside: true
+    });
+    expect(placeBarLabel({ x0: 100, x1: 120, textW: 80, maxX: 600 })).toEqual({
+      x: 126,
+      anchor: 'start',
+      inside: false
+    });
+    // Right side blocked by the next bar → goes left.
+    expect(
+      placeBarLabel({ x0: 100, x1: 120, textW: 60, maxX: 600, blocked: [[130, 300]] })
+    ).toEqual({ x: 94, anchor: 'end', inside: false });
+    // A workplace's first bar tries the left first.
+    expect(placeBarLabel({ x0: 200, x1: 220, textW: 60, maxX: 600, preferLeft: true })).toEqual({
+      x: 194,
+      anchor: 'end',
+      inside: false
+    });
+    // Both sides blocked → tooltip only.
+    expect(
+      placeBarLabel({ x0: 100, x1: 120, textW: 60, maxX: 600, blocked: [[0, 90], [130, 300]] })
+    ).toBeNull();
   });
 
   it('emits readable year axis ticks by zoom span', () => {
@@ -90,7 +156,6 @@ describe('career-river-geometry', () => {
     expect(lanes[0]).toBe(0);
     expect(lanes[1]).toBe(1);
     expect(lanes[2]).toBe(0);
-    expect(roleBandExtraPx(2)).toBeGreaterThan(roleBandExtraPx(1));
   });
 
   it('truncates river labels to a pixel budget', () => {
