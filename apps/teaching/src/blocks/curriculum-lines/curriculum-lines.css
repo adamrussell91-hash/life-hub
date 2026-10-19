@@ -1,0 +1,351 @@
+/* Curriculum lines block: a unit curriculum map drawn as a transit map. */
+
+.block-curriculum-lines {
+  min-width: 0;
+  contain: inline-size;
+}
+
+.block-curriculum-lines .cl-title {
+  margin: 0 0 var(--space-3, 12px);
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 650;
+  color: var(--navy);
+}
+
+.block-curriculum-lines .cl-stage {
+  min-width: 0;
+  min-height: 120px;
+}
+
+.block-curriculum-lines .cl-svg {
+  display: block;
+  overflow: visible;
+}
+
+.block-curriculum-lines .cl-halo,
+.block-curriculum-lines .cl-label,
+.block-curriculum-lines .cl-level {
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+
+.block-curriculum-lines .cl-link {
+  cursor: pointer;
+}
+
+.block-curriculum-lines .cl-link:hover .cl-label--link,
+.block-curriculum-lines .cl-link:focus-visible .cl-label--link {
+  fill: var(--wave);
+  text-decoration: underline;
+}
+
+.block-curriculum-lines .cl-link:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 3px;
+}
+
+.block-curriculum-lines .cl-label--link {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--wave) 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+/* Phone: strand names stay put, the map scrolls sideways inside its own box. */
+.block-curriculum-lines .cl-h {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.block-curriculum-lines .cl-h__names {
+  position: relative;
+  border-right: 1px solid var(--line);
+}
+
+.block-curriculum-lines .cl-h__name {
+  position: absolute;
+  left: 0;
+  right: 8px;
+  transform: translateY(-50%);
+  display: grid;
+  gap: 2px;
+  padding-left: 15px;
+}
+
+.block-curriculum-lines .cl-h__name::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--cl-colour);
+}
+
+.block-curriculum-lines .cl-h__strand {
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--navy);
+}
+
+.block-curriculum-lines .cl-h__path {
+  font-size: var(--text-2xs, 0.6875rem);
+  color: var(--muted);
+}
+
+.block-curriculum-lines .cl-h__scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.block-curriculum-lines .cl-h__scroll:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.block-curriculum-lines .cl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px) var(--space-5, 20px);
+  margin: var(--space-4, 16px) 0 0;
+  padding: var(--space-3, 12px) 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--ink);
+}
+
+.block-curriculum-lines .cl-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cl-legend__mark {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+}
+
+.cl-legend__mark--introduced {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid var(--wave);
+  background: var(--paper);
+}
+
+.cl-legend__mark--reinforced {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--wave);
+}
+
+.cl-legend__mark--mastered {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3.5px solid var(--wave);
+  background: radial-gradient(circle, var(--wave) 0 3px, var(--paper) 3.5px);
+}
+
+.cl-legend__mark--capsule {
+  width: 28px;
+  height: 14px;
+  border-radius: 7px;
+  border: 2px solid var(--marine);
+  background: var(--paper);
+}
+
+.cl-legend__mark--terminus {
+  width: 28px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--marine);
+}
+
+/* Editor */
+
+.cl-editor {
+  display: grid;
+  gap: var(--space-4, 16px);
+  min-width: 0;
+}
+
+.cl-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 12px);
+  align-items: end;
+}
+
+.cl-editor__field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cl-editor__field--grow {
+  flex: 1 1 220px;
+}
+
+.cl-editor__field input,
+.cl-editor__field select {
+  font: inherit;
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 400;
+  color: var(--ink);
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper);
+  min-width: 0;
+}
+
+.cl-editor__section {
+  display: grid;
+  gap: var(--space-2, 8px);
+  min-width: 0;
+}
+
+.cl-editor__heading {
+  margin: 0;
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 650;
+  color: var(--navy);
+}
+
+.cl-editor__hint {
+  margin: 0;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted);
+}
+
+.cl-editor__strand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.cl-editor__swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: none;
+}
+
+.cl-editor__grid-wrap {
+  overflow-x: auto;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.cl-editor__grid {
+  border-collapse: collapse;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.cl-editor__grid th,
+.cl-editor__grid td {
+  border: 1px solid var(--line);
+  padding: 0;
+}
+
+.cl-editor__grid th {
+  padding: 6px 8px;
+  font-weight: 650;
+  color: var(--muted);
+  white-space: nowrap;
+  text-align: left;
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+}
+
+.cl-editor__cell {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  width: 108px;
+  min-height: 52px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cl-editor__cell:hover {
+  background: color-mix(in srgb, var(--wave) 6%, transparent);
+}
+
+.cl-editor__cell[aria-pressed='true'] {
+  outline: 2px solid var(--wave);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--wave) 8%, transparent);
+}
+
+.cl-editor__cell-level {
+  font-weight: 700;
+  color: var(--cl-colour, var(--wave));
+}
+
+.cl-editor__cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-editor__cell--empty {
+  color: var(--muted);
+}
+
+.cl-editor__panel {
+  display: grid;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: color-mix(in srgb, var(--wave) 4%, var(--paper));
+}
+
+.cl-editor__levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cl-editor__checkpoint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+  align-items: end;
+  padding: var(--space-2, 8px) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cl-editor__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--ink);
+}
+
+.cl-editor__preview {
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--line);
+}
