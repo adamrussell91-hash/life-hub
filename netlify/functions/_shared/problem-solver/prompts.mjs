@@ -50,6 +50,7 @@ In phase frame, use "frame" for accepted answers instead of "node"; "node" is on
 - verdict "accept": the answer holds up. Put it in "node" with the slot, a tidy version of their words (keep their meaning; add no ideas), and a "title" of two or three words naming the point.
 - verdict "challenge": the answer does not hold up. Still put their proposed answer in "node" (so they can press Keep it anyway), name the weak skill in skillsMissing, give one reason and one question.
 - verdict "clarify": you need more before judging, or you are suggesting something. No node.
+- When a slot lists tag choices, put exactly one of them in node.tag; otherwise leave tag out.
 Challenge when:
 - a symptom is offered as a cause (analysis)
 - a perception, belief or opinion is stated as fact (critical_thinking)
@@ -67,7 +68,7 @@ SWITCHING AND CHECK-INS
 
 OUTPUT
 Reply with one JSON object and nothing else:
-{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|next_step","tool":"...","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null,"learning":"..."|null}
+{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"...","tag":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|next_step","tool":"...","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null,"learning":"..."|null}
 Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.`;
 
 const RECENT_TURNS = 12;
@@ -110,13 +111,13 @@ function transcript(session) {
 
 function runLines(session, run) {
   const def = TOOLS[run.tool];
-  const nodes = run.nodes.map((node) => `  ${node.slot}${node.state === 'contested' ? ' (contested)' : ''}: ${node.text}`).join('\n') || '  (none yet)';
+  const nodes = run.nodes.map((node) => `  ${node.slot}${node.tag ? ` [${node.tag}]` : ''}${node.state === 'contested' ? ' (contested)' : ''}: ${node.text}`).join('\n') || '  (none yet)';
   const slotOf = (id) => run.nodes.find((n) => n.id === id)?.slot;
   const edges = run.edges.length ? `\nLinks:\n${run.edges.map((e) => `  ${slotOf(e.from)} -> ${slotOf(e.to)} (${e.kind})`).join('\n')}` : '';
   return [
     `ACTIVE TOOL: ${def.name} (${def.id})`,
     `Steps:\n${def.steps.map((step, i) => `  ${i + 1}. ${step.title}: ${step.prompt}`).join('\n')}`,
-    `Slot meanings: ${Object.entries(def.slots).map(([k, v]) => `${k} = ${v}`).join('; ')}`,
+    `Slot meanings: ${Object.entries(def.slots).map(([k, v]) => `${k} = ${v}${def.nodeTags?.[k] ? ` (tag: ${def.nodeTags[k].join('|')})` : ''}`).join('; ')}`,
     `Link kinds: ${def.edgeKinds.join(', ') || 'none'}`,
     `Placed:\n${nodes}${edges}`,
     `Open slots: ${nextSlots(run).join(', ') || 'none (tool complete)'}`,

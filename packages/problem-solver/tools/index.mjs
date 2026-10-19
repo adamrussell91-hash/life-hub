@@ -8,7 +8,8 @@ import { problemStatement } from './problem-statement.mjs';
 import { smart } from './smart.mjs';
 import { contradiction } from './contradiction.mjs';
 
-export const TOOLS = Object.freeze({
+// The container is not frozen (tests register fakes); every definition is frozen.
+export const TOOLS = {
   five_whys: fiveWhys,
   problem_tree: problemTree,
   concept_map: conceptMap,
@@ -17,7 +18,7 @@ export const TOOLS = Object.freeze({
   problem_statement: problemStatement,
   smart,
   contradiction
-});
+};
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
 

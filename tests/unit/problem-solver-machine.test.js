@@ -1,8 +1,8 @@
 // tests/unit/problem-solver-machine.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TOOL_IDS } from '../../packages/problem-solver/tools/index.mjs';
-import { addEdge, applyScores, canEdge, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
+import { TOOL_IDS, TOOLS as REGISTRY } from '../../packages/problem-solver/tools/index.mjs';
+import { addEdge, applyScores, canEdge, checkNode, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
@@ -54,4 +54,27 @@ test('applyScores appends a snapshot under the tool score key, validated by the 
 
 test('applyScores refuses tools that take no scores', () => {
   assert.throws(() => applyScores(newRun('five_whys', 'r'), {}, 'x'), (err) => err.code === 'invalid_scores');
+});
+
+const fakeTool = {
+  id: 'fake_tagged', name: 'Fake', kind: 'diagnostic', step: 'analyse', when: 'test', failureModes: ['a', 'b'], steps: [], edgeKinds: ['link'],
+  slots: { item: 'An item', pick: 'A pick' },
+  nodeTags: { pick: ['up', 'down'] },
+  validateNode(run, node, edges) { return node.slot.startsWith('item') && !edges.some((e) => e.kind === 'link') ? 'Link each item.' : null; },
+  nextSlots: () => ['item:1', 'pick'], complete: () => false
+};
+
+test('checkNode requires a listed tag on tagged slots and rejects tags elsewhere', () => {
+  REGISTRY.fake_tagged = fakeTool; // test-only registration
+  try {
+    const run = { id: 'r', tool: 'fake_tagged', status: 'active', nodes: [], edges: [] };
+    assert.equal(checkNode(run, { slot: 'pick', text: 'x', tag: 'up' }, []), null);
+    assert.match(checkNode(run, { slot: 'pick', text: 'x' }, []), /pick needs a tag: one of up, down/);
+    assert.match(checkNode(run, { slot: 'pick', text: 'x', tag: 'sideways' }, []), /pick needs a tag: one of up, down/);
+    assert.equal(checkNode(run, { slot: 'item:1', text: 'x', tag: 'up' }, [{ from: 'item:1', to: 'pick', kind: 'link' }]), 'Slot item takes no tag.');
+    assert.equal(checkNode(run, { slot: 'item:1', text: 'x' }, []), 'Link each item.');
+    assert.equal(checkNode(run, { slot: 'item:1', text: 'x' }, [{ from: 'item:1', to: 'pick', kind: 'link' }]), null);
+  } finally {
+    delete REGISTRY.fake_tagged;
+  }
 });

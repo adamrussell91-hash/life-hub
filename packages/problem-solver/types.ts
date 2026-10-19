@@ -1,7 +1,7 @@
 export type PsModelId = 'seven_step' | 'polya' | 'triz';
 export type PsToolId = 'five_whys' | 'problem_tree' | 'concept_map' | 'gap_basic' | 'gap_radar' | 'problem_statement' | 'smart' | 'contradiction';
 
-export type PsNode = { id: string; slot: string; text: string; title?: string; state: 'accepted' | 'contested'; objection?: string; skills: string[]; turnId: string | null };
+export type PsNode = { id: string; slot: string; text: string; title?: string; tag?: string; state: 'accepted' | 'contested'; objection?: string; skills: string[]; turnId: string | null };
 export type PsEdge = { from: string; to: string; kind: string };
 export type PsToolRun = { id: string; tool: PsToolId; status: 'active' | 'done' | 'switched'; switchReason?: string; nodes: PsNode[]; edges: PsEdge[]; radar?: { snapshots: { at: string; current: number[]; objective: number[] }[] }; scores?: { snapshots: Array<{ at: string } & Record<string, unknown>> } };
 export type PsTurn = { id: string; role: 'user' | 'coach'; text: string; verdict?: 'accept' | 'challenge' | 'clarify'; skillsSeen?: string[]; skillsMissing?: string[]; createdAt: string };

@@ -58,7 +58,7 @@ export function validateCoachTurn(raw) {
     const nodeText = text(raw.node.text);
     if (!parseSlot(slot)) return fail(`node.slot "${slot}" is not a slot name.`);
     if (!nodeText) return fail('node.text is required.');
-    node = { slot, text: nodeText, title: tidyTitle(raw.node.title) ?? titleFromText(nodeText) };
+    node = { slot, text: nodeText, title: tidyTitle(raw.node.title) ?? titleFromText(nodeText), ...(typeof raw.node.tag === 'string' && raw.node.tag.trim() ? { tag: raw.node.tag.trim().toLowerCase().slice(0, 40) } : {}) };
   }
 
   const edges = [];

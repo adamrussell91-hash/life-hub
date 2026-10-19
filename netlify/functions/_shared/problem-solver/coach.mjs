@@ -1,11 +1,11 @@
 // netlify/functions/_shared/problem-solver/coach.mjs
 import { completeMessage } from '../anthropic-client.mjs';
-import { addEdge, canEdge, canPlace, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { addEdge, canEdge, canPlace, checkNode, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
-import { toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
+import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun } from './session.mjs';
 
 const WORD_LIMIT = 60;
@@ -43,10 +43,14 @@ function fitToRun(session, value) {
   if (!canPlace(run, slot)) return { error: `Slot ${value.node.slot} is not open for ${run.tool}. Open slots: ${nextSlots(run).join(', ') || 'none'}.` };
   const rename = (name) => (name === value.node.slot ? slot : name);
   const node = { ...value.node, slot };
+  if (node.tag != null && !TOOLS[run.tool]?.nodeTags?.[parseSlot(slot)?.name]) delete node.tag;
   if (value.verdict !== 'accept') return { value: { ...value, node, edges: [] } };
+  const renamedEdges = value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }));
+  const problem = checkNode(run, node, renamedEdges);
+  if (problem) return { error: problem };
   let placed = placeNode(run, { id: '__candidate__', slot, text: node.text, state: 'accepted' });
   const edges = [];
-  for (const edge of value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }))) {
+  for (const edge of renamedEdges) {
     const from = placed.nodes.find((n) => n.slot === edge.from)?.id ?? null;
     const to = placed.nodes.find((n) => n.slot === edge.to)?.id ?? null;
     if (!canEdge(placed, from, to, edge.kind)) continue;

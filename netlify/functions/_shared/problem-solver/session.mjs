@@ -113,7 +113,7 @@ const slotToId = (run, slot) => run.nodes.find((node) => node.slot === slot)?.id
 
 function placeAccepted(next, turn, coachTurnId, deps) {
   const run = activeRun(next);
-  let placed = placeNode(run, { id: deps.newId(), slot: turn.node.slot, text: turn.node.text, title: turn.node.title, state: 'accepted', skills: turn.skillsSeen, turnId: coachTurnId });
+  let placed = placeNode(run, { id: deps.newId(), slot: turn.node.slot, text: turn.node.text, title: turn.node.title, ...(turn.node.tag ? { tag: turn.node.tag } : {}), state: 'accepted', skills: turn.skillsSeen, turnId: coachTurnId });
   for (const edge of turn.edges) {
     const from = slotToId(placed, edge.from);
     const to = slotToId(placed, edge.to);
@@ -163,7 +163,7 @@ export function applyCoachTurn(session, turn, deps) {
     if (run && turn.node && turn.verdict === 'accept') {
       next = placeAccepted(next, turn, coachTurn.id, deps);
     } else if (run && turn.node && turn.verdict === 'challenge') {
-      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, objection: turn.message, skills: turn.skillsSeen, runId: run.id } };
+      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, tag: turn.node.tag, objection: turn.message, skills: turn.skillsSeen, runId: run.id } };
     }
   }
 
@@ -179,7 +179,7 @@ export function keepAnyway(session, deps) {
   const run = activeRun(session);
   if (!keep || !run || run.id !== keep.runId) throw fail(409, 'action_not_allowed', 'Nothing to keep.');
   if (!canPlace(run, keep.slot)) throw fail(409, 'action_not_allowed', 'That answer no longer fits here.');
-  const placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, title: keep.title, state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
+  const placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, title: keep.title, ...(keep.tag ? { tag: keep.tag } : {}), state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
   return touch({ ...replaceRun(session, placed), pendingKeep: null, turns: [...session.turns, userTurn('Keep it anyway.', deps)] }, deps);
 }
 

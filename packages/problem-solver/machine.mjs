@@ -1,5 +1,6 @@
 // packages/problem-solver/machine.mjs
 import { TOOLS } from './tools/index.mjs';
+import { parseSlot } from './slots.mjs';
 
 /** @param {string} id */
 export function toolDef(id) {
@@ -67,4 +68,20 @@ export function applyScores(run, payload, at) {
   const key = def.scoreKey ?? 'scores';
   const prior = run[key]?.snapshots ?? [];
   return { ...run, [key]: { ...(run[key] ?? {}), snapshots: [...prior, { at, ...structuredClone(data) }] } };
+}
+
+/**
+ * Checks a proposed node against its tool before it is placed:
+ * a tag from the tool's list where the slot needs one (and none elsewhere),
+ * then the tool's own `validateNode(run, node, edges)`. `edges` are the proposed
+ * links in slot form ({ from, to, kind } with slot names). Returns an error
+ * message for the coach to repair, or null.
+ */
+export function checkNode(run, node, edges = []) {
+  const def = toolDef(run.tool);
+  const name = parseSlot(node.slot)?.name;
+  const tags = def.nodeTags?.[name];
+  if (tags && !tags.includes(node.tag)) return `Slot ${name} needs a tag: one of ${tags.join(', ')}.`;
+  if (!tags && node.tag != null) return `Slot ${name} takes no tag.`;
+  return typeof def.validateNode === 'function' ? def.validateNode(run, node, edges) : null;
 }

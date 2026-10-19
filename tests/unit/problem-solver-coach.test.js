@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { anthropicModel, createModelCoach, fitWords, wordCount } from '../../netlify/functions/_shared/problem-solver/coach.mjs';
+import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
 import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
@@ -187,4 +188,21 @@ test('boundary mode drops an unavailable tool suggestion without a repair call',
   const turn = await coach(boundary);
   assert.equal(calls, 1);
   assert.equal(turn.suggestion, null);
+});
+
+test('a missing tag on a tagged slot triggers one repair that names the choices', async () => {
+  TOOLS.fake_tagged = { id: 'fake_tagged', name: 'Fake', kind: 'diagnostic', step: 'define', when: 'w', failureModes: ['a', 'b'], steps: [{ id: 's', title: 'S', prompt: 'p' }], edgeKinds: [], slots: { pick: 'A pick' }, nodeTags: { pick: ['up', 'down'] }, nextSlots: () => ['pick'], complete: () => false };
+  try {
+    const base = inDefine();
+    const session = { ...base, steps: { ...base.steps, define: { ...base.steps.define, runs: [{ id: 'f', tool: 'fake_tagged', status: 'active', nodes: [], edges: [] }] } } };
+    const replies = [reply({ verdict: 'accept', node: { slot: 'pick', text: 'Rising' } }), reply({ verdict: 'accept', node: { slot: 'pick', text: 'Rising', tag: 'up' } })];
+    const prompts = [];
+    const coach = createModelCoach(async (prompt) => { prompts.push(prompt); return replies.shift(); });
+    const turn = await coach(session);
+    assert.equal(turn.node.tag, 'up');
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1].user, /pick needs a tag: one of up, down/);
+  } finally {
+    delete TOOLS.fake_tagged;
+  }
 });
