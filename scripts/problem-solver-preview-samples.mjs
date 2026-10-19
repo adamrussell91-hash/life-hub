@@ -520,3 +520,59 @@ SAMPLES.swot = run(
   ],
   [of('s1', 'o1'), of('w1', 'o1'), of('s2', 'o2'), of('s3', 'o2'), of('w2', 'o2'), of('w3', 'o2'), of('p1', 'o2'), of('p2', 'o2'), of('t1', 'o2'), of('t2', 'o2')]
 );
+
+// Morphological analysis: a village hall designing a weekday lunch club. Five subjects with three
+// to five forms each; two pairs that cannot go together (one contested); two scenarios. The
+// newest, consistent scenario shows by default; morphological_clash shows the clashing one alone.
+const morphOf = (from, to) => ({ from, to, kind: 'of' });
+const morphNodes = [
+  node('p', 'problem', 'Design a weekday lunch club for older neighbours that the hall can run with volunteers and a small grant.', 'Weekday lunch club'),
+  node('s1', 'subject:1', 'What is served.', 'Menu'),
+  node('s2', 'subject:2', 'Who cooks it.', 'Cooking'),
+  node('s3', 'subject:3', 'How people get there.', 'Transport'),
+  node('s4', 'subject:4', 'How it is paid for.', 'Paying'),
+  node('s5', 'subject:5', 'When it runs.', 'Timing'),
+  node('a11', 'attribute:1', 'Soup with fresh bread.', 'Soup and bread'),
+  node('a12', 'attribute:2', 'A two-course hot meal.', 'Hot two courses'),
+  node('a13', 'attribute:3', 'Sandwiches and cake.', 'Sandwich tea'),
+  node('a14', 'attribute:4', 'A shared pot-luck table.', 'Pot luck'),
+  node('a21', 'attribute:5', 'Volunteers cook in the hall kitchen.', 'Hall volunteers'),
+  node('a22', 'attribute:6', 'The school kitchen sends meals over.', 'School kitchen'),
+  node('a23', 'attribute:7', 'A local caterer delivers.', 'Caterer'),
+  node('a31', 'attribute:8', 'Guests walk or come by bus.', 'Walk or bus'),
+  node('a32', 'attribute:9', 'A volunteer driver rota.', 'Driver rota'),
+  node('a33', 'attribute:10', 'The community minibus.', 'Minibus'),
+  node('a34', 'attribute:11', 'Lifts shared between neighbours.', 'Shared lifts'),
+  node('a41', 'attribute:12', 'A fixed price per meal.', 'Fixed price'),
+  node('a42', 'attribute:13', 'Pay what you can.', 'Donations'),
+  node('a43', 'attribute:14', 'The grant covers everything.', 'Grant-funded'),
+  node('a44', 'attribute:15', 'A monthly membership.', 'Membership'),
+  node('a45', 'attribute:16', 'Free for over-eighties.', 'Free over 80'),
+  node('a51', 'attribute:17', 'Every weekday.', 'Every weekday'),
+  node('a52', 'attribute:18', 'Twice a week.', 'Twice a week'),
+  node('a53', 'attribute:19', 'Once a week, on market day.', 'Market day'),
+  node('c1', 'contradiction:1', 'The school kitchen only cooks in term time and cannot supply every weekday all year.', 'School kitchen, every day'),
+  node('c2', 'contradiction:2', 'A caterer needs a fixed price per head; pay what you can leaves the bill open.', 'Caterer, open bill', { state: 'contested', objection: 'Could the grant cover the gap between what is paid and the caterer\'s price?' }),
+  node('sc1', 'scenario:1', 'Hot meals from the school kitchen every weekday, minibus, donations.', 'School-fed daily club'),
+  node('sc2', 'scenario:2', 'Soup and bread cooked by volunteers twice a week, driver rota, fixed price.', 'Volunteer soup club')
+];
+const morphEdges = [
+  ...['a11', 'a12', 'a13', 'a14'].map((a) => morphOf(a, 's1')),
+  ...['a21', 'a22', 'a23'].map((a) => morphOf(a, 's2')),
+  ...['a31', 'a32', 'a33', 'a34'].map((a) => morphOf(a, 's3')),
+  ...['a41', 'a42', 'a43', 'a44', 'a45'].map((a) => morphOf(a, 's4')),
+  ...['a51', 'a52', 'a53'].map((a) => morphOf(a, 's5')),
+  { from: 'c1', to: 'a22', kind: 'pair' },
+  { from: 'c1', to: 'a51', kind: 'pair' },
+  { from: 'c2', to: 'a23', kind: 'pair' },
+  { from: 'c2', to: 'a42', kind: 'pair' },
+  ...['a12', 'a22', 'a33', 'a42', 'a51'].map((a) => ({ from: 'sc1', to: a, kind: 'picks' })),
+  ...['a11', 'a21', 'a32', 'a41', 'a52'].map((a) => ({ from: 'sc2', to: a, kind: 'picks' }))
+];
+SAMPLES.morphological = run('morphological', [
+  ...morphNodes,
+  node('ev', 'evaluation', 'The volunteer soup club holds together and costs little to try; the school-fed club fails on term dates. Start with soup twice a week and review after a term.', 'Start with the soup club'),
+  node('ch', 'choice', 'Run the volunteer soup club on Tuesdays and Thursdays from January, with a driver rota and a fixed price per bowl.', 'Volunteer soup club')
+], morphEdges);
+SAMPLES.morphological_scenarios = run('morphological', morphNodes, morphEdges);
+SAMPLES.morphological_clash = run('morphological', morphNodes.filter((n) => n.id !== 'sc2'), morphEdges.filter((e) => e.from !== 'sc2'));
