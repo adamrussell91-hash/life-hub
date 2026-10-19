@@ -230,3 +230,53 @@ test('a tool\'s promptNote reaches the coach under the active run', () => {
   }
   assert.match(buildCoachPrompt(s).user, /Note: .*longer than 6 words/);
 });
+
+const idleRunner = { status: 'idle', mode: 'turn', error: null };
+const improveAt = (extra) => ({ ...inTool(), phase: 'improve', steps: { ...inTool().steps, improve: { runs: [], status: 'open', objection: null } }, runner: idleRunner, ...extra });
+
+test('rubric explains the review, the wait and reopen_step', () => {
+  for (const word of ['reopen_step', 'IMPROVE IS WAITING', '"step":"define|analyse"']) assert.ok(RUBRIC.includes(word), word);
+});
+
+test('a waiting Improve holds tools and names the review date', () => {
+  const s = improveAt({ reviewProposal: { title: 'Review: Late work.', due: '2026-11-02', reason: '', status: 'proposed' }, reviewState: { status: 'waiting', due: '2026-11-02', returnTo: null, startedAt: null } });
+  const prompt = buildCoachPrompt(s);
+  assert.match(prompt.user, /IMPROVE IS WAITING/);
+  assert.match(prompt.user, /2026-11-02/);
+  assert.match(prompt.system[1], /CURRENT STEP: Improve/);
+  assert.match(prompt.system[1], /after_action_review \(After action review\)/);
+  assert.match(prompt.system[1], /CARRY FORWARD:/);
+});
+
+test('a review in progress carries the task snapshot', () => {
+  const s = improveAt({
+    reviewState: { status: 'reviewing', due: '2026-11-02', returnTo: 'document', startedAt: '2026-11-02T09:00:00.000Z' },
+    taskSnapshot: { at: '2026-11-02T09:00:00.000Z', byStatus: { open: 1, in_progress: 0, deferred: 0, done: 2, dead: 0, unknown: 0 }, overdue: ['Ask for swaps'] }
+  });
+  const { user } = buildCoachPrompt(s);
+  assert.match(user, /REVIEW IN PROGRESS since 2026-11-02; afterwards the session returns to Document/);
+  assert.match(user, /TASK STATUS \(as of 2026-11-02\): 3 tasks: 1 not started, 2 done; overdue: "Ask for swaps"/);
+});
+
+test('a reopened step tells the coach why and where Move on returns', () => {
+  const s = { ...inTool(), detour: { from: 'improve', to: 'define', reason: 'The sign-off rule was never questioned.', at: 't' } };
+  assert.match(buildCoachPrompt(s).user, /REOPENED: Define was reopened from Improve because: The sign-off rule was never questioned\..*returns to Improve/s);
+});
+
+test('leaving a waiting Improve is not treated as a skip', () => {
+  const base = improveAt({});
+  const s = {
+    ...base,
+    phase: 'document',
+    steps: { ...base.steps, improve: { runs: [], status: 'waiting', objection: null }, document: { runs: [], status: 'open', objection: null } },
+    runner: { status: 'running', mode: 'boundary', leaving: 'improve', error: null },
+    reviewProposal: { title: 'Review: Late work.', due: '2026-11-02', reason: '', status: 'proposed' },
+    reviewState: { status: 'waiting', due: '2026-11-02', returnTo: null, startedAt: null }
+  };
+  const mode = buildCoachPrompt(s).user.split('\n').find((line) => line.startsWith('MODE: boundary'));
+  assert.ok(mode, 'has a MODE line');
+  assert.match(mode, /waiting for its review/i);
+  assert.match(mode, /2026-11-02/);
+  assert.doesNotMatch(mode, /skipped/i);
+  assert.match(mode, /do not object/i);
+});
