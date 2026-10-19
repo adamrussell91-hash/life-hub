@@ -287,3 +287,21 @@ SAMPLES.problem_reduction = run('problem_reduction', [
   node('v3', 'solution:3', 'A photo of the rail in the Friday newsletter, and the rail wheeled out at pick-up on the last Friday of each month.', 'Friday photo and pick-up'),
   node('w', 'integrated', 'A single rail that everyone knows about, shown weekly and opened monthly, with more items named each year so staff can return them straight away.', 'One known rail')
 ]);
+
+// Analogical reasoning: a village bakery's Saturday queue. Round 1 borrows from hospital
+// triage and fails; round 2 borrows from airport bag drop, works, and is retained.
+SAMPLES.analogical_reasoning = run('analogical_reasoning', [
+  node('s', 'source', 'On Saturday mornings the bakery queue runs out of the door for forty minutes; people with one loaf wait behind large pre-orders, and some give up and leave.', 'Saturday queue'),
+  node('t1', 'target:1', 'A hospital emergency department sees a surge of people with very different needs and sorts them as they arrive.', 'Hospital triage'),
+  node('r1', 'rule:1', 'Sort arrivals by how long they will take to serve, not by when they came.', 'Sort by effort'),
+  node('r2', 'rule:2', 'A short look at each arrival decides where they wait.', 'Quick first look'),
+  node('f1', 'filtered:1', 'Keep sorting by effort: a staff member at the door sends one-loaf buyers to a fast till.', 'Door fast till'),
+  node('a1', 'assess:1', 'Not solved: there is only one spare person on a Saturday, and the door job pulled them off the ovens.', 'No spare staff', { tag: 'unsolved' }),
+  node('t2', 'target:2', 'An airport bag drop lets people who checked in online skip the desk and leave their bags at a separate point.', 'Airport bag drop'),
+  node('r3', 'rule:3', 'Work done ahead of arrival moves people out of the main queue.', 'Work done ahead', { state: 'contested', objection: 'Does pre-ordering really match checking in, or just look like it?' }),
+  node('r4', 'rule:4', 'A separate, self-serve point needs no extra staff.', 'Self-serve point'),
+  node('r5', 'rule:5', 'Clear signs tell people which line is theirs before they join.', 'Signs before the line'),
+  node('f2', 'filtered:2', 'Keep work ahead and self-serve: pre-orders are bagged and named on a shelf by the door, paid online, collected without queuing.', 'Pre-order shelf'),
+  node('a2', 'assess:2', 'Solved: in a two-week trial the queue fell to ten minutes and nobody walked away.', 'Queue down to ten minutes', { tag: 'solved' }),
+  node('k', 'retain', 'Move the work that can be done in advance out of the line entirely, and let it serve itself.', 'Move work out of the line')
+]);

@@ -14,6 +14,7 @@ import { createForceFieldView } from '../../../../../packages/problem-solver/ren
 import { createFromToView } from '../../../../../packages/problem-solver/render/from-to';
 import { createIntentStatementView } from '../../../../../packages/problem-solver/render/intent-statement';
 import { createProblemReductionView } from '../../../../../packages/problem-solver/render/problem-reduction';
+import { createAnalogicalReasoningView } from '../../../../../packages/problem-solver/render/analogical-reasoning';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -45,7 +46,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   force_field: () => createForceFieldView(),
   from_to: () => createFromToView(),
   intent_statement: () => createIntentStatementView(),
-  problem_reduction: () => createProblemReductionView()
+  problem_reduction: () => createProblemReductionView(),
+  analogical_reasoning: () => createAnalogicalReasoningView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

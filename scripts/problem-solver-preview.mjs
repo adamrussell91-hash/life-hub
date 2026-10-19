@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>]
 // --click clicks a control first (such as a layout toggle); --name adds -<suffix> to the PNG names.
+// --widths 900,390,320 shoots those viewport widths instead of the default 900 and 390.
 // --next applies SAMPLES['<tool>:next'] after load and shoots <tool>-next-<width>.png (radar morph end state).
 // Bundles a renderer with a synthetic sample run, then screenshots it at 900px and 390px.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -27,6 +28,7 @@ const RENDERERS = {
   from_to: ['from-to', 'createFromToView'],
   intent_statement: ['intent-statement', 'createIntentStatementView'],
   problem_reduction: ['problem-reduction', 'createProblemReductionView'],
+  analogical_reasoning: ['analogical-reasoning', 'createAnalogicalReasoningView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
@@ -43,9 +45,11 @@ const clickIndex = args.indexOf('--click');
 const clickSelector = clickIndex >= 0 ? args.splice(clickIndex, 2)[1] : null;
 const nameIndex = args.indexOf('--name');
 const suffix = nameIndex >= 0 ? `-${args.splice(nameIndex, 2)[1]}` : '';
+const widthsIndex = args.indexOf('--widths');
+const widths = widthsIndex >= 0 ? args.splice(widthsIndex, 2)[1].split(',').map(Number).filter(Boolean) : [900, 390];
 const [tool, outDir] = args;
 if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
-  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>]`);
+  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>] [--widths <w,w>]`);
   process.exit(2);
 }
 mkdirSync(outDir, { recursive: true });
@@ -76,7 +80,7 @@ const page = join(outDir, `${tool}.html`);
 writeFileSync(page, html);
 
 const browser = await chromium.launch({ executablePath: process.env.PS_PREVIEW_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
-for (const width of [900, 390]) {
+for (const width of widths) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 2 });
   const tab = await ctx.newPage();
   tab.on('pageerror', (e) => console.error('page error:', e.message));
@@ -101,4 +105,4 @@ for (const width of [900, 390]) {
 }
 await browser.close();
 const stem = `${tool}${applyNext ? '-next' : ''}${suffix}`;
-console.log(`wrote ${outDir}/${stem}-900.png and ${stem}-390.png`);
+console.log(`wrote ${widths.map((w) => `${outDir}/${stem}-${w}.png`).join(', ')}`);
