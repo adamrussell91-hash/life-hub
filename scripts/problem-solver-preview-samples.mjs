@@ -599,3 +599,17 @@ SAMPLES['pareto:next'] = {
   scores: { snapshots: [paretoFirst, { at: '2026-11-25T17:00:00Z', counts: [30, 12, 34, 10, 6, 8] }] }
 };
 SAMPLES.pareto_unscored = run('pareto', paretoNodes);
+
+// pareto_many: twelve kinds of spend at a sports club over a season, in pounds (figures in the
+// thousands), so the narrowest bars at 390px leave their figures to the key.
+const spend = [
+  ['Pitch hire', 4200], ['Floodlights', 3100], ['Kit', 2600], ['Travel', 1900], ['Referees', 1500], ['Insurance', 1200],
+  ['Balls and cones', 900], ['First aid', 650], ['Kit washing', 400], ['Website', 300], ['Trophies', 90], ['Stamps', 20]
+];
+SAMPLES.pareto_many = {
+  ...run('pareto', [
+    node('t', 'target', 'What the club spent in the 2025 to 2026 season, from the treasurer’s ledger.', 'Season spend'),
+    ...spend.map(([title], i) => node(`i${i + 1}`, `item:${i + 1}`, `${title} for the season.`, title, i === 2 ? { state: 'contested', objection: 'Is kit a club cost or the players’?' } : {}))
+  ]),
+  scores: { snapshots: [{ at: '2026-06-01T12:00:00Z', counts: spend.map(([, n]) => n) }] }
+};
