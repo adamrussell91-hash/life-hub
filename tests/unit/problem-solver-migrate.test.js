@@ -70,3 +70,14 @@ test('index rows from v1 move their phase on too', () => {
   const fresh = { id: 's', status: 'active', phase: 'analyse', model: 'seven_step' };
   assert.equal(migrateRow(fresh), fresh);
 });
+
+test('a closing v1 runner keeps its lease when it becomes a boundary runner', () => {
+  const s = migrateSession(v1({ runner: { status: 'running', mode: 'closing', error: null, leaseUntil: 123 } }));
+  assert.deepEqual(s.runner, { status: 'running', mode: 'boundary', error: null, leaseUntil: 123, leaving: 'define' });
+});
+
+test('an unreadable stored run does not stop a session migrating', () => {
+  const bad = { id: 'x', tool: 'retired_tool', status: 'done', nodes: [], edges: [] };
+  const s = migrateSession(v1({ define: { runs: [bad], finishedEarly: false, exitObjection: null } }));
+  assert.equal(s.steps.define.status, 'skipped');
+});
