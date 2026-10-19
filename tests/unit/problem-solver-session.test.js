@@ -260,8 +260,11 @@ test('the last step\'s learning is recorded once the session is finished', () =>
   assert.equal(s.pendingLearning, null);
 });
 
+// Analyse and Devise have tools now; Decide is the first step of the seven-step model that does not.
+const toDecide = (s) => [1, 2, 3].reduce((acc) => moveOn({ ...acc, runner: { status: 'idle', mode: 'turn', error: null } }, deps), s);
+
 test('the learning question is one-shot: pendingLearning clears even with no learning', () => {
-  let s = applyCoachTurn(moveOn(framed(), deps), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  let s = applyCoachTurn(toDecide(framed()), coach({ verdict: 'clarify', message: 'What did you learn?' }), deps);
   s = applyCoachTurn(say(s, 'Not sure.', deps), coach({ verdict: 'clarify', message: 'Fine.' }), deps);
   assert.equal(s.pendingLearning, null);
   assert.deepEqual(s.learnings, []);

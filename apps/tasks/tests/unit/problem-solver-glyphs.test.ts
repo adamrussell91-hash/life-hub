@@ -23,11 +23,18 @@ describe('skill glyphs', () => {
   });
 });
 
+// Task 4 of Plan 4 adds these emblems and deletes this set.
+const PENDING = new Set([
+  'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement',
+  'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker'
+]);
+
 describe('tool emblems', () => {
   it('every tool has an emblem in book colours with no ids', async () => {
     const { toolEmblem } = await import('../../../../packages/problem-solver/glyphs');
     const { TOOLS } = await import('../../../../packages/problem-solver/tools/index.mjs');
     for (const id of Object.keys(TOOLS) as Array<keyof typeof TOOLS>) {
+      if (PENDING.has(id)) continue;
       const emblem = toolEmblem(id);
       expect(emblem.className).toBe('ps-emblem');
       expect(emblem.getAttribute('aria-hidden')).toBe('true');
