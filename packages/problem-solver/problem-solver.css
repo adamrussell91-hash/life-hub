@@ -4238,10 +4238,16 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   grid-template-columns: subgrid;
   grid-template-rows: subgrid;
   min-width: 0;
-  transition: transform 320ms var(--ps-ease);
 }
 .ps-matrix__option[hidden] { display: none; }
-.ps-matrix__option.is-leading { transform: translateY(-4px); }
+/* The leader's arch rises 4px (a yellow strip below it closes the gap to the band) and its Total
+   tag drops 4px; its cells and rules stay in line with the rows. */
+.ps-matrix__head { position: relative; transition: transform 320ms var(--ps-ease); }
+.ps-matrix__head::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 0; background: var(--ps-yellow); transition: height 320ms var(--ps-ease); }
+.ps-matrix__option.is-leading .ps-matrix__head { transform: translateY(-4px); }
+.ps-matrix__option.is-leading .ps-matrix__head::after { height: 4px; }
+.ps-matrix__total { transition: transform 320ms var(--ps-ease); }
+.ps-matrix__option.is-leading .ps-matrix__total { transform: translateY(4px); }
 .ps-matrix__option:has(:focus-visible),
 .ps-matrix__option:has([aria-expanded='true']) { z-index: 2; }
 
@@ -4422,8 +4428,6 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-matrix__title { font-size: 13px; }
   .ps-matrix__head { min-height: 52px; padding: 10px 12% 7px; }
   .ps-matrix__head .ps-matrix__meta { display: none; }
-  /* One column shows, so a lift would only misalign its rows; the strip marks the leader. */
-  .ps-matrix__option.is-leading { transform: none; }
   .ps-matrix__band-label { font-size: 12px; }
   .ps-matrix__band--criteria { padding-left: 8px; }
   .ps-matrix__value { font-size: 13px; }
@@ -4432,7 +4436,9 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ps-matrix__option { transition: none; }
+  .ps-matrix__head,
+  .ps-matrix__head::after,
+  .ps-matrix__total { transition: none; }
 }
 
 /* Chosen option: the card every Decide chart ends with, the choice in full. */
