@@ -12,7 +12,7 @@ export const problemSolverApi = {
   score: (session: PsSession, payload: Record<string, unknown> & { runId?: string }) =>
     apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: 'score', payload }).then((r) => r.session),
   /** Score the topics of the Gap analysis (advanced) radar; one 1 to 10 score per topic for each overlay. */
-  rescore: (session: PsSession, payload: { current: number[]; objective: number[] }): Promise<PsSession> => problemSolverApi.score(session, payload)
+  rescore: (session: PsSession, payload: { current: number[]; objective: number[]; runId?: string }): Promise<PsSession> => problemSolverApi.score(session, payload)
 };
 
 export function isBusy(session: PsSession): boolean {

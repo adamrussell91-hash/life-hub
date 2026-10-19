@@ -17,8 +17,10 @@ import { morphFromRect } from '../../../design-kit/js/morphing-dialog.js';
 import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
 
 type Scores = { current: number[]; objective: number[] };
+/** Scores for the run on screen, which may not be the step's active run (opened from the record). */
+export type RunScores = Scores & { runId: string };
 type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void };
-export type CanvasHandlers = { onScore?: (scores: Scores) => void };
+export type CanvasHandlers = { onScore?: (scores: RunScores) => void };
 
 /** Tools that draw their own chart. Anything else falls back to the outline. */
 const RENDERERS: Partial<Record<PsToolId, () => View>> = {
@@ -149,6 +151,8 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
   let pinned: { runId: string; via: 'step' | 'film' } | null = null;
   let phase: string | null = null;
   let hadActive = false;
+  /** The run whose chart is on screen, or null when the frame card or record shows. */
+  let displayed: string | null = null;
 
   function viewFor(run: PsToolRun): View | null {
     const make = RENDERERS[run.tool];
@@ -158,7 +162,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       view = make();
       const runId = run.id;
       view.onScore?.((scores) => {
-        if (last && shownRun(last)?.id === runId) handlers.onScore?.(scores);
+        if (displayed === runId) handlers.onScore?.({ runId, ...scores });
       });
       views.set(run.id, view);
     }
@@ -169,6 +173,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
     const heading = el('h2', 'ps-canvas__title', session.model ? MODELS[session.model.id].name : 'Process record');
     if ((session.steps?.[session.phase]?.runs.length ?? 0) > 0) heading.append(toggle('Back to chart', () => openChart(null)));
     record.update(session);
+    displayed = null;
     host.replaceChildren(heading, record.el);
   }
 
@@ -189,12 +194,14 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       chart.append(renderOutline(run));
     }
     host.replaceChildren(heading, chart);
+    displayed = run.id;
     return chart;
   }
 
   function render(): HTMLElement | null {
     const session = last!;
-    if (!allRunsOf(session).length && !(session.model && session.steps?.[session.phase])) {
+    if (!allRunsOf(session).length && session.phase !== 'finished' && !(session.model && session.steps?.[session.phase])) {
+      displayed = null;
       frame.update(session);
       if (frame.el.parentNode !== host || host.childElementCount !== 1) host.replaceChildren(frame.el);
       return null;

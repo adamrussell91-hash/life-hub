@@ -199,3 +199,46 @@ describe('canvas record', () => {
     expect(panel.el.querySelector('.ps-composer__now')!.textContent).toBe('Step: Document');
   });
 });
+
+describe('canvas scores', () => {
+  const node = (id: string, slot: string, title?: string) => ({ id, slot, text: `${slot} answer`, title, state: 'accepted' as const, skills: [], turnId: 't' });
+  const radar = (status: 'active' | 'done') => ({ id: 'rr', tool: 'gap_radar' as const, status, nodes: [node('c', 'current'), node('o', 'objective'), node('a1', 'axis:1', 'One'), node('a2', 'axis:2', 'Two'), node('a3', 'axis:3', 'Three')], edges: [], radar: { snapshots: [] } });
+  const submitScores = (host: HTMLElement) => {
+    host.querySelector<HTMLButtonElement>('.ps-radar__score')!.click();
+    const form = host.querySelector<HTMLFormElement>('.ps-radar__form')!;
+    form.querySelector<HTMLInputElement>('input[name="current"]')!.value = '3';
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+  };
+
+  it('scores a radar opened from the record after moving on, with its run id', () => {
+    const host = document.createElement('div');
+    const onScore = vi.fn();
+    const canvas = mountCanvas(host, { onScore });
+    canvas.update(session({ phase: 'analyse', steps: { define: { runs: [radar('done')], status: 'done', objection: null }, analyse: { runs: [], status: 'open', objection: null } } }));
+    host.querySelector<HTMLButtonElement>('[data-run="rr"] button')!.click();
+    expect(host.querySelector('.ps-radar')).not.toBeNull();
+    submitScores(host);
+    expect(onScore).toHaveBeenCalledWith({ runId: 'rr', current: [3, 5, 5], objective: [8, 8, 8] });
+  });
+
+  it('scores a pinned radar while another tool is active in the step', () => {
+    const host = document.createElement('div');
+    const onScore = vi.fn();
+    const canvas = mountCanvas(host, { onScore });
+    const active = { id: 'r1', tool: 'five_whys' as const, status: 'active' as const, nodes: [], edges: [] };
+    canvas.update(session({ steps: { define: { runs: [radar('done'), active], status: 'open', objection: null } } }));
+    expect(host.querySelector('.ps-whys')).not.toBeNull();
+    host.querySelector<HTMLButtonElement>('.ps-canvas__toggle')!.click();
+    host.querySelector<HTMLButtonElement>('[data-run="rr"] button')!.click();
+    expect(host.querySelector('.ps-radar')).not.toBeNull();
+    submitScores(host);
+    expect(onScore).toHaveBeenCalledWith({ runId: 'rr', current: [3, 5, 5], objective: [8, 8, 8] });
+  });
+
+  it('shows the record, not the frame card, for a finished session with no runs', () => {
+    const host = document.createElement('div');
+    mountCanvas(host).update(session({ phase: 'finished', status: 'finished', steps: {} }));
+    expect(host.querySelector('.ps-frame')).toBeNull();
+    expect(host.querySelector('.ps-record')).not.toBeNull();
+  });
+});
