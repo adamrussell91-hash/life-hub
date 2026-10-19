@@ -29,7 +29,7 @@ export function createAlchemyAgentRunHandler(deps = {}) {
     };
     let outcome;
     try {
-      const result = await (deps.run ?? runAlchemyAgent)({ lessonId: job.lessonId, blockId: job.blockId, request: job.request, env, store, deps, signal: controller.signal, onProgress });
+      const result = await (deps.run ?? runAlchemyAgent)({ kind: job.kind, id: job.entityId, blockId: job.blockId, request: job.request, env, store, deps, signal: controller.signal, onProgress });
       outcome = { status: 'done', result, finished_at: new Date().toISOString() };
     } catch (error) {
       const cause = controller.signal.aborted && controller.signal.reason ? controller.signal.reason : error;

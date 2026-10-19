@@ -58,7 +58,7 @@ test('Ann searches, opens a note, proposes a grounded patch and finishes', async
     [['finish', { summary: 'Added an opening retrieval question.' }]]
   ]);
   const progress = [];
-  const result = await runAlchemyAgent({ lessonId: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs }, onProgress: p => progress.push(p) });
+  const result = await runAlchemyAgent({ kind: 'lesson', id: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs }, onProgress: p => progress.push(p) });
   assert.equal(result.summary, 'Added an opening retrieval question.');
   assert.equal(result.proposals.length, 1);
   assert.deepEqual(result.proposals[0].source, { noteId: 'spacing', title: 'Spacing notes', quote: 'Short low-stakes retrieval questions at the start of a lesson' });
@@ -81,7 +81,7 @@ test('a made-up quote, an unopened note and an ambiguous oldStr come back as err
     ],
     [['finish', { summary: 'Done.' }]]
   ]);
-  const result = await runAlchemyAgent({ lessonId: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
+  const result = await runAlchemyAgent({ kind: 'lesson', id: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
   const [fake, unopened, ambiguous] = toolResults(seen[2]);
   assert.match(fake.content, /quote is not in the note/);
   assert.match(unopened.content, /Cite only a note you opened/);
@@ -94,7 +94,7 @@ test('at most two suggestions may rest on Ann’s own expertise', async () => {
   const { store, fetchImpl, docs } = fixture();
   const own = (oldStr, newStr) => ['propose_edit', { blockId: 'r1', path: 'content.html', oldStr, newStr, why: 'Clearer.' }];
   const { complete, seen } = scripted([[own('Discuss the ending.', 'Discuss the ending in pairs.'), own('<p>Students read', '<p>First, students read'), own('Warm', 'Hot')], [['finish', { summary: 'ok' }]]]);
-  const result = await runAlchemyAgent({ lessonId: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
+  const result = await runAlchemyAgent({ kind: 'lesson', id: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
   assert.equal(result.proposals.length, 2);
   assert.match(toolResults(seen[1])[2].content, /two suggestions without a source/);
 });
@@ -102,7 +102,7 @@ test('at most two suggestions may rest on Ann’s own expertise', async () => {
 test('a block question only edits that block', async () => {
   const { store, fetchImpl, docs } = fixture();
   const { complete, seen } = scripted([[['propose_edit', { blockId: 'r1', path: 'content.html', oldStr: 'Discuss the ending.', newStr: 'Discuss.', why: 'x' }]], [['finish', { summary: 'ok' }]]]);
-  await runAlchemyAgent({ lessonId: 'l1', blockId: 'h1', request: 'Make it punchier', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
+  await runAlchemyAgent({ kind: 'lesson', id: 'l1', blockId: 'h1', request: 'Make it punchier', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
   assert.match(seen[0].messages[0].content, /Adam asked about block h1 only[\s\S]*He said: Make it punchier/);
   assert.match(toolResults(seen[1])[0].content, /one block only/);
 });
@@ -112,7 +112,7 @@ test('the turn limit stops the run, keeps proposals and warns Ann on her last tu
   const turns = Array.from({ length: 20 }, () => [['search_notes', { query: 'memory' }]]);
   turns[0] = [['propose_edit', { blockId: 'h1', path: 'content.text', oldStr: 'Warm up', newStr: 'Retrieval warm up', why: 'x' }]];
   const { complete, seen } = scripted(turns);
-  const result = await runAlchemyAgent({ lessonId: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
+  const result = await runAlchemyAgent({ kind: 'lesson', id: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
   assert.equal(seen.length, LIMITS.lesson.turns);
   assert.equal(result.stoppedEarly, true);
   assert.equal(result.proposals.length, 1);
@@ -122,7 +122,7 @@ test('the turn limit stops the run, keeps proposals and warns Ann on her last tu
 test('a refusal with nothing proposed is an error for the page', async () => {
   const { store, fetchImpl, docs } = fixture();
   const complete = async () => ({ stop_reason: 'refusal', content: [], usage: {} });
-  await assert.rejects(runAlchemyAgent({ lessonId: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } }), /could not review/);
+  await assert.rejects(runAlchemyAgent({ kind: 'lesson', id: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } }), /could not review/);
 });
 
 test('patches refuse protected fields, missing text and invalid results', () => {

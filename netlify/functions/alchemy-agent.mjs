@@ -20,7 +20,7 @@ const bad = (request, env, message) => withCors(errorResponse(400, 'validation_e
 /** What the page needs from a job: never the raw transcript. */
 export function publicJob(job) {
   if (!job) return null;
-  return { job: job.id, lessonId: job.lessonId, blockId: job.blockId, scope: job.scope, status: job.status, progress: job.progress ?? [], result: job.result ?? null, error: job.error ?? null, decisions: job.decisions ?? {}, created_at: job.created_at };
+  return { job: job.id, kind: job.kind, id: job.entityId, blockId: job.blockId, scope: job.scope, status: job.status, progress: job.progress ?? [], result: job.result ?? null, error: job.error ?? null, decisions: job.decisions ?? {}, created_at: job.created_at };
 }
 
 /**
@@ -36,13 +36,14 @@ export function createAlchemyAgentHandler(deps = {}) {
       if (url.pathname.endsWith('/settings')) return await settings(request, env, store, url);
       if (request.method === 'GET') {
         const jobId = url.searchParams.get('job');
-        const lessonId = url.searchParams.get('lesson');
+        const kind = url.searchParams.get('kind') === 'unit' ? 'unit' : 'lesson';
+        const entityId = url.searchParams.get('id');
         if (jobId) {
           const job = await readAgentJob(store, jobId);
           return job ? reply(request, env, publicJob(job)) : withCors(errorResponse(404, 'not_found', 'That review is no longer available.', false), request, env);
         }
-        if (isSafeId(lessonId)) return reply(request, env, publicJob(await latestAgentJob(store, lessonId)));
-        return bad(request, env, 'Choose a lesson or review.');
+        if (isSafeId(entityId)) return reply(request, env, publicJob(await latestAgentJob(store, kind, entityId)));
+        return bad(request, env, 'Choose a lesson, unit or review.');
       }
       if (request.method !== 'POST') return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);
       let body; try { body = await boundedJson(new Response(request.body, { headers: request.headers }), 16000); } catch { body = null; }
@@ -53,15 +54,15 @@ export function createAlchemyAgentHandler(deps = {}) {
         if (!proposal) return withCors(errorResponse(404, 'not_found', 'That suggestion is no longer available.', false), request, env);
         const next = await updateAgentJob(store, job.id, current => ({ ...current, decisions: { ...(current.decisions ?? {}), [proposal.id]: body.action } }));
         if (body.action === 'accepted') {
-          const lesson = await store.get('lessons/' + job.lessonId, { type: 'json', consistency: 'strong' });
-          await rememberAcceptedSource(store, lesson, proposal).catch(() => {});
+          const entity = job.kind === 'unit' ? null : await store.get('lessons/' + job.entityId, { type: 'json', consistency: 'strong' });
+          await rememberAcceptedSource(store, job.kind === 'unit' ? job.entityId : entity?.unit_id, proposal).catch(() => {});
         }
         return reply(request, env, publicJob(next));
       }
-      if (!isSafeId(body.lessonId)) return bad(request, env, 'Choose a lesson to review.');
+      if (!['lesson', 'unit'].includes(body.kind) || !isSafeId(body.id)) return bad(request, env, 'Choose a lesson or unit to review.');
       if (body.blockId !== undefined && body.blockId !== null && !isSafeId(body.blockId)) return bad(request, env, 'Choose a block.');
       if (body.request !== undefined && (typeof body.request !== 'string' || body.request.length > 2000)) return bad(request, env, 'Keep your request under 2,000 characters.');
-      const { job, existing } = await startAgentJob(store, { lessonId: body.lessonId, blockId: body.blockId ?? null, request: body.request ?? '' }, { env, now: deps.now });
+      const { job, existing } = await startAgentJob(store, { kind: body.kind, id: body.id, blockId: body.blockId ?? null, request: body.request ?? '' }, { env, now: deps.now });
       if (!existing) {
         const started = await (deps.invokeRun ?? invokeAgentRun)(request, job.id).catch(() => false);
         if (!started) {

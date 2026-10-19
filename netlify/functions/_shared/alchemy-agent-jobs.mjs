@@ -8,7 +8,7 @@ import { alchemyError } from './alchemy-budget.mjs';
  */
 const BUDGET_KEY = 'alchemy/v2/agent-budget';
 const jobKey = id => 'alchemy/v2/agent-jobs/' + id;
-const latestKey = lessonId => 'alchemy/v2/agent-latest/' + lessonId;
+const latestKey = (kind, id) => 'alchemy/v2/agent-latest/' + kind + '/' + id;
 const DAY = 86400000;
 export const RUN_LEASE_MS = 12 * 60000;
 export const isSafeId = id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(id);
@@ -29,18 +29,18 @@ async function change(store, key, fn) {
  * Starts a run, or returns the one already working on this lesson.
  * Returns {job, existing}.
  */
-export async function startAgentJob(store, { lessonId, blockId = null, request = '' }, { env = {}, now = Date.now } = {}) {
+export async function startAgentJob(store, { kind = 'lesson', id: entityId, blockId = null, request = '' }, { env = {}, now = Date.now } = {}) {
   const time = now();
   const scope = blockId ? 'block' : 'lesson';
   const dailyLimit = scope === 'lesson' ? Number(env.ALCHEMY_AGENT_DAILY_RUNS) || 12 : Number(env.ALCHEMY_AGENT_DAILY_BLOCK_RUNS) || 40;
-  const job = { id: randomUUID(), lessonId, blockId, request, scope, status: 'working', progress: [], created_at: new Date(time).toISOString() };
+  const job = { id: randomUUID(), kind, entityId, blockId, request, scope, status: 'working', progress: [], created_at: new Date(time).toISOString() };
   const outcome = await change(store, BUDGET_KEY, state => {
     const next = { runs: (state?.runs ?? []).filter(r => r.at > time - 2 * DAY), active: Object.fromEntries(Object.entries(state?.active ?? {}).filter(([, a]) => a.until > time)) };
-    const activeKey = lessonId + ':' + scope;
+    const activeKey = kind + ':' + entityId + ':' + scope;
     if (next.active[activeKey]) return { next: state ?? next, value: { existing: next.active[activeKey].jobId } };
     const today = next.runs.filter(r => r.scope === scope && sydneyDay(r.at) === sydneyDay(time)).length;
-    if (today >= dailyLimit) throw alchemyError(429, 'alchemy_budget', scope === 'lesson' ? `Ann has done ${dailyLimit} lesson reviews today. Try again tomorrow.` : 'Ann has answered a lot of block questions today. Try again tomorrow.', 3600000);
-    next.runs.push({ at: time, scope, lessonId });
+    if (today >= dailyLimit) throw alchemyError(429, 'alchemy_budget', scope === 'lesson' ? `Ann has done ${dailyLimit} full reviews today. Try again tomorrow.` : 'Ann has answered a lot of block questions today. Try again tomorrow.', 3600000);
+    next.runs.push({ at: time, scope, kind, entityId });
     next.active[activeKey] = { jobId: job.id, until: time + RUN_LEASE_MS };
     return { next, value: { existing: null } };
   });
@@ -49,7 +49,7 @@ export async function startAgentJob(store, { lessonId, blockId = null, request =
     if (existing) return { job: existing, existing: true };
   }
   await store.setJSON(jobKey(job.id), job);
-  if (scope === 'lesson') await store.setJSON(latestKey(lessonId), { jobId: job.id });
+  if (scope === 'lesson') await store.setJSON(latestKey(kind, entityId), { jobId: job.id });
   return { job, existing: false };
 }
 
@@ -58,8 +58,8 @@ export async function readAgentJob(store, id) {
   return store.get(jobKey(id), { type: 'json', consistency: 'strong' });
 }
 
-export async function latestAgentJob(store, lessonId) {
-  const pointer = await store.get(latestKey(lessonId), { type: 'json', consistency: 'strong' });
+export async function latestAgentJob(store, kind, id) {
+  const pointer = await store.get(latestKey(kind, id), { type: 'json', consistency: 'strong' });
   return pointer?.jobId ? readAgentJob(store, pointer.jobId) : null;
 }
 
@@ -72,7 +72,7 @@ export function updateAgentJob(store, id, fn) {
 export async function releaseAgentRun(store, job) {
   await change(store, BUDGET_KEY, state => {
     const next = state ?? { runs: [], active: {} };
-    const key = job.lessonId + ':' + job.scope;
+    const key = job.kind + ':' + job.entityId + ':' + job.scope;
     if (next.active?.[key]?.jobId === job.id) delete next.active[key];
     return { next, value: null };
   });

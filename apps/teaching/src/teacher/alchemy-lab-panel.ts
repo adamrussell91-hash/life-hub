@@ -1,6 +1,7 @@
 import { alchemyModeLabel, knowledgeHubPageUrl, type AlchemyConnection, type AlchemyMode } from '@/alchemy/connections';
 import { knowledgeHubOrigin, runAlchemyLab } from '@/alchemy/client';
 import { ApiClientError } from '@/api/client';
+import { mountAgentPanel, type AgentPanelOptions, type AgentPanelHandle } from '@/alchemy/agent-panel';
 
 export type AlchemyLabHandle = {
   open(prefill: string): void;
@@ -11,6 +12,8 @@ export type AlchemyLabHandle = {
 
 export type MountAlchemyLabOptions = {
   onHide?: () => void;
+  /** Ann's whole-lesson review; without it the panel only finds connections. */
+  agent?: AgentPanelOptions;
 };
 
 const PLACEHOLDER = 'Paste a lesson outline, learning intention, or topic…';
@@ -25,7 +28,7 @@ export function mountAlchemyLabPanel(
   header.className = 'page-header alchemy-lab__header';
   header.innerHTML = `<div class="page-header__copy">
     <p class="eyebrow page-header__eyebrow">Alchemy Lab</p>
-    <h1 class="page-header__title">Cross-domain connections</h1>
+    <h1 class="page-header__title">Ann and your research</h1>
   </div>`;
 
   const hideBtn = document.createElement('button');
@@ -77,7 +80,20 @@ export function mountAlchemyLabPanel(
   results.setAttribute('aria-live', 'polite');
   results.innerHTML = '<p class="empty">Connections will appear here.</p>';
 
-  host.replaceChildren(header, form, results);
+  host.replaceChildren(header);
+  const agentHost = document.createElement('div');
+  let agent: AgentPanelHandle | null = null;
+  if (options.agent) {
+    host.append(agentHost);
+    agent = mountAgentPanel(agentHost, options.agent);
+    // The older archive search stays, folded away under Ann's review.
+    const more = document.createElement('details');
+    more.className = 'alchemy-lab__connections';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Cross-domain connections';
+    more.append(summary, form, results);
+    host.append(more);
+  } else host.append(form, results);
 
   let busy = false;
   let hasRun = false;
@@ -171,7 +187,8 @@ export function mountAlchemyLabPanel(
     open(prefill: string) {
       textarea.value = prefill;
       syncButtons();
-      textarea.focus();
+      agent?.refresh();
+      if (!agent) textarea.focus();
     },
     setSelectionText(text: string, selected: boolean) {
       selectionText = text;
@@ -182,6 +199,7 @@ export function mountAlchemyLabPanel(
       return !host.hidden;
     },
     dispose() {
+      agent?.dispose();
       host.replaceChildren();
     }
   };
