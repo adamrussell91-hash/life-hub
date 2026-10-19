@@ -6,8 +6,8 @@ import { addEdge, canEdge, canPlace, isComplete, newRun, nextSlots, placeNode, t
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
-test('registry lists all seven tools', () => {
-  assert.deepEqual(TOOL_IDS, ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart']);
+test('registry lists all eight tools', () => {
+  assert.deepEqual(TOOL_IDS, ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction']);
   assert.throws(() => toolDef('nope'), /Unknown tool/);
 });
 

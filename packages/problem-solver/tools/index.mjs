@@ -6,6 +6,7 @@ import { gapBasic } from './gap-basic.mjs';
 import { gapRadar } from './gap-radar.mjs';
 import { problemStatement } from './problem-statement.mjs';
 import { smart } from './smart.mjs';
+import { contradiction } from './contradiction.mjs';
 
 export const TOOLS = Object.freeze({
   five_whys: fiveWhys,
@@ -14,7 +15,13 @@ export const TOOLS = Object.freeze({
   gap_basic: gapBasic,
   gap_radar: gapRadar,
   problem_statement: problemStatement,
-  smart
+  smart,
+  contradiction
 });
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
+
+/** Tool ids whose `step` is the given book step, in registry order. */
+export function toolsForBookStep(step) {
+  return TOOL_IDS.filter((id) => TOOLS[id].step === step);
+}

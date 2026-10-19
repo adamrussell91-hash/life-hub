@@ -15,6 +15,12 @@ export const gapRadar = Object.freeze({
   name: 'Gap analysis (advanced)',
   kind: 'diagnostic',
   when: 'Several dimensions of the gap that can each be scored 1 to 10 and tracked over time.',
+  step: 'define',
+  failureModes: [
+    'Topics that overlap, so scores double count.',
+    'Scores given with no reason or evidence.',
+    'An inconsistent scale between snapshots, so progress cannot be compared.'
+  ],
   steps: [
     ...GAP_STEPS.slice(0, 3),
     { id: 'score', title: 'Score each topic', prompt: 'For each topic, give the current state and the objective a rating from 1 to 10, with 10 a perfect score. Rescore later to track progress.' }

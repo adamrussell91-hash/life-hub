@@ -1,5 +1,5 @@
 export type PsModelId = 'seven_step' | 'polya' | 'triz';
-export type PsToolId = 'five_whys' | 'problem_tree' | 'concept_map' | 'gap_basic' | 'gap_radar' | 'problem_statement' | 'smart';
+export type PsToolId = 'five_whys' | 'problem_tree' | 'concept_map' | 'gap_basic' | 'gap_radar' | 'problem_statement' | 'smart' | 'contradiction';
 
 export type PsNode = { id: string; slot: string; text: string; title?: string; state: 'accepted' | 'contested'; objection?: string; skills: string[]; turnId: string | null };
 export type PsEdge = { from: string; to: string; kind: string };
