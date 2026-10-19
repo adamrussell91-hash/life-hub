@@ -4,6 +4,8 @@ import { addEdge, canEdge, canPlace, nextSlots, placeNode } from '../../../../pa
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
+import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
+import { toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun } from './session.mjs';
 
 const WORD_LIMIT = 60;
@@ -57,6 +59,11 @@ function fitToRun(session, value) {
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
+  const suggested = result.value.suggestion;
+  if (suggested && (suggested.kind === 'next_tool' || suggested.kind === 'switch_tool')) {
+    const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);
+    if (!allowed.includes(suggested.tool)) return { ok: false, error: `Tool ${suggested.tool} is not available in this step. Available: ${allowed.join(', ') || 'none, so do not suggest a tool'}.` };
+  }
   const fitted = fitToRun(session, result.value);
   return fitted.error ? { ok: false, error: fitted.error } : { ok: true, value: fitted.value };
 }

@@ -1,8 +1,8 @@
 // netlify/functions/_shared/problem-solver/prompts.mjs
 import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
 import { MODELS } from '../../../../packages/problem-solver/models.mjs';
-import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
-import { nextSlots } from '../../../../packages/problem-solver/machine.mjs';
+import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
+import { isComplete, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
 import { planStep, stepName, stepPlan, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { activeRun, currentStep, followOn } from './session.mjs';
 import { PROCESS } from './knowledge/process.mjs';
@@ -40,7 +40,7 @@ ${FINAL_WORDS}
 SESSION SHAPE
 1. Frame: get clear answers to the three questions: What is the goal (the ideal state or result)? What is true (facts and data, not perceptions or opinions)? What can be done (can it be solved as it stands, or should it be reframed to something more achievable)? Record each accepted answer in "frame" as goal, whatIsTrue, whatCanBeDone. Ask one at a time.
 2. When all three are answered, choose a process model with a one-sentence reason in "model", and suggest the first tool of its first step with a "next_tool" suggestion.
-3. Entering a step, orient the person in one sentence (what the step is for), then recommend one tool with "next_tool", saying why and naming a sibling tool you passed over.
+3. On the turn after the learning question, when entering a step, orient the person in one sentence (what the step is for), then recommend one tool with "next_tool", saying why and naming a sibling tool you passed over.
 4. In a tool, work its steps in order. Each answer that holds up becomes a node in the open slot it belongs to. Only use slot names from "Open slots". Never invent slots. Use the full slot name with its number (effect:1, not effect). Links join the node you are placing to slots already placed, using only the listed link kinds.
 5. Carry forward: use what earlier steps established (listed under EARLIER STEPS) as the starting point for the current tool, and say so. Do not copy it in without the person agreeing.
 6. The person can move on at any time. Never block them.
@@ -82,9 +82,21 @@ function toolKnowledge(id) {
 function stepLayer(session) {
   if (session.phase === 'finished') return 'The session is finished. Recap briefly when asked and help the person carry the learning forward. Do not suggest tools.';
   const step = session.model ? planStep(session.model.id, session.phase) : null;
-  if (!step) return 'No step yet: the session is still being framed.';
+  if (!step) {
+    return [
+      'NEXT STEP AFTER FRAMING: the model\'s first step, which uses Define tools.',
+      SELECTION.define ?? '',
+      `TOOLS FOR THAT STEP:\n${toolsForBookStep('define').map(toolKnowledge).join('\n')}`
+    ].filter(Boolean).join('\n\n');
+  }
   const books = step.book;
   const tools = toolsForPlanStep(session.model.id, session.phase);
+  if (!tools.length) {
+    return [
+      `CURRENT STEP: ${stepName(session.model.id, session.phase)} (tool families: ${books.join(', ')})`,
+      'No tools are available for this step yet. Do not suggest a tool. Help them think the step through in conversation, using what the step is for, and suggest next_step when it has what it needs.'
+    ].join('\n\n');
+  }
   return [
     `CURRENT STEP: ${stepName(session.model.id, session.phase)} (tool families: ${books.join(', ')})`,
     books.map((id) => SELECTION[id]).filter(Boolean).join('\n') || 'Pick the tool that best fits the problem\'s shape from the list below.',
@@ -126,7 +138,7 @@ function earlierSteps(session) {
     const state = session.steps[step];
     if (!state || step === session.phase) continue;
     const runs = state.runs.filter((run) => run.status !== 'switched' && run.nodes.length);
-    const body = runs.map((run) => `${TOOLS[run.tool].name} ${run.status}; ${run.nodes.map((n) => `${n.slot}: ${n.text}`).join(' | ')}`).join(' // ') || 'nothing kept';
+    const body = runs.map((run) => `${TOOLS[run.tool].name} ${isComplete(run) ? 'complete' : 'incomplete'}; ${run.nodes.map((n) => `${n.slot}: ${n.text}`).join(' | ')}`).join(' // ') || 'nothing kept';
     lines.push(`${stepName(session.model.id, step)} (${state.status}${state.objection ? `, coach objected: ${state.objection}` : ''}): ${body}`);
   }
   return lines.length ? `EARLIER STEPS:\n${lines.join('\n')}` : null;
@@ -148,7 +160,9 @@ export function buildCoachPrompt(session) {
   if (earlier) parts.push(earlier);
   if (session.pendingLearning && session.runner?.mode !== 'boundary') {
     const from = stepName(session.model.id, session.pendingLearning);
-    parts.push(`AWAITING LEARNING from ${from}: if they named something they learned, put it in "learning" (one sentence, their meaning); otherwise leave learning null. Either way, unless the session is finished, orient them to the current step in one sentence and suggest its first tool with next_tool.`);
+    const hasTools = session.model && session.phase !== 'finished' && toolsForPlanStep(session.model.id, session.phase).length > 0;
+    const after = session.phase === 'finished' ? '' : ` Either way, unless the session is finished, orient them to the current step in one sentence${hasTools ? ' and suggest its first tool with next_tool' : ''}.`;
+    parts.push(`AWAITING LEARNING from ${from}: if they named something they learned, put it in "learning" (one sentence, their meaning); otherwise leave learning null.${after}`);
   }
   const step = currentStep(session);
   if (step) {
@@ -158,7 +172,7 @@ export function buildCoachPrompt(session) {
   }
   const run = activeRun(session);
   if (run) parts.push(runLines(session, run));
-  else if (step && !session.pendingLearning && session.runner?.mode !== 'boundary') parts.push('No tool is open in this step yet: orient them and suggest one with next_tool.');
+  else if (step && !session.pendingLearning && session.runner?.mode !== 'boundary' && toolsForPlanStep(session.model.id, session.phase).length) parts.push('No tool is open in this step yet: orient them and suggest one with next_tool.');
   if (session.pendingKeep) parts.push(`Last challenged answer (${session.pendingKeep.slot}): ${session.pendingKeep.text}`);
   if (session.summary) parts.push(`Summary so far: ${session.summary}`);
   const coachTurns = session.turns.filter((t) => t.role === 'coach').length;

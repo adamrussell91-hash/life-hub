@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { anthropicModel, createModelCoach, fitWords, wordCount } from '../../netlify/functions/_shared/problem-solver/coach.mjs';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
-import { createSession, applyCoachTurn, acceptSuggestion, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
+import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 let n = 0;
 const deps = { now: () => '2026-10-16T10:00:00.000Z', newId: () => `id${(n += 1)}` };
@@ -144,4 +144,16 @@ test('anthropicModel sends each system layer as its own cached block', async () 
     { type: 'text', text: 'fixed', cache_control: { type: 'ephemeral' } },
     { type: 'text', text: 'step', cache_control: { type: 'ephemeral' } }
   ]);
+});
+
+test('a tool suggestion that is not available in the step triggers one repair', async () => {
+  const analyse = moveOn(inDefine(), deps);
+  let calls = 0;
+  const coach = createModelCoach(async () => {
+    calls += 1;
+    return calls === 1 ? reply({ suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }) : reply({});
+  });
+  const turn = await coach({ ...analyse, runner: { status: 'queued', mode: 'turn', error: null } });
+  assert.equal(calls, 2);
+  assert.equal(turn.suggestion, null);
 });
