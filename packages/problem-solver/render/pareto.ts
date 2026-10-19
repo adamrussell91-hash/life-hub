@@ -46,6 +46,7 @@ type Bar = {
   centre: number;
   height: number;
 };
+type Before = { centre: number; height: number; rect: DOMRect | null; inside: boolean };
 type Composed = { item: HTMLDivElement; head: HTMLDivElement; text: HTMLParagraphElement; more: HTMLButtonElement; id: string };
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -55,6 +56,10 @@ const MORPH_MS = 600;
 const LABEL_PX = 22;
 /** Before the field has been measured (not yet attached), the same rule as a share of its height. */
 const LABEL_FALLBACK = 8;
+/** Room a figure needs either side inside its bar. */
+const LABEL_PAD = 4;
+/** The figures' font where the computed style does not say (the CSS sets 13px serif, 11px on a phone). */
+const FIGURE_FONT = "600 13px Georgia, 'Times New Roman', serif";
 /** Each bar fills this share of its slot; the rest is the red gap either side, as in the book. */
 const BAR_FILL = 0.84;
 const letter = (i: number): string => String.fromCharCode(65 + i);
@@ -81,7 +86,37 @@ function setStyle(target: HTMLElement, prop: 'left' | 'width' | 'height' | 'bott
 /** A figure as it reads on the chart: whole numbers plain, otherwise one decimal; thousands as k. */
 export function formatFigure(value: number): string {
   if (Math.abs(value) >= 10000) return `${+(value / 1000).toFixed(1)}k`;
-  return Number.isInteger(value) ? String(value) : String(+value.toFixed(1));
+  if (Number.isInteger(value)) return String(value);
+  return String(+value.toFixed(Math.abs(value) < 10 ? 2 : 1));
+}
+
+/** Decimals a number needs to be written exactly (up to four). */
+function decimalsOf(value: number): number {
+  let d = 0;
+  while (d < 4 && Math.abs(value * 10 ** d - Math.round(value * 10 ** d)) > 1e-9) d += 1;
+  return d;
+}
+
+/** An axis tick, with as many decimals as the step needs, so no two ticks read the same. */
+export function formatTick(value: number, step: number): string {
+  if (Math.abs(value) >= 10000) return `${+(value / 1000).toFixed(decimalsOf(step / 1000))}k`;
+  return String(+value.toFixed(decimalsOf(step)));
+}
+
+/** Text width in px for a CSS font, where a canvas can measure it (null otherwise). */
+let measurer: CanvasRenderingContext2D | null = null;
+function textWidth(doc: Document, text: string, font: string): number | null {
+  if (!font) return null;
+  if (!measurer) {
+    try {
+      measurer = doc.createElement('canvas').getContext('2d');
+    } catch {
+      measurer = null;
+    }
+  }
+  if (!measurer || !font) return null;
+  measurer.font = font;
+  return measurer.measureText(text).width;
 }
 
 /** A tidy top for the figure axis: ten equal steps of 1, 2, 2.5 or 5 times a power of ten. */
@@ -156,6 +191,12 @@ export function createParetoView(doc: Document = document): ParetoView {
   let painted = false;
   let destroyed = false;
   let fieldHeight = 0;
+  let fieldWidth = 0;
+  /** Bars whose figure waits for their shrink to finish before it moves. */
+  const pending = new Set<Bar>();
+  /** The control that opened the card now open (a key row or a bar), for Escape to return to. */
+  let openedBy: HTMLButtonElement | null = null;
+  let viaKey = false;
 
   // Data form.
   let handler: ((scores: ParetoScores) => void) | null = null;
@@ -310,6 +351,8 @@ export function createParetoView(doc: Document = document): ParetoView {
     rows = [];
     drawnKey = '';
     fieldHeight = 0;
+    fieldWidth = 0;
+    pending.clear();
     if (form) {
       form.hidden = true;
       toggle!.setAttribute('aria-expanded', 'false');
@@ -357,7 +400,15 @@ export function createParetoView(doc: Document = document): ParetoView {
     const keyShare = el(doc, 'span', 'ps-pareto__key-share');
     key.append(keyCode, keyWords, keyFigure, keyShare);
     key.addEventListener('click', () => {
-      if (!destroyed) bars.get(node.id)?.fill.click();
+      const bar = bars.get(node.id);
+      if (destroyed || !bar) return;
+      viaKey = true;
+      bar.fill.click();
+      viaKey = false;
+      openedBy = bar.card.classList.contains('is-open') ? key : null;
+    });
+    fill.addEventListener('click', () => {
+      if (!viaKey && !destroyed) openedBy = card.classList.contains('is-open') ? fill : null;
     });
     frame!.key.append(key);
 
@@ -378,7 +429,20 @@ export function createParetoView(doc: Document = document): ParetoView {
 
   /** Put each figure inside its bar's top, or on top of a bar too short to hold it. */
   function placeLabels(): void {
+    // Reads first: the figures' font and each figure's width (canvas text metrics, no layout).
+    const sample = [...bars.values()][0]?.value;
+    const font = sample && fieldWidth > 0 ? (typeof getComputedStyle === 'function' ? getComputedStyle(sample).font : '') || FIGURE_FONT : '';
+    const slot = order.length ? (fieldWidth * BAR_FILL) / order.length : 0;
+    const fits = new Map<Bar, boolean>();
     for (const bar of bars.values()) {
+      const w = bar.value.textContent ? textWidth(doc, bar.value.textContent, font) : null;
+      fits.set(bar, w === null || w + LABEL_PAD <= slot);
+    }
+    for (const bar of bars.values()) {
+      // A narrow bar's figure stays off the chart; its key row carries it.
+      bar.value.classList.toggle('is-hidden', !fits.get(bar));
+      // A shrinking bar keeps its figure where it was until its height animation ends.
+      if (pending.has(bar)) continue;
       const tall = fieldHeight > 0 ? (bar.height / 100) * fieldHeight >= LABEL_PX : bar.height >= LABEL_FALLBACK;
       const inside = tall || !bar.value.textContent;
       const host = inside ? bar.fill : bar.item;
@@ -391,8 +455,9 @@ export function createParetoView(doc: Document = document): ParetoView {
 
   function measure(): void {
     if (!frame) return;
-    const h = frame.field.getBoundingClientRect().height;
-    if (h && Math.abs(h - fieldHeight) >= 0.5) fieldHeight = h;
+    const rect = frame.field.getBoundingClientRect();
+    if (rect.height && Math.abs(rect.height - fieldHeight) >= 0.5) fieldHeight = rect.height;
+    if (rect.width && Math.abs(rect.width - fieldWidth) >= 0.5) fieldWidth = rect.width;
   }
 
   /** Lay the bars, codes, line, dots and guide out for the current rows (no motion here). */
@@ -452,7 +517,7 @@ export function createParetoView(doc: Document = document): ParetoView {
     });
 
     // Axis ticks for the figures, in ten tidy steps.
-    f.countTicks.forEach((tick, k) => setText(tick, scored ? formatFigure(((k + 1) * top) / 10) : ''));
+    f.countTicks.forEach((tick, k) => setText(tick, scored ? formatTick(((k + 1) * top) / 10, top / 10) : ''));
 
     // The cumulative line and the 80% guide.
     const points = scored ? rows.map((row) => ({ x: bars.get(row.node.id)!.centre, y: row.cumulative })) : [];
@@ -513,13 +578,24 @@ export function createParetoView(doc: Document = document): ParetoView {
   // ---------------------------------------------------------------- motion
 
   /** Grow the bars from where they stood, glide moved bars (FLIP by measured centres), redraw the line. */
-  function morph(before: Map<string, { centre: number; height: number; rect: DOMRect | null }>, fieldRect: DOMRect | null): void {
+  function morph(before: Map<string, Before>, fieldRect: DOMRect | null): void {
     for (const bar of bars.values()) {
       const was = before.get(bar.node.id);
       if (!was) continue;
       cancelAnimations(bar.item);
       if (canAnimate(bar.fill) && Math.abs(was.height - bar.height) > 0.01) {
-        bar.fill.animate([{ height: `${was.height}%` }, { height: `${bar.height}%` }], { duration: MORPH_MS, easing: EASE });
+        const grow = bar.fill.animate([{ height: `${was.height}%` }, { height: `${bar.height}%` }], { duration: MORPH_MS, easing: EASE });
+        // Shrinking: the figure stays inside (where it was) until the bar has shrunk, then moves.
+        if (bar.height < was.height && was.inside && grow) {
+          pending.add(bar);
+          if (bar.value.parentElement !== bar.fill) bar.fill.append(bar.value);
+          bar.value.classList.remove('is-above');
+          bar.value.style.removeProperty('bottom');
+          grow.onfinish = () => {
+            pending.delete(bar);
+            if (!destroyed && bars.get(bar.node.id) === bar) placeLabels();
+          };
+        }
       }
       // The new centre comes from the measured field and the bar's percent place; the old one was measured.
       if (was.rect && fieldRect && fieldRect.width && Math.abs(was.centre - bar.centre) > 0.01 && canAnimate(bar.item)) {
@@ -668,7 +744,40 @@ export function createParetoView(doc: Document = document): ParetoView {
     }
   }
 
+  /** If focus sits in the form an undo is about to take away, move it to the target card or the chart. */
+  function rescueFocus(): void {
+    const active = doc.activeElement;
+    if (!scoring || !active || !scoring.contains(active)) return;
+    const next = target?.more ?? null;
+    if (next && root.contains(next)) next.focus({ preventScroll: true });
+    else {
+      root.tabIndex = -1;
+      root.focus({ preventScroll: true });
+    }
+  }
+
   const run0HasData = (): boolean => (lastRun?.scores?.snapshots?.length ?? 0) > 0;
+
+  // Escape on a key row, or in a card a key row opened, closes the card and returns to that row.
+  // (A card the bar opened is closed by the disclosure group, which returns focus to the bar.)
+  root.addEventListener(
+    'keydown',
+    (event) => {
+      if (destroyed || event.key !== 'Escape') return;
+      const at = event.target as Node;
+      for (const bar of bars.values()) {
+        if (!bar.card.classList.contains('is-open')) continue;
+        if (at !== bar.key && !(openedBy === bar.key && bar.card.contains(at))) continue;
+        event.preventDefault();
+        event.stopPropagation();
+        group.close();
+        openedBy = null;
+        bar.key.focus({ preventScroll: true });
+        return;
+      }
+    },
+    true
+  );
 
   // ---------------------------------------------------------------- size watch
 
@@ -676,9 +785,9 @@ export function createParetoView(doc: Document = document): ParetoView {
     typeof ResizeObserver === 'function'
       ? new ResizeObserver(() => {
           if (destroyed || !frame) return;
-          const before = fieldHeight;
+          const before = `${fieldHeight}x${fieldWidth}`;
           measure();
-          if (fieldHeight !== before) placeLabels();
+          if (`${fieldHeight}x${fieldWidth}` !== before) placeLabels();
         })
       : null;
 
@@ -691,15 +800,21 @@ export function createParetoView(doc: Document = document): ParetoView {
     const targetNode = run.nodes.find((node) => node.slot === 'target');
     const fresh: HTMLElement[] = [];
 
+    // Reads first: the field and where every bar stands now, before anything is written.
+    measure();
+    const fieldRect = items.length && frame && painted ? frame.field.getBoundingClientRect() : null;
+    const before = new Map<string, Before>();
+    if (items.length && frame && painted) {
+      for (const bar of bars.values()) before.set(bar.node.id, { centre: bar.centre, height: bar.height, rect: bar.item.getBoundingClientRect(), inside: bar.value.parentElement === bar.fill });
+    }
+
+    // An undo that takes the focused form away sends focus somewhere sensible first.
+    if (items.length < 3) rescueFocus();
     syncTarget(targetNode, fresh);
+    pending.clear();
     if (!items.length) {
       if (frame) teardown();
     } else {
-      // Reads first: where every bar stands now, and the field, before anything moves.
-      measure();
-      const fieldRect = frame && painted ? frame.field.getBoundingClientRect() : null;
-      const before = new Map<string, { centre: number; height: number; rect: DOMRect | null }>();
-      if (frame && painted) for (const bar of bars.values()) before.set(bar.node.id, { centre: bar.centre, height: bar.height, rect: bar.item.getBoundingClientRect() });
 
       const newFrame = ensureFrame();
       const ids = new Set(items.map((n) => n.id));

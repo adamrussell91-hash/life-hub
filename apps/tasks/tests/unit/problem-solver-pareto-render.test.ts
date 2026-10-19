@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { axisTop, createParetoView } from '../../../../packages/problem-solver/render/pareto';
+import { axisTop, createParetoView, formatTick } from '../../../../packages/problem-solver/render/pareto';
 import type { PsEdge, PsNode, PsToolRun } from '../../../../packages/problem-solver/types';
 
 const node = (id: string, slot: string, extra: Partial<PsNode> = {}): PsNode => ({ id, slot, text: `${slot} answer text`, title: `${slot} title`, state: 'accepted', skills: [], turnId: 't', ...extra });
@@ -356,6 +356,109 @@ describe('Pareto view', () => {
     expect(rect).not.toHaveBeenCalled();
     view.el.querySelector<HTMLButtonElement>('.ps-pareto__data')!.click();
     expect(view.el.querySelector<HTMLFormElement>('.ps-pareto__form')!.hidden).toBe(true);
+  });
+
+  describe('review fixes', () => {
+    it('closes an open bar card when its node is removed (no orphaned details)', () => {
+      const view = createParetoView();
+      view.update(chart(four, [SAMPLE]));
+      fill(view, 'i4').click();
+      expect(view.el.querySelector('.ps-details.is-open')).not.toBeNull();
+      view.update(chart(four.filter((n) => n.id !== 'i4')));
+      expect(view.el.querySelector('.ps-details.is-open')).toBeNull();
+    });
+
+    it('formats axis ticks with the decimals the step needs, so no two ticks read the same', () => {
+      expect(formatTick(0.05, 0.05)).toBe('0.05');
+      expect(formatTick(0.1, 0.05)).toBe('0.1');
+      expect(formatTick(7.5, 2.5)).toBe('7.5');
+      expect(formatTick(20000, 2000)).toBe('20k');
+      expect(formatTick(12500, 2500)).toBe('12.5k');
+      const view = createParetoView();
+      view.update(chart(four, [snap([0.2, 0.3, 0.4, 0.1])]));
+      const ticks = [...view.el.querySelectorAll('.ps-pareto__axis--count .ps-pareto__tick')].map((t) => t.textContent);
+      expect(new Set(ticks).size).toBe(10);
+      expect(ticks[0]).toBe('0.05');
+    });
+
+    it('hides in-chart figures too wide for their bar; the key still carries them', () => {
+      const ctx = { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+      const many = [node('t', 'target'), ...Array.from({ length: 12 }, (_, i) => node(`i${i + 1}`, `item:${i + 1}`))];
+      const counts = [4200, 3100, 2600, 1900, 1500, 1200, 900, 650, 400, 300, 9, 2];
+      const view = createParetoView();
+      view.update(chart(many, [snap(counts)]));
+      vi.spyOn(view.el.querySelector<HTMLElement>('.ps-pareto__field')!, 'getBoundingClientRect').mockReturnValue({ width: 280, height: 300, left: 0, top: 0 } as DOMRect);
+      view.update(chart(many, [snap(counts, 'b')]));
+      // A bar is 280 / 12 * 0.84 ≈ 19.6px wide: "4200" (32px) does not fit, "9" (8px) does.
+      const value = (id: string) => view.el.querySelector<HTMLElement>(`[data-node="${id}"] .ps-pareto__value`)!;
+      expect(value('i1').classList.contains('is-hidden')).toBe(true);
+      expect(value('i11').classList.contains('is-hidden')).toBe(false);
+      expect(view.el.querySelector('.ps-pareto__key-row[data-for="i1"] .ps-pareto__key-figure')!.textContent).toBe('4200');
+    });
+
+    it('moves a shrinking bar’s figure only after its height animation ends', () => {
+      const anims: Array<{ onfinish: (() => void) | null }> = [];
+      const make = () => {
+        const a = { cancel() {}, finish() {}, onfinish: null as (() => void) | null };
+        anims.push(a);
+        return a as unknown as Animation;
+      };
+      proto.animate = make;
+      svgProto.animate = make;
+      const view = createParetoView();
+      view.update(chart(four, [snap([10, 45, 30, 15])]));
+      const inFill = () => fill(view, 'i1').querySelector('.ps-pareto__value') !== null;
+      expect(inFill()).toBe(true);
+      // i1 drops from 10 of 50 to 1 of 50: too short to hold its figure, but only once it has shrunk.
+      view.update(chart(four, [snap([10, 45, 30, 15]), snap([1, 45, 30, 15], 'b')]));
+      expect(inFill()).toBe(true);
+      for (const a of anims) a.onfinish?.();
+      expect(inFill()).toBe(false);
+    });
+
+    it('Escape returns focus to the key row that opened the card, from the row or from the card', () => {
+      const view = createParetoView();
+      document.body.append(view.el);
+      view.update(chart(four, [SAMPLE]));
+      const key = view.el.querySelector<HTMLButtonElement>('.ps-pareto__key-row[data-for="i2"]')!;
+      key.click();
+      expect(key.getAttribute('aria-expanded')).toBe('true');
+      key.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(view.el.querySelector('.ps-details.is-open')).toBeNull();
+      expect(document.activeElement).toBe(key);
+      key.click();
+      const card = view.el.querySelector<HTMLElement>('.ps-details.is-open .ps-details__text')!;
+      card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(view.el.querySelector('.ps-details.is-open')).toBeNull();
+      expect(document.activeElement).toBe(key);
+      // Opened from the bar, it returns to the bar.
+      fill(view, 'i2').click();
+      view.el.querySelector<HTMLElement>('.ps-details.is-open .ps-details__text')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.activeElement).toBe(fill(view, 'i2'));
+      view.el.remove();
+    });
+
+    it('moves focus somewhere sensible when an undo takes the focused form away', () => {
+      const view = createParetoView();
+      document.body.append(view.el);
+      view.update(chart(four));
+      view.el.querySelector<HTMLButtonElement>('.ps-pareto__data')!.click();
+      const input = view.el.querySelector<HTMLInputElement>('.ps-pareto__form input')!;
+      input.focus();
+      expect(document.activeElement).toBe(input);
+      view.update(chart(four.slice(0, 3)));
+      expect(view.el.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).toBe(item(view, 't').querySelector('.ps-pareto__more'));
+      view.el.remove();
+    });
+
+    it('gives the cut segments and dots a paper edge on the red', () => {
+      const css = readFileSync(resolve(__dirname, '../../../../packages/problem-solver/problem-solver.css'), 'utf8');
+      const section = css.slice(css.indexOf('/* Pareto analysis'));
+      expect(section).toMatch(/\.ps-pareto__dot \{[^}]*box-shadow: 0 0 0 2px var\(--ps-paper\)/);
+      expect(section).toMatch(/\.ps-pareto__cut \{[^}]*background: var\(--ps-paper\)/);
+    });
   });
 
   it('names its container in every phone rule', () => {
