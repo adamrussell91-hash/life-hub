@@ -59,6 +59,7 @@ function fitToRun(session, value) {
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
+  if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null } };
   const suggested = result.value.suggestion;
   if (suggested && (suggested.kind === 'next_tool' || suggested.kind === 'switch_tool')) {
     const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);

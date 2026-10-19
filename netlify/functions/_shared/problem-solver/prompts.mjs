@@ -161,7 +161,7 @@ export function buildCoachPrompt(session) {
   if (session.pendingLearning && session.runner?.mode !== 'boundary') {
     const from = stepName(session.model.id, session.pendingLearning);
     const hasTools = session.model && session.phase !== 'finished' && toolsForPlanStep(session.model.id, session.phase).length > 0;
-    const after = session.phase === 'finished' ? '' : ` Either way, unless the session is finished, orient them to the current step in one sentence${hasTools ? ' and suggest its first tool with next_tool' : ''}.`;
+    const after = session.phase === 'finished' ? '' : ` Either way, orient them to the current step in one sentence${hasTools ? ' and suggest its first tool with next_tool' : ''}.`;
     parts.push(`AWAITING LEARNING from ${from}: if they named something they learned, put it in "learning" (one sentence, their meaning); otherwise leave learning null.${after}`);
   }
   const step = currentStep(session);

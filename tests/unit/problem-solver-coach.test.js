@@ -157,3 +157,15 @@ test('a tool suggestion that is not available in the step triggers one repair', 
   assert.equal(calls, 2);
   assert.equal(turn.suggestion, null);
 });
+
+test('boundary mode drops an unavailable tool suggestion without a repair call', async () => {
+  const boundary = moveOn(inDefine(), deps);
+  let calls = 0;
+  const coach = createModelCoach(async () => {
+    calls += 1;
+    return reply({ suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } });
+  });
+  const turn = await coach(boundary);
+  assert.equal(calls, 1);
+  assert.equal(turn.suggestion, null);
+});
