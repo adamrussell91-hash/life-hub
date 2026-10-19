@@ -116,6 +116,11 @@ const LABELS: Array<[string, string, number, number]> = [
   ['Single-loop learning', 'single', 43.5, 53],
   ['Double-loop learning', 'double', 72.5, 67.5]
 ];
+/** The small line under each loop's name (desktop only). */
+const SUBTITLES: Record<string, string> = {
+  single: 'What gets done as things stand',
+  double: 'What should be done, ideally'
+};
 // The "Start here" pointer: a short curved ink arrow onto the Problem box.
 const START_LINE = 'M64.6 31.2 Q66.9 31.7 67.3 35.6';
 const START_HEAD = head([67.35, 36.2], [0.08, 1], 1.8, 1.2);
@@ -232,6 +237,7 @@ export function createDoubleLoopView(doc: Document = document): DoubleLoopView {
   function buildStage(): void {
     stage = el(doc, 'div', 'ps-dloop__stage');
     stage.setAttribute('data-region', 'loops');
+    stage.setAttribute('role', 'group');
     stage.setAttribute('aria-label', 'Loops');
 
     const svg = svgEl(doc, 'svg', { class: 'ps-dloop__loops', viewBox: '0 0 100 100', 'aria-hidden': 'true', focusable: 'false' });
@@ -261,6 +267,8 @@ export function createDoubleLoopView(doc: Document = document): DoubleLoopView {
       const label = el(doc, 'span', `ps-dloop__meta ps-dloop__label ps-dloop__label--${mod}`, text);
       label.style.left = `${left}%`;
       label.style.top = `${top}%`;
+      const sub = SUBTITLES[mod];
+      if (sub) label.append(el(doc, 'span', 'ps-dloop__meta ps-dloop__label-sub', sub));
       labels.append(label);
     }
 
@@ -337,7 +345,11 @@ export function createDoubleLoopView(doc: Document = document): DoubleLoopView {
     const keyTag = el(doc, 'span', 'ps-dloop__key-tag');
     keyWords.append(el(doc, 'span', 'ps-dloop__key-meta', words.heading), keyTitle, keyTag);
     keyItem.append(keyCode, keyWords);
-    keyItem.addEventListener('click', () => button.click());
+    // Focus goes to the box button, so it never rests inside the aria-hidden key.
+    keyItem.addEventListener('click', () => {
+      button.click();
+      button.focus({ preventScroll: true });
+    });
 
     setAttr(button, 'aria-label', `${words.heading}: nothing yet`);
     return { key, item, shape, button, head, title, tag, count, details, inner, keyItem, keyCode, keyTitle, keyNote: keyTag, keyTag: null, ids: '', latest: null };
@@ -485,7 +497,8 @@ export function createDoubleLoopView(doc: Document = document): DoubleLoopView {
       act: recur === 'yes' || recur === 'no',
       mismatch: recur === 'yes',
       outer: recur === 'yes',
-      match: recur === 'no'
+      // Match: it held, or the recurring branch has reached a solution to watch.
+      match: recur === 'no' || model.solution.length > 0
     };
     let delay = 0;
     for (const key of TRACK_ORDER) {
@@ -498,13 +511,17 @@ export function createDoubleLoopView(doc: Document = document): DoubleLoopView {
 
   // ---------------------------------------------------------------- marker
 
-  function syncMarker(run: PsToolRun, animate: boolean): void {
-    if (!marker) return;
-    const stageKey = loopStage(run) as BoxKey;
-    const target = boxes.get(stageKey) ?? boxes.get('problem')!;
-    if (marker.parentNode === target.item) return;
-    // FLIP between measured centres: read the old place, move, read the new, then animate.
-    const before = animate ? marker.getBoundingClientRect() : null;
+  /** The box the marker should rest on for this run. */
+  function markerBox(run: PsToolRun): Box {
+    return boxes.get(loopStage(run) as BoxKey) ?? boxes.get('problem')!;
+  }
+
+  /**
+   * Move the marker onto its box. FLIP between measured centres: `before` is the marker's place,
+   * read at the top of update() before any write; this moves it, reads the new place and animates.
+   */
+  function syncMarker(target: Box, before: DOMRect | null): void {
+    if (!marker || marker.parentNode === target.item) return;
     markerAnim?.cancel();
     markerAnim = null;
     setAttr(marker, 'data-stage', target.key);
@@ -529,11 +546,14 @@ export function createDoubleLoopView(doc: Document = document): DoubleLoopView {
       buildStage();
       if (animate && canAnimate(stage!)) stage!.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, easing: EASE, fill: 'backwards' });
     }
+    // Read the marker's place before anything is written, when it is about to move.
+    const target = markerBox(run);
+    const before = animate && marker && marker.parentNode !== target.item ? marker.getBoundingClientRect() : null;
     const model = readModel(run);
     pruneCards(run);
     for (const box of boxes.values()) syncBox(box, model[box.key], animate);
     syncTracks(model, run, animate);
-    syncMarker(run, animate);
+    syncMarker(target, before);
     painted = true;
   }
 
