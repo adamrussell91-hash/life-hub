@@ -57,6 +57,15 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
         renderBlock(block, 'student', {
           pageBlocks: planBlocks,
           unitLessons,
+          network: {
+            lines: unit.network_lines ?? [],
+            lessons: unit.lessons.map((lesson) => ({
+              id: lesson.lesson_id,
+              title: lesson.title,
+              href: `${CLASS_SITE_ORIGIN}/s/lessons/${lesson.lesson_id}`,
+              ...(lesson.line_stops ? { line_stops: lesson.line_stops } : {})
+            }))
+          },
           attachedOutcomes: publishedOutcomes,
           anthology: unit.anthology
         })

@@ -1188,12 +1188,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       cover?: unknown;
       blocks?: unknown;
       outcome_ids?: string[];
+      subject_id?: string;
     }>(unitKey(id));
     if (!unit || typeof unit.title !== 'string' || !unit.title) {
       return notFoundResponse('Unit not found');
     }
 
-    const matching: { lesson_id: string; title: string }[] = [];
+    const matching: { lesson_id: string; title: string; line_stops?: import('../src/schemas/block').LineStop[] }[] = [];
     const anthologySnapshots: Array<{
       lesson_id: string;
       lesson_title: string;
@@ -1215,9 +1216,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         typeof snapshot.title === 'string' &&
         snapshot.title
       ) {
+        const draft = store.getJSON<Lesson>(draftLessonKey(snapshot.lesson_id));
         matching.push({
           lesson_id: snapshot.lesson_id,
-          title: snapshot.title
+          title: snapshot.title,
+          ...(draft?.line_stops?.length ? { line_stops: draft.line_stops } : {})
         });
         anthologySnapshots.push({
           lesson_id: snapshot.lesson_id,
@@ -1262,7 +1265,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       .filter((parsed) => parsed.success)
       .map((parsed) => toPublicOutcome(parsed.data));
 
+    const subject = unit.subject_id ? store.getJSON<{ network_lines?: unknown[] }>(subjectKey(unit.subject_id)) : null;
     return okResponse(200, {
+      ...(subject?.network_lines?.length ? { network_lines: subject.network_lines } : {}),
       unit_id: id,
       title: unit.title,
       lessons,
@@ -1274,6 +1279,52 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       outcome_ids: ids,
       outcomes
     });
+  }
+
+  /** Network fields only; the real handler merges any fields. */
+  function handlePatchSubjectNetwork(cookie: string | null | undefined, id: string, body: unknown): MockResponse {
+    if (!getSession(cookie).authenticated) return unauthorizedResponse();
+    const existing = store.getJSON<Record<string, unknown>>(subjectKey(id));
+    if (!existing) return notFoundResponse('Subject not found');
+    const record = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+    const next = { ...existing, updated_at: nowIso() };
+    if (record.network_lines !== undefined) next.network_lines = record.network_lines;
+    if (record.network_nudges !== undefined) next.network_nudges = record.network_nudges;
+    const parsed = SubjectSchema.safeParse(next);
+    if (!parsed.success) return errorResponse(400, 'validation_error', 'Subject network is invalid');
+    store.setJSON(subjectKey(id), parsed.data);
+    return okResponse(200, parsed.data);
+  }
+
+  function handleGetPublishedNetwork(classId: string): MockResponse {
+    const cls = store.getJSON<{ status?: string; subject_id?: string }>(classKey(classId));
+    if (!cls || cls.status !== 'active') return notFoundResponse('Class not found');
+    const subject = cls.subject_id ? store.getJSON<{ id: string; scope_id?: string; network_lines?: unknown[]; network_nudges?: Record<string, unknown> }>(subjectKey(cls.subject_id)) : null;
+    if (!subject?.network_lines?.length) return okResponse(200, { lines: [], units: [], nudges: {} });
+    const scope = subject.scope_id ? store.getJSON<{ timeline_items?: Array<{ kind: string; unit_id?: string; start_week: number; order: number }> }>(scopeSequenceKey(subject.scope_id)) : null;
+    const order = new Map<string, number>();
+    [...(scope?.timeline_items ?? [])].filter((i) => i.kind === 'unit').sort((a, b) => a.start_week - b.start_week || a.order - b.order)
+      .forEach((i, n) => { if (i.unit_id && !order.has(i.unit_id)) order.set(i.unit_id, n); });
+    const published = new Set(store.listKeys('published/lessons/').map((k) => k.slice('published/lessons/'.length)));
+    const units = store.listKeys('units/')
+      .map((k) => store.getJSON<{ id: string; title: string; subject_id: string; lesson_ids: string[]; blocks?: import('../src/schemas/block').Block[]; status?: string }>(k))
+      .filter((u): u is NonNullable<typeof u> => Boolean(u?.id) && u!.subject_id === subject.id && u!.status !== 'trashed' && u!.status !== 'archived')
+      .filter((u) => order.size === 0 || order.has(u.id))
+      .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+    const out = units.map((u) => {
+      const lessons = u.lesson_ids.filter((id) => published.has(id)).map((id) => {
+        const draft = store.getJSON<Lesson>(draftLessonKey(id));
+        return { id, ...(draft?.line_stops?.length ? { line_stops: draft.line_stops } : {}) };
+      });
+      const rail = new Set<string>();
+      for (const block of filterBlocksForStudent(u.blocks ?? [])) {
+        if (block.block_type === 'curriculum_lines' && (block.content as { version?: number }).version === 2) {
+          for (const stop of (block.content as { rail_stops: Array<{ line_id: string }> }).rail_stops) rail.add(stop.line_id);
+        }
+      }
+      return { id: u.id, title: u.title, lesson_ids: lessons.map((l) => l.id), lessons, rail_line_ids: [...rail] };
+    }).filter((u) => u.lessons.length);
+    return okResponse(200, { lines: subject.network_lines, units: out, nudges: subject.network_nudges ?? {} });
   }
 
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -3853,6 +3904,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);
     if (method === 'POST' && path === '/api/subjects') return handlePostSubject(cookie, body);
+    const subjectPatch = /^\/api\/subjects\/([^/]+)$/.exec(path);
+    if (subjectPatch && method === 'PATCH') return handlePatchSubjectNetwork(cookie, subjectPatch[1]!, body);
+    const networkMatch = /^\/api\/published\/networks\/([^/]+)$/.exec(path);
+    if (networkMatch && method === 'GET') return handleGetPublishedNetwork(networkMatch[1]!);
     if (method === 'POST' && path === '/api/outcomes') return handlePostOutcome(cookie, body);
     if (method === 'POST' && path === '/api/units') return handlePostUnit(cookie, body);
     if (method === 'POST' && path === '/api/lessons') return handlePostLesson(cookie, body);

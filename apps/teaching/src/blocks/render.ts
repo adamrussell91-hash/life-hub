@@ -47,8 +47,17 @@ import { createHubAudioPlayer } from '../../design-kit/js/hub-audio-player.js';
 import { mountHubImageAnnotator } from '../../design-kit/js/hub-image-annotate.js';
 import { renderToolkitContent } from '@/toolkit/render';
 import 'photoswipe/dist/photoswipe.css';
+import type { NetworkLine } from '@/schemas/block';
+import type { NetLesson } from '@/network/model';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
+/** Lessons are in unit order and limited to what the viewer may see; `href` only on ones they may open. */
+export type UnitNetworkContext = {
+  lines: NetworkLine[];
+  lessons: NetLesson[];
+  bands?: ReadonlyMap<string, string>;
+};
+
 export type RenderContext = {
   lessonId?: string;
   attachedOutcomes?: PublicOutcome[];
@@ -58,6 +67,8 @@ export type RenderContext = {
   pageBlocks?: Block[];
   /** Lessons a unit plan block may link to, resolved for this viewer (Curriculum lines). */
   unitLessons?: Array<{ id: string; title: string; href: string }>;
+  /** Curriculum network for a unit map: the subject's lines, the unit's lessons and their week bands. */
+  network?: UnitNetworkContext;
   onMakeAnthologyCards?: (request: {
     items: AnthologyData['items'];
     view: 'text' | 'theme' | 'technique' | 'connections';
