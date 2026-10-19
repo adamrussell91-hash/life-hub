@@ -174,17 +174,12 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
   let model: Model = { source: null, retain: null, rounds: [], next: new Set() };
   /** The round the reader picked, or null to follow the newest. */
   let picked: number | null = null;
-  /** The assessment whose unsolved ending has already sent the marker round. */
-  let looped: string | null = null;
-  const chartId = nextId('ps-analogy-chart');
 
   function ensureChart(): HTMLDivElement {
     if (chart) return chart;
     chart = doc.createElement('div');
     chart.className = 'ps-analogy__chart';
-    chart.id = chartId;
     chart.setAttribute('data-region', 'flow');
-    chart.setAttribute('aria-label', 'Stations of the analogy');
     overlay = svgEl(doc, 'svg');
     overlay.setAttribute('class', 'ps-analogy__links');
     overlay.setAttribute('aria-hidden', 'true');
@@ -412,7 +407,23 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
   }
 
   function syncTabs(): void {
-    if (model.rounds.length < 2) return;
+    const focused = tablist?.contains(doc.activeElement) ?? false;
+    if (model.rounds.length < 2) {
+      // Back to one round (an undo): the tabs go, and focus with them, to the flow's first button.
+      tablist?.remove();
+      tablist = null;
+      tabs.length = 0;
+      if (focused) stations.get('source')?.button?.focus();
+      return;
+    }
+    // Drop the tabs of rounds that have gone, so arrow keys never land on a stale one.
+    let lostFocus = false;
+    for (let i = tabs.length - 1; i >= 0; i -= 1) {
+      if (model.rounds.some((round) => round.index === Number(tabs[i].dataset.round))) continue;
+      if (tabs[i] === doc.activeElement) lostFocus = true;
+      tabs[i].remove();
+      tabs.splice(i, 1);
+    }
     if (!tablist) {
       tablist = doc.createElement('div');
       tablist.className = 'ps-analogy__tabs';
@@ -429,7 +440,6 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
         tab.type = 'button';
         tab.className = 'ps-analogy__tab';
         tab.setAttribute('role', 'tab');
-        tab.setAttribute('aria-controls', chartId);
         tab.dataset.round = String(round.index);
         tab.append(span(doc, 'ps-analogy__tab-name', `Round ${round.index}`), span(doc, 'ps-analogy__tab-mark'));
         tab.lastElementChild!.setAttribute('aria-hidden', 'true');
@@ -450,6 +460,7 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
       const on = Number(tab.dataset.round) === current;
       tab.setAttribute('aria-selected', String(on));
       tab.tabIndex = on ? 0 : -1;
+      if (on && lostFocus && focused) tab.focus();
     }
   }
 
@@ -490,6 +501,11 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
     for (const link of links.values()) {
       const on = stations.get(link.spec.from)!.lit && stations.get(link.spec.to)!.lit;
       if (on && !link.lit) drawn.push(link);
+      if (!on && link.lit) {
+        // Un-lit before its draw-in ran: drop the pending animation.
+        for (const anim of link.anims) anim.cancel();
+        link.anims = [];
+      }
       link.lit = on;
       link.g.classList.toggle('is-lit', on);
     }
@@ -591,6 +607,9 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
     stopMarker();
     const next = readModel(run);
     if (!chart && !next.source && !next.rounds.length && !next.retain) return;
+    // Opening a saved run, or an undo back to an earlier ending, must not replay the loop.
+    const first = !chart;
+    const known = new Set(model.rounds.map((round) => round.assess?.id).filter(Boolean));
     // Following the newest: stay there as rounds arrive. A pick of a round that has gone
     // (an undo) falls back to the newest.
     model = next;
@@ -598,12 +617,10 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
     ensureChart();
     render(true);
 
+    // The marker runs only when the newest round has just ended unsolved, in front of the reader.
     const last = newest();
-    const ended = last?.assess?.tag === 'unsolved' ? `${last.assess.id}` : null;
-    if (ended && ended !== looped) {
-      looped = ended;
-      if (shown() === last && stations.get('search')!.lit) runMarker();
-    } else if (!ended) looped = null;
+    const assess = last?.assess;
+    if (!first && assess?.tag === 'unsolved' && !known.has(assess.id) && shown() === last && stations.get('search')!.lit) runMarker();
   }
 
   return { el: root, update };

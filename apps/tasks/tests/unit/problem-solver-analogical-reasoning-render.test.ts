@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAnalogicalReasoningView } from '../../../../packages/problem-solver/render/analogical-reasoning';
 import type { PsEdge, PsNode, PsToolRun } from '../../../../packages/problem-solver/types';
 
@@ -18,6 +18,7 @@ const rule3 = node('r3', 'rule:3');
 const filtered2 = node('f2', 'filtered:2');
 const assess2 = node('a2', 'assess:2', { tag: 'solved' });
 const retain = node('k', 'retain');
+const target3 = node('t3', 'target:3', { title: 'Library returns' });
 
 describe('Analogical reasoning view', () => {
   it('renders no stations and no chart for an empty run', () => {
@@ -158,5 +159,77 @@ describe('Analogical reasoning view', () => {
     // Round 1 ended unsolved, so viewing it does not show the retained lesson.
     view.el.querySelector<HTMLButtonElement>('[role="tab"]')!.click();
     expect(lit(view, 'retain')).toBe(false);
+  });
+
+  it('drops the tabs of rounds that have gone on an undo', () => {
+    const view = createAnalogicalReasoningView();
+    const two = [source, target1, ...rules1, filtered1, assess1, target2, rule3, filtered2, node('a2', 'assess:2', { tag: 'unsolved' })];
+    view.update(run([...two, target3]));
+    expect(view.el.querySelectorAll('[role="tab"]').length).toBe(3);
+    view.update(run(two));
+    const tabs = [...view.el.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    expect(tabs.map((tab) => tab.dataset.round)).toEqual(['1', '2']);
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+    // The keyboard wraps over the two that remain.
+    tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+    view.update(run([source, target1, ...rules1, filtered1, assess1]));
+    expect(view.el.querySelector('[role="tablist"]')).toBeNull();
+    expect(view.el.querySelectorAll('[role="tab"]').length).toBe(0);
+    // Two rounds again: a fresh tablist.
+    view.update(run([source, target1, ...rules1, filtered1, assess1, target2]));
+    expect(view.el.querySelectorAll('[role="tab"]').length).toBe(2);
+  });
+
+  describe('loop marker', () => {
+    const restore: Array<() => void> = [];
+    afterEach(() => {
+      while (restore.length) restore.pop()!();
+    });
+
+    /** Give every element a size, so arrows have a route, and record animate calls on the marker. */
+    function stubLayout(): ReturnType<typeof vi.fn> {
+      for (const prop of ['offsetWidth', 'offsetHeight'] as const) {
+        const before = Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop);
+        Object.defineProperty(HTMLElement.prototype, prop, { configurable: true, get: () => 60 });
+        restore.push(() => (before ? Object.defineProperty(HTMLElement.prototype, prop, before) : delete (HTMLElement.prototype as unknown as Record<string, unknown>)[prop]));
+      }
+      const calls = vi.fn();
+      const before = (HTMLElement.prototype as unknown as { animate?: unknown }).animate;
+      (HTMLElement.prototype as unknown as { animate: unknown }).animate = function animate(this: HTMLElement) {
+        if (this.classList.contains('ps-analogy__marker')) calls();
+        return { cancel() {}, finished: Promise.resolve() };
+      };
+      restore.push(() => ((HTMLElement.prototype as unknown as { animate?: unknown }).animate = before));
+      return calls;
+    }
+
+    const round1 = [source, target1, ...rules1, filtered1];
+
+    it('does not run on the first render of a saved unsolved run', () => {
+      const calls = stubLayout();
+      const view = createAnalogicalReasoningView();
+      view.update(run([...round1, assess1]));
+      expect(calls).not.toHaveBeenCalled();
+    });
+
+    it('runs once when the newest round newly ends unsolved', () => {
+      const calls = stubLayout();
+      const view = createAnalogicalReasoningView();
+      view.update(run(round1));
+      view.update(run([...round1, assess1]));
+      expect(calls.mock.calls.length).toBeGreaterThan(0);
+      const after = calls.mock.calls.length;
+      view.update(run([...round1, assess1]));
+      expect(calls.mock.calls.length).toBe(after);
+    });
+
+    it('does not run again when the next analogue is undone', () => {
+      const calls = stubLayout();
+      const view = createAnalogicalReasoningView();
+      view.update(run([...round1, assess1, target2]));
+      view.update(run([...round1, assess1]));
+      expect(calls).not.toHaveBeenCalled();
+    });
   });
 });
