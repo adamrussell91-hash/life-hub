@@ -44,11 +44,12 @@ export const duncker = Object.freeze({
     if (!hasSlot(run, 'desired')) return ['desired'];
     if (hasSlot(run, 'evaluation')) return [];
     const paths = pathways(run);
+    const uncovered = paths.filter((path) => !run.edges.some((edge) => edge.kind === 'under' && edge.to === path.id));
     const covered = paths.length >= 2 && paths.every((path) => run.edges.some((edge) => edge.kind === 'under' && edge.to === path.id));
     const kinds = new Set(paths.map((path) => path.tag));
     return open(
       nextIndexed(run, 'pathway', PATHWAYS),
-      paths.length ? nextIndexed(run, 'solution', 16) : null,
+      paths.length ? (uncovered.length ? `solution:${countSlots(run, 'solution') + 1}` : nextIndexed(run, 'solution', 16)) : null,
       kinds.has('opposite') && !hasSlot(run, 'redefinition') ? 'redefinition' : null,
       covered && kinds.has('direct') && kinds.has('opposite') ? 'evaluation' : null
     );

@@ -187,3 +187,30 @@ test('problem reduction: numbers beyond the sub count are part of the sentence',
   assert.equal(checkNode(r, { slot: 'priority', text: '2 first (affects 30 people), then 1' }, []), null);
   assert.deepEqual(priorityOrder(put(r, 'priority', { text: '2 first (affects 30 people), then 1' })), [2, 1]);
 });
+
+test('duncker never stalls: a solution stays open while any pathway has none', () => {
+  let r = newRun('duncker', 'r');
+  r = put(r, 'problem');
+  r = put(r, 'desired');
+  for (const s of ['pathway:1', 'pathway:2', 'pathway:3']) r = put(r, s, { tag: 'direct' });
+  r = put(r, 'pathway:4', { tag: 'opposite' });
+  for (let i = 1; i <= 16; i += 1) {
+    r = put(r, `solution:${i}`);
+    r = link(r, `solution:${i}`, `pathway:${(i % 3) + 1}`, 'under');
+  }
+  assert.ok(nextSlots(r).includes('solution:17'), 'pathway:4 still has no solution');
+  r = put(r, 'solution:17');
+  r = link(r, 'solution:17', 'pathway:4', 'under');
+  assert.ok(!nextSlots(r).includes('solution:18'));
+  assert.ok(nextSlots(r).includes('evaluation'));
+});
+
+test('problem reduction: a bare number list is strict; numbers in a sentence are prose', () => {
+  let r = newRun('problem_reduction', 'r');
+  r = put(r, 'problem');
+  r = put(r, 'sub:1');
+  r = put(r, 'sub:2');
+  assert.match(checkNode(r, { slot: 'priority', text: '2, 3, 1' }, []), /every sub-problem number once/);
+  assert.equal(checkNode(r, { slot: 'priority', text: '2, 1' }, []), null);
+  assert.equal(checkNode(r, { slot: 'priority', text: '2 first (affects 30 people), then 1' }, []), null);
+});
