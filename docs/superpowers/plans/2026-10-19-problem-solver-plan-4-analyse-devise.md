@@ -212,7 +212,7 @@ test('slot meanings show tag choices and placed nodes show their tag', async () 
 Then implement:
 
 - `coach-schema.mjs`: when building `node`, add `...(typeof raw.node.tag === 'string' && raw.node.tag.trim() ? { tag: raw.node.tag.trim().toLowerCase().slice(0, 40) } : {})`.
-- `coach.mjs` `fitToRun`: after computing `node` (with the fitted slot) and the renamed edges, and before the `verdict !== 'accept'` early return, call `const problem = checkNode(run, node, renamedEdges)`. If it returns a message, return `{ error: problem }`. To do this, compute `renamedEdges = value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }))` once and reuse it in the edge loop. Import `checkNode` from machine.mjs.
+- `coach.mjs` `fitToRun`: after computing `node` (with the fitted slot) and the renamed edges, and before the `verdict !== 'accept'` early return, drop any `tag` on a slot whose tool has no `nodeTags` entry for it (a stray tag is harmless and shouldn't cost a repair), then call `const problem = checkNode(run, node, renamedEdges)`. If it returns a message, return `{ error: problem }`. To do this, compute `renamedEdges = value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }))` once and reuse it in the edge loop. Import `checkNode` from machine.mjs.
 - `session.mjs`: in `placeAccepted`, add `...(turn.node.tag ? { tag: turn.node.tag } : {})` to the placed node. In the challenge branch of `applyCoachTurn`, add `tag: turn.node.tag` to `pendingKeep`. In `keepAnyway`, add `...(keep.tag ? { tag: keep.tag } : {})` to the placed node.
 - `prompts.mjs` `runLines`:
   - In `Slot meanings`, render each slot as `${k} = ${v}${def.nodeTags?.[k] ? ` (tag: ${def.nodeTags[k].join('|')})` : ''}`.
