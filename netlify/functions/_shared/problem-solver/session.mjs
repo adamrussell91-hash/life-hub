@@ -217,7 +217,8 @@ export function applyCoachTurn(session, turn, deps) {
 
   if (mode === 'boundary') {
     const leaving = session.runner.leaving;
-    if (leaving && next.steps[leaving]) next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
+    // A step that is only waiting for its review is not objected to.
+    if (leaving && next.steps[leaving] && next.steps[leaving].status !== 'waiting') next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
     next = { ...next, pendingLearning: leaving && !skippedUntouched(next.steps[leaving]) ? leaving : null };
   } else if (next.phase === 'frame') {
     if (turn.verdict === 'accept' && turn.frame) next = { ...next, frame: { ...next.frame, ...turn.frame } };
