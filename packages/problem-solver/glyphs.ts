@@ -31,6 +31,14 @@ import analogical_reasoning from './glyphs/tools/analogical_reasoning.svg?raw';
 import solution_tree from './glyphs/tools/solution_tree.svg?raw';
 import lotus_blossom from './glyphs/tools/lotus_blossom.svg?raw';
 import duncker from './glyphs/tools/duncker.svg?raw';
+import decision_matrix from './glyphs/tools/decision_matrix.svg?raw';
+import swot from './glyphs/tools/swot.svg?raw';
+import morphological from './glyphs/tools/morphological.svg?raw';
+import pareto from './glyphs/tools/pareto.svg?raw';
+import dmaic from './glyphs/tools/dmaic.svg?raw';
+import fifteen_percent from './glyphs/tools/fifteen_percent.svg?raw';
+import kanban from './glyphs/tools/kanban.svg?raw';
+import eisenhower from './glyphs/tools/eisenhower.svg?raw';
 import type { PsToolId } from './types';
 
 const SOURCES: Record<string, string> = {
@@ -38,14 +46,15 @@ const SOURCES: Record<string, string> = {
   learning, logical_reasoning, metacognition, reflective_thinking, searching, synthesis
 };
 
-const EMBLEMS: Partial<Record<PsToolId, string>> = {
+const EMBLEMS: Record<PsToolId, string> = {
   five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction,
   causal_map, perspective_shift, radial_tree, force_field, from_to, intent_statement,
-  problem_reduction, analogical_reasoning, solution_tree, lotus_blossom, duncker
+  problem_reduction, analogical_reasoning, solution_tree, lotus_blossom, duncker,
+  decision_matrix, swot, morphological, pareto, dmaic, fifteen_percent, kanban, eisenhower
 };
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
-export const EMBLEM_SVG: Partial<Record<PsToolId, string>> = EMBLEMS;
+export const EMBLEM_SVG: Record<PsToolId, string> = EMBLEMS;
 
 let copy = 0;
 
@@ -82,6 +91,6 @@ export function toolEmblem(id: PsToolId, doc: Document = document): HTMLSpanElem
   const span = doc.createElement('span');
   span.className = 'ps-emblem';
   span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = EMBLEMS[id] ?? '';
+  span.innerHTML = EMBLEMS[id];
   return span;
 }

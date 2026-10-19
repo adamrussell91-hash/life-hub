@@ -336,12 +336,22 @@ describe('landing tool shelf', () => {
     const { toolShelf } = await import('@/views/problem-solver/view');
     const shelf = toolShelf();
     const steps = [...shelf.querySelectorAll<HTMLElement>('[data-step]')].map((group) => group.dataset.step);
-    expect(steps).toEqual(['define', 'analyse', 'devise']);
+    expect(steps).toEqual(['define', 'analyse', 'devise', 'decide', 'implement']);
     const analyse = shelf.querySelector('[data-step="analyse"]')!;
     expect(analyse.querySelector('h3')!.textContent).toBe('Analyse');
     const names = [...analyse.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
     expect(names).toEqual(['Causal map', 'Perspective shift', 'Radial tree', 'Force field analysis', 'From…to exploration', 'Intent statement']);
     expect(shelf.querySelector('[data-step="contradiction"]')).toBeNull();
+  });
+
+  it('shelves the four Implement tools, each with its emblem', async () => {
+    const { toolShelf } = await import('@/views/problem-solver/view');
+    const implement = toolShelf().querySelector('[data-step="implement"]')!;
+    expect(implement.querySelector('h3')!.textContent).toBe('Implement');
+    const names = [...implement.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
+    expect(names).toEqual(expect.arrayContaining(['DMAIC cycle', '15% solutions', 'Kanban', 'Eisenhower matrix']));
+    expect(names).toHaveLength(4);
+    expect(implement.querySelectorAll('.ps-emblem svg')).toHaveLength(4);
   });
 });
 
