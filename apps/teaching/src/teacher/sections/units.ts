@@ -3,6 +3,7 @@ import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { navigate } from '@/app/router';
+import { withAppBase } from '@/app/base-path';
 import { applyCreatedEntity, replaceCurriculum } from '@/app/curriculum-state';
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
 import { DEFAULT_PEDAGOGICAL_MODE } from '@/curriculum/pedagogical-mode';
@@ -910,13 +911,20 @@ function mountUnitPlanEditor(
     );
   }
 
+  const unitLessons = options.unit.lesson_ids
+    .map((lessonId) => options.curriculum.lessons.find((row) => row.id === lessonId))
+    .filter((row): row is NonNullable<typeof row> => Boolean(row) && row!.status !== 'trashed')
+    .map((row) => ({ id: row.id, title: row.title, href: withAppBase(`/lessons/${row.id}`) }));
+
   const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
     blocks,
     allowCollectionAtRoot: true,
+    editorContext: { unitLessons },
     idFactory: () => nextId(),
     renderPreview: (block) =>
       renderBlock(block, 'teacher', {
         pageBlocks: blocks,
+        unitLessons,
         attachedOutcomes,
         anthology: anthologyData,
         onMakeAnthologyCards: (request) => {

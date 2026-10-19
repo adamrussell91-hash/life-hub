@@ -1,4 +1,5 @@
 import { FAILURE } from '@/app/failure';
+import { CLASS_SITE_ORIGIN } from '@/app/class-site';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import type { PublishedUnit } from '@/schemas/published-unit';
@@ -41,6 +42,12 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
   }
 
   const planBlocks = unit.blocks ?? [];
+  // Published lessons only: unpublished stations show as text, not links.
+  const unitLessons = unit.lessons.map((lesson) => ({
+    id: lesson.lesson_id,
+    title: lesson.title,
+    href: `${CLASS_SITE_ORIGIN}/s/lessons/${lesson.lesson_id}`
+  }));
   if (planBlocks.length > 0) {
     const plan = document.createElement('section');
     plan.className = 'student-panel student-unit__plan';
@@ -49,6 +56,7 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
       plan.append(
         renderBlock(block, 'student', {
           pageBlocks: planBlocks,
+          unitLessons,
           attachedOutcomes: publishedOutcomes,
           anthology: unit.anthology
         })
