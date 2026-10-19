@@ -127,7 +127,7 @@ describe('renderPersonPage', () => {
           shared_contexts_with_self: [
             {
               ref: `shared:organisation:${ORG_ID}`,
-              display_label: 'St. Redacted College',
+              display_label: 'Tallowwood College',
               relationship_type: 'employee_at'
             }
           ]
@@ -137,7 +137,7 @@ describe('renderPersonPage', () => {
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
     expect(canvas.querySelector('.entity-detail__shared-context')?.textContent).toBe(
-      'You know them through St. Redacted College.'
+      'You know them through Tallowwood College.'
     );
   });
 

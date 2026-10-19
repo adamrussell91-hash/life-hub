@@ -53,7 +53,7 @@ test('organisations collection excludes Communications students from member list
         original_category: STUDENT_ORIGINAL_CATEGORY
       }
     ],
-    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Redacted College' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College' }],
     relationships: [
       {
         person_legacy_id: 'leg-adult',

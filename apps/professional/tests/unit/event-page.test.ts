@@ -6,7 +6,7 @@ const GROUP_ID = 'pd_group_00000000-0000-4000-8000-000000000001';
 const base = {
   schema_version: 2, id: EVENT_ID, title: 'Warlight: Critical Study of Literature', event_type: 'professional_development',
   start: '2026-09-17T23:00:00.000Z', end: '2026-09-18T05:00:00.000Z', time_zone: 'Australia/Sydney', all_day: false,
-  occurrence_state: 'completed', location_text: "Redacted' College", accreditation_category: null, priority_area: null,
+  occurrence_state: 'completed', location_text: "Tallowwood College", accreditation_category: null, priority_area: null,
   hours: 6, attendance_state: 'attended', certificate: null, created_at: '', updated_at: '',
   talks: [{ id: 't1', time: '09:00', title: 'Keynote · Reading against the grain', presenter: 'Dr Mia L.', hours: 1.5 }],
   blocks: []

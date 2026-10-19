@@ -39,7 +39,7 @@ function fixture() {
   const otherOrgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: otherOrgId });
   const personId = generatePersonId();
   const personRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: personId });
-  const names = { [personId]: 'Ava Tran', [orgId]: 'Redacted', [otherOrgId]: 'Riverview' };
+  const names = { [personId]: 'Ava Tran', [orgId]: 'Tallowwood', [otherOrgId]: 'Riverview' };
   const resolveEntity = async (refInput) => {
     const ref = typeof refInput === 'string' ? refInput : formatEntityRef(refInput);
     const [, kind, id] = ref.split(':');
@@ -207,7 +207,7 @@ test('an imported person’s title becomes editable: adopted, and the edit repla
   const env = { ...ENV, GITHUB_TOKEN: 'token' };
   const files = {
     'people.json': [{ legacy_id: 'leg-p', display_name: 'Lauren Stuart', sort_name: 'Stuart, Lauren', aliases: [] }],
-    'organisations.json': [{ legacy_id: 'leg-o', display_name: 'Redacted', legal_name: null, aliases: [] }],
+    'organisations.json': [{ legacy_id: 'leg-o', display_name: 'Tallowwood', legal_name: null, aliases: [] }],
     'relationships.json': [
       {
         person_legacy_id: 'leg-p',
