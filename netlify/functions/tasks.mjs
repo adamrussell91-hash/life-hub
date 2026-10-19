@@ -23,10 +23,13 @@ import {
   writeTaskIndex
 } from './_shared/tasks-blobs.mjs';
 import { normalizeTags } from './_shared/tasks-collection.mjs';
+import { DEFAULT_TASK_PROPERTY_CONFIG } from './_shared/task-properties.mjs';
 
 export const config = { path: '/api/tasks' };
 
 const DOMAINS = new Set(['teaching', 'life', 'wedding', 'health', 'other']);
+/** Where a new task came from; anything unknown is filed as manual. */
+const SOURCES = new Set(DEFAULT_TASK_PROPERTY_CONFIG.sources.map(({ id }) => id));
 const PROFESSIONAL_RECORD_ID_PREFIX = /^(meeting|event|communication|application)[_-]/i;
 
 function readTaskId(request) {
@@ -201,7 +204,7 @@ export function createTasksHandler(deps = {}) {
           depends_on: [],
           tags: normalizeTags(parsed.value.tags),
           attachments: [],
-          source: 'manual',
+          source: SOURCES.has(parsed.value.source) ? parsed.value.source : 'manual',
           // Someday / Maybe fields — no-ops for board tasks that never set them.
           maturity: typeof parsed.value.maturity === 'string' ? parsed.value.maturity : null,
           life_area: typeof parsed.value.life_area === 'string' ? parsed.value.life_area : null,
