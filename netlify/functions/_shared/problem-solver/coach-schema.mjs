@@ -41,7 +41,7 @@ function suggestionOf(raw) {
     if (!TOOL_IDS.includes(raw.tool)) return { error: `Unknown tool in suggestion: ${raw.tool}` };
     return { value: { kind: raw.kind, tool: raw.tool, reason } };
   }
-  if (raw.kind === 'finish_define') return { value: { kind: 'finish_define', reason } };
+  if (raw.kind === 'next_step' || raw.kind === 'finish_define') return { value: { kind: 'next_step', reason } };
   return { value: null };
 }
 
@@ -95,7 +95,8 @@ export function validateCoachTurn(raw) {
       model,
       suggestion: suggestion.value,
       summary: text(raw.summary, 1200),
-      exitObjection: text(raw.exitObjection, 400)
+      exitObjection: text(raw.exitObjection, 400),
+      learning: text(raw.learning, 600)
     }
   };
 }

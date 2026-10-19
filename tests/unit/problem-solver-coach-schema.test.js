@@ -41,3 +41,14 @@ test('model choice and frame fields', () => {
   assert.deepEqual(out.value.model, { id: 'polya', reason: 'Bounded.' });
   assert.equal(validateCoachTurn({ verdict: 'accept', message: 'ok', model: { id: 'six_hats', reason: 'x' } }).ok, false);
 });
+
+test('next_step suggestions are accepted; finish_define is read as next_step', () => {
+  const base = { verdict: 'clarify', message: 'Ready to move on?' };
+  assert.deepEqual(validateCoachTurn({ ...base, suggestion: { kind: 'next_step', reason: 'Enough here.' } }).value.suggestion, { kind: 'next_step', reason: 'Enough here.' });
+  assert.deepEqual(validateCoachTurn({ ...base, suggestion: { kind: 'finish_define', reason: 'Done.' } }).value.suggestion, { kind: 'next_step', reason: 'Done.' });
+});
+
+test('learning is kept as trimmed text, else null', () => {
+  assert.equal(validateCoachTurn({ verdict: 'clarify', message: 'Noted.', learning: '  Rushes to fixes.  ' }).value.learning, 'Rushes to fixes.');
+  assert.equal(validateCoachTurn({ verdict: 'clarify', message: 'Noted.' }).value.learning, null);
+});
