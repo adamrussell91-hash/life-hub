@@ -72,7 +72,7 @@ test('a v1 define session with no model is given the seven-step model and can mo
 });
 
 test('v2 sessions and index rows pass through unchanged', () => {
-  const v2 = migrateSession(v1());
+  const v2 = { ...migrateSession(v1()), reviewState: null, taskSnapshot: null, detour: null };
   assert.equal(migrateSession(v2), v2);
   const row = { id: 's', title: 'T', status: 'active', phase: 'frame' };
   assert.equal(migrateSession(row), row);
@@ -103,4 +103,13 @@ test('a v2 session saved before tasks existed gains empty task fields on read', 
   assert.equal(read.reviewProposal, null);
   assert.equal(read.reviewTaskId, null);
   assert.equal(old.proposedTasks, undefined, 'the input is not mutated');
+});
+
+test('a v2 session saved before Improve waited gains null review fields on read', () => {
+  const old = { id: 'x', turns: [], steps: {}, phase: 'frame', title: 't', proposedTasks: [], reviewProposal: null, reviewTaskId: null };
+  const read = migrateSession(old);
+  assert.equal(read.reviewState, null);
+  assert.equal(read.taskSnapshot, null);
+  assert.equal(read.detour, null);
+  assert.equal('reviewState' in old, false, 'the input is not mutated');
 });

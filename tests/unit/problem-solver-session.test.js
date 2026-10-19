@@ -4,11 +4,13 @@ import assert from 'node:assert/strict';
 import {
   acceptSuggestion, activeRun, applyCoachTurn, createSession, dismissSuggestion,
   archive, moveOn, keepAnyway, score, rescoreRadar, say, summaryRow, followOn,
-  confirmTask, dismissTask, setReviewTask, dismissReview
+  confirmTask, dismissTask, setReviewTask, dismissReview,
+  startReview, taskStatus, reopenProblem, waitingForReview
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 import { newRun } from '../../packages/problem-solver/machine.mjs';
+import { nextPhase } from '../../packages/problem-solver/steps.mjs';
 
 /** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
 async function withoutAnalyseTools(fn) {
@@ -232,7 +234,7 @@ test('say appends a user turn and queues; summary rows are small', () => {
   const s = say(framed(), 'Because the roster is drafted on Friday.', deps);
   assert.equal(s.runner.status, 'queued');
   const row = summaryRow(s);
-  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
+  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewDue', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
   assert.equal(row.tool, 'five_whys');
   assert.equal(summaryRow(row), row);
 });
@@ -466,4 +468,157 @@ test('switching tools sets aside the old run\'s open proposals but keeps confirm
   assert.equal(s.proposedTasks[0].status, 'dismissed');
   assert.equal(s.proposedTasks[0].removed, undefined);
   assert.equal(s.proposedTasks[1].status, 'confirmed');
+});
+
+
+const idle = (s) => ({ ...s, runner: { status: 'idle', mode: 'turn', error: null } });
+
+/** A seven-step session moved on to `phase`; the steps before it are skipped untouched. */
+function at(phase) {
+  let s = idle(framed());
+  while (s.phase !== phase) s = idle(moveOn(s, deps));
+  return s;
+}
+
+/** In Implement with a finished 15% run, so leaving it proposes a review. */
+function implementDone() {
+  let s = idle(acceptSuggestion({ ...at('implement'), suggestion: { kind: 'next_tool', tool: 'fifteen_percent', reason: 'r' } }, deps));
+  for (const [slot, text] of [['reflect', 'We control which day the rota goes out'], ['action:1', 'Move publish day to Wednesday'], ['action:2', 'Ask for swaps by Tuesday']]) {
+    s = idle(applyCoachTurn(s, coach({ node: { slot, text } }), deps));
+  }
+  return idle(applyCoachTurn(s, coach({ node: { slot: 'chosen:1', text: 'Move publish day now' }, edges: [{ from: 'chosen:1', to: 'action:1', kind: 'picks' }] }), deps));
+}
+
+const snapshot = { byStatus: { open: 1, done: 2, bogus: 9 }, overdue: ['Ask for swaps by Tuesday', 7] };
+
+test('leaving a finished Implement opens Improve waiting for the review', () => {
+  const s = idle(moveOn(implementDone(), deps));
+  assert.equal(s.phase, 'improve');
+  assert.equal(s.reviewProposal.status, 'proposed');
+  assert.deepEqual(s.reviewState, { status: 'waiting', due: s.reviewProposal.due, returnTo: null, startedAt: null });
+  assert.equal(waitingForReview(s), true);
+});
+
+test('Implement skipped untouched leaves no review, so Improve does not wait', () => {
+  const s = idle(moveOn(at('implement'), deps));
+  assert.equal(s.phase, 'improve');
+  assert.equal(s.reviewState, null);
+});
+
+test('while Improve waits, the coach suggests no tool', () => {
+  let s = applyCoachTurn(moveOn(implementDone(), deps), coach({}), deps);
+  assert.equal(s.pendingLearning, 'implement');
+  s = applyCoachTurn(idle(s), coach({ learning: 'I plan better with a date.', suggestion: { kind: 'next_tool', tool: 'after_action_review', reason: 'r' } }), deps);
+  assert.equal(s.suggestion, null);
+});
+
+test('moving on while waiting marks Improve waiting and keeps the review open', () => {
+  const s = idle(moveOn(idle(moveOn(implementDone(), deps)), deps));
+  assert.equal(s.phase, 'document');
+  assert.equal(s.steps.improve.status, 'waiting');
+  assert.equal(s.reviewState.status, 'waiting');
+});
+
+test('start_review in a waiting Improve starts it with the task snapshot', () => {
+  let s = idle(moveOn(implementDone(), deps));
+  s = startReview(s, { snapshot }, deps);
+  assert.equal(s.reviewState.status, 'reviewing');
+  assert.equal(s.reviewState.startedAt, deps.now());
+  assert.deepEqual(s.taskSnapshot, { at: deps.now(), byStatus: { open: 1, in_progress: 0, deferred: 0, done: 2, dead: 0, unknown: 0 }, overdue: ['Ask for swaps by Tuesday'] });
+  assert.equal(s.runner.status, 'queued');
+  assert.equal(s.turns.at(-1).text, 'Let\'s review how it went.');
+  const again = startReview(idle(s), {}, deps);
+  assert.equal(again.turns.length, s.turns.length, 'starting twice changes nothing');
+});
+
+test('start_review from Implement leaves it straight into the review', () => {
+  const s = startReview({ ...implementDone(), reviewTaskId: 'task9', reviewProposal: { title: 'Review: Late rota', due: '2026-11-02', reason: '', status: 'confirmed' } }, {}, deps);
+  assert.equal(s.phase, 'improve');
+  assert.equal(s.reviewState.status, 'reviewing');
+  assert.equal(s.reviewState.due, '2026-11-02');
+  assert.equal(s.runner.mode, 'boundary');
+});
+
+test('a late review reopens Improve, then returns to where the session was', () => {
+  let s = idle(moveOn(implementDone(), deps));
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'document');
+  let late = idle(startReview(s, {}, deps));
+  assert.equal(late.phase, 'improve');
+  assert.equal(late.steps.improve.status, 'open');
+  assert.equal(late.reviewState.returnTo, 'document');
+  assert.equal(nextPhase(late), 'document');
+  late = idle(moveOn(late, deps));
+  assert.equal(late.phase, 'document');
+  assert.equal(late.reviewState.status, 'done');
+
+  s = idle(moveOn(s, deps));
+  assert.equal(s.status, 'finished');
+  s = idle(startReview(s, {}, deps));
+  assert.equal(s.status, 'active');
+  assert.equal(s.reviewState.returnTo, 'finished');
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'finished');
+  assert.equal(s.status, 'finished');
+});
+
+test('start_review needs a live review, and is refused before Implement is done', () => {
+  assert.throws(() => startReview(at('improve'), {}, deps), /no review to start/);
+  assert.throws(() => startReview({ ...at('decide'), reviewTaskId: 'task9' }, {}, deps), /once Implement is done/);
+});
+
+test('setting the review aside while waiting lets Improve run now', () => {
+  const s = dismissReview(idle(moveOn(implementDone(), deps)), deps);
+  assert.equal(s.reviewState, null);
+  assert.equal(s.suggestion?.tool, 'after_action_review');
+});
+
+test('task_status stores a cleaned snapshot without calling the coach; the same snapshot is a no-op', () => {
+  let s = idle(dismissReview(idle(moveOn(implementDone(), deps)), deps));
+  s = taskStatus(s, { snapshot }, deps);
+  assert.equal(s.taskSnapshot.byStatus.done, 2);
+  assert.equal(s.runner.status, 'idle');
+  assert.equal(taskStatus(s, { snapshot }, deps), s);
+  assert.throws(() => taskStatus(s, { snapshot: 'x' }, deps), /must be an object/);
+});
+
+/** Improve with a double-loop run that has named a governing assumption. */
+function inDoubleLoop() {
+  let s = idle(dismissReview(idle(moveOn(implementDone(), deps)), deps));
+  s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'double_loop', reason: 'r' } }, deps));
+  for (const [slot, text, tag] of [['problem', 'The rota is still late'], ['single', 'We moved the publish day'], ['recurs', 'Late again in week four', 'yes'], ['governing:1', 'Only the manager may sign it off']]) {
+    s = idle(applyCoachTurn(s, coach({ node: { slot, text, ...(tag ? { tag } : {}) } }), deps));
+  }
+  return s;
+}
+
+test('reopening Define from Improve is a detour; moving on returns to Improve', () => {
+  let s = inDoubleLoop();
+  assert.equal(reopenProblem(s, 'define'), null);
+  assert.match(reopenProblem(s, 'contradiction'), /no contradiction step/);
+  const loopRun = activeRun(s).id;
+  s = acceptSuggestion({ ...s, suggestion: { kind: 'reopen_step', step: 'define', reason: 'The sign-off rule was never questioned.' } }, deps);
+  assert.equal(s.phase, 'define');
+  assert.deepEqual(s.detour, { from: 'improve', to: 'define', reason: 'The sign-off rule was never questioned.', at: deps.now() });
+  assert.equal(s.steps.improve.runs.find((run) => run.id === loopRun).status, 'done');
+  assert.equal(s.steps.define.status, 'open');
+  assert.equal(s.runner.mode, 'turn');
+  assert.equal(nextPhase(s), 'improve');
+  s = moveOn(idle(s), deps);
+  assert.equal(s.phase, 'improve');
+  assert.equal(s.detour, null);
+  assert.equal(s.runner.mode, 'boundary');
+  assert.equal(s.runner.leaving, 'define');
+});
+
+test('reopen is refused while waiting and before double-loop names a governing assumption', () => {
+  const waiting = idle(moveOn(implementDone(), deps));
+  assert.match(reopenProblem(waiting, 'define'), /waiting/);
+  assert.match(reopenProblem(idle(dismissReview(waiting, deps)), 'define'), /governing assumption/);
+  assert.match(reopenProblem(at('decide'), 'define'), /only from Improve/);
+});
+
+test('the summary row carries the review date while waiting', () => {
+  assert.equal(summaryRow(idle(moveOn(implementDone(), deps))).reviewDue, idle(moveOn(implementDone(), deps)).reviewProposal.due);
+  assert.equal(summaryRow(at('decide')).reviewDue, null);
 });
