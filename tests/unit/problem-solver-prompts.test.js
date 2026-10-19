@@ -86,7 +86,8 @@ test('finished sessions get a closing instruction', () => {
 });
 
 test('a step with no tools says so and never lists or suggests tools', () => {
-  const analyse = moveOn(inTool(), deps);
+  // Decide is the first step of the seven-step model with no tools.
+  const analyse = [1, 2].reduce((acc) => moveOn({ ...acc, runner: { status: 'idle', mode: 'turn', error: null } }, deps), moveOn(inTool(), deps));
   const { system, user } = buildCoachPrompt(analyse);
   assert.doesNotMatch(system[1], /TOOLS FOR THIS STEP/);
   assert.match(system[1], /Do not suggest a tool/);

@@ -27,10 +27,10 @@ const SOURCES: Record<string, string> = {
   learning, logical_reasoning, metacognition, reflective_thinking, searching, synthesis
 };
 
-const EMBLEMS: Record<PsToolId, string> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction };
+const EMBLEMS: Partial<Record<PsToolId, string>> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction };
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
-export const EMBLEM_SVG: Record<PsToolId, string> = EMBLEMS;
+export const EMBLEM_SVG: Partial<Record<PsToolId, string>> = EMBLEMS;
 
 let copy = 0;
 

@@ -15,11 +15,16 @@ async function intoDefine() {
 }
 
 test('boundary asks what was learned, then records it', async () => {
-  let s = await step(moveOn(await intoDefine(), deps));
-  assert.equal(s.pendingLearning, 'define');
+  // Analyse and Devise have tools now; Decide is the first step without any.
+  const idle = (x) => ({ ...x, runner: { status: 'idle', mode: 'turn', error: null } });
+  let s = await intoDefine();
+  for (const _ of [1, 2]) s = moveOn(idle(s), deps);
+  s = { ...s, steps: { ...s.steps, devise: { ...s.steps.devise, runs: [{ id: 'dev', tool: 'five_whys', status: 'active', nodes: [], edges: [] }] } } };
+  s = await step(moveOn(idle(s), deps));
+  assert.equal(s.pendingLearning, 'devise');
   assert.match(s.turns.at(-1).text, /learn/);
   s = await step(say(s, 'I blame people when I am tired.', deps));
-  assert.deepEqual(s.learnings.map((l) => l.step), ['define']);
+  assert.deepEqual(s.learnings.map((l) => l.step), ['devise']);
   assert.match(s.turns.at(-1).text, /no tool for this step yet/);
   assert.equal(s.suggestion, null);
 });

@@ -7,6 +7,12 @@ import { gapRadar } from './gap-radar.mjs';
 import { problemStatement } from './problem-statement.mjs';
 import { smart } from './smart.mjs';
 import { contradiction } from './contradiction.mjs';
+import { causalMap } from './causal-map.mjs';
+import { perspectiveShift } from './perspective-shift.mjs';
+import { radialTree } from './radial-tree.mjs';
+import { forceField } from './force-field.mjs';
+import { fromTo } from './from-to.mjs';
+import { intentStatement } from './intent-statement.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -17,7 +23,13 @@ export const TOOLS = {
   gap_radar: gapRadar,
   problem_statement: problemStatement,
   smart,
-  contradiction
+  contradiction,
+  causal_map: causalMap,
+  perspective_shift: perspectiveShift,
+  radial_tree: radialTree,
+  force_field: forceField,
+  from_to: fromTo,
+  intent_statement: intentStatement
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
