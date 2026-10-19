@@ -341,3 +341,51 @@ SAMPLES['solution_tree:next'] = {
   nodes: [...SAMPLES.solution_tree.nodes, node('h10', 'how:10', 'Lay carpet tiles under the tables to soften chair noise.', 'Carpet tiles')],
   edges: [...SAMPLES.solution_tree.edges, { from: 'h10', to: 'h2', kind: 'parent' }]
 };
+
+// Lotus blossom: a small town theatre with empty seats midweek. Eight solutions round the
+// problem; five of them grow ideas (eight on cheaper tickets), one idea is still unplaced,
+// and two ideas are picked. One idea is contested.
+SAMPLES.lotus_blossom = run(
+  'lotus_blossom',
+  [
+    node('p', 'problem', 'Tuesday to Thursday shows play to a third-full house, and the box office cannot tell who is staying away or why.', 'Empty midweek seats'),
+    node('s1', 'solution:1', 'Bring the price down on the nights that do not sell.', 'Cheaper midweek tickets'),
+    node('s2', 'solution:2', 'Fill matinees and early shows with school and college groups.', 'School group deals'),
+    node('s3', 'solution:3', 'Give people a reason to come early with a talk before the show.', 'Pre-show talks'),
+    node('s4', 'solution:4', 'Sell the evening, not just the seat: a show with a simple supper.', 'Show and supper'),
+    node('s5', 'solution:5', 'Get the midweek programme heard on local radio and in the free paper.', 'Local radio slots'),
+    node('s6', 'solution:6', 'Ask regulars to bring someone who has never been.', 'Bring a friend'),
+    node('s7', 'solution:7', 'Put on shorter shows that start at six, for people going home from work.', 'Early short shows'),
+    node('s8', 'solution:8', 'A membership that only covers midweek nights.', 'Midweek membership'),
+    node('i1', 'idea:1', 'Let people choose what to pay on Tuesdays, from a floor of three pounds.', 'Choose your price'),
+    node('i2', 'idea:2', 'Five-pound seats for anyone under twenty-six.', 'Under-26 fiver'),
+    node('i3', 'idea:3', 'Release unsold seats at half price through a text alert at four o\'clock.', 'Four o\'clock alert'),
+    node('i4', 'idea:4', 'Two tickets for the price of one on Wednesdays.', 'Two for one'),
+    node('i5', 'idea:5', 'A discount for anyone living within a mile of the theatre.', 'Neighbour rate', { state: 'contested', objection: 'Who counts as a neighbour, and how would the box office check it at the door?' }),
+    node('i6', 'idea:6', 'A standby queue at the door half an hour before curtain.', 'Standby queue'),
+    node('i7', 'idea:7', 'Carers come free with the person they support.', 'Carers go free'),
+    node('i8', 'idea:8', 'A second visit within a month costs half.', 'Half-price return'),
+    node('i9', 'idea:9', 'Invite a director or actor to talk for twenty minutes before curtain.', 'Meet the director'),
+    node('i10', 'idea:10', 'Short backstage tours before the show, booked with the ticket.', 'Backstage tour'),
+    node('i11', 'idea:11', 'A reading group that meets in the bar before each new play.', 'Play reading club'),
+    node('i12', 'idea:12', 'A soup-and-bread supper served in the foyer before the show.', 'Foyer soup supper'),
+    node('i13', 'idea:13', 'A free ticket for every regular who brings a first-timer.', 'Free seat for you'),
+    node('i14', 'idea:14', 'A postcard regulars can hand to a friend, worth a discount.', 'Friend postcard'),
+    node('i15', 'idea:15', 'A first-timers\' night with a welcome at the door.', 'First-timers night'),
+    node('i16', 'idea:16', 'A loyalty card stamped for each new face brought along.', 'Stamp card'),
+    node('i17', 'idea:17', 'Ten midweek shows for the price of six, spread over a season.', 'Ten for six'),
+    node('i18', 'idea:18', 'Members can swap a night they cannot make for another.', 'Free night swaps'),
+    node('i19', 'idea:19', 'Swap season tickets with the arts centre in the next town.', 'Season ticket swap'),
+    node('f1', 'preferred:1', 'Cheap to run, fills seats that would be empty anyway, and the text list grows on its own.', 'Fills empty seats cheaply'),
+    node('f2', 'preferred:2', 'Brings in exactly the people who have never been, using the regulars we already have.', 'Regulars become hosts')
+  ],
+  [
+    ...['i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8'].map((id) => ({ from: id, to: 's1', kind: 'petal' })),
+    ...['i9', 'i10', 'i11'].map((id) => ({ from: id, to: 's3', kind: 'petal' })),
+    { from: 'i12', to: 's4', kind: 'petal' },
+    ...['i13', 'i14', 'i15', 'i16'].map((id) => ({ from: id, to: 's6', kind: 'petal' })),
+    ...['i17', 'i18'].map((id) => ({ from: id, to: 's8', kind: 'petal' })),
+    { from: 'f1', to: 'i3', kind: 'marks' },
+    { from: 'f2', to: 'i14', kind: 'marks' }
+  ]
+);
