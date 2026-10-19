@@ -50,7 +50,9 @@ const EMBLEMS: Record<PsToolId, string> = {
   five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction,
   causal_map, perspective_shift, radial_tree, force_field, from_to, intent_statement,
   problem_reduction, analogical_reasoning, solution_tree, lotus_blossom, duncker,
-  decision_matrix, swot, morphological, pareto, dmaic, fifteen_percent, kanban, eisenhower
+  decision_matrix, swot, morphological, pareto, dmaic, fifteen_percent, kanban, eisenhower,
+  // Task 2 replaces these temporary fallbacks with real emblems
+  after_action_review: eisenhower, double_loop: eisenhower, feedback_matrix: eisenhower
 };
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */

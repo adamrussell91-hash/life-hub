@@ -139,6 +139,7 @@ function runLines(session, run) {
     `Open slots: ${nextSlots(run).join(', ') || (isComplete(run) ? 'none (tool complete)' : 'none open, but the tool is not complete: see Waiting on or add links')}`,
     ...(def.scoreLine?.(run) ? [`Scores: ${def.scoreLine(run)}`] : []),
     ...(def.awaiting?.(run) ? [`Waiting on: ${def.awaiting(run)}`] : []),
+    ...(def.promptNote?.(run) ? [`Note: ${def.promptNote(run)}`] : []),
     ...(def.taskSlots ? [`Can become tasks: ${proposable(session, run).join(', ') || 'none yet'}`] : []),
     progressLine(session)
   ].join('\n');
