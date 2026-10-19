@@ -8,12 +8,13 @@ import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js
 import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
-import { BOOK_STEPS, nextStepAfter, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { BOOK_STEPS, nextPhase, pastStep, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
-import { createTaskBridge } from './task-bridge';
+import { createTaskBridge, taskSnapshot, type TaskDetail } from './task-bridge';
+import { mountReviewPanel, reviewBanner, type ReviewEntry } from './review-panel';
 import { mountTaskCards } from './task-cards';
 import { createSessionSync } from './session-sync';
 import { tasksApi } from '@/services/client-api';
@@ -253,12 +254,36 @@ function createSkillTray(): { el: HTMLElement; update(session: PsSession): void 
   };
 }
 
-/** The plan step a deep link (`step=<book step>`) points at, only when it is the very next step of the session. */
-export function resumeTarget(session: PsSession, wanted: string | null): string | null {
-  if (!wanted || !session.model) return null;
-  const step = planStepForBook(session.model.id, wanted);
-  return step && step === nextStepAfter(session.model.id, session.phase) ? step : null;
+/** A review exists to wait for: created, or proposed and not set aside (mirrors the server). */
+const reviewLive = (session: PsSession): boolean =>
+  Boolean(session.reviewTaskId) || session.reviewProposal?.status === 'proposed' || session.reviewProposal?.status === 'confirmed';
+
+/**
+ * How a review link (`step=improve`) enters the session, or null when it cannot start a review:
+ * `move` from the step just before Improve, `start` in Improve before the review is under way,
+ * `reopen` once the session has moved past Improve (a new pass that returns afterwards).
+ */
+export function reviewEntry(session: PsSession, wanted: string | null): ReviewEntry | null {
+  if (wanted !== 'improve' || !session.model || !reviewLive(session) || session.detour) return null;
+  const status = session.reviewState?.status;
+  if (status === 'reviewing' || status === 'done') return null;
+  const step = planStepForBook(session.model.id, 'improve');
+  if (!step) return null;
+  if (session.phase === step) return { kind: 'start', step };
+  if (session.phase !== 'finished' && nextPhase(session) === step) return { kind: 'move', step };
+  if (pastStep(session, step)) return { kind: 'reopen', step };
+  return null;
 }
+
+/** Today as the local `YYYY-MM-DD`. */
+function localToday(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+/** Comparable key for a snapshot's counts and overdue titles (its time is left out). */
+const snapshotKey = (snap: { byStatus: Record<string, number>; overdue: string[] } | null | undefined): string =>
+  snap ? JSON.stringify([Object.entries(snap.byStatus).sort(([a], [b]) => a.localeCompare(b)), snap.overdue]) : '';
 
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await problemSolverApi.get(id);
@@ -271,7 +296,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const bench = el('div', 'ps-bench');
   const canvasHost = el('div', 'ps-canvas');
   const tray = createSkillTray();
-  bench.append(canvasHost, tray.el);
+  const review = mountReviewPanel({ start: () => void startReview() });
+  bench.append(review.el, canvasHost, tray.el);
   const cards = mountTaskCards({
     create: (proposal, edits) => bridge.create(session, proposal, edits),
     dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
@@ -282,20 +308,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const coachHost = el('div', 'ps-coach-host');
   coachHost.append(coach.el);
   board.append(bench, coachHost);
-  const resume = resumeTarget(session, hashQuery().get('step'));
-  let banner: HTMLElement | null = null;
-  if (resume) {
-    const name = stepName(session.model!.id, resume);
-    banner = el('div', 'ps-resume');
-    banner.setAttribute('role', 'status');
-    const go = el('button', 'ps-resume__go', `Move on to ${name}`) as HTMLButtonElement;
-    go.type = 'button';
-    go.addEventListener('click', () => {
-      banner?.remove();
-      void act('move_on');
-    });
-    banner.append(el('span', 'ps-resume__text', `This review picks up at ${name}.`), go);
-  }
+  const entry = reviewEntry(session, hashQuery().get('step'));
+  let banner: HTMLElement | null = entry ? reviewBanner(entry, () => void startReview(), stepName(session.model!.id, entry.step)) : null;
   page.append(back, title, track.el, ...(banner ? [banner] : []), board);
   canvas.replaceChildren(page);
   const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
@@ -309,6 +323,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
 
   /** Sorted confirmed task ids last fetched, so statuses refresh only when the set changes. */
   let confirmedKey = '';
+  let shownPhase = '';
   const confirmedIds = () => (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed' && p.taskId).map((p) => p.taskId!).sort().join(',');
 
   /** Draw a snapshot. Only reached through `sync.paint`, which drops older revisions. */
@@ -320,8 +335,12 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     tray.update(session);
     coach.update(session);
     cards.update(session);
+    review.update(session);
     const key = confirmedIds();
-    if (key !== confirmedKey) {
+    // Entering Improve also refreshes, so the coach gets the tasks' snapshot there.
+    const enteredImprove = session.phase !== shownPhase && session.model && session.phase === planStepForBook(session.model.id, 'improve');
+    shownPhase = session.phase;
+    if (key !== confirmedKey || (enteredImprove && key)) {
       confirmedKey = key;
       void refreshStatuses();
     }
@@ -372,13 +391,60 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     setReview: (taskId, due) => confirmed('set_review_task', { taskId, due })
   });
 
-  /** Fetch live statuses for the confirmed tasks; a newer refresh wins over a slower older one. */
+  /** The last snapshot key posted (or seen on the session), so a status refresh never posts twice. */
+  let postedKey = snapshotKey(session.taskSnapshot);
+
+  /** In an Improve plan step, not waiting, with a confirmed task: tell the coach how the tasks stand. */
+  function postSnapshot(details: Record<string, TaskDetail>): void {
+    const s = session;
+    const improve = s.model ? planStepForBook(s.model.id, 'improve') : null;
+    if (!improve || s.phase !== improve || s.reviewState?.status === 'waiting') return;
+    const proposals = s.proposedTasks ?? [];
+    if (!proposals.some((p) => p.status === 'confirmed' && p.taskId)) return;
+    const snapshot = taskSnapshot(proposals, details, localToday());
+    const key = snapshotKey(snapshot);
+    if (key === postedKey || key === snapshotKey(s.taskSnapshot)) return;
+    postedKey = key;
+    confirmed('task_status', { snapshot }).catch(() => {
+      if (postedKey === key) postedKey = '';
+    });
+  }
+
+  /** Fetch the confirmed tasks once: live statuses for the chart, and the snapshot for Improve. */
   let statusRound = 0;
   async function refreshStatuses(): Promise<void> {
     if (!page.isConnected) return;
     const round = ++statusRound;
-    const map = await bridge.statuses(session.proposedTasks ?? []);
-    if (round === statusRound && page.isConnected) diagram.setTaskStatuses(map);
+    const details = await bridge.details(session.proposedTasks ?? []);
+    if (round !== statusRound || !page.isConnected) return;
+    diagram.setTaskStatuses(Object.fromEntries(Object.entries(details).map(([id, d]) => [id, typeof d === 'string' ? d : d.status])));
+    postSnapshot(details);
+  }
+
+  /** Review now, or the review link's banner: post the snapshot and start the review. */
+  let starting = false;
+  async function startReview(): Promise<void> {
+    if (starting) return;
+    starting = true;
+    banner?.remove();
+    banner = null;
+    try {
+      const proposals = session.proposedTasks ?? [];
+      const snapshot = taskSnapshot(proposals, await bridge.details(proposals), localToday());
+      postedKey = snapshotKey(snapshot);
+      paint(await problemSolverApi.actWith(session, 'start_review', { snapshot }));
+    } catch (err) {
+      if ((err as { code?: string }).code === 'conflict') {
+        paint(await problemSolverApi.get(session.id));
+      } else {
+        flash(err);
+      }
+      review.update(session);
+      return;
+    } finally {
+      starting = false;
+    }
+    await settle();
   }
   const onVisible = () => {
     if (document.visibilityState === 'visible' && confirmedKey) void refreshStatuses();
