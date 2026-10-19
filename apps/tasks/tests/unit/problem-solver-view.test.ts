@@ -136,6 +136,25 @@ describe('frame and track', () => {
     expect(stations[1].getAttribute('aria-current')).toBe('step');
   });
 
+  it('marks Improve waiting and keeps stored states during a detour to Define', () => {
+    const track = createTrack();
+    const done = (status: 'done' | 'skipped' | 'waiting' | 'open') => ({ runs: [], status, objection: null });
+    const steps = { define: done('open'), analyse: done('done'), devise: done('skipped'), decide: done('done'), implement: done('done'), improve: done('open'), document: done('open') };
+    track.update(session({ phase: 'define', detour: { from: 'improve', to: 'define', reason: 'r', at: 'a' }, steps }));
+    const states = [...track.el.querySelectorAll('.ps-track__stn')].map((el) => el.getAttribute('data-state'));
+    expect(states).toEqual(['done', 'now', 'done', 'skipped', 'done', 'done', 'waiting', 'future']);
+  });
+
+  it('marks a late review\'s return step waiting', () => {
+    const track = createTrack();
+    const done = (status: 'done' | 'skipped' | 'waiting' | 'open') => ({ runs: [], status, objection: null });
+    const steps = { define: done('done'), analyse: done('done'), devise: done('done'), decide: done('done'), implement: done('done'), improve: done('open') };
+    track.update(session({ phase: 'improve', steps, reviewState: { status: 'reviewing', due: null, returnTo: 'decide', startedAt: 'a' } }));
+    const after = [...track.el.querySelectorAll('.ps-track__stn')].map((el) => el.getAttribute('data-state'));
+    expect(after[4]).toBe('waiting');
+    expect(after[6]).toBe('now');
+  });
+
   it('medal fills one piece per answered question', () => {
     const medal = problemMedal(2, 'five_whys');
     expect(medal.querySelector('.ps-medal__mid')!.getAttribute('fill')).toBe('var(--ps-yellow)');

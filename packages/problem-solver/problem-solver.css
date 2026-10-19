@@ -1045,6 +1045,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-record__card-note { font-size: 12px; opacity: 0.75; overflow-wrap: anywhere; }
 .ps-record__card.is-done .ps-record__card-button { background: var(--ink); color: var(--paper); }
 .ps-record__card.is-switched .ps-record__card-button { border-style: dashed; opacity: 0.5; }
+/* Waiting or paused: dashed ink outline on paper, at full strength (not a ghost). */
+.ps-record__step.is-waiting .ps-record__box { background: var(--paper); color: var(--ink); border: 1.5px dashed var(--ink); opacity: 1; }
 .ps-record__step.is-skipped .ps-record__box { border-style: dashed; opacity: 0.45; }
 .ps-record__step.is-skipped .ps-record__name { text-decoration: line-through; text-decoration-thickness: 1px; }
 .ps-record__objection {

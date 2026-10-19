@@ -7,6 +7,7 @@
 import { el } from '@/views/hub-kit';
 import { stepName, stepPlan } from '../../../../../packages/problem-solver/steps.mjs';
 import { EMBLEM_SVG } from '../../../../../packages/problem-solver/glyphs';
+import { isPaused } from '../../../../../packages/problem-solver/render/record';
 import type { PsSession, PsToolId } from '../../../../../packages/problem-solver/types';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -159,11 +160,15 @@ export function createTrack(): TrackView {
       const names = ['Frame', ...plan.map((s: { step: string }) => stepName(modelId, s.step))];
       const index = plan.findIndex((s: { step: string }) => s.step === session.phase);
       const now = session.phase === 'frame' ? 0 : index >= 0 ? index + 1 : -1;
-      const stateOf = (i: number): 'now' | 'done' | 'skipped' | 'future' => {
+      const stateOf = (i: number): 'now' | 'done' | 'skipped' | 'waiting' | 'future' => {
         if (i === now) return 'now';
         if (i === 0) return session.phase === 'frame' ? 'now' : 'done';
-        const st = session.steps?.[plan[i - 1].step]?.status;
-        if (session.phase === 'finished' || (now > 0 && i < now)) return st === 'skipped' ? 'skipped' : 'done';
+        const step = plan[i - 1].step;
+        const st = session.steps?.[step]?.status;
+        if (isPaused(session, step) || st === 'waiting') return 'waiting';
+        if (st === 'skipped') return 'skipped';
+        if (st === 'done') return 'done';
+        if (session.phase === 'finished' || (now > 0 && i < now)) return 'done';
         return 'future';
       };
       const toolOf = (i: number): PsToolId | null => {
