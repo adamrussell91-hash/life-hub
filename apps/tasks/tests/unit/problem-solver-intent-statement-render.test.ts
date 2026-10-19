@@ -86,4 +86,18 @@ describe('Intent statement view', () => {
     const colour = (el: Element) => ['is-red', 'is-yellow', 'is-blue'].filter((c) => el.classList.contains(c));
     expect([...view.el.querySelectorAll('[data-node]')].map(colour)).toEqual([['is-red'], ['is-yellow'], ['is-blue'], ['is-red'], ['is-yellow'], ['is-blue']]);
   });
+
+  it('gives each band a ring layer behind its fill, and uses no SVG filter', () => {
+    const view = createIntentStatementView();
+    view.update(run(all));
+    for (const id of ['pr', 'st', 'fa', 'ap', 'op', 'ri']) {
+      const kids = [...button(view, id).children].map((el) => el.className.split(' ')[0]);
+      expect(kids).toEqual(['ps-intent__ring', 'ps-intent__shape', 'ps-intent__words']);
+      expect(button(view, id).querySelector('.ps-intent__ring')!.getAttribute('aria-hidden')).toBe('true');
+    }
+    expect(view.el.querySelector('.ps-intent__defs')).toBeNull();
+    expect(view.el.querySelector('svg, filter')).toBeNull();
+    expect(view.el.style.getPropertyValue('--ps-intent-ring-focus')).toBe('');
+    expect(view.el.style.getPropertyValue('--ps-intent-ring-open')).toBe('');
+  });
 });

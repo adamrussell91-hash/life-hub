@@ -20,8 +20,6 @@ const PARTS: Part[] = ['problem', 'stakeholders', 'failures', 'approach', 'oppor
 const HEADING: Record<Part, string> = { problem: 'Problem', stakeholders: 'Stakeholders', failures: 'Failures', approach: 'Approach', opportunity: 'Opportunity', risk: 'Risk' };
 const COLOURS: Accent[] = ['red', 'yellow', 'blue'];
 
-const SVG = 'http://www.w3.org/2000/svg';
-
 const isPart = (name: string | undefined): name is Part => PARTS.includes(name as Part);
 
 function span(doc: Document, className: string, value = ''): HTMLSpanElement {
@@ -45,55 +43,33 @@ export function createIntentStatementView(doc: Document = document): IntentState
   let stack: HTMLDivElement | null = null;
 
   /**
-   * The focus and open rings: one SVG filter each that grows the band's silhouette by 2px in
-   * paper, then in ink, so the ring traces the arrow exactly and the clip never cuts it.
+   * The ring layers are arrows outset round the band (see the CSS). Keeping their slants a
+   * true distance from the fill's needs the slant's steepness, which depends on the band's
+   * height, so each band carries two factors: --ps-intent-tip = 1 / sin(slant), how far the
+   * outset tip moves per pixel of ring, and --ps-intent-run = point / half-height, how far
+   * the outset shoulder moves back. The CSS defaults fit a band at its minimum height.
    */
-  function ringFilters(): SVGSVGElement {
-    const svg = doc.createElementNS(SVG, 'svg') as SVGSVGElement;
-    svg.setAttribute('class', 'ps-intent__defs');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('focusable', 'false');
-    const defs = doc.createElementNS(SVG, 'defs');
-    for (const [kind, ink] of [['focus', 4], ['open', 3.5]] as const) {
-      const id = nextId(`ps-intent-ring-${kind}`);
-      const filter = doc.createElementNS(SVG, 'filter');
-      filter.setAttribute('id', id);
-      for (const [name, value] of [['x', '-10%'], ['y', '-20%'], ['width', '120%'], ['height', '140%'], ['color-interpolation-filters', 'sRGB']]) filter.setAttribute(name, value);
-      const layer = (radius: number, colour: string, result: string): void => {
-        const grow = doc.createElementNS(SVG, 'feMorphology');
-        grow.setAttribute('in', 'SourceAlpha');
-        grow.setAttribute('operator', 'dilate');
-        grow.setAttribute('radius', String(radius));
-        grow.setAttribute('result', `${result}-shape`);
-        const flood = doc.createElementNS(SVG, 'feFlood');
-        flood.setAttribute('class', `ps-intent__flood--${colour}`);
-        flood.setAttribute('result', `${result}-colour`);
-        const fill = doc.createElementNS(SVG, 'feComposite');
-        fill.setAttribute('in', `${result}-colour`);
-        fill.setAttribute('in2', `${result}-shape`);
-        fill.setAttribute('operator', 'in');
-        fill.setAttribute('result', result);
-        filter.append(grow, flood, fill);
-      };
-      layer(ink, 'ink', 'ink');
-      layer(2, 'paper', 'paper');
-      const merge = doc.createElementNS(SVG, 'feMerge');
-      for (const input of ['ink', 'paper', 'SourceGraphic']) {
-        const n = doc.createElementNS(SVG, 'feMergeNode');
-        n.setAttribute('in', input);
-        merge.append(n);
-      }
-      filter.append(merge);
-      defs.append(filter);
-      root.style.setProperty(`--ps-intent-ring-${kind}`, `url(#${id})`);
-    }
-    svg.append(defs);
-    return svg;
-  }
+  const sizes = typeof ResizeObserver === 'function'
+    ? new ResizeObserver((entries) => {
+        // Read every band first, then write.
+        const measured = entries.map(({ target }) => {
+          const el = target as HTMLElement;
+          const half = el.getBoundingClientRect().height / 2;
+          const point = parseFloat(getComputedStyle(el).getPropertyValue('--ps-intent-point')) || 0;
+          return { el, half, point };
+        });
+        for (const { el, half, point } of measured) {
+          if (!half || !point) continue;
+          const tip = (Math.hypot(point, half) / half).toFixed(4);
+          const run = (point / half).toFixed(4);
+          if (el.style.getPropertyValue('--ps-intent-tip') !== tip) el.style.setProperty('--ps-intent-tip', tip);
+          if (el.style.getPropertyValue('--ps-intent-run') !== run) el.style.setProperty('--ps-intent-run', run);
+        }
+      })
+    : null;
 
   function ensureStack(): HTMLDivElement {
     if (stack) return stack;
-    root.append(ringFilters());
     stack = doc.createElement('div');
     stack.className = 'ps-intent__stack';
     stack.setAttribute('data-region', 'statement');
@@ -119,7 +95,10 @@ export function createIntentStatementView(doc: Document = document): IntentState
     button.className = 'ps-intent__band';
     button.setAttribute('aria-expanded', 'false');
     button.setAttribute('aria-controls', detailsId);
-    // The arrow is clipped; the ring is drawn round the button's silhouette, so it is never clipped.
+    // Back to front: the ring (two outset arrows, shown on focus and when open), then the
+    // clipped fill with its notch, then the words, which are never clipped or filtered.
+    const ring = span(doc, 'ps-intent__ring');
+    ring.setAttribute('aria-hidden', 'true');
     const shape = span(doc, 'ps-intent__shape');
     shape.setAttribute('aria-hidden', 'true');
     shape.append(span(doc, `ps-intent__notch is-${COLOURS[(index + 1) % 3]}`));
@@ -128,7 +107,7 @@ export function createIntentStatementView(doc: Document = document): IntentState
     title.append(span(doc, 'ps-intent__title', nodeTitle(node)));
     if (node.state === 'contested') title.append(contestedTag(doc, node));
     words.append(span(doc, 'ps-intent__heading', HEADING[part]), title);
-    button.append(shape, words);
+    button.append(ring, shape, words);
     button.setAttribute('aria-label', label(part, node));
 
     const card = detailsCard(doc, node, colour, detailsId);
@@ -140,6 +119,7 @@ export function createIntentStatementView(doc: Document = document): IntentState
     ensureStack().insertBefore(item, later);
     const band: Band = { item, button, part };
     bands.set(node.id, band);
+    sizes?.observe(button);
     parts.set(part, band);
     return band;
   }
