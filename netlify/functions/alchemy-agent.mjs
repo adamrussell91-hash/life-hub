@@ -5,7 +5,7 @@ import { alchemyJobError } from './_shared/alchemy-check.mjs';
 import { knowledgeIndex } from './_shared/alchemy-unit-notes.mjs';
 import { lexicalRetrieve } from './_shared/knowledge-alchemist.mjs';
 import { readNoteText } from './_shared/alchemy-notes-index.mjs';
-import { readAgentSettings, writeAgentSettings, rememberAcceptedSource } from './_shared/alchemy-agent.mjs';
+import { readAgentSettings, writeAgentSettings, rememberAcceptedSource, rulesTagged } from './_shared/alchemy-agent.mjs';
 import { startAgentJob, readAgentJob, latestAgentJob, updateAgentJob, invokeAgentRun, isSafeId } from './_shared/alchemy-agent-jobs.mjs';
 
 export const config = { path: ['/api/alchemy-agent', '/api/alchemy-agent/settings'], timeout: 26 };
@@ -85,7 +85,11 @@ async function settings(request, env, store, url) {
       const rows = await knowledgeIndex({ store, env, fetchImpl: fetch });
       return reply(request, env, { notes: lexicalRetrieve(rows, search, 12).map(r => ({ id: r.id, title: r.title })) });
     }
-    return reply(request, env, await readAgentSettings(store));
+    const chosen = await readAgentSettings(store);
+    if (chosen.rulesNoteId) return reply(request, env, chosen);
+    // No choice made: a note tagged alchemy-rules is used, so say which.
+    const tagged = rulesTagged(await knowledgeIndex({ store, env, fetchImpl: fetch }).catch(() => []));
+    return reply(request, env, tagged ? { rulesNoteId: tagged.id, rulesNoteTitle: tagged.title, fromTag: true } : chosen);
   }
   if (request.method !== 'PUT') return withCors(methodNotAllowed('GET, PUT, OPTIONS'), request, env);
   let body; try { body = await boundedJson(new Response(request.body, { headers: request.headers }), 4000); } catch { body = null; }

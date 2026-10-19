@@ -1,7 +1,7 @@
 # Alchemy Lab as an agent: design
 
 Date: 20 October 2026
-Status: draft for Adam's review
+Status: approved by Adam 20 Oct; built on `claude/alchemy-agent`
 Replaces: the one-shot block check in `docs/superpowers/specs/2026-10-13-alchemy-block-assistant-design.md` and the passive scans
 
 ## Why
@@ -20,7 +20,7 @@ Notion AI did this job well with a tool-use loop. It searched, filtered on struc
 1. **Whole lesson.** One button, "Improve with Ann", works on the whole lesson. The per-block ask stays for quick jobs.
 2. **A bigger model.** The deep run uses Sonnet (`claude-sonnet-5-5`, set by `ALCHEMY_AGENT_MODEL`). It runs only when Adam presses the button. It never runs in the background.
 3. **One source.** All research and notes now live in the Knowledge Hub, so Ann's tools search only that.
-4. **A rules note** (chosen by Claude). Adam picks one Knowledge Hub note as "Ann's lesson rules". Ann reads it first on every run. It lives with his research and is edited in the Knowledge Hub editor, so no new editor is needed. Teaching stores only the note id. With no note chosen, Ann works without rules and the panel says so.
+4. **A rules note** (chosen by Claude, approved). Ann reads one Knowledge Hub note first on every run. It lives with his research and is edited in the Knowledge Hub editor, so no new editor is needed. A note tagged `alchemy-rules` is used automatically; picking a note in the panel overrides the tag. With neither, Ann works without rules and the panel says so. The first rules note, "Ann's lesson rules", was written from Adam's Notion AI instructions and The Seminar.
 5. **Patches.** Every edit is an exact-match patch: `{blockId, path, oldStr, newStr}`.
 6. **Grounding** (chosen by Claude). A sourced suggestion must quote a passage from a note Ann opened in full during this run, and the server checks that the quote appears in that note. A suggestion that fails the check is dropped before Adam sees it. Ann may add at most two suggestions drawn from her own teaching knowledge. They are labelled "Ann's own idea" and carry no source.
 7. **Waiting is fine.** Adam presses the button and can leave. The panel shows what Ann is doing and fills with cards when she finishes.
@@ -99,7 +99,7 @@ The panel opens from the lesson editor toolbar.
 - **Controls:** Accept, Reject, Accept all.
 - **States:** no rules note chosen (with a link to choose one); index building; budget reached; stale card; run failed (Ann's message and a retry button).
 
-A mockup comes first, for Adam to approve before the UI is built.
+Checked in the local mock at desktop and 390px instead of a separate mockup.
 
 ## Budget and limits
 
@@ -110,7 +110,7 @@ A mockup comes first, for Adam to approve before the UI is built.
 ## What changes in the existing Alchemy Lab
 
 - **Passive background scans:** switched off and their scheduler removed. They used Haiku on snippets and cost money for weak results.
-- **Per-block "Ask Ann":** keeps its button. It runs the same agent with the lesson as context, a scope of the one block, and a 6-turn cap.
+- **Per-block "Ask Ann":** keeps its button. It runs the same agent with the lesson as context, a scope of the one block, and a 6-turn cap. It runs only when Adam presses Ask, never on opening. Unit pages get the same block ask, reviewed as a unit page.
 - **Unit notes shelf and panel:** kept, and they feed the opening context.
 - **`/api/alchemy-lab` (the Clementine archive connections):** untouched.
 - **Old block check (`runAlchemyCheck`, `/api/alchemy-blocks`):** removed once the per-block ask moves over, together with its tests.
