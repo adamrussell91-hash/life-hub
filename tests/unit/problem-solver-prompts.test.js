@@ -2,52 +2,72 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RUBRIC, buildCoachPrompt } from '../../netlify/functions/_shared/problem-solver/prompts.mjs';
-import { createSession, applyCoachTurn, acceptSuggestion } from '../../netlify/functions/_shared/problem-solver/session.mjs';
+import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 let n = 0;
-const deps = { now: () => '2026-10-16T10:00:00.000Z', newId: () => `id${(n += 1)}` };
+const deps = { now: () => '2026-10-19T10:00:00.000Z', newId: () => `id${(n += 1)}` };
+const turn = (fields) => ({ verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, ...fields });
 
-test('rubric names every skill, tool and the voice rule', () => {
-  for (const word of ['Metacognition', 'Critical thinking', '5 Whys', 'Problem tree', 'SMART', '25 and 60 words', 'Keep it anyway']) {
+function inTool(tool = 'five_whys', model = 'seven_step') {
+  let s = createSession({ text: 'Late work.' }, deps);
+  s = applyCoachTurn(s, turn({ frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: model, reason: 'r' }, suggestion: { kind: 'next_tool', tool, reason: 'r' } }), deps);
+  return acceptSuggestion(s, deps);
+}
+
+test('rubric carries voice, skills, process, chapters and final words', () => {
+  for (const word of ['Metacognition', 'Critical thinking', '25 and 60 words', 'Keep it anyway', 'seven-step', 'DEVISE:', 'determination, hope and success', 'Never end on agreement or praise alone.', 'MINIMUM MET']) {
     assert.ok(RUBRIC.includes(word), `rubric mentions ${word}`);
   }
 });
 
-test('frame prompt asks for the missing frame questions', () => {
-  const s = createSession({ text: 'Students hand in work late.' }, deps);
-  const prompt = buildCoachPrompt(s);
-  assert.equal(prompt.system, RUBRIC);
+test('system is two cached layers: the fixed rubric, then the step layer', () => {
+  const prompt = buildCoachPrompt(inTool());
+  assert.equal(prompt.system.length, 2);
+  assert.equal(prompt.system[0], RUBRIC);
+  assert.match(prompt.system[1], /CURRENT STEP: Define/);
+  assert.match(prompt.system[1], /`problem_tree`/);
+  assert.match(prompt.system[1], /five_whys \(5 Whys\)/);
+  assert.match(prompt.system[1], /Watch for: Stopping at a symptom/);
+});
+
+test('frame prompt asks for the missing frame questions and has an empty step layer', () => {
+  const prompt = buildCoachPrompt(createSession({ text: 'Students hand in work late.' }, deps));
   assert.match(prompt.user, /PHASE: frame/);
   assert.match(prompt.user, /Missing frame answers: goal, whatIsTrue, whatCanBeDone/);
-  assert.match(prompt.user, /Students hand in work late\./);
+  assert.match(prompt.system[1], /No step yet/);
 });
 
-test('define prompt lists the tool steps and open slots', () => {
-  let s = createSession({ text: 'Late work.' }, deps);
-  s = applyCoachTurn(s, { verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: 'seven_step', reason: 'r' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' }, summary: null, exitObjection: null }, deps);
-  s = acceptSuggestion(s, deps);
-  const prompt = buildCoachPrompt(s);
+test('tool prompt lists the tool steps, open slots and progress', () => {
+  const prompt = buildCoachPrompt(inTool());
   assert.match(prompt.user, /ACTIVE TOOL: 5 Whys/);
   assert.match(prompt.user, /Open slots: problem/);
-  assert.match(prompt.user, /Ask why\?/);
+  assert.match(prompt.user, /Progress: not yet at the minimum/);
 });
 
-test('rubric says frame answers use "frame", not "node"', () => {
-  assert.ok(RUBRIC.includes('In phase frame, use "frame" for accepted answers instead of "node"; "node" is only for phase define.'));
+test('boundary prompt names the step left and asks for the learning question', () => {
+  const s = moveOn(inTool(), deps);
+  const { user } = buildCoachPrompt(s);
+  assert.match(user, /MODE: boundary\. The person has just left Define/);
+  assert.match(user, /exitObjection/);
+  assert.match(user, /PHASE: analyse/);
 });
 
-test('define prompt says when the tool has met its minimum and what comes next', () => {
-  let s = createSession({ text: 'Skipping training.' }, deps);
-  s = applyCoachTurn(s, { verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: { goal: 'g', whatIsTrue: 't', whatCanBeDone: 'c' }, model: { id: 'seven_step', reason: 'r' }, suggestion: { kind: 'next_tool', tool: 'problem_tree', reason: 'r' }, summary: null, exitObjection: null }, deps);
-  s = acceptSuggestion(s, deps);
-  assert.match(buildCoachPrompt(s).user, /Progress: not yet at the minimum/);
-  for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['effect:1', 'No progress'], ['cause:1', 'Delayed payoff'], ['cause:2', 'Appetite suppressed']]) {
-    s = applyCoachTurn(s, { verdict: 'accept', message: 'ok', node: { slot, text }, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null }, deps);
-  }
-  assert.match(buildCoachPrompt(s).user, /Progress: MINIMUM MET\. Next step to suggest: next_tool problem_statement\./);
+test('after a boundary the prompt asks the coach to record the learning and open the step', () => {
+  let s = applyCoachTurn(moveOn(inTool(), deps), turn({ verdict: 'clarify', message: 'What did you learn?' }), deps);
+  s = say(s, 'I rush.', deps);
+  assert.match(buildCoachPrompt(s).user, /AWAITING LEARNING from Define: if they named something they learned, put it in "learning"/);
 });
 
-test('rubric forbids ending a message without a next step', () => {
-  assert.ok(RUBRIC.includes('Never end on agreement or praise alone.'));
-  assert.ok(RUBRIC.includes('MINIMUM MET'));
+test('earlier steps are summarised for carry-forward', () => {
+  let s = inTool();
+  s = applyCoachTurn(s, turn({ node: { slot: 'problem', text: 'Reports are late.' } }), deps);
+  s = moveOn(s, deps);
+  assert.match(buildCoachPrompt(s).user, /EARLIER STEPS:\nDefine \(skipped\): 5 Whys done; problem: Reports are late\./);
+});
+
+test('finished sessions get a closing instruction', () => {
+  let s = inTool('five_whys', 'polya');
+  for (const _ of [1, 2, 3, 4, 5]) s = moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps);
+  assert.match(buildCoachPrompt(s).user, /PHASE: finished/);
+  assert.match(buildCoachPrompt(s).system[1], /The session is finished/);
 });

@@ -1,7 +1,7 @@
 // tests/unit/problem-solver-coach.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createModelCoach, fitWords, wordCount } from '../../netlify/functions/_shared/problem-solver/coach.mjs';
+import { anthropicModel, createModelCoach, fitWords, wordCount } from '../../netlify/functions/_shared/problem-solver/coach.mjs';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
 import { createSession, applyCoachTurn, acceptSuggestion, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
@@ -88,7 +88,7 @@ test('scripted coach: a switch: answer suggests switching to Problem tree', asyn
   assert.equal(turn.node, null);
   assert.deepEqual(turn.suggestion, { kind: 'switch_tool', tool: 'problem_tree', reason: 'the causes branch in several directions' });
   s = acceptSuggestion(applyCoachTurn(s, turn, deps), deps);
-  assert.deepEqual(s.define.runs.map((run) => [run.tool, run.status]), [['five_whys', 'switched'], ['problem_tree', 'active']]);
+  assert.deepEqual(s.steps.define.runs.map((run) => [run.tool, run.status]), [['five_whys', 'switched'], ['problem_tree', 'active']]);
 });
 
 test('an edge to an unplaced slot is dropped without a repair call', async () => {
@@ -129,6 +129,19 @@ test('problem tree: a bare slot name takes the next open index', async () => {
 
 test('applyCoachTurn drops an edge that cannot be added', () => {
   const s = applyCoachTurn(inDefine(), { verdict: 'accept', message: 'ok', node: { slot: 'problem', text: 'x' }, edges: [{ from: 'problem', to: 'why:1', kind: 'relates' }], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null }, deps);
-  assert.equal(s.define.runs[0].nodes.length, 1);
-  assert.equal(s.define.runs[0].edges.length, 0);
+  assert.equal(s.steps.define.runs[0].nodes.length, 1);
+  assert.equal(s.steps.define.runs[0].edges.length, 0);
+});
+
+test('anthropicModel sends each system layer as its own cached block', async () => {
+  let body;
+  const fetchImpl = async (_url, init) => {
+    body = JSON.parse(init.body);
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: '{}' }], stop_reason: 'end_turn' }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  await anthropicModel({ ANTHROPIC_API_KEY: 'k' }, fetchImpl)({ system: ['fixed', 'step'], user: 'u', maxTokens: 10 });
+  assert.deepEqual(body.system, [
+    { type: 'text', text: 'fixed', cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: 'step', cache_control: { type: 'ephemeral' } }
+  ]);
 });
