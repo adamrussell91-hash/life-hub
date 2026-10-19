@@ -741,3 +741,20 @@ SAMPLES['eisenhower:next'] = {
   ],
   proposed: ['e3']
 };
+
+// After action review: a community garden's first seed swap, reviewed the week after. The swap
+// ran out of tables and seed packets ran short by midday; the learning is the longest answer.
+// One contested node. after_action_review:next shortens what was learned, so the gauge morphs.
+// after_action_review_first has only the first two answers, so two bars wait as faint outlines.
+const aarNodes = [
+  node('v1', 'intended', 'Run a two-hour seed swap at the garden gate: forty visitors, every packet labelled, and a sign-up list for spring volunteers.', 'Forty visitors, labelled packets'),
+  node('v2', 'achieved', 'About sixty people came. Packets ran out by half past eleven, a third were unlabelled, and nine people signed up to volunteer.', 'Sixty came, packets ran out'),
+  node('v3', 'differences', 'A post on the village noticeboard drew more people than planned, and the labelling was left to the morning itself.', 'Bigger crowd, late labelling', { state: 'contested', objection: 'Is "left to the morning" about the plan, or about one person running late?' }),
+  node('v4', 'learned', 'Label every packet at a sorting evening the week before, not on the day. Plan for half again as many people as expected, with a reserve box held back until noon. Put the sign-up list at the exit rather than the entrance, where people linger. Ask two volunteers to share the welcome table so nobody is stuck there all morning.', 'Label early, plan for more')
+];
+SAMPLES.after_action_review = run('after_action_review', aarNodes);
+SAMPLES['after_action_review:next'] = run('after_action_review', [
+  ...aarNodes.slice(0, 3),
+  node('v4', 'learned', 'Label every packet the week before, and plan for more people.', 'Label early, plan for more')
+]);
+SAMPLES.after_action_review_first = run('after_action_review', aarNodes.slice(0, 2));
