@@ -122,10 +122,25 @@ export function statusRequests(item, status) {
   const before = typeof record.status === 'string' && record.status ? record.status : allowed[0][0];
   const out = [{ path: own, method: /** @type {const} */ ('PATCH'), body: { status }, before: { status: before } }];
   const taskId = type === 'work_block' && typeof record.task_id === 'string' ? record.task_id : '';
+  // A split task is one card: ticking any part closes every remaining part and the task.
+  const splitParts = type === 'work_block' && record.session_count > 1 && Array.isArray(record.sessions)
+    ? record.sessions.filter(part => part && typeof part.id === 'string' && part.id !== id)
+    : [];
+  if (status === 'done') {
+    for (const part of splitParts) {
+      if (part.status === 'done' || part.status === 'cancelled') continue;
+      out.push({
+        path: `/api/work-blocks?id=${encodeURIComponent(part.id)}`,
+        method: 'PATCH',
+        body: { status: 'done' },
+        before: { status: typeof part.status === 'string' && part.status ? part.status : 'confirmed' }
+      });
+    }
+  }
   if (taskId) {
     const taskBefore = typeof row.taskStatus === 'string' ? row.taskStatus : 'open';
     const ownOpen = before !== 'done' && before !== 'cancelled' ? 1 : 0;
-    const othersOpen = Math.max(0, (Number(row.taskOpenBlocks) || 0) - ownOpen);
+    const othersOpen = splitParts.length ? 0 : Math.max(0, (Number(row.taskOpenBlocks) || 0) - ownOpen);
     const path = `/api/tasks?id=${encodeURIComponent(taskId)}`;
     if (status === 'done' && taskBefore !== 'done' && othersOpen === 0) {
       out.push({ path, method: 'PATCH', body: { status: 'done' }, before: { status: taskBefore } });

@@ -801,7 +801,13 @@ export function createChatHandler({
           hubTasksLoaded = true;
           try {
             const tasksStore = await getTasksStore(env);
-            hubTasks = withoutDeleted(await listTasksJSON(tasksStore, TASK_PREFIX));
+            const [tasks, workBlocks] = await Promise.all([
+              listTasksJSON(tasksStore, TASK_PREFIX),
+              // A task's time on Today is its work block; reads attach it as scheduled_blocks.
+              listTasksJSON(tasksStore, 'work_blocks/').catch(() => [])
+            ]);
+            hubTasks = withoutDeleted(tasks);
+            hubWorkBlocks = withoutDeleted(workBlocks);
           } catch (err) {
             hubLoadErrors.tasks = err?.code || 'load_failed';
           }
@@ -2455,7 +2461,7 @@ export function createChatHandler({
                     store: 'tasks_hub'
                   });
                 }
-                return JSON.stringify(getTasksFocus(hubTasks, hubProjects, { now: nowInstant }));
+                return JSON.stringify(getTasksFocus(hubTasks, hubProjects, { now: nowInstant, workBlocks: hubWorkBlocks }));
               }
               if (event.name === 'search_tasks') {
                 send({ type: 'status', text: 'Searching tasks…' });
@@ -2463,7 +2469,7 @@ export function createChatHandler({
                 if (hubLoadErrors.tasks) {
                   return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
                 }
-                return JSON.stringify(searchTasks(hubTasks, event.input ?? {}));
+                return JSON.stringify(searchTasks(hubTasks, event.input ?? {}, { workBlocks: hubWorkBlocks }));
               }
               if (event.name === 'get_task') {
                 send({ type: 'status', text: 'Reading task…' });
@@ -2471,7 +2477,7 @@ export function createChatHandler({
                 if (hubLoadErrors.tasks) {
                   return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
                 }
-                return JSON.stringify(getTask(hubTasks, event.input ?? {}));
+                return JSON.stringify(getTask(hubTasks, event.input ?? {}, { workBlocks: hubWorkBlocks }));
               }
               if (event.name === 'search_teaching') {
                 send({ type: 'status', text: 'Searching Teaching…' });
