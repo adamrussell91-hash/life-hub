@@ -22,6 +22,8 @@ const RENDERERS = {
   causal_map: ['causal-map', 'createCausalMapView'],
   perspective_shift: ['perspective-shift', 'createPerspectiveShiftView'],
   radial_tree: ['radial-tree', 'createRadialTreeView'],
+  force_field: ['force-field', 'createForceFieldView'],
+  force_field_unscored: ['force-field', 'createForceFieldView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

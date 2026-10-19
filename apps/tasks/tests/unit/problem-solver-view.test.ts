@@ -293,3 +293,26 @@ describe('landing tool shelf', () => {
     expect(shelf.querySelector('[data-step="contradiction"]')).toBeNull();
   });
 });
+
+describe('session page scores', () => {
+  it('sends force field scores to the API with the run id', async () => {
+    const { renderProblemSolverView } = await import('@/views/problem-solver/view');
+    const { problemSolverApi } = await import('@/views/problem-solver/api');
+    const node = (id: string, slot: string) => ({ id, slot, text: `${slot} answer`, title: slot, state: 'accepted' as const, skills: [], turnId: 't' });
+    const forces = { id: 'ff', tool: 'force_field' as const, status: 'active' as const, nodes: [node('c', 'current'), node('g', 'goal'), node('f1', 'for:1'), node('f2', 'for:2'), node('a1', 'against:1')], edges: [] };
+    const current = session({ phase: 'analyse', pendingKeep: null, steps: { define: { runs: [], status: 'done', objection: null }, analyse: { runs: [forces], status: 'open', objection: null } } });
+    const get = vi.spyOn(problemSolverApi, 'get').mockResolvedValue(current);
+    const score = vi.spyOn(problemSolverApi, 'score').mockResolvedValue(current);
+    location.hash = '#/problem-solver?id=s1';
+    const host = document.createElement('div');
+    await renderProblemSolverView(host);
+    host.querySelector<HTMLButtonElement>('.ps-force__score')!.click();
+    const form = host.querySelector<HTMLFormElement>('.ps-force__form')!;
+    form.querySelector<HTMLInputElement>('input[name="for"]')!.value = '5';
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(score).toHaveBeenCalledWith(current, { runId: 'ff', for: [5, 3], against: [3] });
+    get.mockRestore();
+    score.mockRestore();
+    location.hash = '';
+  });
+});

@@ -216,3 +216,29 @@ SAMPLES['radial_tree:next'] = {
   ],
   edges: [...SAMPLES.radial_tree.edges, { from: 'd8', to: 'b2', kind: 'parent' }]
 };
+
+// Force field: a small bakery weighing a four-day week. Unscored first, then scored, then a
+// rescore a month on (drivers strengthened, restrainers weakened) so the morph and re-order show.
+const forceNodes = [
+  node('cur', 'current', 'Bakers work six days a week and two left this year.', 'Six-day weeks'),
+  node('goal', 'goal', 'A four-day rota that keeps the shop open six days.', 'Four-day rota'),
+  node('f1', 'for:1', 'The whole team asked for it at the last meeting.', 'Keen team'),
+  node('f2', 'for:2', 'A rival bakery is hiring and offers shorter weeks.', 'Rival hiring'),
+  node('f3', 'for:3', 'The new ovens can bake ahead overnight.', 'Bake-ahead ovens'),
+  node('f4', 'for:4', 'Overtime costs would fall.', 'Lower overtime'),
+  node('a1', 'against:1', 'Saturday mornings need every pair of hands.', 'Saturday rush'),
+  node('a2', 'against:2', 'The owner fears wages will rise.', 'Wage worries', { state: 'contested', objection: 'Is that a cost, or a guess about one?' }),
+  node('a3', 'against:3', 'Flour arrives at six every morning and someone must sign for it.', 'Early deliveries'),
+  node('a4', 'against:4', 'Ten-hour shifts tire bakers out.', 'Long shifts')
+];
+SAMPLES.force_field_unscored = run('force_field', forceNodes);
+SAMPLES.force_field = { ...run('force_field', forceNodes), scores: { snapshots: [{ at: '2026-10-01T09:00:00Z', for: [4, 3, 2, 3], against: [5, 3, 2, 3] }] } };
+SAMPLES['force_field:next'] = {
+  ...run('force_field', forceNodes),
+  scores: {
+    snapshots: [
+      { at: '2026-10-01T09:00:00Z', for: [4, 3, 2, 3], against: [5, 3, 2, 3] },
+      { at: '2026-11-01T09:00:00Z', for: [4, 3, 5, 3], against: [3, 2, 2, 3] }
+    ]
+  }
+};

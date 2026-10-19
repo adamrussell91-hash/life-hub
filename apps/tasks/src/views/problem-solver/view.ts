@@ -303,9 +303,10 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     if (isBusy(session)) await settle();
   }
 
-  async function rescore({ runId, current, objective }: RunScores): Promise<void> {
+  /** Any scored tool's payload passes through as it is, with the run it belongs to. */
+  async function rescore({ runId, ...scores }: RunScores): Promise<void> {
     try {
-      paint(await problemSolverApi.score(session, { runId, current, objective }));
+      paint(await problemSolverApi.score(session, { runId, ...scores }));
     } catch (err) {
       if ((err as { code?: string }).code === 'conflict') {
         paint(await problemSolverApi.get(session.id));
