@@ -147,4 +147,38 @@ describe('Perspective shift view', () => {
     view.update(run([...five, node('v1', 'view:1')]));
     expect(pageOf(view, 's1').hidden).toBe(false);
   });
+  it('labels the pager as a group', () => {
+    const view = createPerspectiveShiftView();
+    view.update(run([...four, node('s5', 'stakeholder:5')]));
+    const pager = view.el.querySelector('.ps-persp__pager')!;
+    expect(pager.getAttribute('role')).toBe('group');
+    expect(pager.getAttribute('aria-label')).toBe('Perspective sets');
+  });
+
+  it('moves focus to the new set\'s pager dot when an update switches away from the focused set', () => {
+    const view = createPerspectiveShiftView();
+    document.body.append(view.el);
+    const five = [...four, node('s5', 'stakeholder:5')];
+    view.update(run(five));
+    view.el.querySelectorAll<HTMLButtonElement>('.ps-persp__pager button')[0].click();
+    button(view, 's2').focus();
+    expect(document.activeElement).toBe(button(view, 's2'));
+    view.update(run([...five, node('s6', 'stakeholder:6')]));
+    expect(pageOf(view, 's6').hidden).toBe(false);
+    expect(document.activeElement).toBe(view.el.querySelectorAll('.ps-persp__pager button')[1]);
+    view.el.remove();
+  });
+
+  it('marks the stage complete only while the shown set has all four triangles', () => {
+    const view = createPerspectiveShiftView();
+    view.update(run(four.slice(0, 3)));
+    const stage = view.el.querySelector('.ps-persp__stage')!;
+    expect(stage.classList.contains('is-complete')).toBe(false);
+    view.update(run(four));
+    expect(stage.classList.contains('is-complete')).toBe(true);
+    view.update(run([...four, node('s5', 'stakeholder:5')]));
+    expect(stage.classList.contains('is-complete')).toBe(false);
+    view.el.querySelectorAll<HTMLButtonElement>('.ps-persp__pager button')[0].click();
+    expect(stage.classList.contains('is-complete')).toBe(true);
+  });
 });

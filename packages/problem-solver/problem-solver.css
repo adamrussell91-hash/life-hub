@@ -1310,6 +1310,9 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 .ps-persp__frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
 .ps-persp__frame path { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+.ps-persp__frame { transition: opacity 320ms var(--ps-ease); }
+/* A full set covers the chart; the outline's edge would only peep out along the border. */
+.ps-persp__stage.is-complete .ps-persp__frame { opacity: 0; }
 
 .ps-persp__page { position: absolute; inset: 0; }
 .ps-persp__page[hidden] { display: none; }
@@ -1435,13 +1438,13 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-persp__centre-pop { display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--ps-red); }
 
 /* Pager under the square when there are more than four perspectives. */
-.ps-persp__pager { display: flex; justify-content: center; gap: 4px; margin-top: 10px; }
+.ps-persp__pager { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
 .ps-persp__page-dot {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 4px 10px;
+  min-height: 44px; /* touch target; the visible dot stays 8px */
+  padding: 4px 12px;
   border: 0;
   border-radius: var(--radius-full);
   background: none;
@@ -1481,7 +1484,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-persp__reframe .ps-details__card { margin-top: 4px; padding: 4px 0 8px; background: transparent; box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ps-persp__body, .ps-persp__fill, .ps-persp__page-dot, .ps-persp__page-dot::before { transition: none; }
+  .ps-persp__body, .ps-persp__fill, .ps-persp__frame, .ps-persp__page-dot, .ps-persp__page-dot::before { transition: none; }
 }
 
 /* Outline (accessible alternative and fallback) */
