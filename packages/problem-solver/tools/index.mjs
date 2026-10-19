@@ -13,6 +13,11 @@ import { radialTree } from './radial-tree.mjs';
 import { forceField } from './force-field.mjs';
 import { fromTo } from './from-to.mjs';
 import { intentStatement } from './intent-statement.mjs';
+import { problemReduction } from './problem-reduction.mjs';
+import { analogicalReasoning } from './analogical-reasoning.mjs';
+import { solutionTree } from './solution-tree.mjs';
+import { lotusBlossom } from './lotus-blossom.mjs';
+import { duncker } from './duncker.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -29,7 +34,12 @@ export const TOOLS = {
   radial_tree: radialTree,
   force_field: forceField,
   from_to: fromTo,
-  intent_statement: intentStatement
+  intent_statement: intentStatement,
+  problem_reduction: problemReduction,
+  analogical_reasoning: analogicalReasoning,
+  solution_tree: solutionTree,
+  lotus_blossom: lotusBlossom,
+  duncker
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
