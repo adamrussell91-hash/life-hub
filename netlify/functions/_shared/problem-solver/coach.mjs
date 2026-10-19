@@ -44,20 +44,25 @@ function fitToRun(session, value) {
   const rename = (name) => (name === value.node.slot ? slot : name);
   const node = { ...value.node, slot };
   if (node.tag != null && !TOOLS[run.tool]?.nodeTags?.[parseSlot(slot)?.name]) delete node.tag;
-  if (value.verdict !== 'accept') return { value: { ...value, node, edges: [] } };
   const renamedEdges = value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }));
   const problem = checkNode(run, node, renamedEdges);
   if (problem) return { error: problem };
-  let placed = placeNode(run, { id: '__candidate__', slot, text: node.text, state: 'accepted' });
+  if (value.verdict !== 'accept' && value.verdict !== 'challenge') return { value: { ...value, node, edges: [] } };
+  return { value: { ...value, node, edges: allowedEdges(run, node, renamedEdges) } };
+}
+
+/** The proposed links (slot form) the tool allows once the candidate node is placed. */
+function allowedEdges(run, node, proposed) {
+  let placed = placeNode(run, { id: '__candidate__', slot: node.slot, text: node.text, state: 'accepted' });
   const edges = [];
-  for (const edge of renamedEdges) {
+  for (const edge of proposed) {
     const from = placed.nodes.find((n) => n.slot === edge.from)?.id ?? null;
     const to = placed.nodes.find((n) => n.slot === edge.to)?.id ?? null;
     if (!canEdge(placed, from, to, edge.kind)) continue;
     placed = addEdge(placed, { from, to, kind: edge.kind });
     edges.push(edge);
   }
-  return { value: { ...value, node, edges } };
+  return edges;
 }
 
 function parse(session, text) {

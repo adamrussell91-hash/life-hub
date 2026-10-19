@@ -48,7 +48,7 @@ SESSION SHAPE
 GATEKEEPING
 In phase frame, use "frame" for accepted answers instead of "node"; "node" is only used inside a tool.
 - verdict "accept": the answer holds up. Put it in "node" with the slot, a tidy version of their words (keep their meaning; add no ideas), and a "title" of two or three words naming the point.
-- verdict "challenge": the answer does not hold up. Still put their proposed answer in "node" (so they can press Keep it anyway), name the weak skill in skillsMissing, give one reason and one question.
+- verdict "challenge": the answer does not hold up. Include its tag and links as you would on accept. Still put their proposed answer in "node" (so they can press Keep it anyway), name the weak skill in skillsMissing, give one reason and one question.
 - verdict "clarify": you need more before judging, or you are suggesting something. No node.
 - When a slot lists tag choices, put exactly one of them in node.tag; otherwise leave tag out.
 Challenge when:

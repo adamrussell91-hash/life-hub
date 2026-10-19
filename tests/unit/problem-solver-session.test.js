@@ -285,3 +285,14 @@ test('a placed node keeps its tag, and so does a kept challenged node', () => {
   s = keepAnyway(s, deps);
   assert.equal(activeRun(s).nodes[1].tag, 'y');
 });
+
+test('keep anyway also places the links proposed with a challenged answer', () => {
+  let s = framed('seven_step', 'problem_tree');
+  for (const [slot, text] of [['trunk', 'Inconsistent eating'], ['cause:1', 'Delayed payoff']]) s = applyCoachTurn(s, coach({ node: { slot, text } }), deps);
+  s = applyCoachTurn(s, coach({ verdict: 'challenge', message: 'Symptom.', node: { slot: 'effect:1', text: 'No progress' }, edges: [{ from: 'cause:1', to: 'effect:1', kind: 'relates' }] }), deps);
+  assert.equal(s.pendingKeep.edges.length, 1);
+  s = keepAnyway(s, deps);
+  const run = activeRun(s);
+  const id = (slot) => run.nodes.find((n) => n.slot === slot).id;
+  assert.deepEqual(run.edges, [{ from: id('cause:1'), to: id('effect:1'), kind: 'relates' }]);
+});
