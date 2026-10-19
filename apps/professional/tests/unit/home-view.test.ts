@@ -27,7 +27,7 @@ describe('renderHomeView', () => {
       time_zone: 'Australia/Sydney',
       all_day: false,
       occurrence_state: 'completed',
-      location_text: "St Aloysius' College",
+      location_text: "Tallowwood College",
       accreditation_category: 'Elective PD',
       hours: 6,
       attendance_state: 'attended',

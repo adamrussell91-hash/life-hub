@@ -143,6 +143,14 @@ export function validateFoodJournal(j) {
   for (const r of j.recipes) {
     if (!dishes.has(r.dish_id)) bad("Recipe dish is missing.");
     text(r.title, "Recipe title", 200);
+    if (
+      r.added_at != null &&
+      (typeof r.added_at !== "string" ||
+        r.added_at.length > 40 ||
+        !/^\d{4}-\d{2}-\d{2}T/.test(r.added_at) ||
+        Number.isNaN(Date.parse(r.added_at)))
+    )
+      bad("Recipe added date is invalid.");
     if (r.candidates != null) {
       if (!Array.isArray(r.candidates) || r.candidates.length > 10)
         bad("Recipe research is invalid.");

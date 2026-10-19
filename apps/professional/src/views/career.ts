@@ -1,18 +1,22 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { renderSkillCardDetail } from '@/views/career-card-detail';
-import { getCareer } from '@/api/career';
+import { getCareer, updateFuture } from '@/api/career';
 import { openAddSkillSheet } from '@/views/career-skill-form';
 import { listApplications } from '@/api/applications';
 import { careerCardRoute, careerFutureRoute, parseRoute } from '@/app/router';
 import { buildCareerModel, type CareerModel } from '@/domain/career-model';
+import { riverJobShortLabel } from '@/domain/career-river-geometry';
 import type { CareerOverview } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { mountCareerRiver } from '@/views/career-river';
 import { renderCareerEmployment } from '@/views/career-employment';
-import { openAddFutureSheet, renderFutureDetail } from '@/views/career-future-panel';
+import {
+  openAddFutureSheet,
+  openEditFutureSheet,
+  renderFutureDetail
+} from '@/views/career-future-panel';
 import { renderSkillsScanPanel } from '@/views/career-skills-scan';
 import { renderCareerApplications } from '@/views/career-criteria-mirror';
-import { renderWhatIfPanel } from '@/views/career-what-if';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -32,63 +36,137 @@ function surface(node: HTMLElement): void {
   node.style.boxShadow = 'var(--elev-1)';
 }
 
+function futureCount(model: CareerModel): number {
+  return model.futures.length + model.parked_futures.length;
+}
+
+/**
+ * The Career page as last drawn. Picking a future only swaps the detail slot
+ * and the river's highlight; it never refetches or redraws the page.
+ */
+type MountedCareer = {
+  canvas: HTMLElement;
+  page: HTMLElement;
+  model: CareerModel;
+  river: { destroy: () => void; setSelected: (id: string | null) => void };
+  detailSlot: HTMLElement;
+  futuresList: HTMLElement | null;
+  reload: (reveal?: boolean) => void;
+};
+
+let mounted: MountedCareer | null = null;
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+function showSelection(view: MountedCareer, futureId: string | null, scroll: boolean): void {
+  view.river.setSelected(futureId);
+  const future = futureId ? view.model.futures.find((f) => f.id === futureId) : null;
+  view.detailSlot.replaceChildren();
+  if (future) {
+    renderFutureDetail(view.detailSlot, future, {
+      onChanged: () => view.reload(),
+      onClose: () => {
+        location.hash = '#/career';
+      }
+    });
+  }
+  view.futuresList?.querySelectorAll<HTMLElement>('[data-future-id]').forEach((row) => {
+    row.classList.toggle('is-selected', row.dataset.futureId === futureId);
+  });
+  if (future && scroll) {
+    requestAnimationFrame(() => {
+      view.detailSlot.scrollIntoView({
+        block: 'nearest',
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth'
+      });
+    });
+  }
+}
+
+/**
+ * Router hook for `#/career` ⇄ `#/career/future/<id>`. Returns false when the
+ * page isn't on screen (or the future is unknown) so the router renders it.
+ */
+export function selectCareerFutureInPlace(canvas: HTMLElement, futureId: string | null): boolean {
+  const view = mounted;
+  if (!view || view.canvas !== canvas || !canvas.contains(view.page)) return false;
+  if (futureId && !view.model.futures.some((f) => f.id === futureId)) return false;
+  showSelection(view, futureId, true);
+  return true;
+}
+
+function openCriteriaFor(model: CareerModel, futureId: string, onReload: () => void): void {
+  const future = model.futures.find((f) => f.id === futureId);
+  if (future) openEditFutureSheet(document.body, future, onReload, { focusCriteria: true });
+}
+
+function addFuture(model: CareerModel, onReload: (reveal?: boolean) => void): void {
+  openAddFutureSheet(
+    document.body,
+    (id) => {
+      // replaceState, not location.hash: the reload below draws the new
+      // future selected, and a hashchange would start a second render.
+      history.replaceState(null, '', careerFutureRoute(id));
+      onReload(true);
+    },
+    futureCount(model)
+  );
+}
+
 function renderRiver(
   host: HTMLElement,
   model: CareerModel,
-  selectedFutureId: string | null
-): void {
+  selectedFutureId: string | null,
+  onReload: (reveal?: boolean) => void
+): MountedCareer['river'] {
   const section = el('section', 'career-page__river');
   section.setAttribute('aria-label', 'Career river');
   const mount = el('div', 'career-page__river-mount');
   section.append(mount);
   host.append(section);
-  mountCareerRiver(mount, model, {
+  // The river sets the URL itself; the router's hashchange then calls
+  // selectCareerFutureInPlace, which draws the detail panel.
+  return mountCareerRiver(mount, model, {
     selectedFutureId,
-    onSelectFuture: (id) => {
-      if (id) location.hash = careerFutureRoute(id);
-      else if (parseRoute(location.hash).name === 'career-future') {
-        location.hash = '#/career';
-      }
+    onAddFuture: () => addFuture(model, onReload),
+    onAddCriteria: (id) => openCriteriaFor(model, id, () => onReload()),
+    onRestoreFuture: (id) => {
+      const done = () => onReload();
+      void updateFuture(id, { status: 'active' }).then(done, done);
     }
   });
 }
 
-function renderFuturePanel(
+function renderFuturesList(
   host: HTMLElement,
   model: CareerModel,
-  selectedFutureId: string | null,
-  onReload: () => void
-): void {
-  if (selectedFutureId) {
-    const future = model.futures.find((f) => f.id === selectedFutureId);
-    if (future) {
-      const wrap = el('div', 'career-page__panel-host');
-      host.append(wrap);
-      renderFutureDetail(wrap, future, { onChanged: onReload });
-      return;
-    }
-  }
-
+  onReload: (reveal?: boolean) => void
+): HTMLElement {
   const panel = el('section', 'career-page__panel career-page__futures');
   surface(panel);
   const head = el('div', 'career-page__section-head');
   head.append(el('h2', 'career-page__heading', 'Futures'));
   const add = el('button', 'btn btn--secondary', 'Add a future') as HTMLButtonElement;
   add.type = 'button';
-  add.addEventListener('click', () => openAddFutureSheet(document.body, onReload));
+  add.addEventListener('click', () => addFuture(model, onReload));
   head.append(add);
   panel.append(head);
 
   const active = model.futures.filter((f) => f.status === 'active');
   if (!active.length) {
-    panel.append(
-      el('p', 'empty-state', 'No futures yet. Add a target role to start a branch.')
+    // Empty: one compact line, so a section with nothing in it doesn't dominate.
+    panel.classList.add('career-page__section--empty');
+    head.querySelector('.career-page__heading')?.after(
+      el('p', 'career-page__meta', 'No futures yet. Add a target role to start a branch.')
     );
   } else {
     const list = el('ul', 'career-page__future-list');
     for (const future of active) {
       const li = document.createElement('li');
       li.className = 'career-page__future-row';
+      li.dataset.futureId = future.id;
       const link = el('a', 'career-page__future-link', future.title);
       link.href = careerFutureRoute(future.id);
       li.append(link);
@@ -104,6 +182,7 @@ function renderFuturePanel(
     panel.append(list);
   }
   host.append(panel);
+  return panel;
 }
 
 function renderSkillsScan(
@@ -113,22 +192,37 @@ function renderSkillsScan(
 ): void {
   const wrap = el('div', 'career-page__scan-host');
   host.append(wrap);
-  renderSkillsScanPanel(wrap, model, {
-    onChanged: onReload,
-    onKept: () => {
-      /* river remounts via onChanged */
-    }
-  });
+  renderSkillsScanPanel(wrap, model, { onChanged: onReload });
 }
 
-export async function renderCareerView(canvas: HTMLElement): Promise<void> {
+let renderToken = 0;
+
+/**
+ * `quiet`: a refresh after an edit. The old page stays up until the new one
+ * is ready, so the scroll position survives instead of jumping to a spinner.
+ * `reveal`: scroll to the selected future anyway (a future just added).
+ */
+export async function renderCareerView(
+  canvas: HTMLElement,
+  options: { quiet?: boolean; reveal?: boolean } = {}
+): Promise<void> {
+  const token = ++renderToken;
   const initialRoute = parseRoute(location.hash);
-  if (initialRoute.name === 'career-card') { await renderSkillCardDetail(canvas, initialRoute.id); return; }
-  showViewLoading(canvas, 'Loading career…');
+  if (initialRoute.name === 'career-card') {
+    mounted?.river.destroy();
+    mounted = null;
+    await renderSkillCardDetail(canvas, initialRoute.id);
+    return;
+  }
+  const quiet = Boolean(options.quiet && mounted && canvas.contains(mounted.page));
+  if (!quiet) showViewLoading(canvas, 'Loading career…');
   let overview: CareerOverview;
   try {
     overview = await getCareer();
   } catch (error) {
+    if (token !== renderToken) return;
+    mounted?.river.destroy();
+    mounted = null;
     renderLoadError(canvas, error, () => {
       void renderCareerView(canvas);
     });
@@ -169,33 +263,46 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
     scan: overview.scan
   });
 
+  if (token !== renderToken) return;
+
   const route = parseRoute(location.hash);
   const selectedFutureId =
     route.name === 'career-future' && 'id' in route ? route.id : null;
 
-  const reload = () => {
-    void renderCareerView(canvas);
+  const reload = (reveal = false) => {
+    void renderCareerView(canvas, { quiet: true, reveal });
   };
+  // For callbacks that may pass their own arguments (a saved record).
+  const refresh = () => reload();
 
-  canvas.replaceChildren();
   const page = el('div', 'career-page');
 
   const stats = el('p', 'career-page__stats', model.stats_line);
   page.append(stats);
 
-  renderRiver(page, model, selectedFutureId);
-  renderCareerEmployment(page, model);
+  const river = renderRiver(page, model, selectedFutureId, reload);
+  // The selected future opens right under the river, where the click was.
+  const detailSlot = el('div', 'career-page__detail-slot');
+  page.append(detailSlot);
+  renderCareerEmployment(page, model, { selfRef: overview.self_ref ?? null, onReload: refresh });
 
   const columns = el('div', 'career-page__columns');
-  renderFuturePanel(columns, model, selectedFutureId, reload);
-  renderSkillsScan(columns, model, reload);
+  const futuresList = renderFuturesList(columns, model, reload);
+  renderSkillsScan(columns, model, refresh);
   page.append(columns);
 
-  await renderCareerApplications(page, model, { onChanged: reload });
-  renderSkillsLedger(page, model, reload);
-  renderWhatIfPanel(page, model);
+  await renderCareerApplications(page, model, { onChanged: refresh });
+  renderSkillsLedger(page, model, refresh);
 
-  canvas.append(page);
+  if (token !== renderToken) {
+    river.destroy();
+    return;
+  }
+  mounted?.river.destroy();
+  canvas.replaceChildren(page);
+  mounted = { canvas, page, model, river, detailSlot, futuresList, reload };
+  // Deep link: scroll to the panel. A quiet refresh keeps the reader's place.
+  showSelection(mounted, selectedFutureId, !quiet || Boolean(options.reveal));
 
   try {
     const scrollTo = sessionStorage.getItem('career-scroll-to');
@@ -219,18 +326,26 @@ function renderSkillsLedger(host: HTMLElement, model: CareerModel, onReload: () 
   head.append(add);
   section.append(head);
 
+  const activeFutures = model.futures.filter((f) => f.status === 'active');
   const filters = el('div', 'career-page__ledger-filters');
-  filters.append(el('button', 'hub-pills__btn is-active', 'All') as HTMLButtonElement);
-  for (const future of model.futures.filter((f) => f.status === 'active')) {
-    const chip = el(
-      'button',
-      'hub-pills__btn',
-      future.title.split(' ')[0] || future.title
-    ) as HTMLButtonElement;
+  filters.setAttribute('role', 'group');
+  filters.setAttribute('aria-label', 'Show cards for');
+  const filterButtons: HTMLButtonElement[] = [];
+  const addFilter = (label: string, futureId: string | null) => {
+    const chip = el('button', 'hub-pills__btn', label) as HTMLButtonElement;
     chip.type = 'button';
+    chip.dataset.futureId = futureId ?? '';
+    chip.addEventListener('click', () => applyFilter(futureId));
+    filterButtons.push(chip);
     filters.append(chip);
+  };
+  // One filter per future only earns its place when there's a choice to make.
+  if (model.ledger.length && activeFutures.length) {
+    addFilter('All', null);
+    for (const future of activeFutures) addFilter(riverJobShortLabel(future.title), future.id);
+    section.append(filters);
   }
-  section.append(filters);
+  const filterNote = el('p', 'career-page__meta');
 
   if (!model.ledger.length) {
     section.append(
@@ -254,10 +369,35 @@ function renderSkillsLedger(host: HTMLElement, model: CareerModel, onReload: () 
             ? formatDisplayDate(`${card.occurred_on.slice(0, 7)}-01`)?.replace(/^\d{2}\//, '') ||
               card.occurred_on.slice(0, 7)
             : formatDisplayDate(card.occurred_on) ?? card.occurred_on;
+      li.dataset.futureIds = card.future_ids.join(' ');
       li.append(el('span', 'career-page__ledger-date', date), link);
+      if (card.merged_ids.length) {
+        const kept = card.merged_ids.length + 1;
+        const note = el('span', 'career-page__meta career-page__ledger-merged', `Kept ${kept} times`);
+        note.title = 'The scan kept this skill more than once; it now shows as one card.';
+        li.append(note);
+      }
       list.append(li);
     }
-    section.append(list);
+    section.append(list, filterNote);
   }
   host.append(section);
+
+  function applyFilter(futureId: string | null): void {
+    let shown = 0;
+    section.querySelectorAll<HTMLElement>('.career-page__ledger-row').forEach((row) => {
+      const match = !futureId || (row.dataset.futureIds ?? '').split(' ').includes(futureId);
+      row.hidden = !match;
+      if (match) shown += 1;
+    });
+    for (const button of filterButtons) {
+      const on = (button.dataset.futureId || null) === futureId;
+      button.classList.toggle('is-active', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    const future = futureId ? activeFutures.find((f) => f.id === futureId) : null;
+    filterNote.textContent =
+      future && !shown ? `No cards support ${future.title} yet. Keep one from the Skills scan.` : '';
+  }
+  applyFilter(null);
 }

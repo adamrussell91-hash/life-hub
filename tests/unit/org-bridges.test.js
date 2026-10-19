@@ -7,8 +7,8 @@ import {
   selectUsefulBridges
 } from '../../netlify/functions/_shared/org-bridges.mjs';
 
-const ALOYSIUS = 'shared:organisation:organisation_aloysius';
-const TRINITY = 'shared:organisation:organisation_trinity';
+const TALLOWWOOD = 'shared:organisation:organisation_tallowwood';
+const BANKSIA = 'shared:organisation:organisation_banksia';
 const ADAM = 'person_adam';
 const HENRY = 'person_henry';
 const BIANCA = 'person_bianca';
@@ -17,12 +17,12 @@ const OTHER = 'person_other';
 test('candidates: moved when employee_at in both organisations', () => {
   const candidates = findBridgeCandidates({
     orgA: {
-      ref: ALOYSIUS,
+      ref: TALLOWWOOD,
       employeeIds: [ADAM, HENRY],
       people: [{ id: ADAM }, { id: HENRY }]
     },
     orgB: {
-      ref: TRINITY,
+      ref: BANKSIA,
       employeeIds: [ADAM, BIANCA],
       people: [{ id: ADAM }, { id: BIANCA }]
     },
@@ -35,8 +35,8 @@ test('candidates: moved when employee_at in both organisations', () => {
 
 test('candidates: know_each_other across organisations', () => {
   const candidates = findBridgeCandidates({
-    orgA: { ref: ALOYSIUS, people: [{ id: HENRY }] },
-    orgB: { ref: TRINITY, people: [{ id: BIANCA }] },
+    orgA: { ref: TALLOWWOOD, people: [{ id: HENRY }] },
+    orgB: { ref: BANKSIA, people: [{ id: BIANCA }] },
     professionalRelationships: [
       { source_id: HENRY, target_id: BIANCA, role: 'former_colleague' }
     ],
@@ -49,8 +49,8 @@ test('candidates: know_each_other across organisations', () => {
 
 test('candidates: met_at_event shared attendees', () => {
   const candidates = findBridgeCandidates({
-    orgA: { ref: ALOYSIUS, people: [{ id: HENRY }] },
-    orgB: { ref: TRINITY, people: [{ id: BIANCA }] },
+    orgA: { ref: TALLOWWOOD, people: [{ id: HENRY }] },
+    orgB: { ref: BANKSIA, people: [{ id: BIANCA }] },
     sharedEventAttendances: [
       {
         event_ref: 'professional:event:e1',
@@ -67,13 +67,13 @@ test('useful-link rule 1: warm near → cold far is shown', () => {
     kind: 'know_each_other',
     person_a_id: HENRY,
     person_b_id: BIANCA,
-    org_a_ref: ALOYSIUS,
-    org_b_ref: TRINITY,
+    org_a_ref: TALLOWWOOD,
+    org_b_ref: BANKSIA,
     warmth_a: 'warm',
     warmth_b: 'cold'
   };
   const verdict = evaluateUsefulLink(candidate, {
-    nearOrgRef: ALOYSIUS,
+    nearOrgRef: TALLOWWOOD,
     displayNames: { [HENRY]: 'Henry', [BIANCA]: 'Bianca' }
   });
   assert.equal(verdict.useful, true);
@@ -87,8 +87,8 @@ test('useful-link rule 2: open opportunity tie is shown', () => {
     kind: 'know_each_other',
     person_a_id: OTHER,
     person_b_id: BIANCA,
-    org_a_ref: ALOYSIUS,
-    org_b_ref: TRINITY,
+    org_a_ref: TALLOWWOOD,
+    org_b_ref: BANKSIA,
     warmth_a: 'cold',
     warmth_b: 'cold'
   };
@@ -104,8 +104,8 @@ test('useful-link rule 3: Adam move + upcoming cold former colleagues', () => {
     kind: 'moved',
     person_a_id: ADAM,
     person_b_id: ADAM,
-    org_a_ref: ALOYSIUS,
-    org_b_ref: TRINITY,
+    org_a_ref: TALLOWWOOD,
+    org_b_ref: BANKSIA,
     warmth_a: 'warm',
     warmth_b: 'warm'
   };
@@ -127,8 +127,8 @@ test('useful-link rule 3: Adam move + upcoming cold former colleagues', () => {
 
 test('hidden count: warm↔warm know_each_other is hidden (V4)', () => {
   const candidates = findBridgeCandidates({
-    orgA: { ref: ALOYSIUS, people: [{ id: HENRY }, { id: OTHER }] },
-    orgB: { ref: TRINITY, people: [{ id: BIANCA }, { id: 'person_warm_b' }] },
+    orgA: { ref: TALLOWWOOD, people: [{ id: HENRY }, { id: OTHER }] },
+    orgB: { ref: BANKSIA, people: [{ id: BIANCA }, { id: 'person_warm_b' }] },
     professionalRelationships: [
       { source_id: HENRY, target_id: BIANCA },
       { source_id: OTHER, target_id: 'person_warm_b' }
@@ -141,7 +141,7 @@ test('hidden count: warm↔warm know_each_other is hidden (V4)', () => {
     }
   });
   const { bridges, hidden_count, hidden_label } = selectUsefulBridges(candidates, {
-    nearOrgRef: ALOYSIUS,
+    nearOrgRef: TALLOWWOOD,
     displayNames: { [HENRY]: 'Henry', [BIANCA]: 'Bianca' }
   });
   assert.equal(bridges.length, 1);
@@ -153,10 +153,10 @@ test('hidden count: warm↔warm know_each_other is hidden (V4)', () => {
 
 test('buildOrgBridges: Henry→Bianca shown only while Bianca is cold', () => {
   const base = {
-    orgA: { ref: ALOYSIUS, people: [{ id: HENRY, display_name: 'Henry' }] },
-    orgB: { ref: TRINITY, people: [{ id: BIANCA, display_name: 'Bianca' }] },
+    orgA: { ref: TALLOWWOOD, people: [{ id: HENRY, display_name: 'Henry' }] },
+    orgB: { ref: BANKSIA, people: [{ id: BIANCA, display_name: 'Bianca' }] },
     professionalRelationships: [{ source_id: HENRY, target_id: BIANCA }],
-    nearOrgRef: ALOYSIUS,
+    nearOrgRef: TALLOWWOOD,
     displayNames: { [HENRY]: 'Henry', [BIANCA]: 'Bianca' }
   };
 

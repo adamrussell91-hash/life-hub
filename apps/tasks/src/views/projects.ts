@@ -1,5 +1,5 @@
 import type { Goal } from '@/schemas/goal';
-import { isProjectArchived, type Project } from '@/schemas/project';
+import { isProjectArchived, type Project, type ProjectJob } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { projectPageHash } from '@/domain/cards';
 import { findStallCandidates, type StallCandidate } from '@/domain/stall';
@@ -67,6 +67,7 @@ let projectQuery = '';
 let groupBy: ProjectsGroupBy = 'status';
 let roadmapZoom: RoadmapZoom = 'month';
 let lifecycleFilter: ProjectLifecycle | 'all' = 'all';
+let jobFilter: ProjectJob | 'all' = 'all';
 let tensionDismissed = false;
 
 const CLOCK_ICON =
@@ -246,6 +247,17 @@ function projectBoardMenuItems(
       }
     }
   ];
+  const isHalt = projectJob(card.project) === 'halt_board';
+  items.push({
+    id: 'job',
+    label: isHalt ? 'Move to teaching' : 'Mark as NSW HALT',
+    onSelect: () => {
+      void tasksApi
+        .updateProject(card.project.id, { job: isHalt ? 'teaching' : 'halt_board' })
+        .then(() => actions.onReload())
+        .catch((err) => confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err))));
+    }
+  });
   if (card.readyToClose) {
     items.push({
       id: 'complete',
@@ -261,6 +273,18 @@ function projectBoardMenuItems(
       deleteProjectNow(card.project, () => actions.onDeleted(card.project.id), confirmHost)
   });
   return items;
+}
+
+function projectJob(project: Project): ProjectJob {
+  return project.job ?? 'teaching';
+}
+
+function haltBadge(): HTMLElement {
+  const badge = el('span', 'halt-badge');
+  badge.title = 'NSW HALT board project';
+  badge.setAttribute('aria-label', 'NSW HALT');
+  badge.append(el('span', 'halt-badge__halt', 'HALT'), el('span', 'halt-badge__nsw', 'NSW'));
+  return badge;
 }
 
 function attachProjectBoardMenu(
@@ -281,6 +305,7 @@ function renderProjectBoardCard(
   const article = el('article', card.lifecycle === 'stalled' ? 'hub-card pcard pcard--compact' : 'hub-card pcard');
   article.dataset.projectId = card.project.id;
   article.dataset.lifecycle = card.lifecycle;
+  if (projectJob(card.project) === 'halt_board') article.append(haltBadge());
 
   const top = el('div', 'pcard__top');
   const title = el('span', 'pcard__title', card.project.title);
@@ -486,6 +511,7 @@ function renderBoard(
   const visible = cardsForBoard(ctx).filter((card) => {
     if (!matchesProjectQuery(card.project, projectQuery)) return false;
     if (lifecycleFilter !== 'all' && card.lifecycle !== lifecycleFilter) return false;
+    if (jobFilter !== 'all' && projectJob(card.project) !== jobFilter) return false;
     return true;
   });
   const groups = groupPulseCards(visible, groupBy, ctx.goals, ctx.now);
@@ -806,9 +832,25 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       id: 'projects',
       ariaLabel: 'Filters',
       className: 'hub-filters--inline',
-      active: Boolean(projectQuery.trim()) || lifecycleFilter !== 'all'
+      active: Boolean(projectQuery.trim()) || lifecycleFilter !== 'all' || jobFilter !== 'all'
     });
-    filters.panel.append(search.el);
+    filters.panel.append(
+      search.el,
+      createHubPills<ProjectJob | 'all'>({
+        label: 'Job',
+        role: 'tablist',
+        items: [
+          { id: 'all', label: 'All jobs' },
+          { id: 'teaching', label: 'Teaching' },
+          { id: 'halt_board', label: 'NSW HALT' }
+        ],
+        value: jobFilter,
+        onSelect: (id) => {
+          jobFilter = id;
+          paint();
+        }
+      })
+    );
     const groupByRow = el('div', 'projects-groupby');
     const statusToggle = el('button', `btn ${groupBy === 'status' ? 'btn--primary' : 'btn--ghost'}`, 'Status');
     statusToggle.type = 'button';
@@ -1015,5 +1057,6 @@ export function resetProjectsViewStateForTests(): void {
   groupBy = 'status';
   roadmapZoom = 'month';
   lifecycleFilter = 'all';
+  jobFilter = 'all';
   tensionDismissed = false;
 }

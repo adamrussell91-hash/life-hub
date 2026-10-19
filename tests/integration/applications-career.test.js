@@ -703,7 +703,7 @@ test('dual-organisation career regression: employment org and application-only o
 test('career employment includes ended roles and keeps stacked roles at the same org', async () => {
   // Regression: Career river role band used to filter status=current only and
   // dedupe by org ref — Adam's past Career Overview history (and concurrent
-  // St Pius X roles) never reached the page even when relationships.json had them.
+  // Wattle Grove roles) never reached the page even when relationships.json had them.
   const professionalStore = memoryStore();
   const universalStore = memoryStore();
   const identity = createIdentityRepository({
@@ -712,11 +712,11 @@ test('career employment includes ended roles and keeps stacked roles at the same
   });
   const { ref: pastOrgRef } = await identity.createIdentity({
     kind: 'organisation',
-    input: { display_name: 'St Pius X High School' }
+    input: { display_name: 'Wattle Grove High School' }
   });
   const { ref: currentOrgRef } = await identity.createIdentity({
     kind: 'organisation',
-    input: { display_name: "St Aloysius' College" }
+    input: { display_name: "Tallowwood College" }
   });
   const { ref: selfRef } = await identity.createIdentity({
     kind: 'person',

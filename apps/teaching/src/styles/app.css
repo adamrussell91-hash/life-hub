@@ -12766,3 +12766,11 @@ button.block-annotation__margin-note.is-collapsed:hover {
     padding-inline: var(--space-2);
   }
 }
+
+/* A block opened from a curriculum map stop. */
+.block--linked {
+  outline: 2px solid color-mix(in srgb, var(--wave) 60%, transparent);
+  outline-offset: 6px;
+  border-radius: var(--radius-sm, 8px);
+  transition: outline-color 0.6s ease;
+}

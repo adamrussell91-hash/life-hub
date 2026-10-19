@@ -584,7 +584,7 @@ describe('A8 header meta line', () => {
     const model = buildOrganisationModel({
       id: ORG_ID,
       ref: `shared:organisation:${ORG_ID}`,
-      displayName: 'St. Aloysius College',
+      displayName: 'Tallowwood College',
       chips: [
         { kind: 'workplace', label: 'Workplace', detail: '2025–now', filterBucket: 'work' }
       ],

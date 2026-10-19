@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unit Lines Mockup</title>
+<style>
+  :root { --paper:#fffdf9; --page:#faf6f0; --ink:#17375e; --muted:#6b7788; --line:rgba(23,55,94,.10); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); font-family:Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; color:var(--ink); }
+  .page { max-width:1380px; margin:0 auto; padding:40px 40px 60px; }
+  .eyebrow { font-size:13px; font-weight:600; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+  h1 { margin:6px 0 4px; font-size:34px; font-weight:700; }
+  .sub { color:var(--muted); font-size:15px; margin-bottom:24px; }
+  .card { background:var(--paper); border:1px solid var(--line); border-radius:24px; box-shadow:0 18px 40px rgba(23,55,94,.06); padding:28px 28px 22px; overflow-x:auto; }
+  svg { display:block; }
+  svg text { font-family:Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .halo { paint-order:stroke; stroke:var(--paper); stroke-width:5px; stroke-linejoin:round; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Curriculum map · Lines</div>
+  <h1>Texts and Human Experiences</h1>
+  <div class="sub">Year 12 English Advanced · Common Module · 8 weeks · planned layer</div>
+  <div class="card"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const INK = '#17375e', MUTED = '#6b7788', PAPER = '#fffdf9', NAVY = '#0f2a4a';
+
+// Geometry
+const G = { W: 1310, labelCol: 250, x0: 310, step: 120, termX: 1180, termW: 60,
+            axisY: 34, chipY: 74, rowY0: 178, rowStep: 112, trackW: 7, r: 8, rM: 11 };
+const x = (w) => w === 8 ? G.termX : G.x0 + (w - 1) * G.step;
+const rowY = (i) => G.rowY0 + i * G.rowStep;
+
+// The unit. Levels: I introduced, R reinforced, M mastered.
+const LINES = [
+  { name: 'Unseen short texts', colour: '#b7791f', stations: [
+    [1, 'I', 'Cold read'], [2, 'R', 'Technique → effect'], [4, 'R', 'Paired unseen'],
+    [5, 'M', 'Timed answers'], [7, 'M', 'Exam rehearsal'] ] },
+  { name: 'Human experience', colour: '#2c7a7b', stations: [
+    [1, 'I', 'Naming experience'], [2, 'R', 'Self vs collective'], [3, 'R', 'Paradox, anomaly'],
+    [5, 'R', 'Emotion & motive'], [7, 'M', 'Story as meaning'] ] },
+  { name: 'Prescribed text', colour: '#376fb7', stations: [
+    [1, 'I', 'Opening extract'], [2, 'R', 'Whole-text read'], [3, 'R', 'Key moments'],
+    [4, 'R', 'Form & context'], [6, 'M', 'Paradox in text'], [7, 'M', 'Critical readings'] ] },
+  { name: 'Analytical composing', colour: '#1f3a5f', stations: [
+    [3, 'I', 'Thesis drafting'], [4, 'R', 'Integrated para'], [5, 'R', 'Timed paragraph'],
+    [6, 'R', 'Defend a reading'], [7, 'M', 'Full draft'] ] },
+  { name: 'Personal voice', colour: '#5d4e70', stations: [
+    [2, 'I', 'Reading journal'], [4, 'R', 'Personal response'], [6, 'R', 'Seminar voice'],
+    [7, 'M', 'Reflection'] ] }
+];
+
+// Interchanges: strands taught together, each a formative checkpoint.
+const INTERCHANGES = [
+  { week: 1, rows: [0, 1], label: 'Provocation' },
+  { week: 3, rows: [1, 3], label: 'Thesis workshop' },
+  { week: 5, rows: [0, 1], label: 'Timed check' },
+  { week: 6, rows: [2, 4], label: 'Seminar' }
+];
+
+const LEVEL_WORD = { I: 'introduced', R: 'reinforced', M: 'mastered' };
+
+function s(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function t(parent, txt, attrs) { const e = s('text', attrs, parent); e.textContent = txt; return e; }
+
+const svg = document.getElementById('map');
+const lastRow = rowY(LINES.length - 1);
+const legendY = lastRow + 110;
+const H = legendY + 70;
+svg.setAttribute('viewBox', `0 0 ${G.W} ${H}`);
+svg.setAttribute('width', G.W);
+svg.setAttribute('height', H);
+
+// Week columns and axis
+for (let w = 1; w <= 8; w++) {
+  const cx = x(w);
+  t(svg, w === 8 ? 'Wk 8' : `Wk ${w}`, { x: cx, y: G.axisY, 'text-anchor': 'middle',
+    'font-size': 12.5, 'font-weight': 600, fill: MUTED, 'letter-spacing': '.04em' });
+  s('line', { x1: cx, x2: cx, y1: G.axisY + 12, y2: lastRow + 40, stroke: 'rgba(23,55,94,.07)',
+    'stroke-width': 1, 'stroke-dasharray': '2 5' }, svg);
+}
+
+// Checkpoint chips above the plot
+function chip(cx, label, dark) {
+  const g = s('g', {}, svg);
+  const w = label.length * 6.9 + 26;
+  s('rect', { x: cx - w / 2, y: G.chipY - 14, width: w, height: 28, rx: 14,
+    fill: dark ? NAVY : PAPER, stroke: dark ? NAVY : 'rgba(23,55,94,.28)', 'stroke-width': 1.2 }, g);
+  t(g, label, { x: cx, y: G.chipY + 4.5, 'text-anchor': 'middle', 'font-size': 12.5,
+    'font-weight': 600, fill: dark ? '#fff' : INK });
+}
+for (const ic of INTERCHANGES) chip(x(ic.week), ic.label, false);
+chip(G.termX, 'Assessment task', true);
+
+// Left labels
+LINES.forEach((l, i) => {
+  const y = rowY(i);
+  s('rect', { x: 0, y: y - 9, width: 13, height: 13, rx: 3, fill: l.colour }, svg);
+  t(svg, l.name, { x: 24, y: y + 2, 'font-size': 16, 'font-weight': 650, fill: INK });
+  const first = l.stations[0], mastered = l.stations.find((st) => st[1] === 'M');
+  const path = `I wk ${first[0]} → M wk ${mastered[0]}`;
+  t(svg, path, { x: 24, y: y + 22, 'font-size': 12.5, fill: MUTED });
+});
+
+// Tracks: from first station into the terminus
+LINES.forEach((l, i) => {
+  const y = rowY(i);
+  s('line', { x1: x(l.stations[0][0]), x2: G.termX, y1: y, y2: y, stroke: l.colour,
+    'stroke-width': G.trackW, 'stroke-linecap': 'round' }, svg);
+});
+
+// Interchange capsules
+for (const ic of INTERCHANGES) {
+  const cx = x(ic.week), y1 = rowY(ic.rows[0]), y2 = rowY(ic.rows[1]);
+  s('line', { x1: cx, x2: cx, y1: G.chipY + 14, y2: y1 - 15, stroke: 'rgba(23,55,94,.28)',
+    'stroke-width': 1.2, 'stroke-dasharray': '3 4' }, svg);
+  s('rect', { x: cx - 15, y: y1 - 15, width: 30, height: y2 - y1 + 30, rx: 15,
+    fill: PAPER, stroke: NAVY, 'stroke-width': 2.5 }, svg);
+}
+
+// Terminus: every line arrives at the assessment
+{
+  const y1 = rowY(0) - 26, y2 = lastRow + 26;
+  s('line', { x1: G.termX, x2: G.termX, y1: G.chipY + 14, y2: y1, stroke: NAVY, 'stroke-width': 1.2 }, svg);
+  s('rect', { x: G.termX - G.termW / 2, y: y1, width: G.termW, height: y2 - y1, rx: G.termW / 2,
+    fill: NAVY }, svg);
+  const mid = (y1 + y2) / 2;
+  t(svg, 'EXTENDED RESPONSE · SHORT ANSWERS', { x: G.termX, y: mid, 'text-anchor': 'middle',
+    'font-size': 12.5, 'font-weight': 700, fill: '#fff', 'letter-spacing': '.12em',
+    transform: `rotate(-90 ${G.termX} ${mid}) translate(0 4.5)` });
+}
+
+// Stations
+LINES.forEach((l, i) => {
+  const y = rowY(i);
+  for (const [w, level, label] of l.stations) {
+    const cx = x(w);
+    if (level === 'I') {
+      s('circle', { cx, cy: y, r: G.r, fill: PAPER, stroke: l.colour, 'stroke-width': 3.5 }, svg);
+    } else if (level === 'R') {
+      s('circle', { cx, cy: y, r: G.r, fill: l.colour, stroke: PAPER, 'stroke-width': 2.5 }, svg);
+    } else {
+      s('circle', { cx, cy: y, r: G.rM + 5, fill: 'none', stroke: l.colour, 'stroke-width': 1.6, opacity: .45 }, svg);
+      s('circle', { cx, cy: y, r: G.rM, fill: PAPER, stroke: l.colour, 'stroke-width': 4.5 }, svg);
+      s('circle', { cx, cy: y, r: 4, fill: l.colour }, svg);
+    }
+    t(svg, label, { x: cx, y: y - 24, 'text-anchor': 'middle', 'font-size': 13.5,
+      'font-weight': 500, fill: INK, class: 'halo' });
+    t(svg, LEVEL_WORD[level], { x: cx, y: y + 32, 'text-anchor': 'middle', 'font-size': 12,
+      'font-weight': level === 'M' ? 650 : 450, fill: level === 'M' ? l.colour : MUTED, class: 'halo' });
+  }
+});
+
+// Legend
+{
+  s('line', { x1: 0, x2: G.W, y1: legendY - 34, y2: legendY - 34, stroke: 'rgba(23,55,94,.10)' }, svg);
+  const items = [
+    ['I', 'Introduced'], ['R', 'Reinforced'], ['M', 'Mastered'],
+    ['X', 'Interchange · taught together, checked'], ['T', 'Terminus · assessed']
+  ];
+  let lx = 10;
+  const c = '#376fb7';
+  for (const [k, label] of items) {
+    const cy = legendY;
+    if (k === 'I') s('circle', { cx: lx + 8, cy, r: 7, fill: PAPER, stroke: c, 'stroke-width': 3 }, svg);
+    if (k === 'R') s('circle', { cx: lx + 8, cy, r: 7, fill: c }, svg);
+    if (k === 'M') { s('circle', { cx: lx + 8, cy, r: 9, fill: PAPER, stroke: c, 'stroke-width': 3.5 }, svg);
+                     s('circle', { cx: lx + 8, cy, r: 3.5, fill: c }, svg); }
+    if (k === 'X') s('rect', { x: lx, y: cy - 16, width: 16, height: 32, rx: 8, fill: PAPER, stroke: NAVY, 'stroke-width': 2 }, svg);
+    if (k === 'T') s('rect', { x: lx, y: cy - 16, width: 16, height: 32, rx: 8, fill: NAVY }, svg);
+    t(svg, label, { x: lx + 26, y: cy + 4.5, 'font-size': 13, fill: INK });
+    lx += 26 + label.length * 7.3 + 34;
+  }
+  t(svg, 'Planned layer. Enacted (dashed) and learned (status colour) layers would sit on these same stations.',
+    { x: 10, y: legendY + 44, 'font-size': 12.5, fill: MUTED });
+}
+</script>
+</body>
+</html>

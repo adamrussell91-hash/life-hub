@@ -202,12 +202,12 @@ test('bridge_people surfaces a person spanning two organisation clusters, with a
   const bob = await makePerson(store, { display_name: 'Bob' });
   const carol = await makePerson(store, { display_name: 'Carol' });
   const unsw = await makeOrganisation(store, { display_name: 'UNSW' });
-  const stAloysius = await makeOrganisation(store, { display_name: 'St Aloysius' });
+  const stTallowwood = await makeOrganisation(store, { display_name: 'Tallowwood' });
 
   await makeLink(store, { sourceRef: alice.ref, targetRef: unsw.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
   await makeLink(store, { sourceRef: bob.ref, targetRef: unsw.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
-  await makeLink(store, { sourceRef: alice.ref, targetRef: stAloysius.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
-  await makeLink(store, { sourceRef: carol.ref, targetRef: stAloysius.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
+  await makeLink(store, { sourceRef: alice.ref, targetRef: stTallowwood.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
+  await makeLink(store, { sourceRef: carol.ref, targetRef: stTallowwood.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
 
   const handler = createNetworkEcologyWorldHandler(baseDeps(store, professionalStore));
   const response = await handler(request({ url: URL_BASE }));
@@ -215,8 +215,8 @@ test('bridge_people surfaces a person spanning two organisation clusters, with a
 
   assert.equal(body.bridge_people.length, 1);
   assert.equal(body.bridge_people[0].ref, alice.ref);
-  // Alphabetical by organisation label ("St Aloysius" < "UNSW").
-  assert.equal(body.bridge_people[0].description, 'Connects St Aloysius and UNSW');
+  // Alphabetical by organisation label ("Tallowwood" < "UNSW").
+  assert.equal(body.bridge_people[0].description, 'Connects Tallowwood and UNSW');
 });
 
 // --- Privacy / visibility -----------------------------------------------
@@ -287,12 +287,12 @@ test('PRIVACY: an archived person is also excluded from bridge_people even if th
   const carol = await makePerson(store, { display_name: 'Carol' });
   const hiddenAlice = await makePerson(store, { display_name: 'Hidden Alice' });
   const unsw = await makeOrganisation(store, { display_name: 'UNSW' });
-  const stAloysius = await makeOrganisation(store, { display_name: 'St Aloysius' });
+  const stTallowwood = await makeOrganisation(store, { display_name: 'Tallowwood' });
 
   await makeLink(store, { sourceRef: bob.ref, targetRef: unsw.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
   await makeLink(store, { sourceRef: hiddenAlice.ref, targetRef: unsw.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
-  await makeLink(store, { sourceRef: carol.ref, targetRef: stAloysius.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
-  await makeLink(store, { sourceRef: hiddenAlice.ref, targetRef: stAloysius.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
+  await makeLink(store, { sourceRef: carol.ref, targetRef: stTallowwood.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
+  await makeLink(store, { sourceRef: hiddenAlice.ref, targetRef: stTallowwood.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
 
   // Archive Hidden Alice only after her links exist (see the previous
   // test's comment for why).
@@ -307,7 +307,7 @@ test('PRIVACY: an archived person is also excluded from bridge_people even if th
   // Both organisations now have only 1 visible member each — below the
   // candidate floor — so neither cluster (nor any bridge) should exist.
   assert.equal(body.clusters.find((c) => c.id === unsw.ref), undefined);
-  assert.equal(body.clusters.find((c) => c.id === stAloysius.ref), undefined);
+  assert.equal(body.clusters.find((c) => c.id === stTallowwood.ref), undefined);
 });
 
 test('W2: stubbed GitHub professional_relationship appears as a world edge', async () => {

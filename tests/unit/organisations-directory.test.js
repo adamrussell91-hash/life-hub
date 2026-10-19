@@ -56,7 +56,7 @@ test('deriveOrganisationChips: workplace + event venue with years (D5)', () => {
   assert.equal(chips.find((c) => c.kind === 'event_venue')?.detail, '2 events');
 });
 
-test('A7: St. Aloysius real links — Workplace only, no invented Event venue (D4)', () => {
+test('A7: Tallowwood real links — Workplace only, no invented Event venue (D4)', () => {
   const chips = deriveOrganisationChips(
     [
       {
@@ -111,7 +111,7 @@ test('assembleOrganisationsDirectory de-duplicates Adam across memberships (V4)'
       {
         organisation: {
           id: 'organisation_sac',
-          display_name: 'St. Aloysius College',
+          display_name: 'Tallowwood College',
           legal_name: null,
           logo_key: null,
           lifecycle_status: 'active',
@@ -174,7 +174,7 @@ test('A1: undated import-stamp people excluded from arc; aria count tracked', ()
       {
         organisation: {
           id: 'organisation_sac',
-          display_name: 'St. Aloysius College',
+          display_name: 'Tallowwood College',
           lifecycle_status: 'active',
           created_at: '2019-01-01T00:00:00.000Z',
           updated_at: now,
@@ -295,7 +295,7 @@ test('A2: org warmth bands match People warmthFor for the same ids (V4)', () => 
       {
         organisation: {
           id: 'organisation_sac',
-          display_name: 'St. Aloysius College',
+          display_name: 'Tallowwood College',
           lifecycle_status: 'active',
           created_at: '2019-01-01T00:00:00.000Z',
           updated_at: now,

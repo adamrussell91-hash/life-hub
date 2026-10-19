@@ -562,6 +562,7 @@ var BlockTypeSchema = z6.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "curriculum_lines",
   "quiz_question",
   "question_set",
   "discern_confirm",
@@ -997,6 +998,106 @@ var BrainstormBlockSchema = z6.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var CurriculumLinesColourSchema = z6.enum([
+  "wave",
+  "wave_deep",
+  "green",
+  "green_deep",
+  "amber",
+  "amber_deep",
+  "lilac",
+  "lilac_deep",
+  "navy",
+  "navy_deep"
+]);
+var CurriculumLinesLevelSchema = z6.enum(["introduced", "reinforced", "mastered"]);
+var CurriculumLinesStrandSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  name: z6.string().max(60).default(""),
+  colour: CurriculumLinesColourSchema.default("wave")
+});
+var CurriculumLinesStationSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  strand_id: z6.string().min(1).max(64),
+  week: z6.number().int().min(1).max(20),
+  level: CurriculumLinesLevelSchema.default("reinforced"),
+  label: z6.string().max(120).default(""),
+  lesson_id: z6.string().min(1).max(64).optional()
+});
+var CurriculumLinesCheckpointSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  week: z6.number().int().min(1).max(20),
+  label: z6.string().max(80).default(""),
+  lesson_id: z6.string().min(1).max(64).optional(),
+  strand_ids: z6.array(z6.string().min(1).max(64)).min(1).max(8)
+});
+var CurriculumLinesTerminusSchema = z6.object({
+  label: z6.string().max(80).default("Assessment task"),
+  detail: z6.string().max(160).optional(),
+  when: z6.string().max(24).optional(),
+  lesson_id: z6.string().min(1).max(64).optional()
+});
+var CurriculumLinesV1ContentSchema = z6.object({
+  title: z6.string().max(120).optional(),
+  weeks: z6.number().int().min(1).max(20).default(8),
+  strands: z6.array(CurriculumLinesStrandSchema).min(1).max(8),
+  stations: z6.array(CurriculumLinesStationSchema).max(160).default([]),
+  checkpoints: z6.array(CurriculumLinesCheckpointSchema).max(20).default([]),
+  terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
+});
+var NetworkLineModeSchema = z6.enum(["train", "metro", "light_rail"]);
+var NetworkLineSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  mode: NetworkLineModeSchema,
+  name: z6.string().max(60).default(""),
+  short: z6.string().max(4).optional(),
+  colour: CurriculumLinesColourSchema.default("wave")
+});
+var LineStopSchema = z6.object({
+  line_id: z6.string().min(1).max(64),
+  level: CurriculumLinesLevelSchema.optional()
+});
+var NetworkNudgesSchema = z6.record(
+  z6.string().min(1).max(160),
+  z6.object({ dx: z6.number().min(-2e3).max(2e3), dy: z6.number().min(-2e3).max(2e3) })
+).refine((value) => Object.keys(value).length <= 120, { message: "At most 120 nudges" });
+var CurriculumRailStopSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  line_id: z6.string().min(1).max(64),
+  after_lesson_id: z6.string().min(1).max(64).optional(),
+  kind: z6.enum(["stop", "extension", "support"]).default("stop"),
+  lesson_id: z6.string().min(1).max(64).optional(),
+  block_id: z6.string().min(1).max(120).optional(),
+  label: z6.string().max(120).default("")
+});
+var CurriculumGateSchema = z6.object({
+  id: z6.string().min(1).max(64),
+  after_lesson_id: z6.string().min(1).max(64).optional(),
+  label: z6.string().max(80).default(""),
+  lesson_id: z6.string().min(1).max(64).optional(),
+  line_ids: z6.array(z6.string().min(1).max(64)).max(24).default([])
+});
+var CurriculumLinesV2ContentSchema = z6.object({
+  version: z6.literal(2),
+  title: z6.string().max(120).optional(),
+  rail_stops: z6.array(CurriculumRailStopSchema).max(60).default([]),
+  gates: z6.array(CurriculumGateSchema).max(12).default([]),
+  nudges: NetworkNudgesSchema.default({}),
+  terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
+});
+var CurriculumLinesBlockSchema = z6.object({
+  id: z6.string().min(1),
+  type: z6.literal("block"),
+  block_type: z6.literal("curriculum_lines"),
+  variant: z6.string().default("large"),
+  visibility: VisibilitySchema,
+  content: z6.union([CurriculumLinesV2ContentSchema, CurriculumLinesV1ContentSchema]),
+  ...blockLayout,
+  ...blockTimestamps
+});
+function isCurriculumLinesV2(content) {
+  return content.version === 2;
+}
 var QuestionDropBlockSchema = z6.object({
   id: z6.string().min(1),
   type: z6.literal("block"),
@@ -1696,6 +1797,7 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
   QuestionSetBlockSchema,
@@ -1923,6 +2025,17 @@ export {
   ConceptFeaturesBlockSchema,
   ConceptMapBlockSchema,
   CountdownBlockSchema,
+  CurriculumGateSchema,
+  CurriculumLinesBlockSchema,
+  CurriculumLinesCheckpointSchema,
+  CurriculumLinesColourSchema,
+  CurriculumLinesLevelSchema,
+  CurriculumLinesStationSchema,
+  CurriculumLinesStrandSchema,
+  CurriculumLinesTerminusSchema,
+  CurriculumLinesV1ContentSchema,
+  CurriculumLinesV2ContentSchema,
+  CurriculumRailStopSchema,
   DIAGRAM_IMAGE_PUBLISH_URL_ISSUE,
   DefinitionBlockSchema,
   DiagramBlockSchema,
@@ -1949,8 +2062,12 @@ export {
   HtmlAppBlockSchema,
   HtmlBlockSchema,
   ImageBlockSchema,
+  LineStopSchema,
   MediaSizeVariantSchema,
   MindMapBlockSchema,
+  NetworkLineModeSchema,
+  NetworkLineSchema,
+  NetworkNudgesSchema,
   OutcomesBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
@@ -1988,5 +2105,6 @@ export {
   VideoProviderSchema,
   VisibilitySchema,
   WhiteboardBlockSchema,
+  isCurriculumLinesV2,
   refineAnnotationVoiceTracks
 };

@@ -46,7 +46,15 @@ import {
   lessonToBusySpan
 } from './productivity-os.mjs';
 import { isOpenTask as isOpen } from './task-liveness.mjs';
-import { DUE_TIME_FIELD, taskBlockWrite, TIME_BLOCK_FIELDS } from './task-block-write.mjs';
+import {
+  activeTaskBlocks,
+  DUE_TIME_FIELD,
+  findTaskBlockToMove,
+  taskBlockWrite,
+  TIME_BLOCK_FIELDS,
+  workBlockCancelWrite,
+  workBlockMoveWrite
+} from './task-block-write.mjs';
 const MAX_PROTOCOL_CHARS = 24_000;
 
 function applyProtocolUpdate(current, input) {
@@ -131,7 +139,8 @@ export const CLARE_JOBS = Object.freeze([
   { id: 47, tool: 'compose_schedule', job: 'Compose a day around lessons and protected time' },
   { id: 48, tool: 'focus_block', job: 'Create, start, or finish a focus block' },
   { id: 49, tool: 'shutdown_day', job: 'Build end-of-day shutdown decisions' },
-  { id: 50, tool: 'deadline_runway', job: 'Backward-plan from a hard deadline without moving it' }
+  { id: 50, tool: 'deadline_runway', job: 'Backward-plan from a hard deadline without moving it' },
+  { id: 51, tool: 'move_work_block', job: 'Move or cancel a task\'s time block on Today' }
 ]);
 
 const MUTATE_OPS = [
@@ -396,12 +405,23 @@ export function clareWorkSchemas() {
       deep_work_ok: { type: 'boolean' },
       now_key: { type: 'string' }
     }),
-    tool('compose_schedule', 'Compose a day schedule around lessons, events, confirmed blocks, and protected windows. Never moves due_date.', {
+    tool('move_work_block', 'Move or cancel a Tasks work block — the planned time a task shows on Today. Use this when Adam says "move X to 5pm", "push it to tomorrow" or "drop that block". Pass work_block_id (from scheduled_blocks on search_tasks / get_task) or task_id. Move keeps the same block (start_time alone keeps its length); never compose_schedule to change a time. One Confirm card.', {
+      action: { type: 'string', enum: ['move', 'cancel'] },
+      work_block_id: { type: 'string' },
+      task_id: { type: 'string' },
+      from_date: { type: 'string', description: 'YYYY-MM-DD of the block to change when the task has blocks on several days.' },
+      date: { type: 'string', description: 'YYYY-MM-DD new day. Omit to keep the same day.' },
+      start_time: { type: 'string', description: 'HH:MM new start.' },
+      end_time: { type: 'string', description: 'HH:MM new end. Omit to keep the length.' },
+      duration_minutes: { type: 'number' }
+    }, ['action']),
+    tool('compose_schedule', 'Compose a day schedule around lessons, events, confirmed blocks, and protected windows. Never moves due_date. Tasks that already have a confirmed or in-progress block that day are returned in already_scheduled and get no new block; to change a scheduled task\'s time use move_work_block, not compose_schedule. Only pass extra_block_task_ids when Adam explicitly asks for an additional split block.', {
       date: { type: 'string' },
       energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
       workday_start: { type: 'string' },
       workday_end: { type: 'string' },
       task_ids: { type: 'array', items: { type: 'string' } },
+      extra_block_task_ids: { type: 'array', items: { type: 'string' } },
       protected_windows: { type: 'array', items: { type: 'object' } },
       confirmed_blocks: { type: 'array', items: { type: 'object' } },
       validate_proposed: { type: 'array', items: { type: 'object' } }
@@ -920,6 +940,7 @@ export function planWork(view, {
   protected_windows = null,
   confirmed_blocks = null,
   task_ids = null,
+  extra_block_task_ids = null,
   planning_profile = null
 } = {}) {
   const key = dayKey(date, now);
@@ -973,24 +994,34 @@ export function planWork(view, {
           kind: 'protected'
         };
       }).filter(Boolean) : [],
-      confirmed_blocks: Array.isArray(confirmed_blocks) ? confirmed_blocks.map(span => {
-        if (Number.isFinite(Number(span.start)) && Number.isFinite(Number(span.end))) {
-          return {
-            start: Number(span.start),
-            end: Number(span.end),
-            title: span.title ?? 'Confirmed',
-            kind: 'locked'
+      confirmed_blocks: Array.isArray(confirmed_blocks) ? confirmed_blocks
+        // Blocks on another day are neither busy time nor "already scheduled" for this one.
+        .filter(span => span && (!span.date || span.date === key) && span.status !== 'cancelled')
+        .map(span => {
+          const ids = {
+            task_id: span.task_id ?? null,
+            work_block_id: span.work_block_id ?? span.id ?? null
           };
-        }
-        const start = minutesOf(span.start_time || span.start);
-        if (start == null) return null;
-        return {
-          start,
-          end: start + (Number(span.duration_minutes) || 60),
-          title: span.title ?? 'Confirmed',
-          kind: 'locked'
-        };
-      }).filter(Boolean) : [],
+          if (Number.isFinite(Number(span.start)) && Number.isFinite(Number(span.end))) {
+            return {
+              start: Number(span.start),
+              end: Number(span.end),
+              title: span.title ?? 'Confirmed',
+              kind: 'locked',
+              ...ids
+            };
+          }
+          const start = minutesOf(span.start_time || span.start);
+          if (start == null) return null;
+          return {
+            start,
+            end: start + (Number(span.duration_minutes) || 60),
+            title: span.title ?? 'Confirmed',
+            kind: 'locked',
+            ...ids
+          };
+        }).filter(Boolean) : [],
+      extra_block_task_ids: Array.isArray(extra_block_task_ids) ? extra_block_task_ids.map(String) : [],
       workday: workday?.start && workday?.end
         ? { start: workday.start, end: workday.end, source: workday.source || 'tool_input' }
         : null,
@@ -1598,10 +1629,18 @@ function buildTaskRecord(input, existing, nowIso) {
   return base;
 }
 
-export function buildClareMutation(input, { tasks = [], projects = [], nowIso = () => new Date().toISOString() } = {}) {
+export function buildClareMutation(input, {
+  tasks = [],
+  projects = [],
+  workBlocks = [],
+  today = null,
+  nowIso = () => new Date().toISOString()
+} = {}) {
   const op = String(input?.op ?? '').trim();
   if (!MUTATE_OPS.includes(op)) return deny('unknown_op');
   const stamp = nowIso();
+  // A time change on a task that already holds a block moves that block (see taskBlockWrite).
+  const blockOpts = { today, existingBlocks: workBlocks };
 
   if (op === 'create_task') {
     const title = String(input.title ?? '').trim();
@@ -1650,7 +1689,7 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
         if (Number.isFinite(Number(row.estimated_duration))) {
           patch.estimated_duration = Number(row.estimated_duration);
         }
-        const block = taskBlockWrite({ ...existing, ...patch }, row, stamp);
+        const block = taskBlockWrite({ ...existing, ...patch }, row, stamp, blockOpts);
         if (!Object.keys(patch).length && !block) continue;
         if (Object.keys(patch).length) {
           const record = buildTaskRecord(patch, existing, stamp);
@@ -1758,11 +1797,64 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
   const record = buildTaskRecord(patch, existing, stamp);
   if (op === 'complete_task') record.completed_at = stamp;
   const label = String(input.summary ?? op).replace(/_/g, ' ');
-  const block = op === 'update_task' || op === 'reschedule_task' ? taskBlockWrite(record, input, stamp) : null;
+  const block = op === 'update_task' || op === 'reschedule_task' ? taskBlockWrite(record, input, stamp, blockOpts) : null;
   return propose(`${label}: ${existing.title}`, [
     writeEntry(`tasks:task:${record.id}`, 'overwrite', record, `${label} — ${existing.title}`),
     ...(block ? [block] : [])
   ]);
+}
+
+/**
+ * Move or cancel a Tasks work block (the task's planned time on Today). One Confirm card;
+ * the block keeps its id, so a task never ends up with a second block from a move.
+ */
+export function buildWorkBlockChange(input, {
+  tasks = [],
+  workBlocks = [],
+  today = null,
+  nowIso = () => new Date().toISOString()
+} = {}) {
+  const action = input?.action === 'cancel' ? 'cancel' : 'move';
+  const stamp = nowIso();
+  const blockId = String(input?.work_block_id ?? '').trim().replace(/^tasks:work_block:/, '');
+  const taskId = String(input?.task_id ?? '').trim();
+  let block = null;
+  if (blockId) {
+    block = (workBlocks ?? []).find(item => item?.id === blockId) ?? null;
+    if (!block) return deny('work_block_not_found', { work_block_id: blockId });
+  } else if (taskId) {
+    const fromDate = typeof input.from_date === 'string' && input.from_date.trim() ? input.from_date.trim() : null;
+    block = findTaskBlockToMove(workBlocks, taskId, { date: fromDate, explicitDate: Boolean(fromDate), today });
+    if (!block) {
+      const active = activeTaskBlocks(workBlocks, taskId);
+      if (active.length > 1) {
+        return deny('ambiguous_work_block', {
+          task_id: taskId,
+          blocks: active.map(item => ({ work_block_id: item.id, date: item.date, start_time: item.start_time })),
+          next_step: 'Pass work_block_id (or from_date) for the block Adam means.'
+        });
+      }
+      return deny('no_work_block_for_task', { task_id: taskId });
+    }
+  } else {
+    return deny('missing_work_block_id');
+  }
+  if (block.status === 'cancelled') return deny('work_block_cancelled', { work_block_id: block.id });
+  const title = block.title || findTask(tasks, block.task_id)?.title || 'Planned work';
+  if (action === 'cancel') {
+    const write = workBlockCancelWrite(block, stamp);
+    const { record: _record, ...entry } = write;
+    return propose(`Cancel block: ${title}`, [entry], ['confirm_card', 'tasks_hub', 'calendar_ghost']);
+  }
+  const moved = workBlockMoveWrite(block, {
+    start_time: input.start_time,
+    end_time: input.end_time,
+    duration_minutes: input.duration_minutes,
+    date: input.date
+  }, stamp);
+  if (!moved) return deny('invalid_block_time', { start_time: input.start_time ?? null, end_time: input.end_time ?? null });
+  const { record: _record, ...entry } = moved;
+  return propose(`Move block: ${title}`, [entry], ['confirm_card', 'tasks_hub', 'calendar_ghost']);
 }
 
 export function formatClareDraft({ task, audience, intent, points }) {
@@ -1972,6 +2064,7 @@ function writesFromScheduleProposed(proposed, stamp) {
       duration_minutes: Number(block.duration_minutes) || 30,
       depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
       status: 'proposed',
+      ...(typeof block.split_group === 'string' && block.split_group ? { split_group: block.split_group } : {}),
       source: 'clare',
       locked: false,
       created_at: stamp,
@@ -2430,6 +2523,7 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       ),
       confirmed_blocks: authoritativeBlocks,
       task_ids: input.task_ids,
+      extra_block_task_ids: input.extra_block_task_ids,
       planning_profile: planningProfile
     });
     const scheduleContext = {
@@ -2456,6 +2550,17 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     const stamp = now.toISOString();
     const writes = [];
     const proposed = [];
+    // An explicit extra block joins the task's existing block as a split part (one card).
+    // split_<id> names the existing block as part 1, so the one-block-per-day guard keeps both.
+    const extraIds = new Set((Array.isArray(input.extra_block_task_ids) ? input.extra_block_task_ids : []).map(String));
+    for (const block of selected) {
+      if (!extraIds.has(String(block.task_id))) continue;
+      const existing = authoritativeBlocks.find(item =>
+        item?.task_id === block.task_id
+        && item.date === (block.date || dateKey)
+        && (item.status === 'confirmed' || item.status === 'in_progress'));
+      if (existing?.id) block.split_group = existing.split_group || `split_${existing.id}`;
+    }
     for (const block of selected) {
       const id = newRecordId('wblock');
       const record = {
@@ -2469,6 +2574,7 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         duration_minutes: Number(block.duration_minutes) || 30,
         depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
         status: 'proposed',
+        ...(typeof block.split_group === 'string' && block.split_group ? { split_group: block.split_group } : {}),
         source: 'clare',
         locked: false,
         created_at: stamp,
@@ -2761,7 +2867,21 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     });
   }
   if (name === 'clare_mutate') {
-    return buildClareMutation(input, { tasks, projects, nowIso: () => now.toISOString() });
+    return buildClareMutation(input, {
+      tasks,
+      projects,
+      workBlocks,
+      today: toHubDateKey(now, HUB_TZ),
+      nowIso: () => now.toISOString()
+    });
+  }
+  if (name === 'move_work_block') {
+    return buildWorkBlockChange(input, {
+      tasks,
+      workBlocks,
+      today: toHubDateKey(now, HUB_TZ),
+      nowIso: () => now.toISOString()
+    });
   }
   return deny('unknown_tool', { name });
 }

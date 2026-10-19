@@ -30,7 +30,8 @@ export function createCareerScanHandler(deps = {}) {
         }
         if (request.method === 'POST') {
           const action = url.searchParams.get('action') || 'run-now';
-          const body = await readJsonObject(request).catch(() => ({}));
+          // run-now may arrive with no body, so a parse failure means "no options".
+          const body = (await readJsonObject(request)).value ?? {};
           if (action === 'run-now') {
             const result = await runCareerScanPass({
               ...deps,

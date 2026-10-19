@@ -50,6 +50,7 @@ export function toCurriculumLessonSummary(
     ...(lesson.outcome_ids && lesson.outcome_ids.length > 0
       ? { outcome_ids: lesson.outcome_ids }
       : {}),
-    ...(lesson.pedagogical_mode ? { pedagogical_mode: lesson.pedagogical_mode } : {})
+    ...(lesson.pedagogical_mode ? { pedagogical_mode: lesson.pedagogical_mode } : {}),
+    ...(lesson.line_stops && lesson.line_stops.length > 0 ? { line_stops: lesson.line_stops } : {})
   };
 }

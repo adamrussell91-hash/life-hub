@@ -2,7 +2,7 @@ import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
 import { openTasks } from '@/domain/queries';
-import { BOARD_COLUMNS, columnForTask, statusForColumn, type BoardColumnId } from '@/domain/board';
+import { BOARD_COLUMNS, columnForTask, patchForColumn, type BoardColumnId } from '@/domain/board';
 import {
   countOlderDone,
   filterDoneColumnTasks,
@@ -97,10 +97,12 @@ function persistMove(
   const task = byId.get(detail.id);
   if (!task) return;
   const column = detail.column as BoardColumnId;
-  const status = statusForColumn(column);
-  if (!status || status === task.status) return;
-  const previous = task.status;
-  void tasksApi.updateTask(task.id, { status }).then(
+  const patch = patchForColumn(task, column);
+  if (!patch) return;
+  const previous = Object.fromEntries(
+    Object.keys(patch).map((key) => [key, task[key as keyof Task]])
+  ) as Partial<Task>;
+  void tasksApi.updateTask(task.id, patch).then(
     (updated) => {
       byId.set(updated.id, updated);
       onSaved(updated);
@@ -108,7 +110,7 @@ function persistMove(
         offerTimedUndo({
           message: `Moved “${task.title}”`,
           onUndo: () => {
-            void tasksApi.updateTask(updated.id, { status: previous }).then(
+            void tasksApi.updateTask(updated.id, previous).then(
               (restored) => onSaved(restored),
               () => onReload()
             );

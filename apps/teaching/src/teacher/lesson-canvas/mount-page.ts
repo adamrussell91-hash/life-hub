@@ -28,6 +28,9 @@ import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import type { CurriculumOutcome } from '@/schemas/outcome';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
+import { mountLineChips } from '@/network/line-chips';
+import { revealBlockFromHash } from '@/app/block-hash';
+import type { NetworkLine } from '@/schemas/block';
 import {
   PEDAGOGICAL_MODES,
   PEDAGOGICAL_MODE_LABELS,
@@ -100,7 +103,7 @@ export type MountLessonPageOptions = {
   onCompositionDrop?: (id: string) => void;
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
   outcomesCatalog?: CurriculumOutcome[];
-  subject?: { id: string; outcome_ids: string[] };
+  subject?: { id: string; outcome_ids: string[]; network_lines?: NetworkLine[] };
   onToggleFullPage?: () => void;
   /**
    * Render the in-canvas page menu (Export, Print, Trash…). The lesson
@@ -1068,6 +1071,17 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         })
       : null;
 
+  revealBlockFromHash(root);
+
+  const networkLines = options.subject?.network_lines ?? [];
+  const lineChips = networkLines.length
+    ? mountLineChips(stripHost, {
+        lines: networkLines,
+        stops: lesson.line_stops,
+        onChange: (stops) => emitLesson({ ...lesson, line_stops: stops })
+      })
+    : null;
+
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
@@ -1083,6 +1097,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       });
       canvas.update(lesson.blocks, media);
       strip?.update({ attached: lesson, catalog: options.outcomesCatalog ?? [] });
+      lineChips?.update(lesson.line_stops);
     },
     insertType(type: InsertMenuValue) {
       canvas.insertType(type);
@@ -1096,6 +1111,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       pulse.dispose();
       canvas.dispose();
       strip?.dispose();
+      lineChips?.dispose();
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();

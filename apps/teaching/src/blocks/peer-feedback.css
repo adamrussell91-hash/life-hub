@@ -1,13 +1,10 @@
 /* Peer feedback block: write, swap, read. Tokens only. */
 
+/* The lesson's block card is the frame; no second box inside it. */
 .peer-feedback {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
   min-width: 0;
-  padding: var(--space-5);
-  background: var(--cotton);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
 }
 
 .peer-feedback:not(.peer-feedback--editor) {
@@ -16,9 +13,6 @@
 
 .peer-feedback--editor {
   gap: var(--space-3);
-  padding: 0;
-  background: none;
-  border: 0;
 }
 
 .peer-feedback p {
@@ -29,7 +23,7 @@
 
 .pf-head {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
 .pf-head:has(.pf-corner:not([hidden])) {
@@ -37,6 +31,7 @@
 }
 
 .pf-eyebrow {
+  margin: 0;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
@@ -52,6 +47,128 @@
   color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* ── Task card: the prompt as numbered steps, command words, criteria ── */
+
+.pf-task {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pf-task__steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-task__step {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.pf-task__num {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.pf-task__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.pf-task__text {
+  max-width: 72ch;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* The command word: bold, with a faint underline that says "tap me". */
+.pf-verb {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  color: inherit;
+  background: none;
+  border: 0;
+  text-decoration: underline dotted color-mix(in oklab, var(--muted) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+.pf-verb:hover,
+.pf-verb[aria-expanded='true'] {
+  text-decoration-color: var(--wave);
+}
+
+.pf-verb:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.pf-verb--plain {
+  text-decoration: none;
+  cursor: default;
+}
+
+.pf-task__define,
+.pf-task__hint {
+  max-width: 72ch;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--muted);
+}
+
+.pf-task__hint {
+  font-style: italic;
+}
+
+.pf-task__define[hidden] {
+  display: none;
+}
+
+.pf-task__define strong {
+  color: var(--ink);
+}
+
+.pf-criteria {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  padding-left: calc(1.25rem + var(--space-2));
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.pf-criteria__label {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.pf-criteria__list {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-criteria__item + .pf-criteria__item::before {
+  content: '·';
+  margin-right: var(--space-2);
 }
 
 .pf-note {
@@ -186,6 +303,16 @@
   justify-items: center;
   text-align: center;
   padding-block: var(--space-6);
+}
+
+.pf-panel[hidden] {
+  display: none;
+}
+
+.pf-panel--quiet {
+  gap: var(--space-1);
+  background: none;
+  border-style: dashed;
 }
 
 .pf-panel__title {

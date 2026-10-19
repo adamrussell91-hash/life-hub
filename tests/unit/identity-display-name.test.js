@@ -10,23 +10,23 @@ import {
 test('cleanIdentityDisplayName strips trailing Notion URL parentheticals', () => {
   assert.equal(
     cleanIdentityDisplayName(
-      'Joseph Histon (https://app.notion.com/p/Joseph-Histon-e9b130c709d44b04865e24bbbcc60967?pvs=21)'
+      'Wynn Fernleigh (https://app.notion.com/p/Wynn-Fernleigh-e9b130c709d44b04865e24bbbcc60967?pvs=21)'
     ),
-    'Joseph Histon'
+    'Wynn Fernleigh'
   );
 });
 
 test('cleanIdentityDisplayName recovers a title from a bare Notion /p/ URL', () => {
   assert.equal(
     cleanIdentityDisplayName(
-      'https://app.notion.com/p/Joseph-Histon-e9b130c709d44b04865e24bbbcc60967?pvs=21'
+      'https://app.notion.com/p/Wynn-Fernleigh-e9b130c709d44b04865e24bbbcc60967?pvs=21'
     ),
-    'Joseph Histon'
+    'Wynn Fernleigh'
   );
 });
 
 test('cleanIdentityDisplayName strips a leaked p/ path prefix', () => {
-  assert.equal(cleanIdentityDisplayName('p/Joseph-Histon-e9b130c709d44b04865e24bbbcc60967'), 'Joseph Histon');
+  assert.equal(cleanIdentityDisplayName('p/Wynn-Fernleigh-e9b130c709d44b04865e24bbbcc60967'), 'Wynn Fernleigh');
 });
 
 test('cleanIdentityDisplayName unwraps a markdown link label', () => {
@@ -37,12 +37,12 @@ test('cleanIdentityDisplayName unwraps a markdown link label', () => {
 });
 
 test('cleanIdentityDisplayName leaves a clean name alone', () => {
-  assert.equal(cleanIdentityDisplayName('Natalie Shih'), 'Natalie Shih');
+  assert.equal(cleanIdentityDisplayName('Yara Zephyrine'), 'Yara Zephyrine');
 });
 
 test('identityNameKey matches cleaned Blob twin to GitHub name', () => {
-  const blob = 'Joseph Histon (https://app.notion.com/p/Joseph-Histon-e9b130c709d44b04865e24bbbcc60967)';
-  assert.equal(identityNameKey(blob), identityNameKey('Joseph Histon'));
+  const blob = 'Wynn Fernleigh (https://app.notion.com/p/Wynn-Fernleigh-e9b130c709d44b04865e24bbbcc60967)';
+  assert.equal(identityNameKey(blob), identityNameKey('Wynn Fernleigh'));
 });
 
 test('preferIdentityTwin keeps the GitHub row with relationships over an empty Blob twin', () => {
@@ -50,7 +50,7 @@ test('preferIdentityTwin keeps the GitHub row with relationships over an empty B
     source: 'blob',
     relationships: [],
     record: {
-      display_name: 'Joseph Histon (https://app.notion.com/p/x)',
+      display_name: 'Wynn Fernleigh (https://app.notion.com/p/x)',
       id: 'person_blob'
     }
   };
@@ -58,7 +58,7 @@ test('preferIdentityTwin keeps the GitHub row with relationships over an empty B
     source: 'github',
     relationships: [{ link: { relationship_type: 'employee_at' } }],
     record: {
-      display_name: 'Joseph Histon',
+      display_name: 'Wynn Fernleigh',
       id: 'person_github',
       professional_profile: { schema_version: 1 }
     }
@@ -72,7 +72,7 @@ test('dedupeIdentityRows collapses Blob+GitHub twins and cleans the winner label
     {
       person: {
         id: 'person_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        display_name: 'Joseph Histon (https://app.notion.com/p/Joseph-Histon-e9b130c709d44b04865e24bbbcc60967)'
+        display_name: 'Wynn Fernleigh (https://app.notion.com/p/Wynn-Fernleigh-e9b130c709d44b04865e24bbbcc60967)'
       },
       relationships: [],
       _source: 'blob'
@@ -80,7 +80,7 @@ test('dedupeIdentityRows collapses Blob+GitHub twins and cleans the winner label
     {
       person: {
         id: 'person_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        display_name: 'Joseph Histon',
+        display_name: 'Wynn Fernleigh',
         professional_profile: { schema_version: 1 }
       },
       relationships: [{ link: { id: 'ul_1' } }],
@@ -89,7 +89,7 @@ test('dedupeIdentityRows collapses Blob+GitHub twins and cleans the winner label
     {
       person: {
         id: 'person_cccccccc-cccc-cccc-cccc-cccccccccccc',
-        display_name: 'Natalie Shih'
+        display_name: 'Yara Zephyrine'
       },
       relationships: [],
       _source: 'github'
@@ -104,11 +104,11 @@ test('dedupeIdentityRows collapses Blob+GitHub twins and cleans the winner label
   );
 
   assert.equal(out.length, 2);
-  const joseph = out.find((r) => r.person.display_name === 'Joseph Histon');
+  const joseph = out.find((r) => r.person.display_name === 'Wynn Fernleigh');
   assert.ok(joseph);
   assert.equal(joseph.person.id, 'person_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
   assert.equal(joseph.relationships.length, 1);
-  assert.ok(out.some((r) => r.person.display_name === 'Natalie Shih'));
+  assert.ok(out.some((r) => r.person.display_name === 'Yara Zephyrine'));
 });
 
 test('dedupeIdentityRows drops URL-only labels that cannot be recovered', () => {

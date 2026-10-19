@@ -3,6 +3,7 @@ import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
 import { navigate } from '@/app/router';
+import { withAppBase } from '@/app/base-path';
 import { applyCreatedEntity, replaceCurriculum } from '@/app/curriculum-state';
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
 import { DEFAULT_PEDAGOGICAL_MODE } from '@/curriculum/pedagogical-mode';
@@ -50,6 +51,7 @@ import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
+import { unitNetworkContext } from '@/teacher/network-context';
 
 export const UNITS_INDEX_GROUP_STORAGE_KEY = 'teaching-hub.units-index-group';
 export type UnitsIndexGroupBy = 'subject' | 'year';
@@ -910,13 +912,23 @@ function mountUnitPlanEditor(
     );
   }
 
+  const unitLessons = options.unit.lesson_ids
+    .map((lessonId) => options.curriculum.lessons.find((row) => row.id === lessonId))
+    .filter((row): row is NonNullable<typeof row> => Boolean(row) && row!.status !== 'trashed')
+    .map((row) => ({ id: row.id, title: row.title, href: withAppBase(`/lessons/${row.id}`) }));
+
+  const network = unitNetworkContext(options.curriculum, options.unit);
+
   const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
     blocks,
     allowCollectionAtRoot: true,
+    editorContext: { unitLessons, network },
     idFactory: () => nextId(),
     renderPreview: (block) =>
       renderBlock(block, 'teacher', {
         pageBlocks: blocks,
+        unitLessons,
+        network: unitNetworkContext(options.curriculum, options.unit),
         attachedOutcomes,
         anthology: anthologyData,
         onMakeAnthologyCards: (request) => {

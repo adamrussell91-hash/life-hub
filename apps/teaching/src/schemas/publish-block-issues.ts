@@ -21,6 +21,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   question_set: 'Question set',
   question_drop: 'Question drop',
   brainstorm: 'Brainstorm',
+  curriculum_lines: 'Curriculum lines',
   discern_confirm: 'Discern Confirm',
   quiz_question: 'Quiz question',
   self_check: 'Self check',

@@ -58,6 +58,7 @@ import {
   writeIndex,
   writeTaskIndex
 } from './_shared/tasks-blobs.mjs';
+import { supersedeDuplicateBlocks } from './_shared/work-block-guard.mjs';
 
 // Pending ghosts live at the data-repo root, same idea as the CN patch queue.
 export const PENDING_CALENDAR_GHOSTS_PATH = 'pending-calendar-ghosts.json';
@@ -740,6 +741,8 @@ export async function applyTaskStep(store, step, { ghostId } = {}) {
     if (typeof body.start_time === 'string') next.start_time = body.start_time;
     if (Number.isFinite(body.duration_minutes) && body.duration_minutes > 0) next.duration_minutes = body.duration_minutes;
     await setJSON(store, key, next);
+    // A move onto a day where the task already has a block replaces it, never stacks.
+    await supersedeDuplicateBlocks(store, next);
     return;
   }
   if (step.method === 'POST' && step.collection === 'work_blocks') {
@@ -753,8 +756,9 @@ export async function applyTaskStep(store, step, { ghostId } = {}) {
     const id = ghostId ? `wblock-${String(ghostId).replace(/[^a-z0-9-]/gi, '-').slice(0, 80)}` : `wblock-${Date.now().toString(36)}`;
     const key = `work_blocks/${id}`;
     const stamp = new Date().toISOString();
-    if (!(await getJSON(store, key))) {
-      await setJSON(store, key, {
+    let record = await getJSON(store, key);
+    if (!record) {
+      record = {
         schema_version: 1,
         id,
         title: body.title.trim(),
@@ -765,14 +769,18 @@ export async function applyTaskStep(store, step, { ghostId } = {}) {
         project_id: null,
         depth: 'deep',
         status: 'confirmed',
+        ...(typeof body.split_group === 'string' && body.split_group ? { split_group: body.split_group } : {}),
         source: typeof body.source === 'string' ? body.source : 'agent',
         locked: false,
         created_at: stamp,
         updated_at: stamp
-      });
+      };
+      await setJSON(store, key, record);
     }
     const ids = await readIndex(store, 'work_blocks/_index');
     if (!ids.includes(id)) await writeIndex(store, 'work_blocks/_index', [...ids, id]);
+    // Accepting a block for a task that already holds one that day replaces the old one.
+    await supersedeDuplicateBlocks(store, record);
     return;
   }
   if (step.method === 'PATCH') {

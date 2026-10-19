@@ -68,7 +68,7 @@ export type LineSnapshot = {
 };
 
 function yearsOf(program: Program): number[] {
-  return program.age_groups
+  return (program.age_groups ?? [])
     .map((group) => Number(group.replace(/^Year\s+/i, '')))
     .filter((year) => Number.isFinite(year));
 }
@@ -114,16 +114,17 @@ export function catalogueItem(program: Program, matched: string[] = program.subj
     description: program.description,
     link: program.registration_link,
     format: program.format,
-    subjects: [...program.subjects],
+    subjects: [...(program.subjects ?? [])],
     provider: program.provider,
-    settings: [...program.settings],
+    settings: [...(program.settings ?? [])],
     entry: program.entry,
     entry_route: program.entry_route
   };
 }
 
 function itemFrom(program: Program, subjects: Set<string>): LineItem | null {
-  const matched = program.subjects.filter((subject) => subjects.has(subject));
+  // Stored programs can predate a field; the schema default never ran on them.
+  const matched = (program.subjects ?? []).filter((subject) => subjects.has(subject));
   if (!matched.length) return null;
   const item = catalogueItem(program, matched);
   return item.on.length ? item : null;

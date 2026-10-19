@@ -50,12 +50,12 @@ test('GitHub career employment includes ended roles and stacked same-org roles',
   const organisations = [
     {
       legacy_id: 'derived:org:st-pius-x',
-      display_name: 'St Pius X High School',
+      display_name: 'Wattle Grove High School',
       aliases: []
     },
     {
       legacy_id: '154f794f-8476-8096-8d33-cb09f6411dc9',
-      display_name: "St Aloysius' College",
+      display_name: "Tallowwood College",
       aliases: []
     }
   ];
@@ -93,7 +93,7 @@ test('GitHub career employment includes ended roles and stacked same-org roles',
   const env = { GITHUB_TOKEN: 'token' };
   const selfId = derivePersonId('derived:person:adam-russell');
   const piusId = deriveOrganisationId('derived:org:st-pius-x');
-  const aloysiusId = deriveOrganisationId('154f794f-8476-8096-8d33-cb09f6411dc9');
+  const tallowwoodId = deriveOrganisationId('154f794f-8476-8096-8d33-cb09f6411dc9');
 
   const entries = await listGithubRelationshipEntries('person', selfId, { env, fetchImpl });
   assert.equal(entries.filter((e) => e.link.relationship_type === 'employee_at').length, 3);
@@ -122,7 +122,7 @@ test('GitHub career employment includes ended roles and stacked same-org roles',
       const id = String(ref).split(':').pop();
       const orgId = id;
       const label =
-        orgId === piusId ? 'St Pius X High School' : orgId === aloysiusId ? "St Aloysius' College" : orgId;
+        orgId === piusId ? 'Wattle Grove High School' : orgId === tallowwoodId ? "Tallowwood College" : orgId;
       return {
         ref: formatEntityRef({ namespace: 'shared', kind: 'organisation', id: orgId }),
         kind: 'organisation',

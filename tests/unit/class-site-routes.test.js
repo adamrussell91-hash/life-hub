@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   deadPageHtml,
   handleClassSiteRequest,
+  isLinePath,
   isTeachingAsset,
   scrubTeachingShell,
   studentPath
@@ -133,4 +134,37 @@ test('decoded assets are not labelled as compressed', async () => {
   assert.equal(response.headers.get('content-encoding'), null);
   assert.equal(response.headers.get('content-length'), null);
   assert.equal(await response.text(), 'console.log(1)');
+});
+
+const LINE_SHELL = `<!DOCTYPE html>
+<html><head><title>MindWorks Pathways</title>
+<script type="module" crossorigin src="/tasks/assets/line-abc.js"></script>
+</head><body class="pl-page"><main id="line"></main></body></html>`;
+
+test('the published personal line is served on the class host', async () => {
+  assert.equal(isLinePath('/line'), true);
+  assert.equal(isLinePath('/line/'), true);
+  assert.equal(isLinePath('/tasks/'), false);
+  assert.equal(isLinePath('/tasks/line.html'), false);
+
+  const response = await handleClassSiteRequest(
+    new Request('https://class.adam-russell.com/line'),
+    mockFetch([{ path: '/tasks/line.html', body: LINE_SHELL }])
+  );
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.equal(html.includes('life-hub'), false);
+  assert.match(html, /\/tasks\/assets\/line-abc\.js/);
+});
+
+test('tasks build assets proxy, the tasks app does not', async () => {
+  assert.equal(isTeachingAsset('/tasks/assets/line-abc.js'), true);
+  assert.equal(isTeachingAsset('/tasks/assets/../index.html'), false);
+  for (const path of ['/tasks/', '/tasks/index.html', '/tasks/line.html']) {
+    const response = await handleClassSiteRequest(
+      new Request(`https://class.adam-russell.com${path}`),
+      mockFetch([{ path: '/tasks/index.html', body: 'hub' }, { path: '/tasks/line.html', body: LINE_SHELL }])
+    );
+    assert.equal(response.status, 404, path);
+  }
 });

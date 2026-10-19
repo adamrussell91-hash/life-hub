@@ -259,3 +259,13 @@ export const ProgramUpdateSchema = ProgramCreateSchema.partial();
 export type Program = z.infer<typeof ProgramSchema>;
 export type ProgramCreate = z.infer<typeof ProgramCreateSchema>;
 export type ProgramUpdate = z.infer<typeof ProgramUpdateSchema>;
+
+/** Fills list fields a stored program can predate, so callers can rely on arrays. */
+export function withProgramDefaults(program: Program): Program {
+  return {
+    ...program,
+    subjects: program.subjects ?? [],
+    age_groups: program.age_groups ?? [],
+    settings: program.settings ?? []
+  };
+}
