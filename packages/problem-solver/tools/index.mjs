@@ -22,6 +22,10 @@ import { decisionMatrix } from './decision-matrix.mjs';
 import { swot } from './swot.mjs';
 import { morphological } from './morphological.mjs';
 import { pareto } from './pareto.mjs';
+import { dmaic } from './dmaic.mjs';
+import { fifteenPercent } from './fifteen-percent.mjs';
+import { kanban } from './kanban.mjs';
+import { eisenhower } from './eisenhower.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -47,7 +51,11 @@ export const TOOLS = {
   decision_matrix: decisionMatrix,
   swot,
   morphological,
-  pareto
+  pareto,
+  dmaic,
+  fifteen_percent: fifteenPercent,
+  kanban,
+  eisenhower
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
