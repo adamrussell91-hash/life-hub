@@ -128,7 +128,25 @@ export const SAMPLES = {
       { from: 'i2', to: 'c3', kind: 'plus' },
       { from: 'c3', to: 'c1', kind: 'plus' }
     ]
-  )
+  ),
+  // Five stakeholders, so the pager shows and the second set (the newest) is on screen.
+  perspective_shift: run('perspective_shift', [
+    node('s1', 'stakeholder:1', 'The evening cleaner who locks the sports hall at ten.', 'Evening cleaner'),
+    node('s2', 'stakeholder:2', 'The junior football coach who runs the last session.', 'Junior coach'),
+    node('s3', 'stakeholder:3', 'Parents who wait in the car park for pick-up.', 'Waiting parents', { state: 'contested', objection: 'Parents are several people with different needs; is there one view here?' }),
+    node('s4', 'stakeholder:4', 'The treasurer who books and bills the hall.', 'Hall treasurer'),
+    node('s5', 'stakeholder:5', 'Neighbours across the road from the car park.', 'Neighbours'),
+    node('v1', 'view:1', 'Sessions overrun, so the cleaning starts late and the hall is locked after the shift ends.', 'Overruns eat shift'),
+    node('v2', 'view:2', 'Why is the last slot only fifty minutes when the kit takes fifteen to pack away?', 'Slot too short'),
+    node('v3', 'view:3', 'They wish they knew when the session will really end, so they could time the pick-up.', 'Unclear end time'),
+    node('v4', 'view:4', 'What about the late fee in the booking terms, which is never charged?', 'Unused late fee'),
+    node('n1', 'insight:1', 'It helps when the hall is empty by the time the shift starts.', 'Empty hall on time'),
+    node('n2', 'insight:2', 'I can\'t finish properly when packing away eats the end of the session.', 'Packing time'),
+    node('n3', 'insight:3', 'It helps when the end time is the time the children walk out.', 'Real finish time'),
+    node('n4', 'insight:4', 'It helps when the booking matches how long the hall is really used.', 'Honest bookings'),
+    node('v5', 'view:5', 'Engines idle and car doors slam late into the evening.', 'Late noise'),
+    node('r', 'reframe', 'How might the last session of the evening end, kit packed and hall empty, by the time the cleaner\'s shift begins, without cutting the children\'s playing time?')
+  ])
 };
 
 // The causal map after one more turn: a fourth cause that eases the problem, and its links.

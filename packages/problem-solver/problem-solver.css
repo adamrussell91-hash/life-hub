@@ -1287,6 +1287,203 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-causal__fill, .ps-causal__edge { transition: none; }
 }
 
+/* Perspective shift (toolkit, Analyse): an upright rectangle cut by its diagonals
+   into four triangles, yellow top and bottom, blue at the sides, with a red dot
+   where the diagonals cross. Sizes inside the stage are in cqw of the stage, whose
+   height is 9/7 of its width (the book's proportions). Text columns are sized so
+   every line stays inside its triangle's slanted sides at the depth it sits. */
+.ps-persp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+.ps-persp__stage {
+  position: relative;
+  container-type: inline-size;
+  width: min(100%, 440px);
+  aspect-ratio: 7 / 9;
+}
+
+.ps-persp__frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
+.ps-persp__frame path { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+
+.ps-persp__page { position: absolute; inset: 0; }
+.ps-persp__page[hidden] { display: none; }
+.ps-persp__page.is-leaving { pointer-events: none; }
+.ps-persp__page.is-leaving * { pointer-events: none !important; }
+
+.ps-persp__quadrant { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+/* Blue sits over yellow so the shared diagonals have no seam (yellow runs 1.5px under). */
+.ps-persp__quadrant--right, .ps-persp__quadrant--left { z-index: 2; }
+/* The focused or open triangle rises so its whole focus ring shows. */
+.ps-persp__quadrant:focus-within,
+.ps-persp__quadrant.is-open { z-index: 3; }
+
+.ps-persp__body { position: absolute; inset: 0; display: block; transition: filter 240ms var(--ps-ease); }
+.ps-persp__fill { position: absolute; inset: 0; display: block; pointer-events: auto; cursor: pointer; transition: filter 240ms var(--ps-ease); }
+.ps-persp__quadrant--top .ps-persp__fill { background: var(--ps-yellow); clip-path: polygon(0 0, 100% 0, 100% 1.5px, 50% calc(50% + 1.5px), 0 1.5px); }
+.ps-persp__quadrant--bottom .ps-persp__fill { background: var(--ps-yellow); clip-path: polygon(0 100%, 0 calc(100% - 1.5px), 50% calc(50% - 1.5px), 100% calc(100% - 1.5px), 100% 100%); }
+.ps-persp__quadrant--right .ps-persp__fill { background: var(--ps-blue); clip-path: polygon(100% 0, 100% 100%, 50% 50%); }
+.ps-persp__quadrant--left .ps-persp__fill { background: var(--ps-blue); clip-path: polygon(0 0, 50% 50%, 0 100%); }
+.ps-persp__fill:hover,
+.ps-persp__quadrant:has(.ps-persp__shape:hover) .ps-persp__fill,
+.ps-persp__quadrant:has(.ps-persp__item--stakeholder.is-open) .ps-persp__fill { filter: brightness(1.07) saturate(1.06); }
+.ps-persp__quadrant:has(.ps-persp__shape:focus-visible) .ps-persp__body {
+  filter: drop-shadow(0 0 1px var(--wave)) drop-shadow(0 0 1px var(--wave)) drop-shadow(0 0 1.5px var(--wave));
+}
+
+/* The words: one centred column per triangle. */
+.ps-persp__col {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-align: center;
+  pointer-events: none;
+  --persp-title: 40cqw;
+  --persp-insight: 30cqw;
+}
+
+.ps-persp__quadrant--top .ps-persp__col,
+.ps-persp__quadrant--bottom .ps-persp__col { left: 50%; width: 60cqw; height: 40cqw; transform: translateX(-50%); color: var(--ps-on-yellow); }
+/* Top: the triangle narrows downwards, so the insight (lowest) is the narrowest line. */
+.ps-persp__quadrant--top .ps-persp__col { top: 5cqw; --persp-title: 44cqw; --persp-insight: 30cqw; }
+/* Bottom: it narrows upwards, so the title (higher) is held in tighter than the insight. */
+.ps-persp__quadrant--bottom .ps-persp__col { bottom: 5cqw; --persp-title: 38cqw; --persp-insight: 42cqw; }
+/* Sides: centred on the middle, a little in from the outer edge, as in the book. */
+.ps-persp__quadrant--right .ps-persp__col,
+.ps-persp__quadrant--left .ps-persp__col { top: 50%; width: 36cqw; transform: translateY(-50%); color: #fff; --persp-title: 34cqw; --persp-insight: 30cqw; }
+.ps-persp__quadrant--right .ps-persp__col { right: 1cqw; }
+.ps-persp__quadrant--left .ps-persp__col { left: 1cqw; }
+
+.ps-persp__item { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+
+.ps-persp__shape,
+.ps-persp__view,
+.ps-persp__insight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ps-persp__shape:focus-visible { outline: none; }
+.ps-persp__view:focus-visible,
+.ps-persp__insight:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+.ps-persp__meta {
+  font: var(--weight-semibold) 10px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.78;
+}
+
+.ps-persp__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: var(--persp-title);
+  font: var(--weight-semibold) clamp(12px, 3.5cqw, 15px) / 1.2 var(--font-ui);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+/* The prompt, in small italics; once the view is noted a dot sits beside it. */
+.ps-persp__view { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 0 6px; padding-block: 2px; }
+.ps-persp__prompt {
+  font: italic var(--weight-regular) clamp(12px, 3.1cqw, 13.5px) / 1.3 var(--font-ui);
+  white-space: nowrap;
+  opacity: 0.9;
+}
+.ps-persp__col > .ps-persp__prompt { padding-block: 2px; }
+.ps-persp__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: currentColor; }
+.ps-persp__view:hover .ps-persp__prompt,
+.ps-persp__item--view.is-open .ps-persp__prompt { text-decoration: underline; text-underline-offset: 3px; }
+
+/* The insight: a thin rule carrying its label, then its title. */
+.ps-persp__item--insight { margin-top: 3px; }
+.ps-persp__insight .ps-persp__title { max-width: var(--persp-insight); font-size: clamp(12px, 3.2cqw, 14px); }
+.ps-persp__rule { display: flex; align-items: center; gap: 5px; width: min(var(--persp-insight), 22cqw); }
+.ps-persp__rule::before,
+.ps-persp__rule::after { content: ''; flex: 1; height: 1px; background: currentColor; opacity: 0.5; }
+.ps-persp__insight:hover .ps-persp__title,
+.ps-persp__item--insight.is-open .ps-persp__title { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+.ps-persp .ps-objection { margin-top: 2px; padding: 0 5px; font-size: 9px; line-height: 1.5; }
+.ps-persp__view .ps-objection { margin-top: 0; }
+
+/* The centre dot, above every triangle. */
+.ps-persp__centre { position: absolute; top: 50%; left: 50%; z-index: 4; width: 11cqw; aspect-ratio: 1; transform: translate(-50%, -50%); pointer-events: none; }
+.ps-persp__centre-pop { display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--ps-red); }
+
+/* Pager under the square when there are more than four perspectives. */
+.ps-persp__pager { display: flex; justify-content: center; gap: 4px; margin-top: 10px; }
+.ps-persp__page-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-xs) / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 200ms var(--ps-ease), background 200ms var(--ps-ease);
+}
+.ps-persp__page-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: background 200ms var(--ps-ease), transform 200ms var(--ps-ease); }
+.ps-persp__page-dot:hover { color: var(--ink); }
+.ps-persp__page-dot[aria-current='true'] { color: var(--ink); }
+.ps-persp__page-dot[aria-current='true']::before { background: var(--ps-red); transform: scale(1.15); }
+.ps-persp__page-dot:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+
+.ps-persp__panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.ps-persp__panel .ps-details { width: min(100%, 440px); }
+
+/* The reframe, in full under the square (like the composed problem statement). */
+.ps-persp__reframe {
+  box-sizing: border-box;
+  width: min(100%, 440px);
+  margin-top: 14px;
+  padding: 14px 18px 10px;
+  border-top: 3px solid var(--ps-red);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--glass);
+}
+.ps-persp__reframe-head { display: flex; align-items: center; gap: var(--space-2); }
+.ps-persp__reframe-meta { color: var(--muted); font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-persp__reframe .ps-objection { margin-top: 0; color: var(--muted); }
+.ps-persp__reframe-text { margin: 6px 0 0; color: var(--ink); font: var(--weight-regular) var(--text-base) / 1.55 var(--font-ui); }
+.ps-persp__more { margin-top: 6px; padding: 4px 0; border: 0; background: none; color: var(--muted); font: var(--weight-semibold) var(--text-xs) / 1.4 var(--font-ui); cursor: pointer; }
+.ps-persp__more:hover { color: var(--ink); }
+.ps-persp__more:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; border-radius: 3px; }
+.ps-persp__reframe .ps-details { width: 100%; }
+.ps-persp__reframe .ps-details__card { margin-top: 4px; padding: 4px 0 8px; background: transparent; box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-persp__body, .ps-persp__fill, .ps-persp__page-dot, .ps-persp__page-dot::before { transition: none; }
+}
+
 /* Outline (accessible alternative and fallback) */
 .ps-outline { margin: 0; padding-left: var(--space-5); color: var(--ink); }
 .ps-outline li { margin: var(--space-1) 0; }

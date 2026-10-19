@@ -8,6 +8,7 @@ import { createGapRadarView } from '../../../../../packages/problem-solver/rende
 import { createSmartView } from '../../../../../packages/problem-solver/render/smart';
 import { createProblemTreeView } from '../../../../../packages/problem-solver/render/problem-tree';
 import { createProblemStatementView } from '../../../../../packages/problem-solver/render/problem-statement';
+import { createPerspectiveShiftView } from '../../../../../packages/problem-solver/render/perspective-shift';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -32,7 +33,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   gap_basic: () => createGapBasicView(),
   gap_radar: () => createGapRadarView(),
   smart: () => createSmartView(),
-  causal_map: () => createCausalMapView()
+  causal_map: () => createCausalMapView(),
+  perspective_shift: () => createPerspectiveShiftView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
