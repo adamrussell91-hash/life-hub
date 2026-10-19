@@ -2064,6 +2064,7 @@ function writesFromScheduleProposed(proposed, stamp) {
       duration_minutes: Number(block.duration_minutes) || 30,
       depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
       status: 'proposed',
+      ...(typeof block.split_group === 'string' && block.split_group ? { split_group: block.split_group } : {}),
       source: 'clare',
       locked: false,
       created_at: stamp,
@@ -2549,6 +2550,17 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     const stamp = now.toISOString();
     const writes = [];
     const proposed = [];
+    // An explicit extra block joins the task's existing block as a split part (one card).
+    // split_<id> names the existing block as part 1, so the one-block-per-day guard keeps both.
+    const extraIds = new Set((Array.isArray(input.extra_block_task_ids) ? input.extra_block_task_ids : []).map(String));
+    for (const block of selected) {
+      if (!extraIds.has(String(block.task_id))) continue;
+      const existing = authoritativeBlocks.find(item =>
+        item?.task_id === block.task_id
+        && item.date === (block.date || dateKey)
+        && (item.status === 'confirmed' || item.status === 'in_progress'));
+      if (existing?.id) block.split_group = existing.split_group || `split_${existing.id}`;
+    }
     for (const block of selected) {
       const id = newRecordId('wblock');
       const record = {
@@ -2562,6 +2574,7 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         duration_minutes: Number(block.duration_minutes) || 30,
         depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
         status: 'proposed',
+        ...(typeof block.split_group === 'string' && block.split_group ? { split_group: block.split_group } : {}),
         source: 'clare',
         locked: false,
         created_at: stamp,

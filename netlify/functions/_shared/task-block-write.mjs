@@ -63,7 +63,18 @@ export function blockTimeLabel(block) {
 
 /** Compact view of a task's planned blocks for agent reads. */
 export function scheduledBlocksForTask(blocks, taskId) {
-  return activeTaskBlocks(blocks, taskId).map((block) => ({
+  const active = activeTaskBlocks(blocks, taskId);
+  const groupOf = (block) => {
+    const own = typeof block.split_group === 'string' ? block.split_group : '';
+    if (own) return own;
+    return active.some((other) => other.split_group === `split_${block.id}`) ? `split_${block.id}` : '';
+  };
+  const parts = new Map();
+  for (const block of active) {
+    const group = groupOf(block);
+    if (group) parts.set(group, [...(parts.get(group) ?? []), block]);
+  }
+  return active.map((block) => ({
     work_block_id: block.id ?? null,
     date: block.date ?? null,
     start_time: block.start_time ?? null,
@@ -71,7 +82,14 @@ export function scheduledBlocksForTask(blocks, taskId) {
       ? addMinutes(block.start_time, Number(block.duration_minutes))
       : null,
     duration_minutes: Number(block.duration_minutes) || null,
-    status: block.status
+    status: block.status,
+    ...(() => {
+      const group = groupOf(block);
+      const siblings = group ? parts.get(group) ?? [] : [];
+      return siblings.length > 1
+        ? { split_group: group, part_index: siblings.indexOf(block) + 1, part_count: siblings.length }
+        : {};
+    })()
   }));
 }
 
@@ -145,7 +163,13 @@ export function taskBlockWrite(task, spec, stamp, { today = null, existingBlocks
     : YMD.test(task?.due_date ?? '')
       ? task.due_date
       : YMD.test(today ?? '') ? today : stamp.slice(0, 10);
-  if (task?.id && HHMM.test(start) && Array.isArray(existingBlocks)) {
+  // An explicit split adds a linked part to the task's existing block (one card, two times).
+  const splitWith = spec?.split_block === true && task?.id
+    ? activeTaskBlocks(existingBlocks, task.id).find((block) => block.date === date)
+      ?? activeTaskBlocks(existingBlocks, task.id)[0]
+      ?? null
+    : null;
+  if (!splitWith && task?.id && HHMM.test(start) && Array.isArray(existingBlocks)) {
     const existing = findTaskBlockToMove(existingBlocks, task.id, {
       date,
       explicitDate,
@@ -179,6 +203,7 @@ export function taskBlockWrite(task, spec, stamp, { today = null, existingBlocks
     duration_minutes: minutes,
     depth: task.depth === 'deep' ? 'deep' : task.depth === 'admin' ? 'admin' : 'shallow',
     status: 'confirmed',
+    ...(splitWith ? { split_group: splitWith.split_group || `split_${splitWith.id}` } : {}),
     source: 'clare',
     locked: false,
     created_at: stamp,
@@ -188,14 +213,15 @@ export function taskBlockWrite(task, spec, stamp, { today = null, existingBlocks
     path: `tasks:work_block:${id}`,
     mode: 'create',
     content: JSON.stringify(record, null, 2),
-    diff: `block ${date} ${start}–${end} · ${title}`
+    diff: `${splitWith ? 'split part' : 'block'} ${date} ${start}–${end} · ${title}`
   };
 }
 
 export const TIME_BLOCK_FIELDS = Object.freeze({
   start_time: { type: 'string', description: 'HH:MM planned start (time-block). With end_time, the same Confirm adds a work block linked to the task. If the task already has a confirmed block that day, the same Confirm moves that block instead (start_time alone keeps its length) — never a second block.' },
   end_time: { type: 'string', description: 'HH:MM planned end. Must be after start_time. Optional when moving an existing block.' },
-  block_date: { type: 'string', description: 'YYYY-MM-DD for the block, when it differs from due_date. Defaults to due_date, else today.' }
+  block_date: { type: 'string', description: 'YYYY-MM-DD for the block, when it differs from due_date. Defaults to due_date, else today.' },
+  split_block: { type: 'boolean', description: 'true only when Adam asks to split a long task over several blocks: adds start_time–end_time as a linked part of the task\'s existing block (one task card, ticking it closes every part) instead of moving that block.' }
 });
 
 export const DUE_TIME_FIELD = Object.freeze({

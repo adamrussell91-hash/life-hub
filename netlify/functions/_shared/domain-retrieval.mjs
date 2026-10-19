@@ -462,7 +462,7 @@ export function getTasksFocus(tasks = [], projects = [], { now = new Date(), wor
 /**
  * Agents see every field on a task, plus a plain done flag. With work blocks, a task's
  * confirmed / in-progress blocks ride along as scheduled_blocks: that is its time on Today,
- * even when due_time (a deadline) is empty.
+ * even when due_time (a deadline) is empty. A split task lists every part (part_index of part_count).
  */
 function summariseTask(task, workBlocks = null) {
   const summary = { ...task, is_done: isClosedTask(task) };
@@ -471,7 +471,7 @@ function summariseTask(task, workBlocks = null) {
   if (!scheduled.length) return summary;
   summary.scheduled_blocks = scheduled;
   summary.scheduled_time = scheduled
-    .map(block => `${block.date} ${blockTimeLabel(block)}`.trim())
+    .map(block => `${block.date} ${blockTimeLabel(block)}${block.part_count ? ` (part ${block.part_index} of ${block.part_count})` : ''}`.trim())
     .join('; ');
   return summary;
 }

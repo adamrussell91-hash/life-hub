@@ -734,6 +734,12 @@ function placeTaskBlocks(task, {
     remaining -= chunk;
   }
 
+  // Several chunks of one task are parts of one split (one task card), not duplicates.
+  if (proposed.length > 1) {
+    const group = `split_${task.id}_${date}`;
+    for (const block of proposed) block.split_group = group;
+  }
+
   return {
     proposed,
     remaining,
