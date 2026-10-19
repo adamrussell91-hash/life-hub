@@ -74,4 +74,19 @@ describe('canvas task statuses', () => {
     canvas.setTaskStatuses({ 'task-1': 'in_progress' });
     expect(setTasks).toHaveBeenLastCalledWith([{ nodeId: 'n1', taskId: 'task-1', status: 'in_progress' }] satisfies PsTaskLink[]);
   });
+  it('a task deleted in Tasks reaches the chart as removed, without its status being fetched again', () => {
+    const host = document.createElement('div');
+    const canvas = mountCanvas(host);
+    const whys = { id: 'k1', tool: 'five_whys', status: 'active', nodes: [], edges: [] } as unknown as PsToolRun;
+    canvas.update(session(false, {
+      steps: { implement: { runs: [whys], status: 'open', objection: null } },
+      proposedTasks: [
+        { id: 'p1', title: 'Draft', status: 'dismissed', removed: true, due: null, taskId: 'task-1', source: { runId: 'k1', nodeId: 'n1' } },
+        { id: 'p2', title: 'Never made', status: 'dismissed', due: null, source: { runId: 'k1', nodeId: 'n2' } }
+      ]
+    }));
+    expect(setTasks).toHaveBeenLastCalledWith([{ nodeId: 'n1', taskId: 'task-1', status: 'removed' }]);
+    canvas.setTaskStatuses({ 'task-1': 'unknown' });
+    expect(setTasks).toHaveBeenLastCalledWith([{ nodeId: 'n1', taskId: 'task-1', status: 'removed' }]);
+  });
 });

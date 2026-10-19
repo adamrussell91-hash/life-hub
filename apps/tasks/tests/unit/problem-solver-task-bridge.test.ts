@@ -46,3 +46,12 @@ describe('createTaskBridge', () => {
     expect(dismiss).not.toHaveBeenCalled();
   });
 });
+
+describe('removed tasks', () => {
+  it('a proposal already dismissed as removed is not fetched again', async () => {
+    const getTask = vi.fn();
+    const bridge = createTaskBridge({ createTask: vi.fn(), getTask, domainFor: async () => 'life', confirm: vi.fn(), dismiss: vi.fn(), setReview: vi.fn() });
+    expect(await bridge.statuses([{ ...proposal, status: 'dismissed', removed: true, taskId: 'gone' }])).toEqual({});
+    expect(getTask).not.toHaveBeenCalled();
+  });
+});
