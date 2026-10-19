@@ -12,7 +12,7 @@
 
 **Worktree:** `/Users/adamrussell/Projects/life-hub-ps-process` (branch `claude/problem-solver-process`). Run every command from there.
 
-**Book references (local only, never commit):** the book's chart pages for every tool in this plan are rendered as images in `/private/tmp/claude-501/-Users-adamrussell-Projects-life-hub/d4f11baa-e424-4641-a17f-20549745c162/scratchpad/book/`. They are `causal-map.png`, `perspective-shift.png`, `radial-tree.png`, `force-field.png`, `from-to.png`, `intent-statement.png`, `problem-reduction.png`, `analogical-reasoning.png`, `solution-tree.png`, `lotus-blossom.png` and `duncker-diagram.png`, plus `emblem-sheet.png` (every tool's emblem). Open them with the Read tool before building a tool's emblem or renderer. Shapes, proportions, layout and palette must match the book. The book's wording must not be copied into the repo (public); write labels and prompts in our own words. The short chart labels the book uses as headings ("Influence", "Goal", "Aspect", "Trend", "From", "To") are generic words and may be used.
+**Book references (local only, never commit):** the book's chart pages for every tool in this plan are rendered as images in `/Users/adamrussell/Projects/life-hub-ps-process/.ps-book/ (git-excluded; re-render with pdftoppm from the scans in ~/Downloads if missing)`. They are `causal-map.png`, `perspective-shift.png`, `radial-tree.png`, `force-field.png`, `from-to.png`, `intent-statement.png`, `problem-reduction.png`, `analogical-reasoning.png`, `solution-tree.png`, `lotus-blossom.png` and `duncker-diagram.png`, plus `emblem-sheet.png` (every tool's emblem). Open them with the Read tool before building a tool's emblem or renderer. Shapes, proportions, layout and palette must match the book. The book's wording must not be copied into the repo (public); write labels and prompts in our own words. The short chart labels the book uses as headings ("Influence", "Goal", "Aspect", "Trend", "From", "To") are generic words and may be used.
 
 **Commands used throughout:**
 
@@ -1109,7 +1109,7 @@ Register the five after the Analyse tools: `problem_reduction: problemReduction,
 - Modify: `packages/problem-solver/glyphs.ts` (restore `Record<PsToolId, string>` and drop the Task 2 fallbacks), `apps/tasks/src/views/problem-solver/view.ts` (tool shelf)
 - Test: `apps/tasks/tests/unit/problem-solver-glyphs.test.ts` (it already checks that every tool has an emblem)
 
-- [ ] **Step 1: Draw the emblems.** Open `book/emblem-sheet.png` and each tool's page image. Every emblem is a circle in viewBox `0 0 100 100`, using the book colours as literal fills (read the hex values from an existing emblem, such as `glyphs/tools/five_whys.svg`), no ids and no strokes. Match each one to its book emblem:
+- [ ] **Step 1: Draw the emblems.** Open `.ps-book/emblem-sheet.png` and each tool's page image. Every emblem is a circle in viewBox `0 0 100 100`, using the book colours as literal fills (read the hex values from an existing emblem, such as `glyphs/tools/five_whys.svg`), no ids and no strokes. Match each one to its book emblem:
   - causal_map: red disc; a blue downward triangle at the top; a band of small yellow triangles below it.
   - perspective_shift: blue disc; a yellow bow-tie (two triangles meeting at the centre); a red centre dot.
   - radial_tree: yellow disc; thin blue concentric rings; small red nodes near the centre and blue nodes outward, joined by thin lines. Keep it legible at 24px; fewer nodes than the book is fine.
@@ -1125,7 +1125,7 @@ Register the five after the Analyse tools: `problem_reduction: problemReduction,
   Then compare your emblems with the sheet. Where this list and the sheet disagree, follow the sheet.
 - [ ] **Step 2:** Import the eleven SVGs in `glyphs.ts`, add them to `EMBLEMS`, and restore the strict `Record<PsToolId, string>` type and the strict lookups.
 - [ ] **Step 3: Landing shelf by step.** In `view.ts`, `toolShelf()` lists every tool flat under "Seven Define tools". Change it to one group per book step that has tools (Define, Analyse, Devise for now; later steps appear automatically as their tools register). Each group gets a small heading with the step name (from `BOOK_STEPS` in steps.mjs) and that step's tools from `toolsForBookStep(step)`. Leave out the TRIZ-only `contradiction` step. Change the section aside text from "Seven Define tools…" to "The coach picks from these for each step. Here is what each one is for." Add a view test: the shelf has `[data-step="analyse"]` containing the six Analyse tool names.
-- [ ] **Step 4: Contact sheet.** Build a throwaway HTML page in the scratchpad with all 19 emblems at 96px and 24px on the paper background. Screenshot it with the Chrome path above (reuse `node_modules/playwright-core`), to `scratchpad/preview/emblems.png`. Compare it with `book/emblem-sheet.png` and fix any emblem that doesn't read as its book counterpart.
+- [ ] **Step 4: Contact sheet.** Build a throwaway HTML page in the scratchpad with all 19 emblems at 96px and 24px on the paper background. Screenshot it with the Chrome path above (reuse `node_modules/playwright-core`), to `scratchpad/preview/emblems.png`. Compare it with `.ps-book/emblem-sheet.png` and fix any emblem that doesn't read as its book counterpart.
 - [ ] **Step 5:** Run the glyph and view tests, the type gate, and all Problem Solver tests. Commit: `Problem Solver: Analyse and Devise emblems; tool shelf grouped by step`.
 - [ ] **Step 6: HUMAN CHECKPOINT.** The controller sends `scratchpad/preview/emblems.png` to Adam (SendUserFile) and asks for approval. Renderer tasks may proceed in the meantime. If Adam asks for changes, they become a fix commit before the plan finishes.
 
@@ -1220,24 +1220,25 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 6: Causal map renderer (`render/causal-map.ts`, `createCausalMapView`, prefix `ps-causal`)
 
-**Book:** `book/causal-map.png`.
-- Layout: a red circle "The problem" sits low on the left. Yellow half-disc "Cause" shapes are stacked in a staggered column in the middle, their curved side facing left toward the problem. A band of blue right-pointing chevrons ("Influence") interlocks across the top.
+**Book:** `.ps-book/causal-map.png`.
+- Layout, left to right: a red circle "The problem" at mid-height on the left; a column of yellow half-disc "Cause" shapes (dome up, flat edge down) in the middle; and on the right a tall column of blue downward-pointing arrowheads ("Influence") that interlock into one zig-zag strip. Arrows run from influences to causes and from causes to the problem.
+- Always check the image: where this text and the picture disagree, follow the picture.
 - Arrows are yellow and thin, each with a small "+/−" label.
 - Legend: "+ Positive influences", "− Negative influences".
 
 **Build:**
-- **Regions:** `data-region="influences"` (top band), `"causes"` (middle column), `"problem"` (left).
+- **Regions:** `data-region="problem"` (left), `"causes"` (middle column), `"influences"` (right column).
 - **Shapes:**
   - The problem circle appears with the `problem` node.
-  - Causes are yellow half-discs in a column. On wide screens they are staggered in two offset columns like the book. Each new one scales out from its flat edge.
-  - Influences are blue chevrons in the top band, interlocking and wrapping at 390px, each sliding in from the left.
+  - Causes are yellow half-discs, dome up, in a vertical column. Each new one scales up from its flat edge.
+  - Influences are blue downward-pointing arrowheads stacked into an interlocking zig-zag column on the right. Each new one slides down into place.
 - **Links:** an SVG overlay, with each link drawn from the source's edge to the target's edge as a gentle curve.
   - Stroke colour: `--ps-yellow` for plus kinds; for minus kinds, `--ps-ink`, dashed `4 3`.
   - Strong kinds are 3px, normal kinds 1.5px.
   - Each link has a small round badge at its midpoint showing "+" or "−".
   - Links draw in with stroke-dashoffset.
 - **Legend:** "+ makes it more" and "− makes it less", plus "Thicker: stronger". It appears with the first link.
-- **Phone:** problem on top, influences band, then the cause column. Links are still drawn.
+- **Phone:** keep the three columns, narrower, with titles clamped to 2 lines in container query units. Under 340px wide, stack them: influences as a horizontal strip on top, then causes, then the problem. Links are still drawn.
 
 **Tests:**
 - Causes go in the causes region, influences in the influences region, and the problem in the problem region.
@@ -1247,7 +1248,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 7: Perspective shift renderer (`render/perspective-shift.ts`, `createPerspectiveShiftView`, prefix `ps-persp`)
 
-**Book:** `book/perspective-shift.png`. A square split by its diagonals into four triangles: top yellow, right blue, bottom yellow, left blue. Each triangle carries a perspective label ("Perspective A–D") and a prompt ("I think…", "Why is…", "I wish…", "What about…"). A red dot sits at the centre.
+**Book:** `.ps-book/perspective-shift.png`. A square split by its diagonals into four triangles: top yellow, right blue, bottom yellow, left blue. Each triangle carries a perspective label ("Perspective A–D") and a prompt ("I think…", "Why is…", "I wish…", "What about…"). A red dot sits at the centre.
 
 **Build:**
 - **Triangles:** stakeholder *i* fills triangle `(i-1) % 4` in the order top, right, bottom, left.
@@ -1267,7 +1268,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 8: Radial tree renderer (`render/radial-tree.ts`, `createRadialTreeView`, prefix `ps-radial`)
 
-**Book:** `book/radial-tree.png`. A yellow disc with concentric rings, a large red Level 1 node at the centre, red Level 2 nodes, blue Level 3, and small blue Levels 4–5 at the rim, joined by spokes and lines. Variation: a vertical tree with a blue Level 1 at the top, a red Level 2 row and yellow Level 3 stacks.
+**Book:** `.ps-book/radial-tree.png`. A yellow disc with concentric rings, a large red Level 1 node at the centre, red Level 2 nodes, blue Level 3, and small blue Levels 4–5 at the rim, joined by spokes and lines. Variation: a vertical tree with a blue Level 1 at the top, a red Level 2 row and yellow Level 3 stacks.
 
 **Build (SVG, viewBox `-110 -110 220 220`):**
 - The yellow disc and ring guides (one ring per level present) appear with the `root` node.
@@ -1295,7 +1296,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 9: Force field renderer with scoring (`render/force-field.ts`, `createForceFieldView`, prefix `ps-force`)
 
-**Book:** `book/force-field.png`.
+**Book:** `.ps-book/force-field.png`.
 - A wide blue "Goal" bar across the top, and a tall red "The current state" bar in the centre.
 - Left: a blue "Forces for change" header with blue right-pointing arrows of decreasing length (numbered 5…1).
 - Right: a yellow "Forces against change" header with yellow left-pointing arrows of decreasing length.
@@ -1325,7 +1326,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 10: From…to renderer (`render/from-to.ts`, `createFromToView`, prefix `ps-fromto`)
 
-**Book:** `book/from-to.png`. A blue field; four red header circles "Aspect", "Trend", "From..", "To"; rows of yellow circles beneath, the trend circle holding red arrows (up, right, down).
+**Book:** `.ps-book/from-to.png`. A blue field; four red header circles "Aspect", "Trend", "From..", "To"; rows of yellow circles beneath, the trend circle holding red arrows (up, right, down).
 
 **Build:**
 - **Header:** the blue field and the four red header circles appear with the first `aspect`.
@@ -1343,7 +1344,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 11: Intent statement renderer (`render/intent-statement.ts`, `createIntentStatementView`, prefix `ps-intent`)
 
-**Book:** `book/intent-statement.png`. Six horizontal bands stacked, each a right-pointing chevron with a zig-zag lower edge in alternating red, yellow, blue, red, yellow, blue. The heading is on the left of each band (Problem, Stakeholders, Failures, Approach, Opportunity, Risk) and the prompt on the right.
+**Book:** `.ps-book/intent-statement.png`. Six horizontal bands stacked, each a right-pointing chevron with a zig-zag lower edge in alternating red, yellow, blue, red, yellow, blue. The heading is on the left of each band (Problem, Stakeholders, Failures, Approach, Opportunity, Risk) and the prompt on the right.
 
 **Build:**
 - Each band appears with its node and unfurls left to right (clip-path from `inset(0 100% 0 0)` to `inset(0)`, 480ms).
@@ -1359,7 +1360,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 12: Problem reduction renderer (`render/problem-reduction.ts`, `createProblemReductionView`, prefix `ps-reduce`)
 
-**Book:** `book/problem-reduction.png`. A large red "Problem A" circle on the left, yellow chevrons to two yellow sub-problem circles, chevrons to blue "Solution for" circles, then a large blue "Solution for A" circle on the right.
+**Book:** `.ps-book/problem-reduction.png`. A large red "Problem A" circle on the left, yellow chevrons to two yellow sub-problem circles, chevrons to blue "Solution for" circles, then a large blue "Solution for A" circle on the right.
 
 **Build:**
 - **Columns:** problem (red, large), subs (yellow, stacked), solutions (blue, aligned to their sub), and the integrated solution (blue, large).
@@ -1375,7 +1376,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 13: Analogical reasoning renderer (`render/analogical-reasoning.ts`, `createAnalogicalReasoningView`, prefix `ps-analogy`)
 
-**Book:** `book/analogical-reasoning.png`.
+**Book:** `.ps-book/analogical-reasoning.png`.
 - Main chain: a red "Source problem" box leads to a yellow "Target problem" box (with "Expand" above it and a two-way arrow), then on to "Match", "Filter" and a blue circle "Problem solved?".
 - On Yes, the chain reaches a blue "Retain" box. On No, a loop runs through "Revise", then "Search", and back to "Target problem".
 
@@ -1404,7 +1405,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 14: Solution tree renderer (`render/solution-tree.ts`, `createSolutionTreeView`, prefix `ps-soltree`)
 
-**Book:** `book/solution-tree.png`. A large blue upward triangle "Solution" at the bottom centre, then a fan of small red "How" triangles from its apex, then yellow "How" triangles further out, then blue "How" triangles outermost, all radiating upward like a fan.
+**Book:** `.ps-book/solution-tree.png`. A large blue upward triangle "Solution" at the bottom centre, then a fan of small red "How" triangles from its apex, then yellow "How" triangles further out, then blue "How" triangles outermost, all radiating upward like a fan.
 
 **Build:**
 - **Aim:** the aim is the big blue triangle at the base.
@@ -1421,7 +1422,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 15: Lotus blossom renderer (`render/lotus-blossom.ts`, `createLotusBlossomView`, prefix `ps-lotus`)
 
-**Book:** `book/lotus-blossom.png`.
+**Book:** `.ps-book/lotus-blossom.png`.
 - Centre: a red "Problem" disc ringed by eight yellow "Solution" petals.
 - Around that, eight blue flowers, each with a yellow solution at its centre and eight blue "Idea" petals.
 - Flower positions match the petals' directions.
@@ -1447,7 +1448,7 @@ Each task below gives the book page, the class prefix, the composition, how it b
 
 ### Task 16: Duncker diagram renderer (`render/duncker.ts`, `createDunckerView`, prefix `ps-duncker`)
 
-**Book:** `book/duncker-diagram.png`.
+**Book:** `.ps-book/duncker-diagram.png`.
 - Top: a red "Problem" box, with the label "What to do" beneath it.
 - Two yellow boxes: "Make it OK not to achieve desired state" (left) and "Path to desired state" (right).
 - Under them: "How to do it / Pathways" (Path 1 and Path 2 under each), then "Specific solutions" rows.
