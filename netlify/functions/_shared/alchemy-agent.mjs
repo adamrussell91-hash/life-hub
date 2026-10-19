@@ -20,6 +20,9 @@ export const LIMITS = {
   block: { turns: 6, inputTokens: 150000, proposals: 4, ownIdeas: 2 }
 };
 const SETTINGS_KEY = 'alchemy/v2/settings';
+/** A Knowledge Hub note with this tag is Ann's rules note unless Adam picks another in the panel. */
+export const RULES_TAG = 'alchemy-rules';
+export const rulesTagged = rows => rows.find(row => (row.tags ?? []).some(t => String(t).toLowerCase() === RULES_TAG)) ?? null;
 const validateBlock = block => { const parsed = BlockSchema.safeParse(block); return parsed.success ? parsed.data : null; };
 
 export async function readAgentSettings(store) {
@@ -177,11 +180,16 @@ export async function runAlchemyAgent({ kind = 'lesson', id, blockId = null, req
   const liveUnit = unit && !isDeletedRecord(unit) ? unit : null;
   const shelfUnitId = kind === 'unit' ? lesson.id : liveUnit?.id;
 
+
+  onProgress('Checking your Knowledge Hub is up to date');
+  const docs = await (deps.noteIndex ?? refreshNoteIndex)({ store, env, fetchImpl, signal, onProgress });
+
   onProgress('Reading your rules');
   const settings = await readAgentSettings(store);
+  const rulesNoteId = settings.rulesNoteId ?? rulesTagged(docs)?.id ?? null;
   let rules = null;
-  if (settings.rulesNoteId) {
-    const note = await readNoteText(settings.rulesNoteId, { env, fetchImpl }).catch(() => null);
+  if (rulesNoteId) {
+    const note = await readNoteText(rulesNoteId, { env, fetchImpl }).catch(() => null);
     if (note) rules = { title: note.title.replace(/"/g, "'"), text: note.full.slice(0, RULES_CHARS) };
   }
   const siblings = [];
@@ -194,8 +202,6 @@ export async function runAlchemyAgent({ kind = 'lesson', id, blockId = null, req
   }
   const shelf = shelfUnitId ? (await readUnitNotes(store, shelfUnitId)).notes.slice(0, 20) : [];
 
-  onProgress('Checking your Knowledge Hub is up to date');
-  const docs = await (deps.noteIndex ?? refreshNoteIndex)({ store, env, fetchImpl, signal, onProgress });
 
   const opened = new Map(); // note id → {title, full}
   const proposals = [];
@@ -309,7 +315,7 @@ export async function runAlchemyAgent({ kind = 'lesson', id, blockId = null, req
   }
   if (!summary && turns >= limits.turns) stoppedEarly = true;
   if (!summary) summary = proposals.length ? 'Ann stopped before writing a summary; her suggestions so far are below.' : 'Ann found nothing in your notes that would clearly improve this lesson.';
-  return { summary, proposals, stoppedEarly, turns, usage, rules: rules ? { id: settings.rulesNoteId, title: rules.title } : null };
+  return { summary, proposals, stoppedEarly, turns, usage, rules: rules ? { id: rulesNoteId, title: rules.title } : null };
 }
 
 /** Keep the notes behind an accepted suggestion on the unit's shelf. */

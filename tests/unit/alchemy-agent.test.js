@@ -139,3 +139,22 @@ test('quote checks ignore case, spacing and curly quotes but not words', () => {
   assert.ok(!quoteAppears('He said stop here.', 'He said go here.'));
   assert.ok(!quoteAppears('short note', 'short'));
 });
+
+test('a note tagged alchemy-rules is used when Adam has not chosen one', async () => {
+  const { store, fetchImpl, docs } = fixture();
+  docs.find(d => d.id === 'rules').tags = ['Alchemy-Rules'];
+  const { complete, seen } = scripted([[['finish', { summary: 'ok' }]]]);
+  const result = await runAlchemyAgent({ kind: 'lesson', id: 'l1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
+  assert.match(seen[0].messages[0].content, /<rules title="Lesson rules">/);
+  assert.equal(result.rules.id, 'rules');
+});
+
+test('a unit page is reviewed with its own notes shelf and no parent unit', async () => {
+  const { store, fetchImpl, docs } = fixture();
+  store.rows.set('units/u1', { data: { id: 'u1', title: 'Invented unit', lesson_ids: ['l1'], blocks: [heading('uh', 'Unit overview')] }, etag: '0' });
+  const { complete, seen } = scripted([[['propose_edit', { blockId: 'uh', path: 'content.text', oldStr: 'Unit overview', newStr: 'Unit overview and big question', why: 'x' }]], [['finish', { summary: 'ok' }]]]);
+  const result = await runAlchemyAgent({ kind: 'unit', id: 'u1', env: { GITHUB_TOKEN: 't' }, store, deps: { complete, fetchImpl, noteIndex: async () => docs } });
+  assert.match(seen[0].messages[0].content, /kind="unit page"/);
+  assert.doesNotMatch(seen[0].messages[0].content, /<unit>/);
+  assert.equal(result.proposals[0].blockId, 'uh');
+});
