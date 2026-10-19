@@ -60,7 +60,7 @@ const LAYOUTS: Record<string, Layout> = {
   }
 };
 
-export type StepState = 'done' | 'skipped' | 'current' | 'future';
+export type StepState = 'done' | 'skipped' | 'current' | 'future' | 'waiting';
 export type RecordView = {
   el: HTMLDivElement;
   update(session: PsSession): void;
@@ -73,10 +73,17 @@ export type RecordView = {
 export function stepState(session: PsSession, step: string): StepState {
   const st = session.steps?.[step];
   if (step === session.phase) return 'current';
+  if (isPaused(session, step) || st?.status === 'waiting') return 'waiting';
   if (!st) return 'future';
   if (st.status === 'skipped') return 'skipped';
   if (st.status === 'done' || session.phase === 'finished') return 'done';
   return 'future';
+}
+
+/** A step is paused when an open detour, or a review under way, will return to it. */
+export function isPaused(session: PsSession, step: string): boolean {
+  if (session.detour?.from === step) return true;
+  return session.reviewState?.status === 'reviewing' && session.reviewState.returnTo === step;
 }
 
 /** The run a step's box opens: the last run of that step that was not switched. */
@@ -144,7 +151,7 @@ export function createRecordView(doc: Document = document): RecordView {
     item.setAttribute('data-step', step.id);
     item.setAttribute('data-state', state);
     position?.(item);
-    const words = { done: 'Done', skipped: 'Skipped', current: 'In progress', future: 'Not started' }[state];
+    const words = { done: 'Done', skipped: 'Skipped', current: 'In progress', future: 'Not started', waiting: 'Waiting' }[state];
     const objection = session.steps?.[step.id]?.objection;
     const objected = objection ? `Coach objected: ${objection}` : '';
     const label = `${step.name}: ${step.detail}. ${words}${objected ? `. ${objected}` : ''}`;

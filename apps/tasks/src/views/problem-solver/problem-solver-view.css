@@ -123,6 +123,8 @@
 .ps-track__name { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--ink); }
 .ps-track__stn[data-state='future'] .ps-track__name { color: var(--muted); font-weight: var(--weight-medium); }
 .ps-track__stn[data-state='now'] .ps-track__mark { animation: ps-breathe 2.4s var(--ps-ease) infinite; }
+/* Waiting or paused: a dashed 1.5px ink outline on paper, full strength. */
+.ps-track__stn[data-state='waiting'] .ps-track__mark { border: 1.5px dashed var(--ink); border-radius: var(--radius-full); background: var(--paper); box-sizing: border-box; }
 .ps-track__stn[data-state='skipped'] .ps-track__name { text-decoration: line-through; text-decoration-thickness: 1px; opacity: 0.6; }
 @keyframes ps-breathe { 50% { transform: scale(1.12); } }
 
