@@ -248,6 +248,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       } else {
         delete lesson.outcome_ids;
       }
+      // Saves merge into the stored lesson, so clearing sends an empty list.
+      if (next.line_stops) lesson.line_stops = next.line_stops;
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
       if (next.quiz) {
         lesson.quiz = next.quiz;

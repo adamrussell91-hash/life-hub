@@ -34,7 +34,7 @@ interface SelectedEntity {
  * one on the spot via `POST /api/entities` rather than requiring the
  * organisation/person to already exist).
  */
-function buildSingleEntityField(options: {
+export function buildSingleEntityField(options: {
   kind: 'organisation' | 'person';
   placeholder: string;
   emptyText: string;

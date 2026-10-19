@@ -370,8 +370,8 @@ test('computeBridgePeople identifies a person who is a current member of >= 2 or
       ]
     },
     {
-      ref: 'shared:organisation:Redacted',
-      display_name: 'Redacted',
+      ref: 'shared:organisation:st-tallowwood',
+      display_name: 'Tallowwood',
       members: [
         { ref: 'shared:person:alice', display_name: 'Alice', link: {} },
         { ref: 'shared:person:carol', display_name: 'Carol', link: {} }
@@ -384,8 +384,8 @@ test('computeBridgePeople identifies a person who is a current member of >= 2 or
   assert.equal(bridgePeople[0].ref, 'shared:person:alice');
   // Alphabetical by organisation label, regardless of input order — a
   // plain-language description must not leak internal load/sort order.
-  assert.equal(bridgePeople[0].description, 'Connects Redacted and UNSW');
-  assert.deepEqual(bridgePeople[0].organisation_refs.sort(), ['shared:organisation:Redacted', 'shared:organisation:unsw'].sort());
+  assert.equal(bridgePeople[0].description, 'Connects Tallowwood and UNSW');
+  assert.deepEqual(bridgePeople[0].organisation_refs.sort(), ['shared:organisation:st-tallowwood', 'shared:organisation:unsw'].sort());
 });
 
 test('computeBridgePeople never flags someone who belongs to only one cluster', () => {

@@ -81,8 +81,8 @@ function link(id, type, source, target, extras = {}) {
   };
 }
 
-/** Adam's real St. Redacted memberships (BUILD-PLAN Phase 2 D4/P3). */
-function aloysiusFixture() {
+/** Adam's real Tallowwood memberships (BUILD-PLAN Phase 2 D4/P3). */
+function tallowwoodFixture() {
   const orgId = generateOrganisationId();
   const orgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: orgId });
   const adamId = generatePersonId();
@@ -141,8 +141,8 @@ function aloysiusFixture() {
   };
 }
 
-test('deriveReportingGraph: Adam Redacted has three distinct lines to three heads (D4/P3)', () => {
-  const f = aloysiusFixture();
+test('deriveReportingGraph: Adam Tallowwood has three distinct lines to three heads (D4/P3)', () => {
+  const f = tallowwoodFixture();
   const graph = deriveReportingGraph({
     organisationRef: f.orgRef,
     units: f.units,
@@ -230,7 +230,7 @@ test('deriveReportingGraph: cycle A→B→A terminates and marks both', () => {
 });
 
 test('deriveReportingGraph: ended membership is excluded (temporal)', () => {
-  const f = aloysiusFixture();
+  const f = tallowwoodFixture();
   f.links[0] = { ...f.links[0], valid_to: '2024-12-01T00:00:00.000Z' };
   const graph = deriveReportingGraph({
     organisationRef: f.orgRef,
@@ -258,7 +258,7 @@ test('org-structure GET through real handler (W2)', async () => {
       return {
         ref,
         kind: 'organisation',
-        display_label: 'St. Redacted College',
+        display_label: 'Tallowwood College',
         supporting_label: null,
         href: null,
         lifecycle_status: 'active',
@@ -445,7 +445,7 @@ test('a new box survives the link and layout writes that follow it (stale index 
   const personRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: personId });
   const repo = createOrgStructureRepository({
     store,
-    resolveEntity: chartResolver(orgRef, { [personId]: 'Martin Corcoran' }),
+    resolveEntity: chartResolver(orgRef, { [personId]: 'Sol Merriwa' }),
     getContentStore: async () => store,
     now: () => new Date().toISOString()
   });

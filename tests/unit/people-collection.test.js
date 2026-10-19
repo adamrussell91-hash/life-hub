@@ -148,9 +148,9 @@ test('merges GitHub-imported people and their org relationships into the collect
   const fetchImpl = githubFetch({
     people: [
       { legacy_id: 'leg-self', display_name: 'Adam Russell', is_self: true },
-      { legacy_id: 'leg-colleague', display_name: 'Natalie Shih' }
+      { legacy_id: 'leg-colleague', display_name: 'Yara Zephyrine' }
     ],
-    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Redacted College' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College' }],
     relationships: [
       {
         person_legacy_id: 'leg-self',
@@ -177,29 +177,29 @@ test('merges GitHub-imported people and their org relationships into the collect
   assert.ok(result.some((row) => row.person.id === native.id));
 
   const self = result.find((row) => row.person.display_name === 'Adam Russell');
-  const colleague = result.find((row) => row.person.display_name === 'Natalie Shih');
+  const colleague = result.find((row) => row.person.display_name === 'Yara Zephyrine');
   assert.equal(self.person.is_self, true);
   assert.equal(self.person.id, derivePersonId('leg-self'));
   assert.equal(self.relationships.length, 1);
   assert.equal(self.relationships[0].link.relationship_type, 'employee_at');
-  assert.equal(self.relationships[0].endpoint.display_label, 'St. Redacted College');
+  assert.equal(self.relationships[0].endpoint.display_label, 'Tallowwood College');
   assert.equal(colleague.relationships[0].endpoint.ref, `shared:organisation:${deriveOrganisationId('leg-org-1')}`);
 });
 
 test('dedupes a Blob twin of a GitHub person when ids differ but cleaned names match', async () => {
   resetProfessionalDataCache();
   const store = memoryStore();
-  // Polluted Blob label for the same human GitHub imports cleanly as Natalie Shih.
+  // Polluted Blob label for the same human GitHub imports cleanly as Yara Zephyrine.
   const blobTwin = await makePerson(store, {
-    display_name: 'Natalie Shih (https://app.notion.com/p/Natalie-Shih-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
+    display_name: 'Yara Zephyrine (https://app.notion.com/p/Yara-Zephyrine-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
   });
   const env = { GITHUB_TOKEN: 'token' };
   const fetchImpl = githubFetch({
     people: [
-      { legacy_id: 'leg-colleague', display_name: 'Natalie Shih' },
+      { legacy_id: 'leg-colleague', display_name: 'Yara Zephyrine' },
       { legacy_id: 'leg-other', display_name: 'Someone Else' }
     ],
-    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Redacted College' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College' }],
     relationships: [
       {
         person_legacy_id: 'leg-colleague',
@@ -214,9 +214,9 @@ test('dedupes a Blob twin of a GitHub person when ids differ but cleaned names m
   const resolveEntity = makeGithubResolveEntity(store, env, fetchImpl);
 
   const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
-  const natalies = result.filter((row) => /natalie shih/i.test(row.person.display_name));
+  const natalies = result.filter((row) => /yara zephyrine/i.test(row.person.display_name));
   assert.equal(natalies.length, 1, 'Blob+GitHub twins must collapse to one row');
-  assert.equal(natalies[0].person.display_name, 'Natalie Shih');
+  assert.equal(natalies[0].person.display_name, 'Yara Zephyrine');
   assert.equal(natalies[0].person.id, derivePersonId('leg-colleague'));
   assert.equal(natalies[0].relationships.length, 1);
   assert.equal(natalies[0].relationships[0].link.relationship_type, 'employee_at');
@@ -229,7 +229,7 @@ test('does not listForEntity Blob twins discarded by identity dedupe', async () 
   const store = memoryStore();
   const nativeOnly = await makePerson(store, { display_name: 'Native Only' });
   const discardedTwin = await makePerson(store, {
-    display_name: 'Natalie Shih (https://app.notion.com/p/Natalie-Shih-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)'
+    display_name: 'Yara Zephyrine (https://app.notion.com/p/Yara-Zephyrine-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)'
   });
   // Extra relationship-empty Blob copies that used to each pay listForEntity.
   for (let i = 0; i < 40; i += 1) {
@@ -241,13 +241,13 @@ test('does not listForEntity Blob twins discarded by identity dedupe', async () 
   const env = { GITHUB_TOKEN: 'token' };
   const fetchImpl = githubFetch({
     people: [
-      { legacy_id: 'leg-colleague', display_name: 'Natalie Shih' },
+      { legacy_id: 'leg-colleague', display_name: 'Yara Zephyrine' },
       ...Array.from({ length: 40 }, (_, i) => ({
         legacy_id: `leg-clone-${i}`,
         display_name: `Clone ${i}`
       }))
     ],
-    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Redacted College' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College' }],
     relationships: [
       {
         person_legacy_id: 'leg-colleague',
@@ -287,7 +287,7 @@ test('does not listForEntity Blob twins discarded by identity dedupe', async () 
   assert.equal(listForEntityCalls, 1);
   assert.deepEqual(listedRefs, [nativeOnly.ref]);
   assert.ok(!result.some((row) => row.person.id === discardedTwin.id));
-  assert.equal(result.filter((row) => row.person.display_name === 'Natalie Shih').length, 1);
+  assert.equal(result.filter((row) => row.person.display_name === 'Yara Zephyrine').length, 1);
   assert.equal(result.length, 42); // native only + Natalie + 40 github clones
 });
 
@@ -310,7 +310,7 @@ test('excludes GitHub Communications students and Blob name-twins from People co
         original_category: STUDENT_ORIGINAL_CATEGORY
       }
     ],
-    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Redacted College' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College' }],
     relationships: [
       {
         person_legacy_id: 'leg-adult',
@@ -349,8 +349,8 @@ test('a GitHub person adopted into Blobs keeps its imported relationships', asyn
   const store = memoryStore();
   const env = { GITHUB_TOKEN: 'token' };
   const fetchImpl = githubFetch({
-    people: [{ legacy_id: 'leg-colleague', display_name: 'Natalie Shih' }],
-    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Redacted College' }],
+    people: [{ legacy_id: 'leg-colleague', display_name: 'Yara Zephyrine' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College' }],
     relationships: [{
       person_legacy_id: 'leg-colleague',
       organisation_legacy_id: 'leg-org-1',
@@ -366,11 +366,11 @@ test('a GitHub person adopted into Blobs keeps its imported relationships', asyn
   const id = derivePersonId('leg-colleague');
   const repo = createIdentityRepository({ store });
   await repo.adoptImportedIdentity({ kind: 'person', record: await getGithubPerson(id, { env, fetchImpl }) });
-  await repo.updateFields({ ref: { namespace: 'shared', kind: 'person', id }, patch: { display_name: 'Natalie Shih-Lee' } });
+  await repo.updateFields({ ref: { namespace: 'shared', kind: 'person', id }, patch: { display_name: 'Yara Zephyrine-Lee' } });
 
   const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
   assert.equal(result.length, 1, 'the adopted record replaces the GitHub row, no twin');
-  assert.equal(result[0].person.display_name, 'Natalie Shih-Lee');
+  assert.equal(result[0].person.display_name, 'Yara Zephyrine-Lee');
   assert.equal(result[0].relationships.length, 1, 'the imported employee_at link is still there');
-  assert.equal(result[0].relationships[0].endpoint.display_label, 'St. Redacted College');
+  assert.equal(result[0].relationships[0].endpoint.display_label, 'Tallowwood College');
 });

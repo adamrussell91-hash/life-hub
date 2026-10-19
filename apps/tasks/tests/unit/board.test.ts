@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Task } from '@/schemas/task';
-import { columnForTask, statusForColumn } from '@/domain/board';
+import { columnForTask, patchForColumn, statusForColumn } from '@/domain/board';
 import {
   countOlderDone,
   DONE_RETENTION_MS,
@@ -47,6 +47,38 @@ describe('board columns', () => {
     expect(statusForColumn('doing')).toBe('in_progress');
     expect(statusForColumn('done')).toBe('done');
     expect(statusForColumn('blocked')).toBeNull();
+  });
+
+  it('keeps a card dropped into Blocked there after a reload', () => {
+    const task = baseTask({ id: 'a', title: 'A', status: 'in_progress' });
+    const patch = patchForColumn(task, 'blocked', '2026-10-19T08:00:00.000Z');
+    expect(patch).toEqual({
+      status: 'open',
+      waiting_status: 'waiting',
+      waiting_since: '2026-10-19T08:00:00.000Z'
+    });
+    const parked = { ...task, ...patch } as Task;
+    expect(columnForTask(parked, new Map([[parked.id, parked]]))).toBe('blocked');
+    expect(patchForColumn(parked, 'blocked')).toBeNull();
+  });
+
+  it('clears the manual park when a card leaves Blocked', () => {
+    const parked = baseTask({
+      id: 'a',
+      title: 'A',
+      waiting_status: 'waiting',
+      waiting_since: '2026-10-19T08:00:00.000Z'
+    });
+    const patch = patchForColumn(parked, 'todo');
+    expect(patch).toEqual({
+      waiting_status: null,
+      waiting_on: null,
+      waiting_since: null,
+      follow_up_at: null
+    });
+    const back = { ...parked, ...patch } as Task;
+    expect(columnForTask(back, new Map([[back.id, back]]))).toBe('todo');
+    expect(patchForColumn(parked, 'doing')).toMatchObject({ status: 'in_progress', waiting_status: null });
   });
 
   it('puts unmet-dependency work in Blocked unless it is already started', () => {

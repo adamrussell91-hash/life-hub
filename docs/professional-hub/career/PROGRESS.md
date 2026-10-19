@@ -14,31 +14,13 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 
 | Need | Finding |
 |---|---|
-| Gifted education policy (project / goal / task) | **Not found in reachable stores.** No Tasks project/goal/task titled "Gifted Education Policy" in `apps/tasks/fixtures/seed.json`. No matching record under `life-hub-data`. Closest Knowledge pages are NSW/DoE policy notes (e.g. `page_notion_129f794f847680539797e4bb1ee84789` "NSW High Potential and Gifted Education Policy"), not Adam's school policy project. People notes reference Redacted "Policy & Audit Strategy" meetings (Nina Radice, Feb 2025) — strong signal the project lives in **production Tasks Blobs**, which this environment cannot read (`tasks-api.adam-russell.com` unreachable, HTTP 000). **Id: unknown until live Tasks access.** |
-| Meeting for evidence | Notion-sourced (not yet Professional Hub meeting id): "Gifted Education Planning Meeting with Nina in A0033 - Policy & Audit Strategy Discussion - Feb 5 9AM" (`18cf794f847680148126ecc06ed1d4c8`). Professional meetings live in Blobs (`meetings/records/`) — not in `life-hub-data` JSON. |
+| Gifted education policy (project / goal / task) | **Not found in reachable stores.** No Tasks project/goal/task titled "Gifted Education Policy" in `apps/tasks/fixtures/seed.json`. No matching record under `life-hub-data`. Closest Knowledge pages are NSW/DoE policy notes (e.g. `page_notion_129f794f847680539797e4bb1ee84789` "NSW High Potential and Gifted Education Policy"), not Adam's school policy project. People notes reference Tallowwood "Policy & Audit Strategy" meetings (Bo Pemberly, Feb 2025) — strong signal the project lives in **production Tasks Blobs**, which this environment cannot read (`tasks-api.adam-russell.com` unreachable, HTTP 000). **Id: unknown until live Tasks access.** |
+| Meeting for evidence | Notion-sourced (not yet Professional Hub meeting id): "Gifted Education Planning Meeting with Bo in A0033 - Policy & Audit Strategy Discussion - Feb 5 9AM" (`18cf794f847680148126ecc06ed1d4c8`). Professional meetings live in Blobs (`meetings/records/`) — not in `life-hub-data` JSON. |
 | PD event for evidence | Not named in local seed. Production Professional events store not reachable from this agent. |
 | Done task with `apst_focus` | Seed has done tasks (`task_demo_close_done`, `task_ha_writeup`) but **none carry `apst_focus`**. Live Tasks store required for a real APST-tagged done task. |
-| Adam's current `employee_at` | **Confirmed** in `life-hub-data/data/professional/relationships.json`: **Gifted Education Teacher** at Redacted' College (`154f794f-8476-8096-8d33-cb09f6411dc9`), `valid_from: 2025-01-22`, `valid_to: null`. Full role history listed below. |
+| Adam's current `employee_at` | **Confirmed** in `life-hub-data/data/professional/relationships.json`: **Gifted Education Teacher** at Tallowwood College (`154f794f-8476-8096-8d33-cb09f6411dc9`), `valid_from: 2025-01-22`, `valid_to: null`. Full role history stays in that private file. |
 
-**Current + past `employee_at` (Adam / `derived:person:adam-russell`):**
-
-| Role | From | To | Org |
-|---|---|---|---|
-| Gifted Education Teacher | 2025-01-22 | open | Redacted' (`154f794f-…`) |
-| English Teacher | 2024-08-19 | 2024-12-20 | Catherine McAuley Medowie |
-| English Teacher | 2021-01-25 | 2024-08-16 | St Pius X |
-| Psychology Teacher | 2023-01-23 | 2024-08-16 | St Pius X |
-| Professional Experience Placement Organiser | 2024-01-29 | 2024-08-16 | St Pius X |
-| Curriculum Committee Coordinator for School Transition | 2023-05-01 | 2024-02-29 | St Pius X |
-| Leader of Learning - English (Acting) | 2023-04-21 | 2023-05-13 | St Pius X |
-| Leader of Wellbeing and Engagement (Special Projects) | 2021-05-03 | 2021-12-17 | St Pius X |
-| Gifted Education Mentor | 2020-05-04 | 2020-12-18 | St Pius X |
-| HSIE Teacher | 2020-01-27 | 2020-12-18 | St Pius X |
-| HSIE and Business Studies Teacher | 2019-05-01 | 2019-12-31 | St Joseph's Aberdeen |
-| Senior Education Project Officer | 2018-10-01 | 2019-05-03 | All Areas Education |
-| English Teacher (Maitland Grossmann) | 2017-05-01 | 2017-12-31 | Maitland Grossmann |
-| English/HSIE Teacher | 2015-01-26 | 2018-10-01 | Xavier High Albury |
-| English Teacher | 2012-12-02 | 2014-12-19 | Kooringal High |
+**Current + past `employee_at`:** 15 periods across 8 employers, including concurrent roles at one school. The full list lives in the private `life-hub-data` repo (`data/professional/relationships.json`); it is not copied here because this repo is public.
 
 ### 0.2 Stone "done" field for project / program
 
@@ -234,3 +216,33 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 - `career-moves` keep/coverage still thin — deltas light up once moves exist
 
 **Remaining polish:** 1440/390 screenshots, hub-ui-guardian, 5.6 Career evidence inverse lists, referee briefings.
+
+---
+
+## River fix (19 Oct 2026)
+
+**Status:** done
+**Why:** live page was unreadable — role pills overlapped, the future half sat
+blank with no futures, all skill cards collapsed into one bubble at Now, and
+the ledger repeated cards.
+
+- **Past as swimlanes.** One row group per workplace under the trunk;
+  concurrent roles stack inside their group. Row packing reserves label room,
+  so every role keeps a label (inside the bar, beside it, or tooltip only —
+  never overlapping). Workplace name labels the first role in each group.
+- **No futures, no blank half.** Past share is 84% with no futures (40% once
+  any exist, per §3.2); Now shows two dashed starter branches and an
+  "Add a future" action. Phone keeps at least 60% for the past.
+- **Height** is sized to what is drawn (branch zone + swimlanes + axis).
+- **Phone** (<720px): trunk on the left, roles as thin columns with stacked
+  callout labels; branch labels collision-checked and kept on screen; zoom
+  presets hide behind Zoom.
+- **Add a role** on the Work card writes the `employee_at` link the river reads
+  (self Person → organisation, role, start; ended at the finish date unless
+  "I still do this role"). Overview now returns `self_ref`.
+- **New futures** get their own colour slot and lane (were all slot 1 / lane 0).
+- **Skills scan** dates a card from its latest source record, skips titles
+  already kept or pending, and Keep folds a same-title proposal into the
+  existing card. Existing duplicates fold into one ledger row ("Kept 2 times").
+- Empty Futures / Applications cards collapse to one line.
+- Mock API and Career tests now use invented workplaces only.

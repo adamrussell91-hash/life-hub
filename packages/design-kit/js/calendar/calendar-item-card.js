@@ -118,8 +118,14 @@ function contextRows(item, values) {
   if (record.cycle_day) rows.push(['Timetable', 'Day ' + record.cycle_day + (record.period ? ' · Period ' + record.period : '')]);
   if (record.planning_status === 'not_planned') rows.push(['Lesson plan', 'Not planned yet']);
   if (record.session_count > 1 && Array.isArray(record.sessions)) {
-    const slots = record.sessions.map((s) => `${weekday(s.date)} ${formatDisplayDate(s.date)}${s.period ? ` P${s.period}` : ''}`);
-    rows.push(['Taught over', `${record.session_count} sessions · ${slots.join(', ')}`]);
+    if (itemType(item) === 'work_block') {
+      // One task split over several blocks: every part, in order, on the one card.
+      const slots = record.sessions.map((s, i) => `${i + 1}. ${weekday(s.date)} ${formatDisplayDate(s.date)}${s.time ? ` ${s.time}` : ''}${s.status === 'done' ? ' · done' : ''}`);
+      rows.push(['Split over', `${record.session_count} parts · ${slots.join(', ')}`]);
+    } else {
+      const slots = record.sessions.map((s) => `${weekday(s.date)} ${formatDisplayDate(s.date)}${s.period ? ` P${s.period}` : ''}`);
+      rows.push(['Taught over', `${record.session_count} sessions · ${slots.join(', ')}`]);
+    }
   }
   if (typeof record.location === 'string' && record.location) rows.push(['Where', record.location]);
   if (record.feed) rows.push(['From', 'iCloud · read-only here']);

@@ -947,7 +947,7 @@ describe('renderEventDetailView session layout', () => {
     time_zone: 'Australia/Sydney',
     all_day: false,
     occurrence_state: 'scheduled',
-    location_text: "Redacted' College",
+    location_text: "Tallowwood College",
     accreditation_category: null,
     hours: 6,
     attendance_state: 'registered',

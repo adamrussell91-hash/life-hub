@@ -37,7 +37,7 @@ const light = () => ({ links: 0, blocked: null });
 
 test('splitCombinedName carries the shared surname and splits comma lists', () => {
   assert.deepEqual(splitCombinedName('Hector and Hugo Standen'), ['Hector Standen', 'Hugo Standen']);
-  assert.deepEqual(splitCombinedName('Joseph Histon,<br>Thierry King'), ['Joseph Histon', 'Thierry King']);
+  assert.deepEqual(splitCombinedName('Wynn Fernleigh,<br>Fern Redgum'), ['Wynn Fernleigh', 'Fern Redgum']);
   assert.deepEqual(splitCombinedName('Hamish McEwan-Webber, Harry Payne, Billy Lytas'), [
     'Hamish McEwan-Webber',
     'Harry Payne',
@@ -85,13 +85,13 @@ test('a name two imported people share is ambiguous and never merges', () => {
 
 test('a combined-name record splits into each student, or waits when one has no record', () => {
   const plan = planPeopleDedupe({
-    blobPeople: [blob(1, 'Joseph Histon, Thierry King'), blob(2, 'Hector and Hugo Standen')],
-    imported: [imported(101, 'Joseph Histon'), imported(102, 'Thierry King'), imported(103, 'Hugo Standen')],
+    blobPeople: [blob(1, 'Wynn Fernleigh, Fern Redgum'), blob(2, 'Hector and Hugo Standen')],
+    imported: [imported(101, 'Wynn Fernleigh'), imported(102, 'Fern Redgum'), imported(103, 'Hugo Standen')],
     weightOf: light
   });
   assert.equal(plan.ready.length, 1);
   assert.equal(plan.ready[0].kind, 'combined');
-  assert.deepEqual(plan.ready[0].into.map((p) => p.name), ['Joseph Histon', 'Thierry King']);
+  assert.deepEqual(plan.ready[0].into.map((p) => p.name), ['Wynn Fernleigh', 'Fern Redgum']);
   assert.deepEqual(plan.unresolved.map((u) => [u.remove.name, u.missing]), [['Hector and Hugo Standen', ['Hector Standen']]]);
 });
 

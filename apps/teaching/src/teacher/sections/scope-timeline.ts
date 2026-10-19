@@ -1,3 +1,4 @@
+import { mountYearNetworkView } from '@/network/year-view';
 import { liveUnitLessonCount } from '@/curriculum/with-entity-status';
 import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
@@ -226,7 +227,7 @@ export function renderScopeTimelineEditor(
 
   let scope: ScopeSequence = initial;
   let selectedId: string | null = null;
-  let tab: 'timeline' | 'map' = 'timeline';
+  let tab: 'timeline' | 'map' | 'network' = 'timeline';
   let zoom = readZoom();
   let saving = false;
   let suppressClick = false;
@@ -290,7 +291,13 @@ export function renderScopeTimelineEditor(
   mapTab.dataset.scopeTab = 'map';
   mapTab.textContent = 'Curriculum Map';
 
-  tabs.append(timelineTab, mapTab);
+  const networkTab = document.createElement('button');
+  networkTab.type = 'button';
+  networkTab.className = 'hub-pills__btn scope-timeline__tab';
+  networkTab.dataset.scopeTab = 'network';
+  networkTab.textContent = 'Network';
+
+  tabs.append(timelineTab, mapTab, networkTab);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'scope-timeline__toolbar';
@@ -1119,13 +1126,20 @@ export function renderScopeTimelineEditor(
     mapTab.classList.toggle('scope-timeline__tab--active', tab === 'map');
     timelineTab.classList.toggle('is-active', tab === 'timeline');
     mapTab.classList.toggle('is-active', tab === 'map');
+    networkTab.classList.toggle('scope-timeline__tab--active', tab === 'network');
+    networkTab.classList.toggle('is-active', tab === 'network');
     controls.hidden = tab !== 'timeline';
+    actions.style.display = tab === 'network' ? 'none' : '';
     zoomMonth.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'month');
     zoomYear.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'year');
     zoomMonth.setAttribute('aria-pressed', zoom === 'month' ? 'true' : 'false');
     zoomYear.setAttribute('aria-pressed', zoom === 'year' ? 'true' : 'false');
     if (tab === 'timeline') paintTimeline();
-    else paintMap();
+    else if (tab === 'map') paintMap();
+    else {
+      scrollEl = null;
+      mountYearNetworkView(viewHost, curriculum, subject.id);
+    }
     paintCompare();
   };
 
@@ -1239,6 +1253,11 @@ export function renderScopeTimelineEditor(
     tab = 'map';
     paintView();
     setSelection(selectedId);
+  });
+  networkTab.addEventListener('click', () => {
+    if (tab === 'network') return;
+    tab = 'network';
+    paintView();
   });
 
   zoomMonth.addEventListener('click', () => {

@@ -42,6 +42,7 @@ export const BlockTypeSchema = z.enum([
   'peer_feedback',
   'question_drop',
   'brainstorm',
+  'curriculum_lines',
   'quiz_question',
   'question_set',
   'discern_confirm',
@@ -522,6 +523,120 @@ export const BrainstormBlockSchema = z.object({
     layout: z.enum(['grid', 'cloud', 'groups']).default('grid')
   }), ...blockLayout, ...blockTimestamps
 });
+
+/**
+ * Curriculum lines: a unit's curriculum map drawn as a transit map. Each strand
+ * of learning is a line, each station is one week's work on that strand at a
+ * depth (introduced, reinforced, mastered), and every line runs into the
+ * assessment terminus. A station is a lesson link or a text label; stations on
+ * several strands that link the same lesson in the same week join into an
+ * interchange. Checkpoints are interchanges made by hand.
+ */
+export const CurriculumLinesColourSchema = z.enum([
+  'wave', 'wave_deep', 'green', 'green_deep', 'amber', 'amber_deep', 'lilac', 'lilac_deep', 'navy', 'navy_deep'
+]);
+export const CurriculumLinesLevelSchema = z.enum(['introduced', 'reinforced', 'mastered']);
+export const CurriculumLinesStrandSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().max(60).default(''),
+  colour: CurriculumLinesColourSchema.default('wave')
+});
+export const CurriculumLinesStationSchema = z.object({
+  id: z.string().min(1).max(64),
+  strand_id: z.string().min(1).max(64),
+  week: z.number().int().min(1).max(20),
+  level: CurriculumLinesLevelSchema.default('reinforced'),
+  label: z.string().max(120).default(''),
+  lesson_id: z.string().min(1).max(64).optional()
+});
+export const CurriculumLinesCheckpointSchema = z.object({
+  id: z.string().min(1).max(64),
+  week: z.number().int().min(1).max(20),
+  label: z.string().max(80).default(''),
+  lesson_id: z.string().min(1).max(64).optional(),
+  strand_ids: z.array(z.string().min(1).max(64)).min(1).max(8)
+});
+export const CurriculumLinesTerminusSchema = z.object({
+  label: z.string().max(80).default('Assessment task'),
+  detail: z.string().max(160).optional(),
+  when: z.string().max(24).optional(),
+  lesson_id: z.string().min(1).max(64).optional()
+});
+/** Version 1: free-text strands, one station per strand per week. Converted on read. */
+export const CurriculumLinesV1ContentSchema = z.object({
+  title: z.string().max(120).optional(),
+  weeks: z.number().int().min(1).max(20).default(8),
+  strands: z.array(CurriculumLinesStrandSchema).min(1).max(8),
+  stations: z.array(CurriculumLinesStationSchema).max(160).default([]),
+  checkpoints: z.array(CurriculumLinesCheckpointSchema).max(20).default([]),
+  terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
+});
+
+/**
+ * Network lines live on the subject; which lines a lesson serves lives on the
+ * lesson. The block keeps only what belongs to this unit's map: light-rail
+ * stops, gates, drag nudges and the terminus.
+ */
+export const NetworkLineModeSchema = z.enum(['train', 'metro', 'light_rail']);
+export const NetworkLineSchema = z.object({
+  id: z.string().min(1).max(64),
+  mode: NetworkLineModeSchema,
+  name: z.string().max(60).default(''),
+  short: z.string().max(4).optional(),
+  colour: CurriculumLinesColourSchema.default('wave')
+});
+export const LineStopSchema = z.object({
+  line_id: z.string().min(1).max(64),
+  level: CurriculumLinesLevelSchema.optional()
+});
+export const NetworkNudgesSchema = z.record(
+  z.string().min(1).max(160),
+  z.object({ dx: z.number().min(-2000).max(2000), dy: z.number().min(-2000).max(2000) })
+).refine((value) => Object.keys(value).length <= 120, { message: 'At most 120 nudges' });
+export const CurriculumRailStopSchema = z.object({
+  id: z.string().min(1).max(64),
+  line_id: z.string().min(1).max(64),
+  after_lesson_id: z.string().min(1).max(64).optional(),
+  kind: z.enum(['stop', 'extension', 'support']).default('stop'),
+  lesson_id: z.string().min(1).max(64).optional(),
+  block_id: z.string().min(1).max(120).optional(),
+  label: z.string().max(120).default('')
+});
+export const CurriculumGateSchema = z.object({
+  id: z.string().min(1).max(64),
+  after_lesson_id: z.string().min(1).max(64).optional(),
+  label: z.string().max(80).default(''),
+  lesson_id: z.string().min(1).max(64).optional(),
+  line_ids: z.array(z.string().min(1).max(64)).max(24).default([])
+});
+export const CurriculumLinesV2ContentSchema = z.object({
+  version: z.literal(2),
+  title: z.string().max(120).optional(),
+  rail_stops: z.array(CurriculumRailStopSchema).max(60).default([]),
+  gates: z.array(CurriculumGateSchema).max(12).default([]),
+  nudges: NetworkNudgesSchema.default({}),
+  terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
+});
+export const CurriculumLinesBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('curriculum_lines'), variant: z.string().default('large'),
+  visibility: VisibilitySchema,
+  content: z.union([CurriculumLinesV2ContentSchema, CurriculumLinesV1ContentSchema]),
+  ...blockLayout, ...blockTimestamps
+});
+export type CurriculumLinesBlock = z.infer<typeof CurriculumLinesBlockSchema>;
+export type CurriculumLinesV1Content = z.infer<typeof CurriculumLinesV1ContentSchema>;
+export type CurriculumLinesV2Content = z.infer<typeof CurriculumLinesV2ContentSchema>;
+export type NetworkLine = z.infer<typeof NetworkLineSchema>;
+export type NetworkLineMode = z.infer<typeof NetworkLineModeSchema>;
+export type LineStop = z.infer<typeof LineStopSchema>;
+export type NetworkNudges = z.infer<typeof NetworkNudgesSchema>;
+export type CurriculumRailStop = z.infer<typeof CurriculumRailStopSchema>;
+export type CurriculumGate = z.infer<typeof CurriculumGateSchema>;
+
+export function isCurriculumLinesV2(content: CurriculumLinesBlock['content']): content is CurriculumLinesV2Content {
+  return (content as { version?: number }).version === 2;
+}
 
 /**
  * Question drop: students write a question that feeds a quiz lesson in the
@@ -1329,6 +1444,7 @@ const leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
   QuestionSetBlockSchema,

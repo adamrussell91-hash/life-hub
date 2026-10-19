@@ -3,6 +3,7 @@ import { taskAttachments, type TaskAttachmentScope } from '@/domain/task-attachm
 import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import type { BoardColumnId } from '@/domain/board';
+import { isManuallyBlocked } from '@/domain/board';
 import {
   dueChipKind,
   dueChipLabel,
@@ -335,7 +336,10 @@ export function renderTaskExpandedCard(task: Task, handlers: TaskCardHandlers = 
   if (task.description) card.append(el('p', 'hub-card__meta', task.description));
   const foot = el('footer', 'task-card__foot');
   if (handlers.boardColumn === 'blocked') {
-    foot.append(el('p', 'board-move-note', 'Blocked by unfinished dependencies — drag to Doing when ready.'));
+    const note = isManuallyBlocked(task)
+      ? 'Parked as blocked — drag to Doing when ready.'
+      : 'Blocked by unfinished dependencies — drag to Doing when ready.';
+    foot.append(el('p', 'board-move-note', note));
   }
   foot.append(el('span', 'hub-card__meta', formatRelativeUpdated(task.updated_at)));
   card.append(foot);

@@ -6,6 +6,7 @@ import {
 } from '@/blocks/collection-resolve';
 import { renderBlock, renderCollectionBlock } from '@/blocks/render';
 import { localTodayYmd } from '@/schedule/today';
+import { renderStudentNetwork } from '@/student/network-view';
 import {
   continueLabel,
   pickStudentContinue,
@@ -162,6 +163,8 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
     section.append(grid);
     main.append(section);
   }
+
+  main.append(renderStudentNetwork(cls.id, cls.schedule, today));
 
   const side = document.createElement('aside');
   side.className = 'student-class__side';

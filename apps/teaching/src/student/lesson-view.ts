@@ -1,3 +1,4 @@
+import { revealBlockFromHash } from '@/app/block-hash';
 import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
@@ -133,6 +134,7 @@ function renderPublishedLesson(
   });
   content.append(blocks);
   if (isQuiz) content.append(mountStudentQuiz(lesson));
+  revealBlockFromHash(content);
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {
     const url = new URL(window.location.href);
