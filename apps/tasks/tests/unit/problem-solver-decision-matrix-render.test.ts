@@ -269,6 +269,29 @@ describe('Decision matrix view', () => {
       expect(form.querySelector('.ps-matrix__sum')!.textContent).toBe('Adds up to 3 of 100');
     });
 
+    it('goes away, closing the form, when an undo leaves fewer than two criteria or options', () => {
+      const view = createDecisionMatrixView();
+      view.update(matrix(two));
+      const form = open(view);
+      view.update(matrix([node('c1', 'criterion:1'), node('o1', 'option:1'), node('o2', 'option:2')]));
+      expect(view.el.querySelector('.ps-matrix__score')).toBeNull();
+      expect(view.el.querySelector('.ps-matrix__form')).toBeNull();
+      expect(form.hidden).toBe(true);
+      view.update(matrix(two));
+      const toggle = view.el.querySelector<HTMLButtonElement>('.ps-matrix__score')!;
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(view.el.querySelector<HTMLFormElement>('.ps-matrix__form')!.hidden).toBe(true);
+    });
+
+    it('focuses the checked mode first when opened', () => {
+      const view = createDecisionMatrixView();
+      document.body.append(view.el);
+      view.update(matrix(two, [snap('rank', [2, 1], [[3, 4], [5, 6]])]));
+      const form = open(view);
+      expect(document.activeElement).toBe(form.querySelector('input[value="rank"]'));
+      view.el.remove();
+    });
+
     it('closes on Escape first, and stops the key there', () => {
       const view = createDecisionMatrixView();
       view.update(matrix(two));
@@ -354,6 +377,17 @@ describe('Decision matrix view', () => {
       expect(view.el.querySelectorAll('[data-total]').length).toBe(2);
       expect(view.el.querySelectorAll('[data-for="o3"]').length).toBe(0);
     });
+  });
+
+  it('is a list of rows and columns, not of its tabs, note and form', () => {
+    const view = createDecisionMatrixView();
+    view.update(matrix([...two, node('ch', 'choice')], [SAMPLE]));
+    expect(view.el.getAttribute('role')).not.toBe('list');
+    const grid = view.el.querySelector('.ps-matrix__grid')!;
+    expect(grid.getAttribute('role')).toBe('list');
+    expect(grid.getAttribute('aria-label')).toBe('Decision matrix');
+    for (const id of ['c1', 'c2', 'o1', 'o2']) expect(item(view, id).parentElement).toBe(grid);
+    expect(view.el.querySelector('[data-choice]')!.hasAttribute('role')).toBe(false);
   });
 
   describe('chosen option', () => {

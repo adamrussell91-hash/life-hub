@@ -36,6 +36,26 @@ describe('disclosure group', () => {
     b.button.click();
     expect(b.item.classList.contains('is-open')).toBe(false);
   });
+
+  it('forgets an unregistered item: close() and other clicks leave it alone', () => {
+    const group = createDisclosureGroup();
+    const make = () => {
+      const item = document.createElement('div');
+      const button = document.createElement('button');
+      item.append(button);
+      group.register(item, button);
+      return { item, button };
+    };
+    const a = make();
+    const b = make();
+    a.button.click();
+    group.unregister(a.item);
+    b.button.click();
+    expect(a.item.classList.contains('is-open')).toBe(true);
+    group.close();
+    expect(a.item.classList.contains('is-open')).toBe(true);
+    expect(b.item.classList.contains('is-open')).toBe(false);
+  });
 });
 
 describe('disclosure group: Escape and close', () => {

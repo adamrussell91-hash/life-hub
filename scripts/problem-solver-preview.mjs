@@ -119,6 +119,7 @@ for (const width of widths) {
     // Shapes a layout hides (a phone shows one option at a time) cannot be hovered.
     const visible = [];
     for (const shape of shapes) if (await shape.isVisible()) visible.push(shape);
+    if (visible.length < shapes.length) console.log(`hover: skipped ${shapes.length - visible.length} hidden shapes`);
     for (const shape of visible.slice(0, 16)) {
       await shape.hover();
       await tab.waitForTimeout(80);

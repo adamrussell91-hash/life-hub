@@ -4423,7 +4423,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 /* Phone: one option at a time beside the criteria and weight; the arch shows just the name. */
 @container matrix (max-width: 560px) {
-  .ps-matrix { --ps-matrix-gutter: 20px; --ps-matrix-row: 46px; --ps-matrix-band: 40px; }
+  /* Set on the grid, not the root: a container query cannot style its own container. */
+  .ps-matrix__grid { --ps-matrix-gutter: 20px; --ps-matrix-row: 46px; --ps-matrix-band: 40px; }
   .ps-matrix__criterion { gap: 8px; padding: 6px 8px; }
   .ps-matrix__title { font-size: 13px; }
   .ps-matrix__head { min-height: 52px; padding: 10px 12% 7px; }
