@@ -85,3 +85,12 @@ test('an unstatused illegal_slot error maps to 409', async () => {
   }));
   assert.equal(res.status, 409);
 });
+
+test('GET ?linked= returns the sessions linked to a task', async () => {
+  const { call } = harness();
+  const res = await call('GET', '/api/problem-solver?linked=task:task-1');
+  assert.equal(res.status, 200);
+  const { data } = await res.json();
+  assert.deepEqual(data.sessions, []);
+  assert.equal((await call('GET', '/api/problem-solver?linked=bad')).status, 400);
+});

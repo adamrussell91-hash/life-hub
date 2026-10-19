@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createMemoryProblemStore } from '../../netlify/functions/_shared/problem-solver/store.mjs';
 import { createProblemSolverService } from '../../netlify/functions/_shared/problem-solver/service.mjs';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
+import { createSession } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 function service(coach = scriptedCoach) {
   let n = 0;
@@ -169,4 +170,40 @@ test('retry after a failed boundary turn keeps leaving, so the objection and lea
   assert.equal(done.pendingLearning, 'define');
   assert.equal(done.steps.define.objection, 'Root cause not reached.');
   assert.ok(moved);
+});
+
+const NOW8 = '2026-10-19T10:00:00.000Z';
+const uuid8 = (i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+
+async function seeded(patch) {
+  const store = createMemoryProblemStore();
+  let i = 100;
+  const deps = { now: () => NOW8, newId: () => uuid8((i += 1)) };
+  const base = { ...createSession({ text: 'Late rota.' }, deps), runner: { status: 'idle', mode: 'turn', error: null }, ...patch };
+  await store.write('op', base.id, base, null);
+  const svc = createProblemSolverService({ store, coach: async () => { throw new Error('the coach must not run'); }, now: () => NOW8, newId: deps.newId });
+  return { svc, store, id: base.id };
+}
+
+test('confirm_task, dismiss_task, set_review_task and dismiss_review apply their payloads without the coach', async () => {
+  const proposal = { id: 'p1', title: 'Draft', status: 'proposed', due: null, source: { runId: 'k', nodeId: 'n' } };
+  const { svc, id } = await seeded({ proposedTasks: [proposal, { ...proposal, id: 'p2' }], reviewProposal: { title: 'Review: Late rota.', due: '2026-11-02', reason: '', status: 'proposed' } });
+  let s = await svc.get('op', id);
+  s = await svc.action('op', { id, revision: s.revision, requestId: 'a1', action: 'confirm_task', payload: { proposalId: 'p1', taskId: 'task-1' } });
+  assert.equal(s.proposedTasks[0].taskId, 'task-1');
+  assert.equal(s.runner.status, 'idle');
+  s = await svc.action('op', { id, revision: s.revision, requestId: 'a2', action: 'dismiss_task', payload: { proposalId: 'p2' } });
+  assert.equal(s.proposedTasks[1].status, 'dismissed');
+  s = await svc.action('op', { id, revision: s.revision, requestId: 'a3', action: 'set_review_task', payload: { taskId: 'review-1', due: '2026-11-05' } });
+  assert.equal(s.reviewTaskId, 'review-1');
+  await assert.rejects(svc.action('op', { id, revision: s.revision, requestId: 'a4', action: 'dismiss_review' }), (err) => err.status === 409);
+});
+
+test('linked lists sessions that link, created or review a task, and rejects bad refs', async () => {
+  const { svc, id } = await seeded({ links: [{ kind: 'project', id: 'proj-1' }], proposedTasks: [{ id: 'p1', title: 'Draft', status: 'confirmed', taskId: 'task-1', due: null, source: { runId: 'k', nodeId: 'n' } }], reviewTaskId: 'review-1' });
+  assert.deepEqual((await svc.linked('op', 'task:task-1')).map((row) => [row.id, row.role]), [[id, 'task']]);
+  assert.deepEqual((await svc.linked('op', 'task:review-1')).map((row) => row.role), ['review']);
+  assert.deepEqual((await svc.linked('op', 'project:proj-1')).map((row) => row.role), ['link']);
+  assert.deepEqual(await svc.linked('op', 'task:other'), []);
+  await assert.rejects(svc.linked('op', 'goal:x'), (err) => err.status === 400);
 });
