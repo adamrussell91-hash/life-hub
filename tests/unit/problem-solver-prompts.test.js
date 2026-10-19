@@ -155,3 +155,13 @@ test('open slots none says tool complete only when it is', () => {
   for (const [slot, text] of [['problem', 'p'], ['cause:1', 'a'], ['cause:2', 'b'], ['cause:3', 'c']]) t = applyCoachTurn(t, turn({ node: { slot, text } }), deps);
   assert.doesNotMatch(buildCoachPrompt(t).user, /none \(tool complete\)/);
 });
+
+test('the analyse step layer carries its selection guide, tools and challenge triggers', () => {
+  const s = moveOn(inTool(), deps);
+  const layer = buildCoachPrompt(s).system[1];
+  assert.match(layer, /CURRENT STEP: Analyse/);
+  assert.match(layer, /`causal_map`/);
+  assert.match(layer, /causal_map \(Causal map\)/);
+  assert.match(layer, /CHALLENGE IN THIS STEP:/);
+  assert.doesNotMatch(layer, /No tools are available/);
+});

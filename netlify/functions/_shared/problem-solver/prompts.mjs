@@ -9,6 +9,7 @@ import { PROCESS } from './knowledge/process.mjs';
 import { CHAPTERS } from './knowledge/chapters.mjs';
 import { FINAL_WORDS } from './knowledge/final-words.mjs';
 import { SELECTION } from './knowledge/selection.mjs';
+import { STEP_TRIGGERS } from './knowledge/triggers.mjs';
 
 const skillLines = SKILLS.map((skill) => `- ${skill.id} (${skill.name}): ${skill.description}`).join('\n');
 const modelLines = Object.values(MODELS).map((model) => `- ${model.id}: ${model.name}. Use when: ${model.when}`).join('\n');
@@ -99,10 +100,12 @@ function stepLayer(session) {
       'No tools are available for this step yet. Do not suggest a tool. Help them think the step through in conversation, using what the step is for, and suggest next_step when it has what it needs.'
     ].join('\n\n');
   }
+  const triggers = books.flatMap((id) => STEP_TRIGGERS[id] ?? []);
   return [
     `CURRENT STEP: ${stepName(session.model.id, session.phase)} (tool families: ${books.join(', ')})`,
     books.map((id) => SELECTION[id]).filter(Boolean).join('\n') || 'Pick the tool that best fits the problem\'s shape from the list below.',
-    `TOOLS FOR THIS STEP:\n${tools.map(toolKnowledge).join('\n')}`
+    `TOOLS FOR THIS STEP:\n${tools.map(toolKnowledge).join('\n')}`,
+    ...(triggers.length ? [`CHALLENGE IN THIS STEP:\n${triggers.map((line) => `- ${line}`).join('\n')}`] : [])
   ].join('\n\n');
 }
 
