@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   shouldRunCareerScanNow,
   sourceRefsHash,
-  isoWeekKey
+  isoWeekKey,
+  labelScanProposals
 } from '../../netlify/functions/_shared/career-scan-service.mjs';
 
 test('sourceRefsHash is order-insensitive', () => {
@@ -33,4 +34,29 @@ test('shouldRunCareerScanNow is Sunday 17–19 Sydney with once-per-week success
 test('isoWeekKey is stable for a Sydney Sunday', () => {
   const key = isoWeekKey(new Date('2026-09-27T07:00:00Z'));
   assert.match(key, /^\d{4}-W\d{2}$/);
+});
+
+test('labelScanProposals names and links source and witness refs', async () => {
+  const calls = [];
+  const resolveEntity = async (ref) => {
+    calls.push(ref);
+    if (ref === 'tasks:project:gone') throw new Error('not found');
+    return { display_label: `Label for ${ref}`, href: `/hub/#/${ref}` };
+  };
+  const [proposal] = await labelScanProposals(
+    [
+      {
+        id: 'p1',
+        source_refs: ['tasks:project:p1', 'tasks:project:gone'],
+        witness_refs: ['tasks:project:p1']
+      }
+    ],
+    { resolveEntity }
+  );
+  assert.deepEqual(proposal.source_labels, [
+    { ref: 'tasks:project:p1', label: 'Label for tasks:project:p1', href: '/hub/#/tasks:project:p1' },
+    { ref: 'tasks:project:gone', label: null, href: null }
+  ]);
+  assert.equal(proposal.witness_labels[0].href, '/hub/#/tasks:project:p1');
+  assert.equal(calls.filter((ref) => ref === 'tasks:project:p1').length, 1);
 });
