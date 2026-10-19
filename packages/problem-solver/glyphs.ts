@@ -38,14 +38,14 @@ const SOURCES: Record<string, string> = {
   learning, logical_reasoning, metacognition, reflective_thinking, searching, synthesis
 };
 
-const EMBLEMS: Record<PsToolId, string> = {
+const EMBLEMS: Partial<Record<PsToolId, string>> = {
   five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction,
   causal_map, perspective_shift, radial_tree, force_field, from_to, intent_statement,
   problem_reduction, analogical_reasoning, solution_tree, lotus_blossom, duncker
 };
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
-export const EMBLEM_SVG: Record<PsToolId, string> = EMBLEMS;
+export const EMBLEM_SVG: Partial<Record<PsToolId, string>> = EMBLEMS;
 
 let copy = 0;
 
@@ -82,6 +82,6 @@ export function toolEmblem(id: PsToolId, doc: Document = document): HTMLSpanElem
   const span = doc.createElement('span');
   span.className = 'ps-emblem';
   span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = EMBLEMS[id];
+  span.innerHTML = EMBLEMS[id] ?? '';
   return span;
 }

@@ -128,7 +128,7 @@ function createFrameView(): { el: HTMLElement; update(session: PsSession): void 
       const coreArt = drawing.querySelector('.ps-frame__core > g')!;
       if (coreArt.getAttribute('data-tool') !== String(tool)) {
         coreArt.setAttribute('data-tool', String(tool));
-        coreArt.innerHTML = tool ? EMBLEM_SVG[tool] : '';
+        coreArt.innerHTML = tool ? (EMBLEM_SVG[tool] ?? '') : '';
       }
       medal.classList.toggle('is-done', current === -1 && Boolean(tool));
     }
