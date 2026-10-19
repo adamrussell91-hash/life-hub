@@ -99,3 +99,9 @@ function hasRequiredLink(run, node, edges, kind) {
     return (from === '__candidate__' || to === '__candidate__') && canEdge(candidate, from, to, kind);
   });
 }
+
+/** True when the tool lets this placed node become a real task (its `taskSlots` test passes). */
+export function canPropose(run, node) {
+  const test = toolDef(run.tool).taskSlots?.[parseSlot(node.slot)?.name];
+  return typeof test === 'function' ? Boolean(test(node, run)) : false;
+}
