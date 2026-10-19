@@ -10,6 +10,7 @@ import { createProblemTreeView } from '../../../../../packages/problem-solver/re
 import { createProblemStatementView } from '../../../../../packages/problem-solver/render/problem-statement';
 import { createPerspectiveShiftView } from '../../../../../packages/problem-solver/render/perspective-shift';
 import { createRadialTreeView } from '../../../../../packages/problem-solver/render/radial-tree';
+import { createForceFieldView } from '../../../../../packages/problem-solver/render/force-field';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -19,9 +20,10 @@ import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import { morphFromRect } from '../../../design-kit/js/morphing-dialog.js';
 import type { PsSession, PsToolId, PsToolRun } from '../../../../../packages/problem-solver/types';
 
-type Scores = { current: number[]; objective: number[] };
+/** A scored tool's payload: the radar sends {current, objective}, the force field {for, against}. */
+type Scores = Record<string, number[]>;
 /** Scores for the run on screen, which may not be the step's active run (opened from the record). */
-export type RunScores = Scores & { runId: string };
+export type RunScores = { runId: string; [series: string]: string | number[] };
 type View = { el: HTMLElement; update(run: PsToolRun): void; onScore?(cb: (scores: Scores) => void): void };
 export type CanvasHandlers = { onScore?: (scores: RunScores) => void };
 
@@ -36,7 +38,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   smart: () => createSmartView(),
   causal_map: () => createCausalMapView(),
   perspective_shift: () => createPerspectiveShiftView(),
-  radial_tree: () => createRadialTreeView()
+  radial_tree: () => createRadialTreeView(),
+  force_field: () => createForceFieldView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
@@ -168,7 +171,7 @@ export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): {
       view = make();
       const runId = run.id;
       view.onScore?.((scores) => {
-        if (displayed === runId) handlers.onScore?.({ runId, ...scores });
+        if (displayed === runId) handlers.onScore?.({ ...scores, runId });
       });
       views.set(run.id, view);
     }
