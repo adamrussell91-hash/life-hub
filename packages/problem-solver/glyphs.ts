@@ -20,6 +20,17 @@ import gap_radar from './glyphs/tools/gap_radar.svg?raw';
 import problem_statement from './glyphs/tools/problem_statement.svg?raw';
 import problem_tree from './glyphs/tools/problem_tree.svg?raw';
 import smart from './glyphs/tools/smart.svg?raw';
+import causal_map from './glyphs/tools/causal_map.svg?raw';
+import perspective_shift from './glyphs/tools/perspective_shift.svg?raw';
+import radial_tree from './glyphs/tools/radial_tree.svg?raw';
+import force_field from './glyphs/tools/force_field.svg?raw';
+import from_to from './glyphs/tools/from_to.svg?raw';
+import intent_statement from './glyphs/tools/intent_statement.svg?raw';
+import problem_reduction from './glyphs/tools/problem_reduction.svg?raw';
+import analogical_reasoning from './glyphs/tools/analogical_reasoning.svg?raw';
+import solution_tree from './glyphs/tools/solution_tree.svg?raw';
+import lotus_blossom from './glyphs/tools/lotus_blossom.svg?raw';
+import duncker from './glyphs/tools/duncker.svg?raw';
 import type { PsToolId } from './types';
 
 const SOURCES: Record<string, string> = {
@@ -27,10 +38,14 @@ const SOURCES: Record<string, string> = {
   learning, logical_reasoning, metacognition, reflective_thinking, searching, synthesis
 };
 
-const EMBLEMS: Partial<Record<PsToolId, string>> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction };
+const EMBLEMS: Record<PsToolId, string> = {
+  five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction,
+  causal_map, perspective_shift, radial_tree, force_field, from_to, intent_statement,
+  problem_reduction, analogical_reasoning, solution_tree, lotus_blossom, duncker
+};
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
-export const EMBLEM_SVG: Partial<Record<PsToolId, string>> = EMBLEMS;
+export const EMBLEM_SVG: Record<PsToolId, string> = EMBLEMS;
 
 let copy = 0;
 
@@ -67,6 +82,6 @@ export function toolEmblem(id: PsToolId, doc: Document = document): HTMLSpanElem
   const span = doc.createElement('span');
   span.className = 'ps-emblem';
   span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = EMBLEMS[id] ?? '';
+  span.innerHTML = EMBLEMS[id];
   return span;
 }

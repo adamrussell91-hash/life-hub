@@ -279,3 +279,17 @@ describe('canvas scores', () => {
     expect(host.querySelector('.ps-record')).not.toBeNull();
   });
 });
+
+describe('landing tool shelf', () => {
+  it('groups tools by book step, with the six Analyse tools together', async () => {
+    const { toolShelf } = await import('@/views/problem-solver/view');
+    const shelf = toolShelf();
+    const steps = [...shelf.querySelectorAll<HTMLElement>('[data-step]')].map((group) => group.dataset.step);
+    expect(steps).toEqual(['define', 'analyse', 'devise']);
+    const analyse = shelf.querySelector('[data-step="analyse"]')!;
+    expect(analyse.querySelector('h3')!.textContent).toBe('Analyse');
+    const names = [...analyse.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
+    expect(names).toEqual(['Causal map', 'Perspective shift', 'Radial tree', 'Force field analysis', 'From…to exploration', 'Intent statement']);
+    expect(shelf.querySelector('[data-step="contradiction"]')).toBeNull();
+  });
+});
