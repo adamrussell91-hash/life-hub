@@ -138,8 +138,8 @@ describe('buildCareerModel (V4 single source)', () => {
     expect(model.applications[0].match_percent).toBe(25);
     expect(model.applications[0].match_label).toBe('25%');
     expect(model.stats.skill_cards).toBe(1);
-    expect(model.stats_line).toContain('1 skill cards');
-    expect(model.stats_line).toContain('1 futures ahead');
+    expect(model.stats_line).toContain('1 skill card');
+    expect(model.stats_line).toContain('1 future ahead');
     // legend / ring / river all read the same readiness
     expect(future.readiness).toBe(model.futures[0].readiness);
   });

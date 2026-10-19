@@ -54,7 +54,7 @@ import {
   renderApplicationDetailView,
   renderApplicationNewView
 } from '@/views/applications';
-import { renderCareerView } from '@/views/career';
+import { renderCareerView, selectCareerFutureInPlace } from '@/views/career';
 import { renderOrganisationPage } from '@/views/organisation-page';
 import { renderOrganisationsCompare } from '@/views/organisations-compare';
 import { renderNetworkEcologyView } from '@/views/network-ecology';
@@ -100,6 +100,16 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'calendar' && calendarHandle) {
       renderPrimaryNav(shell.railNav, railHighlightFor(route));
       void calendarHandle.syncZoom();
+      return;
+    }
+
+    // Picking a future on the Career page swaps its detail panel in place;
+    // a full repaint would refetch everything and drop the reader's scroll.
+    if (
+      (route.name === 'career' || route.name === 'career-future') &&
+      selectCareerFutureInPlace(shell.canvas, route.name === 'career-future' ? route.id : null)
+    ) {
+      ++routeGeneration;
       return;
     }
 
