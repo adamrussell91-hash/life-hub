@@ -10,6 +10,9 @@ export type TimedSpan = {
   end: number;
   title?: string;
   kind?: 'lesson' | 'event' | 'work_block' | 'protected' | 'locked';
+  /** Set on confirmed work blocks so the composer knows the task is already scheduled. */
+  task_id?: string | null;
+  work_block_id?: string | null;
 };
 
 export type ScheduleTaskInput = {
@@ -43,11 +46,21 @@ export type UnscheduledItem = {
   remaining_minutes?: number;
 };
 
+export type AlreadyScheduledItem = {
+  task_id: string;
+  title: string;
+  work_block_id: string | null;
+  start_time: string;
+  duration_minutes: number;
+};
+
 export type ScheduleComposeResult = {
   status: 'fully_scheduled' | 'partially_scheduled' | 'impossible' | 'missing_info';
   date: string;
   proposed: ProposedBlock[];
   unscheduled: UnscheduledItem[];
+  /** Tasks skipped because they already hold a confirmed / in-progress block that day. */
+  already_scheduled: AlreadyScheduledItem[];
   free_windows: Array<{ start: string; end: string; minutes: number }>;
   workday: { start: string; end: string; source: string };
   collisions: string[];
@@ -247,6 +260,8 @@ export function composeDaySchedule(input: {
   events?: TimedSpan[];
   confirmed_blocks?: TimedSpan[];
   protected_windows?: TimedSpan[];
+  /** Task ids the caller explicitly wants an extra split block for, despite an existing block. */
+  extra_block_task_ids?: string[];
   workday?: { start: string; end: string; source?: string } | null;
   energy?: 'low' | 'medium' | 'high' | null;
   planning_profile?: { deep_work_preference?: { min_block_minutes?: number } } | null;
@@ -300,7 +315,30 @@ export function composeDaySchedule(input: {
     return depthScore(a.depth) - depthScore(b.depth);
   });
 
+  // A task that already has a confirmed / in-progress block today is scheduled.
+  // Composing again must not double-book it unless the caller asks for an extra split block.
+  const extraBlockIds = new Set((input.extra_block_task_ids ?? []).map(String));
+  const existingByTask = new Map<string, TimedSpan>();
+  for (const span of input.confirmed_blocks ?? []) {
+    if (span?.task_id && !existingByTask.has(String(span.task_id))) {
+      existingByTask.set(String(span.task_id), span);
+    }
+  }
+  const alreadyScheduled: AlreadyScheduledItem[] = [];
+
   for (const task of sorted) {
+    const existing = existingByTask.get(String(task.id));
+    if (existing && !extraBlockIds.has(String(task.id))) {
+      alreadyScheduled.push({
+        task_id: task.id,
+        title: task.title,
+        work_block_id: existing.work_block_id ?? null,
+        start_time: formatMinutes(existing.start),
+        duration_minutes: existing.end - existing.start
+      });
+      doneIds.add(task.id);
+      continue;
+    }
     if (task.blocked) {
       unscheduled.push({ task_id: task.id, title: task.title, reason: 'Blocked' });
       continue;
@@ -393,6 +431,7 @@ export function composeDaySchedule(input: {
     date: input.date,
     proposed,
     unscheduled: stillUnsched,
+    already_scheduled: alreadyScheduled,
     free_windows: finalGaps.map((g) => ({
       start: formatMinutes(g.start),
       end: formatMinutes(g.end),

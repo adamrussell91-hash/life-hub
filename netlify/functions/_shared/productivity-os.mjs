@@ -793,7 +793,30 @@ export function composeDaySchedule(input) {
     return depthScore(a.depth) - depthScore(b.depth);
   });
 
+  // A task that already has a confirmed / in-progress block today is scheduled.
+  // Composing again must not double-book it unless the caller asks for an extra split block.
+  const extraBlockIds = new Set((input.extra_block_task_ids ?? []).map(String));
+  const existingByTask = new Map();
+  for (const span of input.confirmed_blocks ?? []) {
+    if (span?.task_id && !existingByTask.has(String(span.task_id))) {
+      existingByTask.set(String(span.task_id), span);
+    }
+  }
+  const alreadyScheduled = [];
+
   for (const task of sorted) {
+    const existing = existingByTask.get(String(task.id));
+    if (existing && !extraBlockIds.has(String(task.id))) {
+      alreadyScheduled.push({
+        task_id: task.id,
+        title: task.title,
+        work_block_id: existing.work_block_id ?? null,
+        start_time: formatMinutes(existing.start),
+        duration_minutes: existing.end - existing.start
+      });
+      doneIds.add(task.id);
+      continue;
+    }
     if (task.blocked) {
       unscheduled.push({ task_id: task.id, title: task.title, reason: 'Blocked' });
       continue;
@@ -887,6 +910,7 @@ export function composeDaySchedule(input) {
     date: input.date,
     proposed,
     unscheduled: stillUnsched,
+    already_scheduled: alreadyScheduled,
     free_windows: finalGaps.map((g) => ({
       start: formatMinutes(g.start),
       end: formatMinutes(g.end),
@@ -932,7 +956,9 @@ export function buildAuthoritativeHardBusy({
         start,
         end: start + (Number(b.duration_minutes) || 60),
         title: b.title ?? 'Work block',
-        kind: 'locked'
+        kind: 'locked',
+        task_id: b.task_id ?? null,
+        work_block_id: b.id ?? null
       };
     })
     .filter(Boolean);

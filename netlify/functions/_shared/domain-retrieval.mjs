@@ -21,6 +21,7 @@ import { rankKnowledgePages } from './knowledge-data.mjs';
 import { NUTRITION_LOG_PATH, SKINCARE_LOG_PATH } from './treatment-state.mjs';
 import { isClosedTask, isOpenTask } from './task-liveness.mjs';
 import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
+import { blockTimeLabel, scheduledBlocksForTask } from './task-block-write.mjs';
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 20;
@@ -420,7 +421,8 @@ export function getSkincareAdherence(records, today, { lookbackDays = 14 } = {})
   };
 }
 
-export function getTasksFocus(tasks = [], projects = [], { now = new Date() } = {}) {
+export function getTasksFocus(tasks = [], projects = [], { now = new Date(), workBlocks = null } = {}) {
+  const summarise = task => summariseTask(task, workBlocks);
   const open = (Array.isArray(tasks) ? tasks : []).filter(isOpenTask);
   const capacity = buildCapacitySnapshot(open, now, 7);
   const stress = [
@@ -450,16 +452,28 @@ export function getTasksFocus(tasks = [], projects = [], { now = new Date() } = 
       days: capacity.days.slice(0, 7)
     },
     stress_flags: stress.slice(0, 8),
-    overdue: overdue.slice(0, 8).map(summariseTask),
-    due_soon: dueSoon.map(summariseTask),
-    stale_candidates: stale.map(summariseTask),
+    overdue: overdue.slice(0, 8).map(summarise),
+    due_soon: dueSoon.map(summarise),
+    stale_candidates: stale.map(summarise),
     ...truncatedMeta(open.length, Math.min(open.length, 12))
   };
 }
 
-/** Agents see every field on a task, plus a plain done flag. */
-function summariseTask(task) {
-  return { ...task, is_done: isClosedTask(task) };
+/**
+ * Agents see every field on a task, plus a plain done flag. With work blocks, a task's
+ * confirmed / in-progress blocks ride along as scheduled_blocks: that is its time on Today,
+ * even when due_time (a deadline) is empty.
+ */
+function summariseTask(task, workBlocks = null) {
+  const summary = { ...task, is_done: isClosedTask(task) };
+  if (!Array.isArray(workBlocks)) return summary;
+  const scheduled = scheduledBlocksForTask(workBlocks, task?.id);
+  if (!scheduled.length) return summary;
+  summary.scheduled_blocks = scheduled;
+  summary.scheduled_time = scheduled
+    .map(block => `${block.date} ${blockTimeLabel(block)}`.trim())
+    .join('; ');
+  return summary;
 }
 
 /** Done tasks are searchable on request; trashed (deleted) tasks never are. */
@@ -481,7 +495,7 @@ function matchTasks(tasks, toks, keep) {
     });
 }
 
-export function searchTasks(tasks = [], { query, limit = DEFAULT_LIMIT, include_done = false } = {}) {
+export function searchTasks(tasks = [], { query, limit = DEFAULT_LIMIT, include_done = false } = {}, { workBlocks = null } = {}) {
   const toks = tokens(query);
   if (!toks.length) return { ok: false, error: 'empty_query', store: 'tasks_hub' };
   const cap = capLimit(limit);
@@ -495,7 +509,7 @@ export function searchTasks(tasks = [], { query, limit = DEFAULT_LIMIT, include_
     include_done: includeDone,
     count: slice.length,
     ...truncatedMeta(hits.length, slice.length),
-    results: slice.map(summariseTask)
+    results: slice.map(task => summariseTask(task, workBlocks))
   };
   if (!includeDone && !slice.length) {
     const hiddenDone = matchTasks(tasks, toks, isDoneTask).length;
@@ -507,12 +521,12 @@ export function searchTasks(tasks = [], { query, limit = DEFAULT_LIMIT, include_
   return result;
 }
 
-export function getTask(tasks = [], { task_id } = {}) {
+export function getTask(tasks = [], { task_id } = {}, { workBlocks = null } = {}) {
   const id = String(task_id ?? '').trim();
   if (!id) return { ok: false, error: 'missing_task_id', store: 'tasks_hub' };
   const task = (tasks ?? []).find(t => t?.id === id);
   if (!task) return { ok: true, found: false, store: 'tasks_hub', task_id: id };
-  return { ok: true, found: true, store: 'tasks_hub', task: summariseTask(task) };
+  return { ok: true, found: true, store: 'tasks_hub', task: summariseTask(task, workBlocks) };
 }
 
 /** Split mixed Teaching hub loads (draft lessons + scheduled_lesson rows). */
@@ -983,7 +997,7 @@ export function domainRetrievalSchemasFor(slug) {
     {
       name: 'search_tasks',
       description:
-        'Search Tasks Hub by text (title, notes, description, domain, status, id). Every result is the full task record — every field, including status, completed_at and is_done. Open tasks only by default. If nothing open matches, ask Adam whether it is already marked done; when he says yes (or names it as finished), search again with include_done: true. Trashed (dead) tasks are never returned. A task is only the same task if the id matches — never treat a differently titled task as already handled, and never treat a done result as open work. Only Clare can change a task (Clare reopens with update_task status "open").',
+        'Search Tasks Hub by text (title, notes, description, domain, status, id). Every result is the full task record — every field, including status, completed_at and is_done. scheduled_blocks / scheduled_time are the task\'s planned time on Today (its work blocks); due_time is only a deadline, so an empty due_time with scheduled_blocks still means the task has a time. Open tasks only by default. If nothing open matches, ask Adam whether it is already marked done; when he says yes (or names it as finished), search again with include_done: true. Trashed (dead) tasks are never returned. A task is only the same task if the id matches — never treat a differently titled task as already handled, and never treat a done result as open work. Only Clare can change a task (Clare reopens with update_task status "open").',
       input_schema: {
         type: 'object',
         properties: {
@@ -999,7 +1013,7 @@ export function domainRetrievalSchemasFor(slug) {
     },
     {
       name: 'get_task',
-      description: 'Fetch one task by id (open or done) — the full record with every field.',
+      description: 'Fetch one task by id (open or done) — the full record with every field, plus scheduled_blocks (its work-block time on Today, with work_block_id for move_work_block).',
       input_schema: {
         type: 'object',
         properties: { task_id: { type: 'string' } },

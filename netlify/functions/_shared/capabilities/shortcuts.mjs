@@ -71,6 +71,7 @@ import { applyIntuitionEdit } from './intuition.mjs';
 import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
 import { listJSON as listTasksJSON, getJSON as getTasksJSON, newTaskId, TASK_PREFIX, taskKey } from '../tasks-blobs.mjs';
 import { isOpenTask } from '../task-liveness.mjs';
+import { withoutDeleted } from '../record-liveness.mjs';
 import { findTaskTwin } from '../task-duplicates.mjs';
 import {
   addMemory,
@@ -627,7 +628,7 @@ export function shortcutSchemas() {
     update_task: {
       name: 'update_task',
       description:
-        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task. due_time is a deadline only; to time-block a task pass start_time + end_time (adds a linked calendar block). To move or block several tasks in one Confirm, pass items[{task_id, due_date, due_time, start_time, end_time, ...}] — do not fire one update_task per row.',
+        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task. due_time is a deadline only; to time-block a task pass start_time + end_time (adds a linked calendar block). If the task already has a confirmed block that day, start_time (+ optional end_time) moves that block — the task keeps one block; never re-run compose_schedule to change a time. To move or block several tasks in one Confirm, pass items[{task_id, due_date, due_time, start_time, end_time, ...}] — do not fire one update_task per row.',
       input_schema: {
         type: 'object',
         properties: {
@@ -2112,7 +2113,21 @@ async function resolveKnownTask(ctx, taskId) {
   }
 }
 
-function updateBlockWrite(ctx, taskId, item, patch, known) {
+/** Live work blocks, loaded once per call and only when a time-block is asked for. */
+async function loadWorkBlocks(ctx) {
+  if (Array.isArray(ctx.workBlocks)) return ctx.workBlocks;
+  if (!ctx.tasksStore) return [];
+  try {
+    const rows = await listTasksJSON(ctx.tasksStore, 'work_blocks/');
+    ctx.workBlocks = withoutDeleted(Array.isArray(rows) ? rows : []);
+  } catch {
+    ctx.workBlocks = [];
+  }
+  return ctx.workBlocks;
+}
+
+/** A time change on a task that already holds a block moves that block instead of adding one. */
+async function updateBlockWrite(ctx, taskId, item, patch, known) {
   const task = {
     id: taskId,
     title: patch.title || known?.title || 'Planned work',
@@ -2121,7 +2136,8 @@ function updateBlockWrite(ctx, taskId, item, patch, known) {
     depth: patch.depth || known?.depth || null
   };
   const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
-  return taskBlockWrite(task, item, new Date().toISOString(), { today });
+  const existingBlocks = String(item?.start_time ?? '').trim() ? await loadWorkBlocks(ctx) : [];
+  return taskBlockWrite(task, item, new Date().toISOString(), { today, existingBlocks });
 }
 
 function updateTaskIntent(writes) {
@@ -2147,7 +2163,7 @@ async function handleUpdateTask(ctx, input) {
       if (!taskId) continue;
       const patch = buildUpdateTaskPatch(item);
       const known = await resolveKnownTask(ctx, taskId);
-      const block = updateBlockWrite(ctx, taskId, item, patch, known);
+      const block = await updateBlockWrite(ctx, taskId, item, patch, known);
       if (!Object.keys(patch).length && !block) continue;
       if (Object.keys(patch).length) {
         writes.push({
@@ -2174,7 +2190,7 @@ async function handleUpdateTask(ctx, input) {
   if (!taskId) return deny('task_id is required');
   const patch = buildUpdateTaskPatch(input);
   const known = await resolveKnownTask(ctx, taskId);
-  const block = updateBlockWrite(ctx, taskId, input, patch, known);
+  const block = await updateBlockWrite(ctx, taskId, input, patch, known);
   if (!Object.keys(patch).length && !block) return deny('update_task needs at least one field to change');
   const writes = [
     ...(Object.keys(patch).length ? [{
