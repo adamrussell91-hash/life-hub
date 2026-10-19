@@ -42,10 +42,21 @@ export function lineTerms(year: number, years: readonly SchoolYearTerms[] | null
   return termSpans(schoolTerms(year, years)).map((span) => ({ id: span.id, start: span.start, end: span.end }));
 }
 
-/** Public link for a published line, on whichever site this page is served from. */
-export function publicLineUrl(slug: string): string {
+/** Student-safe host, the same one published lessons use. Never the umbrella. */
+export const CLASS_SITE_ORIGIN = 'https://class.adam-russell.com';
+
+/**
+ * Public link for a published line. The class host everywhere except local dev,
+ * where it would point at production instead of this build.
+ */
+export function publicLineUrl(
+  slug: string,
+  current: { hostname: string; origin: string } = location
+): string {
+  const code = encodeURIComponent(slug);
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(current.hostname)) return `${CLASS_SITE_ORIGIN}/line#${code}`;
   const base = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
-  return `${location.origin}${base.replace(/\/?$/, '/')}line.html#${encodeURIComponent(slug)}`;
+  return `${current.origin}${base.replace(/\/?$/, '/')}line.html#${code}`;
 }
 
 let handle: PersonalLineHandle | null = null;

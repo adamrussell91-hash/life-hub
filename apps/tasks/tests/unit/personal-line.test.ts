@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { catalogPrograms } from '@/domain/programs-seed';
 import { buildLineSnapshot } from '@/personal-line/model';
 import { linesForSubjects, yearLineName } from '@/personal-line/lines';
-import { lineTerms } from '@/views/personal-line';
+import { lineTerms, publicLineUrl } from '@/views/personal-line';
 
 const terms = lineTerms(2026, null);
 
@@ -44,5 +44,17 @@ describe('personal line', () => {
       ['basis', 'close', 'cost', 'description', 'due', 'entry', 'entry_route', 'format', 'id', 'length', 'level', 'link', 'location', 'matched', 'name', 'on', 'organiser', 'provider', 'run', 'settings', 'subjects', 'type', 'window', 'years'].sort()
     );
     expect(terms.map((term) => term.id)).toEqual(['T1', 'T2', 'T3', 'T4']);
+  });
+});
+
+describe('publicLineUrl', () => {
+  it('hands out the class host, never the umbrella', () => {
+    const umbrella = { hostname: 'life-hub.adam-russell.com', origin: 'https://life-hub.adam-russell.com' };
+    expect(publicLineUrl('abc12345', umbrella)).toBe('https://class.adam-russell.com/line#abc12345');
+  });
+
+  it('keeps the dev origin locally', () => {
+    const dev = { hostname: 'localhost', origin: 'http://localhost:5173' };
+    expect(publicLineUrl('abc12345', dev)).toMatch(/^http:\/\/localhost:5173\/.*line\.html#abc12345$/);
   });
 });
