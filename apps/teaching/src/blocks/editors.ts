@@ -3,6 +3,7 @@ import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor 
 import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
+import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createKaplanEditor } from '@/blocks/kaplan-editor';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
@@ -88,6 +89,8 @@ export type BlockEditorContext = {
   lessonId?: string;
   /** The unit's lessons, for blocks that link to them (Curriculum lines). */
   unitLessons?: Array<{ id: string; title: string; href: string }>;
+  /** Curriculum network for a unit map: lines, lessons with stops, and how to save them. */
+  network?: UnitNetworkEditorContext;
 };
 
 const VISIBILITY_OPTIONS = [
@@ -2837,7 +2840,9 @@ function createBlockEditorFields(
     case 'brainstorm':
       return createBrainstormEditor(block, onChange);
     case 'curriculum_lines':
-      return createCurriculumLinesEditor(block, onChange, context.unitLessons);
+      return createCurriculumLinesEditor(block, onChange, context.network ?? (context.unitLessons
+        ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }
+        : undefined));
     case 'quiz_question':
       return createQuizQuestionEditor(block, onChange, context.getLessonBlocks);
     case 'question_set':
