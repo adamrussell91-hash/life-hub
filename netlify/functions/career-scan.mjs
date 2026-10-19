@@ -25,7 +25,7 @@ export function createCareerScanHandler(deps = {}) {
       const url = new URL(request.url);
       try {
         if (request.method === 'GET') {
-          const payload = await getScanPanelPayload(store);
+          const payload = await getScanPanelPayload(store, deps);
           return withCors(okResponse(200, payload), request, env);
         }
         if (request.method === 'POST') {
@@ -39,7 +39,7 @@ export function createCareerScanHandler(deps = {}) {
               professionalStore: store,
               force: Boolean(body?.force)
             });
-            const payload = await getScanPanelPayload(store);
+            const payload = await getScanPanelPayload(store, deps);
             return withCors(okResponse(200, { ...result, ...payload }), request, env);
           }
           if (action === 'bin') {

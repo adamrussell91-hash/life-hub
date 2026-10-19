@@ -6,7 +6,8 @@ import {
   shouldRunCareerScanNow,
   skillTitleKey,
   sourceRefsHash,
-  isoWeekKey
+  isoWeekKey,
+  labelScanProposals
 } from '../../netlify/functions/_shared/career-scan-service.mjs';
 import { careerScanProposalKey } from '../../netlify/functions/_shared/professional-blobs.mjs';
 import { generateScanProposalId } from '../../netlify/functions/_shared/career-schema.mjs';
@@ -114,4 +115,29 @@ test('keeping a proposal whose title is already in the ledger reuses that card',
   assert.equal(result.achievement.id, 'ach_existing');
   assert.equal(result.proposal.status, 'kept');
   assert.equal(result.proposal.achievement_id, 'ach_existing');
+});
+
+test('labelScanProposals names and links source and witness refs', async () => {
+  const calls = [];
+  const resolveEntity = async (ref) => {
+    calls.push(ref);
+    if (ref === 'tasks:project:gone') throw new Error('not found');
+    return { display_label: `Label for ${ref}`, href: `/hub/#/${ref}` };
+  };
+  const [proposal] = await labelScanProposals(
+    [
+      {
+        id: 'p1',
+        source_refs: ['tasks:project:p1', 'tasks:project:gone'],
+        witness_refs: ['tasks:project:p1']
+      }
+    ],
+    { resolveEntity }
+  );
+  assert.deepEqual(proposal.source_labels, [
+    { ref: 'tasks:project:p1', label: 'Label for tasks:project:p1', href: '/hub/#/tasks:project:p1' },
+    { ref: 'tasks:project:gone', label: null, href: null }
+  ]);
+  assert.equal(proposal.witness_labels[0].href, '/hub/#/tasks:project:p1');
+  assert.equal(calls.filter((ref) => ref === 'tasks:project:p1').length, 1);
 });
