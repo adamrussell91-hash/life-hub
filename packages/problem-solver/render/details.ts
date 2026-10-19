@@ -131,6 +131,8 @@ export function syncObjectionNote(card: Element, node: PsNode): void {
 
 export type DisclosureGroup = {
   register(item: HTMLElement, button: HTMLButtonElement): void;
+  /** Forget an item whose shape has gone (an undo), so close() and other clicks no longer touch it. */
+  unregister(item: HTMLElement): void;
   /** Close whichever item is open. */
   close(): void;
 };
@@ -154,6 +156,7 @@ export function createDisclosureGroup(): DisclosureGroup {
       items.set(item, button);
       button.addEventListener('click', () => {
         const open = !item.classList.contains('is-open');
+        if (!items.has(item)) return;
         for (const other of items.keys()) if (other !== item) setOpen(other, false);
         setOpen(item, open);
       });
@@ -166,6 +169,9 @@ export function createDisclosureGroup(): DisclosureGroup {
       };
       item.addEventListener('keydown', onKey);
       if (!item.contains(button)) button.addEventListener('keydown', onKey);
+    },
+    unregister(item) {
+      items.delete(item);
     },
     close() {
       for (const item of items.keys()) if (item.classList.contains('is-open')) setOpen(item, false);

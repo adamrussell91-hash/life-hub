@@ -95,7 +95,8 @@ function currentSnapshot(run: PsToolRun, nc: number, no: number): Snapshot | nul
 export function createDecisionMatrixView(doc: Document = document): DecisionMatrixView {
   const root = doc.createElement('div');
   root.className = 'ps-matrix';
-  root.setAttribute('role', 'list');
+  // The grid is the list (rows and columns); the root also holds the tabs, notes and form.
+  root.setAttribute('role', 'group');
   root.setAttribute('aria-label', 'Decision matrix');
   root.setAttribute('data-compact', 'false');
   const group = createDisclosureGroup();
@@ -144,6 +145,8 @@ export function createDecisionMatrixView(doc: Document = document): DecisionMatr
     tabs.setAttribute('aria-label', 'Option shown');
     tabs.hidden = true;
     const grid = div(doc, 'ps-matrix__grid');
+    grid.setAttribute('role', 'list');
+    grid.setAttribute('aria-label', 'Decision matrix');
     const domeBig = div(doc, 'ps-matrix__dome ps-matrix__dome--big');
     const domeSmall = div(doc, 'ps-matrix__dome ps-matrix__dome--small');
     for (const dome of [domeBig, domeSmall]) dome.setAttribute('aria-hidden', 'true');
@@ -176,6 +179,9 @@ export function createDecisionMatrixView(doc: Document = document): DecisionMatr
 
   /** Back to an empty run (a full undo): nothing of the frame is left behind. */
   function teardown(): void {
+    for (const row of rows.values()) group.unregister(row.card);
+    for (const col of cols.values()) group.unregister(col.card);
+    choice.reset();
     stopCount();
     cancelAnimations(root);
     root.replaceChildren();
@@ -321,6 +327,7 @@ export function createDecisionMatrixView(doc: Document = document): DecisionMatr
   function removeRow(id: string): void {
     const row = rows.get(id);
     if (!row) return;
+    group.unregister(row.card);
     row.item.remove();
     row.card.remove();
     rows.delete(id);
@@ -335,6 +342,7 @@ export function createDecisionMatrixView(doc: Document = document): DecisionMatr
   function removeCol(id: string): void {
     const col = cols.get(id);
     if (!col) return;
+    group.unregister(col.card);
     for (const el of [col.item, col.card, col.tab, col.strip]) el.remove();
     cols.delete(id);
     shownTotals.delete(id);
@@ -649,7 +657,7 @@ export function createDecisionMatrixView(doc: Document = document): DecisionMatr
     toggle.setAttribute('aria-expanded', String(open));
     if (open) {
       buildForm(null);
-      form.querySelector<HTMLInputElement>('input:checked, input')?.focus();
+      (form.querySelector<HTMLInputElement>('input:checked') ?? form.querySelector<HTMLInputElement>('input'))?.focus();
     } else toggle.focus();
   }
 
@@ -792,7 +800,14 @@ export function createDecisionMatrixView(doc: Document = document): DecisionMatr
         if (focusedKey) (back ?? form.querySelector<HTMLInputElement>('input'))?.focus();
       } else if (form && !form.hidden) validate();
     }
-    if (scoring && scoring.parentElement !== frame!.foot) frame!.foot.prepend(scoring);
+    if (crits.length >= 2 && opts.length >= 2) {
+      if (scoring!.parentElement !== frame!.foot) frame!.foot.prepend(scoring!);
+    } else if (scoring?.parentElement) {
+      // An undo took scoring away: close the form (without stealing focus) and detach it.
+      form!.hidden = true;
+      toggle!.setAttribute('aria-expanded', 'false');
+      scoring.remove();
+    }
     choice.sync(run, frame!.foot, painted);
 
     // Motion for what is new, never on the first paint of a saved run.

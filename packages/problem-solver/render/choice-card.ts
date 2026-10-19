@@ -13,21 +13,25 @@ import type { DisclosureGroup } from './details';
 export type ChoiceCard = {
   /** Draw, refresh or drop the card for the run's choice node, appending it to `host`. Returns the card or null. */
   sync(run: PsToolRun, host: HTMLElement, animate: boolean): HTMLDivElement | null;
+  /** Drop the card and forget it in the disclosure group (a full teardown). */
+  reset(): void;
 };
+export type ChoiceCardOptions = { role?: string };
 
 /** The run's chosen option, if placed. */
 export function choiceNode(run: PsToolRun): PsNode | null {
   return run.nodes.find((node) => parseSlot(node.slot)?.name === CHOICE_SLOT) ?? null;
 }
 
-export function createChoiceCard(doc: Document, group: DisclosureGroup): ChoiceCard {
+/** `role` is the card's ARIA role inside its parent (for example listitem in a list); none by default. */
+export function createChoiceCard(doc: Document, group: DisclosureGroup, { role }: ChoiceCardOptions = {}): ChoiceCard {
   let card: { item: HTMLDivElement; head: HTMLDivElement; text: HTMLParagraphElement; more: HTMLButtonElement; id: string } | null = null;
 
   function build(node: PsNode): NonNullable<typeof card> {
     const detailsId = nextId('ps-choice-details');
     const item = doc.createElement('div');
     item.className = 'ps-choice';
-    item.setAttribute('role', 'listitem');
+    if (role) item.setAttribute('role', role);
     item.setAttribute('data-node', node.id);
     item.setAttribute('data-choice', '');
     const head = doc.createElement('div');
@@ -54,13 +58,18 @@ export function createChoiceCard(doc: Document, group: DisclosureGroup): ChoiceC
     return { item, head, text, more, id: node.id };
   }
 
+  function drop(): void {
+    if (!card) return;
+    group.unregister(card.item);
+    card.item.remove();
+    card = null;
+  }
+
   return {
+    reset: drop,
     sync(run, host, animate) {
       const node = choiceNode(run);
-      if (card && card.id !== node?.id) {
-        card.item.remove();
-        card = null;
-      }
+      if (card && card.id !== node?.id) drop();
       if (!node) return null;
       const fresh = !card;
       if (!card) card = build(node);
