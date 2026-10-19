@@ -107,9 +107,9 @@ export const SAMPLES = {
   ])
 };
 
-const session = (model, phase, runs) => ({
-  id: `sample-${model}`, title: 'Late deliveries', revision: 1, status: phase === 'defined' ? 'defined' : 'active', phase,
-  frame: {}, model: { id: model, reason: '' }, links: [], define: { runs, finishedEarly: false, exitObjection: null },
+const session = (model, phase, steps) => ({
+  id: `sample-${model}`, title: 'Late deliveries', revision: 1, kind: 'full', status: phase === 'finished' ? 'finished' : 'active', phase,
+  frame: {}, model: { id: model, reason: '' }, links: [], steps, learnings: [], pendingLearning: null,
   turns: [], summary: '', suggestion: null, pendingKeep: null, runner: { status: 'idle', mode: 'turn', error: null }, createdAt: '', updatedAt: ''
 });
 const chain = [
@@ -117,6 +117,7 @@ const chain = [
   { ...SAMPLES.problem_tree, id: 'run-tree', status: 'done' },
   { ...SAMPLES.smart, id: 'run-smart', status: 'done' }
 ];
-SAMPLES.record = session('seven_step', 'defined', chain);
-SAMPLES.record_polya = session('polya', 'define', [chain[0], { ...chain[1], status: 'active' }]);
-SAMPLES.record_triz = session('triz', 'defined', chain.slice(1));
+const step = (runs, status = 'done', objection = null) => ({ runs, status, objection });
+SAMPLES.record = session('seven_step', 'devise', { define: step(chain), analyse: step([], 'skipped', 'No causes mapped.'), devise: step([], 'open') });
+SAMPLES.record_polya = session('polya', 'identify', { identify: step([chain[0], { ...chain[1], status: 'active' }], 'open') });
+SAMPLES.record_triz = session('triz', 'general_problem', { specific_problem: step(chain.slice(1)), general_problem: step([], 'open') });

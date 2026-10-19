@@ -1038,6 +1038,16 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-record__card-note { font-size: 12px; opacity: 0.75; overflow-wrap: anywhere; }
 .ps-record__card.is-done .ps-record__card-button { background: var(--ink); color: var(--paper); }
 .ps-record__card.is-switched .ps-record__card-button { border-style: dashed; opacity: 0.5; }
+.ps-record__step.is-skipped .ps-record__box { border-style: dashed; opacity: 0.45; }
+.ps-record__step.is-skipped .ps-record__name { text-decoration: line-through; text-decoration-thickness: 1px; }
+.ps-record__extras { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-record__extras .ps-record__step { position: static; width: auto; height: auto; }
+.ps-record__extras .ps-record__box { padding: 8px 14px; }
+/* The extras row sits outside the map's container, so cqw sizes would follow the viewport. */
+.ps-record__extras .ps-record__name { font-size: 14px; }
+.ps-record__extras .ps-record__detail { font-size: 12px; }
+.ps-record__films { display: grid; gap: 14px; }
+.ps-record__strip-title { margin: 0 0 6px; font-size: 12px; letter-spacing: var(--tracking-caps); text-transform: uppercase; opacity: 0.78; }
 
 /* The chart opened from the record: colours fade in once the morph has landed. */
 .ps-chart-reveal { animation: ps-colour-in 280ms var(--ps-ease) 380ms backwards; }
