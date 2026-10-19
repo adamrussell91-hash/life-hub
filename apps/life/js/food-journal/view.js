@@ -14,6 +14,7 @@ import {
   emptyJournal,
   liveVisits,
   menuDishes,
+  bookRecipes,
   newVisit,
   newDish,
   MEAL_TYPES,
@@ -33,6 +34,7 @@ import {
   tagKey,
 } from "./model.js";
 import { paintMagazine, paintTimeline, paintEntry, paintFixup, paintVenueCheck } from "./pages.js";
+import { paintRecipeBook } from "./recipe-book.js";
 import { hasPoint, nameSimilarity, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
 import {
   compressPhoto,
@@ -188,6 +190,7 @@ export function createFoodJournalView({
   let filterControls = [],
     journalQuery = "",
     filters = {},
+    book = { sort: "recent" },
     photoCache = new Map(),
     photoExpires = new Map(),
     photoObservers = new Set(),
@@ -600,6 +603,11 @@ export function createFoodJournalView({
     editVisit,
     deleteVisit,
     openRecipe,
+    openBookRecipe: (recipe, trigger) => recipeEditor(recipe, trigger),
+    get book() {
+      return book;
+    },
+    addControl: (control) => filterControls.push(control),
     openRestaurant,
     hasRecipe: (dishId) => journal.recipes.some((r) => r.dish_id === dishId),
     rate: rateDish,
@@ -632,6 +640,7 @@ export function createFoodJournalView({
       ["magazine", "Magazine"],
       ["timeline", "Timeline"],
       ["menu", "Custom Menu"],
+      ["recipes", loaded ? `Recipes (${bookRecipes(journal).length})` : "Recipes"],
     ];
     if (queue) tabs.push(["fixup", `Fix up (${queue})`]);
     if (unsure) tabs.push(["venues", `Check venues (${unsure})`]);
@@ -704,6 +713,10 @@ export function createFoodJournalView({
     }
     if (mode === "venues") {
       paintVenueCheck(pageContext, host, venueIndex);
+      return;
+    }
+    if (mode === "recipes") {
+      paintRecipeBook(pageContext, host);
       return;
     }
     if (mode === "timeline") {
@@ -1574,6 +1587,10 @@ export function createFoodJournalView({
           e.currentTarget.disabled = true;
           try {
             const next = structuredClone(journal);
+            // The book's Recently added order: kept from the first save.
+            const earlier = next.recipes.find((x) => x.dish_id === r.dish_id);
+            r.added_at =
+              original.added_at || earlier?.added_at || new Date().toISOString();
             next.recipes = next.recipes.filter((x) => x.dish_id !== r.dish_id);
             next.recipes.push(r);
             await persist(next);
@@ -1886,6 +1903,7 @@ export function createFoodJournalView({
     loaded = false;
     entryId = null;
     fixIndex = 0;
+    book = { sort: "recent" };
     editorialFailed.clear();
     photoCache.clear();
     photoExpires.clear();
