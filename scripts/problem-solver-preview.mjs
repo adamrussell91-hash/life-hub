@@ -25,6 +25,7 @@ const RENDERERS = {
   force_field: ['force-field', 'createForceFieldView'],
   force_field_unscored: ['force-field', 'createForceFieldView'],
   from_to: ['from-to', 'createFromToView'],
+  intent_statement: ['intent-statement', 'createIntentStatementView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
