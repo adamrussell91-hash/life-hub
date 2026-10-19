@@ -36,7 +36,7 @@ function fitSlot(run, slot) {
 /** Fit the node to its open slot and keep only the links the tool allows; the turn survives a bad link. */
 function fitToRun(session, value) {
   const run = activeRun(session);
-  if (session.phase !== 'define' || !run || !value.node) return { value };
+  if (!session.steps?.[session.phase] || !run || !value.node) return { value };
   const slot = fitSlot(run, value.node.slot);
   if (!canPlace(run, slot)) return { error: `Slot ${value.node.slot} is not open for ${run.tool}. Open slots: ${nextSlots(run).join(', ') || 'none'}.` };
   const rename = (name) => (name === value.node.slot ? slot : name);
@@ -76,15 +76,16 @@ export function createModelCoach(model) {
   };
 }
 
-/** Production model: one non-streaming call with the rubric cached. */
+/** Production model: one non-streaming call; every system layer is its own cached block. */
 export function anthropicModel(env, fetchImpl = fetch) {
   return async ({ system, user, maxTokens }) => {
     if (!env.ANTHROPIC_API_KEY) throw Object.assign(new Error('The coach needs ANTHROPIC_API_KEY.'), { code: 'provider_unavailable', status: 503 });
+    const layers = (Array.isArray(system) ? system : [system]).filter(Boolean);
     return completeMessage({
       apiKey: env.ANTHROPIC_API_KEY,
       fetchImpl,
       maxTokens,
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      system: layers.map((text) => ({ type: 'text', text, cache_control: { type: 'ephemeral' } })),
       messages: [{ role: 'user', content: user }]
     });
   };
