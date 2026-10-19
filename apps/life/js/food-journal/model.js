@@ -647,3 +647,72 @@ export function journalHighlights(journal, todayKey = today()) {
       ) || null,
   };
 }
+// Recipe book: every saved recipe whose dish is still live, with that dish
+// and its visit so the book can filter on meal type, cuisine and tags.
+export function bookRecipes(journal) {
+  const dishes = new Map(
+    liveVisits(journal).flatMap((visit) =>
+      withoutDeleted(visit.dishes).map((dish) => [dish.id, { dish, visit }]),
+    ),
+  );
+  return journal.recipes.flatMap((recipe, order) => {
+    const found = dishes.get(recipe.dish_id);
+    return found ? [{ recipe, order, ...found }] : [];
+  });
+}
+// Newest first by added date; recipes saved before dates existed follow in
+// reverse save order. A to Z ignores case and accents.
+export function sortRecipes(entries, sort = "az") {
+  const list = [...entries];
+  if (sort === "recent")
+    return list.sort(
+      (a, b) =>
+        (b.recipe.added_at || "").localeCompare(a.recipe.added_at || "") ||
+        b.order - a.order,
+    );
+  return list.sort((a, b) =>
+    a.recipe.title.localeCompare(b.recipe.title, "en", { sensitivity: "base" }),
+  );
+}
+export function filterRecipes(entries, filters = {}) {
+  const query = (filters.query || "").trim().toLowerCase();
+  return entries.filter(
+    ({ recipe, dish }) =>
+      (!query ||
+        [recipe.title, ...recipe.ingredients]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)) &&
+      (!filters.meal || dish.meal_type === filters.meal) &&
+      (!filters.cuisine || dish.cuisine === filters.cuisine) &&
+      (!filters.tag || dish.tags.includes(filters.tag)),
+  );
+}
+// Index letter for A to Z: the first letter without its accent, or # for
+// titles that start with a number or symbol.
+export function recipeLetter(title) {
+  const first = String(title || "")
+    .trim()
+    .normalize("NFD")
+    .charAt(0)
+    .toUpperCase();
+  return /[A-Z]/.test(first) ? first : "#";
+}
+// Sorted entries split into index sections: letters for A to Z, months
+// in Sydney time (or Earlier) for recently added.
+export function recipeSections(sorted, sort = "az") {
+  const sections = [];
+  for (const entry of sorted) {
+    const added = entry.recipe.added_at;
+    const key =
+      sort === "recent"
+        ? added
+          ? getSydneyDateKey(new Date(added)).slice(0, 7)
+          : "earlier"
+        : recipeLetter(entry.recipe.title);
+    let section = sections.at(-1);
+    if (section?.key !== key) sections.push((section = { key, entries: [] }));
+    section.entries.push(entry);
+  }
+  return sections;
+}

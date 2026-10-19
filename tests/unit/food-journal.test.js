@@ -29,6 +29,11 @@ import {
   tagKey,
   tagLabel,
   plainNotes,
+  bookRecipes,
+  filterRecipes,
+  sortRecipes,
+  recipeLetter,
+  recipeSections,
 } from "../../apps/life/js/food-journal/model.js";
 import {
   mergeCapture,
@@ -1172,4 +1177,68 @@ test("known tags come from earlier visits, most used first", () => {
     dishes: [{ ...structuredClone(j.visits[0].dishes[0]), id: "dish_2", tags: ["spicy"] }],
   });
   assert.deepEqual(knownTags(j).slice(0, 2), ["spicy", "share"]);
+});
+
+function bookFixture() {
+  const j = fixture();
+  const [lasagne, croquettes] = j.visits[0].dishes;
+  croquettes.meal_type = "Snack";
+  croquettes.tags = ["Fried"];
+  const gone = newVisit();
+  gone.status = "deleted";
+  gone.dishes = [{ ...newDish(), title: "Old soup" }];
+  j.visits.push(gone);
+  const recipe = (dish, title, more = {}) => ({
+    id: `recipe_${title.replace(/\W+/g, "_")}`,
+    dish_id: dish.id,
+    title,
+    servings: 2,
+    ingredients: ["1 cup flour"],
+    steps: ["Cook."],
+    sources: [],
+    ...more,
+  });
+  j.recipes = [
+    recipe(croquettes, "zucchini croquettes", { ingredients: ["2 zucchini", "Panko"] }),
+    recipe(lasagne, "Lasagne al forno", { added_at: "2026-09-30T15:30:00.000Z" }),
+    recipe(gone.dishes[0], "Old soup"),
+  ];
+  return j;
+}
+
+test("recipe book lists recipes with live dishes and filters on title, ingredients and the dish", () => {
+  const j = bookFixture();
+  const all = bookRecipes(j);
+  assert.deepEqual(all.map((x) => x.recipe.title), ["zucchini croquettes", "Lasagne al forno"]);
+  assert.equal(all[1].dish.title, "Lasagne");
+  assert.equal(filterRecipes(all, { query: "PANKO" }).length, 1);
+  assert.equal(filterRecipes(all, { query: "forno" })[0].recipe.title, "Lasagne al forno");
+  assert.equal(filterRecipes(all, { meal: "Snack" }).length, 1);
+  assert.equal(filterRecipes(all, { cuisine: "Italian", tag: "Comfort food" }).length, 1);
+  assert.equal(filterRecipes(all, { meal: "Snack", cuisine: "Italian" }).length, 0);
+});
+
+test("recipe book sorts A to Z by letter and recently added by date, then save order", () => {
+  const j = bookFixture();
+  j.recipes.push({ ...j.recipes[0], id: "recipe_new", dish_id: j.visits[0].dishes[1].id, title: "3 bean salad" });
+  const all = bookRecipes(j);
+  const az = sortRecipes(all, "az");
+  assert.deepEqual(az.map((x) => x.recipe.title), ["3 bean salad", "Lasagne al forno", "zucchini croquettes"]);
+  assert.deepEqual(recipeSections(az, "az").map((s) => s.key), ["#", "L", "Z"]);
+  const recent = sortRecipes(all, "recent");
+  assert.deepEqual(recent.map((x) => x.recipe.title), ["Lasagne al forno", "3 bean salad", "zucchini croquettes"]);
+  // 15:30 UTC on 30 Sep is 1 Oct in Sydney.
+  assert.deepEqual(recipeSections(recent, "recent").map((s) => s.key), ["2026-10", "earlier"]);
+  assert.equal(recipeLetter("Éclairs"), "E");
+  assert.equal(recipeLetter(""), "#");
+});
+
+test("schema accepts a recipe added date and rejects a malformed one", () => {
+  const j = bookFixture();
+  j.recipes.pop();
+  validateFoodJournal(j);
+  j.recipes[0].added_at = "yesterday";
+  assert.throws(() => validateFoodJournal(j), /added date/);
+  j.recipes[0].added_at = 5;
+  assert.throws(() => validateFoodJournal(j), /added date/);
 });
