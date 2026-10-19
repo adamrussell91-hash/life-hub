@@ -8,7 +8,7 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type GapBasicView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
@@ -221,7 +221,8 @@ export function createGapBasicView(doc: Document = document): GapBasicView {
         }
         drawn.set(node.id, item);
       }
-      item.classList.toggle('is-contested', node.state === 'contested');
+      const button = item.querySelector('.ps-gap__shape');
+      syncContested(item, node, button, button);
     }
     for (const name of LOBES) {
       const lobe = lobes.get(name);

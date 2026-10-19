@@ -16,9 +16,9 @@ import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { analogicalReasoning } from '../tools/analogical-reasoning.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, contestedTag, createDisclosureGroup, detailsCard, nextId, syncObjectionNote } from './details';
 
-export type AnalogicalReasoningView = { el: HTMLDivElement; update(run: PsToolRun): void };
+export type AnalogicalReasoningView = { el: HTMLDivElement; update(run: PsToolRun): void; destroy(): void };
 
 type Key = 'source' | 'expand' | 'analogue' | 'match' | 'filter' | 'solved' | 'revise' | 'search' | 'retain';
 type Round = { index: number; target: PsNode; rules: PsNode[]; filtered: PsNode | null; assess: PsNode | null };
@@ -170,6 +170,7 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
   let overlay: SVGSVGElement | null = null;
   let marker: HTMLSpanElement | null = null;
   let markerAnims: Animation[] = [];
+  let observer: ResizeObserver | null = null;
   let panel: HTMLDivElement | null = null;
   let model: Model = { source: null, retain: null, rounds: [], next: new Set() };
   /** The round the reader picked, or null to follow the newest. */
@@ -194,7 +195,10 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
     panel.className = 'ps-analogy__panel';
     root.append(chart, panel);
     if (canAnimate(chart)) chart.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, easing: EASE, fill: 'backwards' });
-    if (typeof ResizeObserver === 'function') new ResizeObserver(() => layout()).observe(chart);
+    if (typeof ResizeObserver === 'function') {
+      observer = new ResizeObserver(() => layout());
+      observer.observe(chart);
+    }
     return chart;
   }
 
@@ -287,7 +291,7 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
         card.prepend(head);
       }
       cards.set(node.id, card);
-    }
+    } else syncObjectionNote(card, node);
     return card;
   }
 
@@ -623,5 +627,14 @@ export function createAnalogicalReasoningView(doc: Document = document): Analogi
     if (!first && assess?.tag === 'unsolved' && !known.has(assess.id) && shown() === last && stations.get('search')!.lit) runMarker();
   }
 
-  return { el: root, update };
+  /** Stop the size watch, the loop marker and any line still drawing once the canvas drops this view. */
+  function destroy(): void {
+    observer?.disconnect();
+    observer = null;
+    stopMarker();
+    for (const link of links.values()) for (const anim of link.anims) anim.cancel();
+    cancelAnimations(root);
+  }
+
+  return { el: root, update, destroy };
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createForceFieldView } from '../../../../packages/problem-solver/render/force-field';
 import type { PsEdge, PsNode, PsToolRun } from '../../../../packages/problem-solver/types';
 
@@ -255,6 +255,21 @@ describe('Force field view', () => {
       expect(form.hidden).toBe(true);
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
       expect(document.activeElement).toBe(toggle);
+      done();
+    });
+
+    it('Escape in the form closes only the form, not an open force card', () => {
+      const { view, form, input, done } = mounted();
+      const card = view.el.querySelector<HTMLButtonElement>('[data-node="f1"] button')!;
+      card.click();
+      const opened = view.el.querySelectorAll('.is-open').length;
+      expect(opened).toBeGreaterThan(0);
+      const outer = vi.fn();
+      view.el.addEventListener('keydown', outer);
+      input('f1').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      expect(form.hidden).toBe(true);
+      expect(outer).not.toHaveBeenCalled();
+      expect(view.el.querySelectorAll('.is-open').length).toBe(opened);
       done();
     });
 

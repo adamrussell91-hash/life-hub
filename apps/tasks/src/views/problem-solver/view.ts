@@ -16,6 +16,8 @@ import { mountCoachPanel } from './coach-panel';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
 
 let poll: AbortController | null = null;
+/** The open session's canvas, dropped (observers, frame loops) when the page changes. */
+let diagramNow: { destroy(): void } | null = null;
 
 const phaseLabel = (row: PsSummary): string => (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
 const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--ps-blue)' : phase === 'finished' ? 'var(--ps-red)' : 'var(--ps-yellow)');
@@ -263,6 +265,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   page.append(back, title, track.el, board);
   canvas.replaceChildren(page);
   const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
+  diagramNow = diagram;
 
   const flash = (err: unknown) => {
     coachHost.querySelector('.ps-coach__status--failed.is-transient')?.remove();
@@ -322,6 +325,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
 
 export async function renderProblemSolverView(canvas: HTMLElement): Promise<void> {
   poll?.abort();
+  diagramNow?.destroy();
+  diagramNow = null;
   canvas.replaceChildren(el('p', 'canvas-status', 'Loading…'));
   const id = hashQuery().get('id');
   try {

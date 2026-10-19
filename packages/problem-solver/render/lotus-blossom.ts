@@ -19,7 +19,7 @@ import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { petalsOf } from '../tools/lotus-blossom.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type LotusBlossomView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
@@ -535,7 +535,9 @@ export function createLotusBlossomView(doc: Document = document): LotusBlossomVi
       const relabel = shape.node.state !== node.state || nodeTitle(shape.node) !== nodeTitle(node);
       shape.node = node;
       if (relabel) shape.title.textContent = nodeTitle(node);
-      shape.item.classList.toggle('is-contested', node.state === 'contested');
+      const words = shape.title.parentElement;
+      syncContested(shape.item, node, words, shape.button);
+      shape.tag = (words?.querySelector<HTMLSpanElement>(':scope > .ps-objection')) ?? null;
     }
 
     // Ideas to their flowers by petal link, in placement order; the rest are unplaced.

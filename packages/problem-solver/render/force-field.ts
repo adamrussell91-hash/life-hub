@@ -14,10 +14,10 @@ import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { forceTotals, forces } from '../tools/force-field.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type ForceScores = { for: number[]; against: number[] };
-export type ForceFieldView = { el: HTMLDivElement; update(run: PsToolRun): void; onScore(cb: (scores: ForceScores) => void): void };
+export type ForceFieldView = { el: HTMLDivElement; update(run: PsToolRun): void; onScore(cb: (scores: ForceScores) => void): void; destroy(): void };
 
 type Side = 'for' | 'against';
 type Bar = 'goal' | 'current';
@@ -403,6 +403,7 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
     form.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopPropagation();
         setOpen(false);
       }
     });
@@ -423,14 +424,15 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
       if (slot.name === 'goal' || slot.name === 'current') {
         const bar = slot.name as Bar;
         if (!bars.has(bar)) addBar(node, bar);
-        bars.get(bar)!.classList.toggle('is-contested', node.state === 'contested');
+        const item = bars.get(bar)!;
+        syncContested(item, node, item.querySelector('.ps-force__words'), item.querySelector('.ps-force__bar'));
       } else if ((slot.name === 'for' || slot.name === 'against') && slot.index) {
         let arrow = arrows.get(node.id);
         if (!arrow) {
           arrow = addArrow(node, slot.name, slot.index);
           fresh.push(arrow);
         }
-        arrow.item.classList.toggle('is-contested', node.state === 'contested');
+        syncContested(arrow.item, node, arrow.button.querySelector('.ps-force__meta-row'), arrow.button);
       }
     }
 
@@ -513,6 +515,12 @@ export function createForceFieldView(doc: Document = document): ForceFieldView {
     update,
     onScore(cb) {
       handler = cb;
+    },
+    /** Stop the length morph and any slide still running once the canvas drops this view. */
+    destroy() {
+      if (frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+      frame = 0;
+      cancelAnimations(root);
     }
   };
 }

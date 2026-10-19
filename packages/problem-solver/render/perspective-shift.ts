@@ -11,7 +11,7 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type PerspectiveShiftView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
@@ -389,7 +389,11 @@ export function createPerspectiveShiftView(doc: Document = document): Perspectiv
       if (kind === 'view') newViews.push(addView(node, cell));
       else newInsights.push(addInsight(node, cell));
     }
-    for (const node of run.nodes) items.get(node.id)?.classList.toggle('is-contested', node.state === 'contested');
+    for (const node of run.nodes) {
+      const item = items.get(node.id);
+      const button = buttons.get(node.id) ?? null;
+      if (item) syncContested(item, node, item.querySelector('.ps-persp__reframe-head') ?? button, button);
+    }
 
     // The reframe card always closes the diagram.
     if (reframe && root.lastElementChild !== reframe) root.append(reframe);

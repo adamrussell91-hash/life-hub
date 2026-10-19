@@ -11,7 +11,7 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type FromToView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
@@ -212,7 +212,7 @@ export function createFromToView(doc: Document = document): FromToView {
     for (const { node, slot } of placed) {
       if (slot!.name === 'insight') {
         if (!insight && field) insight = { item: addInsight(node), id: node.id };
-        if (insight?.id === node.id) insight.item.classList.toggle('is-contested', node.state === 'contested');
+        if (insight?.id === node.id) syncContested(insight.item, node, insight.item.querySelector('.ps-fromto__insight-head'), insight.item.querySelector('.ps-fromto__more'));
         continue;
       }
       const col = slot!.name as Col;
@@ -227,7 +227,7 @@ export function createFromToView(doc: Document = document): FromToView {
         cell.button.setAttribute('aria-label', label(cell));
       }
       cell.node = node;
-      cell.item.classList.toggle('is-contested', node.state === 'contested');
+      syncContested(cell.item, node, cell.button.querySelector('.ps-fromto__words'), cell.button);
     }
 
     // Stagger the new circles, but keep a whole chart arriving at once under about a second.

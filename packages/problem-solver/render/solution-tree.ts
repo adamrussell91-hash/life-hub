@@ -21,9 +21,9 @@ import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { childrenOf, levels } from '../tools/hierarchy.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, cancelAnimations, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
-export type SolutionTreeView = { el: HTMLDivElement; update(run: PsToolRun): void; layout(width: number): void };
+export type SolutionTreeView = { el: HTMLDivElement; update(run: PsToolRun): void; layout(width: number): void; destroy(): void };
 
 type Point = { x: number; y: number };
 type Box = { x: number; y: number; w: number; h: number };
@@ -816,7 +816,9 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
       entry.parent = model.parent.get(node.id) ?? null;
       entry.contested = node.state === 'contested';
       syncEntry(entry, model.level.get(node.id)!, model.code.get(node.id) ?? '');
-      entry.item.classList.toggle('is-contested', entry.contested);
+      syncContested(entry.item, node, entry.label, entry.button);
+      // The aim's hidden measuring copy carries the tag too, so its size stays true.
+      if (entry.probe) syncContested(entry.item, node, entry.probe);
     }
     for (const [id, entry] of entries) {
       if (model.level.has(id)) continue;
@@ -951,15 +953,23 @@ export function createSolutionTreeView(doc: Document = document): SolutionTreeVi
   }
 
   // A width change rescales the fan, may switch the phone fan, and re-places every title.
-  if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(() => {
-      if (widthOverride !== null || !stage) return;
-      const w = root.getBoundingClientRect().width;
-      if (Math.abs(w - width) < 0.5) return;
-      width = w;
-      render(true);
-    }).observe(root);
+  const observer = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(() => {
+        if (widthOverride !== null || !stage) return;
+        const w = root.getBoundingClientRect().width;
+        if (Math.abs(w - width) < 0.5) return;
+        width = w;
+        render(true);
+      })
+    : null;
+  observer?.observe(root);
+
+  /** Stop the size watch and every glide still running once the canvas drops this view. */
+  function destroy(): void {
+    observer?.disconnect();
+    for (const entry of entries.values()) stop(entry);
+    cancelAnimations(root);
   }
 
-  return { el: root, update, layout: layoutFor };
+  return { el: root, update, layout: layoutFor, destroy };
 }
