@@ -1,6 +1,6 @@
 // apps/tasks/tests/unit/problem-solver-task-bridge.test.ts
 import { describe, expect, it, vi } from 'vitest';
-import { createTaskBridge, reviewBody, taskBody, TaskNotLinkedError } from '../../src/views/problem-solver/task-bridge';
+import { createTaskBridge, reviewBody, taskBody, taskSnapshot, TaskNotLinkedError } from '../../src/views/problem-solver/task-bridge';
 import type { PsProposedTask, PsSession } from '../../../../packages/problem-solver/types';
 
 const session = { id: 's1', title: 'Late rota', revision: 4, links: [{ kind: 'project', id: 'proj-1' }], proposedTasks: [], reviewProposal: null, reviewTaskId: null } as unknown as PsSession;
@@ -128,5 +128,51 @@ describe('review fixes', () => {
     const err = await bridge.createReview(session, { title: 'Review', due: '2026-11-02' }).catch((e) => e);
     expect(err).toBeInstanceOf(TaskNotLinkedError);
     expect(err.taskId).toBe('task-8');
+  });
+});
+
+describe('taskSnapshot', () => {
+  it('counts confirmed tasks by live status, lists overdue open ones and leaves deleted tasks out', () => {
+    const proposals = [
+      { id: 'p1', title: 'Draft rota', status: 'confirmed', due: null, taskId: 't1', source: { runId: 'r', nodeId: 'n1' } },
+      { id: 'p2', title: 'Ask for swaps', status: 'confirmed', due: null, taskId: 't2', source: { runId: 'r', nodeId: 'n2' } },
+      { id: 'p3', title: 'Old', status: 'confirmed', due: null, taskId: 't3', source: { runId: 'r', nodeId: 'n3' } },
+      { id: 'p4', title: 'Idea', status: 'proposed', due: null, source: { runId: 'r', nodeId: 'n4' } }
+    ] as PsProposedTask[];
+    const details = {
+      t1: { status: 'done', due_date: '2026-10-25', title: 'Draft rota' },
+      t2: { status: 'open', due_date: '2026-10-28', title: 'Ask for swaps' },
+      t3: 'removed' as const
+    };
+    expect(taskSnapshot(proposals, details, '2026-11-02')).toEqual({
+      byStatus: { open: 1, in_progress: 0, deferred: 0, done: 1, dead: 0, unknown: 0 },
+      overdue: ['Ask for swaps']
+    });
+  });
+  it('counts unknown and unrecognised statuses as unknown', () => {
+    const proposals = [
+      { id: 'p1', title: 'A', status: 'confirmed', taskId: 't1' },
+      { id: 'p2', title: 'B', status: 'confirmed', taskId: 't2' }
+    ] as PsProposedTask[];
+    expect(taskSnapshot(proposals, { t1: 'unknown', t2: { status: 'weird' } }, '2026-11-02').byStatus.unknown).toBe(2);
+  });
+});
+
+describe('bridge.details', () => {
+  const confirmed = (id: string, taskId: string): PsProposedTask => ({ ...proposal, id, status: 'confirmed', taskId });
+  it('returns the task, removed on a 404 or unknown on another failure, dismissing removed ones once', async () => {
+    const getTask = vi.fn(async (id: string) => {
+      if (id === 'gone') throw Object.assign(new Error('nf'), { status: 404 });
+      if (id === 'bad') throw new Error('offline');
+      return { id, status: 'done', due_date: '2026-10-25', title: 'T' };
+    });
+    const dismiss = vi.fn(() => new Promise<void>(() => undefined));
+    const bridge = createTaskBridge({ createTask: vi.fn(), getTask, domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
+    const list = [confirmed('a', 'ok'), confirmed('b', 'gone'), confirmed('c', 'bad')];
+    expect(await bridge.details(list)).toEqual({ ok: { id: 'ok', status: 'done', due_date: '2026-10-25', title: 'T' }, gone: 'removed', bad: 'unknown' });
+    await bridge.statuses(list);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(dismiss).toHaveBeenCalledWith('b', 'removed');
   });
 });
