@@ -431,6 +431,13 @@ describe('Decision matrix view', () => {
     expect(view.el.getAttribute('data-compact')).toBe('false');
   });
 
+  it('lays out for the attached width on the first update, with no wide flash', () => {
+    const view = createDecisionMatrixView();
+    vi.spyOn(view.el, 'getBoundingClientRect').mockReturnValue({ width: 360 } as DOMRect);
+    view.update(matrix(two));
+    expect(view.el.getAttribute('data-compact')).toBe('true');
+  });
+
   it('names its container in every phone rule', () => {
     const css = readFileSync(resolve(__dirname, '../../../../packages/problem-solver/problem-solver.css'), 'utf8');
     const start = css.indexOf('/* Decision matrix');

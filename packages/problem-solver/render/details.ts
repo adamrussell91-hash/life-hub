@@ -144,12 +144,16 @@ export type DisclosureGroup = {
  * handler on an ancestor (the lotus zoom-out on its root); it stops propagation only when
  * it closed something, so the next Escape reaches the renderer. A handler deeper still
  * (the force-field score form) handles its own Escape first and stops it there.
+ * `onChange` runs after any item opens or closes, by click, Escape or close() (for views
+ * that mirror the open state elsewhere, such as a key).
  */
-export function createDisclosureGroup(): DisclosureGroup {
+export function createDisclosureGroup({ onChange }: { onChange?: () => void } = {}): DisclosureGroup {
   const items = new Map<HTMLElement, HTMLButtonElement>();
   function setOpen(item: HTMLElement, open: boolean): void {
+    const was = item.classList.contains('is-open');
     item.classList.toggle('is-open', open);
     items.get(item)?.setAttribute('aria-expanded', String(open));
+    if (was !== open) onChange?.();
   }
   return {
     register(item, button) {

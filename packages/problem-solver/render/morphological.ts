@@ -6,9 +6,9 @@
 // per column, sitting on the attribute it picks, joined by a blue line that zig-zags from column
 // to column behind the ovals. Several scenarios get tabs; only the selected one's ovals show.
 // A contradiction is a chip under the grid ("A cannot go with B") and a small red notch on both
-// of its cells; a scenario holding such a pair draws its line dashed in red with a cross between
-// the two clashing ovals, and its tab says so. The problem is a card above the grid; the
-// evaluation and the Chosen option are cards below it.
+// of its cells; a scenario holding such a pair draws its line dashed in red, rings both clashing
+// ovals in red with a small cross badge on each, and its tab says so. The problem is a card above
+// the grid; the evaluation and the Chosen option are cards below it.
 // Phone (the root up to 560px wide): the grid stays, coded. Subjects read S1, S2..., each cell
 // its code (S2·3), and a key under the grid pairs every code with its title; the key items are
 // the 44px targets.
@@ -67,7 +67,8 @@ export function createMorphologicalView(doc: Document = document): Morphological
   root.setAttribute('role', 'group');
   root.setAttribute('aria-label', 'Morphological analysis');
   root.setAttribute('data-compact', 'false');
-  const group = createDisclosureGroup();
+  // Key items mirror their shape's open state, however it opened or closed (click, Escape, a tab change).
+  const group = createDisclosureGroup({ onChange: () => syncKeyState() });
   const choice = createChoiceCard(doc, group);
 
   // Fixed pieces, created on demand and kept in this order in the root.
@@ -81,7 +82,6 @@ export function createMorphologicalView(doc: Document = document): Morphological
     grid: HTMLDivElement;
     overlay: SVGSVGElement;
     line: SVGPolylineElement | null;
-    marker: SVGGElement | null;
     key: HTMLDivElement;
   } | null = null;
   let clashes: HTMLDivElement | null = null;
@@ -210,7 +210,7 @@ export function createMorphologicalView(doc: Document = document): Morphological
     key.setAttribute('role', 'group');
     key.setAttribute('aria-label', 'Key');
     key.hidden = true;
-    frame = { bar, tabs, pills, chart, grid, overlay, line: null, marker: null, key };
+    frame = { bar, tabs, pills, chart, grid, overlay, line: null, key };
     observer?.observe(chart);
     fresh.push(chart);
     return frame;
@@ -363,8 +363,12 @@ export function createMorphologicalView(doc: Document = document): Morphological
     chip.append(mark, words);
     const out: Clash = { node, chip, text, words, card: card(node, 'red', detailsId, chip), pair: [] };
     // Hovering or focusing the chip outlines both of its cells.
-    const on = (): void => flag(out.pair, true);
-    const off = (): void => flag(out.pair, false);
+    const on = (): void => {
+      if (!destroyed) flag(out.pair, true);
+    };
+    const off = (): void => {
+      if (!destroyed) flag(out.pair, false);
+    };
     chip.addEventListener('mouseenter', on);
     chip.addEventListener('mouseleave', off);
     chip.addEventListener('focus', on);
@@ -386,6 +390,7 @@ export function createMorphologicalView(doc: Document = document): Morphological
 
   /** Key items forward to the shape's button, so one card and one disclosure serve both. */
   function syncKeyState(): void {
+    if (destroyed) return;
     for (const [id, row] of keyRows) setAttr(row.el, 'aria-expanded', cells.get(id)?.button.getAttribute('aria-expanded') ?? 'false');
     for (const [id, g] of keyGroups) setAttr(g.head, 'aria-expanded', columns.get(id)?.head.getAttribute('aria-expanded') ?? 'false');
   }
@@ -454,34 +459,69 @@ export function createMorphologicalView(doc: Document = document): Morphological
     if (!frame) return;
     if (frame.line) cancelAnimations(frame.overlay);
     frame.line?.remove();
-    frame.marker?.remove();
     frame.line = null;
-    frame.marker = null;
     lineKey = '';
   }
 
-  /** The picked cells left to right, and the first clashing pair among them (if any). */
-  function scenarioState(): { picks: Cell[]; clash: [Cell, Cell] | null; ok: boolean } {
-    if (!lastRun || !selected) return { picks: [], clash: null, ok: true };
+  /** The picked cells left to right, and whether the scenario holds together. */
+  function scenarioState(): { picks: Cell[]; ok: boolean } {
+    if (!lastRun || !selected) return { picks: [], ok: true };
     const chosen = new Set(picksOf(lastRun, selected) as string[]);
     const picks = subjectOrder.map((s) => [...cells.values()].find((c) => c.subject === s.id && chosen.has(c.node.id))).filter((c): c is Cell => Boolean(c));
-    const pair = (contradictionPairs(lastRun) as string[][]).find(([a, b]) => chosen.has(a) && chosen.has(b));
-    const clash = pair && cells.get(pair[0]) && cells.get(pair[1]) ? ([cells.get(pair[0])!, cells.get(pair[1])!] as [Cell, Cell]) : null;
-    return { picks, clash, ok: consistent(lastRun, selected) as boolean };
+    return { picks, ok: consistent(lastRun, selected) as boolean };
   }
 
-  /** Measure the ovals (all reads first), then write the line and the clash cross. */
+  /** Contradiction id per picked cell that sits in a clashing pair of the shown scenario. */
+  function clashMarks(chosen: Set<string>): Map<string, Set<string>> {
+    const marks = new Map<string, Set<string>>();
+    if (!lastRun) return marks;
+    for (const c of named(lastRun, 'contradiction')) {
+      const pair = lastRun.edges.filter((e) => e.kind === 'pair' && e.from === c.id).map((e) => e.to);
+      if (pair.length !== 2 || !pair.every((id) => chosen.has(id) && cells.has(id))) continue;
+      for (const id of pair) marks.set(id, (marks.get(id) ?? new Set()).add(c.id));
+    }
+    return marks;
+  }
+
+  /**
+   * Each clashing oval carries a red ring and a small red cross badge on its edge, both for the
+   * contradiction that names it, so the clash is marked where it is (not floating between columns).
+   */
+  function syncClashMarks(chosen: Set<string>): HTMLElement[] {
+    const marks = clashMarks(chosen);
+    const added: HTMLElement[] = [];
+    for (const cell of cells.values()) {
+      const want = new Set(marks.get(cell.node.id) ?? []);
+      for (const mark of [...cell.oval.children].filter((child) => child.classList.contains('ps-morph__ring') || child.classList.contains('ps-morph__badge'))) {
+        if (!want.has(mark.getAttribute('data-for')!)) mark.remove();
+      }
+      for (const id of want) {
+        if ([...cell.oval.children].some((child) => child.classList.contains('ps-morph__badge') && child.getAttribute('data-for') === id)) continue;
+        const ring = el(doc, 'span', 'ps-morph__ring');
+        ring.setAttribute('data-for', id);
+        ring.setAttribute('aria-hidden', 'true');
+        const badge = el(doc, 'span', 'ps-morph__badge');
+        badge.setAttribute('data-for', id);
+        badge.setAttribute('data-clash-marker', '');
+        badge.setAttribute('aria-hidden', 'true');
+        cell.oval.append(ring, badge);
+        added.push(ring, badge);
+      }
+      cell.item.classList.toggle('is-clashing', want.size > 0);
+    }
+    return added;
+  }
+
+  /** Measure the ovals (all reads first), then write the line. */
   function drawLine(): void {
     if (!frame || !frame.line) return;
-    const { picks, clash, ok } = scenarioState();
+    const { picks, ok } = scenarioState();
     // Reads.
     const box = frame.chart.getBoundingClientRect();
-    const centre = (cell: Cell): [number, number] => {
+    const points = picks.map((cell): [number, number] => {
       const r = cell.oval.getBoundingClientRect();
       return [r.left + r.width / 2 - box.left, r.top + r.height / 2 - box.top];
-    };
-    const points = picks.map(centre);
-    const cross = clash ? [centre(clash[0]), centre(clash[1])] : null;
+    });
     // Writes.
     const view = `0 0 ${Math.max(box.width, 1).toFixed(1)} ${Math.max(box.height, 1).toFixed(1)}`;
     setAttr(frame.overlay, 'viewBox', view);
@@ -489,30 +529,10 @@ export function createMorphologicalView(doc: Document = document): Morphological
     setAttr(frame.line, 'data-consistent', String(ok));
     if (ok) setAttr(frame.line, 'pathLength', '1');
     else frame.line.removeAttribute('pathLength');
-    if (cross) {
-      if (!frame.marker) {
-        const marker = doc.createElementNS(SVG, 'g') as SVGGElement;
-        marker.setAttribute('class', 'ps-morph__cross');
-        marker.setAttribute('data-clash-marker', '');
-        const ring = doc.createElementNS(SVG, 'circle');
-        ring.setAttribute('r', '10');
-        const x = doc.createElementNS(SVG, 'path');
-        x.setAttribute('d', 'M-4.5 -4.5 L4.5 4.5 M4.5 -4.5 L-4.5 4.5');
-        marker.append(ring, x);
-        frame.overlay.append(marker);
-        frame.marker = marker;
-      }
-      const mx = (cross[0][0] + cross[1][0]) / 2;
-      const my = (cross[0][1] + cross[1][1]) / 2;
-      setAttr(frame.marker, 'transform', `translate(${mx.toFixed(1)} ${my.toFixed(1)})`);
-    } else if (frame.marker) {
-      frame.marker.remove();
-      frame.marker = null;
-    }
   }
 
   /** Draw the line in, left to right, when the scenario it shows has changed (never at rest). */
-  function animateLine(): void {
+  function animateLine(marks: HTMLElement[]): void {
     if (!frame?.line) return;
     const { picks, ok } = scenarioState();
     const key = `${selected}|${picks.map((c) => c.node.id).join()}|${ok}`;
@@ -523,9 +543,7 @@ export function createMorphologicalView(doc: Document = document): Morphological
     const line = frame.line as unknown as HTMLElement;
     if (ok) line.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: LINE_MS, easing: EASE, fill: 'backwards' });
     else line.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: EASE, fill: 'backwards' });
-    if (frame.marker && canAnimate(frame.marker as unknown as Element)) {
-      (frame.marker as unknown as HTMLElement).animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, delay: 220, easing: EASE, fill: 'backwards' });
-    }
+    for (const mark of marks) if (canAnimate(mark)) mark.animate([{ opacity: 0, transform: 'scale(0.6)' }, { opacity: 1, transform: 'none' }], { duration: 260, delay: 220, easing: EASE, fill: 'backwards' });
   }
 
   // ---------------------------------------------------------------- selection and layout
@@ -551,8 +569,9 @@ export function createMorphologicalView(doc: Document = document): Morphological
     else dropLine();
     // A card never stays open for a scenario that is no longer showing.
     for (const sc of scenarios.values()) if (sc.pill.hidden && sc.card.classList.contains('is-open')) group.close();
+    const marks = syncClashMarks(chosen);
     drawLine();
-    animateLine();
+    animateLine(marks);
   }
 
   function select(id: string): void {
@@ -588,12 +607,6 @@ export function createMorphologicalView(doc: Document = document): Morphological
       : null;
   observer?.observe(root);
 
-  // Key items mirror their shape's open state, whatever opened or closed it.
-  root.addEventListener('click', syncKeyState);
-  root.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') syncKeyState();
-  });
-
   // ---------------------------------------------------------------- update
 
   function teardown(): void {
@@ -625,9 +638,19 @@ export function createMorphologicalView(doc: Document = document): Morphological
     lineKey = '';
   }
 
+  /** Until the size watch has reported, read the width once, so a phone never draws the wide layout first. */
+  function measureOnce(): void {
+    if (width || widthOverride !== null) return;
+    const w = root.getBoundingClientRect().width;
+    if (!w) return;
+    width = w;
+    setCompact(w <= COMPACT_MAX);
+  }
+
   function update(run: PsToolRun): void {
     if (destroyed) return;
     lastRun = run;
+    measureOnce();
     if (!run.nodes.length) {
       if (root.children.length) teardown();
       painted = true;
@@ -657,6 +680,7 @@ export function createMorphologicalView(doc: Document = document): Morphological
     if (subjects.length) ensureFrame(fresh);
     else if (frame) {
       observer?.unobserve(frame.chart);
+      dropLine();
       frame = null;
     }
     subjectOrder = subjects;
@@ -759,12 +783,17 @@ export function createMorphologicalView(doc: Document = document): Morphological
         chip.pair = pair;
       }
       if (clashes!.children[k] !== chip.chip) clashes!.insertBefore(chip.chip, clashes!.children[k] ?? null);
-      const names = pair.map((id) => run.nodes.find((n) => n.id === id)).map((n) => (n ? nodeTitle(n) : '?'));
-      const words = `${names[0] ?? '?'} cannot go with ${names[1] ?? '?'}`;
+      // A pair that has lost an attribute (an undo) has nothing to name: the chip steps aside.
+      const ends = pair.map((id) => cells.get(id)?.node);
+      const whole = ends.length === 2 && ends.every(Boolean);
+      chip.chip.hidden = !whole;
+      if (!whole && chip.card.classList.contains('is-open')) group.close();
+      const words = whole ? `${nodeTitle(ends[0]!)} cannot go with ${nodeTitle(ends[1]!)}` : '';
       setText(chip.text, words);
-      setAttr(chip.chip, 'aria-label', `Contradiction: ${words}${contested(node)}. Show details`);
+      setAttr(chip.chip, 'aria-label', `Contradiction: ${words || 'incomplete'}${contested(node)}. Show details`);
       syncContested(chip.chip, node, chip.words, chip.chip);
     });
+    if (clashes) clashes.hidden = ![...chips.values()].some((c) => !c.chip.hidden);
     if (clashes && !contradictionNodes.length) {
       clashes.remove();
       clashes = null;

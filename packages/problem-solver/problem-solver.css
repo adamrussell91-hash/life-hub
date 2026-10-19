@@ -4682,7 +4682,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
    right across the grid; thin paper gaps part the columns under the header, and empty striped
    cells carry the shorter columns down to the foot. A scenario is one blue oval per column on
    the attribute it picks, joined by a blue line zig-zagging behind the ovals. A clashing
-   scenario's line is dashed red with a cross between the clashing pair. One CSS grid: a track per
+   scenario's line is dashed red, and each clashing oval gets a red ring and a cross badge. One CSS grid: a track per
    subject; each column takes the rows as a subgrid, so the stripes line up.
    Phone: the grid stays, coded (S1, S2·3), with a key under it. */
 .ps-morph {
@@ -4749,8 +4749,6 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-morph__filler { position: relative; min-width: 0; min-height: var(--ps-morph-row); background: var(--ps-morph-light); }
 /* The head is each column's first child, so odd children below it are the even rows. */
 .ps-morph__subject > :nth-child(odd):not(.ps-morph__head) { background: var(--ps-yellow); }
-.ps-morph__cell:has(:focus-visible),
-.ps-morph__cell:has([aria-expanded='true']) { z-index: 3; }
 .ps-morph__cell-button {
   box-sizing: border-box;
   display: flex;
@@ -4775,6 +4773,9 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-morph__head[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
 .ps-morph__head:focus-visible,
 .ps-morph__head[aria-expanded='true'] { z-index: 3; }
+/* Only the (transparent) button rises for its ring: the cell itself never covers the line. */
+.ps-morph__cell-button:focus-visible,
+.ps-morph__cell-button[aria-expanded='true'] { position: relative; z-index: 3; }
 
 /* The oval: the cell's words, which become a blue ellipse when the scenario picks them.
    Above the line (which runs behind the ovals). */
@@ -4800,14 +4801,21 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 /* A contradiction's mark: a small red notch in the cell's top corner; hovering its chip outlines both cells. */
 .ps-morph__notch { position: absolute; top: 0; right: 0; z-index: 2; width: 12px; height: 12px; background: var(--ps-red); clip-path: polygon(0 0, 100% 0, 100% 100%); pointer-events: none; }
-.ps-morph__cell.is-flagged { z-index: 3; box-shadow: inset 0 0 0 2.5px var(--ps-red); }
+.ps-morph__cell.is-flagged::after { content: ''; position: absolute; inset: 0; z-index: 3; box-shadow: inset 0 0 0 2.5px var(--ps-red); pointer-events: none; }
+
+/* A clashing pick: a red ring round the oval and a small cross badge on its edge. */
+.ps-morph__ring { position: absolute; inset: -2px; border-radius: 50%; box-shadow: 0 0 0 2.5px var(--ps-red); pointer-events: none; }
+.ps-morph__badge { position: absolute; top: -6px; right: 4%; width: 18px; height: 18px; border-radius: 50%; background: var(--ps-red); box-shadow: 0 0 0 2px var(--ps-paper); pointer-events: none; }
+.ps-morph__badge::before,
+.ps-morph__badge::after { content: ''; position: absolute; top: 50%; left: 50%; width: 9px; height: 2px; border-radius: 1px; background: #fff; transform: translate(-50%, -50%) rotate(45deg); }
+.ps-morph__badge::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.ps-morph__ring ~ .ps-morph__ring,
+.ps-morph__badge ~ .ps-morph__badge { display: none; }
 
 /* The scenario line, behind the ovals. */
 .ps-morph__lines { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .ps-morph__line { fill: none; stroke: var(--ps-blue); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 1; }
 .ps-morph__line[data-consistent='false'] { stroke: var(--ps-red); stroke-dasharray: 7 5; }
-.ps-morph__cross circle { fill: var(--ps-paper); stroke: var(--ps-red); stroke-width: 2.5; }
-.ps-morph__cross path { fill: none; stroke: var(--ps-red); stroke-width: 2.5; stroke-linecap: round; }
 
 /* Above the grid: the scenario tabs, then the shown scenario as a blue pill (its shape). */
 .ps-morph__bar { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; margin-bottom: 14px; }
@@ -4861,6 +4869,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-morph__scenario .ps-morph__tag { box-shadow: 0 0 0 1.5px #fff; }
 
 /* Contradictions: chips on the paper under the grid. */
+.ps-morph__clashes[hidden],
+.ps-morph__chip[hidden] { display: none; }
 .ps-morph__clashes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; }
 .ps-morph__chip {
   box-sizing: border-box;
@@ -4975,6 +4985,9 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-morph__oval { min-height: 32px; padding: 4px 2px; }
   .ps-morph__cell.is-picked .ps-morph__oval { width: 94%; padding: 6px 4px; }
   .ps-morph__notch { width: 9px; height: 9px; }
+  .ps-morph__badge { top: -7px; right: -2px; width: 15px; height: 15px; }
+  .ps-morph__badge::before,
+  .ps-morph__badge::after { width: 8px; }
   .ps-morph__card { padding: 12px 14px 8px; }
   .ps-morph__chip { padding-right: 12px; }
 }

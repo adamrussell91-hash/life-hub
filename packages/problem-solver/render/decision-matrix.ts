@@ -715,8 +715,18 @@ export function createDecisionMatrixView(doc: Document = document): DecisionMatr
 
   // ---------------------------------------------------------------- update
 
+  /** Until the size watch has reported, read the width once, so a phone never draws the wide layout first. */
+  function measureOnce(): void {
+    if (width || widthOverride !== null || destroyed) return;
+    const w = root.getBoundingClientRect().width;
+    if (!w) return;
+    width = w;
+    setCompact(w <= COMPACT_MAX);
+  }
+
   function update(run: PsToolRun): void {
     lastRun = run;
+    measureOnce();
     const crits = criteriaOf(run) as PsNode[];
     const opts = optionsOf(run) as PsNode[];
     if (!crits.length && !opts.length) {
