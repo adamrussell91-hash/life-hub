@@ -11,7 +11,7 @@ import { TOOLS, TOOL_IDS } from '../../../../../packages/problem-solver/tools/in
 import { stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
-import { mountCanvas } from './canvas';
+import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
 
@@ -292,9 +292,9 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     if (isBusy(session)) await settle();
   }
 
-  async function rescore(scores: { current: number[]; objective: number[] }): Promise<void> {
+  async function rescore({ runId, current, objective }: RunScores): Promise<void> {
     try {
-      paint(await problemSolverApi.rescore(session, scores));
+      paint(await problemSolverApi.score(session, { runId, current, objective }));
     } catch (err) {
       if ((err as { code?: string }).code === 'conflict') {
         paint(await problemSolverApi.get(session.id));
