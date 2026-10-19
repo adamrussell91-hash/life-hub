@@ -3,7 +3,7 @@ import { findAgent } from './agent-directory.mjs';
 import { alchemyError } from './alchemy-budget.mjs';
 import { BlockSchema } from './teaching-block-schema.mjs';
 import { readUnitNotes, addUnitNotes } from './alchemy-unit-notes.mjs';
-import { refreshNoteIndex, searchNotes, noteFilters, readNoteText } from './alchemy-notes-index.mjs';
+import { refreshNoteIndex, searchNotes, noteFilters, readNoteText, readAttachmentText } from './alchemy-notes-index.mjs';
 import { editableFields, childBlocks, patchBlock, PatchError, quoteAppears } from '../../../packages/alchemy/patches.js';
 import { findAlchemyBlock } from '../../../packages/alchemy/revisions.js';
 
@@ -71,7 +71,7 @@ export function renderLessonText(entity, { focusId = null } = {}) {
 const TOOLS = [
   {
     name: 'search_notes',
-    description: 'Search Adam\'s Knowledge Hub (his university notes, research, reading and teaching notes) by meaning-bearing words. Returns up to 10 notes with the passage that best matches. Passages are pointers: open a note with read_note before relying on it. Filters are exact; use list_filters to see real values.',
+    description: 'Search Adam\'s Knowledge Hub (his university notes, research, reading and teaching notes, and the PDFs attached to them) by meaning-bearing words. Returns up to 10 notes with the passage that best matches; passage_from names the PDF when the passage comes from one. Passages are pointers: open the note or PDF with read_note before relying on it. Filters are exact; use list_filters to see real values.',
     input_schema: { type: 'object', additionalProperties: false, required: ['query'], properties: {
       query: { type: 'string', description: 'Words to search for, e.g. "retrieval practice spacing".' },
       tags: { type: 'array', items: { type: 'string' }, description: 'Only notes with all of these tags.' },
@@ -88,8 +88,8 @@ const TOOLS = [
   },
   {
     name: 'read_note',
-    description: 'Open one Knowledge Hub note in full (12,000 characters per call; pass offset to continue). Only notes opened here can be cited.',
-    input_schema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: { type: 'string' }, offset: { type: 'integer', minimum: 0 } } }
+    description: 'Open one Knowledge Hub note in full (12,000 characters per call; pass offset to continue). A note with PDFs lists them under attachments; pass attachment with a PDF\'s id to read that PDF\'s text instead (often the article the note is about). Only notes and PDFs opened here can be cited; cite a PDF quote with the note\'s id.',
+    input_schema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: { type: 'string' }, attachment: { type: 'string', description: 'The id of a PDF attached to the note.' }, offset: { type: 'integer', minimum: 0 } } }
   },
   {
     name: 'read_lesson',
@@ -122,7 +122,7 @@ You are working in Alchemy Lab, helping Adam make one lesson teach better using 
 
 How to work:
 - Start from his rules and the lesson. Decide what would most improve learning: sharper questions, better sequencing, clearer success criteria, accurate and richer subject knowledge, anticipated misconceptions, better checks for understanding.
-- Search his notes for what bears on those needs, filter when a tag or source fits, and open the promising notes with read_note. Search again with better words once you know what you need. Topic overlap alone is not a reason to use a note.
+- Search his notes for what bears on those needs, filter when a tag or source fits, and open the promising notes with read_note. Search again with better words once you know what you need. Topic overlap alone is not a reason to use a note. When a note has the PDF of the article it discusses, open the PDF if the note's own words are not enough.
 - Propose small, specific edits with propose_edit. Prefer the smallest repair that does the job over rewriting. Keep his voice, Australian spelling and the lesson's structure. Never invent student needs or research.
 - Ground changes in his notes wherever you can, quoting the passage you relied on. If a propose_edit result reports a problem, fix that patch and try again.
 - When done, call finish. If nothing in his notes supports a real improvement, say so in finish rather than forcing edits.
@@ -203,7 +203,7 @@ export async function runAlchemyAgent({ kind = 'lesson', id, blockId = null, req
   const shelf = shelfUnitId ? (await readUnitNotes(store, shelfUnitId)).notes.slice(0, 20) : [];
 
 
-  const opened = new Map(); // note id → {title, full}
+  const opened = new Map(); // note id → {title, texts: [{filename, full}]}, a PDF's filename or null for the note
   const proposals = [];
   let summary = '', stoppedEarly = false, turns = 0;
   const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 };
@@ -224,10 +224,15 @@ export async function runAlchemyAgent({ kind = 'lesson', id, blockId = null, req
         onProgress('Looking over your tags and sources');
         return noteFilters(docs);
       case 'read_note': {
-        const note = await readNoteText(String(input.id ?? ''), { env, fetchImpl, offset: input.offset });
+        const note = input.attachment
+          ? await readAttachmentText(String(input.id ?? ''), String(input.attachment), { store, env, fetchImpl, offset: input.offset })
+          : await readNoteText(String(input.id ?? ''), { env, fetchImpl, offset: input.offset });
         if (!note) return { error: 'That note is not in the Knowledge Hub (deleted or wrong id).' };
-        onProgress(`Reading: ${note.title}`);
-        opened.set(note.id, { title: note.title, full: note.full });
+        if (note.error) return note;
+        onProgress(note.attachment ? `Reading: ${note.attachment.filename}` : `Reading: ${note.title}`);
+        const seen = opened.get(note.id) ?? { title: note.title, texts: [] };
+        seen.texts.push({ filename: note.attachment?.filename ?? null, full: note.full });
+        opened.set(note.id, seen);
         const { full, ...visible } = note;
         return visible;
       }
@@ -249,9 +254,10 @@ export async function runAlchemyAgent({ kind = 'lesson', id, blockId = null, req
         if (!own) {
           const note = opened.get(input.source.noteId);
           if (!note) return { error: 'Cite only a note you opened with read_note in this review.' };
-          if (!quoteAppears(note.full, input.source.quote)) return { error: 'That quote is not in the note. Copy 10-400 characters exactly from the note text.' };
+          const from = note.texts.find(t => quoteAppears(t.full, input.source.quote));
+          if (!from) return { error: 'That quote is not in the note or the PDFs of it you opened. Copy 10-400 characters exactly from the text.' };
           if (String(input.source.quote).length > 400) return { error: 'Keep the quote to 400 characters or fewer.' };
-          source = { noteId: input.source.noteId, title: note.title, quote: String(input.source.quote).trim() };
+          source = { noteId: input.source.noteId, title: from.filename ? `${note.title} · ${from.filename}` : note.title, quote: String(input.source.quote).trim() };
         }
         const patch = { blockId: input.blockId, path: input.path, oldStr: input.oldStr, newStr: input.newStr };
         let patched;
