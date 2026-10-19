@@ -110,16 +110,43 @@ type Route = { d: string; mask: string; head: string; mid: Point };
 /**
  * A gentle arc from one anchor to the other, ending in a small arrowhead. Links between
  * columns bow slightly to one side of the straight line (as the book's arrows run nearly
- * straight); links inside one column loop out to the left.
+ * straight). Gutter links leave sideways, run down a lane at `gutter` and come back in,
+ * so they never pass behind another shape: loops inside one column, and in the stacked
+ * layout any link that would otherwise cross a shape in between.
  */
-function route(a: Point, b: Point, axis: 'line' | 'bow', strong: boolean): Route {
+function arrowhead(b: Point, from: Point, strong: boolean): { head: string; base: Point } {
+  const len = strong ? 10 : 8;
+  const half = strong ? 5.5 : 4.5;
+  const tl = Math.hypot(b.x - from.x, b.y - from.y) || 1;
+  const ux = (b.x - from.x) / tl;
+  const uy = (b.y - from.y) / tl;
+  const base = { x: b.x - ux * len, y: b.y - uy * len };
+  return { head: `M${f(b.x)} ${f(b.y)}L${f(base.x - uy * half)} ${f(base.y + ux * half)}L${f(base.x + uy * half)} ${f(base.y - ux * half)}Z`, base };
+}
+
+/**
+ * Stacked layout: out to a lane beside the causes column, straight down it with rounded
+ * corners, and back in to the target. The badge sits on the lane, clear of every shape.
+ * A link leaving an arrowhead's tip starts downwards; any other starts sideways.
+ */
+function laneRoute(a: Point, b: Point, x: number, strong: boolean, startDown: boolean): Route {
+  const r = Math.max(4, Math.min(16, Math.abs(b.y - a.y) / 3));
+  const dir = b.y >= a.y ? 1 : -1;
+  const top = startDown
+    ? `M${f(a.x)} ${f(a.y)}C${f(a.x)} ${f(a.y + 18)} ${f(x)} ${f(a.y + 6)} ${f(x)} ${f(a.y + 28)}`
+    : `M${f(a.x)} ${f(a.y)}C${f(x)} ${f(a.y)} ${f(x)} ${f(a.y)} ${f(x)} ${f(a.y + dir * r)}`;
+  const { head, base } = arrowhead(b, { x, y: b.y }, strong);
+  const bottom = (end: Point) => `L${f(x)} ${f(b.y - dir * r)}C${f(x)} ${f(b.y)} ${f(x)} ${f(b.y)} ${f(end.x)} ${f(end.y)}`;
+  const firstY = startDown ? a.y + 28 : a.y + dir * r;
+  return { d: top + bottom(base), mask: top + bottom(b), head, mid: { x, y: (firstY + b.y - dir * r) / 2 } };
+}
+
+function route(a: Point, b: Point, axis: 'line' | 'gutter', strong: boolean, gutter = 0): Route {
   let c1: Point;
   let c2: Point;
-  if (axis === 'bow') {
-    const reach = 22 + Math.abs(b.y - a.y) * 0.16;
-    const x = Math.max(10, Math.min(a.x, b.x) - reach); // stays on the map when a cause sits at its left edge
-    c1 = { x, y: a.y };
-    c2 = { x, y: b.y };
+  if (axis === 'gutter') {
+    c1 = { x: gutter, y: a.y };
+    c2 = { x: gutter, y: b.y };
   } else {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
@@ -132,18 +159,10 @@ function route(a: Point, b: Point, axis: 'line' | 'bow', strong: boolean): Route
     c2 = { x: a.x + (2 * dx) / 3 + nx, y: a.y + (2 * dy) / 3 + ny };
   }
   // The line stops at the base of the arrowhead; the head's tip touches the shape.
-  const len = strong ? 10 : 8;
-  const half = strong ? 5.5 : 4.5;
-  const tx = b.x - c2.x;
-  const ty = b.y - c2.y;
-  const tl = Math.hypot(tx, ty) || 1;
-  const ux = tx / tl;
-  const uy = ty / tl;
-  const base = { x: b.x - ux * len, y: b.y - uy * len };
-  const head = `M${f(b.x)} ${f(b.y)}L${f(base.x - uy * half)} ${f(base.y + ux * half)}L${f(base.x + uy * half)} ${f(base.y - ux * half)}Z`;
+  const { head, base } = arrowhead(b, c2, strong);
   const curve = (end: Point) => `M${f(a.x)} ${f(a.y)}C${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(end.x)} ${f(end.y)}`;
   // The +/− badge sits past the middle, towards the shape it acts on, as in the book.
-  const t = axis === 'bow' || Math.hypot(b.x - a.x, b.y - a.y) < 90 ? 0.5 : 0.64;
+  const t = axis === 'gutter' || Math.hypot(b.x - a.x, b.y - a.y) < 90 ? 0.5 : 0.64;
   const u = 1 - t;
   const at = (p0: number, p1: number, p2: number, p3: number) => u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
   const mid = { x: at(a.x, c1.x, c2.x, b.x), y: at(a.y, c1.y, c2.y, b.y) };
@@ -311,6 +330,40 @@ export function createCausalMapView(doc: Document = document): CausalMapView {
     const problemBox = regions.problem.getBoundingClientRect();
     const causesBox = regions.causes.getBoundingClientRect();
     const stacked = causesBox.height > 0 && problemBox.top >= causesBox.bottom - 1;
+    const causeOrder = [...regions.causes.children].map((el) => el.getAttribute('data-node'));
+    const firstCause = causeOrder[0];
+    const lastCause = causeOrder.at(-1);
+    // Gutter lanes beside the causes column, one per link, stepping outwards.
+    const causeBoxes = [...boxes].filter(([id]) => kinds.get(id) === 'cause').map(([, b]) => b);
+    const columnLeft = Math.min(...causeBoxes.map((b) => b.x), origin.width / 2);
+    const columnRight = Math.max(...causeBoxes.map((b) => b.x + b.w), origin.width / 2);
+    // Stacked: a link crosses another shape unless it joins neighbouring rows.
+    const crosses = (from: string, to: string): boolean => {
+      const ka = kinds.get(from);
+      const kb = kinds.get(to);
+      return stacked && ka !== kb && !(ka === 'influence' && kb === 'cause' && to === firstCause) && !(ka === 'cause' && kb === 'problem' && from === lastCause);
+    };
+    // Lanes are ordered so gutter links never cross each other: on the left, loops between
+    // causes sit innermost, then links to the problem with the lowest cause innermost; on
+    // the right, the link into the highest cause is innermost.
+    const yOf = (id: string) => boxes.get(id)?.y ?? 0;
+    const left: Array<[string, number]> = [];
+    const right: Array<[string, number]> = [];
+    for (const [key, link] of links) {
+      const { from, to } = link.edge;
+      if (!boxes.has(from) || !boxes.has(to) || !stacked) continue;
+      if (kinds.get(from) === kinds.get(to)) left.push([key, -1e6 + Math.abs(yOf(from) - yOf(to))]);
+      else if (crosses(from, to)) {
+        if (kinds.get(from) === 'cause') left.push([key, -yOf(from)]);
+        else right.push([key, yOf(to)]);
+      }
+    }
+    const order = (list: Array<[string, number]>) => list.sort((x, y) => x[1] - y[1]).map(([key]) => key);
+    const lanes = { left: order(left), right: order(right) };
+    const lane = (side: 'left' | 'right', key: string): number => {
+      const step = 20 + Math.max(0, lanes[side].indexOf(key)) * 10;
+      return side === 'left' ? Math.max(8, columnLeft - step) : Math.min(origin.width - 8, columnRight + step);
+    };
     const spread = (list: string[] | undefined, key: string) => {
       if (!list || list.length < 2) return 0;
       return (list.indexOf(key) - (list.length - 1) / 2) * 9;
@@ -325,16 +378,29 @@ export function createCausalMapView(doc: Document = document): CausalMapView {
       const centre = (r: Box) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
       const ca = centre(a);
       const cb = centre(b);
-      let axis: 'line' | 'bow' = 'line';
+      let axis: 'line' | 'gutter' = 'line';
+      let gutter = 0;
       let start: Point;
       let end: Point;
       const strong = link.group.getAttribute('data-strength') === 'strong';
+      const p = (id: string) => parity.get(id) ?? 'odd';
+      let inLane = false;
       if (ka === kb) {
-        axis = 'bow';
-        start = anchor(ka, a, 'loop', parity.get(from) ?? 'odd', cb);
-        end = anchor(kb, b, 'loop', parity.get(to) ?? 'odd', ca);
+        inLane = stacked;
+        axis = 'gutter';
+        start = anchor(ka, a, 'loop', p(from), cb);
+        end = anchor(kb, b, 'loop', p(to), ca);
+        gutter = stacked ? lane('left', key) : Math.max(10, Math.min(start.x, end.x) - 22 - Math.abs(end.y - start.y) * 0.16);
+      } else if (crosses(from, to)) {
+        inLane = true;
+        // Causes to the problem run down the left; influences down the right.
+        const side = ka === 'cause' ? 'left' : 'right';
+        gutter = lane(side, key);
+        start = ka === 'influence' ? anchor(ka, a, 'bottom', p(from), cb) : anchor(ka, a, side, p(from), cb);
+        // Several links into the problem from one side land a little apart.
+        end = anchor(kb, b, side, p(to), { x: gutter, y: cb.y + (kb === 'problem' ? spread(ins.get(to), key) * 2.4 : 0) });
       } else if (stacked) {
-        // Narrow layout: down from the upper shape into the top of the lower one.
+        // Neighbouring rows: down from the upper shape into the top of the lower one.
         const down = cb.y > ca.y;
         start = anchor(ka, a, down ? 'bottom' : 'top', parity.get(from) ?? 'odd', cb);
         end = anchor(kb, b, down ? 'top' : 'bottom', parity.get(to) ?? 'odd', start);
@@ -347,7 +413,7 @@ export function createCausalMapView(doc: Document = document): CausalMapView {
         start.y += spread(outs.get(from), key);
         if (kb !== 'problem') end.y += spread(ins.get(to), key);
       }
-      const r = route(start, end, axis, strong);
+      const r = inLane ? laneRoute(start, end, gutter, strong, ka === 'influence') : route(start, end, axis, strong, gutter);
       link.path.setAttribute('d', r.d);
       link.maskPath.setAttribute('d', r.mask);
       link.head.setAttribute('d', r.head);
@@ -475,6 +541,7 @@ export function createCausalMapView(doc: Document = document): CausalMapView {
     layout();
     syncOpen();
 
+    let moved = false;
     if (animate && before.size) {
       const origin = map!.getBoundingClientRect();
       for (const [id, old] of before) {
@@ -483,13 +550,15 @@ export function createCausalMapView(doc: Document = document): CausalMapView {
         const dx = old.x - now.x;
         const dy = old.y - now.y;
         if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+        moved = true;
         items.get(id)!.querySelector<HTMLElement>('.ps-causal__body')?.animate(
           [{ transform: `translate(${f(dx)}px, ${f(dy)}px)` }, { transform: 'none' }],
           { duration: 460, easing: EASE }
         );
       }
     }
-    if (added.length || before.size) settle(820);
+    // Links follow shapes only while something grows in or glides; a plain update needs one layout.
+    if (added.length || moved) settle(820);
   }
 
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => layout()).observe(root);
