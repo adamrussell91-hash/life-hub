@@ -834,9 +834,9 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
   }
 
   function ownAnswer(text: string, open: boolean): HTMLElement {
-    const box = el('details', 'pf-own');
+    const box = el('details', 'pf-own block-disclosure');
     box.open = open;
-    box.append(el('summary', 'pf-own__summary', 'Your answer'), el('p', 'pf-own__text', text));
+    box.append(el('summary', 'pf-own__summary block-disclosure__toggle', 'Your answer'), el('p', 'pf-own__text block-disclosure__panel block-body', text));
     return box;
   }
 
