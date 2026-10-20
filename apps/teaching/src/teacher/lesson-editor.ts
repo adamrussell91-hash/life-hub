@@ -868,13 +868,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const openDisplay = () => {
       window.open(displayHref, '_blank', 'noopener,noreferrer');
     };
-    const displayButton = document.createElement('a');
-    displayButton.className = 'btn btn--secondary context-bar__display';
-    displayButton.href = displayHref;
-    displayButton.target = '_blank';
-    displayButton.rel = 'noopener noreferrer';
-    displayButton.textContent = 'Display';
-    displayButton.title = 'Open the projector view with your live controls';
     const feedbackMenuLabel = () =>
       lesson.feedback_off ? 'Turn on student feedback' : 'Turn off student feedback';
     const optionsMenu = mountPageOptionsMenu(
@@ -994,9 +987,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     });
 
     if (actions) {
-      actions.append(optionsMenu.el, displayButton, publicLinkHost, historyHost);
+      actions.append(optionsMenu.el, publicLinkHost, historyHost);
     } else {
-      refs.contextBar.append(optionsMenu.el, displayButton, publicLinkHost, historyHost);
+      refs.contextBar.append(optionsMenu.el, publicLinkHost, historyHost);
     }
     bindBuilderFullPage(builder, {
       getActive: () => fullPage,
