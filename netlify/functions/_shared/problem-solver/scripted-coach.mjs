@@ -7,9 +7,10 @@ import { matrixTotals, options } from '../../../../packages/problem-solver/tools
 import { attributesOf, contradictionPairs, subjectsOf } from '../../../../packages/problem-solver/tools/morphological.mjs';
 import { KANBAN_COLUMNS } from '../../../../packages/problem-solver/tools/kanban.mjs';
 import { QUADRANTS } from '../../../../packages/problem-solver/tools/swot.mjs';
+import { longestEarlier } from '../../../../packages/problem-solver/tools/after-action-review.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
-import { chosenOption, defaultToolFor } from '../../../../packages/problem-solver/steps.mjs';
-import { activeRun } from './session.mjs';
+import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
+import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
 
 /**
  * Deterministic coach for local dev and tests. Short answers (under six words) are challenged.
@@ -17,6 +18,8 @@ import { activeRun } from './session.mjs';
  * An answer like `link: cause 1 to problem, plus` adds that link between nodes already placed.
  * An answer like `option: …` places in that open slot (a Kanban card may use a column instead,
  * `doing: …`). Once a Decide tool can take its choice, an answer with no hint is the choice.
+ * `next: <tool id>` suggests that tool when it belongs to the step, and `reopen: define` (or
+ * `analyse`) suggests reopening that step once double-loop learning allows it.
  */
 const FRAME = [
   ['goal', 'What is the goal, as an ideal state rather than a fix? Say what good looks like.'],
@@ -47,6 +50,10 @@ function linksFor(run, slot) {
     return option ? [{ from: slot, to: option.slot, kind: 'of' }] : [];
   }
   if (run.tool === 'morphological') return morphLinks(run, slot, name);
+  if (run.tool === 'feedback_matrix' && (name === 'why' || name === 'how')) {
+    const theme = nodesNamed(run, 'theme').at(-1);
+    return theme ? [{ from: slot, to: theme.slot, kind: 'of' }] : [];
+  }
   if (run.tool === 'fifteen_percent' && name === 'chosen') {
     const picked = new Set(run.edges.filter((edge) => edge.kind === 'picks').map((edge) => edge.to));
     const action = nodesNamed(run, 'action').find((node) => !picked.has(node.id));
@@ -110,6 +117,31 @@ function placement(run, answer) {
   return { slot: open.find((s) => s !== 'root') ?? 'root', text: answer, tag: null };
 }
 
+/** The tag an answer's wording implies, for the tools whose tags the scripted coach reads from text. */
+function tagFromText(run, slot, text) {
+  const name = parseSlot(slot)?.name;
+  if (run.tool === 'double_loop' && name === 'recurs') return /^yes\b/i.test(text) || /again|came back|recur/i.test(text) ? 'yes' : 'no';
+  if (run.tool === 'feedback_matrix' && name === 'theme') {
+    if (/\b(more|keep)\b/i.test(text)) return 'do_more';
+    return /\?|unclear/i.test(text) ? 'question' : 'change';
+  }
+  return null;
+}
+
+const wordCount = (text) => text.split(/\s+/).filter(Boolean).length;
+
+/** "<due>" as the coach says it, or a plain phrase when the review has no date. */
+const dueText = (session) => session.reviewState?.due ?? 'its date';
+
+/** The after action review's opening: how it went, with the task counts when the page sent them. */
+function reviewOpening(session) {
+  const counts = session.taskSnapshot?.byStatus;
+  const total = counts ? Object.values(counts).reduce((sum, n) => sum + n, 0) : 0;
+  return total ? `Let's look at how it went. ${counts.done} of ${total} tasks are done. ` : 'Let\'s look at how it went. ';
+}
+
+const REOPEN_REASON = 'The governing assumption was set upstream; changing it at the source lets the fix hold.';
+
 /** What the coach says when the choice is placed: the leader, when the tool can tell. */
 function choiceMessage(run) {
   const leader = run.tool === 'decision_matrix' ? matrixTotals(run)?.leader : null;
@@ -134,9 +166,17 @@ export async function scriptedCoach(session) {
   const latest = session.turns.at(-1);
   const last = latest?.role === 'user' ? latest.text : '';
   if (session.runner?.mode === 'boundary') {
+    const left = session.steps?.[session.runner.leaving];
+    if (skippedUntouched(left)) {
+      const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here, or start a tool when you are ready.';
+      return { ...base, verdict: 'clarify', message: `Fair enough, nothing was done in that step, so there is nothing to look back on. ${then}` };
+    }
     return { ...base, verdict: 'clarify', message: 'Fair enough, that step is behind us now. Before we go on: what did you learn about how you tend to work through problems in that step?' };
   }
   if (session.pendingLearning) {
+    if (waitingForReview(session)) {
+      return { ...base, verdict: 'clarify', learning: last || null, message: `Thank you, that is worth keeping. Improve picks up at your review on ${dueText(session)}.` };
+    }
     const hasTool = session.phase !== 'finished' && session.model && defaultToolFor(session.model.id, session.phase);
     const message = session.phase === 'finished'
       ? 'Thank you, that is worth keeping. The whole problem is on the record now; come back to it whenever you need to.'
@@ -159,12 +199,18 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   }
   const run = activeRun(session);
+  if (!run && waitingForReview(session)) {
+    return { ...base, verdict: 'clarify', message: `Improve picks up at your review on ${dueText(session)}. Until then, tell me anything you notice.` };
+  }
+  if (!run && session.reviewState?.status === 'reviewing' && toolsForPlanStep(session.model.id, session.phase).includes('after_action_review')) {
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'next_tool', tool: 'after_action_review', reason: 'The results are in; compare them with the aim.' }, message: 'The results are in. An after action review compares what you meant to happen with what did; start it when you are ready.' };
+  }
   if (!run && !defaultToolFor(session.model.id, session.phase)) return { ...base, verdict: 'clarify', message: 'There is no tool for this step yet. Tell me what you notice, or move on when you are ready.' };
   if (!run) return { ...base, verdict: 'clarify', message: 'Pick a tool to start this step, and we will work through it one question at a time together.' };
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
     const chosen = TOOLS[run.tool].step === 'implement' ? chosenOption(session) : null;
-    const carry = chosen ? `We are carrying forward: ${chosen.title}. ` : '';
+    const carry = chosen ? `We are carrying forward: ${chosen.title}. ` : run.tool === 'after_action_review' ? reviewOpening(session) : '';
     return { ...base, verdict: 'clarify', message: `${carry}Let's start the ${TOOLS[run.tool].name}. ${first.title}: ${first.prompt}` };
   }
   if (/^link:/i.test(last)) {
@@ -178,9 +224,29 @@ export async function scriptedCoach(session) {
   if (/^switch:/i.test(last) && run.tool !== 'problem_tree') {
     return { ...base, verdict: 'clarify', suggestion: { kind: 'switch_tool', tool: 'problem_tree', reason: last.replace(/^switch:\s*/i, '') || 'The causes branch.' }, message: 'Then a single chain will not hold it. A problem tree lets the causes branch; shall we switch?' };
   }
-  const { slot, text, tag } = placement(run, last);
-  if (text.split(/\s+/).filter(Boolean).length < 6) {
+  const nextHint = /^next:\s*([a-z_]+)\s*$/i.exec(last);
+  if (nextHint) {
+    const tool = nextHint[1].toLowerCase();
+    if (TOOLS[tool] && toolsForPlanStep(session.model.id, session.phase).includes(tool)) {
+      return { ...base, verdict: 'clarify', suggestion: { kind: 'next_tool', tool, reason: 'Named as the next tool.' }, message: `Then let us go on with ${TOOLS[tool].name}; start it when you are ready.` };
+    }
+    return { ...base, verdict: 'clarify', message: 'That tool does not belong to this step. Pick one of the step\'s own tools.' };
+  }
+  const reopenHint = /^reopen:\s*([a-z]+)\s*$/i.exec(last);
+  if (reopenHint) {
+    const book = reopenHint[1].toLowerCase();
+    const problem = ['define', 'analyse'].includes(book) ? reopenProblem(session, book) : 'Only Define or Analyse can be reopened.';
+    if (problem) return { ...base, verdict: 'clarify', message: problem };
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'reopen_step', step: book, reason: REOPEN_REASON }, message: `Then the fix belongs in ${book === 'define' ? 'Define' : 'Analyse'}. Reopen it, change what the assumption shaped, and move on to come back here.` };
+  }
+  const placed = placement(run, last);
+  const { slot, text } = placed;
+  const tag = placed.tag ?? tagFromText(run, slot, text);
+  if (wordCount(text) < 6) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['analysis'], message: 'That is too thin to stand on yet. It reads like a symptom rather than a cause. Can you say what specifically happens, and when?' };
+  }
+  if (run.tool === 'after_action_review' && slot === 'learned' && wordCount(text) <= longestEarlier(run)) {
+    return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['reflective_thinking'], message: `Learning is the heart of the review, yet this is shorter than what you said about what happened. Tell me more: what will you keep, change or try next time, and why?` };
   }
   const message = slot === CHOICE_SLOT ? choiceMessage(run) : 'That holds up: it names a process, not a person. Now, why does that happen? Base your answer on what you just said.';
   return { ...base, verdict: 'accept', ...fillNode(run, slot, text, tag), skillsSeen: ['analysis'], message };
