@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cloneBlockWithNewIds, createBlock } from '@/blocks/create-block';
+import { hasDrawing, toScene } from '@/blocks/excalidraw-board';
 import { BlockSchema } from '@/schemas/block';
 
 describe('whiteboard block', () => {
@@ -28,5 +29,34 @@ describe('whiteboard block', () => {
       }
     });
     expect(clone.content).not.toHaveProperty('published_snapshot');
+  });
+
+  it('reads an Excalidraw scene and keeps only the background from app state', () => {
+    const scene = toScene({
+      format: 'excalidraw',
+      version: 1,
+      elements: [{ id: 'a', type: 'rectangle' }],
+      appState: { viewBackgroundColor: '#fffbe6', zoom: { value: 3 } },
+      files: {}
+    });
+    expect(scene.elements).toHaveLength(1);
+    expect(scene.appState).toEqual({ viewBackgroundColor: '#fffbe6' });
+    expect(hasDrawing(scene)).toBe(true);
+  });
+
+  it('treats old BlockSuite snapshots and missing data as an empty board', () => {
+    expect(toScene({ type: 'page', blocks: {} }).elements).toEqual([]);
+    expect(toScene(null).elements).toEqual([]);
+    expect(toScene([1, 2]).elements).toEqual([]);
+  });
+
+  it('does not count deleted shapes as a drawing', () => {
+    const scene = toScene({
+      format: 'excalidraw',
+      elements: [{ id: 'a', isDeleted: true }],
+      appState: {},
+      files: {}
+    });
+    expect(hasDrawing(scene)).toBe(false);
   });
 });
