@@ -3287,6 +3287,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, validated.data);
   }
 
+  /** Earlier parts of files sent in pieces, as the Netlify function takes them. */
+  const pendingMediaParts = new Map<string, Uint8Array[]>();
+
   async function handlePostMediaUpload(
     cookie: string | null | undefined,
     body: unknown
@@ -3340,7 +3343,32 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       provider_file_id = providerFileIdField.trim();
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bytes = new Uint8Array(await file.arrayBuffer());
+    const partCount = Number(body.get('part_count') ?? 1);
+    if (partCount > 1) {
+      const uploadId = String(body.get('upload_id') ?? '');
+      const partIndex = Number(body.get('part_index'));
+      const received = pendingMediaParts.get(uploadId) ?? [];
+      received[partIndex] = bytes;
+      pendingMediaParts.set(uploadId, received);
+      if (partIndex < partCount - 1) {
+        return okResponse(202, { upload_id: uploadId, part_index: partIndex });
+      }
+      pendingMediaParts.delete(uploadId);
+      if (received.length !== partCount || received.some((part) => !part)) {
+        return errorResponse(400, 'validation_error', 'An earlier part of the file is missing. Upload it again.');
+      }
+      const joined = new Uint8Array(received.reduce((sum, part) => sum + part.byteLength, 0));
+      let offset = 0;
+      for (const part of received) {
+        joined.set(part, offset);
+        offset += part.byteLength;
+      }
+      if (joined.byteLength > MAX_MEDIA_BYTES) {
+        return errorResponse(400, 'validation_error', `File exceeds maximum size of ${MAX_MEDIA_BYTES} bytes`);
+      }
+      bytes = joined;
+    }
     const id = newId('media');
     const fileUrl = `http://localhost/api/media/${id}/file`;
     const timestamp = nowIso();

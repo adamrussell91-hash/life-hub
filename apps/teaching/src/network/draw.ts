@@ -3,6 +3,7 @@ import { stripAppBase } from '@/app/base-path';
 import {
   chooseNetworkOrientation,
   layoutNetwork,
+  verticalWidth,
   type LabelView,
   type MarkerView,
   type NetInput,
@@ -129,7 +130,7 @@ function label(parent: Element, view: LabelView, font: string, fill: string, ext
   const parts = view.wrap ? wrapTwo(view.text, font, view.maxW) : [fitText(view.text, font, view.maxW)];
   parts.forEach((part, i) => {
     text(parent, part, {
-      x: view.x, y: view.y - (parts.length - 1 - i) * 15, 'text-anchor': view.anchor,
+      x: view.x, y: view.down ? view.y + i * 15 : view.y - (parts.length - 1 - i) * 15, 'text-anchor': view.anchor,
       class: `net-halo ${extraClass}`.trim(), style: `font:${font};fill:${fill}`
     });
   });
@@ -150,7 +151,7 @@ function badge(parent: Element, x: number, y: number, short: string, name: strin
 export type DrawOptions = {
   /** Editors: drag a stop, gate or unit; the delta is across/along the lines. */
   onNudge?: (key: string, across: number, along: number) => void;
-  /** Year network: units are draggable by id. */
+  /** Stations (lessons or units) are draggable by row id. */
   nudgeRows?: boolean;
   label?: string;
 };
@@ -167,21 +168,18 @@ export function drawNetwork(L: NetLayout, options: DrawOptions = {}): SVGSVGElem
     if (band.shade) s('rect', { x: band.x, y: band.y, width: band.w, height: band.h, class: 'net-band' }, svg);
     text(svg, band.label, { x: band.labelX, y: band.labelY, class: 'net-band__label', style: `font:650 12px ${FONT};fill:${MUTED};letter-spacing:.04em` });
   }
-  for (const pill of L.pills) {
-    s('line', { ...pill.rule, style: `stroke:color-mix(in srgb, ${INK} 14%, transparent);stroke-width:1;stroke-dasharray:1 4` }, svg);
-  }
   for (const path of L.paths) drawPath(svg, path);
 
   const unit = L.rowKind === 'unit';
   for (const pill of L.pills) {
     const g = linkOrGroup(svg, pill.target, `${pill.target.text}${pill.markers.length ? `: ${pill.markers.map((m) => LEVEL_WORD[m.level]).join(', ')}` : ''}`);
     g.classList.add('net-station');
-    if (unit && options.nudgeRows) g.dataset.nudgeKey = pill.rowId;
-    const r = Math.min(pill.w, pill.h) / 2;
+    if (options.onNudge && options.nudgeRows) g.dataset.nudgeKey = pill.rowId;
+    const r = Math.min(14, Math.min(pill.w, pill.h) / 2);
     s('rect', { x: pill.x, y: pill.y, width: pill.w, height: pill.h, rx: r, class: 'net-pill',
       style: unit
         ? `fill:${PAPER};stroke:${DARK};stroke-width:2.4`
-        : `fill:${PAPER};stroke:color-mix(in srgb, ${INK} 34%, transparent);stroke-width:1.5` }, g);
+        : `fill:${PAPER};stroke:color-mix(in srgb, ${INK} 40%, transparent);stroke-width:1.6` }, g);
     for (const m of pill.markers) marker(g, m);
     label(g, pill.label, unit ? FONT_UNIT : FONT_LABEL, INK, pill.target.href ? 'net-label--link' : '');
   }
@@ -239,9 +237,13 @@ function enableDrag(svg: SVGSVGElement, orientation: Orientation, onNudge: NonNu
   svg.classList.add('net-svg--editable');
   let drag: { el: SVGElement; key: string; x: number; y: number; dx: number; dy: number; scale: number; id: number } | null = null;
   let swallow = false;
+  // Stations and stops are links: stop the browser starting its own link drag,
+  // which cancels the pointer and made dragging do nothing.
+  svg.addEventListener('dragstart', (event) => event.preventDefault());
   svg.addEventListener('pointerdown', (event) => {
     const el = (event.target as Element).closest<SVGElement>('[data-nudge-key]');
     if (!el || event.button !== 0) return;
+    event.preventDefault();
     const rect = svg.getBoundingClientRect();
     const scale = rect.width ? Number(svg.getAttribute('width')) / rect.width : 1;
     drag = { el, key: el.dataset.nudgeKey!, x: event.clientX, y: event.clientY, dx: 0, dy: 0, scale, id: event.pointerId };
@@ -252,6 +254,7 @@ function enableDrag(svg: SVGSVGElement, orientation: Orientation, onNudge: NonNu
     drag.dx = (event.clientX - drag.x) * drag.scale;
     drag.dy = (event.clientY - drag.y) * drag.scale;
     if (Math.hypot(drag.dx, drag.dy) > 3) {
+      event.preventDefault();
       drag.el.setAttribute('transform', `translate(${drag.dx} ${drag.dy})`);
       drag.el.classList.add('net-dragging');
     }
@@ -284,16 +287,25 @@ function enableDrag(svg: SVGSVGElement, orientation: Orientation, onNudge: NonNu
  * A map that picks its orientation from the room it has: vertical when every
  * lane fits, otherwise horizontal, swiped sideways inside its own box.
  */
+/** Station names measured in the font the map draws them in. */
+export function measureStations(input: NetInput): (value: string) => number {
+  const font = input.rowKind === 'unit' ? FONT_UNIT : FONT_LABEL;
+  return (value) => measureText(value, font);
+}
+
 export function mountNetworkStage(input: NetInput, options: DrawOptions & { print?: boolean } = {}): HTMLElement {
   const stage = document.createElement('div');
   stage.className = 'net-stage';
   let drawn = '';
+  const measure = measureStations(input);
   const draw = (width: number) => {
-    const orientation = chooseNetworkOrientation(width, input);
-    if (orientation === drawn) return;
-    drawn = orientation;
+    const orientation = chooseNetworkOrientation(width, input, { measure });
+    // A vertical map is centred in its width, so it redraws as the width changes.
+    const key = orientation === 'vertical' ? `v${Math.round(width / 24)}` : 'h';
+    if (key === drawn) return;
+    drawn = key;
     stage.dataset.orientation = orientation;
-    const svg = drawNetwork(layoutNetwork(input, orientation), options);
+    const svg = drawNetwork(layoutNetwork(input, orientation, { width: Math.floor(width), measure }), options);
     if (orientation === 'vertical') {
       stage.replaceChildren(svg);
       return;
@@ -306,7 +318,7 @@ export function mountNetworkStage(input: NetInput, options: DrawOptions & { prin
     stage.replaceChildren(scroller);
   };
   if (options.print || typeof ResizeObserver === 'undefined') {
-    draw(10000);
+    draw(Math.max(verticalWidth(input, { measure }), 900));
     return stage;
   }
   let wasConnected = false;
