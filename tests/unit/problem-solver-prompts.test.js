@@ -76,6 +76,8 @@ test('boundary prompt after skipping a step with no runs asks about the next ste
   assert.doesNotMatch(user, /what they learned/i);
   assert.match(user, /acknowledge/i);
   assert.match(user, /what they want from Devise/);
+  assert.doesNotMatch(user, /No tool suggestion yet/);
+  assert.match(user, /naming the current step's first tool/);
 });
 
 test('after a boundary the prompt asks the coach to record the learning and open the step', () => {

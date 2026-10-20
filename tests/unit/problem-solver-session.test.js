@@ -164,7 +164,7 @@ test('a dismissed opening suggestion stays dismissed until the step changes', ()
   assert.equal(s.suggestion, null, 'the opening suggestion does not come back');
   s = applyCoachTurn(moveOn(s, deps), coach({ verdict: 'clarify', message: 'Skipped.' }), deps);
   assert.notEqual(s.phase, 'general_problem');
-  assert.equal(s.suggestion, null);
+  assert.equal(s.suggestion?.kind, 'next_tool', 'a step left untouched opens the next step with its tool at once');
   s = applyCoachTurn(say(s, 'Ok.', deps), coach({ verdict: 'clarify', message: 'Go on.' }), deps);
   assert.ok(s.suggestion === null || s.suggestion.kind === 'next_tool', 'a new step can open with a suggestion again');
 });
@@ -787,4 +787,21 @@ test('set_review_task is refused on a session with no model (a Lightning run)', 
   const s = createSession({ text: 'I keep missing the bus.' }, deps);
   assert.equal(s.model, null);
   assert.throws(() => setReviewTask(s, { taskId: 't1' }, deps), (err) => err.status === 409 && /no review/.test(err.message));
+});
+
+test('leaving a step untouched brings the next step\'s opening tool at once', () => {
+  let s = moveOn(at('analyse'), deps);
+  assert.equal(s.runner.mode, 'boundary');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify' }), deps);
+  assert.equal(s.phase, 'devise');
+  assert.equal(s.suggestion?.kind, 'next_tool', 'no reply needed first');
+  assert.equal(s.pendingLearning, null);
+});
+
+test('leaving a step with work in it still asks the learning question before any tool', () => {
+  let s = framed();
+  s = idle(applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'The rota changes too late for staff to plan.' } }), deps));
+  s = applyCoachTurn(moveOn(s, deps), coach({ verdict: 'clarify' }), deps);
+  assert.equal(s.suggestion, null);
+  assert.equal(s.pendingLearning, 'define');
 });

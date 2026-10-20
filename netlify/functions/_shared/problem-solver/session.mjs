@@ -249,7 +249,9 @@ export function applyCoachTurn(session, turn, deps) {
 
   // A boundary turn asks the learning question first, so it carries no suggestion.
   // Afterwards a finished tool, or a step with no tool open, always leaves a next step.
-  const quiet = next.phase === 'finished' || mode === 'boundary' || waitingForReview(next);
+  // Leaving a step untouched asks no learning question, so the next step's opening tool comes at once.
+  const untouched = mode === 'boundary' && skippedUntouched(next.steps?.[session.runner?.leaving]);
+  const quiet = next.phase === 'finished' || (mode === 'boundary' && !untouched) || waitingForReview(next);
   const suggestion = quiet ? null : (turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
   return touch({ ...next, turns: [...next.turns, coachTurn], suggestion, summary: turn.summary ?? next.summary }, deps);
 }
