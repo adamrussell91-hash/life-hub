@@ -32,30 +32,30 @@ export function createPeopleTodayHandler(deps = {}) {
         const personRef = url.searchParams.get('person_ref');
         const displayName = url.searchParams.get('display_name') || '';
 
-        let meetings = deps.meetings ?? [];
-        let events = deps.events ?? [];
-        if (!deps.meetings && professionalStore) {
-          try {
-            const meetingRepo = createMeetingRepository({ store: professionalStore });
-            meetings = typeof meetingRepo.listMeetings === 'function' ? await meetingRepo.listMeetings() : [];
-          } catch {
-            meetings = [];
-          }
-        }
-        if (!deps.events && professionalStore) {
-          try {
-            const eventRepo = createEventRepository({ store: professionalStore });
-            events = typeof eventRepo.listEvents === 'function' ? await eventRepo.listEvents() : [];
-          } catch {
-            events = [];
-          }
-        }
-
-        const tasksStore =
-          deps.tasksStore ?? (await (deps.getTasksStore ?? defaultGetTasksStore)(env).catch(() => null));
-        const workBlocks = tasksStore
-          ? await listJSON(tasksStore, 'work_blocks/').catch(() => [])
-          : [];
+        // Meetings, events and work blocks are independent full listings —
+        // load them side by side, each falling back to [] on its own.
+        const loadMeetings = async () => {
+          if (deps.meetings) return deps.meetings;
+          if (!professionalStore) return [];
+          const meetingRepo = createMeetingRepository({ store: professionalStore });
+          return typeof meetingRepo.listMeetings === 'function' ? meetingRepo.listMeetings() : [];
+        };
+        const loadEvents = async () => {
+          if (deps.events) return deps.events;
+          if (!professionalStore) return [];
+          const eventRepo = createEventRepository({ store: professionalStore });
+          return typeof eventRepo.listEvents === 'function' ? eventRepo.listEvents() : [];
+        };
+        const loadWorkBlocks = async () => {
+          const tasksStore =
+            deps.tasksStore ?? (await (deps.getTasksStore ?? defaultGetTasksStore)(env).catch(() => null));
+          return tasksStore ? listTasksJSON(tasksStore, 'work_blocks/') : [];
+        };
+        const [meetings, events, workBlocks] = await Promise.all([
+          loadMeetings().catch(() => []),
+          loadEvents().catch(() => []),
+          loadWorkBlocks().catch(() => [])
+        ]);
         const lessons = deps.lessons ?? [];
 
         const meetPerson =
