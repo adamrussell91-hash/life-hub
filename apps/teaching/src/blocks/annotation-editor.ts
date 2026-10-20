@@ -42,6 +42,7 @@ import { parseStartTime, parseVideoInput } from '@/blocks/video-url';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import { askConfirmCard, askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import { listVoiceDrafts } from '@/blocks/voice-draft-store';
+import { pinnedVoiceTrack } from '@/blocks/voice-playback';
 import {
   mountVoiceRecorder,
   type VoiceRecorderHandle
@@ -744,7 +745,11 @@ export function createAnnotationEditorFields(
     emitChange();
   }
 
-  function openVoiceRecorder(): void {
+  /**
+   * With `pinnedTo`, one short note on that selection, published as soon as it
+   * is saved. Without it, a long take whose line taps become clips in review.
+   */
+  function openVoiceRecorder(pinnedTo?: { anchor: AnnotationAnchor; title: string }): void {
     const layer = ensureVoiceLayer();
     closeVoiceTools();
     clearPending();
@@ -754,10 +759,19 @@ export function createAnnotationEditorFields(
     voiceRecorder = mountVoiceRecorder({
       layerId: layer.id,
       lessonId: context.lessonId,
+      ...(pinnedTo ? { pinnedTo } : {}),
       onTrackReady: (track) => {
-        voiceTracks = [...voiceTracks.filter((row) => row.id !== track.id), track];
+        const ready = pinnedTo ? pinnedVoiceTrack(track, pinnedTo.anchor) : track;
+        voiceTracks = [...voiceTracks.filter((row) => row.id !== ready.id), ready];
         emitChange();
-        openVoiceReview(track.id);
+        if (!pinnedTo) {
+          openVoiceReview(ready.id);
+          return;
+        }
+        closeVoiceTools();
+        paintVoiceTracks();
+        placeHint = 'Voice note added. Highlight more text to record another.';
+        placeStatus.textContent = placeHint;
       },
       onCancel: () => {
         closeVoiceTools();
@@ -765,7 +779,9 @@ export function createAnnotationEditorFields(
       }
     });
     showVoicePanel(voiceRecorder.el);
-    placeHint = 'Recording: tap the poem to pin while you speak.';
+    placeHint = pinnedTo
+      ? 'Recording a voice note on your selection.'
+      : 'Recording: tap the poem to pin while you speak.';
     placeStatus.textContent = placeHint;
   }
 
@@ -1394,6 +1410,14 @@ export function createAnnotationEditorFields(
       (activeLayerId && layers.find((row) => row.id === activeLayerId)) ||
       ensureLayer();
     activeLayerId = layer.id;
+    if (layer.kind === 'voice') {
+      const quote = anchor.quote.exact.trim();
+      openVoiceRecorder({
+        anchor,
+        title: quote.length > 48 ? `“${quote.slice(0, 45).trimEnd()}…”` : `“${quote}”`
+      });
+      return;
+    }
     const id = nextId(`${getLatest().id}_ann`);
     const item: AnnotationItem = {
       id,
@@ -1631,7 +1655,10 @@ export function createAnnotationEditorFields(
       addLabel.textContent = 'Add another note';
       menu.append(addLabel);
       addRow.className = 'block-editor__annotation-bar-menu-add';
-      const addable = layers.filter((layer) => layer.kind !== 'voice');
+      // Voice is a layer like the rest: a voice note on this selection. Offer it even before the layer exists.
+      const addable = voiceLayer()
+        ? layers
+        : [...layers, { id: '', name: 'Voice', kind: 'voice' as const, colour: 'navy' as const }];
       const targets: Array<AnnotationLayer | undefined> = addable.length > 0 ? addable : [undefined];
       for (const layer of targets) {
         const add = document.createElement('button');
@@ -1642,7 +1669,7 @@ export function createAnnotationEditorFields(
         add.setAttribute('aria-label', layer ? `Add a ${layer.name} note to this ${scope}` : `Add a note to this ${scope}`);
         add.addEventListener('click', () => {
           closeBarMenu();
-          applySelection(selection, layer?.id);
+          applySelection(selection, layer && !layer.id ? ensureVoiceLayer().id : layer?.id);
         });
         addRow.append(add);
       }
@@ -2510,7 +2537,7 @@ export function createAnnotationEditorFields(
   /** Which layer the teacher is annotating in; the list and new notes follow it. */
   function paintActiveLayerPick(): void {
     layerPickHost.replaceChildren();
-    const choices = layers.filter((layer) => layer.kind !== 'voice');
+    const choices = layers;
     if (activeLayerId && !layers.some((layer) => layer.id === activeLayerId)) {
       activeLayerId = choices[0]?.id ?? null;
     }
@@ -2528,7 +2555,12 @@ export function createAnnotationEditorFields(
       btn.className = `block-editor__annotation-active-layer-btn block-editor__annotation-active-layer-btn--${layer.colour}`;
       const on = layer.id === activeLayerId;
       btn.setAttribute('aria-pressed', String(on));
-      const count = annotations.filter((ann) => ann.layer_id === layer.id).length;
+      const count =
+        layer.kind === 'voice'
+          ? voiceTracks
+              .filter((track) => track.layer_id === layer.id)
+              .reduce((sum, track) => sum + Math.max(1, track.clips.length), 0)
+          : annotations.filter((ann) => ann.layer_id === layer.id).length;
       btn.textContent = `${layer.name} (${count})`;
       btn.addEventListener('click', () => {
         activeLayerId = layer.id;
@@ -2804,7 +2836,10 @@ export function createAnnotationEditorFields(
     if (activeLayerId && !annotations.some(inLayer)) {
       const empty = document.createElement('p');
       empty.className = 'block-editor__hint';
-      empty.textContent = 'No notes in this layer yet. Highlight words in the text, then choose Add note.';
+      empty.textContent =
+        voiceLayer()?.id === activeLayerId
+          ? 'Highlight a word, a phrase or a line, then record a voice note on it. Each one is listed under Voice.'
+          : 'No notes in this layer yet. Highlight words in the text, then choose Add note.';
       annotationsHost.append(empty);
     }
     annotationsHost.append(annList.el);
