@@ -70,6 +70,7 @@
     "happy-dom": "^17.4.4",
     "katex": "^0.16.47",
     "playwright": "1.61.1",
+    "postcss": "^8.5.28",
     "ts-fsrs": "^5.4.2",
     "typescript": "^5.9.2",
     "vite": "^7.1.2",

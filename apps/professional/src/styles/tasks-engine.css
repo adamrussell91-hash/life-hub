@@ -1,1 +1,2 @@
-@import url('../../../tasks/src/styles/lesson-engine.css') layer(tasks-engine);
+/* Teaching's block styles plus the Tasks page layout, shared as they are. */
+@import url('../../../tasks/src/styles/lesson-engine.css');

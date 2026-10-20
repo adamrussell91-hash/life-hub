@@ -23,7 +23,7 @@ Exit 0 required. Do not open/update the PR if the gate is red.
 
 Docs-only PRs with zero runtime/test/type impact may use `node scripts/pre-pr-check.mjs --docs-only` (still runs `npm test`, the Tasks Hub vitest suite and static guards).
 
-**Ready, then auto-merge.** Open life-hub PRs as ready for review, not draft, unless Adam asks for a draft. Once `pre-pr-check` passes and the PR is pushed, enable auto-merge (merge commit). If auto-merge stalls on a merge conflict, merge `main` in, regenerate generated files (e.g. `node scripts/generate-alchemy-schema.mjs`), rerun the gate and push.
+**Ready, then auto-merge.** Open life-hub PRs as ready for review, not draft, unless Adam asks for a draft. Once `pre-pr-check` passes and the PR is pushed, enable auto-merge (merge commit). If auto-merge stalls on a merge conflict, merge `main` in, regenerate generated files (e.g. `node scripts/generate-alchemy-schema.mjs`, `node scripts/generate-block-css.mjs`), rerun the gate and push.
 
 **Exception: idea docs.** Edits that only touch `docs/future-build-ideas/` skip this gate and may be committed straight to `main` with no PR. These are concept docs for the what if rounds between Claude Code, Cursor and Codex; nothing builds from them. Pull `main` first, commit, push. If a change touches any file outside that folder, the gate applies as normal.
 
