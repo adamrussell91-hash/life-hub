@@ -138,10 +138,42 @@ describe('record filmstrip marks', () => {
     view.update(improveSession(2));
     expect(ids(view, 'improve')).toEqual(['i1', 'i2', 'ps-record__pass', 'i3']);
     const pass = view.el.querySelector('.ps-record__pass')!;
-    expect(pass.getAttribute('role')).toBe('separator');
+    expect(pass.tagName).toBe('LI');
+    expect(pass.getAttribute('role')).toBe('presentation');
+    const rule = pass.querySelector('[role="separator"]')!;
     const day = new Date('2026-10-20T09:00:00.000Z').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
-    expect(pass.textContent).toBe(`Review on ${day}`);
+    expect(rule.textContent).toBe(`Review on ${day}`);
+    expect(rule.getAttribute('aria-label')).toBe(`Review on ${day}`);
     expect(view.el.querySelectorAll('.ps-record__pass')).toHaveLength(1);
+  });
+
+  it('reads "Review" alone when the start date does not parse', () => {
+    const view = createRecordView();
+    const s = improveSession(2);
+    view.update({ ...s, reviewState: { ...s.reviewState!, startedAt: 'not a date' } });
+    expect(view.el.querySelector('.ps-record__pass [role="separator"]')!.textContent).toBe('Review');
+  });
+
+  it('places the divider by run count, switched runs included on either side', () => {
+    const view = createRecordView();
+    const s = improveSession(2);
+    const runs = [run('i1', 'after_action_review', 'done'), run('i2', 'five_cs', 'switched', { switchReason: 'Wrong fit' }), run('i3', 'double_loop', 'switched', { switchReason: 'Too soon' }), run('i4', 'after_action_review', 'active')];
+    view.update({ ...s, steps: { ...s.steps, improve: { runs, status: 'open', objection: null } } });
+    expect(ids(view, 'improve')).toEqual(['i1', 'i2', 'ps-record__pass', 'i3', 'i4']);
+  });
+
+  it('still anchors film cards with a divider and the Lightning strip present', () => {
+    const view = createRecordView();
+    view.update(improveSession(2, { escalatedFrom: 'lt' }));
+    expect(view.anchor('i3', 'film')).toBe(view.el.querySelector('[data-run="i3"]'));
+    expect(view.anchor('i1', 'film')).toBe(view.el.querySelector('[data-run="i1"]'));
+    expect(view.anchor('r2', 'film')).toBe(view.el.querySelector('[data-run="r2"]'));
+  });
+
+  it('copes with a case file that has no history', () => {
+    const view = createRecordView();
+    expect(() => view.update(session({ caseFile: { title: 'T', version: 1, target: { kind: 'task', id: 't' }, writtenAt: 'w', sections: {} } as unknown as PsSession['caseFile'] }))).not.toThrow();
+    expect(view.el.querySelector('.ps-record__casefile')).toBeNull();
   });
 
   it('leaves the divider out with no earlier runs, no new runs, or no runsBefore', () => {
@@ -161,6 +193,7 @@ describe('record filmstrip marks', () => {
     const chips = [...view.el.querySelectorAll<HTMLAnchorElement>('[data-strip="document"] a.ps-record__casefile')];
     expect(chips.map((a) => a.textContent)).toEqual(['Case file v1', 'Case file v2']);
     expect(chips.map((a) => a.getAttribute('href'))).toEqual(['#/task/t1', '#/project/p1']);
+    expect(chips.map((a) => a.getAttribute('aria-label'))).toEqual(['Case file v1, on its task page', 'Case file v2, on its project page']);
     expect(ids(view, 'document').at(0)).toBe('d1');
   });
 

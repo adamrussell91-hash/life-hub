@@ -292,6 +292,7 @@ export function createRecordView(doc: Document = document, options: RecordOption
         link.className = 'ps-record__casefile';
         link.href = href;
         link.textContent = text;
+        link.setAttribute('aria-label', `${text}, on its ${entry.target.kind === 'task' ? 'task' : 'project'} page`);
         item.append(link);
       } else {
         item.append(span('ps-record__casefile', text));
@@ -316,11 +317,15 @@ export function createRecordView(doc: Document = document, options: RecordOption
       const pass = passStart(session, step);
       runs.forEach((run, index) => {
         if (index === pass && session.reviewState?.startedAt) {
+          // The item stays out of the list's count; the separator inside it carries the name.
           const divider = doc.createElement('li');
           divider.className = 'ps-record__pass';
-          divider.setAttribute('role', 'separator');
-          divider.textContent = `Review on ${reviewDay(session.reviewState.startedAt)}`;
-          divider.setAttribute('aria-label', divider.textContent);
+          divider.setAttribute('role', 'presentation');
+          const day = reviewDay(session.reviewState.startedAt);
+          const rule = span('ps-record__pass-label', day ? `Review on ${day}` : 'Review');
+          rule.setAttribute('role', 'separator');
+          rule.setAttribute('aria-label', rule.textContent ?? 'Review');
+          divider.append(rule);
           film.append(divider);
         }
         runStep.set(run.id, step);
@@ -346,7 +351,7 @@ export function createRecordView(doc: Document = document, options: RecordOption
   }
 
   function update(session: PsSession): void {
-    const signature = JSON.stringify([session.model?.id, session.phase, Object.entries(session.steps ?? {}).map(([id, st]) => [id, st.status, st.objection, st.runs.map((run) => [run.id, run.tool, run.status, run.switchReason, run.nodes.length])]), session.reviewState?.runsBefore, session.reviewState?.startedAt, session.caseFile?.history.map((entry) => [entry.version, entry.target.kind, entry.target.id]), session.escalatedFrom]);
+    const signature = JSON.stringify([session.model?.id, session.phase, Object.entries(session.steps ?? {}).map(([id, st]) => [id, st.status, st.objection, st.runs.map((run) => [run.id, run.tool, run.status, run.switchReason, run.nodes.length])]), session.reviewState?.runsBefore, session.reviewState?.startedAt, session.caseFile?.history?.map((entry) => [entry.version, entry.target.kind, entry.target.id]), session.escalatedFrom]);
     if (signature === painted) return;
     painted = signature;
     stepEls.clear();
