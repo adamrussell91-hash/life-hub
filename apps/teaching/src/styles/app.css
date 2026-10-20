@@ -12413,6 +12413,13 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding-right: 15rem;
 }
 
+/* The text column hugs its longest line, so a right-aligned or centred line
+   cannot stretch it and push the margin notes away from the poem. */
+.block-annotation__poem--margin > .block-annotation__stanzas {
+  width: fit-content;
+  max-width: 100%;
+}
+
 /* An open note gets a wider right-hand column, placed beside its line by the ink pass. */
 .block-annotation__poem--panel {
   padding-right: 26rem;
