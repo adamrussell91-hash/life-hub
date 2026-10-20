@@ -60,7 +60,7 @@ export async function mountHubWhiteboard(
 ): Promise<void> {
   host.replaceChildren();
   const loading = document.createElement('p');
-  loading.className = 'block-whiteboard__status';
+  loading.className = 'block-whiteboard__status block-empty';
   loading.textContent = 'Loading whiteboard…';
   host.append(loading);
 
@@ -116,7 +116,7 @@ export async function mountHubWhiteboard(
     const message = error instanceof Error ? error.message : 'Whiteboard failed to load.';
     host.replaceChildren();
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-whiteboard__status block-whiteboard__status--error';
+    unavailable.className = 'block-whiteboard__status block-whiteboard__status--error block-empty';
     unavailable.textContent = message;
     host.append(unavailable);
     options.onStatus?.(message, true);

@@ -123,7 +123,7 @@ export function createQuestionDropEditor(block: DropBlock, onChange: (b: DropBlo
 
   root.append(
     checkbox('Taking questions', current.content.accepting, (on) => set({ accepting: on })),
-    el('p', 'qz-note', 'Students write on the published lesson. Their questions wait on the quiz lesson’s page for you to approve.')
+    el('p', 'qz-note block-secondary', 'Students write on the published lesson. Their questions wait on the quiz lesson’s page for you to approve.')
   );
   return root;
 }
@@ -149,12 +149,12 @@ export function renderQuestionDrop(block: DropBlock, mode: RenderMode, ctx: Rend
   const root = el('section', 'qz-drop');
   root.dataset.blockId = block.id;
   const head = el('header', 'qz-drop__head');
-  head.append(el('p', 'qz-eyebrow', 'Write a quiz question'));
-  head.append(el('h3', 'qz-drop__prompt', block.content.prompt.trim() || 'Write a question for this week’s review quiz.'));
+  head.append(el('p', 'qz-eyebrow block-eyebrow', 'Write a quiz question'));
+  head.append(el('h3', 'qz-drop__prompt block-title', block.content.prompt.trim() || 'Write a question for this week’s review quiz.'));
   root.append(head);
 
   if (mode === 'print') {
-    root.append(el('p', 'qz-note', 'Your question, the answer and how many marks it’s worth:'), el('div', 'qz-print-lines'));
+    root.append(el('p', 'qz-note block-secondary', 'Your question, the answer and how many marks it’s worth:'), el('div', 'qz-print-lines'));
     return root;
   }
   if (mode === 'teacher') {
@@ -162,7 +162,7 @@ export function renderQuestionDrop(block: DropBlock, mode: RenderMode, ctx: Rend
     return root;
   }
   if (!ctx.lessonId) {
-    root.append(el('p', 'qz-note', 'Students write their question on the published lesson.'));
+    root.append(el('p', 'qz-note block-secondary', 'Students write their question on the published lesson.'));
     return root;
   }
   root.append(mountStudent(block, ctx.lessonId, lessonImages(ctx.pageBlocks ?? [])));
@@ -173,14 +173,14 @@ function teacherSummary(block: DropBlock, lessonId?: string): HTMLElement {
   const box = el('div', 'qz-panel');
   const target = block.content.target_quiz_id;
   if (!target) {
-    box.append(el('p', 'qz-panel__title', 'Not feeding a quiz yet'), el('p', 'qz-note', 'Edit this block and choose the quiz lesson it feeds into.'));
+    box.append(el('p', 'qz-panel__title', 'Not feeding a quiz yet'), el('p', 'qz-note block-secondary', 'Edit this block and choose the quiz lesson it feeds into.'));
     return box;
   }
   const kinds = block.content.kinds.length ? block.content.kinds.map((k) => QUIZ_KIND_INFO[k].label).join(', ') : 'Any question type';
   const marks = block.content.marks_min === block.content.marks_max ? plural(block.content.marks_min, 'mark') : `${block.content.marks_min} to ${block.content.marks_max} marks`;
   const title = el('p', 'qz-panel__title', 'Feeds into a quiz');
-  const meta = el('p', 'qz-note', `${kinds} · ${marks} · ${plural(block.content.per_student, 'question')} per student${block.content.accepting ? '' : ' · Paused'}`);
-  const count = el('p', 'qz-note', '');
+  const meta = el('p', 'qz-note block-secondary', `${kinds} · ${marks} · ${plural(block.content.per_student, 'question')} per student${block.content.accepting ? '' : ' · Paused'}`);
+  const count = el('p', 'qz-note block-secondary', '');
   const open = button('Open the quiz', 'secondary', () => navigate(`/lessons/${target}`));
   box.append(title, meta, count, open);
   void apiPost<{ submissions?: Array<{ block_id: string; source_lesson_id: string; status: string }> }>(
@@ -233,7 +233,7 @@ function mountStudent(block: DropBlock, lessonId: string, images: QuizImage[]): 
 
   function paint(): void {
     if (!state) {
-      body.replaceChildren(el('p', 'qz-note', 'Loading…'));
+      body.replaceChildren(el('p', 'qz-note block-secondary', 'Loading…'));
       return;
     }
     const s = state;
@@ -243,7 +243,7 @@ function mountStudent(block: DropBlock, lessonId: string, images: QuizImage[]): 
       done.append(el('p', 'qz-panel__title', s.sent.length === 1 ? `Sent to ${s.quiz_title}` : `${s.sent.length} questions sent to ${s.quiz_title}`));
       const list = el('ul', 'qz-sent');
       for (const q of s.sent) list.append(el('li', '', `${QUIZ_KIND_INFO[q.kind]?.label ?? 'Question'}: ${q.prompt || 'Fill the gap'}`));
-      done.append(list, el('p', 'qz-note', 'Your teacher checks every question before it goes in the quiz.'));
+      done.append(list, el('p', 'qz-note block-secondary', 'Your teacher checks every question before it goes in the quiz.'));
       frame.append(done);
     }
     const remaining = s.per_student - s.sent.length;
@@ -301,7 +301,7 @@ function mountStudent(block: DropBlock, lessonId: string, images: QuizImage[]): 
       }
     });
     const actions = el('div', 'qz-actions');
-    actions.append(sendBtn, el('span', 'qz-note', remaining > 1 ? `You can send ${remaining}.` : 'You can’t change it after you send it.'));
+    actions.append(sendBtn, el('span', 'qz-note block-secondary', remaining > 1 ? `You can send ${remaining}.` : 'You can’t change it after you send it.'));
     wrap.append(builder.root, actions);
     return wrap;
   }
@@ -313,6 +313,6 @@ function mountStudent(block: DropBlock, lessonId: string, images: QuizImage[]): 
 
 function waitPanel(title: string, sub: string): HTMLElement {
   const box = el('div', 'qz-panel qz-panel--wait');
-  box.append(el('p', 'qz-panel__title', title), el('p', 'qz-note', sub));
+  box.append(el('p', 'qz-panel__title', title), el('p', 'qz-note block-secondary', sub));
   return box;
 }
