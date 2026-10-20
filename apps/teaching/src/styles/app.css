@@ -8954,18 +8954,28 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .lesson-page__meta {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-2);
   margin: var(--space-4) 0 var(--space-2);
 }
 
 .lesson-page__meta-outcomes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
   flex: 1 1 auto;
   min-width: 0;
 }
 
+/* Outcomes, + Add and the line chips share one row; an opened outcome drops below it. */
 .lesson-page__meta .outcome-strip {
-  margin-bottom: 0;
+  display: contents;
+}
+
+.lesson-page__meta .outcome-strip__expand {
+  flex: 1 0 100%;
+  order: 1;
 }
 
 /* Matches .outcome-chip so lesson type reads as one more tag, not a form field. */
