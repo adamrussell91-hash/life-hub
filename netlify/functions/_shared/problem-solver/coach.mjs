@@ -4,6 +4,7 @@ import { acceptProblem, addEdge, canEdge, canPlace, checkNode, nextSlots, placeN
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
+import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, reopenProblem, waitingForReview } from './session.mjs';
@@ -122,12 +123,19 @@ function parse(session, text) {
   return { ok: true, value };
 }
 
+function parseLightning(session, text) {
+  const result = validateCoachTurn(extractJson(text));
+  return result.ok ? checkLightningTurn(session, result.value) : result;
+}
+
 export function createModelCoach(model) {
   return async function modelCoach(session) {
-    const prompt = buildCoachPrompt(session);
+    const lightning = session.kind === 'lightning';
+    const prompt = lightning ? buildLightningPrompt(session) : buildCoachPrompt(session);
+    const read = lightning ? parseLightning : parse;
     const first = await model({ ...prompt, maxTokens: 900 });
-    let result = parse(session, first);
-    if (!result.ok) result = parse(session, await model({ ...repairPrompt(prompt, first, result.error), maxTokens: 900 }));
+    let result = read(session, first);
+    if (!result.ok) result = read(session, await model({ ...repairPrompt(prompt, first, result.error), maxTokens: 900 }));
     if (!result.ok) throw Object.assign(new Error('Coach lost the thread, try again.'), { code: 'coach_lost_thread', status: 502 });
     let message = result.value.message;
     if (wordCount(message) > REWRITE_OVER) {

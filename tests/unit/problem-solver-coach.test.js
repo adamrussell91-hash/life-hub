@@ -5,6 +5,7 @@ import { anthropicModel, createModelCoach, fitWords, wordCount } from '../../net
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
 import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say, dismissReview } from '../../netlify/functions/_shared/problem-solver/session.mjs';
+import { createLightningSession } from '../../netlify/functions/_shared/problem-solver/lightning-session.mjs';
 
 let n = 0;
 const deps = { now: () => '2026-10-16T10:00:00.000Z', newId: () => `id${(n += 1)}` };
@@ -348,4 +349,16 @@ test('an accepted name that follows the rules passes', async () => {
   const turn = await coach(namingNext());
   assert.equal(turn.verdict, 'accept');
   assert.equal(turn.node.text, 'Kitchen rota case file 20261020 v1 Final');
+});
+
+test('a Lightning run goes through the Lightning prompt, and a wrong-box reply gets one repair', async () => {
+  const run = { ...createLightningSession({ text: 'The printer jams every Monday.' }, deps), runner: { status: 'queued', mode: 'turn', error: null } };
+  const prompts = [];
+  const replies = [reply({ lightning: { node: 'goal' } }), reply({ message: 'Could you live with it as it is?', lightning: { node: 'start', answer: 'no' } })];
+  const coach = createModelCoach(async (prompt) => { prompts.push(prompt); return replies.shift(); });
+  const turn = await coach(run);
+  assert.match(prompts[0].system[0], /^You are the Problem Solver coach in Lightning mode/);
+  assert.equal(prompts.length, 2);
+  assert.match(JSON.stringify(prompts[1]), /Answer the current box/);
+  assert.deepEqual(turn.lightning, { node: 'start', answer: 'no' });
 });
