@@ -8,12 +8,15 @@ import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js
 import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
-import { BOOK_STEPS, nextStepAfter, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { BOOK_STEPS, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
 import { createTaskBridge } from './task-bridge';
+import { mountReviewPanel, reviewBanner, type ReviewEntry } from './review-panel';
+import { createReviewSync } from './review-sync';
 import { mountTaskCards } from './task-cards';
 import { createSessionSync } from './session-sync';
 import { tasksApi } from '@/services/client-api';
@@ -253,11 +256,15 @@ function createSkillTray(): { el: HTMLElement; update(session: PsSession): void 
   };
 }
 
-/** The plan step a deep link (`step=<book step>`) points at, only when it is the very next step of the session. */
-export function resumeTarget(session: PsSession, wanted: string | null): string | null {
-  if (!wanted || !session.model) return null;
-  const step = planStepForBook(session.model.id, wanted);
-  return step && step === nextStepAfter(session.model.id, session.phase) ? step : null;
+/**
+ * How a review link (`step=improve`) enters the session, or null when it cannot start a review.
+ * The rules are the server's own (`reviewStart`), so the banner never offers a start it refuses.
+ */
+export function reviewEntry(session: PsSession, wanted: string | null): ReviewEntry | null {
+  if (wanted !== 'improve') return null;
+  const kind = reviewStart(session);
+  const step = session.model ? planStepForBook(session.model.id, 'improve') : null;
+  return kind && step ? { kind, step } : null;
 }
 
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
@@ -271,7 +278,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const bench = el('div', 'ps-bench');
   const canvasHost = el('div', 'ps-canvas');
   const tray = createSkillTray();
-  bench.append(canvasHost, tray.el);
+  const review = mountReviewPanel({ start: () => void reviews.startReview() });
+  bench.append(review.el, canvasHost, tray.el);
   const cards = mountTaskCards({
     create: (proposal, edits) => bridge.create(session, proposal, edits),
     dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
@@ -282,20 +290,9 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const coachHost = el('div', 'ps-coach-host');
   coachHost.append(coach.el);
   board.append(bench, coachHost);
-  const resume = resumeTarget(session, hashQuery().get('step'));
-  let banner: HTMLElement | null = null;
-  if (resume) {
-    const name = stepName(session.model!.id, resume);
-    banner = el('div', 'ps-resume');
-    banner.setAttribute('role', 'status');
-    const go = el('button', 'ps-resume__go', `Move on to ${name}`) as HTMLButtonElement;
-    go.type = 'button';
-    go.addEventListener('click', () => {
-      banner?.remove();
-      void act('move_on');
-    });
-    banner.append(el('span', 'ps-resume__text', `This review picks up at ${name}.`), go);
-  }
+  const entry = reviewEntry(session, hashQuery().get('step'));
+  // A waiting Improve already shows Review now; one start button is enough.
+  const banner = entry && !(entry.kind === 'start' && waitingForReview(session)) ? reviewBanner(entry, () => void reviews.startReview(), stepName(session.model!.id, entry.step)) : null;
   page.append(back, title, track.el, ...(banner ? [banner] : []), board);
   canvas.replaceChildren(page);
   const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });
@@ -307,9 +304,6 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     coach.el.querySelector('.ps-coach__extras')?.prepend(note);
   };
 
-  /** Sorted confirmed task ids last fetched, so statuses refresh only when the set changes. */
-  let confirmedKey = '';
-  const confirmedIds = () => (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed' && p.taskId).map((p) => p.taskId!).sort().join(',');
 
   /** Draw a snapshot. Only reached through `sync.paint`, which drops older revisions. */
   const render = (next: PsSession) => {
@@ -320,11 +314,8 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     tray.update(session);
     coach.update(session);
     cards.update(session);
-    const key = confirmedIds();
-    if (key !== confirmedKey) {
-      confirmedKey = key;
-      void refreshStatuses();
-    }
+    review.update(session);
+    reviews.onRender(session);
   };
 
   const sync = createSessionSync({
@@ -372,21 +363,25 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     setReview: (taskId, due) => confirmed('set_review_task', { taskId, due })
   });
 
-  /** Fetch live statuses for the confirmed tasks; a newer refresh wins over a slower older one. */
-  let statusRound = 0;
-  async function refreshStatuses(): Promise<void> {
-    if (!page.isConnected) return;
-    const round = ++statusRound;
-    const map = await bridge.statuses(session.proposedTasks ?? []);
-    if (round === statusRound && page.isConnected) diagram.setTaskStatuses(map);
-  }
+  const reviews = createReviewSync({
+    getSession: () => session,
+    confirmed,
+    settle,
+    details: (proposals) => bridge.details(proposals),
+    setTaskStatuses: (map) => diagram.setTaskStatuses(map),
+    review,
+    banner: () => (banner?.isConnected ? banner : null),
+    flash,
+    alive: () => page.isConnected,
+    focusCoach: () => coach.el.querySelector<HTMLTextAreaElement>('textarea')?.focus()
+  });
   const onVisible = () => {
-    if (document.visibilityState === 'visible' && confirmedKey) void refreshStatuses();
+    if (document.visibilityState === 'visible') reviews.refreshIfTasks();
   };
   document.addEventListener('visibilitychange', onVisible);
   unsubscribeNow.push(
-    onTasksChanged(() => void (confirmedKey && refreshStatuses())),
-    onTasksDeleted(() => void (confirmedKey && refreshStatuses())),
+    onTasksChanged(() => reviews.refreshIfTasks()),
+    onTasksDeleted(() => reviews.refreshIfTasks()),
     () => document.removeEventListener('visibilitychange', onVisible)
   );
 

@@ -27,6 +27,9 @@ import { createDmaicView } from '../../../../../packages/problem-solver/render/d
 import { createFifteenPercentView } from '../../../../../packages/problem-solver/render/fifteen-percent';
 import { createKanbanView } from '../../../../../packages/problem-solver/render/kanban';
 import { createEisenhowerView } from '../../../../../packages/problem-solver/render/eisenhower';
+import { createAfterActionReviewView } from '../../../../../packages/problem-solver/render/after-action-review';
+import { createDoubleLoopView } from '../../../../../packages/problem-solver/render/double-loop';
+import { createFeedbackMatrixView } from '../../../../../packages/problem-solver/render/feedback-matrix';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -76,7 +79,10 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   dmaic: () => createDmaicView(),
   fifteen_percent: () => createFifteenPercentView(),
   kanban: () => createKanbanView(),
-  eisenhower: () => createEisenhowerView()
+  eisenhower: () => createEisenhowerView(),
+  after_action_review: () => createAfterActionReviewView(),
+  double_loop: () => createDoubleLoopView(),
+  feedback_matrix: () => createFeedbackMatrixView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
@@ -144,7 +150,7 @@ function createFrameView(): { el: HTMLElement; update(session: PsSession): void 
         group.dataset.state = state;
       });
       count.textContent = `${FRAME_QUESTIONS.filter(([key]) => session.frame[key]).length} of 3 answered`;
-      const tool = session.suggestion && session.suggestion.kind !== 'next_step' ? session.suggestion.tool : null;
+      const tool = session.suggestion?.kind === 'next_tool' || session.suggestion?.kind === 'switch_tool' ? session.suggestion.tool : null;
       const coreArt = drawing.querySelector('.ps-frame__core > g')!;
       if (coreArt.getAttribute('data-tool') !== String(tool)) {
         coreArt.setAttribute('data-tool', String(tool));

@@ -104,7 +104,7 @@ export function planStepForBook(modelId, book) {
 /**
  * The option chosen in Decide and carried into Implement as its aim: the `choice` node of
  * the latest Decide run that was not switched away from, or null. Read by the prompt, the
- * canvas aim caption and (Plan 6) Improve.
+ * canvas aim caption and Improve's carry-forward.
  */
 export function chosenOption(session) {
   const runs = Object.values(session.steps ?? {}).flatMap((step) => step.runs).filter((run) => run.status !== 'switched' && TOOLS[run.tool]?.step === 'decide');
@@ -113,4 +113,27 @@ export function chosenOption(session) {
     if (node) return { text: node.text, title: node.title ?? node.text, contested: node.state === 'contested', runId: run.id, tool: run.tool };
   }
   return null;
+}
+
+/**
+ * Where Move on goes from the session's current step: back from a reopened step
+ * (`detour`), back to where a late review began (`reviewState.returnTo`), otherwise
+ * the next plan step. Null means the session finishes.
+ */
+export function nextPhase(session) {
+  if (!session.model) return null;
+  if (session.detour && session.detour.to === session.phase) return session.detour.from;
+  const review = session.reviewState;
+  if (review?.status === 'reviewing' && review.returnTo && session.phase === planStepForBook(session.model.id, 'improve')) {
+    return review.returnTo === 'finished' ? null : review.returnTo;
+  }
+  return nextStepAfter(session.model.id, session.phase);
+}
+
+/** True when the session has moved beyond plan step `stepId` (or finished). */
+export function pastStep(session, stepId) {
+  if (session.phase === 'finished') return true;
+  const order = stepPlan(session.model.id).map((s) => s.step);
+  const here = order.indexOf(session.phase);
+  return here >= 0 && here > order.indexOf(stepId);
 }

@@ -1,7 +1,7 @@
 // netlify/functions/_shared/problem-solver/service.mjs
 import { randomUUID } from 'node:crypto';
 import {
-  acceptSuggestion, applyCoachTurn, archive, confirmTask, createSession, dismissReview, dismissSuggestion, dismissTask,
+  acceptSuggestion, applyCoachTurn, archive, confirmTask, createSession, dismissReview, startReview, taskStatus, dismissSuggestion, dismissTask,
   keepAnyway, moveOn, rename, rescoreRadar, say, score, setReviewTask, summaryRow
 } from './session.mjs';
 import { migrateRow, migrateSession } from './migrate.mjs';
@@ -49,6 +49,8 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     dismiss_task: (s, body) => dismissTask(s, body.payload ?? {}, deps),
     set_review_task: (s, body) => setReviewTask(s, body.payload ?? {}, deps),
     dismiss_review: (s) => dismissReview(s, deps),
+    start_review: (s, body) => startReview(s, body.payload ?? {}, deps),
+    task_status: (s, body) => taskStatus(s, body.payload ?? {}, deps),
     archive: (s) => archive(s, deps),
     retry: (s) => {
       if (s.runner.status !== 'failed') throw httpError(409, 'action_not_allowed', 'Nothing to retry.');

@@ -25,26 +25,58 @@ const tasksNamed = (page, title) => page.evaluate(async (wanted) => {
   return res.data.tasks.filter((task) => task.title === wanted || task.title.startsWith(wanted));
 }, title);
 
+/** Open the process record when a step's chart is on screen (a step with runs opens on its chart). */
+async function openRecord(page) {
+  const toggle = page.locator('.ps-canvas__title').getByRole('button', { name: 'Record', exact: true });
+  if (await toggle.isVisible()) await toggle.click();
+  await expect(page.locator('.ps-record')).toBeVisible();
+}
+
 async function answer(page, text) {
   await page.getByLabel('Your answer').fill(text);
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByLabel('Your answer')).toBeEnabled();
 }
 
+/** Describe a new problem and answer the three frame questions; the coach then suggests 5 Whys. */
+async function frameProblem(page, text) {
+  await page.getByLabel('Describe the problem').fill(text);
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(page.locator('.ps-frame')).toBeVisible();
+  await answer(page, 'A rota that is fixed a full week ahead');
+  await expect(page.locator('.ps-frame__row.is-answered')).toHaveCount(1);
+  await answer(page, 'It changed late three of the last four weeks');
+  await answer(page, 'We could change which day it is published');
+  await expect(page.locator('.ps-suggestion')).toContainText('5 Whys');
+}
+
+/** The open problem's id, and a reader for its saved session. */
+async function sessionReader(page) {
+  const id = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('id'));
+  return { id, now: () => page.evaluate(async (sid) => (await fetch(`/api/problem-solver?id=${encodeURIComponent(sid)}`).then((r) => r.json())).data.session, id) };
+}
+
+/** Leave a finished Implement: the dated review card appears and creating it links the review task. Returns its date. */
+async function createReviewOnLeaving(page, viewport, sessionNow) {
+  await page.getByRole('button', { name: 'Move on to Improve' }).click();
+  const reviewCard = page.locator('.ps-reviewcard');
+  await expect(reviewCard).toBeVisible();
+  const due = await reviewCard.locator('input[name="due"]').inputValue();
+  expect(due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  await noOverflow(page);
+  await shot(page, 'reviewcard', viewport);
+  await reviewCard.getByRole('button', { name: 'Create review task' }).click();
+  await expect(reviewCard).toHaveCount(0);
+  await expect.poll(async () => Boolean((await sessionNow()).reviewTaskId)).toBe(true);
+  return due;
+}
+
 for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }]) {
-  test(`5 Whys, a switch to Problem tree, the record and a causal map, then Decide, Implement and the review at ${viewport.width}px`, async ({ page }) => {
+  test(`5 Whys, a switch to Problem tree, the record and a causal map, then Decide, Implement, the review and Improve at ${viewport.width}px`, async ({ page }) => {
     test.setTimeout(240_000);
     await page.setViewportSize(viewport);
     await signIn(page);
-    await page.getByLabel('Describe the problem').fill('The weekly rota keeps changing at the last minute');
-    await page.getByRole('button', { name: 'Start' }).click();
-    await expect(page.locator('.ps-frame')).toBeVisible();
-
-    await answer(page, 'A rota that is fixed a full week ahead');
-    await expect(page.locator('.ps-frame__row.is-answered')).toHaveCount(1);
-    await answer(page, 'It changed late three of the last four weeks');
-    await answer(page, 'We could change which day it is published');
-    await expect(page.locator('.ps-suggestion')).toContainText('5 Whys');
+    await frameProblem(page, 'The weekly rota keeps changing at the last minute');
     await page.getByRole('button', { name: 'Start it' }).click();
     await expect(page.locator('.ps-whys')).toBeAttached();
     await expect(page.locator('.ps-whys [data-node]')).toHaveCount(0);
@@ -180,8 +212,7 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await shot(page, 'taskcard', viewport);
     await taskCard.getByRole('button', { name: 'Create task' }).click();
     await expect(taskCard).toHaveCount(0);
-    const sessionId = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('id'));
-    const sessionNow = () => page.evaluate(async (id) => (await fetch(`/api/problem-solver?id=${encodeURIComponent(id)}`).then((r) => r.json())).data.session, sessionId);
+    const { id: sessionId, now: sessionNow } = await sessionReader(page);
     await expect.poll(async () => (await sessionNow()).proposedTasks.filter((p) => p.status === 'confirmed').length).toBe(1);
     const confirmed = (await sessionNow()).proposedTasks.find((p) => p.status === 'confirmed');
     const created = (await tasksNamed(page, 'Draft the new Wednesday rota template')).find((task) => task.id === confirmed.taskId);
@@ -209,16 +240,7 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await shot(page, 'kanban', viewport);
 
     // Review: leaving Implement proposes a dated review task; creating it links it back.
-    await page.getByRole('button', { name: 'Move on to Improve' }).click();
-    const reviewCard = page.locator('.ps-reviewcard');
-    await expect(reviewCard).toBeVisible();
-    const due = await reviewCard.locator('input[name="due"]').inputValue();
-    expect(due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    await noOverflow(page);
-    await shot(page, 'reviewcard', viewport);
-    await reviewCard.getByRole('button', { name: 'Create review task' }).click();
-    await expect(reviewCard).toHaveCount(0);
-    await expect.poll(async () => Boolean((await sessionNow()).reviewTaskId)).toBe(true);
+    const due = await createReviewOnLeaving(page, viewport, sessionNow);
     const reviews = await tasksNamed(page, 'Review: The weekly rota keeps changing at the last minute');
     const session = await sessionNow();
     const review = reviews.find((task) => task.id === session.reviewTaskId);
@@ -237,5 +259,145 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current', { timeout: 20_000 });
     await noOverflow(page);
     await shot(page, 'improve', viewport);
+
+    // Waiting: Improve waits for the review. The learning answer is kept and no tool is suggested.
+    // The link already says step=improve, but a waiting Improve shows only its own Review now.
+    const panel = page.locator('.ps-review');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('Improve picks up at your review on');
+    await expect(panel.getByRole('button', { name: 'Review now' })).toBeVisible();
+    await expect(page.locator('.ps-resume')).toHaveCount(0);
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I hurry the last step when the end is in sight');
+    const dueSaid = await page.evaluate((d) => new Date(`${d}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }), due);
+    await expect(page.locator('.ps-coach__messages')).toContainText(`Improve picks up at your review on ${dueSaid}.`);
+    await expect(page.locator('.ps-suggestion')).toHaveCount(0);
+    await noOverflow(page);
+    await shot(page, 'waiting', viewport);
+
+    // Review now: a task is done in Tasks, then the panel's button starts the review with the counts.
+    await page.evaluate(async (id) => {
+      const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'done' }) });
+      if (!res.ok) throw new Error(`PATCH failed: ${res.status}`);
+    }, created.id);
+    await panel.getByRole('button', { name: 'Review now' }).click();
+    await expect(panel).toBeHidden({ timeout: 20_000 });
+    await expect.poll(async () => (await sessionNow()).reviewState?.status).toBe('reviewing');
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: After action review', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-aar')).toBeAttached();
+    await expect(page.locator('.ps-coach__messages')).toContainText('Let\'s look at how it went. 1 of 1 tasks are done.');
+
+    // After action review: three full answers, a learned answer too short to be the heart of it, then a fuller one.
+    await answer(page, 'Publish the rota a full week ahead every single week');
+    await answer(page, 'It went out on time in three weeks out of four');
+    await answer(page, 'The manager was away once and nobody else could sign it off');
+    await expect(page.locator('.ps-aar [data-bar][data-filled="true"]')).toHaveCount(3);
+    await answer(page, 'Name a deputy who can sign off');
+    await expect(page.locator('.ps-coach__messages')).toContainText('Tell me more');
+    await expect(page.locator('.ps-aar [data-bar][data-filled="true"]')).toHaveCount(3);
+    await answer(page, 'A single person signing off is fragile, so we will name a deputy and write the steps down for them');
+    await expect(page.locator('.ps-aar [data-bar][data-filled="true"]')).toHaveCount(4);
+    await expect(page.locator('.ps-aar [data-share]')).toBeAttached();
+    await noOverflow(page);
+    await shot(page, 'aar', viewport);
+
+    // Double loop: the problem came back, so the outer loop is drawn; the governing rule reopens Define.
+    await answer(page, 'next: double_loop');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Double-loop learning');
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-dloop')).toBeAttached();
+    await answer(page, 'The rota is changed at the last minute most weeks');
+    await answer(page, 'We moved the publish day from Friday to Wednesday');
+    await answer(page, 'yes, it came back again in week four');
+    await answer(page, 'Only the manager is allowed to approve any rota change');
+    await expect(page.locator('.ps-dloop [data-loop="outer"][data-drawn="true"]')).toBeAttached();
+    await noOverflow(page);
+    await shot(page, 'dloop', viewport);
+    await answer(page, 'reopen: define');
+    await expect(page.locator('.ps-suggestion')).toContainText('Reopen: Define');
+    await page.getByRole('button', { name: 'Reopen it' }).click();
+    await expect(page.locator('.ps-track__stn', { hasText: 'Define' })).toHaveAttribute('data-state', 'now', { timeout: 20_000 });
+    // Define already has runs, so it opens on its chart; the record shows Improve paused.
+    await openRecord(page);
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'waiting');
+    await noOverflow(page);
+    await shot(page, 'reopened', viewport);
+
+    // Moving on from the reopened Define comes straight back to Improve, with the double loop kept.
+    await page.getByRole('button', { name: 'Move on to Improve' }).click();
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I fix the symptom before I question the rule');
+    await openRecord(page);
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current', { timeout: 20_000 });
+    await expect(page.locator('.ps-record__strip[data-strip="improve"]')).toContainText('Double-loop learning');
+    await noOverflow(page);
+    await shot(page, 'back-to-improve', viewport);
+
+    // Leaving Improve ends the review; Document and Finish close the problem.
+    await page.getByRole('button', { name: 'Move on to Document' }).click();
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await expect.poll(async () => (await sessionNow()).reviewState?.status).toBe('done');
+    await answer(page, 'I learn more when I wait for real results');
+    await page.getByRole('button', { name: 'Finish' }).click();
+    await expect.poll(async () => (await sessionNow()).phase).toBe('finished');
+    await expect.poll(async () => (await sessionNow()).status).toBe('finished');
+    await noOverflow(page);
+    await shot(page, 'finished', viewport);
+
+    // A done review cannot start again: the review link opens the problem with no banner.
+    await page.goto(`/#/problem-solver?id=${encodeURIComponent(sessionId)}&step=improve`);
+    await page.reload();
+    await expect(page.locator('.ps-record')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.ps-resume')).toHaveCount(0);
+    await expect(page.locator('.ps-review')).toBeHidden();
+  });
+  test(`a late review: Improve left waiting, then the review link reopens it and returns to Document at ${viewport.width}px`, async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    await frameProblem(page, 'The meeting notes never reach the people who missed it');
+    const { id, now } = await sessionReader(page);
+
+    // Skip the early steps untouched, then finish a Kanban board in Implement.
+    for (const next of ['Analyse', 'Devise', 'Decide', 'Implement']) await page.getByRole('button', { name: `Move on to ${next}` }).click();
+    // A step left untouched asks no learning question, so the next tool is suggested on the next turn.
+    await answer(page, 'Ready to plan the work out now please');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Kanban', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-kanban')).toBeAttached();
+    for (const card of ['Notes template shared with the whole team', 'Notes posted in the channel within the hour', 'Absent people tagged in the posted notes']) await answer(page, `done: ${card}`);
+    await expect(page.locator('.ps-kanban [data-node]')).toHaveCount(3);
+    await createReviewOnLeaving(page, viewport, now);
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I stop checking once the work feels finished');
+    await expect(page.locator('.ps-review')).toContainText('Improve picks up at your review on');
+
+    // Move on past the waiting Improve: it stays waiting.
+    await page.getByRole('button', { name: 'Move on to Document' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('document');
+    await openRecord(page);
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'waiting', { timeout: 20_000 });
+    expect((await now()).reviewState.status).toBe('waiting');
+
+    // The review link: the problem has moved on, the review reopens Improve, Move on returns to Document.
+    await page.goto(`/#/problem-solver?id=${encodeURIComponent(id)}&step=improve`);
+    await page.reload();
+    const banner = page.locator('.ps-resume');
+    await expect(banner).toContainText('This problem has moved on', { timeout: 20_000 });
+    await noOverflow(page);
+    await shot(page, 'late-banner', viewport);
+    await banner.getByRole('button', { name: 'Review the results' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('improve');
+    await openRecord(page);
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current', { timeout: 20_000 });
+    await expect(page.locator('.ps-reviewcard')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Move on to Document' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('document');
+    await expect(page.locator('.ps-track__stn', { hasText: 'Document' })).toHaveAttribute('data-state', 'now', { timeout: 20_000 });
+    expect((await now()).reviewState.status).toBe('done');
+    await noOverflow(page);
+    await shot(page, 'late-returned', viewport);
   });
 }

@@ -258,7 +258,9 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
         card.refresh(busy);
       }
 
-      const showReview = session.reviewProposal?.status === 'proposed' && !session.reviewTaskId;
+      // Only before the review is under way: once it has started or finished, a review task is moot.
+      const reviewPending = !session.reviewState || session.reviewState.status === 'waiting';
+      const showReview = session.reviewProposal?.status === 'proposed' && !session.reviewTaskId && reviewPending;
       if (showReview && !review) review = reviewCard(session.reviewProposal!);
       if (!showReview && review) {
         review.el.remove();

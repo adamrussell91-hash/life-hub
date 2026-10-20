@@ -51,6 +51,12 @@ const RENDERERS = {
   fifteen_percent_now: ['fifteen-percent', 'createFifteenPercentView'],
   kanban: ['kanban', 'createKanbanView'],
   eisenhower: ['eisenhower', 'createEisenhowerView'],
+  after_action_review: ['after-action-review', 'createAfterActionReviewView'],
+  after_action_review_first: ['after-action-review', 'createAfterActionReviewView'],
+  double_loop: ['double-loop', 'createDoubleLoopView'],
+  double_loop_held: ['double-loop', 'createDoubleLoopView'],
+  feedback_matrix: ['feedback-matrix', 'createFeedbackMatrixView'],
+  feedback_matrix_first: ['feedback-matrix', 'createFeedbackMatrixView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

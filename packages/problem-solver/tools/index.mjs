@@ -26,6 +26,9 @@ import { dmaic } from './dmaic.mjs';
 import { fifteenPercent } from './fifteen-percent.mjs';
 import { kanban } from './kanban.mjs';
 import { eisenhower } from './eisenhower.mjs';
+import { afterActionReview } from './after-action-review.mjs';
+import { doubleLoop } from './double-loop.mjs';
+import { feedbackMatrix } from './feedback-matrix.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -55,7 +58,10 @@ export const TOOLS = {
   dmaic,
   fifteen_percent: fifteenPercent,
   kanban,
-  eisenhower
+  eisenhower,
+  after_action_review: afterActionReview,
+  double_loop: doubleLoop,
+  feedback_matrix: feedbackMatrix
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));

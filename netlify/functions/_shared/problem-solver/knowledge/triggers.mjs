@@ -27,5 +27,12 @@ export const STEP_TRIGGERS = Object.freeze({
     'Status quo, loss or regret talk left unexamined ("we have always done it this way") (metacognition).',
     'No measure of success, so nobody will know whether it worked (critical_thinking).',
     'Rolling out everywhere when a cheap pilot was possible (decision_making).'
+  ],
+  improve: [
+    'Blaming a person for what a process or system allowed (logical_reasoning).',
+    'Skipping or rushing what was learned (metacognition).',
+    'A single-loop fix offered for a problem that keeps recurring (analysis).',
+    'Results claimed with no measure, or the plan described instead of what happened (critical_thinking).',
+    'Only the solution reviewed, never the process that produced it (metacognition).'
   ]
 });
