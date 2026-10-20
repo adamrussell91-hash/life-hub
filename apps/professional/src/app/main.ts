@@ -60,6 +60,10 @@ import { renderOrganisationsCompare } from '@/views/organisations-compare';
 import { renderNetworkEcologyView } from '@/views/network-ecology';
 import { renderQuickLog } from '@/views/quick-log';
 import { personRoute } from '@/app/router';
+import { setClassroomExtras } from '@teaching/blocks/classroom-extras';
+
+// Pages here run Teaching's block editors without the classroom extras.
+setClassroomExtras(false);
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.replaceChildren();
