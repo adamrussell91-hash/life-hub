@@ -23,9 +23,14 @@ export function reviewLive(session) {
   return Boolean(session.reviewTaskId) || ['proposed', 'confirmed'].includes(session.reviewProposal?.status);
 }
 
+/** True while the session is in its Improve plan step (whatever the review is doing). */
+export function inImprove(session) {
+  return Boolean(session.model && planStep(session.model.id, session.phase)?.book.includes('improve'));
+}
+
 /** True while the session sits in its Improve step waiting for the review. */
 export function waitingForReview(session) {
-  return session.reviewState?.status === 'waiting' && Boolean(session.model && planStep(session.model.id, session.phase)?.book.includes('improve'));
+  return session.reviewState?.status === 'waiting' && inImprove(session);
 }
 
 /**
@@ -35,6 +40,8 @@ export function waitingForReview(session) {
  * - `reopen`: past Improve (a later step, or finished), a new Improve pass that returns afterwards.
  * Null when archived, with no Improve step, no live review, a review under way or done, a
  * reopened step open, or Implement not yet behind the session.
+ * The page's `ReviewEntry['kind']` is derived from this return type.
+ * @returns {'move' | 'start' | 'reopen' | null}
  */
 export function reviewStart(session) {
   if (session.status === 'archived' || !session.model) return null;

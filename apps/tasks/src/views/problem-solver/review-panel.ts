@@ -2,23 +2,13 @@
 // Improve waits for real results: the panel above the chart while it waits, and the banner a
 // review task's link opens with. Both start the review through the page's `start`.
 import { el } from '@/views/hub-kit';
-import { planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
-import { waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
+import { stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
 import type { PsSession } from '../../../../../packages/problem-solver/types';
 
-/** How a review link enters the session: move into Improve, start it there, or reopen it after. */
-export type ReviewEntry = { kind: 'move' | 'start' | 'reopen'; step: string };
+/** How a review link enters the session: move into Improve, start it there, or reopen it after (`reviewStart`'s kinds). */
+export type ReviewEntry = { kind: NonNullable<ReturnType<typeof reviewStart>>; step: string };
 export type ReviewPanel = { el: HTMLElement; update(session: PsSession): void };
-
-/** The session's Improve plan step, or null before a model is chosen. */
-export function improveStep(session: PsSession): string | null {
-  return session.model ? planStepForBook(session.model.id, 'improve') : null;
-}
-
-/** True while Improve is open and waiting for its review (the server's own rule). */
-export function waitingInImprove(session: PsSession): boolean {
-  return waitingForReview(session);
-}
 
 function dueLabel(due: string | null | undefined): string {
   if (!due) return '';
@@ -45,7 +35,7 @@ export function mountReviewPanel({ start }: { start: () => void }): ReviewPanel 
   return {
     el: panel,
     update(session) {
-      const on = waitingInImprove(session);
+      const on = waitingForReview(session);
       panel.hidden = !on;
       go.disabled = false;
       if (!on) return;

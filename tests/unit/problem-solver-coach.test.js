@@ -291,3 +291,20 @@ test('while Improve waits, a tool suggestion is dropped without a repair call', 
   assert.equal(turn.suggestion, null);
   assert.equal(calls, 1);
 });
+
+test('a reopen in the same reply that places the first governing node survives', async () => {
+  let s = idleRunner(dismissReview(waitingImprove(), deps));
+  s = idleRunner(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'double_loop', reason: 'r' } }, deps));
+  s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot: 'problem', text: 'The rota changes at the last minute' } }), deps));
+  s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot: 'single', text: 'We moved the publish day' } }), deps));
+  s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot: 'recurs', text: 'Yes, it came back in week four', tag: 'yes' } }), deps));
+  assert.equal(s.steps.improve.runs.at(-1).nodes.length, 3);
+  const suggestion = { kind: 'reopen_step', step: 'define', reason: 'The goal was set by the rule.' };
+  const coach = createModelCoach(async () => reply({ verdict: 'accept', node: { slot: 'governing:1', text: 'Only the manager may approve a rota change' }, suggestion }));
+  const turn = await coach(s);
+  assert.equal(turn.node?.slot, 'governing:1');
+  assert.deepEqual(turn.suggestion, suggestion);
+  // A challenged governing node is not placed, so the reopen still waits for it.
+  const challenged = await createModelCoach(async () => reply({ verdict: 'challenge', node: { slot: 'governing:1', text: 'Only the manager may approve a rota change' }, suggestion }))(s);
+  assert.equal(challenged.suggestion, null);
+});

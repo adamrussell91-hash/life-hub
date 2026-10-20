@@ -80,6 +80,19 @@ function allowedEdges(run, node, proposed) {
   return edges;
 }
 
+/**
+ * The session as the reopen gate should see it: this turn's accepted node added to the active
+ * run, so a reply that names the first governing assumption and suggests a reopen keeps both.
+ * Only the slot matters to the gate; the node itself is placed later by applyCoachTurn.
+ */
+function withAcceptedNode(session, turn) {
+  const run = activeRun(session);
+  if (!run || turn.verdict !== 'accept' || !turn.node?.slot) return session;
+  const step = session.steps[session.phase];
+  const runs = step.runs.map((item) => (item.id === run.id ? { ...item, nodes: [...item.nodes, { id: '__candidate__', slot: turn.node.slot, text: turn.node.text, state: 'accepted' }] } : item));
+  return { ...session, steps: { ...session.steps, [session.phase]: { ...step, runs } } };
+}
+
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
@@ -94,11 +107,15 @@ function parse(session, text) {
     const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);
     if (!allowed.includes(suggested.tool)) return { ok: false, error: `Tool ${suggested.tool} is not available in this step. Available: ${allowed.join(', ') || 'none, so do not suggest a tool'}.` };
   }
-  // A reopen the session would refuse, or any tool suggestion while Improve waits, is dropped; the turn survives.
-  if (suggested?.kind === 'reopen_step' && reopenProblem(session, suggested.step)) result.value = { ...result.value, suggestion: null };
+  // A reopen the session would refuse (judged with this turn's accepted node in place) is dropped.
+  // While Improve waits every suggestion goes: tool ones here, and applyCoachTurn drops the rest,
+  // next_step included. Either way the turn survives.
   if (waitingForReview(session) && result.value.suggestion && result.value.suggestion.kind !== 'next_step') result.value = { ...result.value, suggestion: null };
   const fitted = fitToRun(session, result.value);
-  return fitted.error ? { ok: false, error: fitted.error } : { ok: true, value: fitted.value };
+  if (fitted.error) return { ok: false, error: fitted.error };
+  const value = fitted.value;
+  if (value.suggestion?.kind === 'reopen_step' && reopenProblem(withAcceptedNode(session, value), value.suggestion.step)) return { ok: true, value: { ...value, suggestion: null } };
+  return { ok: true, value };
 }
 
 export function createModelCoach(model) {

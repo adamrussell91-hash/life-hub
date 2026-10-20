@@ -9,13 +9,13 @@ import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/prob
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
 import { BOOK_STEPS, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
-import { reviewStart } from '../../../../../packages/problem-solver/review.mjs';
+import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
 import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
 import { createTaskBridge } from './task-bridge';
-import { mountReviewPanel, reviewBanner, waitingInImprove, type ReviewEntry } from './review-panel';
+import { mountReviewPanel, reviewBanner, type ReviewEntry } from './review-panel';
 import { createReviewSync } from './review-sync';
 import { mountTaskCards } from './task-cards';
 import { createSessionSync } from './session-sync';
@@ -292,7 +292,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   board.append(bench, coachHost);
   const entry = reviewEntry(session, hashQuery().get('step'));
   // A waiting Improve already shows Review now; one start button is enough.
-  const banner = entry && !(entry.kind === 'start' && waitingInImprove(session)) ? reviewBanner(entry, () => void reviews.startReview(), stepName(session.model!.id, entry.step)) : null;
+  const banner = entry && !(entry.kind === 'start' && waitingForReview(session)) ? reviewBanner(entry, () => void reviews.startReview(), stepName(session.model!.id, entry.step)) : null;
   page.append(back, title, track.el, ...(banner ? [banner] : []), board);
   canvas.replaceChildren(page);
   const diagram = mountCanvas(canvasHost, { onScore: (scores) => void rescore(scores) });

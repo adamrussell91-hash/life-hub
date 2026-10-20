@@ -159,11 +159,6 @@ export function createTaskBridge(deps: Deps) {
       // Keep the proposals' order, not the order the fetches came back in.
       dismissRemoved(confirmed.map((p) => p.id).filter((id) => removed.includes(id)));
       return out;
-    },
-    /** Live status per confirmed task id: its status, 'removed' (404) or 'unknown'. */
-    async statuses(proposals: PsProposedTask[]): Promise<Record<string, string>> {
-      const details = await this.details(proposals);
-      return Object.fromEntries(Object.entries(details).map(([id, d]) => [id, typeof d === 'string' ? d : d.status]));
     }
   };
 }
