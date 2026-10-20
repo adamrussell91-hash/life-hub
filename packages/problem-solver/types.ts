@@ -19,7 +19,8 @@ export type PsStepState = { runs: PsToolRun[]; status: PsStepStatus; objection: 
 export type PsSuggestion =
   | { kind: 'next_tool' | 'switch_tool'; tool: PsToolId; reason: string }
   | { kind: 'next_step'; reason: string }
-  | { kind: 'reopen_step'; step: 'define' | 'analyse'; reason: string };
+  | { kind: 'reopen_step'; step: 'define' | 'analyse'; reason: string }
+  | { kind: 'escalate'; reason: string };
 
 export type PsProposedTask = {
   id: string;
@@ -46,7 +47,7 @@ export type PsSession = {
   id: string;
   title: string;
   revision: number;
-  kind: 'full';
+  kind: 'full' | 'lightning';
   status: 'active' | 'finished' | 'archived';
   /** 'frame', a plan step id from steps.mjs, or 'finished'. */
   phase: string;
@@ -72,15 +73,18 @@ export type PsSession = {
   caseFile: PsCaseFileRecord | null;
   /** The key of a case-file offer set aside with Not now. */
   caseFileDeclined: string | null;
+  lightning: PsLightningState | null;
+  escalatedFrom: string | null;
+  frameSeeds: PsFrameSeeds | null;
   taskSnapshot: PsTaskSnapshot | null;
   detour: PsDetour | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full'; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null };
+export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning'; escalatedTo?: string | null; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null };
 
-export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file';
+export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file' | 'lightning_answer' | 'lightning_again' | 'escalate';
 
 export type PsCaseFileTarget = { kind: 'task' | 'project'; id: string };
 /** What was written where: the section digests written, so later changes can be found. */
