@@ -80,3 +80,14 @@ test('reopen_step suggestion: define or analyse only', () => {
   assert.equal(bad.ok, false);
   assert.match(bad.error, /reopen_step needs step define or analyse/);
 });
+
+test('lightning step: a known box, kept as given; unknown fails; absent is null', () => {
+  const ok = validateCoachTurn({ verdict: 'clarify', message: 'ok', lightning: { node: 'start', answer: 'no', note: 'It wastes an hour' } });
+  assert.deepEqual(ok.value.lightning, { node: 'start', answer: 'no', note: 'It wastes an hour' });
+  assert.match(validateCoachTurn({ verdict: 'clarify', message: 'ok', lightning: { node: 'nowhere' } }).error, /Unknown Lightning box/);
+  assert.equal(validateCoachTurn({ verdict: 'clarify', message: 'ok' }).value.lightning, null);
+});
+
+test('escalate suggestion is kept', () => {
+  assert.deepEqual(validateCoachTurn({ verdict: 'clarify', message: 'ok', suggestion: { kind: 'escalate', reason: 'It recurs.' } }).value.suggestion, { kind: 'escalate', reason: 'It recurs.' });
+});
