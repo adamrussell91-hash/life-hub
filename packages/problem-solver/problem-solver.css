@@ -4118,7 +4118,22 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 
 @media (prefers-reduced-motion: reduce) {
   .ps-scope .ps-taskcard,
-  .ps-scope .ps-reviewcard { animation: none; }
+  .ps-scope .ps-reviewcard,
+  .ps-scope .ps-casefilecard { animation: none; }
+}
+
+/* Case-file card: the task card's frame with a solid ink top edge. Title and place each take
+   the full width (the place select is a 44px target and never wider than the card), and the
+   section headings sit in a muted list, two columns until the coach column is phone width. */
+.ps-scope .ps-casefilecard { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-4); border-top: 3px solid var(--ps-ink); border-radius: var(--radius-lg); background: var(--ps-card); box-shadow: inset 0 0 0 2px var(--ps-yellow); animation: ps-msg-in 600ms var(--ps-spring); }
+.ps-casefilecard .ps-taskcard__fields { grid-template-columns: minmax(0, 1fr); }
+.ps-casefilecard .ps-taskcard__fields:empty { display: none; }
+.ps-casefilecard__select { box-sizing: border-box; width: 100%; max-width: 100%; min-height: 44px; text-overflow: ellipsis; }
+.ps-casefilecard__sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1) var(--space-4); margin: 0; padding-left: var(--space-5); color: var(--muted); font-size: var(--text-sm); }
+.ps-casefilecard__sections li { min-width: 0; overflow-wrap: anywhere; }
+
+@container taskcards (max-width: 420px) {
+  .ps-casefilecard__sections { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Implement aim: the option chosen in Decide, under the chart heading. */

@@ -10,14 +10,16 @@ import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
 import { BOOK_STEPS, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
-import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
+import type { PsAction, PsCaseFileOffer, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
 import { createTaskBridge } from './task-bridge';
 import { mountReviewPanel, reviewBanner, type ReviewEntry } from './review-panel';
 import { createReviewSync } from './review-sync';
-import { mountTaskCards } from './task-cards';
+import { compactToday, mountTaskCards, type PlaceOption } from './task-cards';
+import { createCaseFileBridge, type CaseFilePlace } from './case-file-bridge';
+import { caseFileOffer, composeCaseFile } from '../../../../../packages/problem-solver/case-file.mjs';
 import { createSessionSync } from './session-sync';
 import { tasksApi } from '@/services/client-api';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
@@ -267,6 +269,50 @@ export function reviewEntry(session: PsSession, wanted: string | null): ReviewEn
   return kind && step ? { kind, step } : null;
 }
 
+/**
+ * Where the case file can go, in order: linked projects, linked tasks, tasks made from the
+ * coach's proposals that are not linked already, then a new project named by the case file.
+ * `labels` maps `kind:id` to a fetched title.
+ */
+export function caseFilePlaces(session: PsSession, labels: Record<string, string>): PlaceOption[] {
+  const out: PlaceOption[] = [];
+  const seen = new Set<string>();
+  const add = (value: string, label: string) => {
+    if (seen.has(value)) return;
+    seen.add(value);
+    out.push({ value, label });
+  };
+  const named = (value: string, prefix: string, fallback: string) => (labels[value] ? `${prefix}: ${labels[value]}` : fallback);
+  for (const link of session.links) if (link.kind === 'project') add(`project:${link.id}`, named(`project:${link.id}`, 'Project', 'Linked project'));
+  for (const link of session.links) if (link.kind === 'task') add(`task:${link.id}`, named(`task:${link.id}`, 'Task', 'Linked task'));
+  for (const proposal of session.proposedTasks ?? []) {
+    if (proposal.status !== 'confirmed' || !proposal.taskId) continue;
+    const value = `task:${proposal.taskId}`;
+    add(value, `Task: ${labels[value] ?? proposal.title}`);
+  }
+  add('new', `New project: ${composeCaseFile(session)?.title ?? 'the case file'}`);
+  return out;
+}
+
+type CaseFileChoice = { place: CaseFilePlace; title: string; moved?: boolean };
+
+/**
+ * The card's write, run from the latest session at click time, never a snapshot captured
+ * earlier, so a stale copy cannot write twice or make a second project. If the latest offer
+ * is no longer the card's (its content or the record moved on), nothing is written.
+ */
+export function latestCaseFileWriter(
+  latest: () => PsSession,
+  write: (session: PsSession, offer: PsCaseFileOffer, choice: CaseFileChoice) => Promise<void>
+): (offer: PsCaseFileOffer, choice: CaseFileChoice) => Promise<void> {
+  return async (offer, choice) => {
+    const session = latest();
+    const now = caseFileOffer(session);
+    if (!now || now.key !== offer.key) throw new Error('The case file changed; check the card again.');
+    await write(session, now, choice);
+  };
+}
+
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await problemSolverApi.get(id);
   const page = el('div', 'ps-page ps-session ps-scope');
@@ -284,7 +330,10 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     create: (proposal, edits) => bridge.create(session, proposal, edits),
     dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
     createReview: (edits) => bridge.createReview(session, edits),
-    dismissReview: () => confirmed('dismiss_review', {})
+    dismissReview: () => confirmed('dismiss_review', {}),
+    places: (s) => placesFor(s),
+    writeCaseFile: (offer, choice) => writeCaseFile(offer, choice),
+    dismissCaseFile: (key) => confirmed('dismiss_case_file', { key })
   }, { fallbackFocus: () => coach.el.querySelector('textarea') });
   const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el });
   const coachHost = el('div', 'ps-coach-host');
@@ -362,6 +411,33 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     dismiss: (proposalId, reason) => confirmed('dismiss_task', { proposalId, ...(reason ? { reason } : {}) }),
     setReview: (taskId, due) => confirmed('set_review_task', { taskId, due })
   });
+
+  /** Titles for the linked pages; a page that cannot be fetched keeps its fallback label. */
+  async function placesFor(s: PsSession): Promise<PlaceOption[]> {
+    const labels: Record<string, string> = {};
+    const linked = s.links.filter((link) => link.kind === 'project' || link.kind === 'task');
+    await Promise.all(linked.map(async (link) => {
+      try {
+        const page = link.kind === 'project' ? await tasksApi.getProject(link.id) : await tasksApi.getTask(link.id);
+        if (page.title) labels[`${link.kind}:${link.id}`] = page.title;
+      } catch {
+        /* the fallback label stands */
+      }
+    }));
+    return caseFilePlaces(s, labels);
+  }
+
+  const caseFiles = createCaseFileBridge({
+    createProject: (body) => tasksApi.createProject({ title: body.title, purpose: `Case file for the problem "${sync.session().title}"` }),
+    getProject: (projectId) => tasksApi.getProject(projectId),
+    updateProject: (projectId, body) => tasksApi.updateProject(projectId, body),
+    getTask: (taskId) => tasksApi.getTask(taskId),
+    updateTask: (taskId, body) => tasksApi.updateTask(taskId, body),
+    link: (payload) => confirmed('link_case_file', payload),
+    today: compactToday
+  });
+
+  const writeCaseFile = latestCaseFileWriter(() => sync.session(), (latest, offer, choice) => caseFiles.write(latest, offer, choice));
 
   const reviews = createReviewSync({
     getSession: () => session,

@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { mountCoachPanel, renderCoachPanel } from '@/views/problem-solver/coach-panel';
 import { createTrack, problemMedal } from '@/views/problem-solver/decor';
 import { mountCanvas } from '@/views/problem-solver/canvas';
-import { reviewEntry } from '@/views/problem-solver/view';
+import { caseFilePlaces, latestCaseFileWriter, reviewEntry } from '@/views/problem-solver/view';
+import { caseFileOffer } from '../../../../packages/problem-solver/case-file.mjs';
 import type { PsSession } from '../../../../packages/problem-solver/types';
 
 const morph = vi.hoisted(() => vi.fn());
@@ -465,5 +466,47 @@ describe('reviewEntry', () => {
     expect(reviewEntry(session({ phase: 'define', detour: { from: 'improve', to: 'define', reason: 'r', at: '' }, ...live }), 'improve')).toBeNull();
     expect(reviewEntry(session({ phase: 'decide', ...live }), 'improve')).toBeNull();
     expect(reviewEntry(session({ phase: 'frame', model: null, ...live }), 'improve')).toBeNull();
+  });
+});
+
+describe('caseFilePlaces', () => {
+  const NAME = 'Kitchen rota case file 20261020 v1 Final';
+  const five = { id: 'r5', tool: 'five_cs', status: 'done', edges: [], nodes: ['contextualise', 'categorise', 'condense:1', 'correct'].map((slot) => ({ id: slot, slot, text: `About ${slot}`, state: 'accepted' })).concat([{ id: 'c', slot: 'correspond', text: NAME, state: 'accepted' }]) };
+  const doc = (extra: Partial<PsSession> = {}) => session({
+    phase: 'document', pendingKeep: null,
+    steps: { document: { runs: [five], status: 'open', objection: null } } as unknown as PsSession['steps'],
+    links: [{ kind: 'task', id: 't9' }, { kind: 'goal', id: 'g1' }, { kind: 'project', id: 'p1' }],
+    proposedTasks: [
+      { id: 'a', title: 'Draft rota', status: 'confirmed', taskId: 't1' },
+      { id: 'b', title: 'Linked already', status: 'confirmed', taskId: 't9' },
+      { id: 'c', title: 'Not yet', status: 'proposed' }
+    ],
+    reviewState: null, caseFile: null, caseFileDeclined: null,
+    ...extra
+  } as Partial<PsSession>);
+
+  it('lists linked projects, linked tasks, unlisted proposal tasks, then a new project', () => {
+    expect(caseFilePlaces(doc(), { 'project:p1': 'Kitchen rota', 'task:t1': 'Draft the rota' })).toEqual([
+      { value: 'project:p1', label: 'Project: Kitchen rota' },
+      { value: 'task:t9', label: 'Linked task' },
+      { value: 'task:t1', label: 'Task: Draft the rota' },
+      { value: 'new', label: `New project: ${NAME}` }
+    ]);
+  });
+
+  it('falls back to Linked project when a title could not be fetched', () => {
+    expect(caseFilePlaces(doc(), {})[0]).toEqual({ value: 'project:p1', label: 'Linked project' });
+  });
+
+  it('writes from the latest session, and refuses when its offer has moved on', async () => {
+    const card = caseFileOffer(doc())!;
+    let latest = doc({ revision: 9 });
+    const write = vi.fn().mockResolvedValue(undefined);
+    const run = latestCaseFileWriter(() => latest, write);
+    await run(card, { place: 'new', title: NAME });
+    expect(write).toHaveBeenCalledWith(latest, expect.objectContaining({ key: card.key }), { place: 'new', title: NAME });
+    latest = doc({ caseFile: { title: NAME, version: 1, target: { kind: 'project', id: 'p7' }, writtenAt: 'x', sections: card.digests, history: [] } });
+    await expect(run(card, { place: 'new', title: NAME })).rejects.toThrow('The case file changed; check the card again.');
+    expect(write).toHaveBeenCalledTimes(1);
   });
 });

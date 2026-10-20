@@ -2,11 +2,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mountTaskCards } from '../../src/views/problem-solver/task-cards';
 import { TaskNotLinkedError } from '../../src/views/problem-solver/task-bridge';
+import { CaseFilePageGone } from '../../src/views/problem-solver/case-file-bridge';
+import { caseFileOffer, composeCaseFile, sectionDigests } from '../../../../packages/problem-solver/case-file.mjs';
 import type { PsSession } from '../../../../packages/problem-solver/types';
 
 const base = { id: 's', title: 'Late rota', runner: { status: 'idle', mode: 'turn', error: null }, proposedTasks: [], reviewProposal: null, reviewTaskId: null } as unknown as PsSession;
 const p = (id: string, status = 'proposed') => ({ id, title: `Task ${id}`, status, due: '2026-10-24', source: { runId: 'k', nodeId: id } });
-const handlers = () => ({ create: vi.fn().mockResolvedValue(undefined), dismiss: vi.fn().mockResolvedValue(undefined), createReview: vi.fn().mockResolvedValue(undefined), dismissReview: vi.fn().mockResolvedValue(undefined) });
+const PLACES = [{ value: 'project:p1', label: 'Project: Kitchen rota' }, { value: 'task:t1', label: 'Task: Draft rota' }, { value: 'new', label: 'New project: x' }];
+const handlers = () => ({
+  create: vi.fn().mockResolvedValue(undefined),
+  dismiss: vi.fn().mockResolvedValue(undefined),
+  createReview: vi.fn().mockResolvedValue(undefined),
+  dismissReview: vi.fn().mockResolvedValue(undefined),
+  places: vi.fn().mockResolvedValue(PLACES),
+  writeCaseFile: vi.fn().mockResolvedValue(undefined),
+  dismissCaseFile: vi.fn().mockResolvedValue(undefined)
+});
 
 describe('task cards', () => {
   it('one card per proposed task; confirmed and dismissed ones show none', () => {
@@ -172,3 +183,172 @@ describe('task cards, review fixes', () => {
   });
 });
 
+
+describe('case-file card', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const NAME = 'Kitchen rota case file 20261020 v1 Final';
+  const node = (slot: string, text: string) => ({ id: `n-${slot}`, slot, text, title: slot, state: 'accepted' });
+  const five = (keep = 'Publish on Wednesday') => ({
+    id: 'r5', tool: 'five_cs', status: 'done', edges: [],
+    nodes: [node('contextualise', 'So next term starts calmly'), node('categorise', 'On the project page'), node('condense:1', keep), node('correct', 'Nothing needs correcting'), node('correspond', NAME)]
+  });
+  const doc = (keep?: string, extra: Record<string, unknown> = {}) => ({
+    ...base,
+    status: 'active', model: { id: 'seven_step', reason: '' }, phase: 'document', links: [],
+    frame: { goal: 'Rota fixed a week ahead', whatIsTrue: 'Changed often', whatCanBeDone: 'c' },
+    steps: { document: { runs: [five(keep)], status: 'open', objection: null } },
+    learnings: [], reviewState: null, caseFile: null, caseFileDeclined: null,
+    ...extra
+  }) as unknown as PsSession;
+  /** Written before with an older "What to keep", so the offer is an update of that section. */
+  const written = (target = { kind: 'project', id: 'p1' }) => {
+    const sections = sectionDigests(composeCaseFile(doc('Publish on Monday'))!);
+    return doc(undefined, { caseFile: { title: NAME, version: 1, target, writtenAt: 'x', sections, history: [] } });
+  };
+
+  it('shows no card while there is nothing to offer', () => {
+    const cards = mountTaskCards(handlers());
+    const s = doc(undefined, { phase: 'implement', steps: { implement: { runs: [], status: 'open', objection: null } } });
+    expect(caseFileOffer(s)).toBeNull();
+    cards.update(s);
+    expect(cards.el.querySelector('.ps-casefilecard')).toBeNull();
+    expect(cards.el.hidden).toBe(true);
+  });
+
+  it('the write card has the title, the places, the sections and two buttons', async () => {
+    const h = handlers();
+    const cards = mountTaskCards(h);
+    const s = doc();
+    cards.update(s);
+    await flush();
+    const card = cards.el.querySelector('article.ps-casefilecard')!;
+    expect(card.querySelector('.ps-taskcard__meta')!.textContent).toBe('Write the case file?');
+    expect(card.querySelector<HTMLInputElement>('input[name="title"]')!.value).toBe(NAME);
+    expect(h.places).toHaveBeenCalledWith(s);
+    const select = card.querySelector<HTMLSelectElement>('select[name="place"]')!;
+    expect([...select.options].map((o) => o.value)).toEqual(['project:p1', 'task:t1', 'new']);
+    expect([...select.options].map((o) => o.textContent)).toEqual(['Project: Kitchen rota', 'Task: Draft rota', `New project: ${NAME}`]);
+    expect(select.value).toBe('project:p1');
+    const headings = [...card.querySelectorAll('ul.ps-casefilecard__sections li')].map((li) => li.textContent);
+    expect(headings).toEqual(caseFileOffer(s)!.file.sections.map((x) => x.heading));
+    expect(card.querySelector('[data-act="write-casefile"]')!.textContent).toBe('Write case file');
+    expect(card.querySelector('[data-act="dismiss-casefile"]')!.textContent).toBe('Not now');
+  });
+
+  it('offers only a new project when the places cannot be loaded', async () => {
+    const h = handlers();
+    h.places.mockRejectedValueOnce(new Error('offline'));
+    const cards = mountTaskCards(h);
+    cards.update(doc());
+    await flush();
+    const select = cards.el.querySelector<HTMLSelectElement>('.ps-casefilecard select')!;
+    expect([...select.options].map((o) => o.value)).toEqual(['new']);
+    expect(cards.el.querySelector('.ps-casefilecard .ps-taskcard__error')!.textContent).toBe('');
+  });
+
+  it('a title that breaks a strict naming rule is refused on the card', async () => {
+    const h = handlers();
+    const cards = mountTaskCards(h);
+    cards.update(doc());
+    await flush();
+    const title = cards.el.querySelector<HTMLInputElement>('.ps-casefilecard input[name="title"]')!;
+    title.value = 'rota stuff';
+    cards.el.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!.click();
+    await flush();
+    expect(h.writeCaseFile).not.toHaveBeenCalled();
+    expect(cards.el.querySelector('.ps-casefilecard .ps-taskcard__error')!.textContent).toBe('Add the date as YYYYMMDD, for example 20261020.');
+  });
+
+  it('Write case file sends the place and title, and reads Writing… while pending', async () => {
+    const h = handlers();
+    let done!: () => void;
+    h.writeCaseFile.mockImplementationOnce(() => new Promise<void>((r) => (done = r)));
+    const cards = mountTaskCards(h);
+    const s = doc();
+    cards.update(s);
+    await flush();
+    const button = cards.el.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!;
+    button.click();
+    expect(button.textContent).toBe('Writing…');
+    expect(h.writeCaseFile).toHaveBeenCalledWith(expect.objectContaining({ kind: 'write', key: caseFileOffer(s)!.key }), { place: { kind: 'project', id: 'p1' }, title: NAME });
+    done();
+    await flush();
+    const select = cards.el.querySelector<HTMLSelectElement>('.ps-casefilecard select')!;
+    select.value = 'new';
+    select.dispatchEvent(new Event('change'));
+    button.click();
+    expect(h.writeCaseFile).toHaveBeenLastCalledWith(expect.anything(), { place: 'new', title: NAME });
+  });
+
+  it('Not now sets the offer aside by its key', async () => {
+    const h = handlers();
+    const cards = mountTaskCards(h);
+    const s = doc();
+    cards.update(s);
+    cards.el.querySelector<HTMLButtonElement>('[data-act="dismiss-casefile"]')!.click();
+    await flush();
+    expect(h.dismissCaseFile).toHaveBeenCalledWith(caseFileOffer(s)!.key);
+  });
+
+  it('the update card lists the changed sections and has no title or place', async () => {
+    const h = handlers();
+    const cards = mountTaskCards(h);
+    const s = written();
+    expect(caseFileOffer(s)!.kind).toBe('update');
+    cards.update(s);
+    const card = cards.el.querySelector('.ps-casefilecard')!;
+    expect(card.querySelector('.ps-taskcard__meta')!.textContent).toBe('Add an update to the case file?');
+    expect([...card.querySelectorAll('.ps-casefilecard__sections li')].map((li) => li.textContent)).toEqual(['What to keep']);
+    expect(card.querySelector('input, select')).toBeNull();
+    expect(card.querySelector('[data-act="write-casefile"]')!.textContent).toBe('Add update');
+    expect(card.querySelector('[data-act="dismiss-casefile"]')!.textContent).toBe('Not now');
+    card.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!.click();
+    await flush();
+    expect(h.writeCaseFile).toHaveBeenCalledWith(expect.objectContaining({ kind: 'update', version: 2 }), { place: { kind: 'project', id: 'p1' }, title: NAME });
+    expect(h.places).not.toHaveBeenCalled();
+  });
+
+  it('when the page has gone, the update card turns into the write form for a copy elsewhere', async () => {
+    const h = handlers();
+    h.writeCaseFile.mockRejectedValueOnce(new CaseFilePageGone());
+    const cards = mountTaskCards(h, { today: () => '20261102' });
+    const s = written();
+    cards.update(s);
+    const card = cards.el.querySelector('.ps-casefilecard')!;
+    card.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!.click();
+    await flush();
+    expect(cards.el.querySelector('.ps-casefilecard')).toBe(card);
+    expect(card.querySelector('.ps-taskcard__error')!.textContent).toContain('is gone');
+    expect(card.querySelector<HTMLInputElement>('input[name="title"]')!.value).toBe('Kitchen rota case file 20261102 v2 Final');
+    const select = card.querySelector<HTMLSelectElement>('select[name="place"]')!;
+    expect([...select.options].map((o) => o.value)).toEqual(['task:t1', 'new']);
+    const primary = card.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!;
+    expect(primary.textContent).toBe('Write it there');
+    expect(card.querySelectorAll('.ps-casefilecard__sections li').length).toBe(caseFileOffer(s)!.file.sections.length);
+    primary.click();
+    await flush();
+    expect(h.writeCaseFile).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'update' }), { place: { kind: 'task', id: 't1' }, title: 'Kitchen rota case file 20261102 v2 Final', moved: true });
+  });
+
+  it('is kept across updates while the offer is the same, and replaced when it changes', async () => {
+    const cards = mountTaskCards(handlers());
+    cards.update(doc());
+    const card = cards.el.querySelector('.ps-casefilecard')!;
+    const title = card.querySelector<HTMLInputElement>('input[name="title"]')!;
+    title.value = 'Kitchen rota notes 20261020 v1 Final';
+    cards.update(doc());
+    expect(cards.el.querySelector('.ps-casefilecard')).toBe(card);
+    expect(title.value).toBe('Kitchen rota notes 20261020 v1 Final');
+    cards.update(doc('Publish on Tuesday'));
+    expect(cards.el.querySelector('.ps-casefilecard')).not.toBe(card);
+    cards.update(doc(undefined, { caseFileDeclined: caseFileOffer(doc())!.key }));
+    expect(cards.el.querySelector('.ps-casefilecard')).toBeNull();
+  });
+
+  it('sits after the task cards and the review card', () => {
+    const cards = mountTaskCards(handlers());
+    cards.update(doc(undefined, { proposedTasks: [p('a')], reviewProposal: { title: 'Review: rota', due: '2099-11-02', reason: '', status: 'proposed' } }));
+    const order = [...cards.el.children].map((child) => child.className.split(' ')[0]);
+    expect(order).toEqual(['ps-taskcard', 'ps-reviewcard', 'ps-casefilecard', 'ps-taskcards__notices']);
+  });
+});
