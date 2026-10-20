@@ -39,7 +39,7 @@ function picker<T extends string | number>(label: string, options: Array<{ value
   options.forEach((o, i) => {
     select.append(option(o.label, String(i), o.value === value));
   });
-  const help = el('p', 'pf-field__hint');
+  const help = el('p', 'pf-field__hint block-secondary');
   const paintHint = (v: T) => {
     help.textContent = hint?.(v) ?? '';
     help.hidden = !hint;
@@ -79,7 +79,7 @@ export function createBrainstormEditor(block: BrainstormBlock, onChange: (b: Bra
     q.wrap,
     picker('Safety', SAFETY, current.content.safety, (v) => set({ safety: v }), (v) => SAFETY.find((s) => s.value === v)?.hint ?? ''),
     row,
-    el('p', 'pf-note', 'To run it, publish the lesson, close this editor and press Start brainstorm on the block.')
+    el('p', 'pf-note block-secondary', 'To run it, publish the lesson, close this editor and press Start brainstorm on the block.')
   );
   return root;
 }

@@ -203,7 +203,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       ]);
     });
     if (!submissions) {
-      wrap.append(bar, el('p', 'qz-note', 'Loading questions…'));
+      wrap.append(bar, el('p', 'qz-note block-secondary', 'Loading questions…'));
       bar.append(add);
       return wrap;
     }
@@ -243,12 +243,12 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     wrap.append(bar);
     if (!submissions.length) {
       wrap.append(
-        el('p', 'qz-note', 'No questions yet. Add a Question drop block to this week’s lessons and choose this quiz as where it feeds into.')
+        el('p', 'qz-note block-secondary', 'No questions yet. Add a Question drop block to this week’s lessons and choose this quiz as where it feeds into.')
       );
       return wrap;
     }
     if (!shown.length) {
-      wrap.append(el('p', 'qz-note', filter === 'pending' ? 'Nothing waiting. You’re all caught up.' : 'None here.'));
+      wrap.append(el('p', 'qz-note block-secondary', filter === 'pending' ? 'Nothing waiting. You’re all caught up.' : 'None here.'));
       return wrap;
     }
     const names = deviceNames(submissions.map((s) => s.device));
@@ -270,7 +270,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     card.dataset.status = s.status;
     const head = el('div', 'qz-sub__head');
     head.append(
-      el('span', 'qz-eyebrow', QUIZ_KIND_INFO[s.question.kind]?.label ?? 'Question'),
+      el('span', 'qz-eyebrow block-eyebrow', QUIZ_KIND_INFO[s.question.kind]?.label ?? 'Question'),
       el('span', 'qz-sub__meta', `${names.get(s.device) ?? 'A student'} · ${s.source_title} · ${plural(s.question.marks, 'mark')}`)
     );
     if (s.flagged) head.append(el('span', 'qz-chip qz-chip--flag', 'Flagged words'));
@@ -305,7 +305,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     const lines = el('div', 'qz-card__answer');
     for (const line of answerLines(s.question)) lines.append(el('p', 'qz-card__line', line));
     card.append(lines);
-    if (s.question.hint) card.append(el('p', 'qz-note', `Hint: ${s.question.hint}`));
+    if (s.question.hint) card.append(el('p', 'qz-note block-secondary', `Hint: ${s.question.hint}`));
 
     const actions = el('div', 'qz-actions');
     if (s.status === 'pending') {
@@ -325,7 +325,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       );
     } else {
       const inQuiz = s.quiz_block_id && blockExists(options.getLesson().blocks, s.quiz_block_id);
-      actions.append(el('span', 'qz-note', s.status === 'approved' ? (inQuiz ? 'In the quiz.' : 'Approved, then removed from the page.') : 'Rejected.'));
+      actions.append(el('span', 'qz-note block-secondary', s.status === 'approved' ? (inQuiz ? 'In the quiz.' : 'Approved, then removed from the page.') : 'Rejected.'));
       actions.append(
         button('Undo', 'ghost', async function () {
           this.disabled = true;
@@ -476,7 +476,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       checkbox('Shuffle answer options', !!s.shuffle_options, (on) => save({ shuffle_options: on })),
       checkbox('Ask “How sure are you?” on each question', !!s.confidence, (on) => save({ confidence: on }))
     );
-    wrap.append(toggles, el('p', 'qz-note', 'Students get changes to questions and settings when you publish.'));
+    wrap.append(toggles, el('p', 'qz-note block-secondary', 'Students get changes to questions and settings when you publish.'));
     return wrap;
   }
 
@@ -485,18 +485,18 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   function resultsView(): HTMLElement {
     const wrap = el('div', 'qz-results');
     if (openAttempt) {
-      wrap.append(el('p', 'qz-note', 'Loading attempt…'));
+      wrap.append(el('p', 'qz-note block-secondary', 'Loading attempt…'));
       void post<{ attempt: AttemptDetail }>({ action: 'attempt', attempt_id: openAttempt })
         .then((res) => wrap.replaceChildren(attemptView(res.attempt)))
         .catch(showError);
       return wrap;
     }
     if (!results) {
-      wrap.append(el('p', 'qz-note', 'Loading results…'));
+      wrap.append(el('p', 'qz-note block-secondary', 'Loading results…'));
       return wrap;
     }
     if (!results.published) {
-      wrap.append(el('p', 'qz-note', 'Publish the quiz to start collecting results.'));
+      wrap.append(el('p', 'qz-note block-secondary', 'Publish the quiz to start collecting results.'));
       return wrap;
     }
     const r = results;
@@ -524,7 +524,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     }
     wrap.append(top);
     if (!total) {
-      wrap.append(el('p', 'qz-note', 'No one has finished the quiz yet. This updates by itself.'));
+      wrap.append(el('p', 'qz-note block-secondary', 'No one has finished the quiz yet. This updates by itself.'));
       return wrap;
     }
 
@@ -569,7 +569,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     if (q.hinted) notes.push(`${q.hinted} used the hint`);
     const sureWrong = q.confidence['3'][0] - q.confidence['3'][1];
     if (sureWrong > 0) notes.push(`${sureWrong} ${sureWrong === 1 ? 'was' : 'were'} sure but didn’t get full marks`);
-    if (notes.length) li.append(el('p', 'qz-note', notes.join(' · ')));
+    if (notes.length) li.append(el('p', 'qz-note block-secondary', notes.join(' · ')));
     if ('options' in q.question && q.key.answer.type === 'choice') {
       const right = new Set(q.key.answer.ids);
       const picksTotal = Object.values(q.picks).reduce((a, b) => a + b, 0);
@@ -603,7 +603,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     a.rows.forEach((r, i) => {
       const item = el('div', 'qz-attempt-row');
       item.append(mountQuestionPlayer({ question: r.question, response: r.response, number: i + 1, result: { mark: r.mark, key: r.key, hinted: r.hinted, awarded: r.awarded } }));
-      if (r.confidence) item.append(el('p', 'qz-note', `How sure: ${['', 'Guessing', 'Fairly sure', 'Sure'][r.confidence]}`));
+      if (r.confidence) item.append(el('p', 'qz-note block-secondary', `How sure: ${['', 'Guessing', 'Fairly sure', 'Sure'][r.confidence]}`));
       const markRow = el('div', 'qz-mark');
       const input = el('input', 'qz-input qz-input--marks');
       input.type = 'number';
@@ -636,7 +636,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     const wrap = el('div', 'qz-live');
     if (!live) {
       wrap.append(
-        el('p', 'qz-note', 'Run the quiz from the front, one question at a time. Students join on the quiz page with a code. No leaderboard: you see how the class went, not who.'),
+        el('p', 'qz-note block-secondary', 'Run the quiz from the front, one question at a time. Students join on the quiz page with a code. No leaderboard: you see how the class went, not who.'),
         button('Start live quiz', 'primary', async function () {
           this.disabled = true;
           await liveAction('live_start');
@@ -650,7 +650,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     code.append(el('span', 'qz-code__label', 'Code'), el('span', 'qz-code__value', formatCode(l.code)));
     bar.append(
       code,
-      el('span', 'qz-note', `${plural(l.joined, 'student')} joined${l.index >= 0 ? ` · Question ${l.index + 1} of ${l.total}` : ''}`),
+      el('span', 'qz-note block-secondary', `${plural(l.joined, 'student')} joined${l.index >= 0 ? ` · Question ${l.index + 1} of ${l.total}` : ''}`),
       button('Show on board', 'ghost', () => showBoard())
     );
     wrap.append(bar, liveStage(l, false), liveControls(l));
@@ -738,7 +738,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   function liveStage(l: Live, big: boolean): HTMLElement {
     const stage = el('div', `qz-live__stage${big ? ' qz-live__stage--board' : ''}`);
     if (l.phase === 'lobby' || !l.question) {
-      stage.append(el('p', 'qz-note', 'Waiting for students to join. Start the first question when everyone’s in.'));
+      stage.append(el('p', 'qz-note block-secondary', 'Waiting for students to join. Start the first question when everyone’s in.'));
       return stage;
     }
     const q = l.question;

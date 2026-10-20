@@ -9,7 +9,7 @@ export function renderOutcomeList(
 
   if (outcomes.length === 0) {
     const empty = document.createElement('p');
-    empty.className = 'outcome-list__empty';
+    empty.className = 'outcome-list__empty block-empty';
     empty.textContent = emptyMessage;
     root.append(empty);
     return root;

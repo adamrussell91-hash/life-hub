@@ -105,7 +105,7 @@ export function taskCard(prompt: string): HTMLElement {
     const item = el('li', 'pf-task__step');
     item.append(el('span', 'pf-task__num', `${i + 1}.`));
     const body = el('div', 'pf-task__body');
-    const line = el('p', 'pf-task__text');
+    const line = el('p', 'pf-task__text block-body');
     const meaning = step.verb ? verbMeaning(step.verb) : null;
     if (step.verb && meaning) {
       const chip = el('button', 'pf-verb', step.verb);

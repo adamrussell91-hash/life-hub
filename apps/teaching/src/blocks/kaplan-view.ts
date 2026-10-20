@@ -140,8 +140,9 @@ export function renderKaplanQualifiers(qualifiers: KaplanQualifier[], options: V
     const supportText = steps[state.step]!.support;
     if (supportText) {
       const support = document.createElement('details');
-      support.className = 'kaplan-support';
+      support.className = 'kaplan-support block-disclosure';
       const summary = document.createElement('summary');
+      summary.className = 'block-disclosure__toggle';
       summary.textContent = 'Need a little support?';
       const text = document.createElement('p');
       text.textContent = supportText;

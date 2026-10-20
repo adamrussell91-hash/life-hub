@@ -142,7 +142,7 @@ export function buildAnthologyView(
   const titleText = options.title ?? block.content.title;
   if (titleText?.trim()) {
     const title = document.createElement('h3');
-    title.className = 'block-anthology__title';
+    title.className = 'block-anthology__title block-title';
     title.textContent = titleText.trim();
     root.append(title);
   }
@@ -184,7 +184,7 @@ export function buildAnthologyView(
   const paintText = () => {
     if (options.data.texts.length === 0) {
       const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty';
+      empty.className = 'block-anthology__empty block-empty';
       empty.textContent = emptyMessage();
       body.append(empty);
       return;
@@ -193,7 +193,7 @@ export function buildAnthologyView(
       const card = document.createElement('article');
       card.className = 'block-anthology__text-card';
       const title = document.createElement('h4');
-      title.className = 'block-anthology__text-title';
+      title.className = 'block-anthology__text-title block-subtitle';
       const titleLink = document.createElement('a');
       titleLink.href = lessonCollectionHref(text.lesson_id);
       titleLink.textContent = text.title;
@@ -235,7 +235,7 @@ export function buildAnthologyView(
     const themes = allThemes(options.data.items);
     if (themes.length === 0) {
       const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty';
+      empty.className = 'block-anthology__empty block-empty';
       empty.textContent = emptyMessage();
       body.append(empty);
       return;
@@ -272,7 +272,7 @@ export function buildAnthologyView(
       const section = document.createElement('section');
       section.className = 'block-anthology__theme-text';
       const heading = document.createElement('h4');
-      heading.className = 'block-anthology__text-title';
+      heading.className = 'block-anthology__text-title block-subtitle';
       heading.textContent = text.title;
       section.append(heading);
 
@@ -360,7 +360,7 @@ export function buildAnthologyView(
     }
     if (grouped.size === 0) {
       const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty';
+      empty.className = 'block-anthology__empty block-empty';
       empty.textContent = emptyMessage();
       body.append(empty);
       return;
@@ -415,7 +415,7 @@ export function buildAnthologyView(
     const connections = anthologyConnections(options.data.items);
     if (connections.length === 0) {
       const empty = document.createElement('p');
-      empty.className = 'block-anthology__empty';
+      empty.className = 'block-anthology__empty block-empty';
       empty.textContent =
         'Shared themes, concepts or techniques across two or more texts will appear here.';
       body.append(empty);

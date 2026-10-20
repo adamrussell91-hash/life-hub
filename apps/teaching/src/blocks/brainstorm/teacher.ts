@@ -205,7 +205,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
     notLive.hidden = true;
     if (!state) {
       idle.hidden = false;
-      idle.replaceChildren(el('p', 'pf-note', 'Loading…'));
+      idle.replaceChildren(el('p', 'pf-note block-secondary', 'Loading…'));
       board.root.hidden = true;
       return;
     }
@@ -217,7 +217,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
       board.root.hidden = true;
       idle.hidden = false;
       idle.replaceChildren(
-        el('p', 'pf-panel__text', 'Students join on the lesson link with the code. No accounts, and they never pick or see a symbol.'),
+        el('p', 'pf-panel__text block-body', 'Students join on the lesson link with the code. No accounts, and they never pick or see a symbol.'),
         button('Start brainstorm', 'primary', function () {
           void send('start', {}, this);
         })
