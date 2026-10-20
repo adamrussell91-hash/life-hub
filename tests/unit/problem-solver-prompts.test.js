@@ -305,3 +305,16 @@ test('a case file ready to write is named, and a written one says where and whic
   assert.match(buildCoachPrompt(written).user, /CASE FILE: v1 "Kitchen rota case file 20261020 v1 Final" written 2026-10-20 to the linked project/);
   assert.match(buildCoachPrompt(written).user, /Changed since it was written: /);
 });
+
+test('carried Lightning seeds show while framing; the tried line stays after', () => {
+  const frameSeeds = { goal: 'Catch the 8.05 every weekday', whatIsTrue: 'Tried draw a diagram: not solved.', tried: [{ node: 'diagram', label: 'Draw a diagram', note: null, outcome: 'not solved', round: 1 }] };
+  const framing = buildCoachPrompt({ ...createSession({ text: 'Late work.' }, deps), frameSeeds });
+  assert.match(framing.user, /CARRIED FROM LIGHTNING/);
+  assert.match(framing.user, /Catch the 8\.05 every weekday/);
+  assert.match(framing.user, /Tried draw a diagram: not solved\./);
+  assert.match(framing.user, /TRIED IN LIGHTNING: Draw a diagram: not solved/);
+  assert.match(framing.user, /causal_map/);
+  const past = buildCoachPrompt({ ...inTool(), frameSeeds });
+  assert.doesNotMatch(past.user, /CARRIED FROM LIGHTNING/);
+  assert.match(past.user, /TRIED IN LIGHTNING: Draw a diagram: not solved/);
+});

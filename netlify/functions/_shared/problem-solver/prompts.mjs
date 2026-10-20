@@ -230,6 +230,17 @@ function earlierSteps(session) {
 }
 
 /** @returns {{ system: string[], user: string }} */
+const FULL_TOOLS = 'Draw a diagram -> causal_map or concept_map; Find an analogy -> analogical_reasoning; reframing -> perspective_shift; Make a list -> lotus_blossom';
+
+function lightningLines(session) {
+  const seeds = session.frameSeeds;
+  if (!seeds) return [];
+  const lines = [];
+  if (session.phase === 'frame') lines.push(`CARRIED FROM LIGHTNING (seeds, not answers: show them, ask the person to confirm or change each, and record only what they confirm in "frame"): goal: ${seeds.goal ?? 'not defined'}; what is true: ${seeds.whatIsTrue ?? 'nothing tried yet'}.`);
+  if (seeds.tried?.length) lines.push(`TRIED IN LIGHTNING: ${seeds.tried.map((t) => `${t.label}: ${t.outcome ?? 'no result'}`).join('; ')}. Their full tools: ${FULL_TOOLS}. When a strategy that did not work has a full tool in the current step, say so when you suggest a tool.`);
+  return lines;
+}
+
 export function buildCoachPrompt(session) {
   const parts = [`PROBLEM: ${session.title}`];
   if (session.runner?.mode === 'boundary') {
@@ -250,6 +261,7 @@ export function buildCoachPrompt(session) {
   const missing = ['goal', 'whatIsTrue', 'whatCanBeDone'].filter((key) => !session.frame[key]);
   parts.push(`Frame: ${JSON.stringify(session.frame)}${missing.length ? `\nMissing frame answers: ${missing.join(', ')}` : ''}`);
   if (session.model) parts.push(`MODEL: ${session.model.id} (${session.model.reason})`);
+  parts.push(...lightningLines(session));
   const earlier = earlierSteps(session);
   if (earlier) parts.push(earlier);
   const chosen = chosenOption(session);
