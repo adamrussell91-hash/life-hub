@@ -57,6 +57,8 @@ const RENDERERS = {
   double_loop_held: ['double-loop', 'createDoubleLoopView'],
   feedback_matrix: ['feedback-matrix', 'createFeedbackMatrixView'],
   feedback_matrix_first: ['feedback-matrix', 'createFeedbackMatrixView'],
+  five_cs: ['five-cs', 'createFiveCsView'],
+  five_cs_first: ['five-cs', 'createFiveCsView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],

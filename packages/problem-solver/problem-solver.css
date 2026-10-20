@@ -6686,3 +6686,217 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-fbm__line { transform: rotate(var(--pa)); }
   .ps-fbm__title--theme { font-size: 12px; }
 }
+
+/* 5 Cs documentation (toolkit p.147 and p.149, Document). The pie: a thin red rim, a thin paper
+   ring, then five equal slices, clockwise from the top left yellow Contextualise, blue Categorise,
+   yellow Condense, red Correct and blue Correspond. Slices wait as faint paper with a thin ink
+   rule and fill with their colour as answers arrive; each heading sits at its slice's centroid.
+   Under it, the blue Correspond card lists the naming rules with yellow (do) and red (don't) dots,
+   and marks each one once the name exists. A paper case file preview follows when all five are in.
+   Phone: slices carry their number, and a key under the pie carries the headings and answers. */
+.ps-fivecs {
+  /* Named, so every phone query measures this root box. */
+  container: fivecs / inline-size;
+  --ps-fivecs-tone: var(--ps-yellow);
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+  color: var(--ps-ink);
+}
+.ps-fivecs [data-tone='blue'] { --ps-fivecs-tone: var(--ps-blue); }
+.ps-fivecs [data-tone='red'] { --ps-fivecs-tone: var(--ps-red); }
+.ps-fivecs [data-tone='yellow'] { --ps-fivecs-tone: var(--ps-yellow); }
+
+/* The pie: square, drawn in one SVG under the HTML labels. */
+.ps-fivecs__pie { position: relative; width: min(100%, 520px); aspect-ratio: 1 / 1; margin-inline: auto; }
+.ps-fivecs__art { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ps-fivecs__rim { fill: var(--ps-red); }
+.ps-fivecs__ring { fill: var(--ps-paper); }
+.ps-fivecs__ghost {
+  fill: var(--ps-paper);
+  stroke: color-mix(in srgb, var(--ps-ink) 35%, transparent);
+  stroke-width: 1px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.ps-fivecs__slice[data-filled='true'] .ps-fivecs__ghost { stroke: none; }
+/* The colour grows from the pie's centre, so the group scales about the middle of the view box. */
+.ps-fivecs__grow { transform-box: view-box; transform-origin: 50px 50px; }
+.ps-fivecs__slice[data-filled='false'] .ps-fivecs__grow { visibility: hidden; }
+/* A hairline of the slice's own colour closes the seam between two filled slices. */
+.ps-fivecs__paint { fill: var(--ps-fivecs-tone); stroke: var(--ps-fivecs-tone); stroke-width: 0.25; stroke-linejoin: round; }
+
+/* The focus and open ring is the slice's own outline: ink over paper, drawn above every slice. */
+.ps-fivecs__outline { visibility: hidden; }
+.ps-fivecs__outline path { fill: none; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ps-fivecs__outline-under { stroke: var(--ps-paper); stroke-width: 5px; }
+.ps-fivecs__outline-ink { stroke: var(--ps-ink); stroke-width: 2px; }
+.ps-fivecs__outline.is-open,
+.ps-fivecs__pie:has([data-slice='contextualise'] .ps-fivecs__button:focus-visible) .ps-fivecs__outline[data-art='contextualise'],
+.ps-fivecs__pie:has([data-slice='categorise'] .ps-fivecs__button:focus-visible) .ps-fivecs__outline[data-art='categorise'],
+.ps-fivecs__pie:has([data-slice='condense'] .ps-fivecs__button:focus-visible) .ps-fivecs__outline[data-art='condense'],
+.ps-fivecs__pie:has([data-slice='correct'] .ps-fivecs__button:focus-visible) .ps-fivecs__outline[data-art='correct'],
+.ps-fivecs__pie:has([data-slice='correspond'] .ps-fivecs__button:focus-visible) .ps-fivecs__outline[data-art='correspond'] { visibility: visible; }
+
+/* Labels: placed by their centre at the slice's centroid; height follows the words. */
+.ps-fivecs__slices { position: absolute; inset: 0; }
+.ps-fivecs__item { position: absolute; width: 30%; transform: translate(-50%, -50%); }
+.ps-fivecs__shape { border-radius: 8px; color: var(--ps-ink); }
+.ps-fivecs__shape.is-filled[data-tone='yellow'] { color: var(--ps-on-yellow); }
+.ps-fivecs__shape.is-filled:is([data-tone='red'], [data-tone='blue']) { color: #fff; }
+.ps-fivecs__button {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-fivecs__button:disabled { cursor: default; }
+.ps-fivecs__button:focus-visible { outline: 2px solid transparent; }
+.ps-fivecs__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 6px; max-width: 100%; }
+.ps-fivecs__heading { font: var(--weight-bold) 12px / 1.25 var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; }
+.ps-fivecs__head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-fivecs__count { font: var(--weight-bold) 11px / 1.25 var(--font-ui); }
+.ps-fivecs__count:empty { display: none; }
+.ps-fivecs__title {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  font: var(--weight-semibold) 14px / 1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-fivecs__title--hint { font-weight: var(--weight-regular); font-size: 13px; opacity: 0.8; }
+.ps-fivecs__num { display: none; font: var(--weight-bold) 22px / 1 var(--font-ui); }
+
+/* Details cards, under the pie; Condense lists each essential under its own title. */
+.ps-fivecs__panel { margin-top: 12px; }
+.ps-fivecs .ps-details { width: min(100%, 560px); }
+.ps-fivecs .ps-details__card + .ps-details__card { margin-top: 6px; }
+.ps-fivecs__card-head { margin: 0 0 4px; color: var(--ink); font: var(--weight-semibold) var(--text-sm) / 1.35 var(--font-ui); }
+
+/* The Correspond card: blue and rounded, one row per naming rule. */
+.ps-fivecs__rules {
+  box-sizing: border-box;
+  width: min(100%, 560px);
+  margin: 20px auto 0;
+  padding: 22px 26px 24px;
+  border-radius: 18px;
+  background: var(--ps-blue);
+  color: #fff;
+}
+.ps-fivecs__rules-title { margin: 0; font: var(--weight-bold) 24px / 1.15 var(--font-ui); }
+.ps-fivecs__rules-sub { margin: 4px 0 0; font: var(--weight-regular) 13px / 1.35 var(--font-ui); }
+.ps-fivecs__name {
+  margin: 14px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--ps-paper);
+  color: var(--ps-ink);
+  font: var(--weight-semibold) 13px / 1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.ps-fivecs__name[hidden] { display: none; }
+.ps-fivecs__rule-list { display: grid; gap: 10px; margin-top: 16px; }
+.ps-fivecs__rule { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; min-height: 22px; }
+.ps-fivecs__dot { width: 14px; height: 14px; border-radius: 50%; background: var(--ps-yellow); }
+.ps-fivecs__rule[data-kind='dont'] .ps-fivecs__dot { background: var(--ps-red); }
+.ps-fivecs__rule-label { font: var(--weight-medium, 500) 15px / 1.3 var(--font-ui); }
+.ps-fivecs__mark { display: inline-flex; justify-content: flex-end; min-width: 22px; }
+.ps-fivecs__mark-icon { display: block; width: 20px; height: 20px; }
+.ps-fivecs__mark-disc { fill: var(--ps-paper); }
+.ps-fivecs__mark-line { fill: none; stroke: var(--ps-blue); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ps-fivecs__rule[data-ok='false'] .ps-fivecs__mark-disc { fill: var(--ps-red); }
+.ps-fivecs__rule[data-ok='false'] .ps-fivecs__mark-line { stroke: #fff; }
+.ps-fivecs__coach {
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 1px currentColor;
+  font: var(--weight-semibold) 11px / 1.5 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ps-fivecs__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* The case file preview: this tool's part of the record, on a paper card. */
+.ps-fivecs__casefile {
+  box-sizing: border-box;
+  width: min(100%, 560px);
+  margin: 16px auto 0;
+  padding: 18px 22px 20px;
+  border-top: 4px solid var(--ps-blue);
+  border-radius: 4px 4px 14px 14px;
+  background: var(--ps-card);
+  box-shadow: inset 0 0 0 1px var(--ps-ghost);
+  color: var(--ps-ink);
+}
+.ps-fivecs__meta { font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-fivecs__casefile-kind { margin: 0; }
+.ps-fivecs__casefile-name { margin: 4px 0 12px; font: var(--weight-semibold) 15px / 1.4 ui-monospace, SFMono-Regular, Menlo, monospace; -webkit-line-clamp: 3; }
+.ps-fivecs__casefile-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: 6px 14px; margin: 0; }
+.ps-fivecs__casefile-value { margin: 0; font: var(--weight-regular) 14px / 1.35 var(--font-ui); overflow-wrap: anywhere; }
+
+/* The key: only on a phone. */
+.ps-fivecs__key { display: none; }
+
+/* Phone: slices carry their number only; the key under the pie pairs each number with its
+   heading and latest answer, and is the touch target. */
+@container fivecs (max-width: 480px) {
+  .ps-fivecs__item { width: 18%; }
+  .ps-fivecs__button { padding: 4px 2px; }
+  .ps-fivecs__num { display: block; }
+  .ps-fivecs__button .ps-fivecs__head,
+  .ps-fivecs__button .ps-fivecs__title { display: none; }
+
+  .ps-fivecs__key { display: grid; gap: 6px; margin-top: 14px; }
+  .ps-fivecs__key-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 10px 6px 6px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--ps-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ps-fivecs__key-item:disabled { cursor: default; }
+  .ps-fivecs__key-item.is-open { box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+  .ps-fivecs__key-code {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--ps-paper);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-ink) 35%, transparent);
+    font: var(--weight-bold) 13px / 1 var(--font-ui);
+  }
+  .ps-fivecs__key-item.is-filled .ps-fivecs__key-code { background: var(--ps-fivecs-tone); box-shadow: none; color: #fff; }
+  .ps-fivecs__key-item.is-filled[data-tone='yellow'] .ps-fivecs__key-code { color: var(--ps-on-yellow); }
+  .ps-fivecs__key-words { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .ps-fivecs__key-meta { font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+  .ps-fivecs__key-title { min-width: 0; font: var(--weight-semibold) 14px / 1.3 var(--font-ui); overflow-wrap: anywhere; }
+  .ps-fivecs__key-title:empty { display: none; }
+  .ps-fivecs__key-item .ps-objection { align-self: flex-start; margin-top: 2px; }
+
+  .ps-fivecs__rules { padding: 18px 16px 20px; border-radius: 14px; }
+  .ps-fivecs__rules-title { font-size: 20px; }
+  .ps-fivecs__rule-label { font-size: 14px; }
+  .ps-fivecs__casefile { padding: 16px 16px 18px; }
+}
