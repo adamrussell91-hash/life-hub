@@ -9,12 +9,12 @@ export const deps = { now: () => '2026-10-20T09:00:00.000Z', newId: () => `eval-
 const idle = (s) => ({ ...s, runner: { status: 'idle', mode: 'turn', error: null } });
 const turn = (fields) => ({ verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, proposeTasks: [], proposeReview: null, lightning: null, ...fields });
 
-const FRAME = { goal: 'The weekly rota is fixed a week ahead', whatIsTrue: 'It changed late in three of the last four weeks', whatCanBeDone: 'Change when and how the rota is published' };
+const ROTA_FRAME = { goal: 'The weekly rota is fixed a week ahead', whatIsTrue: 'It changed late in three of the last four weeks', whatCanBeDone: 'Change when and how the rota is published' };
 
 /** A seven-step session in `phase`, with `tool` open and `nodes` ([slot, text]) placed. */
-export function atTool(phase, tool, nodes = [], title = 'The weekly rota keeps changing late') {
+export function atTool(phase, tool, nodes = [], title = 'The weekly rota keeps changing late', frame = ROTA_FRAME) {
   let s = createSession({ text: title }, deps);
-  s = idle(applyCoachTurn(s, turn({ frame: FRAME, model: { id: 'seven_step', reason: 'A real problem.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }), deps));
+  s = idle(applyCoachTurn(s, turn({ frame, model: { id: 'seven_step', reason: 'A real problem.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }), deps));
   s = idle(acceptSuggestion(s, deps));
   while (s.phase !== phase) s = idle(moveOn(s, deps));
   if (s.phase !== 'define') s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool, reason: 'r' } }, deps));
@@ -29,7 +29,9 @@ export function lightningAt(text, steps = []) {
   return s;
 }
 
-const classLate = () => atTool('define', 'five_whys', [['problem', 'Year 9 students hand in work late']], 'Year 9 students hand in work late.');
+/** The v1 cases' own problem, with a frame that matches it. */
+const CLASS_FRAME = { goal: 'Year 9 work handed in on time', whatIsTrue: 'Half the class missed the last two deadlines', whatCanBeDone: 'Change how deadlines are set and checked' };
+const classLate = () => atTool('define', 'five_whys', [['problem', 'Year 9 students hand in work late']], 'Year 9 students hand in work late.', CLASS_FRAME);
 
 /** Each case: build(), the person's answer, and the checks a good reply passes. */
 export const CASES = [
