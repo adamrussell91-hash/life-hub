@@ -1,7 +1,7 @@
 // apps/tasks/src/views/problem-solver/case-file-blocks.ts
 // The case file as page blocks: a heading, one rich text block per section and a link back.
 // Ids are fixed per session and version, so a retried append never duplicates a block.
-import { createBlock } from '@/blocks/create-block';
+import { createBlock } from '@teaching/blocks/create-block';
 import type { Block } from '@/schemas/block';
 import { reviseName } from '../../../../../packages/problem-solver/naming.mjs';
 import type { PsCaseFileOffer } from '../../../../../packages/problem-solver/types';

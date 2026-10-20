@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createBlock, TAB_CHILD_TYPES } from '@/blocks/create-block';
-import { createTabsEditor, rememberTabsPanel } from '@/blocks/layout-editors';
-import { renderTabsBlock, renderBlock } from '@/blocks/registry';
-import { mountBlockCanvas } from '@/teacher/lesson-canvas/mount-page';
+import { createBlock, TAB_CHILD_TYPES } from '@teaching/blocks/create-block';
+import { createTabsEditor, rememberTabsPanel } from '@teaching/blocks/layout-editors';
+import { renderTabsBlock, renderBlock } from '@teaching/blocks/registry';
+import { mountBlockCanvas } from '@teaching/teacher/lesson-canvas/mount-page';
 import type { Block } from '@/schemas/block';
 import { clickMenuAction, holdDelete, menuItem } from './helpers/hub-list';
 import { closeHubMenu } from '../../design-kit/js/hub-list.js';

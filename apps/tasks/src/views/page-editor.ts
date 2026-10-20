@@ -2,8 +2,8 @@ import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task'
 import { isProjectArchived, type Project, type ProjectStatus, type QualityBar } from '@/schemas/project';
 import type { Program } from '@/schemas/program';
 import type { Block } from '@/schemas/block';
-import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
-import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
+import { nextBlockIdFactory } from '@teaching/teacher/lesson-canvas/drop';
+import { mountBlockCanvas, type BlockCanvasHandle } from '@teaching/teacher/lesson-canvas/mount-page';
 import { tasksApi } from '@/services/client-api';
 import { formatRelativeUpdated, projectChildTasks, projectProgress, statusLabel } from '@/domain/cards';
 import type { ExcursionTemplate } from '@/schemas/templates';
@@ -89,6 +89,7 @@ function mountEngine(
   const handle = mountBlockCanvas(canvasHost, {
     blocks,
     idFactory: nextBlockIdFactory('block', blocks),
+    editOnClick: true,
     onChange
   });
 

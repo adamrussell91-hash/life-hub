@@ -10,7 +10,7 @@ import {
   todayPlateTasks
 } from '@/domain/queries';
 import type { Task } from '@/schemas/task';
-import { createBlock } from '@/blocks/create-block';
+import { createBlock } from '@teaching/blocks/create-block';
 import { PageBlockSchema } from '@/schemas/page-block';
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
 import * as taskProperties from '@/services/task-properties';
