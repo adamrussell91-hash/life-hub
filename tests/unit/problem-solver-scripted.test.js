@@ -6,6 +6,8 @@ import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say, score } f
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 import { addEdge, checkNode, isComplete, newRun, placeNode } from '../../packages/problem-solver/machine.mjs';
+import { createLightningSession, applyLightningTurn } from '../../netlify/functions/_shared/problem-solver/lightning-session.mjs';
+import { currentEntry } from '../../packages/problem-solver/lightning.mjs';
 import { matrixTotals, options } from '../../packages/problem-solver/tools/decision-matrix.mjs';
 
 /** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
@@ -446,4 +448,85 @@ test('knowledge management: answers place in order, explicit and tacit hints go 
     run = placeNode(run, { id: turn.node.slot, ...turn.node, state: 'accepted' });
   }
   assert.equal(isComplete(run), true);
+});
+
+// Lightning runs
+const lightningStep = async (s, text) => {
+  const said = { ...s, turns: [...s.turns, { id: deps.newId(), role: 'user', text, createdAt: deps.now() }] };
+  return applyLightningTurn(said, await scriptedCoach(said), deps);
+};
+const freshRun = () => createLightningSession({ text: 'The shed door sticks.' }, deps);
+const here = (s) => currentEntry(s.lightning)?.node;
+
+test('lightning: opens by asking the first box, with no lightning step', async () => {
+  const turn = await scriptedCoach(freshRun());
+  assert.equal(turn.verdict, 'clarify');
+  assert.equal(turn.message, 'Could you accept things as they are?');
+  assert.equal(turn.lightning, null);
+  assert.equal(turn.suggestion, null);
+});
+
+test('lightning: a run walks to Relax and finishes', async () => {
+  let s = freshRun();
+  s = await lightningStep(s, 'no');
+  assert.equal(s.turns.at(-1).text, 'Next: Define the goal.');
+  assert.equal(here(s), 'goal');
+  s = await lightningStep(s, 'The door should slide shut without force');
+  assert.equal(s.turns.at(-1).text, 'Next: Could taking something away solve it?');
+  s = await lightningStep(s, 'no');
+  s = await lightningStep(s, 'no');
+  assert.equal(here(s), 'diagram');
+  assert.match(s.turns.at(-1).text, /^Next: Draw a diagram\./);
+  s = await lightningStep(s, 'no, sketched it');
+  assert.equal(here(s), 'work_backwards');
+  assert.equal(s.lightning.path.find((e) => e.node === 'diagram').note, 'sketched it');
+  s = await lightningStep(s, 'yes');
+  assert.equal(here(s), 'learn');
+  s = await lightningStep(s, 'The runner was bent and I never looked');
+  s = await lightningStep(s, 'Check the runner each season');
+  assert.equal(s.status, 'finished');
+  assert.ok(s.lightning.finishedAt);
+  assert.equal(s.turns.at(-1).text, 'That run is done.');
+});
+
+test('lightning: yes and no are case-insensitive and may carry words', async () => {
+  const turn = await scriptedCoach({ ...freshRun(), turns: [{ role: 'user', text: 'YES, we can live with it' }, { role: 'user', text: 'YES, we can live with it' }] });
+  assert.deepEqual(turn.lightning, { node: 'start', answer: 'yes', note: 'we can live with it' });
+});
+
+test('lightning: a goal line needs three words, else a clarify', async () => {
+  let s = await lightningStep(freshRun(), 'no');
+  const short = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'Fix it' }] });
+  assert.equal(short.verdict, 'clarify');
+  assert.equal(short.message, 'Say a little more about that.');
+  assert.equal(short.lightning, null);
+});
+
+test('lightning: an unclear reply at a yes/no box asks the box again', async () => {
+  const s = freshRun();
+  const turn = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'maybe, not sure' }] });
+  assert.equal(turn.lightning, null);
+  assert.match(turn.message, /Could you accept things as they are\?/);
+});
+
+test('lightning: escalate gives the escalate suggestion', async () => {
+  const s = freshRun();
+  const turn = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'escalate' }] });
+  assert.deepEqual(turn.suggestion, { kind: 'escalate', reason: 'Named as needing the full process.' });
+  assert.equal(turn.lightning, null);
+  const applied = applyLightningTurn(s, turn, deps);
+  assert.equal(applied.suggestion.kind, 'escalate');
+});
+
+test('lightning: a finished run gets a one-line clarify; "It came back." asks the first box again', async () => {
+  let s = freshRun();
+  s = await lightningStep(s, 'yes');
+  s = await lightningStep(s, 'Nothing to learn here really');
+  s = await lightningStep(s, 'Carry on as before then');
+  assert.equal(s.status, 'finished');
+  const done = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'hello' }] });
+  assert.equal(done.verdict, 'clarify');
+  assert.equal(done.lightning, null);
+  const again = { ...s, status: 'active', lightning: { ...s.lightning, finishedAt: null, path: [...s.lightning.path, { node: 'start', round: 2, at: 'x' }], rounds: 2 }, turns: [...s.turns, { role: 'user', text: 'It came back.' }] };
+  assert.equal((await scriptedCoach(again)).message, 'Could you accept things as they are?');
 });
