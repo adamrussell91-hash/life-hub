@@ -13,6 +13,7 @@ import {
   declineLinkProposal,
   fetchLinkProposals,
   fetchPeopleDirectory,
+  fetchPeopleDirectorySnapshot,
   peekPeopleDirectory,
   fetchPersonLedger,
   fetchRememberFacts,
@@ -108,6 +109,15 @@ function writeHash(selectedId: string | null, query: DirectoryQueryState): void 
 function directoryCountLabel(d: PeopleDirectoryResponse): string {
   const { people, organisations } = d.counts;
   return `${people} ${people === 1 ? 'person' : 'people'} · ${organisations} ${organisations === 1 ? 'organisation' : 'organisations'}`;
+}
+
+/** "2:14 pm" today, "Mon 2:14 pm" on another day. */
+function snapshotTimeLabel(iso: string): string {
+  const at = new Date(iso);
+  const time = at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+  return at.toDateString() === new Date().toDateString()
+    ? time
+    : `${at.toLocaleDateString('en-AU', { weekday: 'short' })} ${time}`;
 }
 
 function isPhone(): boolean {
@@ -1764,14 +1774,33 @@ export async function renderPeoplePage(
 
   async function reloadDirectory(): Promise<void> {
     const load = ++directoryLoad;
+    const live = () => isCurrent() && load === directoryLoad;
+    let snapshotAt: string | null = null;
+    // First open of a session waits on a full scan, so paint the server's
+    // saved copy of the last scan meanwhile. The fresh scan still replaces it.
+    if (!directory) {
+      void fetchPeopleDirectorySnapshot()
+        .then((snapshot) => {
+          if (!snapshot || !live() || directory) return;
+          directory = snapshot;
+          snapshotAt = snapshot.as_of;
+          count.textContent = `${directoryCountLabel(snapshot)} · Updating… (as of ${snapshotTimeLabel(snapshot.as_of)})`;
+          renderDirectory();
+        })
+        .catch(() => {});
+    }
     try {
       const result = await fetchPeopleDirectory({fresh:true});
-      if (!isCurrent() || load !== directoryLoad) return;
+      if (!live()) return;
       directory = result;
       count.textContent = directoryCountLabel(directory);
       renderDirectory();
     } catch (err) {
-      if (!isCurrent() || load !== directoryLoad) return;
+      if (!live()) return;
+      if (snapshotAt && directory) {
+        count.textContent = `${directoryCountLabel(directory)} · Couldn't refresh, showing ${snapshotTimeLabel(snapshotAt)}`;
+        return;
+      }
       count.textContent = 'Unavailable';
       listHost.replaceChildren(
         el('p', 'people-pane__error', err instanceof Error ? err.message : 'Directory failed to load.')
