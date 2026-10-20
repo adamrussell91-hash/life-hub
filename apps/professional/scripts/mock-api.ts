@@ -461,6 +461,80 @@ export function createMockApi() {
       return json(200, { ok: true, data: overview });
     }
 
+    if (path === '/api/people/roles' && method === 'POST') {
+      const input = (body ?? {}) as Record<string, string | null | undefined>;
+      const now = new Date().toISOString();
+      const find = () => relationships.find((l) => l.id === input.link_id && l.source_ref === input.person_ref);
+      if (input.action === 'add') {
+        const link: RelationshipSeed = {
+          id: `ul_${randomUUID()}`,
+          source_ref: String(input.person_ref),
+          target_ref: String(input.organisation_ref),
+          relationship_type: String(input.relationship_type),
+          inverse_label: '',
+          context_key: null,
+          status: input.valid_to ? 'ended' : 'current',
+          temporal_mode: 'period',
+          valid_from: input.valid_from ?? null,
+          valid_to: input.valid_to ?? null,
+          occurred_at: null,
+          role: input.role ?? null,
+          metadata: {}
+        };
+        relationships.push(link);
+        return json(200, { ok: true, data: { link, chart_synced: true } });
+      }
+      const link = find();
+      if (!link) return json(404, { ok: false, error: { code: 'role_not_found', message: 'That role is not on this person.' } });
+      if (input.action === 'edit') {
+        if ('role' in input) link.role = input.role ?? null;
+        if ('valid_from' in input) link.valid_from = input.valid_from ?? null;
+        if ('valid_to' in input) {
+          link.valid_to = input.valid_to ?? null;
+          link.status = link.valid_to ? 'ended' : 'current';
+        }
+      } else if (input.action === 'end') {
+        link.valid_to = input.valid_to ?? now;
+        link.status = 'ended';
+      } else if (input.action === 'remove') {
+        link.status = 'suppressed';
+      } else {
+        return json(400, { ok: false, error: { code: 'invalid_action', message: 'action must be add, edit, end or remove.' } });
+      }
+      return json(200, { ok: true, data: { link, chart_synced: true } });
+    }
+
+    if (path === '/api/people/linkedin-parse' && method === 'POST') {
+      const input = (body ?? {}) as { text?: string; person_ref?: string | null };
+      const text = String(input.text ?? '').trim();
+      if (!text) return json(400, { ok: false, error: { code: 'missing_text', message: 'Paste the profile text first.' } });
+      if (text.length > 30000) return json(413, { ok: false, error: { code: 'paste_too_long', message: 'That’s longer than a profile.' } });
+      if (/fail/i.test(text)) return json(502, { ok: false, error: { code: 'linkedin_parse_failed', message: 'Couldn’t read that paste.' } });
+      // Local preview only: a canned reading built from the seed organisations.
+      const orgs = [...organisations.values()];
+      const a = orgs[0];
+      const b = orgs[1] ?? orgs[0];
+      const row = (id: string, section: string, type: string, title: string, org: { display_name: string; id: string } | null, name: string, start: string | null, end: string | null) => ({
+        id, section, relationship_type: type, title,
+        organisation: org ? { name: org.display_name, ref: `shared:organisation:${org.id}`, status: 'matched' } : { name, ref: null, status: 'new_organisation' },
+        start, end, current: section === 'current', diff: 'new', link_id: null
+      });
+      return json(200, {
+        ok: true,
+        data: {
+          name: 'Noor Vale',
+          headline: 'Head of English · writer',
+          about: 'English teacher and occasional essayist. Interested in reading for pleasure and student voice.',
+          rows: [
+            row('row_1', 'current', 'employee_at', 'Head of English', a ?? null, 'Tallowwood College', '2022-02', null),
+            row('row_2', 'current', 'member_of', 'Chair', null, 'Reading Circle Collective', '2020', null),
+            row('row_3', 'past', 'employee_at', 'English teacher', b ?? null, 'Old School', '2016', '2022-01'),
+            row('row_4', 'education', 'studied_at', 'BA (Hons) English', null, 'Marrow University', '2010', '2013')
+          ]
+        }
+      });
+    }
+
     if (path === '/api/people/directory' && method === 'GET') {
       const rows = [...people.values()]
         .filter((p) => !p.is_self && !['deleted', 'deidentified'].includes(p.lifecycle_status))
@@ -472,15 +546,29 @@ export function createMockApi() {
             parts.length <= 1
               ? (parts[0] ?? '?').slice(0, 2).toUpperCase()
               : `${parts[0]![0] ?? ''}${parts[parts.length - 1]![0] ?? ''}`.toUpperCase();
+          const ref = `shared:person:${p.id}`;
+          const orgLinks = relationships
+            .filter((l) => l.source_ref === ref && ['employee_at', 'member_of'].includes(l.relationship_type) && l.status !== 'suppressed')
+            .map((l) => {
+              const org = organisations.get(l.target_ref.split(':')[2] ?? '');
+              const name = org?.display_name ?? 'Organisation';
+              const mono = name.replace(/[^a-zA-Z0-9\s]/g, ' ').trim().split(/\s+/).slice(0, 3).map((w) => w[0]).join('').toUpperCase() || 'ORG';
+              return { ref: l.target_ref, display_name: name, monogram: mono, logo_key: null, current: l.status === 'current', role: l.role ?? null };
+            });
+          const currentOrgs = orgLinks.filter((o) => o.current);
+          const titled = currentOrgs.find((o) => o.role);
+          const more = currentOrgs.length > 1 ? ` +${currentOrgs.length - 1}` : '';
+          const primary = currentOrgs[0] ?? orgLinks[0] ?? null;
           return {
             id: p.id,
-            ref: `shared:person:${p.id}`,
+            ref,
             display_name: displayName,
             initials,
-            role_line: 'No relationship on record',
+            role_line: titled ? `${titled.role} · ${titled.display_name}${more}` : primary ? `${primary.current ? 'At' : 'Formerly'} ${primary.display_name}${primary.current ? more : ''}` : 'No relationship on record',
             relationship_roles: [],
-            organisation: null,
-            organisations: [],
+            organisation: primary ? { ref: primary.ref, display_name: primary.display_name, monogram: primary.monogram, logo_key: null, current: primary.current } : null,
+            organisations: orgLinks.map(({ role: _role, ...o }) => o),
+            lifecycle_status: p.lifecycle_status,
             warmth: 18,
             warmth_band: 'cold' as const,
             relationship_state: 'active',
@@ -1516,6 +1604,14 @@ export function createMockApi() {
       const record = ref ? findByRef(ref) : null;
       if (!ref || !record || !('kind' in record)) {
         return json(404, { ok: false, error: { code: 'entity_not_found', message: 'Entity not found.' } });
+      }
+      const lifecycle: Record<string, string> = { archive: 'archived', activate: 'active', deidentify: 'deidentified', delete: 'deleted' };
+      if (lifecycle[action] && record.kind === 'person') {
+        if ((record as PersonRecord).is_self && action !== 'activate') {
+          return json(409, { ok: false, error: { code: 'self_protected', message: 'The self identity cannot be archived or deleted.' } });
+        }
+        (record as PersonRecord).lifecycle_status = lifecycle[action]!;
+        return json(200, { ok: true, data: { ...record, ref } });
       }
       if (action !== 'update') {
         return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });

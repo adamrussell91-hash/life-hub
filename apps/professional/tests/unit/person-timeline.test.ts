@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPersonTimeline, dayMonth, groupTimelineByYear, TIMELINE_COLLAPSE_AT } from '@/domain/person-timeline';
+import { buildPersonTimeline, dayMonth, touchpointLabel, groupTimelineByYear, TIMELINE_COLLAPSE_AT } from '@/domain/person-timeline';
 import { renderPersonTimeline } from '@/components/person-timeline';
 import type { PersonRole } from '@/domain/person-roles';
 
@@ -26,6 +26,18 @@ describe('person timeline', () => {
     ]);
     expect(groupTimelineByYear(rows).map((g) => [g.year, g.rows.length])).toEqual([['2024', 1], ['2016', 1], ['2010', 1], ['Undated', 1]]);
     expect(dayMonth('2026-10-01T00:00:00.000Z')).toBe('1 Oct');
+    expect(touchpointLabel('Coffee')).toBe('Coffee');
+  });
+
+  it('drops touchpoints that are a career row and reads raw link labels as words', () => {
+    const rows = buildPersonTimeline(
+      [role({ linkId: 'a', from: '2016-01-01T00:00:00.000Z', current: true })],
+      [
+        { id: 'a', at: '2016-01-01T00:00:00.000Z', label: 'employee_at Tallowwood College' },
+        { id: 't', at: '2024-05-02T00:00:00.000Z', label: 'tagged_with Staff briefing' }
+      ]
+    );
+    expect(rows.map((r) => r.text)).toEqual(['Tagged with Staff briefing', 'Teacher, Tallowwood College']);
   });
 
   it('collapses after 12 rows behind Show all, and has an empty state', () => {

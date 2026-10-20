@@ -511,10 +511,12 @@ export async function renderPeoplePage(
 
   function renderWhoSwitch(): void {
     whoSwitch.replaceChildren();
+    const visible = (rows: DirectoryPersonRow[] | undefined) =>
+      (rows ?? []).filter((r) => query.showArchived || !isArchived(r)).length;
     const counts: Record<DirectoryWho, number> = {
-      colleagues: directory?.people.length ?? 0,
-      students: directory?.students?.length ?? 0,
-      everyone: (directory?.people.length ?? 0) + (directory?.students?.length ?? 0)
+      colleagues: visible(directory?.people),
+      students: visible(directory?.students),
+      everyone: visible(directory?.people) + visible(directory?.students)
     };
     for (const key of ['colleagues', 'students', 'everyone'] as DirectoryWho[]) {
       const btn = el('button', `people-page__who-btn${query.who === key ? ' is-on' : ''}`) as HTMLButtonElement;
