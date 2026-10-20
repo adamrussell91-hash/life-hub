@@ -44,8 +44,22 @@ export function dayMonth(iso: string): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
+/**
+ * Overview timeline labels start with the raw link type ("tagged_with Staff
+ * briefing"); read them as words ("Tagged with Staff briefing").
+ */
+export function touchpointLabel(label: string): string {
+  const m = label.match(/^([a-z]+(?:_[a-z]+)+)\s+(.*)$/);
+  if (!m) return label;
+  const words = m[1]!.replace(/_/g, ' ');
+  return `${words[0]!.toUpperCase()}${words.slice(1)} ${m[2]}`;
+}
+
 export function buildPersonTimeline(roles: PersonRole[], points: TimelinePoint[]): TimelineRow[] {
   const rows: TimelineRow[] = [];
+  // The overview timeline lists every link, roles included: the career row
+  // already says it, so its touchpoint copy is dropped.
+  const careerIds = new Set(roles.map((r) => r.linkId));
   for (const role of roles) {
     rows.push({
       id: `career:${role.linkId}`,
@@ -58,8 +72,8 @@ export function buildPersonTimeline(roles: PersonRole[], points: TimelinePoint[]
     });
   }
   for (const point of points) {
-    if (Number.isNaN(Date.parse(point.at))) continue;
-    rows.push({ id: `touch:${point.id}`, kind: 'touchpoint', at: point.at, text: point.label, when: dayMonth(point.at) });
+    if (careerIds.has(point.id) || Number.isNaN(Date.parse(point.at))) continue;
+    rows.push({ id: `touch:${point.id}`, kind: 'touchpoint', at: point.at, text: touchpointLabel(point.label), when: dayMonth(point.at) });
   }
   return rows.sort((a, b) => time(b.at) - time(a.at) || a.text.localeCompare(b.text));
 }

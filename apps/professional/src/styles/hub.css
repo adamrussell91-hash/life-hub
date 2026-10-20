@@ -6968,9 +6968,10 @@ button.org-chart__unit-label:focus-visible {
   padding: var(--space-3);
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: var(--surface, #fff);
+  background: var(--surface);
   color: var(--ink);
-  font: inherit;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
 }
 
 .role-fields__dates {
@@ -7422,5 +7423,12 @@ button.org-chart__unit-label:focus-visible {
   .linkedin-review__pill {
     grid-column: 3;
     justify-self: start;
+  }
+}
+
+@media (max-width: 719px) {
+  /* Clear the phone tab bar. */
+  .people-toast-host {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 }
