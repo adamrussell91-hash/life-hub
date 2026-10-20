@@ -1,4 +1,4 @@
-import { mountBlockAssistant } from '@/alchemy/block-assistant';
+import { mountAnnReview } from '@/alchemy/ann-review';
 import { mountUnitNotesPanel } from '@/alchemy/unit-notes-panel';
 import { askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import { openScheduleTimetableModal } from '@/teacher/sections/schedule-timetable-modal';
@@ -756,7 +756,7 @@ function mountUnitPlanEditor(
   let saveChain = Promise.resolve();
   let revision = 0;
   let savedRevision = 0;
-  let assistant: ReturnType<typeof mountBlockAssistant> | null = null;
+  let assistant: ReturnType<typeof mountAnnReview> | null = null;
   let lastSaveError: unknown = null;
   let anthologyData: AnthologyData = { items: [], texts: [] };
   let anthologySnapshots: AnthologySnapshot[] = [];
@@ -946,7 +946,7 @@ function mountUnitPlanEditor(
 
   void refreshAnthology();
 
-  assistant = mountBlockAssistant({
+  assistant = mountAnnReview({
     host: root, kind: 'unit', id: options.unit.id,
     getEntity: () => ({ ...options.unit, blocks }),
     flush: async () => { await persistLatest(); if (lastSaveError) throw lastSaveError; },
