@@ -3736,12 +3736,6 @@
   color: var(--danger, #a33);
 }
 
-.people-pane__arc svg {
-  width: 100%;
-  height: 86px;
-  display: block;
-}
-
 .people-pane__full {
   border-top: 1px solid var(--line);
   padding-top: var(--space-3);
@@ -7004,5 +6998,178 @@ button.org-chart__unit-label:focus-visible {
   }
   .role-fields__current {
     grid-column: 1 / -1;
+  }
+}
+
+/* Profile header (person-header.ts). */
+.person-header .people-pane__name-row {
+  align-items: center;
+}
+
+.person-header__warmth {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.person-header__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: #8fa7c7;
+}
+
+.person-header__warmth--warm .person-header__dot {
+  background: var(--high-sea, #2f7d6d);
+}
+
+.person-header__warmth--cooling .person-header__dot {
+  background: var(--pastel-gold-ink, #a87a1f);
+}
+
+.person-header__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.person-header__roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.person-header__role {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.person-header__role-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.person-header__role-title {
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.person-header__met {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.people-pane__chips:empty {
+  display: none;
+}
+
+/* Person timeline (person-timeline.ts). */
+.person-timeline,
+.person-timeline__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.person-timeline__year {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.person-timeline__year:first-child {
+  border-top: 0;
+}
+
+.person-timeline__year-label {
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--muted);
+  padding-top: 4px;
+}
+
+.person-timeline__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.person-timeline__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.person-timeline__marker {
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+}
+
+.person-timeline__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--depth);
+  opacity: 0.55;
+}
+
+.person-timeline__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.person-timeline__row--role .person-timeline__label,
+.person-timeline__row--education .person-timeline__label {
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.person-timeline__when {
+  color: var(--muted);
+}
+
+.person-timeline__toggle {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--high-sea-ink, var(--depth));
+  cursor: pointer;
+}
+
+.people-crest.people-crest--outline {
+  background: var(--paper);
+  color: var(--depth);
+  box-shadow: inset 0 0 0 1.5px var(--depth);
+}
+
+.people-crest.people-crest--outline .people-crest__img {
+  opacity: 0.6;
+}
+
+@media (max-width: 719px) {
+  .person-timeline__year {
+    grid-template-columns: 44px 1fr;
+    gap: 8px;
   }
 }
