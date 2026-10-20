@@ -64,7 +64,12 @@ const RENDERERS = {
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
-  record_triz: ['record', 'createRecordView']
+  record_triz: ['record', 'createRecordView'],
+  // The Lightning chart takes a run's state, not a tool run. Its third item: it is given
+  // onAnswer (so the current box shows its Yes and No buttons) and a wider frame for the spread.
+  lightning: ['lightning', 'createLightningView', { answers: true, wide: true }],
+  lightning_loop: ['lightning', 'createLightningView', { answers: true, wide: true }],
+  lightning_again: ['lightning', 'createLightningView', { answers: true, wide: true }]
 };
 
 const args = process.argv.slice(2);
@@ -89,7 +94,8 @@ if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
 }
 mkdirSync(outDir, { recursive: true });
 
-const [file, factory] = RENDERERS[tool];
+const [file, factory, options = {}] = RENDERERS[tool];
+const makeArgs = options.answers ? 'document, { onAnswer(node, answer) { (window.__answers ??= []).push([node, answer]); } }' : 'document';
 const rawPlugin = {
   name: 'raw-svg',
   setup(b) {
@@ -99,7 +105,7 @@ const rawPlugin = {
 };
 const bundle = await build({
   stdin: {
-    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(document);\nview.update(run);\nif (run.tasks && view.setTasks) view.setTasks(run.tasks);\nif (run.proposed && view.setProposed) view.setProposed(run.proposed);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
+    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(${makeArgs});\nview.update(run);\nif (run.tasks && view.setTasks) view.setTasks(run.tasks);\nif (run.proposed && view.setProposed) view.setProposed(run.proposed);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
     resolveDir: join(root, 'packages/problem-solver'),
     loader: 'ts'
   },
@@ -110,7 +116,7 @@ const bundle = await build({
   loader: { '.svg': 'text' }
 });
 const css = ['apps/tasks/design-kit/tokens.css', 'packages/graph-blocks/graph-blocks.css', 'packages/problem-solver/problem-solver.css'].map((p) => readFileSync(join(root, p), 'utf8')).join('\n');
-const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nbody{margin:0;background:var(--paper);font-family:var(--font-ui)}.wrap{padding:24px 16px;max-width:720px;margin:0 auto}</style></head><body><div class="ps-scope wrap"><div id="mount"></div></div><script>${bundle.outputFiles[0].text.replace(/<\/script/g, '<\\/script')}</script></body></html>`;
+const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nbody{margin:0;background:var(--paper);font-family:var(--font-ui)}.wrap{padding:24px 16px;max-width:${options.wide ? 1060 : 720}px;margin:0 auto}</style></head><body><div class="ps-scope wrap"><div id="mount"></div></div><script>${bundle.outputFiles[0].text.replace(/<\/script/g, '<\\/script')}</script></body></html>`;
 const page = join(outDir, `${tool}.html`);
 writeFileSync(page, html);
 

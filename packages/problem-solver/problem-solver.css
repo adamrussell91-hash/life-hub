@@ -7093,3 +7093,149 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-km__pill { padding: 4px 10px; }
   .ps-km__pill-text { display: block; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* Lightning problem solving (toolkit pp.158–159, Lightning): the whole flowchart as the book's
+   spread, in ink and paper only. Boxes wait faint and ink in solid as the path reaches them;
+   checks are black rounded boxes, choices and strategies paper with an ink rule, Relax a black
+   circle, the two closing boxes paper with a double rule. Earlier rounds stay inked but grey.
+   The stage keeps its size inside its own sideways scroller, so the page never overflows. */
+.ps-ltn {
+  /* Named, so every phone query measures this root box. */
+  container: ltn / inline-size;
+  --ps-ltn-faint: color-mix(in srgb, var(--ps-ink) 22%, var(--ps-paper));
+  --ps-ltn-tint: color-mix(in srgb, var(--ps-ink) 11%, var(--ps-paper));
+  --ps-ltn-muted: color-mix(in srgb, var(--ps-ink) 76%, var(--ps-paper));
+  --ps-ltn-old: color-mix(in srgb, var(--ps-ink) 68%, var(--ps-paper));
+  min-width: 0;
+  color: var(--ps-ink);
+}
+.ps-ltn__scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+  border-radius: 6px;
+}
+.ps-ltn__scroll:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--ps-paper), inset 0 0 0 3.5px var(--ps-ink); }
+.ps-ltn__stage { position: relative; margin-inline: auto; }
+
+/* Arrows: faint until the path takes them, then solid ink drawn in along their length. */
+.ps-ltn__edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.ps-ltn__line { fill: none; stroke: var(--ps-ltn-faint); stroke-width: 1.5; stroke-dasharray: 1 1; stroke-dashoffset: 0; }
+.ps-ltn__head { fill: var(--ps-ltn-faint); stroke: none; }
+.ps-ltn__edge--thin .ps-ltn__line { stroke-width: 1; }
+.ps-ltn__halo { fill: none; stroke: var(--ps-paper); stroke-width: 6; }
+.ps-ltn__edge[data-inked='true'] .ps-ltn__line { stroke: var(--ps-ink); }
+.ps-ltn__edge[data-inked='true'] .ps-ltn__head { fill: var(--ps-ink); }
+.ps-ltn__edge[data-round='old'] .ps-ltn__line { stroke: var(--ps-ltn-old); }
+.ps-ltn__edge[data-round='old'] .ps-ltn__head { fill: var(--ps-ltn-old); }
+.ps-ltn__entry .ps-ltn__line { stroke: var(--ps-ink); stroke-dasharray: none; }
+.ps-ltn__entry .ps-ltn__head { fill: var(--ps-ink); }
+.ps-ltn__start {
+  position: absolute;
+  left: 109px;
+  top: 26px;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+/* Boxes. */
+.ps-ltn__node { position: absolute; box-sizing: border-box; }
+.ps-ltn__shape {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 10px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--ps-paper);
+  box-shadow: inset 0 0 0 1.5px var(--ps-ltn-faint);
+  color: var(--ps-ltn-muted);
+  text-align: center;
+}
+.ps-ltn__title { display: block; font-size: 12px; line-height: 1.3; overflow-wrap: break-word; }
+.ps-ltn__name { font-size: 13px; font-weight: 700; }
+.ps-ltn__node--check .ps-ltn__shape,
+.ps-ltn__node--end .ps-ltn__shape { background: var(--ps-ltn-tint); box-shadow: none; }
+.ps-ltn__node--end .ps-ltn__shape { border-radius: 50%; padding: 0; }
+.ps-ltn__node--close .ps-ltn__shape { box-shadow: inset 0 0 0 1px var(--ps-ltn-faint), inset 0 0 0 3px var(--ps-paper), inset 0 0 0 4px var(--ps-ltn-faint); }
+
+/* Reached: solid ink. */
+.ps-ltn__node:not([data-state='ghost']) .ps-ltn__shape { color: var(--ps-ink); box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+.ps-ltn__node--check:not([data-state='ghost']) .ps-ltn__shape,
+.ps-ltn__node--end:not([data-state='ghost']) .ps-ltn__shape { background: var(--ps-ink); color: var(--ps-paper); box-shadow: none; }
+.ps-ltn__node--close:not([data-state='ghost']) .ps-ltn__shape { box-shadow: inset 0 0 0 1px var(--ps-ink), inset 0 0 0 3px var(--ps-paper), inset 0 0 0 4px var(--ps-ink); }
+/* An earlier round: still inked, in grey. */
+.ps-ltn__node[data-round='old'] .ps-ltn__shape { color: var(--ps-ltn-old); box-shadow: inset 0 0 0 1.5px var(--ps-ltn-old); }
+.ps-ltn__node--check[data-round='old'] .ps-ltn__shape,
+.ps-ltn__node--end[data-round='old'] .ps-ltn__shape { background: var(--ps-ltn-old); color: var(--ps-paper); box-shadow: none; }
+.ps-ltn__node--close[data-round='old'] .ps-ltn__shape { box-shadow: inset 0 0 0 1px var(--ps-ltn-old), inset 0 0 0 3px var(--ps-paper), inset 0 0 0 4px var(--ps-ltn-old); }
+/* The box waiting now: a 3px ink ring outside a paper gap. */
+.ps-ltn__node[data-state='current'] { z-index: 1; }
+.ps-ltn__node[data-state='current'] .ps-ltn__shape { outline: 3px solid var(--ps-ink); outline-offset: 2px; }
+.ps-ltn__node--end[data-state='current'] .ps-ltn__shape { outline: none; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 5px var(--ps-ink); }
+
+/* Yes and No: small paper circles with an ink ring, sitting on the arrows. */
+.ps-ltn__marks { position: absolute; inset: 0; pointer-events: none; }
+.ps-ltn__mark,
+.ps-ltn__answer {
+  position: absolute;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ps-paper);
+  font: 12px/1 var(--font-display);
+  transform: translate(-50%, -50%);
+}
+.ps-ltn__mark { width: 30px; height: 30px; box-shadow: inset 0 0 0 1.25px var(--ps-ltn-faint); color: var(--ps-ltn-muted); }
+.ps-ltn__mark[data-state='done'] { box-shadow: inset 0 0 0 1.25px var(--ps-ink); color: var(--ps-ink); }
+.ps-ltn__mark[data-round='old'] { box-shadow: inset 0 0 0 1.25px var(--ps-ltn-old); color: var(--ps-ltn-old); }
+.ps-ltn__badge {
+  position: absolute;
+  left: 210px;
+  top: 226px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--ps-ink);
+  color: var(--ps-paper);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  transform: translateX(-50%);
+}
+
+/* The answer buttons take the place of the current box's two circles. */
+.ps-ltn__ask { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.ps-ltn__answer {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  box-shadow: 0 0 0 2px var(--ps-ink);
+  color: var(--ps-ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-ltn__answer:hover { background: var(--ps-ink); color: var(--ps-paper); }
+.ps-ltn__answer:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-ink), 0 0 0 4px var(--ps-paper), 0 0 0 5.5px var(--ps-ink); }
+.ps-ltn__answer[aria-disabled='true'] { cursor: default; background: var(--ps-paper); color: var(--ps-ltn-old); box-shadow: 0 0 0 2px var(--ps-ltn-old); }
+
+.ps-ltn__swipe { display: none; margin: 6px 0 0; font-size: 12px; color: var(--ps-ltn-muted); }
+.ps-ltn__sr { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Phone: the chart keeps its size and scrolls sideways inside its own box. */
+@container ltn (max-width: 600px) {
+  .ps-ltn__swipe { display: block; }
+}
