@@ -353,8 +353,8 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await expect(page.locator('.ps-resume')).toHaveCount(0);
     await expect(page.locator('.ps-review')).toBeHidden();
   });
-  test(`a late review: Improve left waiting, then the review link reopens it and returns to Document at ${viewport.width}px`, async ({ page }) => {
-    test.setTimeout(180_000);
+  test(`a late review: Improve left waiting, Document writes the case file, then the review reopens Improve and adds an update at ${viewport.width}px`, async ({ page }) => {
+    test.setTimeout(240_000);
     await page.setViewportSize(viewport);
     await signIn(page);
     await frameProblem(page, 'The meeting notes never reach the people who missed it');
@@ -381,7 +381,81 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'waiting', { timeout: 20_000 });
     expect((await now()).reviewState.status).toBe('waiting');
 
-    // The review link: the problem has moved on, the review reopens Improve, Move on returns to Document.
+    // Document: Improve was left untouched, so no learning question; the next turn suggests the 5 Cs.
+    // Four full answers follow, then the name.
+    await answer(page, 'Ready to write up what we have learned');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: 5 Cs documentation', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-fivecs')).toBeAttached();
+    await answer(page, 'So the next person running the meeting knows what to send');
+    await answer(page, 'Filed under team meetings in the shared drive for everyone');
+    await answer(page, 'Notes go out within the hour with absent people tagged');
+    await answer(page, 'correct: Nothing in the record needs correcting at this point');
+    await expect(page.locator('.ps-fivecs [data-slice][data-filled="true"]')).toHaveCount(4);
+    await noOverflow(page);
+    await shot(page, 'fivecs', viewport);
+
+    // The name: one without a date is challenged; the full one is accepted.
+    await answer(page, 'Kitchen rota case file for the team');
+    await expect(page.locator('.ps-coach__messages')).toContainText('That name needs one more thing');
+    await expect(page.locator('.ps-fivecs [data-slice][data-filled="true"]')).toHaveCount(4);
+    // Today's date as YYYYMMDD in the walk's own clock (the names only need a real date).
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    });
+    const name = `Kitchen rota case file ${today} v1 Final`;
+    await answer(page, name);
+    await expect(page.locator('.ps-fivecs [data-slice][data-filled="true"]')).toHaveCount(5);
+    // Every strict naming rule shows as met.
+    for (const rule of ['date', 'length', 'version', 'final', 'characters']) await expect(page.locator(`.ps-fivecs [data-rule="${rule}"]`)).toHaveAttribute('data-ok', 'true');
+    await noOverflow(page);
+    await shot(page, 'fivecs-named', viewport);
+
+    // Write: the problem links nothing, so the place is a new project named by the case file.
+    const caseCard = page.locator('.ps-casefilecard');
+    await expect(caseCard).toContainText('Write the case file?');
+    await expect(caseCard.locator('select[name="place"]')).toHaveValue('new');
+    await expect(caseCard.locator('select[name="place"] option:checked')).toHaveText(`New project: ${name}`);
+    await noOverflow(page);
+    await shot(page, 'casefilecard', viewport);
+    const projectsNamed = () => page.evaluate(async (wanted) => {
+      const res = await fetch('/api/projects').then((r) => r.json());
+      return res.data.projects.filter((project) => project.title === wanted);
+    }, name);
+    const before = new Set((await projectsNamed()).map((item) => item.id));
+    await caseCard.getByRole('button', { name: 'Write case file' }).click();
+    await expect(caseCard).toHaveCount(0);
+    await expect.poll(async () => (await now()).caseFile?.version).toBe(1);
+    // The mock API is shared by both widths, so count the projects this write made.
+    const target = (await now()).caseFile.target;
+    expect(target.kind).toBe('project');
+    const madeHere = (await projectsNamed()).filter((item) => !before.has(item.id));
+    expect(madeHere.map((item) => item.id)).toEqual([target.id]);
+    const [project] = madeHere;
+    const blocks = project.page_blocks;
+    expect(blocks[0].block_type).toBe('heading');
+    expect(blocks[0].content.text).toBe(name);
+    expect(blocks.at(-1).block_type).toBe('rich_text');
+    expect(blocks.at(-1).content.html).toContain(`#/problem-solver?id=${encodeURIComponent(id)}`);
+
+    // The project page carries the Problem Solver chip.
+    await page.goto(`/#/project/${encodeURIComponent(project.id)}`);
+    await expect(page.locator('a.ps-linkchip')).toBeVisible({ timeout: 20_000 });
+    await noOverflow(page);
+    await shot(page, 'casefile-project', viewport);
+
+    // Finish: the case file is written, so no card.
+    await page.goto(`/#/problem-solver?id=${encodeURIComponent(id)}`);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Finish' })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('button', { name: 'Finish' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('finished');
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I name things better when the rules are in front of me');
+    await expect(caseCard).toHaveCount(0);
+
+    // The review link: the problem has finished, the review reopens Improve, then it finishes again.
     await page.goto(`/#/problem-solver?id=${encodeURIComponent(id)}&step=improve`);
     await page.reload();
     const banner = page.locator('.ps-resume');
@@ -393,11 +467,41 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await openRecord(page);
     await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current', { timeout: 20_000 });
     await expect(page.locator('.ps-reviewcard')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Move on to Document' }).click();
-    await expect.poll(async () => (await now()).phase).toBe('document');
-    await expect(page.locator('.ps-track__stn', { hasText: 'Document' })).toHaveAttribute('data-state', 'now', { timeout: 20_000 });
+    await expect(caseCard).toHaveCount(0);
+
+    // A new after action review, whose learned goes into the case file's update.
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: After action review', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-aar')).toBeAttached();
+    await answer(page, 'Everyone gets the notes within the hour of the meeting');
+    await answer(page, 'Most weeks they went out on time with people tagged');
+    await answer(page, 'One week the note taker was away and nothing was sent');
+    await answer(page, 'A named second note taker covers every absence, and the template sits pinned in the channel for them');
+    await expect(page.locator('.ps-aar [data-bar][data-filled="true"]')).toHaveCount(4);
+    await expect(caseCard).toHaveCount(0);
+
+    // Leaving the review returns to where the problem was: finished.
+    await page.getByRole('button', { name: 'Finish' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('finished');
     expect((await now()).reviewState.status).toBe('done');
+    await expect(caseCard).toContainText('Add an update to the case file?', { timeout: 20_000 });
+    await expect(caseCard.locator('.ps-casefilecard__sections')).toContainText('What was learned');
     await noOverflow(page);
-    await shot(page, 'late-returned', viewport);
+    await shot(page, 'casefile-update', viewport);
+    await caseCard.getByRole('button', { name: 'Add update' }).click();
+    await expect(caseCard).toHaveCount(0);
+    await expect.poll(async () => (await now()).caseFile?.version).toBe(2);
+    const updated = (await projectsNamed()).find((item) => item.id === project.id);
+    const after = updated.page_blocks;
+    expect(after.length).toBeGreaterThan(blocks.length);
+    expect(after.slice(0, blocks.length).map((b) => b.id)).toEqual(blocks.map((b) => b.id));
+    const update = after[blocks.length];
+    expect(update.block_type).toBe('heading');
+    expect(update.variant).toBe('subsection');
+    expect(update.content.text).toMatch(/^Update: Kitchen rota case file \d{8} v2 Final$/);
+    expect(after.some((b) => b.block_type === 'rich_text' && b.content.html.includes('What was learned'))).toBe(true);
+    expect(new Set(after.map((b) => b.id)).size).toBe(after.length);
+    await noOverflow(page);
+    await shot(page, 'late-finished', viewport);
   });
 }
