@@ -1344,7 +1344,7 @@ function renderFluidAnalogy(block: FluidAnalogyBlock, mode: TkRenderMode, ctx: T
     wrap.append(el('p', 'an-level-badge', `Level ${c.level} · ${levelName(c.level)}`));
     wrap.append(tierPanel(block, c.tiers[c.level - 1]!, c.level, mode, ctx));
   } else {
-    const switcher = el('div', 'an-levels');
+    const switcher = el('div', 'hub-pills an-levels');
     switcher.setAttribute('role', 'group');
     switcher.setAttribute('aria-label', 'Level');
     const buttons: HTMLButtonElement[] = [];
@@ -1356,7 +1356,7 @@ function renderFluidAnalogy(block: FluidAnalogyBlock, mode: TkRenderMode, ctx: T
       });
     };
     ANALOGY_LEVELS.forEach(({ level, name }) => {
-      const button = el('button', 'an-levels__btn');
+      const button = el('button', 'hub-pills__btn an-levels__btn');
       button.type = 'button';
       button.append(el('span', 'an-levels__num', `Level ${level}`), el('span', 'an-levels__name', name));
       button.addEventListener('click', () => {
@@ -1708,7 +1708,7 @@ function renderAnalogyMove(block: AnalogyMoveBlock, mode: TkRenderMode, ctx: TkR
   if (!choose) {
     wrap.append(el('p', 'an-level-badge', `Level ${c.level} · ${levelName(c.level)}`), panels[c.level - 1]!);
   } else {
-    const switcher = el('div', 'an-levels');
+    const switcher = el('div', 'hub-pills an-levels');
     switcher.setAttribute('role', 'group');
     switcher.setAttribute('aria-label', 'Level');
     const buttons: HTMLButtonElement[] = [];
@@ -1719,7 +1719,7 @@ function renderAnalogyMove(block: AnalogyMoveBlock, mode: TkRenderMode, ctx: TkR
       });
     };
     ANALOGY_LEVELS.forEach(({ level, name }) => {
-      const button = el('button', 'an-levels__btn');
+      const button = el('button', 'hub-pills__btn an-levels__btn');
       button.type = 'button';
       button.append(el('span', 'an-levels__num', `Level ${level}`), el('span', 'an-levels__name', name));
       button.addEventListener('click', () => {

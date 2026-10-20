@@ -5534,38 +5534,22 @@ a.home-class-tile:hover {
   gap: var(--space-3);
 }
 
+/* Kit .hub-pills view switch; scrolls sideways when the labels outgrow the block. */
 .block-tabs__tablist {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: var(--space-1);
+  align-self: flex-start;
+  max-width: 100%;
   overflow-x: auto;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 0;
 }
 
-.block-tabs__tab {
+.block-tabs__tablist > .block-tabs__tab {
   flex: 0 0 auto;
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--ink-muted, var(--ink));
-  font-family: var(--font-ui);
-  font-size: var(--text-base);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  white-space: nowrap;
 }
 
-.block-tabs__tab:hover {
-  color: var(--ink);
-}
-
-.block-tabs__tab--active,
-.block-tabs__tab[aria-selected='true'] {
-  color: var(--ink);
-  border-bottom-color: var(--accent, var(--ink));
-  font-weight: var(--weight-semibold);
+@media (max-width: 40rem) {
+  .block-tabs__tablist > .block-tabs__tab {
+    min-height: 2.75rem;
+  }
 }
 
 .block-tabs__panel {
