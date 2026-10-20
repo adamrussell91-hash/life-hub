@@ -1378,10 +1378,10 @@ export function renderGalleryBlock(
   return wrapBlock(root, block, mode);
 }
 
-function activityButton(label: string, className: string): HTMLButtonElement {
+function activityButton(label: string, className: string, variant: 'primary' | 'secondary' = 'secondary'): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = `btn ${className}`;
+  button.className = `btn btn--${variant} ${className}`;
   button.textContent = label;
   return button;
 }
@@ -1523,7 +1523,7 @@ export function renderFlashcardsBlock(
   status.className = 'block-flashcards__status';
   status.setAttribute('aria-live', 'polite');
   const prev = activityButton('Prev', 'block-flashcards__btn');
-  const flip = activityButton('Flip', 'block-flashcards__btn');
+  const flip = activityButton('Flip', 'block-flashcards__btn', 'primary');
   const next = activityButton('Next', 'block-flashcards__btn');
   const reset = activityButton('Reset', 'block-flashcards__btn');
 
@@ -1745,7 +1745,7 @@ export function renderClozeBlock(
       persist();
     })
   );
-  const check = activityButton('Check', 'block-cloze__btn');
+  const check = activityButton('Check', 'block-cloze__btn', 'primary');
   const reveal = activityButton('Reveal', 'block-cloze__btn');
   const reset = activityButton('Reset', 'block-cloze__btn');
   check.addEventListener('click', () => {

@@ -44,6 +44,7 @@
 .ct-trigger {
   flex: none;
   display: grid;
+  font: inherit;
   place-items: center;
   width: 2rem;
   height: 2rem;
@@ -242,39 +243,18 @@
 }
 
 .ct-btn {
-  padding: 0.45rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
-  border-radius: var(--radius-sm);
-  background: var(--cotton);
-  color: var(--ink);
-  font: 600 var(--text-sm) / 1.2 var(--font-ui);
   white-space: nowrap;
-  cursor: pointer;
 }
 
-.ct-btn:hover:not(:disabled) {
-  border-color: var(--wave);
-}
-
-.ct-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.ct-btn--go {
-  background: var(--wave);
-  border-color: var(--wave);
-  color: var(--paper);
-}
-
+/* Compact kit button for counters and add/remove rows. */
 .ct-btn--sm {
-  padding: 0.3rem 0.65rem;
-  font-size: var(--text-xs);
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
 }
 
 .ct-trigger:focus-visible,
 .ct-chip:focus-visible,
-.ct-btn:focus-visible,
 .ct-icon-btn:focus-visible,
 .ct-card input:focus-visible,
 .ct-card select:focus-visible,
@@ -589,10 +569,6 @@
 
 .ct-team__lead {
   font-size: 1rem;
-}
-
-.ct-team .ct-btn {
-  background: var(--paper);
 }
 
 /* Coin and dice. */

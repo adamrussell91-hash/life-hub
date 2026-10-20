@@ -158,7 +158,7 @@ function reveal(options: {
   const saved = loadActivityState<{ open?: unknown }>(key);
   let open = saved?.open === true;
   const panelId = nextDomId('tk-reveal');
-  const button = el('button', 'btn block-self-check__btn tk-reveal__btn');
+  const button = el('button', 'btn btn--secondary block-self-check__btn tk-reveal__btn');
   button.type = 'button';
   button.setAttribute('aria-controls', panelId);
   const panel = el('div', 'block-self-check__answer tk-reveal__body');
@@ -1663,7 +1663,7 @@ function stagePanel(
   if (mode !== 'print' && hasExample) {
     const key = activityKey(ctx, block.id, `example-${level}`);
     let shown = loadActivityState<{ open?: unknown }>(key)?.open === true;
-    const button = el('button', 'btn block-self-check__btn an-stage__toggle');
+    const button = el('button', 'btn btn--secondary block-self-check__btn an-stage__toggle');
     button.type = 'button';
     const paint = () => {
       organiser.classList.toggle('is-example', shown);

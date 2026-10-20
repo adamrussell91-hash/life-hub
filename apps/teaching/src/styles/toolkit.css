@@ -1440,7 +1440,7 @@ button.tk-chip:focus-visible {
 }
 
 .an-levels__btn:focus-visible {
-  outline: 2px solid var(--marine);
+  outline: 2px solid var(--wave);
   outline-offset: -4px;
 }
 

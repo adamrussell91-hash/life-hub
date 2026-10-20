@@ -97,6 +97,7 @@
 }
 
 .graph-stage__expand {
+  font: inherit;
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
