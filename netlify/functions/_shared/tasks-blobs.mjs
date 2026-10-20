@@ -28,8 +28,10 @@ export async function defaultGetTasksStore(env = process.env) {
   return getStore(tasksStoreOptions(env));
 }
 
-export async function getJSON(store, key) {
-  return store.get(key, { type: 'json' });
+// Pass { consistency: 'strong' } when reading back a write from the same request;
+// the default eventual read can return null for a just-written key.
+export async function getJSON(store, key, options = {}) {
+  return store.get(key, { ...options, type: 'json' });
 }
 
 export async function setJSON(store, key, value) {
@@ -74,7 +76,8 @@ export function newTaskId() {
 }
 
 export async function readIndex(store, key) {
-  const index = await getJSON(store, key);
+  // Strong: callers read-modify-write the index, and a stale read drops new ids.
+  const index = await getJSON(store, key, { consistency: 'strong' });
   return Array.isArray(index) ? index.filter(id => typeof id === 'string') : [];
 }
 

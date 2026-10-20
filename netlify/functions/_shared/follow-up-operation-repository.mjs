@@ -23,6 +23,8 @@ import {
   taskKey,
   writeTaskIndex
 } from './tasks-blobs.mjs';
+
+const TASKS_STRONG = { consistency: 'strong' };
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { equivalenceInput, generateLinkId } from './universal-link-schema.mjs';
@@ -234,7 +236,7 @@ export function createFollowUpOperationRepository(deps = {}) {
     if (typeof beforeTaskEnsure === 'function') {
       await beforeTaskEnsure({ taskId, tasksStore });
     }
-    const existing = await getTasksJSON(tasksStore, taskKey(taskId));
+    const existing = await getTasksJSON(tasksStore, taskKey(taskId), TASKS_STRONG);
     if (existing?.id === taskId) {
       if (typeof afterTaskEnsure === 'function') {
         await afterTaskEnsure({ taskId, tasksStore, created: false, task: existing });
@@ -267,7 +269,7 @@ export function createFollowUpOperationRepository(deps = {}) {
     if (!ids.includes(taskId)) {
       await writeTaskIndex(tasksStore, [...ids, taskId]);
     }
-    const stored = await getTasksJSON(tasksStore, taskKey(taskId));
+    const stored = await getTasksJSON(tasksStore, taskKey(taskId), TASKS_STRONG);
     if (!stored?.id) {
       throw Object.assign(new Error('Follow-up Task could not be stored.'), {
         status: 503,
