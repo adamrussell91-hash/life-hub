@@ -505,3 +505,139 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await shot(page, 'late-finished', viewport);
   });
 }
+
+/** A reply on a Lightning run. The coach answers before the next; the run's last reply closes the composer. */
+async function ltnSay(page, text, { closes = false } = {}) {
+  await page.getByLabel('Your answer').fill(text);
+  await page.getByRole('button', { name: 'Send' }).click();
+  if (closes) await expect(page.getByLabel('Your answer')).toBeDisabled();
+  else await expect(page.getByLabel('Your answer')).toBeEnabled();
+}
+
+/** The chart box waiting for an answer, and the question holding it. */
+const ltnCurrent = (page) => page.locator('.ps-ltn-page .ps-ltn__node[aria-current="step"]');
+const ltnQuestion = (page) => page.locator('.ps-ltn-strip li[aria-current="step"]');
+
+/** Start a Lightning run from the landing card; the coach asks the first box. */
+async function startLightning(page, snag) {
+  await page.getByLabel('Describe the snag').fill(snag);
+  await page.getByRole('button', { name: 'Go', exact: true }).click();
+  await expect(page.locator('.ps-ltn-page')).toBeVisible();
+  await expect(page.getByLabel('Your answer')).toBeEnabled();
+  await expect(ltnQuestion(page)).toHaveAttribute('data-question', 'fix');
+  await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'start');
+}
+
+/** Answer Start with No on the chart, then give the goal. */
+async function ltnToGoal(page, goal) {
+  await page.getByRole('button', { name: 'No: Could you accept things as they are?' }).click();
+  await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'goal');
+  await expect(page.getByLabel('Your answer')).toBeEnabled();
+  await ltnSay(page, goal);
+  await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'subtract');
+}
+
+test.describe('Lightning', () => {
+  for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+    test(`a run to Relax, then It came back starts round two at ${viewport.width}px`, async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+      await signIn(page);
+      await startLightning(page, `The back door sticks in wet weather (${viewport.width}px)`);
+      await noOverflow(page);
+      await shot(page, 'ltn-start', viewport);
+
+      await ltnToGoal(page, 'Have the door shut without a shove');
+      await ltnSay(page, 'no');
+      await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'one_step');
+      await ltnSay(page, 'no');
+      await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'diagram');
+      await ltnSay(page, 'no, sketched how the jam happens');
+      await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'work_backwards');
+      await ltnSay(page, 'yes, working backwards found it');
+      await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'learn');
+      await expect(ltnQuestion(page)).toHaveAttribute('data-question', 'learn');
+      // The bottom path inks, and Relax inks at its middle spot (reached from the second "solved?").
+      for (const edge of ['diagram>solved_1', 'solved_1>work_backwards', 'work_backwards>solved_2', 'solved_2>relax']) {
+        await expect(page.locator(`.ps-ltn-page .ps-ltn__edge[data-edge="${edge}"]`)).toHaveAttribute('data-inked', 'true');
+      }
+      await expect(page.locator('.ps-ltn-page .ps-ltn__node[data-spot="relax_middle"]')).toHaveAttribute('data-state', 'done');
+      await expect(page.locator('.ps-ltn-page .ps-ltn__node[data-spot="relax_bottom"]')).toHaveAttribute('data-state', 'ghost');
+      await noOverflow(page);
+      await shot(page, 'ltn-relax', viewport);
+
+      await ltnSay(page, 'Check the hinge screws before anything else');
+      await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'next');
+      await ltnSay(page, 'Plane the edge this weekend', { closes: true });
+      await expect(page.getByText('That run is done', { exact: true })).toBeVisible();
+      const again = page.getByRole('button', { name: 'It came back' });
+      await expect(again).toBeVisible();
+      await expect(ltnCurrent(page)).toHaveCount(0);
+      await noOverflow(page);
+      await shot(page, 'ltn-done', viewport);
+
+      await again.click();
+      await expect(ltnCurrent(page)).toHaveAttribute('data-lnode', 'start');
+      await expect(ltnQuestion(page)).toHaveAttribute('data-question', 'fix');
+      await expect(page.getByLabel('Your answer')).toBeEnabled();
+      await expect(page.getByLabel('Your answer')).toBeFocused();
+      await expect(page.locator('.ps-ltn-page__done')).toBeHidden();
+      // The first round stays inked, faded a step.
+      await expect(page.locator('.ps-ltn-page .ps-ltn__node[data-lnode="work_backwards"]')).toHaveAttribute('data-round', 'old');
+      await expect(page.locator('.ps-ltn-page .ps-ltn__edge[data-edge="solved_1>work_backwards"]')).toHaveAttribute('data-round', 'old');
+      await noOverflow(page);
+      await shot(page, 'ltn-round2', viewport);
+    });
+
+    test(`escalation: the full process starts seeded, shows the run's chart, and the list says so at ${viewport.width}px`, async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+      await signIn(page);
+      const snag = `The shared printer jams for the whole team (${viewport.width}px)`;
+      await startLightning(page, snag);
+      await ltnToGoal(page, 'Print without a jam every time');
+      await ltnSay(page, 'escalate');
+      const card = page.locator('.ps-suggestion');
+      await expect(card.locator('.ps-suggestion__title')).toHaveText('This needs the full process');
+      await expect(card.getByRole('button', { name: 'Not now' })).toBeVisible();
+      await noOverflow(page);
+      await shot(page, 'ltn-escalate', viewport);
+      const runHash = await page.evaluate(() => location.hash);
+
+      await card.getByRole('button', { name: 'Start the full process' }).click();
+      await expect(page.locator('.ps-ltn-page')).toHaveCount(0);
+      await expect(page.locator('.ps-frame')).toBeVisible();
+      const from = page.locator('details.ps-ltn-from');
+      await expect(from).toBeVisible();
+      await expect(page.getByLabel('Your answer')).toBeEnabled({ timeout: 20_000 });
+      const first = page.locator('.ps-coach .chat-message--assistant').first();
+      await expect(first).toContainText('Carried over from Lightning');
+      await expect(first).toContainText('Goal: Print without a jam every time');
+      await from.locator('summary').click();
+      await expect(from.locator('.ps-ltn')).toBeVisible();
+      await expect(from.locator('.ps-ltn__node[data-lnode="goal"]')).toHaveAttribute('data-state', 'done');
+      await expect(from.locator('.ps-ltn__ask')).toBeHidden();
+      await expect(from.getByRole('link', { name: 'Open the Lightning run' })).toHaveAttribute('href', runHash);
+      await noOverflow(page);
+      await shot(page, 'ltn-from', viewport);
+
+      // The run itself now says where it went.
+      await page.goto(`/${runHash}`);
+      const sent = page.locator('.ps-ltn-page__sent[role="status"]');
+      await expect(sent).toContainText('This went to the full process.');
+      await expect(page.locator('.ps-ltn-page__done')).toBeHidden();
+      await noOverflow(page);
+
+      await page.getByRole('link', { name: '← Problems' }).click();
+      // The run and the full session share the title; the run's row carries the lightning glyph.
+      const rows = page.locator('.ps-prob', { hasText: snag });
+      await expect(rows).toHaveCount(2);
+      const row = rows.filter({ has: page.locator('.ps-prob__medal--lightning') });
+      await expect(row.locator('.ps-prob__phase')).toHaveText('Went to full process');
+      await expect(row.locator('.ps-lightning-glyph svg')).toBeVisible();
+      await expect(rows.filter({ hasNot: page.locator('.ps-prob__medal--lightning') }).locator('.ps-prob__phase')).toHaveText('Framing');
+      await noOverflow(page);
+      await shot(page, 'ltn-list', viewport);
+    });
+  }
+});
