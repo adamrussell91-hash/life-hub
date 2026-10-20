@@ -129,7 +129,7 @@ describe('Network layout', () => {
     const main = L.paths.find((p) => p.lineId === 'analytic' && p.style === 'main')!;
     const pill = L.pills[1]!;
     // Touches lesson 2's pill edge.
-    expect(main.points.some((p) => Math.abs(p.x - (pill.x + pill.w - 4)) < 1)).toBe(true);
+    expect(main.points.some((p) => Math.abs(p.x - (pill.x + pill.w)) < 1)).toBe(true);
     const spur = L.paths.find((p) => p.style === 'spur')!;
     const loop = L.paths.find((p) => p.style === 'loop')!;
     const dot = (id: string) => L.dots.find((d) => d.id === id)!;
@@ -196,14 +196,43 @@ describe('Network layout', () => {
     }
   });
 
-  it('widens a vertical map to the room it has, centred', () => {
+  it('sizes a vertical station to its longest name, not the room, and centres the map', () => {
     const narrow = layoutNetwork(input(), 'vertical');
     const wide = layoutNetwork(input(), 'vertical', { width: 1400 });
-    expect(wide.pills[0]!.w).toBeGreaterThan(narrow.pills[0]!.w);
+    expect(wide.pills[0]!.w).toBe(narrow.pills[0]!.w);
+    expect(narrow.pills[0]!.w).toBeLessThan(260);
     expect(wide.width).toBeLessThanOrEqual(1400);
     expect(wide.pills[0]!.x).toBeGreaterThan(narrow.pills[0]!.x);
-    const cols = (L: typeof wide) => L.pills[0]!.markers.map((m) => m.x);
-    expect(Math.abs(cols(wide)[1]! - cols(wide)[0]!)).toBeGreaterThan(Math.abs(cols(narrow)[1]! - cols(narrow)[0]!));
+  });
+
+  it('centres the name in a vertical station with its stop markers either side, on the centre line', () => {
+    const L = layoutNetwork(input(), 'vertical');
+    for (const pill of L.pills) {
+      const mid = pill.x + pill.w / 2;
+      expect(pill.label.x).toBeCloseTo(mid);
+      expect(pill.label.y - 4.5).toBeCloseTo(pill.y + pill.h / 2);
+      for (const m of pill.markers) {
+        expect(m.y).toBeCloseTo(pill.y + pill.h / 2);
+        expect(Math.abs(m.x - mid)).toBeGreaterThan(pill.label.maxW / 2);
+      }
+    }
+  });
+
+  it('wraps a name too long for the widest station onto two lines', () => {
+    const long = [{ ...LESSONS[0]!, title: 'A very long lesson name about harbours, lighthouses, salt and the stone of the sea wall' }, ...LESSONS.slice(1)];
+    const L = layoutNetwork(input({}, long), 'vertical');
+    expect(L.pills[0]!.label.maxW).toBeLessThanOrEqual(282);
+    expect(L.pills[0]!.label.wrap).toBe(true);
+    expect(L.pills[1]!.label.wrap).toBe(false);
+  });
+
+  it('marks a light rail stop where it joins the station', () => {
+    const L = layoutNetwork(input(), 'vertical');
+    const rail = L.pills[1]!.markers.find((m) => m.lineId === 'analytic')!;
+    expect(rail).toBeDefined();
+    expect(rail.x === L.pills[1]!.x || rail.x === L.pills[1]!.x + L.pills[1]!.w).toBe(true);
+    expect(L.paths.find((p) => p.lineId === 'analytic' && p.style === 'main')!.points.some((p) => p.x === rail.x)).toBe(true);
+    expect(L.pills[0]!.markers.some((m) => m.lineId === 'analytic')).toBe(false);
   });
 
   it('lets a lesson station be dragged; its lines bend to follow', () => {

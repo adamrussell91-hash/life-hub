@@ -9,7 +9,7 @@ import {
 } from '@/schemas/block';
 import type { UnitNetworkContext } from '@/blocks/render';
 import { lineColour } from '@/network/colour';
-import { drawNetwork, networkLegend } from '@/network/draw';
+import { drawNetwork, measureStations, networkLegend } from '@/network/draw';
 import { chooseNetworkOrientation, layoutNetwork, liveNudges } from '@/network/layout';
 import { el, ghostButton, mountLinesEditor, networkId, selectOf, textInput } from '@/network/lines-editor';
 import { LEVEL_ORDER, MODE_LABEL, convertV1, orderLines, type NetLesson } from '@/network/model';
@@ -80,9 +80,10 @@ export function createCurriculumLinesEditor(
   function paintPreview(): void {
     const input = unitNetworkInput(current, { network: network() });
     const width = Math.max(320, Math.floor(root.getBoundingClientRect().width) || 900);
-    const orientation = chooseNetworkOrientation(width, input);
+    const measure = measureStations(input);
+    const orientation = chooseNetworkOrientation(width, input, { measure });
     const editable = isCurriculumLinesV2(current.content);
-    const svg = drawNetwork(layoutNetwork(input, orientation, { width }), {
+    const svg = drawNetwork(layoutNetwork(input, orientation, { width, measure }), {
       label: 'Unit curriculum map preview',
       ...(editable ? {
         nudgeRows: true,
