@@ -2163,6 +2163,78 @@ a:hover {
   justify-self: start;
 }
 
+/* Where a media block's file comes from: Upload first, then library / Drive. */
+.block-editor__media-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.block-editor__media-actions[hidden] {
+  display: none;
+}
+
+.block-editor__media-actions > .btn {
+  width: auto;
+}
+
+.block-editor__upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.block-editor__upload-btn {
+  min-height: 44px;
+}
+
+.block-editor__upload-btn--compact {
+  min-height: 36px;
+  justify-self: start;
+  font-size: var(--text-sm);
+}
+
+.block-editor__upload--busy .block-editor__upload-btn {
+  cursor: progress;
+}
+
+.block-editor__upload-status,
+.block-editor__upload-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.block-editor__upload-status {
+  color: var(--muted);
+}
+
+.block-editor__upload-error {
+  color: var(--danger);
+}
+
+.block-editor__upload-status[hidden],
+.block-editor__upload-error[hidden] {
+  display: none;
+}
+
+.block-editor__drop-target--active {
+  outline: 2px dashed var(--accent, currentColor);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 640px) {
+  .block-editor__media-actions > .btn,
+  .block-editor__upload,
+  .block-editor__upload-btn:not(.block-editor__upload-btn--compact) {
+    width: 100%;
+  }
+}
+
 .resources-url-form {
   display: flex;
   flex-wrap: wrap;
