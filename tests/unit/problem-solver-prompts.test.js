@@ -64,6 +64,7 @@ test('boundary prompt names the step left and asks for the learning question', (
   const { user } = buildCoachPrompt(s);
   assert.match(user, /MODE: boundary\. The person has just left Define/);
   assert.match(user, /exitObjection/);
+  assert.match(user, /how they solve problems/);
   assert.match(user, /PHASE: analyse/);
 });
 

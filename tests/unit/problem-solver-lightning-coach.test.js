@@ -23,6 +23,11 @@ test('every box has an intent, and the rubric names the escalation reasons', () 
   for (const word of ['escalate', 'stakeholders', 'three or more strategies', 'Can I fix this?']) assert.ok(LIGHTNING_RUBRIC.includes(word), word);
 });
 
+test('the rubric carries a Final words section about practice', () => {
+  assert.ok(LIGHTNING_RUBRIC.includes('FINAL WORDS'));
+  assert.ok(LIGHTNING_RUBRIC.includes('practice'));
+});
+
 test('the prompt names the current box and both ways on', () => {
   const { system, user } = buildLightningPrompt(run());
   assert.equal(system.length, 1);
