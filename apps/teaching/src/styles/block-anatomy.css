@@ -81,16 +81,14 @@
   color: var(--muted);
 }
 
-/* Roles on a navy or tinted fill (toolkit Tool box, card stack cards). */
-.block-on-dark .block-eyebrow,
-.block-on-dark .block-secondary {
-  color: var(--on-dark-muted);
+/* Roles on a filled surface (toolkit Tool box, card stack tints) take the
+   fill's ink; the eyebrow and secondary copy step back with opacity. */
+.block-on-fill :is(.block-eyebrow, .block-title, .block-subtitle, .block-body, .block-secondary) {
+  color: inherit;
 }
 
-.block-on-dark .block-title,
-.block-on-dark .block-subtitle,
-.block-on-dark .block-body {
-  color: var(--on-dark);
+.block-on-fill :is(.block-eyebrow, .block-secondary) {
+  opacity: 0.78;
 }
 
 /* View switch: kit .hub-pills, directly under the title / body. */

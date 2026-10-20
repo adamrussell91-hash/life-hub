@@ -4691,6 +4691,7 @@ a.home-class-tile:hover {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
 }
+
 .block-definition__definition {
   margin: var(--space-1) 0 0;
 }
@@ -5139,31 +5140,18 @@ a.home-class-tile:hover {
 
 .block-card-stack__eyebrow {
   margin: 0 0 var(--space-3);
-  font-family: var(--font-ui);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
   opacity: 0.72;
 }
 
 .block-card-stack__title {
   margin: 0;
   max-width: 16ch;
-  font-family: var(--font-ui);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-tight);
   text-wrap: balance;
 }
 
 .block-card-stack__description {
   margin: var(--space-4) 0 0;
   max-width: 42rem;
-  font-family: var(--font-ui);
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
   opacity: 0.86;
   white-space: pre-wrap;
 }
@@ -5234,9 +5222,6 @@ a.home-class-tile:hover {
   margin: 0;
   min-width: 4.5rem;
   text-align: center;
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--muted);
 }
 
 .block-editor__card-stack-items {
@@ -5378,10 +5363,6 @@ a.home-class-tile:hover {
   position: relative;
   margin: 0;
   padding-left: 2rem;
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
-  line-height: 1.6;
-  color: var(--ink);
   max-width: var(--measure);
 }
 
@@ -5411,12 +5392,6 @@ a.home-class-tile:hover {
 
 .block-question-set__answer-label {
   margin: 14px 0 7px 2rem;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-bold);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-caps);
-  font-family: var(--font-ui);
 }
 
 .block-question-set__answer {
@@ -5630,16 +5605,12 @@ a.home-class-tile:hover {
 }
 
 /* Learning activities */
+/* Flat inside the block card, full width: the flashcard deck is the one inner panel. */
 .block-flashcards,
 .block-cloze,
 .block-self-check {
   display: grid;
   gap: var(--space-3);
-  max-width: 42rem;
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.62);
 }
 
 .block-flashcards__teacher-list {
@@ -5719,18 +5690,7 @@ a.home-class-tile:hover {
 .block-flashcards__status,
 .block-cloze__score {
   min-height: 1.35rem;
-  color: var(--muted);
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
   text-align: center;
-}
-
-.block-flashcards__controls,
-.block-cloze__controls {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
 }
 
 .block-flashcards--shuffling {
@@ -5751,15 +5711,10 @@ a.home-class-tile:hover {
   }
 }
 
-.block-cloze__title,
-.block-self-check__title {
+.block-cloze__title {
   color: var(--depth);
   font-family: var(--font-ui);
   font-size: var(--text-md);
-}
-
-.block-cloze__sentence {
-  line-height: 2.35;
 }
 
 .block-cloze__blank {
@@ -5802,7 +5757,6 @@ a.home-class-tile:hover {
 .block-cloze__word-bank {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: var(--space-2);
 }
 
@@ -5815,13 +5769,14 @@ a.home-class-tile:hover {
   font-family: var(--font-ui);
   font-size: var(--text-sm);
 }
-
-.block-self-check__prompt {
-  font-weight: var(--weight-semibold);
+.block-self-check__answer-hidden {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--wave);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(55, 111, 183, 0.08);
 }
 
-.block-self-check__answer,
-.block-self-check__answer-hidden {
+.block-self-check__answer {
   padding: var(--space-3) var(--space-4);
   border-left: 3px solid var(--wave);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
@@ -5865,7 +5820,6 @@ a.home-class-tile:hover {
   flex-wrap: wrap;
   gap: var(--space-2);
 }
-
 .block-self-check__confidence-btn {
   min-width: 2.65rem;
   padding-inline: 0.75rem;
@@ -6902,6 +6856,7 @@ input.scope-timeline__note-title:focus-visible {
   .block-flashcards__card,
   .block-flashcards__status,
   .block-flashcards__controls,
+  .block-flashcards__actions,
   .block-cloze__sentence,
   .block-cloze__word-bank,
   .block-cloze__controls,
@@ -9575,6 +9530,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-whiteboard {
   margin: 0;
 }
+
 .block-whiteboard__surface,
 .block-editor__whiteboard-surface {
   position: relative;
@@ -12390,7 +12346,6 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3) 0;
   border-top: 1px solid var(--line);
 }
-
 .block-anthology__technique-name,
 .block-anthology__connection-title {
   margin: 0;

@@ -120,7 +120,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
 
   function waitPanel(title: string, sub: string): HTMLElement {
     const box = el('div', 'pf-panel pf-panel--wait');
-    box.append(el('p', 'pf-panel__title', title), el('p', 'pf-panel__text', sub));
+    box.append(el('p', 'pf-panel__title block-subtitle', title), el('p', 'pf-panel__text block-body', sub));
     return box;
   }
 
@@ -136,7 +136,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     code.maxLength = 7;
     code.placeholder = '000 000';
     code.value = joinCode;
-    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint', 'No account and no name. Classmates won’t know which answers are yours.'));
+    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'No account and no name. Classmates won’t know which answers are yours.'));
     const join = button('Join', 'primary', function () {
       void doJoin(this);
     });
@@ -202,7 +202,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
           go.click();
         }
       });
-      const row = el('div', 'pf-actions');
+      const row = el('div', 'pf-actions block-actions');
       row.append(go);
       wrap.append(f, row);
       if (refocus) {
@@ -230,7 +230,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
 
   function paint(): void {
     if (!state) {
-      body.replaceChildren(el('p', 'pf-note', 'Loading…'));
+      body.replaceChildren(el('p', 'pf-note block-secondary', 'Loading…'));
       board.root.hidden = true;
       return;
     }
