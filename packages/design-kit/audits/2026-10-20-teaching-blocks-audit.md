@@ -252,3 +252,13 @@ This is a proposal, not a spec. Nothing below is built.
 8. **Toolkit / analogy CSS hygiene:** replace `11px` / `12px` / `#fff` literals with tokens. No visual change.
 
 Each step is one commit. Steps 1 to 6 together would fit in a single PR.
+
+## Built, 20 October 2026
+
+Steps 1 to 6 above, then the wider ask: one block anatomy for every block. Step 7 (annotation palette and Newsreader) is still open.
+
+- **Roles:** `apps/teaching/src/styles/block-anatomy.css` holds eyebrow, title, subtitle, body, secondary, switch, disclosure, actions, pager and empty. Every block renderer tags its parts with them; block CSS keeps layout and identity only.
+- **Slot order:** eyebrow → title → body → view switch → content → disclosure → actions or pager.
+- **Kept on purpose:** toolkit skill / tool / value boxes, griffin eyebrow, quadrant grid, sentence frames; analogy icon title box, level badge, types list, tiers and organisers; card stack tints (the tint is stored author content). Countdown lost its marine fill. The Close Reading bridge is a plain form.
+- **Guards:** `apps/teaching/tests/unit/block-text-baseline.test.ts` (every seed lesson block and every block type render the same text as main before the restyle) and `apps/teaching/tests/browser/block-anatomy.spec.ts` (sizes, weights and colours per role; actions last; 44px controls at 390px), on `apps/teaching/block-anatomy.html`.
+- **Screenshots:** `2026-10-20-teaching-blocks/before/` and `after/`, one per family at 1100px and 390px.
