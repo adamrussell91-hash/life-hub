@@ -358,7 +358,8 @@ describe('several notes on one line or stanza', () => {
     const adds = Array.from(open.querySelectorAll('.block-editor__annotation-bar-menu-new')).map(
       (btn) => btn.textContent
     );
-    expect(adds).toEqual(['+ Structure', '+ Imagery', '+ Teacher notes']);
+    // Voice is offered on every selection, even before the layer exists.
+    expect(adds).toEqual(['+ Structure', '+ Imagery', '+ Teacher notes', '+ Voice']);
     mount.remove();
     document.querySelectorAll('.block-editor__annotation-bar-menu').forEach((m) => m.remove());
   });

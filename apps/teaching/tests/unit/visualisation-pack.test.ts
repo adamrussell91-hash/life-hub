@@ -182,7 +182,9 @@ describe('createBlock visualisation defaults', () => {
 
   it('lists Visualisation group and allows nesting', () => {
     const viz = BLOCK_GROUPS.find((g) => g.label === 'Visualisation');
-    expect(viz?.types).toEqual(['chart', 'table', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'whiteboard']);
+    expect(viz?.types).toEqual([
+      'chart', 'table', 'timeline', 'equation', 'diagram', 'mind_map', 'concept_map', 'curriculum_lines', 'whiteboard'
+    ]);
     for (const t of viz!.types) {
       expect(NEW_BLOCK_TYPES).toContain(t);
       if (t === 'timeline') expect(COLUMN_CHILD_TYPES).not.toContain(t);
