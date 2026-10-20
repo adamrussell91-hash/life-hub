@@ -1275,7 +1275,7 @@ function analogyCheckList(checks: string[]): HTMLElement {
 function analogyFocus(text: string): HTMLElement | null {
   if (!text.trim()) return null;
   const box = el('div', 'an-focus');
-  box.append(el('span', 'an-focus__label', 'Working with'), el('p', 'an-focus__text', text.trim()));
+  box.append(el('span', 'an-focus__label block-eyebrow', 'Working with'), el('p', 'an-focus__text block-subtitle', text.trim()));
   return box;
 }
 
@@ -1285,7 +1285,7 @@ function analogyCard(title: string, tag: string | undefined, definition: string,
   if (tag) heading.append(el('span', 'an-tag', tag));
   card.append(heading);
   if (definition.trim()) card.append(el('p', 'tk-card__definition block-body', definition));
-  if (cardName) card.append(el('p', 'an-card-name', cardName));
+  if (cardName) card.append(el('p', 'an-card-name block-secondary', cardName));
   return card;
 }
 
@@ -1309,8 +1309,8 @@ function tierPanel(
     const list = el('ol', 'an-steps');
     for (const step of steps) {
       const item = el('li', 'an-step');
-      if (step.title.trim()) item.append(el('span', 'an-step__title', step.title.trim()));
-      if (step.prompt.trim()) item.append(el('span', 'an-step__frame', step.prompt.trim()));
+      if (step.title.trim()) item.append(el('span', 'an-step__title block-subtitle', step.title.trim()));
+      if (step.prompt.trim()) item.append(el('span', 'an-step__frame block-body', step.prompt.trim()));
       list.append(item);
     }
     panel.append(list);
@@ -1403,11 +1403,11 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
     ] as const) {
       if (!text.trim()) continue;
       const side = el('div', `an-contrast__side an-contrast__side--${tone}`);
-      side.append(el('p', 'an-contrast__label', label), el('p', 'an-contrast__text', text));
+      side.append(el('p', 'an-contrast__label block-eyebrow', label), el('p', 'an-contrast__text block-body', text));
       contrast.append(side);
     }
     wrap.append(contrast);
-    if (c.why.trim()) wrap.append(el('p', 'an-contrast__why', c.why));
+    if (c.why.trim()) wrap.append(el('p', 'an-contrast__why block-body', c.why));
   }
 
   const chosen = new Set(c.types);
@@ -1417,9 +1417,9 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
     const item = el('li', 'an-types__item');
     if (chosen.has(type.id)) item.classList.add('is-chosen');
     const head = el('p', 'an-types__head');
-    head.append(el('span', 'an-types__num', String(type.order)), el('span', 'an-types__name', type.label), el('span', 'an-tag', type.tag));
-    if (chosen.has(type.id)) head.append(el('span', 'an-types__chosen', 'This lesson'));
-    item.append(head, el('p', 'an-types__text', type.definition));
+    head.append(el('span', 'an-types__num', String(type.order)), el('span', 'an-types__name block-subtitle', type.label), el('span', 'an-tag', type.tag));
+    if (chosen.has(type.id)) head.append(el('span', 'an-types__chosen block-eyebrow', 'This lesson'));
+    item.append(head, el('p', 'an-types__text block-body', type.definition));
     list.append(item);
   }
   wrap.append(list);
@@ -1429,7 +1429,7 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
   const tiers = el('ol', 'an-tiers');
   for (const { level, name, summary } of ANALOGY_LEVELS) {
     const item = el('li', 'an-tiers__item');
-    item.append(el('span', 'an-tiers__num', `Level ${level}`), el('strong', 'an-tiers__name', name), el('span', 'an-tiers__text', summary));
+    item.append(el('span', 'an-tiers__num block-eyebrow', `Level ${level}`), el('strong', 'an-tiers__name block-subtitle', name), el('span', 'an-tiers__text block-body', summary));
     tiers.append(item);
   }
   levels.append(tiers);
@@ -1439,7 +1439,7 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
   if (steps.length) {
     const box = el('div', 'an-process-box');
     box.append(el('p', 'tk-subhead block-subtitle', 'A simple process you can use'));
-    const process = el('ol', 'an-process');
+    const process = el('ol', 'an-process block-body');
     for (const line of steps) process.append(el('li', undefined, line));
     box.append(process);
     wrap.append(box);
@@ -1475,9 +1475,9 @@ function box(slot: Slot | undefined, className = ''): HTMLElement | null {
   if (!hasSlot(slot)) return null;
   const node = el('div', `an-box ${className}`.trim());
   node.dataset.slot = slot.key;
-  if (slot.label.trim()) node.append(el('span', 'an-box__label', slot.label.trim()));
-  node.append(el('span', 'an-box__frame', slot.frame.trim() || ' '));
-  node.append(el('span', 'an-box__example', slot.example.trim() || slot.frame.trim() || ' '));
+  if (slot.label.trim()) node.append(el('span', 'an-box__label block-subtitle', slot.label.trim()));
+  node.append(el('span', 'an-box__frame block-body', slot.frame.trim() || ' '));
+  node.append(el('span', 'an-box__example block-body', slot.example.trim() || slot.frame.trim() || ' '));
   return node;
 }
 
@@ -1489,20 +1489,18 @@ function group(className: string, label: string | null, ...nodes: Array<Node | n
   const kept = nodes.filter((node): node is Node => node !== null);
   if (!kept.length) return null;
   const wrap = el('div', className);
-  if (label) wrap.append(el('p', 'an-org__caption', label));
+  if (label) wrap.append(el('p', 'an-org__caption block-eyebrow', label));
   wrap.append(...kept);
   return wrap;
 }
 
-/** Close Reading: two piers (the text, the thing outside it), links as planks, the limit as a broken plank. */
+/** Close Reading as a plain form: the text and the thing outside it side by side, the links, limit and insight full width under them. */
 function bridgeOrganiser(slots: Map<string, Slot>): HTMLElement {
   const org = el('div', 'an-org an-bridge');
   const outside = boxes(slots, ['outside', 'concrete', 'abstract', 'discipline'], 'an-bridge__option');
-  const span = el('div', 'an-bridge__span');
-  span.setAttribute('aria-hidden', 'true');
   appendIf(
     org,
-    group('an-bridge__piers', null, box(slots.get('text'), 'an-bridge__pier'), span, group('an-bridge__pier-stack', null, ...outside)),
+    group('an-bridge__piers', null, box(slots.get('text'), 'an-bridge__pier'), group('an-bridge__pier-stack', null, ...outside)),
     group('an-bridge__deck', null, ...boxes(slots, ['link1', 'link2'], 'an-plank')),
     box(slots.get('limit'), 'an-plank an-plank--broken'),
     ...boxes(slots, ['insight', 'use'], 'an-so')
@@ -1659,12 +1657,12 @@ function stagePanel(
   organiser.setAttribute('aria-label', shape);
   organiser.setAttribute('role', 'group');
   const head = el('div', 'an-stage__head');
-  head.append(el('p', 'an-stage__shape', shape));
+  head.append(el('p', 'an-stage__shape block-subtitle', shape));
   const hasExample = [...slots.values()].some((slot) => slot.example.trim());
   if (mode !== 'print' && hasExample) {
     const key = activityKey(ctx, block.id, `example-${level}`);
     let shown = loadActivityState<{ open?: unknown }>(key)?.open === true;
-    const button = el('button', 'btn btn--secondary block-self-check__btn an-stage__toggle');
+    const button = el('button', 'block-disclosure__toggle block-self-check__btn an-stage__toggle');
     button.type = 'button';
     const paint = () => {
       organiser.classList.toggle('is-example', shown);
@@ -1676,8 +1674,10 @@ function stagePanel(
       saveActivityState(key, { open: shown });
       paint();
     });
-    head.append(button);
     paint();
+    // Disclosure sits under the organiser it fills.
+    panel.append(head, organiser, button);
+    return panel;
   }
   panel.append(head, organiser);
   return panel;
