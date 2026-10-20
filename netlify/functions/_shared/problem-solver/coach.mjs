@@ -99,6 +99,7 @@ function withAcceptedNode(session, turn) {
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
+  if (result.value.suggestion?.kind === 'escalate') result.value = { ...result.value, suggestion: null };
   if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null, proposeTasks: [], proposeReview: null } };
   // In frame a suggestion only means something on the turn that sets the model (the frame
   // completes and the first step opens); otherwise accepting it would be refused.
