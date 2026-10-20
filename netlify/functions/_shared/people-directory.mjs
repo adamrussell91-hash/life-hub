@@ -125,12 +125,14 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
     // Job title at their current workplace says the most; then how you know
     // them; then just where they are.
     const titled = currentOrgLinks.find((o) => typeof o.role === 'string' && o.role.trim());
+    // Several current roles: the first one, then "+N" for the rest.
+    const moreRoles = currentOrgLinks.length > 1 ? ` +${currentOrgLinks.length - 1}` : '';
     const roleLine =
-      (titled ? `${titled.role.trim()} · ${titled.display_name}` : null) ??
+      (titled ? `${titled.role.trim()} · ${titled.display_name}${moreRoles}` : null) ??
       proRoles.find((r) => r.current)?.label ??
       (primaryOrg
         ? primaryOrg.current
-          ? `At ${primaryOrg.display_name}`
+          ? `At ${primaryOrg.display_name}${moreRoles}`
           : `Formerly ${primaryOrg.display_name}`
         : 'No relationship on record');
 
@@ -178,6 +180,7 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
       they_owe_count: 0,
       pending_proposal_count: pendingProposals,
       next_label: null,
+      lifecycle_status: person.lifecycle_status ?? 'active',
       created_at: person.created_at,
       updated_at: person.updated_at
     });
