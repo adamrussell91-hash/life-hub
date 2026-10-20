@@ -16,6 +16,7 @@ on:
       - 'apps/tasks/package-lock.json'
       - 'packages/whiteboard/**'
       - 'apps/teaching/src/blocks/whiteboard-runtime.ts'
+      - 'apps/teaching/src/blocks/excalidraw-board.ts'
       - 'apps/teaching/src/blocks/create-block.ts'
       - 'apps/teaching/src/blocks/editors.ts'
       - 'apps/teaching/src/blocks/render.ts'
