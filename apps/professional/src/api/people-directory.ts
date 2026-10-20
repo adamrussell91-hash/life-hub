@@ -58,6 +58,12 @@ export interface PeopleDirectoryResponse {
   counts: { people: number; organisations: number; students?: number };
 }
 
+/** The last finished server scan, saved for a session's first paint. */
+export interface PeopleDirectorySnapshot extends PeopleDirectoryResponse {
+  /** ISO time of the scan that produced it. */
+  as_of: string;
+}
+
 let lastDirectory: PeopleDirectoryResponse | null = null;
 let lastRevision = -1;
 let directoryRequest = 0;
@@ -82,6 +88,16 @@ export async function fetchPeopleDirectory(
     lastRevision = revision;
   }
   return data;
+}
+
+/** Saved copy of the last scan, or null if none yet. Never a substitute for `fetchPeopleDirectory`. */
+export async function fetchPeopleDirectorySnapshot(
+  options: { signal?: AbortSignal } = {}
+): Promise<PeopleDirectorySnapshot | null> {
+  const data = await apiGet<PeopleDirectorySnapshot | null>('/api/people/directory?snapshot=1', {
+    signal: options.signal
+  });
+  return data && typeof data.as_of === 'string' && Array.isArray(data.people) ? data : null;
 }
 
 export interface UpdateOrganisationInput {
