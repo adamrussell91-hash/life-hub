@@ -1,21 +1,103 @@
+/* Shared audio player (Media Chrome). A light pill on the canvas: navy round
+ * play button, slim navy progress line, quiet time and controls. Media Chrome
+ * paints its controller black by default, so every surface is set here. */
 .hub-audio-player {
   display: block;
   width: 100%;
-  --media-primary-color: var(--ink-1, #0a1536);
-  --media-secondary-color: var(--surface-1, #faf8f2);
-  --media-control-background: color-mix(in srgb, var(--ink-1, #0a1536) 8%, transparent);
-  --media-control-hover-background: color-mix(in srgb, var(--ink-1, #0a1536) 14%, transparent);
-  --media-range-bar-color: var(--accent-1, #2f5d8c);
-  --media-font-family: var(--font-body, system-ui, sans-serif);
-  --media-font-size: 0.85rem;
-  border-radius: 0.65rem;
-  overflow: hidden;
+  --media-background-color: transparent;
+  --media-primary-color: var(--ink, #13233a);
+  --media-secondary-color: transparent;
+  --media-text-color: var(--muted, #6b7788);
+  --media-icon-color: var(--muted, #6b7788);
+  --media-control-background: transparent;
+  --media-control-hover-background: transparent;
+  --media-control-height: var(--space-8, 2rem);
+  --media-control-padding: 0 var(--space-2, 0.5rem);
+  --media-button-icon-width: 1.125rem;
+  --media-button-icon-height: 1.125rem;
+  --media-font-family: var(--font-ui, Inter, system-ui, sans-serif);
+  --media-font-size: var(--text-sm, 0.8125rem);
+  --media-font-weight: var(--weight-medium, 500);
+  --media-focus-box-shadow: 0 0 0 2px var(--wave, #376fb7);
+  --media-range-track-height: 4px;
+  --media-range-track-border-radius: var(--radius-full, 999px);
+  --media-range-track-background: color-mix(in srgb, var(--navy, #17375e) 12%, transparent);
+  --media-range-bar-color: var(--navy, #17375e);
+  --media-time-range-buffered-color: color-mix(in srgb, var(--navy, #17375e) 20%, transparent);
+  --media-range-thumb-width: 12px;
+  --media-range-thumb-height: 12px;
+  --media-range-thumb-border-radius: var(--radius-full, 999px);
+  --media-range-thumb-background: var(--navy, #17375e);
+  --media-range-thumb-box-shadow: 0 0 0 3px var(--warm-white, #fbf8f2);
+  --media-preview-time-background: var(--navy, #17375e);
+  --media-preview-time-text-shadow: none;
+  --media-box-arrow-display: none;
+  max-width: 32rem;
+  padding: var(--space-1, 0.25rem);
+  background: var(--warm-white, #fbf8f2);
+  border: 1px solid var(--line, rgba(23, 55, 94, 0.1));
+  border-radius: var(--radius-full, 999px);
+  box-shadow: var(--elev-1, 0 1px 2px rgba(20, 35, 70, 0.06));
 }
 
 .hub-audio-player media-control-bar {
   width: 100%;
-  gap: 0.25rem;
-  padding: 0.35rem 0.5rem;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+.hub-audio-player media-play-button {
+  --media-primary-color: var(--warm-white, #fbf8f2);
+  --media-icon-color: var(--warm-white, #fbf8f2);
+  --media-control-height: var(--space-10, 2.5rem);
+  --media-control-padding: 0;
+  --media-button-icon-width: 1.25rem;
+  --media-button-icon-height: 1.25rem;
+  flex: none;
+  width: var(--space-10, 2.5rem);
+  height: var(--space-10, 2.5rem);
+  justify-content: center;
+  border-radius: var(--radius-full, 999px);
+  background: var(--navy, #17375e);
+  transition: background 0.15s ease;
+}
+
+.hub-audio-player media-play-button:hover {
+  background: var(--navy-2, #244f7c);
+}
+
+.hub-audio-player media-time-range {
+  flex: 1 1 auto;
+  min-width: 4rem;
+  margin-inline: var(--space-2, 0.5rem);
+}
+
+.hub-audio-player media-time-display {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-audio-player media-playback-rate-button {
+  flex: none;
+  --media-text-color: var(--ink, #13233a);
+  --media-control-height: var(--space-6, 1.5rem);
+  --media-control-padding: 0 var(--space-2, 0.5rem);
+  border-radius: var(--radius-full, 999px);
+  background: color-mix(in srgb, var(--navy, #17375e) 7%, transparent);
+  margin-inline: var(--space-1, 0.25rem);
+}
+
+.hub-audio-player media-playback-rate-button:hover,
+.hub-audio-player media-mute-button:hover {
+  --media-icon-color: var(--ink, #13233a);
+  --media-primary-color: var(--ink, #13233a);
+  background: color-mix(in srgb, var(--navy, #17375e) 12%, transparent);
+}
+
+.hub-audio-player media-mute-button {
+  flex: none;
+  border-radius: var(--radius-full, 999px);
+  margin-inline-end: var(--space-1, 0.25rem);
 }
 
 .hub-audio-player__media {
@@ -24,11 +106,17 @@
 
 .hub-audio-player-wrap {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--space-2, 0.5rem);
 }
 
 .hub-audio-player__title {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: var(--text-base, 0.9375rem);
+  font-weight: var(--weight-semibold, 600);
+}
+
+@media (max-width: 30rem) {
+  .hub-audio-player media-playback-rate-button {
+    display: none;
+  }
 }
