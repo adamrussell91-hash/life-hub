@@ -34,5 +34,12 @@ export const STEP_TRIGGERS = Object.freeze({
     'A single-loop fix offered for a problem that keeps recurring (analysis).',
     'Results claimed with no measure, or the plan described instead of what happened (critical_thinking).',
     'Only the solution reviewed, never the process that produced it (metacognition).'
+  ],
+  document: [
+    'A name only the person would understand: initials, in-jokes or private abbreviations (critical_thinking).',
+    'Keeping everything instead of condensing to the few things that matter (analysis).',
+    'No purpose given, so nobody knows who the record is for (critical_thinking).',
+    'Only written records captured, with no plan for know-how held by people (reflective_thinking).',
+    'Personal or sensitive details kept that should not be stored (critical_thinking).'
   ]
 });

@@ -280,3 +280,28 @@ test('leaving a waiting Improve is not treated as a skip', () => {
   assert.doesNotMatch(mode, /skipped/i);
   assert.match(mode, /do not object/i);
 });
+
+const documentAt = (runs, extra = {}) => ({ ...inTool(), phase: 'document', steps: { ...inTool().steps, document: { runs, status: 'open', objection: null } }, runner: { status: 'idle', mode: 'turn', error: null }, caseFile: null, caseFileDeclined: null, ...extra });
+const doneFiveCs = () => ({ id: 'r5', tool: 'five_cs', status: 'active', edges: [], nodes: [
+  ['contextualise', 'So next term starts calmly'], ['categorise', 'On the rota project page'], ['condense:1', 'Publish on Wednesday'],
+  ['correct', 'Nothing needs correcting'], ['correspond', 'Kitchen rota case file 20261020 v1 Final']
+].map(([slot, text]) => ({ id: slot, slot, text, title: slot, state: 'accepted' })) });
+
+test('rubric explains the case file and the name rules', () => {
+  for (const word of ['CASE FILE', 'node.text', 'Document']) assert.ok(RUBRIC.includes(word), word);
+});
+
+test('the Document step carries its guide, triggers and carry-forward', () => {
+  const { system } = buildCoachPrompt(documentAt([]));
+  assert.match(system[1], /CURRENT STEP: Document/);
+  assert.match(system[1], /five_cs \(5 Cs documentation\)/);
+  assert.match(system[1], /CHALLENGE IN THIS STEP/);
+  assert.match(system[1], /CARRY FORWARD:/);
+});
+
+test('a case file ready to write is named, and a written one says where and which version', () => {
+  assert.match(buildCoachPrompt(documentAt([doneFiveCs()])).user, /CASE FILE: ready to write as "Kitchen rota case file 20261020 v1 Final"/);
+  const written = documentAt([doneFiveCs()], { caseFile: { title: 'Kitchen rota case file 20261020 v1 Final', version: 1, target: { kind: 'project', id: 'p' }, writtenAt: '2026-10-20T09:00:00.000Z', sections: {}, history: [] } });
+  assert.match(buildCoachPrompt(written).user, /CASE FILE: v1 "Kitchen rota case file 20261020 v1 Final" written 2026-10-20 to the linked project/);
+  assert.match(buildCoachPrompt(written).user, /Changed since it was written: /);
+});
