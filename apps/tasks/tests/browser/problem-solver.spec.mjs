@@ -38,20 +38,45 @@ async function answer(page, text) {
   await expect(page.getByLabel('Your answer')).toBeEnabled();
 }
 
+/** Describe a new problem and answer the three frame questions; the coach then suggests 5 Whys. */
+async function frameProblem(page, text) {
+  await page.getByLabel('Describe the problem').fill(text);
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(page.locator('.ps-frame')).toBeVisible();
+  await answer(page, 'A rota that is fixed a full week ahead');
+  await expect(page.locator('.ps-frame__row.is-answered')).toHaveCount(1);
+  await answer(page, 'It changed late three of the last four weeks');
+  await answer(page, 'We could change which day it is published');
+  await expect(page.locator('.ps-suggestion')).toContainText('5 Whys');
+}
+
+/** The open problem's id, and a reader for its saved session. */
+async function sessionReader(page) {
+  const id = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('id'));
+  return { id, now: () => page.evaluate(async (sid) => (await fetch(`/api/problem-solver?id=${encodeURIComponent(sid)}`).then((r) => r.json())).data.session, id) };
+}
+
+/** Leave a finished Implement: the dated review card appears and creating it links the review task. Returns its date. */
+async function createReviewOnLeaving(page, viewport, sessionNow) {
+  await page.getByRole('button', { name: 'Move on to Improve' }).click();
+  const reviewCard = page.locator('.ps-reviewcard');
+  await expect(reviewCard).toBeVisible();
+  const due = await reviewCard.locator('input[name="due"]').inputValue();
+  expect(due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  await noOverflow(page);
+  await shot(page, 'reviewcard', viewport);
+  await reviewCard.getByRole('button', { name: 'Create review task' }).click();
+  await expect(reviewCard).toHaveCount(0);
+  await expect.poll(async () => Boolean((await sessionNow()).reviewTaskId)).toBe(true);
+  return due;
+}
+
 for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }]) {
   test(`5 Whys, a switch to Problem tree, the record and a causal map, then Decide, Implement, the review and Improve at ${viewport.width}px`, async ({ page }) => {
     test.setTimeout(240_000);
     await page.setViewportSize(viewport);
     await signIn(page);
-    await page.getByLabel('Describe the problem').fill('The weekly rota keeps changing at the last minute');
-    await page.getByRole('button', { name: 'Start' }).click();
-    await expect(page.locator('.ps-frame')).toBeVisible();
-
-    await answer(page, 'A rota that is fixed a full week ahead');
-    await expect(page.locator('.ps-frame__row.is-answered')).toHaveCount(1);
-    await answer(page, 'It changed late three of the last four weeks');
-    await answer(page, 'We could change which day it is published');
-    await expect(page.locator('.ps-suggestion')).toContainText('5 Whys');
+    await frameProblem(page, 'The weekly rota keeps changing at the last minute');
     await page.getByRole('button', { name: 'Start it' }).click();
     await expect(page.locator('.ps-whys')).toBeAttached();
     await expect(page.locator('.ps-whys [data-node]')).toHaveCount(0);
@@ -187,8 +212,7 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await shot(page, 'taskcard', viewport);
     await taskCard.getByRole('button', { name: 'Create task' }).click();
     await expect(taskCard).toHaveCount(0);
-    const sessionId = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('id'));
-    const sessionNow = () => page.evaluate(async (id) => (await fetch(`/api/problem-solver?id=${encodeURIComponent(id)}`).then((r) => r.json())).data.session, sessionId);
+    const { id: sessionId, now: sessionNow } = await sessionReader(page);
     await expect.poll(async () => (await sessionNow()).proposedTasks.filter((p) => p.status === 'confirmed').length).toBe(1);
     const confirmed = (await sessionNow()).proposedTasks.find((p) => p.status === 'confirmed');
     const created = (await tasksNamed(page, 'Draft the new Wednesday rota template')).find((task) => task.id === confirmed.taskId);
@@ -216,16 +240,7 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await shot(page, 'kanban', viewport);
 
     // Review: leaving Implement proposes a dated review task; creating it links it back.
-    await page.getByRole('button', { name: 'Move on to Improve' }).click();
-    const reviewCard = page.locator('.ps-reviewcard');
-    await expect(reviewCard).toBeVisible();
-    const due = await reviewCard.locator('input[name="due"]').inputValue();
-    expect(due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    await noOverflow(page);
-    await shot(page, 'reviewcard', viewport);
-    await reviewCard.getByRole('button', { name: 'Create review task' }).click();
-    await expect(reviewCard).toHaveCount(0);
-    await expect.poll(async () => Boolean((await sessionNow()).reviewTaskId)).toBe(true);
+    const due = await createReviewOnLeaving(page, viewport, sessionNow);
     const reviews = await tasksNamed(page, 'Review: The weekly rota keeps changing at the last minute');
     const session = await sessionNow();
     const review = reviews.find((task) => task.id === session.reviewTaskId);
@@ -337,5 +352,52 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await expect(page.locator('.ps-record')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('.ps-resume')).toHaveCount(0);
     await expect(page.locator('.ps-review')).toBeHidden();
+  });
+  test(`a late review: Improve left waiting, then the review link reopens it and returns to Document at ${viewport.width}px`, async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    await frameProblem(page, 'The meeting notes never reach the people who missed it');
+    const { id, now } = await sessionReader(page);
+
+    // Skip the early steps untouched, then finish a Kanban board in Implement.
+    for (const next of ['Analyse', 'Devise', 'Decide', 'Implement']) await page.getByRole('button', { name: `Move on to ${next}` }).click();
+    // A step left untouched asks no learning question, so the next tool is suggested on the next turn.
+    await answer(page, 'Ready to plan the work out now please');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Kanban', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-kanban')).toBeAttached();
+    for (const card of ['Notes template shared with the whole team', 'Notes posted in the channel within the hour', 'Absent people tagged in the posted notes']) await answer(page, `done: ${card}`);
+    await expect(page.locator('.ps-kanban [data-node]')).toHaveCount(3);
+    await createReviewOnLeaving(page, viewport, now);
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I stop checking once the work feels finished');
+    await expect(page.locator('.ps-review')).toContainText('Improve picks up at your review on');
+
+    // Move on past the waiting Improve: it stays waiting.
+    await page.getByRole('button', { name: 'Move on to Document' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('document');
+    await openRecord(page);
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'waiting', { timeout: 20_000 });
+    expect((await now()).reviewState.status).toBe('waiting');
+
+    // The review link: the problem has moved on, the review reopens Improve, Move on returns to Document.
+    await page.goto(`/#/problem-solver?id=${encodeURIComponent(id)}&step=improve`);
+    await page.reload();
+    const banner = page.locator('.ps-resume');
+    await expect(banner).toContainText('This problem has moved on', { timeout: 20_000 });
+    await noOverflow(page);
+    await shot(page, 'late-banner', viewport);
+    await banner.getByRole('button', { name: 'Review the results' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('improve');
+    await openRecord(page);
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current', { timeout: 20_000 });
+    await expect(page.locator('.ps-reviewcard')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Move on to Document' }).click();
+    await expect.poll(async () => (await now()).phase).toBe('document');
+    await expect(page.locator('.ps-track__stn', { hasText: 'Document' })).toHaveAttribute('data-state', 'now', { timeout: 20_000 });
+    expect((await now()).reviewState.status).toBe('done');
+    await noOverflow(page);
+    await shot(page, 'late-returned', viewport);
   });
 }

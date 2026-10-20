@@ -3,8 +3,7 @@
 // posted to the coach while Improve runs, and starting the review (Review now or the banner).
 // Every write goes through the session sync, so it waits for the coach and retries a stale
 // revision like the task cards do.
-import { planStepForBook } from '../../../../../packages/problem-solver/steps.mjs';
-import { waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
+import { inImprove, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
 import type { PsAction, PsProposedTask, PsSession } from '../../../../../packages/problem-solver/types';
 import { taskSnapshot, type TaskDetail } from './task-bridge';
 
@@ -47,8 +46,6 @@ export const snapshotKey = (snap: { byStatus: Record<string, number>; overdue: s
 
 const confirmedIds = (session: PsSession) =>
   (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed' && p.taskId).map((p) => p.taskId!).sort().join(',');
-
-const inImprove = (session: PsSession) => Boolean(session.model) && session.phase === planStepForBook(session.model!.id, 'improve');
 
 export function createReviewSync(deps: ReviewSyncDeps): ReviewSync {
   const today = deps.today ?? (() => localToday());

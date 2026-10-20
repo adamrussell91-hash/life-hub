@@ -47,7 +47,7 @@ describe('createTaskBridge', () => {
     expect(createTask).toHaveBeenCalledTimes(1);
     expect(confirm).toHaveBeenLastCalledWith('p1', 'task-1');
   });
-  it('statuses: found tasks give their status; a 404 gives removed and dismisses the proposal', async () => {
+  it('details: found tasks give the task; a 404 gives removed and dismisses the proposal', async () => {
     const getTask = vi.fn(async (id: string) => {
       if (id === 'gone') throw Object.assign(new Error('Task not found'), { status: 404 });
       return { id, status: 'in_progress' };
@@ -55,14 +55,14 @@ describe('createTaskBridge', () => {
     const dismiss = vi.fn().mockResolvedValue(undefined);
     const bridge = createTaskBridge({ createTask: vi.fn(), getTask, domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
     const confirmed = (id: string, taskId: string): PsProposedTask => ({ ...proposal, id, status: 'confirmed', taskId });
-    const statuses = await bridge.statuses([confirmed('a', 'task-1'), confirmed('b', 'gone')]);
-    expect(statuses).toEqual({ 'task-1': 'in_progress', gone: 'removed' });
+    const details = await bridge.details([confirmed('a', 'task-1'), confirmed('b', 'gone')]);
+    expect(details).toEqual({ 'task-1': { id: 'task-1', status: 'in_progress' }, gone: 'removed' });
     expect(dismiss).toHaveBeenCalledWith('b', 'removed');
   });
   it('a network failure leaves the status unknown and dismisses nothing', async () => {
     const dismiss = vi.fn();
     const bridge = createTaskBridge({ createTask: vi.fn(), getTask: vi.fn().mockRejectedValue(new Error('offline')), domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
-    expect(await bridge.statuses([{ ...proposal, status: 'confirmed', taskId: 't' }])).toEqual({ t: 'unknown' });
+    expect(await bridge.details([{ ...proposal, status: 'confirmed', taskId: 't' }])).toEqual({ t: 'unknown' });
     expect(dismiss).not.toHaveBeenCalled();
   });
 });
@@ -71,7 +71,7 @@ describe('removed tasks', () => {
   it('a proposal already dismissed as removed is not fetched again', async () => {
     const getTask = vi.fn();
     const bridge = createTaskBridge({ createTask: vi.fn(), getTask, domainFor: async () => 'life', confirm: vi.fn(), dismiss: vi.fn(), setReview: vi.fn() });
-    expect(await bridge.statuses([{ ...proposal, status: 'dismissed', removed: true, taskId: 'gone' }])).toEqual({});
+    expect(await bridge.details([{ ...proposal, status: 'dismissed', removed: true, taskId: 'gone' }])).toEqual({});
     expect(getTask).not.toHaveBeenCalled();
   });
 });
@@ -80,12 +80,12 @@ describe('review fixes', () => {
   const confirmed = (id: string, taskId: string): PsProposedTask => ({ ...proposal, id, status: 'confirmed', taskId });
   const gone = async () => { throw Object.assign(new Error('Task not found'), { status: 404 }); };
 
-  it('statuses returns while a dismissal is still pending, and dismissals go one after another', async () => {
+  it('details returns while a dismissal is still pending, and dismissals go one after another', async () => {
     let release!: () => void;
     const dismiss = vi.fn().mockImplementationOnce(() => new Promise<void>((r) => (release = r))).mockResolvedValue(undefined);
     const bridge = createTaskBridge({ createTask: vi.fn(), getTask: vi.fn(gone), domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
-    const statuses = await bridge.statuses([confirmed('a', 'x'), confirmed('b', 'y')]);
-    expect(statuses).toEqual({ x: 'removed', y: 'removed' });
+    const details = await bridge.details([confirmed('a', 'x'), confirmed('b', 'y')]);
+    expect(details).toEqual({ x: 'removed', y: 'removed' });
     expect(dismiss).toHaveBeenCalledTimes(1);
     release();
     await new Promise((r) => setTimeout(r, 0));
@@ -96,8 +96,8 @@ describe('review fixes', () => {
   it('a dismissal already on its way is not sent again by a second refresh', async () => {
     const dismiss = vi.fn(() => new Promise<void>(() => undefined));
     const bridge = createTaskBridge({ createTask: vi.fn(), getTask: vi.fn(gone), domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
-    await bridge.statuses([confirmed('a', 'x')]);
-    await bridge.statuses([confirmed('a', 'x')]);
+    await bridge.details([confirmed('a', 'x')]);
+    await bridge.details([confirmed('a', 'x')]);
     expect(dismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -178,7 +178,7 @@ describe('bridge.details', () => {
     const bridge = createTaskBridge({ createTask: vi.fn(), getTask, domainFor: async () => 'life', confirm: vi.fn(), dismiss, setReview: vi.fn() });
     const list = [confirmed('a', 'ok'), confirmed('b', 'gone'), confirmed('c', 'bad')];
     expect(await bridge.details(list)).toEqual({ ok: { id: 'ok', status: 'done', due_date: '2026-10-25', title: 'T' }, gone: 'removed', bad: 'unknown' });
-    await bridge.statuses(list);
+    await bridge.details(list);
     await new Promise((r) => setTimeout(r, 0));
     expect(dismiss).toHaveBeenCalledTimes(1);
     expect(dismiss).toHaveBeenCalledWith('b', 'removed');

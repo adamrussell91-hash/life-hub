@@ -1,7 +1,7 @@
 // tests/unit/problem-solver-review.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../packages/problem-solver/review.mjs';
+import { cleanOverdue, inImprove, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../packages/problem-solver/review.mjs';
 
 const base = (extra = {}) => ({
   status: 'active', phase: 'implement', model: { id: 'seven_step' }, reviewTaskId: 'task-r', reviewProposal: null,
@@ -51,4 +51,11 @@ test('reviewStart: null when it cannot start', () => {
   assert.equal(reviewStart(base({ phase: 'document', reviewState: { ...waiting, status: 'done' } })), null);
   assert.equal(reviewStart(base({ phase: 'define', detour: { from: 'improve', to: 'define' } })), null);
   assert.equal(reviewStart(base({ phase: 'decide' })), null);
+});
+
+test('inImprove: true in the model\'s Improve plan step only, whatever the review is doing', () => {
+  assert.equal(inImprove({ model: { id: 'seven_step' }, phase: 'improve', reviewState: null }), true);
+  assert.equal(inImprove({ model: { id: 'seven_step' }, phase: 'improve', reviewState: { status: 'reviewing' } }), true);
+  assert.equal(inImprove({ model: { id: 'seven_step' }, phase: 'document' }), false);
+  assert.equal(inImprove({ model: null, phase: 'frame' }), false);
 });
