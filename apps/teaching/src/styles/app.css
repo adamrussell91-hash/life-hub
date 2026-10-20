@@ -4541,15 +4541,27 @@ a.home-class-tile:hover {
 
 .block-image__caption,
 .block-video__caption,
-.block-video__title,
-.block-image__unavailable,
-.block-video__unavailable,
-.block-embed__unavailable,
-.block-unavailable {
+.block-video__title {
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   color: var(--muted);
   margin-top: var(--space-2);
+}
+
+/* One empty / unavailable state for every block: secondary copy, no box. */
+.block-empty {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--muted);
+}
+
+.block-empty:first-child {
+  margin-top: 0;
 }
 
 .block-embed__open {
@@ -4715,9 +4727,7 @@ a.home-class-tile:hover {
   line-height: 1.5;
 }
 
-.block-audio__title,
-.block-attachment__unavailable,
-.block-audio__unavailable {
+.block-audio__title {
   margin: 0 0 var(--space-2);
   font-family: var(--font-ui);
   font-size: var(--text-base);
@@ -7686,13 +7696,6 @@ input.scope-timeline__note-title:focus-visible {
   font-family: ui-monospace, monospace;
 }
 
-.block-diagram__unavailable {
-  margin: 0 0 var(--space-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-base);
-  color: var(--muted);
-}
-
 .block-editor__viz-preview {
   margin-top: var(--space-3);
   padding: var(--space-3);
@@ -7713,12 +7716,6 @@ input.scope-timeline__note-title:focus-visible {
 .block-collection__list {
   margin: 0;
   padding-left: var(--space-5);
-}
-
-.block-collection__empty {
-  margin: 0;
-  color: var(--text-muted, var(--muted));
-  font-size: var(--text-sm);
 }
 
 /* ── Search command palette ───────────────────────────────────────────── */
@@ -9686,8 +9683,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   min-width: 0;
 }
 
-.block-editor__whiteboard-status,
-.block-whiteboard__status {
+.block-editor__whiteboard-status {
   margin: 0;
   color: var(--muted);
   font-family: var(--font-ui);

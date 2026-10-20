@@ -355,6 +355,6 @@ describe('Curriculum lines block: render', () => {
 
   it('asks for lines and lessons when it has neither', () => {
     const el = renderBlock(createBlock('curriculum_lines', 'cl2'), 'teacher', {});
-    expect(el.querySelector('.net-empty')?.textContent).toContain('lines');
+    expect(el.querySelector('.block-empty')?.textContent).toContain('lines');
   });
 });

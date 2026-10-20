@@ -224,7 +224,7 @@ export function renderImageBlock(
     img.loading = 'lazy';
     img.addEventListener('error', () => {
       const unavailable = document.createElement('p');
-      unavailable.className = 'block-image__unavailable';
+      unavailable.className = 'block-image__unavailable block-empty';
       unavailable.textContent = block.content.alt_text.trim() || FAILURE.imageUnavailable;
       img.replaceWith(unavailable);
     });
@@ -247,7 +247,7 @@ export function renderImageBlock(
     }
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-image__unavailable';
+    unavailable.className = 'block-image__unavailable block-empty';
     unavailable.textContent = block.content.alt_text.trim() || FAILURE.imageUnavailable;
     figure.append(unavailable);
   }
@@ -296,7 +296,7 @@ export function renderVideoBlock(
 
   if (!video) {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-video__unavailable';
+    unavailable.className = 'block-video__unavailable block-empty';
     unavailable.textContent = FAILURE.videoUnavailable;
     wrap.append(unavailable);
   } else if (video.provider === 'file') {
@@ -397,7 +397,7 @@ export function renderEmbedBlock(
 
   if (!safeUrl) {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-embed__unavailable';
+    unavailable.className = 'block-embed__unavailable block-empty';
     unavailable.textContent = FAILURE.embedUnavailable;
     wrap.append(unavailable);
     return wrapBlock(wrap, block, mode);
@@ -648,7 +648,7 @@ export function renderAudioBlock(
     });
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-audio__unavailable';
+    unavailable.className = 'block-audio__unavailable block-empty';
     unavailable.textContent = 'Audio unavailable.';
     wrap.append(unavailable);
   }
@@ -686,7 +686,7 @@ export function renderAttachmentBlock(
     wrap.append(link);
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-attachment__unavailable';
+    unavailable.className = 'block-attachment__unavailable block-empty';
     unavailable.textContent = block.content.title.trim() || 'Attachment unavailable.';
     wrap.append(unavailable);
   }
@@ -1076,7 +1076,7 @@ export function renderCollectionBlock(
 
   if (resolved.links.length === 0) {
     const empty = document.createElement('p');
-    empty.className = 'block-collection__empty';
+    empty.className = 'block-collection__empty block-empty';
     empty.textContent = resolved.emptyMessage ?? 'No items.';
     root.append(empty);
     return root;
@@ -1269,7 +1269,7 @@ function galleryFigure(
     }
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-gallery__unavailable';
+    unavailable.className = 'block-gallery__unavailable block-empty';
     unavailable.textContent = entry.alt_text.trim() || 'Image unavailable.';
     figure.append(unavailable);
   }
@@ -2073,7 +2073,7 @@ export function renderDiagramBlock(
       root.append(img);
     } else {
       const unavailable = document.createElement('p');
-      unavailable.className = 'block-diagram__unavailable';
+      unavailable.className = 'block-diagram__unavailable block-empty';
       unavailable.textContent =
         mode === 'teacher'
           ? DIAGRAM_IMAGE_PUBLISH_URL_ISSUE
@@ -2346,7 +2346,7 @@ function renderBlockContent(
     }
   } catch {
     const fallback = document.createElement('p');
-    fallback.className = 'block-unavailable';
+    fallback.className = 'block-unavailable block-empty';
     fallback.textContent = FAILURE.unsupportedBlock;
     return wrapBlock(fallback, block, mode);
   }
