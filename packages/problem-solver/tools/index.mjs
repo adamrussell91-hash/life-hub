@@ -29,6 +29,8 @@ import { eisenhower } from './eisenhower.mjs';
 import { afterActionReview } from './after-action-review.mjs';
 import { doubleLoop } from './double-loop.mjs';
 import { feedbackMatrix } from './feedback-matrix.mjs';
+import { fiveCs } from './five-cs.mjs';
+import { knowledgeManagement } from './knowledge-management.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -61,7 +63,9 @@ export const TOOLS = {
   eisenhower,
   after_action_review: afterActionReview,
   double_loop: doubleLoop,
-  feedback_matrix: feedbackMatrix
+  feedback_matrix: feedbackMatrix,
+  five_cs: fiveCs,
+  knowledge_management: knowledgeManagement
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));
