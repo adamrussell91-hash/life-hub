@@ -48,8 +48,10 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   return node;
 }
 
+/** Kit .btn: the go action is primary (navy), the rest secondary. ct-btn classes are layout hooks only. */
 function btn(label: string, className = 'ct-btn'): HTMLButtonElement {
-  const b = el('button', className, label);
+  const variant = className.includes('ct-btn--go') ? 'btn--primary' : 'btn--secondary';
+  const b = el('button', `btn ${variant} ${className}`, label);
   b.type = 'button';
   return b;
 }

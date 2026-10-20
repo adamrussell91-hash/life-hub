@@ -5803,40 +5803,6 @@ a.home-class-tile:hover {
   gap: var(--space-2);
 }
 
-.block-flashcards__btn,
-.block-cloze__btn,
-.block-self-check__btn,
-.block-self-check__confidence-btn {
-  color: var(--marine);
-  border-color: var(--line);
-  background: rgba(255, 255, 255, 0.88);
-}
-
-.block-flashcards__btn:hover:not(:disabled),
-.block-cloze__btn:hover:not(:disabled),
-.block-self-check__btn:hover:not(:disabled),
-.block-self-check__confidence-btn:hover:not(:disabled) {
-  color: #fff;
-  border-color: var(--wave);
-  background: var(--wave);
-  box-shadow: var(--elev-2);
-}
-
-.block-flashcards__btn:focus-visible,
-.block-cloze__btn:focus-visible,
-.block-self-check__btn:focus-visible,
-.block-self-check__confidence-btn:focus-visible {
-  outline: 3px solid rgba(55, 111, 183, 0.35);
-  outline-offset: 2px;
-}
-
-.block-flashcards__btn:active:not(:disabled),
-.block-cloze__btn:active:not(:disabled),
-.block-self-check__btn:active:not(:disabled),
-.block-self-check__confidence-btn:active:not(:disabled) {
-  filter: brightness(0.9);
-}
-
 .block-flashcards--shuffling {
   animation: activity-shuffle 260ms ease-out;
 }
@@ -5977,8 +5943,8 @@ a.home-class-tile:hover {
 
 .block-self-check__confidence-btn[aria-pressed='true'] {
   color: #fff;
-  border-color: var(--marine);
-  background: var(--marine);
+  border-color: var(--navy);
+  background: var(--navy);
 }
 
 .block-self-check__preview-list {
