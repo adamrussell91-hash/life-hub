@@ -1,5 +1,5 @@
 import { setToolkitClasses } from '@/toolkit/class-context';
-import { mountBlockAssistant } from '@/alchemy/block-assistant';
+import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
 import { withAppBase } from '@/app/base-path';
@@ -131,7 +131,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let editSourceOpenSeq = 0;
   let aiPanel: AiPanelHandle | null = null;
   let alchemyLab: AlchemyLabHandle | null = null;
-  let blockAssistant: ReturnType<typeof mountBlockAssistant> | null = null;
+  let annReview: ReturnType<typeof mountAnnReview> | null = null;
   let page: LessonPageHandle | null = null;
   let palette: LessonPaletteHandle | null = null;
   let removeChromeKeys: (() => void) | null = null;
@@ -217,7 +217,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     compositionStatus.className = 'lesson-editor__composition-status';
     compositionStatus.hidden = true;
 
-    pageCol.append(publishPanel, tagsHost, pageHost, compositionStatus);
+    const annBarHost = document.createElement('div');
+    annBarHost.className = 'lesson-builder__ann';
+    pageCol.append(publishPanel, tagsHost, annBarHost, pageHost, compositionStatus);
     chatCol.append(aiHost, labHost);
     builder.append(railHost, pageCol, chatCol, chatFab);
     builder.insertAdjacentHTML('beforeend', fullPageExitHtml(false));
@@ -266,7 +268,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function markDirty(): void {
       bumpDraftClock();
       saveController?.notifyChange();
-      blockAssistant?.changed();
+      annReview?.changed();
     }
 
     function persistChrome(): void {
@@ -674,21 +676,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     });
 
     alchemyLab = mountAlchemyLabPanel(labHost, {
-      onHide: () => setChatShelved(true),
-      agent: {
-        kind: 'lesson',
-        id: lesson.id,
-        getEntity: () => lesson,
-        flush: async () => {
-          await saveController?.flush();
-          if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes before asking Ann.');
-        },
-        apply: async (next) => {
-          assignLesson(next as Lesson); page?.update(lesson); markDirty();
-          await saveController?.saveNow({ checkpointReason: 'ai_accepted' });
-          if (saveController?.getState() === 'save_failed') throw new Error('The edit is on the page but could not be saved. Retry Save.');
-        }
-      }
+      onHide: () => setChatShelved(true)
     });
 
     syncAiSelection();
@@ -849,8 +837,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       getLesson: () => lesson
     });
 
-    blockAssistant = mountBlockAssistant({
-      host: builder, kind: 'lesson', id: lesson.id, getEntity: () => lesson,
+    annReview = mountAnnReview({
+      host: builder, barHost: annBarHost, kind: 'lesson', id: lesson.id, getEntity: () => lesson,
       flush: async () => {
         await saveController?.flush();
         if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes before asking Ann.');
@@ -941,6 +929,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         {
           label: 'Alchemy Lab',
           className: 'context-bar__alchemy-lab',
+          onSelect: () => {
+            annReview?.focusBar();
+          }
+        },
+        {
+          label: 'Cross-domain connections',
+          className: 'context-bar__connections-lab',
           onSelect: () => {
             openAlchemyLab();
           }
@@ -1053,8 +1048,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       publicLinkDispose = null;
       aiPanel?.dispose();
       aiPanel = null;
-      blockAssistant?.dispose();
-      blockAssistant = null;
+      annReview?.dispose();
+      annReview = null;
       alchemyLab?.dispose();
       alchemyLab = null;
       savePublishHandle?.dispose();

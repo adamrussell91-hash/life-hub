@@ -1,7 +1,7 @@
 # Alchemy Lab: review inside the lesson
 
 Date: 20 October 2026
-Status: design approved by Adam (direction A), awaiting spec review
+Status: approved by Adam 20 Oct; built on `claude/alchemy-in-lesson`
 Builds on: `2026-10-20-alchemy-agent-design.md` (PRs 972 and 973, merged)
 
 ## Why
@@ -19,7 +19,7 @@ A slim bar at the top of the lesson canvas, below the context bar. It stays in v
 | State | Bar shows |
 |---|---|
 | Idle | **Improve with Ann**, plus "Rules: *note*" with a Change link. Same picker as today. |
-| Working | One live line (the latest progress step) and a counter, "6 searches · 4 notes read". The counter opens the research trail: every search and every note opened, in order, with links to the notes. Adam can keep editing. |
+| Working | One live line (the latest progress step) and a counter, "6 searches · 4 notes read". The counter opens the research trail: every search and every note opened, in order. Notes behind a suggestion link to the note; others show their title (progress lines carry titles, not ids). Adam can keep editing. |
 | Done | "4 suggestions" with **Previous**, **Next**, **Accept all** and **Close review**. Ann's summary sits in a line below the bar and expands to its full text. "Ann stopped early" shows here when it applies. |
 | Error | Ann's message and **Try again**. |
 
