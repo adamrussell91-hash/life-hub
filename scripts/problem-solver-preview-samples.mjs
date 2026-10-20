@@ -1,4 +1,5 @@
 // Synthetic sample runs for the Problem Solver preview harness. No personal data.
+import { again, applyStep, newLightning } from '../packages/problem-solver/lightning.mjs';
 const node = (id, slot, text, title, extra = {}) => ({ id, slot, text, title, state: 'accepted', skills: ['analysis'], turnId: 't', ...extra });
 const run = (tool, nodes, edges = []) => ({ id: `sample-${tool}`, tool, status: 'active', nodes, edges });
 
@@ -876,3 +877,44 @@ SAMPLES['knowledge_management:next'] = run('knowledge_management', [
   ...kmNodes.slice(4)
 ]);
 SAMPLES.knowledge_management_first = run('knowledge_management', kmNodes.slice(0, 2));
+
+// Lightning: run states, not tool runs, built with the graph's own transitions. A shared printer
+// that jams: lightning reaches Relax on the second strategy (working backwards) and waits on
+// "What can I learn?"; lightning_loop tries every strategy, reframes once and is asked again
+// whether taking something away would solve it; lightning_again finished a first round by
+// taking something away, came back, and is now on guess and check.
+const at = '2026-10-20T09:00:00.000Z';
+const walk = (steps, state = newLightning(at)) => steps.reduce((s, step) => applyStep(s, step, at), state);
+const opening = [{ node: 'start', answer: 'no' }, { node: 'goal', note: 'Print a full page without a jam.' }];
+SAMPLES.lightning = walk([
+  ...opening,
+  { node: 'subtract', answer: 'no' },
+  { node: 'one_step', answer: 'no' },
+  { node: 'diagram', note: 'Sketched the paper path from tray to rollers.', answer: 'no' },
+  { node: 'work_backwards', note: 'Worked back from a clean page to the tray settings.', answer: 'yes' }
+]);
+SAMPLES.lightning_loop = walk([
+  ...opening,
+  { node: 'subtract', answer: 'no' },
+  { node: 'one_step', answer: 'no' },
+  { node: 'diagram', answer: 'no' },
+  { node: 'work_backwards', answer: 'no' },
+  { node: 'make_list', note: 'Paper type, tray guide, rollers, firmware.', answer: 'no' },
+  { node: 'take_break', answer: 'no' },
+  { node: 'analogy', note: 'Asked how the office down the hall fixed theirs.', answer: 'no' },
+  { node: 'reframing', answer: 'yes', note: 'Use the other tray for now.' },
+  { node: 'goal', note: 'Print from the second tray today.' }
+]);
+SAMPLES.lightning_again = walk(
+  [{ node: 'start', answer: 'no' }, { node: 'goal', note: 'Print a full page without a jam.' }, { node: 'subtract', answer: 'no' }, { node: 'one_step', answer: 'yes' }],
+  again(
+    walk([
+      ...opening,
+      { node: 'subtract', answer: 'yes' },
+      { node: 'via_negativa', note: 'Took out the bent sheets at the bottom of the tray.', answer: 'yes' },
+      { node: 'learn', note: 'Check the tray before blaming the printer.' },
+      { node: 'next', note: 'Keep the paper flat in its box.' }
+    ]),
+    at
+  )
+);
