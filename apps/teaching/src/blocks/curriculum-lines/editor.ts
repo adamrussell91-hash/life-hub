@@ -12,7 +12,7 @@ import { lineColour } from '@/network/colour';
 import { drawNetwork, measureStations, networkLegend } from '@/network/draw';
 import { chooseNetworkOrientation, layoutNetwork, liveNudges } from '@/network/layout';
 import { el, ghostButton, mountLinesEditor, networkId, selectOf, textInput } from '@/network/lines-editor';
-import { LEVEL_ORDER, MODE_LABEL, convertV1, orderLines, type NetLesson } from '@/network/model';
+import { LEVEL_ORDER, MODE_LABEL, convertV1, orderLines, orderStations, type NetLesson } from '@/network/model';
 import { unitNetworkInput } from './render';
 
 /** What the unit page gives the editor: the network, plus how to save the parts that live elsewhere. */
@@ -65,6 +65,8 @@ export function createCurriculumLinesEditor(
 
   const network = (): UnitNetworkContext => ({ lines, lessons, ...(context?.bands ? { bands: context.bands } : {}) });
   const v2 = (): CurriculumLinesV2Content => current.content as CurriculumLinesV2Content;
+  /** The unit's lessons in this map's station order, shown or not. */
+  const mapLessons = (): NetLesson[] => orderStations(lessons, isCurriculumLinesV2(current.content) ? v2().station_order : undefined);
   const emit = (content: CurriculumLinesBlock['content']) => {
     current = { ...current, content };
     onChange(current);
@@ -198,7 +200,7 @@ export function createCurriculumLinesEditor(
 
   /* Which lines each lesson serves (saved on the lesson). */
   function stopsSection(): HTMLElement {
-    const s = section('Stations', 'Each lesson is a station. Tap a line to say the lesson serves it; tap again to step the depth (introduced, reinforced, mastered), then off. The lesson’s settings show the same line chips.');
+    const s = section('Stations', 'Each lesson is a station. Move it up or down to change its place on this map, or untick it to leave it off. Tap a line to say the lesson serves it; tap again to step the depth (introduced, reinforced, mastered), then off. The lesson’s settings show the same line chips.');
     if (!lessons.length) {
       s.append(el('p', 'cl-editor__hint', 'Add lessons to this unit first.'));
       return s;
@@ -210,7 +212,7 @@ export function createCurriculumLinesEditor(
     const wrap = el('div', 'cl-editor__grid-wrap');
     const table = el('table', 'cl-editor__grid');
     const head = el('tr');
-    head.append(el('th', undefined, 'Lesson'));
+    head.append(el('th', 'cl-editor__place', 'On map'), el('th', undefined, 'Lesson'));
     for (const line of lines) {
       const th = el('th', `cl-editor__col cl-editor__col--${line.mode}`, line.short?.trim() || line.name.slice(0, 4) || '?');
       th.title = `${MODE_LABEL[line.mode]}: ${line.name}`;
@@ -218,9 +220,26 @@ export function createCurriculumLinesEditor(
       head.append(th);
     }
     table.append(head);
-    for (const lesson of lessons) {
-      const tr = el('tr');
-      tr.append(el('th', undefined, lesson.title || 'Untitled lesson'));
+    const ordered = mapLessons();
+    const hidden = new Set(v2().hidden_lessons ?? []);
+    ordered.forEach((lesson, index) => {
+      const name = lesson.title || 'Untitled lesson';
+      const tr = el('tr', hidden.has(lesson.id) ? 'cl-editor__station--off' : undefined);
+      const place = el('td', 'cl-editor__place');
+      const shown = el('input');
+      shown.type = 'checkbox';
+      shown.checked = !hidden.has(lesson.id);
+      shown.setAttribute('aria-label', `Show ${name} on this map`);
+      shown.addEventListener('change', () => {
+        const next = ordered.map((l) => l.id).filter((id) => (id === lesson.id ? !shown.checked : hidden.has(id)));
+        commit({ hidden_lessons: next.length ? next : undefined });
+      });
+      const up = ghostButton('↑', () => move(ordered, index, -1), `Move ${name} up`);
+      up.disabled = index === 0;
+      const down = ghostButton('↓', () => move(ordered, index, 1), `Move ${name} down`);
+      down.disabled = index === ordered.length - 1;
+      place.append(shown, up, down);
+      tr.append(place, el('th', undefined, name));
       for (const line of lines) {
         const stop = lesson.line_stops?.find((x) => x.line_id === line.id);
         const td = el('td');
@@ -235,10 +254,19 @@ export function createCurriculumLinesEditor(
         tr.append(td);
       }
       table.append(tr);
-    }
+    });
     wrap.append(table);
     s.append(wrap);
     return s;
+  }
+
+  function move(ordered: readonly NetLesson[], index: number, by: -1 | 1): void {
+    const ids = ordered.map((l) => l.id);
+    const [id] = ids.splice(index, 1);
+    ids.splice(index + by, 0, id!);
+    // Back in unit order means no custom order to keep.
+    const same = ids.join() === lessons.map((l) => l.id).join();
+    commit({ station_order: same ? undefined : ids });
   }
 
   async function cycle(lessonId: string, line: NetworkLine): Promise<void> {
@@ -272,9 +300,9 @@ export function createCurriculumLinesEditor(
 
   const positionOptions = () => [
     { value: BEFORE_FIRST, label: 'Before the first lesson' },
-    ...lessons.map((l) => ({ value: l.id, label: `After ${l.title || 'untitled lesson'}` }))
+    ...mapLessons().map((l) => ({ value: l.id, label: `After ${l.title || 'untitled lesson'}` }))
   ];
-  const lessonOptions = (none: string) => [{ value: '', label: none }, ...lessons.map((l) => ({ value: l.id, label: l.title || 'Untitled lesson' }))];
+  const lessonOptions = (none: string) => [{ value: '', label: none }, ...mapLessons().map((l) => ({ value: l.id, label: l.title || 'Untitled lesson' }))];
 
   /* Light-rail stops, extensions and support loops (saved in the block). */
   function railSection(): HTMLElement {
@@ -310,7 +338,7 @@ export function createCurriculumLinesEditor(
       s.append(row);
     }
     const add = ghostButton('Add light-rail stop', () => {
-      const last = lessons[lessons.length - 1];
+      const last = mapLessons().at(-1);
       commit({ rail_stops: [...v2().rail_stops, { id: networkId('stop'), line_id: rails[0]!.id, ...(last ? { after_lesson_id: last.id } : {}), kind: 'stop', label: '' }] });
     });
     add.disabled = v2().rail_stops.length >= 60;
