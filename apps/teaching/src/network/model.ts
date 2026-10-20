@@ -60,6 +60,16 @@ function lessonTarget(label: string, lessonId: string | undefined, blockId: stri
   return { text, href: blockId ? `${lesson.href}#block=${encodeURIComponent(blockId)}` : lesson.href };
 }
 
+/** The unit's lessons in this map's station order (unlisted lessons keep unit order, at the end). */
+export function orderStations<T extends { id: string }>(lessons: readonly T[], order: readonly string[] | undefined): T[] {
+  if (!order?.length) return [...lessons];
+  const rank = new Map(order.map((id, i) => [id, i]));
+  return lessons
+    .map((lesson, i) => ({ lesson, key: rank.get(lesson.id) ?? order.length + i }))
+    .sort((a, b) => a.key - b.key)
+    .map((x) => x.lesson);
+}
+
 /**
  * The unit map's input. `lessons` is the unit's lessons in order, already
  * limited to what the viewer may see; `bands` names each lesson's week.
@@ -72,10 +82,19 @@ export function buildUnitNetwork(
 ): NetInput {
   const lines = new Map(subjectLines.map((l) => [l.id, l]));
   const byId = new Map(lessons.map((l) => [l.id, l]));
-  const rowIndex = new Map(lessons.map((l, i) => [l.id, i]));
+  const hidden = new Set(content.hidden_lessons ?? []);
+  const ordered = orderStations(lessons, content.station_order);
+  const shown = ordered.filter((l) => !hidden.has(l.id));
+  // A lesson left off the map hands its gap to the nearest shown station before it.
+  const rowIndex = new Map<string, number>();
+  let row = -1;
+  for (const lesson of ordered) {
+    if (!hidden.has(lesson.id)) row += 1;
+    rowIndex.set(lesson.id, row);
+  }
   // A stop whose lesson left the unit falls to the end rather than vanishing.
-  const afterRow = (id: string | undefined) => (id === undefined ? -1 : rowIndex.get(id) ?? lessons.length - 1);
-  const rows: NetRow[] = lessons.map((lesson) => ({
+  const afterRow = (id: string | undefined) => (id === undefined ? -1 : rowIndex.get(id) ?? shown.length - 1);
+  const rows: NetRow[] = shown.map((lesson) => ({
     id: lesson.id,
     target: { text: lesson.title || 'Untitled lesson', ...(lesson.href ? { href: lesson.href } : {}) },
     stops: stopsFor(lesson.line_stops, lines),

@@ -208,6 +208,21 @@ describe('mountLessonPage', () => {
     expect(host.querySelector('.entity-banner__title')?.textContent).toBe('Renamed lesson');
   });
 
+  it('names the lesson type above the cover title and follows the type picker', () => {
+    const { handle } = mount(makeLesson({ pedagogical_mode: 'workshop' }));
+    const eyebrow = (): string | null | undefined =>
+      host.querySelector('.entity-banner__eyebrow')?.textContent;
+    expect(eyebrow()).toBe('Workshop');
+
+    const select = host.querySelector<HTMLSelectElement>('.lesson-page__mode-select')!;
+    select.value = 'seminar';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(eyebrow()).toBe('Seminar');
+
+    handle.update(makeLesson());
+    expect(eyebrow()).toBe('Lesson');
+  });
+
   it('resolves a media_id cover when update delivers the media library', () => {
     const media: Media[] = [
       {

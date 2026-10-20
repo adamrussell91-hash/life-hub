@@ -7,6 +7,8 @@ import { blockRegistry } from '@/blocks/registry';
 import { lineColour, nextColour } from '@/network/colour';
 import { connect, layoutNetwork, liveNudges, type NetInput, type NetLevel, type Pt } from '@/network/layout';
 import { buildUnitNetwork, convertV1, type NetLesson } from '@/network/model';
+import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines/editor';
+import type { CurriculumLinesBlock } from '@/schemas/block';
 import { buildYearNetwork, classNow, outcomeCoverage, unitStops } from '@/network/year';
 
 /* Invented names only: this repository is public. */
@@ -162,6 +164,19 @@ describe('Network layout', () => {
   it('keeps a stop whose lesson left the unit, at the end', () => {
     const net = input({ rail_stops: [{ id: 'r1', line_id: 'oral', after_lesson_id: 'gone', kind: 'stop', label: 'Speech' }] });
     expect(net.railStops[0]!.afterRow).toBe(LESSONS.length - 1);
+  });
+
+  it('puts stations in the map’s own order, leaves hidden lessons off, and hands their gaps back', () => {
+    const net = input({
+      station_order: ['l3', 'l1'],
+      hidden_lessons: ['l2'],
+      rail_stops: [{ id: 'r1', line_id: 'oral', after_lesson_id: 'l2', kind: 'stop', label: 'Speech' }]
+    });
+    expect(net.rows.map((r) => r.id)).toEqual(['l3', 'l1', 'l4']);
+    // l2 sat after l1 in the map's order, so its stop follows l1.
+    expect(net.railStops[0]!.afterRow).toBe(1);
+    const firstHidden = input({ hidden_lessons: ['l1'], gates: [{ id: 'g', after_lesson_id: 'l1', label: 'Quiz', line_ids: [] }] });
+    expect(firstHidden.gates[0]!.afterRow).toBe(-1);
   });
 
   it('links lessons and block stops the viewer may open, and shows the rest as text', () => {
@@ -356,5 +371,43 @@ describe('Curriculum lines block: render', () => {
   it('asks for lines and lessons when it has neither', () => {
     const el = renderBlock(createBlock('curriculum_lines', 'cl2'), 'teacher', {});
     expect(el.querySelector('.net-empty')?.textContent).toContain('lines');
+  });
+});
+
+describe('Curriculum lines block: station editor', () => {
+  function mountEditor(content: CurriculumLinesV2Content = v2()) {
+    const block = { ...createBlock('curriculum_lines', 'map'), content } as CurriculumLinesBlock;
+    let latest = block;
+    const host = createCurriculumLinesEditor(block, (next) => { latest = next; }, {
+      lines: LINES,
+      lessons: LESSONS,
+      saveLessonStops: async () => {}
+    });
+    document.body.append(host);
+    const button = (label: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+    const rowNames = () => [...host.querySelectorAll('.cl-editor__grid tr')].slice(1).map((tr) => tr.querySelector('th')?.textContent);
+    return { host, button, rowNames, content: () => latest.content as CurriculumLinesV2Content };
+  }
+
+  it('moves a station up and down on this map without touching the unit', () => {
+    const { button, rowNames, content } = mountEditor();
+    expect(button('Move Harbour poems up').disabled).toBe(true);
+    button('Move Salt and stone up').click();
+    expect(content().station_order).toEqual(['l1', 'l3', 'l2', 'l4']);
+    expect(rowNames()).toEqual(['Harbour poems', 'Salt and stone', 'Lighthouse letters', 'Tide tables']);
+    button('Move Salt and stone down').click();
+    expect(content().station_order).toBeUndefined();
+  });
+
+  it('leaves a lesson off the map and brings it back', () => {
+    const { host, content } = mountEditor();
+    const box = () => host.querySelector<HTMLInputElement>('input[aria-label="Show Lighthouse letters on this map"]')!;
+    box().checked = false;
+    box().dispatchEvent(new Event('change'));
+    expect(content().hidden_lessons).toEqual(['l2']);
+    expect(box().checked).toBe(false);
+    box().checked = true;
+    box().dispatchEvent(new Event('change'));
+    expect(content().hidden_lessons).toBeUndefined();
   });
 });

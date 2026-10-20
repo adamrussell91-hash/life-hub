@@ -138,7 +138,27 @@
   border-bottom: 3px solid var(--net-colour) !important;
 }
 
-.cl-editor__grid tr > th:first-child {
+.cl-editor__grid td.cl-editor__place {
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.cl-editor__place input {
+  margin: 0 4px 0 0;
+  vertical-align: middle;
+}
+
+.cl-editor__place .btn {
+  min-height: 28px;
+  padding: 0 8px;
+}
+
+.cl-editor__station--off > th,
+.cl-editor__station--off > td:not(.cl-editor__place) {
+  opacity: 0.45;
+}
+
+.cl-editor__grid tr > th:nth-child(2) {
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
