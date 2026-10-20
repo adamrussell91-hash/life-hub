@@ -8,6 +8,7 @@
  * tap opens a dictionary card.
  */
 import { positionHubFloating } from '../../design-kit/js/hub-floating.js';
+import { createMorphologyToggle, findMorphology } from '@/blocks/morphology';
 
 export type WordHelpKind = 'technical' | 'uncommon' | 'foreign' | 'archaic' | 'long' | 'idiom';
 
@@ -167,7 +168,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, va
   return node;
 }
 
-export function buildWordCard(entry: WordHelpEntry, onClose: () => void): HTMLElement {
+export function buildWordCard(entry: WordHelpEntry, onClose: () => void, onLayout: () => void = () => {}): HTMLElement {
   const card = el('div', 'word-card');
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-label', `Dictionary: ${entry.word}`);
@@ -198,13 +199,16 @@ export function buildWordCard(entry: WordHelpEntry, onClose: () => void): HTMLEl
     origin.append(el('span', 'word-card__label', 'Origin'), el('span', '', entry.etymology));
     card.append(origin);
   }
+  // Words that belong to a known family get a morphemic matrix under the card.
+  const family = findMorphology(entry.word);
+  if (family) card.append(createMorphologyToggle(family, onLayout));
   return card;
 }
 
 export function openWordCard(anchor: HTMLElement, entry: WordHelpEntry): void {
   closeOpenCard?.();
   const doc = anchor.ownerDocument;
-  const card = buildWordCard(entry, () => close(true));
+  const card = buildWordCard(entry, () => close(true), () => place());
   doc.body.append(card);
   anchor.setAttribute('aria-expanded', 'true');
 
