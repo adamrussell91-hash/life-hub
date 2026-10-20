@@ -66,7 +66,7 @@
 
 .qz-eyebrow {
   font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   color: var(--muted);
