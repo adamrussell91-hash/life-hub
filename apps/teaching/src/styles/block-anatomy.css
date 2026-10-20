@@ -10,6 +10,12 @@
  * Tokens only. Imported last by blocks/render.ts so the roles win ties.
  */
 
+/* Reading size for everything a block renders, wherever it renders
+   (student lesson, teacher editor, unit and class panels). */
+.block {
+  font-size: var(--text-md);
+}
+
 /* Roles --------------------------------------------------------------------- */
 
 .block-eyebrow {
@@ -209,7 +215,15 @@ details[open] > .block-disclosure__toggle::before {
   color: var(--muted);
 }
 
-/* Heading block: drawn on the canvas so it divides the lesson. */
+/* Heading block: drawn on the canvas so it divides the lesson, in the
+   student lesson and in the teacher's editor (whose card is the row). */
+.lesson-page__block:has(> .block[data-block-type='heading']) {
+  padding-block: var(--space-2) 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .lesson-blocks .block[data-block-type='heading'] {
   padding-block: var(--space-2) 0;
   padding-inline: var(--space-1);
@@ -220,7 +234,7 @@ details[open] > .block-disclosure__toggle::before {
 
 /* Touch targets: 44px for every control at phone width. */
 @media (max-width: 40rem) {
-  .lesson-blocks .block :is(
+  .block :is(
     button,
     .btn,
     .hub-pills__btn,
@@ -233,7 +247,7 @@ details[open] > .block-disclosure__toggle::before {
     min-height: 44px;
   }
 
-  .lesson-blocks .block :is(.hub-icon-btn, .ct-icon-btn, .ct-trigger) {
+  .block :is(.hub-icon-btn, .ct-icon-btn, .ct-trigger) {
     min-width: 44px;
   }
 }
