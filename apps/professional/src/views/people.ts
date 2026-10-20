@@ -38,7 +38,9 @@ import {
   type RememberFact,
   type TodayStripResponse
 } from '@/api/people-directory';
-import { mountAddPersonForm, type AddPersonResult } from '@/components/add-person-form';
+import type { AddPersonResult } from '@/components/add-person-form';
+import { mountAddPersonPanel } from '@/components/add-person-panel';
+import { mountLinkedInPaste, renderLinkedInReview, saveLinkedInSelection } from '@/components/linkedin-review';
 import { createToastHost } from '@/components/people-toast';
 import { openDeletePersonDialog } from '@/components/delete-person-dialog';
 import { invalidateCrestUrl, resolveCrestUrl } from '@/components/org-ui';
@@ -1955,8 +1957,48 @@ export async function renderPeoplePage(
     return banner;
   }
 
-  function openLinkedInUpdate(_id: string, _ref: string, _name: string, _roles: PersonRole[]): void {
-    toasts.show('Update from LinkedIn arrives with the paste reader.');
+  /** "…" → Update from LinkedIn: the same paste box and review card, in the pane. */
+  function openLinkedInUpdate(id: string, ref: string, name: string, _roles: PersonRole[]): void {
+    pane.querySelector('[data-section="linkedin"]')?.remove();
+    const box = el('section', 'people-pane__box people-pane__linkedin');
+    box.setAttribute('data-section', 'linkedin');
+    const head = el('div', 'people-pane__h2', 'Update from LinkedIn');
+    const close = el('button', 'person-icon-btn people-pane__linkedin-close', '✕') as HTMLButtonElement;
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close Update from LinkedIn');
+    close.addEventListener('click', () => box.remove());
+    head.append(close);
+    const body = el('div', 'people-pane__section-body');
+    box.append(head, body);
+    pane.querySelector('[data-section="header"]')?.after(box);
+
+    function showPaste(): void {
+      body.replaceChildren();
+      const paste = mountLinkedInPaste(body, {
+        personRef: ref,
+        onParsed: (result) => {
+          renderLinkedInReview(body, {
+            result,
+            existing: { name },
+            crest: (orgRef, orgName) => crestNode(orgMonogram(orgName), 'sm', orgRef ? { orgRef } : {}),
+            onBack: showPaste,
+            onSave: async (selection) => {
+              const saved = await saveLinkedInSelection(selection, { personRef: ref });
+              box.remove();
+              toasts.show(
+                saved.failed.length
+                  ? `Saved ${saved.saved} change${saved.saved === 1 ? '' : 's'}. ${saved.failed.join(' and ')} didn't save.`
+                  : `Saved ${saved.saved} change${saved.saved === 1 ? '' : 's'}`
+              );
+              void loadPersonSections(id);
+              void reloadDirectory();
+            }
+          });
+        }
+      });
+      paste.focus();
+    }
+    showPaste();
   }
 
   function openPerson(id: string): void {
@@ -1967,8 +2009,7 @@ export async function renderPeoplePage(
   }
 
   function onPersonAdded(result: AddPersonResult): void {
-    addHost.hidden = true;
-    addForm?.reset();
+    closeAddPanel();
     const row = rowForNewPerson(result);
     forgetPerson(row.id);
     directory = directory
@@ -1989,16 +2030,33 @@ export async function renderPeoplePage(
     void reloadDirectory();
   }
 
-  let addForm: { focusName: () => void; reset: () => void } | null = null;
+  let addPanel: { open: () => void; reset: () => void } | null = null;
+  function closeAddPanel(): void {
+    addHost.hidden = true;
+    addPanel?.reset();
+    addBtn.setAttribute('aria-expanded', 'false');
+  }
+  addBtn.setAttribute('aria-expanded', 'false');
   addBtn.addEventListener('click', () => {
-    addHost.hidden = !addHost.hidden;
-    if (!addHost.hidden && !addForm) {
-      addForm = mountAddPersonForm(addHost, {
-        onCreated: (result) => onPersonAdded(result),
-        onCancel: () => { addHost.hidden = true; }
+    if (!addHost.hidden) {
+      closeAddPanel();
+      return;
+    }
+    addHost.hidden = false;
+    addBtn.setAttribute('aria-expanded', 'true');
+    if (!addPanel) {
+      addPanel = mountAddPersonPanel(addHost, {
+        crest: (orgRef, orgName) => crestNode(orgMonogram(orgName), 'sm', orgRef ? { orgRef } : {}),
+        onAdded: (result) => onPersonAdded(result),
+        onClose: closeAddPanel
       });
     }
-    if (!addHost.hidden) addForm?.focusName();
+    addPanel.open();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || addHost.hidden || !isCurrent()) return;
+    if (document.querySelector('.person-dialog')) return;
+    closeAddPanel();
   });
   addIcon.addEventListener('click', () => addBtn.click());
 
