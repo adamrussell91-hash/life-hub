@@ -254,32 +254,21 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await expect(page.locator('.ps-resume')).toHaveCount(0);
     await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
     await answer(page, 'I hurry the last step when the end is in sight');
-    await expect(page.locator('.ps-coach__messages')).toContainText(`Improve picks up at your review on ${due}.`);
+    const dueSaid = await page.evaluate((d) => new Date(`${d}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }), due);
+    await expect(page.locator('.ps-coach__messages')).toContainText(`Improve picks up at your review on ${dueSaid}.`);
     await expect(page.locator('.ps-suggestion')).toHaveCount(0);
     await noOverflow(page);
     await shot(page, 'waiting', viewport);
 
-    // Move on past the waiting Improve, then finish: the review is still to come.
-    await page.getByRole('button', { name: 'Move on to Document' }).click();
-    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'waiting', { timeout: 20_000 });
-    await expect(page.locator('.ps-coach__messages')).toContainText('nothing was done in that step');
-    await page.getByRole('button', { name: 'Finish' }).click();
-    await expect.poll(async () => (await sessionNow()).phase).toBe('finished');
-
-    // Late review: a task is done in Tasks, then the review link reopens Improve with the counts.
+    // Review now: a task is done in Tasks, then the panel's button starts the review with the counts.
     await page.evaluate(async (id) => {
       const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'done' }) });
       if (!res.ok) throw new Error(`PATCH failed: ${res.status}`);
     }, created.id);
-    await page.goto(`/#/problem-solver?id=${encodeURIComponent(sessionId)}&step=improve`);
-    await page.reload();
-    const banner = page.locator('.ps-resume');
-    await expect(banner).toContainText('This problem has moved on', { timeout: 20_000 });
-    await noOverflow(page);
-    await shot(page, 'late-banner', viewport);
-    await banner.getByRole('button', { name: 'Review the results' }).click();
-    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current', { timeout: 20_000 });
-    await expect.poll(async () => (await sessionNow()).status).toBe('active');
+    await panel.getByRole('button', { name: 'Review now' }).click();
+    await expect(panel).toBeHidden({ timeout: 20_000 });
+    await expect.poll(async () => (await sessionNow()).reviewState?.status).toBe('reviewing');
+    await expect(page.locator('.ps-record [data-step="improve"]')).toHaveAttribute('data-state', 'current');
     await expect(page.locator('.ps-suggestion')).toContainText('Next: After action review', { timeout: 20_000 });
     await page.getByRole('button', { name: 'Start it' }).click();
     await expect(page.locator('.ps-aar')).toBeAttached();
@@ -331,11 +320,22 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await noOverflow(page);
     await shot(page, 'back-to-improve', viewport);
 
-    // The late review returns to where the problem was: finished.
+    // Leaving Improve ends the review; Document and Finish close the problem.
+    await page.getByRole('button', { name: 'Move on to Document' }).click();
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await expect.poll(async () => (await sessionNow()).reviewState?.status).toBe('done');
+    await answer(page, 'I learn more when I wait for real results');
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect.poll(async () => (await sessionNow()).phase).toBe('finished');
     await expect.poll(async () => (await sessionNow()).status).toBe('finished');
     await noOverflow(page);
     await shot(page, 'finished', viewport);
+
+    // A done review cannot start again: the review link opens the problem with no banner.
+    await page.goto(`/#/problem-solver?id=${encodeURIComponent(sessionId)}&step=improve`);
+    await page.reload();
+    await expect(page.locator('.ps-record')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.ps-resume')).toHaveCount(0);
+    await expect(page.locator('.ps-review')).toBeHidden();
   });
 }
