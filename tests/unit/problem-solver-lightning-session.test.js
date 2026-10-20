@@ -85,6 +85,14 @@ test('escalate: a full session seeded from the run; the run is marked and finish
   assert.throws(() => lightningAgain(lightning, deps), /went to the full process/);
 });
 
+test('an archived run cannot come back or be escalated', () => {
+  let s = run();
+  for (const step of [{ node: 'start', answer: 'yes' }, { node: 'learn' }, { node: 'next' }]) s = idle(applyLightningTurn(s, turn({ lightning: step }), deps));
+  const archived = { ...s, status: 'archived' };
+  assert.throws(() => lightningAgain(archived, deps), /This run is archived\./);
+  assert.throws(() => escalateLightning({ ...run(), status: 'archived' }, 'full-9', deps), /This run is archived\./);
+});
+
 test('summary rows say a run is Lightning, and where it went', () => {
   const row = summaryRow(run());
   assert.equal(row.kind, 'lightning');

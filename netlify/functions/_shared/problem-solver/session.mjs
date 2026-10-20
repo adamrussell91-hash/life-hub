@@ -365,6 +365,7 @@ function reopenStep(session, suggestion, deps) {
 export function acceptSuggestion(session, deps) {
   const suggestion = session.suggestion;
   if (!suggestion) throw fail(409, 'action_not_allowed', 'No suggestion to accept.');
+  if (suggestion.kind === 'escalate') throw fail(409, 'action_not_allowed', 'Use the escalate action to take this to the full process.');
   if (suggestion.kind === 'reopen_step') return reopenStep({ ...session, suggestion: null }, suggestion, deps);
   if (suggestion.kind === 'next_step' || suggestion.kind === 'finish_define') return moveOn({ ...session, suggestion: null }, deps);
   if (!currentStep(session)) throw fail(409, 'action_not_allowed', 'There is no step open for that tool.');
@@ -443,6 +444,7 @@ export function dismissTask(session, payload, deps) {
 
 /** The page created the review task; record it with the date the person picked. */
 export function setReviewTask(session, payload, deps) {
+  if (!session.model) throw fail(409, 'action_not_allowed', 'This problem has no review.');
   const taskId = typeof payload?.taskId === 'string' ? payload.taskId.trim() : '';
   if (!taskId || taskId.length > 200) throw fail(400, 'validation_error', 'A task id is required.');
   if (session.reviewTaskId && session.reviewTaskId !== taskId) throw fail(409, 'action_not_allowed', 'This problem already has a review task.');
