@@ -298,7 +298,7 @@ export function moveOn(session, deps, options = {}) {
     next = { ...next, reviewState: { ...session.reviewState, status: 'done' } };
   } else if (nextId && inBook(session, leaving, 'implement') && inBook(session, nextId, 'improve') && reviewLive(next)) {
     const due = next.reviewProposal?.due ?? null;
-    next = { ...next, reviewState: options.review ? { status: 'reviewing', due, returnTo: null, startedAt: deps.now() } : { status: 'waiting', due, returnTo: null, startedAt: null } };
+    next = { ...next, reviewState: options.review ? { status: 'reviewing', due, returnTo: null, startedAt: deps.now(), runsBefore: next.steps[nextId]?.runs.length ?? 0 } : { status: 'waiting', due, returnTo: null, startedAt: null } };
   }
   next = { ...next, turns: [...next.turns, userTurn(nextId ? 'Move on.' : 'That is everything.', deps)] };
   next = nextId ? withStep({ ...next, phase: nextId }, nextId, { status: 'open' }) : { ...next, phase: 'finished', status: 'finished' };
@@ -327,7 +327,7 @@ export function startReview(session, payload, deps) {
   // (unlike reopenStep, which closes Improve's run because the detour starts fresh work elsewhere).
   const due = session.reviewProposal?.due ?? null;
   const returnTo = kind === 'reopen' ? session.phase : null;
-  next = { ...next, status: 'active', phase: improve, suggestion: null, pendingKeep: null, reviewState: { status: 'reviewing', due, returnTo, startedAt: deps.now() } };
+  next = { ...next, status: 'active', phase: improve, suggestion: null, pendingKeep: null, reviewState: { status: 'reviewing', due, returnTo, startedAt: deps.now(), runsBefore: session.steps?.[improve]?.runs.length ?? 0 } };
   next = withStep(next, improve, { status: 'open' });
   const text = returnTo ? 'Time to review how it went.' : 'Let\'s review how it went.';
   return queue(touch({ ...next, turns: [...next.turns, userTurn(text, deps)] }, deps));

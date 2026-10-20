@@ -9,7 +9,7 @@ export type PsTurn = { id: string; role: 'user' | 'coach'; text: string; verdict
 export type PsStepStatus = 'open' | 'done' | 'skipped' | 'waiting';
 
 /** Improve's review: waiting for results, under way, or done. `returnTo` is where a late review goes back to. */
-export type PsReviewState = { status: 'waiting' | 'reviewing' | 'done'; due: string | null; returnTo: string | null; startedAt: string | null };
+export type PsReviewState = { status: 'waiting' | 'reviewing' | 'done'; due: string | null; returnTo: string | null; startedAt: string | null; runsBefore?: number };
 /** Counts of the problem's tasks by live status, and overdue titles. Posted by the page; deleted tasks are left out. */
 export type PsTaskSnapshot = { at: string; byStatus: Record<'open' | 'in_progress' | 'deferred' | 'done' | 'dead' | 'unknown', number>; overdue: string[] };
 /** A step reopened from Improve; Move on returns to `from`. */
