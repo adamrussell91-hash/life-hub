@@ -227,6 +227,7 @@ export function applyCoachTurn(session, turn, deps) {
     if (run && turn.node && turn.verdict === 'accept') {
       // A node the tool refuses to accept (a name breaking a strict rule) is not placed; the turn stays.
       if (!acceptProblem(run, turn.node)) next = placeAccepted(next, turn, coachTurn.id, deps);
+      else turn = { ...turn, suggestion: null }; // nothing was placed, so "move on" would be wrong
     } else if (run && !turn.node && turn.verdict === 'accept' && turn.edges?.length) {
       next = replaceRun(next, addAllowedEdges(run, turn.edges));
     } else if (run && turn.node && turn.verdict === 'challenge') {
@@ -515,7 +516,7 @@ export function linkCaseFile(session, payload, deps) {
     history: [...(record?.history ?? []), { version, at, target }]
   };
   const linked = session.links.some((link) => sameTarget(link, target));
-  const links = linked || session.links.length >= LINKS_MAX ? session.links : [...session.links, target];
+  const links = linked ? session.links : [...session.links, target];
   return touch({ ...session, caseFile, caseFileDeclined: null, links }, deps);
 }
 
