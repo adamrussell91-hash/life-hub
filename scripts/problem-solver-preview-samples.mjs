@@ -1,4 +1,5 @@
 // Synthetic sample runs for the Problem Solver preview harness. No personal data.
+import { again, applyStep, newLightning } from '../packages/problem-solver/lightning.mjs';
 const node = (id, slot, text, title, extra = {}) => ({ id, slot, text, title, state: 'accepted', skills: ['analysis'], turnId: 't', ...extra });
 const run = (tool, nodes, edges = []) => ({ id: `sample-${tool}`, tool, status: 'active', nodes, edges });
 
@@ -832,3 +833,88 @@ const fbmEdges = [
 SAMPLES.feedback_matrix = run('feedback_matrix', [...fbmItems, ...fbmThemes.filter((n) => n.id !== 'h7')], fbmEdges);
 SAMPLES['feedback_matrix:next'] = run('feedback_matrix', [...fbmItems, ...fbmThemes.map((n) => (n.id === 'h6' ? { ...n, state: 'contested', objection: 'Would a reserve list just move the lateness to Friday?' } : n))], [...fbmEdges, { id: 'e-h7', from: 'h7', to: 't1', kind: 'of' }]);
 SAMPLES.feedback_matrix_first = run('feedback_matrix', fbmItems.slice(0, 7));
+
+// 5 Cs documentation: a village library leaves a record of how it cleared its returns backlog.
+// Condense has three essentials, so its slice shows the latest and "+2". The name keeps an
+// abbreviation the coach objected to, so the Correspond slice is contested (the one contested node)
+// and every strict rule still passes. five_cs:next revises the name, so the marks and chip change.
+// five_cs_first has only the first two answers, so three slices wait as faint paper.
+const fiveCsNodes = [
+  node('k1', 'contextualise', 'So the next volunteer coordinator can see why the returns backlog built up and how it was cleared, without asking around.', 'Handover to the next lead'),
+  node('k2', 'categorise', 'Filed in the library committee folder under Volunteers, then Rota; every committee member can open it.', 'Committee folder, Volunteers'),
+  node('k3', 'condense:1', 'The backlog came from one weekly returns shift, on the busiest day.', 'One shift, busiest day'),
+  node('k4', 'condense:2', 'Two shorter shifts on Tuesday and Saturday cleared it in three weeks.', 'Two shorter shifts'),
+  node('k5', 'condense:3', 'A sign on the returns trolley says when it was last emptied.', 'Sign on the trolley'),
+  node('k6', 'correct', 'The first draft said the backlog began in spring; the issue log shows it began in late winter. Corrected by the coordinator in October.', 'Start date moved to winter'),
+  node('k7', 'correspond', 'Library returns LRB 20261020 v1 Final', 'Library returns LRB', { state: 'contested', objection: 'Would someone new know what LRB stands for?' })
+];
+SAMPLES.five_cs = run('five_cs', fiveCsNodes);
+SAMPLES['five_cs:next'] = run('five_cs', [
+  ...fiveCsNodes.slice(0, 6),
+  node('k7', 'correspond', 'Library returns backlog case file 20261020 v2 Final', 'Library returns backlog')
+]);
+SAMPLES.five_cs_first = run('five_cs', fiveCsNodes.slice(0, 2));
+
+// Knowledge management: a community choir keeps what it learned running its first open rehearsal.
+// Capture has three explicit and two tacit entries; the second tacit entry is contested (the one
+// contested node), so its pill carries the tag. knowledge_management:next adds a fourth explicit
+// entry, which drops into its list; knowledge_management_first has Consider and one explicit
+// entry, so Share and Review wait as faint paper.
+const kmNodes = [
+  node('m1', 'consider', 'The sign-up sheet and the hall booking are saved; nothing says how the warm-up was run or who greeted newcomers at the door.', 'Warm-up and welcome not recorded'),
+  node('m2', 'explicit:1', 'A one-page running order for an open rehearsal, kept in the shared choir folder.', 'Running order, one page'),
+  node('m3', 'explicit:2', 'The hall checklist: keys, heating, chairs in a horseshoe, kettle on by half past six.', 'Hall checklist'),
+  node('m4', 'explicit:3', 'The welcome email sent the week before, saved as a template.', 'Welcome email template'),
+  node('m5', 'tacit:1', 'How the section leaders read a nervous room; a new leader shadows one at the next open night.', 'Reading the room, by shadowing'),
+  node('m6', 'tacit:2', 'Choosing a first song everyone can join; the music lead talks it through at a committee evening.', 'Picking the first song', { state: 'contested', objection: 'Is one evening enough to pass that on?' }),
+  node('m7', 'share', 'Link the folder from the members newsletter and ask each section to add one tip after every open night.', 'Newsletter link, section tips'),
+  node('m8', 'review', 'Look again before the spring open night; update the running order and delete the old contact list.', 'Before spring, prune contacts')
+];
+SAMPLES.knowledge_management = run('knowledge_management', kmNodes);
+SAMPLES['knowledge_management:next'] = run('knowledge_management', [
+  ...kmNodes.slice(0, 4),
+  node('m9', 'explicit:4', 'A map of the hall showing where newcomers sit and where coats go.', 'Hall map for newcomers'),
+  ...kmNodes.slice(4)
+]);
+SAMPLES.knowledge_management_first = run('knowledge_management', kmNodes.slice(0, 2));
+
+// Lightning: run states, not tool runs, built with the graph's own transitions. A shared printer
+// that jams: lightning reaches Relax on the second strategy (working backwards) and waits on
+// "What can I learn?"; lightning_loop tries every strategy, reframes once and is asked again
+// whether taking something away would solve it; lightning_again finished a first round by
+// taking something away, came back, and is now on guess and check.
+const at = '2026-10-20T09:00:00.000Z';
+const walk = (steps, state = newLightning(at)) => steps.reduce((s, step) => applyStep(s, step, at), state);
+const opening = [{ node: 'start', answer: 'no' }, { node: 'goal', note: 'Print a full page without a jam.' }];
+SAMPLES.lightning = walk([
+  ...opening,
+  { node: 'subtract', answer: 'no' },
+  { node: 'one_step', answer: 'no' },
+  { node: 'diagram', note: 'Sketched the paper path from tray to rollers.', answer: 'no' },
+  { node: 'work_backwards', note: 'Worked back from a clean page to the tray settings.', answer: 'yes' }
+]);
+SAMPLES.lightning_loop = walk([
+  ...opening,
+  { node: 'subtract', answer: 'no' },
+  { node: 'one_step', answer: 'no' },
+  { node: 'diagram', answer: 'no' },
+  { node: 'work_backwards', answer: 'no' },
+  { node: 'make_list', note: 'Paper type, tray guide, rollers, firmware.', answer: 'no' },
+  { node: 'take_break', answer: 'no' },
+  { node: 'analogy', note: 'Asked how the office down the hall fixed theirs.', answer: 'no' },
+  { node: 'reframing', answer: 'yes', note: 'Use the other tray for now.' },
+  { node: 'goal', note: 'Print from the second tray today.' }
+]);
+SAMPLES.lightning_again = walk(
+  [{ node: 'start', answer: 'no' }, { node: 'goal', note: 'Print a full page without a jam.' }, { node: 'subtract', answer: 'no' }, { node: 'one_step', answer: 'yes' }],
+  again(
+    walk([
+      ...opening,
+      { node: 'subtract', answer: 'yes' },
+      { node: 'via_negativa', note: 'Took out the bent sheets at the bottom of the tray.', answer: 'yes' },
+      { node: 'learn', note: 'Check the tray before blaming the printer.' },
+      { node: 'next', note: 'Keep the paper flat in its box.' }
+    ]),
+    at
+  )
+);

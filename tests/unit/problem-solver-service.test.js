@@ -187,7 +187,7 @@ async function seeded(patch) {
 
 test('confirm_task, dismiss_task, set_review_task and dismiss_review apply their payloads without the coach', async () => {
   const proposal = { id: 'p1', title: 'Draft', status: 'proposed', due: null, source: { runId: 'k', nodeId: 'n' } };
-  const { svc, id } = await seeded({ proposedTasks: [proposal, { ...proposal, id: 'p2' }], reviewProposal: { title: 'Review: Late rota.', due: '2026-11-02', reason: '', status: 'proposed' } });
+  const { svc, id } = await seeded({ model: { id: 'seven_step', reason: 'Default.' }, proposedTasks: [proposal, { ...proposal, id: 'p2' }], reviewProposal: { title: 'Review: Late rota.', due: '2026-11-02', reason: '', status: 'proposed' } });
   let s = await svc.get('op', id);
   s = await svc.action('op', { id, revision: s.revision, requestId: 'a1', action: 'confirm_task', payload: { proposalId: 'p1', taskId: 'task-1' } });
   assert.equal(s.proposedTasks[0].taskId, 'task-1');
@@ -219,4 +219,41 @@ test('start_review and task_status are known actions; task_status while busy is 
   s = await svc.action('op', { id: s.id, revision: s.revision, action: 'say', text: 'It changed three of four weeks' });
   assert.equal(s.runner.status, 'queued');
   await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action: 'task_status', payload: { snapshot } }), (err) => err.status === 409 && err.code === 'busy');
+});
+
+test('link_case_file and dismiss_case_file are known actions; link_case_file while busy is 409', async () => {
+  const svc = service();
+  let s = await svc.run('op', (await svc.create('op', { text: 'Late rota.' })).id);
+  // Known actions are refused on the session's state, not as unknown (400).
+  for (const action of ['link_case_file', 'dismiss_case_file']) {
+    await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action, payload: {} }), (err) => !/Unknown action/.test(err.message));
+  }
+  s = await svc.action('op', { id: s.id, revision: s.revision, action: 'say', text: 'It changed three of four weeks' });
+  assert.equal(s.runner.status, 'queued');
+  await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action: 'link_case_file', payload: {} }), (err) => err.status === 409 && err.code === 'busy');
+});
+
+test('a finished Lightning run refuses messages, so no coach call is queued', async () => {
+  const store = createMemoryProblemStore();
+  const svc = createProblemSolverService({ store, coach: scriptedCoach, now: () => '2026-10-20T10:00:00.000Z', newId: () => '00000000-0000-4000-8000-000000000001' });
+  const run = { ...createSession({ text: 'I keep missing the bus.' }, { now: () => '2026-10-20T10:00:00.000Z', newId: () => 'x1' }), id: '00000000-0000-4000-8000-0000000000aa', kind: 'lightning', phase: 'lightning', status: 'finished', runner: { status: 'idle', mode: 'turn', error: null }, lightning: { path: [{ node: 'next', round: 1, at: 'a' }], rounds: 1, finishedAt: 'a', escalatedTo: null } };
+  await store.write('op', run.id, run, null);
+  await assert.rejects(svc.action('op', { id: run.id, revision: run.revision, requestId: 'q1', action: 'say', text: 'Hello again' }), (err) => err.status === 409 && /This run is finished\. Press It came back/.test(err.message));
+});
+
+test('a Lightning run goes from create to finished with the scripted coach', async () => {
+  const svc = service();
+  let s = await svc.create('op', { kind: 'lightning', text: 'The garden gate keeps swinging open.', requestId: 'l0' });
+  assert.equal(s.kind, 'lightning');
+  s = await svc.run('op', s.id);
+  assert.equal(s.turns.at(-1).text, 'Could you accept things as they are?');
+  let i = 0;
+  for (const text of ['no', 'The gate should stay shut on its own', 'no', 'no', 'no, drew the hinge', 'no', 'yes, wrote a list of fixes', 'Gates need a catch as well as hinges', 'Fit a catch this weekend']) {
+    s = await svc.action('op', { id: s.id, revision: s.revision, requestId: `l${(i += 1)}`, action: 'say', text });
+    s = await svc.run('op', s.id);
+  }
+  assert.equal(s.status, 'finished');
+  assert.ok(s.lightning.finishedAt);
+  assert.equal(s.turns.at(-1).text, 'That run is done.');
+  assert.equal(s.runner.status, 'idle');
 });

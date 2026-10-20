@@ -5,7 +5,10 @@ import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/sc
 import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say, score } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
+import { MODELS } from '../../packages/problem-solver/models.mjs';
 import { addEdge, checkNode, isComplete, newRun, placeNode } from '../../packages/problem-solver/machine.mjs';
+import { createLightningSession, applyLightningTurn, escalateLightning } from '../../netlify/functions/_shared/problem-solver/lightning-session.mjs';
+import { currentEntry } from '../../packages/problem-solver/lightning.mjs';
 import { matrixTotals, options } from '../../packages/problem-solver/tools/decision-matrix.mjs';
 
 /** Run `fn` with the Analyse tools moved to a step that does not exist, so Analyse offers no tool. */
@@ -47,6 +50,38 @@ test('when the next step has a tool, the learning turn suggests it', async () =>
   s = await step(moveOn(acceptSuggestion(s, deps), deps));
   s = await step(say(s, 'I rush.', deps));
   assert.equal(s.suggestion?.tool, 'contradiction');
+});
+
+/** Frame a problem whose third answer is `third`; returns the session after the coach's reply. */
+async function framedWith(third) {
+  let s = await step(createSession({ text: 'Late rota.' }, deps));
+  for (const text of ['Rota fixed a week ahead.', 'Changed three weeks out of four, by the logs.', third]) s = await step(say(s, text, deps));
+  return s;
+}
+
+test('a model hint in the third frame answer chooses Polya, starting with 5 Whys', async () => {
+  const s = await framedWith('Move the publish day earlier, model: polya');
+  assert.equal(s.model.id, 'polya');
+  assert.equal(s.phase, 'identify');
+  assert.equal(s.suggestion?.tool, 'five_whys');
+  assert.ok(s.turns.at(-1).text.includes(`I suggest ${MODELS.polya.name},`));
+});
+
+test('a model hint in the third frame answer chooses TRIZ, starting with 5 Whys', async () => {
+  const s = await framedWith('model: TRIZ, faster swaps make the rota less stable');
+  assert.equal(s.model.id, 'triz');
+  assert.equal(s.phase, 'specific_problem');
+  assert.equal(s.suggestion?.tool, 'five_whys');
+  assert.ok(s.turns.at(-1).text.includes(`I suggest ${MODELS.triz.name},`));
+});
+
+test('without a model hint, or with an unknown one, the frame chooses the seven-step process', async () => {
+  for (const third of ['Move the publish day earlier.', 'model: nonsense, move the publish day']) {
+    const s = await framedWith(third);
+    assert.equal(s.model.id, 'seven_step');
+    assert.equal(s.suggestion?.tool, 'five_whys');
+    assert.match(s.turns.at(-1).text, /I suggest the problem solving process,/);
+  }
 });
 
 test('finished sessions get a closing line', async () => {
@@ -395,4 +430,159 @@ test('a boundary turn leaving a step with nothing done asks no learning question
   assert.equal(s.steps.improve.status, 'waiting');
   assert.equal(s.pendingLearning, null);
   assert.doesNotMatch(s.turns.at(-1).text, /learn/);
+});
+
+const SENTENCE = 'The rota record helps the next organiser avoid the same late week';
+const documentSession = (run, text) => run ? inStep('document', run, text) : { ...inStep('document', null, text), steps: { document: { runs: [], status: 'open', objection: null } } };
+
+test('Document with no tool open suggests the 5 Cs, the step\'s default', async () => {
+  const turn = await scriptedCoach(documentSession(null, 'What should we keep from all this?'));
+  assert.deepEqual([turn.verdict, turn.suggestion?.kind, turn.suggestion?.tool], ['clarify', 'next_tool', 'five_cs']);
+});
+
+test('5 Cs: a name that breaks a strict rule is challenged with the advice, carrying the node', async () => {
+  const run = build('five_cs', [['contextualise', SENTENCE], ['categorise', SENTENCE], ['condense:1', SENTENCE], ['correct', SENTENCE]]);
+  let turn = await scriptedCoach(documentSession(run, 'Kitchen rota case file for the team'));
+  assert.equal(turn.verdict, 'challenge');
+  assert.match(turn.message, /^That name needs one more thing: add the date as YYYYMMDD/);
+  assert.deepEqual([turn.node?.slot, turn.node?.text], ['correspond', 'Kitchen rota case file for the team']);
+  assert.deepEqual(turn.proposeTasks, []);
+  turn = await scriptedCoach(documentSession(run, 'Kitchen rota case file 20261020 v1 Final'));
+  assert.equal(turn.verdict, 'accept');
+  assert.deepEqual([turn.node?.slot, turn.node?.text], ['correspond', 'Kitchen rota case file 20261020 v1 Final']);
+});
+
+test('5 Cs: a thin name is still challenged as thin first', async () => {
+  const run = build('five_cs', [['contextualise', SENTENCE], ['categorise', SENTENCE], ['condense:1', SENTENCE], ['correct', SENTENCE]]);
+  const turn = await scriptedCoach(documentSession(run, 'Rota v1 Final'));
+  assert.equal(turn.verdict, 'challenge');
+  assert.match(turn.message, /too thin/);
+});
+
+test('next: knowledge_management in Document suggests it', async () => {
+  const run = build('five_cs', [['contextualise', SENTENCE], ['categorise', SENTENCE], ['condense:1', SENTENCE], ['correct', SENTENCE], ['correspond', 'Kitchen rota case file 20261020 v1 Final']]);
+  const turn = await scriptedCoach(documentSession(run, 'next: knowledge_management'));
+  assert.deepEqual([turn.verdict, turn.suggestion?.kind, turn.suggestion?.tool], ['clarify', 'next_tool', 'knowledge_management']);
+});
+
+test('knowledge management: answers place in order, explicit and tacit hints go to those slots', async () => {
+  let run = build('knowledge_management', []);
+  for (const [text, slot] of [
+    [SENTENCE, 'consider'],
+    [`tacit: ${SENTENCE}`, 'tacit:1'],
+    [`explicit: ${SENTENCE}`, 'explicit:1'],
+    [`share: ${SENTENCE}`, 'share'],
+    [`review: ${SENTENCE}`, 'review']
+  ]) {
+    const turn = await scriptedCoach(documentSession(run, text));
+    assert.equal(turn.verdict, 'accept', text);
+    assert.equal(turn.node.slot, slot, text);
+    assert.equal(turn.node.text, SENTENCE);
+    run = placeNode(run, { id: turn.node.slot, ...turn.node, state: 'accepted' });
+  }
+  assert.equal(isComplete(run), true);
+});
+
+// Lightning runs
+const lightningStep = async (s, text) => {
+  const said = { ...s, turns: [...s.turns, { id: deps.newId(), role: 'user', text, createdAt: deps.now() }] };
+  return applyLightningTurn(said, await scriptedCoach(said), deps);
+};
+const freshRun = () => createLightningSession({ text: 'The shed door sticks.' }, deps);
+const here = (s) => currentEntry(s.lightning)?.node;
+
+test('lightning: opens by asking the first box, with no lightning step', async () => {
+  const turn = await scriptedCoach(freshRun());
+  assert.equal(turn.verdict, 'clarify');
+  assert.equal(turn.message, 'Could you accept things as they are?');
+  assert.equal(turn.lightning, null);
+  assert.equal(turn.suggestion, null);
+});
+
+test('lightning: a run walks to Relax and finishes', async () => {
+  let s = freshRun();
+  s = await lightningStep(s, 'no');
+  assert.equal(s.turns.at(-1).text, 'Next: Define the goal.');
+  assert.equal(here(s), 'goal');
+  s = await lightningStep(s, 'The door should slide shut without force');
+  assert.equal(s.turns.at(-1).text, 'Next: Could taking something away solve it?');
+  s = await lightningStep(s, 'no');
+  s = await lightningStep(s, 'no');
+  assert.equal(here(s), 'diagram');
+  assert.match(s.turns.at(-1).text, /^Next: Draw a diagram\./);
+  s = await lightningStep(s, 'no, sketched it');
+  assert.equal(here(s), 'work_backwards');
+  assert.equal(s.lightning.path.find((e) => e.node === 'diagram').note, 'sketched it');
+  s = await lightningStep(s, 'yes');
+  assert.equal(here(s), 'learn');
+  s = await lightningStep(s, 'The runner was bent and I never looked');
+  s = await lightningStep(s, 'Check the runner each season');
+  assert.equal(s.status, 'finished');
+  assert.ok(s.lightning.finishedAt);
+  assert.equal(s.turns.at(-1).text, 'That run is done.');
+});
+
+test('lightning: yes and no are case-insensitive and may carry words', async () => {
+  const turn = await scriptedCoach({ ...freshRun(), turns: [{ role: 'user', text: 'YES, we can live with it' }, { role: 'user', text: 'YES, we can live with it' }] });
+  assert.deepEqual(turn.lightning, { node: 'start', answer: 'yes', note: 'we can live with it' });
+});
+
+test('lightning: a goal line needs three words, else a clarify', async () => {
+  let s = await lightningStep(freshRun(), 'no');
+  const short = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'Fix it' }] });
+  assert.equal(short.verdict, 'clarify');
+  assert.equal(short.message, 'Say a little more about that.');
+  assert.equal(short.lightning, null);
+});
+
+test('lightning: an unclear reply at a yes/no box asks the box again', async () => {
+  const s = freshRun();
+  const turn = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'maybe, not sure' }] });
+  assert.equal(turn.lightning, null);
+  assert.match(turn.message, /Could you accept things as they are\?/);
+});
+
+test('lightning: escalate gives the escalate suggestion', async () => {
+  const s = freshRun();
+  const turn = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'escalate' }] });
+  assert.deepEqual(turn.suggestion, { kind: 'escalate', reason: 'Named as needing the full process.' });
+  assert.equal(turn.lightning, null);
+  const applied = applyLightningTurn(s, turn, deps);
+  assert.equal(applied.suggestion.kind, 'escalate');
+});
+
+test('lightning: a finished run gets a one-line clarify; "It came back." asks the first box again', async () => {
+  let s = freshRun();
+  s = await lightningStep(s, 'yes');
+  s = await lightningStep(s, 'Nothing to learn here really');
+  s = await lightningStep(s, 'Carry on as before then');
+  assert.equal(s.status, 'finished');
+  const done = await scriptedCoach({ ...s, turns: [...s.turns, { role: 'user', text: 'hello' }] });
+  assert.equal(done.verdict, 'clarify');
+  assert.equal(done.lightning, null);
+  const again = { ...s, status: 'active', lightning: { ...s.lightning, finishedAt: null, path: [...s.lightning.path, { node: 'start', round: 2, at: 'x' }], rounds: 2 }, turns: [...s.turns, { role: 'user', text: 'It came back.' }] };
+  assert.equal((await scriptedCoach(again)).message, 'Could you accept things as they are?');
+});
+
+test('an escalated full session opens with the carried seeds, then the reply sets the goal as usual', async () => {
+  let run = freshRun();
+  run = await lightningStep(run, 'no');
+  run = await lightningStep(run, 'The door should slide shut without force');
+  run = await lightningStep(run, 'no');
+  run = await lightningStep(run, 'no');
+  run = await lightningStep(run, 'no, sketched where it rubs');
+  let { full } = escalateLightning(run, 'full1', deps);
+  full = await step(full);
+  assert.equal(full.turns.at(-1).text, `Carried over from Lightning. Goal: The door should slide shut without force. What is true: ${full.frameSeeds.whatIsTrue.replace(/\.$/, '')}. Is that still right, or what would you change?`);
+  assert.match(full.frameSeeds.whatIsTrue, /draw a diagram/i);
+  assert.doesNotMatch(full.turns.at(-1).text, /\.\./);
+  full = await step(say(full, 'Yes, the door should slide shut without any force', deps));
+  assert.equal(full.frame.goal, 'Yes, the door should slide shut without any force');
+  assert.match(full.turns.at(-1).text, /what is actually true/);
+});
+
+test('seeds with nothing set say so', async () => {
+  const { full } = escalateLightning(freshRun(), 'full2', deps);
+  const turn = await scriptedCoach(full);
+  assert.equal(turn.message, 'Carried over from Lightning. Goal: not set. What is true: nothing tried yet. Is that still right, or what would you change?');
 });

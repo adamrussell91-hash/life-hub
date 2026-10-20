@@ -42,6 +42,9 @@ import eisenhower from './glyphs/tools/eisenhower.svg?raw';
 import after_action_review from './glyphs/tools/after_action_review.svg?raw';
 import double_loop from './glyphs/tools/double_loop.svg?raw';
 import feedback_matrix from './glyphs/tools/feedback_matrix.svg?raw';
+import five_cs from './glyphs/tools/five_cs.svg?raw';
+import knowledge_management from './glyphs/tools/knowledge_management.svg?raw';
+import lightning from './glyphs/lightning.svg?raw';
 import type { PsToolId } from './types';
 
 const SOURCES: Record<string, string> = {
@@ -54,7 +57,7 @@ const EMBLEMS: Record<PsToolId, string> = {
   causal_map, perspective_shift, radial_tree, force_field, from_to, intent_statement,
   problem_reduction, analogical_reasoning, solution_tree, lotus_blossom, duncker,
   decision_matrix, swot, morphological, pareto, dmaic, fifteen_percent, kanban, eisenhower,
-  after_action_review, double_loop, feedback_matrix
+  after_action_review, double_loop, feedback_matrix, five_cs, knowledge_management
 };
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
@@ -96,5 +99,14 @@ export function toolEmblem(id: PsToolId, doc: Document = document): HTMLSpanElem
   span.className = 'ps-emblem';
   span.setAttribute('aria-hidden', 'true');
   span.innerHTML = EMBLEMS[id];
+  return span;
+}
+
+/** The Lightning bolt: ink only (currentColor), for the black-and-white mode. */
+export function lightningGlyph(doc: Document = document): HTMLSpanElement {
+  const span = doc.createElement('span');
+  span.className = 'ps-lightning-glyph';
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = lightning;
   return span;
 }

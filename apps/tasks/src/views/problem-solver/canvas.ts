@@ -1,5 +1,6 @@
 // apps/tasks/src/views/problem-solver/canvas.ts
 import { el } from '@/views/hub-kit';
+import { projectPageHash, taskPageHash } from '@/domain/cards';
 import { createCausalMapView } from '../../../../../packages/problem-solver/render/causal-map';
 import { createConceptMapView } from '../../../../../packages/problem-solver/render/concept-map';
 import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
@@ -30,6 +31,8 @@ import { createEisenhowerView } from '../../../../../packages/problem-solver/ren
 import { createAfterActionReviewView } from '../../../../../packages/problem-solver/render/after-action-review';
 import { createDoubleLoopView } from '../../../../../packages/problem-solver/render/double-loop';
 import { createFeedbackMatrixView } from '../../../../../packages/problem-solver/render/feedback-matrix';
+import { createFiveCsView } from '../../../../../packages/problem-solver/render/five-cs';
+import { createKnowledgeManagementView } from '../../../../../packages/problem-solver/render/knowledge-management';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -82,7 +85,9 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   eisenhower: () => createEisenhowerView(),
   after_action_review: () => createAfterActionReviewView(),
   double_loop: () => createDoubleLoopView(),
-  feedback_matrix: () => createFeedbackMatrixView()
+  feedback_matrix: () => createFeedbackMatrixView(),
+  five_cs: () => createFiveCsView(),
+  knowledge_management: () => createKnowledgeManagementView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
@@ -197,7 +202,7 @@ function rectOf(node: Element | null): DOMRect | null {
 export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void; setTaskStatuses(statuses: Record<string, string>): void; destroy(): void } {
   const views = new Map<string, View>();
   const frame = createFrameView();
-  const record = createRecordView();
+  const record = createRecordView(document, { pageHref: (target) => (target.kind === 'task' ? taskPageHash(target.id) : projectPageHash(target.id)) });
   let last: PsSession | null = null;
   let mode: 'chart' | 'record' | null = null;
   let pinned: { runId: string; via: 'step' | 'film' } | null = null;

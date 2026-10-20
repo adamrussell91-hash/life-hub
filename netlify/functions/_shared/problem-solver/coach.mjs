@@ -1,9 +1,10 @@
 // netlify/functions/_shared/problem-solver/coach.mjs
 import { completeMessage } from '../anthropic-client.mjs';
-import { addEdge, canEdge, canPlace, checkNode, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { acceptProblem, addEdge, canEdge, canPlace, checkNode, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
+import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, reopenProblem, waitingForReview } from './session.mjs';
@@ -48,6 +49,9 @@ function fitToRun(session, value) {
   const renamedEdges = value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }));
   const problem = checkNode(run, node, renamedEdges);
   if (problem) return { error: problem };
+  // A strict rule (the 5 Cs name) refuses an accept, never a challenge: send it back to be challenged.
+  const refused = value.verdict === 'accept' ? acceptProblem(run, node) : null;
+  if (refused) return { error: `${refused} Challenge instead, name the rule in one sentence, and ask for a corrected name.` };
   if (value.verdict !== 'accept' && value.verdict !== 'challenge') return { value: { ...value, node, edges: [] } };
   return { value: { ...value, node, edges: allowedEdges(run, node, renamedEdges), proposeTasks: value.proposeTasks.map((p) => ({ ...p, slot: rename(p.slot) })) } };
 }
@@ -96,6 +100,7 @@ function withAcceptedNode(session, turn) {
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
+  if (result.value.suggestion?.kind === 'escalate') result.value = { ...result.value, suggestion: null };
   if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null, proposeTasks: [], proposeReview: null } };
   // In frame a suggestion only means something on the turn that sets the model (the frame
   // completes and the first step opens); otherwise accepting it would be refused.
@@ -118,12 +123,19 @@ function parse(session, text) {
   return { ok: true, value };
 }
 
+function parseLightning(session, text) {
+  const result = validateCoachTurn(extractJson(text));
+  return result.ok ? checkLightningTurn(session, result.value) : result;
+}
+
 export function createModelCoach(model) {
   return async function modelCoach(session) {
-    const prompt = buildCoachPrompt(session);
+    const lightning = session.kind === 'lightning';
+    const prompt = lightning ? buildLightningPrompt(session) : buildCoachPrompt(session);
+    const read = lightning ? parseLightning : parse;
     const first = await model({ ...prompt, maxTokens: 900 });
-    let result = parse(session, first);
-    if (!result.ok) result = parse(session, await model({ ...repairPrompt(prompt, first, result.error), maxTokens: 900 }));
+    let result = read(session, first);
+    if (!result.ok) result = read(session, await model({ ...repairPrompt(prompt, first, result.error), maxTokens: 900 }));
     if (!result.ok) throw Object.assign(new Error('Coach lost the thread, try again.'), { code: 'coach_lost_thread', status: 502 });
     let message = result.value.message;
     if (wordCount(message) > REWRITE_OVER) {
