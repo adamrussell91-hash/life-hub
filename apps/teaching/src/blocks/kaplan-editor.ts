@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas/block';
+import { classroomExtras } from '@/blocks/classroom-extras';
 import type { KaplanLens, KaplanQualifier } from '@/schemas/kaplan';
 import {
   KAPLAN_LABELS, KAPLAN_LENSES, KAPLAN_PATHS, canHaveKaplanQualifier,
@@ -14,6 +15,7 @@ type Options<T extends Block> = { getBlock: () => T; onChange: (block: T) => voi
 export function createKaplanEditor<T extends Block>(options: Options<T>): HTMLElement {
   const root = document.createElement('div');
   root.className = 'kaplan-author';
+  if (!classroomExtras()) return root;
   if (!canHaveKaplanQualifier(options.getBlock()) && !canHaveDiscern(options.getBlock())) return root;
   const bar = document.createElement('div');
   bar.className = 'kaplan-author__bar';

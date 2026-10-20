@@ -1,9 +1,32 @@
-import type { InsertMenuValue } from '@/blocks/create-block';
+import { BLOCK_GROUPS, type InsertMenuValue } from '@teaching/blocks/create-block';
 import {
-  taskPaletteFamilies,
+  familiesFromGroups,
   type PaletteBlockCard,
   type PaletteFamily
-} from '@/teacher/lesson-canvas/palette-catalog';
+} from '@teaching/teacher/lesson-canvas/palette-catalog';
+
+/**
+ * The blocks a Tasks or Professional page offers. Each one is Teaching's own
+ * block; the classroom-only ones (annotation, quizzes, toolkit…) stay in
+ * Teaching. Families and order follow Teaching's palette.
+ */
+export const TASK_BLOCK_TYPES: ReadonlySet<string> = new Set([
+  'rich_text', 'heading', 'callout', 'quote', 'divider', 'definition', 'code', 'html', 'html_app',
+  'image', 'gallery', 'video', 'embed', 'audio', 'attachment',
+  'accordion', 'table', 'question_set', 'timeline', 'card_stack', 'outcomes',
+  'flashcards', 'cloze', 'self_check',
+  'chart', 'equation', 'diagram', 'mind_map', 'concept_map', 'whiteboard',
+  'section', 'columns', 'spacer', 'tabs'
+]);
+
+/** Teaching's palette families, narrowed to the blocks Tasks pages offer. */
+export function taskPaletteFamilies(): PaletteFamily[] {
+  const groups = BLOCK_GROUPS.map((group) => ({
+    ...group,
+    types: [...new Set(group.types)].filter((type) => TASK_BLOCK_TYPES.has(type))
+  })).filter((group) => group.types.length > 0);
+  return familiesFromGroups(groups);
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,

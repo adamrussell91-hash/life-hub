@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { closeHubMenu, createHubList } from '../../design-kit/js/hub-list.js';
 import { resetHubFeedbackForTests } from '../../design-kit/js/hub-feedback.js';
-import { createBlock } from '@/blocks/create-block';
-import { createAccordionEditor, createTableEditor } from '@/blocks/registry';
+import { createBlock } from '@teaching/blocks/create-block';
+import { createAccordionEditor, createTableEditor } from '@teaching/blocks/registry';
 import type { Block } from '@/schemas/block';
 import { clickMenuAction, hold, holdDelete, menuItem } from './helpers/hub-list';
 
