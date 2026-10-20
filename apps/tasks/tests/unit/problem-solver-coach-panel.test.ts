@@ -45,3 +45,23 @@ describe('coach panel: Improve', () => {
     expect(panel.querySelector('[data-action="move_on"]')!.textContent).toBe('Finish');
   });
 });
+
+describe('coach panel: Document', () => {
+  const doc = (text: string) => session({
+    phase: 'document',
+    steps: { document: { runs: [{ id: 'r5', tool: 'five_cs', status: 'active', nodes: [], edges: [] }], status: 'open', objection: null } },
+    pendingKeep: { slot: 'correspond', text, objection: 'Only you would know what KR means.' }
+  } as Partial<PsSession>);
+
+  it('a name the naming rules refuse gets no Keep it anyway, only a short note', () => {
+    const panel = renderCoachPanel(doc('KR stuff'), noop);
+    expect(panel.querySelector('[data-action="keep_anyway"]')).toBeNull();
+    expect(panel.querySelector('.ps-coach__status--keep')!.textContent).toBe("This name breaks a naming rule, so it can't be kept as it is.");
+  });
+
+  it('a name that passes the strict rules can still be kept anyway', () => {
+    const panel = renderCoachPanel(doc('KR stuff 20261020 v1 Final'), noop);
+    expect(panel.querySelector('[data-action="keep_anyway"]')).not.toBeNull();
+    expect(panel.querySelector('.ps-coach__status--keep')).toBeNull();
+  });
+});

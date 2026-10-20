@@ -2,6 +2,7 @@
 import { el } from '@/views/hub-kit';
 import { skillChip, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
+import { acceptProblem } from '../../../../../packages/problem-solver/machine.mjs';
 import { nextPhase, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession } from '../../../../../packages/problem-solver/types';
 import { coachAvatar, thinkingDots } from './decor';
@@ -15,6 +16,16 @@ function actionButton(label: string, action: PsAction, handlers: CoachPanelHandl
   button.dataset.action = action;
   button.addEventListener('click', () => handlers.onAction(action));
   return button;
+}
+
+/**
+ * True when the active run's tool would refuse the pending keep (a 5 Cs name that breaks a
+ * strict naming rule), so Keep it anyway would only meet a 409.
+ */
+function keepRefused(session: PsSession): boolean {
+  const keep = session.pendingKeep;
+  const run = session.steps?.[session.phase]?.runs.find((item) => item.status === 'active');
+  return Boolean(keep && run && acceptProblem(run, keep));
 }
 
 function message(turn: PsSession['turns'][number], fresh: boolean): HTMLLIElement {
@@ -154,7 +165,10 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
       const card = boundaryFailed ? null : suggestionCard(session, handlers);
       if (card) parts.push(card);
       const actions = el('div', 'ps-coach__actions');
-      if (session.pendingKeep && !locked) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
+      if (session.pendingKeep && !locked) {
+        if (keepRefused(session)) parts.push(el('p', 'ps-coach__status ps-coach__status--keep', "This name breaks a naming rule, so it can't be kept as it is."));
+        else actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
+      }
       const inStep = Boolean(session.model && session.steps?.[session.phase]);
       if (inStep && !locked) {
         const after = nextPhase(session);

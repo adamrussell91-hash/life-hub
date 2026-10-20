@@ -4,18 +4,28 @@
 import { el } from '@/views/hub-kit';
 import { errorMessage } from '@/views/feedback';
 import { taskPageHash } from '@/domain/cards';
-import type { PsProposedTask, PsSession } from '../../../../../packages/problem-solver/types';
+import { caseFileOffer } from '../../../../../packages/problem-solver/case-file.mjs';
+import { namingProblem, reviseName } from '../../../../../packages/problem-solver/naming.mjs';
+import type { PsCaseFileOffer, PsProposedTask, PsSession } from '../../../../../packages/problem-solver/types';
 import { TaskNotLinkedError, type TaskEdits } from './task-bridge';
+import { CaseFilePageGone, type CaseFilePlace } from './case-file-bridge';
 
 export type TaskCardHandlers = {
   create(proposal: PsProposedTask, edits: TaskEdits): Promise<void>;
   dismiss(proposal: PsProposedTask): Promise<void>;
   createReview(edits: { title: string; due: string }): Promise<void>;
   dismissReview(): Promise<void>;
+  /** Where the case file can go: linked pages first, `new` (a new project) last. */
+  places(session: PsSession): Promise<PlaceOption[]>;
+  writeCaseFile(offer: PsCaseFileOffer, choice: { place: CaseFilePlace; title: string; moved?: boolean }): Promise<void>;
+  dismissCaseFile(key: string): Promise<void>;
 };
+export type PlaceOption = { value: string; label: string };
 export type TaskCardOptions = {
   /** Where focus goes when a card removes itself and no card is left (the composer). */
   fallbackFocus?: () => HTMLElement | null;
+  /** Today as YYYYMMDD, for the case file's revised name (defaults to the local date). */
+  today?: () => string;
 };
 export type TaskCards = { el: HTMLElement; update(session: PsSession): void };
 
@@ -28,6 +38,18 @@ function today(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+/** Today as YYYYMMDD in local time, the date a case-file name carries. */
+export function compactToday(): string {
+  return today().replace(/-/g, '');
+}
+
+/** A select value back to a place: `new`, or `kind:id`. */
+function parsePlace(value: string): CaseFilePlace {
+  const at = value.indexOf(':');
+  if (value === 'new' || at < 0) return 'new';
+  return { kind: value.slice(0, at) as 'task' | 'project', id: value.slice(at + 1) };
+}
+
 function button(label: string, act: string, kind: string): HTMLButtonElement {
   const b = el('button', `btn ${kind}`, label) as HTMLButtonElement;
   b.type = 'button';
@@ -35,7 +57,7 @@ function button(label: string, act: string, kind: string): HTMLButtonElement {
   return b;
 }
 
-function field(label: string, input: HTMLInputElement): HTMLLabelElement {
+function field(label: string, input: HTMLElement): HTMLLabelElement {
   const wrap = el('label', 'ps-taskcard__field') as HTMLLabelElement;
   wrap.append(el('span', 'ps-taskcard__label', label), input);
   return wrap;
@@ -62,7 +84,12 @@ function errorContent(err: unknown): Node[] {
  * `run` handles the in-flight state (both buttons disabled, the clicked one relabelled) and
  * shows a failure without losing the card.
  */
-type Card = { el: HTMLElement; refresh(busy: boolean): void };
+type Card = {
+  el: HTMLElement;
+  refresh(busy: boolean): void;
+  /** Swap the card's heading, fields and primary label in place (the same article stays). */
+  reshape(next: { meta?: string; fields?: HTMLElement[]; primary?: string }): void;
+};
 type CardParts = {
   className: string;
   meta: string;
@@ -72,6 +99,8 @@ type CardParts = {
   onPrimary: () => Promise<void>;
   onSecondary: () => Promise<void>;
   extra?: HTMLElement | null;
+  /** The primary's text while its action runs. */
+  busyLabel?: string;
   /** The card failed after it left the page. */
   onLostError(err: unknown): void;
   /** The card's own action removed it. */
@@ -89,7 +118,8 @@ function makeCard(parts: CardParts): Card {
   row.append(primary, secondary);
   const body = el('div', 'ps-taskcard__fields');
   body.append(...parts.fields);
-  card.append(el('p', 'ps-taskcard__meta', parts.meta), body);
+  const meta = el('p', 'ps-taskcard__meta', parts.meta);
+  card.append(meta, body);
   if (parts.extra) card.append(parts.extra);
   card.append(row, hint, error);
 
@@ -100,7 +130,7 @@ function makeCard(parts: CardParts): Card {
   const paint = () => {
     for (const [b, label] of labels) {
       b.disabled = busy || pending !== null;
-      b.textContent = b === pending ? (b === primary ? 'Creating…' : 'Setting aside…') : label;
+      b.textContent = b === pending ? (b === primary ? (parts.busyLabel ?? 'Creating…') : 'Setting aside…') : label;
     }
     hint.textContent = busy ? WAITING : '';
   };
@@ -132,6 +162,12 @@ function makeCard(parts: CardParts): Card {
     refresh(next) {
       busy = next;
       paint();
+    },
+    reshape(next) {
+      if (next.meta !== undefined) meta.textContent = next.meta;
+      if (next.fields) body.replaceChildren(...next.fields);
+      if (next.primary !== undefined) labels.set(primary, next.primary);
+      paint();
     }
   };
 }
@@ -148,9 +184,13 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
   /** Card order on the last update, to find the card after one that removed itself. */
   let lastOrder: string[] = [];
   let review: (Card & { sync(proposal: NonNullable<PsSession['reviewProposal']>): void }) | null = null;
+  let caseFile: (Card & { key: string }) | null = null;
+  /** The session of the last update, for the places list when an update card turns into a write. */
+  let current: PsSession | null = null;
+  const dateToday = options.today ?? compactToday;
 
   const syncHidden = () => {
-    root.hidden = cards.size === 0 && !review && notices.childElementCount === 0;
+    root.hidden = cards.size === 0 && !review && !caseFile && notices.childElementCount === 0;
   };
 
   /** A failure that arrived after its card had gone: a short notice in its place. */
@@ -172,8 +212,9 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
   function focusAfter(id: string): void {
     const index = lastOrder.indexOf(id);
     const candidates = [...lastOrder.slice(index + 1), ...lastOrder.slice(0, Math.max(index, 0)).reverse()];
-    const next = candidates.map((key) => (key === 'review' ? review?.el : cards.get(key)?.el)).find((node) => node?.parentNode === root);
-    const target = next?.querySelector<HTMLElement>('input') ?? options.fallbackFocus?.() ?? null;
+    const byKey = (key: string) => (key === 'review' ? review?.el : key === 'casefile' ? caseFile?.el : cards.get(key)?.el);
+    const next = candidates.map(byKey).find((node) => node?.parentNode === root);
+    const target = next?.querySelector<HTMLElement>('input, select, button') ?? options.fallbackFocus?.() ?? null;
     target?.focus();
   }
 
@@ -236,9 +277,100 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
     };
   }
 
+  /**
+   * The case-file card. A write asks for a title (checked against the strict naming rules
+   * before anything is written) and a place; an update goes where the case file already is.
+   * If that page has gone, the card turns into the write form for a full copy elsewhere.
+   */
+  function caseFileCard(offer: PsCaseFileOffer, session: PsSession): Card & { key: string } {
+    let moved = false;
+    const write = offer.kind === 'write';
+    const title = input('title', 'text', offer.file.title);
+    const place = el('select', 'ps-taskcard__input ps-casefilecard__select') as HTMLSelectElement;
+    place.name = 'place';
+    const newLabel = () => `New project: ${title.value.trim() || offer.file.title}`;
+    const NEW: PlaceOption[] = [{ value: 'new', label: '' }];
+    /** The person picked a place themselves, so a late list keeps their pick when it can. */
+    let touched = false;
+    place.addEventListener('change', () => (touched = true));
+    const fill = (options: PlaceOption[]) => {
+      const keep = touched ? place.value : null;
+      place.replaceChildren(...options.map((item) => {
+        const option = el('option', '', item.value === 'new' ? newLabel() : item.label) as HTMLOptionElement;
+        option.value = item.value;
+        return option;
+      }));
+      if (keep && options.some((item) => item.value === keep)) place.value = keep;
+      else place.selectedIndex = 0;
+    };
+    /** Only `new` until the list arrives; only `new` if it fails. `skip` drops a page that has gone. */
+    const loadPlaces = (s: PsSession, skip: string | null) => {
+      touched = false;
+      fill(NEW);
+      handlers.places(s).then(
+        (options) => {
+          const list = options.filter((item) => item.value !== skip);
+          fill(list.length ? list : NEW);
+        },
+        () => fill(NEW)
+      );
+    };
+    title.addEventListener('input', () => {
+      const option = [...place.options].find((item) => item.value === 'new');
+      if (option) option.textContent = newLabel();
+    });
+    const sections = el('ul', 'ps-casefilecard__sections');
+    sections.setAttribute('aria-label', 'Sections');
+    const listSections = (keys: string[] | null) => {
+      const shown = offer.file.sections.filter((s) => !keys || keys.includes(s.key));
+      sections.replaceChildren(...shown.map((s) => el('li', '', s.heading)));
+    };
+    listSections(write ? null : offer.changed);
+    const writeFields = () => [field('Title', title), field('Place', place)];
+    if (write) loadPlaces(session, null);
+
+    const card = makeCard({
+      className: 'ps-casefilecard',
+      meta: write ? 'Write the case file?' : 'Add an update to the case file?',
+      fields: write ? writeFields() : [],
+      primary: button(write ? 'Write case file' : 'Add update', 'write-casefile', 'btn--primary'),
+      secondary: button('Not now', 'dismiss-casefile', 'btn--ghost'),
+      busyLabel: 'Writing…',
+      onPrimary: async () => {
+        const record = current?.caseFile ?? session.caseFile;
+        if (!write && !moved && record) {
+          try {
+            await handlers.writeCaseFile(offer, { place: record.target, title: record.title });
+          } catch (err) {
+            if (err instanceof CaseFilePageGone) {
+              moved = true;
+              title.value = reviseName(record.title, { version: offer.version, date: dateToday() });
+              loadPlaces(current ?? session, `${record.target.kind}:${record.target.id}`);
+              listSections(null);
+              card.reshape({ meta: 'Write the case file somewhere else?', fields: writeFields(), primary: 'Write it there' });
+            }
+            throw err;
+          }
+          return;
+        }
+        const name = title.value.trim();
+        const problem = namingProblem(name);
+        if (problem) throw new Error(problem.charAt(0).toUpperCase() + problem.slice(1));
+        await handlers.writeCaseFile(offer, { place: parsePlace(place.value), title: name, ...(moved ? { moved: true } : {}) });
+      },
+      onSecondary: () => handlers.dismissCaseFile(offer.key),
+      extra: sections,
+      onLostError: notice,
+      onGone: () => focusAfter('casefile')
+    });
+    card.el.dataset.casefile = offer.key;
+    return { ...card, key: offer.key };
+  }
+
   return {
     el: root,
     update(session) {
+      current = session;
       const busy = session.runner.status === 'queued' || session.runner.status === 'running';
       const open = (session.proposedTasks ?? []).filter((p) => p.status === 'proposed');
       const ids = new Set(open.map((p) => p.id));
@@ -271,15 +403,24 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
         review.refresh(busy);
       }
 
-      // The coach's order, the review card last, notices at the end. Only out-of-place nodes
-      // move, so a field being typed in keeps its focus.
-      const order = [...open.map((p) => cards.get(p.id)!.el), ...(review ? [review.el] : []), notices];
+      // Kept while the offer is the same content, so typed edits survive polling.
+      const offer = caseFileOffer(session);
+      if (caseFile && caseFile.key !== offer?.key) {
+        caseFile.el.remove();
+        caseFile = null;
+      }
+      if (offer && !caseFile) caseFile = caseFileCard(offer, session);
+      caseFile?.refresh(busy);
+
+      // The coach's order, then the review card and the case-file card, notices at the end.
+      // Only out-of-place nodes move, so a field being typed in keeps its focus.
+      const order = [...open.map((p) => cards.get(p.id)!.el), ...(review ? [review.el] : []), ...(caseFile ? [caseFile.el] : []), notices];
       let cursor = root.firstElementChild;
       for (const node of order) {
         if (node === cursor) cursor = cursor.nextElementSibling;
         else root.insertBefore(node, cursor);
       }
-      lastOrder = [...open.map((p) => p.id), ...(review ? ['review'] : [])];
+      lastOrder = [...open.map((p) => p.id), ...(review ? ['review'] : []), ...(caseFile ? ['casefile'] : [])];
       syncHidden();
     }
   };
