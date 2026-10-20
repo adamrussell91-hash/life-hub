@@ -190,11 +190,11 @@ export function numberMarker(n: number, p: Pt, text: string): HTMLElement {
 function chosenPanel(items: Array<{ id: string; text: string }>, onRemove?: (id: string) => void): HTMLElement {
   const panel = el('section', 'tk-chosen');
   panel.hidden = items.length === 0;
-  panel.append(el('p', 'tk-chosen__label', items.length > 1 ? 'Chosen questions' : 'Chosen question'));
+  panel.append(el('p', 'tk-chosen__label block-eyebrow', items.length > 1 ? 'Chosen questions' : 'Chosen question'));
   const list = el('ul', 'tk-chosen__list');
   for (const item of items) {
     const li = el('li', 'tk-chosen__item');
-    li.append(el('span', 'tk-chosen__text', item.text));
+    li.append(el('span', 'tk-chosen__text block-body', item.text));
     if (onRemove) {
       const remove = btn('Remove', 'btn btn--ghost tk-chosen__remove', () => onRemove(item.id));
       remove.setAttribute('aria-label', `Remove “${item.text}” from chosen`);
@@ -224,7 +224,7 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
   draft.setAttribute('aria-label', 'Your question. Drag it, or use the arrow keys, to place it.');
   draft.hidden = true;
   // Shown on the grid itself while a written question is still waiting for a spot.
-  const prompt = el('p', 'tk-quadrant__prompt', 'Tap where your question belongs');
+  const prompt = el('p', 'tk-quadrant__prompt block-body', 'Tap where your question belongs');
   prompt.hidden = true;
   layer.append(prompt, draft);
 
@@ -232,7 +232,7 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
   text.maxLength = QUESTION_MAX;
   text.rows = 2;
   text.placeholder = 'Write one question about the stimulus';
-  const readout = el('p', 'tk-ask__where');
+  const readout = el('p', 'tk-ask__where block-eyebrow');
   readout.setAttribute('aria-live', 'polite');
   const error = el('p', 'tk-ask__error');
   error.setAttribute('role', 'alert');
@@ -308,7 +308,7 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
     const full = state.mine.length >= state.per_student;
     layer.classList.toggle('is-full', full || !state.open);
 
-    form.replaceChildren(el('p', 'tk-subhead', 'Your questions'));
+    form.replaceChildren(el('p', 'tk-subhead block-subtitle', 'Your questions'));
     if (state.mine.length) {
       const list = el('ul', 'tk-ask__mine');
       for (const mine of state.mine) {
@@ -319,13 +319,13 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
       form.append(list);
     }
     if (!state.open) {
-      form.append(el('p', 'tk-ask__note', 'Your teacher has closed questions for now.'));
+      form.append(el('p', 'tk-ask__note block-secondary', 'Your teacher has closed questions for now.'));
     } else if (full) {
-      form.append(el('p', 'tk-ask__note', `You have sent ${state.per_student} questions. Look for yours on the board.`));
+      form.append(el('p', 'tk-ask__note block-secondary', `You have sent ${state.per_student} questions. Look for yours on the board.`));
     } else {
       paintReadout();
       form.append(
-        el('p', 'tk-ask__note', `Write a question, then place it. You can send ${state.per_student - state.mine.length} more.`),
+        el('p', 'tk-ask__note block-secondary', `Write a question, then place it. You can send ${state.per_student - state.mine.length} more.`),
         text,
         readout,
         error,
@@ -347,7 +347,7 @@ export function mountStudentQuestions(host: HTMLElement, layer: HTMLElement, opt
       if (typing) text.focus();
     }
   }).catch(() => undefined);
-  form.append(el('p', 'tk-ask__note', 'Loading…'));
+  form.append(el('p', 'tk-ask__note block-secondary', 'Loading…'));
   void refresh();
   poll(host, STUDENT_POLL_MS, () => void refresh());
 }
@@ -403,7 +403,7 @@ export function mountClassQuestions(host: HTMLElement, layer: HTMLElement, mapVi
     appBox.addEventListener('change', () => { showApp = appBox.checked; paint(); });
     appLabel.append(appBox, document.createTextNode(' Show where the app would put them'));
     bar.replaceChildren(
-      el('p', 'tk-subhead tk-class__title', 'Class questions'),
+      el('p', 'tk-subhead tk-class__title block-subtitle', 'Class questions'),
       el('span', 'tk-class__count', count === 1 ? '1 question' : `${count} questions`),
       toggle('Map', 'map'),
       toggle('Columns', 'columns'),
@@ -466,7 +466,7 @@ export function mountClassQuestions(host: HTMLElement, layer: HTMLElement, mapVi
     detail.hidden = !q;
     if (!q) return;
     const head = el('div', 'tk-class__detail-head');
-    head.append(token(q.symbol, 'md'), el('p', 'tk-class__question', q.text));
+    head.append(token(q.symbol, 'md'), el('p', 'tk-class__question block-body', q.text));
     const facts = el('ul', 'tk-class__facts');
     facts.append(el('li', undefined, `Student put it in ${describePoint(q.student)}.`));
     if (q.teacher) facts.append(el('li', undefined, `You moved it to ${describePoint(q.teacher)}.`));
@@ -476,7 +476,7 @@ export function mountClassQuestions(host: HTMLElement, layer: HTMLElement, mapVi
         : `The app agrees: ${QUADRANT_LABEL[quadrantAt(q.ai)]}.`));
     }
     const chosen = board.chosen.includes(q.id);
-    const actions = el('div', 'tk-class__actions');
+    const actions = el('div', 'tk-class__actions block-actions');
     actions.append(btn(chosen ? 'Unchoose' : 'Choose this question', chosen ? 'btn btn--secondary' : 'btn btn--primary',
       () => void act({ action: 'choose', question_id: q.id, on: !chosen })));
     if (q.teacher) actions.append(btn('Put back where the student had it', 'btn btn--ghost', () => void act({ action: 'unmove', question_id: q.id })));
@@ -490,7 +490,7 @@ export function mountClassQuestions(host: HTMLElement, layer: HTMLElement, mapVi
     for (const quadrant of COLUMN_ORDER) {
       const col = el('section', `tk-class__col tk-quadrant__tile--${quadrant}`);
       const inCol = board.questions.filter((q) => quadrantAt(placed(q)) === quadrant);
-      col.append(el('p', 'tk-quadrant__name', `${QUADRANT_LABEL[quadrant]} (${inCol.length})`));
+      col.append(el('p', 'tk-quadrant__name block-subtitle', `${QUADRANT_LABEL[quadrant]} (${inCol.length})`));
       for (const q of inCol) {
         const card = btn('', 'tk-class__card', () => select(q.id === selected ? null : q.id));
         card.classList.toggle('is-selected', q.id === selected);

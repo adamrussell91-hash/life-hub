@@ -28,12 +28,6 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--high-sea-ink);
 }
 
 .tk-eyebrow__griffin,
@@ -58,19 +52,11 @@
   border-left: 3px solid var(--marine);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: color-mix(in srgb, var(--wave) 8%, #fff);
-  font-family: var(--font-ui);
-  line-height: 1.5;
-  color: var(--ink);
 }
 
 .tk-guide__label {
   display: block;
   margin-bottom: 2px;
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--marine);
 }
 
 .tk-empty {
@@ -89,19 +75,11 @@
 
 .tk-card__title {
   margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-  color: var(--navy);
   overflow-wrap: anywhere;
 }
 
 .tk-card__definition {
   margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
-  line-height: 1.5;
-  color: var(--ink);
 }
 
 /* Skill: white card with the black and orange stripe mark from the framework header. */
@@ -126,10 +104,6 @@
 .tk-card--tool {
   background: var(--depth);
   border-color: var(--depth);
-}
-
-.tk-card--tool .tk-card__title,
-.tk-card--tool .tk-card__definition {
   color: #fff;
 }
 
@@ -137,10 +111,6 @@
 .tk-card--value {
   background: var(--high-sea);
   border-color: var(--high-sea);
-}
-
-.tk-card--value .tk-card__title,
-.tk-card--value .tk-card__definition {
   color: var(--depth);
 }
 
@@ -175,12 +145,6 @@
 .tk-question__label {
   display: block;
   margin-bottom: 2px;
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--high-sea-ink);
 }
 
 .tk-question__text {
@@ -201,30 +165,25 @@
 /* Context, frames, steps ---------------------------------------------------- */
 
 .tk-context,
-.tk-instruction,
-.tk-subhead,
-.tk-text,
-.tk-sentence {
+.tk-instruction {
   margin: 0;
   font-family: var(--font-ui);
   color: var(--ink);
   line-height: 1.5;
 }
-
-.tk-subhead {
-  font-weight: var(--weight-bold);
-  color: var(--navy);
+.tk-subhead,
+.tk-text,
+.tk-sentence {
+  margin: 0;
 }
 
-.tk-context__label,
+.tk-context__label {
+  display: inline-block;
+  margin-right: var(--space-2);
+}
 .tk-sentence__label {
   display: inline-block;
   margin-right: var(--space-2);
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .tk-sentence {
@@ -239,11 +198,6 @@
   font-size: var(--text-sm);
 }
 
-.tk-step__title {
-  font-weight: var(--weight-bold);
-  color: var(--navy);
-}
-
 .tk-step .tk-reveal {
   margin: var(--space-2) 0 0 2rem;
 }
@@ -251,9 +205,6 @@
 .tk-checks {
   margin: var(--space-1) 0 0 2rem;
   padding-left: 1.1rem;
-  font-family: var(--font-ui);
-  color: var(--ink);
-  line-height: 1.5;
 }
 
 .tk-frame {
@@ -307,8 +258,8 @@
 
 .tk-probe.is-open .tk-reveal__btn {
   color: #fff;
-  background: var(--marine);
-  border-color: var(--marine);
+  background: var(--navy);
+  border-color: var(--navy);
 }
 
 .tk-probe__question {
@@ -329,15 +280,6 @@
   display: grid;
   gap: var(--space-1);
   align-content: start;
-}
-
-.tk-links__label {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .tk-links__chips {
@@ -470,14 +412,6 @@ button.tk-chip:focus-visible {
   border-style: solid;
 }
 
-.tk-fork__slot-label {
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .tk-fork__slot-value {
   min-height: 1.4em;
   color: var(--ink);
@@ -515,7 +449,7 @@ button.tk-chip:focus-visible {
   padding: 0 6px;
   margin-right: var(--space-1);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
@@ -552,7 +486,7 @@ button.tk-chip:focus-visible {
   border-radius: var(--radius-sm);
   background: #fff;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--text-sm);
   text-align: center;
   color: var(--muted);
   overflow-wrap: anywhere;
@@ -568,19 +502,12 @@ button.tk-chip:focus-visible {
 .tk-options {
   margin: var(--space-2) 0 0;
   padding-left: 1.3rem;
-  font-family: var(--font-ui);
-  color: var(--ink);
-  line-height: 1.5;
 }
 
 /* Thinking move mini cards --------------------------------------------------- */
 
 .tk-move__sentence {
   margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-  color: var(--navy);
 }
 
 .tk-minis {
@@ -640,14 +567,6 @@ button.tk-chip:focus-visible {
   align-items: center;
   min-width: 20rem;
   font-family: var(--font-ui);
-}
-
-.tk-quadrant__axis {
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .tk-quadrant__axis--top {
@@ -710,24 +629,14 @@ button.tk-chip:focus-visible {
 .tk-quadrant__where {
   display: none;
   margin: 0 0 2px;
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .tk-quadrant__name {
   margin: 0;
-  font-weight: var(--weight-bold);
-  color: var(--navy);
 }
 
 .tk-quadrant__def {
   margin: 2px 0 0;
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  color: var(--ink);
 }
 
 .tk-respond {
@@ -737,9 +646,6 @@ button.tk-chip:focus-visible {
 
 .tk-respond__question {
   margin: 0;
-  font-family: var(--font-ui);
-  font-weight: var(--weight-bold);
-  color: var(--navy);
 }
 
 /* Features of a Concept ------------------------------------------------------ */
@@ -766,8 +672,8 @@ button.tk-chip:focus-visible {
 
 .tk-criteria__row dd {
   margin: 2px 0 0;
-  font-size: var(--text-sm);
-  line-height: 1.45;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
   color: var(--ink);
 }
 
@@ -908,12 +814,6 @@ button.tk-chip:focus-visible {
 
 .tk-intent__label {
   margin: 0;
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .tk-described {
@@ -958,9 +858,6 @@ button.tk-chip:focus-visible {
 
 .tk-reflect__q {
   margin: 0;
-  font-family: var(--font-ui);
-  color: var(--ink);
-  line-height: 1.5;
 }
 
 /* Teacher note (in-block and standalone) ------------------------------------- */
@@ -989,8 +886,6 @@ button.tk-chip:focus-visible {
 
 .tk-note__title {
   margin: 0;
-  font-weight: var(--weight-bold);
-  color: var(--navy);
 }
 
 .tk-note__pill {
@@ -1001,41 +896,15 @@ button.tk-chip:focus-visible {
   border: 1px solid color-mix(in srgb, var(--high-sea) 45%, transparent);
   background: #fff;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
   color: var(--high-sea-ink);
   white-space: nowrap;
 }
 
+/* The toggle itself is the shared .block-disclosure__toggle. */
 .tk-note__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 2rem;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-weight: var(--weight-bold);
-  color: var(--navy);
-  cursor: pointer;
-}
-
-.tk-note__toggle::before {
-  content: '▸';
-  font-size: 0.8em;
-  color: var(--high-sea-ink);
-  transition: transform 0.15s ease;
-}
-
-.tk-note__toggle[aria-expanded='true']::before {
-  transform: rotate(90deg);
-}
-
-.tk-note__toggle:focus-visible {
-  outline: 3px solid rgba(55, 111, 183, 0.35);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
+  flex: none;
 }
 
 .tk-note__body {
@@ -1059,26 +928,15 @@ button.tk-chip:focus-visible {
 
 .tk-note__label {
   margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--high-sea-ink);
 }
 
 .tk-note__text,
 .tk-note__hint {
   margin: 0;
-  line-height: 1.5;
 }
 
 .tk-note__text + .tk-note__text {
   margin-top: var(--space-1);
-}
-
-.tk-note__hint {
-  font-size: var(--text-sm);
-  color: var(--muted);
 }
 
 .tk-note__list {
@@ -1137,7 +995,7 @@ button.tk-chip:focus-visible {
   border: 1px solid color-mix(in srgb, var(--high-sea) 45%, transparent);
   background: #fff;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
   color: var(--high-sea-ink);
 }
@@ -2467,10 +2325,13 @@ button.tk-chip:focus-visible {
   }
 
   .tk-sentence--compact,
-  .tk-checks,
-  .tk-step .tk-reveal,
-  .tk-stress__pills,
-  .tk-stress__item > .tk-reveal {
+.tk-step .tk-reveal,
+.tk-stress__pills,
+.tk-stress__item > .tk-reveal {
+    margin-left: 0;
+  }
+
+.tk-checks {
     margin-left: 0;
   }
 }
@@ -2614,9 +2475,6 @@ button.tk-qdot {
   padding: 0.3rem 0.75rem;
   border-radius: var(--radius-full);
   background: var(--navy);
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: var(--weight-bold);
   white-space: nowrap;
   pointer-events: none;
 }
@@ -2742,8 +2600,6 @@ button.tk-qdot {
 
 .tk-class__question {
   margin: 0;
-  font-size: var(--text-lg, 1.125rem);
-  color: var(--ink);
 }
 
 .tk-class__facts {
@@ -2809,8 +2665,6 @@ button.tk-qdot {
 .tk-ask__note,
 .tk-ask__where {
   margin: 0;
-  font-size: var(--text-sm);
-  color: var(--muted);
 }
 
 .tk-ask__error {
@@ -2852,11 +2706,6 @@ button.tk-qdot {
 
 .tk-chosen__label {
   margin: 0 0 var(--space-1);
-  font-size: 11px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--high-sea-ink);
 }
 
 .tk-chosen__list {
@@ -2871,12 +2720,6 @@ button.tk-qdot {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.tk-chosen__text {
-  font-size: 1.15rem;
-  font-weight: var(--weight-bold);
-  color: var(--navy);
 }
 
 .tk-chosen__remove {
