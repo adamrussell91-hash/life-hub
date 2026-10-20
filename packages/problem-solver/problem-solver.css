@@ -1071,6 +1071,41 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-record__extras .ps-record__objection { font-size: 11px; }
 .ps-record__films { display: grid; gap: 14px; padding-inline-start: calc(var(--ps-record-map-width) * var(--ps-record-inset, 0)); }
 .ps-record__strip-title { margin: 0 0 6px; font-size: 12px; letter-spacing: var(--tracking-caps); text-transform: uppercase; opacity: 0.78; }
+/* Where the latest review pass begins in Improve: a ruled line across the strip with its date. */
+.ps-record__pass {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+.ps-record__pass::before,
+.ps-record__pass::after { content: ''; flex: 1 1 0; min-width: 12px; border-top: 1.5px dashed var(--ink); }
+.ps-record__pass::before { flex: 0 0 12px; }
+/* Case file versions close the Document strip as small ink-outlined chips. */
+.ps-record__version { display: flex; align-items: center; min-width: 0; }
+.ps-record__casefile {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.ps-record__casefile:hover { text-decoration: underline; text-underline-offset: 2px; }
+a.ps-record__casefile:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* The Lightning start: the quick route's card, ink on paper with the bolt in place of an emblem. */
+.ps-record__lightning { text-decoration: none; }
+.ps-record__lightning .ps-lightning-glyph { grid-row: span 2; width: 28px; height: 28px; color: var(--ink); }
+.ps-record__lightning .ps-lightning-glyph svg { display: block; width: 100%; height: 100%; }
 
 /* The chart opened from the record: colours fade in once the morph has landed. */
 .ps-chart-reveal { animation: ps-colour-in 280ms var(--ps-ease) 380ms backwards; }

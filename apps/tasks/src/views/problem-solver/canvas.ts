@@ -1,5 +1,6 @@
 // apps/tasks/src/views/problem-solver/canvas.ts
 import { el } from '@/views/hub-kit';
+import { projectPageHash, taskPageHash } from '@/domain/cards';
 import { createCausalMapView } from '../../../../../packages/problem-solver/render/causal-map';
 import { createConceptMapView } from '../../../../../packages/problem-solver/render/concept-map';
 import { createFiveWhysView } from '../../../../../packages/problem-solver/render/five-whys';
@@ -201,7 +202,7 @@ function rectOf(node: Element | null): DOMRect | null {
 export function mountCanvas(host: HTMLElement, handlers: CanvasHandlers = {}): { update(session: PsSession): void; setTaskStatuses(statuses: Record<string, string>): void; destroy(): void } {
   const views = new Map<string, View>();
   const frame = createFrameView();
-  const record = createRecordView();
+  const record = createRecordView(document, { pageHref: (target) => (target.kind === 'task' ? taskPageHash(target.id) : projectPageHash(target.id)) });
   let last: PsSession | null = null;
   let mode: 'chart' | 'record' | null = null;
   let pinned: { runId: string; via: 'step' | 'film' } | null = null;

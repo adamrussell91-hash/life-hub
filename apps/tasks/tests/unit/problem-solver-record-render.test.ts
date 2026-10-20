@@ -118,3 +118,97 @@ describe('process record', () => {
     expect(view.el.style.getPropertyValue('--ps-record-inset')).toBe((60 / 360).toFixed(4));
   });
 });
+
+describe('record filmstrip marks', () => {
+  const improveSession = (runsBefore: number | undefined, over: Partial<PsSession> = {}) =>
+    session({
+      phase: 'improve',
+      steps: {
+        ...session().steps,
+        improve: { runs: [run('i1', 'after_action_review', 'done'), run('i2', 'five_cs', 'done'), run('i3', 'double_loop', 'active')], status: 'open', objection: null }
+      },
+      reviewState: { status: 'reviewing', due: null, returnTo: 'finished', startedAt: '2026-10-20T09:00:00.000Z', runsBefore },
+      ...over
+    });
+  const ids = (view: ReturnType<typeof createRecordView>, strip: string) =>
+    [...view.el.querySelectorAll(`[data-strip="${strip}"] .ps-record__film > li`)].map((li) => li.getAttribute('data-run') ?? li.className);
+
+  it('marks where the latest review pass begins in the Improve strip', () => {
+    const view = createRecordView();
+    view.update(improveSession(2));
+    expect(ids(view, 'improve')).toEqual(['i1', 'i2', 'ps-record__pass', 'i3']);
+    const pass = view.el.querySelector('.ps-record__pass')!;
+    expect(pass.getAttribute('role')).toBe('separator');
+    const day = new Date('2026-10-20T09:00:00.000Z').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+    expect(pass.textContent).toBe(`Review on ${day}`);
+    expect(view.el.querySelectorAll('.ps-record__pass')).toHaveLength(1);
+  });
+
+  it('leaves the divider out with no earlier runs, no new runs, or no runsBefore', () => {
+    for (const before of [0, 3, undefined]) {
+      const view = createRecordView();
+      view.update(improveSession(before));
+      expect(view.el.querySelector('.ps-record__pass')).toBeNull();
+    }
+  });
+
+  const caseFile = { title: 'T', version: 2, target: { kind: 'project' as const, id: 'p1' }, writtenAt: 'w', sections: {}, history: [{ version: 1, at: 'a', target: { kind: 'task' as const, id: 't1' } }, { version: 2, at: 'b', target: { kind: 'project' as const, id: 'p1' } }] };
+  const documented = (over: Partial<PsSession> = {}) => session({ phase: 'document', caseFile, steps: { ...session().steps, document: { runs: [run('d1', 'knowledge_management', 'done')], status: 'done', objection: null } }, ...over });
+
+  it('ends the Document strip with a chip per case-file version, linked when pageHref is given', () => {
+    const view = createRecordView(document, { pageHref: (target) => `#/${target.kind}/${target.id}` });
+    view.update(documented());
+    const chips = [...view.el.querySelectorAll<HTMLAnchorElement>('[data-strip="document"] a.ps-record__casefile')];
+    expect(chips.map((a) => a.textContent)).toEqual(['Case file v1', 'Case file v2']);
+    expect(chips.map((a) => a.getAttribute('href'))).toEqual(['#/task/t1', '#/project/p1']);
+    expect(ids(view, 'document').at(0)).toBe('d1');
+  });
+
+  it('shows the chips as plain text without pageHref, and gives Document a strip for them', () => {
+    const view = createRecordView();
+    view.update(documented({ steps: session().steps }));
+    expect(view.el.querySelector('a.ps-record__casefile')).toBeNull();
+    expect([...view.el.querySelectorAll('[data-strip="document"] .ps-record__casefile')].map((el) => el.textContent)).toEqual(['Case file v1', 'Case file v2']);
+  });
+
+  it('starts the films with a Lightning strip linking to the quick route', () => {
+    const view = createRecordView();
+    view.update(session({ escalatedFrom: 'lt 1' }));
+    const first = view.el.querySelector('.ps-record__films > .ps-record__strip')!;
+    expect(first.getAttribute('data-strip')).toBe('lightning');
+    expect(first.querySelector('.ps-record__strip-title')!.textContent).toBe('Lightning');
+    const link = first.querySelector<HTMLAnchorElement>('a.ps-record__lightning')!;
+    expect(link.getAttribute('href')).toBe('#/problem-solver?id=lt%201');
+    expect(link.querySelector('.ps-lightning-glyph')).not.toBeNull();
+    expect(link.textContent).toContain('Quick route');
+    expect(link.textContent).toContain('Where this began');
+  });
+
+  it('changes nothing for a session without these', () => {
+    const plain = createRecordView();
+    plain.update(session());
+    const marked = createRecordView();
+    marked.update(session({ escalatedFrom: null, caseFile: null, reviewState: null }));
+    // The arrow markers take fresh ids per view, so compare the films and the step list.
+    expect(marked.el.querySelector('.ps-record__films')!.outerHTML).toBe(plain.el.querySelector('.ps-record__films')!.outerHTML);
+    expect(marked.el.querySelectorAll('[data-step]')).toHaveLength(plain.el.querySelectorAll('[data-step]').length);
+    expect(plain.el.querySelector('.ps-record__pass, .ps-record__casefile, .ps-record__lightning')).toBeNull();
+  });
+
+  it('repaints when a mark changes and not on a no-op update', () => {
+    const view = createRecordView();
+    view.update(improveSession(2));
+    const film = view.el.querySelector('.ps-record__films');
+    view.update(improveSession(2, { updatedAt: 'later', turns: [] }));
+    expect(view.el.querySelector('.ps-record__films')).toBe(film);
+    view.update(improveSession(1));
+    expect(view.el.querySelector('.ps-record__films')).not.toBe(film);
+    expect(ids(view, 'improve')).toEqual(['i1', 'ps-record__pass', 'i2', 'i3']);
+    const before = view.el.querySelector('.ps-record__films');
+    view.update(improveSession(1, { escalatedFrom: 'lt' }));
+    expect(view.el.querySelector('.ps-record__films')).not.toBe(before);
+    const again = view.el.querySelector('.ps-record__films');
+    view.update(improveSession(1, { escalatedFrom: 'lt', caseFile }));
+    expect(view.el.querySelector('.ps-record__films')).not.toBe(again);
+  });
+});

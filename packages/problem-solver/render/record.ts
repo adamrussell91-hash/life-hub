@@ -9,12 +9,12 @@
 // Step boxes are HTML laid over an SVG of arrows, both placed on one fixed grid
 // (W x H units) and scaled with the container, so a box is a real button and a
 // real element the morph can start from or land on.
-import type { PsSession, PsToolRun } from '../types';
+import type { PsCaseFileTarget, PsSession, PsToolRun } from '../types';
 import { MODELS } from '../models.mjs';
 import { TOOLS } from '../tools/index.mjs';
-import { toolEmblem } from '../glyphs';
+import { lightningGlyph, toolEmblem } from '../glyphs';
 import { nextId } from './details';
-import { stepName, stepPlan } from '../steps.mjs';
+import { planStepForBook, stepName, stepPlan } from '../steps.mjs';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const W = 360;
@@ -59,6 +59,25 @@ const LAYOUTS: Record<string, Layout> = {
     labels: []
   }
 };
+
+export type RecordOptions = {
+  /** The page a case file was written on; without it the version chips are plain text. */
+  pageHref?(target: PsCaseFileTarget): string;
+};
+
+/** A review's start day, as the review panel shows dates (a bare date is local midnight). */
+function reviewDay(at: string): string {
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(at) ? `${at}T00:00:00` : at);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** Where the latest review pass begins in Improve's runs, or null when there is no earlier pass to divide from. */
+function passStart(session: PsSession, step: string): number | null {
+  const review = session.reviewState;
+  const before = review?.runsBefore ?? 0;
+  if (!session.model || step !== planStepForBook(session.model.id, 'improve') || before <= 0) return null;
+  return (session.steps?.[step]?.runs.length ?? 0) > before ? before : null;
+}
 
 export type StepState = 'done' | 'skipped' | 'current' | 'future' | 'waiting';
 export type RecordView = {
@@ -106,7 +125,7 @@ function place(el: HTMLElement, box: { x: number; y: number; w: number; h: numbe
   el.style.height = pct(box.h, h);
 }
 
-export function createRecordView(doc: Document = document): RecordView {
+export function createRecordView(doc: Document = document, options: RecordOptions = {}): RecordView {
   const root = doc.createElement('div');
   root.className = 'ps-record';
   let open: (runId: string, from: HTMLElement) => void = () => undefined;
@@ -232,25 +251,78 @@ export function createRecordView(doc: Document = document): RecordView {
     return row;
   }
 
+  function strip(id: string, title: string): { section: HTMLElement; film: HTMLOListElement } {
+    const section = doc.createElement('section');
+    section.className = 'ps-record__strip';
+    section.setAttribute('data-strip', id);
+    const heading = doc.createElement('h3');
+    heading.className = 'ps-record__strip-title';
+    heading.textContent = title;
+    const film = doc.createElement('ol');
+    film.className = 'ps-record__film';
+    film.setAttribute('aria-label', `${title} tools`);
+    section.append(heading, film);
+    return { section, film };
+  }
+
+  /** A full session escalated from Lightning starts with the quick route it came from. */
+  function lightningStrip(from: string): HTMLElement {
+    const { section, film } = strip('lightning', 'Lightning');
+    film.setAttribute('aria-label', 'Lightning route');
+    const item = doc.createElement('li');
+    item.className = 'ps-record__card ps-record__card--lightning';
+    const link = doc.createElement('a');
+    link.className = 'ps-record__card-button ps-record__lightning';
+    link.href = `#/problem-solver?id=${encodeURIComponent(from)}`;
+    link.setAttribute('aria-label', 'Quick route. Where this began. Open the Lightning run');
+    link.append(lightningGlyph(doc), span('ps-record__card-name', 'Quick route'), span('ps-record__card-note', 'Where this began'));
+    item.append(link);
+    film.append(item);
+    return section;
+  }
+
+  function caseFileChips(session: PsSession): HTMLLIElement[] {
+    return (session.caseFile?.history ?? []).map((entry) => {
+      const item = doc.createElement('li');
+      item.className = 'ps-record__version';
+      const text = `Case file v${entry.version}`;
+      const href = options.pageHref?.(entry.target);
+      if (href) {
+        const link = doc.createElement('a');
+        link.className = 'ps-record__casefile';
+        link.href = href;
+        link.textContent = text;
+        item.append(link);
+      } else {
+        item.append(span('ps-record__casefile', text));
+      }
+      return item;
+    });
+  }
+
   function paintFilm(session: PsSession): HTMLElement | null {
     cards.clear();
     if (!session.model) return null;
     const modelId = session.model.id;
     const wrap = doc.createElement('div');
     wrap.className = 'ps-record__films';
+    if (session.escalatedFrom) wrap.append(lightningStrip(session.escalatedFrom));
+    const documentStep = planStepForBook(modelId, 'document');
     for (const { step } of stepPlan(modelId)) {
       const runs = session.steps?.[step]?.runs ?? [];
-      if (!runs.length) continue;
-      const strip = doc.createElement('section');
-      strip.className = 'ps-record__strip';
-      strip.setAttribute('data-strip', step);
-      const heading = doc.createElement('h3');
-      heading.className = 'ps-record__strip-title';
-      heading.textContent = stepName(modelId, step);
-      const film = doc.createElement('ol');
-      film.className = 'ps-record__film';
-      film.setAttribute('aria-label', `${heading.textContent} tools`);
-      for (const run of runs) {
+      const chips = step === documentStep ? caseFileChips(session) : [];
+      if (!runs.length && !chips.length) continue;
+      const { section, film } = strip(step, stepName(modelId, step));
+      const pass = passStart(session, step);
+      runs.forEach((run, index) => {
+        if (index === pass && session.reviewState?.startedAt) {
+          const divider = doc.createElement('li');
+          divider.className = 'ps-record__pass';
+          divider.setAttribute('role', 'separator');
+          divider.textContent = `Review on ${reviewDay(session.reviewState.startedAt)}`;
+          divider.setAttribute('aria-label', divider.textContent);
+          film.append(divider);
+        }
         runStep.set(run.id, step);
         const item = doc.createElement('li');
         item.className = `ps-record__card is-${run.status}`;
@@ -266,15 +338,15 @@ export function createRecordView(doc: Document = document): RecordView {
         item.append(btn);
         film.append(item);
         cards.set(run.id, item);
-      }
-      strip.append(heading, film);
-      wrap.append(strip);
+      });
+      film.append(...chips);
+      wrap.append(section);
     }
     return wrap.childElementCount ? wrap : null;
   }
 
   function update(session: PsSession): void {
-    const signature = JSON.stringify([session.model?.id, session.phase, Object.entries(session.steps ?? {}).map(([id, st]) => [id, st.status, st.objection, st.runs.map((run) => [run.id, run.tool, run.status, run.switchReason, run.nodes.length])])]);
+    const signature = JSON.stringify([session.model?.id, session.phase, Object.entries(session.steps ?? {}).map(([id, st]) => [id, st.status, st.objection, st.runs.map((run) => [run.id, run.tool, run.status, run.switchReason, run.nodes.length])]), session.reviewState?.runsBefore, session.reviewState?.startedAt, session.caseFile?.history.map((entry) => [entry.version, entry.target.kind, entry.target.id]), session.escalatedFrom]);
     if (signature === painted) return;
     painted = signature;
     stepEls.clear();
