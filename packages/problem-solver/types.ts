@@ -33,6 +33,13 @@ export type PsProposedTask = {
 };
 export type PsReviewProposal = { title: string; due: string; reason: string; status: 'proposed' | 'confirmed' | 'dismissed' };
 /** A confirmed task's live state, passed from the page to a chart (never stored). */
+export type PsLightningNodeId = 'start' | 'goal' | 'subtract' | 'one_step' | 'via_negativa' | 'guess_check' | 'diagram' | 'solved_1' | 'work_backwards' | 'solved_2' | 'make_list' | 'solved_3' | 'take_break' | 'solved_4' | 'analogy' | 'solved_5' | 'reframing' | 'cannot' | 'relax' | 'learn' | 'next';
+export type PsLightningEntry = { node: PsLightningNodeId; round: number; at: string; answer?: 'yes' | 'no'; note?: string };
+export type PsLightningState = { path: PsLightningEntry[]; rounds: number; finishedAt: string | null; escalatedTo: string | null };
+export type PsLightningTried = { node: PsLightningNodeId; label: string; note: string | null; outcome: 'solved' | 'not solved' | null; round: number };
+/** What an escalated full session starts from; seeds, not answers, until the coach confirms them. */
+export type PsFrameSeeds = { goal: string | null; whatIsTrue: string | null; tried: PsLightningTried[] };
+
 export type PsTaskLink = { nodeId: string; taskId: string; status: string };
 
 export type PsSession = {
