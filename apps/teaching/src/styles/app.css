@@ -5379,8 +5379,9 @@ a.home-class-tile:hover {
 .callout__body {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--ink);
 }
 
 .callout--wave {
@@ -13131,7 +13132,6 @@ button.block-annotation__margin-note.is-collapsed:hover {
 .callout--cultural-warning .callout__head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .callout--cultural-warning .callout__identity,
 .callout--cultural-warning .callout__title { color: var(--pastel-peach-ink); }
-.callout--cultural-warning .callout__body { color: var(--ink); }
 [data-callout-style="cultural_warning"] { color: var(--pastel-peach-ink); }
 .callout__motion-toggle {
   margin-inline-start: auto;
