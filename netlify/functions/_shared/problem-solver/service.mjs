@@ -106,6 +106,7 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
       if (Number(body.revision) !== value.revision) throw httpError(409, 'conflict', 'This problem changed elsewhere. Reloaded the latest.');
       const act = ACTIONS[body.action];
       if (!act) throw httpError(400, 'validation_error', `Unknown action: ${body.action}`);
+      if (value.kind === 'lightning' && value.status !== 'active' && body.action === 'say') throw httpError(409, 'action_not_allowed', 'This run is finished. Press It came back if it returned.');
       if (['queued', 'running'].includes(value.runner.status) && body.action !== 'archive') throw httpError(409, 'busy', 'The coach is still thinking.');
       if (value.runner.status === 'failed' && value.runner.mode === 'boundary' && !['retry', 'archive'].includes(body.action)) {
         throw httpError(409, 'action_not_allowed', 'The coach did not finish wrapping up that step. Try again first.');

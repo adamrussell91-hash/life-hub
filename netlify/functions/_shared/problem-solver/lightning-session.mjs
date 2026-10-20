@@ -57,6 +57,7 @@ export function lightningAnswer(session, payload, deps) {
 /** "It came back": a finished, unescalated run starts a new round from the start. */
 export function lightningAgain(session, deps) {
   if (!isLightning(session)) throw fail(409, 'action_not_allowed', 'This is not a Lightning run.');
+  if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This run is archived.');
   if (session.lightning.escalatedTo) throw fail(409, 'action_not_allowed', 'This run went to the full process.');
   if (!session.lightning.finishedAt) throw fail(409, 'action_not_allowed', 'This run is still going.');
   const state = again(session.lightning, deps.now());
@@ -66,10 +67,12 @@ export function lightningAgain(session, deps) {
 /**
  * Escalate: a full session (id `fullId`) seeded from the run, and the run marked as escalated
  * and finished. Returns both; the service writes the full session first. Refused when already
- * escalated (the service returns the existing one).
+ * escalated: only a replay with the same request id returns the run (the service handles it);
+ * a new request id on an escalated run gets 409.
  */
 export function escalateLightning(session, fullId, deps) {
   if (!isLightning(session)) throw fail(409, 'action_not_allowed', 'This is not a Lightning run.');
+  if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This run is archived.');
   if (session.lightning.escalatedTo) throw fail(409, 'action_not_allowed', 'This run already went to the full process.');
   const seeds = escalationSeeds(session.lightning);
   const snag = session.turns.find((t) => t.role === 'user')?.text ?? session.title;

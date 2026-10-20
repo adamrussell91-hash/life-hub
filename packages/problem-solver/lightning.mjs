@@ -43,13 +43,24 @@ export const LIGHTNING_QUESTIONS = Object.freeze([
   { id: 'next', label: 'What next?' }
 ]);
 
-export function questionOf(id) {
-  if (id === 'start') return 'fix';
+/**
+ * Which of the four questions a node lights. Relax reached straight from Start belongs to
+ * "fix"; reached later it belongs to "do".
+ * @param {string} id
+ * @param {string | null} [previous] the node before this one on the path
+ * @returns {'fix' | 'do' | 'learn' | 'next'}
+ */
+export function questionOf(id, previous = null) {
+  if (id === 'start' || (id === 'relax' && previous === 'start')) return 'fix';
   if (id === 'learn' || id === 'next') return id;
   return 'do';
 }
 
-/** True when the node is answered yes or no. */
+/**
+ * True when the node is answered yes or no.
+ * @param {string} id
+ * @returns {boolean}
+ */
 export const isQuestion = (id) => Boolean(LIGHTNING_NODES[id]?.yes);
 
 /** Every edge of the graph, for the chart: { from, to, label: 'yes' | 'no' | null }. */
@@ -60,11 +71,19 @@ export const LIGHTNING_EDGES = Object.freeze(LIGHTNING_NODE_IDS.flatMap((from) =
 
 const invalid = (code, message) => Object.assign(new Error(message), { code });
 
+/**
+ * @param {string} at
+ * @returns {import('./types').PsLightningState}
+ */
 export function newLightning(at) {
   return { path: [{ node: 'start', round: 1, at }], rounds: 1, finishedAt: null, escalatedTo: null };
 }
 
-/** The entry waiting for an answer, or null once the run is finished. */
+/**
+ * The entry waiting for an answer, or null once the run is finished.
+ * @param {import('./types').PsLightningState} state
+ * @returns {import('./types').PsLightningEntry | null}
+ */
 export function currentEntry(state) {
   return state.finishedAt ? null : state.path.at(-1) ?? null;
 }
@@ -76,6 +95,10 @@ export function currentEntry(state) {
  *   can say what was tried and whether it worked;
  * - Relax passes straight on to "What can I learn?"; answering "What next?" finishes the run.
  * Throws `stale_node` when `step.node` is not the current node, `invalid_answer` otherwise.
+ * @param {import('./types').PsLightningState} state
+ * @param {{ node: string, answer?: string, note?: string }} step
+ * @param {string} at
+ * @returns {import('./types').PsLightningState}
  */
 export function applyStep(state, step, at) {
   const current = currentEntry(state);
@@ -107,33 +130,49 @@ export function applyStep(state, step, at) {
   return { ...state, path };
 }
 
-/** "It came back": a finished run starts a new round from the start. */
+/**
+ * "It came back": a finished run starts a new round from the start.
+ * @param {import('./types').PsLightningState} state
+ * @param {string} at
+ * @returns {import('./types').PsLightningState}
+ */
 export function again(state, at) {
   if (!state.finishedAt) throw invalid('invalid_answer', 'This run is still going.');
   const rounds = state.rounds + 1;
   return { ...state, rounds, finishedAt: null, path: [...state.path, { node: 'start', round: rounds, at }] };
 }
 
-/** How many times the current round has defined the goal (more than 1 means a reframing loop). */
+/**
+ * How many times the current round has defined the goal (more than 1 means a reframing loop).
+ * @param {import('./types').PsLightningState} state
+ * @returns {number}
+ */
 export function passes(state) {
   return state.path.filter((entry) => entry.round === state.rounds && entry.node === 'goal').length;
 }
 
-/** Strategies tried in every round with what was tried and whether it worked, in order. The one waiting now is not tried yet. */
+/** Strategies tried in every round with what was tried and whether it worked, in order. The one waiting now is not tried yet.
+ * @param {import('./types').PsLightningState} state
+ * @returns {import('./types').PsLightningTried[]}
+ */
 export function strategiesTried(state) {
   const out = [];
-  const waiting = currentEntry(state);
   state.path.forEach((entry, i) => {
     const def = LIGHTNING_NODES[entry.node];
-    if (def.kind !== 'strategy' || entry.node === 'cannot' || entry === waiting) return;
+    if (def.kind !== 'strategy' || entry.node === 'cannot') return;
     const after = state.path[i + 1];
+    if (!after) return; // the last entry has not been tried, whether the run is open or escalated
     const outcome = after && isQuestion(after.node) && after.answer ? (after.answer === 'yes' ? 'solved' : 'not solved') : null;
     out.push({ node: entry.node, label: def.label, note: entry.note ?? null, outcome, round: entry.round });
   });
   return out;
 }
 
-/** What a full session starts from when a Lightning run is escalated (the coach confirms each). */
+/**
+ * What a full session starts from when a Lightning run is escalated (the coach confirms each).
+ * @param {import('./types').PsLightningState} state
+ * @returns {import('./types').PsFrameSeeds}
+ */
 export function escalationSeeds(state) {
   const goal = state.path.filter((entry) => entry.node === 'goal' && entry.note).at(-1)?.note ?? null;
   const tried = strategiesTried(state);

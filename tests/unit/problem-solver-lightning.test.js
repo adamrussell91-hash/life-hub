@@ -20,6 +20,9 @@ test('the graph: every link lands on a node, every question has yes and no', () 
   assert.equal(questionOf('start'), 'fix');
   assert.equal(questionOf('make_list'), 'do');
   assert.equal(questionOf('learn'), 'learn');
+  assert.equal(questionOf('relax', 'start'), 'fix', 'Relax straight from Start answers "fix"');
+  assert.equal(questionOf('relax', 'solved_2'), 'do');
+  assert.equal(questionOf('relax'), 'do');
 });
 
 test('accepting the status quo goes to Relax, then the two closing questions, then finishes', () => {
@@ -88,4 +91,10 @@ test('escalation seeds: the latest goal and what was tried, with outcomes', () =
   assert.equal(seeds.whatIsTrue, 'Tried draw a diagram (Sketched the morning): not solved.');
   assert.equal(seeds.tried.length, 1);
   assert.deepEqual(escalationSeeds(newLightning(AT)), { goal: null, whatIsTrue: null, tried: [] });
+});
+
+test('a strategy still waiting when the run is escalated has not been tried', () => {
+  const s = walk(newLightning(AT), { node: 'start', answer: 'no' }, { node: 'goal', note: 'g' }, { node: 'subtract', answer: 'no' }, { node: 'one_step', answer: 'no' });
+  assert.equal(currentEntry(s).node, 'diagram');
+  assert.deepEqual(strategiesTried({ ...s, finishedAt: AT, escalatedTo: 'full-1' }), []);
 });

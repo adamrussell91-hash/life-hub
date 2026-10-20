@@ -775,3 +775,16 @@ test('a refused name drops the coach suggestion for that turn', () => {
   assert.equal(activeRun(s).nodes.some((x) => x.slot === 'correspond'), false);
   assert.equal(s.suggestion, null);
 });
+
+test('an escalate suggestion cannot be accepted as a tool; the session is unchanged', () => {
+  const s = { ...idle(framed()), suggestion: { kind: 'escalate', reason: 'Too big for a quick pass.' } };
+  assert.ok(s.steps[s.phase], 'a step is open');
+  assert.throws(() => acceptSuggestion(s, deps), (err) => err.status === 409 && /escalate action/.test(err.message));
+  assert.equal(s.suggestion.kind, 'escalate');
+});
+
+test('set_review_task is refused on a session with no model (a Lightning run)', () => {
+  const s = createSession({ text: 'I keep missing the bus.' }, deps);
+  assert.equal(s.model, null);
+  assert.throws(() => setReviewTask(s, { taskId: 't1' }, deps), (err) => err.status === 409 && /no review/.test(err.message));
+});
