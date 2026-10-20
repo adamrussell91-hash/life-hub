@@ -64,6 +64,8 @@ import {
 } from '@/domain/directory-query';
 import { cleanIdentityDisplayName } from '@/domain/identity-display-name';
 import { buildPersonModel, type PersonModel } from '@/domain/person-model';
+import { orgMonogram, rolesFromOverview } from '@/domain/person-roles';
+import { renderRolesEditor } from '@/components/person-roles-editor';
 import { renderRelationshipArcSvg } from '@/domain/relationship-arc';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
@@ -335,32 +337,29 @@ function initialsFor(name: string): string {
   return `${parts[0]![0] ?? ''}${parts[parts.length - 1]![0] ?? ''}`.toUpperCase();
 }
 
-function orgMonogramFor(name: string): string {
-  const words = name.replace(/[^a-zA-Z0-9\s]/g, ' ').trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return 'ORG';
-  if (words.length === 1) return words[0]!.slice(0, 3).toUpperCase();
-  return words.slice(0, 3).map((w) => w[0]).join('').toUpperCase();
-}
-
 /** A directory row for someone just added, shown before the fresh scan lands. */
-export function rowForNewPerson(result: AddPersonResult, roleTitle: string | null = null): DirectoryPersonRow {
+export function rowForNewPerson(result: AddPersonResult): DirectoryPersonRow {
   const { person } = result;
-  const org = result.organisation && !result.failed.includes('Workplace')
+  const role = result.role && !result.failed.includes('Workplace') ? result.role : null;
+  const org = role
     ? {
-        ref: result.organisation.ref,
-        display_name: result.organisation.display_label,
-        monogram: orgMonogramFor(result.organisation.display_label),
+        ref: role.organisation.ref,
+        display_name: role.organisation.display_label,
+        monogram: orgMonogram(role.organisation.display_label),
         logo_key: null,
-        current: true
+        current: role.current
       }
     : null;
+  const roleTitle = role?.current ? role.title : null;
   return {
     id: person.id,
     person_type: 'colleague',
     ref: person.ref,
     display_name: person.display_name,
     initials: initialsFor(person.display_name),
-    role_line: org ? (roleTitle ? `${roleTitle} · ${org.display_name}` : `At ${org.display_name}`) : 'No relationship on record',
+    role_line: org
+      ? roleTitle ? `${roleTitle} · ${org.display_name}` : `${org.current ? 'At' : 'Formerly'} ${org.display_name}`
+      : 'No relationship on record',
     relationship_roles: [],
     job_title: roleTitle,
     organisation: org,
@@ -811,6 +810,7 @@ export async function renderPeoplePage(
     const linkedHost = pane.querySelector(
       '[data-section="linked"] .people-pane__section-body'
     ) as HTMLElement | null;
+    const rolesHost = pane.querySelector('[data-section="roles"] .people-pane__section-body') as HTMLElement | null;
     const tagHost = pane.querySelector('[data-section="tags"]') as HTMLElement | null;
     const fullHost = pane.querySelector('[data-section="full"] .people-pane__section-body') as HTMLElement | null;
 
@@ -819,6 +819,7 @@ export async function renderPeoplePage(
     if (rememberHost) setSectionState(rememberHost, 'loading');
     if (arcHost) setSectionState(arcHost, 'loading');
     if (linkedHost) setSectionState(linkedHost, 'loading');
+    if (rolesHost) setSectionState(rolesHost, 'loading');
 
     try {
       const ref = personRef(id);
@@ -1085,6 +1086,21 @@ export async function renderPeoplePage(
           }
         }
 
+        if (rolesHost && changed === 'overview') {
+          renderRolesEditor(rolesHost, {
+            personRef: ref,
+            roles: rolesFromOverview(overview),
+            crest: (orgRef, orgName) => crestNode(orgMonogram(orgName), 'sm', {
+              orgRef,
+              logoKey: directory?.organisations.find((o) => o.ref === orgRef)?.logo_key ?? null
+            }),
+            onChanged: () => {
+              void loadPersonSections(id);
+              void reloadDirectory();
+            }
+          });
+        }
+
         if (linkedHost && changed === 'overview') {
           renderLinkedEverywhere(linkedHost, overview.linked_records);
         }
@@ -1131,6 +1147,7 @@ export async function renderPeoplePage(
       if (rememberHost) setSectionState(rememberHost, 'error', msg);
       if (arcHost) setSectionState(arcHost, 'error', msg);
       if (linkedHost) setSectionState(linkedHost, 'error', msg);
+      if (rolesHost) setSectionState(rolesHost, 'error', msg);
     }
   }
 
@@ -1305,6 +1322,11 @@ export async function renderPeoplePage(
     header.setAttribute('data-section', 'header');
     header.append(el('p', 'people-pane__loading', 'Loading…'));
     pane.append(header);
+
+    const roles = sectionHost('people-pane__roles', 'Roles and education');
+    roles.root.setAttribute('data-section', 'roles');
+    setSectionState(roles.body, 'loading');
+    pane.append(roles.root);
 
     const next = sectionHost('people-pane__next-wrap', 'Next');
     next.root.setAttribute('data-section', 'next');
@@ -1941,10 +1963,10 @@ export async function renderPeoplePage(
     void paintSelection();
   }
 
-  function onPersonAdded(result: AddPersonResult, roleTitle: string | null = null): void {
+  function onPersonAdded(result: AddPersonResult): void {
     addHost.hidden = true;
     addForm?.reset();
-    const row = rowForNewPerson(result, roleTitle);
+    const row = rowForNewPerson(result);
     forgetPerson(row.id);
     directory = directory
       ? { ...directory, people: [row, ...directory.people], counts: { ...directory.counts, people: directory.counts.people + 1 } }

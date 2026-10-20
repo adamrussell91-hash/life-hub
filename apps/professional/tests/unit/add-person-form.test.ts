@@ -57,13 +57,16 @@ describe('mountAddPersonForm', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the six brief-section-5 fields plus Add person / Cancel actions', () => {
+  it('renders the brief-section-5 fields, with a first role row, plus Add person / Cancel actions', () => {
     const host = document.createElement('div');
     mountAddPersonForm(host, { onCreated: vi.fn(), onCancel: vi.fn() });
 
     expect(host.querySelector('[aria-label="Name"]')).toBeTruthy();
     expect(host.querySelector('[aria-label="Where you met"]')).toBeTruthy();
-    expect(host.querySelector('[aria-label="Organisation, when known"]')).toBeTruthy();
+    expect(host.querySelector('[aria-label="Organisation"]')).toBeTruthy();
+    expect(host.querySelector('[aria-label="Role"]')).toBeTruthy();
+    expect(host.querySelector('[aria-label="From"]')).toBeTruthy();
+    expect(host.querySelector('[aria-label="Current"]')).toBeTruthy();
     expect(host.querySelector('[aria-label="Who introduced you"]')).toBeTruthy();
     expect(host.querySelector('[aria-label="One optional observation"]')).toBeTruthy();
     expect(host.querySelector('[aria-label="Date"]')).toBeTruthy();
@@ -112,7 +115,7 @@ describe('mountAddPersonForm', () => {
     expect(init?.method).toBe('POST');
     expect(JSON.parse(String(init?.body))).toEqual({ kind: 'person', display_name: 'Jordan New' });
 
-    expect(onCreated).toHaveBeenCalledWith({ person: personRecord(), warnings: [] });
+    expect(onCreated).toHaveBeenCalledWith({ person: personRecord(), warnings: [], failed: [], role: null });
   });
 
   it('links an existing organisation, records an introduction, and logs the combined observation', async () => {
@@ -154,6 +157,10 @@ describe('mountAddPersonForm', () => {
             data: { link: { id: 'ul_1', ...body, status: 'current' }, created: true }
           });
         }
+        if (href.endsWith('/api/people/roles') && init?.method === 'POST') {
+          const body = JSON.parse(String(init.body));
+          return jsonResponse(200, { ok: true, data: { link: { id: 'ul_2', ...body, status: 'current' }, chart_synced: true } });
+        }
         if (href.endsWith('/api/observations') && init?.method === 'POST') {
           const body = JSON.parse(String(init.body));
           return jsonResponse(201, {
@@ -174,10 +181,12 @@ describe('mountAddPersonForm', () => {
         'Discussed twice exceptional learners.';
       host.querySelector<HTMLInputElement>('[aria-label="Date"]')!.value = '2026-09-15';
 
-      const orgInput = host.querySelector<HTMLInputElement>('[aria-label="Organisation, when known"]')!;
+      const orgInput = host.querySelector<HTMLInputElement>('[aria-label="Organisation"]')!;
       const orgPicker = await openPicker(host, orgInput, 'Acme');
       (orgPicker.querySelector('.entity-picker__option') as HTMLButtonElement).click();
       expect(host.textContent).toMatch(/Acme Org/);
+      host.querySelector<HTMLInputElement>('[aria-label="Role"]')!.value = 'Deputy Principal';
+      host.querySelector<HTMLInputElement>('[aria-label="From"]')!.value = '2019';
 
       const introducerInput = host.querySelector<HTMLInputElement>('[aria-label="Who introduced you"]')!;
       const introducerPicker = await openPicker(host, introducerInput, 'Nina');
@@ -192,8 +201,19 @@ describe('mountAddPersonForm', () => {
 
       const calls = vi.mocked(fetch).mock.calls;
       const postCalls = calls.filter(([, init]) => init?.method === 'POST');
-      // person + organisation link + introduction link + observation.
+      // person + first role + introduction link + observation.
       expect(postCalls.length).toBe(4);
+
+      const roleBody = JSON.parse(String(postCalls.find(([url]) => String(url).endsWith('/api/people/roles'))![1]?.body));
+      expect(roleBody).toEqual({
+        action: 'add',
+        person_ref: PERSON_REF,
+        organisation_ref: ORG_REF,
+        relationship_type: 'employee_at',
+        role: 'Deputy Principal',
+        valid_from: '2019-01-01T00:00:00.000Z',
+        valid_to: null
+      });
 
       const linkCall = postCalls.find(([url]) => String(url).endsWith('/api/universal-links'))!;
       const linkBodies = postCalls
@@ -201,12 +221,6 @@ describe('mountAddPersonForm', () => {
         .map(([, init]) => JSON.parse(String(init?.body)));
       expect(linkBodies).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({
-            source_ref: PERSON_REF,
-            target_ref: ORG_REF,
-            relationship_type: 'member_of',
-            valid_from: '2026-09-15T00:00:00.000Z'
-          }),
           expect.objectContaining({
             source_ref: INTRODUCER_REF,
             target_ref: PERSON_REF,
@@ -229,7 +243,12 @@ describe('mountAddPersonForm', () => {
         linked_ref: null
       });
 
-      expect(onCreated).toHaveBeenCalledWith({ person: personRecord(), warnings: [] });
+      expect(onCreated).toHaveBeenCalledWith({
+        person: personRecord(),
+        warnings: [],
+        failed: [],
+        role: { organisation: { ref: ORG_REF, display_label: 'Acme Org' }, title: 'Deputy Principal', current: true }
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -259,7 +278,7 @@ describe('mountAddPersonForm', () => {
       // A dedicated field (picker `mode: 'field'`): the whole value is the
       // query, so a multi-word organisation name works, and a leading `@`
       // (old habit) is ignored.
-      const orgInput = host.querySelector<HTMLInputElement>('[aria-label="Organisation, when known"]')!;
+      const orgInput = host.querySelector<HTMLInputElement>('[aria-label="Organisation"]')!;
       const picker = await openPicker(host, orgInput, 'Brand New Org');
       const createBtn = picker.querySelector<HTMLButtonElement>('.entity-picker__create')!;
       expect(createBtn.textContent).toBe('Create organisation “Brand New Org”');
@@ -286,7 +305,7 @@ describe('mountAddPersonForm', () => {
     mountAddPersonForm(host, { onCreated });
 
     host.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value = 'Jordan New';
-    const orgInput = host.querySelector<HTMLInputElement>('[aria-label="Organisation, when known"]')!;
+    const orgInput = host.querySelector<HTMLInputElement>('[aria-label="Organisation"]')!;
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const href = String(input);
@@ -305,7 +324,7 @@ describe('mountAddPersonForm', () => {
       if (href.endsWith('/api/entities') && init?.method === 'POST') {
         return jsonResponse(201, { ok: true, data: personRecord() });
       }
-      if (href.endsWith('/api/universal-links') && init?.method === 'POST') {
+      if (href.endsWith('/api/people/roles') && init?.method === 'POST') {
         return jsonResponse(500, { ok: false, error: { code: 'internal_error', message: 'Link service down.' } });
       }
       throw new Error(`Unexpected fetch: ${href}`);
@@ -326,6 +345,7 @@ describe('mountAddPersonForm', () => {
       const [result] = onCreated.mock.calls[0];
       expect(result.person).toEqual(personRecord());
       expect(result.warnings).toEqual(['Linking to Acme Org failed: Link service down.']);
+      expect(result.failed).toEqual(['Workplace']);
     } finally {
       vi.useRealTimers();
     }

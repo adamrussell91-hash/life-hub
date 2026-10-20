@@ -649,4 +649,119 @@ describe('renderPeoplePage (W2 real entry)', () => {
       expect(button(canvas, 'Archive person')).toBeUndefined();
     });
   });
+
+  describe('people profiles: roles editor', () => {
+    const ORG = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002';
+    const UNI = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000003';
+    const roleEntry = (id: string, type: string, ref: string, label: string, extra: Record<string, unknown> = {}) => ({
+      link: { id, relationship_type: type, status: 'current', temporal_mode: 'period', role: null, context_key: null, occurred_at: null,
+        valid_from: null, valid_to: null, source_ref: `shared:person:${PERSON_ID}`, target_ref: ref, metadata: {}, ...extra },
+      endpoint: { ref, kind: 'organisation', display_label: label },
+      direction: 'outgoing'
+    });
+
+    function stubRoles() {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      const roleCalls: Array<Record<string, unknown>> = [];
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/api/people/roles')) {
+          const body = JSON.parse(String(init?.body));
+          roleCalls.push(body);
+          return jsonResponse({ link: { id: 'new' }, chart_synced: true });
+        }
+        if (url.includes('/api/entities/search')) {
+          return jsonResponse({ groups: { organisation: [{ ref: UNI, kind: 'organisation', display_label: 'Marrow University', supporting_label: null, href: null }] } });
+        }
+        const response = await original(input, init);
+        if (url.includes('/api/entities/overview')) {
+          const body = await response.json();
+          body.data.current_relationships = [
+            roleEntry('r1', 'employee_at', ORG, 'Tallowwood College', { role: 'Head of English', valid_from: '2022-02-01T00:00:00.000Z' }),
+            roleEntry('r2', 'member_of', UNI, 'Marrow University', { role: 'Council member', import_source: 'notion' })
+          ];
+          body.data.historical_relationships = [
+            roleEntry('r3', 'employee_at', UNI, 'Marrow University', { status: 'ended', role: 'Tutor', valid_from: '2016-01-01T00:00:00.000Z', valid_to: '2019-01-01T00:00:00.000Z' })
+          ];
+          return jsonResponse(body.data);
+        }
+        return response;
+      });
+      return roleCalls;
+    }
+
+    const rolesBox = (canvas: HTMLElement) => canvas.querySelector<HTMLElement>('[data-section="roles"]')!;
+    const rowOf = (canvas: HTMLElement, id: string) => rolesBox(canvas).querySelector<HTMLElement>(`[data-link-id="${id}"]`)!;
+    const btn = (root: HTMLElement, text: string) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === text);
+
+    it('lists roles with ranges; imported roles have no Remove; End and Remove post to the roles endpoint', async () => {
+      const calls = stubRoles();
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      expect(rowOf(canvas, 'r1').textContent).toContain('Head of English');
+      expect(rowOf(canvas, 'r1').textContent).toContain('Tallowwood College · Feb 2022 – now');
+      expect(rowOf(canvas, 'r3').textContent).toContain('2016 – 2019');
+      expect(btn(rowOf(canvas, 'r2'), 'Remove')).toBeUndefined();
+      expect(btn(rowOf(canvas, 'r3'), 'End')).toBeUndefined();
+
+      btn(rowOf(canvas, 'r1'), 'End')!.click();
+      await vi.waitFor(() => expect(calls).toEqual([{ action: 'end', person_ref: `shared:person:${PERSON_ID}`, link_id: 'r1' }]));
+
+      await vi.waitFor(() => expect(btn(rowOf(canvas, 'r3'), 'Remove')).toBeTruthy());
+      btn(rowOf(canvas, 'r3'), 'Remove')!.click();
+      btn(rowOf(canvas, 'r3'), 'Yes')!.click();
+      await vi.waitFor(() => expect(calls.at(-1)).toEqual({ action: 'remove', person_ref: `shared:person:${PERSON_ID}`, link_id: 'r3' }));
+    });
+
+    it('Edit changes the role and dates; Add education picks an institution', async () => {
+      const calls = stubRoles();
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+
+      btn(rowOf(canvas, 'r1'), 'Edit')!.click();
+      const form = rolesBox(canvas).querySelector<HTMLElement>('.roles-editor__form')!;
+      expect(form.querySelector<HTMLInputElement>('[aria-label="From"]')!.value).toBe('2022-02');
+      form.querySelector<HTMLInputElement>('[aria-label="Role"]')!.value = 'Deputy Principal';
+      btn(form, 'Save')!.click();
+      await vi.waitFor(() => expect(calls[0]).toEqual({
+        action: 'edit', person_ref: `shared:person:${PERSON_ID}`, link_id: 'r1',
+        role: 'Deputy Principal', valid_from: '2022-02-01T00:00:00.000Z', valid_to: null
+      }));
+
+      // The person reloads after a save, which redraws the editor.
+      await vi.waitFor(() => expect(rolesBox(canvas).querySelector('.roles-editor__form')).toBeNull());
+      btn(rolesBox(canvas), '+ Add education')!.click();
+      const add = rolesBox(canvas).querySelector<HTMLElement>('.roles-editor__form')!;
+      const institution = add.querySelector<HTMLInputElement>('[aria-label="Institution"]')!;
+      institution.focus();
+      institution.value = 'Marrow';
+      institution.dispatchEvent(new Event('input', { bubbles: true }));
+      await vi.waitFor(() => expect(add.querySelector('.entity-picker__option')).toBeTruthy(), { timeout: 1500 });
+      add.querySelector<HTMLButtonElement>('.entity-picker__option')!.click();
+      add.querySelector<HTMLInputElement>('[aria-label="Qualification"]')!.value = 'BA (Hons)';
+      add.querySelector<HTMLInputElement>('[aria-label="From"]')!.value = '2010';
+      add.querySelector<HTMLInputElement>('[aria-label="To"]')!.value = '2013';
+      btn(add, 'Add education')!.click();
+      await vi.waitFor(() => expect(calls.at(-1)).toEqual({
+        action: 'add', person_ref: `shared:person:${PERSON_ID}`, organisation_ref: UNI, relationship_type: 'studied_at',
+        role: 'BA (Hons)', valid_from: '2010-01-01T00:00:00.000Z', valid_to: '2013-01-01T00:00:00.000Z'
+      }));
+    });
+
+    it('a bad date shows an error and saves nothing', async () => {
+      const calls = stubRoles();
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      btn(rowOf(canvas, 'r1'), 'Edit')!.click();
+      const form = rolesBox(canvas).querySelector<HTMLElement>('.roles-editor__form')!;
+      form.querySelector<HTMLInputElement>('[aria-label="From"]')!.value = 'last spring';
+      btn(form, 'Save')!.click();
+      expect(rolesBox(canvas).querySelector('.roles-editor__status')?.textContent).toBe('Dates look like 2016 or 2016-03.');
+      expect(calls).toEqual([]);
+    });
+  });
 });
