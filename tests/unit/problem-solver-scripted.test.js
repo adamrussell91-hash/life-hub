@@ -53,7 +53,8 @@ test('finished sessions get a closing line', async () => {
   let s = await intoDefine();
   for (const _ of [1, 2, 3, 4, 5, 6, 7]) s = await step(moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps));
   assert.equal(s.phase, 'finished');
-  assert.match(s.turns.at(-1).text, /learn/);
+  // The last step was left untouched, so there is nothing to have learned from it.
+  assert.match(s.turns.at(-1).text, /on the record now/);
 });
 
 test('in Analyse the scripted coach opens with a causal map, places causes and adds a link', async () => {
@@ -255,4 +256,143 @@ test('an Implement tool opens by carrying the chosen option forward', async () =
   session.turns = [{ role: 'coach', text: 'Start it.' }];
   const turn = await scriptedCoach(session);
   assert.match(turn.message, /^We are carrying forward: Let staff swap shifts in a shared app\./);
+});
+
+// Improve: the wait, the review opening, the three tools' hints.
+
+/** A seven-step session moved on to Implement, with a kanban run there and a live review. */
+async function intoImplementDone() {
+  let s = await intoDefine();
+  for (const _ of [1, 2, 3, 4]) s = await step(moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps));
+  assert.equal(s.phase, 'implement');
+  const kanban = { ...build('kanban', [['card:1', 'Draft the Wednesday rota', 'done']]), status: 'active' };
+  s = { ...s, steps: { ...s.steps, implement: { ...s.steps.implement, runs: [kanban] } } };
+  s = { ...s, runner: { status: 'idle', mode: 'turn', error: null }, reviewProposal: { title: 'Review: Late rota', due: '2026-11-02', reason: 'r', status: 'proposed' } };
+  return s;
+}
+
+test('leaving Implement with a review in place: the learning turn says when Improve picks up, with no suggestion', async () => {
+  let s = await step(moveOn(await intoImplementDone(), deps));
+  assert.equal(s.phase, 'improve');
+  assert.equal(s.reviewState.status, 'waiting');
+  assert.match(s.turns.at(-1).text, /learn/);
+  s = await step(say(s, 'I hurry the last step when the end is in sight.', deps));
+  assert.equal(s.learnings.at(-1).text, 'I hurry the last step when the end is in sight.');
+  assert.equal(s.suggestion, null);
+  const said = new Date('2026-11-02T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  assert.match(said, /2 Nov/);
+  assert.ok(s.turns.at(-1).text.includes(`Improve picks up at your review on ${said}.`), s.turns.at(-1).text);
+});
+
+const improveSession = (run, text, extra = {}) => ({ ...inStep('improve', run, text), reviewState: { status: 'reviewing', due: '2026-11-02', returnTo: null, startedAt: 'x' }, ...extra });
+
+test('a reviewing Improve with no tool open suggests the after action review', async () => {
+  const s = { ...improveSession(null, 'Let\'s review how it went.'), steps: { improve: { runs: [], status: 'open', objection: null } } };
+  const turn = await scriptedCoach(s);
+  assert.deepEqual([turn.suggestion?.kind, turn.suggestion?.tool], ['next_tool', 'after_action_review']);
+});
+
+test('the after action review opens on how it went, with the task counts when there is a snapshot', async () => {
+  const s = improveSession(build('after_action_review', []), '');
+  s.turns = [{ role: 'coach', text: 'Start it.' }];
+  let turn = await scriptedCoach(s);
+  assert.match(turn.message, /^Let's look at how it went\./);
+  assert.doesNotMatch(turn.message, /tasks are done/);
+  s.taskSnapshot = { at: 'x', byStatus: { open: 1, in_progress: 1, deferred: 0, done: 2, dead: 0, unknown: 0 }, overdue: [] };
+  turn = await scriptedCoach(s);
+  assert.match(turn.message, /^Let's look at how it went\. 2 of 4 tasks are done\./);
+});
+
+test('after action review answers place in order; a short learned is challenged, a longer one accepted', async () => {
+  let run = build('after_action_review', []);
+  const answers = ['Publish the rota a week ahead every single time', 'It went out on time in three weeks of four', 'The manager was away and nobody else could sign it off'];
+  for (const [i, text] of answers.entries()) {
+    const turn = await scriptedCoach(improveSession(run, text));
+    assert.equal(turn.verdict, 'accept');
+    assert.equal(turn.node.slot, ['intended', 'achieved', 'differences'][i]);
+    run = placeNode(run, { id: turn.node.slot, ...turn.node, state: 'accepted' });
+  }
+  let turn = await scriptedCoach(improveSession(run, 'Name a deputy who can sign off'));
+  assert.equal(turn.verdict, 'challenge');
+  assert.equal(turn.node.slot, 'learned');
+  assert.match(turn.message, /more/i);
+  turn = await scriptedCoach(improveSession(run, 'A single point of sign off is fragile, so name a deputy and write the steps down for them'));
+  assert.equal(turn.verdict, 'accept');
+  assert.equal(turn.node.slot, 'learned');
+});
+
+test('double loop: recurs is tagged yes or no from the answer', async () => {
+  const run = build('double_loop', [['problem', 'p'], ['single', 's']]);
+  for (const [text, tag] of [
+    ['yes, it came back again in week four', 'yes'],
+    ['It came back the following month after we fixed it', 'yes'],
+    ['The late rota did recur over the summer', 'yes'],
+    ['The rota stayed on time every week since then', 'no']
+  ]) {
+    const turn = await scriptedCoach(improveSession(run, text));
+    assert.equal(turn.node.slot, 'recurs');
+    assert.equal(turn.node.tag, tag, text);
+  }
+});
+
+test('reopen: define in a double loop with a governing node suggests reopening Define', async () => {
+  const run = build('double_loop', [['problem', 'p'], ['single', 's'], ['recurs', 'r', 'yes'], ['governing:1', 'g']]);
+  const s = improveSession(run, 'reopen: define');
+  s.steps.define = { runs: [], status: 'done', objection: null };
+  const turn = await scriptedCoach(s);
+  assert.equal(turn.verdict, 'clarify');
+  assert.equal(turn.node, null);
+  assert.equal(turn.suggestion.kind, 'reopen_step');
+  assert.equal(turn.suggestion.step, 'define');
+  assert.equal(typeof turn.suggestion.reason, 'string');
+  assert.ok(turn.suggestion.reason.length > 10);
+  // Without a governing node there is nothing to reopen for.
+  const early = improveSession(build('double_loop', [['problem', 'p']]), 'reopen: define');
+  early.steps.define = { runs: [], status: 'done', objection: null };
+  const refused = await scriptedCoach(early);
+  assert.equal(refused.suggestion, null);
+  assert.equal(refused.node, null);
+});
+
+test('next: <tool> suggests that tool when it belongs to the step', async () => {
+  const run = build('after_action_review', [['intended', 'i'], ['achieved', 'a'], ['differences', 'd'], ['learned', 'l']]);
+  let turn = await scriptedCoach(improveSession(run, 'next: double_loop'));
+  assert.deepEqual([turn.verdict, turn.suggestion?.kind, turn.suggestion?.tool], ['clarify', 'next_tool', 'double_loop']);
+  assert.equal(turn.node, null);
+  turn = await scriptedCoach(improveSession(run, 'next: kanban'));
+  assert.equal(turn.suggestion, null);
+});
+
+test('feedback matrix: themes are tagged from their wording; why and how link to the latest theme', async () => {
+  const items = [['suggestion:1', 's'], ['compliment:1', 'c'], ['change:1', 'ch']];
+  let run = build('feedback_matrix', items);
+  for (const [text, tag] of [
+    ['theme: Keep publishing the rota on Wednesday mornings', 'do_more'],
+    ['theme: Do more of the early swaps through the app', 'do_more'],
+    ['theme: Who signs off when the manager is away?', 'question'],
+    ['theme: It is unclear who owns the holiday calendar', 'question'],
+    ['theme: Stop texting swaps outside the shared app', 'change']
+  ]) {
+    const turn = await scriptedCoach(improveSession(run, text));
+    assert.equal(turn.node.slot, 'theme:1');
+    assert.equal(turn.node.tag, tag, text);
+  }
+  run = build('feedback_matrix', [...items, ['theme:1', 't1', 'change'], ['theme:2', 't2', 'do_more']]);
+  for (const name of ['why', 'how']) {
+    const turn = await scriptedCoach(improveSession(run, `${name}: Swaps by text never reach the rota at all`));
+    assert.equal(turn.node.slot, `${name}:1`);
+    assert.deepEqual(turn.edges, [{ from: `${name}:1`, to: 'theme:2', kind: 'of' }]);
+    assert.equal(checkNode(run, turn.node, turn.edges), null);
+  }
+});
+
+test('a boundary turn leaving a step with nothing done asks no learning question', async () => {
+  let s = await step(moveOn(await intoImplementDone(), deps));
+  s = await step(say(s, 'I hurry the last step when the end is in sight.', deps));
+  assert.equal(s.steps.improve.status, 'open');
+  s = await step(moveOn(s, deps));
+  assert.equal(s.phase, 'document');
+  assert.equal(s.steps.improve.status, 'waiting');
+  assert.equal(s.pendingLearning, null);
+  assert.doesNotMatch(s.turns.at(-1).text, /learn/);
 });

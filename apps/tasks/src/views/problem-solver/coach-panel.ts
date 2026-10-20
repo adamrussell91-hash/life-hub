@@ -2,7 +2,7 @@
 import { el } from '@/views/hub-kit';
 import { skillChip, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
-import { nextStepAfter, stepName } from '../../../../../packages/problem-solver/steps.mjs';
+import { nextPhase, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import type { PsAction, PsSession } from '../../../../../packages/problem-solver/types';
 import { coachAvatar, thinkingDots } from './decor';
 
@@ -45,15 +45,25 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
   const suggestion = session.suggestion;
   if (!suggestion) return null;
   const card = el('div', 'ps-suggestion confirm-card');
-  const nextName = session.model ? nextStepAfter(session.model.id, session.phase) : null;
-  const title = suggestion.kind === 'next_step'
-    ? (nextName ? `Next step: ${stepName(session.model!.id, nextName)}` : 'Ready to finish')
-    : `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
+  const model = session.model?.id;
+  let title: string;
+  let accept = 'Start it';
+  if (suggestion.kind === 'next_step') {
+    const nextName = model ? nextPhase(session) : null;
+    title = nextName ? `Next step: ${stepName(model!, nextName)}` : 'Ready to finish';
+    accept = 'Move on';
+  } else if (suggestion.kind === 'reopen_step') {
+    const target = model ? planStepForBook(model, suggestion.step) : null;
+    title = `Reopen: ${model && target ? stepName(model, target) : suggestion.step}`;
+    accept = 'Reopen it';
+  } else {
+    title = `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
+  }
   const heading = el('p', 'ps-suggestion__title', title);
-  if (suggestion.kind !== 'next_step') heading.prepend(toolEmblem(suggestion.tool));
+  if (suggestion.kind === 'next_tool' || suggestion.kind === 'switch_tool') heading.prepend(toolEmblem(suggestion.tool));
   card.append(heading, el('p', 'ps-suggestion__reason', suggestion.reason));
   const row = el('div', 'ps-suggestion__actions');
-  row.append(actionButton(suggestion.kind === 'next_step' ? 'Move on' : 'Start it', 'accept_suggestion', handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
+  row.append(actionButton(accept, 'accept_suggestion', handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
   card.append(row);
   return card;
 }
@@ -147,7 +157,7 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
       if (session.pendingKeep && !locked) actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
       const inStep = Boolean(session.model && session.steps?.[session.phase]);
       if (inStep && !locked) {
-        const after = nextStepAfter(session.model!.id, session.phase);
+        const after = nextPhase(session);
         actions.append(actionButton(after ? `Move on to ${stepName(session.model!.id, after)}` : 'Finish', 'move_on', handlers));
       }
       if (actions.childElementCount) parts.push(actions);

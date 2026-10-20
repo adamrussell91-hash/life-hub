@@ -1,7 +1,11 @@
 // netlify/functions/_shared/problem-solver/session.mjs
 import { addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
-import { defaultToolFor, firstStep, nextStepAfter, planStep, stepName } from '../../../../packages/problem-solver/steps.mjs';
+import { defaultToolFor, firstStep, nextPhase, planStep, planStepForBook, stepName } from '../../../../packages/problem-solver/steps.mjs';
+import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
+import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
+
+export { waitingForReview };
 
 const TITLE_MAX = 120;
 const TEXT_MAX = 12000;
@@ -53,6 +57,20 @@ const addDays = (iso, days) => new Date(Date.parse(iso) + days * DAY_MS).toISOSt
 const afterToday = (due, deps) => typeof due === 'string' && due > deps.now().slice(0, 10);
 const inBook = (session, stepId, book) => Boolean(session.model && planStep(session.model.id, stepId)?.book.includes(book));
 
+/** A clean snapshot, or null when none was sent. Unknown statuses are dropped; removed tasks are never counted. */
+function cleanSnapshot(raw, deps) {
+  if (raw == null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw fail(400, 'validation_error', 'A task snapshot must be an object.');
+  const count = (value) => (Number.isInteger(value) && value >= 0 ? Math.min(value, 500) : 0);
+  return {
+    at: deps.now(),
+    byStatus: Object.fromEntries(SNAPSHOT_STATUSES.map((key) => [key, count(raw.byStatus?.[key])])),
+    overdue: cleanOverdue(raw.overdue)
+  };
+}
+
+const sameSnapshot = (a, b) => Boolean(a && b) && JSON.stringify([a.byStatus, a.overdue]) === JSON.stringify([b.byStatus, b.overdue]);
+
 /** Add the coach's proposals for placed nodes the tool lets become tasks, once per node. */
 function addProposals(session, items, deps) {
   const run = activeRun(session);
@@ -99,6 +117,9 @@ export function createSession({ title = '', text, links = [] }, deps) {
     proposedTasks: [],
     reviewProposal: null,
     reviewTaskId: null,
+    reviewState: null,
+    taskSnapshot: null,
+    detour: null,
     requestIds: [],
     runner: { status: 'queued', mode: 'turn', error: null },
     createdAt: at,
@@ -164,7 +185,7 @@ function placeAccepted(next, turn, coachTurnId, deps) {
 
 /** The tool suggestion a new step opens with when the coach forgets to give one. */
 function openingSuggestion(session) {
-  if (session.dismissedOpening === session.phase) return null;
+  if (session.dismissedOpening === session.phase || waitingForReview(session)) return null;
   if (!session.model || !currentStep(session) || activeRun(session)) return null;
   const tool = defaultToolFor(session.model.id, session.phase);
   return tool ? { kind: 'next_tool', tool, reason: `A good first tool for ${stepName(session.model.id, session.phase)}.` } : null;
@@ -172,7 +193,7 @@ function openingSuggestion(session) {
 
 /** A step left without any tool run: there is nothing to have learned from it. */
 export function skippedUntouched(step) {
-  return Boolean(step) && step.status === 'skipped' && step.runs.length === 0;
+  return Boolean(step) && (step.status === 'skipped' || step.status === 'waiting') && step.runs.length === 0;
 }
 
 /** Apply a validated coach turn. Throws `illegal_slot` so the coach can be asked to repair. */
@@ -190,7 +211,8 @@ export function applyCoachTurn(session, turn, deps) {
 
   if (mode === 'boundary') {
     const leaving = session.runner.leaving;
-    if (leaving && next.steps[leaving]) next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
+    // A step that is only waiting for its review is not objected to.
+    if (leaving && next.steps[leaving] && next.steps[leaving].status !== 'waiting') next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
     next = { ...next, pendingLearning: leaving && !skippedUntouched(next.steps[leaving]) ? leaving : null };
   } else if (next.phase === 'frame') {
     if (turn.verdict === 'accept' && turn.frame) next = { ...next, frame: { ...next.frame, ...turn.frame } };
@@ -220,7 +242,7 @@ export function applyCoachTurn(session, turn, deps) {
 
   // A boundary turn asks the learning question first, so it carries no suggestion.
   // Afterwards a finished tool, or a step with no tool open, always leaves a next step.
-  const quiet = next.phase === 'finished' || mode === 'boundary';
+  const quiet = next.phase === 'finished' || mode === 'boundary' || waitingForReview(next);
   const suggestion = quiet ? null : (turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
   return touch({ ...next, turns: [...next.turns, coachTurn], suggestion, summary: turn.summary ?? next.summary }, deps);
 }
@@ -245,26 +267,96 @@ export function keepAnyway(session, deps) {
  * finishes) and a boundary coach turn is queued for the recap, any objection and the
  * "what did you learn about how you solve problems" question.
  */
-export function moveOn(session, deps) {
+export function moveOn(session, deps, options = {}) {
   if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
   const step = currentStep(session);
   if (!session.model || !step) throw fail(409, 'action_not_allowed', 'Nothing to move on from yet.');
   const leaving = session.phase;
   const runs = step.runs.map((run) => (run.status === 'active' ? { ...run, status: 'done' } : run));
-  const status = runs.some((run) => run.status !== 'switched' && isRunComplete(run)) ? 'done' : 'skipped';
-  const nextId = nextStepAfter(session.model.id, leaving);
+  const kept = runs.some((run) => run.status !== 'switched' && isRunComplete(run));
+  const status = kept ? 'done' : waitingForReview(session) ? 'waiting' : 'skipped';
+  const nextId = nextPhase(session);
   let next = withStep({ ...session, suggestion: null, pendingKeep: null }, leaving, { runs, status });
   if (inBook(session, leaving, 'implement') && status === 'done' && !session.reviewTaskId && !session.reviewProposal) {
     next = { ...next, reviewProposal: { title: reviewTitle(session), due: addDays(deps.now(), REVIEW_AFTER_DAYS), reason: 'A first look at how the plan is going.', status: 'proposed' } };
   }
+  // Back from a reopened step: the detour is over.
+  if (session.detour?.to === leaving) next = { ...next, detour: null };
+  // Leaving the review: done. Leaving Implement for Improve with a review in place: wait for it.
+  if (session.reviewState?.status === 'reviewing' && inBook(session, leaving, 'improve')) {
+    next = { ...next, reviewState: { ...session.reviewState, status: 'done' } };
+  } else if (nextId && inBook(session, leaving, 'implement') && inBook(session, nextId, 'improve') && reviewLive(next)) {
+    const due = next.reviewProposal?.due ?? null;
+    next = { ...next, reviewState: options.review ? { status: 'reviewing', due, returnTo: null, startedAt: deps.now() } : { status: 'waiting', due, returnTo: null, startedAt: null } };
+  }
   next = { ...next, turns: [...next.turns, userTurn(nextId ? 'Move on.' : 'That is everything.', deps)] };
-  next = nextId ? withStep({ ...next, phase: nextId }, nextId, {}) : { ...next, phase: 'finished', status: 'finished' };
+  next = nextId ? withStep({ ...next, phase: nextId }, nextId, { status: 'open' }) : { ...next, phase: 'finished', status: 'finished' };
   return queue(touch(next, deps), 'boundary', leaving);
+}
+
+/**
+ * Start Improve's review on real results. From the step before Improve it leaves that step
+ * straight into the review. In Improve it starts now. Past Improve (a later step, or
+ * finished) it reopens Improve for a new pass and returns afterwards. Idempotent once reviewing.
+ */
+export function startReview(session, payload, deps) {
+  if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
+  const improve = session.model ? planStepForBook(session.model.id, 'improve') : null;
+  if (!improve) throw fail(409, 'action_not_allowed', 'This problem has no Improve step.');
+  if (session.reviewState?.status === 'reviewing' && session.phase === improve) return session;
+  if (session.reviewState?.status === 'done') throw fail(409, 'action_not_allowed', 'This review is already done.');
+  if (!reviewLive(session)) throw fail(409, 'action_not_allowed', 'There is no review to start.');
+  if (session.detour) throw fail(409, 'action_not_allowed', 'Finish the reopened step first.');
+  const snap = cleanSnapshot(payload?.snapshot, deps);
+  const kind = reviewStart(session);
+  if (!kind) throw fail(409, 'action_not_allowed', 'The review opens once Implement is done.');
+  let next = snap ? { ...session, taskSnapshot: snap } : session;
+  if (kind === 'move') return moveOn(next, deps, { review: true });
+  // A late review deliberately leaves the interrupted step's active run alone so it resumes on return
+  // (unlike reopenStep, which closes Improve's run because the detour starts fresh work elsewhere).
+  const due = session.reviewProposal?.due ?? null;
+  const returnTo = kind === 'reopen' ? session.phase : null;
+  next = { ...next, status: 'active', phase: improve, suggestion: null, pendingKeep: null, reviewState: { status: 'reviewing', due, returnTo, startedAt: deps.now() } };
+  next = withStep(next, improve, { status: 'open' });
+  const text = returnTo ? 'Time to review how it went.' : 'Let\'s review how it went.';
+  return queue(touch({ ...next, turns: [...next.turns, userTurn(text, deps)] }, deps));
+}
+
+/** The page's latest snapshot of the problem's tasks. No coach call; an unchanged snapshot is a no-op. */
+export function taskStatus(session, payload, deps) {
+  if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
+  if (!session.model) throw fail(409, 'action_not_allowed', 'There are no tasks yet.');
+  if (payload?.snapshot == null) throw fail(400, 'validation_error', 'A task snapshot is required.');
+  const snap = cleanSnapshot(payload.snapshot, deps);
+  return sameSnapshot(snap, session.taskSnapshot) ? session : touch({ ...session, taskSnapshot: snap }, deps);
+}
+
+/** Why `book` cannot be reopened now, or null when it can. Read by the coach parser and the accept. */
+export function reopenProblem(session, book) {
+  if (!session.model || !inBook(session, session.phase, 'improve')) return 'Reopen only from Improve.';
+  if (session.detour) return 'A step is already reopened.';
+  if (waitingForReview(session)) return 'Improve is waiting for the review; do not reopen now.';
+  const target = planStepForBook(session.model.id, book);
+  if (!target || !session.steps[target]) return `There is no ${book} step in this problem to reopen.`;
+  const named = currentStep(session).runs.some((run) => run.tool === 'double_loop' && run.status !== 'switched' && run.nodes.some((node) => parseSlot(node.slot)?.name === 'governing'));
+  return named ? null : 'Reopen only after double-loop learning has named a governing assumption.';
+}
+
+function reopenStep(session, suggestion, deps) {
+  const problem = reopenProblem(session, suggestion.step);
+  if (problem) throw fail(409, 'action_not_allowed', problem);
+  const from = session.phase;
+  const target = planStepForBook(session.model.id, suggestion.step);
+  const runs = currentStep(session).runs.map((run) => (run.status === 'active' ? { ...run, status: 'done' } : run));
+  let next = withStep({ ...session, suggestion: null, pendingKeep: null }, from, { runs });
+  next = withStep({ ...next, phase: target, detour: { from, to: target, reason: suggestion.reason, at: deps.now() } }, target, { status: 'open' });
+  return queue(touch({ ...next, turns: [...next.turns, userTurn(`Reopen ${stepName(session.model.id, target)}.`, deps)] }, deps));
 }
 
 export function acceptSuggestion(session, deps) {
   const suggestion = session.suggestion;
   if (!suggestion) throw fail(409, 'action_not_allowed', 'No suggestion to accept.');
+  if (suggestion.kind === 'reopen_step') return reopenStep({ ...session, suggestion: null }, suggestion, deps);
   if (suggestion.kind === 'next_step' || suggestion.kind === 'finish_define') return moveOn({ ...session, suggestion: null }, deps);
   if (!currentStep(session)) throw fail(409, 'action_not_allowed', 'There is no step open for that tool.');
   const current = activeRun(session);
@@ -348,12 +440,25 @@ export function setReviewTask(session, payload, deps) {
   if (session.reviewTaskId === taskId) return session;
   const due = isDate(payload?.due) ? payload.due : session.reviewProposal?.due ?? addDays(deps.now(), REVIEW_AFTER_DAYS);
   const proposal = session.reviewProposal ?? { title: reviewTitle(session), reason: '', due };
-  return touch({ ...session, reviewTaskId: taskId, reviewProposal: { ...proposal, due, status: 'confirmed' } }, deps);
+  const waiting = session.reviewState?.status === 'waiting' ? { reviewState: { ...session.reviewState, due } } : {};
+  return touch({ ...session, ...waiting, reviewTaskId: taskId, reviewProposal: { ...proposal, due, status: 'confirmed' } }, deps);
 }
 
 export function dismissReview(session, deps) {
   if (!session.reviewProposal || session.reviewProposal.status !== 'proposed') throw fail(409, 'action_not_allowed', 'There is no review to set aside.');
-  return touch({ ...session, reviewProposal: { ...session.reviewProposal, status: 'dismissed' } }, deps);
+  let next = { ...session, reviewProposal: { ...session.reviewProposal, status: 'dismissed' } };
+  if (session.reviewState?.status === 'waiting') {
+    next = { ...next, reviewState: null };
+    if (currentStep(next) && inBook(next, next.phase, 'improve')) {
+      if (!activeRun(next) && !next.pendingLearning) next = { ...next, suggestion: openingSuggestion(next) };
+    } else if (session.model) {
+      // Left Improve while it waited: the waiting status resolves now.
+      const improve = planStepForBook(session.model.id, 'improve');
+      const step = improve && next.steps[improve];
+      if (step?.status === 'waiting') next = withStep(next, improve, { status: step.runs.some((run) => run.status !== 'switched' && isRunComplete(run)) ? 'done' : 'skipped' });
+    }
+  }
+  return touch(next, deps);
 }
 
 export function rename(session, title, deps) {
@@ -389,6 +494,7 @@ export function summaryRow(session) {
     links: session.links,
     taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
     reviewTaskId: session.reviewTaskId ?? null,
+    reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   };

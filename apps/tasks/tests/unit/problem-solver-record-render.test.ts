@@ -33,6 +33,30 @@ describe('process record', () => {
     expect([state(view, 'define'), state(view, 'analyse'), state(view, 'devise'), state(view, 'improve')]).toEqual(['done', 'skipped', 'current', 'future']);
   });
 
+  it('marks a waiting step, and the paused step of a detour or a late review, as waiting', () => {
+    const waiting = session({ phase: 'improve', steps: { ...session().steps, improve: { runs: [], status: 'waiting', objection: null } } });
+    expect(stepState(waiting, 'improve')).toBe('current');
+    expect(stepState(session({ steps: { ...session().steps, decide: { runs: [], status: 'waiting', objection: null } } }), 'decide')).toBe('waiting');
+    const detour = session({ phase: 'define', detour: { from: 'improve', to: 'define', reason: 'Wrong problem', at: 'a' }, steps: { ...session().steps, improve: { runs: [], status: 'open', objection: null } } });
+    expect(stepState(detour, 'improve')).toBe('waiting');
+    expect(stepState(detour, 'define')).toBe('current');
+    expect(stepState(detour, 'analyse')).toBe('skipped');
+    const review = session({ phase: 'improve', reviewState: { status: 'reviewing', due: null, returnTo: 'devise', startedAt: 'a' } });
+    expect(stepState(review, 'devise')).toBe('waiting');
+    expect(stepState(session({ phase: 'improve', reviewState: { status: 'reviewing', due: null, returnTo: 'finished', startedAt: 'a' } }), 'devise')).toBe('future');
+  });
+
+  it('keeps the stored state of steps after the current one during a detour', () => {
+    const steps = { ...session().steps, decide: { runs: [], status: 'done' as const, objection: null }, implement: { runs: [], status: 'skipped' as const, objection: null } };
+    const detour = session({ phase: 'define', detour: { from: 'improve', to: 'define', reason: 'r', at: 'a' }, steps });
+    expect(stepState(detour, 'decide')).toBe('done');
+    expect(stepState(detour, 'implement')).toBe('skipped');
+    const view = createRecordView();
+    view.update(session({ phase: 'define', detour: { from: 'devise', to: 'define', reason: 'r', at: 'a' }, steps }));
+    expect(state(view, 'devise')).toBe('waiting');
+    expect(view.el.querySelector('[data-step="devise"] button')!.getAttribute('aria-label')).toContain('Waiting');
+  });
+
   it('finished sessions show every visited step as done or skipped', () => {
     const s = session({ phase: 'finished', status: 'finished' });
     expect(stepState(s, 'devise')).toBe('done');

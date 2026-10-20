@@ -4,7 +4,7 @@ import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { canPropose, isComplete, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
 import { chosenOption, planStep, stepName, stepPlan, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
-import { activeRun, currentStep, followOn, skippedUntouched } from './session.mjs';
+import { activeRun, currentStep, followOn, skippedUntouched, waitingForReview } from './session.mjs';
 import { PROCESS } from './knowledge/process.mjs';
 import { CHAPTERS } from './knowledge/chapters.mjs';
 import { FINAL_WORDS } from './knowledge/final-words.mjs';
@@ -46,6 +46,7 @@ SESSION SHAPE
 5. Carry forward: use what earlier steps established (listed under EARLIER STEPS) as the starting point for the current tool, and say so. Do not copy it in without the person agreeing.
 6. The person can move on at any time. Never block them.
 7. Tasks: in Implement, when a card, a do-first item or a chosen 15% action is specific enough to start (a clear action, ideally an owner and a date), offer it as a real task in "proposeTasks" with its slot and a short task title. Only slots listed under "Can become tasks" qualify. The person confirms each one on a card; never say a task exists until TASKS shows it confirmed. Before Implement ends, propose a dated review in "proposeReview", timed for when the first results should show (a date after TODAY).
+8. Improve: when the state says IMPROVE IS WAITING, the results are not in yet. After the learning answer, say Improve picks up at the review on its date, that they can press Review now if results are already in, or move on. Do not open tools or place nodes. In a review, look at what actually happened, open with the after action review, and use TASK STATUS as evidence. When double-loop learning finds a governing assumption was wrong at the root, you may suggest "reopen_step" with step define or analyse and a one-sentence reason. Moving on from the reopened step returns to Improve.
 
 GATEKEEPING
 In phase frame, use "frame" for accepted answers instead of "node"; "node" is only used inside a tool.
@@ -71,8 +72,8 @@ SWITCHING AND CHECK-INS
 
 OUTPUT
 Reply with one JSON object and nothing else:
-{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"...","tag":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|next_step","tool":"...","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null,"learning":"..."|null,"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}],"proposeReview":{"due":"YYYY-MM-DD","reason":"..."}|null}
-Include "proposeTasks" and "proposeReview" only in Implement. Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.`;
+{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"...","tag":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|next_step|reopen_step","tool":"...","step":"define|analyse","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null,"learning":"..."|null,"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}],"proposeReview":{"due":"YYYY-MM-DD","reason":"..."}|null}
+Include "proposeTasks" and "proposeReview" only in Implement. Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "step" only with reopen_step, and "tool" only with next_tool or switch_tool. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.`;
 
 const RECENT_TURNS = 12;
 const SUMMARY_EVERY = 6;
@@ -84,7 +85,8 @@ function toolKnowledge(id) {
 
 const CARRY = {
   decide: 'CARRY FORWARD: seed options from Devise (preferred lotus ideas, solution-tree branches, Duncker solutions, the integrated reduction) and confirm each with the person before placing it.',
-  implement: 'CARRY FORWARD: the CHOSEN OPTION from Decide is the aim of Implement. Open by confirming it in one sentence, then seed it into DMAIC\'s Define, the 15% Reflect or the first Kanban cards. If none is recorded, ask what was decided before placing anything. SMART measures from Define seed DMAIC\'s Measure. Confirm before placing.'
+  implement: 'CARRY FORWARD: the CHOSEN OPTION from Decide is the aim of Implement. Open by confirming it in one sentence, then seed it into DMAIC\'s Define, the 15% Reflect or the first Kanban cards. If none is recorded, ask what was decided before placing anything. SMART measures from Define seed DMAIC\'s Measure. Confirm before placing.',
+  improve: 'CARRY FORWARD: in the after action review, seed "set out to achieve" from the SMART goal in Define, DMAIC\'s Measure and the CHOSEN OPTION, and seed "achieved" from TASK STATUS. In double-loop learning, the problem is the gap the review found. Confirm before placing.'
 };
 
 /** Step layer: stable for the whole of a step, so it caches between turns. */
@@ -139,6 +141,7 @@ function runLines(session, run) {
     `Open slots: ${nextSlots(run).join(', ') || (isComplete(run) ? 'none (tool complete)' : 'none open, but the tool is not complete: see Waiting on or add links')}`,
     ...(def.scoreLine?.(run) ? [`Scores: ${def.scoreLine(run)}`] : []),
     ...(def.awaiting?.(run) ? [`Waiting on: ${def.awaiting(run)}`] : []),
+    ...(def.promptNote?.(run) ? [`Note: ${def.promptNote(run)}`] : []),
     ...(def.taskSlots ? [`Can become tasks: ${proposable(session, run).join(', ') || 'none yet'}`] : []),
     progressLine(session)
   ].join('\n');
@@ -169,6 +172,26 @@ function taskLines(session) {
   return `TASKS FROM THIS PROBLEM:\n${lines.join('\n') || '  none'}\nREVIEW TASK: ${review}`;
 }
 
+const STATUS_WORDS = { open: 'not started', in_progress: 'in progress', deferred: 'deferred', done: 'done', dead: 'dropped', unknown: 'could not be checked' };
+
+function reviewLines(session) {
+  const lines = [];
+  const state = session.reviewState;
+  const name = (step) => (step === 'finished' ? 'finished' : stepName(session.model.id, step));
+  if (state?.status === 'waiting') lines.push(`IMPROVE IS WAITING for results. The review is ${session.reviewTaskId ? 'a task' : 'proposed'} for ${state.due ?? 'a date not yet set'}. Do not suggest a tool or place nodes.`);
+  if (state?.status === 'reviewing') lines.push(`REVIEW IN PROGRESS since ${String(state.startedAt).slice(0, 10)}${state.returnTo ? `; afterwards the session returns to ${name(state.returnTo)}` : ''}. Look at what actually happened, not the plan.`);
+  const snap = session.taskSnapshot;
+  if (snap) {
+    const counts = Object.entries(STATUS_WORDS).filter(([key]) => snap.byStatus[key] > 0).map(([key, words]) => `${snap.byStatus[key]} ${words}`);
+    const total = Object.values(snap.byStatus).reduce((sum, value) => sum + value, 0);
+    const overdue = snap.overdue.length ? `; overdue: ${snap.overdue.map((title) => `"${title}"`).join(', ')}` : '';
+    lines.push(`TASK STATUS (as of ${snap.at.slice(0, 10)}): ${total} ${total === 1 ? 'task' : 'tasks'}${counts.length ? `: ${counts.join(', ')}` : ''}${overdue}`);
+  }
+  const detour = session.detour;
+  if (detour && detour.to === session.phase) lines.push(`REOPENED: ${name(detour.to)} was reopened from ${name(detour.from)} because: ${detour.reason} Use a fresh tool run here; earlier runs stay. When it has what it needs, suggest next_step: moving on returns to ${name(detour.from)}.`);
+  return lines;
+}
+
 function progressLine(session) {
   const next = followOn(session);
   if (!next) return 'Progress: not yet at the minimum for this tool; keep working its steps.';
@@ -196,7 +219,11 @@ export function buildCoachPrompt(session) {
     const left = session.model && session.runner.leaving ? stepName(session.model.id, session.runner.leaving) : 'the last step';
     const leftStep = session.steps?.[session.runner.leaving];
     const status = leftStep?.status;
-    if (skippedUntouched(leftStep)) {
+    if (status === 'waiting' && skippedUntouched(leftStep)) {
+      const ahead = session.phase === 'finished' ? 'what they want to take forward from this problem' : `what they want from ${session.model ? stepName(session.model.id, session.phase) : 'the next step'}`;
+      const date = session.reviewState?.due ? ` on ${session.reviewState.due}` : '';
+      parts.push(`MODE: boundary. The person has moved on while ${left} is waiting for its review. In one message: acknowledge in one line that ${left} picks up at the review${date}; do not object, leave exitObjection empty, and do not ask a learning question; then ask one question about ${ahead}. No tool suggestion yet.`);
+    } else if (skippedUntouched(leftStep)) {
       const ahead = session.phase === 'finished' ? 'what they want to take forward from this problem' : `what they want from ${session.model ? stepName(session.model.id, session.phase) : 'the next step'}`;
       parts.push(`MODE: boundary. The person has skipped ${left} without using any tool. In one message: acknowledge the skip in one line, without a recap; if skipping it matters, say so once, kindly, and put a one-sentence reason in exitObjection; then ask one question about ${ahead}. Do not ask a learning question. No tool suggestion yet.`);
     } else parts.push(`MODE: boundary. The person has just left ${left} (${status ?? 'unknown'}). In one message: a one-sentence recap of what ${left} established; if it was left unfinished in a way that matters, say so once, kindly, and put a one-sentence reason in exitObjection; then ask one question about what they learned about how they solve problems in that step. No tool suggestion yet.`);
@@ -213,10 +240,13 @@ export function buildCoachPrompt(session) {
   // Inside a Decide step the run lines already show the `choice` slot, so it is not repeated.
   if (chosen && !books.includes('decide')) parts.push(`CHOSEN OPTION (the aim for Implement): ${chosen.text}${chosen.contested ? ' (kept against the coach\'s objection)' : ''}`);
   else if (!chosen && books.includes('implement')) parts.push('CHOSEN OPTION: none recorded. Ask what was decided and confirm it as the aim before placing anything.');
+  if (session.model) parts.push(...reviewLines(session));
   if (session.pendingLearning && session.runner?.mode !== 'boundary') {
     const from = stepName(session.model.id, session.pendingLearning);
     const hasTools = session.model && session.phase !== 'finished' && toolsForPlanStep(session.model.id, session.phase).length > 0;
-    const after = session.phase === 'finished' ? '' : ` Either way, orient them to the current step in one sentence${hasTools ? ' and suggest its first tool with next_tool' : ''}.`;
+    const after = session.phase === 'finished' ? '' : waitingForReview(session)
+      ? ' Then say Improve picks up at the review, and do not suggest a tool.'
+      : ` Either way, orient them to the current step in one sentence${hasTools ? ' and suggest its first tool with next_tool' : ''}.`;
     parts.push(`AWAITING LEARNING from ${from}: if they named something they learned, put it in "learning" (one sentence, their meaning); otherwise leave learning null.${after}`);
   }
   const step = currentStep(session);

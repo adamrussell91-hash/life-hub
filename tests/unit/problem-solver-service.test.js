@@ -207,3 +207,16 @@ test('linked lists sessions that link, created or review a task, and rejects bad
   assert.deepEqual(await svc.linked('op', 'task:other'), []);
   await assert.rejects(svc.linked('op', 'goal:x'), (err) => err.status === 400);
 });
+
+
+test('start_review and task_status are known actions; task_status while busy is 409', async () => {
+  const svc = service();
+  let s = await svc.run('op', (await svc.create('op', { text: 'Late rota.' })).id);
+  const snapshot = { byStatus: { open: 1 }, overdue: [] };
+  // Known actions are refused on the session's state (409), not as unknown (400).
+  await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action: 'start_review' }), (err) => err.status === 409 && err.code === 'action_not_allowed');
+  await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action: 'task_status', payload: { snapshot } }), (err) => err.status === 409 && err.code === 'action_not_allowed');
+  s = await svc.action('op', { id: s.id, revision: s.revision, action: 'say', text: 'It changed three of four weeks' });
+  assert.equal(s.runner.status, 'queued');
+  await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action: 'task_status', payload: { snapshot } }), (err) => err.status === 409 && err.code === 'busy');
+});

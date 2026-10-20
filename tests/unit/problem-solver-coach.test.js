@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { anthropicModel, createModelCoach, fitWords, wordCount } from '../../netlify/functions/_shared/problem-solver/coach.mjs';
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/scripted-coach.mjs';
-import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
+import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say, dismissReview } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 let n = 0;
 const deps = { now: () => '2026-10-16T10:00:00.000Z', newId: () => `id${(n += 1)}` };
@@ -251,4 +251,60 @@ test('boundary turns carry no task or review proposals', async () => {
   const turn = await coach(boundary);
   assert.deepEqual(turn.proposeTasks, []);
   assert.equal(turn.proposeReview, null);
+});
+
+
+const idleRunner = (s) => ({ ...s, runner: { status: 'idle', mode: 'turn', error: null } });
+const turnOf = (fields) => ({ verdict: 'accept', message: 'ok', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, ...fields });
+
+/** Leaving a finished Implement opens Improve waiting for the review. */
+function waitingImprove() {
+  let s = idleRunner(createSession({ title: 'Late rota', text: 'The rota keeps changing late.' }, deps));
+  s = applyCoachTurn(s, turnOf({ frame: { goal: 'Rota fixed a week ahead', whatIsTrue: 'Changed 3 of 4 weeks', whatCanBeDone: 'Change publish day' }, model: { id: 'seven_step', reason: 'Default.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }), deps);
+  s = idleRunner(acceptSuggestion(s, deps));
+  while (s.phase !== 'implement') s = idleRunner(moveOn(s, deps));
+  s = idleRunner(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'fifteen_percent', reason: 'r' } }, deps));
+  for (const [slot, text] of [['reflect', 'We control which day the rota goes out'], ['action:1', 'Move publish day to Wednesday'], ['action:2', 'Ask for swaps by Tuesday']]) {
+    s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot, text } }), deps));
+  }
+  s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot: 'chosen:1', text: 'Move publish day now' }, edges: [{ from: 'chosen:1', to: 'action:1', kind: 'picks' }] }), deps));
+  return idleRunner(moveOn(s, deps));
+}
+
+test('a reopen the session would refuse is dropped without a repair call', async () => {
+  const s = idleRunner(dismissReview(waitingImprove(), deps));
+  assert.equal(s.phase, 'improve');
+  assert.equal(s.reviewState, null);
+  let calls = 0;
+  const coach = createModelCoach(async () => { calls += 1; return reply({ suggestion: { kind: 'reopen_step', step: 'define', reason: 'The goal was off.' } }); });
+  const turn = await coach(s);
+  assert.equal(turn.suggestion, null);
+  assert.equal(calls, 1);
+});
+
+test('while Improve waits, a tool suggestion is dropped without a repair call', async () => {
+  const s = waitingImprove();
+  assert.equal(s.reviewState.status, 'waiting');
+  let calls = 0;
+  const coach = createModelCoach(async () => { calls += 1; return reply({ suggestion: { kind: 'next_tool', tool: 'after_action_review', reason: 'Review it.' } }); });
+  const turn = await coach(s);
+  assert.equal(turn.suggestion, null);
+  assert.equal(calls, 1);
+});
+
+test('a reopen in the same reply that places the first governing node survives', async () => {
+  let s = idleRunner(dismissReview(waitingImprove(), deps));
+  s = idleRunner(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'double_loop', reason: 'r' } }, deps));
+  s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot: 'problem', text: 'The rota changes at the last minute' } }), deps));
+  s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot: 'single', text: 'We moved the publish day' } }), deps));
+  s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot: 'recurs', text: 'Yes, it came back in week four', tag: 'yes' } }), deps));
+  assert.equal(s.steps.improve.runs.at(-1).nodes.length, 3);
+  const suggestion = { kind: 'reopen_step', step: 'define', reason: 'The goal was set by the rule.' };
+  const coach = createModelCoach(async () => reply({ verdict: 'accept', node: { slot: 'governing:1', text: 'Only the manager may approve a rota change' }, suggestion }));
+  const turn = await coach(s);
+  assert.equal(turn.node?.slot, 'governing:1');
+  assert.deepEqual(turn.suggestion, suggestion);
+  // A challenged governing node is not placed, so the reopen still waits for it.
+  const challenged = await createModelCoach(async () => reply({ verdict: 'challenge', node: { slot: 'governing:1', text: 'Only the manager may approve a rota change' }, suggestion }))(s);
+  assert.equal(challenged.suggestion, null);
 });

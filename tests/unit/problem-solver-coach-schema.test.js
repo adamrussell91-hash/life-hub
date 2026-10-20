@@ -72,3 +72,11 @@ test('proposeReview needs a real date', () => {
   assert.deepEqual(validateCoachTurn({ verdict: 'clarify', message: 'ok', proposeReview: { due: '2026-11-02', reason: 'First results by then.' } }).value.proposeReview, { due: '2026-11-02', reason: 'First results by then.' });
   assert.equal(validateCoachTurn({ verdict: 'clarify', message: 'ok', proposeReview: { due: '2026-02-31' } }).value.proposeReview, null);
 });
+
+test('reopen_step suggestion: define or analyse only', () => {
+  const ok = validateCoachTurn({ verdict: 'clarify', message: 'x', suggestion: { kind: 'reopen_step', step: 'define', reason: 'r' } });
+  assert.deepEqual(ok.value.suggestion, { kind: 'reopen_step', step: 'define', reason: 'r' });
+  const bad = validateCoachTurn({ verdict: 'clarify', message: 'x', suggestion: { kind: 'reopen_step', step: 'devise', reason: 'r' } });
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /reopen_step needs step define or analyse/);
+});

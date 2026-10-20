@@ -1,17 +1,40 @@
 // apps/tasks/src/views/problem-solver/task-bridge.ts
 // The only place Problem Solver writes to Tasks. The server never does: the page creates
 // the task through tasksApi, then tells the session its id (confirm_task / set_review_task).
-import type { PsProposedTask, PsSession } from '../../../../../packages/problem-solver/types';
+import type { PsProposedTask, PsSession, PsTaskSnapshot } from '../../../../../packages/problem-solver/types';
+import { cleanOverdue, SNAPSHOT_STATUSES } from '../../../../../packages/problem-solver/review.mjs';
 
 export type TaskEdits = { title: string; due: string | null };
 type Deps = {
   createTask(body: Record<string, unknown>): Promise<{ id: string }>;
-  getTask(id: string): Promise<{ id: string; status: string }>;
+  getTask(id: string): Promise<{ id: string; status: string; due_date?: string | null; title?: string }>;
   domainFor(session: PsSession): Promise<string>;
   confirm(proposalId: string, taskId: string): Promise<void>;
   dismiss(proposalId: string, reason?: 'removed'): Promise<void>;
   setReview(taskId: string, due: string): Promise<void>;
 };
+
+export type TaskDetail = { status: string; due_date?: string | null; title?: string } | 'removed' | 'unknown';
+type SnapshotStatus = keyof PsTaskSnapshot['byStatus'];
+
+/**
+ * Counts by live status and overdue titles for the coach, cleaned as the server cleans them.
+ * Deleted tasks are never counted (Plan 5, Decision 8).
+ */
+export function taskSnapshot(proposals: PsProposedTask[], details: Record<string, TaskDetail>, today: string): { byStatus: Record<SnapshotStatus, number>; overdue: string[] } {
+  const byStatus = Object.fromEntries(SNAPSHOT_STATUSES.map((key) => [key, 0])) as Record<SnapshotStatus, number>;
+  const overdue: string[] = [];
+  for (const p of proposals) {
+    if (p.status !== 'confirmed' || !p.taskId) continue;
+    const detail = details[p.taskId];
+    if (!detail || detail === 'removed') continue;
+    if (detail === 'unknown') { byStatus.unknown += 1; continue; }
+    const key = SNAPSHOT_STATUSES.includes(detail.status) ? (detail.status as SnapshotStatus) : 'unknown';
+    byStatus[key] += 1;
+    if (detail.due_date && detail.due_date < today && !['done', 'dead'].includes(detail.status)) overdue.push(detail.title || p.title);
+  }
+  return { byStatus, overdue: cleanOverdue(overdue) };
+}
 
 const projectOf = (session: PsSession) => session.links.find((link) => link.kind === 'project')?.id ?? null;
 
@@ -117,16 +140,16 @@ export function createTaskBridge(deps: Deps) {
       reviewCreated = null;
     },
     /**
-     * Live status per confirmed task id: its status, 'removed' (404) or 'unknown'. Returns as
-     * soon as the map is built; removed proposals are dismissed afterwards, in the background.
+     * Live task per confirmed task id: the task, 'removed' (404) or 'unknown'. Returns as soon as
+     * the map is built; removed proposals are dismissed afterwards, in the background.
      */
-    async statuses(proposals: PsProposedTask[]): Promise<Record<string, string>> {
+    async details(proposals: PsProposedTask[]): Promise<Record<string, TaskDetail>> {
       const confirmed = proposals.filter((p) => p.status === 'confirmed' && p.taskId);
-      const out: Record<string, string> = {};
+      const out: Record<string, TaskDetail> = {};
       const removed: string[] = [];
       await Promise.all(confirmed.map(async (p) => {
         try {
-          out[p.taskId!] = (await deps.getTask(p.taskId!)).status;
+          out[p.taskId!] = await deps.getTask(p.taskId!);
         } catch (err) {
           const status = (err as { status?: number }).status;
           out[p.taskId!] = status === 404 ? 'removed' : 'unknown';

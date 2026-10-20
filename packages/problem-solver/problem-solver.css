@@ -1045,6 +1045,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-record__card-note { font-size: 12px; opacity: 0.75; overflow-wrap: anywhere; }
 .ps-record__card.is-done .ps-record__card-button { background: var(--ink); color: var(--paper); }
 .ps-record__card.is-switched .ps-record__card-button { border-style: dashed; opacity: 0.5; }
+/* Waiting or paused: dashed ink outline on paper, at full strength (not a ghost). */
+.ps-record__step.is-waiting .ps-record__box { background: var(--paper); color: var(--ink); border: 1.5px dashed var(--ink); opacity: 1; }
 .ps-record__step.is-skipped .ps-record__box { border-style: dashed; opacity: 0.45; }
 .ps-record__step.is-skipped .ps-record__name { text-decoration: line-through; text-decoration-thickness: 1px; }
 .ps-record__objection {
@@ -5992,4 +5994,680 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-eisen__side { display: none; }
   .ps-eisen__quadrant { min-height: 0; padding: 14px 12px; }
   .ps-eisen__axes { display: block; }
+}
+
+/* Review panel: Improve waits for the review. A paper card above the chart with a dashed
+   blue top edge (the review is still to come), the date line, and Review now. */
+.ps-review {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-top: 3px dashed var(--ps-blue);
+  border-radius: 12px;
+  background: var(--ps-paper);
+  color: var(--ps-ink);
+}
+.ps-review[hidden] { display: none; }
+.ps-review__line {
+  margin: 0;
+  font: var(--weight-medium) var(--text-base) / 1.45 var(--font-ui);
+  overflow-wrap: anywhere;
+}
+.ps-review__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.ps-review__go { min-height: 44px; }
+.ps-review__note {
+  flex: 1 1 14rem;
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  font: var(--weight-regular) var(--text-sm) / 1.45 var(--font-ui);
+}
+
+/* After action review (toolkit p.143, Improve): four equal horizontal bars stacked with even
+   gaps, each with a shape at its left and its heading beside it. Yellow with a red square, yellow
+   with a blue triangle, red with a yellow triangle, blue with a yellow equals sign. The bars show
+   from the start as faint outlines (paper with a thin ink rule): the four questions are the tool.
+   An answer fills its bar from the left, its shape pops in, and the answer sits under the heading,
+   clamped to three lines. Under the bars, a thin ink gauge shows the share of words spent on
+   learning against a tick at half. Phone: smaller shapes, the heading on one line. */
+.ps-aar {
+  /* Named, so every phone query measures this root box. */
+  container: aar / inline-size;
+  --ps-aar-mark-size: 48px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+}
+/* The book's gap between bars is about a quarter of a bar's height. */
+.ps-aar__stack { display: flex; flex-direction: column; gap: 22px; }
+.ps-aar__item { position: relative; }
+.ps-aar__item:has(:focus-visible),
+.ps-aar__item:has([aria-expanded='true']) { z-index: 2; }
+
+.ps-aar__bar {
+  position: relative;
+  min-height: 96px;
+  background: var(--ps-paper);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-ink) 35%, transparent);
+  color: var(--ps-ink);
+}
+.ps-aar__fill { position: absolute; inset: 0; opacity: 0; }
+.ps-aar__bar[data-tone='yellow'] .ps-aar__fill { background: var(--ps-yellow); }
+.ps-aar__bar[data-tone='red'] .ps-aar__fill { background: var(--ps-red); }
+.ps-aar__bar[data-tone='blue'] .ps-aar__fill { background: var(--ps-blue); }
+.ps-aar__bar.is-filled .ps-aar__fill { opacity: 1; }
+.ps-aar__bar.is-filled[data-tone='yellow'] { color: var(--ps-on-yellow); }
+.ps-aar__bar.is-filled:is([data-tone='red'], [data-tone='blue']) { color: #fff; }
+
+.ps-aar__button {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: var(--ps-aar-mark-size) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  column-gap: 20px;
+  row-gap: 4px;
+  width: 100%;
+  min-height: 96px;
+  padding: 14px 24px 14px 18px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-aar__button:disabled { cursor: default; }
+/* Hover darkens under white text and lightens under ink, so contrast only rises. */
+.ps-aar__bar.is-filled:is([data-tone='red'], [data-tone='blue']) .ps-aar__button:hover { background: rgb(0 0 0 / 0.08); }
+.ps-aar__bar.is-filled[data-tone='yellow'] .ps-aar__button:hover { background: rgb(255 255 255 / 0.16); }
+.ps-aar__button:focus-visible,
+.ps-aar__button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+/* The shapes: flat fills, decorative (the heading says it in words). */
+.ps-aar__mark {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  justify-self: center;
+  width: var(--ps-aar-mark-size);
+  height: var(--ps-aar-mark-size);
+  background: var(--ps-aar-mark);
+}
+.ps-aar__mark[data-mark='red'] { --ps-aar-mark: var(--ps-red); }
+.ps-aar__mark[data-mark='blue'] { --ps-aar-mark: var(--ps-blue); }
+.ps-aar__mark[data-mark='yellow'] { --ps-aar-mark: var(--ps-yellow); }
+.ps-aar__mark--triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.ps-aar__mark--equals {
+  height: calc(var(--ps-aar-mark-size) * 0.6);
+  background: linear-gradient(to bottom, var(--ps-aar-mark) 0 36%, transparent 36% 64%, var(--ps-aar-mark) 64% 100%);
+}
+.ps-aar__bar:not(.is-filled) .ps-aar__mark { opacity: 0.35; }
+
+.ps-aar__head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; grid-column: 2; grid-row: 1; min-width: 0; }
+.ps-aar__bar:not(.is-filled) .ps-aar__head { grid-row: 1 / -1; }
+.ps-aar__title { min-width: 0; font: var(--weight-bold) 17px / 1.25 var(--font-ui); overflow-wrap: anywhere; }
+.ps-aar__head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-aar__answer {
+  display: -webkit-box;
+  grid-column: 2;
+  grid-row: 2;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-regular) 14px / 1.4 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.ps-aar__bar:not(.is-filled) .ps-aar__answer { display: none; }
+
+.ps-aar__item > .ps-details { width: 100%; }
+
+/* Time on learning: a meta label over a thin ink rule, a thicker ink fill and a tick at half. */
+.ps-aar__share { display: grid; gap: 8px; margin-top: 22px; color: var(--ps-ink); }
+.ps-aar__meta { font: var(--weight-semibold) 11px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-aar__share-track { position: relative; display: block; height: 14px; }
+.ps-aar__share-track::before {
+  content: '';
+  position: absolute;
+  inset: 6.5px 0 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--ps-ink) 35%, transparent);
+}
+.ps-aar__share-fill {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--ps-ink);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.ps-aar__share-tick { position: absolute; top: 0; left: 50%; width: 2px; height: 14px; margin-left: -1px; background: var(--ps-ink); }
+
+/* Phone: bars full width, smaller shapes, the heading on one line and the answer below. */
+@container aar (max-width: 480px) {
+  .ps-aar__item { --ps-aar-mark-size: 28px; }
+  .ps-aar__stack { gap: 14px; }
+  .ps-aar__bar,
+  .ps-aar__button { min-height: 72px; }
+  .ps-aar__button { column-gap: 12px; padding: 12px 14px 12px 12px; }
+  .ps-aar__title { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+  .ps-aar__answer { font-size: 13px; }
+  .ps-aar__share { margin-top: 16px; }
+}
+
+/* Double-loop learning (toolkit p.135, Improve): a square stage with a tall blue outer loop
+   running clockwise and a flatter blue inner loop across its middle; they meet at Action strategy
+   (left) and Problem (right). Yellow Consequences at the top, yellow Governing variables at the
+   bottom, red Problem with a "Start here" pointer, and blue Solution outside the loops at the top
+   right, reached by a curved Match arrow. Loops and arrows show as faint tracks and light as the
+   run goes; boxes stay pale until they hold an entry. A small ink marker sits on the latest box.
+   Phone: boxes show a code and their heading, and a key under the stage carries the entries. */
+.ps-dloop {
+  /* Named, so every phone query measures this root box. */
+  container: dloop / inline-size;
+  --ps-dloop-line: 5px;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+  color: var(--ps-ink);
+}
+.ps-dloop__stage { position: relative; width: 100%; aspect-ratio: 1 / 1; }
+.ps-dloop__loops { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+
+/* The loops: a faint track, and a lit line over it that a mask draws in along the path. */
+.ps-dloop__faint,
+.ps-dloop__line {
+  fill: none;
+  stroke: var(--ps-blue);
+  stroke-width: var(--ps-dloop-line);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.ps-dloop__faint { opacity: 0.2; }
+.ps-dloop__track:not(.is-on) .ps-dloop__line { visibility: hidden; }
+.ps-dloop__arrowhead { fill: var(--ps-blue); opacity: 0.25; }
+.ps-dloop__track.is-on .ps-dloop__arrowhead { opacity: 1; }
+/* The book's Match and Mismatch run a little lighter than the loops. */
+.ps-dloop__track--match :is(.ps-dloop__faint, .ps-dloop__line),
+.ps-dloop__track--mismatch :is(.ps-dloop__faint, .ps-dloop__line) { stroke-width: calc(var(--ps-dloop-line) * 0.8); }
+.ps-dloop__pointer { fill: none; stroke: var(--ps-ink); stroke-width: 1.2px; vector-effect: non-scaling-stroke; }
+.ps-dloop__pointer-head { fill: var(--ps-ink); }
+
+/* Labels: small ink words on the paper, placed where the book puts them. */
+.ps-dloop__labels { position: absolute; inset: 0; pointer-events: none; }
+.ps-dloop__label { position: absolute; }
+.ps-dloop__meta { font: var(--weight-semibold) 10px / 1.25 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-dloop__label--match { transform: translateX(-50%); }
+.ps-dloop__label--match,
+.ps-dloop__label--mismatch { font: var(--weight-regular) 13px / 1.2 var(--font-ui); letter-spacing: 0; text-transform: none; }
+.ps-dloop__label--start { font: italic var(--weight-regular) 13px / 1.2 var(--font-ui); letter-spacing: 0; text-transform: none; transform: translateX(-100%); white-space: nowrap; }
+.ps-dloop__label--single { width: 17%; text-align: center; transform: translate(-50%, -50%); }
+.ps-dloop__label--double { width: 17%; }
+.ps-dloop__label-sub { display: block; margin-top: 3px; font: var(--weight-regular) 12px / 1.3 var(--font-ui); letter-spacing: 0; text-transform: none; }
+
+/* Boxes: placed by their centre in percent of the stage; height follows the words. */
+.ps-dloop__boxes { position: absolute; inset: 0; }
+.ps-dloop__item { position: absolute; transform: translate(-50%, -50%); }
+.ps-dloop__item:has(:focus-visible),
+.ps-dloop__item.is-open { z-index: 2; }
+.ps-dloop__shape {
+  --ps-dloop-tone: var(--ps-yellow);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ps-dloop-tone) 14%, var(--ps-paper));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-dloop-tone) 55%, transparent);
+  color: var(--ps-ink);
+}
+.ps-dloop__shape[data-tone='red'] { --ps-dloop-tone: var(--ps-red); }
+.ps-dloop__shape[data-tone='blue'] { --ps-dloop-tone: var(--ps-blue); }
+.ps-dloop__shape.is-filled { background: var(--ps-dloop-tone); box-shadow: none; }
+.ps-dloop__shape.is-filled[data-tone='yellow'] { color: var(--ps-on-yellow); }
+.ps-dloop__shape.is-filled:is([data-tone='red'], [data-tone='blue']) { color: #fff; }
+
+.ps-dloop__button {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 10px 11px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-dloop__button:disabled { cursor: default; }
+/* Hover darkens under white text and lightens under ink, so contrast only rises. */
+.ps-dloop__shape.is-filled:is([data-tone='red'], [data-tone='blue']) .ps-dloop__button:hover { background: rgb(0 0 0 / 0.08); }
+.ps-dloop__shape.is-filled[data-tone='yellow'] .ps-dloop__button:hover { background: rgb(255 255 255 / 0.16); }
+.ps-dloop__button:focus-visible,
+.ps-dloop__button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+.ps-dloop__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 6px; max-width: 100%; }
+.ps-dloop__head .ps-dloop__meta { overflow-wrap: anywhere; }
+.ps-dloop__head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-dloop__code { display: none; font: var(--weight-bold) 13px / 1.1 var(--font-ui); }
+.ps-dloop__count { font: var(--weight-bold) 10px / 1.25 var(--font-ui); }
+.ps-dloop__count:empty { display: none; }
+.ps-dloop__title {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  font: var(--weight-semibold) 15px / 1.25 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-dloop__title:empty,
+.ps-dloop__tag:empty { display: none; }
+.ps-dloop__tag { font: italic var(--weight-semibold) 11px / 1.25 var(--font-ui); }
+
+/* The marker: an ink dot with a paper ring, on the top edge of the latest box. */
+.ps-dloop__marker {
+  position: absolute;
+  top: 0;
+  left: 82%;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--ps-ink);
+  box-shadow: 0 0 0 2px var(--ps-paper);
+  pointer-events: none;
+}
+
+/* Details cards, under the stage; each entry in a box has its own card, headed by what it is. */
+.ps-dloop__panel { margin-top: 12px; }
+.ps-dloop .ps-details { width: min(100%, 560px); }
+.ps-dloop .ps-details__card + .ps-details__card { margin-top: 6px; }
+.ps-dloop__card-head { margin: 0 0 4px; color: var(--ink); font: var(--weight-semibold) var(--text-sm) / 1.35 var(--font-ui); }
+
+/* The key: only on a phone. */
+.ps-dloop__key { display: none; }
+
+/* Phone: boxes carry a code and their heading; the key under the stage carries each latest entry
+   and is the touch target. Thinner loops. */
+@container dloop (max-width: 480px) {
+  .ps-dloop { --ps-dloop-line: 3.5px; }
+  .ps-dloop__button { min-height: 0; padding: 6px 4px 7px; gap: 1px; }
+  .ps-dloop__code { display: block; }
+  .ps-dloop__head { flex-direction: column; gap: 1px; }
+  .ps-dloop__head .ps-dloop__meta { letter-spacing: 0.02em; text-transform: none; font-size: 11px; }
+  .ps-dloop__head .ps-objection,
+  .ps-dloop__count,
+  .ps-dloop__title,
+  .ps-dloop__tag { display: none; }
+  .ps-dloop__label--match,
+  .ps-dloop__label--mismatch,
+  .ps-dloop__label--start { font-size: 11px; }
+  .ps-dloop__label--single,
+  .ps-dloop__label--double { width: 25%; letter-spacing: 0.02em; }
+  .ps-dloop__label-sub { display: none; }
+
+  .ps-dloop__key { display: grid; gap: 6px; margin-top: 14px; }
+  .ps-dloop__key-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 10px 6px 6px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--ps-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ps-dloop__key-item:disabled { cursor: default; }
+  .ps-dloop__key-item.is-open { box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+  .ps-dloop__key-code {
+    --ps-dloop-tone: var(--ps-yellow);
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ps-dloop-tone) 14%, var(--ps-paper));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-dloop-tone) 55%, transparent);
+    font: var(--weight-bold) 13px / 1 var(--font-ui);
+  }
+  .ps-dloop__key-item[data-tone='red'] .ps-dloop__key-code { --ps-dloop-tone: var(--ps-red); }
+  .ps-dloop__key-item[data-tone='blue'] .ps-dloop__key-code { --ps-dloop-tone: var(--ps-blue); }
+  .ps-dloop__key-item.is-filled .ps-dloop__key-code { background: var(--ps-dloop-tone); box-shadow: none; color: #fff; }
+  .ps-dloop__key-item.is-filled[data-tone='yellow'] .ps-dloop__key-code { color: var(--ps-on-yellow); }
+  .ps-dloop__key-words { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .ps-dloop__key-tag { font: italic var(--weight-semibold) 12px / 1.3 var(--font-ui); }
+  .ps-dloop__key-tag:empty { display: none; }
+  .ps-dloop__key-meta { font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+  .ps-dloop__key-title { min-width: 0; font: var(--weight-semibold) 14px / 1.3 var(--font-ui); overflow-wrap: anywhere; }
+  .ps-dloop__key-item .ps-objection { align-self: flex-start; margin-top: 2px; }
+}
+
+/* Feedback matrix (toolkit p.137 and p.139, Improve). Part one: a square 2x2 grid with no gaps,
+   yellow Suggestions, blue Compliments, red Changes and yellow Questions, each heading centred on
+   its outer edge (top row at the top, bottom row at the bottom). Four symbol discs meet at the
+   centre, each in its quadrant's inner corner: blue with a yellow plus, yellow with a blue tick,
+   yellow with a blue cross, blue with a yellow question mark. The book sets the yellow quadrants'
+   words in white (about 1.8:1), so here they are the dark on-yellow ink. Items are paper pills;
+   three show and "+N more" opens the rest. Part two: each theme a large circle by its tag (Do
+   more blue, Question yellow, Change red) with why and how satellites joined by short yellow
+   lines, as the book draws them; then the actions as numbered cards with a blue left edge.
+   Phone: codes S, C, X and Q with a key under the grid; clusters one to a row with satellites on
+   a full ring. */
+.ps-fbm {
+  /* Named, so every phone query measures this root box. */
+  container: fbm / inline-size;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  color: var(--ps-ink);
+}
+.ps-fbm__part-head {
+  margin: 0 0 8px;
+  font: var(--weight-semibold) 11px / 1.3 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+/* Part one: the grid. Rows are at least square and grow if a quadrant's pills need more. */
+.ps-fbm__grid {
+  --ps-fbm-disc: clamp(40px, 14cqi, 90px);
+  --ps-fbm-gap: clamp(3px, 1.2cqi, 8px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(50cqi, auto));
+}
+.ps-fbm__quadrant {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px 16px calc(var(--ps-fbm-disc) + var(--ps-fbm-gap) + 12px);
+  text-align: center;
+}
+.ps-fbm__quadrant[data-row='bottom'] { padding: calc(var(--ps-fbm-disc) + var(--ps-fbm-gap) + 12px) 16px 18px; }
+.ps-fbm__quadrant[data-fill='yellow'] { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+.ps-fbm__quadrant[data-fill='blue'] { background: var(--ps-blue); color: #fff; }
+.ps-fbm__quadrant[data-fill='red'] { background: var(--ps-red); color: #fff; }
+.ps-fbm__quadrant:has(:focus-visible),
+.ps-fbm__quadrant:has([aria-expanded='true']) { z-index: 2; }
+
+.ps-fbm__head { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.ps-fbm__quadrant[data-row='bottom'] .ps-fbm__head { order: 3; margin-top: auto; }
+.ps-fbm__quadrant[data-row='bottom'] .ps-fbm__items { order: 1; }
+.ps-fbm__quadrant[data-row='bottom'] .ps-fbm__more { order: 2; }
+.ps-fbm__code { display: none; font: var(--weight-bold) 18px / 1 var(--font-ui); }
+.ps-fbm__title--quadrant { font: var(--weight-bold) 15px / 1.2 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; }
+.ps-fbm__head .ps-fbm__words { font: italic var(--weight-regular) 12px / 1.3 var(--font-ui); letter-spacing: 0; text-transform: none; }
+
+.ps-fbm__items { display: flex; flex-direction: column; gap: 6px; }
+.ps-fbm__item { position: relative; display: flex; border-radius: 22px; }
+.ps-fbm__item[hidden] { display: none; }
+.ps-fbm__item:has(:focus-visible),
+.ps-fbm__item:has([aria-expanded='true']) { z-index: 2; }
+.ps-fbm__pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--ps-paper);
+  color: var(--ps-ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Hover draws an ink ring inside, so the words keep their contrast. */
+.ps-fbm__pill:hover { box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+.ps-fbm__pill:focus-visible,
+.ps-fbm__pill[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-fbm__pill-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 6px; min-width: 0; max-width: 100%; }
+.ps-fbm__pill-head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-fbm__title--pill {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-semibold) 13px / 1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-fbm__more {
+  align-self: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 22px;
+  background: none;
+  color: inherit;
+  font: var(--weight-semibold) 13px / 1 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ps-fbm__more[hidden] { display: none; }
+.ps-fbm__more:focus-visible,
+.ps-fbm__more[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+/* The discs: one in each quadrant's inner corner, a small gap from the centre lines. */
+.ps-fbm__disc {
+  position: absolute;
+  width: var(--ps-fbm-disc);
+  height: var(--ps-fbm-disc);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.ps-fbm__disc--suggestion { right: var(--ps-fbm-gap); bottom: var(--ps-fbm-gap); }
+.ps-fbm__disc--compliment { left: var(--ps-fbm-gap); bottom: var(--ps-fbm-gap); }
+.ps-fbm__disc--change { right: var(--ps-fbm-gap); top: var(--ps-fbm-gap); }
+.ps-fbm__disc--question { left: var(--ps-fbm-gap); top: var(--ps-fbm-gap); }
+.ps-fbm__disc[data-tone='blue'] { background: var(--ps-blue); }
+.ps-fbm__disc[data-tone='yellow'] { background: var(--ps-yellow); }
+.ps-fbm__symbol { display: block; width: 100%; height: 100%; }
+.ps-fbm__symbol[data-mark='yellow'] { fill: var(--ps-yellow); stroke: var(--ps-yellow); }
+.ps-fbm__symbol[data-mark='blue'] { fill: var(--ps-blue); stroke: var(--ps-blue); }
+.ps-fbm__symbol path[fill='none'] { fill: none; }
+
+.ps-fbm__key { display: none; }
+.ps-fbm__panel { margin-top: 10px; }
+.ps-fbm__panel:empty { display: none; }
+.ps-fbm .ps-details { width: min(100%, 560px); }
+.ps-fbm .ps-details__card + .ps-details__card { margin-top: 6px; }
+.ps-fbm__card-head { margin: 0 0 4px; color: var(--ink); font: var(--weight-semibold) var(--text-sm) / 1.35 var(--font-ui); }
+
+/* Part two: clusters two to a row, each a square box with the theme at its centre. */
+.ps-fbm__part--two { margin-top: 28px; }
+.ps-fbm__clusters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.ps-fbm__clusters[hidden],
+.ps-fbm__part-head[hidden] { display: none; }
+.ps-fbm__cluster { min-width: 0; }
+/* An odd last cluster spans both columns and sits between them, as the book's third does. */
+.ps-fbm__cluster[data-span='both'] { grid-column: 1 / -1; }
+/* The stage is cut to the height the satellites reach (--h, in percent of its width); the square
+   layer inside is lifted by what the stage leaves off its top (--lift; a percent margin is of
+   the width). */
+.ps-fbm__stage { position: relative; width: 100%; max-width: 340px; aspect-ratio: 100 / var(--h, 100); margin-inline: auto; }
+.ps-fbm__cluster[data-span='both'] .ps-fbm__stage { width: calc(50% - 6px); }
+.ps-fbm__layer { position: absolute; top: 0; left: 0; width: 100%; aspect-ratio: 1 / 1; margin-top: calc(var(--lift, 0%) * -1); }
+.ps-fbm__lines { position: absolute; inset: 0; pointer-events: none; }
+/* A line runs from the theme's centre to the satellite's, under both circles. The outer span
+   turns to the satellite; the inner one carries the colour and draws in along the line. */
+.ps-fbm__line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36%;
+  height: 4px;
+  margin-top: -2px;
+  transform-origin: 0 50%;
+  transform: rotate(var(--a));
+}
+.ps-fbm__line-ink { display: block; width: 100%; height: 100%; border-radius: 2px; background: var(--ps-yellow); transform-origin: 0 50%; }
+.ps-fbm__theme {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 32%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+}
+.ps-fbm__sats { position: absolute; inset: 0; pointer-events: none; }
+.ps-fbm__sat {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  z-index: 1;
+  width: 22%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+.ps-fbm__sat:has(:focus-visible),
+.ps-fbm__sat:has([aria-expanded='true']),
+.ps-fbm__theme:has(:focus-visible),
+.ps-fbm__theme:has([aria-expanded='true']) { z-index: 3; }
+.ps-fbm__sat > .ps-objection { position: absolute; top: calc(100% + 2px); left: 50%; margin: 0; transform: translateX(-50%); opacity: 1; white-space: nowrap; }
+/* In the lower half the tag sits above the satellite, so it never reaches past the stage. */
+.ps-fbm__sat[data-low='true'] > .ps-objection { top: auto; bottom: calc(100% + 2px); }
+.ps-fbm__circle {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 14%;
+  border: 0;
+  border-radius: 50%;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-fbm__circle[data-fill='blue'] { background: var(--ps-blue); color: #fff; }
+.ps-fbm__circle[data-fill='red'] { background: var(--ps-red); color: #fff; }
+.ps-fbm__circle[data-fill='yellow'] { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+/* Hover darkens under white text and lightens under ink, so contrast only rises. */
+.ps-fbm__circle:is([data-fill='blue'], [data-fill='red']):hover { background-image: linear-gradient(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.1)); }
+.ps-fbm__circle[data-fill='yellow']:hover { background-image: linear-gradient(rgb(255 255 255 / 0.18), rgb(255 255 255 / 0.18)); }
+.ps-fbm__circle:focus-visible,
+.ps-fbm__circle[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-fbm__circle-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 4px; max-width: 100%; }
+.ps-fbm__circle-head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-fbm__meta { font: var(--weight-semibold) 10px / 1.25 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-fbm__title--theme {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  font: var(--weight-semibold) 13px / 1.2 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.ps-fbm__title--sat { font: var(--weight-semibold) 13px / 1 var(--font-ui); }
+
+/* Actions: a numbered list of cards, each with a blue left edge. */
+.ps-fbm__actions { margin-top: 20px; }
+.ps-fbm__actions[hidden] { display: none; }
+.ps-fbm__action-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ps-fbm__action { position: relative; display: flex; }
+.ps-fbm__action:has(:focus-visible),
+.ps-fbm__action:has([aria-expanded='true']) { z-index: 2; }
+.ps-fbm__action-card {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-left: 3px solid var(--ps-blue);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--ps-card);
+  color: var(--ps-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ps-fbm__action-card:hover { box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+.ps-fbm__action-card:focus-visible,
+.ps-fbm__action-card[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+.ps-fbm__num { flex: none; min-width: 1.2em; font: var(--weight-bold) 15px / 1 var(--font-ui); }
+.ps-fbm__action-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.ps-fbm__action-head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-fbm__title--action { min-width: 0; font: var(--weight-semibold) 14px / 1.3 var(--font-ui); overflow-wrap: anywhere; }
+
+/* Phone: the 2x2 stays with codes for headings and a key under it; titles keep to one line;
+   clusters stack in boxes of a fixed size with their satellites on a full ring. */
+@container fbm (max-width: 480px) {
+  .ps-fbm__grid { --ps-fbm-disc: clamp(34px, 12cqi, 48px); }
+  .ps-fbm__quadrant { gap: 6px; padding: 12px 6px calc(var(--ps-fbm-disc) + var(--ps-fbm-gap) + 8px); }
+  .ps-fbm__quadrant[data-row='bottom'] { padding: calc(var(--ps-fbm-disc) + var(--ps-fbm-gap) + 8px) 6px 12px; }
+  .ps-fbm__code { display: block; }
+  .ps-fbm__title--quadrant,
+  .ps-fbm__words { display: none; }
+  .ps-fbm__items { gap: 4px; }
+  .ps-fbm__pill { padding: 4px 10px; }
+  .ps-fbm__title--pill { -webkit-line-clamp: 1; font-size: 12px; }
+
+  .ps-fbm__key { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin-top: 12px; }
+  .ps-fbm__key-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ps-fbm__key-code {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font: var(--weight-bold) 13px / 1 var(--font-ui);
+  }
+  .ps-fbm__key-item[data-tone='yellow'] .ps-fbm__key-code { background: var(--ps-yellow); color: var(--ps-on-yellow); }
+  .ps-fbm__key-item[data-tone='blue'] .ps-fbm__key-code { background: var(--ps-blue); color: #fff; }
+  .ps-fbm__key-item[data-tone='red'] .ps-fbm__key-code { background: var(--ps-red); color: #fff; }
+  .ps-fbm__key-words { min-width: 0; font: var(--weight-semibold) 13px / 1.3 var(--font-ui); }
+
+  .ps-fbm__clusters { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .ps-fbm__stage,
+  .ps-fbm__cluster[data-span='both'] .ps-fbm__stage { width: min(100%, 300px); aspect-ratio: 1 / 1; }
+  .ps-fbm__layer { margin-top: 0; }
+  .ps-fbm__sat { left: var(--px); top: var(--py); }
+  .ps-fbm__sat[data-low] > .ps-objection { top: calc(100% + 2px); bottom: auto; }
+  .ps-fbm__sat[data-plow='true'] > .ps-objection { top: auto; bottom: calc(100% + 2px); }
+  .ps-fbm__line { transform: rotate(var(--pa)); }
+  .ps-fbm__title--theme { font-size: 12px; }
 }

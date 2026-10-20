@@ -71,6 +71,19 @@ describe('task cards', () => {
     cards.update({ ...base, reviewProposal, reviewTaskId: 'task-9' } as PsSession);
     expect(cards.el.querySelector('.ps-reviewcard')).toBeNull();
   });
+  it('the review card shows while Improve waits, and goes once the review has started or finished', () => {
+    const cards = mountTaskCards(handlers());
+    const reviewProposal = { title: 'Review: Late rota', due: '2026-11-02', reason: 'A first look.', status: 'proposed' };
+    const state = (status: string) => ({ status, due: '2026-11-02', returnTo: null, startedAt: null });
+    cards.update({ ...base, reviewProposal, reviewState: state('waiting') } as unknown as PsSession);
+    expect(cards.el.querySelector('.ps-reviewcard')).not.toBeNull();
+    cards.update({ ...base, reviewProposal, reviewState: state('reviewing') } as unknown as PsSession);
+    expect(cards.el.querySelector('.ps-reviewcard')).toBeNull();
+    cards.update({ ...base, reviewProposal, reviewState: null } as unknown as PsSession);
+    expect(cards.el.querySelector('.ps-reviewcard')).not.toBeNull();
+    cards.update({ ...base, reviewProposal, reviewState: state('done') } as unknown as PsSession);
+    expect(cards.el.querySelector('.ps-reviewcard')).toBeNull();
+  });
 });
 
 describe('task cards, review fixes', () => {
