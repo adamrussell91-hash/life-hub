@@ -376,6 +376,7 @@ describe('blockRegistry', () => {
       'concept_features',
       'concept_map',
       'countdown',
+      'curriculum_lines',
       'definition',
       'diagram',
       'discern_confirm',

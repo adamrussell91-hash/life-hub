@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlockEditor } from '@/blocks/editors';
 import { createBlock } from '@/blocks/create-block';
-import { resetSessionUploads } from '@/blocks/upload-button';
+import { AUDIO_ACCEPT, resetSessionUploads } from '@/blocks/upload-button';
 import type { Block } from '@/schemas/block';
 import type { Media } from '@/schemas/media';
 import { uploadMediaFile } from '@/teacher/media-api';
@@ -132,7 +132,7 @@ describe('Upload from computer in media block editors', () => {
   it('audio: upload sets the audio url and title', async () => {
     const { editor, latest } = mount(createBlock('audio', 'b_audio'));
     const [input] = uploadInputs(editor);
-    expect(input!.accept).toBe('audio/*');
+    expect(input!.accept).toBe(AUDIO_ACCEPT);
     await pick(input!, [mp3()]);
     const block = latest() as Extract<Block, { block_type: 'audio' }>;
     expect(block.content).toEqual({ url: urlOf('reading.mp3'), title: 'reading.mp3' });

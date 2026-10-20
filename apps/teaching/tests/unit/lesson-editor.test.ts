@@ -278,7 +278,7 @@ describe('mountLessonEditor', () => {
 
     const input = refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title');
     expect(input?.value).toBe('Intro to Testing');
-    expect(input?.getAttribute('aria-label')).toBe('Lesson title');
+    expect(input?.getAttribute('aria-label')).toBe('Lesson name');
   });
 
   it('mounts palette, page, and a Life Hub chat bubble that opens the right column', async () => {
@@ -1008,8 +1008,6 @@ describe('mountLessonEditor', () => {
 
   it('confirms stale Accept after a local edit and applies when confirmed', async () => {
     mockLessonLoad();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     mount();
     await tick();
 
@@ -1034,19 +1032,24 @@ describe('mountLessonEditor', () => {
     )!;
     accept.click();
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'You edited while the plan was built. Accept replaces the lesson with this plan.'
+    const card = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLElement>('.confirm-card[aria-label="You edited while the plan was built."]');
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    expect(card.querySelector('.page-header__title')?.textContent).toBe('You edited while the plan was built.');
+    expect(card.querySelector('.page-header__supporting')?.textContent).toBe(
+      'Accept replaces the lesson with this plan.'
     );
+    [...card.querySelectorAll('button')].find((btn) => btn.textContent === 'Accept plan')!.click();
+    await tick();
     expect(refs.canvas.querySelector<HTMLInputElement>('.lesson-page__title')?.value).toBe(
       'Built lesson'
     );
-    confirmSpy.mockRestore();
   });
 
   it('confirms stale Accept after history restore', async () => {
     mockLessonLoad();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     mount();
     await tick();
 
@@ -1069,10 +1072,17 @@ describe('mountLessonEditor', () => {
     )!;
     accept.click();
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'You edited while the plan was built. Accept replaces the lesson with this plan.'
+    const card = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLElement>('.confirm-card[aria-label="You edited while the plan was built."]');
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    expect(card.querySelector('.page-header__title')?.textContent).toBe('You edited while the plan was built.');
+    expect(card.querySelector('.page-header__supporting')?.textContent).toBe(
+      'Accept replaces the lesson with this plan.'
     );
-    confirmSpy.mockRestore();
+    [...card.querySelectorAll('button')].find((btn) => btn.textContent === 'Accept plan')!.click();
+    await tick();
   });
 
   it('recedes the flyout during drag so a page gap can receive the drop', async () => {
