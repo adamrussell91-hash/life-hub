@@ -154,20 +154,36 @@ function clipWhere(clip: PublishedVoiceClip): string {
   return quote.length > 60 ? `“${quote.slice(0, 57).trimEnd()}…”` : `“${quote}”`;
 }
 
-/** Below the poem: every voice note with its length, a scrub bar and its transcript. */
+/** A fold that remembers whether it was open, since the view repaints on every click. */
+function rememberedFold(className: string, key: string, open: Set<string>): HTMLDetailsElement {
+  const fold = document.createElement('details');
+  fold.className = className;
+  fold.open = open.has(key);
+  fold.addEventListener('toggle', () => {
+    if (fold.open) open.add(key);
+    else open.delete(key);
+  });
+  return fold;
+}
+
+/**
+ * Below the poem, folded shut: every voice note with its length, a scrub bar and its
+ * transcript. A take cut into parts shows once, its parts folded under it.
+ */
 function buildVoiceNotesList(
   tracks: AnnotationVoiceTrack[],
   player: {
     toggle: (note: VoiceNoteSource) => void;
     seek: (note: VoiceNoteSource, fraction: number) => void;
   },
-  layers: AnnotationLayer[]
+  layers: AnnotationLayer[],
+  open: Set<string>
 ): HTMLElement {
-  const section = document.createElement('section');
-  section.className = 'block-annotation__voice-notes';
-  const heading = document.createElement('h4');
+  const section = rememberedFold('block-annotation__voice-notes', 'voice-notes', open);
+  const heading = document.createElement('summary');
   heading.className = 'block-annotation__voice-notes-title';
-  heading.textContent = 'Voice notes';
+  const count = tracks.filter((track) => approvedClips(track).length > 0).length;
+  heading.textContent = `Voice notes · ${count}`;
   const list = document.createElement('ul');
   list.className = 'block-annotation__voice-note-list';
   section.append(heading, list);
@@ -241,35 +257,56 @@ function buildVoiceNotesList(
     const clips = approvedClips(track);
     if (clips.length > 1) {
       // A long take cut into clips: hear it straight through, lines lighting as it goes.
-      list.append(
-        row({
-          source: {
-            key: `track:${track.id}`,
-            url: track.audio.url,
-            start_s: 0,
-            end_s: track.audio.duration_s || Math.max(...clips.map((clip) => clip.end_s)),
-            clips: clips
-              .map((clip) => ({ id: clip.id, start_s: clip.start_s, end_s: clip.end_s }))
-              .sort((a, b) => a.start_s - b.start_s)
-          },
-          title: track.title,
-          where: `Whole recording · ${clips.length} parts`,
-          transcript: track.transcript.words.map((word) => word.w).join(' '),
-          colour
-        })
-      );
+      const whole = row({
+        source: {
+          key: `track:${track.id}`,
+          url: track.audio.url,
+          start_s: 0,
+          end_s: track.audio.duration_s || Math.max(...clips.map((clip) => clip.end_s)),
+          clips: clips
+            .map((clip) => ({ id: clip.id, start_s: clip.start_s, end_s: clip.end_s }))
+            .sort((a, b) => a.start_s - b.start_s)
+        },
+        title: track.title,
+        where: `Whole recording · ${clips.length} parts`,
+        transcript: track.transcript.words.map((word) => word.w).join(' '),
+        colour
+      });
+      const parts = rememberedFold('block-annotation__voice-note-parts', `parts:${track.id}`, open);
+      const partsSummary = document.createElement('summary');
+      partsSummary.textContent = `${clips.length} parts`;
+      const partsList = document.createElement('ul');
+      partsList.className = 'block-annotation__voice-note-list';
+      clips.forEach((clip, index) => {
+        partsList.append(
+          row({
+            source: clipSource(clip),
+            title: `Part ${index + 1}`,
+            where: clipWhere(clip),
+            transcript: clip.transcript_text,
+            colour
+          })
+        );
+      });
+      parts.append(partsSummary, partsList);
+      // Its own row, not inside the whole take's: the player updates every time inside a row.
+      const partsRow = document.createElement('li');
+      partsRow.className = 'block-annotation__voice-note-parts-row';
+      partsRow.append(parts);
+      list.append(whole, partsRow);
+      continue;
     }
-    clips.forEach((clip, index) => {
+    for (const clip of clips) {
       list.append(
         row({
           source: clipSource(clip),
-          title: clips.length > 1 ? `${track.title} · part ${index + 1}` : track.title,
+          title: track.title,
           where: clipWhere(clip),
           transcript: clip.transcript_text,
           colour
         })
       );
-    });
+    }
   }
   return section;
 }
@@ -788,6 +825,8 @@ function buildInteractiveView(
   });
   root.append(sheet);
 
+  // Which voice-note folds are open, kept across repaints.
+  const voiceFoldsOpen = new Set<string>();
   const voicePlayer = createVoiceNotePlayer(root, {
     onLine: (clipId) => {
       root.querySelectorAll('.block-annotation__line.is-voice-active').forEach((node) => {
@@ -1442,7 +1481,7 @@ function buildInteractiveView(
 
     const publishedTracks = publishedVoiceTracks(content);
     if (voiceClips.length > 0) {
-      textCol.append(buildVoiceNotesList(voiceTracks, voicePlayer, content.layers));
+      textCol.append(buildVoiceNotesList(voiceTracks, voicePlayer, content.layers, voiceFoldsOpen));
     }
 
     if (content.annotations.length === 0 && publishedTracks.length === 0) {

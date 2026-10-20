@@ -81,6 +81,50 @@ describe('voice notes in the annotation view', () => {
     expect(rows[0]!.textContent).toContain('Bent double');
   });
 
+  it('folds the list shut under a count, and keeps it open across repaints', () => {
+    const el = renderAnnotationBlock(withVoice(), 'teacher');
+    document.body.append(el);
+    const fold = () => el.querySelector<HTMLDetailsElement>('details.block-annotation__voice-notes')!;
+    expect(fold().open).toBe(false);
+    expect(fold().querySelector('summary')?.textContent).toBe('Voice notes · 2');
+    fold().open = true;
+    fold().dispatchEvent(new Event('toggle'));
+    const chip = [...el.querySelectorAll<HTMLButtonElement>('.block-annotation__chip')].find((btn) =>
+      btn.textContent?.includes('Voice')
+    )!;
+    chip.click();
+    chip.click();
+    expect(fold().open).toBe(true);
+  });
+
+  it('folds the parts of a cut take under the whole recording', () => {
+    const block = withVoice();
+    const [first] = block.content.voice_tracks!;
+    const cut = {
+      ...first!,
+      clips: [
+        { ...first!.clips[0]!, id: 'clip_a', start_s: 0, end_s: 40 },
+        {
+          ...first!.clips[0]!,
+          id: 'clip_b',
+          start_s: 40,
+          end_s: 79.7,
+          anchor: lineAnchor('line_2', 'Knock-kneed')
+        }
+      ]
+    };
+    block.content.voice_tracks = [cut];
+    const el = renderAnnotationBlock(block, 'teacher');
+    const list = el.querySelector('.block-annotation__voice-note-list')!;
+    const top = [...list.children];
+    expect(top).toHaveLength(2);
+    expect(top[0]!.textContent).toContain('Whole recording · 2 parts');
+    const parts = top[1]!.querySelector<HTMLDetailsElement>('details.block-annotation__voice-note-parts')!;
+    expect(parts.open).toBe(false);
+    expect(parts.querySelectorAll('.block-annotation__voice-note')).toHaveLength(2);
+    expect(el.querySelector('summary.block-annotation__voice-notes-title')?.textContent).toBe('Voice notes · 1');
+  });
+
   it('starts playing inside the click, at the note, and shows it is playing', () => {
     const el = renderAnnotationBlock(withVoice(), 'teacher');
     document.body.append(el);
