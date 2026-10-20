@@ -763,3 +763,15 @@ test('Document re-entered after a late review keeps its runs and its case file',
   assert.equal(s.steps.document.runs.length, 1);
   assert.equal(s.caseFile.version, 1);
 });
+
+test('link_case_file adds its page even when the session already has 20 links', () => {
+  const full = { ...named(), links: Array.from({ length: 20 }, (_, i) => ({ kind: 'task', id: `l${i}` })) };
+  const s = linkCaseFile(full, { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps);
+  assert.deepEqual(s.links.at(-1), { kind: 'project', id: 'proj1' });
+});
+
+test('a refused name drops the coach suggestion for that turn', () => {
+  const s = idle(applyCoachTurn(namingNext(), coach({ node: { slot: 'correspond', text: 'rota stuff' }, suggestion: { kind: 'next_step', reason: 'Ready.' } }), deps));
+  assert.equal(activeRun(s).nodes.some((x) => x.slot === 'correspond'), false);
+  assert.equal(s.suggestion, null);
+});
