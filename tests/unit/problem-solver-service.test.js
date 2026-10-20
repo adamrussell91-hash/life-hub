@@ -220,3 +220,15 @@ test('start_review and task_status are known actions; task_status while busy is 
   assert.equal(s.runner.status, 'queued');
   await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action: 'task_status', payload: { snapshot } }), (err) => err.status === 409 && err.code === 'busy');
 });
+
+test('link_case_file and dismiss_case_file are known actions; link_case_file while busy is 409', async () => {
+  const svc = service();
+  let s = await svc.run('op', (await svc.create('op', { text: 'Late rota.' })).id);
+  // Known actions are refused on the session's state, not as unknown (400).
+  for (const action of ['link_case_file', 'dismiss_case_file']) {
+    await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action, payload: {} }), (err) => !/Unknown action/.test(err.message));
+  }
+  s = await svc.action('op', { id: s.id, revision: s.revision, action: 'say', text: 'It changed three of four weeks' });
+  assert.equal(s.runner.status, 'queued');
+  await assert.rejects(svc.action('op', { id: s.id, revision: s.revision, action: 'link_case_file', payload: {} }), (err) => err.status === 409 && err.code === 'busy');
+});

@@ -1,6 +1,6 @@
 // netlify/functions/_shared/problem-solver/coach.mjs
 import { completeMessage } from '../anthropic-client.mjs';
-import { addEdge, canEdge, canPlace, checkNode, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
+import { acceptProblem, addEdge, canEdge, canPlace, checkNode, nextSlots, placeNode } from '../../../../packages/problem-solver/machine.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
@@ -48,6 +48,9 @@ function fitToRun(session, value) {
   const renamedEdges = value.edges.map((e) => ({ ...e, from: rename(e.from), to: rename(e.to) }));
   const problem = checkNode(run, node, renamedEdges);
   if (problem) return { error: problem };
+  // A strict rule (the 5 Cs name) refuses an accept, never a challenge: send it back to be challenged.
+  const refused = value.verdict === 'accept' ? acceptProblem(run, node) : null;
+  if (refused) return { error: `${refused} Challenge instead, name the rule in one sentence, and ask for a corrected name.` };
   if (value.verdict !== 'accept' && value.verdict !== 'challenge') return { value: { ...value, node, edges: [] } };
   return { value: { ...value, node, edges: allowedEdges(run, node, renamedEdges), proposeTasks: value.proposeTasks.map((p) => ({ ...p, slot: rename(p.slot) })) } };
 }
