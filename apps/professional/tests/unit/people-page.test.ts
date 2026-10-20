@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderPeoplePage } from '@/views/people';
 import { parseRoute, personRoute, peopleRoute } from '@/app/router';
+import { clearScheduleReadCache } from '@/api/schedule-read-cache';
 
 const PERSON_ID = 'person_00000000-0000-4000-8000-000000000001';
 
@@ -230,6 +231,80 @@ describe('renderPeoplePage (W2 real entry)', () => {
     const canvas = document.createElement('div');
     await renderPeoplePage(canvas);
     expect(canvas.textContent).toContain('New workplace');
+  });
+
+  describe('first open of a session', () => {
+    const SNAPSHOT_AT = '2026-10-20T03:14:00.000Z';
+
+    function withSnapshot(fresh: (original: () => Promise<Response>) => Promise<Response>) {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.includes('/api/people/directory?snapshot=1')) {
+          const body = await (await original(input, init)).json();
+          body.data.people[0].display_name = 'Saved Copy';
+          return jsonResponse({ ...body.data, as_of: SNAPSHOT_AT });
+        }
+        if (url.includes('/api/people/directory?fresh=1')) return fresh(() => original(input, init));
+        return original(input, init);
+      });
+    }
+
+    it('paints the saved copy with an as-of note, then swaps in the fresh scan', async () => {
+      let release!: () => void;
+      withSnapshot(async (load) => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return load();
+      });
+      const canvas = document.createElement('div');
+      const loading = renderPeoplePage(canvas);
+      try {
+        await vi.waitFor(() => expect(canvas.textContent).toContain('Saved Copy'));
+        expect(canvas.querySelector('.people-page__count')?.textContent).toMatch(/Updating… \(as of .+\)/);
+        release();
+        await loading;
+        expect(canvas.textContent).toContain('Isla Emberly');
+        expect(canvas.textContent).not.toContain('Saved Copy');
+        expect(canvas.querySelector('.people-page__count')?.textContent).toBe('1 person · 1 organisation');
+      } finally { release?.(); await loading; }
+    });
+
+    it('keeps the saved copy when the fresh scan fails', async () => {
+      let fail!: () => void;
+      withSnapshot(async () => {
+        await new Promise<void>((resolve) => { fail = resolve; });
+        return new Response(JSON.stringify({ ok: false, error: { code: 'internal_error', message: 'Scan failed', retryable: true } }), { status: 500 });
+      });
+      const canvas = document.createElement('div');
+      const loading = renderPeoplePage(canvas);
+      try {
+        await vi.waitFor(() => expect(canvas.textContent).toContain('Saved Copy'));
+        fail();
+        await loading;
+        expect(canvas.textContent).toContain('Saved Copy');
+        expect(canvas.querySelector('.people-page__count')?.textContent).toMatch(/Couldn't refresh, showing .+/);
+      } finally { fail?.(); await loading; }
+    });
+
+    it('ignores a saved copy that arrives after the fresh scan', async () => {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      let releaseSnapshot!: () => void;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        if (String(input).includes('/api/people/directory?snapshot=1')) {
+          await new Promise<void>((resolve) => { releaseSnapshot = resolve; });
+          return jsonResponse({ people: [], organisations: [], counts: { people: 0, organisations: 0 }, as_of: SNAPSHOT_AT });
+        }
+        return original(input, init);
+      });
+      const canvas = document.createElement('div');
+      await renderPeoplePage(canvas);
+      releaseSnapshot();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(canvas.textContent).toContain('Isla Emberly');
+      expect(canvas.querySelector('.people-page__count')?.textContent).toBe('1 person · 1 organisation');
+    });
   });
 
   it('renders the ledger independently and keeps an open edit form when Remember finishes', async () => {
