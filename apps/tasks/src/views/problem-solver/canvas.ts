@@ -31,6 +31,7 @@ import { createAfterActionReviewView } from '../../../../../packages/problem-sol
 import { createDoubleLoopView } from '../../../../../packages/problem-solver/render/double-loop';
 import { createFeedbackMatrixView } from '../../../../../packages/problem-solver/render/feedback-matrix';
 import { createFiveCsView } from '../../../../../packages/problem-solver/render/five-cs';
+import { createKnowledgeManagementView } from '../../../../../packages/problem-solver/render/knowledge-management';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -84,7 +85,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   after_action_review: () => createAfterActionReviewView(),
   double_loop: () => createDoubleLoopView(),
   feedback_matrix: () => createFeedbackMatrixView(),
-  five_cs: () => createFiveCsView()
+  five_cs: () => createFiveCsView(),
+  knowledge_management: () => createKnowledgeManagementView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

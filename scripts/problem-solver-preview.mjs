@@ -59,6 +59,8 @@ const RENDERERS = {
   feedback_matrix_first: ['feedback-matrix', 'createFeedbackMatrixView'],
   five_cs: ['five-cs', 'createFiveCsView'],
   five_cs_first: ['five-cs', 'createFiveCsView'],
+  knowledge_management: ['knowledge-management', 'createKnowledgeManagementView'],
+  knowledge_management_first: ['knowledge-management', 'createKnowledgeManagementView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
