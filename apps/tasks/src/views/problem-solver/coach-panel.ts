@@ -67,6 +67,8 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
     const target = model ? planStepForBook(model, suggestion.step) : null;
     title = `Reopen: ${model && target ? stepName(model, target) : suggestion.step}`;
     accept = 'Reopen it';
+  } else if (suggestion.kind === 'escalate') {
+    title = 'This needs the full process';
   } else {
     title = `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
   }

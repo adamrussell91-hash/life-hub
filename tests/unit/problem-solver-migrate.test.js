@@ -72,7 +72,7 @@ test('a v1 define session with no model is given the seven-step model and can mo
 });
 
 test('v2 sessions and index rows pass through unchanged', () => {
-  const v2 = { ...migrateSession(v1()), reviewState: null, taskSnapshot: null, detour: null, caseFile: null, caseFileDeclined: null };
+  const v2 = { ...migrateSession(v1()), reviewState: null, taskSnapshot: null, detour: null, caseFile: null, caseFileDeclined: null, lightning: null, escalatedFrom: null, frameSeeds: null };
   assert.equal(migrateSession(v2), v2);
   const row = { id: 's', title: 'T', status: 'active', phase: 'frame' };
   assert.equal(migrateSession(row), row);
@@ -121,4 +121,16 @@ test('a v2 session saved before the case file gains the two empty fields on read
   const s = migrateSession(old);
   assert.equal(s.caseFile, null);
   assert.equal(s.caseFileDeclined, null);
+});
+
+test('a v2 session saved before Lightning gains the three empty fields on read', () => {
+  const old = { ...migrateSession(v1()) };
+  delete old.lightning;
+  delete old.escalatedFrom;
+  delete old.frameSeeds;
+  const s = migrateSession(old);
+  assert.equal(s.lightning, null);
+  assert.equal(s.escalatedFrom, null);
+  assert.equal(s.frameSeeds, null);
+  assert.equal('lightning' in old, false, 'the input is not mutated');
 });

@@ -122,6 +122,9 @@ export function createSession({ title = '', text, links = [] }, deps) {
     detour: null,
     caseFile: null,
     caseFileDeclined: null,
+    lightning: null,
+    escalatedFrom: null,
+    frameSeeds: null,
     requestIds: [],
     runner: { status: 'queued', mode: 'turn', error: null },
     createdAt: at,
@@ -561,6 +564,7 @@ export function summaryRow(session) {
     taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
     reviewTaskId: session.reviewTaskId ?? null,
     reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
+    escalatedTo: session.lightning?.escalatedTo ?? null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   };

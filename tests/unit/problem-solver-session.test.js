@@ -234,7 +234,7 @@ test('say appends a user turn and queues; summary rows are small', () => {
   const s = say(framed(), 'Because the roster is drafted on Friday.', deps);
   assert.equal(s.runner.status, 'queued');
   const row = summaryRow(s);
-  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewDue', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
+  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'escalatedTo', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewDue', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
   assert.equal(row.tool, 'five_whys');
   assert.equal(summaryRow(row), row);
 });
