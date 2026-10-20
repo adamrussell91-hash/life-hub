@@ -34,7 +34,7 @@ export function renderCurriculumLines(block: CurriculumLinesBlock, mode: RenderM
   const input = unitNetworkInput(block, ctx);
   if (!input.lines.length && !input.rows.length) {
     const empty = document.createElement('p');
-    empty.className = 'net-empty';
+    empty.className = 'block-empty';
     empty.textContent = mode === 'student'
       ? 'This map has no lessons yet.'
       : 'No lines or lessons yet. Add this subject’s lines, then tag each lesson with the lines it serves.';
