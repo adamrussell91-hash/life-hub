@@ -38,6 +38,7 @@ export default defineConfig({
   server: { port: 5173 },
   test: {
     include: ['tests/**/*.test.ts'],
-    environment: 'happy-dom'
+    environment: 'happy-dom',
+    setupFiles: ['tests/setup/web-storage.ts']
   }
 });
