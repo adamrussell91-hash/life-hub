@@ -29,6 +29,7 @@ import { createKanbanView } from '../../../../../packages/problem-solver/render/
 import { createEisenhowerView } from '../../../../../packages/problem-solver/render/eisenhower';
 import { createAfterActionReviewView } from '../../../../../packages/problem-solver/render/after-action-review';
 import { createDoubleLoopView } from '../../../../../packages/problem-solver/render/double-loop';
+import { createFeedbackMatrixView } from '../../../../../packages/problem-solver/render/feedback-matrix';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -80,7 +81,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   kanban: () => createKanbanView(),
   eisenhower: () => createEisenhowerView(),
   after_action_review: () => createAfterActionReviewView(),
-  double_loop: () => createDoubleLoopView()
+  double_loop: () => createDoubleLoopView(),
+  feedback_matrix: () => createFeedbackMatrixView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [
