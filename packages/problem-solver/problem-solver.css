@@ -7355,6 +7355,16 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-scope.ps-ltn-page .ps-coach .btn--primary { background: var(--ps-ink); color: var(--ps-paper); }
 .ps-scope.ps-ltn-page .ps-coach .btn:focus-visible { outline: 2px solid var(--ps-ink); outline-offset: 2px; }
 .ps-scope.ps-ltn-page .ps-composer__now:empty { display: none; }
+.ps-scope.ps-ltn-page .ps-suggestion__pending { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.ps-scope.ps-ltn-page .ps-suggestion__actions .btn:disabled { opacity: 0.5; cursor: default; }
+/* The conversation scrolls in its own box under the chart: a hairline and a soft fade at its
+   top edge show that earlier messages sit above. */
+.ps-scope.ps-ltn-page .ps-coach { padding-top: var(--space-3); border-top: 1px solid var(--ltn-faint); }
+.ps-scope.ps-ltn-page .ps-coach__messages {
+  padding-top: var(--space-4);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black var(--space-6));
+  mask-image: linear-gradient(to bottom, transparent 0, black var(--space-6));
+}
 
 /* From Lightning: the run's chart on the full session it led to, closed until opened. */
 .ps-ltn-from { min-width: 0; border: 1.5px solid var(--ps-ink); border-radius: var(--radius-lg); background: var(--ps-paper); color: var(--ps-ink); }

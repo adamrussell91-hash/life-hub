@@ -20,6 +20,7 @@ import { createReviewSync } from './review-sync';
 import { compactToday, mountTaskCards, type PlaceOption } from './task-cards';
 import { createCaseFileBridge, type CaseFilePlace } from './case-file-bridge';
 import { caseFileOffer, composeCaseFile } from '../../../../../packages/problem-solver/case-file.mjs';
+import { currentEntry } from '../../../../../packages/problem-solver/lightning.mjs';
 import { createSessionSync } from './session-sync';
 import { mountFromLightning, mountLightningPage } from './lightning-view';
 import { tasksApi } from '@/services/client-api';
@@ -416,22 +417,51 @@ async function renderLightningSession(canvas: HTMLElement, initial: PsSession): 
     if (alive() && isBusy(sync.session())) await sync.settle();
   };
 
+  /** A click on a box that has moved on, or while the coach is thinking, is dropped, not posted. */
   async function answerBox(node: string, answer: 'yes' | 'no'): Promise<void> {
+    const now = sync.session();
+    const current = now.lightning ? currentEntry(now.lightning) : null;
+    if (!current || current.node !== node || isBusy(now)) {
+      view.releaseAnswer();
+      return;
+    }
     if (await post('lightning_answer', { node, answer })) await settleIfBusy();
     else view.releaseAnswer();
   }
 
+  /** It came back: once the new round is in and the coach has asked, the composer takes focus. */
   async function again(): Promise<void> {
-    if (await post('lightning_again', {})) await settleIfBusy();
+    if (!(await post('lightning_again', {}))) return;
+    await settleIfBusy();
+    if (alive()) view.focusComposer();
+  }
+
+  const openFull = (to: string) => {
+    if (alive()) location.hash = `#/problem-solver?id=${encodeURIComponent(to)}`;
+  };
+
+  /**
+   * Start the full process. The card waits while the post is out. A run already escalated
+   * (in another tab, say) opens its full session instead of showing the refusal.
+   */
+  async function escalate(): Promise<void> {
+    view.setEscalating(true);
+    try {
+      await sync.confirmed('escalate', {});
+    } catch (err) {
+      const already = sync.session().lightning?.escalatedTo;
+      if (already) return openFull(already);
+      view.setEscalating(false);
+      await recover(err);
+      return;
+    }
+    const to = sync.session().lightning?.escalatedTo;
+    if (to) openFull(to);
+    else view.setEscalating(false);
   }
 
   async function coachAction(action: PsAction): Promise<void> {
-    if (action === 'escalate') {
-      if (!(await post('escalate', {}))) return;
-      const to = sync.session().lightning?.escalatedTo;
-      if (to && alive()) location.hash = `#/problem-solver?id=${encodeURIComponent(to)}`;
-      return;
-    }
+    if (action === 'escalate') return escalate();
     if (await post(action, {})) await settleIfBusy();
   }
 
