@@ -94,3 +94,39 @@ test('GET ?linked= returns the sessions linked to a task', async () => {
   assert.deepEqual(data.sessions, []);
   assert.equal((await call('GET', '/api/problem-solver?linked=bad')).status, 400);
 });
+
+test('an escalate action starts a coach run for the new full session', async () => {
+  const store = createMemoryProblemStore();
+  const kicks = [];
+  let kickResult = false;
+  const coach = async () => ({ verdict: 'clarify', message: 'Does it keep coming back?', node: null, edges: [], skillsSeen: [], skillsMissing: [], suggestion: { kind: 'escalate', reason: 'It recurs.' }, summary: null, lightning: null });
+  const handler = createProblemSolverHandler({ env: ENV, now: () => NOW, getStore: async () => store, coach, invokeRun: async (request, id) => { kicks.push(id); return kickResult; } });
+  const call = (body) => handler(new Request('https://life.example/api/problem-solver', { method: 'POST', headers: { cookie: `life_hub_session=${SESSION}`, 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+  const run = (await (await call({ create: { kind: 'lightning', text: 'The printer jams every Monday.', requestId: 'r1' } })).json()).data.session;
+  assert.equal(run.kind, 'lightning');
+  assert.equal(run.suggestion.kind, 'escalate');
+  kicks.length = 0;
+  kickResult = true;
+  const fullId = '22222222-2222-4222-8222-222222222222';
+  const res = await call({ id: run.id, revision: run.revision, requestId: fullId, action: 'escalate' });
+  assert.equal(res.status, 202);
+  const { data } = await res.json();
+  assert.equal(data.session.id, run.id);
+  assert.equal(data.session.lightning.escalatedTo, fullId);
+  assert.deepEqual(kicks, [fullId]);
+});
+
+test('escalate falls back to an inline run of the full session when the kick fails', async () => {
+  const store = createMemoryProblemStore();
+  const coach = async (s) => ({ verdict: 'clarify', message: s.kind === 'full' ? 'What is the goal?' : 'Could you live with it?', node: null, edges: [], skillsSeen: [], skillsMissing: [], suggestion: null, summary: null, lightning: null, frame: null, model: null });
+  const handler = createProblemSolverHandler({ env: ENV, now: () => NOW, getStore: async () => store, coach, invokeRun: async () => false });
+  const call = (body) => handler(new Request('https://life.example/api/problem-solver', { method: 'POST', headers: { cookie: `life_hub_session=${SESSION}`, 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+  const run = (await (await call({ create: { kind: 'lightning', text: 'The printer jams every Monday.', requestId: 'r1' } })).json()).data.session;
+  const fullId = '33333333-3333-4333-8333-333333333333';
+  const res = await call({ id: run.id, revision: run.revision, requestId: fullId, action: 'escalate' });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.session.lightning.escalatedTo, fullId);
+  const full = (await (await handler(new Request(`https://life.example/api/problem-solver?id=${fullId}`, { headers: { cookie: `life_hub_session=${SESSION}` } }))).json()).data.session;
+  assert.equal(full.runner.status, 'idle');
+  assert.equal(full.turns.at(-1).text, 'What is the goal?');
+});

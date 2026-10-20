@@ -9,7 +9,10 @@ import { KANBAN_COLUMNS } from '../../../../packages/problem-solver/tools/kanban
 import { QUADRANTS } from '../../../../packages/problem-solver/tools/swot.mjs';
 import { longestEarlier } from '../../../../packages/problem-solver/tools/after-action-review.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
+import { MODELS } from '../../../../packages/problem-solver/models.mjs';
+import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
+import { applyStep, currentEntry, isQuestion, LIGHTNING_NODES } from '../../../../packages/problem-solver/lightning.mjs';
 import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
 
 /**
@@ -19,13 +22,28 @@ import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './
  * An answer like `option: …` places in that open slot (a Kanban card may use a column instead,
  * `doing: …`). Once a Decide tool can take its choice, an answer with no hint is the choice.
  * `next: <tool id>` suggests that tool when it belongs to the step, and `reopen: define` (or
- * `analyse`) suggests reopening that step once double-loop learning allows it.
+ * `analyse`) suggests reopening that step once double-loop learning allows it. A third frame
+ * answer containing `model: polya` (or `triz`) chooses that model. A 5 Cs name
+ * that breaks a strict naming rule is challenged with that rule's advice.
  */
 const FRAME = [
   ['goal', 'What is the goal, as an ideal state rather than a fix? Say what good looks like.'],
   ['whatIsTrue', 'Good, that is a clear aim. Now, what is actually true here? Separate the facts and data from what you believe or feel.'],
   ['whatCanBeDone', 'That is evidence, not opinion. What can be done: can this be solved as it stands, or should we reframe it to something more achievable?']
 ];
+
+/**
+ * Why each model fits, for a third frame answer naming it with `model: polya` or `model: triz`
+ * (the walks use it). Every model's first step takes Define tools, so 5 Whys comes first for all.
+ */
+const MODEL_REASONS = {
+  seven_step: 'A real problem that will need analysis and a decision.',
+  polya: 'A bounded problem with a clear test of success.',
+  triz: 'Improving one thing makes another worse.'
+};
+
+/** A seed without its closing full stop, so the sentence around it keeps one. */
+const bare = (text) => String(text).trim().replace(/[.]+$/, '');
 
 const nodesNamed = (run, name) => run.nodes.filter((node) => parseSlot(node.slot)?.name === name);
 
@@ -163,15 +181,64 @@ function parseLink(text) {
   return match ? { from: slotFrom(match[1]), to: slotFrom(match[2]), kind: slotFrom(match[3]) } : null;
 }
 
-const base = { node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null };
+const base = { node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, lightning: null };
+
+/**
+ * Lightning runs: the coach asks the current box, reads a reply starting yes or no (then
+ * optional words) as the answer, takes a goal, learn, next or cannot line of three words or
+ * more as the note, and treats `escalate` as asking for the full process.
+ */
+const LIGHTNING_NOTE_NODES = ['goal', 'learn', 'next', 'cannot'];
+
+function lightningMessage(state, before) {
+  const entry = currentEntry(state);
+  if (!entry) return 'That run is done.';
+  const def = LIGHTNING_NODES[entry.node];
+  const strategy = def.kind === 'strategy' ? ` Try it on your snag, then say what you did and whether it worked.` : '';
+  return `${before}Next: ${def.label}${/[?.]$/.test(def.label) ? '' : '.'}${strategy}`;
+}
+
+function lightningTurn(session, last) {
+  const state = session.lightning;
+  const entry = currentEntry(state);
+  const turn = (verdict, message, lightning = null, extra = {}) => ({ ...base, verdict, message, lightning, ...extra });
+  if (!entry) return turn('clarify', 'That run is done. Say "it came back" if it returns.');
+  const def = LIGHTNING_NODES[entry.node];
+  const asking = `${def.label}${def.kind === 'strategy' ? ' Try it on your snag, then say what you did and whether it worked.' : ''}`;
+  if (session.turns.length === 1 || last === 'It came back.') return turn('clarify', asking);
+  if (/^escalate$/i.test(last.trim())) {
+    return turn('clarify', 'This sounds bigger than a quick pass. The full process may suit it better.', null, { suggestion: { kind: 'escalate', reason: 'Named as needing the full process.' } });
+  }
+  const reply = /^(yes|no)\b[\s,.]*(.*)$/is.exec(last.trim());
+  const answer = reply?.[1].toLowerCase();
+  const words = reply?.[2].trim() ?? '';
+  const chartAnswered = reply && !words && /^(yes|no)\.$/i.test(last.trim()) && state.path.at(-2)?.answer === answer;
+  if (chartAnswered) return turn('clarify', lightningMessage(state, 'Noted. '));
+  const note = words || undefined;
+  if (isQuestion(entry.node) || (def.kind === 'strategy' && entry.node !== 'cannot')) {
+    if (!answer) return turn('clarify', `Start with yes or no. ${asking}`);
+    const step = { node: entry.node, answer, ...(note ? { note } : {}) };
+    return turn('accept', lightningMessage(applyStep(state, step, session.updatedAt), ''), step);
+  }
+  if (LIGHTNING_NOTE_NODES.includes(entry.node)) {
+    if (wordCount(last) < 3) return turn('clarify', 'Say a little more about that.');
+    const step = { node: entry.node, note: last.trim() };
+    return turn('accept', lightningMessage(applyStep(state, step, session.updatedAt), ''), step);
+  }
+  return turn('clarify', asking);
+}
 
 export async function scriptedCoach(session) {
+  if (session.kind === 'lightning') {
+    const turn = session.turns.at(-1);
+    return lightningTurn(session, turn?.role === 'user' ? turn.text : '');
+  }
   const latest = session.turns.at(-1);
   const last = latest?.role === 'user' ? latest.text : '';
   if (session.runner?.mode === 'boundary') {
     const left = session.steps?.[session.runner.leaving];
     if (skippedUntouched(left)) {
-      const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here, or start a tool when you are ready.';
+      const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here; the first tool for this step is ready below.';
       return { ...base, verdict: 'clarify', message: `Fair enough, nothing was done in that step, so there is nothing to look back on. ${then}` };
     }
     return { ...base, verdict: 'clarify', message: 'Fair enough, that step is behind us now. Before we go on: what did you learn about how you tend to work through problems in that step?' };
@@ -192,12 +259,21 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'clarify', message: 'The whole problem is on the record. Anything you add now is a note for next time; what would you want to remember?' };
   }
   if (session.phase === 'frame') {
-    if (session.turns.length === 1) return { ...base, verdict: 'clarify', message: FRAME[0][1] };
+    if (session.turns.length === 1) {
+      // Escalated from Lightning: the carried seeds come first, for the person to confirm or change.
+      const seeds = session.frameSeeds;
+      if (seeds) {
+        return { ...base, verdict: 'clarify', message: `Carried over from Lightning. Goal: ${bare(seeds.goal ?? 'not set')}. What is true: ${bare(seeds.whatIsTrue ?? 'nothing tried yet')}. Is that still right, or what would you change?` };
+      }
+      return { ...base, verdict: 'clarify', message: FRAME[0][1] };
+    }
     const missing = FRAME.filter(([key]) => !session.frame[key]);
     const [key] = missing[0];
     const frame = { [key]: last };
     if (missing.length === 1) {
-      return { ...base, verdict: 'accept', frame, message: 'Clear enough to work with. I suggest the problem solving process, starting with 5 Whys, because there is one symptom here with a likely single chain of cause.', model: { id: 'seven_step', reason: 'A real problem that will need analysis and a decision.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom, likely one chain.' }, skillsSeen: ['analysis'] };
+      const hinted = /\bmodel:\s*([a-z_]+)/i.exec(last)?.[1]?.toLowerCase();
+      const id = MODEL_REASONS[hinted] ? hinted : 'seven_step';
+      return { ...base, verdict: 'accept', frame, message: `Clear enough to work with. I suggest ${MODELS[id].name.replace(/^The /, 'the ')}, starting with 5 Whys, because there is one symptom here with a likely single chain of cause.`, model: { id, reason: MODEL_REASONS[id] }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom, likely one chain.' }, skillsSeen: ['analysis'] };
     }
     return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   }
@@ -209,7 +285,10 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'clarify', suggestion: { kind: 'next_tool', tool: 'after_action_review', reason: 'The results are in; compare them with the aim.' }, message: 'The results are in. An after action review compares what you meant to happen with what did; start it when you are ready.' };
   }
   if (!run && !defaultToolFor(session.model.id, session.phase)) return { ...base, verdict: 'clarify', message: 'There is no tool for this step yet. Tell me what you notice, or move on when you are ready.' };
-  if (!run) return { ...base, verdict: 'clarify', message: 'Pick a tool to start this step, and we will work through it one question at a time together.' };
+  if (!run) {
+    const tool = defaultToolFor(session.model.id, session.phase);
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'next_tool', tool, reason: 'A good first tool for this step.' }, message: `Pick a tool to start this step; ${TOOLS[tool].name} is a good first one, and we will work through it one question at a time together.` };
+  }
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
     const chosen = TOOLS[run.tool].step === 'implement' ? chosenOption(session) : null;
@@ -247,6 +326,10 @@ export async function scriptedCoach(session) {
   const tag = placed.tag ?? tagFromText(run, slot, text);
   if (wordCount(text) < 6) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['analysis'], message: 'That is too thin to stand on yet. It reads like a symptom rather than a cause. Can you say what specifically happens, and when?' };
+  }
+  const nameAdvice = run.tool === 'five_cs' && slot === 'correspond' ? namingProblem(text) : null;
+  if (nameAdvice) {
+    return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['critical_thinking'], message: `That name needs one more thing: ${nameAdvice} Then it can be found and trusted later. What is the full name?` };
   }
   if (run.tool === 'after_action_review' && slot === 'learned' && wordCount(text) <= longestEarlier(run)) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['reflective_thinking'], message: `Learning is the heart of the review, yet this is shorter than what you said about what happened. Tell me more: what will you keep, change or try next time, and why?` };

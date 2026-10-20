@@ -105,3 +105,12 @@ export function canPropose(run, node) {
   const test = toolDef(run.tool).taskSlots?.[parseSlot(node.slot)?.name];
   return typeof test === 'function' ? Boolean(test(node, run)) : false;
 }
+
+/**
+ * Why the tool refuses to accept this node, or null. Only accepted (and kept) nodes are checked,
+ * so the coach can still challenge with the person's words on the table (the 5 Cs name rules).
+ */
+export function acceptProblem(run, node) {
+  const test = toolDef(run.tool).strictNode;
+  return typeof test === 'function' ? test(run, node) ?? null : null;
+}

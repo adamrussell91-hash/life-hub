@@ -442,6 +442,7 @@ export function createMockApi({ seed }: MockApiOptions) {
             ? await problemSolver.create('operator', payload.create as Record<string, unknown>)
             : await problemSolver.action('operator', payload);
           if (session.runner.status === 'queued') session = await problemSolver.run('operator', session.id);
+          if (payload.action === 'escalate' && session.lightning?.escalatedTo) await problemSolver.run('operator', session.lightning.escalatedTo);
           return json(200, { ok: true, data: { session } });
         }
       } catch (error) {

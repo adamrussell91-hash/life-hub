@@ -5,20 +5,24 @@ import { el } from '@/views/hub-kit';
 import { hashQuery } from '@/shell/shell';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
-import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
+import { EMBLEM_SVG, lightningGlyph, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
 import { BOOK_STEPS, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
-import type { PsAction, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
+import type { PsAction, PsCaseFileOffer, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
 import { isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
 import { createTaskBridge } from './task-bridge';
 import { mountReviewPanel, reviewBanner, type ReviewEntry } from './review-panel';
 import { createReviewSync } from './review-sync';
-import { mountTaskCards } from './task-cards';
+import { compactToday, mountTaskCards, type PlaceOption } from './task-cards';
+import { createCaseFileBridge, type CaseFilePlace } from './case-file-bridge';
+import { caseFileOffer, composeCaseFile } from '../../../../../packages/problem-solver/case-file.mjs';
+import { currentEntry } from '../../../../../packages/problem-solver/lightning.mjs';
 import { createSessionSync } from './session-sync';
+import { mountFromLightning, mountLightningPage } from './lightning-view';
 import { tasksApi } from '@/services/client-api';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
@@ -29,7 +33,9 @@ let diagramNow: { destroy(): void } | null = null;
 /** The open session's Tasks listeners (live statuses), removed when the page changes. */
 let unsubscribeNow: Array<() => void> = [];
 
-const phaseLabel = (row: PsSummary): string => (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
+const phaseLabel = (row: PsSummary): string =>
+  row.kind === 'lightning' ? (row.escalatedTo ? 'Went to full process' : row.status === 'finished' || row.phase === 'finished' ? 'Done' : 'Lightning')
+  : (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
 const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--ps-blue)' : phase === 'finished' ? 'var(--ps-red)' : 'var(--ps-yellow)');
 const COLOURS = ['var(--ps-red)', 'var(--ps-yellow)', 'var(--ps-blue)'];
 
@@ -79,6 +85,43 @@ function startForm(onType: () => void): HTMLFormElement {
   return start;
 }
 
+function lightningCard(): HTMLElement {
+  const card = el('section', 'ps-lightning-card');
+  const form = el('form', 'ps-lightning-card__form') as HTMLFormElement;
+  const input = el('input', 'ps-lightning-card__input') as HTMLInputElement;
+  input.type = 'text';
+  input.placeholder = 'What is the snag?';
+  input.setAttribute('aria-label', 'Describe the snag');
+  const go = el('button', 'ps-lightning-card__go', 'Go') as HTMLButtonElement;
+  go.type = 'submit';
+  const status = el('p', 'ps-lightning-card__status');
+  status.setAttribute('role', 'status');
+  const row = el('div', 'ps-lightning-card__row');
+  row.append(input, go);
+  const head = el('div', 'ps-lightning-card__head');
+  head.append(lightningGlyph(), el('h2', 'ps-lightning-card__title', 'Lightning'));
+  form.append(row, status);
+  card.append(head, el('p', 'ps-lightning-card__line', 'A quick route for everyday snags.'), form);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      return;
+    }
+    go.disabled = true;
+    status.textContent = '';
+    try {
+      const session = await problemSolverApi.create({ text, kind: 'lightning' });
+      location.hash = `#/problem-solver?id=${session.id}`;
+    } catch (err) {
+      status.textContent = errorMessage(err);
+      go.disabled = false;
+    }
+  });
+  return card;
+}
+
 function problemCard(row: PsSummary, index: number): HTMLLIElement {
   const item = el('li', 'ps-prob') as HTMLLIElement;
   item.style.setProperty('--i', String(index));
@@ -86,11 +129,14 @@ function problemCard(row: PsSummary, index: number): HTMLLIElement {
   link.href = `#/problem-solver?id=${row.id}`;
   const medal = el('span', 'ps-prob__medal');
   const frame = row.frame ?? (row.phase === 'frame' ? 0 : 3);
-  medal.append(problemMedal(frame, row.tool));
+  if (row.kind === 'lightning') {
+    medal.classList.add('ps-prob__medal--lightning');
+    medal.append(lightningGlyph());
+  } else medal.append(problemMedal(frame, row.tool));
   const body = el('span', 'ps-prob__body');
   const meta = el('span', 'ps-prob__meta');
   const phase = el('span', 'ps-prob__phase', phaseLabel(row));
-  phase.style.setProperty('--c', phaseColour(row.phase));
+  phase.style.setProperty('--c', row.kind === 'lightning' ? 'var(--ps-ink)' : phaseColour(row.phase));
   meta.append(phase, el('span', '', row.tool ? TOOLS[row.tool].name : row.phase === 'frame' ? `Question ${Math.min(frame + 1, 3)} of 3` : ''), el('span', '', formatDisplayDate(row.updatedAt.slice(0, 10))));
   body.append(el('span', 'ps-prob__title', row.title), meta);
   const seen = Object.keys(row.skills ?? {});
@@ -191,7 +237,8 @@ async function renderList(canvas: HTMLElement): Promise<void> {
   const copy = el('div', 'ps-hero__copy');
   copy.append(
     el('p', 'ps-hero__lede', 'Name the thing that is stuck. A coach asks one question at a time and builds the toolkit’s charts with you, piece by piece.'),
-    startForm(() => board.nudge())
+    startForm(() => board.nudge()),
+    lightningCard()
   );
   hero.append(copy, board.el);
   page.append(hero);
@@ -267,8 +314,176 @@ export function reviewEntry(session: PsSession, wanted: string | null): ReviewEn
   return kind && step ? { kind, step } : null;
 }
 
+/**
+ * Where the case file can go, in order: linked projects, linked tasks, tasks made from the
+ * coach's proposals that are not linked already, then a new project named by the case file.
+ * `labels` maps `kind:id` to a fetched title.
+ */
+export function caseFilePlaces(session: PsSession, labels: Record<string, string>): PlaceOption[] {
+  const out: PlaceOption[] = [];
+  const seen = new Set<string>();
+  const add = (value: string, label: string) => {
+    if (seen.has(value)) return;
+    seen.add(value);
+    out.push({ value, label });
+  };
+  const named = (value: string, prefix: string, fallback: string) => (labels[value] ? `${prefix}: ${labels[value]}` : fallback);
+  for (const link of session.links) if (link.kind === 'project') add(`project:${link.id}`, named(`project:${link.id}`, 'Project', 'Linked project'));
+  for (const link of session.links) if (link.kind === 'task') add(`task:${link.id}`, named(`task:${link.id}`, 'Task', 'Linked task'));
+  for (const proposal of session.proposedTasks ?? []) {
+    if (proposal.status !== 'confirmed' || !proposal.taskId) continue;
+    const value = `task:${proposal.taskId}`;
+    add(value, `Task: ${labels[value] ?? proposal.title}`);
+  }
+  add('new', `New project: ${composeCaseFile(session)?.title ?? 'the case file'}`);
+  return out;
+}
+
+type CaseFileChoice = { place: CaseFilePlace; title: string; moved?: boolean };
+
+/**
+ * The card's write, run from the latest session at click time, never a snapshot captured
+ * earlier, so a stale copy cannot write twice or make a second project. If the latest offer
+ * is no longer the card's (its content or the record moved on), nothing is written.
+ */
+export function latestCaseFileWriter(
+  latest: () => PsSession,
+  write: (session: PsSession, offer: PsCaseFileOffer, choice: CaseFileChoice) => Promise<void>
+): (offer: PsCaseFileOffer, choice: CaseFileChoice) => Promise<void> {
+  return async (offer, choice) => {
+    const session = latest();
+    const now = caseFileOffer(session);
+    if (!now || now.key !== offer.key) throw new Error('The case file changed; check the card again.');
+    await write(session, now, choice);
+  };
+}
+
+/** The session sync for a page: one poll at a time, kept in `poll` so leaving the page aborts it. */
+function syncFor(initial: PsSession, render: (session: PsSession) => void, alive: () => boolean) {
+  return createSessionSync({
+    initial,
+    render,
+    actWith: (s, action, payload) => problemSolverApi.actWith(s, action, payload),
+    get: (sessionId) => problemSolverApi.get(sessionId),
+    poll: (sessionId, onUpdate) => {
+      poll?.abort();
+      poll = new AbortController();
+      return pollUntilSettled(sessionId, onUpdate, { signal: poll.signal });
+    },
+    alive
+  });
+}
+
+const isConflict = (err: unknown): boolean => (err as { code?: string }).code === 'conflict';
+
+/**
+ * A Lightning run: the question strip, the chart (Yes and No on its current box), the coach,
+ * and how the run ends. Every action goes through the session sync; a conflict refetches.
+ */
+async function renderLightningSession(canvas: HTMLElement, initial: PsSession): Promise<void> {
+  const view = mountLightningPage(initial, {
+    onAnswer: (node, answer) => void answerBox(node, answer),
+    onSay: (text) => void say(text),
+    onAction: (action) => void coachAction(action),
+    onAgain: () => again()
+  });
+  canvas.replaceChildren(view.el);
+  diagramNow = view;
+  const alive = () => view.el.isConnected;
+  const sync = syncFor(initial, (next) => view.update(next), alive);
+
+  /** A failed post: a conflict shows the latest instead; anything else is flashed. */
+  async function recover(err: unknown): Promise<void> {
+    if (!alive()) return;
+    if (!isConflict(err)) return view.flash(err);
+    try {
+      sync.paint(await problemSolverApi.get(sync.session().id));
+    } catch (fetchErr) {
+      view.flash(fetchErr);
+    }
+  }
+
+  /** Post through the sync; true when it went through. */
+  async function post(action: PsAction, payload: Record<string, unknown>): Promise<boolean> {
+    try {
+      await sync.confirmed(action, payload);
+      return true;
+    } catch (err) {
+      await recover(err);
+      return false;
+    }
+  }
+  const settleIfBusy = async () => {
+    if (alive() && isBusy(sync.session())) await sync.settle();
+  };
+
+  /** A click on a box that has moved on, or while the coach is thinking, is dropped, not posted. */
+  async function answerBox(node: string, answer: 'yes' | 'no'): Promise<void> {
+    const now = sync.session();
+    const current = now.lightning ? currentEntry(now.lightning) : null;
+    if (!current || current.node !== node || isBusy(now)) {
+      view.releaseAnswer();
+      return;
+    }
+    if (await post('lightning_answer', { node, answer })) await settleIfBusy();
+    else view.releaseAnswer();
+  }
+
+  /** It came back: once the new round is in and the coach has asked, the composer takes focus. */
+  async function again(): Promise<void> {
+    if (!(await post('lightning_again', {}))) return;
+    await settleIfBusy();
+    if (alive()) view.focusComposer();
+  }
+
+  const openFull = (to: string) => {
+    if (alive()) location.hash = `#/problem-solver?id=${encodeURIComponent(to)}`;
+  };
+
+  /**
+   * Start the full process. The card waits while the post is out. A run already escalated
+   * (in another tab, say) opens its full session instead of showing the refusal.
+   */
+  async function escalate(): Promise<void> {
+    view.setEscalating(true);
+    try {
+      await sync.confirmed('escalate', {});
+    } catch (err) {
+      const already = sync.session().lightning?.escalatedTo;
+      if (already) return openFull(already);
+      view.setEscalating(false);
+      await recover(err);
+      return;
+    }
+    const to = sync.session().lightning?.escalatedTo;
+    if (to) openFull(to);
+    else view.setEscalating(false);
+  }
+
+  async function coachAction(action: PsAction): Promise<void> {
+    if (action === 'escalate') return escalate();
+    if (await post(action, {})) await settleIfBusy();
+  }
+
+  /** A reply typed to the coach: queued behind any write, posted with the latest revision. */
+  async function say(text: string): Promise<void> {
+    try {
+      const next = await sync.enqueue(() => problemSolverApi.act(sync.session(), 'say', text));
+      sync.paint(next);
+    } catch (err) {
+      await recover(err);
+      return;
+    }
+    await settleIfBusy();
+  }
+
+  view.update(initial);
+  await settleIfBusy();
+}
+
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await problemSolverApi.get(id);
+  if (session.kind === 'lightning') return renderLightningSession(canvas, session);
   const page = el('div', 'ps-page ps-session ps-scope');
   const back = el('a', 'ps-back', '← Problems') as HTMLAnchorElement;
   back.href = '#/problem-solver';
@@ -279,12 +494,18 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const canvasHost = el('div', 'ps-canvas');
   const tray = createSkillTray();
   const review = mountReviewPanel({ start: () => void reviews.startReview() });
-  bench.append(review.el, canvasHost, tray.el);
+  // A full session that came from a Lightning run shows that run's chart, closed until opened.
+  const fromLightning = session.escalatedFrom ? mountFromLightning(session.escalatedFrom, (runId) => problemSolverApi.get(runId)) : null;
+  if (fromLightning) unsubscribeNow.push(() => fromLightning.destroy());
+  bench.append(review.el, canvasHost, ...(fromLightning ? [fromLightning.el] : []), tray.el);
   const cards = mountTaskCards({
     create: (proposal, edits) => bridge.create(session, proposal, edits),
     dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
     createReview: (edits) => bridge.createReview(session, edits),
-    dismissReview: () => confirmed('dismiss_review', {})
+    dismissReview: () => confirmed('dismiss_review', {}),
+    places: (s) => placesFor(s),
+    writeCaseFile: (offer, choice) => writeCaseFile(offer, choice),
+    dismissCaseFile: (key) => confirmed('dismiss_case_file', { key })
   }, { fallbackFocus: () => coach.el.querySelector('textarea') });
   const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el });
   const coachHost = el('div', 'ps-coach-host');
@@ -318,18 +539,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     reviews.onRender(session);
   };
 
-  const sync = createSessionSync({
-    initial: session,
-    render,
-    actWith: (s, action, payload) => problemSolverApi.actWith(s, action, payload),
-    get: (sessionId) => problemSolverApi.get(sessionId),
-    poll: (sessionId, onUpdate) => {
-      poll?.abort();
-      poll = new AbortController();
-      return pollUntilSettled(sessionId, onUpdate, { signal: poll.signal });
-    },
-    alive: () => page.isConnected
-  });
+  const sync = syncFor(session, render, () => page.isConnected);
   const paint = (next: PsSession) => void sync.paint(next);
   const settle = () => sync.settle();
   /** Task writes: after the coach settles, one at a time, a stale revision retried once. */
@@ -362,6 +572,33 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     dismiss: (proposalId, reason) => confirmed('dismiss_task', { proposalId, ...(reason ? { reason } : {}) }),
     setReview: (taskId, due) => confirmed('set_review_task', { taskId, due })
   });
+
+  /** Titles for the linked pages; a page that cannot be fetched keeps its fallback label. */
+  async function placesFor(s: PsSession): Promise<PlaceOption[]> {
+    const labels: Record<string, string> = {};
+    const linked = s.links.filter((link) => link.kind === 'project' || link.kind === 'task');
+    await Promise.all(linked.map(async (link) => {
+      try {
+        const page = link.kind === 'project' ? await tasksApi.getProject(link.id) : await tasksApi.getTask(link.id);
+        if (page.title) labels[`${link.kind}:${link.id}`] = page.title;
+      } catch {
+        /* the fallback label stands */
+      }
+    }));
+    return caseFilePlaces(s, labels);
+  }
+
+  const caseFiles = createCaseFileBridge({
+    createProject: (body) => tasksApi.createProject({ title: body.title, purpose: `Case file for the problem "${sync.session().title}"` }),
+    getProject: (projectId) => tasksApi.getProject(projectId),
+    updateProject: (projectId, body) => tasksApi.updateProject(projectId, body),
+    getTask: (taskId) => tasksApi.getTask(taskId),
+    updateTask: (taskId, body) => tasksApi.updateTask(taskId, body),
+    link: (payload) => confirmed('link_case_file', payload),
+    today: compactToday
+  });
+
+  const writeCaseFile = latestCaseFileWriter(() => sync.session(), (latest, offer, choice) => caseFiles.write(latest, offer, choice));
 
   const reviews = createReviewSync({
     getSession: () => session,

@@ -3,6 +3,7 @@ import { isSkillId } from '../../../../packages/problem-solver/skills.mjs';
 import { MODEL_IDS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOL_IDS } from '../../../../packages/problem-solver/tools/index.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
+import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightning.mjs';
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
 
 const VERDICTS = ['accept', 'challenge', 'clarify'];
@@ -49,6 +50,7 @@ function suggestionOf(raw) {
     return { value: { kind: raw.kind, tool: raw.tool, reason } };
   }
   if (raw.kind === 'next_step' || raw.kind === 'finish_define') return { value: { kind: 'next_step', reason } };
+  if (raw.kind === 'escalate') return { value: { kind: 'escalate', reason } };
   if (raw.kind === 'reopen_step') {
     if (!['define', 'analyse'].includes(raw.step)) return { error: 'reopen_step needs step define or analyse.' };
     return { value: { kind: 'reopen_step', step: raw.step, reason } };
@@ -93,6 +95,14 @@ export function validateCoachTurn(raw) {
   const suggestion = suggestionOf(raw.suggestion);
   if (suggestion.error) return fail(suggestion.error);
 
+  let lightning = null;
+  if (raw.lightning != null) {
+    if (!LIGHTNING_NODE_IDS.includes(raw.lightning?.node)) return fail(`Unknown Lightning box: ${raw.lightning?.node}`);
+    const answer = ['yes', 'no'].includes(raw.lightning.answer) ? raw.lightning.answer : null;
+    const note = text(raw.lightning.note);
+    lightning = { node: raw.lightning.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}) };
+  }
+
   const proposeTasks = [];
   for (const item of Array.isArray(raw.proposeTasks) ? raw.proposeTasks.slice(0, 5) : []) {
     const title = text(item?.title, 120);
@@ -116,6 +126,7 @@ export function validateCoachTurn(raw) {
       summary: text(raw.summary, 1200),
       exitObjection: text(raw.exitObjection, 400),
       learning: text(raw.learning, 600),
+      lightning,
       proposeTasks,
       proposeReview
     }

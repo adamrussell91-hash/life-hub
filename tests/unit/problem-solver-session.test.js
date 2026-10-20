@@ -5,7 +5,7 @@ import {
   acceptSuggestion, activeRun, applyCoachTurn, createSession, dismissSuggestion,
   archive, moveOn, keepAnyway, score, rescoreRadar, say, summaryRow, followOn,
   confirmTask, dismissTask, setReviewTask, dismissReview,
-  startReview, taskStatus, reopenProblem, waitingForReview
+  startReview, taskStatus, reopenProblem, waitingForReview, linkCaseFile, dismissCaseFile
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
@@ -164,7 +164,7 @@ test('a dismissed opening suggestion stays dismissed until the step changes', ()
   assert.equal(s.suggestion, null, 'the opening suggestion does not come back');
   s = applyCoachTurn(moveOn(s, deps), coach({ verdict: 'clarify', message: 'Skipped.' }), deps);
   assert.notEqual(s.phase, 'general_problem');
-  assert.equal(s.suggestion, null);
+  assert.equal(s.suggestion?.kind, 'next_tool', 'a step left untouched opens the next step with its tool at once');
   s = applyCoachTurn(say(s, 'Ok.', deps), coach({ verdict: 'clarify', message: 'Go on.' }), deps);
   assert.ok(s.suggestion === null || s.suggestion.kind === 'next_tool', 'a new step can open with a suggestion again');
 });
@@ -234,7 +234,7 @@ test('say appends a user turn and queues; summary rows are small', () => {
   const s = say(framed(), 'Because the roster is drafted on Friday.', deps);
   assert.equal(s.runner.status, 'queued');
   const row = summaryRow(s);
-  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewDue', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
+  assert.deepEqual(Object.keys(row).sort(), ['createdAt', 'escalatedTo', 'frame', 'id', 'kind', 'links', 'model', 'phase', 'reviewDue', 'reviewTaskId', 'skills', 'status', 'taskIds', 'title', 'tool', 'updatedAt']);
   assert.equal(row.tool, 'five_whys');
   assert.equal(summaryRow(row), row);
 });
@@ -680,4 +680,148 @@ test('a reopen during a late review returns to Improve, then to where the sessio
   assert.equal(nextPhase(s), 'document');
   s = idle(moveOn(s, deps));
   assert.equal(s.phase, 'document');
+});
+
+/** In Document with a 5 Cs run whose name is next. */
+function namingNext() {
+  let s = idle(acceptSuggestion({ ...at('document'), suggestion: { kind: 'next_tool', tool: 'five_cs', reason: 'r' } }, deps));
+  for (const [slot, text] of [['contextualise', 'So next term starts without the same scramble'], ['categorise', 'On the Kitchen rota project page'], ['condense:1', 'Publish the rota on Wednesday'], ['correct', 'Nothing in it needs correcting now']]) {
+    s = idle(applyCoachTurn(s, coach({ node: { slot, text } }), deps));
+  }
+  return s;
+}
+const NAME = 'Kitchen rota case file 20261020 v1 Final';
+const named = () => idle(applyCoachTurn(namingNext(), coach({ node: { slot: 'correspond', text: NAME } }), deps));
+const digests = { purpose: '0a1b2c3d', kept: '1a2b3c4d' };
+
+test('a new session has no case file', () => {
+  const s = createSession({ text: 'x' }, deps);
+  assert.equal(s.caseFile, null);
+  assert.equal(s.caseFileDeclined, null);
+});
+
+test('an accepted name that breaks a strict rule is not placed; Keep it anyway refuses it too', () => {
+  let s = idle(applyCoachTurn(namingNext(), coach({ node: { slot: 'correspond', text: 'rota stuff' } }), deps));
+  assert.equal(activeRun(s).nodes.some((x) => x.slot === 'correspond'), false);
+  s = idle(applyCoachTurn(s, coach({ verdict: 'challenge', node: { slot: 'correspond', text: 'rota stuff' } }), deps));
+  assert.equal(s.pendingKeep.slot, 'correspond');
+  assert.throws(() => keepAnyway(s, deps), /naming rule: add the date/);
+  s = idle(applyCoachTurn(s, coach({ node: { slot: 'correspond', text: NAME } }), deps));
+  assert.equal(activeRun(s).nodes.at(-1).text, NAME);
+});
+
+test('link_case_file records the first write and links the page', () => {
+  const s = linkCaseFile(named(), { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps);
+  assert.deepEqual(s.caseFile, { title: NAME, version: 1, target: { kind: 'project', id: 'proj1' }, writtenAt: deps.now(), sections: digests, history: [{ version: 1, at: deps.now(), target: { kind: 'project', id: 'proj1' } }] });
+  assert.deepEqual(s.links.at(-1), { kind: 'project', id: 'proj1' });
+  assert.equal(s.runner.status, 'idle', 'no coach call');
+  assert.equal(linkCaseFile(s, { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps), s, 'a retry is a no-op');
+});
+
+test('an update is the next version on the same page and merges its sections; a move replaces them', () => {
+  const s = linkCaseFile(named(), { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps);
+  const up = linkCaseFile(s, { target: { kind: 'project', id: 'proj1' }, version: 2, title: 'Kitchen rota case file 20261102 v2 Final', sections: { learned: '2a3b4c5d' } }, deps);
+  assert.equal(up.caseFile.version, 2);
+  assert.deepEqual(up.caseFile.sections, { ...digests, learned: '2a3b4c5d' });
+  assert.equal(up.caseFile.history.length, 2);
+  assert.equal(up.links.filter((l) => l.id === 'proj1').length, 1);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'proj1' }, version: 3, title: NAME, sections: digests }, deps), /next case file version is v2/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'task', id: 't9' }, version: 2, title: NAME, sections: digests }, deps), /already on/);
+  const moved = linkCaseFile(s, { target: { kind: 'task', id: 't9' }, version: 2, title: NAME, sections: { kept: '9a9b9c9d' }, moved: true }, deps);
+  assert.deepEqual(moved.caseFile.sections, { kept: '9a9b9c9d' });
+  assert.deepEqual(moved.caseFile.target, { kind: 'task', id: 't9' });
+});
+
+test('link_case_file validates its payload', () => {
+  const s = named();
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'goal', id: 'g' }, version: 1, title: NAME, sections: digests }, deps), /task or project/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 0, title: NAME, sections: digests }, deps), /version/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: '', sections: digests }, deps), /title/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: { purpose: 'nothex!!' } }, deps), /sections/);
+  assert.throws(() => linkCaseFile({ ...s, status: 'archived' }, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: digests }, deps), /archived/);
+});
+
+test('Not now on the case file stores its key; a new write clears it', () => {
+  let s = dismissCaseFile(named(), { key: 'abcdef12' }, deps);
+  assert.equal(s.caseFileDeclined, 'abcdef12');
+  assert.equal(dismissCaseFile(s, { key: 'abcdef12' }, deps), s);
+  assert.throws(() => dismissCaseFile(s, { key: 'x' }, deps), /key/);
+  s = linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: digests }, deps);
+  assert.equal(s.caseFileDeclined, null);
+});
+
+test('Document re-entered after a late review keeps its runs and its case file', () => {
+  let s = idle(moveOn(implementDone(), deps));
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'document');
+  s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'five_cs', reason: 'r' } }, deps));
+  s = linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: digests }, deps);
+  s = idle(startReview(s, {}, deps));
+  assert.equal(s.phase, 'improve');
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'document');
+  assert.equal(s.steps.document.runs.length, 1);
+  assert.equal(s.caseFile.version, 1);
+});
+
+test('link_case_file adds its page even when the session already has 20 links', () => {
+  const full = { ...named(), links: Array.from({ length: 20 }, (_, i) => ({ kind: 'task', id: `l${i}` })) };
+  const s = linkCaseFile(full, { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps);
+  assert.deepEqual(s.links.at(-1), { kind: 'project', id: 'proj1' });
+});
+
+test('a refused name drops the coach suggestion for that turn', () => {
+  const s = idle(applyCoachTurn(namingNext(), coach({ node: { slot: 'correspond', text: 'rota stuff' }, suggestion: { kind: 'next_step', reason: 'Ready.' } }), deps));
+  assert.equal(activeRun(s).nodes.some((x) => x.slot === 'correspond'), false);
+  assert.equal(s.suggestion, null);
+});
+
+test('an escalate suggestion cannot be accepted as a tool; the session is unchanged', () => {
+  const s = { ...idle(framed()), suggestion: { kind: 'escalate', reason: 'Too big for a quick pass.' } };
+  assert.ok(s.steps[s.phase], 'a step is open');
+  assert.throws(() => acceptSuggestion(s, deps), (err) => err.status === 409 && /escalate action/.test(err.message));
+  assert.equal(s.suggestion.kind, 'escalate');
+});
+
+test('set_review_task is refused on a session with no model (a Lightning run)', () => {
+  const s = createSession({ text: 'I keep missing the bus.' }, deps);
+  assert.equal(s.model, null);
+  assert.throws(() => setReviewTask(s, { taskId: 't1' }, deps), (err) => err.status === 409 && /no review/.test(err.message));
+});
+
+test('leaving a step untouched brings the next step\'s opening tool at once', () => {
+  let s = moveOn(at('analyse'), deps);
+  assert.equal(s.runner.mode, 'boundary');
+  s = applyCoachTurn(s, coach({ verdict: 'clarify' }), deps);
+  assert.equal(s.phase, 'devise');
+  assert.equal(s.suggestion?.kind, 'next_tool', 'no reply needed first');
+  assert.equal(s.pendingLearning, null);
+});
+
+test('leaving a step with work in it still asks the learning question before any tool', () => {
+  let s = framed();
+  s = idle(applyCoachTurn(s, coach({ node: { slot: 'problem', text: 'The rota changes too late for staff to plan.' } }), deps));
+  s = applyCoachTurn(moveOn(s, deps), coach({ verdict: 'clarify' }), deps);
+  assert.equal(s.suggestion, null);
+  assert.equal(s.pendingLearning, 'define');
+});
+
+test('a review records how many Improve runs came before it', () => {
+  let s = idle(moveOn(implementDone(), deps));
+  s = idle(startReview(s, {}, deps));
+  assert.equal(s.reviewState.runsBefore, 0);
+  const t = startReview(idle(moveOn(implementDone(), deps)), {}, deps);
+  assert.equal(t.reviewState.runsBefore, 0);
+});
+
+test('a late review records the Improve runs already finished before it', () => {
+  let s = idle(dismissReview(idle(moveOn(implementDone(), deps)), deps));
+  s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'after_action_review', reason: 'r' } }, deps));
+  s = { ...s, steps: { ...s.steps, improve: { ...s.steps.improve, runs: s.steps.improve.runs.map((run) => ({ ...run, status: 'done' })) } } };
+  assert.equal(s.steps.improve.runs.length, 1);
+  s = idle(moveOn(s, deps));
+  s = { ...s, reviewTaskId: 'task9', reviewProposal: { title: 'Review: Late rota', due: '2026-11-02', reason: '', status: 'confirmed' }, reviewState: null };
+  const late = startReview(s, {}, deps);
+  assert.equal(late.reviewState.status, 'reviewing');
+  assert.equal(late.reviewState.runsBefore, 1);
 });

@@ -64,6 +64,7 @@ test('boundary prompt names the step left and asks for the learning question', (
   const { user } = buildCoachPrompt(s);
   assert.match(user, /MODE: boundary\. The person has just left Define/);
   assert.match(user, /exitObjection/);
+  assert.match(user, /how they solve problems/);
   assert.match(user, /PHASE: analyse/);
 });
 
@@ -76,6 +77,8 @@ test('boundary prompt after skipping a step with no runs asks about the next ste
   assert.doesNotMatch(user, /what they learned/i);
   assert.match(user, /acknowledge/i);
   assert.match(user, /what they want from Devise/);
+  assert.doesNotMatch(user, /No tool suggestion yet/);
+  assert.match(user, /naming the current step's first tool/);
 });
 
 test('after a boundary the prompt asks the coach to record the learning and open the step', () => {
@@ -279,4 +282,42 @@ test('leaving a waiting Improve is not treated as a skip', () => {
   assert.match(mode, /2026-11-02/);
   assert.doesNotMatch(mode, /skipped/i);
   assert.match(mode, /do not object/i);
+});
+
+const documentAt = (runs, extra = {}) => ({ ...inTool(), phase: 'document', steps: { ...inTool().steps, document: { runs, status: 'open', objection: null } }, runner: { status: 'idle', mode: 'turn', error: null }, caseFile: null, caseFileDeclined: null, ...extra });
+const doneFiveCs = () => ({ id: 'r5', tool: 'five_cs', status: 'active', edges: [], nodes: [
+  ['contextualise', 'So next term starts calmly'], ['categorise', 'On the rota project page'], ['condense:1', 'Publish on Wednesday'],
+  ['correct', 'Nothing needs correcting'], ['correspond', 'Kitchen rota case file 20261020 v1 Final']
+].map(([slot, text]) => ({ id: slot, slot, text, title: slot, state: 'accepted' })) });
+
+test('rubric explains the case file and the name rules', () => {
+  for (const word of ['CASE FILE', 'node.text', 'Document']) assert.ok(RUBRIC.includes(word), word);
+});
+
+test('the Document step carries its guide, triggers and carry-forward', () => {
+  const { system } = buildCoachPrompt(documentAt([]));
+  assert.match(system[1], /CURRENT STEP: Document/);
+  assert.match(system[1], /five_cs \(5 Cs documentation\)/);
+  assert.match(system[1], /CHALLENGE IN THIS STEP/);
+  assert.match(system[1], /CARRY FORWARD:/);
+});
+
+test('a case file ready to write is named, and a written one says where and which version', () => {
+  assert.match(buildCoachPrompt(documentAt([doneFiveCs()])).user, /CASE FILE: ready to write as "Kitchen rota case file 20261020 v1 Final"/);
+  const written = documentAt([doneFiveCs()], { caseFile: { title: 'Kitchen rota case file 20261020 v1 Final', version: 1, target: { kind: 'project', id: 'p' }, writtenAt: '2026-10-20T09:00:00.000Z', sections: {}, history: [] } });
+  assert.match(buildCoachPrompt(written).user, /CASE FILE: v1 "Kitchen rota case file 20261020 v1 Final" written 2026-10-20 to the linked project/);
+  assert.match(buildCoachPrompt(written).user, /Changed since it was written: /);
+});
+
+test('carried Lightning seeds show while framing; the tried line stays after', () => {
+  const frameSeeds = { goal: 'Catch the 8.05 every weekday', whatIsTrue: 'Tried draw a diagram: not solved.', tried: [{ node: 'diagram', label: 'Draw a diagram', note: null, outcome: 'not solved', round: 1 }] };
+  const framing = buildCoachPrompt({ ...createSession({ text: 'Late work.' }, deps), frameSeeds });
+  assert.match(framing.user, /CARRIED FROM LIGHTNING/);
+  assert.match(framing.user, /Catch the 8\.05 every weekday/);
+  assert.match(framing.user, /Tried draw a diagram: not solved\./);
+  assert.match(framing.user, /TRIED IN LIGHTNING: Draw a diagram: not solved/);
+  assert.match(framing.user, /causal_map/);
+  const past = buildCoachPrompt({ ...inTool(), frameSeeds });
+  assert.doesNotMatch(past.user, /CARRIED FROM LIGHTNING/);
+  assert.match(past.user, /TRIED IN LIGHTNING: Draw a diagram: not solved/);
 });

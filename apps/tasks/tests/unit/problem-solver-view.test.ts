@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { mountCoachPanel, renderCoachPanel } from '@/views/problem-solver/coach-panel';
 import { createTrack, problemMedal } from '@/views/problem-solver/decor';
 import { mountCanvas } from '@/views/problem-solver/canvas';
-import { reviewEntry } from '@/views/problem-solver/view';
+import { caseFilePlaces, latestCaseFileWriter, reviewEntry } from '@/views/problem-solver/view';
+import { caseFileOffer } from '../../../../packages/problem-solver/case-file.mjs';
 import type { PsSession } from '../../../../packages/problem-solver/types';
 
 const morph = vi.hoisted(() => vi.fn());
@@ -366,7 +367,7 @@ describe('landing tool shelf', () => {
     const { toolShelf } = await import('@/views/problem-solver/view');
     const shelf = toolShelf();
     const steps = [...shelf.querySelectorAll<HTMLElement>('[data-step]')].map((group) => group.dataset.step);
-    expect(steps).toEqual(['define', 'analyse', 'devise', 'decide', 'implement', 'improve']);
+    expect(steps).toEqual(['define', 'analyse', 'devise', 'decide', 'implement', 'improve', 'document']);
     const analyse = shelf.querySelector('[data-step="analyse"]')!;
     expect(analyse.querySelector('h3')!.textContent).toBe('Analyse');
     const names = [...analyse.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
@@ -396,6 +397,19 @@ describe('landing tool shelf', () => {
     const emblems = new Set([EMBLEM_SVG.after_action_review, EMBLEM_SVG.double_loop, EMBLEM_SVG.feedback_matrix, EMBLEM_SVG.eisenhower]);
     expect(emblems.size).toBe(4);
   });
+
+  it('shelves the two Document tools, each with its own emblem', async () => {
+    const { toolShelf } = await import('@/views/problem-solver/view');
+    const { EMBLEM_SVG } = await import('../../../../packages/problem-solver/glyphs');
+    const document_ = toolShelf().querySelector('[data-step="document"]')!;
+    expect(document_.querySelector('h3')!.textContent).toBe('Document');
+    const names = [...document_.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
+    expect(names).toEqual(expect.arrayContaining(['5 Cs documentation', 'Knowledge management']));
+    expect(names).toHaveLength(2);
+    expect(document_.querySelectorAll('.ps-emblem svg')).toHaveLength(2);
+    const emblems = new Set([EMBLEM_SVG.five_cs, EMBLEM_SVG.knowledge_management, EMBLEM_SVG.eisenhower]);
+    expect(emblems.size).toBe(3);
+  });
 });
 
 describe('session page scores', () => {
@@ -418,6 +432,57 @@ describe('session page scores', () => {
     get.mockRestore();
     score.mockRestore();
     location.hash = '';
+  });
+});
+
+describe('Lightning on the landing page', () => {
+  const row = (extra: Record<string, unknown>) => ({ id: 'l1', title: 'Stuck door', status: 'active', phase: 'lightning', model: null, tool: null, links: [], createdAt: '', updatedAt: '2026-10-20T10:00:00Z', kind: 'lightning', ...extra });
+
+  it('shows the Lightning card after the start form and creates a run', async () => {
+    const { renderProblemSolverView } = await import('@/views/problem-solver/view');
+    const { problemSolverApi } = await import('@/views/problem-solver/api');
+    vi.spyOn(problemSolverApi, 'list').mockResolvedValue([]);
+    const create = vi.spyOn(problemSolverApi, 'create').mockResolvedValue({ id: 'new1' } as PsSession);
+    location.hash = '';
+    const host = document.createElement('div');
+    await renderProblemSolverView(host);
+    const card = host.querySelector<HTMLElement>('section.ps-lightning-card')!;
+    expect(card).not.toBeNull();
+    expect(card.previousElementSibling?.classList.contains('ps-start')).toBe(true);
+    expect(card.querySelector('.ps-lightning-glyph svg')).not.toBeNull();
+    expect(card.querySelector('h2')!.textContent).toBe('Lightning');
+    expect(card.textContent).toContain('A quick route for everyday snags.');
+    const input = card.querySelector<HTMLInputElement>('input[aria-label="Describe the snag"]')!;
+    expect(card.querySelector('button[type="submit"]')!.textContent).toBe('Go');
+    document.body.append(host);
+    card.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(create).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(input);
+    input.value = 'The door sticks';
+    card.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await vi.waitFor(() => expect(location.hash).toBe('#/problem-solver?id=new1'));
+    expect(create).toHaveBeenCalledWith({ text: 'The door sticks', kind: 'lightning' });
+    host.remove();
+    vi.restoreAllMocks();
+    location.hash = '';
+  });
+
+  it('marks Lightning rows with the glyph and a Lightning phase label', async () => {
+    const { renderProblemSolverView } = await import('@/views/problem-solver/view');
+    const { problemSolverApi } = await import('@/views/problem-solver/api');
+    vi.spyOn(problemSolverApi, 'list').mockResolvedValue([
+      row({ id: 'a' }), row({ id: 'b', status: 'finished', phase: 'finished' }), row({ id: 'c', escalatedTo: 'full1' })
+    ] as never);
+    location.hash = '';
+    const host = document.createElement('div');
+    await renderProblemSolverView(host);
+    const items = [...host.querySelectorAll('.ps-prob:not(.ps-prob--new)')];
+    expect(items.map((item) => item.querySelector('.ps-prob__phase')!.textContent)).toEqual(['Lightning', 'Done', 'Went to full process']);
+    for (const item of items) {
+      expect(item.querySelector('.ps-lightning-glyph svg')).not.toBeNull();
+      expect(item.querySelector('.ps-medal')).toBeNull();
+    }
+    vi.restoreAllMocks();
   });
 });
 
@@ -452,5 +517,47 @@ describe('reviewEntry', () => {
     expect(reviewEntry(session({ phase: 'define', detour: { from: 'improve', to: 'define', reason: 'r', at: '' }, ...live }), 'improve')).toBeNull();
     expect(reviewEntry(session({ phase: 'decide', ...live }), 'improve')).toBeNull();
     expect(reviewEntry(session({ phase: 'frame', model: null, ...live }), 'improve')).toBeNull();
+  });
+});
+
+describe('caseFilePlaces', () => {
+  const NAME = 'Kitchen rota case file 20261020 v1 Final';
+  const five = { id: 'r5', tool: 'five_cs', status: 'done', edges: [], nodes: ['contextualise', 'categorise', 'condense:1', 'correct'].map((slot) => ({ id: slot, slot, text: `About ${slot}`, state: 'accepted' })).concat([{ id: 'c', slot: 'correspond', text: NAME, state: 'accepted' }]) };
+  const doc = (extra: Partial<PsSession> = {}) => session({
+    phase: 'document', pendingKeep: null,
+    steps: { document: { runs: [five], status: 'open', objection: null } } as unknown as PsSession['steps'],
+    links: [{ kind: 'task', id: 't9' }, { kind: 'goal', id: 'g1' }, { kind: 'project', id: 'p1' }],
+    proposedTasks: [
+      { id: 'a', title: 'Draft rota', status: 'confirmed', taskId: 't1' },
+      { id: 'b', title: 'Linked already', status: 'confirmed', taskId: 't9' },
+      { id: 'c', title: 'Not yet', status: 'proposed' }
+    ],
+    reviewState: null, caseFile: null, caseFileDeclined: null,
+    ...extra
+  } as Partial<PsSession>);
+
+  it('lists linked projects, linked tasks, unlisted proposal tasks, then a new project', () => {
+    expect(caseFilePlaces(doc(), { 'project:p1': 'Kitchen rota', 'task:t1': 'Draft the rota' })).toEqual([
+      { value: 'project:p1', label: 'Project: Kitchen rota' },
+      { value: 'task:t9', label: 'Linked task' },
+      { value: 'task:t1', label: 'Task: Draft the rota' },
+      { value: 'new', label: `New project: ${NAME}` }
+    ]);
+  });
+
+  it('falls back to Linked project when a title could not be fetched', () => {
+    expect(caseFilePlaces(doc(), {})[0]).toEqual({ value: 'project:p1', label: 'Linked project' });
+  });
+
+  it('writes from the latest session, and refuses when its offer has moved on', async () => {
+    const card = caseFileOffer(doc())!;
+    let latest = doc({ revision: 9 });
+    const write = vi.fn().mockResolvedValue(undefined);
+    const run = latestCaseFileWriter(() => latest, write);
+    await run(card, { place: 'new', title: NAME });
+    expect(write).toHaveBeenCalledWith(latest, expect.objectContaining({ key: card.key }), { place: 'new', title: NAME });
+    latest = doc({ caseFile: { title: NAME, version: 1, target: { kind: 'project', id: 'p7' }, writtenAt: 'x', sections: card.digests, history: [] } });
+    await expect(run(card, { place: 'new', title: NAME })).rejects.toThrow('The case file changed; check the card again.');
+    expect(write).toHaveBeenCalledTimes(1);
   });
 });
