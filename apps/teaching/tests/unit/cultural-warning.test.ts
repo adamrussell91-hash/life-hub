@@ -19,7 +19,13 @@ beforeEach(() => {
   reduced = false;
   painted = vi.fn();
   disconnected = vi.fn();
-  const context = new Proxy({}, { get: (_, key) => key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : key === 'fill' ? painted : vi.fn(), set: () => true });
+  // One stub per method: the painter makes thousands of calls, and a fresh vi.fn() per call is slow enough to time the test out under load.
+  const stubs = new Map<PropertyKey, unknown>();
+  const stub = (key: PropertyKey) => {
+    if (!stubs.has(key)) stubs.set(key, key === 'createLinearGradient' ? () => ({ addColorStop() {} }) : key === 'fill' ? painted : () => {});
+    return stubs.get(key);
+  };
+  const context = new Proxy({}, { get: (_, key) => stub(key), set: () => true });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as CanvasRenderingContext2D);
   vi.stubGlobal('requestAnimationFrame', vi.fn((cb: FrameRequestCallback) => { frame = cb; return 1; }));
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
