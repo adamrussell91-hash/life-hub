@@ -1623,10 +1623,6 @@ button.tk-chip:focus-visible {
   border-color: color-mix(in srgb, var(--an-ink) 30%, #fff);
 }
 
-.an-org .an-box__frame {
-  color: var(--muted);
-}
-
 .an-org.is-example .an-box__frame {
   display: none;
 }
@@ -1759,16 +1755,6 @@ button.tk-chip:focus-visible {
   text-align: center;
   border-style: solid;
   border-color: color-mix(in srgb, var(--an-ink) 35%, #fff);
-}
-
-.an-bench__analogy .an-box__frame,
-.an-bench__analogy .an-box__example {
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-}
-
-.an-bench__analogy .an-box__example {
-  color: var(--depth);
 }
 
 .an-bench__sides {

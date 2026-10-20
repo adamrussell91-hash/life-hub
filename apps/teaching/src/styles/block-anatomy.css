@@ -72,6 +72,11 @@
   color: var(--ink);
 }
 
+/* Prompt text standing in for an answer, like a field placeholder. */
+.block-body.block-body--placeholder {
+  color: var(--muted);
+}
+
 .block-secondary {
   margin: 0;
   font-family: var(--font-ui);

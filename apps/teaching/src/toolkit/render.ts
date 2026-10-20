@@ -1476,7 +1476,7 @@ function box(slot: Slot | undefined, className = ''): HTMLElement | null {
   const node = el('div', `an-box ${className}`.trim());
   node.dataset.slot = slot.key;
   if (slot.label.trim()) node.append(el('span', 'an-box__label block-subtitle', slot.label.trim()));
-  node.append(el('span', 'an-box__frame block-body', slot.frame.trim() || ' '));
+  node.append(el('span', 'an-box__frame block-body block-body--placeholder', slot.frame.trim() || ' '));
   node.append(el('span', 'an-box__example block-body', slot.example.trim() || slot.frame.trim() || ' '));
   return node;
 }
