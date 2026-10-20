@@ -190,6 +190,35 @@ describe('annotation render + sanitise', () => {
     el.remove();
   });
 
+  it('a note with its own reader is put down by a second click, Close or empty space', async () => {
+    const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
+    document.body.append(el);
+    const stanza = () => el.querySelector<HTMLButtonElement>('.block-annotation__anchor--stanza')!;
+    const panel = el.querySelector<HTMLElement>('.block-annotation__panel')!;
+
+    stanza().click();
+    await frame();
+    expect(panel.hidden).toBe(false);
+    expect(stanza().classList.contains('is-active')).toBe(true);
+    stanza().click();
+    await frame();
+    expect(panel.hidden).toBe(true);
+    expect(stanza().classList.contains('is-active')).toBe(false);
+
+    stanza().click();
+    panel.querySelector<HTMLButtonElement>('.block-annotation__close')!.click();
+    await frame();
+    expect(stanza().classList.contains('is-active')).toBe(false);
+
+    stanza().click();
+    el.querySelector<HTMLElement>('.block-annotation__line-text')!.click();
+    await frame();
+    expect(panel.hidden).toBe(true);
+    expect(stanza().classList.contains('is-active')).toBe(false);
+    el.remove();
+  });
+
   it('a stanza note, which has no handwriting, still opens inside the block', () => {
     const el = renderAnnotationBlock(dulceAnnotationFixture, 'teacher');
     el.querySelector<HTMLButtonElement>('.block-annotation__anchor--stanza')!.click();
