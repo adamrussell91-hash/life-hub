@@ -323,7 +323,10 @@ var ToolkitSkillContentSchema = z5.object({
   teacher_jots: TkJotsSchema.optional()
 });
 var ToolFrameSchema = z5.enum(["fork", "steps", "converter", "stress"]);
-var PairLevelSchema = z5.enum(["none", "level1", "level2", "level3", "maths", "inquiry"]);
+var PairLevelSchema = z5.preprocess(
+  (value) => value === "level2" ? "none" : value,
+  z5.enum(["none", "level1", "level3", "maths", "inquiry"])
+);
 var StressVerdictSchema = z5.enum(["survives", "fails", "qualifies"]);
 var ForkSlotsSchema = z5.object({
   kind: z5.string().default(""),

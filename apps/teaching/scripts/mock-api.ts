@@ -1,4 +1,5 @@
-import { canonical, contextSnapshot, blockRevision, findAlchemyBlock } from '../../../packages/alchemy/revisions.js';
+import { findAlchemyBlock } from '../../../packages/alchemy/revisions.js';
+import { editableFields, childBlocks } from '../../../packages/alchemy/patches.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -510,6 +511,11 @@ const MEDIA_FOLDERS_KEY = 'meta/media_folders';
 
 type MockUnitNote={id:string;title:string;why:string;excerpt?:string};
 const mockJobs=new Map<string,{status:string;result:unknown;polls:number}>();let mockJobSerial=0;
+// Ann's lesson reviews: a job that reports a few steps, then suggests patches on the lesson's own text.
+type MockAgentJob={job:string;kind:string;id:string;blockId:string|null;scope:string;status:string;progress:Array<{at:string;text:string}>;result:unknown;error:null;decisions:Record<string,string>;created_at:string;polls:number;steps:string[];final:unknown};
+const mockAgentJobs=new Map<string,MockAgentJob>();const mockAgentLatest=new Map<string,string>();
+let mockAgentSettings:{rulesNoteId:string|null;rulesNoteTitle:string|null}={rulesNoteId:null,rulesNoteTitle:null};
+const MOCK_RULES_NOTES=[{id:'note_rules',title:'Lesson design rules'},{id:'note_questions',title:'Question design for close reading'},{id:'note_caesar',title:'Worked examples and scaffolding'}];
 const mockUnitNotes=new Map<string,{notes:MockUnitNote[];removed:string[]}>();
 function mockUnitNotesAdd(unitId:string,entries:MockUnitNote[]):MockUnitNote[]{
   const state=mockUnitNotes.get(unitId)??{notes:[],removed:[]};
@@ -3623,33 +3629,41 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return okResponse(200, { text: 'mock-ai-reply' });
     }
 
-    if (method === 'POST' && path === '/api/alchemy-blocks') {
+    if (path === '/api/alchemy-agent/settings') {
       if (!getSession(cookie).authenticated) return unauthorizedResponse();
-      const query=body as {kind?:string;id?:string;blocks?:string[];validateOnly?:boolean;contextRevision?:string;instruction?:string};
-      if (!query || !['lesson','unit'].includes(query.kind||'') || !query.id || !Array.isArray(query.blocks) || query.blocks.length>4) return errorResponse(400,'alchemy_input','Choose up to four blocks.');
-      const entity=store.getJSON<Lesson|Unit>(query.kind==='lesson'?draftLessonKey(query.id):unitKey(query.id));
-      if(!entity) return errorResponse(404,'not_found','Lesson or unit not found.');
-      const unit=query.kind==='lesson'?store.getJSON<Unit>(unitKey((entity as Lesson).unit_id)):null;
-      const contextRevision=canonical({entity:contextSnapshot(entity),unit:unit?contextSnapshot(unit):null});
-      if(query.validateOnly)return okResponse(200,{valid:query.contextRevision===contextRevision});
-      // Row-level asks target the first editable text inside the row, as Ann may pick a nested block.
-      const textTarget=(b:any):any=>{if(['heading','rich_text'].includes(b.block_type))return b;const lists=b.block_type==='section'?[b.content.blocks]:b.block_type==='columns'?b.content.columns.map((c:any)=>c.blocks):b.block_type==='tabs'?b.content.tabs.map((t:any)=>t.blocks):[];for(const list of lists)for(const child of list||[]){const hit=textTarget(child);if(hit)return hit;}return null;};
-      const unitId=query.kind==='lesson'?(entity as Lesson).unit_id:query.id;
-      const proposals=query.blocks.flatMap(rowId=>{
-        const row=findAlchemyBlock(entity.blocks||[],rowId);
-        const block=row?textTarget(row):null;
-        if(!block)return [];const id=block.id;
-        const replacement=structuredClone(block);
-        if(replacement.block_type==='heading')replacement.content.text=(query.instruction?.trim()?'Model together, then try independently: ':'Start with a worked example: ')+replacement.content.text;
-        else if(replacement.block_type==='rich_text')replacement.content.html='<p>First, model the process together. Then try independently.</p>'+replacement.content.html;
-        else return [];
-        return [{blockId:id,original:blockRevision(block),contextRevision,rationale:'Make the modelling step explicit before independent practice.',replacement,sources:[{id:'note_caesar',title:'Worked examples and scaffolding',excerpt:'Local fixture: model the process before independent practice.'}]}];
-      });
-      if(unitId&&proposals.length)mockUnitNotesAdd(unitId,[{id:'note_caesar',title:'Worked examples and scaffolding',why:'Model the process before independent practice.'}]);
-      const data={proposals,assessed:query.blocks,contextRevision,mode:'local'};
-      // Like production, a teacher's ask comes back as a job the page polls.
-      if((body as {mode?:string}).mode==='manual'){const job=`00000000-0000-4000-8000-${String(++mockJobSerial).padStart(12,'0')}`;mockJobs.set(job,{status:'working',result:data,polls:0});return okResponse(202,{job,status:'working'});}
-      return okResponse(200,data);
+      const search=new URLSearchParams(pathWithQuery.split('?')[1]||'').get('search');
+      if(method==='GET'&&search!==null)return okResponse(200,{notes:MOCK_RULES_NOTES.filter(n=>n.title.toLowerCase().includes(search.toLowerCase()))});
+      if(method==='GET')return okResponse(200,mockAgentSettings);
+      const id=(body as {rulesNoteId?:string|null})?.rulesNoteId??null;const note=MOCK_RULES_NOTES.find(n=>n.id===id);
+      mockAgentSettings={rulesNoteId:note?.id??null,rulesNoteTitle:note?.title??null};return okResponse(200,mockAgentSettings);
+    }
+
+    if (path === '/api/alchemy-agent') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const params=new URLSearchParams(pathWithQuery.split('?')[1]||'');
+      const view=(j:MockAgentJob|undefined)=>{if(!j)return null;const {polls,steps,final,...rest}=j;return rest;};
+      if(method==='GET'){
+        const id=params.get('job')||mockAgentLatest.get((params.get('kind')||'lesson')+':'+(params.get('id')||''))||'';const j=mockAgentJobs.get(id);
+        if(!j)return params.get('id')?okResponse(200,null):errorResponse(404,'not_found','That review is no longer available.');
+        if(j.status==='working'){j.polls++;const next=j.steps[j.progress.length];if(next)j.progress.push({at:new Date().toISOString(),text:next});else{j.status='done';j.result=j.final;}}
+        return okResponse(200,view(j));
+      }
+      const req=(body||{}) as {kind?:string;id?:string;blockId?:string;action?:string;job?:string;proposal?:string};
+      if(req.action){const j=mockAgentJobs.get(req.job||'');if(!j)return errorResponse(404,'not_found','That suggestion is no longer available.');j.decisions[req.proposal||'']=req.action;return okResponse(200,view(j));}
+      const lesson=(req.kind==='unit'?store.getJSON<Unit>(unitKey(req.id||'')):store.getJSON<Lesson>(draftLessonKey(req.id||''))) as (Lesson|Unit|null);
+      if(!lesson)return errorResponse(404,'not_found','This page is unavailable.');
+      const fields:Array<{block:any;path:string;value:string}>=[];
+      const walk=(blocks:any[])=>{for(const b of blocks||[]){for(const [path,value] of editableFields(b))fields.push({block:b,path,value});walk(childBlocks(b));}};
+      walk(lesson.blocks||[]);
+      const focus=req.blockId?findAlchemyBlock(lesson.blocks||[],req.blockId):null;
+      const picks=(focus?fields.filter(f=>f.block.id===focus.id||findAlchemyBlock(childBlocks(focus),f.block.id)):fields).filter(f=>f.value.replace(/<[^>]*>/g,'').trim().split(/\s+/).length>=3).slice(0,3);
+      const proposals=picks.map((f,i)=>{const plain=f.value.match(/>([^<>]{12,})</)?.[1]??f.value;const words=plain.trim().split(/\s+/).slice(0,3).join(' ');return {id:'p'+(i+1),blockId:f.block.id,path:f.path,oldStr:words,newStr:i===0?'Retrieval first: '+words:words+' (model it together first)',why:i===0?'Opening with a quick retrieval question strengthens memory more than rereading.':'Students need to see the process modelled before trying it alone.',source:i<2?{noteId:i===0?'note_questions':'note_caesar',title:i===0?'Question design for close reading':'Worked examples and scaffolding',quote:i===0?'Short low-stakes retrieval questions at the start of a lesson strengthen memory.':'Model the process before independent practice.'}:null,blockLabel:String(f.block.block_type).replace(/_/g,' ')+': “'+words+'…”',blockType:f.block.block_type};});
+      const id=`00000000-0000-4000-9000-${String(++mockJobSerial).padStart(12,'0')}`;
+      const j:MockAgentJob={job:id,kind:req.kind==='unit'?'unit':'lesson',id:lesson.id,blockId:req.blockId??null,scope:req.blockId?'block':'lesson',status:'working',progress:[],result:null,error:null,decisions:{},created_at:new Date().toISOString(),polls:0,
+        steps:['Reading your rules','Checking your Knowledge Hub is up to date','Searching: retrieval practice at the start of a lesson','Reading: Question design for close reading','Reading: Worked examples and scaffolding',...proposals.map(p=>'Drafted a suggestion for '+p.blockLabel)],
+        final:{summary:proposals.length?'I looked for ways to strengthen recall and modelling. Two changes come from your notes; one is my own idea.':'Nothing in your notes clearly improves this lesson.',proposals,stoppedEarly:false,rules:mockAgentSettings.rulesNoteId?{id:mockAgentSettings.rulesNoteId,title:mockAgentSettings.rulesNoteTitle}:null}};
+      mockAgentJobs.set(id,j);if(!req.blockId)mockAgentLatest.set(j.kind+':'+lesson.id,id);
+      return okResponse(202,view(j));
     }
 
     if (method === 'GET' && path === '/api/alchemy-blocks') {
