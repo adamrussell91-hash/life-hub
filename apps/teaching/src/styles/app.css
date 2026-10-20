@@ -1566,6 +1566,7 @@ a:hover {
 
 .lesson-blocks .block {
   padding: 18px 20px;
+  font-size: var(--text-md);
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -5345,15 +5346,15 @@ a.home-class-tile:hover {
 }
 
 .block-heading--page {
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
 }
 
 .block-heading--section {
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
 }
 
 .block-heading--subsection {
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
 }
 
