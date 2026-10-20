@@ -308,3 +308,44 @@ test('a reopen in the same reply that places the first governing node survives',
   const challenged = await createModelCoach(async () => reply({ verdict: 'challenge', node: { slot: 'governing:1', text: 'Only the manager may approve a rota change' }, suggestion }))(s);
   assert.equal(challenged.suggestion, null);
 });
+
+/** In Document with a 5 Cs run whose next slot is correspond. */
+function namingNext() {
+  let s = idleRunner(createSession({ title: 'Late rota', text: 'The rota keeps changing late.' }, deps));
+  s = applyCoachTurn(s, turnOf({ frame: { goal: 'Rota fixed a week ahead', whatIsTrue: 'Changed 3 of 4 weeks', whatCanBeDone: 'Change publish day' }, model: { id: 'seven_step', reason: 'Default.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'r' } }), deps);
+  s = idleRunner(acceptSuggestion(s, deps));
+  while (s.phase !== 'document') s = idleRunner(moveOn(s, deps));
+  s = idleRunner(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'five_cs', reason: 'r' } }, deps));
+  for (const [slot, text] of [['contextualise', 'So next term starts without the same scramble'], ['categorise', 'On the Kitchen rota project page'], ['condense:1', 'Publish the rota on Wednesday'], ['correct', 'Nothing in it needs correcting now']]) {
+    s = idleRunner(applyCoachTurn(s, turnOf({ node: { slot, text } }), deps));
+  }
+  return s;
+}
+
+test('an accepted name that breaks a naming rule triggers one repair that says to challenge', async () => {
+  const s = namingNext();
+  const prompts = [];
+  const coach = createModelCoach(async (prompt) => {
+    prompts.push(prompt);
+    return prompts.length === 1
+      ? reply({ verdict: 'accept', node: { slot: 'correspond', text: 'rota stuff' } })
+      : reply({ verdict: 'challenge', node: { slot: 'correspond', text: 'rota stuff' }, message: 'The name needs a date. What is the date today?' });
+  });
+  const turn = await coach(s);
+  assert.equal(turn.verdict, 'challenge');
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[1].user, /naming rule/);
+  assert.match(prompts[1].user, /Challenge instead/);
+});
+
+test('a name that breaks a naming rule twice in a row loses the thread', async () => {
+  const coach = createModelCoach(async () => reply({ verdict: 'accept', node: { slot: 'correspond', text: 'rota stuff' } }));
+  await assert.rejects(coach(namingNext()), (err) => err.code === 'coach_lost_thread');
+});
+
+test('an accepted name that follows the rules passes', async () => {
+  const coach = createModelCoach(async () => reply({ verdict: 'accept', node: { slot: 'correspond', text: 'Kitchen rota case file 20261020 v1 Final' } }));
+  const turn = await coach(namingNext());
+  assert.equal(turn.verdict, 'accept');
+  assert.equal(turn.node.text, 'Kitchen rota case file 20261020 v1 Final');
+});
