@@ -33,7 +33,8 @@ export type PaletteFamily = {
   cards: PaletteCard[];
 };
 
-function familiesFromGroups(
+/** One palette family per group, in the group's order. */
+export function familiesFromGroups(
   groups: typeof LESSON_BLOCK_GROUPS
 ): PaletteFamily[] {
   return groups.map((group) => ({

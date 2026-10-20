@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
-import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
-import { createBlockEditor } from '@/blocks/editors';
-import { renderBlock } from '@/blocks/render';
-import { blockRegistry } from '@/blocks/registry';
+import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@teaching/blocks/create-block';
+import { createBlockEditor } from '@teaching/blocks/editors';
+import { renderBlock } from '@teaching/blocks/render';
+import { blockRegistry } from '@teaching/blocks/registry';
 
 function emptyCard(id: string) {
   return { id, eyebrow: '', title: '', description: '', tint: 'navy' as const };

@@ -79,6 +79,11 @@ export type MountBlockCanvasOptions = {
   decorateRow?: (row: HTMLElement, block: Block) => void;
   /** Author canvases only. Student / published surfaces omit the ⋯ menu. */
   editable?: boolean;
+  /**
+   * Clicking a published block opens its editor. Tasks and Professional pages
+   * (notes typed mid-meeting) want this; lessons wait for Edit in the ⋯ menu.
+   */
+  editOnClick?: boolean;
 };
 
 export type BlockCanvasHandle = {
@@ -747,6 +752,13 @@ export function mountBlockCanvas(
       bindRowDropTarget(row, index);
       if (canEdit) {
         row.append(createGrip(block, row), createBlockMenu(block));
+        if (options.editOnClick) {
+          row.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest('button, a, input, textarea, select, .lesson-page__grip, .lesson-page__block-menu')) return;
+            select(block.id);
+          });
+        }
       }
 
       if (isLinkedSection(block)) {

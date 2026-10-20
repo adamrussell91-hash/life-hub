@@ -81,6 +81,10 @@ import { loadTaskProperties } from '@/services/task-properties';
 import { tasksApi } from '@/services/client-api';
 import { mapsOrSeed } from '@/domain/maps';
 import { getFocus, hydrateFocusFromHash, mergeFocusIntoHash } from '@/domain/focus';
+import { setClassroomExtras } from '@teaching/blocks/classroom-extras';
+
+// Pages here run Teaching's block editors without the classroom extras.
+setClassroomExtras(false);
 
 let kitCalendarHandle: HubCalendarHandle | null = null;
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createBlock, LESSON_BLOCK_GROUPS } from '@/blocks/create-block';
+import { createBlock } from '@teaching/blocks/create-block';
+import { taskPaletteFamilies } from '@/views/block-insert';
 import {
   dueChipKind,
   dueChipLabel,
@@ -118,7 +119,7 @@ describe('card domain helpers', () => {
   it('builds page hashes and Teaching Hub lesson families', () => {
     expect(taskPageHash('task_1')).toBe('#/task/task_1');
     expect(projectPageHash('proj_mw')).toBe('#/project/proj_mw');
-    expect(LESSON_BLOCK_GROUPS.map((group) => group.label)).toEqual([
+    expect(taskPaletteFamilies().map((family) => family.id)).toEqual([
       'Basic',
       'Media',
       'Teaching',
