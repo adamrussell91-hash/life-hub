@@ -3,7 +3,8 @@ import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
 import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { canPropose, isComplete, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
-import { chosenOption, planStep, stepName, stepPlan, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
+import { caseFileOffer } from '../../../../packages/problem-solver/case-file.mjs';
+import { chosenOption, planStep, planStepForBook, stepName, stepPlan, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { activeRun, currentStep, followOn, skippedUntouched, waitingForReview } from './session.mjs';
 import { PROCESS } from './knowledge/process.mjs';
 import { CHAPTERS } from './knowledge/chapters.mjs';
@@ -48,6 +49,8 @@ SESSION SHAPE
 7. Tasks: in Implement, when a card, a do-first item or a chosen 15% action is specific enough to start (a clear action, ideally an owner and a date), offer it as a real task in "proposeTasks" with its slot and a short task title. Only slots listed under "Can become tasks" qualify. The person confirms each one on a card; never say a task exists until TASKS shows it confirmed. Before Implement ends, propose a dated review in "proposeReview", timed for when the first results should show (a date after TODAY).
 8. Improve: when the state says IMPROVE IS WAITING, the results are not in yet. After the learning answer, say Improve picks up at the review on its date, that they can press Review now if results are already in, or move on. Do not open tools or place nodes. In a review, look at what actually happened, open with the after action review, and use TASK STATUS as evidence. When double-loop learning finds a governing assumption was wrong at the root, you may suggest "reopen_step" with step define or analyse and a one-sentence reason. Moving on from the reopened step returns to Improve.
 
+9. Document: the case file is built from the 5 Cs (and knowledge management when it is done), together with what earlier steps established. In correspond, put the agreed name exactly in node.text. The machine refuses a name that breaks a strict rule, so challenge such a name and name the rule. The person writes the case file onto a page from a card. Never say it is written until CASE FILE says so. When CASE FILE lists changes since it was written, the person can add a dated update from the card; say so once.
+
 GATEKEEPING
 In phase frame, use "frame" for accepted answers instead of "node"; "node" is only used inside a tool.
 - verdict "accept": the answer holds up. Put it in "node" with the slot, a tidy version of their words (keep their meaning; add no ideas), and a "title" of two or three words naming the point.
@@ -86,7 +89,8 @@ function toolKnowledge(id) {
 const CARRY = {
   decide: 'CARRY FORWARD: seed options from Devise (preferred lotus ideas, solution-tree branches, Duncker solutions, the integrated reduction) and confirm each with the person before placing it.',
   implement: 'CARRY FORWARD: the CHOSEN OPTION from Decide is the aim of Implement. Open by confirming it in one sentence, then seed it into DMAIC\'s Define, the 15% Reflect or the first Kanban cards. If none is recorded, ask what was decided before placing anything. SMART measures from Define seed DMAIC\'s Measure. Confirm before placing.',
-  improve: 'CARRY FORWARD: in the after action review, seed "set out to achieve" from the SMART goal in Define, DMAIC\'s Measure and the CHOSEN OPTION, and seed "achieved" from TASK STATUS. In double-loop learning, the problem is the gap the review found. Confirm before placing.'
+  improve: 'CARRY FORWARD: in the after action review, seed "set out to achieve" from the SMART goal in Define, DMAIC\'s Measure and the CHOSEN OPTION, and seed "achieved" from TASK STATUS. In double-loop learning, the problem is the gap the review found. Confirm before placing.',
+  document: 'CARRY FORWARD: seed contextualise from the goal in the frame; seed condense from the CHOSEN OPTION, the after action review\'s learned and the confirmed tasks; seed correct from anything the review showed was wrong. In knowledge management, explicit items often come from the condensed list and tacit items from what the review learned. Confirm before placing.'
 };
 
 /** Step layer: stable for the whole of a step, so it caches between turns. */
@@ -192,6 +196,19 @@ function reviewLines(session) {
   return lines;
 }
 
+function caseFileLines(session) {
+  const document = planStepForBook(session.model.id, 'document');
+  if (!document || !session.steps?.[document]) return [];
+  const offer = caseFileOffer(session);
+  const record = session.caseFile;
+  if (record) {
+    const where = record.target.kind === 'project' ? 'the linked project' : 'the linked task';
+    const changed = offer?.kind === 'update' ? ` Changed since it was written: ${offer.changed.map((key) => offer.file.sections.find((s) => s.key === key)?.heading).join(', ')}. The person can add update v${offer.version} from the card.` : '';
+    return [`CASE FILE: v${record.version} "${record.title}" written ${record.writtenAt.slice(0, 10)} to ${where}.${changed}`];
+  }
+  return offer ? [`CASE FILE: ready to write as "${offer.file.title}". The person writes it from the card; it is not written yet.`] : [];
+}
+
 function progressLine(session) {
   const next = followOn(session);
   if (!next) return 'Progress: not yet at the minimum for this tool; keep working its steps.';
@@ -240,7 +257,7 @@ export function buildCoachPrompt(session) {
   // Inside a Decide step the run lines already show the `choice` slot, so it is not repeated.
   if (chosen && !books.includes('decide')) parts.push(`CHOSEN OPTION (the aim for Implement): ${chosen.text}${chosen.contested ? ' (kept against the coach\'s objection)' : ''}`);
   else if (!chosen && books.includes('implement')) parts.push('CHOSEN OPTION: none recorded. Ask what was decided and confirm it as the aim before placing anything.');
-  if (session.model) parts.push(...reviewLines(session));
+  if (session.model) parts.push(...reviewLines(session), ...caseFileLines(session));
   if (session.pendingLearning && session.runner?.mode !== 'boundary') {
     const from = stepName(session.model.id, session.pendingLearning);
     const hasTools = session.model && session.phase !== 'finished' && toolsForPlanStep(session.model.id, session.phase).length > 0;
