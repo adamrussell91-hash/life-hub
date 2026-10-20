@@ -69,15 +69,18 @@ async function parseApiResponse<T>(response: Response): Promise<ApiResult<T>> {
   return body;
 }
 
-export async function uploadMediaFile(
-  file: File,
-  opts?: { title?: string; provider_file_id?: string }
-): Promise<Media> {
-  const form = new FormData();
-  form.append('file', file, file.name);
-  if (opts?.title) form.append('title', opts.title);
-  if (opts?.provider_file_id) form.append('provider_file_id', opts.provider_file_id);
+/**
+ * Netlify drops request bodies over 6 MB before the function runs, so files
+ * larger than this go up in parts that the server joins on the last one.
+ */
+export const UPLOAD_PART_BYTES = 3 * 1024 * 1024;
 
+function newUploadId(): string {
+  const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `up_${random.replace(/[^A-Za-z0-9_-]/g, '')}`;
+}
+
+async function postMediaForm(form: FormData): Promise<unknown> {
   const url = `${getApiBaseUrl()}/api/media/upload`;
 
   let response: Response;
@@ -95,9 +98,37 @@ export async function uploadMediaFile(
     });
   }
 
-  const result = await parseApiResponse<Media>(response);
+  const result = await parseApiResponse<unknown>(response);
   if (!result.ok) {
     throw new ApiClientError(result.error);
   }
   return result.data;
+}
+
+export async function uploadMediaFile(
+  file: File,
+  opts?: { title?: string; provider_file_id?: string }
+): Promise<Media> {
+  const partCount = Math.max(1, Math.ceil(file.size / UPLOAD_PART_BYTES));
+  const uploadId = partCount > 1 ? newUploadId() : '';
+  let data: unknown;
+  for (let index = 0; index < partCount; index += 1) {
+    const form = new FormData();
+    const part =
+      partCount > 1
+        ? new File([file.slice(index * UPLOAD_PART_BYTES, (index + 1) * UPLOAD_PART_BYTES)], file.name, {
+            type: file.type
+          })
+        : file;
+    form.append('file', part, file.name);
+    if (opts?.title) form.append('title', opts.title);
+    if (opts?.provider_file_id) form.append('provider_file_id', opts.provider_file_id);
+    if (partCount > 1) {
+      form.append('upload_id', uploadId);
+      form.append('part_index', String(index));
+      form.append('part_count', String(partCount));
+    }
+    data = await postMediaForm(form);
+  }
+  return data as Media;
 }
