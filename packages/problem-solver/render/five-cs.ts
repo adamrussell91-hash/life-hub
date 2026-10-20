@@ -301,6 +301,7 @@ export function createFiveCsView(doc: Document = document): FiveCsView {
     const words = SLICE[slice.c];
     const latest = nodes[nodes.length - 1] ?? null;
     const was = slice.latest;
+    const prevIds = slice.ids ? slice.ids.split(' ') : [];
     const wasFilled = slice.ids !== '';
     if (!latest) {
       if (!wasFilled) return;
@@ -359,7 +360,8 @@ export function createFiveCsView(doc: Document = document): FiveCsView {
     const have = [...slice.inner.children];
     if (wanted.length !== have.length || wanted.some((card, i) => card !== have[i])) slice.inner.replaceChildren(...wanted);
 
-    if (!animate || was === latest.id) return;
+    // Only a latest answer that is new moves; an undo back to an older one stays still.
+    if (!animate || was === latest.id || prevIds.includes(latest.id)) return;
     // A slice filling grows its colour out from the centre and fades its words in; a new latest
     // answer in a filled slice only fades its words in.
     if (!wasFilled && canAnimate(slice.grow)) {
@@ -377,6 +379,7 @@ export function createFiveCsView(doc: Document = document): FiveCsView {
 
   function syncRules(name: string | null, animate: boolean): void {
     if (name === null) {
+      cancelAnimations(nameChip);
       nameChip.hidden = true;
       setText(nameChip, '');
       shownName = null;
