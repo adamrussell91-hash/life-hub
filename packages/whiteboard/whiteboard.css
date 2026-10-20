@@ -1,0 +1,149 @@
+/* Whiteboard block (Excalidraw), shared by the Teaching and Tasks hubs.
+   The page shows a picture; drawing happens full screen. Uses design-kit tokens. */
+.block-whiteboard,
+.block-editor__whiteboard-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.block-whiteboard {
+  margin: 0;
+}
+
+.block-whiteboard__surface,
+.block-editor__whiteboard-surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.block-whiteboard__picture {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fff;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.block-editor__whiteboard-surface .block-whiteboard__picture {
+  cursor: pointer;
+}
+
+.block-whiteboard__picture:hover {
+  border-color: var(--wave);
+}
+
+.block-whiteboard__picture:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.block-whiteboard__picture svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 80vh;
+}
+
+.block-whiteboard__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.block-whiteboard__action {
+  min-height: 44px;
+}
+
+.block-whiteboard__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.block-editor__whiteboard-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.block-editor__whiteboard-title {
+  min-width: 0;
+}
+
+.block-whiteboard__status,
+.block-editor__whiteboard-status,
+.board-overlay__status {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.block-editor__whiteboard-status--error,
+.block-whiteboard__status--error,
+.board-overlay__status--error {
+  color: var(--danger-hover);
+}
+
+.board-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.board-overlay__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.board-overlay__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-overlay__done {
+  min-height: 44px;
+}
+
+.board-overlay__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 720px) {
+  .block-editor__whiteboard-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .board-overlay__bar {
+    padding: var(--space-2) var(--space-3);
+  }
+}
