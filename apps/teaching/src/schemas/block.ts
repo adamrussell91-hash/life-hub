@@ -615,6 +615,10 @@ export const CurriculumLinesV2ContentSchema = z.object({
   rail_stops: z.array(CurriculumRailStopSchema).max(60).default([]),
   gates: z.array(CurriculumGateSchema).max(12).default([]),
   nudges: NetworkNudgesSchema.default({}),
+  /** Map-only station order; lessons not listed follow in unit order. */
+  station_order: z.array(z.string().min(1).max(64)).max(200).optional(),
+  /** Lessons left off this map (they stay in the unit). */
+  hidden_lessons: z.array(z.string().min(1).max(64)).max(200).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
 });
 export const CurriculumLinesBlockSchema = z.object({
