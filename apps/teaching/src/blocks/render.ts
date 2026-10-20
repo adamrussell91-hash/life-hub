@@ -705,14 +705,14 @@ export function renderAccordionBlock(
 
   for (const item of block.content.items) {
     const details = document.createElement('details');
-    details.className = 'block-accordion__item';
+    details.className = 'block-accordion__item block-disclosure';
 
     const summary = document.createElement('summary');
-    summary.className = 'block-accordion__title block-subtitle';
+    summary.className = 'block-accordion__title block-disclosure__toggle block-disclosure__toggle--title block-subtitle';
     summary.textContent = item.title;
 
     const body = document.createElement('div');
-    body.className = 'block-accordion__body block-body';
+    body.className = 'block-accordion__body block-disclosure__panel block-body';
     body.textContent = item.body;
 
     if (mode === 'print') details.open = true;
@@ -2011,8 +2011,9 @@ export function renderChartBlock(
   root.append(wrap);
 
   const details = document.createElement('details');
-  details.className = 'block-chart__data';
+  details.className = 'block-chart__data block-disclosure';
   const summary = document.createElement('summary');
+  summary.className = 'block-disclosure__toggle';
   summary.textContent = 'Chart data';
   const table = document.createElement('table');
   table.className = 'block-chart__table';

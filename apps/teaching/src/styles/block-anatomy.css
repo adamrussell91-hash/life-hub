@@ -158,6 +158,19 @@ details[open] > .block-disclosure__toggle::before {
   }
 }
 
+/* A disclosure whose toggle is the item's own title (accordion rows). */
+.block-disclosure__toggle.block-disclosure__toggle--title {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  color: var(--navy);
+}
+
 .block-disclosure__panel {
   min-width: 0;
   width: 100%;
