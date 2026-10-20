@@ -20,7 +20,7 @@ export function renderBrainstorm(block: BrainstormBlock, mode: RenderMode, ctx: 
   const root = el('section', 'peer-feedback brainstorm');
   root.dataset.blockId = block.id;
   const head = el('header', 'pf-head');
-  head.append(el('p', 'pf-eyebrow', 'Brainstorm'), el('h3', 'pf-prompt', block.content.question.trim() || 'Share your ideas.'));
+  head.append(el('p', 'pf-eyebrow block-eyebrow', 'Brainstorm'), el('h3', 'pf-prompt block-title', block.content.question.trim() || 'Share your ideas.'));
   root.append(head);
 
   if (mode === 'print') {
@@ -30,7 +30,7 @@ export function renderBrainstorm(block: BrainstormBlock, mode: RenderMode, ctx: 
     return root;
   }
   if (!ctx.lessonId) {
-    root.append(el('p', 'pf-note', 'Students take part from the published lesson.'));
+    root.append(el('p', 'pf-note block-secondary', 'Students take part from the published lesson.'));
     return root;
   }
   if (mode === 'teacher') {

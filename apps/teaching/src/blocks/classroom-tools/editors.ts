@@ -39,7 +39,7 @@ export function createTimerStackEditor(initial: TimerSegment[], onStack: (stack:
   const hint = el('p', 'block-editor__hint', 'Ready to start when the lesson opens. Leave empty for a single 5 minute timer.');
   const rows = el('div', 'ct-stack');
   const presets = el('div', 'ct-presets');
-  const add = el('button', 'ct-btn ct-btn--sm', '+ Add a timer');
+  const add = el('button', 'btn btn--secondary ct-btn ct-btn--sm', '+ Add a timer');
   add.type = 'button';
   const total = el('span', 'ct-sub ct-sub--end');
   root.append(heading, hint, presets, rows, el('div', 'ct-row'));
@@ -90,7 +90,7 @@ export function createTimerStackEditor(initial: TimerSegment[], onStack: (stack:
         });
         const minLabel = el('label', 'ct-inline');
         minLabel.append(mins, el('span', '', 'min'));
-        const remove = el('button', 'ct-btn ct-btn--sm', 'Remove');
+        const remove = el('button', 'btn btn--secondary ct-btn ct-btn--sm', 'Remove');
         remove.type = 'button';
         remove.setAttribute('aria-label', `Remove timer ${i + 1}`);
         remove.addEventListener('click', () => {

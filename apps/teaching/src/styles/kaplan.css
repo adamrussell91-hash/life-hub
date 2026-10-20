@@ -77,7 +77,6 @@
 .kaplan-field :is(input, select, textarea):focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
 .kaplan-caption { font-size: var(--text-sm); color: var(--muted); font-weight: var(--weight-regular); margin-top: var(--space-2); }
 .kaplan-support { font-size: var(--text-sm); margin-top: var(--space-3); color: var(--muted); }
-.kaplan-support summary { color: var(--wave); cursor: pointer; }
 .kaplan-support p { margin-top: var(--space-2); max-width: var(--measure); white-space: pre-wrap; }
 .kaplan-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-4); }
 .kaplan-author { width: 100%; font-family: var(--font-ui); }
