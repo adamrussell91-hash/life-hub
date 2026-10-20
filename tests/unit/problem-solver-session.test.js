@@ -805,3 +805,23 @@ test('leaving a step with work in it still asks the learning question before any
   assert.equal(s.suggestion, null);
   assert.equal(s.pendingLearning, 'define');
 });
+
+test('a review records how many Improve runs came before it', () => {
+  let s = idle(moveOn(implementDone(), deps));
+  s = idle(startReview(s, {}, deps));
+  assert.equal(s.reviewState.runsBefore, 0);
+  const t = startReview(idle(moveOn(implementDone(), deps)), {}, deps);
+  assert.equal(t.reviewState.runsBefore, 0);
+});
+
+test('a late review records the Improve runs already finished before it', () => {
+  let s = idle(dismissReview(idle(moveOn(implementDone(), deps)), deps));
+  s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'after_action_review', reason: 'r' } }, deps));
+  s = { ...s, steps: { ...s.steps, improve: { ...s.steps.improve, runs: s.steps.improve.runs.map((run) => ({ ...run, status: 'done' })) } } };
+  assert.equal(s.steps.improve.runs.length, 1);
+  s = idle(moveOn(s, deps));
+  s = { ...s, reviewTaskId: 'task9', reviewProposal: { title: 'Review: Late rota', due: '2026-11-02', reason: '', status: 'confirmed' }, reviewState: null };
+  const late = startReview(s, {}, deps);
+  assert.equal(late.reviewState.status, 'reviewing');
+  assert.equal(late.reviewState.runsBefore, 1);
+});
