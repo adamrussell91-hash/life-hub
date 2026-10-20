@@ -107,4 +107,39 @@ describe('createCaseFileBridge', () => {
     d.getProject.mockRejectedValueOnce(Object.assign(new Error('server'), { status: 500 }));
     await expect(createCaseFileBridge(d as never).write(written, updateOffer, { place: { kind: 'project', id: 'proj-9' }, title: file.title })).rejects.toThrow('server');
   });
+
+  it('a first write takes its version from the title, block ids included', async () => {
+    const d = deps();
+    const title = 'Late rota Problem Solver 20261102 v3 Final';
+    await createCaseFileBridge(d as never).write(session, writeOffer, { place: 'new', title });
+    expect(d.link.mock.calls[0][0].version).toBe(3);
+    const blocks = d.updateProject.mock.calls[0][1].page_blocks.slice(1);
+    expect(blocks.every((block: { id: string }) => block.id.includes('-v3-'))).toBe(true);
+  });
+
+  it('a deleted case-file project is forgotten, so the next try makes a fresh one', async () => {
+    const d = deps();
+    d.createProject.mockResolvedValueOnce({ id: 'proj-1' }).mockResolvedValueOnce({ id: 'proj-2' });
+    d.getProject.mockRejectedValueOnce(missing());
+    const bridge = createCaseFileBridge(d as never);
+    await expect(bridge.write(session, writeOffer, { place: 'new', title: file.title })).rejects.toBeInstanceOf(CaseFilePageGone);
+    await bridge.write(session, writeOffer, { place: 'new', title: file.title });
+    expect(d.createProject).toHaveBeenCalledTimes(2);
+    expect(d.link.mock.calls[0][0].target).toEqual({ kind: 'project', id: 'proj-2' });
+  });
+
+  it('refuses a second write while one is in flight, and allows one after a failure', async () => {
+    const d = deps();
+    let release!: (value: { id: string }) => void;
+    d.createProject.mockImplementationOnce(() => new Promise((r) => (release = r)));
+    d.updateProject.mockRejectedValueOnce(new Error('boom'));
+    const bridge = createCaseFileBridge(d as never);
+    const first = bridge.write(session, writeOffer, { place: 'new', title: file.title });
+    await expect(bridge.write(session, writeOffer, { place: 'new', title: file.title })).rejects.toThrow('The case file is still being written.');
+    release({ id: 'proj-1' });
+    await expect(first).rejects.toThrow('boom');
+    await bridge.write(session, writeOffer, { place: 'new', title: file.title });
+    expect(d.createProject).toHaveBeenCalledTimes(1);
+    expect(d.link).toHaveBeenCalledTimes(1);
+  });
 });
