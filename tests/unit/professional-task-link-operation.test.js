@@ -558,3 +558,27 @@ test('Meetings GET returns preparation_operations list', async () => {
   assert.equal(payload.data.meeting.preparation_operations.length, 2);
   assert.ok(payload.data.meeting.preparation_operation);
 });
+
+test('new Task read-back uses strong consistency so edge lag cannot fail the create', async () => {
+  const professionalStore = memoryStore();
+  const tasksStore = memoryStore();
+  const strongGet = tasksStore.get;
+  // Simulate the Blobs edge: an eventual read of a just-written key returns null.
+  tasksStore.get = async (key, options = {}) =>
+    options.consistency === 'strong' ? strongGet(key, options) : null;
+  const repo = makeRepo({
+    professionalStore,
+    tasksStore,
+    links: [],
+    getUniversalLinkStore: async () => memoryStore()
+  });
+
+  const result = await repo.linkTask({
+    targetRef: CASES[1].targetRef,
+    relationshipType: 'follow_up',
+    title: 'Send an intro email'
+  });
+  assert.equal(result.operation.status, 'committed');
+  const index = tasksStore._map.get('tasks/_index');
+  assert.ok(index.includes(result.operation.task_id));
+});
