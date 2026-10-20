@@ -5,7 +5,13 @@
 
 import type { EntityOverview, PersonBrief } from '@/domain/types';
 import type { LedgerResponse, LinkProposal } from '@/api/people-directory';
-import { applyPeopleDedupe, fetchEntityOverview, fetchPeopleDedupePlan, type DedupeAction } from '@/api/entities';
+import {
+  applyPeopleDedupe,
+  fetchEntityOverview,
+  fetchPeopleDedupePlan,
+  transitionPerson,
+  type DedupeAction
+} from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
 import {
   acceptLinkProposal,
@@ -32,7 +38,10 @@ import {
   type RememberFact,
   type TodayStripResponse
 } from '@/api/people-directory';
-import { mountAddPersonForm } from '@/components/add-person-form';
+import { mountAddPersonForm, type AddPersonResult } from '@/components/add-person-form';
+import { createToastHost } from '@/components/people-toast';
+import { buildPersonMenu } from '@/components/person-menu';
+import { openDeletePersonDialog } from '@/components/delete-person-dialog';
 import { invalidateCrestUrl, resolveCrestUrl } from '@/components/org-ui';
 import { mountIdentityEditor } from '@/components/person-identity-editor';
 import { renderLinkedEverywhere } from '@/components/linked-everywhere';
@@ -124,7 +133,12 @@ function isPhone(): boolean {
   return window.matchMedia(PHONE_MQ).matches;
 }
 
+function isArchived(row: DirectoryPersonRow): boolean {
+  return row.lifecycle_status === 'archived';
+}
+
 function matchesFilters(row: DirectoryPersonRow, query: DirectoryQueryState): boolean {
+  if (isArchived(row) && !query.showArchived) return false;
   if (query.q.trim()) {
     const q = query.q.trim().toLowerCase();
     const hay = [
@@ -314,6 +328,58 @@ function setSectionState(body: HTMLElement, state: 'loading' | 'empty' | 'error'
   body.append(p);
 }
 
+function initialsFor(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ''}${parts[parts.length - 1]![0] ?? ''}`.toUpperCase();
+}
+
+function orgMonogramFor(name: string): string {
+  const words = name.replace(/[^a-zA-Z0-9\s]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 'ORG';
+  if (words.length === 1) return words[0]!.slice(0, 3).toUpperCase();
+  return words.slice(0, 3).map((w) => w[0]).join('').toUpperCase();
+}
+
+/** A directory row for someone just added, shown before the fresh scan lands. */
+export function rowForNewPerson(result: AddPersonResult, roleTitle: string | null = null): DirectoryPersonRow {
+  const { person } = result;
+  const org = result.organisation && !result.failed.includes('Workplace')
+    ? {
+        ref: result.organisation.ref,
+        display_name: result.organisation.display_label,
+        monogram: orgMonogramFor(result.organisation.display_label),
+        logo_key: null,
+        current: true
+      }
+    : null;
+  return {
+    id: person.id,
+    person_type: 'colleague',
+    ref: person.ref,
+    display_name: person.display_name,
+    initials: initialsFor(person.display_name),
+    role_line: org ? (roleTitle ? `${roleTitle} · ${org.display_name}` : `At ${org.display_name}`) : 'No relationship on record',
+    relationship_roles: [],
+    job_title: roleTitle,
+    organisation: org,
+    organisations: org ? [org] : [],
+    warmth: 0,
+    warmth_band: 'cold',
+    relationship_state: 'new',
+    relationship_reasons: [],
+    open_item_count: 0,
+    you_owe_count: 0,
+    they_owe_count: 0,
+    pending_proposal_count: 0,
+    next_label: null,
+    lifecycle_status: 'active',
+    created_at: person.created_at,
+    updated_at: person.updated_at
+  };
+}
+
 /**
  * Real entry point for the People route controller (W2).
  */
@@ -369,7 +435,8 @@ export async function renderPeoplePage(
   const dir = el('section', 'people-page__dir card');
   const pane = el('section', 'people-page__pane card');
   split.append(dir, pane);
-  root.append(titleRow, addHost, todayStrip, askCard, split);
+  const toasts = createToastHost();
+  root.append(titleRow, addHost, todayStrip, askCard, split, toasts.root);
   canvas.append(root);
 
   let askResult: AskResponse | null = null;
@@ -502,6 +569,17 @@ export async function renderPeoplePage(
       });
       pills.append(pill);
     }
+    if (query.showArchived) {
+      const pill = el('button', 'people-page__pill', 'Showing archived ✕') as HTMLButtonElement;
+      pill.type = 'button';
+      pill.addEventListener('click', () => {
+        query = { ...query, showArchived: false };
+        syncControlLabels();
+        applyQueryToHash();
+        renderDirectory();
+      });
+      pills.append(pill);
+    }
     if (query.hasOpen) {
       const pill = el('button', 'people-page__pill', 'Needs you ✕') as HTMLButtonElement;
       pill.type = 'button';
@@ -586,7 +664,7 @@ export async function renderPeoplePage(
         const warmth = model?.warmth ?? row.warmth;
         const roleLine = model?.roleLine ?? row.role_line;
         const a = document.createElement('a');
-        a.className = `people-page__row${row.id === selectedId ? ' is-on' : ''}`;
+        a.className = `people-page__row${row.id === selectedId ? ' is-on' : ''}${isArchived(row) ? ' is-archived' : ''}`;
         a.href = peopleRoute(row.id, serializeDirectoryQuery(query));
         const org = row.organisation;
         a.append(
@@ -598,6 +676,9 @@ export async function renderPeoplePage(
         const nameLine = el('span', 'people-page__row-name', row.display_name);
         if (row.person_type === 'student') {
           nameLine.append(el('span', 'people-page__type-badge', 'Student'));
+        }
+        if (isArchived(row)) {
+          nameLine.append(el('span', 'people-page__type-badge people-page__archived-pill', 'Archived'));
         }
         stack.append(nameLine);
         stack.append(el('span', 'people-page__row-sub', roleLine));
@@ -855,7 +936,16 @@ export async function renderPeoplePage(
             );
             editor.button.classList.add('people-pane__edit');
             nameRow.append(editor.button);
+            const archived = personEntity.lifecycle_status === 'archived';
+            if (!personEntity.is_self && !archived) {
+              nameRow.append(buildPersonMenu([
+                { label: 'Archive person', onSelect: () => void archivePerson(id, ref, model.displayName) }
+              ]));
+            }
             stack.append(nameRow);
+            if (archived && !personEntity.is_self) {
+              stack.append(archivedBanner(id, ref, model.displayName, personEntity.lifecycle_status));
+            }
             const chips = buildPersonChips(model, id);
             stack.append(chips);
             const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
@@ -1445,6 +1535,14 @@ export async function renderPeoplePage(
     openCb.checked = query.hasOpen;
     open.append(openCb, document.createTextNode(' Needs you (open items or link proposals)'));
 
+    const archived = document.createElement('label');
+    archived.className = 'people-page__field';
+    const archivedCb = document.createElement('input');
+    archivedCb.type = 'checkbox';
+    archivedCb.checked = query.showArchived;
+    archivedCb.setAttribute('aria-label', 'Show archived');
+    archived.append(archivedCb, document.createTextNode(' Show archived'));
+
     const apply = el('button', 'btn btn--primary', 'Apply') as HTMLButtonElement;
     apply.type = 'button';
     apply.addEventListener('click', () => {
@@ -1455,6 +1553,7 @@ export async function renderPeoplePage(
         orgScope: orgScopeSelect.value as DirectoryQueryState['orgScope'],
         warmth: warmthSelect.value as DirectoryQueryState['warmth'],
         hasOpen: openCb.checked,
+        showArchived: archivedCb.checked,
         sort: (sortSelect?.value as DirectorySort | undefined) ?? query.sort,
         group: (groupSelect?.value as DirectoryGroup | undefined) ?? query.group
       };
@@ -1468,7 +1567,7 @@ export async function renderPeoplePage(
     close.addEventListener('click', () => {
       sheet.hidden = true;
     });
-    sheetInner.append(roleField, orgScopeField, orgField, warmth, open, apply, close);
+    sheetInner.append(roleField, orgScopeField, orgField, warmth, open, archived, apply, close);
     sheetInner.scrollTop = 0;
   }
 
@@ -1752,16 +1851,129 @@ export async function renderPeoplePage(
     }
   }
 
+  function forgetPerson(id: string): void {
+    if (directory) {
+      directory = {
+        ...directory,
+        people: directory.people.filter((p) => p.id !== id),
+        students: (directory.students ?? []).filter((p) => p.id !== id)
+      };
+    }
+    personModels.delete(id);
+    personOverviews.delete(id);
+  }
+
+  /** Archive: the person leaves the list at once; Undo brings them back. */
+  async function archivePerson(id: string, ref: string, name: string): Promise<void> {
+    try {
+      await transitionPerson(ref, 'archive');
+    } catch (err) {
+      toasts.show(`Couldn't archive ${name}. ${err instanceof Error ? err.message : ''}`.trim());
+      return;
+    }
+    const row = findRow(id);
+    if (row) row.lifecycle_status = 'archived';
+    if (selectedId === id && !query.showArchived) {
+      selectedId = null;
+      applyQueryToHash();
+      void paintSelection();
+    } else if (selectedId === id) {
+      void paintSelection();
+    }
+    renderDirectory();
+    toasts.show(`Archived ${name}`, [{ label: 'Undo', onClick: () => void restorePerson(id, ref, name) }]);
+    void reloadDirectory();
+  }
+
+  async function restorePerson(id: string, ref: string, name: string): Promise<void> {
+    try {
+      await transitionPerson(ref, 'activate');
+    } catch (err) {
+      toasts.show(`Couldn't restore ${name}. ${err instanceof Error ? err.message : ''}`.trim());
+      return;
+    }
+    const row = findRow(id);
+    if (row) row.lifecycle_status = 'active';
+    if (selectedId === id) void paintSelection();
+    renderDirectory();
+    toasts.show(`Restored ${name}`);
+    void reloadDirectory();
+  }
+
+  function deletePermanently(id: string, ref: string, name: string, status: string): void {
+    openDeletePersonDialog(root, {
+      name,
+      alreadyDeidentified: status === 'deidentified',
+      transition: (action) => transitionPerson(ref, action),
+      onDeleted: () => {
+        forgetPerson(id);
+        if (directory) count.textContent = directoryCountLabel(directory);
+        if (selectedId === id) {
+          selectedId = null;
+          applyQueryToHash();
+          void paintSelection();
+        }
+        renderDirectory();
+        toasts.show(`Deleted ${name} permanently`);
+        void reloadDirectory();
+      }
+    });
+  }
+
+  function archivedBanner(id: string, ref: string, name: string, status: string): HTMLElement {
+    const banner = el('div', 'people-pane__archived');
+    banner.setAttribute('role', 'note');
+    banner.append(el('span', 'people-pane__archived-text', 'Archived. Hidden from the list.'));
+    const restore = el('button', 'btn btn--secondary', 'Restore') as HTMLButtonElement;
+    restore.type = 'button';
+    restore.addEventListener('click', () => void restorePerson(id, ref, name));
+    const remove = el('button', 'btn btn--ghost people-pane__delete', 'Delete permanently') as HTMLButtonElement;
+    remove.type = 'button';
+    remove.addEventListener('click', () => deletePermanently(id, ref, name, status));
+    banner.append(restore, remove);
+    return banner;
+  }
+
+  function openPerson(id: string): void {
+    selectedId = id;
+    applyQueryToHash();
+    renderDirectory();
+    void paintSelection();
+  }
+
+  function onPersonAdded(result: AddPersonResult, roleTitle: string | null = null): void {
+    addHost.hidden = true;
+    addForm?.reset();
+    const row = rowForNewPerson(result, roleTitle);
+    forgetPerson(row.id);
+    directory = directory
+      ? { ...directory, people: [row, ...directory.people], counts: { ...directory.counts, people: directory.counts.people + 1 } }
+      : { people: [row], students: [], organisations: [], counts: { people: 1, organisations: 0 } };
+    count.textContent = directoryCountLabel(directory);
+    if (query.who === 'students') query = { ...query, who: 'colleagues' };
+    openPerson(row.id);
+    const name = row.display_name;
+    const message = result.failed.length
+      ? `Added ${name}. ${result.failed.join(' and ')} didn't save.`
+      : `Added ${name}`;
+    toasts.show(message, [
+      { label: 'Open', onClick: () => openPerson(row.id) },
+      { label: 'Undo', onClick: () => void archivePerson(row.id, row.ref, name) }
+    ]);
+    // The fresh scan still runs, in the background.
+    void reloadDirectory();
+  }
+
+  let addForm: { focusName: () => void; reset: () => void } | null = null;
   addBtn.addEventListener('click', () => {
     addHost.hidden = !addHost.hidden;
-    if (!addHost.hidden && !addHost.dataset.mounted) {
-      mountAddPersonForm(addHost, {
-        onCreated: () => {
-          void reloadDirectory();
-        }
+    if (!addHost.hidden && !addForm) {
+      addForm = mountAddPersonForm(addHost, {
+        onCreated: (result) => onPersonAdded(result),
+        onCancel: () => { addHost.hidden = true; }
       });
-      addHost.dataset.mounted = '1';
     }
+    if (!addHost.hidden) addForm?.focusName();
   });
   addIcon.addEventListener('click', () => addBtn.click());
 

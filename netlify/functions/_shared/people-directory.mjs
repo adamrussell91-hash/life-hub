@@ -178,6 +178,7 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
       they_owe_count: 0,
       pending_proposal_count: pendingProposals,
       next_label: null,
+      lifecycle_status: person.lifecycle_status ?? 'active',
       created_at: person.created_at,
       updated_at: person.updated_at
     });

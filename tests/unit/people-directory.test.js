@@ -263,3 +263,23 @@ test('assemblePeopleDirectory leads with the job title at their current workplac
   assert.equal(data.people[0].role_line, 'Head of Department Learning Enrichment · Tallowwood');
   assert.equal(data.people[0].job_title, 'Head of Department Learning Enrichment');
 });
+
+test('assemblePeopleDirectory carries lifecycle_status so archived people can be hidden', () => {
+  const person = (id, name, lifecycle_status) => ({
+    person: {
+      id, display_name: name, is_self: false, lifecycle_status,
+      created_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-20T00:00:00.000Z',
+      ref: `shared:person:${id}`
+    },
+    relationships: []
+  });
+  const data = assemblePeopleDirectory([
+    person(PERSON_ID, 'Isla Emberly', 'active'),
+    person('person_00000000-0000-4000-8000-000000000003', 'Rowan Pike', 'archived'),
+    person('person_00000000-0000-4000-8000-000000000004', 'Gone Person', 'deleted')
+  ]);
+  assert.deepEqual(
+    data.people.map((p) => [p.display_name, p.lifecycle_status]),
+    [['Isla Emberly', 'active'], ['Rowan Pike', 'archived']]
+  );
+});

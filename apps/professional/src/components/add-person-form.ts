@@ -20,7 +20,7 @@ function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiClientError || err instanceof Error ? err.message : fallback;
 }
 
-interface SelectedEntity {
+export interface SelectedEntity {
   ref: string;
   display_label: string;
 }
@@ -114,6 +114,10 @@ export interface AddPersonResult {
    * the optional follow-up writes (organisation link, introduction link,
    * observation) didn't make it and can be added later from their page. */
   warnings: string[];
+  /** Short labels of the writes that didn't save ("Workplace"), for the toast. */
+  failed: string[];
+  /** The organisation picked, so the new directory row can show it at once. */
+  organisation: SelectedEntity | null;
 }
 
 export interface AddPersonFormOptions {
@@ -136,7 +140,10 @@ function todayIsoDate(): string {
  * incomplete initial record ("additional structure appears through later
  * activity").
  */
-export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOptions): { focusName: () => void } {
+export function mountAddPersonForm(
+  host: HTMLElement,
+  options: AddPersonFormOptions
+): { focusName: () => void; reset: () => void } {
   const form = document.createElement('form');
   form.className = 'add-person-form';
   form.setAttribute('aria-label', 'Add person');
@@ -240,66 +247,79 @@ export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOpti
         return;
       }
 
+      // The person exists now; the optional writes run together, and a
+      // failure in one is a warning, never a rollback.
       const organisation = orgField.getSelected();
+      const introducer = introducerField.getSelected();
+      const whereMet = whereInput.value.trim();
+      const observationText = observationInput.value.trim();
+      const combinedText = [whereMet ? `Met at ${whereMet}.` : '', observationText].filter(Boolean).join(' ');
+      const writes: Array<{ label: string; detail: string; run: () => Promise<unknown> }> = [];
       if (organisation) {
-        try {
+        writes.push({
+          label: 'Workplace',
+          detail: `Linking to ${organisation.display_label}`,
           // `member_of` rather than `employee_at` — a quick capture rarely
           // knows employment status, just that this org came up.
-          await createUniversalLink({
+          run: () => createUniversalLink({
             source_ref: person.ref,
             target_ref: organisation.ref,
             relationship_type: 'member_of',
             valid_from: occurredAt
-          });
-        } catch (err) {
-          warnings.push(
-            `Linking to ${organisation.display_label} failed: ${errorMessage(err, 'unknown error')}`
-          );
-        }
+          })
+        });
       }
-
-      const introducer = introducerField.getSelected();
       if (introducer) {
-        try {
+        writes.push({
+          label: 'Introduction',
+          detail: `Recording the introduction from ${introducer.display_label}`,
           // Source = the introducer (the earlier-known party), target =
           // the new person, per BUILD-PLAN.md Feature 1.1's documented
           // direction choice for `professional_relationship`.
-          await createUniversalLink({
+          run: () => createUniversalLink({
             source_ref: introducer.ref,
             target_ref: person.ref,
             relationship_type: 'professional_relationship',
             role: 'introduction',
             valid_from: occurredAt
-          });
-        } catch (err) {
-          warnings.push(
-            `Recording the introduction from ${introducer.display_label} failed: ${errorMessage(err, 'unknown error')}`
-          );
-        }
+          })
+        });
       }
-
-      const whereMet = whereInput.value.trim();
-      const observationText = observationInput.value.trim();
-      const combinedText = [whereMet ? `Met at ${whereMet}.` : '', observationText].filter(Boolean).join(' ');
       if (combinedText) {
-        try {
-          await createObservation({
+        writes.push({
+          label: 'Observation',
+          detail: 'Saving the observation',
+          run: () => createObservation({
             about_ref: person.ref,
             text: combinedText,
             occurred_at: occurredAt,
             source: 'manual',
             linked_ref: null
-          });
-        } catch (err) {
-          warnings.push(`Saving the observation failed: ${errorMessage(err, 'unknown error')}`);
-        }
+          })
+        });
       }
+      const failed: string[] = [];
+      const settled = await Promise.allSettled(writes.map((w) => w.run()));
+      settled.forEach((result, i) => {
+        if (result.status === 'fulfilled') return;
+        const write = writes[i]!;
+        failed.push(write.label);
+        warnings.push(`${write.detail} failed: ${errorMessage(result.reason, 'unknown error')}`);
+      });
 
       submit.disabled = false;
-      options.onCreated({ person, warnings });
+      options.onCreated({ person, warnings, failed, organisation });
     })();
   });
 
+  function reset(): void {
+    form.reset();
+    dateInput.value = todayIsoDate();
+    orgField.reset();
+    introducerField.reset();
+    status.hidden = true;
+  }
+
   host.append(form);
-  return { focusName: () => nameInput.focus() };
+  return { focusName: () => nameInput.focus(), reset };
 }

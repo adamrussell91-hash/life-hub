@@ -43,6 +43,20 @@ export function updatePerson(
   return apiPatch<EntityRecord>(`/api/entities?${params.toString()}`, patch, { signal: options.signal });
 }
 
+export type PersonLifecycleAction = 'archive' | 'activate' | 'deidentify' | 'delete';
+
+/** `PATCH /api/entities?ref=<ref>&action=archive|activate|deidentify|delete`.
+ * Archive and activate are the everyday pair; deidentify then delete is
+ * "Delete permanently" (identifying fields redacted, tombstone kept). */
+export function transitionPerson(
+  ref: string,
+  action: PersonLifecycleAction,
+  options: SearchOptions = {}
+): Promise<EntityRecord> {
+  const params = new URLSearchParams({ ref, action });
+  return apiPatch<EntityRecord>(`/api/entities?${params.toString()}`, {}, { signal: options.signal });
+}
+
 /** `GET /api/entities/search?q=<encoded>&kinds=<kind[,kind]>` — one request. */
 export function searchEntities(
   query: string,
