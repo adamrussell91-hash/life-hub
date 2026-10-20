@@ -75,6 +75,7 @@ import {
   mountMediaLibraryPicker,
   resolveMediaLibraryUrl
 } from '@/teacher/media-library-picker';
+import { createAudioRecordButton } from '@/blocks/audio-record-button';
 import {
   createUploadButton,
   rememberUploadedMedia,
@@ -1104,22 +1105,33 @@ export function createAudioEditor(
     });
   };
 
+  let lastUploadedUrl = '';
   const upload = createUploadButton({
     accept: 'audio/*',
     noun: 'an audio file',
     label: 'Upload audio',
     dropTarget: fields,
     onUploaded: (uploadedUrl, media) => {
+      lastUploadedUrl = uploadedUrl;
       url.value = uploadedUrl;
-      if (!title.value.trim()) title.value = media.title;
+      if (!title.value.trim()) title.value = media.title.replace(/\.(webm|m4a|ogg)$/, '');
       emitChange();
     }
+  });
+
+  const record = createAudioRecordButton({
+    upload: (file) => {
+      lastUploadedUrl = '';
+      return upload.uploadFiles([file]);
+    },
+    uploaded: () => Boolean(lastUploadedUrl),
+    fileTitle: () => title.value
   });
 
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(mediaSourceRow(upload.el), url, title);
+  fields.append(mediaSourceRow(upload.el, record.el), url, title);
   return editorShell(block, onChange, fields, getLatest);
 }
 
