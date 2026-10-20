@@ -62,6 +62,9 @@ export type PsSession = {
   reviewProposal: PsReviewProposal | null;
   reviewTaskId: string | null;
   reviewState: PsReviewState | null;
+  caseFile: PsCaseFileRecord | null;
+  /** The key of a case-file offer set aside with Not now. */
+  caseFileDeclined: string | null;
   taskSnapshot: PsTaskSnapshot | null;
   detour: PsDetour | null;
   createdAt: string;
@@ -70,4 +73,11 @@ export type PsSession = {
 
 export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full'; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null };
 
-export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status';
+export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file';
+
+export type PsCaseFileTarget = { kind: 'task' | 'project'; id: string };
+/** What was written where: the section digests written, so later changes can be found. */
+export type PsCaseFileRecord = { title: string; version: number; target: PsCaseFileTarget; writtenAt: string; sections: Record<string, string>; history: { version: number; at: string; target: PsCaseFileTarget }[] };
+export type PsCaseFileSection = { key: string; heading: string; lines: string[] };
+export type PsCaseFile = { title: string; version: number; sections: PsCaseFileSection[] };
+export type PsCaseFileOffer = { kind: 'write' | 'update'; version: number; file: PsCaseFile; digests: Record<string, string>; key: string; changed: string[] };
