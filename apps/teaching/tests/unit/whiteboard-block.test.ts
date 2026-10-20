@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cloneBlockWithNewIds, createBlock } from '@/blocks/create-block';
-import { hasDrawing, toScene } from '@/blocks/excalidraw-board';
+import { hasDrawing, toScene } from '../../../../packages/whiteboard/excalidraw-board';
 import { BlockSchema } from '@/schemas/block';
 
 describe('whiteboard block', () => {

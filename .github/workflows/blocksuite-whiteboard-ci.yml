@@ -3,7 +3,8 @@ name: Whiteboard integration validation
 on:
   pull_request:
     branches: [main]
-    # BlockSuite lives in the shared block editor, so those files stay listed.
+    # The Excalidraw board lives in packages/whiteboard; each hub's block
+    # editor files mount it, so those files stay listed.
     # ponytail: do not widen this to apps/tasks/** or apps/teaching/** — that
     # reruns this job for unrelated views such as Excursions. Split the
     # whiteboard editor out of editors/render/registry if those files get too hot.
@@ -16,7 +17,6 @@ on:
       - 'apps/tasks/package-lock.json'
       - 'packages/whiteboard/**'
       - 'apps/teaching/src/blocks/whiteboard-runtime.ts'
-      - 'apps/teaching/src/blocks/excalidraw-board.ts'
       - 'apps/teaching/src/blocks/create-block.ts'
       - 'apps/teaching/src/blocks/editors.ts'
       - 'apps/teaching/src/blocks/render.ts'
@@ -30,6 +30,8 @@ on:
       - 'apps/tasks/src/blocks/registry.ts'
       - 'apps/tasks/src/schemas/block.ts'
       - 'apps/tasks/tests/unit/whiteboard-block.test.ts'
+      - 'apps/tasks/scripts/mock-api.ts'
+      - 'apps/teaching/scripts/mock-api.ts'
       - 'netlify/functions/whiteboards.mjs'
       - 'netlify/functions/_shared/whiteboard-blobs.mjs'
       - 'netlify/functions/lesson-publish.mjs'
