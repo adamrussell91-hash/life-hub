@@ -287,18 +287,25 @@ function enableDrag(svg: SVGSVGElement, orientation: Orientation, onNudge: NonNu
  * A map that picks its orientation from the room it has: vertical when every
  * lane fits, otherwise horizontal, swiped sideways inside its own box.
  */
+/** Station names measured in the font the map draws them in. */
+export function measureStations(input: NetInput): (value: string) => number {
+  const font = input.rowKind === 'unit' ? FONT_UNIT : FONT_LABEL;
+  return (value) => measureText(value, font);
+}
+
 export function mountNetworkStage(input: NetInput, options: DrawOptions & { print?: boolean } = {}): HTMLElement {
   const stage = document.createElement('div');
   stage.className = 'net-stage';
   let drawn = '';
+  const measure = measureStations(input);
   const draw = (width: number) => {
-    const orientation = chooseNetworkOrientation(width, input);
-    // A vertical map fills its width, so it redraws as the width changes.
+    const orientation = chooseNetworkOrientation(width, input, { measure });
+    // A vertical map is centred in its width, so it redraws as the width changes.
     const key = orientation === 'vertical' ? `v${Math.round(width / 24)}` : 'h';
     if (key === drawn) return;
     drawn = key;
     stage.dataset.orientation = orientation;
-    const svg = drawNetwork(layoutNetwork(input, orientation, { width: Math.floor(width) }), options);
+    const svg = drawNetwork(layoutNetwork(input, orientation, { width: Math.floor(width), measure }), options);
     if (orientation === 'vertical') {
       stage.replaceChildren(svg);
       return;
@@ -311,7 +318,7 @@ export function mountNetworkStage(input: NetInput, options: DrawOptions & { prin
     stage.replaceChildren(scroller);
   };
   if (options.print || typeof ResizeObserver === 'undefined') {
-    draw(Math.max(verticalWidth(input), 900));
+    draw(Math.max(verticalWidth(input, { measure }), 900));
     return stage;
   }
   let wasConnected = false;
