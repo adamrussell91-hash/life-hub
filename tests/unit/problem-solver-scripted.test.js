@@ -396,3 +396,54 @@ test('a boundary turn leaving a step with nothing done asks no learning question
   assert.equal(s.pendingLearning, null);
   assert.doesNotMatch(s.turns.at(-1).text, /learn/);
 });
+
+const SENTENCE = 'The rota record helps the next organiser avoid the same late week';
+const documentSession = (run, text) => run ? inStep('document', run, text) : { ...inStep('document', null, text), steps: { document: { runs: [], status: 'open', objection: null } } };
+
+test('Document with no tool open suggests the 5 Cs, the step\'s default', async () => {
+  const turn = await scriptedCoach(documentSession(null, 'What should we keep from all this?'));
+  assert.deepEqual([turn.verdict, turn.suggestion?.kind, turn.suggestion?.tool], ['clarify', 'next_tool', 'five_cs']);
+});
+
+test('5 Cs: a name that breaks a strict rule is challenged with the advice, carrying the node', async () => {
+  const run = build('five_cs', [['contextualise', SENTENCE], ['categorise', SENTENCE], ['condense:1', SENTENCE], ['correct', SENTENCE]]);
+  let turn = await scriptedCoach(documentSession(run, 'Kitchen rota case file for the team'));
+  assert.equal(turn.verdict, 'challenge');
+  assert.match(turn.message, /^That name needs one more thing: add the date as YYYYMMDD/);
+  assert.deepEqual([turn.node?.slot, turn.node?.text], ['correspond', 'Kitchen rota case file for the team']);
+  assert.deepEqual(turn.proposeTasks, []);
+  turn = await scriptedCoach(documentSession(run, 'Kitchen rota case file 20261020 v1 Final'));
+  assert.equal(turn.verdict, 'accept');
+  assert.deepEqual([turn.node?.slot, turn.node?.text], ['correspond', 'Kitchen rota case file 20261020 v1 Final']);
+});
+
+test('5 Cs: a thin name is still challenged as thin first', async () => {
+  const run = build('five_cs', [['contextualise', SENTENCE], ['categorise', SENTENCE], ['condense:1', SENTENCE], ['correct', SENTENCE]]);
+  const turn = await scriptedCoach(documentSession(run, 'Rota v1 Final'));
+  assert.equal(turn.verdict, 'challenge');
+  assert.match(turn.message, /too thin/);
+});
+
+test('next: knowledge_management in Document suggests it', async () => {
+  const run = build('five_cs', [['contextualise', SENTENCE], ['categorise', SENTENCE], ['condense:1', SENTENCE], ['correct', SENTENCE], ['correspond', 'Kitchen rota case file 20261020 v1 Final']]);
+  const turn = await scriptedCoach(documentSession(run, 'next: knowledge_management'));
+  assert.deepEqual([turn.verdict, turn.suggestion?.kind, turn.suggestion?.tool], ['clarify', 'next_tool', 'knowledge_management']);
+});
+
+test('knowledge management: answers place in order, explicit and tacit hints go to those slots', async () => {
+  let run = build('knowledge_management', []);
+  for (const [text, slot] of [
+    [SENTENCE, 'consider'],
+    [`tacit: ${SENTENCE}`, 'tacit:1'],
+    [`explicit: ${SENTENCE}`, 'explicit:1'],
+    [`share: ${SENTENCE}`, 'share'],
+    [`review: ${SENTENCE}`, 'review']
+  ]) {
+    const turn = await scriptedCoach(documentSession(run, text));
+    assert.equal(turn.verdict, 'accept', text);
+    assert.equal(turn.node.slot, slot, text);
+    assert.equal(turn.node.text, SENTENCE);
+    run = placeNode(run, { id: turn.node.slot, ...turn.node, state: 'accepted' });
+  }
+  assert.equal(isComplete(run), true);
+});

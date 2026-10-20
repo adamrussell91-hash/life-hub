@@ -9,6 +9,7 @@ import { KANBAN_COLUMNS } from '../../../../packages/problem-solver/tools/kanban
 import { QUADRANTS } from '../../../../packages/problem-solver/tools/swot.mjs';
 import { longestEarlier } from '../../../../packages/problem-solver/tools/after-action-review.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
+import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
 
@@ -19,7 +20,8 @@ import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './
  * An answer like `option: …` places in that open slot (a Kanban card may use a column instead,
  * `doing: …`). Once a Decide tool can take its choice, an answer with no hint is the choice.
  * `next: <tool id>` suggests that tool when it belongs to the step, and `reopen: define` (or
- * `analyse`) suggests reopening that step once double-loop learning allows it.
+ * `analyse`) suggests reopening that step once double-loop learning allows it. A 5 Cs name
+ * that breaks a strict naming rule is challenged with that rule's advice.
  */
 const FRAME = [
   ['goal', 'What is the goal, as an ideal state rather than a fix? Say what good looks like.'],
@@ -209,7 +211,10 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'clarify', suggestion: { kind: 'next_tool', tool: 'after_action_review', reason: 'The results are in; compare them with the aim.' }, message: 'The results are in. An after action review compares what you meant to happen with what did; start it when you are ready.' };
   }
   if (!run && !defaultToolFor(session.model.id, session.phase)) return { ...base, verdict: 'clarify', message: 'There is no tool for this step yet. Tell me what you notice, or move on when you are ready.' };
-  if (!run) return { ...base, verdict: 'clarify', message: 'Pick a tool to start this step, and we will work through it one question at a time together.' };
+  if (!run) {
+    const tool = defaultToolFor(session.model.id, session.phase);
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'next_tool', tool, reason: 'A good first tool for this step.' }, message: `Pick a tool to start this step; ${TOOLS[tool].name} is a good first one, and we will work through it one question at a time together.` };
+  }
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
     const chosen = TOOLS[run.tool].step === 'implement' ? chosenOption(session) : null;
@@ -247,6 +252,10 @@ export async function scriptedCoach(session) {
   const tag = placed.tag ?? tagFromText(run, slot, text);
   if (wordCount(text) < 6) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['analysis'], message: 'That is too thin to stand on yet. It reads like a symptom rather than a cause. Can you say what specifically happens, and when?' };
+  }
+  const nameAdvice = run.tool === 'five_cs' && slot === 'correspond' ? namingProblem(text) : null;
+  if (nameAdvice) {
+    return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['critical_thinking'], message: `That name needs one more thing: ${nameAdvice} Then it can be found and trusted later. What is the full name?` };
   }
   if (run.tool === 'after_action_review' && slot === 'learned' && wordCount(text) <= longestEarlier(run)) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['reflective_thinking'], message: `Learning is the heart of the review, yet this is shorter than what you said about what happened. Tell me more: what will you keep, change or try next time, and why?` };
