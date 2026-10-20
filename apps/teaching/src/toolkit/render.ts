@@ -1254,9 +1254,15 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
 
 // ─── Fluid analogy ──────────────────────────────────────────────────────────
 
-/** Same eyebrow as the toolkit, without the griffin: not a Newington framework block. */
+/** Same eyebrow as the toolkit. The griffin marks Newington framework blocks, so analogy carries its own chain mark. */
 function analogyEyebrow(text: string): HTMLElement {
-  return el('p', 'tk-eyebrow an-eyebrow', text);
+  const row = el('p', 'tk-eyebrow an-eyebrow');
+  const icon = el('span', 'tk-eyebrow__icon');
+  icon.setAttribute('aria-hidden', 'true');
+  // Static markup from analogy-icons.ts, never user content.
+  icon.innerHTML = analogyIconSvg('analogy_chains');
+  row.append(icon, el('span', undefined, text));
+  return row;
 }
 
 function analogyCheckList(checks: string[]): HTMLElement {
