@@ -6,7 +6,7 @@ import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say, score } f
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 import { addEdge, checkNode, isComplete, newRun, placeNode } from '../../packages/problem-solver/machine.mjs';
-import { createLightningSession, applyLightningTurn } from '../../netlify/functions/_shared/problem-solver/lightning-session.mjs';
+import { createLightningSession, applyLightningTurn, escalateLightning } from '../../netlify/functions/_shared/problem-solver/lightning-session.mjs';
 import { currentEntry } from '../../packages/problem-solver/lightning.mjs';
 import { matrixTotals, options } from '../../packages/problem-solver/tools/decision-matrix.mjs';
 
@@ -529,4 +529,27 @@ test('lightning: a finished run gets a one-line clarify; "It came back." asks th
   assert.equal(done.lightning, null);
   const again = { ...s, status: 'active', lightning: { ...s.lightning, finishedAt: null, path: [...s.lightning.path, { node: 'start', round: 2, at: 'x' }], rounds: 2 }, turns: [...s.turns, { role: 'user', text: 'It came back.' }] };
   assert.equal((await scriptedCoach(again)).message, 'Could you accept things as they are?');
+});
+
+test('an escalated full session opens with the carried seeds, then the reply sets the goal as usual', async () => {
+  let run = freshRun();
+  run = await lightningStep(run, 'no');
+  run = await lightningStep(run, 'The door should slide shut without force');
+  run = await lightningStep(run, 'no');
+  run = await lightningStep(run, 'no');
+  run = await lightningStep(run, 'no, sketched where it rubs');
+  let { full } = escalateLightning(run, 'full1', deps);
+  full = await step(full);
+  assert.equal(full.turns.at(-1).text, `Carried over from Lightning. Goal: The door should slide shut without force. What is true: ${full.frameSeeds.whatIsTrue.replace(/\.$/, '')}. Is that still right, or what would you change?`);
+  assert.match(full.frameSeeds.whatIsTrue, /draw a diagram/i);
+  assert.doesNotMatch(full.turns.at(-1).text, /\.\./);
+  full = await step(say(full, 'Yes, the door should slide shut without any force', deps));
+  assert.equal(full.frame.goal, 'Yes, the door should slide shut without any force');
+  assert.match(full.turns.at(-1).text, /what is actually true/);
+});
+
+test('seeds with nothing set say so', async () => {
+  const { full } = escalateLightning(freshRun(), 'full2', deps);
+  const turn = await scriptedCoach(full);
+  assert.equal(turn.message, 'Carried over from Lightning. Goal: not set. What is true: nothing tried yet. Is that still right, or what would you change?');
 });

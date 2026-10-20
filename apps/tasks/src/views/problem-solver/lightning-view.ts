@@ -8,6 +8,7 @@ import { LIGHTNING_QUESTIONS, currentEntry, questionOf } from '../../../../../pa
 import { createLightningView, type LightningAnswer, type LightningView } from '../../../../../packages/problem-solver/render/lightning';
 import type { PsAction, PsLightningNodeId, PsLightningState, PsSession } from '../../../../../packages/problem-solver/types';
 import { mountCoachPanel, type CoachPanel } from './coach-panel';
+import { isBusy } from './api';
 
 const sessionHref = (id: string): string => `#/problem-solver?id=${encodeURIComponent(id)}`;
 
@@ -61,6 +62,10 @@ export type LightningPage = {
   flash(err: unknown): void;
   /** Let the chart's Yes and No be pressed again after an answer that did not go through. */
   releaseAnswer(): void;
+  /** Hold the escalate card while its post is out ("Taking it to the full process…"). */
+  setEscalating(pending: boolean): void;
+  /** Put focus in the composer, if it takes replies. */
+  focusComposer(): void;
   destroy(): void;
 };
 
@@ -103,6 +108,37 @@ export function mountLightningPage(session: PsSession, handlers: LightningPageHa
   page.append(back, title, strip.el, chartRow, board);
 
   let destroyed = false;
+  let busy = isBusy(session);
+  let escalating = false;
+  const answerButtons = () => [...chart.el.querySelectorAll<HTMLButtonElement>('.ps-ltn__answer')];
+
+  /** While the coach is thinking, the chart's Yes and No wait with it. */
+  function lockAnswers(): void {
+    const ask = chart.el.querySelector('.ps-ltn__ask');
+    if (busy) {
+      ask?.setAttribute('aria-disabled', 'true');
+      for (const button of answerButtons()) button.setAttribute('aria-disabled', 'true');
+    } else if (ask?.hasAttribute('aria-disabled')) {
+      // An answer always moves the box on, so nothing is still waiting to be sent here.
+      ask.removeAttribute('aria-disabled');
+      for (const button of answerButtons()) button.removeAttribute('aria-disabled');
+    }
+  }
+
+  /** The escalate card's buttons wait while its post is out or the coach is thinking. */
+  function holdEscalate(): void {
+    const card = coach.el.querySelector('.ps-suggestion');
+    const start = card?.querySelector<HTMLButtonElement>('[data-action="escalate"]');
+    if (!card || !start) return;
+    for (const button of card.querySelectorAll<HTMLButtonElement>('.ps-suggestion__actions button')) button.disabled = escalating || busy;
+    let note = card.querySelector('.ps-suggestion__pending');
+    if (escalating && !note) {
+      note = el('p', 'ps-suggestion__pending', 'Taking it to the full process…');
+      note.setAttribute('role', 'status');
+      card.append(note);
+    } else if (!escalating) note?.remove();
+  }
+
   return {
     el: page,
     coach,
@@ -110,22 +146,34 @@ export function mountLightningPage(session: PsSession, handlers: LightningPageHa
       if (destroyed) return;
       if (title.textContent !== next.title) title.textContent = next.title;
       const state = next.lightning;
+      busy = isBusy(next);
       if (state) {
         strip.update(state);
         chart.update(state);
       }
+      lockAnswers();
       const escalatedTo = state?.escalatedTo ?? null;
       sent.hidden = !escalatedTo;
       if (escalatedTo && sentLink.getAttribute('href') !== sessionHref(escalatedTo)) sentLink.href = sessionHref(escalatedTo);
       done.hidden = Boolean(escalatedTo) || !state?.finishedAt;
       coach.update(next);
+      holdEscalate();
     },
     flash(err) {
       coach.el.querySelector('.ps-coach__status--failed.is-transient')?.remove();
       coach.el.querySelector('.ps-coach__extras')?.prepend(el('p', 'ps-coach__status ps-coach__status--failed is-transient', errorMessage(err)));
     },
     releaseAnswer() {
-      for (const button of chart.el.querySelectorAll('.ps-ltn__answer')) button.removeAttribute('aria-disabled');
+      if (busy) return;
+      for (const button of answerButtons()) button.removeAttribute('aria-disabled');
+    },
+    setEscalating(pending) {
+      escalating = pending;
+      holdEscalate();
+    },
+    focusComposer() {
+      const input = coach.el.querySelector<HTMLTextAreaElement>('textarea');
+      if (input && !input.disabled) input.focus();
     },
     destroy() {
       destroyed = true;

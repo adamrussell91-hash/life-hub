@@ -30,6 +30,9 @@ const FRAME = [
   ['whatCanBeDone', 'That is evidence, not opinion. What can be done: can this be solved as it stands, or should we reframe it to something more achievable?']
 ];
 
+/** A seed without its closing full stop, so the sentence around it keeps one. */
+const bare = (text) => String(text).trim().replace(/[.]+$/, '');
+
 const nodesNamed = (run, name) => run.nodes.filter((node) => parseSlot(node.slot)?.name === name);
 
 /** The links a slot needs to pass its tool's check: each satisfied the simplest way. */
@@ -244,7 +247,14 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'clarify', message: 'The whole problem is on the record. Anything you add now is a note for next time; what would you want to remember?' };
   }
   if (session.phase === 'frame') {
-    if (session.turns.length === 1) return { ...base, verdict: 'clarify', message: FRAME[0][1] };
+    if (session.turns.length === 1) {
+      // Escalated from Lightning: the carried seeds come first, for the person to confirm or change.
+      const seeds = session.frameSeeds;
+      if (seeds) {
+        return { ...base, verdict: 'clarify', message: `Carried over from Lightning. Goal: ${bare(seeds.goal ?? 'not set')}. What is true: ${bare(seeds.whatIsTrue ?? 'nothing tried yet')}. Is that still right, or what would you change?` };
+      }
+      return { ...base, verdict: 'clarify', message: FRAME[0][1] };
+    }
     const missing = FRAME.filter(([key]) => !session.frame[key]);
     const [key] = missing[0];
     const frame = { [key]: last };

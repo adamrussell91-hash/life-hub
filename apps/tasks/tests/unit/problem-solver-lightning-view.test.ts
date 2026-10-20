@@ -50,6 +50,7 @@ async function load() {
   return { ...view, api: problemSolverApi };
 }
 
+/** Open a page; a busy session keeps polling, so its render is not awaited. */
 async function open(session: PsSession) {
   const { renderProblemSolverView, unmountProblemSolverView, api } = await load();
   const get = vi.spyOn(api, 'get').mockResolvedValue(session);
@@ -57,7 +58,9 @@ async function open(session: PsSession) {
   location.hash = `#/problem-solver?id=${session.id}`;
   const host = document.createElement('div');
   document.body.append(host);
-  await renderProblemSolverView(host);
+  const rendered = renderProblemSolverView(host);
+  if (session.runner.status === 'running') await vi.waitFor(() => expect(host.querySelector('.ps-ltn-page, .ps-session')).not.toBeNull());
+  else await rendered;
   return { host, get, actWith, api, renderProblemSolverView, unmountProblemSolverView };
 }
 
@@ -197,6 +200,69 @@ describe('Lightning run page', () => {
     expect(banner.textContent).toContain('This went to the full process.');
     expect(banner.querySelector('a')!.getAttribute('href')).toBe('#/problem-solver?id=full1');
     expect(host.querySelector<HTMLElement>('.ps-ltn-page__done')!.hidden).toBe(true);
+  });
+
+  it('while the coach is thinking the chart answers wait, and a click posts nothing', async () => {
+    const busy = run({ runner: { status: 'running', mode: 'turn', error: null } });
+    const { host, get, actWith } = await open(busy);
+    const ask = host.querySelector<HTMLElement>('.ps-ltn__ask')!;
+    expect(ask.getAttribute('aria-disabled')).toBe('true');
+    const yes = host.querySelector<HTMLButtonElement>('.ps-ltn__answer[data-answer="yes"]')!;
+    expect(yes.getAttribute('aria-disabled')).toBe('true');
+    yes.click();
+    expect(actWith).not.toHaveBeenCalled();
+    get.mockResolvedValue(run({ revision: 3 }));
+    await vi.waitFor(() => expect(ask.hasAttribute('aria-disabled')).toBe(false));
+    expect(yes.hasAttribute('aria-disabled')).toBe(false);
+  });
+
+  it('the escalate card waits while its post is out, saying so', async () => {
+    const { host, actWith } = await open(run({ suggestion: { kind: 'escalate', reason: 'r' } }));
+    let finish!: (s: PsSession) => void;
+    actWith.mockReturnValue(new Promise<PsSession>((resolve) => (finish = resolve)));
+    const card = host.querySelector<HTMLElement>('.ps-suggestion')!;
+    button(card, 'Start the full process').click();
+    await vi.waitFor(() => expect(card.querySelector('.ps-suggestion__pending')!.textContent).toBe('Taking it to the full process…'));
+    expect([...card.querySelectorAll<HTMLButtonElement>('.ps-suggestion__actions button')].every((b) => b.disabled)).toBe(true);
+    finish(run({ revision: 3, status: 'finished', suggestion: null, lightning: state({ finishedAt: at, escalatedTo: 'full1' }) }));
+    await vi.waitFor(() => expect(location.hash).toBe('#/problem-solver?id=full1'));
+  });
+
+  it('the escalate card buttons wait while the coach is thinking', async () => {
+    const { host } = await open(run({ suggestion: { kind: 'escalate', reason: 'r' }, runner: { status: 'running', mode: 'turn', error: null } }));
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>('.ps-suggestion__actions button')];
+    expect(buttons).toHaveLength(2);
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+    expect(host.querySelector('.ps-suggestion__pending')).toBeNull();
+  });
+
+  it('a run already escalated elsewhere opens its full session instead of showing the refusal', async () => {
+    const { host, get, actWith } = await open(run({ suggestion: { kind: 'escalate', reason: 'r' } }));
+    get.mockResolvedValue(run({ revision: 4, status: 'finished', suggestion: null, lightning: state({ finishedAt: at, escalatedTo: 'other1' }) }));
+    actWith.mockRejectedValueOnce(conflict()).mockRejectedValueOnce(Object.assign(new Error('This run already went to the full process.'), { code: 'action_not_allowed' }));
+    button(host.querySelector('.ps-suggestion')!, 'Start the full process').click();
+    await vi.waitFor(() => expect(location.hash).toBe('#/problem-solver?id=other1'));
+    expect(host.querySelector('.ps-coach__status--failed')).toBeNull();
+  });
+
+  it('a failed escalate frees the card and shows the error', async () => {
+    const { host, actWith } = await open(run({ suggestion: { kind: 'escalate', reason: 'r' } }));
+    actWith.mockRejectedValue(new Error('Network down'));
+    button(host.querySelector('.ps-suggestion')!, 'Start the full process').click();
+    await vi.waitFor(() => expect(host.querySelector('.ps-coach__status--failed')!.textContent).toBe('Network down'));
+    expect(host.querySelector('.ps-suggestion__pending')).toBeNull();
+    expect(button(host.querySelector('.ps-suggestion')!, 'Start the full process').disabled).toBe(false);
+    expect(location.hash).toBe('#/problem-solver?id=l1');
+  });
+
+  it('after It came back, the composer takes focus once the coach has asked', async () => {
+    const path = [{ node: 'start', round: 1, at, answer: 'yes' }, { node: 'relax', round: 1, at }, { node: 'learn', round: 1, at }, { node: 'next', round: 1, at }] as PsLightningState['path'];
+    const { host, get, actWith } = await open(run({ status: 'finished', lightning: state({ path, finishedAt: at }) }));
+    const round2 = run({ revision: 3, lightning: state({ path: [...path, { node: 'start', round: 2, at }], rounds: 2 }) });
+    actWith.mockResolvedValue({ ...round2, runner: { status: 'queued', mode: 'turn', error: null } });
+    get.mockResolvedValue(round2);
+    button(host, 'It came back').click();
+    await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector('.ps-ltn-page textarea')));
   });
 
   it('leaving the page aborts the poll and drops the chart', async () => {
