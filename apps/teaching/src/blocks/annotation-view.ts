@@ -224,6 +224,8 @@ function renderAttachmentList(attachments: AnnotationAttachment[]): HTMLElement 
 
 /** The margin stack closes the gap a closed note leaves. */
 const PANEL_CLOSED_EVENT = 'annotation-panel-closed';
+/** The reader shut the note themselves, so it should stop being the picked one. */
+const NOTE_DISMISSED_EVENT = 'annotation-note-dismissed';
 
 function closeAnnotationPanel(root: HTMLElement): void {
   const panel = root.querySelector<HTMLElement>('.block-annotation__panel');
@@ -350,6 +352,7 @@ function openAnnotation(
     close.textContent = 'Close';
     close.addEventListener('click', () => {
       closeAnnotationPanel(root);
+      root.dispatchEvent(new CustomEvent(NOTE_DISMISSED_EVENT));
       anchorEl.focus();
     });
     header.append(title, close);
@@ -388,6 +391,7 @@ function openAnnotation(
   close.textContent = 'Close';
   close.addEventListener('click', () => {
     closeAnnotationPanel(root);
+    root.dispatchEvent(new CustomEvent(NOTE_DISMISSED_EVENT));
     anchorEl.focus();
   });
   header.append(title, close);
@@ -589,6 +593,7 @@ function buildInteractiveView(
       const open = root.querySelector<HTMLElement>('.block-annotation__anchor.is-open');
       closeAnnotationPanel(root);
       state = { ...state, openAnnotationId: null };
+      root.dispatchEvent(new CustomEvent(NOTE_DISMISSED_EVENT));
       open?.focus();
     }
   });
@@ -844,6 +849,26 @@ function buildInteractiveView(
     activeNoteId = id;
     scheduleInk(false);
   }
+
+  /** Put the picked note down: its reader closes and every note shows again. */
+  function dismissNote(): void {
+    if (root.querySelector('.block-annotation__anchor.is-open')) {
+      closeAnnotationPanel(root);
+      state = { ...state, openAnnotationId: null };
+    }
+    selectNote(null);
+  }
+
+  root.addEventListener(NOTE_DISMISSED_EVENT, () => selectNote(null));
+
+  // Clicking empty space puts the picked note down, as clicking it again does.
+  root.addEventListener('click', (event) => {
+    if (!activeNoteId || state.focusThreadId) return;
+    const target = event.target as Element | null;
+    if (!target?.closest('.block-annotation__poem')) return;
+    if (target.closest('button, a, input, textarea, select, summary, .block-annotation__panel')) return;
+    dismissNote();
+  });
 
   function marginLabel(ann: AnnotationItem): string | undefined {
     if (ann.technique?.id && table) {
@@ -1120,9 +1145,14 @@ function buildInteractiveView(
         paint();
         return;
       }
+      if (activeNoteId === item.annotation.id) {
+        // A second click on the picked note puts it down again.
+        dismissNote();
+        return;
+      }
       if (!readerNeeded(item.annotation)) {
-        // The margin carries the note: toggle it open, fold the rest away.
-        selectNote(activeNoteId === item.annotation.id ? null : item.annotation.id);
+        // The margin carries the note: open it, fold the rest away.
+        selectNote(item.annotation.id);
         return;
       }
       selectNote(item.annotation.id);
@@ -1456,6 +1486,7 @@ function buildInteractiveView(
         const open = root.querySelector<HTMLElement>('.block-annotation__anchor.is-open');
         closeAnnotationPanel(root);
         state = { ...state, openAnnotationId: null };
+        selectNote(null);
         open?.focus();
         break;
       }
