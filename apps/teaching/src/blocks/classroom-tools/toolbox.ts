@@ -90,7 +90,7 @@ export function mountToolbox(host: HTMLElement, options: ToolboxOptions): () => 
   if (options.kind === 'divider') {
     bar.append(el('hr', 'ct-rule'), tray, trigger);
   } else {
-    bar.append(el('span', 'ct-block-label', 'Classroom tools'), tray, trigger);
+    bar.append(el('span', 'ct-block-label block-eyebrow', 'Classroom tools'), tray, trigger);
   }
 
   const panel = el('div', 'ct-panel');
