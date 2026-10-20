@@ -26,7 +26,7 @@ export function resolvedCalloutStyle(content: { style: string; title?: string })
 export function calloutIdentity(style: string): HTMLElement {
   const [label, paths] = ICONS[style] ?? ICONS.information!;
   const identity = document.createElement('span');
-  identity.className = 'callout__identity';
+  identity.className = 'callout__identity block-eyebrow';
   identity.dataset.calloutStyle = ICONS[style] ? style : 'information';
   identity.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
   identity.append(document.createTextNode(label));

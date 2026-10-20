@@ -421,10 +421,10 @@ describe('learning activity rendering', () => {
     const card = el.querySelector('.block-flashcards__card')!;
     const buttons = [...el.querySelectorAll<HTMLButtonElement>('.block-flashcards__btn')];
 
-    expect(buttons.map((button) => button.textContent)).toEqual(['Prev', 'Flip', 'Next', 'Reset']);
+    expect(buttons.map((button) => button.textContent)).toEqual(['Prev', 'Next', 'Flip', 'Reset']);
     expect(card.querySelector('.block-flashcards__face--front')?.textContent).toBe('Term');
     expect(card.querySelector('.block-flashcards__face--back')?.textContent).toBe('Definition');
-    expect(buttons[1]!.getAttribute('aria-pressed')).toBe('false');
+    expect(buttons[2]!.getAttribute('aria-pressed')).toBe('false');
     expect(
       card.querySelector('.block-flashcards__face--front')?.getAttribute('aria-hidden')
     ).toBe('false');
@@ -432,9 +432,9 @@ describe('learning activity rendering', () => {
       'true'
     );
 
-    buttons[1]!.click();
+    buttons[2]!.click();
     expect(card.classList.contains('block-flashcards__card--flipped')).toBe(true);
-    expect(buttons[1]!.getAttribute('aria-pressed')).toBe('true');
+    expect(buttons[2]!.getAttribute('aria-pressed')).toBe('true');
     expect(
       card.querySelector('.block-flashcards__face--front')?.getAttribute('aria-hidden')
     ).toBe('true');
@@ -566,7 +566,7 @@ describe('learning activity rendering', () => {
     });
     const el = renderBlock(block, 'student');
     const card = el.querySelector('.block-flashcards__card')!;
-    const [prev, flip, next, reset] = [
+    const [prev, next, flip, reset] = [
       ...el.querySelectorAll<HTMLButtonElement>('.block-flashcards__btn')
     ];
 

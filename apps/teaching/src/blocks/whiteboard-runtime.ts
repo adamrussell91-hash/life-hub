@@ -58,7 +58,7 @@ function clearSeed(block: WhiteboardBlock, onBlockChange?: (block: WhiteboardBlo
 
 function statusLine(text: string, isError = false): HTMLParagraphElement {
   const line = document.createElement('p');
-  line.className = 'block-whiteboard__status';
+  line.className = 'block-whiteboard__status block-empty';
   if (isError) line.classList.add('block-whiteboard__status--error');
   line.textContent = text;
   return line;
