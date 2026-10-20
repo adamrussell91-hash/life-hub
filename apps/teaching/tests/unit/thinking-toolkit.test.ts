@@ -94,7 +94,14 @@ describe('Thinking Toolkit library', () => {
       expect(libraryItem(preset.skill)?.kind).toBe('skill');
       for (const id of preset.tools) expect(libraryItem(id)?.kind).toBe('tool');
     }
-    expect(Object.keys(DISTINCTION_PAIR_BANK)).toEqual(['level1', 'level2', 'level3', 'maths', 'inquiry']);
+    expect(Object.keys(DISTINCTION_PAIR_BANK)).toEqual(['level1', 'level3', 'maths', 'inquiry']);
+  });
+
+  it('loads a saved distinction block that chose the retired abstract pairs', () => {
+    const block = createBlock('toolkit_tool', 'legacy_1');
+    const saved = { ...block, content: { ...(block.content as object), pair_level: 'level2' } };
+    const parsed = BlockSchema.parse(saved);
+    expect((parsed.content as { pair_level: string }).pair_level).toBe('none');
   });
 
   it('gives every item a plain description and something students can use', () => {
