@@ -1,0 +1,336 @@
+/*
+ * Morphemic matrix on the dictionary card (src/blocks/morphology.ts).
+ * Kit tokens only. Morpheme tiles keep one pastel from the build row to the
+ * chips: front gold, prefix peach, ending sage, base navy.
+ */
+
+.word-card--matrix {
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+
+/* Row on the card ---------------------------------------------------------- */
+
+.morph {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.morph__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.morph__toggle[aria-expanded='true'] {
+  border-color: var(--wave);
+}
+
+.morph__toggle-meta {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--muted);
+}
+
+.morph__panel {
+  margin-top: var(--space-3);
+}
+
+/* Matrix ------------------------------------------------------------------- */
+
+.morph-matrix {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.morph-matrix__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.morph-matrix__title {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--high-sea-ink);
+}
+
+.morph-matrix__meaning {
+  margin: var(--space-px) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.morph-matrix__score {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: end;
+  text-align: right;
+}
+
+.morph-matrix__count {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--marine);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.morph-matrix__pips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  max-width: 7.5rem;
+}
+
+.morph-matrix__pip {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-full);
+}
+
+.morph-matrix__pip.is-on {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.morph-matrix__assembly {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.morph-matrix__tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.morph-matrix__tile--base {
+  background: var(--navy);
+  color: #fff;
+}
+
+.morph-matrix__tile--gold {
+  background: var(--pastel-gold);
+  color: var(--pastel-gold-ink);
+}
+
+.morph-matrix__tile--peach {
+  background: var(--pastel-peach);
+  color: var(--pastel-peach-ink);
+}
+
+.morph-matrix__tile--sage {
+  background: var(--pastel-sage);
+  color: var(--pastel-sage-ink);
+}
+
+.morph-matrix__tile--empty {
+  border: 1.5px dashed var(--line);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--muted);
+}
+
+.morph-matrix__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.morph-matrix__group {
+  min-width: 0;
+}
+
+.morph-matrix__label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.morph-matrix__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.morph-matrix__chip {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.morph-matrix__chip--gold {
+  background: var(--pastel-gold);
+  color: var(--pastel-gold-ink);
+}
+
+.morph-matrix__chip--peach {
+  background: var(--pastel-peach);
+  color: var(--pastel-peach-ink);
+}
+
+.morph-matrix__chip--sage {
+  background: var(--pastel-sage);
+  color: var(--pastel-sage-ink);
+}
+
+.morph-matrix__chip[aria-pressed='true'] {
+  border-color: var(--wave);
+  box-shadow: 0 0 0 2px var(--wave);
+  font-weight: var(--weight-bold);
+}
+
+.morph-matrix__cousins {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.morph-matrix__cousins:empty {
+  display: none;
+}
+
+.morph-matrix__result {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  min-height: 5.5rem;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.morph-matrix__word {
+  margin: 0;
+  font-family: Newsreader, Georgia, serif;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.morph-matrix__def {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.morph-matrix__example {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--muted);
+}
+
+.morph-matrix__nudge {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.morph-matrix__new {
+  justify-self: start;
+  padding: var(--space-px) var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--pastel-blue);
+  color: var(--pastel-blue-ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.morph-matrix__found {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.morph-matrix__found:empty {
+  display: none;
+}
+
+.morph-matrix__found-chip {
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font-family: Newsreader, Georgia, serif;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.morph-matrix__found-chip.is-current {
+  border-color: var(--wave);
+}
+
+.morph-matrix__again {
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.morph-matrix__done {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--success);
+}
+
+@media (max-width: 420px) {
+  .morph-matrix__tile {
+    min-width: 2.5rem;
+    padding: 0 var(--space-2);
+  }
+}
