@@ -351,4 +351,51 @@ describe('case-file card', () => {
     const order = [...cards.el.children].map((child) => child.className.split(' ')[0]);
     expect(order).toEqual(['ps-taskcard', 'ps-reviewcard', 'ps-casefilecard', 'ps-taskcards__notices']);
   });
+
+  it('a copy elsewhere must keep the offer version, and focus goes to the place on turning', async () => {
+    const h = handlers();
+    h.writeCaseFile.mockRejectedValueOnce(new CaseFilePageGone());
+    const cards = mountTaskCards(h, { today: () => '20261102' });
+    document.body.append(cards.el);
+    cards.update(written());
+    cards.el.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!.click();
+    await flush();
+    const card = cards.el.querySelector('.ps-casefilecard')!;
+    expect(document.activeElement).toBe(card.querySelector('select[name="place"]'));
+    card.querySelector<HTMLInputElement>('input[name="title"]')!.value = 'Kitchen rota case file 20261102 v5 Final';
+    card.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!.click();
+    await flush();
+    expect(h.writeCaseFile).toHaveBeenCalledTimes(1);
+    expect(card.querySelector('.ps-taskcard__error')!.textContent).toBe('Keep the version as v2.');
+    cards.el.remove();
+  });
+
+  it('a first write may choose its own version', async () => {
+    const h = handlers();
+    const cards = mountTaskCards(h);
+    cards.update(doc());
+    await flush();
+    cards.el.querySelector<HTMLInputElement>('.ps-casefilecard input[name="title"]')!.value = 'Kitchen rota case file 20261020 v2 Final';
+    cards.el.querySelector<HTMLButtonElement>('[data-act="write-casefile"]')!.click();
+    await flush();
+    expect(h.writeCaseFile).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ title: 'Kitchen rota case file 20261020 v2 Final' }));
+  });
+
+  it('reloads the places when the links change, keeping the selection that is still there', async () => {
+    const h = handlers();
+    const cards = mountTaskCards(h);
+    cards.update(doc());
+    await flush();
+    const select = cards.el.querySelector<HTMLSelectElement>('.ps-casefilecard select')!;
+    select.value = 'task:t1';
+    select.dispatchEvent(new Event('change'));
+    cards.update(doc());
+    expect(h.places).toHaveBeenCalledTimes(1);
+    h.places.mockResolvedValueOnce([{ value: 'project:p2', label: 'Project: Pantry' }, ...PLACES]);
+    cards.update(doc(undefined, { links: [{ kind: 'project', id: 'p2' }] }));
+    await flush();
+    expect(h.places).toHaveBeenCalledTimes(2);
+    expect([...select.options].map((o) => o.value)).toEqual(['project:p2', 'project:p1', 'task:t1', 'new']);
+    expect(select.value).toBe('task:t1');
+  });
 });
