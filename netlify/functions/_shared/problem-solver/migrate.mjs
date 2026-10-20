@@ -21,9 +21,9 @@ function afterDefine(modelId) {
   return (modelId && nextStepAfter(modelId, defineFor(modelId))) || 'finished';
 }
 
-const LATER_FIELDS = Object.freeze({ proposedTasks: [], reviewProposal: null, reviewTaskId: null, reviewState: null, taskSnapshot: null, detour: null });
+const LATER_FIELDS = Object.freeze({ proposedTasks: [], reviewProposal: null, reviewTaskId: null, reviewState: null, taskSnapshot: null, detour: null, caseFile: null, caseFileDeclined: null });
 
-/** Sessions saved before Plans 5 and 6 gain these fields; nothing is written until the next save. */
+/** Sessions saved before Plans 5, 6 and 7 gain these fields; nothing is written until the next save. */
 function withLaterFields(session) {
   if (!session || !Array.isArray(session.turns) || Object.keys(LATER_FIELDS).every((key) => key in session)) return session;
   return { ...structuredClone(LATER_FIELDS), ...session };
