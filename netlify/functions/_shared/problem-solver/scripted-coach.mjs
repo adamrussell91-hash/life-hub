@@ -21,7 +21,8 @@ import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './
  * An answer like `option: …` places in that open slot (a Kanban card may use a column instead,
  * `doing: …`). Once a Decide tool can take its choice, an answer with no hint is the choice.
  * `next: <tool id>` suggests that tool when it belongs to the step, and `reopen: define` (or
- * `analyse`) suggests reopening that step once double-loop learning allows it. A 5 Cs name
+ * `analyse`) suggests reopening that step once double-loop learning allows it. A third frame
+ * answer containing `model: polya` (or `triz`) chooses that model. A 5 Cs name
  * that breaks a strict naming rule is challenged with that rule's advice.
  */
 const FRAME = [
@@ -29,6 +30,16 @@ const FRAME = [
   ['whatIsTrue', 'Good, that is a clear aim. Now, what is actually true here? Separate the facts and data from what you believe or feel.'],
   ['whatCanBeDone', 'That is evidence, not opinion. What can be done: can this be solved as it stands, or should we reframe it to something more achievable?']
 ];
+
+/**
+ * The model a third frame answer may name with `model: polya` or `model: triz`; the walks use
+ * it. Every model's first step takes Define tools, so the first suggestion is 5 Whys for all.
+ */
+const MODEL_HINTS = {
+  seven_step: ['seven_step', 'the problem solving process', 'A real problem that will need analysis and a decision.'],
+  polya: ['polya', "Polya's four steps", 'A bounded problem with a clear test of success.'],
+  triz: ['triz', 'TRIZ', 'Improving one thing makes another worse.']
+};
 
 /** A seed without its closing full stop, so the sentence around it keeps one. */
 const bare = (text) => String(text).trim().replace(/[.]+$/, '');
@@ -259,7 +270,9 @@ export async function scriptedCoach(session) {
     const [key] = missing[0];
     const frame = { [key]: last };
     if (missing.length === 1) {
-      return { ...base, verdict: 'accept', frame, message: 'Clear enough to work with. I suggest the problem solving process, starting with 5 Whys, because there is one symptom here with a likely single chain of cause.', model: { id: 'seven_step', reason: 'A real problem that will need analysis and a decision.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom, likely one chain.' }, skillsSeen: ['analysis'] };
+      const hinted = MODEL_HINTS[/\bmodel:\s*([a-z_]+)/i.exec(last)?.[1]?.toLowerCase()];
+      const [id, name, reason] = hinted ?? MODEL_HINTS.seven_step;
+      return { ...base, verdict: 'accept', frame, message: `Clear enough to work with. I suggest ${name}, starting with 5 Whys, because there is one symptom here with a likely single chain of cause.`, model: { id, reason }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom, likely one chain.' }, skillsSeen: ['analysis'] };
     }
     return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   }

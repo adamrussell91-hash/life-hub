@@ -38,15 +38,18 @@ async function answer(page, text) {
   await expect(page.getByLabel('Your answer')).toBeEnabled();
 }
 
-/** Describe a new problem and answer the three frame questions; the coach then suggests 5 Whys. */
-async function frameProblem(page, text) {
+/**
+ * Describe a new problem and answer the three frame questions; the coach then suggests 5 Whys.
+ * A third answer with `model: polya` or `model: triz` makes the scripted coach choose that model.
+ */
+async function frameProblem(page, text, third = 'We could change which day it is published') {
   await page.getByLabel('Describe the problem').fill(text);
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('.ps-frame')).toBeVisible();
   await answer(page, 'A rota that is fixed a full week ahead');
   await expect(page.locator('.ps-frame__row.is-answered')).toHaveCount(1);
   await answer(page, 'It changed late three of the last four weeks');
-  await answer(page, 'We could change which day it is published');
+  await answer(page, third);
   await expect(page.locator('.ps-suggestion')).toContainText('5 Whys');
 }
 
@@ -55,6 +58,15 @@ async function sessionReader(page) {
   const id = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('id'));
   return { id, now: () => page.evaluate(async (sid) => (await fetch(`/api/problem-solver?id=${encodeURIComponent(sid)}`).then((r) => r.json())).data.session, id) };
 }
+
+/** Today's date as YYYYMMDD in the page's own clock, for a case-file name. */
+const todayStamp = (page) => page.evaluate(() => {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+});
+
+/** Wait for a chart-to-record morph (a spring run on animation frames) to land. */
+const settled = (page) => expect(page.locator('.hub-morph-dialog__animating')).toHaveCount(0);
 
 /** Leave a finished Implement: the dated review card appears and creating it links the review task. Returns its date. */
 async function createReviewOnLeaving(page, viewport, sessionNow) {
@@ -399,12 +411,8 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     await answer(page, 'Kitchen rota case file for the team');
     await expect(page.locator('.ps-coach__messages')).toContainText('That name needs one more thing');
     await expect(page.locator('.ps-fivecs [data-slice][data-filled="true"]')).toHaveCount(4);
-    // Today's date as YYYYMMDD in the walk's own clock (the names only need a real date).
-    const today = await page.evaluate(() => {
-      const d = new Date();
-      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    });
-    const name = `Kitchen rota case file ${today} v1 Final`;
+    // The names only need a real date.
+    const name = `Kitchen rota case file ${await todayStamp(page)} v1 Final`;
     await answer(page, name);
     await expect(page.locator('.ps-fivecs [data-slice][data-filled="true"]')).toHaveCount(5);
     // Every strict naming rule shows as met.
@@ -503,6 +511,256 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     expect(new Set(after.map((b) => b.id)).size).toBe(after.length);
     await noOverflow(page);
     await shot(page, 'late-finished', viewport);
+  });
+}
+
+/** Move on from the current step and wait until the coach has answered the boundary turn. */
+async function moveOnTo(page, next) {
+  await page.getByRole('button', { name: next === 'Finish' ? 'Finish' : `Move on to ${next}` }).click();
+  await expect(page.getByLabel('Your answer')).toBeEnabled();
+}
+
+for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }]) {
+  test(`the seven-step process, one tool a step with Devise skipped, through the case file to Finish at ${viewport.width}px`, async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    await frameProblem(page, `The stock count never matches the till at closing (${viewport.width}px)`);
+    const { now } = await sessionReader(page);
+    expect((await now()).model.id).toBe('seven_step');
+    await noOverflow(page);
+    await shot(page, 'walk-framed', viewport);
+
+    // Define: 5 Whys, the problem, five whys and the root cause (named with its hint).
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-whys')).toBeAttached();
+    for (const line of [
+      'The stock count is short of the till most evenings',
+      'Items sold at the counter are not scanned every time',
+      'The spare scanner at the counter has a flat battery',
+      'Nobody is set to charge the spare scanner overnight',
+      'The closing checklist leaves the scanner off entirely',
+      'The checklist was written before the scanner was bought'
+    ]) await answer(page, line);
+    await answer(page, 'root: The closing checklist has no step to charge the scanner');
+    await expect(page.locator('.ps-whys [data-node]')).toHaveCount(7);
+    await noOverflow(page);
+    await shot(page, 'walk-define', viewport);
+
+    // Analyse: a causal map, the problem and three causes, each linked to the problem.
+    await moveOnTo(page, 'Analyse');
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I stop at the first cause that sounds likely');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Causal map');
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-causal')).toBeAttached();
+    await answer(page, 'The stock count is short of the till most evenings');
+    await answer(page, 'Counter sales are not scanned when the queue is long');
+    await answer(page, 'Deliveries are booked in a day after they arrive');
+    await answer(page, 'Damaged items are thrown out without being written off');
+    for (const n of [1, 2, 3]) await answer(page, `link: cause ${n} to problem, plus`);
+    await expect(page.locator('.ps-causal [data-edge]')).toHaveCount(3);
+    await noOverflow(page);
+    await shot(page, 'walk-analyse', viewport);
+
+    // Devise is skipped untouched: no learning question, and Decide's tool is suggested without a reply.
+    await moveOnTo(page, 'Devise');
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I trust the map more once every cause has a link');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Lotus blossom');
+    const userTurns = async () => (await now()).turns.filter((turn) => turn.role === 'user').length;
+    const before = await userTurns();
+    await moveOnTo(page, 'Decide');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Decision matrix', { timeout: 20_000 });
+    expect(await userTurns()).toBe(before + 1); // only the "Move on." turn
+    expect((await now()).steps.devise.status).toBe('skipped');
+
+    // Decide: two criteria, two options, scored, then the choice.
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-matrix')).toBeAttached();
+    await answer(page, 'criterion: The count matches the till every evening');
+    await answer(page, 'criterion: Closing takes no longer than it does now');
+    await answer(page, 'option: Add a scanner charging step to the checklist');
+    await answer(page, 'option: Count the counter stock again before closing');
+    await page.getByRole('button', { name: 'Score the options' }).click();
+    const form = page.locator('.ps-matrix__form');
+    await form.getByLabel('Percent').check();
+    const weights = form.locator('input[data-weight]');
+    await weights.nth(0).fill('70');
+    await weights.nth(1).fill('30');
+    const ratings = form.locator('input[data-rating]');
+    for (const [i, value] of ['9', '4', '9', '3'].entries()) await ratings.nth(i).fill(value);
+    await form.getByRole('button', { name: 'Save scores' }).click();
+    await expect(page.locator('.ps-matrix [data-total]')).toHaveCount(2);
+    await answer(page, 'choice: Add a scanner charging step to the checklist');
+    await expect(page.locator('.ps-matrix [data-choice]')).toContainText('scanner charging step');
+    await noOverflow(page);
+    await shot(page, 'walk-decide', viewport);
+
+    // Implement: a Kanban board. The first card becomes a real task and shows its live status.
+    await moveOnTo(page, 'Implement');
+    await answer(page, 'I decide faster once the weights are written down');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Kanban');
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-kanban')).toBeAttached();
+    await answer(page, 'Add the charging step to the closing checklist');
+    const taskCard = page.locator('.ps-taskcard');
+    await expect(taskCard).toHaveCount(1);
+    await taskCard.getByRole('button', { name: 'Create task' }).click();
+    await expect(taskCard).toHaveCount(0);
+    await expect.poll(async () => (await now()).proposedTasks.filter((p) => p.status === 'confirmed').length).toBe(1);
+    const confirmed = (await now()).proposedTasks.find((p) => p.status === 'confirmed');
+    await expect(page.locator('.ps-kanban [data-column="todo"] [data-task-status="open"]')).toHaveCount(1);
+    await page.evaluate(async (id) => {
+      const res = await fetch(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'in_progress' }) });
+      if (!res.ok) throw new Error(`PATCH failed: ${res.status}`);
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, confirmed.taskId);
+    await expect(page.locator('.ps-kanban [data-column="doing"] [data-task-status="in_progress"]')).toHaveCount(1);
+    await answer(page, 'doing: Show the closing staff where the charger lives');
+    await expect(taskCard).toHaveCount(1);
+    await taskCard.getByRole('button', { name: 'Not this one' }).click();
+    await expect(taskCard).toHaveCount(0);
+    await answer(page, 'done: A second charger was bought for the counter last week');
+    await expect(page.locator('.ps-kanban [data-node]')).toHaveCount(3);
+    await noOverflow(page);
+    await shot(page, 'walk-implement', viewport);
+
+    // Improve: the review is set aside, so Improve opens at once with an after action review.
+    await page.getByRole('button', { name: 'Move on to Improve' }).click();
+    const reviewCard = page.locator('.ps-reviewcard');
+    await expect(reviewCard).toBeVisible();
+    await reviewCard.getByRole('button', { name: 'Not now' }).click();
+    await expect(reviewCard).toHaveCount(0);
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I plan better when each card is small enough to finish');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: After action review', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-aar')).toBeAttached();
+    await answer(page, 'The count matches the till on every evening this week');
+    await answer(page, 'It matched on four evenings out of five this week');
+    await answer(page, 'One evening the charger was unplugged for the kettle');
+    await answer(page, 'A checklist step only holds when the thing it needs has its own place, so the charger gets a fixed socket of its own');
+    await expect(page.locator('.ps-aar [data-bar][data-filled="true"]')).toHaveCount(4);
+    await noOverflow(page);
+    await shot(page, 'walk-improve', viewport);
+
+    // Document: the 5 Cs, a strict name, then the case file is written.
+    await moveOnTo(page, 'Document');
+    await answer(page, 'I learn most when I compare the aim with the facts');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: 5 Cs documentation', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Start it' }).click();
+    await expect(page.locator('.ps-fivecs')).toBeAttached();
+    await answer(page, 'So whoever closes the shop knows why the scanner matters');
+    await answer(page, 'Filed under shop procedures in the shared drive for staff');
+    await answer(page, 'The scanner is charged at a fixed socket every closing');
+    await answer(page, 'correct: Nothing in the record needs correcting at this point');
+    const name = `Stock count case file ${await todayStamp(page)} v1 Final`;
+    await answer(page, name);
+    await expect(page.locator('.ps-fivecs [data-slice][data-filled="true"]')).toHaveCount(5);
+    const caseCard = page.locator('.ps-casefilecard');
+    await expect(caseCard).toContainText('Write the case file?');
+    await caseCard.getByRole('button', { name: 'Write case file' }).click();
+    await expect(caseCard).toHaveCount(0);
+    await expect.poll(async () => (await now()).caseFile?.version).toBe(1);
+    await noOverflow(page);
+    await shot(page, 'walk-document', viewport);
+
+    // The record lights each step: done, Devise skipped and faint, Document current, with its case file.
+    await openRecord(page);
+    await settled(page);
+    for (const step of ['define', 'analyse', 'decide', 'implement', 'improve']) {
+      await expect(page.locator(`.ps-record [data-step="${step}"]`)).toHaveAttribute('data-state', 'done', { timeout: 20_000 });
+    }
+    const devise = page.locator('.ps-record [data-step="devise"]');
+    await expect(devise).toHaveAttribute('data-state', 'skipped');
+    await expect(devise.locator('.ps-record__box')).toHaveCSS('opacity', '0.45');
+    await expect(page.locator('.ps-record [data-step="document"]')).toHaveAttribute('data-state', 'current');
+    await expect(page.locator('.ps-record__strip[data-strip="document"] .ps-record__version')).toHaveText('Case file v1');
+    await noOverflow(page);
+    await shot(page, 'walk-record', viewport);
+
+    // A filmstrip card morphs into its chart, and back.
+    await page.locator('.ps-record__strip[data-strip="analyse"] .ps-record__card-button').click();
+    await expect(page.locator('.ps-canvas__chart')).toBeVisible();
+    await expect(page.locator('.ps-causal [data-edge]')).toHaveCount(3);
+    await settled(page);
+    await noOverflow(page);
+    await page.getByRole('button', { name: 'Back to record' }).click();
+    await expect(page.locator('.ps-record [data-step="devise"]')).toBeVisible();
+
+    // Finish at Document.
+    await moveOnTo(page, 'Finish');
+    await expect.poll(async () => (await now()).phase).toBe('finished');
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i);
+    await answer(page, 'I keep a record better when the naming rules are shown');
+    await expect.poll(async () => (await now()).steps.document.status).toBe('done');
+    await noOverflow(page);
+    await shot(page, 'walk-finished', viewport);
+  });
+
+  test(`Polya: the track and record follow its four steps and the Document extra, every step skipped to Finish at ${viewport.width}px`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    await frameProblem(page, `The bike lock code is forgotten every spring (${viewport.width}px)`, 'Write the code somewhere safe, model: polya');
+    const { now } = await sessionReader(page);
+    expect((await now()).model.id).toBe('polya');
+    await expect(page.locator('.ps-track__name')).toHaveText(['Frame', 'Identify the problem', 'Devise a solution', 'Implement the solution', 'Evaluate the solution', 'Document']);
+    await expect(page.locator('.ps-track__stn').nth(1)).toHaveAttribute('data-state', 'now');
+    await noOverflow(page);
+    await shot(page, 'polya-framed', viewport);
+
+    // Each step is left untouched, so the next one's tool is suggested at once.
+    await moveOnTo(page, 'Devise a solution');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Lotus blossom', { timeout: 20_000 });
+    await moveOnTo(page, 'Implement the solution');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Kanban', { timeout: 20_000 });
+    await moveOnTo(page, 'Evaluate the solution');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: After action review', { timeout: 20_000 });
+    await moveOnTo(page, 'Document');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: 5 Cs documentation', { timeout: 20_000 });
+    await moveOnTo(page, 'Finish');
+    await expect.poll(async () => (await now()).phase).toBe('finished');
+
+    await openRecord(page);
+    for (const step of ['identify', 'devise', 'implement', 'evaluate']) {
+      await expect(page.locator(`.ps-record__map [data-step="${step}"]`)).toHaveAttribute('data-state', 'skipped', { timeout: 20_000 });
+    }
+    const extra = page.locator('.ps-record__extras [data-step="document"]');
+    await expect(extra).toHaveAttribute('data-state', 'skipped');
+    await expect(extra).toContainText('Optional');
+    await expect(page.locator('.ps-track__stn[data-state="skipped"]')).toHaveCount(5);
+    await noOverflow(page);
+    await shot(page, 'polya-finished', viewport);
+  });
+
+  test(`TRIZ: the Contradiction step offers the contradiction tool, then every step and extra to Finish at ${viewport.width}px`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize(viewport);
+    await signIn(page);
+    await frameProblem(page, `A faster kettle trips the kitchen fuse (${viewport.width}px)`, 'model: triz, faster boiling draws more power than the circuit allows');
+    const { now } = await sessionReader(page);
+    expect((await now()).model.id).toBe('triz');
+    await expect(page.locator('.ps-track__name')).toHaveText(['Frame', 'Specific problem', 'General problem', 'General solution', 'Specific solution', 'Implement', 'Improve', 'Document']);
+
+    // General problem is TRIZ's Contradiction step: its tool is the contradiction.
+    await moveOnTo(page, 'General problem');
+    await expect(page.locator('.ps-suggestion')).toContainText('Next: Contradiction', { timeout: 20_000 });
+    await noOverflow(page);
+    await shot(page, 'triz-contradiction', viewport);
+    for (const next of ['General solution', 'Specific solution', 'Implement', 'Improve', 'Document', 'Finish']) await moveOnTo(page, next);
+    await expect.poll(async () => (await now()).phase).toBe('finished');
+
+    await openRecord(page);
+    for (const step of ['specific_problem', 'general_problem', 'general_solution', 'specific_solution']) {
+      await expect(page.locator(`.ps-record__map [data-step="${step}"]`)).toHaveAttribute('data-state', 'skipped', { timeout: 20_000 });
+    }
+    for (const step of ['implement', 'improve', 'document']) {
+      await expect(page.locator(`.ps-record__extras [data-step="${step}"]`)).toHaveAttribute('data-state', 'skipped');
+    }
+    await noOverflow(page);
+    await shot(page, 'triz-finished', viewport);
   });
 }
 

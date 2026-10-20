@@ -51,6 +51,36 @@ test('when the next step has a tool, the learning turn suggests it', async () =>
   assert.equal(s.suggestion?.tool, 'contradiction');
 });
 
+/** Frame a problem whose third answer is `third`; returns the session after the coach's reply. */
+async function framedWith(third) {
+  let s = await step(createSession({ text: 'Late rota.' }, deps));
+  for (const text of ['Rota fixed a week ahead.', 'Changed three weeks out of four, by the logs.', third]) s = await step(say(s, text, deps));
+  return s;
+}
+
+test('a model hint in the third frame answer chooses Polya, starting with 5 Whys', async () => {
+  const s = await framedWith('Move the publish day earlier, model: polya');
+  assert.equal(s.model.id, 'polya');
+  assert.equal(s.phase, 'identify');
+  assert.equal(s.suggestion?.tool, 'five_whys');
+  assert.match(s.turns.at(-1).text, /Polya/);
+});
+
+test('a model hint in the third frame answer chooses TRIZ, starting with 5 Whys', async () => {
+  const s = await framedWith('model: TRIZ, faster swaps make the rota less stable');
+  assert.equal(s.model.id, 'triz');
+  assert.equal(s.phase, 'specific_problem');
+  assert.equal(s.suggestion?.tool, 'five_whys');
+});
+
+test('without a model hint, or with an unknown one, the frame chooses the seven-step process', async () => {
+  for (const third of ['Move the publish day earlier.', 'model: nonsense, move the publish day']) {
+    const s = await framedWith(third);
+    assert.equal(s.model.id, 'seven_step');
+    assert.equal(s.suggestion?.tool, 'five_whys');
+  }
+});
+
 test('finished sessions get a closing line', async () => {
   let s = await intoDefine();
   for (const _ of [1, 2, 3, 4, 5, 6, 7]) s = await step(moveOn({ ...s, runner: { status: 'idle', mode: 'turn', error: null } }, deps));
