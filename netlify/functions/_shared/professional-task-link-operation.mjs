@@ -17,6 +17,8 @@ import {
   taskKey,
   writeTaskIndex
 } from './tasks-blobs.mjs';
+
+const TASKS_STRONG = { consistency: 'strong' };
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { equivalenceInput, generateLinkId } from './universal-link-schema.mjs';
@@ -209,7 +211,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
 
   async function ensureTaskRecord(taskId, title) {
     const tasksStore = await getTasksStore(deps.env);
-    const existing = await getTasksJSON(tasksStore, taskKey(taskId));
+    const existing = await getTasksJSON(tasksStore, taskKey(taskId), TASKS_STRONG);
     if (existing?.id === taskId) return { task: existing, created: false };
     const timestamp = now();
     const task = {
@@ -234,7 +236,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
     await setTasksJSON(tasksStore, taskKey(taskId), task);
     const ids = await readTaskIndex(tasksStore);
     if (!ids.includes(taskId)) await writeTaskIndex(tasksStore, [...ids, taskId]);
-    const stored = await getTasksJSON(tasksStore, taskKey(taskId));
+    const stored = await getTasksJSON(tasksStore, taskKey(taskId), TASKS_STRONG);
     if (!stored?.id) {
       throw Object.assign(new Error('Task could not be stored.'), {
         status: 503,
