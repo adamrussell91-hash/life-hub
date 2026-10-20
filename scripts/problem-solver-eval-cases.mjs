@@ -32,6 +32,8 @@ export function lightningAt(text, steps = []) {
 /** The v1 cases' own problem, with a frame that matches it. */
 const CLASS_FRAME = { goal: 'Year 9 work handed in on time', whatIsTrue: 'Half the class missed the last two deadlines', whatCanBeDone: 'Change how deadlines are set and checked' };
 const classLate = () => atTool('define', 'five_whys', [['problem', 'Year 9 students hand in work late']], 'Year 9 students hand in work late.', CLASS_FRAME);
+/** The strong answer states the problem itself, so its box is still open (as in the v1 script). */
+const classLateOpen = () => atTool('define', 'five_whys', [], 'Year 9 students hand in work late.', CLASS_FRAME);
 
 /** Each case: build(), the person's answer, and the checks a good reply passes. */
 export const CASES = [
@@ -104,7 +106,7 @@ export const CASES = [
   { name: 'Define: vague cause', build: classLate, answer: 'Because students are lazy.', expect: { verdict: 'challenge' } },
   { name: 'Define: perception as fact', build: classLate, answer: 'Everyone knows the deadlines are unfair.', expect: { verdict: 'challenge' } },
   { name: 'Define: premature solution', build: classLate, answer: 'We should just add a reminder app.', expect: { verdict: 'challenge' } },
-  { name: 'Define: strong answer', build: classLate, answer: 'Half the class missed the last two deadlines for the Year 9 essay, set on a Friday and due the following Monday.', expect: { verdict: 'accept' } }
+  { name: 'Define: strong answer', build: classLateOpen, answer: 'Half the class missed the last two deadlines for the Year 9 essay, set on a Friday and due the following Monday.', expect: { verdict: 'accept' } }
 ];
 
 /** The session the coach sees: the case's session with the answer said. */
