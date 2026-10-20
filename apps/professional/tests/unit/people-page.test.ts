@@ -807,4 +807,165 @@ describe('renderPeoplePage (W2 real entry)', () => {
       expect(calls).toEqual([]);
     });
   });
+
+  describe('people profiles: paste from LinkedIn', () => {
+    const NEW_ID = 'person_00000000-0000-4000-8000-0000000000bb';
+    const ORG = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002';
+    const PARSED = {
+      name: 'Noor Vale',
+      headline: 'Head of English',
+      about: 'Teacher and writer.',
+      rows: [
+        { id: 'row_1', section: 'current', relationship_type: 'employee_at', title: 'Head of English', organisation: { name: 'Tallowwood College', ref: ORG, status: 'matched' }, start: '2022-02', end: null, current: true, diff: 'new', link_id: null },
+        { id: 'row_2', section: 'current', relationship_type: 'member_of', title: 'Chair', organisation: { name: 'Reading Circle', ref: null, status: 'new_organisation' }, start: '2020', end: null, current: true, diff: 'new', link_id: null },
+        { id: 'row_3', section: 'past', relationship_type: 'employee_at', title: 'Tutor', organisation: { name: 'Old School', ref: null, status: 'new_organisation' }, start: '2016', end: '2019', current: false, diff: 'new', link_id: null },
+        { id: 'row_4', section: 'education', relationship_type: 'studied_at', title: 'BA', organisation: { name: 'Marrow University', ref: null, status: 'new_organisation' }, start: '2010', end: '2013', current: false, diff: 'new', link_id: null }
+      ]
+    };
+
+    function stubPaste(parse: (body: Record<string, unknown>) => Response | Promise<Response>) {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      const writes: string[] = [];
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/api/people/linkedin-parse')) return parse(JSON.parse(String(init?.body)));
+        if (init?.method === 'POST' && /\/api\/entities$/.test(url)) {
+          const body = JSON.parse(String(init.body));
+          writes.push(`${body.kind}:${body.display_name}`);
+          return body.kind === 'person'
+            ? jsonResponse({ schema_version: 1, id: NEW_ID, kind: 'person', display_name: body.display_name, sort_name: null, aliases: [], lifecycle_status: 'active', is_self: false, retention_reason: null, retention_review_at: null, created_at: '2026-10-20T00:00:00.000Z', updated_at: '2026-10-20T00:00:00.000Z', ref: `shared:person:${NEW_ID}` })
+            : jsonResponse({ id: 'organisation_x', kind: 'organisation', display_name: body.display_name, ref: `shared:organisation:new_${body.display_name.replace(/\s/g, '_')}` });
+        }
+        if (url.endsWith('/api/people/roles')) {
+          const body = JSON.parse(String(init?.body));
+          writes.push(`${body.action}:${body.organisation_ref ?? body.link_id}:${body.role ?? ''}`);
+          return jsonResponse({ link: { id: 'l' }, chart_synced: true });
+        }
+        if (url.endsWith('/api/observations') && init?.method === 'POST') {
+          writes.push(`observation:${JSON.parse(String(init.body)).text}`);
+          return jsonResponse({ observation: {}, created: true });
+        }
+        if (url.includes('/api/entities/overview') && url.includes(encodeURIComponent(NEW_ID))) {
+          const body = await (await original(input, init)).json();
+          return jsonResponse({ ...body.data, entity: { ...body.data.entity, id: NEW_ID, display_name: 'Noor Vale', ref: `shared:person:${NEW_ID}` } });
+        }
+        return original(input, init);
+      });
+      return writes;
+    }
+
+    const btn = (root: ParentNode, text: string) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === text);
+    async function openPaste(canvas: HTMLElement) {
+      btn(canvas, 'Add person')!.click();
+      const area = canvas.querySelector<HTMLTextAreaElement>('textarea[aria-label="LinkedIn profile text"]')!;
+      area.value = 'Noor Vale · Head of English at Tallowwood College';
+      area.dispatchEvent(new Event('input'));
+      btn(canvas, 'Read profile')!.click();
+    }
+
+    it('reads a paste into a ticked review card; unticked rows are left out; orgs, then person, then links', async () => {
+      const writes = stubPaste(() => jsonResponse(PARSED));
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      await openPaste(canvas);
+      const card = await vi.waitFor(() => {
+        const found = canvas.querySelector<HTMLElement>('[aria-label="Review LinkedIn details"]');
+        if (!found) throw new Error('no card');
+        return found;
+      });
+      expect([...card.querySelectorAll('.linkedin-review__h')].map((h) => h.textContent)).toEqual(['Current roles', 'Past work', 'Education', 'About']);
+      expect([...card.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every((c) => c.checked)).toBe(true);
+      expect(card.querySelector('[data-row-id="row_2"] .linkedin-review__pill')?.textContent).toBe('new organisation');
+      expect(card.querySelector('[data-row-id="row_1"] .linkedin-review__pill')?.textContent).toBe('matched');
+      expect(btn(card, 'Add Noor with 5 items')).toBeTruthy();
+      expect(canvas.querySelector<HTMLElement>('form[aria-label="Add person"]')!.closest<HTMLElement>('[hidden]')).toBeTruthy();
+
+      const tutor = card.querySelector<HTMLInputElement>('[data-row-id="row_3"] input')!;
+      tutor.checked = false;
+      tutor.dispatchEvent(new Event('change', { bubbles: true }));
+      btn(card, 'Add Noor with 4 items')!.click();
+
+      await vi.waitFor(() => expect(canvas.querySelector('.people-toast')?.textContent).toContain('Added Noor Vale'));
+      expect(writes.slice(0, 3)).toEqual(['organisation:Reading Circle', 'organisation:Marrow University', 'person:Noor Vale']);
+      expect(writes.slice(3).sort()).toEqual([
+        `add:${ORG}:Head of English`,
+        'add:shared:organisation:new_Marrow_University:BA',
+        'add:shared:organisation:new_Reading_Circle:Chair',
+        'observation:LinkedIn paste: Teacher and writer.'
+      ].sort());
+      expect(writes.some((w) => w.includes('Old School'))).toBe(false);
+      await vi.waitFor(() => expect(canvas.querySelector('[data-section="header"] .people-pane__name')?.textContent).toBe('Noor Vale'));
+      expect(canvas.querySelector<HTMLElement>('.people-page__add-host')!.hidden).toBe(true);
+    });
+
+    it('Back to paste returns to the paste box; Esc closes the panel', async () => {
+      stubPaste(() => jsonResponse(PARSED));
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      await openPaste(canvas);
+      await vi.waitFor(() => expect(btn(canvas, 'Back to paste')).toBeTruthy());
+      btn(canvas, 'Back to paste')!.click();
+      expect(canvas.querySelector('[aria-label="Review LinkedIn details"]')).toBeNull();
+      expect(canvas.querySelector<HTMLElement>('.add-person-panel__paste')!.hidden).toBe(false);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(canvas.querySelector<HTMLElement>('.people-page__add-host')!.hidden).toBe(true);
+    });
+
+    it('shows the not-set-up and unreadable messages, and the manual form still works', async () => {
+      let code = 'linkedin_parse_unconfigured';
+      stubPaste(() => new Response(JSON.stringify({ ok: false, error: { code, message: 'x', retryable: false } }), { status: code === 'linkedin_parse_unconfigured' ? 503 : 502 }));
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      await openPaste(canvas);
+      await vi.waitFor(() => expect(canvas.querySelector('.linkedin-paste__status')?.textContent).toMatch(/^Paste reading is not set up/));
+      expect(btn(canvas, 'Read profile')!.disabled).toBe(true);
+      expect(canvas.querySelector<HTMLElement>('form[aria-label="Add person"]')!.closest('[hidden]')).toBeNull();
+      code = 'linkedin_parse_failed';
+      const again = document.createElement('div');
+      document.body.append(again);
+      await renderPeoplePage(again);
+      await openPaste(again);
+      await vi.waitFor(() => expect(again.querySelector('.linkedin-paste__status')?.textContent).toBe('Couldn’t read that paste. Try again or type it in.'));
+      expect(btn(again, 'Read profile')!.disabled).toBe(false);
+    });
+
+    it('Update from LinkedIn on an existing person hides unchanged rows and saves changes', async () => {
+      const seen: Array<Record<string, unknown>> = [];
+      const writes = stubPaste((body) => {
+        seen.push(body);
+        return jsonResponse({
+          ...PARSED,
+          about: null,
+          rows: [
+            { ...PARSED.rows[0], diff: 'same', link_id: 'l1' },
+            { ...PARSED.rows[2], organisation: { name: 'Tallowwood College', ref: ORG, status: 'matched' }, diff: 'changed', link_id: 'l2' }
+          ]
+        });
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      canvas.querySelector<HTMLButtonElement>('[aria-label="More actions"]')!.click();
+      btn(canvas, 'Update from LinkedIn')!.click();
+      const box = canvas.querySelector<HTMLElement>('[data-section="linkedin"]')!;
+      const area = box.querySelector<HTMLTextAreaElement>('textarea')!;
+      area.value = 'profile';
+      area.dispatchEvent(new Event('input'));
+      btn(box, 'Read profile')!.click();
+      await vi.waitFor(() => expect(btn(box, 'Save 1 change')).toBeTruthy());
+      expect(seen[0]).toEqual({ text: 'profile', person_ref: `shared:person:${PERSON_ID}` });
+      expect(box.querySelector<HTMLElement>('[data-row-id="row_1"]')!.hidden).toBe(true);
+      expect(box.querySelector('[data-row-id="row_3"]')?.textContent).toContain('dates differ');
+      btn(box, 'Show 1 unchanged')!.click();
+      expect(box.querySelector<HTMLElement>('[data-row-id="row_1"]')!.hidden).toBe(false);
+      btn(box, 'Save 1 change')!.click();
+      await vi.waitFor(() => expect(canvas.querySelector('.people-toast')?.textContent).toBe('Saved 1 change✕'));
+      expect(writes).toEqual(['edit:l2:']);
+      expect(canvas.querySelector('[data-section="linkedin"]')).toBeNull();
+    });
+  });
 });
