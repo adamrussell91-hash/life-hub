@@ -28,6 +28,7 @@ describe('people redesign Phase 1 routes', () => {
 describe('renderPeoplePage (W2 real entry)', () => {
   beforeEach(() => {
     document.body.replaceChildren();
+    history.replaceState(null, '', '#/people');
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo) => {
@@ -464,5 +465,188 @@ describe('renderPeoplePage (W2 real entry)', () => {
     const today = canvas.querySelector('.people-page__today');
     expect(today).toBeTruthy();
     expect(today?.textContent).toMatch(/You usually meet Henry after lunch|Today/);
+  });
+
+  describe('people profiles: add, archive, delete', () => {
+    const NEW_ID = 'person_00000000-0000-4000-8000-0000000000aa';
+    const ORG_REF = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002';
+
+    function entity(id: string, name: string, extra: Record<string, unknown> = {}) {
+      return {
+        schema_version: 1, id, kind: 'person', display_name: name, sort_name: null, aliases: [],
+        lifecycle_status: 'active', is_self: false, retention_reason: null, retention_review_at: null,
+        created_at: '2026-10-20T00:00:00.000Z', updated_at: '2026-10-20T00:00:00.000Z',
+        ref: `shared:person:${id}`, ...extra
+      };
+    }
+
+    function lifecycleCalls(): string[] {
+      return vi.mocked(fetch).mock.calls
+        .filter(([, init]) => init?.method === 'PATCH')
+        .map(([input]) => new URL(String(input), 'https://x.test').searchParams.get('action') ?? '')
+        .filter((a) => ['archive', 'activate', 'deidentify', 'delete'].includes(a));
+    }
+
+    /** Wraps the default stub: `status` drives Isla's lifecycle in directory + overview. */
+    function stubLifecycle(state: { status: string; isSelf?: boolean }) {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (init?.method === 'PATCH' && url.includes('/api/entities?')) {
+          const action = new URL(url, 'https://x.test').searchParams.get('action');
+          state.status = ({ archive: 'archived', activate: 'active', deidentify: 'deidentified', delete: 'deleted' } as Record<string, string>)[action ?? ''] ?? state.status;
+          return jsonResponse(entity(PERSON_ID, 'Isla Emberly', { lifecycle_status: state.status }));
+        }
+        const response = await original(input, init);
+        if (url.includes('/api/people/directory')) {
+          const body = await response.json();
+          body.data.people = state.status === 'deleted' ? [] : body.data.people.map((p: Record<string, unknown>) => ({ ...p, lifecycle_status: state.status }));
+          return jsonResponse(body.data);
+        }
+        if (url.includes('/api/entities/overview')) {
+          const body = await response.json();
+          body.data.entity = { ...body.data.entity, lifecycle_status: state.status, is_self: Boolean(state.isSelf) };
+          return jsonResponse(body.data);
+        }
+        return response;
+      });
+    }
+
+    const rowFor = (canvas: HTMLElement, id: string) => canvas.querySelector(`a.people-page__row[href^="#/people/${id}"]`);
+    const button = (canvas: HTMLElement, text: string) =>
+      [...canvas.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === text);
+
+    it('Add closes the form, shows the toast and opens the person before the directory reload finishes', async () => {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      let created = false;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (init?.method === 'POST' && /\/api\/entities$/.test(url)) {
+          created = true;
+          return jsonResponse(entity(NEW_ID, 'Noor Vale'));
+        }
+        if (init?.method === 'POST') return jsonResponse({});
+        if (created && url.includes('/api/people/directory')) await held;
+        if (url.includes('/api/entities/overview') && url.includes(encodeURIComponent(NEW_ID))) {
+          const body = await (await original(input, init)).json();
+          return jsonResponse({ ...body.data, entity: entity(NEW_ID, 'Noor Vale') });
+        }
+        return original(input, init);
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      try {
+        button(canvas, 'Add person')!.click();
+        const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Add person"]')!;
+        form.querySelector<HTMLInputElement>('input[aria-label="Name"]')!.value = 'Noor Vale';
+        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        await vi.waitFor(() => {
+          expect(canvas.querySelector<HTMLElement>('.people-page__add-host')!.hidden).toBe(true);
+          expect(canvas.querySelector('.people-toast')?.textContent).toContain('Added Noor Vale');
+          expect(canvas.querySelector('[data-section="header"] .people-pane__name')?.textContent).toBe('Noor Vale');
+        });
+        expect(rowFor(canvas, NEW_ID)?.classList.contains('is-on')).toBe(true);
+        expect(form.querySelector<HTMLInputElement>('input[aria-label="Name"]')!.value).toBe('');
+        expect(button(canvas, 'Open')).toBeTruthy();
+      } finally {
+        release();
+      }
+    });
+
+    it('Undo on the added toast archives the new person', async () => {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (init?.method === 'POST' && /\/api\/entities$/.test(url)) return jsonResponse(entity(NEW_ID, 'Noor Vale'));
+        if (init?.method === 'PATCH') return jsonResponse(entity(NEW_ID, 'Noor Vale', { lifecycle_status: 'archived' }));
+        return original(input, init);
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      button(canvas, 'Add person')!.click();
+      const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Add person"]')!;
+      form.querySelector<HTMLInputElement>('input[aria-label="Name"]')!.value = 'Noor Vale';
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      await vi.waitFor(() => expect(button(canvas, 'Undo')).toBeTruthy());
+      button(canvas, 'Undo')!.click();
+      await vi.waitFor(() => {
+        expect(lifecycleCalls()).toEqual(['archive']);
+        expect(rowFor(canvas, NEW_ID)).toBeNull();
+        expect(canvas.querySelector('.people-toast')?.textContent).toContain('Archived Noor Vale');
+      });
+    });
+
+    it('Archive hides the row, Show archived reveals it, and Restore brings them back', async () => {
+      const state = { status: 'active' };
+      stubLifecycle(state);
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      canvas.querySelector<HTMLButtonElement>('[aria-label="More actions"]')!.click();
+      button(canvas, 'Archive person')!.click();
+      await vi.waitFor(() => {
+        expect(rowFor(canvas, PERSON_ID)).toBeNull();
+        expect(canvas.querySelector('.people-toast')?.textContent).toContain('Archived Isla Emberly');
+      });
+      button(canvas, 'Filter 0')!.click();
+      canvas.querySelector<HTMLInputElement>('input[aria-label="Show archived"]')!.checked = true;
+      button(canvas, 'Apply')!.click();
+      const row = rowFor(canvas, PERSON_ID) as HTMLAnchorElement;
+      expect(row.classList.contains('is-archived')).toBe(true);
+      expect(row.textContent).toContain('Archived');
+      row.click();
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__archived')).toBeTruthy());
+      expect(canvas.querySelector('[aria-label="More actions"]')).toBeNull();
+      button(canvas, 'Restore')!.click();
+      await vi.waitFor(() => {
+        expect(lifecycleCalls()).toEqual(['archive', 'activate']);
+        expect(canvas.querySelector('.people-pane__archived')).toBeNull();
+        expect(rowFor(canvas, PERSON_ID)?.classList.contains('is-archived')).toBe(false);
+      });
+    });
+
+    it('Delete permanently needs the typed name and runs deidentify then delete', async () => {
+      const state = { status: 'archived' };
+      stubLifecycle(state);
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__archived')).toBeTruthy());
+      button(canvas, 'Delete permanently')!.click();
+      const dialog = canvas.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
+      expect(dialog.textContent).toContain('can’t be undone');
+      const confirm = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Delete permanently')!;
+      const input = dialog.querySelector<HTMLInputElement>('input')!;
+      expect(confirm.disabled).toBe(true);
+      input.value = 'Isla';
+      input.dispatchEvent(new Event('input'));
+      expect(confirm.disabled).toBe(true);
+      input.value = ' isla  emberly ';
+      input.dispatchEvent(new Event('input'));
+      expect(confirm.disabled).toBe(false);
+      confirm.click();
+      await vi.waitFor(() => {
+        expect(lifecycleCalls()).toEqual(['deidentify', 'delete']);
+        expect(canvas.textContent).toContain('Select someone from the directory.');
+        expect(canvas.querySelector('[role="dialog"][aria-modal="true"]')).toBeNull();
+      });
+    });
+
+    it('the self profile offers no archive or delete', async () => {
+      stubLifecycle({ status: 'active', isSelf: true });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      expect(canvas.querySelector('[data-section="header"] .people-pane__name')).toBeTruthy();
+      expect(canvas.querySelector('[aria-label="More actions"]')).toBeNull();
+      expect(button(canvas, 'Archive person')).toBeUndefined();
+    });
   });
 });
