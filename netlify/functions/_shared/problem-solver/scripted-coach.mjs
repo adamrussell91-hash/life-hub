@@ -130,8 +130,11 @@ function tagFromText(run, slot, text) {
 
 const wordCount = (text) => text.split(/\s+/).filter(Boolean).length;
 
-/** "<due>" as the coach says it, or a plain phrase when the review has no date. */
-const dueText = (session) => session.reviewState?.due ?? 'its date';
+/** The review's date as the waiting panel shows it ("Mon, 2 Nov"), or a plain phrase when it has none. */
+function dueText(session) {
+  const due = session.reviewState?.due;
+  return due ? new Date(`${due}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : 'its date';
+}
 
 /** The after action review's opening: how it went, with the task counts when the page sent them. */
 function reviewOpening(session) {

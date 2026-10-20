@@ -279,7 +279,9 @@ test('leaving Implement with a review in place: the learning turn says when Impr
   s = await step(say(s, 'I hurry the last step when the end is in sight.', deps));
   assert.equal(s.learnings.at(-1).text, 'I hurry the last step when the end is in sight.');
   assert.equal(s.suggestion, null);
-  assert.ok(s.turns.at(-1).text.includes('Improve picks up at your review on 2026-11-02.'), s.turns.at(-1).text);
+  const said = new Date('2026-11-02T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  assert.match(said, /2 Nov/);
+  assert.ok(s.turns.at(-1).text.includes(`Improve picks up at your review on ${said}.`), s.turns.at(-1).text);
 });
 
 const improveSession = (run, text, extra = {}) => ({ ...inStep('improve', run, text), reviewState: { status: 'reviewing', due: '2026-11-02', returnTo: null, startedAt: 'x' }, ...extra });
