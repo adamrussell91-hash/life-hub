@@ -168,6 +168,8 @@ describe('Ann’s bar', () => {
     const start = vi.fn(async () => ({ ...done([]), status: 'working' as const, result: null, progress: [{ at: '', text: 'Searching: memory' }] }));
     const follow = vi.fn((first: AgentJob, onUpdate: (j: AgentJob) => void) => { onUpdate(first); return new Promise<AgentJob>(resolve => { push = j => { onUpdate(j); resolve(j); }; }); });
     const bar = mountAnnBar(host, { store, kind: 'lesson', id: 'l', flush: async () => {}, acceptAll: async () => {}, start, follow, latest: async () => null });
+    expect(host.querySelector('.ann-bar__start')).toBeNull();
+    (host.querySelector('.ann-bar__chip') as HTMLButtonElement).click();
     (host.querySelector('.ann-bar__start') as HTMLButtonElement).click();
     await vi.waitFor(() => expect(host.querySelector('.ann-bar__live')?.textContent).toBe('Searching: memory'));
     expect(host.querySelector('.ann-bar__counter')?.textContent).toBe('1 search · 0 notes read');
