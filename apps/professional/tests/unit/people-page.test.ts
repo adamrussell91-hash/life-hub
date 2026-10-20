@@ -645,8 +645,10 @@ describe('renderPeoplePage (W2 real entry)', () => {
       document.body.append(canvas);
       await renderPeoplePage(canvas, { selectedId: PERSON_ID });
       expect(canvas.querySelector('[data-section="header"] .people-pane__name')).toBeTruthy();
-      expect(canvas.querySelector('[aria-label="More actions"]')).toBeNull();
+      const items = [...canvas.querySelectorAll('.person-menu__item')].map((b) => b.textContent);
+      expect(items).toEqual(['Update from LinkedIn', 'Check for links']);
       expect(button(canvas, 'Archive person')).toBeUndefined();
+      expect(button(canvas, 'Delete permanently')).toBeUndefined();
     });
   });
 
@@ -749,6 +751,47 @@ describe('renderPeoplePage (W2 real entry)', () => {
         action: 'add', person_ref: `shared:person:${PERSON_ID}`, organisation_ref: UNI, relationship_type: 'studied_at',
         role: 'BA (Hons)', valid_from: '2010-01-01T00:00:00.000Z', valid_to: '2013-01-01T00:00:00.000Z'
       }));
+    });
+
+    it('the header lists every current role, keeps two controls, and the timeline merges career and touchpoints', async () => {
+      stubRoles();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.includes('/api/observations')) {
+          return jsonResponse({ observations: [{ id: 'o1', about_ref: `shared:person:${PERSON_ID}`, text: 'Met at the Literacy Forum. Sharp on phonics.', occurred_at: '2026-05-14T00:00:00.000Z', source: 'manual', linked_ref: null }] });
+        }
+        const response = await original(input, init);
+        if (url.includes('/api/entities/overview')) {
+          const body = await response.json();
+          body.data.timeline = [{ id: 'm1', kind: 'meeting', label: 'Coffee catch-up', date: '2026-03-12T00:00:00.000Z', href: null }];
+          return jsonResponse(body.data);
+        }
+        return response;
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      const header = canvas.querySelector<HTMLElement>('[data-section="header"]')!;
+      expect([...header.querySelectorAll('.person-header__role-text')].map((li) => li.textContent)).toEqual([
+        'Head of English, Tallowwood College',
+        'Council member, Marrow University'
+      ]);
+      expect(header.querySelector('.person-header__warmth')?.textContent).toMatch(/Warming|Cooling|Cold/);
+      expect(header.querySelector('.people-pane__chip--organisation, .people-pane__chip--relationship')).toBeNull();
+      const controls = header.querySelector('.person-header__controls')!;
+      expect([...controls.children].map((c) => c.className)).toEqual(['person-icon-btn people-pane__edit', 'person-menu']);
+      expect(controls.querySelector('[aria-label="Edit Isla Emberly"]')).toBeTruthy();
+      await vi.waitFor(() => expect(header.querySelector('.person-header__met')?.textContent).toMatch(/^Met at the Literacy Forum · /));
+
+      const timeline = canvas.querySelector<HTMLElement>('[data-section="timeline"]')!;
+      expect(canvas.textContent).not.toContain('Your relationship so far');
+      expect([...timeline.querySelectorAll('.person-timeline__year-label')].map((n) => n.textContent)).toEqual(['2026', '2022', '2016', 'Undated']);
+      const rows = [...timeline.querySelectorAll<HTMLElement>('.person-timeline__row')];
+      expect(rows.map((r) => r.dataset.kind)).toEqual(['touchpoint', 'role', 'role', 'role']);
+      expect(rows[0]!.querySelector('.person-timeline__text')!.textContent).toBe('Coffee catch-up · 12 Mar');
+      expect(rows[1]!.querySelector('.person-timeline__text')!.textContent).toBe('Head of English, Tallowwood College · 2022 – now');
+      expect(rows[2]!.querySelector('.person-timeline__text')!.textContent).toBe('Tutor, Marrow University · 2016 – 2019');
     });
 
     it('a bad date shows an error and saves nothing', async () => {
