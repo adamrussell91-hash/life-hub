@@ -396,6 +396,19 @@ describe('landing tool shelf', () => {
     const emblems = new Set([EMBLEM_SVG.after_action_review, EMBLEM_SVG.double_loop, EMBLEM_SVG.feedback_matrix, EMBLEM_SVG.eisenhower]);
     expect(emblems.size).toBe(4);
   });
+
+  it('shelves the two Document tools, each with its own emblem', async () => {
+    const { toolShelf } = await import('@/views/problem-solver/view');
+    const { EMBLEM_SVG } = await import('../../../../packages/problem-solver/glyphs');
+    const document_ = toolShelf().querySelector('[data-step="document"]')!;
+    expect(document_.querySelector('h3')!.textContent).toBe('Document');
+    const names = [...document_.querySelectorAll('.ps-shelf__name')].map((name) => name.textContent);
+    expect(names).toEqual(expect.arrayContaining(['5 Cs documentation', 'Knowledge management']));
+    expect(names).toHaveLength(2);
+    expect(document_.querySelectorAll('.ps-emblem svg')).toHaveLength(2);
+    const emblems = new Set([EMBLEM_SVG.five_cs, EMBLEM_SVG.knowledge_management, EMBLEM_SVG.eisenhower]);
+    expect(emblems.size).toBe(3);
+  });
 });
 
 describe('session page scores', () => {
