@@ -10571,11 +10571,65 @@ body.is-lesson-builder-full-page .hub-utilities {
 }
 
 .block-annotation__voice-notes-title {
-  margin: 0 0 var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  min-height: 44px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  list-style: none;
+}
+
+.block-annotation__voice-notes-title::-webkit-details-marker,
+.block-annotation__voice-note-parts > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A chevron that turns when the fold opens. */
+.block-annotation__voice-notes-title::before,
+.block-annotation__voice-note-parts > summary::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.block-annotation__voice-notes[open] > .block-annotation__voice-notes-title::before,
+.block-annotation__voice-note-parts[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.block-annotation__voice-notes[open] > .block-annotation__voice-notes-title {
+  margin-bottom: var(--space-2);
+}
+
+.block-annotation__voice-note-parts-row {
+  margin: calc(var(--space-1) * -1) 0 0 var(--space-5, 1.5rem);
+}
+
+.block-annotation__voice-note-parts > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  min-height: 36px;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   color: var(--muted);
-  letter-spacing: 0.02em;
+  cursor: pointer;
+  list-style: none;
+}
+
+.block-annotation__voice-note-parts[open] > summary {
+  margin-bottom: var(--space-2);
 }
 
 .block-annotation__voice-note-list {
