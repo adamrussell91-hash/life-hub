@@ -285,9 +285,18 @@ if (!tasksOk) {
   process.exit(1);
 }
 
-// Teaching resolves its packages from the root install (npm ci at the root).
+// Teaching has its own lockfile (React, Excalidraw, BlockSuite are not in the root install).
 const teachingDir = join(root, 'apps', 'teaching');
-const teachingVitest = join(root, 'node_modules', '.bin', 'vitest');
+if (!existsSync(join(teachingDir, 'node_modules', '.package-lock.json'))) {
+  const installOk = run('Install Teaching Hub dependencies', 'npm', ['ci', '--ignore-scripts'], {
+    cwd: teachingDir
+  });
+  if (!installOk) {
+    console.error('\npre-pr-check FAILED installing Teaching Hub dependencies');
+    process.exit(1);
+  }
+}
+const teachingVitest = join(teachingDir, 'node_modules', '.bin', 'vitest');
 const teachingPlan = vitestArgs(TEACHING_FULL_SUITE_TRIGGERS);
 const teachingScope = teachingPlan.args.includes('--changed') ? 'tests this change reaches' : 'full suite';
 console.log(`\nTeaching Hub vitest scope: ${teachingScope} (${teachingPlan.why})`);
