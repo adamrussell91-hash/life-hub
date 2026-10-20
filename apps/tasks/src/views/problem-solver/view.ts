@@ -5,7 +5,7 @@ import { el } from '@/views/hub-kit';
 import { hashQuery } from '@/shell/shell';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
-import { EMBLEM_SVG, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
+import { EMBLEM_SVG, lightningGlyph, skillGlyph, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../../packages/problem-solver/skills.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/tools/index.mjs';
 import { BOOK_STEPS, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
@@ -31,7 +31,9 @@ let diagramNow: { destroy(): void } | null = null;
 /** The open session's Tasks listeners (live statuses), removed when the page changes. */
 let unsubscribeNow: Array<() => void> = [];
 
-const phaseLabel = (row: PsSummary): string => (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
+const phaseLabel = (row: PsSummary): string =>
+  row.kind === 'lightning' ? (row.escalatedTo ? 'Went to full process' : row.status === 'finished' || row.phase === 'finished' ? 'Done' : 'Lightning')
+  : (row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase);
 const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--ps-blue)' : phase === 'finished' ? 'var(--ps-red)' : 'var(--ps-yellow)');
 const COLOURS = ['var(--ps-red)', 'var(--ps-yellow)', 'var(--ps-blue)'];
 
@@ -81,6 +83,43 @@ function startForm(onType: () => void): HTMLFormElement {
   return start;
 }
 
+function lightningCard(): HTMLElement {
+  const card = el('section', 'ps-lightning-card');
+  const form = el('form', 'ps-lightning-card__form') as HTMLFormElement;
+  const input = el('input', 'ps-lightning-card__input') as HTMLInputElement;
+  input.type = 'text';
+  input.placeholder = 'What is the snag?';
+  input.setAttribute('aria-label', 'Describe the snag');
+  const go = el('button', 'ps-lightning-card__go', 'Go') as HTMLButtonElement;
+  go.type = 'submit';
+  const status = el('p', 'ps-lightning-card__status');
+  status.setAttribute('role', 'status');
+  const row = el('div', 'ps-lightning-card__row');
+  row.append(input, go);
+  const head = el('div', 'ps-lightning-card__head');
+  head.append(lightningGlyph(), el('h2', 'ps-lightning-card__title', 'Lightning'));
+  form.append(row, status);
+  card.append(head, el('p', 'ps-lightning-card__line', 'A quick route for everyday snags.'), form);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      return;
+    }
+    go.disabled = true;
+    status.textContent = '';
+    try {
+      const session = await problemSolverApi.create({ text, kind: 'lightning' });
+      location.hash = `#/problem-solver?id=${session.id}`;
+    } catch (err) {
+      status.textContent = errorMessage(err);
+      go.disabled = false;
+    }
+  });
+  return card;
+}
+
 function problemCard(row: PsSummary, index: number): HTMLLIElement {
   const item = el('li', 'ps-prob') as HTMLLIElement;
   item.style.setProperty('--i', String(index));
@@ -88,11 +127,14 @@ function problemCard(row: PsSummary, index: number): HTMLLIElement {
   link.href = `#/problem-solver?id=${row.id}`;
   const medal = el('span', 'ps-prob__medal');
   const frame = row.frame ?? (row.phase === 'frame' ? 0 : 3);
-  medal.append(problemMedal(frame, row.tool));
+  if (row.kind === 'lightning') {
+    medal.classList.add('ps-prob__medal--lightning');
+    medal.append(lightningGlyph());
+  } else medal.append(problemMedal(frame, row.tool));
   const body = el('span', 'ps-prob__body');
   const meta = el('span', 'ps-prob__meta');
   const phase = el('span', 'ps-prob__phase', phaseLabel(row));
-  phase.style.setProperty('--c', phaseColour(row.phase));
+  phase.style.setProperty('--c', row.kind === 'lightning' ? 'var(--ps-ink)' : phaseColour(row.phase));
   meta.append(phase, el('span', '', row.tool ? TOOLS[row.tool].name : row.phase === 'frame' ? `Question ${Math.min(frame + 1, 3)} of 3` : ''), el('span', '', formatDisplayDate(row.updatedAt.slice(0, 10))));
   body.append(el('span', 'ps-prob__title', row.title), meta);
   const seen = Object.keys(row.skills ?? {});
@@ -193,7 +235,8 @@ async function renderList(canvas: HTMLElement): Promise<void> {
   const copy = el('div', 'ps-hero__copy');
   copy.append(
     el('p', 'ps-hero__lede', 'Name the thing that is stuck. A coach asks one question at a time and builds the toolkit’s charts with you, piece by piece.'),
-    startForm(() => board.nudge())
+    startForm(() => board.nudge()),
+    lightningCard()
   );
   hero.append(copy, board.el);
   page.append(hero);

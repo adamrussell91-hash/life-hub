@@ -435,6 +435,57 @@ describe('session page scores', () => {
   });
 });
 
+describe('Lightning on the landing page', () => {
+  const row = (extra: Record<string, unknown>) => ({ id: 'l1', title: 'Stuck door', status: 'active', phase: 'lightning', model: null, tool: null, links: [], createdAt: '', updatedAt: '2026-10-20T10:00:00Z', kind: 'lightning', ...extra });
+
+  it('shows the Lightning card after the start form and creates a run', async () => {
+    const { renderProblemSolverView } = await import('@/views/problem-solver/view');
+    const { problemSolverApi } = await import('@/views/problem-solver/api');
+    vi.spyOn(problemSolverApi, 'list').mockResolvedValue([]);
+    const create = vi.spyOn(problemSolverApi, 'create').mockResolvedValue({ id: 'new1' } as PsSession);
+    location.hash = '';
+    const host = document.createElement('div');
+    await renderProblemSolverView(host);
+    const card = host.querySelector<HTMLElement>('section.ps-lightning-card')!;
+    expect(card).not.toBeNull();
+    expect(card.previousElementSibling?.classList.contains('ps-start')).toBe(true);
+    expect(card.querySelector('.ps-lightning-glyph svg')).not.toBeNull();
+    expect(card.querySelector('h2')!.textContent).toBe('Lightning');
+    expect(card.textContent).toContain('A quick route for everyday snags.');
+    const input = card.querySelector<HTMLInputElement>('input[aria-label="Describe the snag"]')!;
+    expect(card.querySelector('button[type="submit"]')!.textContent).toBe('Go');
+    document.body.append(host);
+    card.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(create).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(input);
+    input.value = 'The door sticks';
+    card.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await vi.waitFor(() => expect(location.hash).toBe('#/problem-solver?id=new1'));
+    expect(create).toHaveBeenCalledWith({ text: 'The door sticks', kind: 'lightning' });
+    host.remove();
+    vi.restoreAllMocks();
+    location.hash = '';
+  });
+
+  it('marks Lightning rows with the glyph and a Lightning phase label', async () => {
+    const { renderProblemSolverView } = await import('@/views/problem-solver/view');
+    const { problemSolverApi } = await import('@/views/problem-solver/api');
+    vi.spyOn(problemSolverApi, 'list').mockResolvedValue([
+      row({ id: 'a' }), row({ id: 'b', status: 'finished', phase: 'finished' }), row({ id: 'c', escalatedTo: 'full1' })
+    ] as never);
+    location.hash = '';
+    const host = document.createElement('div');
+    await renderProblemSolverView(host);
+    const items = [...host.querySelectorAll('.ps-prob:not(.ps-prob--new)')];
+    expect(items.map((item) => item.querySelector('.ps-prob__phase')!.textContent)).toEqual(['Lightning', 'Done', 'Went to full process']);
+    for (const item of items) {
+      expect(item.querySelector('.ps-lightning-glyph svg')).not.toBeNull();
+      expect(item.querySelector('.ps-medal')).toBeNull();
+    }
+    vi.restoreAllMocks();
+  });
+});
+
 describe('reviewEntry', () => {
   const live = { reviewTaskId: 'task-r' };
   const waiting = { status: 'waiting' as const, due: '2026-11-02', returnTo: null, startedAt: null };
