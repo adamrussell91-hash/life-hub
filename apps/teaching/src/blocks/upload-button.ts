@@ -74,6 +74,31 @@ export function fileMatchesAccept(file: File, accept: string | undefined): boole
   });
 }
 
+const AUDIO_TYPE_BY_EXTENSION: Record<string, string> = {
+  webm: 'audio/webm',
+  m4a: 'audio/mp4',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  aac: 'audio/aac'
+};
+
+/** Audio files by extension, for pickers that take `audio/*`. */
+export const AUDIO_ACCEPT = `audio/*,${Object.keys(AUDIO_TYPE_BY_EXTENSION)
+  .map((ext) => `.${ext}`)
+  .join(',')}`;
+
+/**
+ * macOS calls a downloaded `.webm` or `.m4a` a video, or gives it no type.
+ * Where the picker wants audio, trust the extension instead.
+ */
+export function asAudioFile(file: File, accept: string | undefined): File {
+  if (!accept?.includes('audio/') || file.type.startsWith('audio/')) return file;
+  const type = AUDIO_TYPE_BY_EXTENSION[file.name.toLowerCase().split('.').pop() ?? ''];
+  if (!type || (file.type && !file.type.startsWith('video/'))) return file;
+  return new File([file], file.name, { type, lastModified: file.lastModified });
+}
+
 const UNSUPPORTED_TYPE = (file: File): string =>
   `${file.name} is a type that can't be uploaded. Use an image, PDF, Word, PowerPoint, Excel, audio, ZIP or text file.`;
 
@@ -148,7 +173,9 @@ export function createUploadButton(options: UploadButtonOptions): UploadButtonHa
 
   const uploadFiles = async (picked: File[]): Promise<void> => {
     if (busy || picked.length === 0) return;
-    const files = options.multiple ? picked : picked.slice(0, 1);
+    const files = (options.multiple ? picked : picked.slice(0, 1)).map((file) =>
+      asAudioFile(file, options.accept)
+    );
     const wrongType = files.find((file) => !fileMatchesAccept(file, options.accept));
     if (wrongType) {
       setError(`${wrongType.name} isn't ${noun}. Choose ${noun} instead.`);

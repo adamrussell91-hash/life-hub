@@ -77,6 +77,7 @@ import {
 } from '@/teacher/media-library-picker';
 import { createAudioRecordButton } from '@/blocks/audio-record-button';
 import {
+  AUDIO_ACCEPT,
   createUploadButton,
   rememberUploadedMedia,
   withSessionUploads
@@ -1107,7 +1108,7 @@ export function createAudioEditor(
 
   let lastUploadedUrl = '';
   const upload = createUploadButton({
-    accept: 'audio/*',
+    accept: AUDIO_ACCEPT,
     noun: 'an audio file',
     label: 'Upload audio',
     dropTarget: fields,

@@ -3,6 +3,8 @@ import type { Media } from '@/schemas/media';
 import { uploadMediaFile } from '@/teacher/media-api';
 import { applyCreatedMedia } from '@/app/curriculum-state';
 import {
+  AUDIO_ACCEPT,
+  asAudioFile,
   createUploadButton,
   fileMatchesAccept,
   resetSessionUploads,
@@ -216,5 +218,36 @@ describe('createUploadButton', () => {
     expect(onUploaded).toHaveBeenCalledTimes(1);
     expect(outerDrop).not.toHaveBeenCalled();
     expect(target.classList.contains('block-editor__drop-target--active')).toBe(false);
+  });
+});
+
+describe('asAudioFile', () => {
+  it('reads a downloaded .webm that macOS calls video as audio', () => {
+    const file = new File(['x'], 'Lesson Explainer.webm', { type: 'video/webm' });
+    expect(fileMatchesAccept(file, AUDIO_ACCEPT)).toBe(true);
+    expect(asAudioFile(file, AUDIO_ACCEPT).type).toBe('audio/webm');
+  });
+
+  it('fills in a missing type from the extension', () => {
+    expect(asAudioFile(new File(['x'], 'take.m4a'), AUDIO_ACCEPT).type).toBe('audio/mp4');
+  });
+
+  it('leaves audio files, other pickers and other types alone', () => {
+    const mp3 = new File(['x'], 'song.mp3', { type: 'audio/mpeg' });
+    expect(asAudioFile(mp3, AUDIO_ACCEPT)).toBe(mp3);
+    const video = new File(['x'], 'clip.webm', { type: 'video/webm' });
+    expect(asAudioFile(video, 'image/*')).toBe(video);
+    const mov = new File(['x'], 'clip.mov', { type: 'video/quicktime' });
+    expect(asAudioFile(mov, AUDIO_ACCEPT)).toBe(mov);
+  });
+
+  it('uploads a video-typed .webm through an audio button as audio', async () => {
+    uploadMock.mockImplementation(async (file) => mediaFor(file));
+    const onUploaded = vi.fn();
+    const handle = createUploadButton({ accept: AUDIO_ACCEPT, noun: 'an audio file', onUploaded });
+    await handle.uploadFiles([new File(['x'], 'Lesson Explainer.webm', { type: 'video/webm' })]);
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock.mock.calls[0]![0].type).toBe('audio/webm');
+    expect(onUploaded).toHaveBeenCalledTimes(1);
   });
 });

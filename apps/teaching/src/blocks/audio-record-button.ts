@@ -3,9 +3,12 @@
  * the block's own upload button, so it gets the same checks and the same link
  * as a file picked from the computer.
  */
+import { MAX_MEDIA_BYTES } from '@/media/upload-rules';
 
-/** Uploads are one request, and Netlify drops bodies over 6 MB: at 64 kbps that is about 12 minutes. */
+/** Ten minutes. Some browsers ignore the 64 kbps ask, so the take also stops by size. */
 export const MAX_RECORDING_MS = 10 * 60 * 1000;
+/** Just under the 10 MB upload limit, leaving room for the last second of audio. */
+export const MAX_RECORDING_BYTES = MAX_MEDIA_BYTES - 512 * 1024;
 
 export type AudioRecordButtonOptions = {
   /** Hand the finished take to the upload; resolves once it has finished. */
@@ -69,6 +72,7 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
   let chunks: BlobPart[] = [];
+  let recordedBytes = 0;
   let startedAt = 0;
   let timer = 0;
   let disposed = false;
@@ -106,13 +110,17 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
     }
     rescue.hidden = true;
     chunks = [];
+    recordedBytes = 0;
     try {
       recorder = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64_000 });
     } catch {
       recorder = new MediaRecorder(stream, { mimeType: mime });
     }
     recorder.addEventListener('dataavailable', (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+        recordedBytes += event.data.size;
+      }
     });
     recorder.addEventListener('stop', () => void finish(recorder?.mimeType || mime), { once: true });
     recorder.start(1000);
@@ -123,7 +131,13 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
       const elapsed = Date.now() - startedAt;
       label.textContent = `Stop · ${clock(elapsed)}`;
       // Stop at the cap, or when the editor closes mid-take (the take still uploads).
-      if (elapsed >= MAX_RECORDING_MS || (elapsed > 1000 && !el.isConnected)) stop();
+      if (
+        elapsed >= MAX_RECORDING_MS ||
+        recordedBytes >= MAX_RECORDING_BYTES ||
+        (elapsed > 1000 && !el.isConnected)
+      ) {
+        stop();
+      }
     };
     tick();
     timer = window.setInterval(tick, 250);
