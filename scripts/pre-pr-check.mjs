@@ -12,14 +12,14 @@
  * Options:
  *   --docs-only   Skip Professional typecheck. Still runs npm test + static
  *                 guards. Only for PRs with zero runtime / test / type impact.
- *   --full        Run the whole Tasks Hub vitest suite, not just the tests
- *                 the change can reach (also PRE_PR_FULL=1).
+ *   --full        Run the whole Tasks Hub and Teaching Hub vitest suites,
+ *                 not just the tests the change can reach (also PRE_PR_FULL=1).
  *   --help
  *
  * This script is the source of truth for which commands agents must run.
  * Keep steps aligned with `.github/workflows/pages.yml`:
- *   - Pages runs `npm test` and the full Tasks Hub vitest suite in a `test`
- *     job beside the deploy, so a break still shows red on main
+ *   - Pages runs `npm test` and the full Tasks Hub and Teaching Hub vitest
+ *     suites in a `test` job beside the deploy, so a break still shows red on main
  *   - `build:professional` runs `npm run typecheck` (`tsc --noEmit`) first
  *
  * Tasks Hub vitest runs only the tests the change can reach (vitest
@@ -27,6 +27,7 @@
  * so the slow Grove world tests stay out of PRs that never touch the Grove.
  * Anything named grove, Tasks fixtures or config, or this gate itself, runs
  * the whole suite, because tests read those files without importing them.
+ * Teaching Hub vitest works the same way with its own triggers.
  *
  * Agent checklist (Project store): docs/mandatory-pre-pr-check.md
  * Principle: never weaken Pages / hide failures to go green.
@@ -206,8 +207,18 @@ const FULL_SUITE_TRIGGERS = [
   /^\.github\/workflows\//
 ];
 
+// Teaching tests read these with fs or vite config (the text baseline, the
+// storage shim, seed fixtures), so vitest's import graph cannot see them.
+const TEACHING_FULL_SUITE_TRIGGERS = [
+  /^apps\/teaching\/(fixtures|tests\/setup|tests\/unit\/__baselines__)\//,
+  /^apps\/teaching\/(package(-lock)?\.json|vite\.config\.ts|tsconfig[^/]*\.json)$/,
+  /^packages\//,
+  /^scripts\/pre-pr-check\.mjs$/,
+  /^\.github\/workflows\//
+];
+
 /** Vitest args for this change: all tests, or only those it can reach. */
-function tasksVitestArgs() {
+function vitestArgs(triggers = FULL_SUITE_TRIGGERS) {
   if (forceFull) return { args: ['run'], why: '--full' };
   const base = changeBase();
   if (!base) return { args: ['run'], why: 'no base commit to compare against' };
@@ -215,11 +226,11 @@ function tasksVitestArgs() {
   const untracked = git(['ls-files', '--others', '--exclude-standard']);
   if (committed === null || untracked === null) return { args: ['run'], why: 'git diff failed' };
   const changed = `${committed}\n${untracked}`.split('\n').filter(Boolean);
-  const trigger = changed.find((file) => FULL_SUITE_TRIGGERS.some((re) => re.test(file)));
+  const trigger = changed.find((file) => triggers.some((re) => re.test(file)));
   if (trigger) return { args: ['run'], why: `${trigger} changed` };
   return {
     args: ['run', '--changed', base, '--passWithNoTests'],
-    why: `${changed.length} changed files, none Grove or Tasks config`
+    why: `${changed.length} changed files, none that need the full suite`
   };
 }
 
@@ -262,7 +273,7 @@ if (!existsSync(join(tasksDir, 'node_modules'))) {
 const tasksEnv = { ...process.env };
 delete tasksEnv.ANTHROPIC_API_KEY;
 const tasksVitest = join(tasksDir, 'node_modules', '.bin', 'vitest');
-const tasksPlan = tasksVitestArgs();
+const tasksPlan = vitestArgs();
 const tasksScope = tasksPlan.args.includes('--changed') ? 'tests this change reaches' : 'full suite';
 console.log(`\nTasks Hub vitest scope: ${tasksScope} (${tasksPlan.why})`);
 const tasksOk = run(`Tasks Hub vitest (${tasksScope})`, tasksVitest, tasksPlan.args, {
@@ -271,6 +282,23 @@ const tasksOk = run(`Tasks Hub vitest (${tasksScope})`, tasksVitest, tasksPlan.a
 });
 if (!tasksOk) {
   console.error('\npre-pr-check FAILED at Tasks Hub vitest');
+  process.exit(1);
+}
+
+// Teaching resolves its packages from the root install (npm ci at the root).
+const teachingDir = join(root, 'apps', 'teaching');
+const teachingVitest = join(root, 'node_modules', '.bin', 'vitest');
+const teachingPlan = vitestArgs(TEACHING_FULL_SUITE_TRIGGERS);
+const teachingScope = teachingPlan.args.includes('--changed') ? 'tests this change reaches' : 'full suite';
+console.log(`\nTeaching Hub vitest scope: ${teachingScope} (${teachingPlan.why})`);
+const teachingOk = run(
+  `Teaching Hub vitest (${teachingScope})`,
+  teachingVitest,
+  [...teachingPlan.args, 'tests/unit'],
+  { cwd: teachingDir, env: tasksEnv }
+);
+if (!teachingOk) {
+  console.error('\npre-pr-check FAILED at Teaching Hub vitest');
   process.exit(1);
 }
 
