@@ -7241,3 +7241,134 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 @container ltn (max-width: 1009px) {
   .ps-ltn__swipe { display: block; }
 }
+
+/* Lightning page: a run's own page, ink and paper only. The chart takes a full-width row above
+   the coach (its stage is about 1010px, so it shows whole where the window allows and scrolls
+   inside its own box otherwise). The question strip is one row, a 2×2 grid on a phone. */
+.ps-scope.ps-ltn-page {
+  --ltn-faint: color-mix(in srgb, var(--ps-ink) 22%, var(--ps-paper));
+  --ltn-muted: color-mix(in srgb, var(--ps-ink) 72%, var(--ps-paper));
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+  color: var(--ps-ink);
+}
+.ps-ltn-page .ps-back { color: var(--ltn-muted); }
+.ps-ltn-page .ps-back:hover { color: var(--ps-ink); }
+.ps-ltn-page .ps-session__title { color: var(--ps-ink); }
+
+.ps-ltn-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ps-ltn-strip__q {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--ltn-faint);
+  border-radius: 999px;
+  background: var(--ps-paper);
+  color: var(--ltn-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  transition: background-color 240ms var(--ps-ease), color 240ms var(--ps-ease), border-color 240ms var(--ps-ease);
+}
+.ps-ltn-strip__n {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.ps-ltn-strip__label { min-width: 0; overflow-wrap: anywhere; line-height: var(--leading-tight); }
+.ps-ltn-strip__q[data-lit='true'] { border-color: var(--ps-ink); color: var(--ps-ink); }
+.ps-ltn-strip__q[aria-current='step'] { border-color: var(--ps-ink); background: var(--ps-ink); color: var(--ps-paper); font-weight: var(--weight-semibold); }
+
+.ps-ltn-page__chart {
+  min-width: 0;
+  padding: var(--space-4);
+  border: 2px solid var(--ps-ink);
+  border-radius: var(--radius-xl);
+  background: var(--ps-paper);
+}
+
+.ps-ltn-page__board { display: grid; gap: var(--space-4); min-width: 0; max-width: 56rem; }
+.ps-ltn-page__done,
+.ps-ltn-page__sent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--ps-ink);
+  border-radius: var(--radius-lg);
+  background: var(--ps-paper);
+}
+.ps-ltn-page__done[hidden],
+.ps-ltn-page__sent[hidden] { display: none; }
+.ps-ltn-page__done-line,
+.ps-ltn-page__sent-line { flex: 1 1 12rem; margin: 0; font-weight: var(--weight-semibold); }
+.ps-ltn-page__sent-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--ps-ink); font-weight: var(--weight-semibold); text-underline-offset: 3px; }
+.ps-ltn-page__again,
+.ps-ltn-from__retry {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1.5px solid var(--ps-ink);
+  border-radius: 999px;
+  background: var(--ps-ink);
+  color: var(--ps-paper);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+.ps-ltn-page__again:disabled { opacity: 0.5; cursor: default; }
+.ps-ltn-page__again:focus-visible,
+.ps-ltn-from__retry:focus-visible,
+.ps-ltn-page__sent-link:focus-visible,
+.ps-ltn-from__summary:focus-visible,
+.ps-ltn-from__link:focus-visible { outline: 2px solid var(--ps-ink); outline-offset: 2px; }
+
+/* The coach in ink and paper: the avatar keeps its three shapes as ink, paper and grey, the
+   thinking dots and skill marks go grey, and the buttons are ink pills at least 44px tall. */
+.ps-scope.ps-ltn-page .ps-dots i { background: var(--ps-ink); }
+.ps-scope.ps-ltn-page .ps-coach__skills .ps-glyph { filter: grayscale(1); }
+.ps-scope.ps-ltn-page .ps-avatar circle:first-child { fill: var(--ps-ink); }
+.ps-scope.ps-ltn-page .ps-avatar path { fill: var(--ps-paper); stroke: var(--ps-ink); stroke-width: 5; }
+.ps-scope.ps-ltn-page .ps-avatar circle:last-child { fill: var(--ltn-muted); }
+.ps-scope.ps-ltn-page .ps-msg.chat-message--assistant .chat-message__body { background: var(--ps-paper); color: var(--ps-ink); box-shadow: inset 0 0 0 1.5px var(--ps-ink); }
+.ps-scope.ps-ltn-page .ps-msg.chat-message--user .chat-message__body { background: var(--ps-ink); color: var(--ps-paper); }
+.ps-scope.ps-ltn-page .ps-suggestion { background: var(--ps-paper); box-shadow: inset 0 0 0 2px var(--ps-ink); }
+.ps-scope.ps-ltn-page .ps-suggestion__reason,
+.ps-scope.ps-ltn-page .ps-thinking,
+.ps-scope.ps-ltn-page .ps-coach__status { color: var(--ps-ink); }
+.ps-scope.ps-ltn-page .ps-coach .btn { min-height: 44px; border: 1.5px solid var(--ps-ink); border-radius: 999px; background: var(--ps-paper); color: var(--ps-ink); }
+.ps-scope.ps-ltn-page .ps-coach .btn--primary { background: var(--ps-ink); color: var(--ps-paper); }
+.ps-scope.ps-ltn-page .ps-coach .btn:focus-visible { outline: 2px solid var(--ps-ink); outline-offset: 2px; }
+.ps-scope.ps-ltn-page .ps-composer__now:empty { display: none; }
+
+/* From Lightning: the run's chart on the full session it led to, closed until opened. */
+.ps-ltn-from { min-width: 0; border: 1.5px solid var(--ps-ink); border-radius: var(--radius-lg); background: var(--ps-paper); color: var(--ps-ink); }
+.ps-ltn-from__summary { display: flex; align-items: center; min-height: 44px; padding: 0 var(--space-4); font-weight: var(--weight-semibold); cursor: pointer; }
+.ps-ltn-from__body { display: grid; gap: var(--space-3); min-width: 0; padding: 0 var(--space-4) var(--space-4); }
+.ps-ltn-from__status { margin: 0; font-size: var(--text-sm); }
+.ps-ltn-from__failed { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.ps-ltn-from__link { width: fit-content; color: var(--ps-ink); font-weight: var(--weight-semibold); text-underline-offset: 3px; }
+
+@media (max-width: 600px) {
+  .ps-ltn-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ps-ltn-page__chart { padding: var(--space-2); border-radius: var(--radius-lg); }
+  .ps-ltn-from__summary, .ps-ltn-from__body { padding-inline: var(--space-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-ltn-strip__q { transition: none; }
+}

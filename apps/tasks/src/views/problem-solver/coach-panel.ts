@@ -59,6 +59,8 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
   const model = session.model?.id;
   let title: string;
   let accept = 'Start it';
+  // Escalating is its own action (accept_suggestion refuses it): it makes the full session.
+  let acceptAction: PsAction = 'accept_suggestion';
   if (suggestion.kind === 'next_step') {
     const nextName = model ? nextPhase(session) : null;
     title = nextName ? `Next step: ${stepName(model!, nextName)}` : 'Ready to finish';
@@ -69,6 +71,8 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
     accept = 'Reopen it';
   } else if (suggestion.kind === 'escalate') {
     title = 'This needs the full process';
+    accept = 'Start the full process';
+    acceptAction = 'escalate';
   } else {
     title = `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
   }
@@ -76,7 +80,7 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
   if (suggestion.kind === 'next_tool' || suggestion.kind === 'switch_tool') heading.prepend(toolEmblem(suggestion.tool));
   card.append(heading, el('p', 'ps-suggestion__reason', suggestion.reason));
   const row = el('div', 'ps-suggestion__actions');
-  row.append(actionButton(accept, 'accept_suggestion', handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
+  row.append(actionButton(accept, acceptAction, handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
   card.append(row);
   return card;
 }
@@ -133,7 +137,10 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
       const busy = session.runner.status === 'queued' || session.runner.status === 'running';
       // A failed boundary turn must be retried before anything else: the step has already moved.
       const boundaryFailed = session.runner.status === 'failed' && session.runner.mode === 'boundary';
-      const locked = busy || boundaryFailed;
+      const lightning = session.kind === 'lightning';
+      // A finished Lightning run takes no more replies until It came back starts a new round.
+      const closed = lightning && session.status !== 'active';
+      const locked = busy || boundaryFailed || closed;
 
       for (const turn of session.turns) {
         if (shown.has(turn.id)) continue;
@@ -171,7 +178,8 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
         if (keepRefused(session)) parts.push(el('p', 'ps-coach__status ps-coach__status--keep', "This name breaks a naming rule, so it can't be kept as it is."));
         else actions.append(actionButton('Keep it anyway', 'keep_anyway', handlers));
       }
-      const inStep = Boolean(session.model && session.steps?.[session.phase]);
+      // A Lightning run has no steps: no Move on and no step label.
+      const inStep = !lightning && Boolean(session.model && session.steps?.[session.phase]);
       if (inStep && !locked) {
         const after = nextPhase(session);
         actions.append(actionButton(after ? `Move on to ${stepName(session.model!.id, after)}` : 'Finish', 'move_on', handlers));
@@ -183,12 +191,12 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
         extras.replaceChildren(...parts);
       }
 
-      const question = session.phase === 'frame' ? (['goal', 'whatIsTrue', 'whatCanBeDone'] as const).findIndex((key) => !session.frame[key]) : -1;
+      const question = !lightning && session.phase === 'frame' ? (['goal', 'whatIsTrue', 'whatCanBeDone'] as const).findIndex((key) => !session.frame[key]) : -1;
       const prompts = ['What is the goal?', 'What is true?', 'What can be done?'];
-      const stepLabel = session.model && session.steps?.[session.phase] ? `Step: ${stepName(session.model.id, session.phase)}` : '';
-      now.textContent = question >= 0 ? `Answering: ${prompts[question]}` : session.phase === 'finished' ? 'Problem finished' : stepLabel;
+      const stepLabel = inStep ? `Step: ${stepName(session.model!.id, session.phase)}` : '';
+      now.textContent = lightning ? '' : question >= 0 ? `Answering: ${prompts[question]}` : session.phase === 'finished' ? 'Problem finished' : stepLabel;
       now.dataset.q = String(question);
-      input.placeholder = session.phase === 'finished' ? 'Add a note for next time…' : 'Your answer…';
+      input.placeholder = closed ? 'This run is done.' : !lightning && session.phase === 'finished' ? 'Add a note for next time…' : 'Your answer…';
       input.disabled = locked;
       send.disabled = locked;
 

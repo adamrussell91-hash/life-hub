@@ -21,6 +21,7 @@ import { compactToday, mountTaskCards, type PlaceOption } from './task-cards';
 import { createCaseFileBridge, type CaseFilePlace } from './case-file-bridge';
 import { caseFileOffer, composeCaseFile } from '../../../../../packages/problem-solver/case-file.mjs';
 import { createSessionSync } from './session-sync';
+import { mountFromLightning, mountLightningPage } from './lightning-view';
 import { tasksApi } from '@/services/client-api';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { art, createShapeBoard, createTrack, FRAME_PIECES, problemMedal } from './decor';
@@ -356,8 +357,103 @@ export function latestCaseFileWriter(
   };
 }
 
+/** The session sync for a page: one poll at a time, kept in `poll` so leaving the page aborts it. */
+function syncFor(initial: PsSession, render: (session: PsSession) => void, alive: () => boolean) {
+  return createSessionSync({
+    initial,
+    render,
+    actWith: (s, action, payload) => problemSolverApi.actWith(s, action, payload),
+    get: (sessionId) => problemSolverApi.get(sessionId),
+    poll: (sessionId, onUpdate) => {
+      poll?.abort();
+      poll = new AbortController();
+      return pollUntilSettled(sessionId, onUpdate, { signal: poll.signal });
+    },
+    alive
+  });
+}
+
+const isConflict = (err: unknown): boolean => (err as { code?: string }).code === 'conflict';
+
+/**
+ * A Lightning run: the question strip, the chart (Yes and No on its current box), the coach,
+ * and how the run ends. Every action goes through the session sync; a conflict refetches.
+ */
+async function renderLightningSession(canvas: HTMLElement, initial: PsSession): Promise<void> {
+  const view = mountLightningPage(initial, {
+    onAnswer: (node, answer) => void answerBox(node, answer),
+    onSay: (text) => void say(text),
+    onAction: (action) => void coachAction(action),
+    onAgain: () => again()
+  });
+  canvas.replaceChildren(view.el);
+  diagramNow = view;
+  const alive = () => view.el.isConnected;
+  const sync = syncFor(initial, (next) => view.update(next), alive);
+
+  /** A failed post: a conflict shows the latest instead; anything else is flashed. */
+  async function recover(err: unknown): Promise<void> {
+    if (!alive()) return;
+    if (!isConflict(err)) return view.flash(err);
+    try {
+      sync.paint(await problemSolverApi.get(sync.session().id));
+    } catch (fetchErr) {
+      view.flash(fetchErr);
+    }
+  }
+
+  /** Post through the sync; true when it went through. */
+  async function post(action: PsAction, payload: Record<string, unknown>): Promise<boolean> {
+    try {
+      await sync.confirmed(action, payload);
+      return true;
+    } catch (err) {
+      await recover(err);
+      return false;
+    }
+  }
+  const settleIfBusy = async () => {
+    if (alive() && isBusy(sync.session())) await sync.settle();
+  };
+
+  async function answerBox(node: string, answer: 'yes' | 'no'): Promise<void> {
+    if (await post('lightning_answer', { node, answer })) await settleIfBusy();
+    else view.releaseAnswer();
+  }
+
+  async function again(): Promise<void> {
+    if (await post('lightning_again', {})) await settleIfBusy();
+  }
+
+  async function coachAction(action: PsAction): Promise<void> {
+    if (action === 'escalate') {
+      if (!(await post('escalate', {}))) return;
+      const to = sync.session().lightning?.escalatedTo;
+      if (to && alive()) location.hash = `#/problem-solver?id=${encodeURIComponent(to)}`;
+      return;
+    }
+    if (await post(action, {})) await settleIfBusy();
+  }
+
+  /** A reply typed to the coach: queued behind any write, posted with the latest revision. */
+  async function say(text: string): Promise<void> {
+    try {
+      const next = await sync.enqueue(() => problemSolverApi.act(sync.session(), 'say', text));
+      sync.paint(next);
+    } catch (err) {
+      await recover(err);
+      return;
+    }
+    await settleIfBusy();
+  }
+
+  view.update(initial);
+  await settleIfBusy();
+}
+
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await problemSolverApi.get(id);
+  if (session.kind === 'lightning') return renderLightningSession(canvas, session);
   const page = el('div', 'ps-page ps-session ps-scope');
   const back = el('a', 'ps-back', '← Problems') as HTMLAnchorElement;
   back.href = '#/problem-solver';
@@ -368,7 +464,10 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const canvasHost = el('div', 'ps-canvas');
   const tray = createSkillTray();
   const review = mountReviewPanel({ start: () => void reviews.startReview() });
-  bench.append(review.el, canvasHost, tray.el);
+  // A full session that came from a Lightning run shows that run's chart, closed until opened.
+  const fromLightning = session.escalatedFrom ? mountFromLightning(session.escalatedFrom, (runId) => problemSolverApi.get(runId)) : null;
+  if (fromLightning) unsubscribeNow.push(() => fromLightning.destroy());
+  bench.append(review.el, canvasHost, ...(fromLightning ? [fromLightning.el] : []), tray.el);
   const cards = mountTaskCards({
     create: (proposal, edits) => bridge.create(session, proposal, edits),
     dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),
@@ -410,18 +509,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     reviews.onRender(session);
   };
 
-  const sync = createSessionSync({
-    initial: session,
-    render,
-    actWith: (s, action, payload) => problemSolverApi.actWith(s, action, payload),
-    get: (sessionId) => problemSolverApi.get(sessionId),
-    poll: (sessionId, onUpdate) => {
-      poll?.abort();
-      poll = new AbortController();
-      return pollUntilSettled(sessionId, onUpdate, { signal: poll.signal });
-    },
-    alive: () => page.isConnected
-  });
+  const sync = syncFor(session, render, () => page.isConnected);
   const paint = (next: PsSession) => void sync.paint(next);
   const settle = () => sync.settle();
   /** Task writes: after the coach settles, one at a time, a stale revision retried once. */

@@ -65,3 +65,41 @@ describe('coach panel: Document', () => {
     expect(panel.querySelector('.ps-coach__status--keep')).toBeNull();
   });
 });
+
+describe('coach panel: Lightning', () => {
+  const run = (extra: Partial<PsSession> = {}) => session({
+    kind: 'lightning', phase: 'lightning', model: null, steps: {},
+    lightning: { path: [{ node: 'start', round: 1, at: '' }], rounds: 1, finishedAt: null, escalatedTo: null },
+    ...extra
+  } as Partial<PsSession>);
+
+  it('the escalate card posts escalate, not accept_suggestion, and Not now dismisses', () => {
+    const actions: string[] = [];
+    const panel = renderCoachPanel(run({ suggestion: { kind: 'escalate', reason: 'Several people are involved.' } }), { onSay: () => undefined, onAction: (action) => actions.push(action) });
+    expect(panel.querySelector('.ps-suggestion__title')!.textContent).toBe('This needs the full process');
+    expect(panel.querySelector('.ps-suggestion__reason')!.textContent).toBe('Several people are involved.');
+    expect(panel.querySelector('[data-action="accept_suggestion"]')).toBeNull();
+    const start = panel.querySelector<HTMLButtonElement>('.ps-suggestion [data-action="escalate"]')!;
+    expect(start.textContent).toBe('Start the full process');
+    const later = panel.querySelector<HTMLButtonElement>('.ps-suggestion [data-action="dismiss_suggestion"]')!;
+    expect(later.textContent).toBe('Not now');
+    start.click();
+    later.click();
+    expect(actions).toEqual(['escalate', 'dismiss_suggestion']);
+  });
+
+  it('shows no step controls and no step label on a run', () => {
+    const panel = renderCoachPanel(run({ steps: { define: { runs: [], status: 'open', objection: null } }, phase: 'define', model: { id: 'seven_step', reason: '' } }), noop);
+    expect(panel.querySelector('[data-action="move_on"]')).toBeNull();
+    expect(panel.querySelector('.ps-composer__now')!.textContent).toBe('');
+    expect((panel.querySelector('textarea') as HTMLTextAreaElement).disabled).toBe(false);
+  });
+
+  it('a finished run takes no more replies', () => {
+    const panel = renderCoachPanel(run({ status: 'finished' }), noop);
+    const input = panel.querySelector('textarea') as HTMLTextAreaElement;
+    expect(input.disabled).toBe(true);
+    expect(input.placeholder).toBe('This run is done.');
+    expect((panel.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+});
