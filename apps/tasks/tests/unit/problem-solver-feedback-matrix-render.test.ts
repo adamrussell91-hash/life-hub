@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createFeedbackMatrixView } from '../../../../packages/problem-solver/render/feedback-matrix';
+import { arcFacing, clusterReach, createFeedbackMatrixView, satelliteAngles } from '../../../../packages/problem-solver/render/feedback-matrix';
 import type { PsEdge, PsNode, PsToolRun } from '../../../../packages/problem-solver/types';
 
 const node = (id: string, slot: string, extra: Partial<PsNode> = {}): PsNode => ({ id, slot, text: `${slot} answer text`, title: `${slot} title`, state: 'accepted', skills: [], turnId: 't', ...extra });
@@ -280,6 +280,78 @@ describe('Feedback matrix view', () => {
     expect([...key.querySelectorAll('.ps-fbm__key-code')].map((c) => c.textContent)).toEqual(['S', 'C', 'X', 'Q']);
     expect(key.querySelector('button, [tabindex]')).toBeNull();
     expect([...view.el.querySelectorAll('[data-quadrant] .ps-fbm__code')].map((c) => c.textContent)).toEqual(['S', 'C', 'X', 'Q']);
+  });
+
+  it('moves focus to "+N more" when the focused pill moves into it', () => {
+    const view = createFeedbackMatrixView();
+    document.body.append(view.el);
+    const later = [2, 3, 4].map((i) => node(`s${i}`, `suggestion:${i}`, { title: `Idea ${i}` }));
+    view.update(fbm(later));
+    pill(view, 's4').focus();
+    expect(document.activeElement).toBe(pill(view, 's4'));
+    view.update(fbm([node('s1', 'suggestion:1', { title: 'Idea 1' }), ...later]));
+    const more = quadrant(view, 'suggestion').querySelector<HTMLButtonElement>('.ps-fbm__more')!;
+    expect(view.el.querySelector<HTMLElement>('[data-node="s4"]')!.hidden).toBe(true);
+    expect(document.activeElement).toBe(more);
+    view.el.remove();
+  });
+
+  it('keeps "+N more" cards only for the pills past the third', () => {
+    const view = createFeedbackMatrixView();
+    const four = [2, 3, 4, 5].map((i) => node(`s${i}`, `suggestion:${i}`, { title: `Idea ${i}` }));
+    view.update(fbm(four));
+    expect([...view.el.querySelectorAll('.ps-fbm__more-list [data-for]')].map((c) => c.getAttribute('data-for'))).toEqual(['s5']);
+    view.update(fbm(four.slice(1)));
+    expect(view.el.querySelectorAll('.ps-fbm__more-list [data-for]').length).toBe(0);
+    view.update(fbm([node('s1', 'suggestion:1'), ...four.slice(1)]));
+    expect([...view.el.querySelectorAll('.ps-fbm__more-list [data-for]')].map((c) => c.getAttribute('data-for'))).toEqual(['s5']);
+  });
+
+  it('hides the Part two heading and the clusters when only actions remain', () => {
+    const view = createFeedbackMatrixView();
+    view.update(FULL());
+    view.update(fbm([S1, C1, X1, A1]));
+    const two = view.el.querySelector<HTMLElement>('[data-part="two"]')!;
+    expect((two.firstElementChild as HTMLElement).hidden).toBe(true);
+    expect(two.querySelector<HTMLElement>('.ps-fbm__clusters')!.hidden).toBe(true);
+    expect(two.querySelector<HTMLElement>('.ps-fbm__actions')!.hidden).toBe(false);
+    view.update(FULL());
+    expect((two.firstElementChild as HTMLElement).hidden).toBe(false);
+  });
+
+  it('draws a new line in along itself: the inner ink scales from the theme', () => {
+    const animate = spyAnimate();
+    const view = createFeedbackMatrixView();
+    view.update(fbm([T1]));
+    view.update(fbm([T1, H1], [of('h1', 't1')]));
+    const ink = view.el.querySelector('[data-edge="h1>t1"] .ps-fbm__line-ink')!;
+    const at = animate.mock.contexts.indexOf(ink);
+    expect(at).toBeGreaterThan(-1);
+    expect(animate.mock.calls[at][0]).toEqual([{ transform: 'scaleX(0)' }, { transform: 'none' }]);
+    expect(animate.mock.contexts).not.toContain(view.el.querySelector('[data-edge="h1>t1"]'));
+  });
+
+  it('cuts each stage to the height its satellites reach, and lets an odd last cluster span both columns', () => {
+    const view = createFeedbackMatrixView();
+    view.update(FULL());
+    const h = (id: string) => Number(cluster(view, id).querySelector<HTMLElement>('.ps-fbm__stage')!.style.getPropertyValue('--h'));
+    expect(h('t1')).toBeLessThan(100);
+    expect(h('t1')).toBeGreaterThan(32);
+    expect(cluster(view, 't3').getAttribute('data-span')).toBe('both');
+    expect(cluster(view, 't1').hasAttribute('data-span')).toBe(false);
+    expect(clusterReach([270])).toEqual({ top: 50, bottom: 19 });
+  });
+
+  it('never faces a cluster\'s arc downwards', () => {
+    for (let count = 1; count <= 6; count += 1) {
+      for (let i = 0; i < count; i += 1) {
+        const facing = arcFacing(i, count);
+        expect(Math.sin((facing * Math.PI) / 180)).toBeLessThanOrEqual(1e-9);
+      }
+    }
+    expect(arcFacing(0, 1)).toBe(270);
+    expect(arcFacing(2, 3)).toBe(180);
+    expect(satelliteAngles(1, 270)).toEqual([[270, 270]]);
   });
 
   it('does nothing after destroy', () => {

@@ -6509,10 +6509,20 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 /* Part two: clusters two to a row, each a square box with the theme at its centre. */
 .ps-fbm__part--two { margin-top: 28px; }
 .ps-fbm__clusters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.ps-fbm__clusters[hidden],
+.ps-fbm__part-head[hidden] { display: none; }
 .ps-fbm__cluster { min-width: 0; }
-.ps-fbm__stage { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1 / 1; margin-inline: auto; }
+/* An odd last cluster spans both columns and sits between them, as the book's third does. */
+.ps-fbm__cluster[data-span='both'] { grid-column: 1 / -1; }
+/* The stage is cut to the height the satellites reach (--h, in percent of its width); the square
+   layer inside is lifted by what the stage leaves off its top (--lift; a percent margin is of
+   the width). */
+.ps-fbm__stage { position: relative; width: 100%; max-width: 340px; aspect-ratio: 100 / var(--h, 100); margin-inline: auto; }
+.ps-fbm__cluster[data-span='both'] .ps-fbm__stage { width: calc(50% - 6px); }
+.ps-fbm__layer { position: absolute; top: 0; left: 0; width: 100%; aspect-ratio: 1 / 1; margin-top: calc(var(--lift, 0%) * -1); }
 .ps-fbm__lines { position: absolute; inset: 0; pointer-events: none; }
-/* A line runs from the theme's centre to the satellite's, under both circles. */
+/* A line runs from the theme's centre to the satellite's, under both circles. The outer span
+   turns to the satellite; the inner one carries the colour and draws in along the line. */
 .ps-fbm__line {
   position: absolute;
   left: 50%;
@@ -6520,11 +6530,10 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   width: 36%;
   height: 4px;
   margin-top: -2px;
-  border-radius: 2px;
-  background: var(--ps-yellow);
   transform-origin: 0 50%;
   transform: rotate(var(--a));
 }
+.ps-fbm__line-ink { display: block; width: 100%; height: 100%; border-radius: 2px; background: var(--ps-yellow); transform-origin: 0 50%; }
 .ps-fbm__theme {
   position: absolute;
   left: 50%;
@@ -6550,6 +6559,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-fbm__theme:has(:focus-visible),
 .ps-fbm__theme:has([aria-expanded='true']) { z-index: 3; }
 .ps-fbm__sat > .ps-objection { position: absolute; top: calc(100% + 2px); left: 50%; margin: 0; transform: translateX(-50%); opacity: 1; white-space: nowrap; }
+/* In the lower half the tag sits above the satellite, so it never reaches past the stage. */
+.ps-fbm__sat[data-low='true'] > .ps-objection { top: auto; bottom: calc(100% + 2px); }
 .ps-fbm__circle {
   box-sizing: border-box;
   display: flex;
@@ -6651,8 +6662,12 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-fbm__key-words { min-width: 0; font: var(--weight-semibold) 13px / 1.3 var(--font-ui); }
 
   .ps-fbm__clusters { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .ps-fbm__stage { width: min(100%, 300px); }
+  .ps-fbm__stage,
+  .ps-fbm__cluster[data-span='both'] .ps-fbm__stage { width: min(100%, 300px); aspect-ratio: 1 / 1; }
+  .ps-fbm__layer { margin-top: 0; }
   .ps-fbm__sat { left: var(--px); top: var(--py); }
+  .ps-fbm__sat[data-low] > .ps-objection { top: calc(100% + 2px); bottom: auto; }
+  .ps-fbm__sat[data-plow='true'] > .ps-objection { top: auto; bottom: calc(100% + 2px); }
   .ps-fbm__line { transform: rotate(var(--pa)); }
   .ps-fbm__title--theme { font-size: 12px; }
 }
