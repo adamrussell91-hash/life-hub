@@ -9687,12 +9687,13 @@ body.is-lesson-builder-full-page .hub-utilities {
   box-shadow: var(--elev-4);
 }
 
-/* BlockSuite whiteboard block */
+/* Whiteboard block (Excalidraw). The lesson shows a picture; drawing happens full screen. */
 .block-whiteboard,
 .block-editor__whiteboard-fields {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .block-whiteboard {
@@ -9708,43 +9709,128 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .block-whiteboard__surface,
 .block-editor__whiteboard-surface {
-  position: relative;
-  min-height: 22.5rem;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.82);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
-.block-whiteboard__surface .hub-blocksuite-whiteboard,
-.block-editor__whiteboard-surface .hub-blocksuite-whiteboard {
+.block-whiteboard__picture {
+  display: flex;
+  justify-content: center;
   width: 100%;
-  height: 100%;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fff;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.block-editor__whiteboard-surface .block-whiteboard__picture {
+  cursor: pointer;
+}
+
+.block-whiteboard__picture:hover {
+  border-color: var(--wave);
+}
+
+.block-whiteboard__picture:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.block-whiteboard__picture svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 80vh;
+}
+
+.block-whiteboard__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.block-whiteboard__action {
+  min-height: 44px;
+}
+
+.block-whiteboard__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
 }
 
 .block-editor__whiteboard-meta {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 8rem auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
 }
 
-.block-editor__whiteboard-title,
-.block-editor__whiteboard-height {
+.block-editor__whiteboard-title {
   min-width: 0;
 }
 
 .block-editor__whiteboard-status,
-.block-whiteboard__status {
+.block-whiteboard__status,
+.board-overlay__status {
   margin: 0;
   color: var(--muted);
   font-family: var(--font-ui);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 
 .block-editor__whiteboard-status--error,
-.block-whiteboard__status--error {
+.block-whiteboard__status--error,
+.board-overlay__status--error {
   color: var(--danger-hover);
+}
+
+.board-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.board-overlay__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.board-overlay__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-overlay__done {
+  min-height: 44px;
+}
+
+.board-overlay__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 720px) {
@@ -9752,9 +9838,8 @@ body.is-lesson-builder-full-page .hub-utilities {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .block-whiteboard__surface,
-  .block-editor__whiteboard-surface {
-    min-height: 26rem;
+  .board-overlay__bar {
+    padding: var(--space-2) var(--space-3);
   }
 }
 
@@ -9902,7 +9987,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-annotation__panel[hidden] {
@@ -9932,7 +10017,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0 var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -10008,7 +10093,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-4);
   padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--paper, #fff);
+  background: var(--paper);
   box-shadow: var(--elev-2, 0 -8px 24px rgba(0, 0, 0, 0.12));
 }
 
@@ -10090,7 +10175,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-editor__annotation-note-list[hidden] {
@@ -10118,7 +10203,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0 var(--space-2);
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -10164,7 +10249,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-editor__annotation-voice-panel[hidden] {
@@ -10208,7 +10293,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--line, #d7d2c8);
   border-radius: var(--radius-md, 10px);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-editor__annotation-voice-live[hidden],
@@ -10648,7 +10733,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   border: 1px solid var(--line);
   border-left: 3px solid var(--vc);
   border-radius: 10px;
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-annotation__voice-note-play {
@@ -10763,7 +10848,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .student-feedback {
@@ -10788,7 +10873,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-editor__annotation-stanza {
@@ -10836,7 +10921,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-editor__annotation-note[hidden] {
@@ -10898,7 +10983,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0 var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -11017,7 +11102,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0 0.25rem;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   line-height: 1;
@@ -11108,7 +11193,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0 var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -11146,7 +11231,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 /* Technique card: mirrors the Periodic Table of Literary Elements detail pane. */
@@ -11643,7 +11728,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0.35rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-editor__annotation-poem-btn {
@@ -11694,7 +11779,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-body);
   font-size: var(--text-base);
   line-height: 1.55;
@@ -11790,7 +11875,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-2) var(--space-2) var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
@@ -11944,7 +12029,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-editor__annotation-details > summary,
@@ -12004,7 +12089,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: var(--space-3, 0.75rem);
   padding-bottom: calc(var(--space-3, 0.75rem) + env(safe-area-inset-bottom, 0px));
   border-radius: var(--radius-md, 0.75rem) var(--radius-md, 0.75rem) 0 0;
-  background: var(--paper, #fff);
+  background: var(--paper);
   box-sizing: border-box;
 }
 
@@ -12111,7 +12196,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   border: 1px solid var(--line);
   border-left: 4px solid var(--thread-c);
   border-radius: var(--radius-sm, 0.35rem);
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   white-space: nowrap;
@@ -12195,7 +12280,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation__step-caption {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm, 0.35rem);
-  background: var(--paper, #fff);
+  background: var(--paper);
 }
 
 .block-annotation__focus-nav {
@@ -12292,7 +12377,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation__thread-chip-count {
   padding: 0.05rem 0.45rem;
   border-radius: 999px;
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-size: var(--text-xs);
   color: var(--muted);
 }
@@ -12329,7 +12414,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0 var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md, 0.5rem);
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -12424,7 +12509,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   cursor: pointer;
@@ -12646,7 +12731,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0 var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper, #fff);
+  background: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   text-align: left;
@@ -12903,7 +12988,7 @@ button.block-annotation__margin-note.is-collapsed:hover {
   padding: 0.375rem 0.5rem;
   border-left: 3px solid var(--ink-c);
   border-radius: 4px;
-  background: var(--paper, #fff);
+  background: var(--paper);
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
   color: var(--ink-base);
 }

@@ -2124,7 +2124,6 @@ export function renderWhiteboardBlock(
 
   const surface = document.createElement('div');
   surface.className = 'block-whiteboard__surface';
-  surface.style.height = `${block.content.height_px ?? 640}px`;
   root.append(surface);
 
   void mountHubWhiteboard(surface, block, {
