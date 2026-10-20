@@ -30,6 +30,7 @@ import { createEisenhowerView } from '../../../../../packages/problem-solver/ren
 import { createAfterActionReviewView } from '../../../../../packages/problem-solver/render/after-action-review';
 import { createDoubleLoopView } from '../../../../../packages/problem-solver/render/double-loop';
 import { createFeedbackMatrixView } from '../../../../../packages/problem-solver/render/feedback-matrix';
+import { createFiveCsView } from '../../../../../packages/problem-solver/render/five-cs';
 import { EMBLEM_SVG, toolEmblem } from '../../../../../packages/problem-solver/glyphs';
 import { FRAME_PIECES } from './decor';
 import { createRecordView } from '../../../../../packages/problem-solver/render/record';
@@ -82,7 +83,8 @@ const RENDERERS: Partial<Record<PsToolId, () => View>> = {
   eisenhower: () => createEisenhowerView(),
   after_action_review: () => createAfterActionReviewView(),
   double_loop: () => createDoubleLoopView(),
-  feedback_matrix: () => createFeedbackMatrixView()
+  feedback_matrix: () => createFeedbackMatrixView(),
+  five_cs: () => createFiveCsView()
 };
 
 const FRAME_QUESTIONS: Array<[keyof PsSession['frame'], string, keyof typeof FRAME_PIECES, string]> = [

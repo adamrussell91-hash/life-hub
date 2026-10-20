@@ -832,3 +832,24 @@ const fbmEdges = [
 SAMPLES.feedback_matrix = run('feedback_matrix', [...fbmItems, ...fbmThemes.filter((n) => n.id !== 'h7')], fbmEdges);
 SAMPLES['feedback_matrix:next'] = run('feedback_matrix', [...fbmItems, ...fbmThemes.map((n) => (n.id === 'h6' ? { ...n, state: 'contested', objection: 'Would a reserve list just move the lateness to Friday?' } : n))], [...fbmEdges, { id: 'e-h7', from: 'h7', to: 't1', kind: 'of' }]);
 SAMPLES.feedback_matrix_first = run('feedback_matrix', fbmItems.slice(0, 7));
+
+// 5 Cs documentation: a village library leaves a record of how it cleared its returns backlog.
+// Condense has three essentials, so its slice shows the latest and "+2". The name keeps an
+// abbreviation the coach objected to, so the Correspond slice is contested (the one contested node)
+// and every strict rule still passes. five_cs:next revises the name, so the marks and chip change.
+// five_cs_first has only the first two answers, so three slices wait as faint paper.
+const fiveCsNodes = [
+  node('k1', 'contextualise', 'So the next volunteer coordinator can see why the returns backlog built up and how it was cleared, without asking around.', 'Handover to the next lead'),
+  node('k2', 'categorise', 'Filed in the library committee folder under Volunteers, then Rota; every committee member can open it.', 'Committee folder, Volunteers'),
+  node('k3', 'condense:1', 'The backlog came from one weekly returns shift, on the busiest day.', 'One shift, busiest day'),
+  node('k4', 'condense:2', 'Two shorter shifts on Tuesday and Saturday cleared it in three weeks.', 'Two shorter shifts'),
+  node('k5', 'condense:3', 'A sign on the returns trolley says when it was last emptied.', 'Sign on the trolley'),
+  node('k6', 'correct', 'The first draft said the backlog began in spring; the issue log shows it began in late winter. Corrected by the coordinator in October.', 'Start date moved to winter'),
+  node('k7', 'correspond', 'Library returns LRB 20261020 v1 Final', 'Library returns LRB', { state: 'contested', objection: 'Would someone new know what LRB stands for?' })
+];
+SAMPLES.five_cs = run('five_cs', fiveCsNodes);
+SAMPLES['five_cs:next'] = run('five_cs', [
+  ...fiveCsNodes.slice(0, 6),
+  node('k7', 'correspond', 'Library returns backlog case file 20261020 v2 Final', 'Library returns backlog')
+]);
+SAMPLES.five_cs_first = run('five_cs', fiveCsNodes.slice(0, 2));
