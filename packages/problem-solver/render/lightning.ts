@@ -113,11 +113,11 @@ const ROUTES: Record<string, Omit<EdgeSpec, 'key' | 'from' | 'to' | 'spot' | 'la
   'solved_3>relax': { points: [[876, 203], [795, 203], ...TO_MIDDLE], mark: [850, 203] },
   'solved_3>take_break': { points: [[933, 183], [933, 118]], mark: [933, 151] },
   'take_break>solved_4': { points: [[845, 59], [742, 59]] },
-  'solved_4>relax': { points: [[724, 79], [724, 100], [795, 100], ...TO_MIDDLE], mark: [724, 100] },
+  'solved_4>relax': { points: [[724, 79], [724, 108], [795, 108], ...TO_MIDDLE], mark: [724, 108] },
   'solved_4>analogy': { points: [[647, 79], [647, 140]], mark: [647, 108] },
   'analogy>solved_5': { points: [[646, 206], [646, 236]] },
   'solved_5>relax': { points: [[703, 256], [795, 256], ...TO_MIDDLE], mark: [732, 256] },
-  'solved_5>reframing': { points: [[621, 276], [621, 290], [409, 290]], mark: [621, 290] },
+  'solved_5>reframing': { points: [[621, 276], [621, 290], [409, 290]], mark: [560, 290] },
   'reframing>goal': { points: [[259, 261], [186, 261]], mark: [222, 261] },
   'reframing>cannot': { points: [[334, 226], [334, 159]], mark: [334, 193] },
   'cannot>learn': { points: [[413, 121], [480, 121], ...TO_LEARN], thin: true },
@@ -169,7 +169,7 @@ function trimmed(points: Pt[]): Pt[] {
 
 type NodeState = 'ghost' | 'done' | 'current';
 type NodeEl = { place: Place; id: PsLightningNodeId; item: HTMLDivElement; shape: HTMLDivElement; state: NodeState; old: boolean; anim: Animation | null };
-type EdgeEl = { spec: EdgeSpec; g: SVGGElement; line: SVGPathElement; head: SVGPathElement; mark: HTMLSpanElement | null; inked: boolean; old: boolean; anims: Animation[] };
+type EdgeEl = { spec: EdgeSpec; g: SVGGElement; line: SVGPathElement; head: SVGPathElement; halo: SVGPathElement | null; mark: HTMLSpanElement | null; inked: boolean; old: boolean; anims: Animation[] };
 
 function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, className: string, text = ''): HTMLElementTagNameMap[K] {
   const out = doc.createElement(tag);
@@ -255,6 +255,7 @@ export function createLightningView(doc: Document = document, opts: LightningVie
   ask.hidden = true;
   const buttons: Record<LightningAnswer, HTMLButtonElement> = { yes: el(doc, 'button', 'ps-ltn__answer', 'Yes'), no: el(doc, 'button', 'ps-ltn__answer', 'No') };
   let asking: PsLightningNodeId | null = null;
+  let askedKey: string | null = null;
   for (const answer of ['yes', 'no'] as const) {
     const button = buttons[answer];
     button.type = 'button';
@@ -313,7 +314,9 @@ export function createLightningView(doc: Document = document, opts: LightningVie
     const line = svgEl(doc, 'path', { class: 'ps-ltn__line', d: lineD(trimmed(spec.points)), pathLength: '1' });
     const head = svgEl(doc, 'path', { class: 'ps-ltn__head', d: headD(spec.points) });
     g.append(line, head);
-    if (spec.thin) haloLayer.append(svgEl(doc, 'path', { class: 'ps-ltn__halo', d: lineD(trimmed(spec.points)) }));
+    // A closing arrow's halo shows only while that arrow is inked, so a faint one never cuts a gap.
+    const halo = spec.thin ? svgEl(doc, 'path', { class: 'ps-ltn__halo', d: lineD(trimmed(spec.points)) }) : null;
+    if (halo) haloLayer.append(halo);
     (spec.thin ? closeLayer : flowLayer).append(g);
     let mark: HTMLSpanElement | null = null;
     if (spec.label && spec.mark) {
@@ -324,7 +327,7 @@ export function createLightningView(doc: Document = document, opts: LightningVie
       mark.style.top = `${spec.mark[1]}px`;
       marks.append(mark);
     }
-    edges.set(edgeId(spec), { spec, g, line, head, mark, inked: false, old: false, anims: [] });
+    edges.set(edgeId(spec), { spec, g, line, head, halo, mark, inked: false, old: false, anims: [] });
   }
 
   // ---------------------------------------------------------------- update
@@ -376,6 +379,7 @@ export function createLightningView(doc: Document = document, opts: LightningVie
       const state = inked ? 'done' : 'ghost';
       setAttr(e.g, 'data-state', state);
       setAttr(e.g, 'data-inked', inked ? 'true' : null);
+      if (e.halo) setAttr(e.halo, 'data-inked', inked ? 'true' : null);
       setAttr(e.g, 'data-round', old ? 'old' : null);
       if (e.mark) {
         setAttr(e.mark, 'data-state', state);
@@ -404,9 +408,15 @@ export function createLightningView(doc: Document = document, opts: LightningVie
     const cur = currentEntry(state);
     const node = cur && isQuestion(cur.node) && opts.onAnswer ? cur.node : null;
     for (const e of edges.values()) if (e.mark) e.mark.hidden = Boolean(node) && e.spec.from === node;
-    for (const answer of ['yes', 'no'] as const) buttons[answer].removeAttribute('aria-disabled');
+    // An answer stays sent until the question moves on: a re-render of the same state keeps
+    // the buttons waiting, so one click can never answer twice.
+    const key = cur ? `${cur.node}|${cur.round}|${state.path.length}` : null;
+    if (key !== askedKey) for (const answer of ['yes', 'no'] as const) buttons[answer].removeAttribute('aria-disabled');
+    askedKey = key;
     asking = node;
     if (!node) {
+      // Focus on a button about to hide goes to the chart's scroller, not the page.
+      if (!ask.hidden && ask.contains(doc.activeElement)) scroller.focus({ preventScroll: true });
       ask.hidden = true;
       return;
     }
@@ -450,8 +460,8 @@ export function createLightningView(doc: Document = document, opts: LightningVie
   function reveal(place: Place, smooth: boolean): void {
     const box = LAYOUT[place as keyof typeof LAYOUT];
     const view = scroller.clientWidth;
-    if (!view || view >= stage.offsetWidth) return;
-    const left = Math.max(0, Math.min(box.x + box.w / 2 - view / 2, stage.offsetWidth - view));
+    if (!view || view >= width) return;
+    const left = Math.max(0, Math.min(box.x + box.w / 2 - view / 2, width - view));
     if (Math.abs(scroller.scrollLeft - left) < 1) return;
     if (typeof scroller.scrollTo === 'function') scroller.scrollTo({ left, behavior: smooth && !reducedMotion() ? 'smooth' : 'auto' });
     else scroller.scrollLeft = left;
