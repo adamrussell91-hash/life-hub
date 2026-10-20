@@ -113,4 +113,26 @@ describe('teacher media-api client', () => {
     expect(form.get('provider_file_id')).toBe('drive_9');
     expect(form.get('file')).toBeInstanceOf(File);
   });
+
+  it('uploadMediaFile sends files over the part size in parts with one upload id', async () => {
+    const uploaded: Media = { ...sampleMedia, id: 'media_big', provider: 'direct', media_type: 'other' };
+    fetchMock
+      .mockResolvedValueOnce(mockFetchJson({ ok: true, data: { upload_id: 'x', part_index: 0 } }, 202))
+      .mockResolvedValueOnce(mockFetchJson({ ok: true, data: { upload_id: 'x', part_index: 1 } }, 202))
+      .mockResolvedValueOnce(mockFetchJson({ ok: true, data: uploaded }, 201));
+
+    const { uploadMediaFile, UPLOAD_PART_BYTES } = await import('@/teacher/media-api');
+    const file = new File([new Uint8Array(UPLOAD_PART_BYTES * 2 + 10)], 'talk.webm', { type: 'audio/webm' });
+    const result = await uploadMediaFile(file, { title: 'Talk' });
+
+    expect(result).toEqual(uploaded);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const forms = fetchMock.mock.calls.map(([, init]) => init?.body as FormData);
+    expect(forms.map((form) => form.get('part_index'))).toEqual(['0', '1', '2']);
+    expect(new Set(forms.map((form) => form.get('upload_id'))).size).toBe(1);
+    expect(forms.every((form) => form.get('part_count') === '3')).toBe(true);
+    expect(forms.map((form) => (form.get('file') as File).size)).toEqual([UPLOAD_PART_BYTES, UPLOAD_PART_BYTES, 10]);
+    expect((forms[2]!.get('file') as File).type).toBe('audio/webm');
+  });
+
 });
