@@ -671,6 +671,29 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, { folders });
   }
 
+  // Mirrors netlify/functions/whiteboards.mjs so boards save in local dev.
+  function handleWhiteboard(
+    cookie: string | null | undefined,
+    method: string,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const key = `whiteboards/${id}`;
+    if (method === 'GET') {
+      const record = store.getJSON(key);
+      return record ? okResponse(200, record) : errorResponse(404, 'not_found', 'Whiteboard document not found.');
+    }
+    const snapshot = (body as { snapshot?: unknown } | null)?.snapshot;
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+      return errorResponse(400, 'validation_error', 'Whiteboard snapshot is required.');
+    }
+    const record = { id, snapshot, schema_version: 1, updated_at: nowIso() };
+    store.setJSON(key, record);
+    return okResponse(200, record);
+  }
+
   function handleAuth(body: unknown): MockResponse {
     const candidate = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
     const providedPassphrase = candidate.passphrase;
@@ -3968,6 +3991,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'POST' && path === '/api/media') return handlePostMedia(cookie, body);
     if ((method === 'GET' || method === 'PUT') && path === '/api/media-folders') {
       return handleMediaFolders(cookie, method, body);
+    }
+    const whiteboardMatch = /^\/api\/whiteboards\/([A-Za-z0-9_-]{1,160})$/.exec(path);
+    if (whiteboardMatch && (method === 'GET' || method === 'PUT')) {
+      return handleWhiteboard(cookie, method, whiteboardMatch[1]!, body);
     }
 
     const compositionMatch = COMPOSITION_ID_RE.exec(path);

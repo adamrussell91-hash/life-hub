@@ -1,14 +1,17 @@
 import { getApiBaseUrl } from '@/api/config';
 import type { Block } from '@/schemas/block';
 import {
-  mountBlockSuiteWhiteboard,
-  type BlockSuiteSnapshot,
-  type MountedWhiteboard
-} from '../../../../packages/whiteboard/blocksuite-adapter';
-import {
   loadWhiteboardDocument,
   saveWhiteboardDocument
 } from '../../../../packages/whiteboard/document-client';
+import {
+  hasDrawing,
+  openBoardOverlay,
+  renderBoardSvg,
+  toScene,
+  type BoardOverlay,
+  type BoardScene
+} from '@/blocks/excalidraw-board';
 
 export type WhiteboardBlock = Extract<Block, { block_type: 'whiteboard' }>;
 
@@ -17,24 +20,34 @@ type MountOptions = {
   published?: boolean;
   onBlockChange?: (block: WhiteboardBlock) => void;
   onStatus?: (message: string, isError?: boolean) => void;
+  /** The editor's title field can change after mount. */
+  getTitle?: () => string | undefined;
 };
 
-async function resolveDraftSnapshot(block: WhiteboardBlock): Promise<{
-  snapshot: BlockSuiteSnapshot | null;
+const SAVE_DELAY_MS = 600;
+
+// The lesson editor can rebuild a block while its board is open full screen,
+// so a closed board tells every mounted copy of the same document to redraw.
+const UPDATED_EVENT = 'hub-whiteboard:updated';
+type UpdatedDetail = { documentId: string; scene: BoardScene };
+
+async function resolveDraftScene(block: WhiteboardBlock): Promise<{
+  scene: BoardScene;
   seeded: boolean;
 }> {
   const baseUrl = getApiBaseUrl();
   const own = await loadWhiteboardDocument(baseUrl, block.content.document_id);
-  if (own) return { snapshot: own.snapshot, seeded: false };
+  if (own) return { scene: toScene(own.snapshot), seeded: false };
 
   const seedId = block.content.seed_document_id;
-  if (!seedId) return { snapshot: null, seeded: false };
+  if (!seedId) return { scene: toScene(null), seeded: false };
 
   const seed = await loadWhiteboardDocument(baseUrl, seedId);
-  if (!seed) return { snapshot: null, seeded: true };
+  if (!seed) return { scene: toScene(null), seeded: true };
 
-  await saveWhiteboardDocument(baseUrl, block.content.document_id, seed.snapshot);
-  return { snapshot: seed.snapshot, seeded: true };
+  const scene = toScene(seed.snapshot);
+  await saveWhiteboardDocument(baseUrl, block.content.document_id, scene);
+  return { scene, seeded: true };
 }
 
 function clearSeed(block: WhiteboardBlock, onBlockChange?: (block: WhiteboardBlock) => void): void {
@@ -43,14 +56,20 @@ function clearSeed(block: WhiteboardBlock, onBlockChange?: (block: WhiteboardBlo
   onBlockChange({ ...block, content });
 }
 
-function disposeWhenDetached(host: HTMLElement, handle: MountedWhiteboard): void {
-  if (typeof MutationObserver === 'undefined') return;
-  const observer = new MutationObserver(() => {
-    if (host.isConnected) return;
-    observer.disconnect();
-    handle.dispose();
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+function statusLine(text: string, isError = false): HTMLParagraphElement {
+  const line = document.createElement('p');
+  line.className = 'block-whiteboard__status';
+  if (isError) line.classList.add('block-whiteboard__status--error');
+  line.textContent = text;
+  return line;
+}
+
+function button(label: string, variant: 'primary' | 'secondary'): HTMLButtonElement {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = `btn btn--${variant} block-whiteboard__action`;
+  el.textContent = label;
+  return el;
 }
 
 export async function mountHubWhiteboard(
@@ -58,67 +77,144 @@ export async function mountHubWhiteboard(
   block: WhiteboardBlock,
   options: MountOptions
 ): Promise<void> {
-  host.replaceChildren();
-  const loading = document.createElement('p');
-  loading.className = 'block-whiteboard__status';
-  loading.textContent = 'Loading whiteboard…';
-  host.append(loading);
+  host.replaceChildren(statusLine('Loading whiteboard…'));
 
+  let scene: BoardScene;
   try {
-    let snapshot: BlockSuiteSnapshot | null = null;
-    let seeded = false;
-
     if (options.published) {
-      const value = block.content.published_snapshot;
-      snapshot =
-        value && typeof value === 'object' && !Array.isArray(value)
-          ? (value as BlockSuiteSnapshot)
-          : null;
+      scene = toScene(block.content.published_snapshot);
     } else {
-      const resolved = await resolveDraftSnapshot(block);
-      snapshot = resolved.snapshot;
-      seeded = resolved.seeded;
+      const resolved = await resolveDraftScene(block);
+      scene = resolved.scene;
+      if (resolved.seeded) clearSeed(block, options.onBlockChange);
     }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Whiteboard failed to load.';
+    host.replaceChildren(statusLine(message, true));
+    options.onStatus?.(message, true);
+    return;
+  }
 
-    if (options.published && !snapshot) {
-      loading.textContent = 'This whiteboard has no published content.';
+  const editable = !options.readOnly;
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let pending: BoardScene | null = null;
+  let saveChain = Promise.resolve();
+  let overlay: BoardOverlay | null = null;
+
+  const report = (message: string, isError = false) => {
+    overlay?.setStatus(message, isError);
+    options.onStatus?.(message, isError);
+  };
+
+  const flush = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    const next = pending;
+    pending = null;
+    if (!next) return saveChain;
+    report('Saving…');
+    saveChain = saveChain
+      .then(() => saveWhiteboardDocument(getApiBaseUrl(), block.content.document_id, next))
+      .then(() => report('Saved'))
+      .catch((error: unknown) => {
+        report(error instanceof Error ? error.message : 'Whiteboard save failed.', true);
+      });
+    return saveChain;
+  };
+
+  const queueSave = (next: BoardScene) => {
+    pending = next;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => void flush(), SAVE_DELAY_MS);
+    overlay?.setStatus('Unsaved changes');
+  };
+
+  const open = async () => {
+    if (overlay) return;
+    try {
+      overlay = await openBoardOverlay({
+        scene,
+        title: options.getTitle?.() ?? block.content.title,
+        editable,
+        onScene: editable ? queueSave : undefined,
+        onClose: (latest) => {
+          overlay = null;
+          if (!editable) return;
+          void flush();
+          document.dispatchEvent(
+            new CustomEvent<UpdatedDetail>(UPDATED_EVENT, {
+              detail: { documentId: block.content.document_id, scene: latest }
+            })
+          );
+        }
+      });
+    } catch (error) {
+      report(error instanceof Error ? error.message : 'Whiteboard failed to open.', true);
+    }
+  };
+
+  const paint = async () => {
+    const actions = document.createElement('div');
+    actions.className = 'block-whiteboard__actions';
+
+    if (!hasDrawing(scene)) {
+      if (!editable) {
+        host.replaceChildren(
+          statusLine(
+            options.published
+              ? 'This whiteboard has no published content.'
+              : 'Nothing on this board yet.'
+          )
+        );
+        return;
+      }
+      const empty = document.createElement('div');
+      empty.className = 'block-whiteboard__empty';
+      empty.append(statusLine('An empty board. Open it to draw, write and lay out ideas.'));
+      const start = button('Start drawing', 'primary');
+      start.addEventListener('click', () => void open());
+      actions.append(start);
+      empty.append(actions);
+      host.replaceChildren(empty);
       return;
     }
 
-    if (seeded) clearSeed(block, options.onBlockChange);
+    let picture: SVGSVGElement;
+    try {
+      picture = await renderBoardSvg(scene);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Whiteboard failed to draw.';
+      host.replaceChildren(statusLine(message, true));
+      return;
+    }
+    const title = options.getTitle?.() ?? block.content.title;
+    picture.setAttribute('aria-label', title?.trim() || 'Whiteboard drawing');
 
-    let saveChain = Promise.resolve();
-    const handle = await mountBlockSuiteWhiteboard(host, {
-      snapshot,
-      readOnly: options.readOnly,
-      onSnapshot: options.readOnly
-        ? undefined
-        : (nextSnapshot) => {
-            options.onStatus?.('Saving…');
-            saveChain = saveChain
-              .then(() =>
-                saveWhiteboardDocument(
-                  getApiBaseUrl(),
-                  block.content.document_id,
-                  nextSnapshot
-                )
-              )
-              .then(() => options.onStatus?.('Saved'))
-              .catch((error: unknown) => {
-                const message = error instanceof Error ? error.message : 'Whiteboard save failed.';
-                options.onStatus?.(message, true);
-              });
-            return saveChain.then(() => undefined);
-          }
-    });
-    disposeWhenDetached(host, handle);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Whiteboard failed to load.';
-    host.replaceChildren();
-    const unavailable = document.createElement('p');
-    unavailable.className = 'block-whiteboard__status block-whiteboard__status--error';
-    unavailable.textContent = message;
-    host.append(unavailable);
-    options.onStatus?.(message, true);
-  }
+    const frame = document.createElement('button');
+    frame.type = 'button';
+    frame.className = 'block-whiteboard__picture';
+    frame.setAttribute('aria-label', editable ? 'Edit whiteboard' : 'Open whiteboard full screen');
+    frame.append(picture);
+    frame.addEventListener('click', () => void open());
+
+    const action = button(editable ? 'Edit board' : 'Full screen', editable ? 'primary' : 'secondary');
+    action.addEventListener('click', () => void open());
+    actions.append(action);
+
+    host.replaceChildren(frame, actions);
+  };
+
+  const onUpdated = (event: Event) => {
+    if (!host.isConnected) {
+      document.removeEventListener(UPDATED_EVENT, onUpdated);
+      return;
+    }
+    const detail = (event as CustomEvent<UpdatedDetail>).detail;
+    if (detail.documentId !== block.content.document_id) return;
+    scene = detail.scene;
+    void paint();
+  };
+  document.addEventListener(UPDATED_EVENT, onUpdated);
+
+  await paint();
 }

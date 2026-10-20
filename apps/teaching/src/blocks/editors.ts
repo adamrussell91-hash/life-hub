@@ -2742,55 +2742,31 @@ export function createWhiteboardEditor(
   title.placeholder = 'Whiteboard title (optional)';
   title.setAttribute('aria-label', 'Whiteboard title');
 
-  const height = document.createElement('input');
-  height.type = 'number';
-  height.className = 'block-editor__whiteboard-height';
-  height.min = '360';
-  height.max = '1400';
-  height.step = '40';
-  height.value = String(block.content.height_px ?? 640);
-  height.setAttribute('aria-label', 'Whiteboard height in pixels');
-
   const status = document.createElement('span');
   status.className = 'block-editor__whiteboard-status';
   status.setAttribute('role', 'status');
 
   const surface = document.createElement('div');
   surface.className = 'block-editor__whiteboard-surface';
-  surface.style.height = `${block.content.height_px ?? 640}px`;
 
-  const emitMetadata = () => {
+  title.addEventListener('input', () => {
     const latest = getLatest();
-    const nextHeight = Math.max(360, Math.min(1400, Number(height.value) || 640));
-    surface.style.height = `${nextHeight}px`;
     onChange({
       ...latest,
-      content: {
-        ...latest.content,
-        title: title.value.trim() || undefined,
-        height_px: nextHeight
-      }
+      content: { ...latest.content, title: title.value.trim() || undefined }
     });
-  };
+  });
 
-  title.addEventListener('input', emitMetadata);
-  height.addEventListener('change', emitMetadata);
-
-  meta.append(title, height, status);
+  meta.append(title, status);
   fields.append(meta, surface);
 
-  void mountHubWhiteboard(surface, block, {
+  void mountHubWhiteboard(surface, getLatest(), {
     readOnly: false,
-    onBlockChange: (next) => {
+    getTitle: () => getLatest().content.title,
+    onBlockChange: () => {
       const latest = getLatest();
       const { seed_document_id: _seed, ...content } = latest.content;
-      onChange({
-        ...latest,
-        content: {
-          ...content,
-          document_id: next.content.document_id
-        }
-      });
+      onChange({ ...latest, content });
     },
     onStatus: (message, isError = false) => {
       status.textContent = message;
