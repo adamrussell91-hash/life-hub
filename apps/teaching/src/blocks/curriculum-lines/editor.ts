@@ -9,7 +9,7 @@ import {
 } from '@/schemas/block';
 import type { UnitNetworkContext } from '@/blocks/render';
 import { lineColour } from '@/network/colour';
-import { drawNetwork, networkLegend } from '@/network/draw';
+import { drawNetwork, measureStations, networkLegend } from '@/network/draw';
 import { chooseNetworkOrientation, layoutNetwork, liveNudges } from '@/network/layout';
 import { el, ghostButton, mountLinesEditor, networkId, selectOf, textInput } from '@/network/lines-editor';
 import { LEVEL_ORDER, MODE_LABEL, convertV1, orderLines, type NetLesson } from '@/network/model';
@@ -50,7 +50,7 @@ function section(heading: string, hint?: string): HTMLElement {
  * Unit map editor. Lines belong to the subject and stops to each lesson, so
  * this edits them where they live (through the context's save functions); the
  * block itself keeps light-rail stops, gates, nudges and the terminus. Drag a
- * stop or gate on the preview to nudge it.
+ * station, stop or gate on the preview to nudge it.
  */
 export function createCurriculumLinesEditor(
   block: CurriculumLinesBlock,
@@ -80,14 +80,16 @@ export function createCurriculumLinesEditor(
   function paintPreview(): void {
     const input = unitNetworkInput(current, { network: network() });
     const width = Math.max(320, Math.floor(root.getBoundingClientRect().width) || 900);
-    const orientation = chooseNetworkOrientation(width, input);
+    const measure = measureStations(input);
+    const orientation = chooseNetworkOrientation(width, input, { measure });
     const editable = isCurriculumLinesV2(current.content);
-    const svg = drawNetwork(layoutNetwork(input, orientation), {
+    const svg = drawNetwork(layoutNetwork(input, orientation, { width, measure }), {
       label: 'Unit curriculum map preview',
       ...(editable ? {
+        nudgeRows: true,
         onNudge: (key: string, across: number, along: number) => {
           const was = v2().nudges[key] ?? { dx: 0, dy: 0 };
-          const ids = [...v2().rail_stops.map((s) => s.id), ...v2().gates.map((g) => g.id)];
+          const ids = [...v2().rail_stops.map((s) => s.id), ...v2().gates.map((g) => g.id), ...input.rows.map((r) => r.id)];
           commit({ nudges: liveNudges({ ...v2().nudges, [key]: { dx: was.dx + across, dy: was.dy + along } }, ids) }, false);
         }
       } : {})
@@ -96,7 +98,7 @@ export function createCurriculumLinesEditor(
     frame.append(svg);
     const tools = el('div', 'cl-editor__row');
     if (editable) {
-      tools.append(el('span', 'cl-editor__hint', 'Drag a stop or gate on the map to tidy it.'));
+      tools.append(el('span', 'cl-editor__hint', 'Drag a station, stop or gate on the map to tidy it.'));
       const reset = ghostButton('Reset positions', () => commit({ nudges: {} }, false));
       reset.disabled = !Object.keys(v2().nudges).length;
       tools.append(reset);

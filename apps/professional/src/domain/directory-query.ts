@@ -33,6 +33,8 @@ export interface DirectoryQueryState {
   orgScope: OrgScopeFilter;
   warmth: WarmthFilter;
   hasOpen: boolean;
+  /** Archived people are hidden unless this is on. */
+  showArchived: boolean;
   q: string;
 }
 
@@ -74,6 +76,7 @@ export function defaultDirectoryQuery(): DirectoryQueryState {
     orgScope: 'all',
     warmth: 'all',
     hasOpen: false,
+    showArchived: false,
     q: ''
   };
 }
@@ -100,6 +103,7 @@ export function parseDirectoryQuery(search: string): DirectoryQueryState {
         ? warmthRaw
         : 'all',
     hasOpen: params.get('open') === '1',
+    showArchived: params.get('archived') === '1',
     q: params.get('q') ?? ''
   };
 }
@@ -114,6 +118,7 @@ export function serializeDirectoryQuery(state: DirectoryQueryState): string {
   if (state.orgScope !== 'all') params.set('orgScope', state.orgScope);
   if (state.warmth !== 'all') params.set('warmth', state.warmth);
   if (state.hasOpen) params.set('open', '1');
+  if (state.showArchived) params.set('archived', '1');
   if (state.q.trim()) params.set('q', state.q.trim());
   const s = params.toString();
   return s ? `?${s}` : '';
@@ -125,5 +130,6 @@ export function activeFilterCount(state: DirectoryQueryState): number {
   if (state.org || state.orgScope !== 'all') n += 1;
   if (state.warmth !== 'all') n += 1;
   if (state.hasOpen) n += 1;
+  if (state.showArchived) n += 1;
   return n;
 }

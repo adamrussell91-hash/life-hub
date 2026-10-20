@@ -98,7 +98,7 @@ describe('Network layout', () => {
     }
   });
 
-  it('nests two trains that skip the same station: the left train takes the outer lane', () => {
+  it('bends trains that skip a station round its nearer side; on the phone map they nest, left train outside', () => {
     const lessons: NetLesson[] = [
       { id: 'a', title: 'A', line_stops: [{ line_id: 'understand' }, { line_id: 'respond' }] },
       { id: 'b', title: 'B', line_stops: [{ line_id: 'represent' }] },
@@ -107,9 +107,15 @@ describe('Network layout', () => {
     const L = layoutNetwork(input({}, lessons), 'vertical');
     const pill = L.pills[1]!;
     const mid = pill.y + pill.h / 2;
-    const detourOf = (id: string) => Math.min(...L.paths.find((p) => p.lineId === id)!.points.filter((p) => Math.abs(p.y - mid) < pill.h).map((p) => p.x));
-    expect(detourOf('understand')).toBeLessThan(detourOf('respond'));
-    expect(detourOf('respond')).toBeLessThan(pill.x);
+    const near = (id: string) => L.paths.find((p) => p.lineId === id)!.points.filter((p) => Math.abs(p.y - mid) < pill.h).map((p) => p.x);
+    expect(Math.min(...near('understand'))).toBeLessThan(pill.x);
+    expect(Math.max(...near('respond'))).toBeGreaterThan(pill.x + pill.w);
+    const H = layoutNetwork(input({}, lessons), 'horizontal');
+    const hp = H.pills[1]!;
+    const hmid = hp.x + hp.w / 2;
+    const top = (id: string) => Math.min(...H.paths.find((p) => p.lineId === id)!.points.filter((p) => Math.abs(p.x - hmid) < hp.w).map((p) => p.y));
+    expect(top('understand')).toBeLessThan(top('respond'));
+    expect(top('respond')).toBeLessThan(hp.y);
   });
 
   it('joins light rail at the station edge and hangs extension spurs and support loops off it', () => {
@@ -123,7 +129,7 @@ describe('Network layout', () => {
     const main = L.paths.find((p) => p.lineId === 'analytic' && p.style === 'main')!;
     const pill = L.pills[1]!;
     // Touches lesson 2's pill edge.
-    expect(main.points.some((p) => Math.abs(p.x - (pill.x + pill.w - 4)) < 1)).toBe(true);
+    expect(main.points.some((p) => Math.abs(p.x - (pill.x + pill.w)) < 1)).toBe(true);
     const spur = L.paths.find((p) => p.style === 'spur')!;
     const loop = L.paths.find((p) => p.style === 'loop')!;
     const dot = (id: string) => L.dots.find((d) => d.id === id)!;
@@ -174,6 +180,68 @@ describe('Network layout', () => {
   it('turns metro and train stops in the gap into plain stops; only light rail branches', () => {
     const net = input({ rail_stops: [{ id: 'r1', line_id: 'represent', after_lesson_id: 'l1', kind: 'support', label: 'x' }] });
     expect(net.railStops[0]!.kind).toBe('stop');
+  });
+
+  it('puts each lesson name inside its station, in both orientations', () => {
+    for (const o of ['vertical', 'horizontal'] as const) {
+      const L = layoutNetwork(input(), o);
+      for (const pill of L.pills) {
+        expect(pill.label.text).toBe(LESSONS.find((l) => l.id === pill.rowId)!.title);
+        expect(pill.label.x).toBeGreaterThan(pill.x);
+        expect(pill.label.x).toBeLessThan(pill.x + pill.w);
+        expect(pill.label.y).toBeGreaterThan(pill.y);
+        expect(pill.label.y).toBeLessThan(pill.y + pill.h);
+        expect(pill.label.maxW).toBeLessThan(o === 'vertical' ? pill.w : pill.w);
+      }
+    }
+  });
+
+  it('sizes a vertical station to its longest name, not the room, and centres the map', () => {
+    const narrow = layoutNetwork(input(), 'vertical');
+    const wide = layoutNetwork(input(), 'vertical', { width: 1400 });
+    expect(wide.pills[0]!.w).toBe(narrow.pills[0]!.w);
+    expect(narrow.pills[0]!.w).toBeLessThan(260);
+    expect(wide.width).toBeLessThanOrEqual(1400);
+    expect(wide.pills[0]!.x).toBeGreaterThan(narrow.pills[0]!.x);
+  });
+
+  it('centres the name in a vertical station with its stop markers either side, on the centre line', () => {
+    const L = layoutNetwork(input(), 'vertical');
+    for (const pill of L.pills) {
+      const mid = pill.x + pill.w / 2;
+      expect(pill.label.x).toBeCloseTo(mid);
+      expect(pill.label.y - 4.5).toBeCloseTo(pill.y + pill.h / 2);
+      for (const m of pill.markers) {
+        expect(m.y).toBeCloseTo(pill.y + pill.h / 2);
+        expect(Math.abs(m.x - mid)).toBeGreaterThan(pill.label.maxW / 2);
+      }
+    }
+  });
+
+  it('wraps a name too long for the widest station onto two lines', () => {
+    const long = [{ ...LESSONS[0]!, title: 'A very long lesson name about harbours, lighthouses, salt and the stone of the sea wall' }, ...LESSONS.slice(1)];
+    const L = layoutNetwork(input({}, long), 'vertical');
+    expect(L.pills[0]!.label.maxW).toBeLessThanOrEqual(282);
+    expect(L.pills[0]!.label.wrap).toBe(true);
+    expect(L.pills[1]!.label.wrap).toBe(false);
+  });
+
+  it('marks a light rail stop where it joins the station', () => {
+    const L = layoutNetwork(input(), 'vertical');
+    const rail = L.pills[1]!.markers.find((m) => m.lineId === 'analytic')!;
+    expect(rail).toBeDefined();
+    expect(rail.x === L.pills[1]!.x || rail.x === L.pills[1]!.x + L.pills[1]!.w).toBe(true);
+    expect(L.paths.find((p) => p.lineId === 'analytic' && p.style === 'main')!.points.some((p) => p.x === rail.x)).toBe(true);
+    expect(L.pills[0]!.markers.some((m) => m.lineId === 'analytic')).toBe(false);
+  });
+
+  it('lets a lesson station be dragged; its lines bend to follow', () => {
+    const plain = layoutNetwork(input(), 'vertical');
+    const moved = layoutNetwork(input({ nudges: { l2: { dx: 30, dy: 12 } } }), 'vertical');
+    expect(moved.pills[1]!.x - plain.pills[1]!.x).toBe(30);
+    expect(moved.pills[1]!.y - plain.pills[1]!.y).toBe(12);
+    const respond = moved.pills[1]!.markers.find((m) => m.lineId === 'respond')!;
+    expect(moved.paths.find((p) => p.lineId === 'respond')!.points.some((p) => p.x === respond.x && p.y === respond.y)).toBe(true);
   });
 
   it('is wider than a phone when vertical, so phones get the horizontal map', () => {

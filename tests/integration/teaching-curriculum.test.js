@@ -633,6 +633,57 @@ test('media upload writes a public file behind the Life session', async () => {
   assert.ok(await store.get(`media_files/${media.id}`));
 });
 
+function partRequest(bytes, index, count, uploadId = 'up_test1234') {
+  const form = new FormData();
+  form.set('file', new File([bytes], 'talk.webm', { type: 'audio/webm' }));
+  form.set('title', 'Talk');
+  form.set('upload_id', uploadId);
+  form.set('part_index', String(index));
+  form.set('part_count', String(count));
+  return new Request('https://api.adam-russell.com/api/media/upload', {
+    method: 'POST',
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      origin: 'https://teaching-hub.adam-russell.com'
+    },
+    body: form
+  });
+}
+
+test('media upload joins a file sent in parts and clears the parts', async () => {
+  const store = memoryStore();
+  const handler = createMediaUploadHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+  const parts = [Uint8Array.from([1, 2, 3]), Uint8Array.from([4, 5]), Uint8Array.from([6])];
+  let last;
+  for (const [index, bytes] of parts.entries()) {
+    last = await handler(partRequest(bytes, index, parts.length));
+    assert.equal(last.status, index < parts.length - 1 ? 202 : 201);
+  }
+  const media = (await last.json()).data;
+  assert.equal(media.mime_type, 'audio/webm');
+  assert.equal(media.title, 'Talk');
+  const stored = await store.get(`media_files/${media.id}`);
+  assert.deepEqual(Array.from(new Uint8Array(stored)), [1, 2, 3, 4, 5, 6]);
+  assert.equal(await store.get('media_parts/up_test1234/0'), null);
+});
+
+test('media upload refuses a last part whose earlier parts never arrived', async () => {
+  const store = memoryStore();
+  const handler = createMediaUploadHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+  const response = await handler(partRequest(Uint8Array.from([6]), 1, 2, 'up_missing1'));
+  assert.equal(response.status, 400);
+  const bad = await handler(partRequest(Uint8Array.from([6]), 0, 2, 'bad id'));
+  assert.equal(bad.status, 400);
+});
+
 test('media item route forwards the reserved upload path', async () => {
   const store = memoryStore();
   const deps = {

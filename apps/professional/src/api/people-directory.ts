@@ -37,6 +37,8 @@ export interface DirectoryPersonRow {
   they_owe_count: number;
   pending_proposal_count?: number;
   next_label: string | null;
+  /** `active` unless archived; archived rows are hidden by default. */
+  lifecycle_status?: string;
   created_at: string;
   updated_at: string;
 }

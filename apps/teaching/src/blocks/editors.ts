@@ -75,6 +75,13 @@ import {
   mountMediaLibraryPicker,
   resolveMediaLibraryUrl
 } from '@/teacher/media-library-picker';
+import { createAudioRecordButton } from '@/blocks/audio-record-button';
+import {
+  AUDIO_ACCEPT,
+  createUploadButton,
+  rememberUploadedMedia,
+  withSessionUploads
+} from '@/blocks/upload-button';
 
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
 
@@ -163,6 +170,7 @@ function createDrivePickButton(options: {
         if (!resolved) {
           throw new Error('Uploaded file has no usable URL.');
         }
+        rememberUploadedMedia(media);
         options.onPicked(resolved, pick.title);
       } catch (error) {
         options.onError?.(driveErrorMessage(error));
@@ -172,6 +180,37 @@ function createDrivePickButton(options: {
     })();
   });
   return driveBtn;
+}
+
+/**
+ * Where a media block's file comes from. Upload from computer leads (it is the
+ * reliable path); library and Drive sit beside it; the URL field comes after.
+ */
+function mediaSourceRow(upload: HTMLElement, ...secondary: HTMLElement[]): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'block-editor__media-actions';
+  row.append(upload, ...secondary);
+  return row;
+}
+
+/** Compact upload for an image URL field inside a list item (gallery, timeline, cards). */
+function itemImageUpload(
+  urlField: HTMLInputElement | HTMLTextAreaElement,
+  label: string,
+  onUploaded: (url: string, media: Media) => void
+): HTMLElement {
+  const upload = createUploadButton({
+    accept: 'image/*',
+    noun: 'an image',
+    label: 'Upload image',
+    compact: true,
+    onUploaded: (url, media) => {
+      urlField.value = url;
+      onUploaded(url, media);
+    }
+  });
+  upload.button.setAttribute('aria-label', label);
+  return upload.el;
 }
 
 function createMediaSizeSelect(
@@ -519,7 +558,7 @@ export function createImageEditor(
     libraryHost.hidden = !libraryHost.hidden;
     if (!libraryHost.hidden) {
       mountMediaLibraryPicker(libraryHost, {
-        media: context.media ?? [],
+        media: withSessionUploads(context.media ?? []),
         mediaTypes: ['image'],
         emptyMessage: 'No images in library',
         onPick: (media) => {
@@ -549,11 +588,33 @@ export function createImageEditor(
     }
   });
 
+  const upload = createUploadButton({
+    accept: 'image/*',
+    noun: 'an image',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl) => {
+      url.value = uploadedUrl;
+      driveHint.hidden = true;
+      libraryHost.hidden = true;
+      emitChange();
+      // A file name is not a description; ask for real alt text instead.
+      if (!alt.value.trim()) alt.focus();
+    }
+  });
+
   url.addEventListener('input', emitChange);
   alt.addEventListener('input', emitChange);
   caption.addEventListener('input', emitChange);
 
-  fields.append(url, alt, caption, sizeSelect, libraryBtn, driveBtn, driveHint, libraryHost);
+  fields.append(
+    mediaSourceRow(upload.el, libraryBtn, driveBtn),
+    driveHint,
+    libraryHost,
+    url,
+    alt,
+    caption,
+    sizeSelect
+  );
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -717,7 +778,22 @@ export function createEmbedEditor(
     }
   });
 
-  fields.append(url, title, provider, driveBtn, hint);
+  // Uploaded files live at /api/media/<id>/file, which has no .pdf extension
+  // to detect, so the provider is set here. The renderer shows these inline.
+  const upload = createUploadButton({
+    accept: 'application/pdf,.pdf',
+    noun: 'a PDF',
+    label: 'Upload PDF',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl, media) => {
+      url.value = uploadedUrl;
+      if (!title.value.trim()) title.value = media.title;
+      provider.value = 'pdf';
+      emitChange(undefined);
+    }
+  });
+
+  fields.append(mediaSourceRow(upload.el, driveBtn), url, title, provider, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1030,10 +1106,33 @@ export function createAudioEditor(
     });
   };
 
+  let lastUploadedUrl = '';
+  const upload = createUploadButton({
+    accept: AUDIO_ACCEPT,
+    noun: 'an audio file',
+    label: 'Upload audio',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl, media) => {
+      lastUploadedUrl = uploadedUrl;
+      url.value = uploadedUrl;
+      if (!title.value.trim()) title.value = media.title.replace(/\.(webm|m4a|ogg)$/, '');
+      emitChange();
+    }
+  });
+
+  const record = createAudioRecordButton({
+    upload: (file) => {
+      lastUploadedUrl = '';
+      return upload.uploadFiles([file]);
+    },
+    uploaded: () => Boolean(lastUploadedUrl),
+    fileTitle: () => title.value
+  });
+
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(url, title);
+  fields.append(mediaSourceRow(upload.el, record.el), url, title);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1091,7 +1190,7 @@ export function createAttachmentEditor(
     libraryHost.hidden = !libraryHost.hidden;
     if (!libraryHost.hidden) {
       mountMediaLibraryPicker(libraryHost, {
-        media: context.media ?? [],
+        media: withSessionUploads(context.media ?? []),
         emptyMessage: 'No media in library',
         onPick: (media) => {
           const resolved = resolveMediaLibraryUrl(media);
@@ -1128,11 +1227,31 @@ export function createAttachmentEditor(
     }
   });
 
+  const upload = createUploadButton({
+    noun: 'a file',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl, media) => {
+      url.value = uploadedUrl;
+      if (!title.value.trim()) title.value = media.title;
+      if (!filename.value.trim()) filename.value = media.file_name ?? media.title;
+      driveHint.hidden = true;
+      libraryHost.hidden = true;
+      emitChange();
+    }
+  });
+
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
   filename.addEventListener('input', emitChange);
 
-  fields.append(url, title, filename, libraryBtn, driveBtn, driveHint, libraryHost);
+  fields.append(
+    mediaSourceRow(upload.el, libraryBtn, driveBtn),
+    driveHint,
+    libraryHost,
+    url,
+    title,
+    filename
+  );
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1600,8 +1719,10 @@ export function createGalleryEditor(
       },
       renderItem: (entry, ctx) => {
         const n = ctx.index + 1;
+        const urlField = editorField('block-editor__gallery-url', entry.url, 'Image link (https://…)', `Gallery image ${n} URL`, (value) => ctx.update({ ...ctx.current, url: value }), 'url');
         return fragmentOf(
-          editorField('block-editor__gallery-url', entry.url, 'Image link (https://…)', `Gallery image ${n} URL`, (value) => ctx.update({ ...ctx.current, url: value }), 'url'),
+          itemImageUpload(urlField, `Upload gallery image ${n}`, (url) => ctx.update({ ...ctx.current, url })),
+          urlField,
           fieldPair(
             editorField('block-editor__gallery-alt', entry.alt_text, 'Alt text (required to publish)', `Gallery image ${n} alt text`, (value) => ctx.update({ ...ctx.current, alt_text: value })),
             editorField('block-editor__gallery-caption', entry.caption ?? '', 'Caption (optional)', `Gallery image ${n} caption`, (value) => ctx.update({ ...ctx.current, caption: value || undefined }))
@@ -1636,8 +1757,30 @@ export function createGalleryEditor(
   settings.className = 'block-editor__inline-settings';
   settings.append(layoutSelect.el, sizeSelect.el);
 
+  // Several images at once: fill empty slots first, then add new ones up to the cap.
+  const upload = createUploadButton({
+    accept: 'image/*',
+    multiple: true,
+    noun: 'an image',
+    label: 'Upload images',
+    dropTarget: fields,
+    onUploaded: (url) => {
+      const emptyIndex = items.findIndex((entry) => !entry.url.trim());
+      const max = layout === 'comparison' ? 2 : 12;
+      if (emptyIndex >= 0) {
+        items = items.map((entry, index) => (index === emptyIndex ? { ...entry, url } : entry));
+      } else if (items.length < max) {
+        items = [...items, { ...emptyItem(), url }];
+      } else {
+        return;
+      }
+      emitChange();
+      renderList();
+    }
+  });
+
   renderList();
-  fields.append(settings, listHost);
+  fields.append(mediaSourceRow(upload.el), settings, listHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1702,14 +1845,16 @@ export function createTimelineEditor(
     renderItem: (event, ctx) => {
       const n = ctx.index + 1;
       const patch = (partial: Partial<TimelineEventDraft>) => ctx.update({ ...ctx.current, ...partial });
+      const imageUrlField = editorField('block-editor__timeline-image-url', event.image_url ?? '', 'Image link (optional)', `Timeline event ${n} image URL`, (value) => patch({ image_url: value }), 'url');
       return fragmentOf(
         fieldPair(
           editorField('block-editor__timeline-when', event.when, 'When', `Timeline event ${n} when`, (value) => patch({ when: value })),
           editorField('block-editor__timeline-label', event.label, 'Label', `Timeline event ${n} label`, (value) => patch({ label: value }))
         ),
         editorField('block-editor__timeline-description', event.description, 'What happened', `Timeline event ${n} description`, (value) => patch({ description: value }), 'textarea'),
+        itemImageUpload(imageUrlField, `Upload timeline event ${n} image`, (url) => patch({ image_url: url })),
         fieldPair(
-          editorField('block-editor__timeline-image-url', event.image_url ?? '', 'Image link (optional)', `Timeline event ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          imageUrlField,
           editorField('block-editor__timeline-image-alt', event.image_alt ?? '', 'Image alt (required if image set)', `Timeline event ${n} image alt`, (value) => patch({ image_alt: value }))
         ),
         fieldPair(
@@ -1813,6 +1958,7 @@ export function createCardStackEditor(
     renderItem: (card, ctx) => {
       const n = ctx.index + 1;
       const patch = (partial: Partial<CardStackDraft>) => ctx.update({ ...ctx.current, ...partial });
+      const imageUrlField = editorField('block-editor__card-stack-image-url', card.image_url ?? '', 'Image link (optional)', `Card ${n} image URL`, (value) => patch({ image_url: value }), 'url');
       const tint = createChoice({
         key: 'Tint',
         value: card.tint,
@@ -1833,8 +1979,9 @@ export function createCardStackEditor(
           editorField('block-editor__card-stack-card-title', card.title, 'Title', `Card ${n} title`, (value) => patch({ title: value }))
         ),
         editorField('block-editor__card-stack-description', card.description, 'Description', `Card ${n} description`, (value) => patch({ description: value }), 'textarea'),
+        itemImageUpload(imageUrlField, `Upload card ${n} image`, (url) => patch({ image_url: url })),
         fieldPair(
-          editorField('block-editor__card-stack-image-url', card.image_url ?? '', 'Image link (optional)', `Card ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          imageUrlField,
           editorField('block-editor__card-stack-image-alt', card.image_alt ?? '', 'Image alt (required if image set)', `Card ${n} image alt`, (value) => patch({ image_alt: value }))
         ),
         settings
@@ -1914,13 +2061,15 @@ export function createFlashcardsEditor(
     renderItem: (card, ctx) => {
       const n = ctx.index + 1;
       const patch = (partial: Partial<FlashcardDraft>) => ctx.update({ ...ctx.current, ...partial });
+      const imageUrlField = editorField('block-editor__flashcards-image-url', card.image_url ?? '', 'Image link (optional)', `Flashcard ${n} image URL`, (value) => patch({ image_url: value }), 'url');
       const nodes: Node[] = [
         fieldPair(
           editorField('block-editor__flashcards-front', card.front, 'Front', `Flashcard ${n} front`, (value) => patch({ front: value })),
           editorField('block-editor__flashcards-back', card.back, 'Back', `Flashcard ${n} back`, (value) => patch({ back: value }))
         ),
+        itemImageUpload(imageUrlField, `Upload flashcard ${n} image`, (url) => patch({ image_url: url })),
         fieldPair(
-          editorField('block-editor__flashcards-image-url', card.image_url ?? '', 'Image link (optional)', `Flashcard ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          imageUrlField,
           editorField('block-editor__flashcards-image-alt', card.image_alt ?? '', 'Image alt (required if image set)', `Flashcard ${n} image alt`, (value) => patch({ image_alt: value }))
         )
       ];
@@ -2476,8 +2625,27 @@ export function createDiagramEditor(
     }
   };
 
+  const upload = createUploadButton({
+    accept: 'image/*',
+    noun: 'an image',
+    label: 'Upload image',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl) => {
+      if (source !== 'image') {
+        source = 'image';
+        sourceSelect.value = 'image';
+        renderSourceFields();
+      }
+      imageUrl.value = uploadedUrl;
+      emitChange();
+      if (!imageAlt.value.trim()) imageAlt.focus();
+    }
+  });
+  const uploadRow = mediaSourceRow(upload.el);
+
   const renderSourceFields = () => {
     const isImage = source === 'image';
+    uploadRow.hidden = !isImage;
     imageUrl.hidden = !isImage;
     imageAlt.hidden = !isImage;
     svgMarkup.hidden = isImage;
@@ -2509,7 +2677,7 @@ export function createDiagramEditor(
 
   renderSourceFields();
   updatePreview();
-  fields.append(sourceSelect, imageUrl, imageAlt, svgMarkup, caption, preview);
+  fields.append(sourceSelect, uploadRow, imageUrl, imageAlt, svgMarkup, caption, preview);
   return editorShell(block, onChange, fields, getLatest);
 }
 
