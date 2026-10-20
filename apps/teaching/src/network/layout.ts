@@ -81,18 +81,23 @@ export const NET_G = {
   trunkStep: 40,
   trunkStepMax: 120,
   trunkPad: 18,
-  stationPad: 34,
-  /** Vertical stations are cards this wide (more when the container has room). */
-  stationMin: 260,
-  stationMax: 560,
+  /**
+   * Vertical stations are capsules: stop markers either side of the name, all
+   * on the centre line, and only as wide as the longest name needs.
+   */
+  colInset: 24,
+  colStep: 22,
+  nameGap: 14,
+  namePad: 20,
+  nameMax: 280,
+  stationInset: 10,
+  nameLine: 15,
   detourGap: 12,
   detourStep: 14,
   lrGap: 30,
   lrStep: 30,
   pillHalf: 14,
   unitPillHalf: 18,
-  /** Vertical: the name band above the stop markers, inside the station. */
-  nameBandV: 22,
   /** Horizontal: stations are this wide along, with the name band below the lines. */
   pillHalfH: 56,
   unitPillHalfH: 64,
@@ -159,18 +164,20 @@ type Entry =
   | { type: 'stop'; stop: NetRailStop; size: number; a: number }
   | { type: 'gate'; gate: NetGate; size: number; a: number };
 
-/** The width a vertical map needs; narrower containers get the horizontal map. */
-export function verticalWidth(input: NetInput): number {
-  return layoutNetwork(input, 'vertical').width;
-}
-
 export type LayoutOptions = {
-  /** The room the map has. A vertical map spreads its lines and widens its stations to use it. */
+  /** The room the map has. A vertical map sits centred in it. */
   width?: number;
+  /** Station name width in px; the drawing measures with its own font. */
+  measure?: (text: string) => number;
 };
 
-export function chooseNetworkOrientation(width: number, input: NetInput): Orientation {
-  return width >= verticalWidth(input) ? 'vertical' : 'horizontal';
+/** The width a vertical map needs; narrower containers get the horizontal map. */
+export function verticalWidth(input: NetInput, options: LayoutOptions = {}): number {
+  return layoutNetwork(input, 'vertical', { measure: options.measure }).width;
+}
+
+export function chooseNetworkOrientation(width: number, input: NetInput, options: LayoutOptions = {}): Orientation {
+  return width >= verticalWidth(input, options) ? 'vertical' : 'horizontal';
 }
 
 /** Zigzag offsets for the year network's trunk: 0, +1, +1, 0, -1, -1, … */
@@ -193,8 +200,8 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
    * Across: [left light rail][left detours][corridor][right detours][right light rail].
    * Station names sit inside the stations, so there is no title gutter: only
    * room for week labels and the left light rail's stop labels. A vertical
-   * station is a wide card: trains take its outer columns (metro the middle)
-   * and bend round the nearer side, so a wide card costs no extra height.
+   * station is a capsule just wide enough for its name, trunk stop markers
+   * either side of it on the centre line; trains bend round the nearer side.
    */
   const zig = unit ? G.zig : 0;
   const railSide = new Map<string, { side: 1 | -1; k: number }>();
@@ -215,12 +222,19 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
     + detourRoom(leftTrains.length) + detourRoom(rightTrains.length)
     + nameBand + (nr ? G.lrGap + (nr - 1) * G.lrStep : 0) + sideRoom;
   const minCorridor = 2 * G.trunkPad + Math.max(0, trunk.length - 1) * G.trunkStep;
-  const room = options.width ? options.width - gutter - outside : 0;
-  const corridorW = vertical
-    ? Math.max(minCorridor, Math.min(G.stationMax, Math.max(G.stationMin, room)))
-    : minCorridor;
-  const pad = vertical ? G.stationPad : G.trunkPad;
-  const trunkStep = across.length > 1 ? Math.max(G.trunkStep, (corridorW - 2 * pad) / (across.length - 1)) : 0;
+  // A vertical station is as wide as its longest name; a longer name wraps to two lines.
+  const measure = options.measure ?? ((t: string) => t.length * (unit ? 7.6 : 7));
+  const longest = Math.max(0, ...input.rows.map((r) => measure(r.target.text)));
+  const nameLines = vertical && longest > G.nameMax ? 2 : 1;
+  const nameW = Math.ceil(Math.min(longest, G.nameMax));
+  // Trunk columns flank the name: left trains then half the metros, the other half then right trains.
+  const metroSplit = Math.ceil(metros.length / 2);
+  const leftCols = [...leftTrains, ...metros.slice(0, metroSplit)];
+  const rightCols = [...metros.slice(metroSplit), ...rightTrains];
+  const block = (n: number) => (n ? G.colInset + (n - 1) * G.colStep + G.nameGap : G.namePad);
+  const sideW = Math.max(block(leftCols.length), block(rightCols.length));
+  const corridorW = vertical ? 2 * sideW + nameW : minCorridor;
+  const trunkStep = across.length > 1 ? G.trunkStep : 0;
   const natural = gutter + outside + corridorW;
   // Spare room centres the map.
   const centre = vertical && options.width ? Math.max(0, Math.floor((options.width - natural) / 2)) : 0;
@@ -237,7 +251,12 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
   const corridorR = corridorL + corridorW;
   const colC = new Map<string, number>();
   const trunkMid = (corridorL + corridorR) / 2;
-  across.forEach((line, j) => colC.set(line.id, trunkMid + (j - (across.length - 1) / 2) * trunkStep));
+  if (vertical) {
+    leftCols.forEach((line, j) => colC.set(line.id, corridorL + G.colInset + j * G.colStep));
+    rightCols.forEach((line, j) => colC.set(line.id, corridorR - G.colInset - (rightCols.length - 1 - j) * G.colStep));
+  } else {
+    across.forEach((line, j) => colC.set(line.id, trunkMid + (j - (across.length - 1) / 2) * trunkStep));
+  }
   // Horizontal stations carry their name in a band below the lines.
   const stationR = corridorR + nameBand;
   cur = stationR + (rightTrains.length ? G.detourGap : 0);
@@ -275,9 +294,11 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
   }
 
   /* Along. */
-  // A station reaches `pre` before its row's line and `post` after it; the name band is in `pre` when vertical.
-  const half = vertical ? (unit ? G.unitPillHalf : G.pillHalf) : (unit ? G.unitPillHalfH : G.pillHalfH);
-  const pre = half + (vertical ? G.nameBandV : 0);
+  // A station reaches `pre` before its row's line and `post` after it; vertical stations are centred on it.
+  const half = vertical
+    ? Math.max(unit ? G.unitPillHalf : G.pillHalf, (nameLines * G.nameLine) / 2 + G.stationInset + (unit ? 2 : 0))
+    : (unit ? G.unitPillHalfH : G.pillHalfH);
+  const pre = half;
   const post = half;
   const span = pre + post;
   const basePitch = unit ? (vertical ? G.unitPitchV : G.unitPitchH) : (vertical ? G.pitchV : G.pitchH);
@@ -386,7 +407,7 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
   rails.forEach((line) => {
     const { side, k } = railSide.get(line.id)!;
     const lane = laneC(line.id);
-    const edge = side > 0 ? stationR - 4 : corridorL + 4;
+    const edge = side > 0 ? stationR : corridorL;
     const ways: Way[] = [];
     const branches: PathView[] = [];
     const startAt = (aa: number) => { if (!ways.length) ways.push({ a: aa, c: lane + sh(0) }); };
@@ -418,6 +439,11 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
     input.rows.forEach((row, i) => {
       if (row.stops.has(line.id)) {
         startAt(rowA[i]! - pre - out - 10);
+        // A stop marker where it joins the station, like the trunk lines.
+        const at = P(rowA[i]!, edge + sh(i));
+        const list = markersByRow.get(i) ?? [];
+        list.push({ lineId: line.id, colour: line.colour, x: at.x, y: at.y, level: row.stops.get(line.id) ?? 'reinforced', mode: line.mode });
+        markersByRow.set(i, list);
         ways.push({ a: rowA[i]! - 9 + k * 6, c: edge + sh(i), near: true }, { a: rowA[i]! + 9 - k * 6, c: edge + sh(i), near: true });
         // Back out to its lane before a station it does not serve, so it never looks like a stop.
         const nextRow = input.rows[i + 1];
@@ -446,10 +472,12 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
   }
   for (const dot of dots) dot.label.text = dot.target.text;
 
-  /* Stations, with their names inside: a band above the stops (vertical) or below the lines (horizontal). */
-  const nameLabel = (along: number, lo: number, hi: number, alongLo: number, alongHi: number, text: string): LabelView => vertical
-    ? { x: (lo + hi) / 2, y: alongLo + 16, anchor: 'middle', text, maxW: hi - lo - 28, wrap: false }
-    : { x: along, y: hi - nameBand + 15, anchor: 'middle', text, maxW: alongHi - alongLo - 14, wrap: true, down: true };
+  /* Stations, with their names inside: centred between the markers (vertical) or in a band below the lines (horizontal). */
+  const nameLabel = (along: number, lo: number, hi: number, alongLo: number, alongHi: number, text: string): LabelView => {
+    if (!vertical) return { x: along, y: hi - nameBand + 15, anchor: 'middle', text, maxW: alongHi - alongLo - 14, wrap: true, down: true };
+    const lines = measure(text) > nameW + 1 ? 2 : 1;
+    return { x: (lo + hi) / 2, y: along + 4.5 - ((lines - 1) * G.nameLine) / 2, anchor: 'middle', text, maxW: nameW + 2, wrap: lines > 1, down: true };
+  };
   const pills: PillView[] = input.rows.map((row, i) => {
     const s = sh(i);
     const tl = P(rowA[i]! - pre, corridorL + s);
@@ -493,6 +521,14 @@ export function layoutNetwork(input: NetInput, orientation: Orientation, options
     const pt = vertical ? { x: c, y: a0 - 20 } : { x: a0 - 12, y: c };
     return { lineId: line.id, x: pt.x, y: pt.y, short: line.short, name: line.name, colour: line.colour, mode: line.mode };
   });
+  // Neighbouring trunk columns are closer than a badge: lift every other one.
+  if (vertical) {
+    let prev: HeaderView | undefined;
+    for (const h of [...header].sort((x, y) => x.x - y.x)) {
+      if (prev && h.x - prev.x < 36 && prev.y === a0 - 20) h.y -= 20;
+      prev = h;
+    }
+  }
 
   /* Week bands. */
   const bands: BandView[] = bandsAlong.map((b, i) => {
