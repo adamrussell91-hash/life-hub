@@ -781,7 +781,7 @@ export function renderQuestionSetBlock(
     li.dataset.questionId = question.id;
 
     const prompt = document.createElement('p');
-    prompt.className = 'block-question-set__prompt';
+    prompt.className = 'block-question-set__prompt block-body';
     prompt.textContent = question.prompt;
     li.append(prompt);
 
@@ -812,7 +812,7 @@ export function renderQuestionSetBlock(
       }
     } else if (question.kind === 'short_answer' && question.response_space !== 'none') {
       const label = document.createElement('p');
-      label.className = 'block-question-set__answer-label';
+      label.className = 'block-question-set__answer-label block-eyebrow';
       label.textContent = 'Your response';
       const box = document.createElement('div');
       box.className = 'block-question-set__answer';
@@ -1014,19 +1014,19 @@ export function renderCardStackBlock(
   stage.append(viewport);
 
   const controls = document.createElement('div');
-  controls.className = 'block-card-stack__controls';
+  controls.className = 'block-card-stack__controls block-pager';
 
   const prev = document.createElement('button');
   prev.type = 'button';
-  prev.className = 'btn btn--ghost block-card-stack__prev';
+  prev.className = 'btn btn--secondary block-card-stack__prev';
   prev.textContent = 'Previous';
 
   const status = document.createElement('p');
-  status.className = 'block-card-stack__status';
+  status.className = 'block-card-stack__status block-pager__status';
 
   const next = document.createElement('button');
   next.type = 'button';
-  next.className = 'btn btn--ghost block-card-stack__next';
+  next.className = 'btn btn--secondary block-card-stack__next';
   next.textContent = 'Next';
 
   controls.append(prev, status, next);
@@ -1388,6 +1388,15 @@ function activityButton(label: string, className: string, variant: 'primary' | '
   return button;
 }
 
+/** The shared show / hide toggle: kit chevron, left-aligned, above any actions. */
+export function disclosureToggle(label: string, className = ''): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `block-disclosure__toggle ${className}`.trim();
+  button.textContent = label;
+  return button;
+}
+
 function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -1432,7 +1441,7 @@ function flashcardImage(card: FlashcardItem): HTMLImageElement | null {
 function paintFlashcardFace(face: HTMLElement, text: string, card?: FlashcardItem): void {
   face.replaceChildren();
   const copy = document.createElement('span');
-  copy.className = 'block-flashcards__copy';
+  copy.className = 'block-flashcards__copy block-subtitle';
   copy.textContent = text;
   const image = card ? flashcardImage(card) : null;
   face.append(...(image ? [image, copy] : [copy]));
@@ -1522,7 +1531,7 @@ export function renderFlashcardsBlock(
   card.append(inner);
 
   const status = document.createElement('p');
-  status.className = 'block-flashcards__status';
+  status.className = 'block-flashcards__status block-pager__status';
   status.setAttribute('aria-live', 'polite');
   const prev = activityButton('Prev', 'block-flashcards__btn');
   const flip = activityButton('Flip', 'block-flashcards__btn', 'primary');
@@ -1573,9 +1582,13 @@ export function renderFlashcardsBlock(
     persist();
   });
 
+  // Pager centred under the deck, then the deck's actions.
   const controls = document.createElement('div');
-  controls.className = 'block-flashcards__controls';
-  controls.append(prev, flip, next, reset);
+  controls.className = 'block-flashcards__controls block-pager';
+  controls.append(prev, status, next);
+  const actions = document.createElement('div');
+  actions.className = 'block-flashcards__actions block-actions';
+  actions.append(flip, reset);
   const printSummary = document.createElement('ol');
   printSummary.className = 'block-flashcards__print';
   printSummary.setAttribute('aria-hidden', 'true');
@@ -1588,7 +1601,7 @@ export function renderFlashcardsBlock(
     entry.append(frontCopy, backCopy);
     printSummary.append(entry);
   }
-  root.append(card, status, controls, printSummary);
+  root.append(card, controls, actions, printSummary);
   paint();
   persist();
   if (block.content.shuffle && !saved && !prefersReducedMotion()) {
@@ -1614,7 +1627,7 @@ export function renderClozeBlock(
   }
 
   const sentence = document.createElement('p');
-  sentence.className = 'block-cloze__sentence';
+  sentence.className = 'block-cloze__sentence block-body';
 
   if (mode === 'teacher') {
     for (const segment of segments) {
@@ -1705,7 +1718,7 @@ export function renderClozeBlock(
   bank.className = 'block-cloze__word-bank';
   bank.setAttribute('aria-label', 'Word bank');
   const score = document.createElement('p');
-  score.className = 'block-cloze__score';
+  score.className = 'block-cloze__score block-secondary';
   score.setAttribute('aria-live', 'polite');
 
   function answers(): string[] {
@@ -1789,7 +1802,7 @@ export function renderClozeBlock(
   });
 
   const controls = document.createElement('div');
-  controls.className = 'block-cloze__controls';
+  controls.className = 'block-cloze__controls block-actions';
   controls.append(check, reveal, reset);
   const printSummary = document.createElement('p');
   printSummary.className = 'block-cloze__print';
@@ -1804,7 +1817,7 @@ export function renderClozeBlock(
       printSummary.append(blank);
     }
   }
-  root.append(sentence, bank, controls, score, printSummary);
+  root.append(sentence, bank, score, controls, printSummary);
   paintBank();
   paintScore();
   return wrapBlock(root, block, mode);
@@ -1844,14 +1857,14 @@ export function renderSelfCheckBlock(
 
   if (block.content.title?.trim()) {
     const title = document.createElement('h3');
-    title.className = 'block-self-check__title';
+    title.className = 'block-self-check__title block-subtitle';
     title.textContent = block.content.title;
     root.append(title);
   }
 
   if (mode === 'teacher') {
     const prompt = document.createElement('p');
-    prompt.className = 'block-self-check__prompt';
+    prompt.className = 'block-self-check__prompt block-body';
     prompt.textContent = block.content.prompt;
     root.append(prompt);
     if (block.content.mode === 'checklist') {
@@ -1878,7 +1891,7 @@ export function renderSelfCheckBlock(
   }
 
   const prompt = document.createElement('p');
-  prompt.className = 'block-self-check__prompt';
+  prompt.className = 'block-self-check__prompt block-body';
   prompt.textContent = block.content.prompt;
   root.append(prompt);
 
@@ -1899,7 +1912,7 @@ export function renderSelfCheckBlock(
     list.className = 'block-self-check__checklist';
     for (const item of block.content.items ?? []) {
       const label = document.createElement('label');
-      label.className = 'block-self-check__checklist-item';
+      label.className = 'block-self-check__checklist-item block-body';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'block-self-check__checkbox';
@@ -1928,7 +1941,7 @@ export function renderSelfCheckBlock(
   let revealed =
     rawSaved?.revealed === true && (block.content.mode === 'reveal' || rating !== undefined);
   const answer = document.createElement('div');
-  answer.className = 'block-self-check__answer';
+  answer.className = 'block-self-check__answer block-disclosure__panel block-body';
   answer.textContent = block.content.answer ?? '';
 
   function paintAnswer(): void {
@@ -1936,14 +1949,19 @@ export function renderSelfCheckBlock(
   }
 
   if (block.content.mode === 'reveal') {
-    const toggle = activityButton(revealed ? 'Hide answer' : 'Show answer', 'block-self-check__btn');
+    const toggle = disclosureToggle(revealed ? 'Hide answer' : 'Show answer', 'block-self-check__btn');
+    toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
     toggle.addEventListener('click', () => {
       revealed = !revealed;
       toggle.textContent = revealed ? 'Hide answer' : 'Show answer';
+      toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
       paintAnswer();
       saveActivityState(key, { revealed } satisfies AnswerState);
     });
-    root.append(toggle, answer);
+    const disclosure = document.createElement('div');
+    disclosure.className = 'block-self-check__disclosure block-disclosure';
+    disclosure.append(toggle, answer);
+    root.append(disclosure);
   } else {
     const scale = document.createElement('div');
     scale.className = 'block-self-check__confidence';

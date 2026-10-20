@@ -41,7 +41,7 @@ function prefersReducedMotion(): boolean {
 
 export function createCardStackArticle(card: CardStackCard, index: number): HTMLElement {
   const article = document.createElement('article');
-  article.className = 'block-card-stack__card';
+  article.className = 'block-card-stack__card block-on-fill';
   article.dataset.tint = card.tint;
   article.dataset.cardId = card.id;
 
@@ -60,19 +60,19 @@ export function createCardStackArticle(card: CardStackCard, index: number): HTML
 
   if (card.eyebrow.trim()) {
     const eyebrow = document.createElement('p');
-    eyebrow.className = 'block-card-stack__eyebrow';
+    eyebrow.className = 'block-card-stack__eyebrow block-eyebrow';
     eyebrow.textContent = card.eyebrow;
     text.append(eyebrow);
   }
 
   const title = document.createElement('h3');
-  title.className = 'block-card-stack__title';
+  title.className = 'block-card-stack__title block-title';
   title.textContent = card.title;
   text.append(title);
 
   if (card.description.trim()) {
     const description = document.createElement('p');
-    description.className = 'block-card-stack__description';
+    description.className = 'block-card-stack__description block-body';
     description.textContent = card.description;
     text.append(description);
   }

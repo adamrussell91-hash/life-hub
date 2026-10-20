@@ -131,7 +131,7 @@ export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlo
   modes.setAttribute('role', 'group');
   modes.setAttribute('aria-label', 'How students give feedback');
   modeWrap.append(modes);
-  const modeHint = el('p', 'pf-field__hint');
+  const modeHint = el('p', 'pf-field__hint block-secondary');
   modeWrap.append(modeHint);
   const perMode = el('div', 'pf-run');
 
@@ -160,7 +160,7 @@ export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlo
   root.append(textField(fields[0]), modeWrap, perMode);
   paintMode();
   root.append(
-    el('p', 'pf-note', 'To run it, publish the lesson, close this editor and press Start activity on the block.')
+    el('p', 'pf-note block-secondary', 'To run it, publish the lesson, close this editor and press Start activity on the block.')
   );
   return root;
 }
@@ -169,7 +169,7 @@ export function renderPeerFeedback(block: PeerBlock, mode: RenderMode, ctx: Rend
   const root = el('section', 'peer-feedback');
   root.dataset.blockId = block.id;
   const head = el('header', 'pf-head');
-  head.append(el('h3', 'pf-eyebrow', 'Peer feedback'));
+  head.append(el('h3', 'pf-eyebrow block-eyebrow', 'Peer feedback'));
   head.append(taskCard(block.content.prompt.trim() || 'Write a short answer, swap it, and give each other feedback.'));
   root.append(head);
 
@@ -186,7 +186,7 @@ export function renderPeerFeedback(block: PeerBlock, mode: RenderMode, ctx: Rend
     return root;
   }
   if (!ctx.lessonId) {
-    root.append(el('p', 'pf-note', 'Students take part from the published lesson.'));
+    root.append(el('p', 'pf-note block-secondary', 'Students take part from the published lesson.'));
     return root;
   }
   if (mode === 'teacher') {
@@ -279,7 +279,7 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
 
   function paint(): void {
     if (!state) {
-      body.replaceChildren(el('p', 'pf-note', 'Loading…'));
+      body.replaceChildren(el('p', 'pf-note block-secondary', 'Loading…'));
       return;
     }
     if (state.phase === 'write') {
@@ -299,7 +299,7 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
   function idleView(): HTMLElement {
     const box = el('div', 'pf-panel pf-panel--start');
     box.append(
-      el('p', 'pf-panel__text', 'Students join on the lesson link with the code. No accounts, and they never pick or see a symbol.'),
+      el('p', 'pf-panel__text block-body', 'Students join on the lesson link with the code. No accounts, and they never pick or see a symbol.'),
       button('Start activity', 'primary', function () {
         freshRound();
         void send('start', {}, this);
@@ -473,13 +473,13 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
 
     // Feedback shows as it arrives, so anything held can be dealt with before hand-back.
     if (r.received) item.append(receivedView(r.received, r.reviewer ?? null));
-    else if (phase === 'results' && r.included) item.append(el('p', 'pf-note', 'No feedback came back for this one.'));
+    else if (phase === 'results' && r.included) item.append(el('p', 'pf-note block-secondary', 'No feedback came back for this one.'));
     return item;
   }
 
   function receivedView(received: Received, reviewer: string | null): HTMLElement {
     if (received.status === 'removed') {
-      const gone = el('p', 'pf-note');
+      const gone = el('p', 'pf-note block-secondary');
       gone.append('Feedback from ', reviewerTag(reviewer), ' was removed. The writer won’t see it.');
       return gone;
     }
@@ -557,9 +557,9 @@ function showCodeOverlay(code: string): void {
 function feedbackPair(block: PeerBlock, feedback: Feedback, from?: string | null): HTMLElement {
   const wrap = el('div', 'pf-feedback');
   const a = el('div', 'pf-feedback__card pf-feedback__card--strength');
-  a.append(el('p', 'pf-feedback__label', block.content.strength_prompt), el('p', 'pf-feedback__text', feedback.strength));
+  a.append(el('p', 'pf-feedback__label block-eyebrow', block.content.strength_prompt), el('p', 'pf-feedback__text block-body', feedback.strength));
   const b = el('div', 'pf-feedback__card pf-feedback__card--suggestion');
-  b.append(el('p', 'pf-feedback__label', block.content.suggestion_prompt), el('p', 'pf-feedback__text', feedback.suggestion));
+  b.append(el('p', 'pf-feedback__label block-eyebrow', block.content.suggestion_prompt), el('p', 'pf-feedback__text block-body', feedback.suggestion));
   wrap.append(a, b);
   if (from) {
     const by = el('p', 'pf-feedback__from');
@@ -657,7 +657,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
 
   function paint(): void {
     if (!state) {
-      body.replaceChildren(el('p', 'pf-note', 'Loading…'));
+      body.replaceChildren(el('p', 'pf-note block-secondary', 'Loading…'));
       return;
     }
     paintCorner(state.symbol);
@@ -680,7 +680,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
 
   function waitPanel(title: string, sub: string): HTMLElement {
     const box = el('div', 'pf-panel pf-panel--wait');
-    box.append(el('p', 'pf-panel__title', title), el('p', 'pf-panel__text', sub));
+    box.append(el('p', 'pf-panel__title block-subtitle', title), el('p', 'pf-panel__text block-body', sub));
     return box;
   }
 
@@ -696,7 +696,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
     code.maxLength = 7;
     code.placeholder = '000 000';
     code.value = joinCode;
-    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint', 'No account and no name. Classmates won’t know which answer is yours.'));
+    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'No account and no name. Classmates won’t know which answer is yours.'));
 
     const join = button('Join', 'primary', function () {
       void doJoin(this);
@@ -809,7 +809,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
 
     // results
     if (s.mode === 'annotate' && s.layers?.length) {
-      stage.append(el('h4', 'pf-stage__title', 'Feedback on your answer'), annotatedView(s.text ?? '', s.layers, s.codes ?? []));
+      stage.append(el('h4', 'pf-stage__title block-subtitle', 'Feedback on your answer'), annotatedView(s.text ?? '', s.layers, s.codes ?? []));
       return stage;
     }
     if (s.mode === 'annotate') {
@@ -820,7 +820,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
         )
       );
     } else if (s.received) {
-      stage.append(el('h4', 'pf-stage__title', 'Feedback on your answer'), feedbackPair(block, s.received));
+      stage.append(el('h4', 'pf-stage__title block-subtitle', 'Feedback on your answer'), feedbackPair(block, s.received));
     } else {
       stage.append(
         waitPanel(
@@ -841,7 +841,7 @@ function mountStudent(block: PeerBlock, lessonId: string, corner: HTMLElement): 
   }
 
   function actionsRow(...buttons: HTMLButtonElement[]): HTMLElement {
-    const row = el('div', 'pf-actions');
+    const row = el('div', 'pf-actions block-actions');
     row.append(...buttons);
     return row;
   }
