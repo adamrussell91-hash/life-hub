@@ -226,7 +226,7 @@ export async function scriptedCoach(session) {
   if (session.runner?.mode === 'boundary') {
     const left = session.steps?.[session.runner.leaving];
     if (skippedUntouched(left)) {
-      const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here, or start a tool when you are ready.';
+      const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here; the first tool for this step is ready below.';
       return { ...base, verdict: 'clarify', message: `Fair enough, nothing was done in that step, so there is nothing to look back on. ${then}` };
     }
     return { ...base, verdict: 'clarify', message: 'Fair enough, that step is behind us now. Before we go on: what did you learn about how you tend to work through problems in that step?' };
