@@ -104,6 +104,15 @@ describe('Thinking Toolkit library', () => {
     expect((parsed.content as { pair_level: string }).pair_level).toBe('none');
   });
 
+  it('renders a saved distinction block that still holds the retired abstract pairs', () => {
+    const block = createBlock('toolkit_tool', 'legacy_2');
+    const saved = { ...block, content: { ...(block.content as object), pair_level: 'level2' } } as typeof block;
+    const el = renderBlock(saved, 'student');
+    expect(el.querySelector('.block-unavailable')).toBeNull();
+    expect(el.querySelector('.tk-fork')).not.toBeNull();
+    expect(el.textContent).not.toContain('Pairs to try');
+  });
+
   it('gives every item a plain description and something students can use', () => {
     for (const item of [...TOOLKIT_SKILLS, ...TOOLKIT_TOOLS, ...TOOLKIT_VALUES]) {
       expect(item.definition.trim(), item.id).not.toBe('');

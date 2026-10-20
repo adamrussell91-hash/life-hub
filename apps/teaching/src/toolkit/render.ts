@@ -496,8 +496,9 @@ function renderFork(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderCo
       })
     );
   }
-  if (c.pair_level !== 'none') {
-    const bank = DISTINCTION_PAIR_BANK[c.pair_level];
+  // Saved blocks can hold a retired level (e.g. 'level2'); render them with no pairs.
+  const bank = c.pair_level === 'none' ? undefined : DISTINCTION_PAIR_BANK[c.pair_level];
+  if (bank) {
     appendIf(
       frag,
       reveal({
