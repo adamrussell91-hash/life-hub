@@ -558,11 +558,6 @@ button.tk-chip:focus-visible {
   font-weight: var(--weight-bold);
 }
 
-.tk-claim__text.callout__body {
-  color: var(--ink);
-  font-size: var(--text-md);
-}
-
 .tk-options {
   margin: var(--space-2) 0 0;
   padding-left: 1.3rem;
