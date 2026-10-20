@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pickKitOption } from './kit-filter';
 import {
   COLUMN_CHILD_TYPES,
   createBlock
@@ -15,7 +16,7 @@ function heading() {
   return createBlock('heading', 'h1') as Extract<Block, { block_type: 'heading' }>;
 }
 
-describe('block editors use kit filters', () => {
+describe('block editors use kit filters (I5), shared by every hub', () => {
   it('creates visibility as a hub-filter button', () => {
     const el = createVisibilitySelect(heading(), () => undefined);
     expect(el.tagName).toBe('BUTTON');
@@ -32,8 +33,7 @@ describe('block editors use kit filters', () => {
     expect(editor.querySelector('select')).toBeNull();
     const level = editor.querySelector<HTMLButtonElement>('.block-editor__heading-variant')!;
     expect(level.classList.contains('hub-filter')).toBe(true);
-    level.click();
-    document.querySelector<HTMLButtonElement>('[data-hub-option="page"]')!.click();
+    pickKitOption(level, 'page');
     expect(latest.variant).toBe('page');
   });
 

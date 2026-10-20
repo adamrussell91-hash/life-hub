@@ -52,6 +52,8 @@ import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
+import { createEditorFilter, type HubFilterControl } from '@/blocks/editor-filter';
+import { classroomExtras } from '@/blocks/classroom-extras';
 import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
 import {
@@ -115,27 +117,20 @@ export function createVisibilitySelect<T extends Block>(
   block: T,
   onChange: BlockChangeHandler<T>,
   getLatest: () => T = () => block
-): HTMLSelectElement {
-  const select = document.createElement('select');
-  select.className = 'block-editor__visibility';
-  select.setAttribute('aria-label', 'Visibility');
-
-  for (const option of VISIBILITY_OPTIONS) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    opt.selected = block.visibility === option.value;
-    select.append(opt);
-  }
-
-  select.addEventListener('change', () => {
-    onChange({
-      ...getLatest(),
-      visibility: select.value as Block['visibility']
-    });
-  });
-
-  return select;
+): HTMLElement {
+  return createEditorFilter({
+    key: 'Shown to',
+    value: block.visibility,
+    options: VISIBILITY_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    className: 'block-editor__visibility',
+    ariaLabel: 'Visibility',
+    onChange: (value) => {
+      onChange({
+        ...getLatest(),
+        visibility: value as Block['visibility']
+      });
+    }
+  }).el;
 }
 
 function driveErrorMessage(error: unknown): string {
@@ -216,26 +211,20 @@ function itemImageUpload(
 function createMediaSizeSelect(
   selected: 'small' | 'medium' | 'large',
   onChange: () => void
-): HTMLSelectElement {
-  const select = document.createElement('select');
-  select.className = 'block-editor__media-size';
-  select.setAttribute('aria-label', 'Size');
-
-  for (const option of MEDIA_SIZE_OPTIONS) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    opt.selected = selected === option.value;
-    select.append(opt);
-  }
-
-  select.addEventListener('change', onChange);
-  return select;
+): HubFilterControl {
+  return createEditorFilter({
+    key: 'Size',
+    value: selected,
+    options: MEDIA_SIZE_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    className: 'block-editor__media-size',
+    ariaLabel: 'Size',
+    onChange
+  });
 }
 
 type Choice = { el: HTMLElement; getValue(): string; setValue(value: string): void };
 
-/** One labelled choice control. Teaching uses a native select. */
+/** One labelled choice control: the kit filter pill, never a native select. */
 function createChoice(options: {
   key: string;
   value: string;
@@ -244,28 +233,7 @@ function createChoice(options: {
   ariaLabel: string;
   onChange: (value: string) => void;
 }): Choice {
-  const select = document.createElement('select');
-  select.className = options.className;
-  select.setAttribute('aria-label', options.ariaLabel);
-  for (const option of options.options) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    select.append(opt);
-  }
-  select.value = options.value;
-  select.addEventListener('change', () => options.onChange(select.value));
-  return asChoice(select);
-}
-
-function asChoice(select: HTMLSelectElement): Choice {
-  return {
-    el: select,
-    getValue: () => select.value,
-    setValue: (value) => {
-      select.value = value;
-    }
-  };
+  return createEditorFilter(options);
 }
 
 export function editorShell<T extends Block>(
@@ -368,10 +336,13 @@ export function createRichTextEditor(
     publish(html);
   });
 
-  const textTools = createRichTextTools({ tiptap, getLatest, onChange });
-  toolbar.append(...textTools.buttons);
-
-  fields.append(toolbar, textTools.status, tiptap.host, textTools.strip, source);
+  if (classroomExtras()) {
+    const textTools = createRichTextTools({ tiptap, getLatest, onChange });
+    toolbar.append(...textTools.buttons);
+    fields.append(toolbar, textTools.status, tiptap.host, textTools.strip, source);
+  } else {
+    fields.append(toolbar, tiptap.host, source);
+  }
   const shell = editorShell(block, onChange, fields, getLatest);
   shell.addEventListener(
     'remove',
@@ -397,30 +368,26 @@ export function createHeadingEditor(
   textInput.value = block.content.text;
   textInput.setAttribute('aria-label', 'Heading text');
 
-  const variantSelect = document.createElement('select');
-  variantSelect.className = 'block-editor__heading-variant';
-  variantSelect.setAttribute('aria-label', 'Heading level');
-
-  for (const variant of ['page', 'section', 'subsection'] as const) {
-    const opt = document.createElement('option');
-    opt.value = variant;
-    opt.textContent = variant;
-    opt.selected = block.variant === variant;
-    variantSelect.append(opt);
-  }
+  const variantSelect = createEditorFilter({
+    key: 'Level',
+    value: block.variant,
+    options: (['page', 'section', 'subsection'] as const).map((variant) => ({ value: variant, label: variant })),
+    className: 'block-editor__heading-variant',
+    ariaLabel: 'Heading level',
+    onChange: () => emitChange()
+  });
 
   const emitChange = () => {
     onChange({
       ...getLatest(),
-      variant: variantSelect.value as typeof block.variant,
+      variant: variantSelect.getValue() as typeof block.variant,
       content: { text: textInput.value }
     });
   };
 
   textInput.addEventListener('input', emitChange);
-  variantSelect.addEventListener('change', emitChange);
 
-  fields.append(textInput, variantSelect);
+  fields.append(textInput, variantSelect.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -433,27 +400,26 @@ export function createCalloutEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const styleSelect = document.createElement('select');
-  styleSelect.className = 'block-editor__callout-style';
-  styleSelect.setAttribute('aria-label', 'Callout style');
-
-  for (const style of [
-    'cultural_warning',
-    'information',
-    'important',
-    'warning',
-    'extension',
-    'scaffold',
-    'example',
-    'remember',
-    'teacher'
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = style;
-    opt.textContent = style === 'cultural_warning' ? 'Cultural warning' : style;
-    opt.selected = resolvedCalloutStyle(block.content) === style;
-    styleSelect.append(opt);
-  }
+  const styleSelect = createEditorFilter({
+    key: 'Style',
+    value: resolvedCalloutStyle(block.content),
+    options: (
+      [
+        'cultural_warning',
+        'information',
+        'important',
+        'warning',
+        'extension',
+        'scaffold',
+        'example',
+        'remember',
+        'teacher'
+      ] as const
+    ).map((style) => ({ value: style, label: style === 'cultural_warning' ? 'Cultural warning' : style })),
+    className: 'block-editor__callout-style',
+    ariaLabel: 'Callout style',
+    onChange: () => emitChange()
+  });
 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
@@ -478,7 +444,7 @@ export function createCalloutEditor(
     onChange({
       ...getLatest(),
       content: {
-        style: styleSelect.value as typeof block.content.style,
+        style: styleSelect.getValue() as typeof block.content.style,
         title: title.length > 0 ? title : undefined,
         body: bodyInput.value,
         ...(relatedTo ? { related_to: relatedTo } : {})
@@ -486,14 +452,14 @@ export function createCalloutEditor(
     });
   };
 
-  styleSelect.addEventListener('change', emitChange);
   titleInput.addEventListener('input', emitChange);
   bodyInput.addEventListener('input', emitChange);
 
   const targetLabel = document.createElement('label');
   targetLabel.textContent = 'Related activity or question';
   targetLabel.append(targetSelect);
-  fields.append(styleSelect, titleInput, bodyInput, targetLabel);
+  fields.append(styleSelect.el, titleInput, bodyInput);
+  if (classroomExtras()) fields.append(targetLabel);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -543,7 +509,7 @@ export function createImageEditor(
   const emitChange = () => {
     onChange({
       ...getLatest(),
-      variant: sizeSelect.value as typeof block.variant,
+      variant: sizeSelect.getValue() as typeof block.variant,
       content: {
         url: url.value,
         alt_text: alt.value,
@@ -613,7 +579,7 @@ export function createImageEditor(
     url,
     alt,
     caption,
-    sizeSelect
+    sizeSelect.el
   );
   return editorShell(block, onChange, fields, getLatest);
 }
@@ -654,7 +620,7 @@ export function createVideoEditor(
       const { start_seconds: _previousStart, ...rest } = block.content;
       onChange({
         ...getLatest(),
-        variant: sizeSelect.value as typeof block.variant,
+        variant: sizeSelect.getValue() as typeof block.variant,
         content: {
           ...rest,
           provider: parsed.provider,
@@ -668,7 +634,7 @@ export function createVideoEditor(
       status.textContent = 'Unrecognised video link';
       onChange({
         ...getLatest(),
-        variant: sizeSelect.value as typeof block.variant,
+        variant: sizeSelect.getValue() as typeof block.variant,
         content: {
           ...block.content,
           external_id: '',
@@ -684,7 +650,7 @@ export function createVideoEditor(
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(url, status, title, sizeSelect);
+  fields.append(url, status, title, sizeSelect.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -708,9 +674,6 @@ export function createEmbedEditor(
   title.value = block.content.title ?? '';
   title.setAttribute('aria-label', 'Embed title');
 
-  const provider = document.createElement('select');
-  provider.className = 'block-editor__embed-provider';
-  provider.setAttribute('aria-label', 'Embed provider');
   const providerOptions: Array<{ value: EmbedProvider; label: string }> = [
     { value: 'google_maps', label: 'Google Maps' },
     { value: 'google_slides', label: 'Google Slides' },
@@ -718,20 +681,28 @@ export function createEmbedEditor(
     { value: 'pdf', label: 'PDF' },
     { value: 'generic', label: 'Generic' }
   ];
-  for (const opt of providerOptions) {
-    const option = document.createElement('option');
-    option.value = opt.value;
-    option.textContent = opt.label;
-    provider.append(option);
-  }
-  provider.value = block.content.provider ?? 'generic';
+  const provider = createEditorFilter({
+    key: 'Provider',
+    value: block.content.provider ?? 'generic',
+    options: providerOptions,
+    className: 'block-editor__embed-provider',
+    ariaLabel: 'Embed provider',
+    onChange: (value) => {
+      const parsed = parseEmbedInput(url.value);
+      if (parsed && parsed.provider === value) {
+        emitChange(parsed.embed_url);
+        return;
+      }
+      emitChange(undefined);
+    }
+  });
 
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
   hint.textContent = 'Share settings must allow viewers. Docs and Drive files preview in place.';
 
   const emitChange = (embedUrl?: string) => {
-    const selected = provider.value as EmbedProvider;
+    const selected = provider.getValue() as EmbedProvider;
     onChange({
       ...getLatest(),
       content: {
@@ -746,7 +717,7 @@ export function createEmbedEditor(
   const applyUrlDetection = () => {
     const parsed = parseEmbedInput(url.value);
     if (parsed) {
-      provider.value = parsed.provider;
+      provider.setValue(parsed.provider);
       emitChange(parsed.embed_url);
       return;
     }
@@ -757,14 +728,6 @@ export function createEmbedEditor(
   title.addEventListener('input', () => {
     const latest = getLatest();
     emitChange(latest.content.embed_url);
-  });
-  provider.addEventListener('change', () => {
-    const parsed = parseEmbedInput(url.value);
-    if (parsed && parsed.provider === provider.value) {
-      emitChange(parsed.embed_url);
-      return;
-    }
-    emitChange(undefined);
   });
 
   const driveBtn = createDrivePickButton({
@@ -788,12 +751,12 @@ export function createEmbedEditor(
     onUploaded: (uploadedUrl, media) => {
       url.value = uploadedUrl;
       if (!title.value.trim()) title.value = media.title;
-      provider.value = 'pdf';
+      provider.setValue('pdf');
       emitChange(undefined);
     }
   });
 
-  fields.append(mediaSourceRow(upload.el, driveBtn), url, title, provider, hint);
+  fields.append(mediaSourceRow(upload.el, driveBtn), url, title, provider.el, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -855,19 +818,17 @@ export function createHtmlAppEditor(
   aiFields.className = 'block-editor__html-app-ai-fields';
   aiFields.hidden = !block.content.ai;
 
-  const provider = document.createElement('select');
-  provider.className = 'block-editor__html-app-ai-provider';
-  provider.setAttribute('aria-label', 'AI provider');
-  for (const [value, label] of [
-    ['openai', 'OpenAI'],
-    ['anthropic', 'Anthropic']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    provider.append(opt);
-  }
-  provider.value = block.content.ai?.provider ?? 'openai';
+  const provider = createEditorFilter({
+    key: 'Provider',
+    value: block.content.ai?.provider ?? 'openai',
+    options: [
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'anthropic', label: 'Anthropic' }
+    ],
+    className: 'block-editor__html-app-ai-provider',
+    ariaLabel: 'AI provider',
+    onChange: () => emitChange()
+  });
 
   const model = document.createElement('input');
   model.type = 'text';
@@ -891,7 +852,7 @@ export function createHtmlAppEditor(
   maxTokens.value = String(block.content.ai?.max_tokens ?? 512);
   maxTokens.setAttribute('aria-label', 'Max tokens');
 
-  aiFields.append(provider, model, system, maxTokens);
+  aiFields.append(provider.el, model, system, maxTokens);
 
   const emitChange = () => {
     const current = getLatest();
@@ -907,7 +868,7 @@ export function createHtmlAppEditor(
       const tokens = Number.parseInt(maxTokens.value, 10);
       content.ai = {
         enabled: true,
-        provider: provider.value === 'anthropic' ? 'anthropic' : 'openai',
+        provider: provider.getValue() === 'anthropic' ? 'anthropic' : 'openai',
         model: model.value.trim() || 'gpt-4o-mini',
         system: system.value,
         max_tokens:
@@ -921,7 +882,7 @@ export function createHtmlAppEditor(
   aiToggle.addEventListener('change', () => {
     aiFields.hidden = !aiToggle.checked;
     if (aiToggle.checked && !model.value.trim()) {
-      model.value = provider.value === 'anthropic' ? DEFAULT_ANTHROPIC_MODEL : 'gpt-4o-mini';
+      model.value = provider.getValue() === 'anthropic' ? DEFAULT_ANTHROPIC_MODEL : 'gpt-4o-mini';
     }
     emitChange();
   });
@@ -929,7 +890,6 @@ export function createHtmlAppEditor(
   title.addEventListener('input', emitChange);
   height.addEventListener('input', emitChange);
   html.addEventListener('input', emitChange);
-  provider.addEventListener('change', emitChange);
   model.addEventListener('input', emitChange);
   system.addEventListener('input', emitChange);
   maxTokens.addEventListener('input', emitChange);
@@ -1692,7 +1652,7 @@ export function createGalleryEditor(
     });
   };
 
-  const sizeSelect = asChoice(createMediaSizeSelect(block.variant, emitChange));
+  const sizeSelect = createMediaSizeSelect(block.variant, emitChange);
   const listHost = document.createElement('div');
 
   const emptyItem = (): GalleryItem => ({ id: itemId(`${getLatest().id}_i`), url: '', alt_text: '' });
@@ -2558,19 +2518,21 @@ export function createDiagramEditor(
 
   let source = block.content.source;
 
-  const sourceSelect = document.createElement('select');
-  sourceSelect.className = 'block-editor__diagram-source';
-  sourceSelect.setAttribute('aria-label', 'Diagram source');
-  for (const [value, label] of [
-    ['image', 'Image URL'],
-    ['svg', 'Inline SVG']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    opt.selected = source === value;
-    sourceSelect.append(opt);
-  }
+  const sourceSelect = createEditorFilter({
+    key: 'Source',
+    value: source,
+    options: [
+      { value: 'image', label: 'Image URL' },
+      { value: 'svg', label: 'Inline SVG' }
+    ],
+    className: 'block-editor__diagram-source',
+    ariaLabel: 'Diagram source',
+    onChange: (value) => {
+      source = value as typeof source;
+      renderSourceFields();
+      emitChange();
+    }
+  });
 
   const imageUrl = document.createElement('input');
   imageUrl.type = 'url';
@@ -2633,7 +2595,7 @@ export function createDiagramEditor(
     onUploaded: (uploadedUrl) => {
       if (source !== 'image') {
         source = 'image';
-        sourceSelect.value = 'image';
+        sourceSelect.setValue('image');
         renderSourceFields();
       }
       imageUrl.value = uploadedUrl;
@@ -2665,11 +2627,6 @@ export function createDiagramEditor(
     });
   };
 
-  sourceSelect.addEventListener('change', () => {
-    source = sourceSelect.value as typeof source;
-    renderSourceFields();
-    emitChange();
-  });
   imageUrl.addEventListener('input', emitChange);
   imageAlt.addEventListener('input', emitChange);
   svgMarkup.addEventListener('input', emitChange);
@@ -2677,7 +2634,7 @@ export function createDiagramEditor(
 
   renderSourceFields();
   updatePreview();
-  fields.append(sourceSelect, uploadRow, imageUrl, imageAlt, svgMarkup, caption, preview);
+  fields.append(sourceSelect.el, uploadRow, imageUrl, imageAlt, svgMarkup, caption, preview);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2792,21 +2749,19 @@ export function createAnthologyEditor(
   title.placeholder = 'Title (optional)';
   title.setAttribute('aria-label', 'Anthology title');
 
-  const view = document.createElement('select');
-  view.className = 'block-editor__anthology-view';
-  view.setAttribute('aria-label', 'Default view');
-  for (const [value, label] of [
-    ['text', 'By text'],
-    ['theme', 'By theme'],
-    ['technique', 'By technique'],
-    ['connections', 'Connections']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    opt.selected = (block.content.default_view ?? 'text') === value;
-    view.append(opt);
-  }
+  const view = createEditorFilter({
+    key: 'View',
+    value: block.content.default_view ?? 'text',
+    options: [
+      { value: 'text', label: 'By text' },
+      { value: 'theme', label: 'By theme' },
+      { value: 'technique', label: 'By technique' },
+      { value: 'connections', label: 'Connections' }
+    ],
+    className: 'block-editor__anthology-view',
+    ariaLabel: 'Default view',
+    onChange: () => emitChange()
+  });
 
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
@@ -2818,15 +2773,14 @@ export function createAnthologyEditor(
       ...getLatest(),
       content: {
         title: title.value.trim() || undefined,
-        default_view: view.value as 'text' | 'theme' | 'technique' | 'connections'
+        default_view: view.getValue() as 'text' | 'theme' | 'technique' | 'connections'
       }
     });
   };
 
   title.addEventListener('input', emitChange);
-  view.addEventListener('change', emitChange);
 
-  fields.append(title, view, hint);
+  fields.append(title, view.el, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2839,19 +2793,17 @@ export function createCollectionEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const source = document.createElement('select');
-  source.className = 'block-editor__collection-source';
-  source.setAttribute('aria-label', 'Collection source');
-  for (const [value, label] of [
-    ['unit_lessons', 'Unit lessons'],
-    ['recent_lessons', 'Recent lessons']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    opt.selected = block.content.source === value;
-    source.append(opt);
-  }
+  const source = createEditorFilter({
+    key: 'Source',
+    value: block.content.source,
+    options: [
+      { value: 'unit_lessons', label: 'Unit lessons' },
+      { value: 'recent_lessons', label: 'Recent lessons' }
+    ],
+    className: 'block-editor__collection-source',
+    ariaLabel: 'Collection source',
+    onChange: () => emitChange()
+  });
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -2876,7 +2828,7 @@ export function createCollectionEditor(
     const draft = {
       ...getLatest(),
       content: {
-        source: source.value as 'unit_lessons' | 'recent_lessons',
+        source: source.getValue() as 'unit_lessons' | 'recent_lessons',
         title: title.value.trim() || undefined
       }
     };
@@ -2884,10 +2836,9 @@ export function createCollectionEditor(
     updatePreview(draft);
   };
 
-  source.addEventListener('change', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(source, title, preview);
+  fields.append(source.el, title, preview);
   updatePreview(getLatest());
   return editorShell(block, onChange, fields, getLatest);
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { pickKitOption } from './kit-filter';
 import { CALLOUT_STYLE_CLASS, renderBlock } from '@/blocks/render';
 import {
   createBlockEditor,
@@ -287,7 +288,6 @@ describe('block editors', () => {
 
     const editor = createHeadingEditor(block, onChange);
     const textInput = editor.querySelector<HTMLInputElement>('.block-editor__heading-text')!;
-    const variantSelect = editor.querySelector<HTMLSelectElement>('.block-editor__heading-variant')!;
 
     textInput.value = 'After';
     textInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -297,8 +297,7 @@ describe('block editors', () => {
       content: { text: 'After' }
     });
 
-    variantSelect.value = 'subsection';
-    variantSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    pickKitOption(editor.querySelector('.block-editor__heading-variant'), 'subsection');
 
     expect(onChange).toHaveBeenLastCalledWith({
       ...block,
@@ -336,10 +335,7 @@ describe('block editors', () => {
     };
 
     const editor = createBlockEditor(richText, onChange);
-    const visibility = editor.querySelector<HTMLSelectElement>('.block-editor__visibility')!;
-
-    visibility.value = 'teacher_only';
-    visibility.dispatchEvent(new Event('change', { bubbles: true }));
+    pickKitOption(editor.querySelector('.block-editor__visibility'), 'teacher_only');
 
     expect(onChange).toHaveBeenCalledWith({
       ...richText,

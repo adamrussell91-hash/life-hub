@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { pickKitOption } from './kit-filter';
 import { BlockSchema } from '@/schemas/block';
 import {
   BLOCK_GROUPS,
@@ -575,9 +576,7 @@ describe('visualisation editors', () => {
       title.dispatchEvent(new Event('input'));
       expect(latest.content.title).toBe('Enrolments');
 
-      const type = el.querySelector('.block-editor__chart-type') as HTMLSelectElement;
-      type.value = 'line';
-      type.dispatchEvent(new Event('change'));
+      pickKitOption(el.querySelector('.block-editor__chart-type'), 'line');
       expect(latest.content.chart_type).toBe('line');
 
       const seriesName = el.querySelector('.block-editor__chart-series-name') as HTMLInputElement;
@@ -593,10 +592,7 @@ describe('visualisation editors', () => {
       const el = createChartEditor(block, (next) => {
         latest = next;
       });
-      const colour = el.querySelector('.block-editor__chart-series-color') as HTMLSelectElement;
-      expect(colour).not.toBeNull();
-      colour.value = 'danger';
-      colour.dispatchEvent(new Event('change'));
+      pickKitOption(el.querySelector('.block-editor__chart-series-color'), 'danger');
       expect(latest.content.series[0]?.color).toBe('danger');
     });
   });
@@ -638,9 +634,7 @@ describe('visualisation editors', () => {
       url.dispatchEvent(new Event('input'));
       expect(latest.content.image_url).toBe('https://example.com/diagram.png');
 
-      const source = el.querySelector('.block-editor__diagram-source') as HTMLSelectElement;
-      source.value = 'svg';
-      source.dispatchEvent(new Event('change'));
+      pickKitOption(el.querySelector('.block-editor__diagram-source'), 'svg');
       expect(latest.content.source).toBe('svg');
 
       const svg = el.querySelector('.block-editor__diagram-svg') as HTMLTextAreaElement;

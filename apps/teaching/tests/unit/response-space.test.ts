@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { kitValue, pickKitOption } from './kit-filter';
 import { BlockSchema, QuestionItemSchema, ResponseSpaceSchema } from '@/schemas/block';
 import { createBlock } from '@/blocks/create-block';
 import { createQuestionSetEditor } from '@/blocks/editors';
@@ -84,9 +85,7 @@ describe('response_space editor', () => {
     let latest = createBlock('question_set', 'qs_none') as Extract<Block, { block_type: 'question_set' }>;
     latest.content.questions[0].prompt = 'Discuss this aloud.';
     const editor = createQuestionSetEditor(latest, (next) => { latest = next; }, () => latest);
-    const space = editor.querySelector('.block-editor__question-response-space') as HTMLSelectElement;
-    space.value = 'none';
-    space.dispatchEvent(new Event('change'));
+    pickKitOption(editor.querySelector('.block-editor__question-response-space'), 'none');
     expect(latest.content.questions[0].response_space).toBe('none');
 
     const saved = BlockSchema.parse(JSON.parse(JSON.stringify(latest))) as typeof latest;
@@ -123,21 +122,16 @@ describe('response_space editor', () => {
       () => latest
     );
 
-    const space = root.querySelector(
-      '.block-editor__question-response-space'
-    ) as HTMLSelectElement;
+    const space = root.querySelector('.block-editor__question-response-space');
     expect(space).toBeTruthy();
-    expect(space.value).toBe('medium');
-    space.value = 'extended';
-    space.dispatchEvent(new Event('change'));
+    expect(kitValue(space)).toBe('medium');
+    pickKitOption(space, 'extended');
     expect(latest.content.questions[0]?.response_space).toBe('extended');
 
-    const kind = root.querySelector('.block-editor__question-kind') as HTMLSelectElement;
-    kind.value = 'multiple_choice';
-    kind.dispatchEvent(new Event('change'));
+    pickKitOption(root.querySelector('.block-editor__question-kind'), 'multiple_choice');
     expect(latest.content.questions[0]?.response_space).toBeUndefined();
     expect(
-      (root.querySelector('.block-editor__question-response-space') as HTMLSelectElement | null)
+      (root.querySelector('.block-editor__question-response-space') as HTMLElement | null)
         ?.hidden
     ).toBe(true);
   });

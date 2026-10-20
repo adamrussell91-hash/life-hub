@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { kitLabel, pickKitOption } from './kit-filter';
 import { createBlock } from '@/blocks/create-block';
 import { createCalloutEditor } from '@/blocks/editors';
 import { renderCalloutBlock } from '@/blocks/render';
@@ -45,13 +46,12 @@ describe('Cultural warning callout', () => {
     const b = block(); b.content.style = 'information';
     const onChange = vi.fn();
     const editor = createCalloutEditor(b, onChange);
-    const select = editor.querySelector<HTMLSelectElement>('.block-editor__callout-style')!;
-    select.value = 'cultural_warning'; select.dispatchEvent(new Event('change'));
+    pickKitOption(editor.querySelector('.block-editor__callout-style'), 'cultural_warning');
     expect(onChange.mock.lastCall?.[0].content).toEqual({ ...b.content, style: 'cultural_warning', title: undefined });
   });
   it('shows an existing explicitly titled warning as the dedicated selection', () => {
     const b = block(); b.content.style = 'information'; b.content.title = 'Cultural Warning for Teachers and Students';
-    expect(createCalloutEditor(b, vi.fn()).querySelector<HTMLSelectElement>('.block-editor__callout-style')?.value).toBe('cultural_warning');
+    expect(kitLabel(createCalloutEditor(b, vi.fn()).querySelector('.block-editor__callout-style'))).toBe('Cultural warning');
   });
   it('renders in student and teacher views with decorative canvas and working pause', () => {
     for (const mode of ['student', 'teacher'] as const) {

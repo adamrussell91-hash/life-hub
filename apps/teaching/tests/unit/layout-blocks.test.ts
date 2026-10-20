@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { pickKitOption } from './kit-filter';
 import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
 import {
   createColumnsEditor,
@@ -314,11 +315,7 @@ describe('layout block editors', () => {
       },
       () => latest as Extract<Block, { block_type: 'spacer' }>
     );
-    const select = el.querySelector(
-      '.block-editor__spacer-size'
-    ) as HTMLSelectElement;
-    select.value = 'large';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    pickKitOption(el.querySelector('.block-editor__spacer-size'), 'large');
     expect(onChange).toHaveBeenCalled();
     expect(
       (onChange.mock.calls.at(-1)![0] as Extract<Block, { block_type: 'spacer' }>).content.size
@@ -367,11 +364,7 @@ describe('layout block editors', () => {
       },
       () => latest as Extract<Block, { block_type: 'columns' }>
     );
-    const select = el.querySelector(
-      '.block-editor__columns-preset'
-    ) as HTMLSelectElement;
-    select.value = '50-50';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    pickKitOption(el.querySelector('.block-editor__columns-preset'), '50-50');
     const updated = onChange.mock.calls.at(-1)![0] as Extract<
       Block,
       { block_type: 'columns' }
