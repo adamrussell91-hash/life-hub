@@ -896,7 +896,7 @@ button.tk-chip:focus-visible {
   border: 1px solid color-mix(in srgb, var(--high-sea) 45%, transparent);
   background: #fff;
   font-family: var(--font-ui);
-  font-size: var(--text-2xs);
+  font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   color: var(--high-sea-ink);
   white-space: nowrap;
@@ -1431,11 +1431,11 @@ button.tk-chip:focus-visible {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--navy);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   color: #fff;
 }
