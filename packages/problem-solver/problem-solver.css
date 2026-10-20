@@ -6900,3 +6900,196 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
   .ps-fivecs__rule-label { font-size: 14px; }
   .ps-fivecs__casefile { padding: 16px 16px 18px; }
 }
+
+/* Knowledge management (toolkit p.151, Document): four equal yellow squares stacked with a small
+   even gap. Consider has a blue right-angled triangle in the lower left with its heading at the
+   top; Capture a red band across the top carrying its heading; Share a thick blue frame with its
+   heading inside at the top; Review a red disc carrying its heading. Squares wait as faint paper
+   with a thin ink rule and fill as their block gets an entry: the triangle grows from its right
+   angle, the band slides down, the frame draws round, the disc pops. The answers sit to the right
+   of each square; Capture lists Explicit and Tacit entries as pills.
+   Phone: 72px squares in a left column, the answers beside them, pills on one line. */
+.ps-km {
+  /* Named, so every phone query measures this root box. */
+  container: km / inline-size;
+  --ps-km-side: 148px;
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+  color: var(--ps-ink);
+}
+/* The book's gap between squares is about a twentieth of a side. */
+.ps-km__stack { display: flex; flex-direction: column; gap: 8px; }
+.ps-km__item { position: relative; }
+.ps-km__item:has(:focus-visible),
+.ps-km__item:has(.is-open) { z-index: 2; }
+.ps-km__row { display: grid; grid-template-columns: var(--ps-km-side) minmax(0, 1fr); align-items: start; column-gap: 22px; }
+
+.ps-km__button {
+  display: block;
+  width: var(--ps-km-side);
+  height: var(--ps-km-side);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ps-km__button:disabled { cursor: default; }
+.ps-km__button:focus-visible,
+.ps-km__button[aria-expanded='true'] { outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--ps-paper), 0 0 0 3.5px var(--ps-ink); }
+
+/* The square: paper with a thin ink rule until its block has an entry, then flat yellow. */
+.ps-km__square {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ps-paper);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ps-ink) 35%, transparent);
+  color: var(--ps-ink);
+}
+.ps-km__square.is-filled { background: var(--ps-yellow); box-shadow: none; color: var(--ps-on-yellow); }
+/* Hover lightens the yellow under ink, so contrast only rises. */
+.ps-km__button:not(:disabled):hover .ps-km__square.is-filled { background: color-mix(in srgb, var(--ps-yellow) 88%, #fff); }
+.ps-km__title {
+  display: block;
+  overflow: hidden;
+  font: var(--weight-bold) 15px / 1.2 var(--font-ui);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Consider and Share carry their heading on the yellow, near the top. */
+.ps-km__item--consider .ps-km__title,
+.ps-km__item--share .ps-km__title { position: absolute; top: 12%; left: 12%; right: 12%; }
+
+/* Marks: faint ink until the block fills, then their colour. */
+.ps-km__triangle {
+  position: absolute;
+  left: 8%;
+  bottom: 8%;
+  width: 84%;
+  height: 56%;
+  background: color-mix(in srgb, var(--ps-ink) 10%, transparent);
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+  /* It grows from its right angle. */
+  transform-origin: 0 100%;
+}
+.ps-km__square.is-filled .ps-km__triangle { background: var(--ps-blue); }
+
+.ps-km__band {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 27%;
+  padding-inline: 6px;
+  background: color-mix(in srgb, var(--ps-ink) 8%, transparent);
+  color: var(--ps-ink);
+}
+.ps-km__square.is-filled .ps-km__band { background: var(--ps-red); color: #fff; }
+.ps-km__band .ps-km__title { min-width: 0; }
+
+.ps-km__frame { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ps-km__frame-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ps-ink) 12%, transparent);
+  stroke-width: 9;
+}
+.ps-km__square.is-filled .ps-km__frame-line { stroke: var(--ps-blue); }
+
+.ps-km__disc {
+  position: absolute;
+  top: 9%;
+  left: 9%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 82%;
+  height: 82%;
+  padding: 18% 12% 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ps-ink) 8%, transparent);
+  color: var(--ps-ink);
+}
+.ps-km__square.is-filled .ps-km__disc { background: var(--ps-red); color: #fff; }
+.ps-km__disc .ps-km__title { min-width: 0; }
+
+/* Answers beside each square. */
+.ps-km__answer { display: grid; gap: 8px; min-width: 0; padding-top: 10px; }
+.ps-km__answer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.ps-km__answer-title {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-semibold) 16px / 1.35 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.ps-km__answer-title.ps-km__hint { color: var(--muted, var(--ps-ink)); font-weight: var(--weight-regular); font-size: 14px; }
+.ps-km__answer-head .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+.ps-km__item--capture .ps-km__answer-title:not(.ps-km__hint) { font: var(--weight-semibold) 12px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+
+/* Capture: Explicit and Tacit side by side, each entry a pill. */
+.ps-km__lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.ps-km__lists[hidden] { display: none; }
+.ps-km__list-wrap { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.ps-km__meta { margin: 0; font: var(--weight-semibold) 10px / 1.3 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-km__list { display: grid; gap: 6px; min-width: 0; }
+.ps-km__list:empty { display: none; }
+.ps-km__empty { margin: 0; color: var(--muted, var(--ps-ink)); font: var(--weight-regular) 13px / 1.35 var(--font-ui); }
+.ps-km__empty[hidden] { display: none; }
+.ps-km__pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  justify-self: start;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background: var(--ps-card);
+  box-shadow: inset 0 0 0 1px var(--ps-ghost);
+  color: var(--ps-ink);
+}
+.ps-km__pill-text {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  font: var(--weight-medium, 500) 13px / 1.35 var(--font-ui);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ps-km__pill .ps-objection { flex: none; margin-top: 0; opacity: 1; }
+
+/* Details cards open under their row; Capture lists each entry under its own heading. */
+.ps-km__item > .ps-details { width: 100%; }
+.ps-km .ps-details__card + .ps-details__card { margin-top: 6px; }
+.ps-km__card-head { margin: 0 0 4px; color: var(--ink); font: var(--weight-semibold) var(--text-sm) / 1.35 var(--font-ui); }
+
+/* Phone: 72px squares in a left column, the answers beside them, pills on one line. */
+@container km (max-width: 480px) {
+  /* The root is the container, so the side is set on the stack inside it. */
+  .ps-km__stack { --ps-km-side: 72px; gap: 4px; }
+  .ps-km__row { column-gap: 14px; }
+  .ps-km__title { font-size: 12px; }
+  .ps-km__item--consider .ps-km__title { top: 13%; left: 6%; right: 6%; }
+  .ps-km__item--share .ps-km__title { top: 13%; }
+  .ps-km__band { padding-inline: 3px; }
+  .ps-km__disc { align-items: center; padding: 0 6%; }
+  .ps-km__answer { gap: 6px; padding-top: 4px; }
+  .ps-km__answer-title { font-size: 14px; -webkit-line-clamp: 2; }
+  .ps-km__answer-title.ps-km__hint { font-size: 13px; }
+  .ps-km__lists { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .ps-km__pill { padding: 4px 10px; }
+  .ps-km__pill-text { display: block; text-overflow: ellipsis; white-space: nowrap; }
+}
