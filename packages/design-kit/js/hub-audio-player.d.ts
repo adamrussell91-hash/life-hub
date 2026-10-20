@@ -7,3 +7,4 @@ export function createHubAudioPlayer(
   src: string,
   opts?: { title?: string; className?: string }
 ): Promise<HTMLElement | null>;
+export function measureUnknownDuration(audio: HTMLAudioElement): void;

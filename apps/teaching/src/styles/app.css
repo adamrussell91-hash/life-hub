@@ -2175,6 +2175,48 @@ a:hover {
   display: none;
 }
 
+/* Record into an audio block: a red dot that pulses while the mic is live. */
+.block-editor__record {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+
+.block-editor__record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  font-variant-numeric: tabular-nums;
+}
+
+.block-editor__record-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--danger, #b3261e);
+}
+
+.block-editor__record.is-recording .block-editor__record-dot {
+  animation: block-editor-record-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes block-editor-record-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-editor__record.is-recording .block-editor__record-dot {
+    animation: none;
+  }
+}
+
+.block-editor__record-rescue[hidden] {
+  display: none;
+}
+
 .block-editor__media-actions > .btn {
   width: auto;
 }
