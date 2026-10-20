@@ -44,6 +44,7 @@ import double_loop from './glyphs/tools/double_loop.svg?raw';
 import feedback_matrix from './glyphs/tools/feedback_matrix.svg?raw';
 import five_cs from './glyphs/tools/five_cs.svg?raw';
 import knowledge_management from './glyphs/tools/knowledge_management.svg?raw';
+import lightning from './glyphs/lightning.svg?raw';
 import type { PsToolId } from './types';
 
 const SOURCES: Record<string, string> = {
@@ -98,5 +99,14 @@ export function toolEmblem(id: PsToolId, doc: Document = document): HTMLSpanElem
   span.className = 'ps-emblem';
   span.setAttribute('aria-hidden', 'true');
   span.innerHTML = EMBLEMS[id];
+  return span;
+}
+
+/** The Lightning bolt: ink only (currentColor), for the black-and-white mode. */
+export function lightningGlyph(doc: Document = document): HTMLSpanElement {
+  const span = doc.createElement('span');
+  span.className = 'ps-lightning-glyph';
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = lightning;
   return span;
 }

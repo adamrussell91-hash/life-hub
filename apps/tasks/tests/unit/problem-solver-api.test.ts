@@ -37,6 +37,18 @@ describe('problemSolverApi.actWith', () => {
     }
   });
 
+  it('create posts the kind for a Lightning run', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, data: { session: { id: 'l1' } } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await problemSolverApi.create({ text: 'The door sticks', kind: 'lightning' });
+      const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(JSON.parse(String(init.body)).create).toMatchObject({ text: 'The door sticks', kind: 'lightning' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('linked asks for the sessions linked to a task', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, data: { sessions: [{ id: 's1', title: 'T', phase: 'implement', model: 'seven_step', role: 'task' }] } }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

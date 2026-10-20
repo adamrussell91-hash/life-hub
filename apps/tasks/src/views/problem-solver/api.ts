@@ -7,7 +7,7 @@ export type PsLinkedSession = { id: string; title: string; phase: string; model:
 export const problemSolverApi = {
   list: () => apiGet<{ sessions: PsSummary[] }>('/api/problem-solver?list=1').then((r) => r.sessions),
   get: (id: string) => apiGet<{ session: PsSession }>(`/api/problem-solver?id=${encodeURIComponent(id)}`).then((r) => r.session),
-  create: (body: { text: string; title?: string; links?: PsSession['links'] }) =>
+  create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' }) =>
     apiPost<{ session: PsSession }>('/api/problem-solver', { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
   act: (session: PsSession, action: PsAction, text?: string) =>
     apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),
