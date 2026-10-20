@@ -34,7 +34,18 @@
 .ann-bar { display: flex; flex-direction: column; gap: var(--space-1); box-shadow: var(--elev-1); padding: var(--space-2) var(--space-3); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink); font-size: .9rem; }
 .ann-bar:focus { outline: none; }
 .ann-bar [hidden] { display: none !important; }
-.ann-bar__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-height: 44px; }
+.ann-bar__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-height: 36px; }
+/* At rest the bar is only a chip at the right edge, and the tray floats over the lesson instead of pushing it down. */
+.lesson-builder__ann:has(> .ann-bar[data-state="idle"]), .lesson-builder__ann:has(> .ann-bar[data-state="error"]) { position: relative; z-index: 6; height: 0; margin-bottom: 0; }
+.ann-bar[data-state="idle"], .ann-bar[data-state="error"] { position: absolute; top: var(--space-2); left: var(--space-2); right: var(--space-2); z-index: 1; pointer-events: none; padding: 0; background: none; border: 0; box-shadow: none; align-items: flex-start; }
+.ann-bar[data-state="idle"] .ann-bar__row, .ann-bar[data-state="error"] .ann-bar__row { min-height: 0; }
+.ann-bar .ann-bar__chip, .ann-bar__tray { pointer-events: auto; }
+.ann-bar .ann-bar__chip { min-height: 28px; padding: 0 var(--space-2); border-radius: 999px; font-size: .8rem; font-weight: 600; color: var(--muted); background: color-mix(in srgb, var(--paper) 72%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: .7; transition: opacity 120ms ease, color 120ms ease; }
+.ann-bar .ann-bar__chip::before { content: "✦"; margin-right: 4px; color: var(--alchemy-accent, var(--wave)); }
+.ann-bar .ann-bar__chip:hover, .ann-bar .ann-bar__chip:focus-visible, .ann-bar--tray .ann-bar__chip { opacity: 1; color: var(--ink); }
+.ann-bar[data-state="error"] .ann-bar__chip::after { content: ""; width: 6px; height: 6px; margin-left: 4px; border-radius: 50%; background: var(--danger); }
+.ann-bar__tray { margin-top: var(--space-1); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); width: min(30rem, 100%); box-sizing: border-box; padding: var(--space-2) var(--space-3); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--elev-2, var(--elev-1)); }
+.ann-bar__tray .ann-bar__rules { margin-left: 0; flex-basis: 100%; font-size: .85rem; }
 .ann-bar__name { font-weight: 600; color: var(--alchemy-accent, var(--wave)); }
 .ann-bar__live { flex: 1 1 12rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ann-bar[data-state="working"] .ann-bar__live::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: var(--space-2); border-radius: 50%; background: var(--alchemy-accent, var(--wave)); animation: ann-breathe 1.4s ease-in-out infinite; }
@@ -44,7 +55,7 @@
 .ann-bar__extra { display: contents; }
 .ann-bar__more-toggle { display: none; }
 .ann-bar .btn { min-height: 36px; }
-.ann-bar__start { min-height: 40px; }
+.ann-bar__start { min-height: 36px; }
 .ann-bar__rules { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: auto; min-width: 0; }
 .ann-bar__rules a { overflow-wrap: anywhere; }
 .ann-bar__muted { color: var(--muted); }
@@ -97,5 +108,6 @@
   .ann-bar__prev, .ann-bar__next, .ann-bar__more-toggle { flex: 1 1 0; justify-content: center; }
   .ann-bar__rules { margin-left: 0; flex-basis: 100%; }
   .ann-bar .btn { min-height: 44px; }
+  .ann-bar .ann-bar__chip { min-height: 32px; }
 }
 @media print { .ann-bar, .ann-inline { display: none !important; } .lesson-page__block.ann-target { box-shadow: var(--elev-1); } .lesson-page__block[data-ann-count]::after { display: none; } }
