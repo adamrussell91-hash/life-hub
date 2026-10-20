@@ -1731,8 +1731,10 @@ export async function renderPeoplePage(
       if (!current()) return;
       todayData = result;
       renderTodayStrip();
-    } catch {
+    } catch (err) {
       if (!current()) return;
+      // Keep the cause visible: a server bug here once hid behind this line for weeks.
+      console.warn('People today strip failed', err);
       todayStrip.classList.add('people-page__today--compact');
       todayStrip.replaceChildren(
         el('p', 'people-pane__empty people-page__today-unavailable', 'Today strip unavailable.')
