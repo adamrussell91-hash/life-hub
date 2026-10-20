@@ -240,3 +240,20 @@ test('a finished Lightning run refuses messages, so no coach call is queued', as
   await store.write('op', run.id, run, null);
   await assert.rejects(svc.action('op', { id: run.id, revision: run.revision, requestId: 'q1', action: 'say', text: 'Hello again' }), (err) => err.status === 409 && /This run is finished\. Press It came back/.test(err.message));
 });
+
+test('a Lightning run goes from create to finished with the scripted coach', async () => {
+  const svc = service();
+  let s = await svc.create('op', { kind: 'lightning', text: 'The garden gate keeps swinging open.', requestId: 'l0' });
+  assert.equal(s.kind, 'lightning');
+  s = await svc.run('op', s.id);
+  assert.equal(s.turns.at(-1).text, 'Could you accept things as they are?');
+  let i = 0;
+  for (const text of ['no', 'The gate should stay shut on its own', 'no', 'no', 'no, drew the hinge', 'no', 'yes, wrote a list of fixes', 'Gates need a catch as well as hinges', 'Fit a catch this weekend']) {
+    s = await svc.action('op', { id: s.id, revision: s.revision, requestId: `l${(i += 1)}`, action: 'say', text });
+    s = await svc.run('op', s.id);
+  }
+  assert.equal(s.status, 'finished');
+  assert.ok(s.lightning.finishedAt);
+  assert.equal(s.turns.at(-1).text, 'That run is done.');
+  assert.equal(s.runner.status, 'idle');
+});

@@ -11,6 +11,7 @@ import { longestEarlier } from '../../../../packages/problem-solver/tools/after-
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
 import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
+import { applyStep, currentEntry, isQuestion, LIGHTNING_NODES } from '../../../../packages/problem-solver/lightning.mjs';
 import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
 
 /**
@@ -165,9 +166,58 @@ function parseLink(text) {
   return match ? { from: slotFrom(match[1]), to: slotFrom(match[2]), kind: slotFrom(match[3]) } : null;
 }
 
-const base = { node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null };
+const base = { node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, lightning: null };
+
+/**
+ * Lightning runs: the coach asks the current box, reads a reply starting yes or no (then
+ * optional words) as the answer, takes a goal, learn, next or cannot line of three words or
+ * more as the note, and treats `escalate` as asking for the full process.
+ */
+const LIGHTNING_NOTE_NODES = ['goal', 'learn', 'next', 'cannot'];
+
+function lightningMessage(state, before) {
+  const entry = currentEntry(state);
+  if (!entry) return 'That run is done.';
+  const def = LIGHTNING_NODES[entry.node];
+  const strategy = def.kind === 'strategy' ? ` Try it on your snag, then say what you did and whether it worked.` : '';
+  return `${before}Next: ${def.label}${/[?.]$/.test(def.label) ? '' : '.'}${strategy}`;
+}
+
+function lightningTurn(session, last) {
+  const state = session.lightning;
+  const entry = currentEntry(state);
+  const turn = (verdict, message, lightning = null, extra = {}) => ({ ...base, verdict, message, lightning, ...extra });
+  if (!entry) return turn('clarify', 'That run is done. Say "it came back" if it returns.');
+  const def = LIGHTNING_NODES[entry.node];
+  const asking = `${def.label}${def.kind === 'strategy' ? ' Try it on your snag, then say what you did and whether it worked.' : ''}`;
+  if (session.turns.length === 1 || last === 'It came back.') return turn('clarify', asking);
+  if (/^escalate$/i.test(last.trim())) {
+    return turn('clarify', 'This sounds bigger than a quick pass. The full process may suit it better.', null, { suggestion: { kind: 'escalate', reason: 'Named as needing the full process.' } });
+  }
+  const reply = /^(yes|no)\b[\s,.]*(.*)$/is.exec(last.trim());
+  const answer = reply?.[1].toLowerCase();
+  const words = reply?.[2].trim() ?? '';
+  const chartAnswered = reply && !words && /^(yes|no)\.$/i.test(last.trim()) && state.path.at(-2)?.answer === answer;
+  if (chartAnswered) return turn('clarify', lightningMessage(state, 'Noted. '));
+  const note = words || undefined;
+  if (isQuestion(entry.node) || (def.kind === 'strategy' && entry.node !== 'cannot')) {
+    if (!answer) return turn('clarify', `Start with yes or no. ${asking}`);
+    const step = { node: entry.node, answer, ...(note ? { note } : {}) };
+    return turn('accept', lightningMessage(applyStep(state, step, session.updatedAt), ''), step);
+  }
+  if (LIGHTNING_NOTE_NODES.includes(entry.node)) {
+    if (wordCount(last) < 3) return turn('clarify', 'Say a little more about that.');
+    const step = { node: entry.node, note: last.trim() };
+    return turn('accept', lightningMessage(applyStep(state, step, session.updatedAt), ''), step);
+  }
+  return turn('clarify', asking);
+}
 
 export async function scriptedCoach(session) {
+  if (session.kind === 'lightning') {
+    const turn = session.turns.at(-1);
+    return lightningTurn(session, turn?.role === 'user' ? turn.text : '');
+  }
   const latest = session.turns.at(-1);
   const last = latest?.role === 'user' ? latest.text : '';
   if (session.runner?.mode === 'boundary') {
