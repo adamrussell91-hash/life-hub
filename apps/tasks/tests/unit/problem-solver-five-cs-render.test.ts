@@ -241,6 +241,20 @@ describe('5 Cs view', () => {
     expect(ruleAnims.filter((anim) => anim.cancel.mock.calls.length > 0).length).toBeGreaterThanOrEqual(8);
   });
 
+  it('stays still on undo of the latest condense item', () => {
+    const { spy } = spyAnimate();
+    const view = createFiveCsView();
+    view.update(cs([X, G, D1]));
+    view.update(cs([X, G, D1, D2]));
+    spy.mockClear();
+    view.update(cs([X, G, D1]));
+    const item = slice(view, 'condense');
+    expect(spy.mock.contexts.filter((ctx) => item.contains(ctx as Node) || ctx === item)).toEqual([]);
+    expect(spy).not.toHaveBeenCalled();
+    expect(item.querySelector('.ps-fivecs__title')!.textContent).toBe('One swap sheet');
+    expect(item.querySelector('.ps-fivecs__count')!.textContent).toBe('');
+  });
+
   it('has a key pairing each number with its heading, which opens and focuses the slice', () => {
     const view = createFiveCsView();
     view.update(cs([X, G, D1, D2]));
