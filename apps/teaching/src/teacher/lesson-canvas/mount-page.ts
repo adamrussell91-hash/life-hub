@@ -34,6 +34,7 @@ import type { NetworkLine } from '@/schemas/block';
 import {
   PEDAGOGICAL_MODES,
   PEDAGOGICAL_MODE_LABELS,
+  pedagogicalModeLabel,
   resolvePedagogicalMode,
   type PedagogicalMode
 } from '@/curriculum/pedagogical-mode';
@@ -929,7 +930,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     cover: lesson.cover ?? null,
     media,
     title: lesson.title,
-    eyebrow: 'Lesson',
+    eyebrow: pedagogicalModeLabel(lesson.pedagogical_mode),
     entityId: lesson.id,
     editable: true,
     size: 'hero',
@@ -968,6 +969,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   modeSelect.addEventListener('change', () => {
     const pedagogical_mode = modeSelect.value as PedagogicalMode;
     emitLesson({ ...lesson, pedagogical_mode });
+    banner.update({ eyebrow: PEDAGOGICAL_MODE_LABELS[pedagogical_mode] });
     syncQuizPanel();
   });
   metaRow.append(modeSelect);
@@ -1093,6 +1095,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       banner.update({
         cover: lesson.cover ?? null,
         title: lesson.title,
+        eyebrow: pedagogicalModeLabel(lesson.pedagogical_mode),
         ...(nextMedia ? { media } : {})
       });
       canvas.update(lesson.blocks, media);
