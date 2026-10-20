@@ -1126,7 +1126,7 @@ export function renderTabsBlock(
   }
 
   const tablist = document.createElement('div');
-  tablist.className = 'block-tabs__tablist';
+  tablist.className = 'hub-pills block-tabs__tablist';
   tablist.setAttribute('role', 'tablist');
   tablist.setAttribute('aria-label', 'Content tabs');
 
@@ -1160,7 +1160,7 @@ export function renderTabsBlock(
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'block-tabs__tab';
+    btn.className = 'hub-pills__btn block-tabs__tab';
     btn.setAttribute('role', 'tab');
     btn.id = tabId;
     btn.setAttribute('aria-controls', panelId);

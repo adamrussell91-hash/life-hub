@@ -1407,45 +1407,23 @@ button.tk-chip:focus-visible {
   overflow-wrap: anywhere;
 }
 
-/* Level switch: three equal segments, the open level filled. */
+/* Level switch: kit .hub-pills, three equal segments. */
 .an-levels {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1.5px solid var(--marine);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
+  display: flex;
+  width: 100%;
 }
 
-.an-levels__btn {
+.an-levels > .an-levels__btn {
   display: grid;
+  flex: 1 1 0;
   gap: 1px;
   min-height: 44px;
   padding: 6px var(--space-2);
-  border: 0;
-  border-left: 1px solid color-mix(in srgb, var(--marine) 40%, #fff);
-  background: #fff;
-  font-family: var(--font-ui);
   text-align: center;
-  color: var(--navy);
-  cursor: pointer;
-}
-
-.an-levels__btn:first-child {
-  border-left: 0;
-}
-
-.an-levels__btn[aria-pressed='true'] {
-  background: var(--navy);
-  color: #fff;
-}
-
-.an-levels__btn:focus-visible {
-  outline: 2px solid var(--wave);
-  outline-offset: -4px;
 }
 
 .an-levels__num {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
