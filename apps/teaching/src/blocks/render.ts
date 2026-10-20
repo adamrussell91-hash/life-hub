@@ -49,6 +49,8 @@ import { renderToolkitContent } from '@/toolkit/render';
 import 'photoswipe/dist/photoswipe.css';
 import type { NetworkLine } from '@/schemas/block';
 import type { NetLesson } from '@/network/model';
+// Last: the shared block anatomy roles win ties with block stylesheets above.
+import '@/styles/block-anatomy.css';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
 /** Lessons are in unit order and limited to what the viewer may see; `href` only on ones they may open. */
@@ -155,7 +157,7 @@ export function renderRichTextBlock(
   ctx: RenderContext = {}
 ): HTMLElement {
   const body = document.createElement('div');
-  body.className = 'block-rich-text';
+  body.className = 'block-rich-text block-body';
   body.innerHTML = sanitizeRichTextHtml(block.content.html);
   if (mode === 'print') return wrapBlock(body, block, mode);
 
@@ -197,13 +199,13 @@ export function renderCalloutBlock(
 
   if (block.content.title) {
     const title = document.createElement('p');
-    title.className = 'callout__title';
+    title.className = 'callout__title block-subtitle';
     title.textContent = block.content.title;
     callout.append(title);
   }
 
   const body = document.createElement('p');
-  body.className = 'callout__body';
+  body.className = 'callout__body block-body';
   body.textContent = block.content.body;
   callout.append(body);
   if (style === 'cultural_warning') mountCulturalWarningTracks(callout, mode !== 'print');
@@ -253,7 +255,7 @@ export function renderImageBlock(
   }
   if (block.content.caption) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-image__caption';
+    cap.className = 'block-image__caption block-secondary';
     cap.textContent = block.content.caption;
     figure.append(cap);
   }
@@ -280,7 +282,7 @@ export function renderVideoBlock(
     );
     if (block.content.caption) {
       const cap = document.createElement('p');
-      cap.className = 'block-video__caption';
+      cap.className = 'block-video__caption block-secondary';
       cap.textContent = block.content.caption;
       wrap.append(cap);
     }
@@ -289,7 +291,7 @@ export function renderVideoBlock(
 
   if (block.content.title) {
     const title = document.createElement('p');
-    title.className = 'block-video__title';
+    title.className = 'block-video__title block-subtitle';
     title.textContent = block.content.title;
     wrap.append(title);
   }
@@ -324,7 +326,7 @@ export function renderVideoBlock(
   }
   if (block.content.caption) {
     const cap = document.createElement('p');
-    cap.className = 'block-video__caption';
+    cap.className = 'block-video__caption block-secondary';
     cap.textContent = block.content.caption;
     wrap.append(cap);
   }
@@ -552,7 +554,7 @@ export function renderQuoteBlock(
   figure.className = 'block-quote';
 
   const quote = document.createElement('blockquote');
-  quote.className = 'block-quote__text';
+  quote.className = 'block-quote__text block-body';
   quote.textContent = block.content.quote;
   figure.append(quote);
 
@@ -561,7 +563,7 @@ export function renderQuoteBlock(
   const reference = block.content.reference?.trim();
   if (attribution || source || reference) {
     const caption = document.createElement('figcaption');
-    caption.className = 'block-quote__attribution';
+    caption.className = 'block-quote__attribution block-secondary';
     const parts = [attribution, source, reference].filter(Boolean);
     caption.textContent = parts.join(' — ');
     figure.append(caption);
@@ -586,11 +588,11 @@ export function renderDefinitionBlock(
   dl.className = 'block-definition';
 
   const dt = document.createElement('dt');
-  dt.className = 'block-definition__term';
+  dt.className = 'block-definition__term block-subtitle';
   dt.textContent = block.content.term;
 
   const dd = document.createElement('dd');
-  dd.className = 'block-definition__definition';
+  dd.className = 'block-definition__definition block-body';
   dd.textContent = block.content.definition;
 
   dl.append(dt, dd);
@@ -634,7 +636,7 @@ export function renderAudioBlock(
 
   if (block.content.title?.trim()) {
     const title = document.createElement('p');
-    title.className = 'block-audio__title';
+    title.className = 'block-audio__title block-subtitle';
     title.textContent = block.content.title;
     wrap.append(title);
   }
@@ -706,11 +708,11 @@ export function renderAccordionBlock(
     details.className = 'block-accordion__item';
 
     const summary = document.createElement('summary');
-    summary.className = 'block-accordion__title';
+    summary.className = 'block-accordion__title block-subtitle';
     summary.textContent = item.title;
 
     const body = document.createElement('div');
-    body.className = 'block-accordion__body';
+    body.className = 'block-accordion__body block-body';
     body.textContent = item.body;
 
     if (mode === 'print') details.open = true;
@@ -727,7 +729,7 @@ export function renderTableBlock(
   mode: RenderMode
 ): HTMLElement {
   const table = document.createElement('table');
-  table.className = 'block-table';
+  table.className = 'block-table block-body';
 
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
@@ -844,7 +846,7 @@ export function renderSectionBlock(
   section.className = 'block-section';
 
   const title = document.createElement('h2');
-  title.className = 'block-section__title';
+  title.className = 'block-section__title block-title';
   title.textContent = block.content.title;
 
   const body = document.createElement('div');
@@ -915,7 +917,7 @@ export function renderTimelineBlock(
     if (layout === 'alternate') item.style.gridRow = `${index + 1} / span 2`;
 
     const when = document.createElement('p');
-    when.className = 'block-timeline__when';
+    when.className = 'block-timeline__when block-eyebrow';
     const { start, end } = splitTimelineWhen(event.when);
     if (end) {
       const startEl = document.createElement('span');
@@ -938,13 +940,13 @@ export function renderTimelineBlock(
     card.className = 'block-timeline__card';
 
     const label = document.createElement('h3');
-    label.className = 'block-timeline__label';
+    label.className = 'block-timeline__label block-subtitle';
     label.textContent = event.label;
     card.append(label);
 
     if (event.description.trim()) {
       const description = document.createElement('p');
-      description.className = 'block-timeline__description';
+      description.className = 'block-timeline__description block-body';
       description.textContent = event.description;
       card.append(description);
     }
@@ -984,7 +986,7 @@ export function renderCardStackBlock(
 
   if (block.content.title?.trim()) {
     const heading = document.createElement('h2');
-    heading.className = 'block-card-stack__heading';
+    heading.className = 'block-card-stack__heading block-title';
     heading.textContent = block.content.title.trim();
     root.append(heading);
   }
@@ -1044,7 +1046,7 @@ export function renderOutcomesBlock(
   const root = document.createElement('div');
   root.className = 'block-outcomes';
   const heading = document.createElement('h2');
-  heading.className = 'block-outcomes__title';
+  heading.className = 'block-outcomes__title block-eyebrow';
   heading.textContent = 'Outcomes';
   root.append(heading);
   root.append(
@@ -1069,7 +1071,7 @@ export function renderCollectionBlock(
   const titleText = block.content.title?.trim();
   if (titleText) {
     const title = document.createElement('h3');
-    title.className = 'block-collection__title';
+    title.className = 'block-collection__title block-title';
     title.textContent = titleText;
     root.append(title);
   }
@@ -1276,7 +1278,7 @@ function galleryFigure(
 
   if (entry.caption) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-gallery__caption';
+    cap.className = 'block-gallery__caption block-secondary';
     cap.textContent = entry.caption;
     figure.append(cap);
   }
@@ -1980,7 +1982,7 @@ export function renderChartBlock(
 
   if (block.content.title?.trim()) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-chart__title';
+    cap.className = 'block-chart__title block-title';
     cap.textContent = block.content.title;
     root.append(cap);
   }
@@ -2117,7 +2119,7 @@ export function renderWhiteboardBlock(
 
   if (block.content.title?.trim()) {
     const title = document.createElement('figcaption');
-    title.className = 'block-whiteboard__title';
+    title.className = 'block-whiteboard__title block-title';
     title.textContent = block.content.title;
     root.append(title);
   }
@@ -2144,7 +2146,7 @@ export function renderMindMapBlock(
 
   if (block.content.title?.trim()) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-mind-map__title';
+    cap.className = 'block-mind-map__title block-title';
     cap.textContent = block.content.title;
     root.append(cap);
   }
@@ -2166,7 +2168,7 @@ export function renderConceptMapBlock(
 
   if (block.content.title?.trim()) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-concept-map__title';
+    cap.className = 'block-concept-map__title block-title';
     cap.textContent = block.content.title;
     root.append(cap);
   }

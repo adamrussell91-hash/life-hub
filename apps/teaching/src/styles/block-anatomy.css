@@ -1,0 +1,221 @@
+/*
+ * Lesson block anatomy: one grammar for every block.
+ *
+ * Slot order, each slot optional and simply not rendered when blank:
+ *   eyebrow → title → body / lead → view switch → content → disclosure(s) → actions or pager
+ *
+ * Every block renderer tags its parts with these role classes; block CSS keeps
+ * layout and identity only (toolkit colour boxes, analogy organisers, the
+ * quadrant grid), never its own type sizes or text colours for these roles.
+ * Tokens only. Imported last by blocks/render.ts so the roles win ties.
+ */
+
+/* Roles --------------------------------------------------------------------- */
+
+.block-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Thinking families (toolkit and analogy): High Sea ink and the family icon. */
+.block-eyebrow--thinking {
+  color: var(--high-sea-ink);
+}
+
+.block-eyebrow__icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.block-eyebrow__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.block-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+  color: var(--navy);
+}
+
+.block-subtitle {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  color: var(--navy);
+}
+
+.block-body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-normal);
+  color: var(--ink);
+}
+
+.block-secondary {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-normal);
+  color: var(--muted);
+}
+
+/* Roles on a navy or tinted fill (toolkit Tool box, card stack cards). */
+.block-on-dark .block-eyebrow,
+.block-on-dark .block-secondary {
+  color: var(--on-dark-muted);
+}
+
+.block-on-dark .block-title,
+.block-on-dark .block-subtitle,
+.block-on-dark .block-body {
+  color: var(--on-dark);
+}
+
+/* View switch: kit .hub-pills, directly under the title / body. */
+.block-switch {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+/* Disclosure: one toggle with a kit chevron, left-aligned, above actions. */
+.block-disclosure {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.block-disclosure__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+}
+
+.block-disclosure__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.block-disclosure__toggle::marker {
+  content: '';
+}
+
+/* Kit chevron: points right when shut, down when open. */
+.block-disclosure__toggle::before {
+  content: '';
+  flex: none;
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+}
+
+.block-disclosure__toggle[aria-expanded='true']::before,
+.block-disclosure__toggle[aria-pressed='true']::before,
+details[open] > .block-disclosure__toggle::before {
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-disclosure__toggle::before {
+    transition: none;
+  }
+}
+
+.block-disclosure__panel {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Actions: bottom of the block, left-aligned, primary first. */
+.block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+/* Pager: centred directly under the deck. Prev · n / N · Next. */
+.block-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.block-pager__status {
+  min-width: 3.5rem;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Heading block: drawn on the canvas so it divides the lesson. */
+.lesson-blocks .block[data-block-type='heading'] {
+  padding-block: var(--space-2) 0;
+  padding-inline: var(--space-1);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Touch targets: 44px for every control at phone width. */
+@media (max-width: 40rem) {
+  .lesson-blocks .block :is(
+    button,
+    .btn,
+    .hub-pills__btn,
+    .hub-list__chip,
+    .hub-chip,
+    summary,
+    [role='tab'],
+    select
+  ) {
+    min-height: 44px;
+  }
+
+  .lesson-blocks .block :is(.hub-icon-btn, .ct-icon-btn, .ct-trigger) {
+    min-width: 44px;
+  }
+}
