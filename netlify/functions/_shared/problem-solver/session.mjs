@@ -1,5 +1,5 @@
 // netlify/functions/_shared/problem-solver/session.mjs
-import { addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
+import { acceptProblem, addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
 import { defaultToolFor, firstStep, nextPhase, planStep, planStepForBook, stepName } from '../../../../packages/problem-solver/steps.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
@@ -120,6 +120,8 @@ export function createSession({ title = '', text, links = [] }, deps) {
     reviewState: null,
     taskSnapshot: null,
     detour: null,
+    caseFile: null,
+    caseFileDeclined: null,
     requestIds: [],
     runner: { status: 'queued', mode: 'turn', error: null },
     createdAt: at,
@@ -223,7 +225,8 @@ export function applyCoachTurn(session, turn, deps) {
   } else if (currentStep(next)) {
     const run = activeRun(next);
     if (run && turn.node && turn.verdict === 'accept') {
-      next = placeAccepted(next, turn, coachTurn.id, deps);
+      // A node the tool refuses to accept (a name breaking a strict rule) is not placed; the turn stays.
+      if (!acceptProblem(run, turn.node)) next = placeAccepted(next, turn, coachTurn.id, deps);
     } else if (run && !turn.node && turn.verdict === 'accept' && turn.edges?.length) {
       next = replaceRun(next, addAllowedEdges(run, turn.edges));
     } else if (run && turn.node && turn.verdict === 'challenge') {
@@ -252,6 +255,8 @@ export function keepAnyway(session, deps) {
   const run = activeRun(session);
   if (!keep || !run || run.id !== keep.runId) throw fail(409, 'action_not_allowed', 'Nothing to keep.');
   if (!canPlace(run, keep.slot)) throw fail(409, 'action_not_allowed', 'That answer no longer fits here.');
+  const refused = acceptProblem(run, keep);
+  if (refused) throw fail(409, 'action_not_allowed', refused);
   let placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, title: keep.title, ...(keep.tag ? { tag: keep.tag } : {}), state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
   for (const edge of keep.edges ?? []) {
     const from = slotToId(placed, edge.from);
@@ -459,6 +464,66 @@ export function dismissReview(session, deps) {
     }
   }
   return touch(next, deps);
+}
+
+const DIGEST_RE = /^[0-9a-f]{8}$/;
+const SECTION_KEYS_MAX = 20;
+
+function cleanTarget(raw) {
+  const id = typeof raw?.id === 'string' ? raw.id.trim() : '';
+  if (!['task', 'project'].includes(raw?.kind) || !id || id.length > 200) throw fail(400, 'validation_error', 'A case file needs a task or project to go on.');
+  return { kind: raw.kind, id };
+}
+
+function cleanDigests(raw) {
+  const entries = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.entries(raw) : [];
+  if (!entries.length || entries.length > SECTION_KEYS_MAX || entries.some(([key, value]) => !/^[a-z_]{1,24}$/.test(key) || !DIGEST_RE.test(String(value)))) {
+    throw fail(400, 'validation_error', 'The case file sections are not valid.');
+  }
+  return Object.fromEntries(entries);
+}
+
+const sameTarget = (a, b) => Boolean(a && b) && a.kind === b.kind && a.id === b.id;
+
+/**
+ * The page wrote the case file (or an update) to a task or project page; record it. No coach call.
+ * A first write or a move (`moved`: the old page is gone) replaces the section digests; an update
+ * merges them and must be the next version on the same page. The same version on the same page
+ * again is a no-op, so a retry after a lost response is safe. The page joins the problem's links.
+ */
+export function linkCaseFile(session, payload, deps) {
+  if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
+  if (!session.model || !planStepForBook(session.model.id, 'document')) throw fail(409, 'action_not_allowed', 'This problem has no Document step.');
+  const target = cleanTarget(payload?.target);
+  const version = payload?.version;
+  if (!Number.isInteger(version) || version < 1 || version > 999) throw fail(400, 'validation_error', 'A case file version is required.');
+  const title = typeof payload?.title === 'string' ? payload.title.trim().slice(0, 260) : '';
+  if (!title) throw fail(400, 'validation_error', 'A case file title is required.');
+  const sections = cleanDigests(payload?.sections);
+  const record = session.caseFile;
+  if (record && record.version === version && sameTarget(record.target, target)) return session;
+  const moved = payload?.moved === true;
+  if (record && version !== record.version + 1) throw fail(409, 'action_not_allowed', `The next case file version is v${record.version + 1}.`);
+  if (record && !moved && !sameTarget(record.target, target)) throw fail(409, 'action_not_allowed', 'An update goes on the page the case file is already on.');
+  const at = deps.now();
+  const caseFile = {
+    title,
+    version,
+    target,
+    writtenAt: at,
+    sections: record && !moved ? { ...record.sections, ...sections } : sections,
+    history: [...(record?.history ?? []), { version, at, target }]
+  };
+  const linked = session.links.some((link) => sameTarget(link, target));
+  const links = linked || session.links.length >= LINKS_MAX ? session.links : [...session.links, target];
+  return touch({ ...session, caseFile, caseFileDeclined: null, links }, deps);
+}
+
+/** Not now on the case-file card: hidden until its content changes again (`key` is the offer's). */
+export function dismissCaseFile(session, payload, deps) {
+  const key = typeof payload?.key === 'string' ? payload.key : '';
+  if (!DIGEST_RE.test(key)) throw fail(400, 'validation_error', 'A case file key is required.');
+  return session.caseFileDeclined === key ? session : touch({ ...session, caseFileDeclined: key }, deps);
 }
 
 export function rename(session, title, deps) {

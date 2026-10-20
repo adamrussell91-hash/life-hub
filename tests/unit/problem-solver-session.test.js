@@ -5,7 +5,7 @@ import {
   acceptSuggestion, activeRun, applyCoachTurn, createSession, dismissSuggestion,
   archive, moveOn, keepAnyway, score, rescoreRadar, say, summaryRow, followOn,
   confirmTask, dismissTask, setReviewTask, dismissReview,
-  startReview, taskStatus, reopenProblem, waitingForReview
+  startReview, taskStatus, reopenProblem, waitingForReview, linkCaseFile, dismissCaseFile
 } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
@@ -680,4 +680,86 @@ test('a reopen during a late review returns to Improve, then to where the sessio
   assert.equal(nextPhase(s), 'document');
   s = idle(moveOn(s, deps));
   assert.equal(s.phase, 'document');
+});
+
+/** In Document with a 5 Cs run whose name is next. */
+function namingNext() {
+  let s = idle(acceptSuggestion({ ...at('document'), suggestion: { kind: 'next_tool', tool: 'five_cs', reason: 'r' } }, deps));
+  for (const [slot, text] of [['contextualise', 'So next term starts without the same scramble'], ['categorise', 'On the Kitchen rota project page'], ['condense:1', 'Publish the rota on Wednesday'], ['correct', 'Nothing in it needs correcting now']]) {
+    s = idle(applyCoachTurn(s, coach({ node: { slot, text } }), deps));
+  }
+  return s;
+}
+const NAME = 'Kitchen rota case file 20261020 v1 Final';
+const named = () => idle(applyCoachTurn(namingNext(), coach({ node: { slot: 'correspond', text: NAME } }), deps));
+const digests = { purpose: '0a1b2c3d', kept: '1a2b3c4d' };
+
+test('a new session has no case file', () => {
+  const s = createSession({ text: 'x' }, deps);
+  assert.equal(s.caseFile, null);
+  assert.equal(s.caseFileDeclined, null);
+});
+
+test('an accepted name that breaks a strict rule is not placed; Keep it anyway refuses it too', () => {
+  let s = idle(applyCoachTurn(namingNext(), coach({ node: { slot: 'correspond', text: 'rota stuff' } }), deps));
+  assert.equal(activeRun(s).nodes.some((x) => x.slot === 'correspond'), false);
+  s = idle(applyCoachTurn(s, coach({ verdict: 'challenge', node: { slot: 'correspond', text: 'rota stuff' } }), deps));
+  assert.equal(s.pendingKeep.slot, 'correspond');
+  assert.throws(() => keepAnyway(s, deps), /naming rule: add the date/);
+  s = idle(applyCoachTurn(s, coach({ node: { slot: 'correspond', text: NAME } }), deps));
+  assert.equal(activeRun(s).nodes.at(-1).text, NAME);
+});
+
+test('link_case_file records the first write and links the page', () => {
+  const s = linkCaseFile(named(), { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps);
+  assert.deepEqual(s.caseFile, { title: NAME, version: 1, target: { kind: 'project', id: 'proj1' }, writtenAt: deps.now(), sections: digests, history: [{ version: 1, at: deps.now(), target: { kind: 'project', id: 'proj1' } }] });
+  assert.deepEqual(s.links.at(-1), { kind: 'project', id: 'proj1' });
+  assert.equal(s.runner.status, 'idle', 'no coach call');
+  assert.equal(linkCaseFile(s, { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps), s, 'a retry is a no-op');
+});
+
+test('an update is the next version on the same page and merges its sections; a move replaces them', () => {
+  const s = linkCaseFile(named(), { target: { kind: 'project', id: 'proj1' }, version: 1, title: NAME, sections: digests }, deps);
+  const up = linkCaseFile(s, { target: { kind: 'project', id: 'proj1' }, version: 2, title: 'Kitchen rota case file 20261102 v2 Final', sections: { learned: '2a3b4c5d' } }, deps);
+  assert.equal(up.caseFile.version, 2);
+  assert.deepEqual(up.caseFile.sections, { ...digests, learned: '2a3b4c5d' });
+  assert.equal(up.caseFile.history.length, 2);
+  assert.equal(up.links.filter((l) => l.id === 'proj1').length, 1);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'proj1' }, version: 3, title: NAME, sections: digests }, deps), /next case file version is v2/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'task', id: 't9' }, version: 2, title: NAME, sections: digests }, deps), /already on/);
+  const moved = linkCaseFile(s, { target: { kind: 'task', id: 't9' }, version: 2, title: NAME, sections: { kept: '9a9b9c9d' }, moved: true }, deps);
+  assert.deepEqual(moved.caseFile.sections, { kept: '9a9b9c9d' });
+  assert.deepEqual(moved.caseFile.target, { kind: 'task', id: 't9' });
+});
+
+test('link_case_file validates its payload', () => {
+  const s = named();
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'goal', id: 'g' }, version: 1, title: NAME, sections: digests }, deps), /task or project/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 0, title: NAME, sections: digests }, deps), /version/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: '', sections: digests }, deps), /title/);
+  assert.throws(() => linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: { purpose: 'nothex!!' } }, deps), /sections/);
+  assert.throws(() => linkCaseFile({ ...s, status: 'archived' }, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: digests }, deps), /archived/);
+});
+
+test('Not now on the case file stores its key; a new write clears it', () => {
+  let s = dismissCaseFile(named(), { key: 'abcdef12' }, deps);
+  assert.equal(s.caseFileDeclined, 'abcdef12');
+  assert.equal(dismissCaseFile(s, { key: 'abcdef12' }, deps), s);
+  assert.throws(() => dismissCaseFile(s, { key: 'x' }, deps), /key/);
+  s = linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: digests }, deps);
+  assert.equal(s.caseFileDeclined, null);
+});
+
+test('Document re-entered after a late review keeps its runs and its case file', () => {
+  let s = idle(moveOn(implementDone(), deps));
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'document');
+  s = idle(acceptSuggestion({ ...s, suggestion: { kind: 'next_tool', tool: 'five_cs', reason: 'r' } }, deps));
+  s = linkCaseFile(s, { target: { kind: 'project', id: 'p' }, version: 1, title: NAME, sections: digests }, deps);
+  s = idle(startReview(s, {}, deps));
+  assert.equal(s.phase, 'improve');
+  s = idle(moveOn(s, deps));
+  assert.equal(s.phase, 'document');
+  assert.equal(s.steps.document.runs.length, 1);
+  assert.equal(s.caseFile.version, 1);
 });
