@@ -514,9 +514,10 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
   });
 }
 
-/** Move on from the current step and wait until the coach has answered the boundary turn. */
+/** Move on from the current step; wait until the session has reached the next step (so the next answer goes to it) and the coach has answered. */
 async function moveOnTo(page, next) {
   await page.getByRole('button', { name: next === 'Finish' ? 'Finish' : `Move on to ${next}` }).click();
+  await expect(page.locator('.ps-composer__now')).toHaveText(next === 'Finish' ? 'Problem finished' : `Step: ${next}`, { timeout: 20_000 });
   await expect(page.getByLabel('Your answer')).toBeEnabled();
 }
 
@@ -628,6 +629,7 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
 
     // Improve: the review is set aside, so Improve opens at once with an after action review.
     await page.getByRole('button', { name: 'Move on to Improve' }).click();
+    await expect(page.locator('.ps-composer__now')).toHaveText('Step: Improve', { timeout: 20_000 });
     const reviewCard = page.locator('.ps-reviewcard');
     await expect(reviewCard).toBeVisible();
     await reviewCard.getByRole('button', { name: 'Not now' }).click();
@@ -683,6 +685,7 @@ for (const viewport of [{ width: 900, height: 900 }, { width: 390, height: 844 }
     // A filmstrip card morphs into its chart, and back.
     await page.locator('.ps-record__strip[data-strip="analyse"] .ps-record__card-button').click();
     await expect(page.locator('.ps-canvas__chart')).toBeVisible();
+    await expect(page.locator('.ps-canvas__chart')).toHaveClass(/\bps-chart-reveal\b/);
     await expect(page.locator('.ps-causal [data-edge]')).toHaveCount(3);
     await settled(page);
     await noOverflow(page);

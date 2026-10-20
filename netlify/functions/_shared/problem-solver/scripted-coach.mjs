@@ -9,6 +9,7 @@ import { KANBAN_COLUMNS } from '../../../../packages/problem-solver/tools/kanban
 import { QUADRANTS } from '../../../../packages/problem-solver/tools/swot.mjs';
 import { longestEarlier } from '../../../../packages/problem-solver/tools/after-action-review.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
+import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { applyStep, currentEntry, isQuestion, LIGHTNING_NODES } from '../../../../packages/problem-solver/lightning.mjs';
@@ -32,13 +33,13 @@ const FRAME = [
 ];
 
 /**
- * The model a third frame answer may name with `model: polya` or `model: triz`; the walks use
- * it. Every model's first step takes Define tools, so the first suggestion is 5 Whys for all.
+ * Why each model fits, for a third frame answer naming it with `model: polya` or `model: triz`
+ * (the walks use it). Every model's first step takes Define tools, so 5 Whys comes first for all.
  */
-const MODEL_HINTS = {
-  seven_step: ['seven_step', 'the problem solving process', 'A real problem that will need analysis and a decision.'],
-  polya: ['polya', "Polya's four steps", 'A bounded problem with a clear test of success.'],
-  triz: ['triz', 'TRIZ', 'Improving one thing makes another worse.']
+const MODEL_REASONS = {
+  seven_step: 'A real problem that will need analysis and a decision.',
+  polya: 'A bounded problem with a clear test of success.',
+  triz: 'Improving one thing makes another worse.'
 };
 
 /** A seed without its closing full stop, so the sentence around it keeps one. */
@@ -270,9 +271,9 @@ export async function scriptedCoach(session) {
     const [key] = missing[0];
     const frame = { [key]: last };
     if (missing.length === 1) {
-      const hinted = MODEL_HINTS[/\bmodel:\s*([a-z_]+)/i.exec(last)?.[1]?.toLowerCase()];
-      const [id, name, reason] = hinted ?? MODEL_HINTS.seven_step;
-      return { ...base, verdict: 'accept', frame, message: `Clear enough to work with. I suggest ${name}, starting with 5 Whys, because there is one symptom here with a likely single chain of cause.`, model: { id, reason }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom, likely one chain.' }, skillsSeen: ['analysis'] };
+      const hinted = /\bmodel:\s*([a-z_]+)/i.exec(last)?.[1]?.toLowerCase();
+      const id = MODEL_REASONS[hinted] ? hinted : 'seven_step';
+      return { ...base, verdict: 'accept', frame, message: `Clear enough to work with. I suggest ${MODELS[id].name.replace(/^The /, 'the ')}, starting with 5 Whys, because there is one symptom here with a likely single chain of cause.`, model: { id, reason: MODEL_REASONS[id] }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom, likely one chain.' }, skillsSeen: ['analysis'] };
     }
     return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   }

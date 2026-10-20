@@ -5,6 +5,7 @@ import { scriptedCoach } from '../../netlify/functions/_shared/problem-solver/sc
 import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say, score } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
+import { MODELS } from '../../packages/problem-solver/models.mjs';
 import { addEdge, checkNode, isComplete, newRun, placeNode } from '../../packages/problem-solver/machine.mjs';
 import { createLightningSession, applyLightningTurn, escalateLightning } from '../../netlify/functions/_shared/problem-solver/lightning-session.mjs';
 import { currentEntry } from '../../packages/problem-solver/lightning.mjs';
@@ -63,7 +64,7 @@ test('a model hint in the third frame answer chooses Polya, starting with 5 Whys
   assert.equal(s.model.id, 'polya');
   assert.equal(s.phase, 'identify');
   assert.equal(s.suggestion?.tool, 'five_whys');
-  assert.match(s.turns.at(-1).text, /Polya/);
+  assert.ok(s.turns.at(-1).text.includes(`I suggest ${MODELS.polya.name},`));
 });
 
 test('a model hint in the third frame answer chooses TRIZ, starting with 5 Whys', async () => {
@@ -71,6 +72,7 @@ test('a model hint in the third frame answer chooses TRIZ, starting with 5 Whys'
   assert.equal(s.model.id, 'triz');
   assert.equal(s.phase, 'specific_problem');
   assert.equal(s.suggestion?.tool, 'five_whys');
+  assert.ok(s.turns.at(-1).text.includes(`I suggest ${MODELS.triz.name},`));
 });
 
 test('without a model hint, or with an unknown one, the frame chooses the seven-step process', async () => {
@@ -78,6 +80,7 @@ test('without a model hint, or with an unknown one, the frame chooses the seven-
     const s = await framedWith(third);
     assert.equal(s.model.id, 'seven_step');
     assert.equal(s.suggestion?.tool, 'five_whys');
+    assert.match(s.turns.at(-1).text, /I suggest the problem solving process,/);
   }
 });
 
