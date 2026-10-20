@@ -46,6 +46,10 @@ const THEME: Record<ThemeTag, { word: string; fill: Accent }> = {
 const SHOWN = 3;
 /** Satellite centres sit this far from the theme's centre, in percent of the square cluster box. */
 const RING = 36;
+/** The theme's and a satellite's radius, and the room kept round them, in the same units. */
+const THEME_R = 16;
+const SAT_R = 11;
+const REACH_PAD = 3;
 /** The widest step between neighbouring satellites on a desktop arc, in degrees. */
 const STEP = 52;
 const GLIDE = 520;
@@ -70,11 +74,14 @@ const f = (n: number): string => n.toFixed(2);
 
 /**
  * Where a cluster's arc faces on a desktop, in degrees clockwise from the right: away from the
- * other clusters in the two-column grid (nearer ones push harder), leaning well upwards (never down) as the book's
- * do. A lone cluster faces straight up.
+ * other clusters in the two-column grid (nearer ones push harder), leaning well upwards so it
+ * never faces down. An odd last cluster spans both columns and sits between them, as the book
+ * tucks its third cluster under the first two; with nothing to either side it faces left, as
+ * the book's does. A lone cluster faces straight up.
  */
 export function arcFacing(index: number, count: number): number {
-  const at = (i: number): [number, number] => [i % 2, Math.floor(i / 2)];
+  if (count <= 1) return 270;
+  const at = (i: number): [number, number] => [count % 2 === 1 && i === count - 1 ? 0.5 : i % 2, Math.floor(i / 2)];
   const [x, y] = at(index);
   let vx = 0;
   let vy = 0;
@@ -88,10 +95,26 @@ export function arcFacing(index: number, count: number): number {
     vy += dy / d2 / Math.sqrt(d2);
   }
   const len = Math.hypot(vx, vy);
-  if (len < 1e-6) return 270;
-  vx = vx / len;
-  vy = vy / len - 1;
-  return (Math.atan2(vy, vx) * 180) / Math.PI;
+  vx = len < 1e-6 ? 0 : vx / len;
+  vy = len < 1e-6 ? 0 : vy / len - 1;
+  if (Math.hypot(vx, vy) < 1e-6) return 180;
+  const deg = (Math.atan2(vy, vx) * 180) / Math.PI;
+  return deg < 0 ? deg + 360 : deg;
+}
+
+/**
+ * How far the drawing reaches above and below the theme's centre on a desktop, in percent of the
+ * stage's width: the theme's radius, or a satellite's centre plus its radius, with a small margin.
+ */
+export function clusterReach(angles: number[]): { top: number; bottom: number } {
+  let top = THEME_R;
+  let bottom = THEME_R;
+  for (const a of angles) {
+    const y = RING * Math.sin((a * Math.PI) / 180);
+    top = Math.max(top, SAT_R - y);
+    bottom = Math.max(bottom, SAT_R + y);
+  }
+  return { top: top + REACH_PAD, bottom: bottom + REACH_PAD };
 }
 
 /** Each satellite's angle: [desktop arc, phone ring], in degrees. */
@@ -102,10 +125,10 @@ export function satelliteAngles(count: number, facing: number): Array<[number, n
 
 type Pill = { node: PsNode; kind: Quadrant; item: HTMLDivElement; button: HTMLButtonElement; head: HTMLSpanElement; title: HTMLSpanElement; card: HTMLDivElement; cardKey: string };
 type QuadBox = { kind: Quadrant; box: HTMLDivElement; list: HTMLDivElement; more: HTMLButtonElement; moreList: HTMLDivElement; moreInner: HTMLDivElement };
-type Sat = { node: PsNode; kind: Kind; theme: string; item: HTMLDivElement; button: HTMLButtonElement; line: HTMLSpanElement; card: HTMLDivElement; cardKey: string; a: string; pa: string };
-type Cluster = { node: PsNode; item: HTMLDivElement; stage: HTMLDivElement; lines: HTMLDivElement; button: HTMLButtonElement; head: HTMLSpanElement; meta: HTMLSpanElement; title: HTMLSpanElement; sats: HTMLDivElement; card: HTMLDivElement; cardKey: string };
+type Sat = { node: PsNode; kind: Kind; theme: string; item: HTMLDivElement; button: HTMLButtonElement; line: HTMLSpanElement; ink: HTMLSpanElement; card: HTMLDivElement; cardKey: string; a: string; pa: string };
+type Cluster = { node: PsNode; item: HTMLDivElement; stage: HTMLDivElement; layer: HTMLDivElement; lines: HTMLDivElement; button: HTMLButtonElement; head: HTMLSpanElement; meta: HTMLSpanElement; title: HTMLSpanElement; sats: HTMLDivElement; card: HTMLDivElement; cardKey: string };
 type Action = { node: PsNode; item: HTMLDivElement; button: HTMLButtonElement; num: HTMLSpanElement; head: HTMLSpanElement; title: HTMLSpanElement; card: HTMLDivElement; cardKey: string };
-type PartTwo = { el: HTMLDivElement; clusters: HTMLDivElement; panel: HTMLDivElement; actions: HTMLDivElement; actionList: HTMLOListElement; actionPanel: HTMLDivElement };
+type PartTwo = { el: HTMLDivElement; head: HTMLParagraphElement; clusters: HTMLDivElement; panel: HTMLDivElement; actions: HTMLDivElement; actionList: HTMLOListElement; actionPanel: HTMLDivElement };
 
 function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, className: string, text = ''): HTMLElementTagNameMap[K] {
   const out = doc.createElement(tag);
@@ -275,15 +298,18 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
   function syncQuadrants(run: PsToolRun, fresh: HTMLElement[]): void {
     const byKind = new Map<Quadrant, PsNode[]>(QUADS.map((kind) => [kind, run.nodes.filter((node) => nameOf(node) === kind).sort(bySlot)]));
     for (const [id, pill] of [...pills]) if (!byKind.get(pill.kind)!.some((node) => node.id === id)) removePill(id);
-    const live = new Set(run.nodes.map((node) => node.id));
+    // The "+N more" cards are kept only for pills that are past the third now.
+    const past = new Set(QUADS.flatMap((kind) => byKind.get(kind)!.slice(SHOWN).map((node) => node.id)));
     for (const [id, { card }] of [...moreCards]) {
-      if (live.has(id)) continue;
+      if (past.has(id)) continue;
       card.remove();
       moreCards.delete(id);
     }
+    const active = doc.activeElement;
     for (const kind of QUADS) {
       const q = quads.get(kind)!;
       const nodes = byKind.get(kind)!;
+      let refocus = false;
       nodes.forEach((node, i) => {
         let pill = pills.get(node.id);
         if (!pill) {
@@ -293,6 +319,8 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
         pill.node = node;
         if (q.list.children[i] !== pill.item) q.list.insertBefore(pill.item, q.list.children[i] ?? null);
         const hide = i >= SHOWN;
+        // Focus on a pill (or in its card) that moves into "+N more" follows it to that button.
+        if (hide && !pill.item.hidden && active && (pill.item.contains(active) || pill.card.contains(active))) refocus = true;
         if (pill.item.hidden !== hide) pill.item.hidden = hide;
         // A card is never left open for a pill that has gone out of view.
         if (hide && pill.card.classList.contains('is-open')) group.close();
@@ -310,6 +338,7 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
       const wanted = rest.map((node) => moreCard(node, QUAD[kind].fill));
       const have = [...q.moreInner.children];
       if (wanted.length !== have.length || wanted.some((card, i) => card !== have[i])) q.moreInner.replaceChildren(...wanted);
+      if (refocus) q.more.focus({ preventScroll: true });
     }
   }
 
@@ -343,9 +372,10 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
     actionList.setAttribute('aria-label', 'Actions');
     const actionPanel = el(doc, 'div', 'ps-fbm__panel');
     block.append(el(doc, 'p', 'ps-fbm__meta ps-fbm__part-head', 'Actions'), actionList, actionPanel);
-    part.append(el(doc, 'p', 'ps-fbm__meta ps-fbm__part-head', 'Part two'), list, panel, block);
+    const head = el(doc, 'p', 'ps-fbm__meta ps-fbm__part-head', 'Part two');
+    part.append(head, list, panel, block);
     root.append(part);
-    two = { el: part, clusters: list, panel, actions: block, actionList, actionPanel };
+    two = { el: part, head, clusters: list, panel, actions: block, actionList, actionPanel };
     return two;
   }
 
@@ -367,9 +397,13 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
     theme.append(button);
     const list = el(doc, 'div', 'ps-fbm__sats');
     list.setAttribute('role', 'list');
-    stage.append(lines, theme, list);
+    // A square layer with the theme at its centre; the stage around it is cut to the height the
+    // satellites reach, and the layer is lifted by what the stage leaves off its top.
+    const layer = el(doc, 'div', 'ps-fbm__layer');
+    layer.append(lines, theme, list);
+    stage.append(layer);
     item.append(stage);
-    const cluster: Cluster = { node, item, stage, lines, button, head, meta, title, sats: list, card: null as unknown as HTMLDivElement, cardKey: '' };
+    const cluster: Cluster = { node, item, stage, layer, lines, button, head, meta, title, sats: list, card: null as unknown as HTMLDivElement, cardKey: '' };
     cluster.card = newCard(node, host.panel, button);
     clusters.set(node.id, cluster);
     return cluster;
@@ -394,10 +428,13 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
     button.setAttribute('data-shape', '');
     button.append(el(doc, 'span', 'ps-fbm__title ps-fbm__title--sat', kind === 'why' ? 'Why' : 'How'));
     item.append(button);
+    // The outer span turns to the satellite; the inner one carries the colour and draws in.
     const line = el(doc, 'span', 'ps-fbm__line');
     line.setAttribute('data-edge', `${node.id}>${cluster.node.id}`);
+    const ink = el(doc, 'span', 'ps-fbm__line-ink');
+    line.append(ink);
     cluster.lines.append(line);
-    const sat: Sat = { node, kind, theme: cluster.node.id, item, button, line, card: null as unknown as HTMLDivElement, cardKey: '', a: '', pa: '' };
+    const sat: Sat = { node, kind, theme: cluster.node.id, item, button, line, ink, card: null as unknown as HTMLDivElement, cardKey: '', a: '', pa: '' };
     sat.card = newCard(node, host.panel, button);
     sats.set(node.id, sat);
     return sat;
@@ -470,6 +507,9 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
       return;
     }
     const host = ensureTwo();
+    // Actions can outlast every theme (an undo); then only they show, under their own heading.
+    host.head.hidden = !themes.length;
+    host.clusters.hidden = !themes.length;
 
     themes.forEach((node, i) => {
       let cluster = clusters.get(node.id);
@@ -494,6 +534,10 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
       const { why, how } = satellitesOf(run, node.id) as { why: PsNode[]; how: PsNode[] };
       const ring: Array<[PsNode, Kind]> = [...why.map((n): [PsNode, Kind] => [n, 'why']), ...how.map((n): [PsNode, Kind] => [n, 'how'])];
       const angles = satelliteAngles(ring.length, arcFacing(i, themes.length));
+      const reach = clusterReach(angles.map(([a]) => a));
+      setAttr(cluster.item, 'data-span', themes.length % 2 === 1 && i === themes.length - 1 && themes.length > 1 ? 'both' : null);
+      setVar(cluster.stage, '--h', f(reach.top + reach.bottom));
+      setVar(cluster.stage, '--lift', `${f(50 - reach.top)}%`);
       ring.forEach(([satNode, kind], k) => {
         let sat = sats.get(satNode.id);
         if (!sat) {
@@ -514,6 +558,9 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
         setVar(sat.item, '--py', `${f(50 + RING * Math.sin(rad(pa)))}%`);
         setVar(sat.line, '--a', `${sat.a}deg`);
         setVar(sat.line, '--pa', `${sat.pa}deg`);
+        // A contested tag hangs below a satellite in the upper half, above one in the lower half.
+        setAttr(sat.item, 'data-low', Math.sin(rad(a)) > 0.05 ? 'true' : 'false');
+        setAttr(sat.item, 'data-plow', Math.sin(rad(pa)) > 0.05 ? 'true' : 'false');
         const fill = satFill(kind, tag);
         setAttr(sat.button, 'data-fill', fill);
         setAttr(sat.line, 'data-kind', kind);
@@ -590,7 +637,7 @@ export function createFeedbackMatrixView(doc: Document = document): FeedbackMatr
     const bornThemes = new Set(born.clusters.map((cluster) => cluster.node.id));
     born.sats.forEach((sat, i) => {
       const delay = (bornThemes.has(sat.theme) ? 260 : 0) + Math.min(i * 90, 360);
-      if (canAnimate(sat.line)) sat.line.animate([{ scale: '0 1' }, { scale: '1 1' }], { duration: 320, delay, easing: EASE, fill: 'backwards' });
+      if (canAnimate(sat.ink)) sat.ink.animate([{ transform: 'scaleX(0)' }, { transform: 'none' }], { duration: 320, delay, easing: EASE, fill: 'backwards' });
       if (canAnimate(sat.button)) sat.button.animate([{ opacity: 0, transform: 'scale(0.3)' }, { opacity: 1, transform: 'none' }], { duration: 380, delay: delay + 240, easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)', fill: 'backwards' });
     });
     born.actions.forEach((action, i) => {

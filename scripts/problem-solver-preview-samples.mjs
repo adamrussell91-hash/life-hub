@@ -791,7 +791,8 @@ SAMPLES.double_loop_held = run('double_loop', [
 // Feedback matrix: a junior football club sorts the parents' and coaches' end-of-season feedback.
 // Suggestions has four items, so it shows three and "+1 more". One contested node (a change).
 // Part two has one theme of each tag with why and how satellites, and three actions.
-// feedback_matrix:next adds a third how to the first theme, so its satellites spread and glide.
+// feedback_matrix:next adds a third how to the first theme, so its satellites spread and glide,
+// and contests one of the Change cluster's hows, so its tag shows beside a satellite.
 // feedback_matrix_first is part one only, before any theme.
 const fbmItems = [
   node('f1', 'suggestion:1', 'Run a kit swap at the first training session so outgrown boots get passed on.', 'Kit swap at first training'),
@@ -829,5 +830,5 @@ const fbmEdges = [
   ['y4', 't3'], ['h4', 't3'], ['h5', 't3'], ['h6', 't3']
 ].map(([from, to]) => ({ id: `e-${from}`, from, to, kind: 'of' }));
 SAMPLES.feedback_matrix = run('feedback_matrix', [...fbmItems, ...fbmThemes.filter((n) => n.id !== 'h7')], fbmEdges);
-SAMPLES['feedback_matrix:next'] = run('feedback_matrix', [...fbmItems, ...fbmThemes], [...fbmEdges, { id: 'e-h7', from: 'h7', to: 't1', kind: 'of' }]);
+SAMPLES['feedback_matrix:next'] = run('feedback_matrix', [...fbmItems, ...fbmThemes.map((n) => (n.id === 'h6' ? { ...n, state: 'contested', objection: 'Would a reserve list just move the lateness to Friday?' } : n))], [...fbmEdges, { id: 'e-h7', from: 'h7', to: 't1', kind: 'of' }]);
 SAMPLES.feedback_matrix_first = run('feedback_matrix', fbmItems.slice(0, 7));
