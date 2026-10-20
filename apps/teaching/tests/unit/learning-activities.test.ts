@@ -1,5 +1,6 @@
 import { holdDelete, menuItem } from './helpers/hub-list';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { pickKitOption } from './kit-filter';
 import { BlockSchema } from '@/schemas/block';
 import {
   BLOCK_GROUPS,
@@ -985,9 +986,7 @@ describe('learning activity editors', () => {
         (el.querySelector('.block-editor__self-check-items') as HTMLElement).hidden
       ).toBe(true);
 
-      const mode = el.querySelector('.block-editor__self-check-mode') as HTMLSelectElement;
-      mode.value = 'checklist';
-      mode.dispatchEvent(new Event('change'));
+      pickKitOption(el.querySelector('.block-editor__self-check-mode'), 'checklist');
 
       expect(latest.content.mode).toBe('checklist');
       expect(

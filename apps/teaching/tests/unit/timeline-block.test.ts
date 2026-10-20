@@ -1,5 +1,6 @@
 import { clickMenuAction, holdDelete, menuItem } from './helpers/hub-list';
 import { describe, it, expect } from 'vitest';
+import { kitValue, pickKitOption } from './kit-filter';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
@@ -360,10 +361,9 @@ describe('timeline layouts', () => {
     const editor = createBlockEditor(latest, (next) => {
       latest = next;
     });
-    const select = editor.querySelector('[aria-label="Timeline layout"]') as HTMLSelectElement;
-    expect(select.value).toBe('rail');
-    select.value = 'alternate';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const select = editor.querySelector('[aria-label="Timeline layout"]');
+    expect(kitValue(select)).toBe('rail');
+    pickKitOption(select, 'alternate');
     if (latest.block_type !== 'timeline') throw new Error('expected timeline');
     expect(latest.content.layout).toBe('alternate');
     expect(latest.content.events).toHaveLength(3);

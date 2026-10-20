@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { pickKitOption } from './kit-filter';
 import { clickMenuAction } from './helpers/hub-list';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { trySetColumnWidths } from '@/blocks/column-widths';
@@ -172,11 +173,7 @@ describe('createColumnsEditor builder UX', () => {
       () => latest
     );
 
-    const preset = el.querySelector(
-      'select.block-editor__columns-preset'
-    ) as HTMLSelectElement;
-    preset.value = 'custom';
-    preset.dispatchEvent(new Event('change'));
+    pickKitOption(el.querySelector('.block-editor__columns-preset'), 'custom');
     expect(latest.content.preset).toBe('custom');
     expect(el.querySelectorAll('input.block-editor__columns-width').length).toBe(2);
 

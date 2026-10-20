@@ -13,6 +13,7 @@ import {
   cloneBlockWithNewIds
 } from '@/blocks/create-block';
 import { editorShell, type BlockChangeHandler, type BlockEditorContext } from '@/blocks/editors';
+import { createEditorFilter } from '@/blocks/editor-filter';
 import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
 import type { Block } from '@/schemas/block';
 import { createHubTabStrip } from '../../design-kit/js/hub-list.js';
@@ -28,28 +29,28 @@ export function createSpacerEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const select = document.createElement('select');
-  select.className = 'block-editor__spacer-size';
-  select.setAttribute('aria-label', 'Spacer size');
-  for (const size of ['small', 'medium', 'large'] as const) {
-    const opt = document.createElement('option');
-    opt.value = size;
-    opt.textContent = size[0]!.toUpperCase() + size.slice(1);
-    select.append(opt);
-  }
-  select.value = block.content.size;
-  select.addEventListener('change', () => {
-    onChange({
-      ...getLatest(),
-      content: { size: select.value as 'small' | 'medium' | 'large' }
-    });
+  const select = createEditorFilter({
+    key: 'Size',
+    value: block.content.size,
+    options: (['small', 'medium', 'large'] as const).map((size) => ({
+      value: size,
+      label: size[0]!.toUpperCase() + size.slice(1)
+    })),
+    className: 'block-editor__spacer-size',
+    ariaLabel: 'Spacer size',
+    onChange: (value) => {
+      onChange({
+        ...getLatest(),
+        content: { size: value as 'small' | 'medium' | 'large' }
+      });
+    }
   });
 
   const preview = document.createElement('div');
   preview.className = `block-spacer block-spacer--${block.content.size}`;
   preview.setAttribute('aria-hidden', 'true');
 
-  fields.append(select, preview);
+  fields.append(select.el, preview);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -126,19 +127,19 @@ export function createColumnsEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__columns';
 
-  const preset = document.createElement('select');
-  preset.className = 'block-editor__columns-preset';
-  preset.setAttribute('aria-label', 'Column layout');
-  for (const value of [...COLUMN_PRESETS, 'custom'] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = value === 'custom' ? 'Custom' : value;
-    preset.append(opt);
-  }
-  preset.value = block.content.preset;
-  preset.addEventListener('change', () => {
+  const preset = createEditorFilter({
+    key: 'Layout',
+    value: block.content.preset,
+    options: [...COLUMN_PRESETS, 'custom'].map((value) => ({
+      value,
+      label: value === 'custom' ? 'Custom' : value
+    })),
+    className: 'block-editor__columns-preset',
+    ariaLabel: 'Column layout',
+    onChange: (value) => applyPreset(value as ColumnsBlock['content']['preset'])
+  });
+  function applyPreset(nextPreset: ColumnsBlock['content']['preset']): void {
     const current = getLatest();
-    const nextPreset = preset.value as ColumnsBlock['content']['preset'];
     if (nextPreset === 'custom') {
       onChange({
         ...current,
@@ -160,7 +161,7 @@ export function createColumnsEditor(
       });
     }
     rebuildPanes();
-  });
+  }
 
   const widthsRow = document.createElement('div');
   widthsRow.className = 'block-editor__columns-widths';
@@ -288,7 +289,7 @@ export function createColumnsEditor(
   }
 
   rebuildPanes();
-  fields.append(preset, widthsRow, widthsHint, panes);
+  fields.append(preset.el, widthsRow, widthsHint, panes);
   return editorShell(block, onChange, fields, getLatest);
 }
 

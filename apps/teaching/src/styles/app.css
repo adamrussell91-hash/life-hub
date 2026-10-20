@@ -1201,14 +1201,12 @@ a:hover {
   box-shadow: var(--elev-1);
 }
 
-.block-editor__visibility {
+/* Closed choices (visibility, level, style, size…) are kit filter pills (I5); they hug their label. */
+.block-editor .hub-filter,
+.block-editor__fields .hub-filter,
+.block-editor__nested-list .hub-filter {
   justify-self: start;
-  padding: var(--space-1) var(--space-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  width: max-content;
 }
 
 .block-editor__html,
@@ -1263,10 +1261,7 @@ a:hover {
 }
 
 .block-editor__heading-text,
-.block-editor__heading-variant,
-.block-editor__callout-style,
 .block-editor__callout-title,
-.block-editor__media-size,
 .block-editor__quote-attribution,
 .block-editor__quote-source,
 .block-editor__quote-reference,
@@ -1278,12 +1273,10 @@ a:hover {
 .block-editor__attachment-title,
 .block-editor__attachment-filename,
 .block-editor__accordion-title,
-.block-editor__gallery-layout,
 .block-editor__gallery-url,
 .block-editor__gallery-alt,
 .block-editor__gallery-caption,
 .block-editor__question-set-title,
-.block-editor__question-kind,
 .block-editor__table-header,
 .block-editor__table-cell {
   padding: var(--space-2) var(--space-3);
@@ -12464,8 +12457,7 @@ body.is-lesson-builder-full-page .hub-utilities {
   font-size: var(--text-sm);
 }
 
-.block-editor__anthology-title,
-.block-editor__anthology-view {
+.block-editor__anthology-title {
   min-height: 2.75rem;
   width: 100%;
   padding: 0 var(--space-3);
