@@ -34,8 +34,9 @@ export function lostTouch(e: unknown): string {
 }
 
 /**
- * Ann's bar at the top of the lesson: start a review, watch what she reads,
- * then step through her suggestions. The suggestions themselves sit in the
+ * Ann's bar at the top of the lesson. At rest it is one small chip that opens
+ * a tray (start a review, choose the rules note); during a review it grows
+ * into the bar that shows what she reads and steps through her suggestions. The suggestions themselves sit in the
  * lesson, under the blocks they change.
  */
 export function mountAnnBar(host: HTMLElement, options: AnnBarOptions): AnnBarHandle {
@@ -45,12 +46,16 @@ export function mountAnnBar(host: HTMLElement, options: AnnBarOptions): AnnBarHa
   const latest = options.latest ?? latestAgentReview;
   const lifecycle = new AbortController();
   let settings: AgentSettings | null = null;
-  let trailOpen = false, moreOpen = false, picking = false, summaryOpen = false, starting = false;
+  let trailOpen = false, moreOpen = false, picking = false, summaryOpen = false, starting = false, trayOpen = false;
 
   const bar = el('section', 'ann-bar');
   bar.setAttribute('aria-label', 'Ann’s review of this ' + kind);
   bar.tabIndex = -1;
   host.append(bar);
+
+  const closeTray = () => { if (!trayOpen) return; trayOpen = false; picking = false; paint(); };
+  document.addEventListener('pointerdown', e => { if (!bar.contains(e.target as Node)) closeTray(); }, { signal: lifecycle.signal });
+  bar.addEventListener('keydown', e => { if (e.key === 'Escape' && trayOpen) { closeTray(); bar.querySelector<HTMLElement>('.ann-bar__chip')?.focus(); } });
 
   const button = (label: string, cls: string, onClick: () => void, primary = false) => {
     const b = el('button', 'btn ' + (primary ? 'btn--primary ' : 'btn--ghost ') + cls, label);
@@ -61,7 +66,7 @@ export function mountAnnBar(host: HTMLElement, options: AnnBarOptions): AnnBarHa
 
   async function startReview() {
     if (starting) return;
-    starting = true; store.setError(''); paint();
+    starting = true; trayOpen = false; store.setError(''); paint();
     try {
       await options.flush();
       void watch(await start({ kind, id: options.id }));
@@ -151,7 +156,11 @@ export function mountAnnBar(host: HTMLElement, options: AnnBarOptions): AnnBarHa
     const below: HTMLElement[] = [];
     bar.dataset.state = review?.status === 'working' ? 'working' : review?.status === 'done' && !closed ? 'done' : review?.status === 'error' && !closed ? 'error' : 'idle';
     bar.classList.toggle('ann-bar--more', moreOpen);
-    row.append(el('span', 'ann-bar__name', 'Ann'));
+    bar.classList.remove('ann-bar--tray');
+    const resting = bar.dataset.state === 'idle' || bar.dataset.state === 'error';
+    // A store error at rest (say Ann could not start) opens the tray to show it.
+    if (resting && error) trayOpen = true;
+    if (!resting) row.append(el('span', 'ann-bar__name', 'Ann'));
 
     if (bar.dataset.state === 'working') {
       const lastStep = review!.progress.at(-1)?.text ?? 'Starting';
@@ -172,12 +181,26 @@ export function mountAnnBar(host: HTMLElement, options: AnnBarOptions): AnnBarHa
       below.push(summary);
       if (review!.result?.stoppedEarly) below.push(el('p', 'ann-bar__muted', 'Ann reached her time or reading limit, so she stopped early.'));
     } else {
-      if (bar.dataset.state === 'error') row.append(el('span', 'ann-bar__error', review!.error?.message || 'Ann could not finish this review.'));
-      const go = button(bar.dataset.state === 'error' ? 'Try again' : review ? 'Review again' : 'Improve with Ann', 'ann-bar__start', () => void startReview(), true);
-      go.disabled = starting;
-      row.append(go, rulesLine());
+      // At rest Ann is a chip; her start button and rules note wait in a tray.
+      const open = trayOpen || bar.dataset.state === 'error';
+      const chip = button('Ann', 'ann-bar__chip', () => { trayOpen = !trayOpen; picking = false; paint(); });
+      chip.setAttribute('aria-expanded', String(open));
+      chip.setAttribute('aria-controls', 'ann-bar-tray-' + options.id);
+      chip.title = 'Improve this ' + kind + ' with Ann';
+      row.append(chip);
+      bar.classList.toggle('ann-bar--tray', open);
+      if (open) {
+        const tray = el('div', 'ann-bar__tray');
+        tray.id = 'ann-bar-tray-' + options.id;
+        if (bar.dataset.state === 'error') tray.append(el('span', 'ann-bar__error', review!.error?.message || 'Ann could not finish this review.'));
+        const go = button(bar.dataset.state === 'error' ? 'Try again' : review ? 'Review again' : 'Improve with Ann', 'ann-bar__start', () => void startReview(), true);
+        go.disabled = starting;
+        tray.append(go, rulesLine());
+        if (error) tray.append(el('p', 'ann-bar__error', error));
+        below.push(tray);
+      }
     }
-    if (error) below.push(el('p', 'ann-bar__error', error));
+    if (error && !resting) below.push(el('p', 'ann-bar__error', error));
     if (trailOpen && review && bar.dataset.state !== 'idle') below.push(trail(review));
     bar.replaceChildren(row, ...below);
   }
@@ -191,7 +214,7 @@ export function mountAnnBar(host: HTMLElement, options: AnnBarOptions): AnnBarHa
   }).catch(() => {});
 
   return {
-    focus() { bar.scrollIntoView({ block: 'nearest' }); (bar.querySelector<HTMLElement>('.ann-bar__start, .ann-bar__next') ?? bar).focus(); },
+    focus() { if (bar.dataset.state === 'idle' && !trayOpen) { trayOpen = true; paint(); } bar.scrollIntoView({ block: 'nearest' }); (bar.querySelector<HTMLElement>('.ann-bar__start, .ann-bar__next') ?? bar).focus(); },
     dispose() { lifecycle.abort(); unsubscribe(); bar.remove(); }
   };
 }
