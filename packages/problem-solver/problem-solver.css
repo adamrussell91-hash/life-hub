@@ -7125,6 +7125,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-ltn__head { fill: var(--ps-ltn-faint); stroke: none; }
 .ps-ltn__edge--thin .ps-ltn__line { stroke-width: 1; }
 .ps-ltn__halo { fill: none; stroke: var(--ps-paper); stroke-width: 6; }
+.ps-ltn__halo:not([data-inked='true']) { display: none; }
 .ps-ltn__edge[data-inked='true'] .ps-ltn__line { stroke: var(--ps-ink); }
 .ps-ltn__edge[data-inked='true'] .ps-ltn__head { fill: var(--ps-ink); }
 .ps-ltn__edge[data-round='old'] .ps-ltn__line { stroke: var(--ps-ltn-old); }
@@ -7202,7 +7203,7 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-ltn__badge {
   position: absolute;
   left: 210px;
-  top: 226px;
+  top: 212px;
   padding: 2px 6px;
   border-radius: 999px;
   background: var(--ps-ink);
@@ -7235,7 +7236,8 @@ button.ps-record__box:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-ltn__swipe { display: none; margin: 6px 0 0; font-size: 12px; color: var(--ps-ltn-muted); }
 .ps-ltn__sr { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* Phone: the chart keeps its size and scrolls sideways inside its own box. */
-@container ltn (max-width: 600px) {
+/* Narrower than the stage (a tool page, a phone): the chart keeps its size, scrolls sideways
+   inside its own box, and says so under it. */
+@container ltn (max-width: 1009px) {
   .ps-ltn__swipe { display: block; }
 }

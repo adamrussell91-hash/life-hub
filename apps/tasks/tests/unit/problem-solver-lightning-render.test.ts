@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLightningView } from '../../../../packages/problem-solver/render/lightning';
+import { LAYOUT, createLightningView } from '../../../../packages/problem-solver/render/lightning';
 import { LIGHTNING_NODE_IDS, again, applyStep, newLightning } from '../../../../packages/problem-solver/lightning.mjs';
 import type { PsLightningState } from '../../../../packages/problem-solver/types';
 
@@ -120,6 +120,63 @@ describe('Lightning chart', () => {
     expect(view.el.querySelector<HTMLElement>('[data-mark="start>goal"]')!.hidden).toBe(false);
   });
 
+  it('a re-render of the same state does not let one question be answered twice', () => {
+    const onAnswer = vi.fn();
+    const view = createLightningView(document, { onAnswer });
+    const state = walk(OPEN);
+    view.update(state);
+    answer(view, 'no').click();
+    view.update(state);
+    view.update(walk(OPEN));
+    answer(view, 'no').click();
+    answer(view, 'yes').click();
+    expect(onAnswer).toHaveBeenCalledTimes(1);
+    expect(answer(view, 'yes').getAttribute('aria-disabled')).toBe('true');
+    view.update(walk([...OPEN, { node: 'subtract', answer: 'no' }]));
+    answer(view, 'yes').click();
+    expect(onAnswer).toHaveBeenCalledTimes(2);
+    expect(onAnswer).toHaveBeenLastCalledWith('one_step', 'yes');
+  });
+
+  it('moves focus to the chart when the focused answer buttons hide', () => {
+    const view = createLightningView(document, { onAnswer() {} });
+    document.body.append(view.el);
+    view.update(walk(OPEN));
+    answer(view, 'yes').focus();
+    view.update(walk([...OPEN, { node: 'subtract', answer: 'yes' }]));
+    expect(view.el.querySelector<HTMLElement>('.ps-ltn__ask')!.hidden).toBe(true);
+    expect(document.activeElement).toBe(view.el.querySelector('.ps-ltn__scroll'));
+    view.el.remove();
+  });
+
+  it('keeps every 44px answer button clear of the boxes and the loop badge', () => {
+    const view = createLightningView(document, { onAnswer() {} });
+    const boxes = Object.values(LAYOUT);
+    const badge = { x: 196, y: 212, w: 28, h: 20 };
+    const hits = (a: { x: number; y: number; w: number; h: number }, b: typeof a) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const ask = (state: PsLightningState) => {
+      view.update(state);
+      for (const a of ['yes', 'no'] as const) {
+        const b = answer(view, a);
+        const r = { x: parseFloat(b.style.left) - 22, y: parseFloat(b.style.top) - 22, w: 44, h: 44 };
+        expect(boxes.filter((bx) => hits(r, bx)), `${a} at ${b.getAttribute('aria-label')}`).toEqual([]);
+        expect(hits(r, badge), `${a} at ${b.getAttribute('aria-label')} covers the badge`).toBe(false);
+      }
+    };
+    const steps: Step[] = [];
+    const fail = ALL_FAIL.slice(2);
+    ask(walk(steps));
+    ask(walk(OPEN));
+    ask(walk([...OPEN, fail[0]]));
+    let path = [...OPEN, fail[0], fail[1]];
+    // Each strategy, sent without its answer, leaves its "solved?" asking.
+    for (const strategy of fail.slice(2)) {
+      ask(walk([...path, { node: strategy.node }]));
+      path = [...path, strategy];
+    }
+    ask(walk(path));
+  });
+
   it('shows no answer buttons without onAnswer or at a strategy', () => {
     const readOnly = createLightningView();
     readOnly.update(newLightning(AT));
@@ -147,6 +204,7 @@ describe('Lightning chart', () => {
     expect(edge(fromStart, 'start>relax').getAttribute('data-inked')).toBe('true');
     expect(fromStart.el.querySelector('[data-edge="relax>learn"][data-spot="relax_start"]')!.getAttribute('data-inked')).toBe('true');
     expect(box(fromStart, 'learn').getAttribute('data-state')).toBe('current');
+    expect(fromStart.el.querySelectorAll('.ps-ltn__halo[data-inked="true"]').length).toBe(1);
 
     const fromFirst = createLightningView();
     fromFirst.update(walk([...OPEN, { node: 'subtract', answer: 'yes' }, { node: 'via_negativa', answer: 'yes' }]));
@@ -171,6 +229,10 @@ describe('Lightning chart', () => {
     expect(badge.textContent).toBe('×2');
     expect(edge(view, 'reframing>goal').getAttribute('data-inked')).toBe('true');
     expect(edge(view, 'solved_5>reframing').getAttribute('data-inked')).toBe('true');
+    // Faint closing arrows draw no halo, so they cut no gap in these inked lines.
+    const halos = [...view.el.querySelectorAll('.ps-ltn__halo')];
+    expect(halos.length).toBe(5);
+    expect(halos.every((h) => !h.hasAttribute('data-inked'))).toBe(true);
   });
 
   it('greys the earlier round after "It came back"', () => {
@@ -283,5 +345,8 @@ describe('Lightning chart', () => {
     expect(section).toContain('@container ltn (');
     expect(section).not.toMatch(/@container \(/);
     expect(section).not.toMatch(/--ps-(red|yellow|blue)|#[0-9a-f]{3,6}\b/i);
+    // The scroll hint shows whenever the box is narrower than the stage.
+    const stage = parseInt(createLightningView().el.querySelector<HTMLElement>('.ps-ltn__stage')!.style.width, 10);
+    expect(section).toContain(`@container ltn (max-width: ${stage - 1}px)`);
   });
 });
