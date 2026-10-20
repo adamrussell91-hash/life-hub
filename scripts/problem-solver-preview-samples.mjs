@@ -787,3 +787,47 @@ SAMPLES.double_loop_held = run('double_loop', [
   node('d3', 'recurs', 'No shortage in the six Saturdays since, and waste stayed under a crate a week.', 'Six clear Saturdays', { tag: 'no' }),
   node('d9', 'monitor', 'The Friday closer checks the fridge each week and flags any short Saturday.', 'Weekly fridge check')
 ]);
+
+// Feedback matrix: a junior football club sorts the parents' and coaches' end-of-season feedback.
+// Suggestions has four items, so it shows three and "+1 more". One contested node (a change).
+// Part two has one theme of each tag with why and how satellites, and three actions.
+// feedback_matrix:next adds a third how to the first theme, so its satellites spread and glide.
+// feedback_matrix_first is part one only, before any theme.
+const fbmItems = [
+  node('f1', 'suggestion:1', 'Run a kit swap at the first training session so outgrown boots get passed on.', 'Kit swap at first training'),
+  node('f2', 'suggestion:2', 'Post the season calendar in one place, not across three group chats.', 'One season calendar'),
+  node('f3', 'suggestion:3', 'Pair each new family with one that has been here a season.', 'Buddy families'),
+  node('f4', 'suggestion:4', 'Try a short warm-down the children lead themselves.', 'Child-led warm-down'),
+  node('f5', 'compliment:1', 'Every child got roughly equal minutes across the season.', 'Fair playing time'),
+  node('f6', 'compliment:2', 'The half-time fruit rota never missed a week.', 'Fruit rota held'),
+  node('f7', 'change:1', 'Stop sending team sheets the night before a match; families cannot plan.', 'No more late team sheets', { state: 'contested', objection: 'Is it every week, or the two weeks the coach was ill?' }),
+  node('f8', 'change:2', 'Drop the second weekly session in winter; turnout fell below half.', 'Drop winter second session'),
+  node('f9', 'question:1', 'Who decides which parent drives to away fixtures?', 'Who drives to away games?')
+];
+const fbmThemes = [
+  node('t1', 'theme:1', 'Families welcomed in with practical help at the start of the season.', 'Welcome families early', { tag: 'do_more' }),
+  node('t2', 'theme:2', 'Nobody knows who arranges lifts to away fixtures.', 'Lifts to away games', { tag: 'question' }),
+  node('t3', 'theme:3', 'Match information reaches families too late to plan around.', 'Late match information', { tag: 'change' }),
+  node('y1', 'why:1', 'Families who feel at home in September are still coming in March.', 'Early welcome keeps families'),
+  node('h1', 'how:1', 'Hold the kit swap at the first session every year.', 'Yearly kit swap'),
+  node('h2', 'how:2', 'Give each new family a buddy family for the first month.', 'Buddy for a month'),
+  node('y2', 'why:2', 'The same three parents end up driving every week.', 'Same drivers every week'),
+  node('y3', 'why:3', 'Two away games were nearly missed for want of a car.', 'Near misses'),
+  node('h3', 'how:3', 'Ask the committee to name one person who owns the lift list.', 'Name a lift organiser'),
+  node('y4', 'why:4', 'Working parents need two days to swap a shift.', 'Shifts need notice'),
+  node('h4', 'how:4', 'Pick the squad at Thursday training.', 'Squad on Thursday'),
+  node('h5', 'how:5', 'Send the sheet by Thursday evening, whatever happens.', 'Sheet by Thursday night'),
+  node('h6', 'how:6', 'Keep a standing reserve list so late drop-outs do not delay it.', 'Standing reserve list'),
+  node('h7', 'how:7', 'Put the kit swap date in the welcome email.', 'Date in welcome email'),
+  node('a1', 'action:1', 'Book the clubhouse for a kit swap on the first Saturday of the season.', 'Book the kit swap'),
+  node('a2', 'action:2', 'Raise the lift organiser at the next committee meeting.', 'Lift organiser to committee'),
+  node('a3', 'action:3', 'Coaches agree to send team sheets by Thursday evening from the first match.', 'Team sheets by Thursday')
+];
+const fbmEdges = [
+  ['y1', 't1'], ['h1', 't1'], ['h2', 't1'],
+  ['y2', 't2'], ['y3', 't2'], ['h3', 't2'],
+  ['y4', 't3'], ['h4', 't3'], ['h5', 't3'], ['h6', 't3']
+].map(([from, to]) => ({ id: `e-${from}`, from, to, kind: 'of' }));
+SAMPLES.feedback_matrix = run('feedback_matrix', [...fbmItems, ...fbmThemes.filter((n) => n.id !== 'h7')], fbmEdges);
+SAMPLES['feedback_matrix:next'] = run('feedback_matrix', [...fbmItems, ...fbmThemes], [...fbmEdges, { id: 'e-h7', from: 'h7', to: 't1', kind: 'of' }]);
+SAMPLES.feedback_matrix_first = run('feedback_matrix', fbmItems.slice(0, 7));
