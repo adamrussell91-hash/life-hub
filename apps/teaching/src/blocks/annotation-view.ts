@@ -52,7 +52,12 @@ import {
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseVideoInput, parseStartTime, videoEmbedSrc } from '@/blocks/video-url';
-import { activeClipAt } from '@/blocks/voice-playback';
+import {
+  createVoiceNotePlayer,
+  formatVoiceTime,
+  voiceNoteLength,
+  type VoiceNoteSource
+} from '@/blocks/voice-note-player';
 import { renderElementCard, type TechniqueCardPoemSpot } from '@/blocks/technique-card';
 import type {
   AnnotationAttachment,
@@ -83,6 +88,190 @@ function approvedClips(track: AnnotationVoiceTrack): PublishedVoiceClip[] {
   return track.clips
     .filter((clip) => clip.approved)
     .map((clip) => ({ ...clip, track }));
+}
+
+function voiceKeyOf(clip: PublishedVoiceClip): string {
+  return `clip:${clip.track.id}:${clip.id}`;
+}
+
+function clipSource(clip: PublishedVoiceClip): VoiceNoteSource {
+  return { key: voiceKeyOf(clip), url: clip.track.audio.url, start_s: clip.start_s, end_s: clip.end_s };
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Play and pause glyphs side by side; CSS shows the one that fits. */
+function voiceIcon(): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('block-annotation__voice-icon');
+  const play = document.createElementNS(SVG_NS, 'path');
+  play.setAttribute('d', 'M4.5 2.8v10.4L13 8z');
+  play.classList.add('block-annotation__voice-icon-play');
+  const pause = document.createElementNS(SVG_NS, 'path');
+  pause.setAttribute('d', 'M4 2.5h3v11H4zM9 2.5h3v11H9z');
+  pause.classList.add('block-annotation__voice-icon-pause');
+  svg.append(play, pause);
+  return svg;
+}
+
+function tagVoiceControl(el: HTMLElement, source: VoiceNoteSource, label: string): void {
+  el.dataset.voiceKey = source.key;
+  el.dataset.voiceLength = String(voiceNoteLength(source));
+  el.dataset.voiceLabel = label;
+}
+
+/** The small pill at the end of a line: plays its note in place and shows how long it runs. */
+function buildVoiceMark(
+  clip: PublishedVoiceClip,
+  player: { toggle: (note: VoiceNoteSource) => void },
+  colour: AnnotationLayer['colour']
+): HTMLButtonElement {
+  const source = clipSource(clip);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `block-annotation__voice-mark block-annotation__voice-mark--${colour}`;
+  tagVoiceControl(btn, source, clip.track.title);
+  btn.dataset.voiceToggle = '';
+  btn.dataset.voiceClipId = clip.id;
+  btn.title = clip.track.title;
+  const time = document.createElement('span');
+  time.className = 'block-annotation__voice-time';
+  time.dataset.voiceTime = '';
+  time.textContent = formatVoiceTime(voiceNoteLength(source));
+  btn.append(voiceIcon(), time);
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    player.toggle(source);
+  });
+  return btn;
+}
+
+function clipWhere(clip: PublishedVoiceClip): string {
+  const quote = clip.anchor?.quote.exact.trim();
+  if (!quote) return 'Whole poem';
+  return quote.length > 60 ? `“${quote.slice(0, 57).trimEnd()}…”` : `“${quote}”`;
+}
+
+/** Below the poem: every voice note with its length, a scrub bar and its transcript. */
+function buildVoiceNotesList(
+  tracks: AnnotationVoiceTrack[],
+  player: {
+    toggle: (note: VoiceNoteSource) => void;
+    seek: (note: VoiceNoteSource, fraction: number) => void;
+  },
+  layers: AnnotationLayer[]
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'block-annotation__voice-notes';
+  const heading = document.createElement('h4');
+  heading.className = 'block-annotation__voice-notes-title';
+  heading.textContent = 'Voice notes';
+  const list = document.createElement('ul');
+  list.className = 'block-annotation__voice-note-list';
+  section.append(heading, list);
+
+  function row(input: {
+    source: VoiceNoteSource;
+    title: string;
+    where: string;
+    transcript: string;
+    colour: AnnotationLayer['colour'];
+  }): HTMLLIElement {
+    const { source } = input;
+    const li = document.createElement('li');
+    li.className = `block-annotation__voice-note block-annotation__voice-note--${input.colour}`;
+    tagVoiceControl(li, source, input.title);
+
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'block-annotation__voice-note-play';
+    tagVoiceControl(play, source, input.title);
+    play.dataset.voiceToggle = '';
+    play.setAttribute('aria-label', `Play voice note: ${input.title}`);
+    play.append(voiceIcon());
+    play.addEventListener('click', () => player.toggle(source));
+
+    const main = document.createElement('div');
+    main.className = 'block-annotation__voice-note-main';
+    const head = document.createElement('p');
+    head.className = 'block-annotation__voice-note-head';
+    const title = document.createElement('strong');
+    title.textContent = input.title;
+    const where = document.createElement('span');
+    where.className = 'block-annotation__voice-note-where';
+    where.textContent = input.where;
+    head.append(title, where);
+
+    const bar = document.createElement('div');
+    bar.className = 'block-annotation__voice-note-bar';
+    const scrub = document.createElement('input');
+    scrub.type = 'range';
+    scrub.min = '0';
+    scrub.max = '1000';
+    scrub.value = '0';
+    scrub.dataset.voiceScrub = '';
+    scrub.className = 'block-annotation__voice-note-scrub';
+    scrub.setAttribute('aria-label', `Position in ${input.title}`);
+    scrub.addEventListener('input', () => player.seek(source, Number(scrub.value) / 1000));
+    const time = document.createElement('span');
+    time.className = 'block-annotation__voice-time';
+    time.dataset.voiceTime = '';
+    time.textContent = formatVoiceTime(voiceNoteLength(source));
+    bar.append(scrub, time);
+    main.append(head, bar);
+
+    if (input.transcript.trim()) {
+      const details = document.createElement('details');
+      details.className = 'block-annotation__voice-note-transcript';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Transcript';
+      const body = document.createElement('p');
+      body.textContent = input.transcript.trim();
+      details.append(summary, body);
+      main.append(details);
+    }
+    li.append(play, main);
+    return li;
+  }
+
+  for (const track of tracks) {
+    const colour = layerById(layers, track.layer_id)?.colour ?? 'wave';
+    const clips = approvedClips(track);
+    if (clips.length > 1) {
+      // A long take cut into clips: hear it straight through, lines lighting as it goes.
+      list.append(
+        row({
+          source: {
+            key: `track:${track.id}`,
+            url: track.audio.url,
+            start_s: 0,
+            end_s: track.audio.duration_s || Math.max(...clips.map((clip) => clip.end_s)),
+            clips: clips
+              .map((clip) => ({ id: clip.id, start_s: clip.start_s, end_s: clip.end_s }))
+              .sort((a, b) => a.start_s - b.start_s)
+          },
+          title: track.title,
+          where: `Whole recording · ${clips.length} parts`,
+          transcript: track.transcript.words.map((word) => word.w).join(' '),
+          colour
+        })
+      );
+    }
+    clips.forEach((clip, index) => {
+      list.append(
+        row({
+          source: clipSource(clip),
+          title: clips.length > 1 ? `${track.title} · part ${index + 1}` : track.title,
+          where: clipWhere(clip),
+          transcript: clip.transcript_text,
+          colour
+        })
+      );
+    });
+  }
+  return section;
 }
 
 function layerById(layers: AnnotationLayer[], id: string): AnnotationLayer | undefined {
@@ -599,103 +788,17 @@ function buildInteractiveView(
   });
   root.append(sheet);
 
-  const voiceAudio = document.createElement('audio');
-  voiceAudio.preload = 'metadata';
-  voiceAudio.hidden = true;
-  root.append(voiceAudio);
-
-  let voiceRaf = 0;
-  let voiceHighlightId: string | null = null;
-  let voicePlayAll = false;
-  let voicePlayAllClips: Array<{ id: string; start_s: number; end_s: number }> = [];
-
-  function stopVoiceRaf(): void {
-    if (voiceRaf) {
-      cancelAnimationFrame(voiceRaf);
-      voiceRaf = 0;
+  const voicePlayer = createVoiceNotePlayer(root, {
+    onLine: (clipId) => {
+      root.querySelectorAll('.block-annotation__line.is-voice-active').forEach((node) => {
+        node.classList.remove('is-voice-active');
+      });
+      if (!clipId) return;
+      root
+        .querySelectorAll(`[data-voice-clip-id="${clipId}"]`)
+        .forEach((node) => node.closest('.block-annotation__line')?.classList.add('is-voice-active'));
     }
-  }
-
-  function clearVoiceHighlight(): void {
-    root.querySelectorAll('.block-annotation__line.is-voice-active').forEach((node) => {
-      node.classList.remove('is-voice-active');
-    });
-    voiceHighlightId = null;
-  }
-
-  function highlightVoiceClip(clipId: string | null): void {
-    if (clipId === voiceHighlightId) return;
-    clearVoiceHighlight();
-    voiceHighlightId = clipId;
-    if (!clipId) return;
-    root
-      .querySelectorAll(`[data-voice-clip-id="${clipId}"]`)
-      .forEach((node) => node.closest('.block-annotation__line')?.classList.add('is-voice-active'));
-  }
-
-  function tickVoicePlayback(): void {
-    if (voiceAudio.paused || voiceAudio.ended) {
-      stopVoiceRaf();
-      if (voiceAudio.ended) {
-        voicePlayAll = false;
-        clearVoiceHighlight();
-      }
-      return;
-    }
-    if (voicePlayAll && voicePlayAllClips.length > 0) {
-      const active = activeClipAt(voicePlayAllClips, voiceAudio.currentTime);
-      highlightVoiceClip(active?.id ?? null);
-    }
-    voiceRaf = requestAnimationFrame(tickVoicePlayback);
-  }
-
-  function startVoiceRaf(): void {
-    stopVoiceRaf();
-    voiceRaf = requestAnimationFrame(tickVoicePlayback);
-  }
-
-  function playVoiceClip(clip: PublishedVoiceClip): void {
-    voicePlayAll = false;
-    voicePlayAllClips = [];
-    if (voiceAudio.src !== clip.track.audio.url) {
-      voiceAudio.src = clip.track.audio.url;
-    }
-    const onMeta = () => {
-      voiceAudio.currentTime = Math.max(0, clip.start_s);
-      void voiceAudio.play().then(() => startVoiceRaf()).catch(() => stopVoiceRaf());
-      highlightVoiceClip(clip.id);
-      const endAt = clip.end_s;
-      const onTime = () => {
-        if (voiceAudio.currentTime >= endAt - 0.02) {
-          voiceAudio.pause();
-          voiceAudio.removeEventListener('timeupdate', onTime);
-          stopVoiceRaf();
-          clearVoiceHighlight();
-        }
-      };
-      voiceAudio.addEventListener('timeupdate', onTime);
-    };
-    if (voiceAudio.readyState >= 1) onMeta();
-    else voiceAudio.addEventListener('loadedmetadata', onMeta, { once: true });
-  }
-
-  function playAllVoice(track: AnnotationVoiceTrack): void {
-    const clips = approvedClips(track);
-    if (clips.length === 0) return;
-    voicePlayAll = true;
-    voicePlayAllClips = clips.map((clip) => ({
-      id: clip.id,
-      start_s: clip.start_s,
-      end_s: clip.end_s
-    }));
-    if (voiceAudio.src !== track.audio.url) voiceAudio.src = track.audio.url;
-    const start = () => {
-      voiceAudio.currentTime = 0;
-      void voiceAudio.play().then(() => startVoiceRaf()).catch(() => stopVoiceRaf());
-    };
-    if (voiceAudio.readyState >= 1) start();
-    else voiceAudio.addEventListener('loadedmetadata', start, { once: true });
-  }
+  });
 
   function exitFocus(): void {
     state = {
@@ -1199,9 +1302,16 @@ function buildInteractiveView(
       });
     }
 
-    const voiceClips = publishedVoiceTracks(content).flatMap(approvedClips);
+    // Voice notes follow their layer's tick-box like every other mark.
+    const voiceTracks = publishedVoiceTracks(content).filter((track) =>
+      activeLayerIds(stops, state).has(track.layer_id)
+    );
+    const voiceClips = voiceTracks.flatMap(approvedClips);
+    if (voicePlayer.currentKey() && !voiceClips.some((clip) => voiceKeyOf(clip) === voicePlayer.currentKey()) &&
+      !voiceTracks.some((track) => `track:${track.id}` === voicePlayer.currentKey())) {
+      voicePlayer.stop();
+    }
     const voiceByLine = new Map<string, PublishedVoiceClip[]>();
-    const generalVoice = voiceClips.filter((clip) => !clip.anchor);
     for (const clip of voiceClips) {
       if (!clip.anchor?.line) continue;
       pushGrouped(voiceByLine, clip.anchor.line, clip);
@@ -1251,29 +1361,6 @@ function buildInteractiveView(
       for (const pip of pipsByLine.get(lineId) ?? []) {
         margin.append(pip);
       }
-      for (const clip of voiceByLine.get(lineId) ?? []) {
-        const play = document.createElement('button');
-        play.type = 'button';
-        play.className = 'block-annotation__voice-play';
-        play.dataset.voiceClipId = clip.id;
-        play.setAttribute('aria-label', `Play voice clip: ${clip.transcript_text.slice(0, 40) || clip.id}`);
-        play.textContent = '▶';
-        play.addEventListener('click', () => playVoiceClip(clip));
-        margin.append(play);
-
-        if (clip.transcript_text.trim()) {
-          const details = document.createElement('details');
-          details.className = 'block-annotation__voice-transcript';
-          const summary = document.createElement('summary');
-          summary.textContent = 'Transcript';
-          const body = document.createElement('p');
-          body.textContent = clip.transcript_text;
-          details.append(summary, body);
-          // Attach beside text after textEl is created below.
-          row.dataset.hasVoiceTranscript = '1';
-          (row as HTMLElement & { __voiceDetails?: HTMLElement }).__voiceDetails = details;
-        }
-      }
       row.append(margin);
 
       const textEl = document.createElement('p');
@@ -1317,12 +1404,13 @@ function buildInteractiveView(
         textEl.append(markerRow);
       }
 
-      row.append(textEl);
-      const voiceDetails = (row as HTMLElement & { __voiceDetails?: HTMLElement }).__voiceDetails;
-      if (voiceDetails) {
-        delete (row as HTMLElement & { __voiceDetails?: HTMLElement }).__voiceDetails;
-        textEl.append(voiceDetails);
+      for (const clip of voiceByLine.get(lineId) ?? []) {
+        textEl.append(
+          buildVoiceMark(clip, voicePlayer, layerById(content.layers, clip.track.layer_id)?.colour ?? 'wave')
+        );
       }
+
+      row.append(textEl);
       return row;
     }
 
@@ -1353,42 +1441,8 @@ function buildInteractiveView(
     textCol.append(poemHost);
 
     const publishedTracks = publishedVoiceTracks(content);
-    if (publishedTracks.length > 0) {
-      const voiceBar = document.createElement('div');
-      voiceBar.className = 'block-annotation__voice-bar';
-      for (const track of publishedTracks) {
-        const playAll = document.createElement('button');
-        playAll.type = 'button';
-        playAll.className = 'btn btn--secondary block-annotation__voice-play-all';
-        playAll.textContent = `Play all · ${track.title}`;
-        playAll.addEventListener('click', () => playAllVoice(track));
-        voiceBar.append(playAll);
-      }
-      textCol.append(voiceBar);
-    }
-
-    if (generalVoice.length > 0) {
-      const general = document.createElement('section');
-      general.className = 'block-annotation__voice-general';
-      const generalTitle = document.createElement('h4');
-      generalTitle.textContent = 'General comments';
-      general.append(generalTitle);
-      const generalList = document.createElement('ul');
-      for (const clip of generalVoice) {
-        const li = document.createElement('li');
-        const play = document.createElement('button');
-        play.type = 'button';
-        play.className = 'btn btn--secondary block-annotation__voice-play';
-        play.dataset.voiceClipId = clip.id;
-        play.textContent = 'Play';
-        play.addEventListener('click', () => playVoiceClip(clip));
-        const text = document.createElement('p');
-        text.textContent = clip.transcript_text || clip.track.title;
-        li.append(play, text);
-        generalList.append(li);
-      }
-      general.append(generalList);
-      textCol.append(general);
+    if (voiceClips.length > 0) {
+      textCol.append(buildVoiceNotesList(voiceTracks, voicePlayer, content.layers));
     }
 
     if (content.annotations.length === 0 && publishedTracks.length === 0) {
@@ -1401,6 +1455,7 @@ function buildInteractiveView(
       textCol.append(empty);
     }
 
+    voicePlayer.sync();
     textCol.scrollTop = scrollTop;
     if (stepping) {
       root

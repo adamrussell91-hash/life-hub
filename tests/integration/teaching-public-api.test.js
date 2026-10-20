@@ -262,6 +262,38 @@ test('media file is public for active media and 404 when archived', async () => 
   assert.equal(missing.status, 404);
 });
 
+test('media file serves byte ranges so Safari can play and seek audio', async () => {
+  const bytes = new Uint8Array([10, 11, 12, 13, 14, 15]).buffer;
+  const handler = createMediaFileHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'media/voice-1': { id: 'voice-1', status: 'active', mime_type: 'audio/webm' },
+      'media_files/voice-1': { data: bytes, metadata: { contentType: 'audio/webm' } }
+    })
+  });
+  const url = 'https://api.adam-russell.com/api/media/voice-1/file';
+
+  const whole = await handler(jsonRequest(url));
+  assert.equal(whole.status, 200);
+  assert.equal(whole.headers.get('accept-ranges'), 'bytes');
+  assert.equal(whole.headers.get('content-length'), '6');
+
+  const part = await handler(jsonRequest(url, { headers: { range: 'bytes=2-3' } }));
+  assert.equal(part.status, 206);
+  assert.equal(part.headers.get('content-range'), 'bytes 2-3/6');
+  assert.deepEqual([...new Uint8Array(await part.arrayBuffer())], [12, 13]);
+
+  const open = await handler(jsonRequest(url, { headers: { range: 'bytes=4-' } }));
+  assert.equal(open.headers.get('content-range'), 'bytes 4-5/6');
+
+  const tail = await handler(jsonRequest(url, { headers: { range: 'bytes=-2' } }));
+  assert.deepEqual([...new Uint8Array(await tail.arrayBuffer())], [14, 15]);
+
+  const beyond = await handler(jsonRequest(url, { headers: { range: 'bytes=9-' } }));
+  assert.equal(beyond.status, 416);
+  assert.equal(beyond.headers.get('content-range'), 'bytes */6');
+});
+
 test('html-app-ai stays public, 503s without Blobs, and completes an enabled lane', async () => {
   const unbound = createHtmlAppAiHandler({
     env,
