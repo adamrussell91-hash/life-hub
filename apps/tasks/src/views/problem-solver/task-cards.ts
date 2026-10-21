@@ -6,9 +6,9 @@ import { errorMessage } from '@/views/feedback';
 import { taskPageHash } from '@/domain/cards';
 import { caseFileOffer } from '../../../../../packages/problem-solver/case-file.mjs';
 import { nameVersion, namingProblem, reviseName } from '../../../../../packages/problem-solver/naming.mjs';
-import type { PsCaseFileOffer, PsProposedTask, PsSession } from '../../../../../packages/problem-solver/types';
+import type { PsProposedTask, PsSession } from '../../../../../packages/problem-solver/types';
 import { TaskNotLinkedError, type TaskEdits } from './task-bridge';
-import { CaseFilePageGone, type CaseFilePlace } from './case-file-bridge';
+import { CaseFilePageGone, type CaseFilePlace, type PaperOffer } from './case-file-bridge';
 
 export type TaskCardHandlers = {
   create(proposal: PsProposedTask, edits: TaskEdits): Promise<void>;
@@ -17,7 +17,7 @@ export type TaskCardHandlers = {
   dismissReview(): Promise<void>;
   /** Where the case file can go: linked pages first, `new` (a new project) last. */
   places(session: PsSession): Promise<PlaceOption[]>;
-  writeCaseFile(offer: PsCaseFileOffer, choice: { place: CaseFilePlace; title: string; moved?: boolean }): Promise<void>;
+  writeCaseFile(offer: PaperOffer, choice: { place: CaseFilePlace; title: string; moved?: boolean }): Promise<void>;
   dismissCaseFile(key: string): Promise<void>;
 };
 export type PlaceOption = { value: string; label: string };
@@ -26,7 +26,18 @@ export type TaskCardOptions = {
   fallbackFocus?: () => HTMLElement | null;
   /** Today as YYYYMMDD, for the case file's revised name (defaults to the local date). */
   today?: () => string;
+  /** The page record the card writes (Problem Solver's case file by default). */
+  paper?: PaperCard;
 };
+
+/**
+ * Which page record the card offers: its offer, the word for it, and whether its title must
+ * pass the strict naming rules and carry its version (the case file's do; a decision record's
+ * title is free).
+ */
+export type PaperCard = { offer(session: PsSession): PaperOffer | null; noun: string; strictNames: boolean };
+
+const CASE_FILE: PaperCard = { offer: (session) => caseFileOffer(session), noun: 'case file', strictNames: true };
 export type TaskCards = { el: HTMLElement; update(session: PsSession): void };
 
 const WAITING = 'Waiting for the coach…';
@@ -191,10 +202,12 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
   /** Card order on the last update, to find the card after one that removed itself. */
   let lastOrder: string[] = [];
   let review: (Card & { sync(proposal: NonNullable<PsSession['reviewProposal']>): void }) | null = null;
-  let caseFile: (Card & { key: string; sync(session: PsSession): void }) | null = null;
+  let caseFile: (Card & { key: string; kind: string; sync(session: PsSession): void }) | null = null;
   /** The session of the last update, for the places list when an update card turns into a write. */
   let current: PsSession | null = null;
   const dateToday = options.today ?? compactToday;
+  const paper = options.paper ?? CASE_FILE;
+  const noun = paper.noun;
 
   const syncHidden = () => {
     root.hidden = cards.size === 0 && !review && !caseFile && notices.childElementCount === 0;
@@ -289,9 +302,10 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
    * before anything is written) and a place; an update goes where the case file already is.
    * If that page has gone, the card turns into the write form for a full copy elsewhere.
    */
-  function caseFileCard(offer: PsCaseFileOffer, session: PsSession): Card & { key: string; sync(session: PsSession): void } {
+  function caseFileCard(offer: PaperOffer, session: PsSession): Card & { key: string; kind: string; sync(session: PsSession): void } {
     let moved = false;
     const write = offer.kind === 'write';
+    const graphic = offer.kind === 'graphic';
     const title = input('title', 'text', offer.file.title);
     const place = el('select', 'ps-taskcard__input ps-casefilecard__select') as HTMLSelectElement;
     place.name = 'place';
@@ -348,11 +362,12 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
     const writeFields = () => [field('Title', title), field('Place', place)];
     if (write) loadPlaces(session, true);
 
+    if (graphic) sections.replaceChildren();
     const card = makeCard({
       className: 'ps-casefilecard',
-      meta: write ? 'Write the case file?' : 'Add an update to the case file?',
+      meta: write ? `Write the ${noun}?` : graphic ? `The ${noun}'s graphic did not write. Try it again?` : `Add an update to the ${noun}?`,
       fields: write ? writeFields() : [],
-      primary: button(write ? 'Write case file' : 'Add update', 'write-casefile', 'btn--primary'),
+      primary: button(write ? `Write ${noun}` : graphic ? 'Retry the graphic' : 'Add update', 'write-casefile', 'btn--primary'),
       secondary: button('Not now', 'dismiss-casefile', 'btn--ghost'),
       busyLabel: 'Writing…',
       onPrimary: async () => {
@@ -367,7 +382,7 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
               skip = `${record.target.kind}:${record.target.id}`;
               loadPlaces(current ?? session, true);
               listSections(null);
-              card.reshape({ meta: 'Write the case file somewhere else?', fields: writeFields(), primary: 'Write it there' });
+              card.reshape({ meta: `Write the ${noun} somewhere else?`, fields: writeFields(), primary: 'Write it there' });
               place.focus();
             }
             throw err;
@@ -375,10 +390,13 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
           return;
         }
         const name = title.value.trim();
-        const problem = namingProblem(name);
-        if (problem) throw new Error(problem.charAt(0).toUpperCase() + problem.slice(1));
-        // Only a first write may choose its version; a later copy carries the offer's.
-        if ((moved || record) && nameVersion(name) !== offer.version) throw new Error(`Keep the version as v${offer.version}.`);
+        if (!name) throw new Error('Give it a title.');
+        if (paper.strictNames) {
+          const problem = namingProblem(name);
+          if (problem) throw new Error(problem.charAt(0).toUpperCase() + problem.slice(1));
+          // Only a first write may choose its version; a later copy carries the offer's.
+          if ((moved || record) && nameVersion(name) !== offer.version) throw new Error(`Keep the version as v${offer.version}.`);
+        }
         await handlers.writeCaseFile(offer, { place: parsePlace(place.value), title: name, ...(moved ? { moved: true } : {}) });
       },
       onSecondary: () => handlers.dismissCaseFile(offer.key),
@@ -390,6 +408,7 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
     return {
       ...card,
       key: offer.key,
+      kind: offer.kind,
       sync(next) {
         if (placesKey !== null && placeKey(next) !== placesKey) loadPlaces(next, false);
       }
@@ -432,9 +451,10 @@ export function mountTaskCards(handlers: TaskCardHandlers, options: TaskCardOpti
         review.refresh(busy);
       }
 
-      // Kept while the offer is the same content, so typed edits survive polling.
-      const offer = caseFileOffer(session);
-      if (caseFile && caseFile.key !== offer?.key) {
+      // Kept while the offer is the same content and kind, so typed edits survive polling (a
+      // written record whose graphic failed keeps its content but turns into a retry).
+      const offer = paper.offer(session);
+      if (caseFile && (caseFile.key !== offer?.key || caseFile.kind !== offer?.kind)) {
         caseFile.el.remove();
         caseFile = null;
       }
