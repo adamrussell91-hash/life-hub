@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Continuum Line mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #fbf8f2; --card: #ffffff; --shore: #eae7da; --ink: #13233a; --muted: #6b7788;
+  --line: rgba(23, 55, 94, 0.12); --navy: #17375e; --wave: #376fb7;
+  --c0: #376fb7; --c1: #2f7a4f; --c2: #a85a0c; --c3: #6c581f; --c4: #5d4e70; --c5: #9b2c2c;
+  --radius-sm: 14px; --radius-md: 20px; --radius-lg: 24px;
+  --font: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font); color: var(--ink); background: var(--paper); font-size: 15px; line-height: 1.45; }
+button { font: inherit; color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
+
+/* mockup chrome */
+.chrome { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-bottom: 20px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: var(--shore); border-radius: 999px; }
+.seg button { min-height: 34px; padding: 4px 14px; border: 0; background: transparent; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(19,35,58,.12); }
+.chrome__label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-right: 6px; }
+.view[hidden] { display: none; }
+
+.btn { min-height: 40px; padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--card); font-weight: 600; font-size: 14px; cursor: pointer; }
+.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn--ghost { background: transparent; border-color: transparent; color: var(--wave); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+/* teacher */
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; min-width: 0; }
+.t-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 20px; align-items: start; margin-bottom: 16px; }
+.stim { background: var(--paper); border-radius: var(--radius-md); padding: 16px 18px; }
+.stim__kind { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 6px; }
+.stim__text { font-size: 18px; margin: 0; }
+.statement__nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.statement__count { font-size: 13px; color: var(--muted); font-weight: 600; }
+.statement__text { font-size: 30px; font-weight: 700; letter-spacing: -0.015em; margin: 0; line-height: 1.15; }
+.arrow-btn { width: 36px; height: 36px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font-size: 16px; }
+.arrow-btn:disabled { opacity: .35; cursor: default; }
+.dots { display: flex; gap: 6px; flex-wrap: wrap; }
+.dot { min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--muted); }
+.dot[aria-current="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.dot small { font-weight: 500; opacity: .8; margin-left: 4px; }
+
+.bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
+.bar__group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.counter { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 14px; border-radius: 999px; background: var(--shore); font-weight: 700; font-size: 15px; }
+.counter span { font-weight: 500; color: var(--muted); font-size: 13px; }
+.status { font-size: 13px; color: var(--muted); }
+
+.stage { position: relative; height: 380px; border-radius: var(--radius-md); background: linear-gradient(180deg, #fff 0%, var(--paper) 100%); border: 1px solid var(--line); overflow: hidden; touch-action: manipulation; }
+.stage__hidden-note { position: absolute; left: 0; right: 0; top: 14px; text-align: center; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); transition: opacity .4s; }
+.track { position: absolute; height: 4px; border-radius: 4px; background: var(--ink); transition: opacity .5s; }
+.track.is-quiet { opacity: .25; }
+.tick { position: absolute; width: 2px; height: 12px; background: var(--ink); opacity: .35; transform: translate(-1px, -4px); }
+.tick--stop { width: 4px; height: 20px; opacity: 1; border-radius: 2px; transform: translate(-2px, -8px); }
+.end-label { position: absolute; font-weight: 700; font-size: 15px; white-space: nowrap; }
+.end-label--l { transform: translateX(0); }
+.end-label--r { transform: translateX(-100%); }
+.mid-label { position: absolute; transform: translateX(-50%); font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+
+.tok { position: absolute; left: 0; top: 0; width: var(--s, 28px); height: var(--s, 28px); will-change: transform; border: 0; padding: 0; background: none; cursor: default; }
+.tok svg { width: 100%; height: 100%; display: block; fill: var(--fill); filter: drop-shadow(0 1px 1.5px rgba(19,35,58,.25)); }
+.stage.is-revealed .tok { cursor: pointer; }
+.tok.is-picked svg { filter: drop-shadow(0 0 0 2px #fff) drop-shadow(0 0 4px var(--fill)); }
+.tok.is-picked { z-index: 3; }
+.tok.is-dim { opacity: .28; }
+.ghost { position: absolute; left: 0; top: 0; width: var(--s, 28px); height: var(--s, 28px); opacity: .22; pointer-events: none; transition: opacity .6s; }
+.ghost svg { width: 100%; height: 100%; fill: none; stroke: var(--fill); stroke-width: 2; stroke-dasharray: 3 2; }
+.arrows { position: absolute; inset: 0; pointer-events: none; }
+.arrows line { stroke-width: 2; stroke-linecap: round; opacity: .7; }
+
+.pop { position: absolute; z-index: 5; width: min(300px, calc(100% - 24px)); background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(19,35,58,.18); font-size: 14px; }
+.pop__head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; margin-bottom: 4px; color: var(--muted); }
+.pop__head svg { width: 18px; height: 18px; fill: var(--fill); }
+.pop p { margin: 0; }
+.pop .moved { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.pop .moved b { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+
+.reasons { margin-top: 16px; }
+.reasons__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.reasons__head h3 { margin: 0; font-size: 17px; }
+.rlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.rcard { background: var(--paper); border-radius: 14px; padding: 10px 12px; display: grid; grid-template-columns: 22px 1fr; gap: 4px 10px; align-items: start; font-size: 14px; animation: rise .4s ease both; }
+.rcard svg { width: 22px; height: 22px; fill: var(--fill); }
+.rcard p { margin: 0; }
+.rcard .mini { grid-column: 2; position: relative; height: 4px; background: var(--shore); border-radius: 4px; margin-top: 4px; }
+.rcard .mini i { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--fill); transform: translateX(-50%); }
+.rcard .mini i.was { background: transparent; border: 1.5px dashed var(--fill); }
+.rcard .why { grid-column: 2; font-size: 13px; color: var(--muted); }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.group { background: var(--paper); border-radius: 16px; padding: 12px; animation: rise .45s ease both; }
+.group h4 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; gap: 8px; }
+.group h4 span { color: var(--muted); font-weight: 500; }
+.group .rcard { background: var(--card); margin-bottom: 8px; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.note { margin-top: 18px; font-size: 13px; color: var(--muted); }
+.note b { color: var(--ink); }
+
+/* student phone */
+.phone-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.phone { width: 390px; max-width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 28px; padding: 16px; min-height: 720px; box-shadow: 0 8px 30px rgba(19,35,58,.08); }
+.s-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); margin-bottom: 12px; gap: 8px; }
+.s-me { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
+.s-me svg { width: 20px; height: 20px; fill: var(--fill); }
+.s-stim { background: var(--paper); border-radius: 16px; padding: 12px 14px; font-size: 15px; margin-bottom: 14px; }
+.s-statement { font-size: 22px; font-weight: 700; line-height: 1.2; margin: 0 0 18px; letter-spacing: -0.01em; }
+.s-line { position: relative; height: 92px; margin: 0 6px 6px; touch-action: none; cursor: pointer; }
+.s-line .track { left: 0; right: 0; top: 54px; }
+.s-line .end-label { top: 70px; font-size: 13px; }
+.s-hint { position: absolute; left: 0; right: 0; top: 18px; text-align: center; font-size: 13px; color: var(--muted); }
+.s-tok { position: absolute; top: 28px; width: 30px; height: 30px; transform: translateX(-50%); transition: left .25s ease; }
+.s-tok svg { width: 100%; height: 100%; fill: var(--fill); filter: drop-shadow(0 1px 2px rgba(19,35,58,.3)); }
+.s-tok.is-ghost { opacity: .3; }
+.s-tok.is-ghost svg { fill: none; stroke: var(--fill); stroke-width: 2; stroke-dasharray: 3 2; filter: none; }
+.s-nudge { display: flex; justify-content: center; gap: 10px; margin-bottom: 14px; }
+.s-nudge button { width: 44px; height: 44px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 18px; cursor: pointer; }
+.s-field label { display: block; font-weight: 600; margin-bottom: 6px; }
+.s-field textarea { width: 100%; min-height: 96px; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; font: inherit; background: var(--paper); resize: vertical; }
+.s-field .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.s-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.s-actions .btn { flex: 1; min-height: 46px; }
+.s-done { text-align: center; padding: 30px 8px; }
+.s-done svg { width: 54px; height: 54px; fill: var(--fill); }
+.s-done h3 { margin: 12px 0 6px; }
+.s-done p { color: var(--muted); margin: 0 0 14px; }
+.s-progress { display: flex; gap: 4px; margin-bottom: 12px; }
+.s-progress i { flex: 1; height: 4px; border-radius: 4px; background: var(--shore); }
+.s-progress i.on { background: var(--navy); }
+.side-notes { flex: 1; min-width: 260px; max-width: 520px; font-size: 14px; }
+.side-notes h3 { margin: 0 0 8px; font-size: 16px; }
+.side-notes ul { margin: 0; padding-left: 18px; }
+.side-notes li { margin-bottom: 8px; }
+
+/* editor */
+.ed { display: grid; gap: 18px; max-width: 760px; }
+.ed h3 { margin: 0 0 8px; font-size: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 600; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.ed textarea, .ed input[type=text] { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; background: var(--paper); }
+.st-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; border-radius: 14px; background: var(--paper); margin-bottom: 8px; }
+.st-row b { color: var(--muted); font-size: 13px; text-align: center; }
+.st-row .st-scale { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--navy); }
+.scale-prev { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin-top: 10px; padding-top: 18px; border-top: 4px solid var(--ink); position: relative; }
+
+@media (max-width: 760px) {
+  .t-top { grid-template-columns: minmax(0, 1fr); }
+  .statement__text { font-size: 22px; }
+  .stage { height: 340px; }
+  .panel { padding: 14px; }
+  .st-row { grid-template-columns: 22px minmax(0, 1fr); }
+  .st-row .st-scale { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .rcard, .group { animation: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Continuum Line</h1>
+  <p class="sub">Mockup of a critical thinking block. Students place their symbol on the line and give a reason. Nothing shows until you reveal. Example class data, invented.</p>
+
+  <div class="chrome">
+    <div><span class="chrome__label">View</span>
+      <div class="seg" id="viewSeg">
+        <button data-v="teacher" aria-pressed="true">Teacher (projector)</button>
+        <button data-v="student" aria-pressed="false">Student (phone)</button>
+        <button data-v="editor" aria-pressed="false">Set up</button>
+      </div>
+    </div>
+    <div><span class="chrome__label">Pace</span>
+      <div class="seg" id="paceSeg">
+        <button data-p="teacher" aria-pressed="true">Teacher led</button>
+        <button data-p="student" aria-pressed="false">Student paced</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEACHER -->
+  <section class="view" id="v-teacher">
+    <div class="panel">
+      <div class="t-top">
+        <div class="stim">
+          <p class="stim__kind">Stimulus · text</p>
+          <p class="stim__text">Ben stood at the bus stop, sweating, checking his phone every few seconds.</p>
+        </div>
+        <div>
+          <div class="statement__nav">
+            <button class="arrow-btn" id="prevSt" aria-label="Previous statement">‹</button>
+            <span class="statement__count" id="stCount"></span>
+            <button class="arrow-btn" id="nextSt" aria-label="Next statement">›</button>
+            <div class="dots" id="stDots"></div>
+          </div>
+          <p class="statement__text" id="stText"></p>
+        </div>
+      </div>
+
+      <div class="bar">
+        <div class="bar__group">
+          <span class="counter" id="counter"></span>
+          <span class="status" id="status"></span>
+        </div>
+        <div class="bar__group" id="controls"></div>
+      </div>
+
+      <div class="stage" id="stage">
+        <p class="stage__hidden-note" id="hiddenNote">Placements hidden</p>
+        <svg class="arrows" id="arrows"></svg>
+      </div>
+
+      <div class="reasons" id="reasons" hidden></div>
+    </div>
+    <p class="note"><b>Try it:</b> watch symbols arrive (they roam the whole space, nothing to do with where they placed). Reveal, click any symbol, show all reasons, sort them, then let them re-place. Statement 3 is a snapped binary to force a defence.</p>
+  </section>
+
+  <!-- STUDENT -->
+  <section class="view" id="v-student" hidden>
+    <div class="chrome">
+      <div><span class="chrome__label">Student state</span>
+        <div class="seg" id="sStateSeg">
+          <button data-s="place" aria-pressed="true">Placing</button>
+          <button data-s="wait" aria-pressed="false">Placed</button>
+          <button data-s="replace" aria-pressed="false">Re-place</button>
+        </div>
+      </div>
+    </div>
+    <div class="phone-row">
+      <div class="phone" id="phone"></div>
+      <div class="side-notes">
+        <h3>Student side</h3>
+        <ul>
+          <li>Tap the line to drop your symbol, drag it, or nudge it with the arrows. On a snapped line it jumps to the nearest stop.</li>
+          <li>A reason is required before you can place it.</li>
+          <li>Students never see anyone else's position before the reveal. The waiting screen shows only their own.</li>
+          <li><b>Student paced:</b> after placing, “Next statement” moves them on. Teacher reveals each statement when ready.</li>
+          <li><b>Re-place:</b> their first spot stays as a dashed ghost. Moving needs a “why I moved” reason. “Keep it here” is one tap.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDITOR -->
+  <section class="view" id="v-editor" hidden>
+    <div class="panel ed">
+      <div>
+        <h3>Stimulus</h3>
+        <div class="chips" id="stimKind">
+          <button class="chip" aria-pressed="true">Text</button><button class="chip" aria-pressed="false">Image</button><button class="chip" aria-pressed="false">Video</button>
+        </div>
+        <textarea rows="2" style="margin-top:8px">Ben stood at the bus stop, sweating, checking his phone every few seconds.</textarea>
+      </div>
+      <div>
+        <h3>Line</h3>
+        <div class="chips" id="presets">
+          <button class="chip" aria-pressed="true">Implied ↔ Not implied</button>
+          <button class="chip" aria-pressed="false">All · Some · None</button>
+          <button class="chip" aria-pressed="false">Certain ↔ Impossible</button>
+          <button class="chip" aria-pressed="false">Fact ↔ Opinion</button>
+          <button class="chip" aria-pressed="false">Strong ↔ Weak evidence</button>
+          <button class="chip" aria-pressed="false">Agree ↔ Disagree</button>
+          <button class="chip" aria-pressed="false">Custom…</button>
+        </div>
+        <div class="scale-prev" id="scalePrev"><span>Implied</span><span>Not implied</span></div>
+        <p style="margin:14px 0 0"><label class="toggle"><input type="checkbox" id="snapToggle"> Snap to the stops (forces a choice)</label></p>
+      </div>
+      <div>
+        <h3>Statements <span style="color:var(--muted);font-weight:500">4 of 10</span></h3>
+        <div id="stRows"></div>
+        <button class="btn btn--ghost">+ Add statement</button>
+      </div>
+      <div>
+        <h3>Pace</h3>
+        <div class="chips" id="edPace">
+          <button class="chip" aria-pressed="true">Teacher led: I click through</button>
+          <button class="chip" aria-pressed="false">Student paced: they move on</button>
+        </div>
+      </div>
+      <div>
+        <h3>Re-place round</h3>
+        <label class="toggle"><input type="checkbox" checked> Offer “move your symbol and say why” after each reveal</label>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const SHAPES = [
+    'M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z',
+    'M12 5.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13z',
+    'M6.5 6.5h11v11h-11z',
+    'M12 4l8 8-8 8-8-8z',
+    'M12 5l8 14H4z',
+    'M12 19.5s-7-4.3-7-9.2A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.3c0 4.9-7 9.2-7 9.2z'
+  ];
+  const COLOUR_NAMES = ['Blue', 'Green', 'Orange', 'Gold', 'Purple', 'Red'];
+  const SHAPE_NAMES = ['star', 'circle', 'square', 'diamond', 'triangle', 'heart'];
+  const svgFor = (s, extra = '') => `<svg viewBox="0 0 24 24" aria-hidden="true"${extra}><path d="${SHAPES[s]}"/></svg>`;
+
+  // seeded random so the mockup is the same every load
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+
+  // 24 students, distinct colour+shape
+  const ids = [];
+  for (let s = 0; s < 6; s++) for (let c = 0; c < 6; c++) ids.push([c, s]);
+  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  const STUDENTS = ids.slice(0, 24).map(([c, s]) => ({ c, s, name: `${COLOUR_NAMES[c]} ${SHAPE_NAMES[s]}` }));
+
+  const IMPLIED = { left: 'Implied', right: 'Not implied' };
+  const S1 = [
+    [0.08, 0, "Sweating is what you do when it's hot. That's the most normal reason."],
+    [0.12, 0, "He's standing outside waiting, so the weather is the obvious cause."],
+    [0.18, 0, 'It says sweating and bus stop, so he is outside. Heat fits best.'],
+    [0.22, 0, 'Hot day is the first thing most readers would think.'],
+    [0.25, 0, 'Nothing else in the text explains the sweat, so heat is likely.'],
+    [0.30, 2, "It's suggested, but the text never mentions the weather at all."],
+    [0.34, 1, 'Probably hot, but he keeps checking his phone, so he might be stressed too.'],
+    [0.38, 1, 'Could be hot, or he could have run to catch the bus.'],
+    [0.42, 2, 'Sweating is a clue, not proof. I went a bit left of the middle.'],
+    [0.46, 1, "He might be nervous. The phone checking makes me think he's waiting on news."],
+    [0.50, 2, 'Half and half. One clue and no temperature.'],
+    [0.52, 1, 'He could be sick. People sweat with a fever.'],
+    [0.55, 1, 'The phone checking points to nerves more than weather.'],
+    [0.58, 2, "We're told how Ben is, not what the day is like."],
+    [0.60, 1, "If he ran to the stop he'd sweat on a cold day."],
+    [0.63, 1, 'Nervous sweating is a thing. Late for an interview maybe.'],
+    [0.67, 2, "Implied means the writer wants us to think it. I don't think the writer cares about the weather."],
+    [0.70, 1, 'There are too many other reasons someone sweats.'],
+    [0.74, 2, 'Nothing in the text is about the day, only about Ben.'],
+    [0.78, 1, 'The focus is on him being anxious. The sweat shows nerves.'],
+    [0.82, 2, "You'd need the weather mentioned for it to be implied."],
+    [0.86, 1, "He's checking his phone, he's late. Stress sweat, not heat."],
+    [0.90, 2, "It's an assumption we make, not something the text implies."],
+    [0.94, 1, 'Could be winter and he just sprinted. Not implied at all.']
+  ];
+  const S1_MOVES = {
+    0: [0.36, 'Someone said he might have run for the bus. I had not thought of that.'],
+    1: [0.42, 'The phone checking changes it for me. It might be nerves.'],
+    3: [0.5, 'Hot day is just the first guess, not the only one.'],
+    5: [0.62, 'If the writer never mentions weather, I can’t say it is implied.'],
+    10: [0.7, 'The point about the writer focusing on Ben convinced me.'],
+    12: [0.76, 'Two other reasons to sweat came up that I had missed.'],
+    21: [0.7, 'Heat is still possible. I was too sure.']
+  };
+  const S1_GROUPS = ['Read it straight from the clue', 'Found another reason to sweat', "Asked what ‘implied’ needs"];
+
+  function generic(mean, spread, pool) {
+    return STUDENTS.map((_, i) => {
+      const p = Math.min(0.97, Math.max(0.03, mean + (rnd() - 0.5) * spread));
+      const g = p < 0.33 ? 0 : p < 0.66 ? 2 : 1;
+      return [p, g, pool[g][i % pool[g].length]];
+    });
+  }
+  const STATEMENTS = [
+    { text: 'It was a hot day.', scale: IMPLIED, snap: false, reasons: S1, groups: S1_GROUPS, moves: S1_MOVES, arrived: 22 },
+    { text: 'Ben was late for something.', scale: IMPLIED, snap: false, groups: ['The phone checking', 'Other reasons to check a phone', 'Not enough in the text'],
+      reasons: generic(0.38, 0.7, [['He keeps checking the time. That is what late people do.', 'Sweating and checking the phone together sounds like rushing.', 'Checking every few seconds means he is in a hurry.'], ['Not enough to go on. He could just be bored.', 'Nothing says what time it is.', 'Waiting is not the same as late.'], ['He could be texting a friend, not checking the time.', 'Maybe the bus is late, not Ben.', 'He might be waiting for a reply.']]), arrived: 20 },
+    { text: 'Ben owns a phone.', scale: IMPLIED, snap: true, groups: ['It says “his phone”', 'Could be borrowed', 'Owning is not stated'],
+      reasons: STUDENTS.map((_, i) => i < 18 ? [0, 0, ['It says his phone. That means he owns it.', '“His” is the clue.', 'You check your own phone, not someone else’s.'][i % 3]] : [1, 1, ['His phone could be a work phone. Owning is not implied.', 'It could be his mum’s phone he borrowed.', '“His” can mean the one he is using.'][i % 3]]), arrived: 24 },
+    { text: 'Ben was waiting for a message.', scale: IMPLIED, snap: false, groups: ['Every few seconds', 'Could be the time', 'Could be anything'],
+      reasons: generic(0.42, 0.75, [['Every few seconds is what you do when you want a reply.', 'Nerves plus phone means news.', 'He is clearly waiting on something on that screen.'], ['He could be checking the bus app.', 'He could be playing a game.', 'Phones are not only for messages.'], ['Could be the time, could be a map. We do not know.', 'It points that way but does not say.', 'Lots of reasons to check a phone.']]), arrived: 9 }
+  ];
+
+  // ── view switching ──────────────────────────────────────────────
+  const seg = (id, attr, on) => document.getElementById(id).addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    for (const x of e.currentTarget.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+    on(b.dataset[attr], b);
+  });
+  seg('viewSeg', 'v', (v) => {
+    for (const n of ['teacher', 'student', 'editor']) document.getElementById('v-' + n).hidden = n !== v;
+    if (v === 'teacher') layoutStage();
+  });
+  let pace = 'teacher';
+  seg('paceSeg', 'p', (p) => { pace = p; renderTeacher(); renderStudent(); });
+
+  // ── teacher projector ───────────────────────────────────────────
+  const stage = document.getElementById('stage');
+  const arrowsSvg = document.getElementById('arrows');
+  const hiddenNote = document.getElementById('hiddenNote');
+  const reasonsBox = document.getElementById('reasons');
+  let cur = 0;
+  const phases = STATEMENTS.map(() => ({ phase: 'collect', reasons: null, moved: 0 }));
+  let toks = [];
+  let order = [];
+  let ghosts = [];
+  let geom = { W: 0, H: 0, L: 0, R: 0, lineY: 0, s: 28 };
+  let pop = null;
+  let picked = null;
+
+  function buildStage() {
+    for (const n of stage.querySelectorAll('.tok, .ghost, .track, .tick, .end-label, .mid-label, .pop')) n.remove();
+    pop = null; picked = null;
+    const st = STATEMENTS[cur];
+    const track = el('div', 'track'); stage.append(track);
+    const ticks = st.snap ? [0, 1] : [0.25, 0.5, 0.75];
+    for (const t of ticks) { const k = el('div', 'tick' + (st.snap ? ' tick--stop' : '')); k.dataset.t = t; stage.append(k); }
+    const l = el('div', 'end-label end-label--l', st.scale.left); const r = el('div', 'end-label end-label--r', st.scale.right);
+    stage.append(l, r);
+    toks = STUDENTS.map((stu, i) => {
+      const n = document.createElement('button');
+      n.className = 'tok'; n.type = 'button';
+      n.style.setProperty('--fill', `var(--c${stu.c})`);
+      n.innerHTML = svgFor(stu.s);
+      n.setAttribute('aria-label', stu.name);
+      n.addEventListener('click', (e) => { e.stopPropagation(); pick(i); });
+      const [pos, g, text] = st.reasons[i];
+      const mv = st.moves?.[i];
+      return { i, stu, n, pos, g, text, newPos: mv ? mv[0] : null, why: mv ? mv[1] : null, moved: false, here: false,
+        x: 0, y: 0, tx: 0, ty: 0, bx: rnd(), by: rnd(), ax: 10 + rnd() * 14, ay: 6 + rnd() * 10, w1: 0.0005 + rnd() * 0.0005, w2: 0.0006 + rnd() * 0.0006, p1: rnd() * 6.28, p2: rnd() * 6.28 };
+    });
+    layoutStage();
+    const ph = phases[cur];
+    const already = ph.phase === 'collect' ? Math.min(ph.arrived ?? 0, st.arrived) : (ph.arrived ?? st.arrived);
+    // arrival order is shuffled so the first in are not all from one end
+    order = toks.map((t) => t.i);
+    for (let k = order.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [order[k], order[j]] = [order[j], order[k]]; }
+    order.slice(0, already).forEach((i) => arrive(toks[i], true));
+    ph.arrived = already;
+    if (ph.phase !== 'collect') { computeLayout(); toks.forEach((t) => { t.x = t.tx; t.y = t.ty; }); }
+    if (ph.phase === 'replace') { buildGhosts(); for (const t of toks) if (t.newPos != null) t.moved = true; computeLayout(); toks.forEach((t) => { t.x = t.tx; t.y = t.ty; }); }
+  }
+
+  function arrive(t, instant) {
+    t.here = true;
+    stage.append(t.n);
+    const { W, H } = geom;
+    if (instant) { const d = driftPoint(t, performance.now()); t.x = d.x; t.y = d.y; }
+    else {
+      // fly in from a random edge
+      const side = Math.floor(rnd() * 4);
+      t.x = side === 0 ? -40 : side === 1 ? W + 40 : rnd() * W;
+      t.y = side === 2 ? -40 : side === 3 ? H + 40 : rnd() * H * 0.6;
+    }
+    place(t);
+  }
+
+  function layoutStage() {
+    const W = stage.clientWidth, H = stage.clientHeight;
+    if (!W) return;
+    const s = W < 600 ? 20 : 28;
+    const pad = W < 600 ? 24 : 48;
+    geom = { W, H, L: pad, R: W - pad, lineY: H - 64, s };
+    stage.style.setProperty('--s', s + 'px');
+    const track = stage.querySelector('.track');
+    Object.assign(track.style, { left: geom.L + 'px', width: (geom.R - geom.L) + 'px', top: geom.lineY + 'px' });
+    for (const k of stage.querySelectorAll('.tick')) { k.style.left = (geom.L + k.dataset.t * (geom.R - geom.L)) + 'px'; k.style.top = geom.lineY + 'px'; }
+    const l = stage.querySelector('.end-label--l'), r = stage.querySelector('.end-label--r');
+    l.style.left = geom.L + 'px'; l.style.top = (geom.lineY + 18) + 'px';
+    r.style.left = geom.R + 'px'; r.style.top = (geom.lineY + 18) + 'px';
+    arrowsSvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    if (phases[cur].phase !== 'collect') { computeLayout(); if (phases[cur].phase === 'replace') placeGhosts(); }
+  }
+
+  // wander: each symbol roams the whole space on its own smooth path, a few seconds per sweep.
+  // Nothing about the path comes from where the student placed it.
+  function driftPoint(t, now) {
+    const { L, R, lineY, s } = geom;
+    const top = 40, bottom = lineY - 50;
+    const fx = 0.5 + 0.32 * Math.sin(now * t.w1 + t.p1) + 0.16 * Math.sin(now * t.w1 * 1.73 + t.bx * 6.28);
+    const fy = 0.5 + 0.32 * Math.sin(now * t.w2 + t.p2) + 0.16 * Math.sin(now * t.w2 * 2.11 + t.by * 6.28);
+    return { x: L + fx * (R - L) - s / 2, y: top + fy * Math.max(10, bottom - top) - s / 2 };
+  }
+
+  // reveal layout: x from position; symbols that bunch stack upward from the line
+  function layoutFor(list, key) {
+    const { L, R, lineY, s } = geom;
+    const out = new Map();
+    const st = STATEMENTS[cur];
+    if (st.snap) {
+      for (const stop of [0, 1]) {
+        const at = list.filter((t) => Math.round(key(t)) === stop);
+        const cols = Math.max(3, Math.ceil(Math.sqrt(at.length * 1.6)));
+        at.forEach((t, k) => {
+          const col = k % cols, row = Math.floor(k / cols);
+          const cx = L + stop * (R - L);
+          const x0 = stop === 0 ? cx : cx - cols * (s + 3) + 3;
+          out.set(t, { x: x0 + col * (s + 3), y: lineY - 12 - s - row * (s + 3) });
+        });
+      }
+      return out;
+    }
+    const placed = [];
+    for (const t of [...list].sort((a, b) => t0(a) - t0(b))) {
+      const x = L + key(t) * (R - L);
+      let level = 0;
+      while (placed.some((p) => p.level === level && Math.abs(p.x - x) < s + 2)) level++;
+      placed.push({ x, level });
+      out.set(t, { x: x - s / 2, y: lineY - 10 - s - level * (s + 2) });
+    }
+    return out;
+    function t0(t) { return key(t); }
+  }
+  const nowPos = (t) => (t.moved ? t.newPos : t.pos);
+  const firstPos = (t) => t.pos;
+
+  function computeLayout() {
+    const here = toks.filter((t) => t.here);
+    const m = layoutFor(here, nowPos);
+    for (const t of here) { const p = m.get(t); t.tx = p.x; t.ty = p.y; }
+  }
+
+  function buildGhosts() {
+    for (const g of ghosts) g.n.remove();
+    ghosts = toks.filter((t) => t.here && t.newPos != null).map((t) => {
+      const n = el('div', 'ghost'); n.style.setProperty('--fill', `var(--c${t.stu.c})`); n.innerHTML = svgFor(t.stu.s);
+      n.style.opacity = '0';
+      stage.insertBefore(n, stage.firstChild.nextSibling);
+      return { t, n, x: 0, y: 0 };
+    });
+    placeGhosts();
+  }
+  function placeGhosts() {
+    const m = layoutFor(toks.filter((t) => t.here), firstPos);
+    for (const g of ghosts) { const p = m.get(g.t); g.x = p.x; g.y = p.y; g.n.style.transform = `translate(${p.x}px, ${p.y}px)`; }
+  }
+
+  function place(t) { t.n.style.transform = `translate(${t.x.toFixed(1)}px, ${t.y.toFixed(1)}px)`; }
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function frame(now) {
+    const ph = phases[cur].phase;
+    for (const t of toks) {
+      if (!t.here) continue;
+      let tx, ty, k;
+      if (ph === 'collect') { const d = driftPoint(t, now); tx = d.x; ty = d.y; k = 0.06; }
+      else { tx = t.tx; ty = t.ty; k = 0.045; }
+      if (still) k = 1;
+      t.x += (tx - t.x) * k; t.y += (ty - t.y) * k;
+      place(t);
+    }
+    if (ph === 'replace') drawArrows();
+    if (pop && picked != null) positionPop();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // moves arc above the row so arrows never run through other symbols
+  function drawArrows() {
+    const s = geom.s;
+    let html = '';
+    for (const g of ghosts) {
+      if (!g.t.moved) continue;
+      const x1 = g.x + s / 2, y1 = g.y, x2 = g.t.x + s / 2, y2 = g.t.y;
+      const span = Math.abs(x2 - x1);
+      if (span < s && Math.abs(y2 - y1) < s) continue;
+      const cx = (x1 + x2) / 2, cy = Math.min(y1, y2) - 18 - span * 0.18;
+      // arrowhead along the curve's end tangent
+      let ux = x2 - cx, uy = y2 - cy; const l = Math.hypot(ux, uy) || 1; ux /= l; uy /= l;
+      const ax = x2 - ux * 3, ay = y2 - uy * 3;
+      const col = getComputedStyle(document.documentElement).getPropertyValue(`--c${g.t.stu.c}`);
+      html += `<path d="M${x1} ${y1} Q${cx} ${cy} ${ax} ${ay}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" opacity=".7"/>` +
+        `<path d="M${ax - ux * 8 - uy * 5} ${ay - uy * 8 + ux * 5} L${ax} ${ay} L${ax - ux * 8 + uy * 5} ${ay - uy * 8 - ux * 5}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>`;
+    }
+    arrowsSvg.innerHTML = html;
+  }
+
+  // arrivals tick in during collect
+  setInterval(() => {
+    const ph = phases[cur];
+    if (ph.phase !== 'collect') return;
+    const st = STATEMENTS[cur];
+    if ((ph.arrived ?? 0) >= st.arrived) return;
+    const t = toks[order[ph.arrived]];
+    ph.arrived++;
+    arrive(t, false);
+    renderBar();
+  }, 750);
+  // other statements fill slowly in student-paced mode
+  setInterval(() => {
+    if (pace !== 'student') return;
+    phases.forEach((ph, k) => { if (k !== cur && ph.phase === 'collect' && (ph.arrived ?? 0) < STATEMENTS[k].arrived) ph.arrived = (ph.arrived ?? 0) + 1; });
+    renderDots();
+  }, 1800);
+
+  function pick(i) {
+    if (phases[cur].phase === 'collect') return;
+    picked = picked === i ? null : i;
+    for (const t of toks) { t.n.classList.toggle('is-picked', t.i === picked); }
+    if (pop) { pop.remove(); pop = null; }
+    if (picked == null) return;
+    const t = toks[picked];
+    pop = el('div', 'pop');
+    pop.style.setProperty('--fill', `var(--c${t.stu.c})`);
+    pop.innerHTML = `<div class="pop__head">${svgFor(t.stu.s)} ${t.stu.name}</div><p>${t.text}</p>` +
+      (t.moved ? `<div class="moved"><b>Moved because</b>${t.why}</div>` : '');
+    pop.addEventListener('click', (e) => e.stopPropagation());
+    stage.append(pop);
+    positionPop();
+  }
+  function positionPop() {
+    const t = toks[picked];
+    const pw = pop.offsetWidth, phh = pop.offsetHeight;
+    let x = t.x + geom.s / 2 - pw / 2; x = Math.max(12, Math.min(geom.W - pw - 12, x));
+    let y = t.y - phh - 10; if (y < 8) y = t.y + geom.s + 10;
+    pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  }
+  stage.addEventListener('click', () => { if (picked != null) pick(picked); });
+
+  // ── controls ────────────────────────────────────────────────────
+  function renderTeacher() { renderHeader(); renderBar(); renderDots(); renderReasons(); }
+  function renderHeader() {
+    const st = STATEMENTS[cur];
+    document.getElementById('stText').textContent = st.text;
+    document.getElementById('stCount').textContent = `Statement ${cur + 1} of ${STATEMENTS.length}` + (st.snap ? ' · snapped' : '');
+    document.getElementById('prevSt').disabled = cur === 0;
+    document.getElementById('nextSt').disabled = cur === STATEMENTS.length - 1;
+    document.getElementById('prevSt').hidden = document.getElementById('nextSt').hidden = pace === 'student';
+  }
+  function renderDots() {
+    const box = document.getElementById('stDots');
+    box.innerHTML = '';
+    STATEMENTS.forEach((st, k) => {
+      const b = el('button', 'dot');
+      b.setAttribute('aria-current', String(k === cur));
+      b.innerHTML = `${k + 1}` + (pace === 'student' ? `<small>${phases[k].phase === 'collect' ? (phases[k].arrived ?? 0) + '/24' : '✓'}</small>` : '');
+      b.addEventListener('click', () => go(k));
+      box.append(b);
+    });
+  }
+  function renderBar() {
+    const ph = phases[cur];
+    const n = toks.filter((t) => t.here).length;
+    const counter = document.getElementById('counter');
+    const status = document.getElementById('status');
+    const ctl = document.getElementById('controls');
+    // rebuild buttons only when what they offer changes, so a click never lands on a replaced button
+    const key = [cur, ph.phase, ph.reasons, pace].join('|');
+    const rebuild = ctl.dataset.key !== key;
+    ctl.dataset.key = key;
+    if (rebuild) ctl.innerHTML = '';
+    const add = (...bs) => { if (rebuild) ctl.append(...bs); };
+    hiddenNote.style.opacity = ph.phase === 'collect' ? '1' : '0';
+    stage.querySelector('.track')?.classList.toggle('is-quiet', ph.phase === 'collect');
+    stage.classList.toggle('is-revealed', ph.phase !== 'collect');
+    if (ph.phase === 'collect') {
+      counter.innerHTML = `${n} <span>of 24 placed</span>`;
+      status.textContent = pace === 'student' ? 'Students move through at their own pace' : 'Reasons required. Nothing shows until you reveal.';
+      add(btn('Reveal', 'primary', reveal));
+    } else if (ph.phase === 'revealed') {
+      counter.innerHTML = `${n} <span>placed</span>`;
+      status.textContent = 'Click a symbol to read its reason';
+      add(
+        btn('Show all reasons', '', () => { ph.reasons = ph.reasons === 'line' ? null : 'line'; renderBar(); renderReasons(); }, ph.reasons === 'line'),
+        btn('Sort reasons', '', () => sortReasons(), ph.reasons === 'groups'),
+        btn('Let them re-place', 'primary', startReplace)
+      );
+    } else {
+      const moved = toks.filter((t) => t.moved).length;
+      counter.innerHTML = `${moved} <span>moved</span>`;
+      status.textContent = 'Dashed = where they started';
+      add(
+        btn('Who moved and why', '', () => { ph.reasons = ph.reasons === 'moved' ? null : 'moved'; renderBar(); renderReasons(); }, ph.reasons === 'moved'),
+        btn('Show all reasons', '', () => { ph.reasons = ph.reasons === 'line' ? null : 'line'; renderBar(); renderReasons(); }, ph.reasons === 'line'),
+        btn('Sort reasons', '', () => sortReasons(), ph.reasons === 'groups')
+      );
+      if (cur < STATEMENTS.length - 1 && pace === 'teacher') add(btn('Next statement', 'primary', () => go(cur + 1)));
+    }
+  }
+  function btn(text, kind, on, pressed) {
+    const b = el('button', 'btn' + (kind ? ' btn--' + kind : ''), text);
+    if (pressed !== undefined) b.setAttribute('aria-pressed', String(!!pressed));
+    b.addEventListener('click', on);
+    return b;
+  }
+
+  function reveal() {
+    phases[cur].phase = 'revealed';
+    computeLayout();
+    renderBar();
+  }
+  function sortReasons() {
+    const ph = phases[cur];
+    if (ph.reasons === 'groups') { ph.reasons = null; renderBar(); renderReasons(); return; }
+    reasonsBox.hidden = false;
+    reasonsBox.innerHTML = '<p class="status">Sorting reasons by how they argued…</p>';
+    setTimeout(() => { ph.reasons = 'groups'; renderBar(); renderReasons(); }, 900);
+  }
+  function startReplace() {
+    const ph = phases[cur];
+    ph.phase = 'replace';
+    buildGhosts();
+    renderBar();
+    const movers = toks.filter((t) => t.here && t.newPos != null);
+    movers.forEach((t, k) => setTimeout(() => {
+      if (phases[cur] !== ph) return;
+      t.moved = true;
+      const g = ghosts.find((x) => x.t === t); if (g) g.n.style.opacity = '';
+      computeLayout(); renderBar(); if (ph.reasons) renderReasons();
+      if (picked === t.i) { picked = null; pick(t.i); }
+    }, 900 + k * 650));
+  }
+
+  function rcard(t, withWhy) {
+    const c = el('div', 'rcard');
+    c.style.setProperty('--fill', `var(--c${t.stu.c})`);
+    c.innerHTML = `${svgFor(t.stu.s)}<p>${t.text}</p><div class="mini">` +
+      (t.moved ? `<i class="was" style="left:${t.pos * 100}%"></i>` : '') + `<i style="left:${nowPos(t) * 100}%"></i></div>` +
+      (withWhy && t.moved ? `<div class="why"><b>Moved:</b> ${t.why}</div>` : '');
+    c.addEventListener('click', () => pick(t.i));
+    return c;
+  }
+  function renderReasons() {
+    const ph = phases[cur];
+    const st = STATEMENTS[cur];
+    if (!ph.reasons || ph.phase === 'collect') { reasonsBox.hidden = true; reasonsBox.innerHTML = ''; return; }
+    reasonsBox.hidden = false;
+    const here = toks.filter((t) => t.here);
+    reasonsBox.innerHTML = '';
+    const head = el('div', 'reasons__head');
+    if (ph.reasons === 'line') {
+      head.append(el('h3', '', `All reasons, ${st.scale.left.toLowerCase()} to ${st.scale.right.toLowerCase()}`));
+      const list = el('div', 'rlist');
+      [...here].sort((a, b) => nowPos(a) - nowPos(b)).forEach((t) => list.append(rcard(t, true)));
+      reasonsBox.append(head, list);
+    } else if (ph.reasons === 'groups') {
+      head.append(el('h3', '', 'Sorted by how they argued'), el('span', 'status', 'You can rename or move any card'));
+      const wrap = el('div', 'groups');
+      st.groups.forEach((name, g) => {
+        const inG = here.filter((t) => t.g === g).sort((a, b) => nowPos(a) - nowPos(b));
+        if (!inG.length) return;
+        const box = el('div', 'group');
+        box.style.animationDelay = g * 90 + 'ms';
+        const h = el('h4'); h.innerHTML = `${name} <span>${inG.length}</span>`;
+        box.append(h);
+        inG.forEach((t) => box.append(rcard(t, true)));
+        wrap.append(box);
+      });
+      reasonsBox.append(head, wrap);
+    } else {
+      const movedList = here.filter((t) => t.moved);
+      head.append(el('h3', '', `Who moved and why (${movedList.length})`));
+      const list = el('div', 'rlist');
+      movedList.forEach((t) => {
+        const c = el('div', 'rcard');
+        c.style.setProperty('--fill', `var(--c${t.stu.c})`);
+        c.innerHTML = `${svgFor(t.stu.s)}<p><b>${t.why}</b></p><div class="mini"><i class="was" style="left:${t.pos * 100}%"></i><i style="left:${t.newPos * 100}%"></i></div><div class="why">First said: ${t.text}</div>`;
+        c.addEventListener('click', () => pick(t.i));
+        list.append(c);
+      });
+      reasonsBox.append(head, list);
+    }
+  }
+
+  function go(k) {
+    if (k < 0 || k >= STATEMENTS.length) return;
+    cur = k;
+    for (const g of ghosts) g.n.remove(); ghosts = []; arrowsSvg.innerHTML = '';
+    buildStage();
+    renderTeacher();
+  }
+  document.getElementById('prevSt').addEventListener('click', () => go(cur - 1));
+  document.getElementById('nextSt').addEventListener('click', () => go(cur + 1));
+  new ResizeObserver(() => layoutStage()).observe(stage);
+
+  function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  // ── student phone ───────────────────────────────────────────────
+  const ME = { c: 0, s: 0, name: 'Blue star' };
+  const phone = document.getElementById('phone');
+  let sState = 'place';
+  let sIdx = 0;
+  let sPos = null;
+  let sFirst = 0.2;
+  seg('sStateSeg', 's', (s) => { sState = s; sPos = s === 'replace' ? sFirst : null; renderStudent(); });
+
+  function renderStudent() {
+    const st = STATEMENTS[sIdx];
+    phone.innerHTML = '';
+    phone.style.setProperty('--fill', 'var(--c0)');
+    const top = el('div', 's-top');
+    top.innerHTML = `<span>Ben at the bus stop · ${sIdx + 1} of ${STATEMENTS.length}</span><span class="s-me">${svgFor(ME.s)} You</span>`;
+    phone.append(top);
+    if (pace === 'student') {
+      const pr = el('div', 's-progress');
+      STATEMENTS.forEach((_, k) => { const i = el('i'); if (k <= sIdx) i.className = 'on'; pr.append(i); });
+      phone.append(pr);
+    }
+    phone.append(el('div', 's-stim', 'Ben stood at the bus stop, sweating, checking his phone every few seconds.'));
+    phone.append(el('p', 's-statement', st.text));
+
+    if (sState === 'wait') {
+      const d = el('div', 's-done');
+      d.innerHTML = `${svgFor(ME.s)}<h3>Placed</h3><p>Only you can see where you put it. Everyone's goes up together when your teacher reveals.</p>`;
+      d.append(lineView(st, sFirst, null, false));
+      const a = el('div', 's-actions');
+      a.append(btn('Change my answer', '', () => { sState = 'place'; sPos = sFirst; syncStateSeg(); renderStudent(); }));
+      if (pace === 'student' && sIdx < STATEMENTS.length - 1) a.append(btn('Next statement →', 'primary', () => { sIdx++; sState = 'place'; sPos = null; syncStateSeg(); renderStudent(); }));
+      d.append(a);
+      phone.append(d);
+      return;
+    }
+
+    const replace = sState === 'replace';
+    if (replace) phone.append(el('p', 'status', 'Changed your mind? Drag your symbol. The dashed one is where you started.'));
+    phone.append(lineView(st, sPos, replace ? sFirst : null, true));
+    const nudge = el('div', 's-nudge');
+    nudge.append(btn('‹', '', () => move(st.snap ? -1 : -0.05)), btn('›', '', () => move(st.snap ? 1 : 0.05)));
+    nudge.querySelectorAll('button').forEach((b, k) => b.setAttribute('aria-label', k ? 'Move right' : 'Move left'));
+    phone.append(nudge);
+
+    const f = el('div', 's-field');
+    const moved = replace && sPos != null && Math.abs(sPos - sFirst) > 0.02;
+    const label = replace ? 'Why did you move?' : 'Why there?';
+    f.innerHTML = `<label for="sReason">${label}</label><textarea id="sReason" placeholder="${replace ? 'I moved because…' : 'I put it here because…'}"></textarea>` +
+      `<div class="hint">${replace ? (moved ? 'Needed when you move' : 'Only needed if you move') : 'Needed before you can place it'}</div>`;
+    if (replace && !moved) f.style.opacity = '.5';
+    phone.append(f);
+    const ta = f.querySelector('textarea');
+    const a = el('div', 's-actions');
+    let submit;
+    if (replace) {
+      a.append(btn('Keep it here', '', () => { sState = 'wait'; sPos = sFirst; syncStateSeg(); renderStudent(); }));
+      submit = btn('Move it', 'primary', () => { sFirst = sPos; sState = 'wait'; syncStateSeg(); renderStudent(); });
+    } else {
+      submit = btn('Place it', 'primary', () => { sFirst = sPos; sState = 'wait'; syncStateSeg(); renderStudent(); });
+    }
+    a.append(submit);
+    phone.append(a);
+    const check = () => { submit.disabled = !(sPos != null && ta.value.trim().length >= 8 && (!replace || moved)); };
+    ta.addEventListener('input', check);
+    check();
+
+    function move(d) {
+      if (sPos == null) sPos = 0.5;
+      sPos = st.snap ? (d < 0 ? 0 : 1) : Math.min(1, Math.max(0, sPos + d));
+      const keep = ta.value; renderStudent(); document.getElementById('sReason').value = keep; document.getElementById('sReason').dispatchEvent(new Event('input'));
+    }
+  }
+  function syncStateSeg() { for (const b of document.querySelectorAll('#sStateSeg button')) b.setAttribute('aria-pressed', String(b.dataset.s === sState)); }
+
+  function lineView(st, pos, ghostPos, live) {
+    const box = el('div', 's-line');
+    const track = el('div', 'track'); box.append(track);
+    for (const t of st.snap ? [0, 1] : [0.25, 0.5, 0.75]) { const k = el('div', 'tick' + (st.snap ? ' tick--stop' : '')); k.style.left = t * 100 + '%'; k.style.top = '54px'; box.append(k); }
+    const l = el('div', 'end-label end-label--l', st.scale.left); l.style.left = '0';
+    const r = el('div', 'end-label end-label--r', st.scale.right); r.style.left = '100%';
+    box.append(l, r);
+    if (pos == null && live) box.append(el('div', 's-hint', 'Tap the line to place your symbol'));
+    if (ghostPos != null) { const g = el('div', 's-tok is-ghost'); g.style.setProperty('--fill', 'var(--c0)'); g.innerHTML = svgFor(ME.s); g.style.left = ghostPos * 100 + '%'; box.append(g); }
+    if (pos != null) { const t = el('div', 's-tok'); t.innerHTML = svgFor(ME.s); t.style.left = pos * 100 + '%'; box.append(t); }
+    if (live) {
+      let dragging = false;
+      const set = (e) => {
+        const rect = box.getBoundingClientRect();
+        let p = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+        if (st.snap) p = p < 0.5 ? 0 : 1;
+        sPos = p;
+        const tok = box.querySelector('.s-tok:not(.is-ghost)');
+        if (tok) { tok.style.left = p * 100 + '%'; } else {
+          const keep = document.getElementById('sReason')?.value ?? '';
+          renderStudent(); const ta = document.getElementById('sReason'); if (ta) { ta.value = keep; ta.dispatchEvent(new Event('input')); }
+        }
+      };
+      box.addEventListener('pointerdown', (e) => { dragging = true; box.setPointerCapture(e.pointerId); set(e); });
+      box.addEventListener('pointermove', (e) => { if (dragging) set(e); });
+      box.addEventListener('pointerup', () => {
+        dragging = false;
+        const keep = document.getElementById('sReason')?.value ?? '';
+        renderStudent(); const ta = document.getElementById('sReason'); if (ta) { ta.value = keep; ta.dispatchEvent(new Event('input')); }
+      });
+    }
+    return box;
+  }
+
+  // ── editor ──────────────────────────────────────────────────────
+  const rows = document.getElementById('stRows');
+  STATEMENTS.forEach((st, k) => {
+    const r = el('div', 'st-row');
+    r.innerHTML = `<b>${k + 1}</b><input type="text" value="${st.text}"><span class="st-scale">${st.snap ? 'Snapped · forces a choice' : 'Continuous'}</span>`;
+    rows.append(r);
+  });
+  for (const id of ['stimKind', 'presets', 'edPace']) document.getElementById(id).addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    for (const x of e.currentTarget.querySelectorAll('.chip')) x.setAttribute('aria-pressed', String(x === b));
+    if (id === 'presets') {
+      const parts = b.textContent.split(/\s[↔·]\s/);
+      document.getElementById('scalePrev').innerHTML = parts.map((p) => `<span>${p}</span>`).join('');
+    }
+  });
+
+  buildStage();
+  renderTeacher();
+  renderStudent();
+})();
+</script>
+</body>
+</html>
