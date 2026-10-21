@@ -3,10 +3,12 @@ import { mountCulturalWarningTracks } from '@/blocks/cultural-warning-tracks';
 import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderBrainstorm } from '@/blocks/brainstorm';
+import { renderHingeQuestion } from '@/blocks/hinge-question';
+import { renderContinuumLine } from '@/blocks/continuum-line';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { attachedSteppedLenses } from '@/blocks/lenses/registry';
-import { renderAnchorBridge, renderHumanExperienceTable } from '@/blocks/formats/question-set-formats';
+import { renderAnchorBridge, renderBecauseButSo, renderHumanExperienceTable, renderQuestionLevels } from '@/blocks/formats/question-set-formats';
 import { renderReasoningChartFormat } from '@/blocks/formats/reasoning-chart';
 import { renderSteppedLenses } from '@/blocks/lenses/stepped-view';
 import { canHaveDiscern } from '@/blocks/discern';
@@ -47,6 +49,7 @@ import { renderOutcomeList } from '@/outcomes/display';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
 import { createHubAudioPlayer } from '../../design-kit/js/hub-audio-player.js';
+import { renderVoiceTask } from '@/blocks/voice-block';
 import { mountHubImageAnnotator } from '../../design-kit/js/hub-image-annotate.js';
 import { renderToolkitContent } from '@/toolkit/render';
 import 'photoswipe/dist/photoswipe.css';
@@ -621,8 +624,12 @@ export function renderCodeBlock(
 
 export function renderAudioBlock(
   block: Extract<Block, { block_type: 'audio' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
+  if ((block.content.mode ?? 'listen') !== 'listen') {
+    return wrapBlock(renderVoiceTask(block, mode, ctx), block, mode);
+  }
   const wrap = document.createElement('div');
   wrap.className = 'block-audio';
 
@@ -768,6 +775,8 @@ export function renderQuestionSetBlock(
 ): HTMLElement {
   if (block.content.format === 'human_experience_table') return wrapBlock(renderHumanExperienceTable(block, mode, ctx), block, mode);
   if (block.content.format === 'anchor_bridge') return wrapBlock(renderAnchorBridge(block, mode, ctx), block, mode);
+  if (block.content.format === 'question_levels') return wrapBlock(renderQuestionLevels(block, mode, ctx), block, mode);
+  if (block.content.format === 'because_but_so') return wrapBlock(renderBecauseButSo(block, mode, ctx), block, mode);
   if (block.content.format === 'reasoning_chart') return wrapBlock(renderReasoningChartFormat(block, mode, ctx), block, mode);
   const wrap = document.createElement('div');
   wrap.className = 'block-question-set';
@@ -2292,7 +2301,7 @@ function renderBlockContent(
     case 'code':
       return renderCodeBlock(block, mode);
     case 'audio':
-      return renderAudioBlock(block, mode);
+      return renderAudioBlock(block, mode, ctx);
     case 'attachment':
       return renderAttachmentBlock(block, mode);
     case 'accordion':
@@ -2305,6 +2314,10 @@ function renderBlockContent(
       return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
     case 'brainstorm':
       return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
+    case 'hinge_question':
+      return wrapBlock(renderHingeQuestion(block, mode, ctx), block, mode);
+    case 'continuum_line':
+      return wrapBlock(renderContinuumLine(block, mode, ctx), block, mode);
     case 'curriculum_lines':
       return wrapBlock(renderCurriculumLines(block, mode, ctx), block, mode);
     case 'discern_confirm':

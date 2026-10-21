@@ -1,0 +1,446 @@
+/* Hinge question block. Shared pieces (fields, panels, chips, board) come from peer-feedback.css. */
+
+.hq-run,
+.hq-teacher,
+.hq-student {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.hq-run > [hidden] {
+  display: none;
+}
+
+.hq-letter {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.hq-letter--lg {
+  width: 3rem;
+  height: 3rem;
+  font-size: var(--text-xl);
+}
+
+/* The share bar: one track, filled to --hq-pct. */
+.hq-bar {
+  display: block;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: linear-gradient(to right, var(--marine) var(--hq-pct, 0%), var(--line) var(--hq-pct, 0%));
+}
+
+[data-right="true"] > .hq-bar,
+[data-right="true"] .hq-bar {
+  background: linear-gradient(to right, var(--success) var(--hq-pct, 0%), var(--line) var(--hq-pct, 0%));
+}
+
+/* ── Editor ────────────────────────────────────────────────────────── */
+
+.hq-editor__options {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.hq-editor__option {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.hq-editor__option[data-right="true"] {
+  border-color: var(--success);
+  background: var(--success-surface);
+}
+
+.hq-editor__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.hq-editor__text,
+.hq-editor__note,
+.hq-threshold__input {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* The answer gets the whole row; the right-answer pick and Remove wrap beneath it. */
+.hq-editor__text {
+  flex: 1 1 calc(100% - 1.75rem - var(--space-3));
+  min-width: 0;
+}
+
+.hq-editor__right {
+  margin-left: calc(1.75rem + var(--space-3));
+  margin-right: auto;
+}
+
+.hq-editor__note {
+  margin-left: calc(1.75rem + var(--space-3));
+  font-size: var(--text-sm);
+}
+
+.hq-editor__right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.hq-editor__thresholds {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hq-threshold__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hq-threshold__input {
+  width: 5rem;
+}
+
+/* ── Teacher ───────────────────────────────────────────────────────── */
+
+.hq-stale {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--danger-surface);
+}
+
+.hq-bar-row {
+  justify-content: space-between;
+}
+
+.hq-status,
+.hq-actions,
+.hq-round {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.hq-status {
+  font-weight: var(--weight-semibold);
+}
+
+.hq-answered {
+  color: var(--muted);
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.hq-clock {
+  font-variant-numeric: tabular-nums;
+}
+
+.hq-round {
+  justify-content: flex-end;
+}
+
+.hq-spread {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hq-spread__row {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hq-spread__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.hq-spread__text {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.hq-spread__count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.hq-spread__note {
+  margin: 0;
+  padding-left: calc(1.75rem + var(--space-3));
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+.hq-step {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--shore);
+}
+
+.hq-step[data-step="move_on"] {
+  border-left-color: var(--success);
+}
+
+.hq-step[data-step="split"] {
+  border-left-color: var(--marine);
+}
+
+.hq-step[data-step="reteach"] {
+  border-left-color: var(--danger);
+}
+
+.hq-step p,
+.hq-private {
+  margin: 0;
+}
+
+.hq-step__label {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+.hq-step__private,
+.hq-private {
+  font-size: var(--text-xs);
+}
+
+/* ── Student ───────────────────────────────────────────────────────── */
+
+.hq-choices {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hq-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  width: 100%;
+  min-height: 3rem;
+  padding: var(--space-3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.hq-choice:hover:not(:disabled) {
+  border-color: var(--marine);
+}
+
+.hq-choice:focus-visible {
+  outline: 2px solid var(--marine);
+  outline-offset: 2px;
+}
+
+.hq-choice:disabled {
+  cursor: default;
+}
+
+.hq-choice__text {
+  min-width: 0;
+}
+
+.hq-choice__mine {
+  grid-column: 2;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--marine);
+}
+
+.hq-choice[data-chosen="true"] {
+  border-color: var(--marine);
+  box-shadow: inset 0 0 0 1px var(--marine);
+}
+
+.hq-choice[data-chosen="true"] .hq-letter {
+  border-color: var(--marine);
+  color: var(--paper);
+  background: var(--marine);
+}
+
+.hq-choice[data-right="true"] {
+  border-color: var(--success);
+  background: var(--success-surface);
+}
+
+.hq-choice[data-right="true"] .hq-letter {
+  border-color: var(--success);
+  color: var(--paper);
+  background: var(--success);
+}
+
+.hq-choice[data-chosen="true"][data-right="false"] {
+  border-color: var(--danger);
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+
+.hq-choice[data-chosen="true"][data-right="false"] .hq-letter {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
+.hq-student .hq-clock {
+  margin: 0;
+}
+
+.hq-verdict {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.hq-verdict p {
+  margin: 0;
+}
+
+.hq-verdict--right {
+  background: var(--success-surface);
+}
+
+.hq-verdict--wrong {
+  background: var(--danger-surface);
+}
+
+/* ── Board (projector) ─────────────────────────────────────────────── */
+
+.hq-board {
+  place-content: center stretch;
+  justify-items: stretch;
+  overflow-y: auto;
+}
+
+.hq-board > * {
+  width: min(100%, 60rem);
+  margin-inline: auto;
+}
+
+.hq-board > .btn {
+  width: auto;
+}
+
+.hq-board__prompt {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2.75rem);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+
+.hq-board__options {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hq-board__option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  font-size: clamp(1.125rem, 2.6vw, 1.75rem);
+}
+
+.hq-board--revealed .hq-board__option {
+  grid-template-columns: auto 1fr auto;
+}
+
+.hq-board__option .hq-bar {
+  grid-column: 2;
+  height: 0.75rem;
+}
+
+.hq-board__pct {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  min-width: 4ch;
+  text-align: right;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.hq-board__tick {
+  grid-column: 2;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--success);
+}
+
+.hq-board__option[data-right="true"] .hq-letter {
+  border-color: var(--success);
+  color: var(--paper);
+  background: var(--success);
+}
+
+.hq-board__foot {
+  margin: 0;
+  font-size: var(--text-xl);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Print ─────────────────────────────────────────────────────────── */
+
+.hq-print {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hq-print__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+@media (max-width: 480px) {
+  .hq-editor__note,
+  .hq-spread__note {
+    margin-left: 0;
+    padding-left: 0;
+  }
+}

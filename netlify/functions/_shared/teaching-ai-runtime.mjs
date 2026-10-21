@@ -107,6 +107,7 @@ var WindowsMirrorsConfigSchema = z4.object({
   supports: z4.record(StepTextSchema.nullable()).optional(),
   examples: z4.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
+var SteppedLensConfigSchema = WindowsMirrorsConfigSchema.omit({ answer_with: true });
 
 // apps/teaching/src/quiz/core.ts
 import { z as z5 } from "zod";
@@ -666,6 +667,8 @@ var BlockTypeSchema = z7.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "hinge_question",
+  "continuum_line",
   "curriculum_lines",
   "quiz_question",
   "question_set",
@@ -1014,9 +1017,20 @@ var AudioBlockSchema = z7.object({
   block_type: z7.literal("audio"),
   variant: z7.string().default("medium"),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z7.object({
     url: z7.string(),
-    title: z7.string().optional()
+    title: z7.string().optional(),
+    mode: z7.enum(["listen", "respond", "viva"]).default("listen"),
+    prompt: z7.string().max(4e3).optional(),
+    time_limit_s: z7.number().int().min(30).max(300).optional(),
+    student_chooses_time: z7.boolean().optional(),
+    scaffold: z7.array(z7.object({ label: z7.string().max(80), weight: z7.number().min(0.5).max(3).default(1) })).max(8).optional(),
+    code_groups: z7.array(z7.enum(["composition", "viva", "speaking"])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1069,7 +1083,9 @@ var QuestionItemSchema = z7.object({
   prompt: z7.string(),
   kind: QuestionKindSchema,
   options: z7.array(z7.string()).optional(),
-  response_space: ResponseSpaceSchema.optional()
+  response_space: ResponseSpaceSchema.optional(),
+  /** The 4 levels format's band; absent means guessed from the question's opening words. */
+  level: z7.enum(["beginner", "detective", "judge", "inventor"]).optional()
 });
 var PeerFeedbackBlockSchema = z7.object({
   id: z7.string().min(1),
@@ -1087,6 +1103,36 @@ var PeerFeedbackBlockSchema = z7.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var ContinuumStatementSchema = z7.object({
+  id: z7.string().min(1),
+  text: z7.string().max(300).default(""),
+  snap: z7.boolean().default(false)
+});
+var ContinuumLineBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("continuum_line"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    stimulus: z7.object({
+      kind: z7.enum(["text", "image", "video"]).default("text"),
+      text: z7.string().max(2e3).default(""),
+      url: z7.string().max(2e3).default(""),
+      alt_text: z7.string().max(500).default("")
+    }).default({ kind: "text", text: "", url: "", alt_text: "" }),
+    scale: z7.object({
+      left: z7.string().max(40).default("Implied"),
+      right: z7.string().max(40).default("Not implied"),
+      stops: z7.array(z7.string().max(40)).max(3).default([])
+    }).default({ left: "Implied", right: "Not implied", stops: [] }),
+    statements: z7.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z7.enum(["teacher", "student"]).default("teacher"),
+    replace: z7.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
 var BrainstormBlockSchema = z7.object({
   id: z7.string().min(1),
   type: z7.literal("block"),
@@ -1099,6 +1145,28 @@ var BrainstormBlockSchema = z7.object({
     per_student: z7.union([z7.literal(0), z7.literal(1), z7.literal(3), z7.literal(5)]).default(3),
     max_length: z7.number().int().min(20).max(280).default(140),
     layout: z7.enum(["grid", "cloud", "groups"]).default("grid")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var HingeOptionSchema = z7.object({
+  id: z7.string().min(1).max(40),
+  text: z7.string().max(300).default(""),
+  misconception: z7.string().max(300).default("")
+});
+var HingeQuestionBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("hinge_question"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    prompt: z7.string().max(500).default(""),
+    options: z7.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z7.string().max(40).default(""),
+    seconds: z7.union([z7.literal(0), z7.literal(30), z7.literal(60), z7.literal(90), z7.literal(120)]).default(60),
+    move_on: z7.number().int().min(1).max(100).default(80),
+    reteach: z7.number().int().min(0).max(99).default(50)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1258,7 +1326,7 @@ var QuestionSetBlockSchema = z7.object({
     title: z7.string().optional(),
     questions: z7.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z7.enum(["standard", "human_experience_table", "anchor_bridge"]).optional(),
+    format: z7.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so"]).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z7.object({
       rows: z7.number().int().min(3).max(5).default(3),
@@ -1633,6 +1701,14 @@ var AnnotationTechniqueRefSchema = z7.object({
   id: z7.string().min(1),
   table_version: z7.string().min(1)
 });
+var AnnotationCodeRefSchema = z7.object({
+  id: z7.string().min(1).max(40),
+  code: z7.string().regex(/^[A-Z]{1,3}$/),
+  label: z7.string().max(60),
+  descriptor: z7.string().max(600).default(""),
+  colour: z7.enum(["blue", "sage", "peach", "gold", "lilac"]).default("blue"),
+  positive: z7.boolean().default(false)
+});
 var AnnotationAttachmentSchema = z7.discriminatedUnion("kind", [
   z7.object({
     kind: z7.literal("link"),
@@ -1736,6 +1812,7 @@ var AnnotationItemSchema = z7.object({
   thread: AnnotationThreadSchema.optional(),
   anthology: AnthologyTagSchema.optional(),
   technique: AnnotationTechniqueRefSchema.optional(),
+  code: AnnotationCodeRefSchema.optional(),
   body: z7.object({
     html: z7.string(),
     attachments: z7.array(AnnotationAttachmentSchema).default([])
@@ -1909,6 +1986,8 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  HingeQuestionBlockSchema,
+  ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
@@ -2107,6 +2186,20 @@ var CoverSchema = z8.object({
   }
 });
 var CoverPatchSchema = CoverSchema.nullable();
+
+// apps/teaching/src/blocks/hinge-question/shared.ts
+var MIN_OPTIONS = 2;
+function starterHingeOptions(blockId) {
+  return ["a", "b", "c", "d"].map((k) => ({ id: `${blockId}_${k}`, text: "", misconception: "" }));
+}
+function hingeIssue(content) {
+  if (!content.prompt.trim()) return "Write the hinge question";
+  if (content.options.length < MIN_OPTIONS) return "A hinge question needs at least two answers";
+  if (content.options.some((o) => !o.text.trim())) return "Fill in every answer, or remove the empty one";
+  if (!content.options.some((o) => o.id === content.correct_id)) return "Mark the right answer";
+  if (content.reteach >= content.move_on) return "The reteach mark must be below the move-on mark";
+  return null;
+}
 
 // apps/teaching/src/blocks/curriculum-lines/starter.ts
 function starterCurriculumLinesContent() {
@@ -3641,6 +3734,8 @@ var NEW_BLOCK_TYPES = [
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "hinge_question",
+  "continuum_line",
   "quiz_question",
   "question_set",
   "flashcards",
@@ -3698,13 +3793,15 @@ var NEW_BLOCK_LABEL = {
   gallery: "Gallery",
   video: "Video",
   embed: "Embed",
-  audio: "Audio",
+  audio: "Voice",
   attachment: "Attachment",
   accordion: "Accordion",
   table: "Table",
   peer_feedback: "Peer feedback",
   question_drop: "Question drop",
   brainstorm: "Brainstorm",
+  hinge_question: "Hinge question",
+  continuum_line: "Continuum line",
   quiz_question: "Quiz question",
   question_set: "Question set",
   flashcards: "Flashcards",
@@ -3787,6 +3884,7 @@ var BLOCK_GROUPS = [
       "thinking_move",
       "question_quadrant",
       "concept_features",
+      "continuum_line",
       "thinking_reflection"
     ]
   },
@@ -3805,7 +3903,7 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Learning",
-    types: ["peer_feedback", "brainstorm", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "annotation"]
+    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "annotation"]
   },
   {
     label: "Visualisation",
@@ -3836,6 +3934,7 @@ var TOOLKIT_GROUP_TYPES = [
   "thinking_move",
   "question_quadrant",
   "concept_features",
+  "continuum_line",
   "thinking_reflection",
   "analogy_types",
   "analogy_close_reading",
@@ -3851,6 +3950,7 @@ var HOMEPAGE_EXCLUDED = /* @__PURE__ */ new Set([
   ...UNIT_ONLY_TYPES,
   "peer_feedback",
   "brainstorm",
+  "hinge_question",
   "question_drop",
   "quiz_question",
   ...TOOLKIT_GROUP_TYPES,
@@ -3869,7 +3969,7 @@ var HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
 var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
-    (type) => !["peer_feedback", "brainstorm", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
+    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
       type
     )
   )
@@ -4107,7 +4207,7 @@ function createBlock(type, id) {
         ...shared,
         block_type: "audio",
         variant: "medium",
-        content: { url: "" }
+        content: { url: "", mode: "listen" }
       };
     case "attachment":
       return {
@@ -4149,6 +4249,23 @@ function createBlock(type, id) {
         per_student: 3,
         max_length: 140,
         layout: "grid"
+      } };
+    case "hinge_question":
+      return { ...shared, block_type: "hinge_question", variant: "medium", content: {
+        prompt: "",
+        options: starterHingeOptions(id),
+        correct_id: "",
+        seconds: 60,
+        move_on: 80,
+        reteach: 50
+      } };
+    case "continuum_line":
+      return { ...shared, block_type: "continuum_line", variant: "medium", content: {
+        stimulus: { kind: "text", text: "", url: "", alt_text: "" },
+        scale: { left: "Implied", right: "Not implied", stops: [] },
+        statements: [{ id: `${id}_s1`, text: "", snap: false }],
+        pace: "teacher",
+        replace: true
       } };
     case "question_drop":
       return { ...shared, block_type: "question_drop", variant: "medium", content: {
@@ -5500,6 +5617,8 @@ var KIND_LABEL = {
   question_set: "Question set",
   question_drop: "Question drop",
   brainstorm: "Brainstorm",
+  hinge_question: "Hinge question",
+  continuum_line: "Continuum line",
   curriculum_lines: "Curriculum lines",
   discern_confirm: "Discern Confirm",
   quiz_question: "Quiz question",
@@ -5658,6 +5777,18 @@ function ownIssue(block, discernHosts) {
   if (block.block_type === "brainstorm" && !block.content.question.trim()) {
     return "Write the question for this Brainstorm";
   }
+  if (block.block_type === "hinge_question") {
+    const issue = hingeIssue(block.content);
+    if (issue) return issue;
+  }
+  if (block.block_type === "continuum_line") {
+    const c = block.content;
+    if (!c.statements.some((s2) => s2.text.trim())) return "Write at least one statement for this Continuum line";
+    if (!c.scale.left.trim() || !c.scale.right.trim()) return "Label both ends of this Continuum line";
+    if (c.stimulus.kind === "text" && !c.stimulus.text.trim()) return "Add the stimulus for this Continuum line";
+    if (c.stimulus.kind === "image" && !isHttpUrl(c.stimulus.url)) return "Give the stimulus image a valid http(s) URL";
+    if (c.stimulus.kind === "video" && !c.stimulus.url.trim()) return "Paste the stimulus video link";
+  }
   if (block.block_type === "quiz_question") {
     const checked = checkQuestion(block.content.question);
     if (!checked.ok) return checked.message;
@@ -5709,7 +5840,11 @@ function ownIssue(block, discernHosts) {
     }
   }
   if (block.block_type === "audio") {
-    if (!isHttpUrl(block.content.url)) {
+    const mode = block.content.mode ?? "listen";
+    if (mode !== "listen" && !block.content.prompt?.trim()) {
+      return "Voice blocks need a question to publish";
+    }
+    if (mode === "listen" && !isHttpUrl(block.content.url)) {
       return "Audio blocks need a valid http(s) URL to publish";
     }
   }
