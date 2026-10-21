@@ -4882,6 +4882,7 @@ function buildAiStaticPrompt(input) {
     "- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.",
     "- Keep proposals minimal and schema-valid.",
     "- Write your explanation for the teacher in the proposal tool's message field; that is the text shown with the proposal.",
+    '- Plan before a big build. A build of more than 5 quiz questions or 8 blocks costs real money, so first reply (no tool call, no research yet) with a short plan headed "Plan to confirm": how many questions or blocks; the kinds and their mix; difficulty levels and marks; the form (where it goes in the lesson, order, sections); where the content comes from (what the teacher gave you, their notes, web research); how many proposals it will take (at most 30 quiz questions each); and a rough cost (about A$0.30 for a small build, A$0.60 to A$0.90 for 20 to 30 questions with research). Ask the teacher to confirm or change it, then build to their answer. Skip the plan only when they have already confirmed one or tell you to go ahead.',
     "",
     BLOCK_BUILD_RECIPES,
     "",
@@ -5994,21 +5995,50 @@ function webSearchTool(tier) {
   return { type: tier === "standard" ? "web_search_20260209" : "web_search_20250305", name: "web_search", max_uses: 5 };
 }
 var MAX_TURNS = 10;
-var MAX_TOKENS = 16e3;
+var MAX_TOKENS = 48e3;
 var PRICES = {
   "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01 },
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2 }
 };
 var WEB_SEARCH_USD = 0.01;
+function cacheWriteCost(usage, input, perToken) {
+  const hour = usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  const total = usage.cache_creation_input_tokens ?? 0;
+  return hour * perToken(input * 2) + Math.max(0, total - hour) * perToken(input * 1.25);
+}
 function estimateCostUsd(model, usage) {
   if (!usage) return 0;
   const price = PRICES[model];
   const perToken = (rate) => rate / 1e6;
-  const tokens = price ? (usage.input_tokens ?? 0) * perToken(price.input) + (usage.cache_creation_input_tokens ?? 0) * perToken(price.input * 1.25) + (usage.cache_read_input_tokens ?? 0) * perToken(price.cacheRead) + (usage.output_tokens ?? 0) * perToken(price.output) : 0;
+  const tokens = price ? (usage.input_tokens ?? 0) * perToken(price.input) + cacheWriteCost(usage, price.input, perToken) + (usage.cache_read_input_tokens ?? 0) * perToken(price.cacheRead) + (usage.output_tokens ?? 0) * perToken(price.output) : 0;
   const searches = (usage.server_tool_use?.web_search_requests ?? 0) * WEB_SEARCH_USD;
   return Math.round((tokens + searches) * 1e6) / 1e6;
 }
 var PROPOSAL_TOOLS = new Set(AI_TOOLS.map((tool2) => tool2.name));
+var PLAN_MARKER = "Plan to confirm";
+var BIG_BUILD = { blocks: 8, quizQuestions: 5 };
+var GO_AHEAD = /\b(go ahead|just (build|do|make) it|no need to (confirm|check|ask)|skip the plan|don'?t (ask|check) first)\b/i;
+function planConfirmed(job) {
+  if (GO_AHEAD.test(job.message)) return true;
+  return (job.history ?? []).some((turn) => turn.role === "assistant" && turn.content.includes(PLAN_MARKER));
+}
+function countBuild(proposal) {
+  const blocks = proposal.kind === "insert_blocks" || proposal.kind === "replace_lesson" ? proposal.blocks : proposal.kind === "replace_section" ? [proposal.section] : [];
+  let total = 0;
+  let quizQuestions = 0;
+  visitBlocks(blocks, (block) => {
+    total += 1;
+    if (block.block_type === "quiz_question") quizQuestions += 1;
+  });
+  return { blocks: total, quizQuestions };
+}
+function isBigBuild(proposal) {
+  const { blocks, quizQuestions } = countBuild(proposal);
+  return blocks > BIG_BUILD.blocks || quizQuestions > BIG_BUILD.quizQuestions;
+}
+function planStatus(job) {
+  return planConfirmed(job) ? "[Plan status: the teacher has answered your plan or said to go ahead. Build to it, applying any changes they asked for.]" : `[Plan status: no plan confirmed yet. If this is a big build (more than ${BIG_BUILD.quizQuestions} quiz questions or ${BIG_BUILD.blocks} blocks), do not research or build yet: reply with the plan, headed "${PLAN_MARKER}", and stop.]`;
+}
 function openingMessages(job) {
   const history = (job.history ?? []).filter((turn) => turn.content.trim()).map((turn) => ({ role: turn.role, content: turn.content }));
   const messages = [];
@@ -6020,11 +6050,14 @@ function openingMessages(job) {
 ${turn.content}`;
     else messages.push({ ...turn });
   }
+  const current = `${job.message}
+
+${planStatus(job)}`;
   const last = messages[messages.length - 1];
   if (last?.role === "user") last.content += `
 
-${job.message}`;
-  else messages.push({ role: "user", content: job.message });
+${current}`;
+  else messages.push({ role: "user", content: current });
   return messages;
 }
 function safeValidate(proposal) {
@@ -6039,8 +6072,9 @@ function checkProposalCall(name, input, lesson) {
   const parsed = parseToolProposal(name, input);
   if ("error" in parsed) return `${name}: ${truncate2(parsed.error)}`;
   const checked = safeValidate(parsed);
-  const quiz = quizProposalIssues(parsed, lesson, { questions: checked.ok });
-  const problems = [...checked.ok ? [] : [checked.error], ...quiz, ...anchorIssues(parsed, lesson)];
+  const quiz = quizProposalIssues(parsed, lesson);
+  const publish = checked.ok || quiz.length > 0 && /^Quiz question \d+:/.test(checked.error) ? [] : [checked.error];
+  const problems = [...publish, ...quiz, ...anchorIssues(parsed, lesson)];
   return problems.length ? truncate2(problems.join("\n")) : parsed;
 }
 function anchorIssues(proposal, lesson) {
@@ -6086,7 +6120,7 @@ async function runLessonAiJob(input) {
     research
   });
   const system = [
-    { type: "text", text: staticPrompt, cache_control: { type: "ephemeral" } },
+    { type: "text", text: staticPrompt, cache_control: { type: "ephemeral", ttl: "1h" } },
     { type: "text", text: lessonContext, cache_control: { type: "ephemeral" } }
   ];
   const toolsFor = (tier2) => [
@@ -6138,6 +6172,7 @@ async function runLessonAiJob(input) {
     if (reply.stop_reason === "refusal") return fail("The model declined this request.");
     if (reply.stop_reason === "max_tokens") {
       lastProblem = "The answer was too long and got cut off. Try asking for a smaller piece.";
+      checks.push(`Turn ${turns}: reply cut off at the ${MAX_TOKENS}-token output limit`);
       const note3 = "Your previous answer was cut off for length and was not shown. Propose a smaller change (split large builds across turns) and say so.";
       const last = messages[messages.length - 1];
       if (typeof last.content === "string") last.content += `
@@ -6164,7 +6199,8 @@ ${note3}`;
           results.push({ type: "tool_result", tool_use_id: call.id, content: "Only one proposal is shown per answer. This one was skipped.", is_error: true });
           continue;
         }
-        const checked = checkProposalCall(call.name, call.input, lesson);
+        const parsedCall = checkProposalCall(call.name, call.input, lesson);
+        const checked = typeof parsedCall !== "string" && isBigBuild(parsedCall) && !planConfirmed(job) ? `This is a big build and the teacher has not confirmed a plan. Do not build yet: reply without any tool call with a short plan headed "${PLAN_MARKER}" and wait for their answer.` : parsedCall;
         if (typeof checked === "string") {
           failedProposals += 1;
           checks.push(`Turn ${turns}: ${checked}`);
@@ -6232,11 +6268,15 @@ ${lastProblem}`;
   return fail(failedProposals > 0 ? lastProblem : "The agent took too many steps. Try a narrower request.");
 }
 export {
+  BIG_BUILD,
   MAX_TURNS,
+  PLAN_MARKER,
   TEACHING_AI_MODELS,
   checkProposalCall,
   estimateCostUsd,
+  isBigBuild,
   pickLane,
+  planConfirmed,
   runLessonAiJob,
   webSearchTool
 };

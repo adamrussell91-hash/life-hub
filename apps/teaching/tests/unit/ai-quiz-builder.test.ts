@@ -8,6 +8,10 @@ import { BLOCK_BUILD_RECIPES } from '@/ai/block-recipes';
 import { buildAiLessonContext } from '@/ai/context';
 import { emptySearchPack } from '@/ai/search-pack';
 import {
+  estimateCostUsd,
+  isBigBuild,
+  planConfirmed,
+  PLAN_MARKER,
   runLessonAiJob,
   webSearchTool,
   type ModelReply,
@@ -197,6 +201,50 @@ describe('quiz proposals on Accept', () => {
   });
 });
 
+describe('plan before a big build', () => {
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => quizBlock(`m${i}`, { kind: 'true_false', prompt: `Statement ${i + 1}.`, answer: true }));
+
+  it('counts a build as big past 5 quiz questions or 8 blocks', () => {
+    expect(isBigBuild(insertQuiz(many(5)))).toBe(false);
+    expect(isBigBuild(insertQuiz(many(6)))).toBe(true);
+    const headings = Array.from({ length: 9 }, (_, i) => createBlock('heading', `h${i}`));
+    expect(isBigBuild({ kind: 'insert_blocks', position: 'below', anchor_block_id: 'b_head', blocks: headings })).toBe(true);
+  });
+
+  it('treats a sent plan, or being told to go ahead, as confirmed', () => {
+    expect(planConfirmed({ message: 'Make a 20-question quiz' })).toBe(false);
+    expect(planConfirmed({ message: 'Yes, but make it 15', history: [{ role: 'assistant', content: `${PLAN_MARKER}\n- 20 questions` }] })).toBe(true);
+    expect(planConfirmed({ message: 'Make 20 questions, just build it' })).toBe(true);
+  });
+
+  it('tells the agent the plan status with the request', async () => {
+    const { complete, requests } = scripted([{ stop_reason: 'end_turn', usage, content: [{ type: 'text', text: `${PLAN_MARKER}: 20 questions…` }] }]);
+    await runLessonAiJob({ job: job('Make a 20-question quiz'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete });
+    expect(String(requests[0]!.messages.at(-1)!.content)).toContain('[Plan status: no plan confirmed yet.');
+  });
+
+  it('refuses a big build without a confirmed plan, and builds once the plan is answered', async () => {
+    const big = { stop_reason: 'tool_use', usage, content: [toolUse('t1', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: many(6) })] };
+    const first = scripted([structuredClone(big), { stop_reason: 'end_turn', usage, content: [{ type: 'text', text: `${PLAN_MARKER}…` }] }]);
+    const refused = await runLessonAiJob({ job: job('Make 6 questions'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete: first.complete });
+    expect(refused.proposal).toBeUndefined();
+    expect(refused.checks[0]).toMatch(/has not confirmed a plan/);
+
+    const second = scripted([structuredClone(big)]);
+    const built = await runLessonAiJob({
+      job: job('Yes, go with that plan', { history: [{ role: 'user', content: 'Make 6 questions' }, { role: 'assistant', content: `${PLAN_MARKER}: 6 true/false` }] }),
+      lesson: lesson('quiz'),
+      agentName: 'Ann',
+      protocol: '',
+      complete: second.complete
+    });
+    expect(built.status).toBe('done');
+    expect(built.proposal).toMatchObject({ kind: 'insert_blocks' });
+    expect(String(second.requests[0]!.messages.at(-1)!.content)).toContain('[Plan status: the teacher has answered your plan');
+  });
+});
+
 describe('quiz recipe and lesson context', () => {
   it('tells Ann every question, fill_gap included, needs a prompt', () => {
     expect(BLOCK_BUILD_RECIPES).toContain('Every question has prompt (always include it');
@@ -266,7 +314,8 @@ describe('runLessonAiJob', () => {
     // Judgement work runs on the standard model with the newer web search.
     expect(requests[0]!.model).toBe('claude-sonnet-5-5');
     expect(requests[0]!.tools.find((t) => t.name === 'web_search')?.type).toBe('web_search_20260209');
-    expect(requests[0]!.system[0]!.cache_control).toEqual({ type: 'ephemeral' });
+    expect(requests[0]!.system[0]!.cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
+    expect(requests[0]!.system[1]!.cache_control).toEqual({ type: 'ephemeral' });
   });
 
   it('hands a failed quiz check back to the agent, which fixes it in the same job', async () => {
@@ -402,6 +451,36 @@ describe('runLessonAiJob', () => {
     const { complete } = scripted([]);
     const result = await runLessonAiJob({ job: job('Quiz'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete, signal: controller.signal });
     expect(result).toMatchObject({ status: 'error', error: expect.stringMatching(/ran out of time/) });
+  });
+
+  it('records a reply cut off at the output limit', async () => {
+    const { complete } = scripted([
+      { stop_reason: 'max_tokens', usage, content: [{ type: 'text', text: 'Here are 30…' }] },
+      { stop_reason: 'end_turn', usage, content: [{ type: 'text', text: 'Smaller.' }] }
+    ]);
+    const result = await runLessonAiJob({ job: job('Quiz'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete });
+    expect(result.checks).toEqual(['Turn 1: reply cut off at the 48000-token output limit']);
+  });
+
+  it('names the exact field when a quiz question fails, not the generic publish message', async () => {
+    const noOptions = quizBlock('q9', { kind: 'multiple_choice', prompt: 'Which?', correct: ['a'] });
+    const { complete } = scripted([
+      { stop_reason: 'tool_use', usage, content: [toolUse('t1', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [noOptions] })] },
+      { stop_reason: 'end_turn', usage, content: [{ type: 'text', text: 'Stopping.' }] }
+    ]);
+    const result = await runLessonAiJob({ job: job('Quiz'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete });
+    expect(result.checks[0]).toMatch(/Question 1 \(q9\): Fill in every option\. \(options: /);
+    expect(result.checks[0]).not.toMatch(/Quiz question 1:/);
+  });
+
+  it('prices one-hour cache writes at twice the input rate', () => {
+    const fiveMinute = estimateCostUsd('claude-sonnet-5-5', { cache_creation_input_tokens: 1_000_000 });
+    const oneHour = estimateCostUsd('claude-sonnet-5-5', {
+      cache_creation_input_tokens: 1_000_000,
+      cache_creation: { ephemeral_1h_input_tokens: 1_000_000 }
+    });
+    expect(fiveMinute).toBe(2.5);
+    expect(oneHour).toBe(4);
   });
 
   it('uses the right web search tool per model', () => {
