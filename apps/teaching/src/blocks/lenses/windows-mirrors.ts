@@ -73,7 +73,8 @@ function config(raw: LensConfig): WindowsMirrorsConfig {
   return WindowsMirrorsConfigSchema.parse(raw);
 }
 
-function focusPhrase(raw: string): string {
+/** The focus as a phrase to drop into a prompt; a whole sentence becomes "this idea". */
+export function focusPhrase(raw: string): string {
   const text = kaplanFocusText(raw);
   if (!text) return 'the ideas in this activity';
   return isKaplanFocusStatement(text) ? 'this idea' : text.replace(/[.?!]+$/, '');
