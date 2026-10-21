@@ -16,7 +16,7 @@ const STALE_ERROR = 'The coach timed out, try again.';
 
 const httpError = (status, code, message) => Object.assign(new Error(message), { status, code });
 
-export function createProblemSolverService({ store, coach, now = () => new Date().toISOString(), newId = randomUUID }) {
+export function createProblemSolverService({ store, coach, kinds = ['full', 'lightning'], now = () => new Date().toISOString(), newId = randomUUID }) {
   const deps = { now, newId };
 
   const isStale = (s) => s.runner.status === 'running' && Date.parse(now()) > (s.runner.leaseUntil ?? 0);
@@ -104,7 +104,9 @@ export function createProblemSolverService({ store, coach, now = () => new Date(
     },
 
     async create(owner, body) {
-      const make = body.kind === 'lightning' ? createLightningSession : createSession;
+      const kind = body.kind ?? kinds[0];
+      if (!kinds.includes(kind)) throw httpError(400, 'validation_error', `This tool does not start ${kind} sessions.`);
+      const make = kind === 'lightning' ? createLightningSession : (input, d) => createSession({ ...input, kind }, d);
       const session = make({ title: body.title, text: body.text, links: Array.isArray(body.links) ? body.links : [] }, deps);
       session.requestIds = body.requestId ? [String(body.requestId)] : [];
       if (!ID_RE.test(String(body.requestId ?? ''))) return save(owner, session, null);
