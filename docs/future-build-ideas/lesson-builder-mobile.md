@@ -100,6 +100,8 @@ From [`docs/CURSOR-UI-FAILURES.md`](../CURSOR-UI-FAILURES.md):
 | In place or sheet? | **Sheet, for every block.** In-place editing is jumpy and buggy on a phone |
 | "Question maker" | Quiz question and question set |
 | Code on a phone? | **Not needed.** Code joins "Edit on a computer" and is left out of the phone picker |
+| Annotation on a phone? | **Out of scope entirely.** It is too complex as a block and needs its own phone design later. In this build it gets "Edit on a computer", is left out of the phone picker and is not on Clare's list |
+| Accepting Ann's suggestions on a phone | **The cards under each block are enough.** No separate accept step inside her full-screen view |
 | Clare's list | See below |
 
 ### In place or in the sheet
@@ -135,16 +137,17 @@ These exclusions apply to Clare on the phone. Hard to author on a phone at all, 
 
 - HTML and HTML app
 - code (not needed on a phone)
+- annotation (needs its own phone design; out of scope here)
 - columns layout (contents stay editable through Arrange and the sheet; only column widths are desktop-only)
 - chart data entry
 
 ## Open questions
 
-- Should annotation be allowed for Clare in a text-only form (the teacher pastes the text, Clare sets up layers but writes no notes)?
-- On a phone, are Ann's suggestion cards under each block enough, or should accepting happen only inside her full-screen view?
+None left from the first round. Next step: the Fixes slice, then the Slice A spike.
 
 ## History
 
+- **2026-10-21:** Annotation is out of scope for the phone build (needs its own design later). Ann's suggestion cards under each block are enough on a phone. Open questions cleared.
 - **2026-10-21:** Decided: sheet editing for every block on a phone, Ann gets a bar slot and a full-screen view, code is not on the phone, class activities join Clare's list (annotation stays out), "question maker" is quiz question and question set.
 - **2026-10-21:** Recorded decisions: the editing bar replaces the hub bar, no Preview on a phone, Arrange handles nested blocks in v1. Added in-place vs sheet rules, Clare's block list, phone-unfriendly blocks, and identified the "✦ Ann" pill as Ann's bar.
 - **2026-10-21:** First draft from a 390px screenshot of the lesson builder: diagnosis, phone mode concept, slice sizes, a cut-down Slice C built on Alchemy suggestions, and the failure register entries to cite.
