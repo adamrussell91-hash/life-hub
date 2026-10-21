@@ -1,6 +1,7 @@
 // tests/unit/problem-solver-prompts.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { RUBRIC, buildCoachPrompt } from '../../netlify/functions/_shared/problem-solver/prompts.mjs';
 import { createSession, applyCoachTurn, acceptSuggestion, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
@@ -31,6 +32,10 @@ test('rubric carries voice, skills, process, chapters and final words', () => {
   for (const word of ['Metacognition', 'Critical thinking', '25 and 60 words', 'Keep it anyway', 'seven-step', 'DEVISE:', 'determination, hope and success', 'Never end on agreement or praise alone.', 'MINIMUM MET']) {
     assert.ok(RUBRIC.includes(word), `rubric mentions ${word}`);
   }
+});
+
+test('the rubric is unchanged by the move to prompts-shared.mjs', () => {
+  assert.equal(createHash('sha256').update(RUBRIC).digest('hex'), '46d6842e42b01f31014541a8122ecc225aa181a94ca0cf191144d4cfae55c5a2');
 });
 
 test('system is two cached layers: the fixed rubric, then the step layer', () => {
