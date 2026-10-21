@@ -87,9 +87,15 @@
   color: var(--ink);
 }
 
+/* The answer gets the whole row; the right-answer pick and Remove wrap beneath it. */
 .hq-editor__text {
-  flex: 1 1 12rem;
+  flex: 1 1 calc(100% - 1.75rem - var(--space-3));
   min-width: 0;
+}
+
+.hq-editor__right {
+  margin-left: calc(1.75rem + var(--space-3));
+  margin-right: auto;
 }
 
 .hq-editor__note {
@@ -243,9 +249,10 @@
 }
 
 .hq-choice {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
   width: 100%;
   min-height: 3rem;
   padding: var(--space-3);
@@ -272,11 +279,11 @@
 }
 
 .hq-choice__text {
-  flex: 1;
   min-width: 0;
 }
 
 .hq-choice__mine {
+  grid-column: 2;
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   color: var(--marine);
@@ -388,6 +395,8 @@
 .hq-board__pct {
   grid-column: 3;
   grid-row: 1 / span 2;
+  min-width: 4ch;
+  text-align: right;
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
 }
