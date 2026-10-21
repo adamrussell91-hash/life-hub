@@ -1,6 +1,6 @@
 import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { eventOptions } from '@/components/event-options';
-import { getEvent, updateEvent, deleteEvent } from '@/api/events';
+import { getEvent, updateEvent, deleteEvent, eventStateAction } from '@/api/events';
 import { createUniversalLink, listUniversalLinksForEntity, endUniversalLink } from '@/api/universal-links';
 import { createPdGroup, getPdGroup } from '@/api/pd-groups';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
@@ -95,6 +95,36 @@ export async function renderEventPage(
     });
   toggleRow.append(toggle, el('span', undefined, 'Counts as PD'));
   settings.append(toggleRow);
+  const state = data.record.occurrence_state;
+  if (state !== 'cancelled') {
+    const isDone = state === 'completed';
+    const doneRow = el('div', 'event-page__pd');
+    const done = el('button', 'switch') as HTMLButtonElement;
+    done.type = 'button';
+    done.setAttribute('role', 'switch');
+    done.setAttribute('aria-checked', String(isDone));
+    done.setAttribute('aria-label', 'Done');
+    done.dataset.part = 'done-switch';
+    const doneError = el('p', 'hub-field__error');
+    doneError.setAttribute('role', 'status');
+    done.addEventListener('click', async () => {
+      done.disabled = true;
+      doneError.textContent = '';
+      try {
+        await eventStateAction(id, isDone ? 'reopen' : 'complete');
+        // Ticking it off means you went, so PD hours count.
+        if (!isDone && data.record.attendance_state !== 'attended' && data.record.attendance_state !== 'partial') {
+          await updateEvent(id, { attendance_state: 'attended' });
+        }
+        await rerender();
+      } catch (err) {
+        doneError.textContent = err instanceof Error ? err.message : 'Could not update the event.';
+        done.disabled = false;
+      }
+    });
+    doneRow.append(done, el('span', undefined, 'Done'), doneError);
+    settings.append(doneRow);
+  }
   root.append(settings);
   const editEvent = () => {
     if (!options.isCurrent()) return;
