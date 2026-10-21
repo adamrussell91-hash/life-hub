@@ -68,7 +68,7 @@ export function renderLessonText(entity, { focusId = null } = {}) {
   return lines.join('\n');
 }
 
-const TOOLS = [
+export const TOOLS = [
   {
     name: 'search_notes',
     description: 'Search Adam\'s Knowledge Hub (his university notes, research, reading and teaching notes, and the PDFs attached to them) by meaning-bearing words. Returns up to 10 notes with the passage that best matches; passage_from names the PDF when the passage comes from one. Passages are pointers: open the note or PDF with read_note before relying on it. Filters are exact; use list_filters to see real values.',

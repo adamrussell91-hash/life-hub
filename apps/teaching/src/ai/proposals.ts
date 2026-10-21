@@ -39,16 +39,22 @@ export const ProposeReplaceSectionSchema = z.object({
   section: BlockSchema
 });
 
+/** Accepting the proposal also switches the lesson to this type (quiz questions need a Quiz lesson). */
+export const ProposalSetModeSchema = z.literal('quiz');
+export type ProposalSetMode = z.infer<typeof ProposalSetModeSchema>;
+
 export const ProposeReplaceLessonSchema = z.object({
   title: z.string().min(1).optional(),
   cover: CoverSchema.optional(),
-  blocks: z.array(BlockSchema)
+  blocks: z.array(BlockSchema),
+  set_mode: ProposalSetModeSchema.optional()
 });
 
 export const ProposeInsertBlocksSchema = z.object({
   anchor_block_id: z.string().min(1).optional(),
   position: z.enum(['above', 'below']),
-  blocks: z.array(BlockSchema).min(1).max(48)
+  blocks: z.array(BlockSchema).min(1).max(48),
+  set_mode: ProposalSetModeSchema.optional()
 });
 
 export const ProposeDeleteBlocksSchema = z.object({
@@ -87,12 +93,14 @@ export type AiProposal =
       title?: string;
       cover?: z.infer<typeof CoverSchema>;
       blocks: z.infer<typeof BlockSchema>[];
+      set_mode?: ProposalSetMode;
     }
   | {
       kind: 'insert_blocks';
       anchor_block_id?: string;
       position: 'above' | 'below';
       blocks: z.infer<typeof BlockSchema>[];
+      set_mode?: ProposalSetMode;
     }
   | { kind: 'delete_blocks'; ids: string[] }
   | {
@@ -137,7 +145,12 @@ export const AI_TOOLS = [
       properties: {
         title: { type: 'string' },
         cover: { type: 'object' },
-        blocks: { type: 'array', items: { type: 'object' } }
+        blocks: { type: 'array', items: { type: 'object' } },
+        set_mode: {
+          type: 'string',
+          enum: ['quiz'],
+          description: 'Set to quiz when the blocks include quiz_question and the lesson is not a quiz yet. Accepting then turns the lesson into a Quiz.'
+        }
       },
       required: ['blocks']
     }
@@ -145,13 +158,18 @@ export const AI_TOOLS = [
   {
     name: 'propose_insert_blocks',
     description:
-      'Propose inserting one or more schema-valid blocks above or below an optional anchor. Without an anchor, append to the lesson root.',
+      'Propose inserting one or more schema-valid blocks above or below an anchor block. To add to the end of the lesson, anchor below its last top-level block. Leave the anchor out only when the lesson is empty.',
     input_schema: {
       type: 'object',
       properties: {
         anchor_block_id: { type: 'string' },
         position: { type: 'string', enum: ['above', 'below'] },
-        blocks: { type: 'array', items: { type: 'object' } }
+        blocks: { type: 'array', items: { type: 'object' } },
+        set_mode: {
+          type: 'string',
+          enum: ['quiz'],
+          description: 'Set to quiz when the blocks include quiz_question and the lesson is not a quiz yet. Accepting then turns the lesson into a Quiz.'
+        }
       },
       required: ['position', 'blocks']
     }
@@ -227,7 +245,8 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
       kind: 'replace_lesson',
       title: parsed.data.title,
       cover: parsed.data.cover,
-      blocks: parsed.data.blocks
+      blocks: parsed.data.blocks,
+      ...(parsed.data.set_mode ? { set_mode: parsed.data.set_mode } : {})
     };
   }
   if (name === 'propose_insert_blocks') {
@@ -240,7 +259,8 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
       kind: 'insert_blocks',
       anchor_block_id: parsed.data.anchor_block_id,
       position: parsed.data.position,
-      blocks: parsed.data.blocks
+      blocks: parsed.data.blocks,
+      ...(parsed.data.set_mode ? { set_mode: parsed.data.set_mode } : {})
     };
   }
   if (name === 'propose_delete_blocks') {

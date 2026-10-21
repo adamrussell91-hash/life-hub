@@ -53,6 +53,11 @@ function withBlocks(lesson: Lesson, blocks: Block[]): Lesson {
   return { ...lesson, blocks };
 }
 
+/** Quiz questions only work in a Quiz lesson, so a proposal can switch the lesson type with them. */
+function withMode(lesson: Lesson, proposal: { set_mode?: 'quiz' }): Lesson {
+  return proposal.set_mode ? { ...lesson, pedagogical_mode: proposal.set_mode } : lesson;
+}
+
 export function applyProposalToLesson(
   lesson: Lesson,
   proposal: AiProposal,
@@ -94,7 +99,7 @@ export function applyProposalToLesson(
 
   if (proposal.kind === 'replace_lesson') {
     const blocks = proposal.blocks.map((block) => cloneBlockWithNewIds(block, nextId));
-    const next: Lesson = { ...lesson, blocks };
+    const next: Lesson = withMode({ ...lesson, blocks }, proposal);
     if (proposal.title !== undefined) next.title = proposal.title;
     if (proposal.cover !== undefined) next.cover = proposal.cover;
     return { ok: true, lesson: next };
@@ -106,7 +111,7 @@ export function applyProposalToLesson(
       if (lesson.blocks.length > 0) {
         return { ok: false, message: 'Anchor block required', lesson };
       }
-      return { ok: true, lesson: withBlocks(lesson, [...lesson.blocks, ...inserts]) };
+      return { ok: true, lesson: withMode(withBlocks(lesson, [...lesson.blocks, ...inserts]), proposal) };
     }
     const result = applyInsertBlocks(
       lesson.blocks,
@@ -115,7 +120,7 @@ export function applyProposalToLesson(
       inserts
     );
     return result.ok
-      ? { ok: true, lesson: withBlocks(lesson, result.blocks) }
+      ? { ok: true, lesson: withMode(withBlocks(lesson, result.blocks), proposal) }
       : { ok: false, message: 'Anchor block not found', lesson };
   }
 
