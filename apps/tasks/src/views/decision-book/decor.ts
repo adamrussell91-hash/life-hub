@@ -44,74 +44,215 @@ const RING = '<circle cx="50" cy="50" r="46" fill="var(--dm-green)"/><circle cx=
 
 /* ── Shape board ────────────────────────────────────────────────────── */
 
+const INK = 'var(--dm-ink)';
+const PAPER = 'var(--dm-paper)';
+
+/**
+ * The board's twenty-one shapes, all in the cover's language: discs, halves, ink arrows, dotted
+ * lines and paper cut-outs. Each draws in a 100×100 cell from two colours, so any shape can
+ * come up red-led or green-led.
+ */
 const SHAPES: Array<(a: string, b: string) => string> = [
   () => BACK_DISC,
   () => FORWARD_DISC,
   () => '<path d="M50 6A44 44 0 0 0 50 94Z" fill="var(--dm-red)"/><path d="M50 6A44 44 0 0 1 50 94Z" fill="var(--dm-green)"/><path d="M50 6V94" stroke="var(--dm-ink)" stroke-width="3" stroke-dasharray="4 4.4"/>',
   (a) => `<path d="M8 40H60L52 22L94 50L52 78L60 60H8L16 50Z" fill="${a}"/>`,
-  (a) => `<circle cx="50" cy="50" r="44" fill="${a}"/><path d="M45 92V60L24 34L18 40L16 18L38 20L32 26L50 48L68 26L62 20L84 18L82 40L76 34L55 60V92Z" fill="var(--dm-paper)"/>`,
-  () => '<circle cx="34" cy="50" r="30" fill="var(--dm-red)"/><circle cx="66" cy="50" r="30" fill="var(--dm-green)"/><path d="M16 44H62V32L84 50L62 68V56H16Z" fill="var(--dm-ink)"/>',
-  (a) => `<path d="M76 24A37 37 0 1 0 87 50" fill="none" stroke="${a}" stroke-width="14"/><path d="M74 54L87 34L100 54Z" fill="var(--dm-ink)"/>`,
-  (a, b) => `<circle cx="24" cy="50" r="16" fill="${a}"/><circle cx="76" cy="50" r="16" fill="${b}"/><path d="M42 50H60" stroke="var(--dm-ink)" stroke-width="3" stroke-dasharray="3 4"/><path d="M58 42L66 50L58 58Z" fill="var(--dm-ink)"/>`
+  (a) => `<circle cx="50" cy="50" r="44" fill="${a}"/><path d="M45 92V60L24 34L18 40L16 18L38 20L32 26L50 48L68 26L62 20L84 18L82 40L76 34L55 60V92Z" fill="${PAPER}"/>`,
+  () => `<circle cx="34" cy="50" r="30" fill="var(--dm-red)"/><circle cx="66" cy="50" r="30" fill="var(--dm-green)"/><path d="M16 44H62V32L84 50L62 68V56H16Z" fill="${INK}"/>`,
+  (a) => `<path d="M76 24A37 37 0 1 0 87 50" fill="none" stroke="${a}" stroke-width="14"/><path d="M74 54L87 34L100 54Z" fill="${INK}"/>`,
+  (a, b) => `<circle cx="24" cy="50" r="16" fill="${a}"/><circle cx="76" cy="50" r="16" fill="${b}"/><path d="M42 50H60" stroke="${INK}" stroke-width="3" stroke-dasharray="3 4"/><path d="M58 42L66 50L58 58Z" fill="${INK}"/>`,
+  // A quarter of the other colour, with a rising arrow.
+  (a, b) => `<circle cx="50" cy="50" r="44" fill="${b}"/><path d="M6 50A44 44 0 0 0 50 94V50Z" fill="${a}"/><path d="M30 64L56 38H44V28H72V56H62V44L36 70Z" fill="${INK}"/>`,
+  // Two halves held apart by an ink diamond.
+  (a, b) => `<path d="M45 8A42 42 0 0 0 45 92Z" fill="${a}"/><path d="M55 8A42 42 0 0 1 55 92Z" fill="${b}"/><path d="M30 50L50 30 70 50 50 70Z" fill="${INK}"/>`,
+  // A target: ring, paper gap, bullseye.
+  (a, b) => `<circle cx="50" cy="50" r="44" fill="${a}"/><circle cx="50" cy="50" r="27" fill="${PAPER}"/><circle cx="50" cy="50" r="13" fill="${b}"/>`,
+  // A big disc and a small one, overlapping.
+  (a, b) => `<circle cx="40" cy="60" r="34" fill="${a}"/><circle cx="68" cy="36" r="24" fill="${b}"/>`,
+  // The Stop Rule's bar.
+  (a) => `<circle cx="50" cy="50" r="44" fill="${a}"/><rect x="24" y="42" width="52" height="16" fill="${PAPER}"/>`,
+  // A tick on green, a cross on red.
+  () => `<circle cx="50" cy="50" r="44" fill="var(--dm-green)"/><path d="M27 51L43 67L74 36" fill="none" stroke="${INK}" stroke-width="11"/>`,
+  () => `<circle cx="50" cy="50" r="44" fill="var(--dm-red)"/><path d="M33 33L67 67M67 33L33 67" fill="none" stroke="${PAPER}" stroke-width="11"/>`,
+  // A balance: beam, pivot and a weight either side.
+  (a, b) => `<path d="M50 30L64 86H36Z" fill="${INK}"/><path d="M10 30H90" stroke="${INK}" stroke-width="6"/><circle cx="22" cy="47" r="14" fill="${a}"/><circle cx="78" cy="47" r="14" fill="${b}"/>`,
+  // A 2×2 matrix with one quadrant still open.
+  (a, b) => `<rect x="10" y="10" width="38" height="38" fill="${a}"/><rect x="52" y="10" width="38" height="38" fill="${b}"/><rect x="10" y="52" width="38" height="38" fill="${INK}"/><rect x="54" y="54" width="34" height="34" fill="none" stroke="${INK}" stroke-width="3" stroke-dasharray="4 4"/>`,
+  // Pareto bars: a fifth, then four fifths.
+  (a, b) => `<rect x="10" y="22" width="80" height="22" rx="11" fill="${PAPER}"/><rect x="10" y="22" width="26" height="22" rx="11" fill="${a}"/><rect x="10" y="56" width="80" height="22" rx="11" fill="${PAPER}"/><rect x="10" y="56" width="66" height="22" rx="11" fill="${b}"/>`,
+  // Two arrows passing each other.
+  (a, b) => `<path d="M12 28H62V16L84 34L62 52V40H12Z" fill="${a}"/><path d="M88 72H38V84L16 66L38 48V60H88Z" fill="${b}"/>`,
+  // The expectations curve: an arc, its peak and a dotted line.
+  (a, b) => `<path d="M12 86Q50 -10 88 86" fill="none" stroke="${INK}" stroke-width="8"/><circle cx="50" cy="38" r="11" fill="${b}"/><path d="M72 14V92" stroke="${a}" stroke-width="4" stroke-dasharray="5 5"/>`,
+  // Steps, with a disc at the top.
+  (a, b) => `<path d="M10 88H36V66H60V44H86V88Z" fill="${a}"/><circle cx="73" cy="27" r="12" fill="${b}"/>`
 ];
 const DISCS = ['var(--dm-red)', 'var(--dm-green)'];
 const pick = (n: number) => Math.floor(Math.random() * n);
 
-function tileMarkup(): string {
-  const a = pick(2);
-  return SHAPES[pick(SHAPES.length)](DISCS[a], DISCS[1 - a]);
-}
+/** Shapes that read wrong turned on their side or upside down: the tick, the cross, the balance, the curve. */
+const UPRIGHT = new Set([13, 14, 15, 19]);
+
+/** What a tile shows: which shape, which colour leads, and how far it has been turned. */
+type Face = { shape: number; lead: number; turn: number };
+
+/** A face whose shape is not already on the board, so twelve tiles show twelve different shapes. */
+const freshFace = (faces: Face[]): Face => {
+  const showing = new Set(faces.map((f) => f.shape));
+  const free = SHAPES.map((_, i) => i).filter((i) => !showing.has(i));
+  return { shape: free[pick(free.length)], lead: pick(2), turn: 0 };
+};
+
+/** The cell-sized empty rect keeps every tile's box, and so its turning centre, on the cell. */
+const faceMarkup = (face: Face): string =>
+  `<rect width="100" height="100" fill="none"/><g transform="rotate(${face.turn} 50 50)">${SHAPES[face.shape](DISCS[face.lead], DISCS[1 - face.lead])}</g>`;
 
 export type ShapeBoard = { el: HTMLElement; nudge(): void };
 
-/** A 4×3 board of cover shapes, in Problem Solver's place. Tiles drop in, then one swaps every couple of seconds. */
+const COLS = 4;
+const ROWS = 3;
+const SPRING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+const EASE_IN = 'cubic-bezier(0.5, 0, 0.75, 0)';
+
+/**
+ * A 4×3 board of cover shapes, in Problem Solver's place. Tiles drop in, then every couple of
+ * seconds the board makes one move: a tile pops, flips over, turns a quarter, drops out, or
+ * swaps its colours; two neighbours trade places; or a row or column slides along one cell.
+ */
 export function createShapeBoard(): ShapeBoard {
   const wrap = el('div', 'ps-loom dm-loom');
   wrap.setAttribute('aria-hidden', 'true');
   const board = svg('0 0 400 300', '');
   const tiles: SVGGElement[] = [];
-  for (let row = 0; row < 3; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
+  const faces: Face[] = [];
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
       const cell = document.createElementNS(SVG_NS, 'g');
       cell.setAttribute('transform', `translate(${col * 100} ${row * 100})`);
-      cell.innerHTML = `<rect x="4" y="4" width="92" height="92" rx="${(row + col) % 3 === 0 ? 46 : 18}" class="ps-loom__cell"/><g class="ps-loom__tile"></g>`;
+      cell.innerHTML = `<rect x="4" y="4" width="92" height="92" rx="${(row + col) % 3 === 0 ? 46 : 18}" class="ps-loom__cell"/><g class="dm-loom__tile"></g>`;
       board.append(cell);
       tiles.push(cell.lastElementChild as SVGGElement);
+      faces.push(freshFace(faces));
     }
   }
   wrap.append(board);
-  const paint = (tile: SVGGElement, delay = 0) => {
-    tile.innerHTML = tileMarkup();
-    tile.style.animationDelay = `${delay}ms`;
-    tile.classList.remove('is-leaving', 'is-entering');
-    void tile.getBoundingClientRect();
-    tile.classList.add('is-entering');
+  const draw = (i: number) => { tiles[i].innerHTML = faceMarkup(faces[i]); };
+  const motion = !reducedMotion() && typeof tiles[0].animate === 'function';
+  const play = (i: number, frames: Keyframe[], ms: number, easing = EASE, delay = 0) =>
+    motion ? tiles[i].animate(frames, { duration: ms, easing, delay, fill: 'backwards' }).finished.catch(() => undefined) : Promise.resolve(undefined);
+
+  const at = (row: number, col: number) => row * COLS + col;
+  const POP_IN: Keyframe[] = [{ transform: 'scale(0) rotate(-120deg)' }, { transform: 'none' }];
+  const pop = async (i: number) => {
+    await play(i, [{ transform: 'none' }, { transform: 'scale(0) rotate(90deg)' }], 300);
+    faces[i] = freshFace(faces);
+    draw(i);
+    await play(i, POP_IN, 720, SPRING);
   };
-  tiles.forEach((tile, i) => paint(tile, i * 110));
-  const swap = () => {
-    const tile = tiles[pick(tiles.length)];
-    tile.style.animationDelay = '0ms';
-    tile.classList.remove('is-entering');
-    tile.classList.add('is-leaving');
-    setTimeout(() => paint(tile), 300);
+  /** Turns over like a card; the back is a new shape, or the same one with its colours swapped. */
+  const flip = async (i: number) => {
+    const vertical = Math.random() < 0.5;
+    const axis = vertical ? 'scaleY' : 'scaleX';
+    await play(i, [{ transform: 'none' }, { transform: `${axis}(0)` }], 220, EASE_IN);
+    faces[i] = Math.random() < 0.35 ? { ...faces[i], lead: 1 - faces[i].lead } : freshFace(faces);
+    draw(i);
+    await play(i, [{ transform: `${axis}(0)` }, { transform: 'none' }], 420, SPRING);
   };
+  /** A quarter or half turn that stays turned. */
+  const turn = async (i: number) => {
+    if (UPRIGHT.has(faces[i].shape)) return flip(i);
+    const by = [90, -90, 180][pick(3)];
+    await play(i, [{ transform: 'none' }, { transform: `rotate(${by}deg)` }], by === 180 ? 760 : 560, SPRING);
+    faces[i] = { ...faces[i], turn: (faces[i].turn + by + 360) % 360 };
+    draw(i);
+  };
+  /** Falls out of the bottom of its cell; the next shape drops in from above. */
+  const drop = async (i: number) => {
+    await play(i, [{ transform: 'none', opacity: 1 }, { transform: 'translateY(40px) scale(0.6)', opacity: 0 }], 280, EASE_IN);
+    faces[i] = freshFace(faces);
+    draw(i);
+    await play(i, [{ transform: 'translateY(-50px)', opacity: 0 }, { transform: 'none', opacity: 1 }], 620, SPRING);
+  };
+  /** Two neighbours trade places, one passing over the other. */
+  const swap = async (i: number) => {
+    const row = Math.floor(i / COLS);
+    const col = i % COLS;
+    const across = Math.random() < 0.5 ? col < COLS - 1 : row === ROWS - 1;
+    const j = across ? (col < COLS - 1 ? i + 1 : i - 1) : (row < ROWS - 1 ? i + COLS : i - COLS);
+    const dx = ((j % COLS) - col) * 100;
+    const dy = (Math.floor(j / COLS) - row) * 100;
+    tiles[i].parentElement!.parentElement!.append(tiles[i].parentElement!);
+    await Promise.all([
+      play(i, [{ transform: 'none' }, { transform: `translate(${dx / 2}px, ${dy / 2}px) scale(1.15)` }, { transform: `translate(${dx}px, ${dy}px)` }], 640, EASE),
+      play(j, [{ transform: 'none' }, { transform: `translate(${-dx / 2}px, ${-dy / 2}px) scale(0.8)` }, { transform: `translate(${-dx}px, ${-dy}px)` }], 640, EASE)
+    ]);
+    [faces[i], faces[j]] = [faces[j], faces[i]];
+    draw(i);
+    draw(j);
+  };
+  /** A row or column slides one cell: the end tile leaves, a new one arrives at the other end. */
+  const shift = async () => {
+    const byRow = Math.random() < 0.6;
+    const r = pick(ROWS);
+    const c = pick(COLS);
+    const line = byRow ? Array.from({ length: COLS }, (_, k) => at(r, k)) : Array.from({ length: ROWS }, (_, k) => at(k, c));
+    const forwards = Math.random() < 0.5;
+    const order = forwards ? line : [...line].reverse();
+    const d = forwards ? -100 : 100;
+    const move = byRow ? `translateX(${d}px)` : `translateY(${d}px)`;
+    await Promise.all(order.map((t, k) =>
+      play(t, k === 0 ? [{ transform: 'none' }, { transform: `${move} scale(0)` }] : [{ transform: 'none' }, { transform: move }], 560, EASE)
+    ));
+    for (let k = 0; k < order.length - 1; k += 1) faces[order[k]] = faces[order[k + 1]];
+    const end = order[order.length - 1];
+    faces[end] = freshFace(faces);
+    order.forEach(draw);
+    await play(end, POP_IN, 620, SPRING);
+  };
+
+  const MOVES: Array<{ weight: number; run: (i: number) => Promise<void> }> = [
+    { weight: 3, run: pop },
+    { weight: 3, run: flip },
+    { weight: 2, run: turn },
+    { weight: 2, run: drop },
+    { weight: 2, run: swap },
+    { weight: 2, run: () => shift() }
+  ];
+  const total = MOVES.reduce((sum, m) => sum + m.weight, 0);
+  let busy = false;
+  let lastMove = -1;
+  const move = (i = pick(tiles.length)) => {
+    if (busy) return;
+    let roll = pick(total);
+    let m = MOVES.findIndex((entry) => (roll -= entry.weight) < 0);
+    if (m === lastMove) m = (m + 1) % MOVES.length;
+    lastMove = m;
+    busy = true;
+    MOVES[m].run(i).finally(() => { busy = false; });
+  };
+
+  tiles.forEach((tile, i) => {
+    draw(i);
+    void play(i, POP_IN, 720, SPRING, i * 110);
+  });
   let last = 0;
-  if (!reducedMotion()) {
+  if (motion) {
     const timer = setInterval(() => {
       if (!wrap.isConnected) {
         clearInterval(timer);
         return;
       }
-      if (!document.hidden) swap();
-    }, 1700);
+      if (!document.hidden) move();
+    }, 1900);
   }
   return {
     el: wrap,
     nudge() {
       const now = Date.now();
-      if (reducedMotion() || now - last < 260) return;
+      if (!motion || now - last < 260) return;
       last = now;
-      swap();
+      move();
     }
   };
 }
