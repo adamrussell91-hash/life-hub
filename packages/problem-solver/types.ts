@@ -39,6 +39,14 @@ export type PsLightningState = { path: PsLightningEntry[]; rounds: number; finis
 export type PsLightningTried = { node: PsLightningNodeId; label: string; note: string | null; outcome: 'solved' | 'not solved' | null; round: number };
 /** What an escalated full session starts from; seeds, not answers, until the coach confirms them. */
 export type PsFrameSeeds = { goal: string | null; whatIsTrue: string | null; tried: PsLightningTried[] };
+/** Decision Maker's quick route (packages/decision-book/quick.mjs). */
+export type DmQuickNodeId = 'decision' | 'tests' | 'test_one' | 'test_two' | 'test_three' | 'proceed' | 'stop' | 'trigger' | 'action' | 'check' | 'learn' | 'next';
+export type DmQuickEntry = { node: DmQuickNodeId; round: number; at: string; answer?: 'yes' | 'no'; note?: string; tests?: string[] };
+/** The check date, and the task made for it (or set aside with Not now). */
+export type DmQuickCheck = { due: string; taskId: string | null; dismissed: boolean };
+export type DmQuickState = { path: DmQuickEntry[]; rounds: number; finishedAt: string | null; escalatedTo: string | null; check: DmQuickCheck | null };
+/** What a full decision starts from when a quick run goes deeper; seeds, not answers. */
+export type DmQuickSeeds = { from: 'quick'; decision: string; known: string | null; tests: { test: string; answer: 'yes' | 'no' | null }[]; stopRule: { trigger: string; action: string | null } | null };
 
 /** A confirmed task's live state, passed from the page to a chart (never stored). */
 export type PsTaskLink = { nodeId: string; taskId: string; status: string };
@@ -47,7 +55,7 @@ export type PsSession = {
   id: string;
   title: string;
   revision: number;
-  kind: 'full' | 'lightning' | 'decision';
+  kind: 'full' | 'lightning' | 'decision' | 'quick';
   status: 'active' | 'finished' | 'archived';
   /** 'frame', a plan step id from steps.mjs, or 'finished'. */
   phase: string;
@@ -78,17 +86,19 @@ export type PsSession = {
   /** The key of a case-file offer set aside with Not now. */
   caseFileDeclined: string | null;
   lightning: PsLightningState | null;
+  /** Decision Maker: a quick decision's run. */
+  quick?: DmQuickState | null;
   escalatedFrom: string | null;
-  frameSeeds: PsFrameSeeds | null;
+  frameSeeds: PsFrameSeeds | DmQuickSeeds | null;
   taskSnapshot: PsTaskSnapshot | null;
   detour: PsDetour | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning' | 'decision'; escalatedTo?: string | null; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null; main?: string | null };
+export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning' | 'decision' | 'quick'; escalatedTo?: string | null; outcome?: 'proceed' | 'stop' | null; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null; main?: string | null };
 
-export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file' | 'lightning_answer' | 'lightning_again' | 'escalate';
+export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file' | 'lightning_answer' | 'lightning_again' | 'quick_answer' | 'quick_again' | 'quick_check' | 'escalate';
 
 export type PsCaseFileTarget = { kind: 'task' | 'project'; id: string };
 /** What was written where: the section digests written, so later changes can be found. */
