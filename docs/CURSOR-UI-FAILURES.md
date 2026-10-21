@@ -57,7 +57,7 @@
 
 ## V: Visibility and state
 
-**V1 · `[hidden]` doesn't hide.** **Seen:** Goals Direction editor (G-18). **Rule:** Any element toggled with `hidden` that has a `display:` rule also gets `.x[hidden]{display:none}`. **Check:** after hiding, `offsetHeight === 0`.
+**V1 · `[hidden]` doesn't hide.** **Seen:** Goals Direction editor (G-18); Teaching question set editor (21/10/26): `.block-editor__inline-settings` is `display: flex` in hub-list.css, so the Human experience table settings showed on every format. **Rule:** Any element toggled with `hidden` that has a `display:` rule also gets `.x[hidden]{display:none}`. **Check:** after hiding, `offsetHeight === 0`.
 
 **V2 · Controls disagree with the view.** **Seen:** Goals Term/Year pills (G-17). **Rule:** One state object drives both the view and the control's active class, recomputed on every render. **Check:** change the view by a *different* input (pinch, keyboard, URL) and the pill follows.
 
