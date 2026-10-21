@@ -2,7 +2,7 @@
 // Improve's review rules, shared by the server and the page so the two cannot drift:
 // when a review is live, when Improve is waiting for it, how a review may start, and how a
 // task snapshot is cleaned.
-import { nextPhase, pastStep, planStep, planStepForBook } from './steps.mjs';
+import { nextPhase, pastStep, planStepForBook, stepServes } from './steps.mjs';
 
 /** Task statuses a snapshot counts. Anything else counts as unknown; removed tasks are never counted. */
 export const SNAPSHOT_STATUSES = Object.freeze(['open', 'in_progress', 'deferred', 'done', 'dead', 'unknown']);
@@ -25,7 +25,7 @@ export function reviewLive(session) {
 
 /** True while the session is in its Improve plan step (whatever the review is doing). */
 export function inImprove(session) {
-  return Boolean(session.model && planStep(session.model.id, session.phase)?.book.includes('improve'));
+  return Boolean(session.model && stepServes(session.model.id, session.phase, 'improve'));
 }
 
 /** True while the session sits in its Improve step waiting for the review. */

@@ -32,6 +32,7 @@ import { feedbackMatrix } from './feedback-matrix.mjs';
 import { fiveCs } from './five-cs.mjs';
 import { knowledgeManagement } from './knowledge-management.mjs';
 import { DECISION_TOOLS } from '../../decision-book/models/index.mjs';
+import { dmRecord } from '../../decision-book/tools/record.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -68,7 +69,9 @@ export const TOOLS = {
   five_cs: fiveCs,
   knowledge_management: knowledgeManagement,
   // Decision Maker's models (step explore, not a toolkit step, so Problem Solver never lists them).
-  ...DECISION_TOOLS
+  ...DECISION_TOOLS,
+  // Decision Maker's Decide step (step settle, likewise not a toolkit step).
+  dm_record: dmRecord
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));

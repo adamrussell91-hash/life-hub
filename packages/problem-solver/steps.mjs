@@ -3,6 +3,7 @@ import { MODELS } from './models.mjs';
 import { TOOLS } from './tools/index.mjs';
 import { DECISION_MODEL } from '../decision-book/model.mjs';
 import { CATALOGUE_IDS } from '../decision-book/catalogue.mjs';
+import { FEEDBACK_ID } from '../decision-book/record-slots.mjs';
 
 /** Tool families. A tool's `step` is one of these. `contradiction` is TRIZ only. */
 export const BOOK_STEPS = Object.freeze([
@@ -18,7 +19,12 @@ export const BOOK_STEPS = Object.freeze([
 
 export const BOOK_STEP_IDS = Object.freeze(BOOK_STEPS.map((s) => s.id));
 
-const entry = (step, book, extra = false, tools = null) => Object.freeze({ step, book: Object.freeze(book), extra, ...(tools ? { tools } : {}) });
+/**
+ * `tools` names a step's tools explicitly. `serves` is the toolkit role a step plays in the
+ * session's machinery (Decision Maker's Decide plays Implement's part in proposing the review;
+ * its Review plays Improve's), without its tools joining that toolkit step.
+ */
+const entry = (step, book, extra = false, tools = null, serves = null) => Object.freeze({ step, book: Object.freeze(book), extra, ...(tools ? { tools } : {}), ...(serves ? { serves } : {}) });
 
 /**
  * Ordered steps a session walks for each model. `book` lists the tool families the
@@ -44,11 +50,12 @@ const PLANS = Object.freeze({
     entry('document', ['document'], true)
   ]),
   // Decision Maker: the coach discerns the model, so Explore names its tools (every catalogue
-  // model registered as a tool) and has no default.
+  // model registered as a tool) and has no default. Decide's one tool is the decision record;
+  // Review names the feedback analysis, which compares what was expected with what happened.
   decision_book: Object.freeze([
     entry('explore', ['explore'], false, () => CATALOGUE_IDS.filter((id) => TOOLS[id])),
-    entry('decide', ['settle']),
-    entry('review', ['review'], true)
+    entry('decide', ['settle'], false, null, 'implement'),
+    entry('review', ['review'], true, () => [FEEDBACK_ID], 'improve')
   ])
 });
 
@@ -101,10 +108,13 @@ export function toolsForPlanStep(modelId, stepId) {
   return Object.values(TOOLS).filter((tool) => books.includes(tool.step)).map((tool) => tool.id);
 }
 
-/** A step that names its own tools has no default: the coach chooses. */
+/** A step that names its own tools has no default (the coach chooses) unless it names only one. */
 export function defaultToolFor(modelId, stepId) {
   const step = planStep(modelId, stepId);
-  if (step?.tools) return null;
+  if (step?.tools) {
+    const named = step.tools();
+    return named.length === 1 ? named[0] : null;
+  }
   for (const book of step?.book ?? []) {
     const id = (DEFAULTS[book] ?? []).find((tool) => TOOLS[tool]?.step === book);
     if (id) return id;
@@ -112,9 +122,15 @@ export function defaultToolFor(modelId, stepId) {
   return toolsForPlanStep(modelId, stepId)[0] ?? null;
 }
 
-/** The plan step of a model whose tool families include `book`, or null. */
+/** True when plan step `stepId` uses `book`'s tools or plays its part (`serves`). */
+export function stepServes(modelId, stepId, book) {
+  const step = planStep(modelId, stepId);
+  return Boolean(step && (step.book.includes(book) || step.serves === book));
+}
+
+/** The plan step of a model whose tool families include `book`, or that serves it, or null. */
 export function planStepForBook(modelId, book) {
-  return stepPlan(modelId).find((s) => s.book.includes(book))?.step ?? null;
+  return stepPlan(modelId).find((s) => s.book.includes(book) || s.serves === book)?.step ?? null;
 }
 
 /**
