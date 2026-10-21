@@ -169,6 +169,12 @@ async function pageFor(width = 1440, { editorial = false, seed } = {}) {
         menu_items: [
           { name: "Soba noodles", description: "", price: "$18" },
           { name: "Pork gyoza", description: "Pan fried", price: "$12" },
+          {
+            name: "Big breakfast plate",
+            description: "Bolognese meatball, maple bacon, chunky house hash brown, eggs your way, avocado, mushrooms, braised kale, roasted tomato, sourdough",
+            price: "$29",
+          },
+          { name: "Extra egg", description: "", price: "$3", kind: "extra" },
         ],
         dishes: [
           {
@@ -397,9 +403,7 @@ for (const width of [390, 320])
     });
     await page.setViewportSize({ width, height: 520 });
     await phoneGate(page);
-    await page
-      .locator(".food-sheet__fields")
-      .evaluate((n) => (n.scrollTop = n.scrollHeight));
+    await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await phoneGate(page);
     await page.getByRole("button", { name: "Save visit", exact: true }).click();
     try {
@@ -497,21 +501,31 @@ for (const width of [390, 320])
 test("capture, private upload, menu text, backup and restore work through the real entry point", async () => {
   const { page, read, errors } = await pageFor(390);
   await page.getByRole("button", { name: "Add visit", exact: true }).click();
-  // On a phone the visit form is a full page with Close and Save on top.
-  await page.waitForTimeout(600);
+  // The visit form is a page in the journal's flow, not a fixed overlay the
+  // keyboard moves: Close and Save on top, the header and tab bar aside.
   const layout = await page.evaluate(() => {
     const box = (q) => document.querySelector(q).getBoundingClientRect();
+    const shown = (q) =>
+      [...document.querySelectorAll(q)].some((n) => n.getClientRects().length);
+    const before = { actions: box(".food-sheet__actions"), fields: box(".food-sheet__fields") };
+    scrollTo(0, document.documentElement.scrollHeight);
     return {
-      sheet: box(".food-sheet"),
-      actions: box(".food-sheet__actions"),
-      fields: box(".food-sheet__fields"),
-      width: innerWidth,
-      height: innerHeight,
+      ...before,
+      dialog: document.querySelectorAll(".hub-morph-dialog").length,
+      position: getComputedStyle(document.querySelector(".food-sheet")).position,
+      header: shown(".page-header"),
+      nav: shown(".hub-mobile-nav"),
+      toolbar: shown(".food-toolbar"),
+      scrolled: scrollY,
+      stuck: box(".food-sheet__actions").top,
     };
   });
-  assert.ok(Math.abs(layout.sheet.width - layout.width) < 2, JSON.stringify(layout));
-  assert.ok(Math.abs(layout.sheet.height - layout.height) < 2, JSON.stringify(layout));
+  assert.equal(layout.dialog, 0, JSON.stringify(layout));
+  assert.equal(layout.position, "static", JSON.stringify(layout));
+  assert.deepEqual([layout.header, layout.nav, layout.toolbar], [false, false, false]);
   assert.ok(layout.actions.bottom <= layout.fields.top + 1, JSON.stringify(layout));
+  assert.ok(layout.scrolled > 0 && Math.abs(layout.stuck) < 1, JSON.stringify(layout));
+  await page.evaluate(() => scrollTo(0, 0));
   // Dish photos are added inside each dish; the top only reads a menu.
   assert.equal(await page.getByLabel("Dish photos", { exact: true }).count(), 0);
   const jpeg =
@@ -535,6 +549,37 @@ test("capture, private upload, menu text, backup and restore work through the re
   assert.equal(await gyoza.isChecked(), false);
   await gyoza.check();
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 2);
+  // A ticked dish brings its ingredients into its notes.
+  assert.equal(
+    await page.getByLabel("Dish notes", { exact: true }).nth(1).inputValue(),
+    "Pan fried",
+  );
+  // Extras sit apart from the dishes and tick onto the last dish.
+  const names = await onMenu.locator(".food-onmenu__list > *").allInnerTexts();
+  assert.match(names.at(-2), /Extras and add-ons/);
+  assert.match(names.at(-1), /Extra egg/);
+  const egg = onMenu.getByRole("checkbox", { name: /Extra egg/ });
+  await egg.check();
+  assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 2);
+  assert.equal(
+    await page.getByLabel("Dish notes", { exact: true }).nth(1).inputValue(),
+    "Pan fried\n+ Extra egg",
+  );
+  await egg.uncheck();
+  // Long descriptions keep their rows, even when the list is capped and
+  // scrolls; nothing runs into the next item.
+  await page.setViewportSize({ width: 390, height: 420 });
+  const rows = await onMenu
+    .locator(".food-onmenu__list > *")
+    .evaluateAll((nodes) => nodes.map((n) => [n.getBoundingClientRect().top, n.getBoundingClientRect().bottom, n.scrollHeight, n.clientHeight]));
+  assert.ok(
+    await onMenu.locator(".food-onmenu__list").evaluate((n) => n.scrollHeight > n.clientHeight),
+  );
+  for (let i = 0; i < rows.length; i++) {
+    assert.ok(rows[i][2] <= rows[i][3] + 1, JSON.stringify(rows));
+    if (i) assert.ok(rows[i][0] >= rows[i - 1][1] - 1, JSON.stringify(rows));
+  }
+  await page.setViewportSize({ width: 390, height: 900 });
   await gyoza.uncheck();
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 1);
   await gyoza.check();
@@ -569,7 +614,8 @@ test("capture, private upload, menu text, backup and restore work through the re
       ["Pork gyoza", 2],
     ],
   );
-  assert.equal(read().visits[1].menu_items.length, 2);
+  assert.equal(read().visits[1].menu_items.length, 4);
+  assert.equal(read().visits[1].dishes[1].notes, "Pan fried");
   assert.ok(read().visits[1].dishes[0].tags.includes("Spicy"));
   const photoState = await page.evaluate(() => {
     const node = document.querySelector(".fj-portrait .food-photo");

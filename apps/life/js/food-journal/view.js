@@ -243,7 +243,7 @@ export function createFoodJournalView({
     actions.dataset.part = "form-actions";
     frame.append(heading, fields, error, actions);
     let closed = false;
-    const handle = openMorphingDialog({
+    const handle = page ? openPage(frame, trigger) : openMorphingDialog({
       frame,
       trigger,
       label: title,
@@ -266,6 +266,33 @@ export function createFoodJournalView({
         handle.close();
       },
     };
+  }
+  // A page sits in the Food Journal's own flow, so the browser scrolls it
+  // and a phone keyboard simply covers its bottom. A fixed sheet or overlay
+  // was moved by every keyboard open and close.
+  function openPage(frame, trigger) {
+    const scroll = window.scrollY,
+      heading = frame.querySelector("h2");
+    host.dataset.foodPage = "";
+    host.prepend(frame);
+    window.scrollTo(0, 0);
+    // The title takes focus, not a field, so the keyboard waits for a tap.
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+    frame.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") handle.close();
+    });
+    const handle = {
+      close() {
+        if (dialog === handle) dialog = null;
+        frame.remove();
+        delete host.dataset.foodPage;
+        window.scrollTo(0, scroll);
+        if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+        else host?.querySelector("button")?.focus({ preventScroll: true });
+      },
+    };
+    return handle;
   }
   async function persist(next, { quiet = false } = {}) {
     if (busy) throw new Error("A save is already running.");
@@ -627,7 +654,9 @@ export function createFoodJournalView({
     if (!host) return;
     for (const c of filterControls) c.dispose();
     filterControls = [];
-    host.replaceChildren();
+    // An open visit page stays put; the journal repaints behind it.
+    for (const child of [...host.children])
+      if (!child.classList.contains("food-sheet--page")) child.remove();
     const queue = loaded ? fixupQueue(journal).length : 0;
     if (mode === "fixup" && !queue) mode = "magazine";
     const unsure = loaded ? venueQueue(journal).length : 0;
@@ -878,7 +907,7 @@ export function createFoodJournalView({
         ? journal.visits.find((v) => v.id === visit.id)
         : null;
     let reviewedNewerVisit = !newerSavedVisit;
-    // A full page on a phone: a sheet jumps as the keyboard comes and goes.
+    // A full page, not a sheet: a sheet jumps as the keyboard comes and goes.
     const s = modal(
       fixup ? "Fix up entry" : original.title ? "Edit visit" : "Add visit",
       trigger,
@@ -982,11 +1011,27 @@ export function createFoodJournalView({
         );
         const list = el("div", "food-onmenu__list");
         let query = "";
+        let checks = [];
         repaintMenu = () => {
           list.replaceChildren();
-          for (const item of visit.menu_items) {
-            const words = `${item.name} ${item.description}`.toLowerCase();
-            if (query && !words.includes(query)) continue;
+          checks = [];
+          // Dishes first, then extras, which tick onto the last dish.
+          const shown = visit.menu_items.filter((item) =>
+            `${item.name} ${item.description}`.toLowerCase().includes(query),
+          );
+          const extras = shown.filter((item) => item.kind === "extra");
+          for (const item of [
+            ...shown.filter((item) => item.kind !== "extra"),
+            ...extras,
+          ]) {
+            if (item === extras[0]) {
+              const group = el("div", "food-onmenu__group");
+              group.append(
+                el("span", "food-onmenu__name", "Extras and add-ons"),
+                el("span", "food-meta", "Added to your last dish"),
+              );
+              list.append(group);
+            }
             const row = el("label", "food-onmenu__item"),
               check = el("input", "hub-check");
             check.type = "checkbox";
@@ -1000,7 +1045,11 @@ export function createFoodJournalView({
               }
               persistDraft();
               dishList.setItems(visit.dishes);
+              // An extra ticks onto a dish, so other rows can change too.
+              for (const [c, i] of checks)
+                c.checked = menuDishIndex(visit, i) >= 0;
             });
+            checks.push([check, item]);
             const text = el("span", "food-onmenu__text");
             text.append(el("span", "food-onmenu__name", item.name));
             if (item.description)
