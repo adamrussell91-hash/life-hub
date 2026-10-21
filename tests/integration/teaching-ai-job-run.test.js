@@ -129,6 +129,36 @@ test('a failed kick errors the job instead of leaving it queued for ten minutes'
   assert.match(job.error, /Could not start the AI runner/);
 });
 
+test('an inbox row still saying working does not refuse the next message once the job is done', async () => {
+  // Live, 21 Oct: the inbox lagged the finished job record and the next send got a 409.
+  const store = memoryStore(seed(workingJob({ created_at: NOW })));
+  store.map.set(aiJobKey('ai_job_abc'), { ...workingJob({ created_at: NOW }), status: 'done', response: 'Done.' });
+  const reads = [];
+  const get = store.get;
+  store.get = async (key, options) => { reads.push({ key, consistency: options?.consistency }); return get(key, options); };
+  const kicks = [];
+  const deps = { env, now, getContentStore: async () => store, kickLessonJobRun: async (_req, id) => { kicks.push(id); return true; } };
+  const created = await read(await createAiJobsHandler(deps)(
+    request('https://api.adam-russell.com/api/ai/jobs', { method: 'POST', body: { lesson_id: 'lesson_1', agent: 'ann', message: 'Next question' } })
+  ));
+  assert.equal(created.status, 202);
+  assert.equal(created.body.data.status, 'working');
+  assert.equal(kicks.length, 1);
+  const inboxRow = store.map.get(aiJobsInboxKey()).jobs.find(row => row.id === 'ai_job_abc');
+  assert.equal(inboxRow.status, 'done');
+  assert.ok(reads.filter(r => r.key === aiJobsInboxKey() || r.key === aiJobKey('ai_job_abc')).every(r => r.consistency === 'strong'));
+});
+
+test('a job that is really still working still refuses a second one', async () => {
+  const store = memoryStore(seed(workingJob({ created_at: NOW })));
+  const deps = { env, now, getContentStore: async () => store, kickLessonJobRun: async () => true };
+  const res = await read(await createAiJobsHandler(deps)(
+    request('https://api.adam-russell.com/api/ai/jobs', { method: 'POST', body: { lesson_id: 'lesson_1', agent: 'ann', message: 'Too soon' } })
+  ));
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error.details.id, 'ai_job_abc');
+});
+
 test('a stale working job no longer locks the lesson', async () => {
   const store = memoryStore(seed(workingJob({ created_at: '2026-10-21T00:40:00.000Z' })));
   const deps = { env, now, getContentStore: async () => store, kickLessonJobRun: async () => true };
