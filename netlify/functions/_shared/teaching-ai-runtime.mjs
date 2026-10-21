@@ -4856,9 +4856,27 @@ What you cannot do:
 - Use collection in a lesson.
 
 Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. If you are unsure where a note lands, say so and ask the teacher to check its placement before publishing.`;
+function withStableIds(block, prefix) {
+  const renamed = /* @__PURE__ */ new Map();
+  const collect = (value2, top) => {
+    if (Array.isArray(value2)) return value2.forEach((item) => collect(item, false));
+    if (!value2 || typeof value2 !== "object") return;
+    for (const [key, child] of Object.entries(value2)) {
+      if (!top && key === "id" && typeof child === "string" && child !== block.id && !renamed.has(child)) {
+        renamed.set(child, `${prefix}_${renamed.size + 1}`);
+      }
+      collect(child, false);
+    }
+  };
+  collect(block, true);
+  return JSON.parse(
+    JSON.stringify(block),
+    (_key, value2) => typeof value2 === "string" && renamed.has(value2) ? renamed.get(value2) : value2
+  );
+}
 function buildBlockSchemaExamples() {
   const examples = NEW_BLOCK_TYPES.filter((type) => type !== "collection").map(
-    (type) => createBlock(type, `${type}_example`)
+    (type) => withStableIds(createBlock(type, `${type}_example`), type)
   );
   return JSON.stringify(
     examples,

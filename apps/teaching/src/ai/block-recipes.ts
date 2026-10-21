@@ -49,9 +49,37 @@ What you cannot do:
 
 Annotation blocks: you can build one from a poem or passage the teacher gives you, with notes anchored to stanzas and quoted lines. Every anchor quote must be copied exactly from the text. If you are unsure where a note lands, say so and ask the teacher to check its placement before publishing.`;
 
+/**
+ * Gives a new block's random inner ids (options, cards, nodes...) stable names,
+ * renaming every reference to them too, so the example is the same on every call.
+ */
+function withStableIds<T extends { id: string }>(block: T, prefix: string): T {
+  const renamed = new Map<string, string>();
+  const collect = (value: unknown, top: boolean): void => {
+    if (Array.isArray(value)) return value.forEach((item) => collect(item, false));
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      // The block's own id stays, including where a quiz question repeats it.
+      if (!top && key === 'id' && typeof child === 'string' && child !== block.id && !renamed.has(child)) {
+        renamed.set(child, `${prefix}_${renamed.size + 1}`);
+      }
+      collect(child, false);
+    }
+  };
+  collect(block, true);
+  return JSON.parse(JSON.stringify(block), (_key, value) =>
+    typeof value === 'string' && renamed.has(value) ? renamed.get(value) : value
+  ) as T;
+}
+
+/**
+ * One example of every block type, for the agent's static prompt. It must be
+ * byte-identical on every call: it sits in the cached prompt prefix, and one
+ * random id would make every job pay to write that cache again.
+ */
 export function buildBlockSchemaExamples(): string {
   const examples = NEW_BLOCK_TYPES.filter((type) => type !== 'collection').map((type) =>
-    createBlock(type, `${type}_example`)
+    withStableIds(createBlock(type, `${type}_example`), type)
   );
 
   return JSON.stringify(examples, (key, value) =>
