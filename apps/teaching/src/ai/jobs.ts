@@ -40,6 +40,9 @@ export type AiJob = {
   proposal?: AiProposal;
   error?: string;
   archiveFailed?: boolean;
+  /** Server runner: proposal check failures the agent fixed (or gave up on), for diagnosis. */
+  checks?: string[];
+  cost_usd?: number;
   created_at: string;
   resolution?: 'accepted' | 'rejected' | 'dismissed';
 };

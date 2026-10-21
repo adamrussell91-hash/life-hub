@@ -198,7 +198,8 @@ export async function runStoredLessonJob({
       error: error instanceof Error ? error.message : 'The AI job failed.',
       turns: 0,
       usage: [],
-      cost_usd: 0
+      cost_usd: 0,
+      checks: []
     };
   } finally {
     clearTimeout(timer);
@@ -212,9 +213,10 @@ export async function runStoredLessonJob({
         ...(result.proposal ? { proposal: result.proposal } : {}),
         model: result.model,
         usage: result.usage,
-        cost_usd: result.cost_usd
+        cost_usd: result.cost_usd,
+        checks: result.checks ?? []
       }
-    : { status: 'error', error: result.error, usage: result.usage, cost_usd: result.cost_usd };
+    : { status: 'error', error: result.error, usage: result.usage, cost_usd: result.cost_usd, checks: result.checks ?? [] };
 
   await appendUsageLog(store, {
     job_id: jobId,
@@ -224,6 +226,7 @@ export async function runStoredLessonJob({
     protocol_id: job.protocol_id ?? null,
     status: patch.status,
     turns: result.turns,
+    failed_checks: (result.checks ?? []).length,
     cost_usd: result.cost_usd,
     usage: result.usage,
     at: nowIso()
