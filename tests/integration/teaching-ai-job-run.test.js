@@ -154,8 +154,8 @@ test('the runner finishes a job with a checked quiz proposal, cost and a usage l
       stop_reason: 'tool_use',
       usage: { input_tokens: 2000, output_tokens: 800, server_tool_use: { web_search_requests: 2 } },
       content: [
-        { type: 'text', text: 'One question, ready to check.' },
-        { type: 'tool_use', id: 't1', name: 'propose_insert_blocks', input: { position: 'below', anchor_block_id: 'b_head', blocks: [question], set_mode: 'quiz' } }
+        { type: 'thinking', thinking: '' },
+        { type: 'tool_use', id: 't1', name: 'propose_insert_blocks', input: { position: 'below', anchor_block_id: 'b_head', blocks: [question], set_mode: 'quiz', message: 'One question, ready to check.' } }
       ]
     };
   };
@@ -163,6 +163,8 @@ test('the runner finishes a job with a checked quiz proposal, cost and a usage l
   assert.equal(job.status, 'done');
   assert.equal(job.phase, undefined);
   assert.equal(job.response, 'One question, ready to check.');
+  assert.deepEqual(job.checks, []);
+  assert.equal(store.map.get(AI_USAGE_LOG_KEY).entries[0].failed_checks, 0);
   assert.equal(job.proposal.set_mode, 'quiz');
   assert.equal(job.proposal.blocks[0].block_type, 'quiz_question');
   assert.ok(job.cost_usd > 0.02, 'two searches are counted');
