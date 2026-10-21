@@ -1143,6 +1143,20 @@ export const AnnotationTechniqueRefSchema = z.object({
   table_version: z.string().min(1)
 });
 
+/**
+ * A feedback code on an annotation note (AR, TS+ …). The code's words are
+ * copied in when tagged, so students can read them without the teacher's
+ * code library, and a later edit to the library doesn't rewrite old notes.
+ */
+export const AnnotationCodeRefSchema = z.object({
+  id: z.string().min(1).max(40),
+  code: z.string().regex(/^[A-Z]{1,3}$/),
+  label: z.string().max(60),
+  descriptor: z.string().max(600).default(''),
+  colour: z.enum(['blue', 'sage', 'peach', 'gold', 'lilac']).default('blue'),
+  positive: z.boolean().default(false)
+});
+
 export const AnnotationAttachmentSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('link'),
@@ -1258,6 +1272,7 @@ export const AnnotationItemSchema = z
     thread: AnnotationThreadSchema.optional(),
     anthology: AnthologyTagSchema.optional(),
     technique: AnnotationTechniqueRefSchema.optional(),
+    code: AnnotationCodeRefSchema.optional(),
     body: z.object({
       html: z.string(),
       attachments: z.array(AnnotationAttachmentSchema).default([])
@@ -1381,6 +1396,7 @@ export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>;
 export type AnnotationAttachment = z.infer<typeof AnnotationAttachmentSchema>;
 export type AnnotationThread = z.infer<typeof AnnotationThreadSchema>;
 export type AnnotationVoiceTrack = z.infer<typeof AnnotationVoiceTrackSchema>;
+export type AnnotationCodeRef = z.infer<typeof AnnotationCodeRefSchema>;
 export type AnthologyTag = z.infer<typeof AnthologyTagSchema>;
 
 function toolkitBlockSchema<T extends string, C extends z.ZodTypeAny>(blockType: T, content: C) {

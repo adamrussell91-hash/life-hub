@@ -189,3 +189,33 @@ describe('teacher marking', () => {
     root.remove();
   });
 });
+
+import { codeRef, mountAnnotationCodeField, renderAnnotationCode } from '@/blocks/annotation-code-field';
+import { AnnotationCodeRefSchema } from '@/schemas/block';
+
+describe('feedback codes on annotation notes', () => {
+  beforeEach(() => primeFeedbackCodes(codes));
+
+  it('copies the code’s words onto the note so students can read them', () => {
+    const ref = codeRef(codes[2]!, true);
+    expect(ref).toMatchObject({ code: 'TS', positive: true, descriptor: 'Great opening concept.' });
+    const note = { code: AnnotationCodeRefSchema.parse(ref) };
+    expect(note.code?.code).toBe('TS');
+    expect(renderAnnotationCode(ref).textContent).toContain('TS+');
+  });
+
+  it('types a code like a margin note; Enter settles a prefix', async () => {
+    const onChange = vi.fn();
+    const field = mountAnnotationCodeField(undefined, onChange);
+    document.body.append(field);
+    await Promise.resolve();
+    await Promise.resolve();
+    const input = field.querySelector<HTMLInputElement>('input[type="text"]')!;
+    input.value = 't';
+    input.dispatchEvent(new Event('input'));
+    expect(onChange).not.toHaveBeenCalled();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ code: 'T', positive: false }));
+    field.remove();
+  });
+});

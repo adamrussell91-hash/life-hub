@@ -1541,6 +1541,14 @@ var AnnotationTechniqueRefSchema = z6.object({
   id: z6.string().min(1),
   table_version: z6.string().min(1)
 });
+var AnnotationCodeRefSchema = z6.object({
+  id: z6.string().min(1).max(40),
+  code: z6.string().regex(/^[A-Z]{1,3}$/),
+  label: z6.string().max(60),
+  descriptor: z6.string().max(600).default(""),
+  colour: z6.enum(["blue", "sage", "peach", "gold", "lilac"]).default("blue"),
+  positive: z6.boolean().default(false)
+});
 var AnnotationAttachmentSchema = z6.discriminatedUnion("kind", [
   z6.object({
     kind: z6.literal("link"),
@@ -1644,6 +1652,7 @@ var AnnotationItemSchema = z6.object({
   thread: AnnotationThreadSchema.optional(),
   anthology: AnthologyTagSchema.optional(),
   technique: AnnotationTechniqueRefSchema.optional(),
+  code: AnnotationCodeRefSchema.optional(),
   body: z6.object({
     html: z6.string(),
     attachments: z6.array(AnnotationAttachmentSchema).default([])
@@ -1996,6 +2005,7 @@ export {
   AnnotationBlockObjectSchema,
   AnnotationBlockSchema,
   AnnotationBlockSettingsSchema,
+  AnnotationCodeRefSchema,
   AnnotationColourSchema,
   AnnotationFamilyKeySchema,
   AnnotationGranularitySchema,
