@@ -26,6 +26,10 @@ export const BLOCK_FORMATS: Partial<Record<Block['block_type'], FormatEntry[]>> 
     {
       id: 'because_but_so', label: 'Because, but, so',
       hint: 'Write each question as an unfinished statement, like “Katniss volunteers for Prim”. Students finish it three ways: because, but and so.'
+    },
+    {
+      id: 'reasoning_chart', label: 'Reasoning chart',
+      hint: 'Each question gets a deductive, inductive or abductive chart students build step by step, then a sentence frame to write it up.'
     }
   ],
   peer_feedback: [
