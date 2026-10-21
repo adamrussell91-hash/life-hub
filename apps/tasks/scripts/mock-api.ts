@@ -145,7 +145,11 @@ export function createMockApi({ seed }: MockApiOptions) {
 
   const personalLines = new Map<string, Record<string, unknown> & { slug: string }>();
   const whiteboards = new Map<string, Record<string, unknown>>();
-  const problemSolver = createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach });
+  // Problem Solver and Decision Maker: one service each over its own memory store, both on the scripted coach.
+  const coachServices: Record<string, ReturnType<typeof createProblemSolverService>> = {
+    '/api/problem-solver': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach }),
+    '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision'] })
+  };
 
   async function handle(method: string, urlPath: string, body?: unknown) {
     await ensure();
@@ -449,7 +453,8 @@ export function createMockApi({ seed }: MockApiOptions) {
       }
     }
 
-    if (path === '/api/problem-solver') {
+    const problemSolver = coachServices[path];
+    if (problemSolver) {
       try {
         if (method === 'GET') {
           if (url.searchParams.has('linked')) return json(200, { ok: true, data: { sessions: await problemSolver.linked('operator', url.searchParams.get('linked') ?? '') } });
