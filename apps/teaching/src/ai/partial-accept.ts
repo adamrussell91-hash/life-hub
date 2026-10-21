@@ -1,4 +1,5 @@
 import { NEW_BLOCK_LABEL } from '@/blocks/create-block';
+import { QUIZ_KIND_INFO } from '@/quiz/core';
 import type { AiProposal } from '@/ai/proposals';
 import { BlockSchema, type Block } from '@/schemas/block';
 
@@ -23,6 +24,12 @@ function blockLabel(block: Block): string {
   if (block.block_type === 'question_set') return truncate(block.content.title ?? '') || 'Question set';
   if (block.block_type === 'self_check') return truncate(block.content.title ?? '') || 'Self check';
   if (block.block_type === 'discern_confirm') return 'Discern Confirm';
+  if (block.block_type === 'quiz_question') {
+    const question = block.content.question;
+    const kind = QUIZ_KIND_INFO[question.kind]?.label ?? 'Question';
+    const text = question.prompt?.trim() || (question.kind === 'fill_gap' ? question.passage ?? '' : '');
+    return `${kind}: ${truncate(text) || 'Question'}`;
+  }
   return NEW_BLOCK_LABEL[block.block_type] ?? block.block_type;
 }
 
@@ -241,7 +248,8 @@ export function filterProposal(proposal: AiProposal, selectedKeys: Set<string>):
     if (!filtered.ok) return filtered;
     const next: Extract<AiProposal, { kind: 'replace_lesson' }> = {
       kind: 'replace_lesson',
-      blocks: filtered.blocks
+      blocks: filtered.blocks,
+      ...(proposal.set_mode ? { set_mode: proposal.set_mode } : {})
     };
     if (selectedKeys.has('title') && proposal.title !== undefined) next.title = proposal.title;
     if (selectedKeys.has('cover') && proposal.cover !== undefined) next.cover = proposal.cover;
