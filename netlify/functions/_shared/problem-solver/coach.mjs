@@ -9,6 +9,8 @@ import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mj
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
+import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { basisCandidates, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 
 const WORD_LIMIT = 60;
 const REWRITE_OVER = 70;
@@ -130,9 +132,25 @@ function parse(session, text) {
   if (waitingForReview(session) && result.value.suggestion && result.value.suggestion.kind !== 'next_step') result.value = { ...result.value, suggestion: null };
   const fitted = fitToRun(session, result.value);
   if (fitted.error) return { ok: false, error: fitted.error };
-  const value = fitted.value;
+  const value = withBasis(session, fitted.value);
+  if (value.error) return { ok: false, error: value.error };
   if (value.suggestion?.kind === 'reopen_step' && reopenProblem(withAcceptedNode(session, value), value.suggestion.step)) return { ok: true, value: { ...value, suggestion: null } };
   return { ok: true, value };
+}
+
+/**
+ * A basis belongs only to a decision record reason. An accepted reason must rest on at least one
+ * placed Explore node when any exist (the repair names them); a reason with nothing behind it is
+ * challenged instead.
+ */
+function withBasis(session, value) {
+  const run = activeRun(session);
+  const reason = run?.tool === RECORD_ID && value.node && parseSlot(value.node.slot)?.name === 'reason';
+  if (!reason) return value.basis?.length ? { ...value, basis: [] } : value;
+  if (value.verdict !== 'accept' || resolveBasis(session, value.basis).length) return value;
+  const candidates = basisCandidates(session);
+  if (!candidates.length) return value;
+  return { error: `A reason rests on what a model showed: put at least one of these in "basis" as {"tool","slot"}, or challenge the reason. ${candidates.slice(0, 20).map((c) => `${c.tool} ${c.slot}`).join('; ')}.` };
 }
 
 function parseLightning(session, text) {

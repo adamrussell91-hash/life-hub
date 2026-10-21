@@ -158,19 +158,21 @@ function taskLines(session) {
 
 const STATUS_WORDS = { open: 'not started', in_progress: 'in progress', deferred: 'deferred', done: 'done', dead: 'dropped', unknown: 'could not be checked' };
 
+/** The page's latest task snapshot as one line of evidence (shared with Decision Maker's Review). */
+export function taskStatusLine(snap) {
+  const counts = Object.entries(STATUS_WORDS).filter(([key]) => snap.byStatus[key] > 0).map(([key, words]) => `${snap.byStatus[key]} ${words}`);
+  const total = Object.values(snap.byStatus).reduce((sum, value) => sum + value, 0);
+  const overdue = snap.overdue.length ? `; overdue: ${snap.overdue.map((title) => `"${title}"`).join(', ')}` : '';
+  return `TASK STATUS (as of ${snap.at.slice(0, 10)}): ${total} ${total === 1 ? 'task' : 'tasks'}${counts.length ? `: ${counts.join(', ')}` : ''}${overdue}`;
+}
+
 function reviewLines(session) {
   const lines = [];
   const state = session.reviewState;
   const name = (step) => (step === 'finished' ? 'finished' : stepName(session.model.id, step));
   if (state?.status === 'waiting') lines.push(`IMPROVE IS WAITING for results. The review is ${session.reviewTaskId ? 'a task' : 'proposed'} for ${state.due ?? 'a date not yet set'}. Do not suggest a tool or place nodes.`);
   if (state?.status === 'reviewing') lines.push(`REVIEW IN PROGRESS since ${String(state.startedAt).slice(0, 10)}${state.returnTo ? `; afterwards the session returns to ${name(state.returnTo)}` : ''}. Look at what actually happened, not the plan.`);
-  const snap = session.taskSnapshot;
-  if (snap) {
-    const counts = Object.entries(STATUS_WORDS).filter(([key]) => snap.byStatus[key] > 0).map(([key, words]) => `${snap.byStatus[key]} ${words}`);
-    const total = Object.values(snap.byStatus).reduce((sum, value) => sum + value, 0);
-    const overdue = snap.overdue.length ? `; overdue: ${snap.overdue.map((title) => `"${title}"`).join(', ')}` : '';
-    lines.push(`TASK STATUS (as of ${snap.at.slice(0, 10)}): ${total} ${total === 1 ? 'task' : 'tasks'}${counts.length ? `: ${counts.join(', ')}` : ''}${overdue}`);
-  }
+  if (session.taskSnapshot) lines.push(taskStatusLine(session.taskSnapshot));
   const detour = session.detour;
   if (detour && detour.to === session.phase) lines.push(`REOPENED: ${name(detour.to)} was reopened from ${name(detour.from)} because: ${detour.reason} Use a fresh tool run here; earlier runs stay. When it has what it needs, suggest next_step: moving on returns to ${name(detour.from)}.`);
   return lines;
