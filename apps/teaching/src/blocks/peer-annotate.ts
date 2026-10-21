@@ -54,14 +54,14 @@ export function sentences(text: string): Sentence[] {
   return out;
 }
 
-type Mark = { start: number; end: number; layer: number; colour: string };
+export type Mark = { start: number; end: number; layer: number; colour: string };
 
 /**
  * The writing as tappable sentences, cut into runs wherever a mark starts or
  * ends. Each run knows its character range, so a tap or a drag maps straight
  * back to offsets in the original text.
  */
-function paper(text: string, marks: Mark[], selected: { start: number; end: number } | null): HTMLElement {
+export function paper(text: string, marks: Mark[], selected: { start: number; end: number } | null): HTMLElement {
   const box = el('div', 'pa-paper');
   const list = sentences(text);
   let p: HTMLElement | null = null;

@@ -941,9 +941,20 @@ var AudioBlockSchema = z7.object({
   block_type: z7.literal("audio"),
   variant: z7.string().default("medium"),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z7.object({
     url: z7.string(),
-    title: z7.string().optional()
+    title: z7.string().optional(),
+    mode: z7.enum(["listen", "respond", "viva"]).default("listen"),
+    prompt: z7.string().max(4e3).optional(),
+    time_limit_s: z7.number().int().min(30).max(300).optional(),
+    student_chooses_time: z7.boolean().optional(),
+    scaffold: z7.array(z7.object({ label: z7.string().max(80), weight: z7.number().min(0.5).max(3).default(1) })).max(8).optional(),
+    code_groups: z7.array(z7.enum(["composition", "viva", "speaking"])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1594,6 +1605,14 @@ var AnnotationTechniqueRefSchema = z7.object({
   id: z7.string().min(1),
   table_version: z7.string().min(1)
 });
+var AnnotationCodeRefSchema = z7.object({
+  id: z7.string().min(1).max(40),
+  code: z7.string().regex(/^[A-Z]{1,3}$/),
+  label: z7.string().max(60),
+  descriptor: z7.string().max(600).default(""),
+  colour: z7.enum(["blue", "sage", "peach", "gold", "lilac"]).default("blue"),
+  positive: z7.boolean().default(false)
+});
 var AnnotationAttachmentSchema = z7.discriminatedUnion("kind", [
   z7.object({
     kind: z7.literal("link"),
@@ -1697,6 +1716,7 @@ var AnnotationItemSchema = z7.object({
   thread: AnnotationThreadSchema.optional(),
   anthology: AnthologyTagSchema.optional(),
   technique: AnnotationTechniqueRefSchema.optional(),
+  code: AnnotationCodeRefSchema.optional(),
   body: z7.object({
     html: z7.string(),
     attachments: z7.array(AnnotationAttachmentSchema).default([])
@@ -2050,6 +2070,7 @@ export {
   AnnotationBlockObjectSchema,
   AnnotationBlockSchema,
   AnnotationBlockSettingsSchema,
+  AnnotationCodeRefSchema,
   AnnotationColourSchema,
   AnnotationFamilyKeySchema,
   AnnotationGranularitySchema,

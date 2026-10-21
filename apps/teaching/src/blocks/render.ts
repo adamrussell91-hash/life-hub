@@ -47,6 +47,7 @@ import { renderOutcomeList } from '@/outcomes/display';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
 import { createHubAudioPlayer } from '../../design-kit/js/hub-audio-player.js';
+import { renderVoiceTask } from '@/blocks/voice-block';
 import { mountHubImageAnnotator } from '../../design-kit/js/hub-image-annotate.js';
 import { renderToolkitContent } from '@/toolkit/render';
 import 'photoswipe/dist/photoswipe.css';
@@ -621,8 +622,12 @@ export function renderCodeBlock(
 
 export function renderAudioBlock(
   block: Extract<Block, { block_type: 'audio' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
+  if ((block.content.mode ?? 'listen') !== 'listen') {
+    return wrapBlock(renderVoiceTask(block, mode, ctx), block, mode);
+  }
   const wrap = document.createElement('div');
   wrap.className = 'block-audio';
 
@@ -2291,7 +2296,7 @@ function renderBlockContent(
     case 'code':
       return renderCodeBlock(block, mode);
     case 'audio':
-      return renderAudioBlock(block, mode);
+      return renderAudioBlock(block, mode, ctx);
     case 'attachment':
       return renderAttachmentBlock(block, mode);
     case 'accordion':
