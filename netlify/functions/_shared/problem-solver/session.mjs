@@ -1,11 +1,13 @@
 // netlify/functions/_shared/problem-solver/session.mjs
 import { acceptProblem, addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
-import { defaultToolFor, firstStep, nextPhase, planStep, planStepForBook, stepName } from '../../../../packages/problem-solver/steps.mjs';
+import { defaultToolFor, firstStep, nextPhase, planStepForBook, stepName, stepServes } from '../../../../packages/problem-solver/steps.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
 import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
 import { parseCompass } from '../../../../packages/decision-book/compass.mjs';
 import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
+import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { resolveBasis } from '../../../../packages/decision-book/record.mjs';
 
 export { waitingForReview };
 
@@ -78,7 +80,7 @@ const reviewTitle = (session) => `Review: ${session.title}`.slice(0, TITLE_MAX);
 const addDays = (iso, days) => new Date(Date.parse(iso) + days * DAY_MS).toISOString().slice(0, 10);
 /** A coach date counts only when it is after today; a date in the past cannot be a plan. */
 const afterToday = (due, deps) => typeof due === 'string' && due > deps.now().slice(0, 10);
-const inBook = (session, stepId, book) => Boolean(session.model && planStep(session.model.id, stepId)?.book.includes(book));
+const inBook = (session, stepId, book) => Boolean(session.model && stepServes(session.model.id, stepId, book));
 
 /** A clean snapshot, or null when none was sent. Unknown statuses are dropped; removed tasks are never counted. */
 function cleanSnapshot(raw, deps) {
@@ -203,13 +205,34 @@ function addAllowedEdges(run, edges) {
 
 function placeAccepted(next, turn, coachTurnId, deps) {
   const run = activeRun(next);
-  let placed = placeNode(run, { id: deps.newId(), slot: turn.node.slot, text: turn.node.text, title: turn.node.title, ...(turn.node.tag ? { tag: turn.node.tag } : {}), state: 'accepted', skills: turn.skillsSeen, turnId: coachTurnId });
+  const id = deps.newId();
+  let placed = placeNode(run, { id, slot: turn.node.slot, text: turn.node.text, title: turn.node.title, ...(turn.node.tag ? { tag: turn.node.tag } : {}), state: 'accepted', skills: turn.skillsSeen, turnId: coachTurnId });
   for (const edge of turn.edges) {
     const from = slotToId(placed, edge.from);
     const to = slotToId(placed, edge.to);
     if (canEdge(placed, from, to, edge.kind)) placed = addEdge(placed, { from, to, kind: edge.kind });
   }
-  return { ...replaceRun(next, placed), pendingKeep: null };
+  return recordPlaced({ ...replaceRun(next, placed), pendingKeep: null }, placed, id, turn.basis, deps);
+}
+
+/**
+ * After a node lands in the decision record: a reason keeps the Explore nodes it rests on
+ * (`basis`, on the session, since they sit in other runs), and the review date becomes the
+ * session's review proposal, the page's confirm card (unless one is created or set aside).
+ */
+function recordPlaced(session, run, nodeId, refs, deps) {
+  if (run.tool !== RECORD_ID) return session;
+  const node = run.nodes.find((item) => item.id === nodeId);
+  const name = parseSlot(node.slot)?.name;
+  if (name === 'reason') {
+    const basis = resolveBasis(session, refs);
+    return basis.length ? { ...session, basis: { ...(session.basis ?? {}), [nodeId]: basis } } : session;
+  }
+  const open = !session.reviewTaskId && session.reviewProposal?.status !== 'dismissed';
+  if (name === 'review' && open && afterToday(node.text, deps)) {
+    return { ...session, reviewProposal: { title: reviewTitle(session), due: node.text, reason: 'The review date set in the decision record.', status: 'proposed' } };
+  }
+  return session;
 }
 
 /** The tool suggestion a new step opens with when the coach forgets to give one. */
@@ -259,7 +282,7 @@ export function applyCoachTurn(session, turn, deps) {
     } else if (run && !turn.node && turn.verdict === 'accept' && turn.edges?.length) {
       next = replaceRun(next, addAllowedEdges(run, turn.edges));
     } else if (run && turn.node && turn.verdict === 'challenge') {
-      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, tag: turn.node.tag, edges: turn.edges ?? [], objection: turn.message, skills: turn.skillsSeen, runId: run.id } };
+      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, tag: turn.node.tag, edges: turn.edges ?? [], objection: turn.message, skills: turn.skillsSeen, runId: run.id, ...(turn.basis?.length ? { basis: turn.basis } : {}) } };
     }
   }
 
@@ -288,13 +311,15 @@ export function keepAnyway(session, deps) {
   if (!canPlace(run, keep.slot)) throw fail(409, 'action_not_allowed', 'That answer no longer fits here.');
   const refused = acceptProblem(run, keep);
   if (refused) throw fail(409, 'action_not_allowed', refused);
-  let placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, title: keep.title, ...(keep.tag ? { tag: keep.tag } : {}), state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
+  const id = deps.newId();
+  let placed = placeNode(run, { id, slot: keep.slot, text: keep.text, title: keep.title, ...(keep.tag ? { tag: keep.tag } : {}), state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
   for (const edge of keep.edges ?? []) {
     const from = slotToId(placed, edge.from);
     const to = slotToId(placed, edge.to);
     if (canEdge(placed, from, to, edge.kind)) placed = addEdge(placed, { from, to, kind: edge.kind });
   }
-  return touch({ ...replaceRun(session, placed), pendingKeep: null, turns: [...session.turns, userTurn('Keep it anyway.', deps)] }, deps);
+  const next = recordPlaced({ ...replaceRun(session, placed), pendingKeep: null }, placed, id, keep.basis, deps);
+  return touch({ ...next, turns: [...session.turns, userTurn('Keep it anyway.', deps)] }, deps);
 }
 
 /**
@@ -518,15 +543,21 @@ function cleanDigests(raw) {
 
 const sameTarget = (a, b) => Boolean(a && b) && a.kind === b.kind && a.id === b.id;
 
+/** A session that writes a page record: Problem Solver's case file (a Document step) or a decision record. */
+const keepsRecord = (session) => Boolean(session.model && (planStepForBook(session.model.id, 'document') || session.kind === 'decision'));
+
 /**
  * The page wrote the case file (or an update) to a task or project page; record it. No coach call.
  * A first write or a move (`moved`: the old page is gone) replaces the section digests; an update
  * merges them and must be the next version on the same page. The same version on the same page
  * again is a no-op, so a retry after a lost response is safe. The page joins the problem's links.
+ * A decision record also says whether its provenance graphic wrote (`graphic`); the same version
+ * on the same page with `graphic: true` records a retried graphic.
  */
 export function linkCaseFile(session, payload, deps) {
   if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
-  if (!session.model || !planStepForBook(session.model.id, 'document')) throw fail(409, 'action_not_allowed', 'This problem has no Document step.');
+  if (!keepsRecord(session)) throw fail(409, 'action_not_allowed', 'This problem has no Document step.');
+  const graphic = session.kind === 'decision' && typeof payload?.graphic === 'boolean' ? { graphic: payload.graphic } : {};
   const target = cleanTarget(payload?.target);
   const version = payload?.version;
   if (!Number.isInteger(version) || version < 1 || version > 999) throw fail(400, 'validation_error', 'A case file version is required.');
@@ -534,7 +565,9 @@ export function linkCaseFile(session, payload, deps) {
   if (!title) throw fail(400, 'validation_error', 'A case file title is required.');
   const sections = cleanDigests(payload?.sections);
   const record = session.caseFile;
-  if (record && record.version === version && sameTarget(record.target, target)) return session;
+  if (record && record.version === version && sameTarget(record.target, target)) {
+    return graphic.graphic === true && record.graphic === false ? touch({ ...session, caseFile: { ...record, graphic: true } }, deps) : session;
+  }
   const moved = payload?.moved === true;
   if (record && version !== record.version + 1) throw fail(409, 'action_not_allowed', `The next case file version is v${record.version + 1}.`);
   if (record && !moved && !sameTarget(record.target, target)) throw fail(409, 'action_not_allowed', 'An update goes on the page the case file is already on.');
@@ -545,7 +578,8 @@ export function linkCaseFile(session, payload, deps) {
     target,
     writtenAt: at,
     sections: record && !moved ? { ...record.sections, ...sections } : sections,
-    history: [...(record?.history ?? []), { version, at, target }]
+    history: [...(record?.history ?? []), { version, at, target }],
+    ...graphic
   };
   const linked = session.links.some((link) => sameTarget(link, target));
   const links = linked ? session.links : [...session.links, target];
