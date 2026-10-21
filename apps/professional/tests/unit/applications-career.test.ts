@@ -330,6 +330,34 @@ describe('renderApplicationDetailView', () => {
     expect(canvas.textContent).toMatch(/Application action Task/);
     expect(canvas.querySelector('[data-task-link-submit="application_action"]')).toBeTruthy();
   });
+
+  it('adding an application action task swaps only the task panel', async () => {
+    const baseFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('action=link-task')) {
+        return Response.json({
+          ok: true,
+          data: {
+            application: sampleApplication({
+              application_action_operation: { operation_id: 'op_1', status: 'committed', task_id: 'task_9' }
+            })
+          }
+        });
+      }
+      return baseFetch(input, init);
+    });
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderApplicationDetailView(canvas, VALID_APPLICATION_ID);
+    const back = canvas.querySelector('a.btn--ghost');
+    const panel = canvas.querySelector('.application-detail__task-panels');
+    canvas.querySelector<HTMLInputElement>('[aria-label="Application action Task title"]')!.value = 'Ring referee';
+    canvas.querySelector<HTMLButtonElement>('[data-task-link-submit="application_action"]')!.click();
+    await vi.waitFor(() => expect(canvas.textContent).toContain('Application action Task task_9'));
+    expect(canvas.querySelector('.application-detail__task-panels')).not.toBe(panel);
+    expect(canvas.querySelector('a.btn--ghost')).toBe(back);
+    canvas.remove();
+  });
 });
 
 describe('renderCareerView', () => {
