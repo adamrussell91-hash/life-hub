@@ -4,6 +4,7 @@ import { renderClassroomToolsContent, renderCountdownContent, renderDividerConte
 import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderHingeQuestion } from '@/blocks/hinge-question';
+import { renderContinuumLine } from '@/blocks/continuum-line';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { attachedSteppedLenses } from '@/blocks/lenses/registry';
@@ -2306,6 +2307,8 @@ function renderBlockContent(
       return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
     case 'hinge_question':
       return wrapBlock(renderHingeQuestion(block, mode, ctx), block, mode);
+    case 'continuum_line':
+      return wrapBlock(renderContinuumLine(block, mode, ctx), block, mode);
     case 'curriculum_lines':
       return wrapBlock(renderCurriculumLines(block, mode, ctx), block, mode);
     case 'discern_confirm':

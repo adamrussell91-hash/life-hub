@@ -44,6 +44,7 @@ export const NEW_BLOCK_TYPES = [
   'question_drop',
   'brainstorm',
   'hinge_question',
+  'continuum_line',
   'quiz_question',
   'question_set',
   'flashcards',
@@ -112,6 +113,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   question_drop: 'Question drop',
   brainstorm: 'Brainstorm',
   hinge_question: 'Hinge question',
+  continuum_line: 'Continuum line',
   quiz_question: 'Quiz question',
   question_set: 'Question set',
   flashcards: 'Flashcards',
@@ -219,6 +221,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
       'thinking_move',
       'question_quadrant',
       'concept_features',
+      'continuum_line',
       'thinking_reflection'
     ]
   },
@@ -270,6 +273,7 @@ const TOOLKIT_GROUP_TYPES = [
   'thinking_move',
   'question_quadrant',
   'concept_features',
+  'continuum_line',
   'thinking_reflection',
   'analogy_types',
   'analogy_close_reading',
@@ -613,6 +617,13 @@ export function createBlock(type: NewBlockType, id: string): Block {
     case 'hinge_question':
       return { ...shared, block_type: 'hinge_question', variant: 'medium', content: {
         prompt: '', options: starterHingeOptions(id), correct_id: '', seconds: 60, move_on: 80, reteach: 50
+      } };
+    case 'continuum_line':
+      return { ...shared, block_type: 'continuum_line', variant: 'medium', content: {
+        stimulus: { kind: 'text', text: '', url: '', alt_text: '' },
+        scale: { left: 'Implied', right: 'Not implied', stops: [] },
+        statements: [{ id: `${id}_s1`, text: '', snap: false }],
+        pace: 'teacher', replace: true
       } };
     case 'question_drop':
       return { ...shared, block_type: 'question_drop', variant: 'medium', content: {
