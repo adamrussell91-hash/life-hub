@@ -5453,6 +5453,16 @@ a.home-class-tile:hover {
 .block-question-set__final { margin-top: var(--space-2); font-size: var(--text-base); }
 .block-question-set__handover { margin-top: var(--space-2); font-family: var(--font-ui); font-weight: var(--weight-semibold); color: var(--navy); }
 .block-question-set__write-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+.block-question-set__band { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 2px solid var(--line); }
+.block-question-set__band:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+.block-question-set__band-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--space-2); }
+.block-question-set__band-head .block-secondary { margin: 0; }
+.block-question-set--levels .block-question-set__question .block-question-set__box,
+.block-question-set--levels .block-question-set__question .block-question-set__response-lines { margin-left: 2rem; width: calc(100% - 2rem); }
+.block-question-set__bbs { display: flex; flex-direction: column; gap: var(--space-3); margin: var(--space-2) 0 0 2rem; }
+.block-question-set__bbs-part { display: flex; flex-direction: column; gap: var(--space-1); }
+.block-question-set__bbs-lead { font-family: var(--font-ui); font-size: var(--text-sm); color: var(--navy); }
+.block-question-set__bbs-lead strong { color: var(--ink); text-transform: uppercase; letter-spacing: 0.04em; }
 @media (max-width: 40rem) {
   .block-question-set__table thead { display: none; }
   .block-question-set__table, .block-question-set__table tbody,
@@ -5464,6 +5474,9 @@ a.home-class-tile:hover {
     font-style: normal; font-weight: var(--weight-semibold); color: var(--navy);
   }
   .block-question-set__boxes { grid-template-columns: 1fr; margin-left: 0; }
+  .block-question-set__bbs { margin-left: 0; }
+  .block-question-set--levels .block-question-set__question .block-question-set__box,
+  .block-question-set--levels .block-question-set__question .block-question-set__response-lines { margin-left: 0; width: 100%; }
   .block-question-set--anchor .block-question-set__write { margin-left: 0; }
 }
 

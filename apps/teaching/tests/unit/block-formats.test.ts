@@ -22,7 +22,7 @@ describe('Format registry', () => {
     const parsed = BlockSchema.parse(JSON.parse(JSON.stringify(block))) as QuestionSet;
     expect(parsed.content.format).toBeUndefined();
     expect(blockFormat(parsed)).toBe('standard');
-    expect(formatsFor('question_set').map((f) => f.id)).toEqual(['standard', 'human_experience_table', 'anchor_bridge', 'reasoning_chart']);
+    expect(formatsFor('question_set').map((f) => f.id)).toEqual(['standard', 'human_experience_table', 'anchor_bridge', 'question_levels', 'because_but_so', 'reasoning_chart']);
   });
   it('treats peer feedback’s comments and annotate modes as its formats', () => {
     const peer = createBlock('peer_feedback', 'peer');
@@ -83,6 +83,52 @@ describe('Anchor & bridge', () => {
     expect(labels).toEqual(['Anchor', 'Human experience', 'Bridge']);
     expect(view.querySelector<HTMLTextAreaElement>('.block-question-set__final')!.value).toContain('This reveals that ___');
     expect(localStorage.length).toBe(0);
+  });
+});
+
+describe('4 levels', () => {
+  function levelsSet(): QuestionSet {
+    const block = questionSet('question_levels');
+    block.content.questions = [
+      { id: 'q1', prompt: 'What if Prim had gone?', kind: 'short_answer' },
+      { id: 'q2', prompt: 'Who volunteers at the reaping?', kind: 'short_answer' },
+      { id: 'q3', prompt: 'Is Katniss a hero?', kind: 'short_answer', level: 'judge' }
+    ];
+    return block;
+  }
+  it('bands questions easiest first, by their tag or their opening words', () => {
+    const view = renderBlock(levelsSet(), 'student', { lessonId: 'lesson' });
+    expect([...view.querySelectorAll<HTMLElement>('.block-question-set__band')].map((b) => b.dataset.level))
+      .toEqual(['beginner', 'judge', 'inventor']);
+    expect([...view.querySelectorAll('.block-question-set__prompt')].map((p) => p.textContent))
+      .toEqual(['Who volunteers at the reaping?', 'Is Katniss a hero?', 'What if Prim had gone?']);
+    expect(view.querySelectorAll<HTMLOListElement>('.block-question-set__band ol')[2]!.style.counterReset).toBe('lesson-q 2');
+    expect(view.querySelector('.block-question-set__handover')).toBeTruthy();
+  });
+  it('shows each question’s Level control only in this format', () => {
+    let block: Block = levelsSet();
+    const editor = createBlockEditor(block, (next) => { block = next; }, () => block);
+    document.body.append(editor);
+    const controls = () => [...editor.querySelectorAll<HTMLElement>('.block-editor__question-level')];
+    expect(controls().every((c) => !c.hidden)).toBe(true);
+    pickKitOption(controls()[0]!, 'detective');
+    expect((block as QuestionSet).content.questions[0]!.level).toBe('detective');
+    pickFormat(editor, 'standard');
+    expect(controls().every((c) => c.hidden)).toBe(true);
+  });
+});
+
+describe('Because, but, so', () => {
+  it('finishes each stem three ways and prints ruled lines', () => {
+    const block = questionSet('because_but_so');
+    block.content.questions[0]!.prompt = 'Katniss volunteers for Prim.';
+    const view = renderBlock(block, 'student', { lessonId: 'lesson' });
+    expect([...view.querySelectorAll('.block-question-set__bbs-lead')].map((l) => l.textContent)).toEqual([
+      'Katniss volunteers for Prim because', 'Katniss volunteers for Prim, but', 'Katniss volunteers for Prim, so'
+    ]);
+    const print = renderBlock(block, 'print');
+    expect(print.querySelector('textarea')).toBeNull();
+    expect(print.querySelectorAll('.block-question-set__bbs .block-question-set__response-lines')).toHaveLength(3);
   });
 });
 

@@ -104,6 +104,7 @@ var WindowsMirrorsConfigSchema = z4.object({
   supports: z4.record(StepTextSchema.nullable()).optional(),
   examples: z4.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
+var SteppedLensConfigSchema = WindowsMirrorsConfigSchema.omit({ answer_with: true });
 
 // apps/teaching/src/quiz/core.ts
 import { z as z5 } from "zod";
@@ -592,6 +593,8 @@ var BlockTypeSchema = z7.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "hinge_question",
+  "continuum_line",
   "curriculum_lines",
   "quiz_question",
   "question_set",
@@ -940,9 +943,20 @@ var AudioBlockSchema = z7.object({
   block_type: z7.literal("audio"),
   variant: z7.string().default("medium"),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z7.object({
     url: z7.string(),
-    title: z7.string().optional()
+    title: z7.string().optional(),
+    mode: z7.enum(["listen", "respond", "viva"]).default("listen"),
+    prompt: z7.string().max(4e3).optional(),
+    time_limit_s: z7.number().int().min(30).max(300).optional(),
+    student_chooses_time: z7.boolean().optional(),
+    scaffold: z7.array(z7.object({ label: z7.string().max(80), weight: z7.number().min(0.5).max(3).default(1) })).max(8).optional(),
+    code_groups: z7.array(z7.enum(["composition", "viva", "speaking"])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -995,7 +1009,9 @@ var QuestionItemSchema = z7.object({
   prompt: z7.string(),
   kind: QuestionKindSchema,
   options: z7.array(z7.string()).optional(),
-  response_space: ResponseSpaceSchema.optional()
+  response_space: ResponseSpaceSchema.optional(),
+  /** The 4 levels format's band; absent means guessed from the question's opening words. */
+  level: z7.enum(["beginner", "detective", "judge", "inventor"]).optional()
 });
 var PeerFeedbackBlockSchema = z7.object({
   id: z7.string().min(1),
@@ -1013,6 +1029,36 @@ var PeerFeedbackBlockSchema = z7.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var ContinuumStatementSchema = z7.object({
+  id: z7.string().min(1),
+  text: z7.string().max(300).default(""),
+  snap: z7.boolean().default(false)
+});
+var ContinuumLineBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("continuum_line"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    stimulus: z7.object({
+      kind: z7.enum(["text", "image", "video"]).default("text"),
+      text: z7.string().max(2e3).default(""),
+      url: z7.string().max(2e3).default(""),
+      alt_text: z7.string().max(500).default("")
+    }).default({ kind: "text", text: "", url: "", alt_text: "" }),
+    scale: z7.object({
+      left: z7.string().max(40).default("Implied"),
+      right: z7.string().max(40).default("Not implied"),
+      stops: z7.array(z7.string().max(40)).max(3).default([])
+    }).default({ left: "Implied", right: "Not implied", stops: [] }),
+    statements: z7.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z7.enum(["teacher", "student"]).default("teacher"),
+    replace: z7.boolean().default(true)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
 var BrainstormBlockSchema = z7.object({
   id: z7.string().min(1),
   type: z7.literal("block"),
@@ -1025,6 +1071,28 @@ var BrainstormBlockSchema = z7.object({
     per_student: z7.union([z7.literal(0), z7.literal(1), z7.literal(3), z7.literal(5)]).default(3),
     max_length: z7.number().int().min(20).max(280).default(140),
     layout: z7.enum(["grid", "cloud", "groups"]).default("grid")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var HingeOptionSchema = z7.object({
+  id: z7.string().min(1).max(40),
+  text: z7.string().max(300).default(""),
+  misconception: z7.string().max(300).default("")
+});
+var HingeQuestionBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("hinge_question"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    prompt: z7.string().max(500).default(""),
+    options: z7.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z7.string().max(40).default(""),
+    seconds: z7.union([z7.literal(0), z7.literal(30), z7.literal(60), z7.literal(90), z7.literal(120)]).default(60),
+    move_on: z7.number().int().min(1).max(100).default(80),
+    reteach: z7.number().int().min(0).max(99).default(50)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1187,7 +1255,7 @@ var QuestionSetBlockSchema = z7.object({
     title: z7.string().optional(),
     questions: z7.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z7.enum(["standard", "human_experience_table", "anchor_bridge"]).optional(),
+    format: z7.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so"]).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z7.object({
       rows: z7.number().int().min(3).max(5).default(3),
@@ -1563,6 +1631,14 @@ var AnnotationTechniqueRefSchema = z7.object({
   id: z7.string().min(1),
   table_version: z7.string().min(1)
 });
+var AnnotationCodeRefSchema = z7.object({
+  id: z7.string().min(1).max(40),
+  code: z7.string().regex(/^[A-Z]{1,3}$/),
+  label: z7.string().max(60),
+  descriptor: z7.string().max(600).default(""),
+  colour: z7.enum(["blue", "sage", "peach", "gold", "lilac"]).default("blue"),
+  positive: z7.boolean().default(false)
+});
 var AnnotationAttachmentSchema = z7.discriminatedUnion("kind", [
   z7.object({
     kind: z7.literal("link"),
@@ -1666,6 +1742,7 @@ var AnnotationItemSchema = z7.object({
   thread: AnnotationThreadSchema.optional(),
   anthology: AnthologyTagSchema.optional(),
   technique: AnnotationTechniqueRefSchema.optional(),
+  code: AnnotationCodeRefSchema.optional(),
   body: z7.object({
     html: z7.string(),
     attachments: z7.array(AnnotationAttachmentSchema).default([])
@@ -1839,6 +1916,8 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  HingeQuestionBlockSchema,
+  ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
@@ -2018,6 +2097,7 @@ export {
   AnnotationBlockObjectSchema,
   AnnotationBlockSchema,
   AnnotationBlockSettingsSchema,
+  AnnotationCodeRefSchema,
   AnnotationColourSchema,
   AnnotationFamilyKeySchema,
   AnnotationGranularitySchema,
@@ -2066,6 +2146,8 @@ export {
   ColumnsBlockSchema,
   ConceptFeaturesBlockSchema,
   ConceptMapBlockSchema,
+  ContinuumLineBlockSchema,
+  ContinuumStatementSchema,
   CountdownBlockSchema,
   CurriculumGateSchema,
   CurriculumLinesBlockSchema,
@@ -2099,6 +2181,8 @@ export {
   GraphNodeSchema,
   HeadingBlockSchema,
   HeadingVariantSchema,
+  HingeOptionSchema,
+  HingeQuestionBlockSchema,
   HtmlAppAiProviderSchema,
   HtmlAppAiSchema,
   HtmlAppBlockSchema,

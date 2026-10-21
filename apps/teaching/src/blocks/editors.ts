@@ -2,6 +2,8 @@ import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
+import { createHingeQuestionEditor } from '@/blocks/hinge-question';
+import { createContinuumLineEditor } from '@/blocks/continuum-line';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
@@ -9,6 +11,7 @@ import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { createFormatField, withFormat } from '@/blocks/formats/registry';
 import { LENS_LEVELS, LEVEL_LABELS, type LensLevel } from '@/blocks/lenses/types';
 import { LOGIC_LABELS, type LogicSetting } from '@/blocks/reasoning/content';
+import { QUESTION_LEVEL_LABELS, QUESTION_LEVELS, guessQuestionLevel, type QuestionLevel } from '@/blocks/lenses/question-levels';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
@@ -81,6 +84,7 @@ import {
   resolveMediaLibraryUrl
 } from '@/teacher/media-library-picker';
 import { createAudioRecordButton } from '@/blocks/audio-record-button';
+import { createVoiceModePicker, createVoiceTaskFields } from '@/blocks/voice-block-editor';
 import {
   AUDIO_ACCEPT,
   createUploadButton,
@@ -1060,9 +1064,11 @@ export function createAudioEditor(
   title.setAttribute('aria-label', 'Audio title');
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         url: url.value,
         title: title.value.trim() || undefined
       }
@@ -1095,7 +1101,26 @@ export function createAudioEditor(
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(mediaSourceRow(upload.el, record.el), url, title);
+  const listen = document.createElement('div');
+  listen.className = 'block-editor__fields voice-editor__listen';
+  listen.append(mediaSourceRow(upload.el, record.el), url, title);
+  const task = createVoiceTaskFields(getLatest, onChange);
+  const paintMode = () => {
+    const isListen = (getLatest().content.mode ?? 'listen') === 'listen';
+    listen.hidden = !isListen;
+    task.el.hidden = isListen;
+    task.refresh();
+  };
+  fields.append(
+    createVoiceModePicker(getLatest, (mode) => {
+      const latest = getLatest();
+      onChange({ ...latest, content: { ...latest.content, mode } });
+      paintMode();
+    }),
+    listen,
+    task.el
+  );
+  paintMode();
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1507,6 +1532,7 @@ export function createQuestionSetEditor(
     kind: 'short_answer' | 'multiple_choice';
     options?: string[];
     response_space?: ResponseSpace;
+    level?: QuestionLevel;
     logic?: LogicSetting;
   };
   const fields = document.createElement('div');
@@ -1528,6 +1554,7 @@ export function createQuestionSetEditor(
     kind: q.kind,
     options: q.options ? [...q.options] : undefined,
     response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined,
+    level: q.level,
     logic: q.logic
   }));
 
@@ -1547,6 +1574,7 @@ export function createQuestionSetEditor(
           ...(q.kind === 'short_answer' && q.response_space
             ? { response_space: q.response_space }
             : {}),
+          ...(q.level ? { level: q.level } : {}),
           ...(q.logic ? { logic: q.logic } : {})
         }))
       }
@@ -1576,7 +1604,21 @@ export function createQuestionSetEditor(
     },
     renderItem: (question, ctx) => {
       const n = ctx.index + 1;
-      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => ctx.update({ ...ctx.current, prompt: value }), 'textarea', 2);
+      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => {
+        ctx.update({ ...ctx.current, prompt: value });
+        if (!ctx.current.level) level.setValue(guessQuestionLevel(value));
+      }, 'textarea', 2);
+
+      // The 4 levels format's band; untouched questions follow their opening words.
+      const level = createChoice({
+        key: 'Level',
+        value: question.level ?? guessQuestionLevel(question.prompt),
+        options: QUESTION_LEVELS.map((value) => ({ value, label: QUESTION_LEVEL_LABELS[value] })),
+        className: 'block-editor__question-level',
+        ariaLabel: `Question ${n} level`,
+        onChange: (value) => ctx.update({ ...ctx.current, level: value as QuestionLevel })
+      });
+      level.el.hidden = getLatest().content.format !== 'question_levels';
 
       const options = editorField(
         'block-editor__question-options',
@@ -1634,7 +1676,7 @@ export function createQuestionSetEditor(
 
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
-      settings.append(kind.el, responseSpace.el, logic.el);
+      settings.append(level.el, kind.el, responseSpace.el, logic.el);
       return fragmentOf(prompt, settings, options);
     }
   });
@@ -1695,6 +1737,7 @@ export function createQuestionSetEditor(
     tableSettings.hidden = format !== 'human_experience_table';
     reasoningSettings.hidden = format !== 'reasoning_chart';
     fields.dataset.format = format;
+    fields.querySelectorAll<HTMLElement>('.block-editor__question-level').forEach((el) => { el.hidden = format !== 'question_levels'; });
   };
   showTableSettings(block.content.format ?? 'standard');
   const format = createFormatField({
@@ -3021,6 +3064,10 @@ function createBlockEditorFields(
       return createQuestionDropEditor(block, onChange, context.lessonId);
     case 'brainstorm':
       return createBrainstormEditor(block, onChange);
+    case 'hinge_question':
+      return createHingeQuestionEditor(block, onChange);
+    case 'continuum_line':
+      return createContinuumLineEditor(block, onChange);
     case 'curriculum_lines':
       return createCurriculumLinesEditor(block, onChange, context.network ?? (context.unitLessons
         ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }

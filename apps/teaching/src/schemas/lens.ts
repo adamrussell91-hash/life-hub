@@ -32,6 +32,13 @@ export const WindowsMirrorsConfigSchema = z.object({
   examples: z.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 
+/**
+ * Lenses whose only settings are the shared ones: focus, level, the student's
+ * level switch, step text overrides and per-level examples. 4 Levels of
+ * Questions and Because, But, So use this.
+ */
+export const SteppedLensConfigSchema = WindowsMirrorsConfigSchema.omit({ answer_with: true });
+
 /** Reasoning: deductive, inductive, abductive, all three in proof order, or the student picks. */
 export const LogicSchema = z.enum(['deductive', 'inductive', 'abductive', 'all_three', 'choice']);
 export const ReasoningConfigSchema = z.object({
@@ -48,3 +55,4 @@ export const ReasoningConfigSchema = z.object({
 export type LensAttachment = z.infer<typeof LensAttachmentSchema>;
 export type ReasoningConfig = z.infer<typeof ReasoningConfigSchema>;
 export type WindowsMirrorsConfig = z.infer<typeof WindowsMirrorsConfigSchema>;
+export type SteppedLensConfig = z.infer<typeof SteppedLensConfigSchema>;
