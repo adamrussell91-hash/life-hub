@@ -8,7 +8,7 @@
   --ps-red: var(--dm-red);
   --ps-yellow: var(--dm-green);
   --ps-blue: var(--dm-ink);
-  --ps-on-yellow: var(--dm-ink);
+  --ps-on-yellow: var(--dm-paper);
   --ps-ink: var(--dm-ink);
   --ps-paper: var(--dm-paper);
   --ps-ghost: var(--dm-ghost);
