@@ -185,6 +185,29 @@ The overlap is narrower than the names suggest:
 - **Reuse the PS tool unchanged:** `swot`, `pareto`, `morphological` and `double_loop`. The book's meaning matches, so the slots, rules and coaching notes carry over. Their renderers are re-skinned with Decision Book tokens (red stays red, yellow becomes green, blue becomes ink). That is checked per renderer, with the matching family renderer as the fallback where a hard-coded colour breaks it.
 - **Same idea, the book differs, so build to this book:** the **Eisenhower matrix** (this edition labels the quadrants decide when, do immediately, do later and delegate, with urgency rising to the right), the **feedback box** (not PS's feedback matrix) and the **feedback analysis**. These use the quadrant and tension families. Faithfulness to the book wins over reuse.
 
+## Design language: part of a set
+
+Decision Maker should look like Problem Solver's sibling: clearly from the same family, with its own voice. Both draw on Bauhaus: flat colour, pure geometry, no gradients or shadows, a quiet paper ground, and type and ink doing the structural work.
+
+**Shared with Problem Solver (the set):**
+- The page grid, the placement of hero, start box, quick card, list, sections, bench and coach, and the section heads (title plus aside).
+- The hub's UI font and type scale. The kit's Arial is replaced after line lengths are checked, as its README allows.
+- The motion curves (`ease` and `spring`) and timings: shapes drop in on arrival, the board swaps a tile every couple of seconds, reduced motion is respected, and the thinking dots are the same.
+- The twelve skill marks, drawn the same way, in ink.
+- Confirm cards, chips, the skill tray and the coach panel. Their structure is shared and the tokens are swapped.
+- One shared skills ribbon, with the tool split described above.
+
+**Decision Maker's own voice:**
+- **Palette:** paper `#faf8ef`, ink `#171813`, red `#ef402b`, green `#60aa36`, with their two tints. No yellow and no blue, so the two tools never blur together on the same rail.
+- **Geometry: square-led, where Problem Solver is circle-led.** Problem Solver's shapes are discs, semicircles and arcs, after Kandinsky. Decision Maker's are squares, quarters, halves, diagonals and the fork, after Albers and the Bauhaus grid. The kit's emblems already work this way (the Eisenhower emblem is four squares and a tick).
+- **Shape board (landing hero):** a 4×3 board of square tiles, in the same place as Problem Solver's board. The tiles are a 2×2 of quarter squares, a diagonally split square, a square with a quarter-circle cut, a forked Y path, a stepped stair, two opposed triangles in a square, a square with an inset square, and a bar split two ways. The colours are red, green, ink and tint.
+- **Medal:** square, where Problem Solver's is round. It is a 2×2 that fills one quarter per framing answer (decision, compass, known), and a fourth quarter once a model is worked. The main model's emblem sits on top once chosen.
+- **Track:** square stations for Frame, Explore, Decide and Review, joined by a ruled line, in the same place as Problem Solver's track.
+- **Section compass:** the four approved section emblems in a 2×2 above the canvas, with the lit quadrants at full strength and the rest in tint.
+- **Coach avatar:** Problem Solver's avatar construction, built from squares.
+
+The shared structure lives once, in Problem Solver's components, which take a token scope and a shape set. Decision Maker supplies `.dm-scope` tokens and `decor.ts` shapes rather than copies of the components.
+
 ## Diagrams
 
 ### Families, not 50 one-offs
@@ -249,8 +272,8 @@ The step engine, machine, service, store, runner and coach pipeline all stay sin
 | Unit | Change |
 | --- | --- |
 | `packages/decision-book/` (new) | `catalogue.mjs` (52 entries: id, section, family, tier, pages, when, seeAlso), `compass.mjs`, `quick.mjs`, `record.mjs` (decision record composer plus digests, like `case-file.mjs`), `tools/*.mjs` built with family factories (`quadrantTool`, `plotTool`, …) that meet the existing tool contract (`slots`, `nextSlots`, `complete`, `edgeKinds`, `nodeTags`, `validateNode`, `taskSlots`), `render/*.ts`, `glyphs/`, `decision-book.css` |
-| `packages/problem-solver/tools/index.mjs` | Also registers the Decision Book tools. Every definition gains `book: 'toolkit' \| 'decision'`. Problem Solver shelves and prompts filter by book, and the four reused tools carry both |
-| `packages/problem-solver/models.mjs`, `steps.mjs` | A `decision_book` model whose plan is `explore` (every Decision Book tool), `decide` (the decision record) and `review` (feedback analysis, extra) |
+| `packages/problem-solver/tools/index.mjs` | Also registers the Decision Book tools. Their ids start with `dm_`, and their `step` values (`explore`, `settle`, `review`) are not toolkit steps. So Problem Solver's shelves, plans and prompts never list them, with no `book` field needed. The four reused tools keep their Problem Solver ids and steps |
+| `packages/problem-solver/steps.mjs` | A plan entry can name its tools explicitly. Decision Maker's `decision_book` model, defined in `packages/decision-book/model.mjs` so Problem Solver's `MODELS` and its coach never see it, plans `explore` (every catalogue model registered as a tool), `decide` (the decision record) and `review` (feedback analysis, extra). An explicit list has no default tool, because the coach discerns it |
 | `session.mjs` | Frame keys per session kind instead of the constant `FRAME_KEYS`; `kind: 'decision' \| 'quick'` |
 | `service.mjs`, `store.mjs`, `problem-solver.mjs` | The handler and service factories take `{ prefix, prompts, kinds }`. `netlify/functions/decision-book.mjs` and `decision-book-run.mjs` are thin wrappers over the same factories, with store prefix `decision-book/v1` |
 | `prompts-shared.mjs` (new) | Voice, gatekeeping and output, moved out of `prompts.mjs` unchanged |
@@ -289,7 +312,7 @@ These are Problem Solver's, plus:
 - **Unit, server:**
   - the factories still give Problem Solver identical behaviour (every existing test stays green);
   - Decision Book create, actions and frame keys;
-  - parse refusing tools from the other book;
+  - parse refusing tools that are not in the session's current plan step;
   - quick create, answer and escalate.
 - **Playwright**, on the Tasks mock API at desktop and 390px:
   - a full decision from frame through compass, a recommended model, another angle, Decide with stop rule, record on a linked page and review;
@@ -304,7 +327,7 @@ These are Problem Solver's, plus:
 
 ## Build order (one PR, commits in order)
 
-1. Engine seams: the `book` field, frame keys per kind, the factories taking prefix and prompts, and `prompts-shared.mjs`. Problem Solver behaviour stays unchanged, with all tests green.
+1. Engine seams: explicit plan-step tool lists, frame keys per kind, the factories taking prefix and prompts, and `prompts-shared.mjs`. Problem Solver behaviour stays unchanged, with all tests green.
 2. `packages/decision-book` scaffolding: catalogue, compass, tokens, glyphs and section emblems.
 3. Family factories and family renderers (quadrant, plot, scales, curve, tension, path, list, decision record), plus the re-skin of the four reused Problem Solver renderers.
 4. Section 1 configs and coaching notes (18 models; Eisenhower, feedback box and feedback analysis built to this edition).
