@@ -5,6 +5,7 @@ import { isHttpUrl } from '@/blocks/url-safety';
 import { validateConceptMap, validateMindMap } from '@/blocks/graph-layout';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block } from '@/schemas/block';
 import { checkQuestion } from '@/quiz/core';
+import { hingeIssue } from '@/blocks/hinge-question/shared';
 
 export type PublishBlockIssue = {
   blockId: string;
@@ -21,6 +22,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   question_set: 'Question set',
   question_drop: 'Question drop',
   brainstorm: 'Brainstorm',
+  hinge_question: 'Hinge question',
   curriculum_lines: 'Curriculum lines',
   discern_confirm: 'Discern Confirm',
   quiz_question: 'Quiz question',
@@ -201,6 +203,10 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
   }
   if (block.block_type === 'brainstorm' && !block.content.question.trim()) {
     return 'Write the question for this Brainstorm';
+  }
+  if (block.block_type === 'hinge_question') {
+    const issue = hingeIssue(block.content);
+    if (issue) return issue;
   }
   if (block.block_type === 'quiz_question') {
     const checked = checkQuestion(block.content.question);
