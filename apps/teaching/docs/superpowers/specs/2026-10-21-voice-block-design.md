@@ -103,23 +103,24 @@ The layout follows the annotation voice review (`voice-review.ts`): player and t
 **Where a tag lands:**
 - the media time at the moment of the press, minus a reaction offset (default 1.0 s, adjustable 0–2 s in the marking screen and remembered)
 - snapped to the nearest transcript word using Whisper's per-word times. When the transcript only has segment times, the tag lands on the segment and the student sees that sentence highlighted
-- a tag can be dragged to a neighbouring word, or the word span stretched, to fix a near miss
+- a selected tag has nudge buttons (◀ word, word ▶, Longer, Shorter) to fix a near miss
 
 **After a tag:**
 - the tag shows at once on the transcript word in that code's colour
 - the code's descriptor is attached automatically, so Adam never types it
 - `Enter` straight after a tag opens a one-line note on that tag (optional)
-- `Z` undoes the last tag
+- `Backspace` undoes the last tag
 
 **Playback controls while marking:**
-- `K` or the space bar outside the code entry plays and pauses
-- `J` / `L` jump back or forward 5 s
+- Space plays and pauses (when no code is half-typed)
+- `←` / `→` jump back or forward 5 s
+- letters are kept for codes, so no control uses a letter key
 - speed: 1×, 1.25×, 1.5×, 2×
 - clicking a word in the transcript jumps the audio there
 
 **Fillers pre-marked:**
 - after transcription, a word-list pass with no AI tags likely fillers ("um", "uh", "like" as a filler, "you know", "sort of", "basically") as **suggested FW**: grey and dashed
-- Adam confirms with `Y` or rejects with `N`, moving through them in order, or ignores them
+- Adam presses **Review them**, then `Enter` keeps and `Backspace` drops each one in order; **Keep all** and **Drop all** do the lot
 - only confirmed tags reach the student
 - for fillers to show up at all, the Whisper call must keep them (see Transcription)
 
@@ -208,7 +209,7 @@ Codes must be unique across the library. Typed entry relies on that, and the edi
 
 ### In the annotation block
 
-- `AnnotationItemSchema` gains an optional `code: { id: string; positive: boolean }`, alongside the existing `technique` ref
+- `AnnotationItemSchema` gains an optional `code`, alongside the existing `technique` ref. It copies the code's letters, name, description and colour onto the note, because students reading a published lesson can't read the teacher-only library
 - the annotation editor's note popover gets the same typed entry (`A` `R` `Space`) and a small code row. A coded note pre-fills the descriptor, and Adam can add to it
 - the summary-by-criterion view is available on any annotation layer that has coded notes
 - marking students' written work as a block of its own is **out of scope**. This spec only makes the codes usable wherever annotation already runs

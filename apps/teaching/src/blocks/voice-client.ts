@@ -75,7 +75,7 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 export function audioUrl(path: string): string {
-  return `${getApiBaseUrl()}${path}`;
+  return /^(https?:|blob:)/.test(path) ? path : `${getApiBaseUrl()}${path}`;
 }
 
 const endpoint = (lessonId: string, blockId: string) => `/api/published/voice/${encodeURIComponent(lessonId)}/${encodeURIComponent(blockId)}`;

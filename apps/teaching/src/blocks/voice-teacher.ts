@@ -501,6 +501,8 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
 
     function onKey(e: KeyboardEvent): void {
       if (!screen.isConnected) return;
+      // A held key repeats; one press is one tag. Arrows may repeat to scrub.
+      if (e.repeat && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (typingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       const onButton = (e.target as HTMLElement | null)?.closest?.('button');
       if (onButton && e.key === 'Enter') return;
