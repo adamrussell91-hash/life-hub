@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { defaultToolFor, firstStep, nextStepAfter, stepName, stepPlan, toolsForPlanStep } from '../../packages/problem-solver/steps.mjs';
 import { MODEL_IDS } from '../../packages/problem-solver/models.mjs';
 import { DECISION_MODEL } from '../../packages/decision-book/model.mjs';
+import { CATALOGUE_IDS } from '../../packages/decision-book/catalogue.mjs';
 
 test('decision_book plans Explore, Decide and an extra Review', () => {
   assert.deepEqual(stepPlan('decision_book').map((s) => [s.step, s.extra]), [['explore', false], ['decide', false], ['review', true]]);
@@ -13,9 +14,8 @@ test('decision_book plans Explore, Decide and an extra Review', () => {
   assert.equal(stepName('decision_book', 'review'), 'Review');
 });
 
-test('Explore offers the registered catalogue models in catalogue order, with no default', () => {
-  // Until Plan 3 registers the dm_ tools, only the four reused Problem Solver tools exist.
-  assert.deepEqual(toolsForPlanStep('decision_book', 'explore'), ['swot', 'morphological', 'double_loop', 'pareto']);
+test('Explore offers every catalogue model in catalogue order, with no default', () => {
+  assert.deepEqual(toolsForPlanStep('decision_book', 'explore'), [...CATALOGUE_IDS]);
   assert.equal(defaultToolFor('decision_book', 'explore'), null);
 });
 

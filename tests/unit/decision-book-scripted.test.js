@@ -19,7 +19,7 @@ test('the scripted coach frames a decision and suggests the first Explore model'
   assert.equal(s.frame.compass, 'self_understand');
   s = await step(s, 'The offer closes Friday and the rent there is double.');
   assert.equal(s.phase, 'explore');
-  assert.deepEqual(s.suggestion, { kind: 'next_tool', tool: 'swot', reason: 'A first model with clear sides to weigh.' });
+  assert.deepEqual(s.suggestion, { kind: 'next_tool', tool: 'dm_eisenhower', reason: 'A first model with clear sides to weigh.' });
 });
 
 test('talk of a team or other people lands on the others side of the compass', async () => {
