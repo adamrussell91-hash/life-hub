@@ -923,15 +923,21 @@ export function buildEventConnections(record: EventRecord, _reload: () => Promis
   return host;
 }
 
-export function buildEventTaskPanel(record: EventRecord, reload: () => Promise<void>): HTMLElement {
+/** Follow-up task panel. Adding or retrying a task refreshes only this panel, not the page. */
+export function buildEventTaskPanel(initial: EventRecord): HTMLElement {
   const host = el('section', 'card event-page__tasks');
-  const load = async () => {
-    const loading = el('p', 'muted', 'Loading linked tasks…');
-    loading.setAttribute('role', 'status');
-    host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), loading);
+  let record = initial;
+  let seq = 0;
+  const load = async (quiet = false) => {
+    const mine = ++seq;
+    if (!quiet) {
+      const loading = el('p', 'muted', 'Loading linked tasks…');
+      loading.setAttribute('role', 'status');
+      host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), loading);
+    }
     try {
       const entries = await loadEntityRelationships(`professional:event:${record.id}`);
-      if (!host.contains(loading)) return;
+      if (mine !== seq) return;
       const linkedOperations = entries.filter(entry => entry.link.relationship_type === 'learning_for' && entry.endpoint?.kind === 'task').map(entry => {
         const endpoint = entry.endpoint!;
         const taskId = endpoint.ref.replace(/^tasks:task:/, '');
@@ -944,14 +950,20 @@ export function buildEventTaskPanel(record: EventRecord, reload: () => Promise<v
         host, heading: 'Follow-up tasks', relationshipType: 'learning_for', linkedOperations,
         incompleteOperationId: record.learning_operation?.status === 'incomplete' ? record.learning_operation.operation_id : null,
         onSubmit: async input => {
-          try { await linkEventTask(record.id, {relationship_type: 'learning_for', ...input}); }
-          catch (error) { if (!isEventTaskLinkIncompleteError(error)) throw error; }
-          await reload();
+          try { record = (await linkEventTask(record.id, {relationship_type: 'learning_for', ...input})).event ?? record; }
+          catch (error) {
+            if (!isEventTaskLinkIncompleteError(error)) throw error;
+            record = (await getEvent(record.id).catch(() => null))?.event ?? record;
+          }
+          await load(true);
         },
-        onRetry: async operationId => { await retryEventTaskLink(record.id, operationId); await reload(); }
+        onRetry: async operationId => {
+          record = (await retryEventTaskLink(record.id, operationId)).event ?? record;
+          await load(true);
+        }
       });
     } catch {
-      if (!host.contains(loading)) return;
+      if (mine !== seq) return;
       const retry = el('button', 'btn btn--secondary', 'Try again');
       retry.type = 'button';
       retry.addEventListener('click', () => void load());
