@@ -1,5 +1,7 @@
 import type { Block } from '@/schemas/block';
+import { BECAUSE_BUT_SO_LENS } from './because-but-so';
 import { KAPLAN_STEPPED_LENSES } from './kaplan-lenses';
+import { QUESTION_LEVELS_LENS } from './question-levels';
 import type { LensConfig, LensLevel, SteppedLens } from './types';
 import { WINDOWS_MIRRORS } from './windows-mirrors';
 
@@ -7,7 +9,9 @@ import { WINDOWS_MIRRORS } from './windows-mirrors';
  * Every stepped lens the picker offers, in picker order. Adding a framework
  * means adding an entry here, not a block type, schema field or menu item.
  */
-export const STEPPED_LENSES: readonly SteppedLens[] = [...KAPLAN_STEPPED_LENSES, WINDOWS_MIRRORS];
+export const STEPPED_LENSES: readonly SteppedLens[] = [
+  ...KAPLAN_STEPPED_LENSES, WINDOWS_MIRRORS, QUESTION_LEVELS_LENS, BECAUSE_BUT_SO_LENS
+];
 
 export function steppedLens(id: string): SteppedLens | undefined {
   return STEPPED_LENSES.find((lens) => lens.id === id);
