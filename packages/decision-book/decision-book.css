@@ -1,0 +1,17 @@
+/* packages/decision-book/decision-book.css
+   Decision Maker's tokens: the kit's paper, ink, red and green, with their tints, scoped to
+   .dm-scope the way Problem Solver scopes .ps-scope. Motion matches Problem Solver so the
+   two read as a set. */
+.dm-scope {
+  --dm-paper: #faf8ef;
+  --dm-ink: #171813;
+  --dm-red: #ef402b;
+  --dm-green: #60aa36;
+  --dm-soft: #efeee4;
+  --dm-line: #c9cabd;
+  --dm-green-tint: #e5edda;
+  --dm-red-tint: #f8e1d8;
+  --dm-ghost: rgba(23, 24, 19, 0.12);
+  --dm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dm-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}

@@ -29,3 +29,6 @@ apps/*/.ua/
 /apps/life/assets/grove/project-only/
 # Atomic installer staging and preserved rollback bundles contain the same private models.
 /apps/life/assets/grove/.grove-install-*/
+
+# Decision Book page renders for builders: book scans, never committed.
+.db-book/
