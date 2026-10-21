@@ -150,7 +150,13 @@ export function renderSteppedLenses(
     const state = states.get(lens.id)!;
     const level = lensLevel(lens, config, state.level);
     const ctx = { level, choice: state.choice, block };
-    const steps: Array<LensStep | typeof WRITE_ID> = [...lens.steps(config, ctx), WRITE_ID];
+    // Before a choice step is answered, show the full path but lock the steps after it.
+    const unchosen = !state.choice && !!lens.printChoice;
+    const steps: Array<LensStep | typeof WRITE_ID> = [
+      ...lens.steps(config, unchosen ? { ...ctx, choice: lens.printChoice } : ctx), WRITE_ID
+    ];
+    const lockedFrom = unchosen ? steps.findIndex((step) => step !== WRITE_ID && !!step.choices) + 1 : 0;
+    if (lockedFrom > 0) state.step = Math.min(state.step, lockedFrom - 1);
     state.step = Math.min(state.step, steps.length - 1);
     const current = steps[state.step]!;
     const go = (step: number) => { state.step = step; persist(lens, state); showStep(true); };
@@ -181,6 +187,7 @@ export function renderSteppedLenses(
     steps.forEach((step, i) => {
       const b = button(`${i + 1}. ${step === WRITE_ID ? 'Write it down' : step.title}`, 'kaplan-progress__step', () => go(i));
       if (i === state.step) b.setAttribute('aria-current', 'step');
+      if (lockedFrom > 0 && i >= lockedFrom) b.disabled = true;
       progress.append(b);
     });
     workspace.append(progress);

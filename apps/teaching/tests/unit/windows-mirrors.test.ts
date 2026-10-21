@@ -70,7 +70,11 @@ describe('student view', () => {
     view.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
     const next = () => [...view.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Next step')!;
     expect(next().disabled).toBe(true);
+    const progress = () => [...view.querySelectorAll<HTMLButtonElement>('.kaplan-progress__step')];
+    expect(progress()).toHaveLength(5);
+    expect(progress()[1]!.disabled).toBe(true);
     view.querySelector<HTMLButtonElement>('.kaplan-lens-choice')!.click();
+    expect(progress()[1]!.disabled).toBe(false);
     expect(next().disabled).toBe(false);
     expect([...view.querySelectorAll('.kaplan-progress__step')].map((s) => s.textContent))
       .toEqual(['1. Choose your lens', '2. Pick your moment', '3. Look outward', '4. Write it down']);
