@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createNotionClient } from '../../netlify/functions/_shared/notion-client.mjs';
 
-test('every request carries an abort signal, and a hung request is retried then fails', async () => {
+test('every request carries an abort signal, and a hung request is retried then fails', async (t) => {
+  // A real pending fetch keeps its socket alive; AbortSignal.timeout alone does not.
+  const connection = setInterval(() => {}, 1000);
+  t.after(() => clearInterval(connection));
   let calls = 0;
   const hung = (_url, init) => {
     calls += 1;
@@ -14,7 +17,10 @@ test('every request carries an abort signal, and a hung request is retried then 
   assert.equal(calls, 3);
 });
 
-test('a timeout on the first try is retried and can succeed', async () => {
+test('a timeout on the first try is retried and can succeed', async (t) => {
+  // A real pending fetch keeps its socket alive; AbortSignal.timeout alone does not.
+  const connection = setInterval(() => {}, 1000);
+  t.after(() => clearInterval(connection));
   let calls = 0;
   const flaky = (_url, init) => {
     calls += 1;
