@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
+import { LensAttachmentsSchema } from './lens';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -129,6 +130,7 @@ const blockTimestamps = {
 const blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
   discern: DiscernQualifierSchema.optional(),
+  lenses: LensAttachmentsSchema.optional(),
   layout: z.record(z.unknown()).default({}),
   print: z.record(z.unknown()).default({}),
   settings: z.record(z.unknown()).default({})

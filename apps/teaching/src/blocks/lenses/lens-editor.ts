@@ -212,15 +212,12 @@ export function createLensEditor<T extends Block>(options: Options<T>): HTMLElem
     pills.className = 'lens-levels';
     pills.setAttribute('role', 'group');
     pills.setAttribute('aria-label', 'Starting level');
-    const paint = () => {
-      pills.replaceChildren(...target.levels.map((level) => {
-        const pill = button(LEVEL_LABELS[level], () => { if (draft) draft.level = level; paint(); });
-        pill.className = 'lens-levels__option';
-        pill.setAttribute('aria-pressed', String(lensLevel(target, config) === level));
-        return pill;
-      }));
-    };
-    paint();
+    pills.append(...target.levels.map((level) => {
+      const pill = button(LEVEL_LABELS[level], () => { if (draft) draft.level = level; setup(); });
+      pill.className = 'lens-levels__option';
+      pill.setAttribute('aria-pressed', String(lensLevel(target, config) === level));
+      return pill;
+    }));
     group.append(heading, pills);
     const toggle = document.createElement('label');
     toggle.className = 'lens-toggle';
