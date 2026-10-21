@@ -666,6 +666,7 @@ var BlockTypeSchema = z7.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "hinge_question",
   "continuum_line",
   "curriculum_lines",
   "quiz_question",
@@ -1130,6 +1131,28 @@ var BrainstormBlockSchema = z7.object({
     per_student: z7.union([z7.literal(0), z7.literal(1), z7.literal(3), z7.literal(5)]).default(3),
     max_length: z7.number().int().min(20).max(280).default(140),
     layout: z7.enum(["grid", "cloud", "groups"]).default("grid")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var HingeOptionSchema = z7.object({
+  id: z7.string().min(1).max(40),
+  text: z7.string().max(300).default(""),
+  misconception: z7.string().max(300).default("")
+});
+var HingeQuestionBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("hinge_question"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    prompt: z7.string().max(500).default(""),
+    options: z7.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z7.string().max(40).default(""),
+    seconds: z7.union([z7.literal(0), z7.literal(30), z7.literal(60), z7.literal(90), z7.literal(120)]).default(60),
+    move_on: z7.number().int().min(1).max(100).default(80),
+    reteach: z7.number().int().min(0).max(99).default(50)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1940,6 +1963,7 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
@@ -2139,6 +2163,20 @@ var CoverSchema = z8.object({
   }
 });
 var CoverPatchSchema = CoverSchema.nullable();
+
+// apps/teaching/src/blocks/hinge-question/shared.ts
+var MIN_OPTIONS = 2;
+function starterHingeOptions(blockId) {
+  return ["a", "b", "c", "d"].map((k) => ({ id: `${blockId}_${k}`, text: "", misconception: "" }));
+}
+function hingeIssue(content) {
+  if (!content.prompt.trim()) return "Write the hinge question";
+  if (content.options.length < MIN_OPTIONS) return "A hinge question needs at least two answers";
+  if (content.options.some((o) => !o.text.trim())) return "Fill in every answer, or remove the empty one";
+  if (!content.options.some((o) => o.id === content.correct_id)) return "Mark the right answer";
+  if (content.reteach >= content.move_on) return "The reteach mark must be below the move-on mark";
+  return null;
+}
 
 // apps/teaching/src/blocks/curriculum-lines/starter.ts
 function starterCurriculumLinesContent() {
@@ -3673,6 +3711,7 @@ var NEW_BLOCK_TYPES = [
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "hinge_question",
   "continuum_line",
   "quiz_question",
   "question_set",
@@ -3738,6 +3777,7 @@ var NEW_BLOCK_LABEL = {
   peer_feedback: "Peer feedback",
   question_drop: "Question drop",
   brainstorm: "Brainstorm",
+  hinge_question: "Hinge question",
   continuum_line: "Continuum line",
   quiz_question: "Quiz question",
   question_set: "Question set",
@@ -3840,7 +3880,7 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Learning",
-    types: ["peer_feedback", "brainstorm", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "annotation"]
+    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "annotation"]
   },
   {
     label: "Visualisation",
@@ -3887,6 +3927,7 @@ var HOMEPAGE_EXCLUDED = /* @__PURE__ */ new Set([
   ...UNIT_ONLY_TYPES,
   "peer_feedback",
   "brainstorm",
+  "hinge_question",
   "question_drop",
   "quiz_question",
   ...TOOLKIT_GROUP_TYPES,
@@ -3905,7 +3946,7 @@ var HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
 var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
-    (type) => !["peer_feedback", "brainstorm", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
+    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
       type
     )
   )
@@ -4185,6 +4226,15 @@ function createBlock(type, id) {
         per_student: 3,
         max_length: 140,
         layout: "grid"
+      } };
+    case "hinge_question":
+      return { ...shared, block_type: "hinge_question", variant: "medium", content: {
+        prompt: "",
+        options: starterHingeOptions(id),
+        correct_id: "",
+        seconds: 60,
+        move_on: 80,
+        reteach: 50
       } };
     case "continuum_line":
       return { ...shared, block_type: "continuum_line", variant: "medium", content: {
@@ -5544,6 +5594,7 @@ var KIND_LABEL = {
   question_set: "Question set",
   question_drop: "Question drop",
   brainstorm: "Brainstorm",
+  hinge_question: "Hinge question",
   continuum_line: "Continuum line",
   curriculum_lines: "Curriculum lines",
   discern_confirm: "Discern Confirm",
@@ -5702,6 +5753,10 @@ function ownIssue(block, discernHosts) {
   }
   if (block.block_type === "brainstorm" && !block.content.question.trim()) {
     return "Write the question for this Brainstorm";
+  }
+  if (block.block_type === "hinge_question") {
+    const issue = hingeIssue(block.content);
+    if (issue) return issue;
   }
   if (block.block_type === "continuum_line") {
     const c = block.content;
