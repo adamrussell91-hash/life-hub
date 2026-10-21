@@ -275,6 +275,17 @@ One PR, with these steps as commits:
 
 If step 6 grows, it moves to its own PR.
 
+### Tabs check result (2026-10-21)
+
+Task 1 row 1 applies with API version `2025-09-03`: a `tab` container
+(with an empty data object) has one `paragraph` child per pane. Each pane's
+`rich_text` holds its label and its child blocks hold its content.
+`TAB_CONTAINER_TYPE = 'tab'` and `TAB_ITEM_TYPE = 'paragraph'` are confirmed;
+no adapter or fixture changes are needed. The existing invented-fixture reader
+test covers this shape. Columns return as `column_list` / `column`; no
+`width_ratio` was returned by the checked lesson. The probe ran outside the
+repository, and no lesson content, labels, names or identifiers are recorded here.
+
 ## Known limits
 
 - Uploaded videos are streamed without HTTP Range support, so they may not play

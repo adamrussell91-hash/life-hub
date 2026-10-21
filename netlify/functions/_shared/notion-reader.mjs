@@ -1,8 +1,8 @@
 // netlify/functions/_shared/notion-reader.mjs
 import { NotionApiError } from './notion-client.mjs';
 
-// PROVISIONAL: these are the plan's defaults. They stay provisional until the
-// tabs check in the plan's Task 1 is run and its result recorded.
+// Verified 2026-10-21 against API version 2025-09-03 (plan Task 1, row 1):
+// tab containers hold paragraph panes whose rich_text supplies the label.
 const TAB_CONTAINER_TYPE = 'tab';
 const TAB_ITEM_TYPE = 'paragraph';
 
