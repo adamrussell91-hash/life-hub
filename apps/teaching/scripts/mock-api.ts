@@ -104,6 +104,8 @@ import { createPublishedDiscernHandler } from '../../../netlify/functions/publis
 import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
 import { createPublishedQuadrantHandler } from '../../../netlify/functions/published-quadrant.mjs';
 import { createLessonQuadrantHandler } from '../../../netlify/functions/lesson-quadrant.mjs';
+import { createHingeHandler } from '../../../netlify/functions/hinge.mjs';
+import { createPublishedHingeHandler } from '../../../netlify/functions/published-hinge.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
@@ -3541,7 +3543,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return { x: open, y: intellectual };
   }
 
-  /** Quiz lessons and Question drop run the real Functions against the mock store. */
+  /** Quiz lessons, Question drop and Hinge question run the real Functions against the mock store. */
   async function handleQuiz(
     method: string,
     pathWithQuery: string,
@@ -3554,7 +3556,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
     };
     const path = pathWithQuery.split('?')[0]!;
-    const handler = /\/quadrant$/.test(path)
+    const handler = /^\/api\/lessons\/[^/]+\/hinge\//.test(path)
+      ? createHingeHandler(deps)
+      : path.startsWith('/api/published/hinge/')
+        ? createPublishedHingeHandler(deps)
+      : /\/quadrant$/.test(path)
       ? createLessonQuadrantHandler(deps)
       : path.startsWith('/api/published/quadrant/')
         ? createPublishedQuadrantHandler({ ...deps, placeQuestion: mockPlaceQuestion })
@@ -3646,7 +3652,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
       /^\/api\/published\/discern\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quadrant$/.test(path) ||
-      /^\/api\/published\/quadrant\/[^/]+$/.test(path)
+      /^\/api\/published\/quadrant\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/hinge\/[^/]+$/.test(path) ||
+      /^\/api\/published\/hinge\/[^/]+\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
     }
