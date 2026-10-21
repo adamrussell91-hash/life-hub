@@ -47,15 +47,18 @@ export function mountReviewPanel({ start }: { start: () => void }): ReviewPanel 
   };
 }
 
-const BANNER: Record<ReviewEntry['kind'], (name: string) => [string, string]> = {
+const BANNER: Record<ReviewEntry['kind'], (name: string, noun: string) => [string, string]> = {
   move: (name) => [`This review picks up at ${name}.`, 'Start the review'],
   start: () => ['Your review is due.', 'Start the review'],
-  reopen: (name) => [`This problem has moved on. The review adds a new ${name} pass, then brings you back.`, 'Review the results']
+  reopen: (name, noun) => [`This ${noun} has moved on. The review adds a new ${name} pass, then brings you back.`, 'Review the results']
 };
 
-/** The banner a review task's link opens with. `name` is the Improve step's name in this model. */
-export function reviewBanner(entry: ReviewEntry, start: () => void, name = 'Improve'): HTMLElement {
-  const [text, label] = BANNER[entry.kind](name);
+/**
+ * The banner a review task's link opens with. `name` is the Improve step's name in this model;
+ * `noun` is the word for a session (Decision Maker says decision).
+ */
+export function reviewBanner(entry: ReviewEntry, start: () => void, name = 'Improve', noun = 'problem'): HTMLElement {
+  const [text, label] = BANNER[entry.kind](name, noun);
   const banner = el('div', 'ps-resume');
   banner.setAttribute('role', 'status');
   const go = el('button', 'ps-resume__go', label) as HTMLButtonElement;
