@@ -199,12 +199,13 @@ Decision Maker should look like Problem Solver's sibling: clearly from the same 
 
 **Decision Maker's own voice:**
 - **Palette:** paper `#faf8ef`, ink `#171813`, red `#ef402b`, green `#60aa36`, with their two tints. No yellow and no blue, so the two tools never blur together on the same rail.
-- **Geometry: square-led, where Problem Solver is circle-led.** Problem Solver's shapes are discs, semicircles and arcs, after Kandinsky. Decision Maker's are squares, quarters, halves, diagonals and the fork, after Albers and the Bauhaus grid. The kit's emblems already work this way (the Eisenhower emblem is four squares and a tick).
-- **Shape board (landing hero):** a 4×3 board of square tiles, in the same place as Problem Solver's board. The tiles are a 2×2 of quarter squares, a diagonally split square, a square with a quarter-circle cut, a forked Y path, a stepped stair, two opposed triangles in a square, a square with an inset square, and a bar split two ways. The colours are red, green, ink and tint.
-- **Medal:** square, where Problem Solver's is round. It is a 2×2 that fills one quarter per framing answer (decision, compass, known), and a fourth quarter once a model is worked. The main model's emblem sits on top once chosen.
-- **Track:** square stations for Frame, Explore, Decide and Review, joined by a ruled line, in the same place as Problem Solver's track.
-- **Section compass:** the four approved section emblems in a 2×2 above the canvas, with the lit quadrants at full strength and the rest in tint.
-- **Coach avatar:** Problem Solver's avatar construction, built from squares.
+- **Geometry: circles and arrows, after the book's cover.** The cover is a red disc carrying a turning-back chevron and a green disc carrying a forward arrow, with a dotted line between them. Decision Maker builds from that: whole discs that carry direction, arrows, and the dotted divide. Problem Solver breaks its circles into semicircles, bands and wedges beside triangles, in red, yellow and blue (after Kandinsky). Decision Maker keeps its discs whole and adds direction, in red, green and ink. That keeps the two distinct on the same rail. (Changed 21 Oct at Adam's request; the first mockups were square-led.)
+- **Shape board (landing hero):** a 4×3 board, in the same place as Problem Solver's. Its tiles are the red back disc, the green forward disc, a disc split red and green by a dotted line, a lone forward arrow, a disc with a forked arrow, the overlapping pair with an arrow through it (the book emblem), an open ring ending in an arrowhead, and two small discs joined by a dotted arrow.
+- **Medal:** the cover, built as the session moves. The red disc fills with the decision answer and the green disc with the compass answer. The dotted line and both arrows arrive with what is known. The main model's emblem sits in the middle once it is chosen.
+- **Track:** round stations for Frame, Explore, Decide and Review, in the same place as Problem Solver's track, joined by a dotted line. Frame is the disc pair, Explore a ring, Decide the forward disc and Review the back disc.
+- **Section compass:** the four approved section emblems (already discs) in a 2×2 above the canvas. Rows are who (you, others) and columns are the aim (understand, improve). The lit quadrant is ringed and the rest are faded.
+- **Coach avatar:** the red and green discs overlapping, with an arrow through them.
+- **Surfaces:** flat, with no shadows or gradients. Cards use Problem Solver's rounded corners, with a hairline border instead of a shadow, and buttons and chips are round.
 
 The shared structure lives once, in Problem Solver's components, which take a token scope and a shape set. Decision Maker supplies `.dm-scope` tokens and `decor.ts` shapes rather than copies of the components.
 
