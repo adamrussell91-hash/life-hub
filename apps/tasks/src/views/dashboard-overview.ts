@@ -10,7 +10,8 @@ import {
   type DashboardHeatDay,
   type DashboardTimelineItem
 } from '@/domain/dashboard-overview';
-import { preferredDomains, toDateKey, todayPlateTasks } from '@/domain/queries';
+import { compareByDue, preferredDomains, toDateKey } from '@/domain/queries';
+import { parseDueTimeHours } from '@/domain/daily-dial';
 import { findStallCandidates } from '@/domain/stall';
 import {
   findPortfolioTension,
@@ -345,30 +346,21 @@ function renderTimelineRow(
 function itemsForDay(
   items: DashboardTimelineItem[],
   dateKey: string,
-  todayKey: string,
-  plateOrder: Map<string, number>
+  todayKey: string
 ): DashboardTimelineItem[] {
   const dayItems =
     dateKey === todayKey
       ? items.filter((item) => item.daysOut <= 0)
       : items.filter((item) => item.due_date === dateKey);
+  // Due order: date, then clock (untimed after timed), then tasks ahead of project dates.
+  const sourceRank = { task: 0, excursion: 1, project: 2 } as const;
   return [...dayItems].sort((a, b) => {
-    if (a.source === 'task' && b.source === 'task' && a.task && b.task) {
-      if (dateKey === todayKey) {
-        const ao = plateOrder.get(a.task.id) ?? Number.POSITIVE_INFINITY;
-        const bo = plateOrder.get(b.task.id) ?? Number.POSITIVE_INFINITY;
-        if (ao !== bo) return ao - bo;
-      }
-      const pr =
-        ({ urgent: 0, high: 1, medium: 2, low: 3 } as const)[a.task.priority] -
-        ({ urgent: 0, high: 1, medium: 2, low: 3 } as const)[b.task.priority];
-      if (pr !== 0) return pr;
-      const at = a.task.due_time ?? '99:99';
-      const bt = b.task.due_time ?? '99:99';
-      return at.localeCompare(bt);
-    }
-    if (a.source === 'task') return -1;
-    if (b.source === 'task') return 1;
+    if (a.daysOut !== b.daysOut) return a.daysOut - b.daysOut;
+    if (a.task && b.task) return compareByDue(a.task, b.task);
+    const at = parseDueTimeHours(a.task?.due_time) ?? Number.POSITIVE_INFINITY;
+    const bt = parseDueTimeHours(b.task?.due_time) ?? Number.POSITIVE_INFINITY;
+    if (at !== bt) return at - bt;
+    if (a.source !== b.source) return sourceRank[a.source] - sourceRank[b.source];
     return a.title.localeCompare(b.title);
   });
 }
@@ -396,8 +388,7 @@ function renderAgendaBody(
   selectedKey: string
 ): HTMLElement {
   const todayKey = toDateKey(now);
-  const plateOrder = new Map(todayPlateTasks(options.tasks, now).map((task, index) => [task.id, index]));
-  const dayItems = itemsForDay(items, selectedKey, todayKey, plateOrder);
+  const dayItems = itemsForDay(items, selectedKey, todayKey);
   const agenda = el('div', 'dashboard-timeline');
   if (selectedKey === todayKey) agenda.id = 'timeline-today';
 

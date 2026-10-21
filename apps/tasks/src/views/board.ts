@@ -1,7 +1,7 @@
 import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
-import { openTasks } from '@/domain/queries';
+import { compareByDue, openTasks } from '@/domain/queries';
 import { BOARD_COLUMNS, columnForTask, patchForColumn, type BoardColumnId } from '@/domain/board';
 import {
   countOlderDone,
@@ -30,7 +30,7 @@ import { mountTaskCard, type TaskCardHandlers } from '@/views/hub-cards';
 import { renderDashboardOverview } from '@/views/dashboard-overview';
 import { pageHeaderStatusSlot } from '@/shell/shell';
 import { requestToggleDone } from '@/views/dashboard';
-import { runningProjectIds } from '@/domain/dashboard-overview';
+import { completionStamp, runningProjectIds } from '@/domain/dashboard-overview';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { createPriorityAssessControls, maybeApplyPriorityFloors } from '@/views/priority-assess';
 
@@ -60,6 +60,13 @@ function boardLedeSuffix(): string {
     return 'tap a card to expand · use the column tabs to move between lists';
   }
   return 'drag cards between columns, or focus one and press Space';
+}
+
+/** Open columns run soonest due first; Done runs most recently completed first. */
+function compareInColumn(column: BoardColumnId): (a: Task, b: Task) => number {
+  if (column !== 'done') return compareByDue;
+  return (a, b) =>
+    (completionStamp(b)?.getTime() ?? 0) - (completionStamp(a)?.getTime() ?? 0) || compareByDue(a, b);
 }
 
 function appendBoardCard(
@@ -398,8 +405,12 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
       }
     );
     card.dataset.col = column;
-    const hint = list.querySelector('.empty-hint');
-    if (hint) list.insertBefore(card, hint);
+    const compare = compareInColumn(column);
+    const after = [...list.querySelectorAll<HTMLElement>(':scope > [data-id]')].find((sibling) => {
+      const other = sibling !== card ? byId.get(sibling.dataset.id ?? '') : undefined;
+      return other ? compare(task, other) < 0 : false;
+    });
+    list.insertBefore(card, after ?? list.querySelector('.empty-hint'));
     return card;
   }
 
@@ -485,10 +496,11 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     list.dataset.col = col.id;
 
     const columnTasks = scoped().filter((t) => columnForTask(t, byId) === col.id);
-    const items =
+    const items = (
       col.id === 'done'
         ? filterDoneColumnTasks(columnTasks, { showOlder: boardShowOlderDone })
-        : columnTasks;
+        : columnTasks
+    ).sort(compareInColumn(col.id));
     const olderDoneCount =
       col.id === 'done' ? countOlderDone(columnTasks.filter((t) => t.status === 'done')) : 0;
     const reload = () => void renderBoardView(canvas);
