@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
+import { LensAttachmentsSchema } from './lens';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -129,6 +130,7 @@ const blockTimestamps = {
 const blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
   discern: DiscernQualifierSchema.optional(),
+  lenses: LensAttachmentsSchema.optional(),
   layout: z.record(z.unknown()).default({}),
   print: z.record(z.unknown()).default({}),
   settings: z.record(z.unknown()).default({})
@@ -695,7 +697,14 @@ export const QuestionSetBlockSchema = z.object({
   visibility: VisibilitySchema,
   content: z.object({
     title: z.string().optional(),
-    questions: z.array(QuestionItemSchema)
+    questions: z.array(QuestionItemSchema),
+    /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
+    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge']).optional(),
+    /** Human experience table settings, kept when switching format away and back. */
+    table: z.object({
+      rows: z.number().int().min(3).max(5).default(3),
+      example: z.boolean().default(true)
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
