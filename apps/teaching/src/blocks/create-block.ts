@@ -102,7 +102,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   gallery: 'Gallery',
   video: 'Video',
   embed: 'Embed',
-  audio: 'Audio',
+  audio: 'Voice',
   attachment: 'Attachment',
   accordion: 'Accordion',
   table: 'Table',
@@ -570,7 +570,7 @@ export function createBlock(type: NewBlockType, id: string): Block {
         ...shared,
         block_type: 'audio',
         variant: 'medium',
-        content: { url: '' }
+        content: { url: '', mode: 'listen' }
       };
     case 'attachment':
       return {

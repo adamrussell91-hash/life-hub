@@ -430,9 +430,23 @@ export const AudioBlockSchema = z.object({
   block_type: z.literal('audio'),
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z.object({
     url: z.string(),
-    title: z.string().optional()
+    title: z.string().optional(),
+    mode: z.enum(['listen', 'respond', 'viva']).default('listen'),
+    prompt: z.string().max(4000).optional(),
+    time_limit_s: z.number().int().min(30).max(300).optional(),
+    student_chooses_time: z.boolean().optional(),
+    scaffold: z
+      .array(z.object({ label: z.string().max(80), weight: z.number().min(0.5).max(3).default(1) }))
+      .max(8)
+      .optional(),
+    code_groups: z.array(z.enum(['composition', 'viva', 'speaking'])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
