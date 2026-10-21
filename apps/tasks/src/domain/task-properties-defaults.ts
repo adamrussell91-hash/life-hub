@@ -45,7 +45,8 @@ export const DEFAULT_TASK_PROPERTY_CONFIG: TaskPropertyConfig = {
     { id: 'manual', label: 'manual' },
     { id: 'auto_generated_from_excursion', label: 'auto generated from excursion' },
     { id: 'suggested_by_agent', label: 'suggested by agent' },
-    { id: 'problem_solver', label: 'problem solver' }
+    { id: 'problem_solver', label: 'problem solver' },
+    { id: 'decision_maker', label: 'decision maker' }
   ],
   tags: []
 };

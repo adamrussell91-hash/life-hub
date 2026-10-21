@@ -1,13 +1,13 @@
 // netlify/functions/_shared/problem-solver/session.mjs
 import { acceptProblem, addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
-import { defaultToolFor, firstStep, nextPhase, planStepForBook, stepName, stepServes } from '../../../../packages/problem-solver/steps.mjs';
+import { defaultToolFor, firstStep, nextPhase, planStepForBook, stepName, stepServes, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
 import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
 import { parseCompass } from '../../../../packages/decision-book/compass.mjs';
 import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
 import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
-import { resolveBasis } from '../../../../packages/decision-book/record.mjs';
+import { mainModel, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 
 export { waitingForReview };
 
@@ -117,7 +117,10 @@ function replaceRun(session, run) {
   return { ...session, steps };
 }
 
-export function createSession({ title = '', text, links = [], kind = 'full' }, deps) {
+/** A model a decision starts from (picked on the shelf), when it is one Explore offers. */
+const shelfModel = (kind, model) => (kind === 'decision' && typeof model === 'string' && toolsForPlanStep(DECISION_MODEL.id, 'explore').includes(model) ? model : null);
+
+export function createSession({ title = '', text, links = [], kind = 'full', startModel = null }, deps) {
   if (!KIND_FRAMES[kind]) throw fail(400, 'validation_error', `Unknown session kind: ${kind}`);
   const at = deps.now();
   const clean = String(text ?? '').trim();
@@ -151,6 +154,7 @@ export function createSession({ title = '', text, links = [], kind = 'full' }, d
     lightning: null,
     escalatedFrom: null,
     frameSeeds: null,
+    ...(shelfModel(kind, startModel) ? { startModel } : {}),
     requestIds: [],
     runner: { status: 'queued', mode: 'turn', error: null },
     createdAt: at,
@@ -300,7 +304,9 @@ export function applyCoachTurn(session, turn, deps) {
   // Leaving a step untouched asks no learning question, so the next step's opening tool comes at once.
   const untouched = mode === 'boundary' && skippedUntouched(next.steps?.[session.runner?.leaving]);
   const quiet = next.phase === 'finished' || (mode === 'boundary' && !untouched) || waitingForReview(next);
-  const suggestion = quiet ? null : (turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
+  // A decision started from a model on the shelf opens on that model once it is framed.
+  const shelf = session.phase === 'frame' && next.phase !== 'frame' && next.startModel ? { kind: 'next_tool', tool: next.startModel, reason: 'You started from this model on the shelf.' } : null;
+  const suggestion = quiet ? null : (shelf ?? turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
   return touch({ ...next, turns: [...next.turns, coachTurn], suggestion, summary: turn.summary ?? next.summary }, deps);
 }
 
@@ -628,6 +634,8 @@ export function summaryRow(session) {
     reviewTaskId: session.reviewTaskId ?? null,
     reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
     escalatedTo: session.lightning?.escalatedTo ?? null,
+    // A decision's medal shows the model its reasons lean on most.
+    ...(session.kind === 'decision' ? { main: mainModel(session) } : {}),
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   };
