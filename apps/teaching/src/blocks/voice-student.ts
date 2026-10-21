@@ -321,6 +321,11 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
     const timer = window.setInterval(tick, 200);
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== ' ' && e.key !== 'ArrowRight') return;
+      // A held key repeats; one press is one point.
+      if (e.repeat) {
+        e.preventDefault();
+        return;
+      }
       if ((e.target as HTMLElement | null)?.closest?.('input, textarea, button')) return;
       e.preventDefault();
       if (labels.length) view.next();

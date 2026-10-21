@@ -219,3 +219,33 @@ describe('feedback codes on annotation notes', () => {
     field.remove();
   });
 });
+
+import { createBlockEditor } from '@/blocks/editors';
+
+describe('Voice block editor', () => {
+  it('switches between listen, respond and viva and keeps the content', () => {
+    let latest = vivaBlock({ mode: 'listen', prompt: undefined, time_limit_s: undefined });
+    const editor = createBlockEditor(
+      latest,
+      (next) => {
+        latest = next as typeof latest;
+      },
+      () => latest
+    );
+    document.body.append(editor);
+    const pill = (label: string) => [...editor.querySelectorAll<HTMLButtonElement>('.voice-editor__modes button')].find((b) => b.textContent === label)!;
+    expect(editor.querySelector<HTMLElement>('.voice-editor__listen')!.hidden).toBe(false);
+    pill('Viva').click();
+    expect(latest.content.mode).toBe('viva');
+    expect(editor.querySelector<HTMLElement>('.voice-editor__listen')!.hidden).toBe(true);
+    const question = editor.querySelector<HTMLTextAreaElement>('.voice-editor__question')!;
+    question.value = 'Why does the poem end in silence?';
+    question.dispatchEvent(new Event('input'));
+    expect(latest.content.prompt).toBe('Why does the poem end in silence?');
+    [...editor.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Add a point')!.click();
+    expect(latest.content.scaffold).toHaveLength(1);
+    [...editor.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Students choose')!.click();
+    expect(latest.content.student_chooses_time).toBe(true);
+    editor.remove();
+  });
+});

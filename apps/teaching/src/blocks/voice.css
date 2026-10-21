@@ -836,3 +836,18 @@
   margin: 0;
   font-size: var(--text-sm);
 }
+
+/* Single buttons in a grid column keep their own width. */
+.voice-card > .btn,
+.voice-plan > .btn,
+.voice-editor__scaffold > .btn,
+.voice-mark__transcript > .btn,
+.block-editor__annotation-code > .btn {
+  justify-self: start;
+}
+
+@media (max-width: 560px) {
+  .voice-strip__label {
+    flex-basis: 100%;
+  }
+}
