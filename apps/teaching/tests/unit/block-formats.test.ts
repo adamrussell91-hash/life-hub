@@ -102,7 +102,7 @@ describe('4 levels', () => {
       .toEqual(['beginner', 'judge', 'inventor']);
     expect([...view.querySelectorAll('.block-question-set__prompt')].map((p) => p.textContent))
       .toEqual(['Who volunteers at the reaping?', 'Is Katniss a hero?', 'What if Prim had gone?']);
-    expect(view.querySelectorAll<HTMLOListElement>('.block-question-set__band ol')[2]!.start).toBe(3);
+    expect(view.querySelectorAll<HTMLOListElement>('.block-question-set__band ol')[2]!.style.counterReset).toBe('lesson-q 2');
     expect(view.querySelector('.block-question-set__handover')).toBeTruthy();
   });
   it('shows each question’s Level control only in this format', () => {
