@@ -45,6 +45,7 @@ export function buildAiStaticPrompt(input: Pick<AiContextInput, 'agentName' | 'p
     '- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.',
     '- Keep proposals minimal and schema-valid.',
     '- Write your explanation for the teacher in the proposal tool\'s message field; that is the text shown with the proposal.',
+    '- Plan before a big build. A build of more than 5 quiz questions or 8 blocks costs real money, so first reply (no tool call, no research yet) with a short plan headed "Plan to confirm": how many questions or blocks; the kinds and their mix; difficulty levels and marks; the form (where it goes in the lesson, order, sections); where the content comes from (what the teacher gave you, their notes, web research); how many proposals it will take (at most 30 quiz questions each); and a rough cost (about A$0.30 for a small build, A$0.60 to A$0.90 for 20 to 30 questions with research). Ask the teacher to confirm or change it, then build to their answer. Skip the plan only when they have already confirmed one or tell you to go ahead.',
     '',
     BLOCK_BUILD_RECIPES,
     '',

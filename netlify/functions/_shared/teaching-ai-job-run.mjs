@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Anthropic from '@anthropic-ai/sdk';
 import { runLessonAiJob } from './teaching-ai-runtime.mjs';
 import { aiJobKey, draftLessonKey, getJSON, setJSON } from './teaching-blobs.mjs';
 import { TOOLS as ALCHEMY_TOOLS } from './alchemy-agent.mjs';
@@ -42,54 +43,47 @@ export function teachingModels(env = {}) {
 }
 
 /**
- * Adapts a runner request to one Messages API call. Thinking stays at its
- * adaptive default; effort sets the depth. The standard lane opts into the
- * server-side refusal fallback (Haiku has none).
+ * Adapts a runner request to one streamed Messages API call and returns the
+ * final message. Streaming lets one reply hold a full 30-question proposal
+ * without a long idle HTTP request. Thinking stays at its adaptive default;
+ * effort sets the depth. The standard lane opts into the server-side refusal
+ * fallback (Haiku has none). Client tools stream their input eagerly; the
+ * runner checks every proposal against the schema, and a cut-off reply
+ * (max_tokens) is never run.
  */
-export function createAnthropicComplete({ apiKey, fetchImpl = fetch, signal } = {}) {
+export function createAnthropicComplete({ apiKey, client, signal } = {}) {
+  const anthropic = client ?? new Anthropic({ apiKey, maxRetries: 2 });
   return async function complete(request) {
     const standard = request.tier === 'standard';
-    const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        ...(standard ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {})
-      },
-      body: JSON.stringify({
-        model: request.model,
-        max_tokens: request.max_tokens,
-        system: request.system,
-        tools: request.tools,
-        messages: request.messages,
-        output_config: { effort: request.effort },
-        // Caches the conversation tail too; the two system breakpoints cover the prefix.
-        cache_control: { type: 'ephemeral' },
-        ...(standard ? { fallbacks: 'default' } : {})
-      })
-    }).catch(error => {
+    const params = {
+      model: request.model,
+      max_tokens: request.max_tokens,
+      system: request.system,
+      tools: request.tools.map(tool => (tool.type ? tool : { ...tool, eager_input_streaming: true })),
+      messages: request.messages,
+      output_config: { effort: request.effort },
+      // Caches the conversation tail too; the system breakpoints cover the prefix.
+      cache_control: { type: 'ephemeral' }
+    };
+    const stream = standard
+      ? anthropic.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }, { signal })
+      : anthropic.messages.stream(params, { signal });
+    try {
+      return await stream.finalMessage();
+    } catch (error) {
       if (signal?.aborted) throw new Error('The agent ran out of time. Try a smaller request.');
-      throw new Error('Could not reach Claude. Try again.', { cause: error });
-    });
-    if (!response.ok) throw new Error(await friendlyApiError(response));
-    return response.json();
+      throw new Error(friendlyApiError(error));
+    }
   };
 }
 
-export async function friendlyApiError(response) {
-  let detail = '';
-  try {
-    const body = await response.json();
-    detail = typeof body?.error?.message === 'string' ? body.error.message : '';
-  } catch {
-    /* no body */
-  }
-  if (response.status === 401) return 'The Anthropic API key was rejected. Check ANTHROPIC_API_KEY on Netlify.';
-  if (response.status === 429) return 'Claude is rate limited right now. Try again in a minute.';
-  if (response.status === 400) return `Claude rejected the request${detail ? `: ${detail}` : '.'}`;
-  return `Claude API error ${response.status}. Try again.`;
+export function friendlyApiError(error) {
+  if (error instanceof Anthropic.AuthenticationError) return 'The Anthropic API key was rejected. Check ANTHROPIC_API_KEY on Netlify.';
+  if (error instanceof Anthropic.RateLimitError) return 'Claude is rate limited right now. Try again in a minute.';
+  if (error instanceof Anthropic.BadRequestError) return `Claude rejected the request: ${error.message}`;
+  if (error instanceof Anthropic.APIConnectionError) return 'Could not reach Claude. Try again.';
+  if (error instanceof Anthropic.APIError) return `Claude API error ${error.status ?? ''}`.trim() + '. Try again.';
+  return error instanceof Error ? error.message : 'The model request failed.';
 }
 
 /** Runs the notes tools for the runner, refreshing the notes index on first use only. */
@@ -184,7 +178,7 @@ export async function runStoredLessonJob({
       lesson,
       agentName: TEACHING_AGENT_NAMES[job.agent] ?? TEACHING_AGENT_NAMES.ann,
       protocol: loadTeachingProtocol(job.agent, readFileSyncImpl ? { readFileSyncImpl } : {}),
-      complete: complete ?? createAnthropicComplete({ apiKey, fetchImpl, signal: controller.signal }),
+      complete: complete ?? createAnthropicComplete({ apiKey, signal: controller.signal }),
       tools: NOTE_TOOLS,
       runTool: createNoteToolRunner({ store, env, fetchImpl, signal: controller.signal, deps: { noteIndex } }),
       webSearch: true,
