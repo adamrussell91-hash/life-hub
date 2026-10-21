@@ -51,6 +51,8 @@ export function validateFoodJournal(j) {
         text(item.name, "Menu item", 200);
         text(item.description, "Menu item description", 1000);
         text(item.price, "Menu item price", 40);
+        if (item.kind != null && !["dish", "extra"].includes(item.kind))
+          bad("Menu items are invalid.");
       }
     }
     if (v.reviewed != null && typeof v.reviewed !== "boolean")

@@ -106,26 +106,64 @@ export function mergeCapture(visit, draft, photos = []) {
 
 const sameName = (a, b) =>
   String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
-// The dish a menu item became, or -1.
+// Extras (add bacon, a side of hash brown) ride on a dish as "+ name" lines.
+const isExtra = (item) => item.kind === "extra";
+const extraLine = (item) => `+ ${item.name}`;
+const hasLine = (dish, line) =>
+  dish.notes.split("\n").some((l) => sameName(l, line));
+// The dish a menu item became, or -1. An extra is on the dish that carries
+// its line, or is a dish of its own when nothing was ticked before it.
 export const menuDishIndex = (visit, item) =>
-  visit.dishes.findIndex((d) => sameName(d.title, item.name));
-// Ticking a menu item adds it as a dish, using the blank starter dish first.
-// Unticking removes it only while it is untouched: no rating, notes, tags or
-// photos. The last dish turns blank rather than going.
+  visit.dishes.findIndex(
+    (d) =>
+      sameName(d.title, item.name) ||
+      (isExtra(item) && hasLine(d, extraLine(item))),
+  );
+// A ticked dish is untouched while its notes are still the menu's own
+// ingredients plus any ticked extras.
+const untouched = (dish, item) =>
+  dish.rating == null &&
+  !dish.tags.length &&
+  !dish.photos.length &&
+  dish.notes
+    .split("\n")
+    .filter((l) => !l.startsWith("+ "))
+    .join("\n")
+    .trim() === String(item.description || "").trim();
+// Ticking a menu item adds it as a dish, using the blank starter dish first,
+// with the menu's ingredients as its notes so a recipe has them. Ticking an
+// extra adds it to the last dish instead. Unticking removes it only while it
+// is untouched. The last dish turns blank rather than going.
 export function toggleMenuDish(visit, item) {
   const next = structuredClone(visit),
     index = menuDishIndex(next, item);
   if (index < 0) {
+    const last = next.dishes.findLast((d) => d.title.trim());
+    if (isExtra(item) && last) {
+      last.notes = [last.notes.trimEnd(), extraLine(item)]
+        .filter(Boolean)
+        .join("\n");
+      return next;
+    }
+    const notes = String(item.description || "");
     const blank = next.dishes.find((d) => !d.title.trim());
-    if (blank) blank.title = item.name;
-    else next.dishes.push({ ...newDish(), title: item.name });
+    if (blank) {
+      blank.title = item.name;
+      if (!blank.notes.trim()) blank.notes = notes;
+    } else next.dishes.push({ ...newDish(), title: item.name, notes });
     return next;
   }
   const dish = next.dishes[index];
-  if (dish.rating != null || dish.notes.trim() || dish.tags.length || dish.photos.length)
+  if (!sameName(dish.title, item.name)) {
+    dish.notes = dish.notes
+      .split("\n")
+      .filter((l) => !sameName(l, extraLine(item)))
+      .join("\n");
     return next;
+  }
+  if (!untouched(dish, item)) return next;
   if (next.dishes.length > 1) next.dishes.splice(index, 1);
-  else dish.title = "";
+  else Object.assign(dish, { title: "", notes: "" });
   return next;
 }
 
