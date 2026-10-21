@@ -13,7 +13,12 @@ import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { applyStep, currentEntry, isQuestion, LIGHTNING_NODES } from '../../../../packages/problem-solver/lightning.mjs';
-import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
+import { FEEDBACK_ID, RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { basisCandidates } from '../../../../packages/decision-book/record.mjs';
+import { isRecordDate } from '../../../../packages/decision-book/tools/record.mjs';
+import { anotherAngle } from './knowledge/decision-book.mjs';
+import { validateCoachTurn } from './coach-schema.mjs';
+import { activeRun, currentStep, followOn, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
 
 /**
  * Deterministic coach for local dev and tests. Short answers (under six words) are challenged.
@@ -27,7 +32,13 @@ import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './
  * that breaks a strict naming rule is challenged with that rule's advice. A decision session
  * takes its opening message as the decision, then asks who it is about and what is known; the
  * compass comes from the wording (team, others, them … → others; improve, better, change … →
- * improve).
+ * improve). In a decision session, once a model meets its minimum, `another angle` suggests the
+ * next model from its see also (as `next_model`, read through the coach schema like a live reply)
+ * and `decide` suggests moving on to Decide. The decision record takes its slots in order (a
+ * `reason:` hint adds another reason); each reason rests on the first Explore node it has not
+ * yet used, and the review needs a YYYY-MM-DD date. In Review, a feedback analysis force reads
+ * as expected when it says expected, thought, hoped or planned, otherwise as actual. A quadrant
+ * model's item goes in the cell its words name ("… do immediately").
  */
 const FRAME = [
   ['goal', 'What is the goal, as an ideal state rather than a fix? Say what good looks like.'],
@@ -86,6 +97,13 @@ function linksFor(run, slot) {
     const action = nodesNamed(run, 'action').find((node) => !picked.has(node.id));
     return action ? [{ from: slot, to: action.slot, kind: 'picks' }] : [];
   }
+  // A Decision Book model's required link: the first placed node the tool lets it join.
+  const kind = TOOLS[run.tool].requiredLinks?.[name]?.kind;
+  if (kind) {
+    const candidate = { ...run, nodes: [...run.nodes, { id: '__candidate__', slot }] };
+    const to = run.nodes.find((node) => canEdge(candidate, '__candidate__', node.id, kind));
+    return to ? [{ from: slot, to: to.slot, kind }] : [];
+  }
   return [];
 }
 
@@ -141,6 +159,8 @@ function placement(run, answer) {
     if (run.tool === 'kanban' && card && KANBAN_COLUMNS.includes(name)) return { slot: card, text, tag: name };
   }
   if (open.includes(CHOICE_SLOT)) return { slot: CHOICE_SLOT, text: answer, tag: null };
+  // The decision record moves on in order: a further reason needs its hint.
+  if (run.tool === RECORD_ID) return { slot: open.find((s) => parseSlot(s)?.name !== 'reason') ?? open[0], text: answer, tag: null };
   return { slot: open.find((s) => s !== 'root') ?? 'root', text: answer, tag: null };
 }
 
@@ -152,6 +172,10 @@ function tagFromText(run, slot, text) {
     if (/\b(more|keep)\b/i.test(text)) return 'do_more';
     return /\?|unclear/i.test(text) ? 'question' : 'change';
   }
+  if (run.tool === FEEDBACK_ID && name === 'force') return /\b(expected|thought|hoped|planned)\b/i.test(text) ? 'expected' : 'actual';
+  // A Decision Book quadrant item names its cell in words ("… do immediately").
+  const cells = TOOLS[run.tool].chart?.cells;
+  if (cells && name === 'item') return cells.find((cell) => text.toLowerCase().includes(cell.label.toLowerCase()))?.id ?? null;
   return null;
 }
 
@@ -206,14 +230,68 @@ function decisionFrameTurn(session, last) {
   const frame = { [key]: key === 'compass' ? heardCompass(last) : last };
   if (missing.length > 1) return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   const first = toolsForPlanStep('decision_book', 'explore')[0];
-  return {
-    ...base,
+  return asCoachReply({
     verdict: 'accept',
     frame,
     message: 'That frames it well. I suggest starting with one model that lays out the sides to weigh. Shall we begin?',
-    suggestion: first ? { kind: 'next_tool', tool: first, reason: 'A first model with clear sides to weigh.' } : null,
+    suggestion: first ? { kind: 'next_model', tool: first, reason: 'A first model with clear sides to weigh.' } : null,
     skillsSeen: ['decision_making']
-  };
+  });
+}
+
+/** A decision turn read through the coach schema, as a live reply is (so next_model becomes next_tool). */
+function asCoachReply(raw) {
+  const result = validateCoachTurn(raw);
+  if (!result.ok) throw new Error(`Scripted decision turn is invalid: ${result.error}`);
+  return result.value;
+}
+
+/** The Explore node a new reason rests on: the first one no placed reason uses yet, else the first. */
+function restsOn(session) {
+  const candidates = basisCandidates(session);
+  const used = new Set(Object.values(session.basis ?? {}).flat().map((ref) => ref.nodeId));
+  const pick = candidates.find((c) => !used.has(c.nodeId)) ?? candidates[0];
+  return pick ? [{ tool: pick.tool, slot: pick.slot }] : [];
+}
+
+/**
+ * A decision session's own turns, or null to fall through to the shared ones: opening a step's
+ * model, another angle, Decide, the decision record's reasons and date, and the review.
+ */
+function decisionTurn(session, last, run) {
+  if (!run && waitingForReview(session)) return { ...base, verdict: 'clarify', message: `Review picks up on ${dueText(session)}. Press Review now if the results are already in.` };
+  if (!run && session.reviewState?.status === 'reviewing' && session.phase === 'review') {
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_model', tool: FEEDBACK_ID, reason: 'Compare what you expected with what happened.' }, message: 'The results are in. The feedback analysis sets what you expected beside what happened; start it when you are ready.' });
+  }
+  if (!run && session.phase === 'explore') {
+    const first = toolsForPlanStep(session.model.id, 'explore')[0];
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_model', tool: first, reason: 'A first model with clear sides to weigh.' }, message: 'Pick a model from the shelf, or start with this one: it lays out the sides to weigh.' });
+  }
+  if (!run) return null;
+  if (/^another angle\b/i.test(last.trim()) && session.phase === 'explore') {
+    if (!followOn(session)) return { ...base, verdict: 'clarify', message: 'Finish this model first: it is not at its minimum yet. What goes next on the chart?' };
+    const used = (currentStep(session)?.runs ?? []).map((item) => item.tool);
+    const { book, ours } = anotherAngle(run.tool, used);
+    const tool = book[0] ?? ours[0];
+    if (!tool) return { ...base, verdict: 'clarify', suggestion: { kind: 'next_step', reason: 'No other angle is listed; settle the decision.' }, message: 'There is no other angle listed for this one. Shall we settle the decision?' };
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_model', tool, reason: `Another angle on the same decision: ${TOOLS[tool].name}.` }, message: `Another angle would help: ${TOOLS[tool].name} looks at it from a different side. Start it when you are ready.` });
+  }
+  if (/^decide\b/i.test(last.trim()) && session.phase === 'explore') {
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'next_step', reason: 'The models have done their work.' }, message: 'Then let us settle it. Move on to Decide when you are ready.' };
+  }
+  if (run.tool !== RECORD_ID) return null;
+  const { slot, text } = placement(run, last);
+  const name = parseSlot(slot)?.name;
+  if (name === 'review') {
+    const date = /\d{4}-\d{2}-\d{2}/.exec(text)?.[0];
+    if (!isRecordDate(date)) return { ...base, verdict: 'clarify', message: 'Give the review a date, written like 2027-01-21. When will you look at what happened?' };
+    return { ...base, verdict: 'accept', node: { slot, text: date }, skillsSeen: ['metacognition'], message: 'Review set for that date; confirm it on the card. The decision record is complete.' };
+  }
+  if (wordCount(text) < 6) return null;
+  if (name === 'reason') {
+    return { ...base, verdict: 'accept', node: { slot, text }, basis: restsOn(session), skillsSeen: ['decision_making'], message: 'That reason rests on what the model showed. Now, what would make you rethink: what would you notice?' };
+  }
+  return null;
 }
 
 /**
@@ -274,11 +352,13 @@ export async function scriptedCoach(session) {
       const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here; the first tool for this step is ready below.';
       return { ...base, verdict: 'clarify', message: `Fair enough, nothing was done in that step, so there is nothing to look back on. ${then}` };
     }
-    return { ...base, verdict: 'clarify', message: 'Fair enough, that step is behind us now. Before we go on: what did you learn about how you tend to work through problems in that step?' };
+    const how = session.kind === 'decision' ? 'decide' : 'tend to work through problems';
+    return { ...base, verdict: 'clarify', message: `Fair enough, that step is behind us now. Before we go on: what did you learn about how you ${how} in that step?` };
   }
   if (session.pendingLearning) {
     if (waitingForReview(session)) {
-      return { ...base, verdict: 'clarify', learning: last || null, message: `Thank you, that is worth keeping. Improve picks up at your review on ${dueText(session)}.` };
+      const step = session.kind === 'decision' ? 'Review' : 'Improve';
+      return { ...base, verdict: 'clarify', learning: last || null, message: `Thank you, that is worth keeping. ${step} picks up at your review on ${dueText(session)}.` };
     }
     const hasTool = session.phase !== 'finished' && session.model && defaultToolFor(session.model.id, session.phase);
     const message = session.phase === 'finished'
@@ -312,6 +392,10 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
   }
   const run = activeRun(session);
+  if (session.kind === 'decision') {
+    const own = decisionTurn(session, last, run);
+    if (own) return own;
+  }
   if (!run && waitingForReview(session)) {
     return { ...base, verdict: 'clarify', message: `Improve picks up at your review on ${dueText(session)}. Until then, tell me anything you notice.` };
   }
@@ -326,7 +410,7 @@ export async function scriptedCoach(session) {
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
     const chosen = TOOLS[run.tool].step === 'implement' ? chosenOption(session) : null;
-    const carry = chosen ? `We are carrying forward: ${chosen.title}. ` : run.tool === 'after_action_review' ? reviewOpening(session) : '';
+    const carry = chosen ? `We are carrying forward: ${chosen.title}. ` : run.tool === 'after_action_review' || (run.tool === FEEDBACK_ID && session.reviewState?.status === 'reviewing') ? reviewOpening(session) : '';
     return { ...base, verdict: 'clarify', message: `${carry}Let's start the ${TOOLS[run.tool].name}. ${first.title}: ${first.prompt}` };
   }
   if (/^link:/i.test(last)) {
@@ -368,6 +452,8 @@ export async function scriptedCoach(session) {
   if (run.tool === 'after_action_review' && slot === 'learned' && wordCount(text) <= longestEarlier(run)) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['reflective_thinking'], message: `Learning is the heart of the review, yet this is shorter than what you said about what happened. Tell me more: what will you keep, change or try next time, and why?` };
   }
-  const message = slot === CHOICE_SLOT ? choiceMessage(run) : 'That holds up: it names a process, not a person. Now, why does that happen? Base your answer on what you just said.';
+  const message = slot === CHOICE_SLOT ? choiceMessage(run)
+    : session.kind === 'decision' ? 'That holds up, and it is on the chart. What goes next: what else belongs here?'
+      : 'That holds up: it names a process, not a person. Now, why does that happen? Base your answer on what you just said.';
   return { ...base, verdict: 'accept', ...fillNode(run, slot, text, tag), skillsSeen: ['analysis'], message };
 }
