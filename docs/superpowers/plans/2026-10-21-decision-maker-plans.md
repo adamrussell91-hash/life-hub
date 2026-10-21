@@ -3,7 +3,7 @@
 Spec: `docs/superpowers/specs/2026-10-21-decision-book-design.md`.
 Branch: `claude/decision-book`, worktree `/Users/adamrussell/Projects/life-hub-decision-book`.
 
-There are six plans and **one PR**, opened at the end of Plan 6 with auto-merge, following the "Minimise PRs" rule. Each plan is written in full, with exact code, only once the plan before it has landed. Each one builds on real code rather than guesses, which is how Problem Solver's Plans 1–9 were run.
+There are seven plans and **one PR**, opened at the end of Plan 7 with auto-merge, following the "Minimise PRs" rule. Each plan is written in full, with exact code, only once the plan before it has landed. Each one builds on real code rather than guesses, which is how Problem Solver's Plans 1–9 were run.
 
 | Plan | Phase | Status | Ends with |
 | --- | --- | --- | --- |
@@ -11,8 +11,9 @@ There are six plans and **one PR**, opened at the end of Plan 6 with auto-merge,
 | 2 | Charts | **Done** (`2026-10-21-decision-maker-plan-2-charts.md`) | Eight family renderers and the four re-skinned Problem Solver renderers, each tested on fixed inputs and checked once on a contact sheet |
 | 3 | The models | **Done** (`2026-10-21-decision-maker-plan-3-models.md`) | Tool configs and coaching notes for all 52 entries, one section per commit (sections can run as parallel subagents) |
 | 4 | The coach | **Written:** `2026-10-21-decision-maker-plan-4-coach.md` (code drafted and run green, then removed) | Shared rubric text, the Decision Maker rubric with catalogue lines, per-model notes, waiting, Eisenhower tasks, another angle, `next_model`, and the canvas map. Split from the old Plan 4 on 21 Oct, because the coach and the app were too much for one plan |
-| 5 | Decide, Review and the app | To write after Plan 4 | The decision record tool and its step layer, Review via the feedback analysis, the landing and session pages, the decision record with provenance, and the shared skill tally |
-| 6 | Quick decision and checks | To write after Plan 5 | Quick route and Go deeper; light source check; live coach evaluation; Playwright walks at desktop and 390px; `pre-pr-check`; the PR |
+| 5 | Decide, Record and Review | **Written:** `2026-10-21-decision-maker-plan-5-decide-review.md` (code drafted and run green, then removed) | The decision record tool (`dm_record`) and Decide's step layer, reasons resting on model nodes (`basis`), the first step and review date as confirm cards, the record composed from the session with its provenance and update offers, Review on the feedback analysis via `reviewState`, and the scripted coach's whole decision. Split from the old Plan 5 on 21 Oct, because the server work and the app were too much for one plan |
+| 6 | The app | To write after Plan 5 | The landing and session pages, the record's page blocks and bridge, the mock API route, the shared skill tally, and the browser check at desktop and 390px |
+| 7 | Quick decision and checks | To write after Plan 6 | Quick route and Go deeper; light source check; live coach evaluation; Playwright walks at desktop and 390px; `pre-pr-check`; the PR |
 
 ## What each later plan must cover (from the spec)
 
@@ -38,14 +39,17 @@ There are six plans and **one PR**, opened at the end of Plan 6 with auto-merge,
 - The Decision Maker rubric, with catalogue lines (all 52) in the cached layer and only the active model's note per turn.
 - Compass placement and discernment (recommend one model, name a sibling); "another angle"; the decision traps.
 
-**Plan 5: Decide, Review and the app** (Plan 4's "Notes for Plan 5" add detail)
+**Plan 5: Decide, Record and Review** (written)
 - The Decide step's decision record tool (`step: 'settle'`, with the stop-rule trigger and action, first step and review date).
 - Review via the feedback analysis on `reviewState`.
+
+**Plan 6: The app** (Plan 5's "Notes for Plan 6" add detail)
 - The client in `apps/tasks/src/views/decision-book/`: nav "Decision Maker" at `#/decision-maker`. It reuses Problem Solver's coach panel, task cards, review panel, bridges, link chips and API client, given a base path.
-- The new client pieces: compass, square medal, square track, shape board and the decision record with a provenance image block.
+- The new client pieces, in the approved circle-and-arrow design: compass, medal, track and shape board.
+- The decision record on a linked page: its page blocks with a provenance image block, the bridge with a graphic retry, and the mock API's `/api/decision-book` route.
 - The shared skill tally ribbon on both landing pages.
 
-**Plan 6: Quick decision and checks**
+**Plan 7: Quick decision and checks**
 - `packages/decision-book/quick.mjs` as data: decision, then three yes/no questions, then proceed or not, then a Stop Rule, then learn and next.
 - A `quick` session kind on `/api/decision-book`, with its chart, It came back, and Go deeper (which carries the decision and criteria into a full session).
 - The light check of Drexler/Sibbet, Hersey–Blanchard, Belbin, Whitmore and de Bono against their sources.
