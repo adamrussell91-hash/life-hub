@@ -433,9 +433,23 @@ export const AudioBlockSchema = z.object({
   block_type: z.literal('audio'),
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z.object({
     url: z.string(),
-    title: z.string().optional()
+    title: z.string().optional(),
+    mode: z.enum(['listen', 'respond', 'viva']).default('listen'),
+    prompt: z.string().max(4000).optional(),
+    time_limit_s: z.number().int().min(30).max(300).optional(),
+    student_chooses_time: z.boolean().optional(),
+    scaffold: z
+      .array(z.object({ label: z.string().max(80), weight: z.number().min(0.5).max(3).default(1) }))
+      .max(8)
+      .optional(),
+    code_groups: z.array(z.enum(['composition', 'viva', 'speaking'])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1171,6 +1185,20 @@ export const AnnotationTechniqueRefSchema = z.object({
   table_version: z.string().min(1)
 });
 
+/**
+ * A feedback code on an annotation note (AR, TS+ …). The code's words are
+ * copied in when tagged, so students can read them without the teacher's
+ * code library, and a later edit to the library doesn't rewrite old notes.
+ */
+export const AnnotationCodeRefSchema = z.object({
+  id: z.string().min(1).max(40),
+  code: z.string().regex(/^[A-Z]{1,3}$/),
+  label: z.string().max(60),
+  descriptor: z.string().max(600).default(''),
+  colour: z.enum(['blue', 'sage', 'peach', 'gold', 'lilac']).default('blue'),
+  positive: z.boolean().default(false)
+});
+
 export const AnnotationAttachmentSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('link'),
@@ -1286,6 +1314,7 @@ export const AnnotationItemSchema = z
     thread: AnnotationThreadSchema.optional(),
     anthology: AnthologyTagSchema.optional(),
     technique: AnnotationTechniqueRefSchema.optional(),
+    code: AnnotationCodeRefSchema.optional(),
     body: z.object({
       html: z.string(),
       attachments: z.array(AnnotationAttachmentSchema).default([])
@@ -1409,6 +1438,7 @@ export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>;
 export type AnnotationAttachment = z.infer<typeof AnnotationAttachmentSchema>;
 export type AnnotationThread = z.infer<typeof AnnotationThreadSchema>;
 export type AnnotationVoiceTrack = z.infer<typeof AnnotationVoiceTrackSchema>;
+export type AnnotationCodeRef = z.infer<typeof AnnotationCodeRefSchema>;
 export type AnthologyTag = z.infer<typeof AnthologyTagSchema>;
 
 function toolkitBlockSchema<T extends string, C extends z.ZodTypeAny>(blockType: T, content: C) {

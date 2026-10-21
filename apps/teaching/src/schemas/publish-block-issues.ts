@@ -262,7 +262,11 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
     }
   }
   if (block.block_type === 'audio') {
-    if (!isHttpUrl(block.content.url)) {
+    const mode = block.content.mode ?? 'listen';
+    if (mode !== 'listen' && !block.content.prompt?.trim()) {
+      return 'Voice blocks need a question to publish';
+    }
+    if (mode === 'listen' && !isHttpUrl(block.content.url)) {
       return 'Audio blocks need a valid http(s) URL to publish';
     }
   }
