@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
-import { LensAttachmentsSchema } from './lens';
+import { LensAttachmentsSchema, LensLevelSchema, LogicSchema } from './lens';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -492,7 +492,9 @@ export const QuestionItemSchema = z.object({
   prompt: z.string(),
   kind: QuestionKindSchema,
   options: z.array(z.string()).optional(),
-  response_space: ResponseSpaceSchema.optional()
+  response_space: ResponseSpaceSchema.optional(),
+  /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
+  logic: LogicSchema.optional()
 });
 
 export const PeerFeedbackBlockSchema = z.object({
@@ -699,11 +701,16 @@ export const QuestionSetBlockSchema = z.object({
     title: z.string().optional(),
     questions: z.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge']).optional(),
+    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge', 'reasoning_chart']).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z.object({
       rows: z.number().int().min(3).max(5).default(3),
       example: z.boolean().default(true)
+    }).optional(),
+    /** Reasoning chart settings, kept when switching format away and back. */
+    reasoning: z.object({
+      level: LensLevelSchema.default('core'),
+      student_level: z.boolean().default(true)
     }).optional()
   }),
   ...blockLayout,

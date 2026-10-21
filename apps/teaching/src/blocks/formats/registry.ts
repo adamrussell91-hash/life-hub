@@ -18,6 +18,10 @@ export const BLOCK_FORMATS: Partial<Record<Block['block_type'], FormatEntry[]>> 
     {
       id: 'anchor_bridge', label: 'Anchor & bridge',
       hint: 'Each question gets three boxes (anchor, human experience, bridge) and a response frame.'
+    },
+    {
+      id: 'reasoning_chart', label: 'Reasoning chart',
+      hint: 'Each question gets a deductive, inductive or abductive chart students build step by step, then a sentence frame to write it up.'
     }
   ],
   peer_feedback: [
