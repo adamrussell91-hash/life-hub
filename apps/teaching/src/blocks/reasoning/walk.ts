@@ -30,6 +30,11 @@ export type WalkOptions = {
   preview: boolean;
   /** The teacher's own Write it down example, per level. */
   examples?: Partial<Record<LensLevel, string>>;
+  /** The teacher's rewording of a step's question or hint, keyed `${level}.${stepId}`. */
+  prompts?: Record<string, string>;
+  supports?: Record<string, string | null>;
+  /** Discussion mode: students talk each step through instead of typing. */
+  talk?: boolean;
   onDone?: () => void;
 };
 
@@ -137,6 +142,14 @@ function answered(step: ReasoningStep, state: WalkState): boolean {
   return !!value && value !== step.starter;
 }
 
+/** The step with the teacher's rewording applied. */
+function worded(step: ReasoningStep, options: WalkOptions): ReasoningStep {
+  const key = `${options.level}.${step.id}`;
+  const question = options.prompts?.[key]?.trim();
+  const hint = options.supports?.[key];
+  return { ...step, question: question || step.question, hint: hint != null ? hint.trim() : step.hint };
+}
+
 export function createReasoningWalk(options: WalkOptions): HTMLElement {
   const root = el('div', 'block-reasoning');
   const { state, level } = options;
@@ -148,10 +161,11 @@ export function createReasoningWalk(options: WalkOptions): HTMLElement {
       root.append(choiceCards(options, () => draw(true)));
       return;
     }
-    const steps = reasoningSteps(logic, level);
+    const steps = reasoningSteps(logic, level).map((step) => worded(step, options));
+    const done = (step: ReasoningStep) => step.kind !== 'text' || !!options.talk || answered(step, state);
     const list: Array<ReasoningStep | typeof WRITE> = [...steps, WRITE];
     // A tab opens once every writing step before it is answered.
-    const open = (i: number) => steps.slice(0, i).every((s) => s.kind !== 'text' || answered(s, state));
+    const open = (i: number) => steps.slice(0, i).every(done);
     state.step = Math.min(state.step, list.length - 1);
     while (state.step > 0 && !open(state.step)) state.step -= 1;
     const current = list[state.step]!;
@@ -194,7 +208,7 @@ export function createReasoningWalk(options: WalkOptions): HTMLElement {
       drawStep(panel, current, steps, paintChart, () => { error.textContent = ''; });
       const next = list[state.step + 1]!;
       actions.append(button(`Next: ${next === WRITE ? 'Write it down' : next.title}`, 'btn btn--primary', () => {
-        if (current.kind === 'text' && !answered(current, state)) {
+        if (!done(current)) {
           error.textContent = 'Write your answer first.';
           return;
         }
@@ -212,6 +226,12 @@ export function createReasoningWalk(options: WalkOptions): HTMLElement {
     if (step.example && level !== 'extend') panel.append(example(step.example));
     if (step.kind === 'test') {
       panel.append(testGrid(step, steps));
+      return;
+    }
+    if (options.talk) {
+      panel.append(el('p', 'kaplan-caption', 'Talk this step through, then move on when you are ready.'));
+      if (step.checks?.length) panel.append(fitChecks(step, steps, paintChart));
+      if (step.sure) panel.append(surePills());
       return;
     }
     const field = el('label', 'kaplan-field');

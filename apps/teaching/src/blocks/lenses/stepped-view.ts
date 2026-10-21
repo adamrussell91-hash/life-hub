@@ -69,6 +69,10 @@ function printLens({ lens, config }: AttachedLens, block: Block): HTMLElement {
   section.append(title);
   const focus = focusLine(config);
   if (focus) section.append(focus);
+  if (lens.print) {
+    section.append(lens.print(config, ctx));
+    return section;
+  }
   const list = el('ol');
   for (const step of lens.steps(config, ctx)) {
     const li = el('li');
@@ -180,6 +184,16 @@ export function renderSteppedLenses(
         levels.append(pick);
       }
       workspace.append(levels);
+    }
+
+    if (lens.walk) {
+      const focus = focusLine(config);
+      if (focus) workspace.append(focus);
+      workspace.append(lens.walk({
+        config, ctx, storageKey: keyFor(lens), preview: options.mode !== 'student',
+        onDone: () => { state.done = true; persist(lens, state); markDone(lens, true); }
+      }));
+      return;
     }
 
     const progress = el('nav', 'kaplan-progress');

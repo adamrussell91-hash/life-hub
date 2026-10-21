@@ -59,4 +59,11 @@ export type SteppedLens = {
   writeItDown: (config: LensConfig, ctx: StepContext) => WriteItDown;
   /** Extra setup controls, e.g. Windows & Mirrors' Answer with. */
   setupFields?: (draft: LensConfig, update: (next: LensConfig) => void) => HTMLElement[];
+  /**
+   * A lens that draws its own walk (Reasoning's chart). The engine draws the
+   * heading and level pills, then hands it the rest of the workspace.
+   */
+  walk?: (args: { config: LensConfig; ctx: StepContext; storageKey?: string; preview: boolean; onDone: () => void }) => HTMLElement;
+  /** Replaces the default print sheet. */
+  print?: (config: LensConfig, ctx: StepContext) => HTMLElement;
 };

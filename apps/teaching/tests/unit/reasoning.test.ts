@@ -3,6 +3,13 @@ import { reasoningSteps, reasoningWrite, LOGIC_CARDS } from '@/blocks/reasoning/
 import { renderReasoningChart } from '@/blocks/reasoning/chart';
 import { createReasoningWalk, emptyWalkState, renderReasoningPrint, type WalkState } from '@/blocks/reasoning/walk';
 import type { LensLevel } from '@/blocks/lenses/types';
+import { createBlock } from '@/blocks/create-block';
+import { withLens } from '@/blocks/lenses/attachments';
+import { REASONING, REASONING_ID } from '@/blocks/lenses/reasoning';
+import { STEPPED_LENSES } from '@/blocks/lenses/registry';
+import { renderBlock } from '@/blocks/render';
+import { BlockSchema, type Block } from '@/schemas/block';
+import { ReasoningConfigSchema } from '@/schemas/lens';
 
 const ids = (logic: Parameters<typeof reasoningSteps>[0], level: LensLevel) => reasoningSteps(logic, level).map((s) => s.id);
 beforeEach(() => { document.body.replaceChildren(); localStorage.clear(); });
@@ -179,5 +186,57 @@ describe('Reasoning walk', () => {
     expect(sheet.textContent).toContain('For example');
     expect(sheet.querySelectorAll('.lens-lines__line').length).toBeGreaterThan(0);
     expect(renderReasoningPrint('choice', 'core').textContent).toContain('Circle one');
+  });
+});
+
+describe('Reasoning lens', () => {
+  function questionBlock(): Block {
+    const block = createBlock('question_set', 'qset');
+    if (block.block_type !== 'question_set') throw Error('wrong block');
+    block.content.questions[0]!.prompt = 'Will Katniss survive the Games?';
+    return block;
+  }
+  const attach = (config: Record<string, unknown>) => withLens(questionBlock(), REASONING_ID, config);
+
+  it('is in the registry and defaults to Student’s choice at Core', () => {
+    expect(STEPPED_LENSES).toContain(REASONING);
+    const c = ReasoningConfigSchema.parse({});
+    expect(c.logic).toBe('choice');
+    expect(c.level).toBe('core');
+    expect(REASONING.canAttach(createBlock('peer_feedback', 'pf'))).toBe(false);
+  });
+  it('saves on the block and reads back', () => {
+    const block = REASONING.write(questionBlock(), REASONING.create(questionBlock()));
+    expect(BlockSchema.safeParse(block).success).toBe(true);
+    expect(REASONING.read(block)?.logic).toBe('choice');
+  });
+  it('opens the walk from the chip and keeps answers on this device', () => {
+    const view = renderBlock(attach({ logic: 'inductive', level: 'support' }), 'student', { lessonId: 'lesson' });
+    document.body.append(view);
+    view.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
+    expect(view.querySelector('.block-reasoning-chart')!.getAttribute('data-logic')).toBe('inductive');
+    const box = view.querySelector<HTMLTextAreaElement>('.block-reasoning__box')!;
+    box.value = 'Both tributes died.';
+    box.dispatchEvent(new Event('input'));
+    expect(JSON.stringify(localStorage)).toContain('Both tributes died.');
+  });
+  it('rebuilds the walk at the level the student picks', () => {
+    const view = renderBlock(attach({ logic: 'abductive' }), 'student', { lessonId: 'lesson' });
+    document.body.append(view);
+    view.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
+    expect(view.querySelectorAll('.kaplan-progress__step')).toHaveLength(8);
+    [...view.querySelectorAll<HTMLButtonElement>('.lens-levels__option')].find((b) => b.textContent === 'More help')!.click();
+    expect(view.querySelectorAll('.kaplan-progress__step')).toHaveLength(5);
+  });
+  it('uses the teacher’s wording of a step', () => {
+    const view = renderBlock(attach({ logic: 'deductive', prompts: { 'core.r': 'What law of Panem always applies?' } }), 'student', { lessonId: 'lesson' });
+    document.body.append(view);
+    view.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
+    expect(view.querySelector('.block-reasoning .kaplan-workspace__step-title')!.textContent).toBe('What law of Panem always applies?');
+  });
+  it('prints the chart and ruled lines', () => {
+    const sheet = renderBlock(attach({ logic: 'inductive' }), 'print');
+    expect(sheet.querySelector('.block-reasoning-chart')).toBeTruthy();
+    expect(sheet.querySelectorAll('.lens-lines__line').length).toBeGreaterThan(0);
   });
 });
