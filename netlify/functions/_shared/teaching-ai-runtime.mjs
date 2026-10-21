@@ -108,6 +108,17 @@ var WindowsMirrorsConfigSchema = z4.object({
   examples: z4.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 var SteppedLensConfigSchema = WindowsMirrorsConfigSchema.omit({ answer_with: true });
+var LogicSchema = z4.enum(["deductive", "inductive", "abductive", "all_three", "choice"]);
+var ReasoningConfigSchema = z4.object({
+  focus: z4.string().trim().max(200).default(""),
+  logic: LogicSchema.default("choice"),
+  level: LensLevelSchema.default("core"),
+  student_level: z4.boolean().default(true),
+  mode: z4.enum(["notes", "discussion"]).default("notes"),
+  prompts: z4.record(StepTextSchema).optional(),
+  supports: z4.record(StepTextSchema.nullable()).optional(),
+  examples: z4.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
+});
 
 // apps/teaching/src/quiz/core.ts
 import { z as z5 } from "zod";
@@ -1085,7 +1096,9 @@ var QuestionItemSchema = z7.object({
   options: z7.array(z7.string()).optional(),
   response_space: ResponseSpaceSchema.optional(),
   /** The 4 levels format's band; absent means guessed from the question's opening words. */
-  level: z7.enum(["beginner", "detective", "judge", "inventor"]).optional()
+  level: z7.enum(["beginner", "detective", "judge", "inventor"]).optional(),
+  /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
+  logic: LogicSchema.optional()
 });
 var PeerFeedbackBlockSchema = z7.object({
   id: z7.string().min(1),
@@ -1326,11 +1339,16 @@ var QuestionSetBlockSchema = z7.object({
     title: z7.string().optional(),
     questions: z7.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z7.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so"]).optional(),
+    format: z7.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so", "reasoning_chart"]).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z7.object({
       rows: z7.number().int().min(3).max(5).default(3),
       example: z7.boolean().default(true)
+    }).optional(),
+    /** Reasoning chart settings, kept when switching format away and back. */
+    reasoning: z7.object({
+      level: LensLevelSchema.default("core"),
+      student_level: z7.boolean().default(true)
     }).optional()
   }),
   ...blockLayout,
