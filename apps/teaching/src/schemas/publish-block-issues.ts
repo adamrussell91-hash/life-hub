@@ -21,6 +21,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   question_set: 'Question set',
   question_drop: 'Question drop',
   brainstorm: 'Brainstorm',
+  continuum_line: 'Continuum line',
   curriculum_lines: 'Curriculum lines',
   discern_confirm: 'Discern Confirm',
   quiz_question: 'Quiz question',
@@ -201,6 +202,14 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
   }
   if (block.block_type === 'brainstorm' && !block.content.question.trim()) {
     return 'Write the question for this Brainstorm';
+  }
+  if (block.block_type === 'continuum_line') {
+    const c = block.content;
+    if (!c.statements.some((s) => s.text.trim())) return 'Write at least one statement for this Continuum line';
+    if (!c.scale.left.trim() || !c.scale.right.trim()) return 'Label both ends of this Continuum line';
+    if (c.stimulus.kind === 'text' && !c.stimulus.text.trim()) return 'Add the stimulus for this Continuum line';
+    if (c.stimulus.kind === 'image' && !isHttpUrl(c.stimulus.url)) return 'Give the stimulus image a valid http(s) URL';
+    if (c.stimulus.kind === 'video' && !c.stimulus.url.trim()) return 'Paste the stimulus video link';
   }
   if (block.block_type === 'quiz_question') {
     const checked = checkQuestion(block.content.question);
