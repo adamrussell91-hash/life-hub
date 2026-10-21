@@ -869,6 +869,38 @@ a:hover {
   display: none;
 }
 
+/* Nothing in the panel may spill past its frame; the thread and the Confirm
+ * tray scroll inside it instead. */
+.ai-panel > * {
+  min-width: 0;
+}
+
+.ai-panel {
+  overflow: hidden;
+}
+
+/* Matches the kit's shared :is() tray rule (0,4,0) and loads after it, so the
+ * tray here may shrink and scroll instead of pushing the composer off. */
+.ai-panel.ai-panel > .chat-pending-confirms:not([hidden]) {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(45%, 22rem);
+}
+
+.agent-protocol-pills[hidden] {
+  display: none;
+}
+
+.ai-panel__chip-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.ai-panel__chip-toggles:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
 .ai-panel__toolbar {
   display: flex;
   align-items: flex-start;
@@ -967,6 +999,7 @@ a:hover {
   color: var(--orca);
 }
 
+.ai-panel__protocols-toggle,
 .ai-panel__suggestions-toggle {
   align-self: flex-start;
   padding: var(--space-1) var(--space-2);
@@ -1067,12 +1100,25 @@ a:hover {
   gap: var(--space-1);
 }
 
+/* When a short panel squeezes the tray, the decision row stays pinned. */
+.chat-pending-confirms .ai-panel__proposal-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding-block: 0.375rem;
+  background: inherit;
+}
+
 .ai-panel__proposal-list {
   margin: 0 0 var(--space-2);
   padding: 0;
   list-style: none;
   display: grid;
   gap: 0.25rem;
+  /* A long batch scrolls in place so Accept and Reject stay in view. */
+  max-height: 9rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .ai-panel__proposal-check {

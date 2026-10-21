@@ -376,6 +376,24 @@ describe('mountAiPanel', () => {
     });
   });
 
+  it('folds the protocol chips away once the chat has started', async () => {
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    const tray = () => mounted.host.querySelector<HTMLElement>('.agent-protocol-pills')!;
+    const toggle = () => mounted.host.querySelector<HTMLButtonElement>('.ai-panel__protocols-toggle')!;
+    expect(tray().hidden).toBe(false);
+    expect(toggle().hidden).toBe(true);
+
+    submitMessage(mounted.host, 'Hello');
+    await vi.waitFor(() => expect(tray().hidden).toBe(true));
+    expect(toggle().hidden).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+
+    toggle().click();
+    expect(tray().hidden).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  });
+
   it('keeps suggestion buttons out of the way until asked for', () => {
     const mounted = mountPanel();
     handle = mounted.handle;
