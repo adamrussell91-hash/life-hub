@@ -685,26 +685,27 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     action: string | undefined,
     history: Array<{ role: 'user' | 'assistant'; content: string }>
   ): Promise<void> {
+    const request = {
+      lesson_id: options.lessonId,
+      agent: turnAgent,
+      scope,
+      selected_block_id: selectedBlockId ?? undefined,
+      lesson_snapshot_at: snapshotAt,
+      message,
+      ...(protocolId ? { protocol_id: protocolId } : {}),
+      action,
+      history
+    };
     let jobId: string;
     try {
-      const started = await startAiJob(
-        {
-          lesson_id: options.lessonId,
-          agent: turnAgent,
-          scope,
-          selected_block_id: selectedBlockId ?? undefined,
-          lesson_snapshot_at: snapshotAt,
-          message,
-          ...(protocolId ? { protocol_id: protocolId } : {}),
-          action,
-          history
-        },
-        { signal }
-      );
-      jobId = started.id;
+      jobId = (await startAiJob(request, { signal })).id;
     } catch (error) {
-      if (error instanceof AiJobConflictError) {
-        const existing = await pollAiJob(error.jobId, { signal });
+      if (!(error instanceof AiJobConflictError)) throw error;
+      const existing = await pollAiJob(error.jobId, { signal });
+      if (existing.status === 'working') {
+        // Another request on this lesson is still running: follow it so its
+        // answer is not lost, and give the teacher's new message back in the
+        // box rather than dropping it.
         const user = messages.find((entry) => entry.id === userId);
         const assistant = messages.find((entry) => entry.id === assistantId);
         if (user) user.text = existing.message;
@@ -713,9 +714,11 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
           assistant.jobId = existing.id;
           saveTranscript(options.lessonId, messages);
         }
+        input.value = message;
         jobId = error.jobId;
       } else {
-        throw error;
+        // The earlier job had already finished; the server's list was a moment behind.
+        jobId = (await startAiJob(request, { signal })).id;
       }
     }
     await pollJobUntilSettled(jobId, assistantId, snapshotAt, signal);
