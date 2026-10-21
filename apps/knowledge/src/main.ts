@@ -1,3 +1,4 @@
+import "../../../packages/stale-chunk-reload.js";
 import "./tokens.css";
 import "./style.css";
 import "./protocols/style.css";
