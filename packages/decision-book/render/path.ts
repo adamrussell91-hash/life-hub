@@ -3,7 +3,8 @@
 //   flow    the route taken, top to bottom: each stage a disc on a dotted line, its answer
 //           beside it; a question's answer carries a Yes or No word chip; the stage being
 //           asked shows as an open disc saying "Now"; an end stage is a filled disc.
-//   stages  one track per round, the stages left to right on a dotted line ending in an arrow.
+//   stages  one track per round, the stages left to right on a dotted line ending in an arrow;
+//           a track of more than five stages runs top to bottom when its card is narrow.
 //   layers  the safeguards as stacked slices, each with its holes; a hole not yet linked to a
 //           layer waits under them.
 // Phone: tracks turn vertical; the flow is already vertical.
@@ -47,6 +48,8 @@ export function createPathView(tool: ChartTool & { chart: PathChart }, doc: Docu
     track.setAttribute('aria-label', `Round ${round}`);
     track.append(el(doc, 'span', 'dm-path__round-label', `Round ${round}`));
     const line = el(doc, 'div', 'dm-path__stages');
+    // Seven stages cannot share a narrow card's width: the CSS turns a long track vertical.
+    if (chart.stages!.length > 5) line.setAttribute('data-many', 'true');
     for (const stage of chart.stages!) {
       const cell = el(doc, 'div', 'dm-path__stage');
       cell.setAttribute('data-stage', stage.id);
