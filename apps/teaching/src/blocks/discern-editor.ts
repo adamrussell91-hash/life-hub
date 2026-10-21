@@ -1,7 +1,7 @@
 import type { Block } from '@/schemas/block';
 import type { DiscernInitialType, DiscernQualifier, DiscernScalePreset } from '@/schemas/discern';
 import {
-  DISCERN_SCALES, canHaveDiscern, defaultDiscern, discernQuestionText, discernSteps, suggestDiscernInitial,
+  DISCERN_SCALES, defaultDiscern, discernQuestionText, discernSteps, suggestDiscernInitial,
   withDiscern, withoutDiscern
 } from './discern';
 import { button, discernSymbol, el } from './discern-view';
@@ -24,8 +24,8 @@ const TYPE_LABEL: Record<DiscernInitialType, string> = { scale: 'Scale', choose:
 
 export type DiscernAuthor = {
   panel: HTMLElement;
-  /** Menu entries for the block options menu. */
-  items: () => Array<{ label: string; action: () => void }>;
+  /** Opens setup: the saved Discern to edit, or a new one. */
+  open: () => void;
   /** The attached chip, or null when Discern is not on this block. */
   chip: () => HTMLButtonElement | null;
 };
@@ -240,13 +240,7 @@ export function createDiscernAuthor<T extends Block>(options: Options<T>): Disce
 
   return {
     panel,
-    items: () => {
-      if (!canHaveDiscern(options.getBlock())) return [];
-      const existing = options.getBlock().discern;
-      return existing
-        ? [{ label: 'Edit Discern', action: () => open(existing) }, { label: 'Remove Discern', action: remove }]
-        : [{ label: 'Add Discern', action: () => open(null) }];
-    },
+    open: () => open(options.getBlock().discern ?? null),
     chip: () => {
       const existing = options.getBlock().discern;
       if (!existing) return null;

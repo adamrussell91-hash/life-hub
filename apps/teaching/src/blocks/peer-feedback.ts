@@ -105,9 +105,19 @@ const MODES: Array<{ mode: Mode; label: string }> = [
   { mode: 'annotate', label: 'Notes on the text' }
 ];
 
-export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlock) => void): HTMLElement {
+export function createPeerFeedbackEditor(
+  block: PeerBlock,
+  onChange: (b: PeerBlock) => void,
+  getLatest?: () => PeerBlock
+): HTMLElement {
   const root = el('div', 'peer-feedback peer-feedback--editor');
   let current = block;
+  // Start from the latest block so a lens added beside these fields is kept.
+  const update = (content: Partial<PeerBlock['content']>): void => {
+    const latest = getLatest?.() ?? current;
+    current = { ...latest, content: { ...latest.content, ...content } };
+    onChange(current);
+  };
   const fields = [
     { key: 'prompt', label: 'What should students write about?', hint: 'Keep it to a short answer: a paragraph or two.', max: 4000, rows: 3 },
     { key: 'strength_prompt', label: 'First feedback box', hint: 'Usually what works well.', max: 300, rows: 1 },
@@ -119,8 +129,7 @@ export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlo
     input.rows = f.rows;
     input.maxLength = f.max;
     input.addEventListener('input', () => {
-      current = { ...current, content: { ...current.content, [f.key]: input.value } };
-      onChange(current);
+      update({ [f.key]: input.value });
     });
     return wrap;
   };
@@ -141,8 +150,7 @@ export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlo
       ...MODES.map((m) => {
         const b = button(m.label, 'ghost', () => {
           if (mode === m.mode) return;
-          current = { ...current, content: { ...current.content, mode: m.mode } };
-          onChange(current);
+          update({ mode: m.mode });
           paintMode();
         });
         b.className = 'pa-mode__option';
