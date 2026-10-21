@@ -78,6 +78,7 @@ import {
   resolveMediaLibraryUrl
 } from '@/teacher/media-library-picker';
 import { createAudioRecordButton } from '@/blocks/audio-record-button';
+import { createVoiceModePicker, createVoiceTaskFields } from '@/blocks/voice-block-editor';
 import {
   AUDIO_ACCEPT,
   createUploadButton,
@@ -1057,9 +1058,11 @@ export function createAudioEditor(
   title.setAttribute('aria-label', 'Audio title');
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         url: url.value,
         title: title.value.trim() || undefined
       }
@@ -1092,7 +1095,26 @@ export function createAudioEditor(
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(mediaSourceRow(upload.el, record.el), url, title);
+  const listen = document.createElement('div');
+  listen.className = 'block-editor__fields voice-editor__listen';
+  listen.append(mediaSourceRow(upload.el, record.el), url, title);
+  const task = createVoiceTaskFields(getLatest, onChange);
+  const paintMode = () => {
+    const isListen = (getLatest().content.mode ?? 'listen') === 'listen';
+    listen.hidden = !isListen;
+    task.el.hidden = isListen;
+    task.refresh();
+  };
+  fields.append(
+    createVoiceModePicker(getLatest, (mode) => {
+      const latest = getLatest();
+      onChange({ ...latest, content: { ...latest.content, mode } });
+      paintMode();
+    }),
+    listen,
+    task.el
+  );
+  paintMode();
   return editorShell(block, onChange, fields, getLatest);
 }
 

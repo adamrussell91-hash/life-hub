@@ -71,6 +71,7 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, c.alt_text ?? c.image_alt);
       push(parts, c.title);
       push(parts, c.caption);
+      push(parts, c.prompt);
       break;
     case 'html_app':
       push(parts, c.title);

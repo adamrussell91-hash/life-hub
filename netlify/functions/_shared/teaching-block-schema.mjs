@@ -914,9 +914,20 @@ var AudioBlockSchema = z6.object({
   block_type: z6.literal("audio"),
   variant: z6.string().default("medium"),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z6.object({
     url: z6.string(),
-    title: z6.string().optional()
+    title: z6.string().optional(),
+    mode: z6.enum(["listen", "respond", "viva"]).default("listen"),
+    prompt: z6.string().max(4e3).optional(),
+    time_limit_s: z6.number().int().min(30).max(300).optional(),
+    student_chooses_time: z6.boolean().optional(),
+    scaffold: z6.array(z6.object({ label: z6.string().max(80), weight: z6.number().min(0.5).max(3).default(1) })).max(8).optional(),
+    code_groups: z6.array(z6.enum(["composition", "viva", "speaking"])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
