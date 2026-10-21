@@ -7,8 +7,8 @@ There are five plans and **one PR**, opened at the end of Plan 5 with auto-merge
 
 | Plan | Phase | Status | Ends with |
 | --- | --- | --- | --- |
-| 1 | Foundations | **Written:** `2026-10-21-decision-maker-plan-1-foundations.md` | Catalogue, compass, glyphs, tokens, the `decision` session kind, `/api/decision-book`, and mockups. **Adam approves the design language before Plan 2** |
-| 2 | Charts | To write after Plan 1 | Eight family renderers and the four re-skinned Problem Solver renderers, each tested on fixed inputs and checked once on a contact sheet |
+| 1 | Foundations | **Done** (`2026-10-21-decision-maker-plan-1-foundations.md`); design approved 21 Oct | Catalogue, compass, glyphs, tokens, the `decision` session kind, `/api/decision-book`, and mockups. **Adam approves the design language before Plan 2** |
+| 2 | Charts | **Written:** `2026-10-21-decision-maker-plan-2-charts.md` (code drafted and run green, then removed) | Eight family renderers and the four re-skinned Problem Solver renderers, each tested on fixed inputs and checked once on a contact sheet |
 | 3 | The models | To write after Plan 2 | Tool configs and coaching notes for all 52 entries, one section per commit (sections can run as parallel subagents) |
 | 4 | The coach and the app | To write after Plan 3 | Decision Maker prompt and discernment, Decide and Review, the landing and session pages, decision record with provenance, and the shared skill tally |
 | 5 | Quick decision and checks | To write after Plan 4 | Quick route and Go deeper; light source check; live coach evaluation; Playwright walks at desktop and 390px; `pre-pr-check`; the PR |
