@@ -1,3 +1,4 @@
+import '../../../../packages/stale-chunk-reload.js';
 import 'katex/dist/katex.min.css';
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { apiGet, ApiClientError } from '@/api/client';
