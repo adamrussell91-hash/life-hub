@@ -128,7 +128,7 @@ async function appendUsageLog(store, entry) {
 
 /** Writes onto the job unless the teacher dismissed it while the model was working. */
 async function patchWorkingJob(store, jobId, patch, nowIso) {
-  const current = await getJSON(store, aiJobKey(jobId));
+  const current = await getJSON(store, aiJobKey(jobId), { consistency: 'strong' });
   if (!current || current.status !== 'working') return current;
   const next = { ...current, ...patch, updated_at: nowIso() };
   await setJSON(store, aiJobKey(jobId), next);
