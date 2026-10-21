@@ -8,6 +8,7 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'POST', pattern: /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/brainstorm\/[^/]+\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/hinge\/[^/]+\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/published\/continuum\/[^/]+\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/quiz\/[^/]+$/ },
   { method: 'GET', pattern: /^\/\.netlify\/functions\/published-lesson(?:\/|$)/ },
   { method: 'GET', pattern: /^\/api\/published\/lessons\/[^/]+$/ },
