@@ -3,15 +3,16 @@
 Spec: `docs/superpowers/specs/2026-10-21-decision-book-design.md`.
 Branch: `claude/decision-book`, worktree `/Users/example/Projects/life-hub-decision-book`.
 
-There are five plans and **one PR**, opened at the end of Plan 5 with auto-merge, following the "Minimise PRs" rule. Each plan is written in full, with exact code, only once the plan before it has landed. Each one builds on real code rather than guesses, which is how Problem Solver's Plans 1–9 were run.
+There are six plans and **one PR**, opened at the end of Plan 6 with auto-merge, following the "Minimise PRs" rule. Each plan is written in full, with exact code, only once the plan before it has landed. Each one builds on real code rather than guesses, which is how Problem Solver's Plans 1–9 were run.
 
 | Plan | Phase | Status | Ends with |
 | --- | --- | --- | --- |
 | 1 | Foundations | **Done** (`2026-10-21-decision-maker-plan-1-foundations.md`); design approved 21 Oct | Catalogue, compass, glyphs, tokens, the `decision` session kind, `/api/decision-book`, and mockups. **Adam approves the design language before Plan 2** |
 | 2 | Charts | **Done** (`2026-10-21-decision-maker-plan-2-charts.md`) | Eight family renderers and the four re-skinned Problem Solver renderers, each tested on fixed inputs and checked once on a contact sheet |
-| 3 | The models | **Written:** `2026-10-21-decision-maker-plan-3-models.md` (code drafted and run green, then removed) | Tool configs and coaching notes for all 52 entries, one section per commit (sections can run as parallel subagents) |
-| 4 | The coach and the app | To write after Plan 3 | Decision Maker prompt and discernment, Decide and Review, the landing and session pages, decision record with provenance, and the shared skill tally |
-| 5 | Quick decision and checks | To write after Plan 4 | Quick route and Go deeper; light source check; live coach evaluation; Playwright walks at desktop and 390px; `pre-pr-check`; the PR |
+| 3 | The models | **Done** (`2026-10-21-decision-maker-plan-3-models.md`) | Tool configs and coaching notes for all 52 entries, one section per commit (sections can run as parallel subagents) |
+| 4 | The coach | **Written:** `2026-10-21-decision-maker-plan-4-coach.md` (code drafted and run green, then removed) | Shared rubric text, the Decision Maker rubric with catalogue lines, per-model notes, waiting, Eisenhower tasks, another angle, `next_model`, and the canvas map. Split from the old Plan 4 on 21 Oct, because the coach and the app were too much for one plan |
+| 5 | Decide, Review and the app | To write after Plan 4 | The decision record tool and its step layer, Review via the feedback analysis, the landing and session pages, the decision record with provenance, and the shared skill tally |
+| 6 | Quick decision and checks | To write after Plan 5 | Quick route and Go deeper; light source check; live coach evaluation; Playwright walks at desktop and 390px; `pre-pr-check`; the PR |
 
 ## What each later plan must cover (from the spec)
 
@@ -32,17 +33,19 @@ There are five plans and **one PR**, opened at the end of Plan 5 with auto-merge
 - Lenses are short: one idea, one marker or question.
 - The tools are registered in `packages/problem-solver/tools/index.mjs` with `dm_` ids and `step: 'explore'`.
 
-**Plan 4: The coach and the app**
+**Plan 4: The coach** (written, plus the canvas map, Eisenhower tasks, waiting and `next_model`)
 - Move voice, gatekeeping and output out of `prompts.mjs` into `prompts-shared.mjs`, with Problem Solver's prompt text unchanged and checked by a snapshot test.
 - The Decision Maker rubric, with catalogue lines (all 52) in the cached layer and only the active model's note per turn.
 - Compass placement and discernment (recommend one model, name a sibling); "another angle"; the decision traps.
+
+**Plan 5: Decide, Review and the app** (Plan 4's "Notes for Plan 5" add detail)
 - The Decide step's decision record tool (`step: 'settle'`, with the stop-rule trigger and action, first step and review date).
 - Review via the feedback analysis on `reviewState`.
 - The client in `apps/tasks/src/views/decision-book/`: nav "Decision Maker" at `#/decision-maker`. It reuses Problem Solver's coach panel, task cards, review panel, bridges, link chips and API client, given a base path.
 - The new client pieces: compass, square medal, square track, shape board and the decision record with a provenance image block.
 - The shared skill tally ribbon on both landing pages.
 
-**Plan 5: Quick decision and checks**
+**Plan 6: Quick decision and checks**
 - `packages/decision-book/quick.mjs` as data: decision, then three yes/no questions, then proceed or not, then a Stop Rule, then learn and next.
 - A `quick` session kind on `/api/decision-book`, with its chart, It came back, and Go deeper (which carries the decision and criteria into a full session).
 - The light check of Drexler/Sibbet, Hersey–Blanchard, Belbin, Whitmore and de Bono against their sources.
