@@ -13,7 +13,7 @@ There are seven plans and **one PR**, opened at the end of Plan 7 with auto-merg
 | 4 | The coach | **Written:** `2026-10-21-decision-maker-plan-4-coach.md` (code drafted and run green, then removed) | Shared rubric text, the Decision Maker rubric with catalogue lines, per-model notes, waiting, Eisenhower tasks, another angle, `next_model`, and the canvas map. Split from the old Plan 4 on 21 Oct, because the coach and the app were too much for one plan |
 | 5 | Decide, Record and Review | **Done** (`2026-10-21-decision-maker-plan-5-decide-review.md`, HEAD `998e0f148`) | The decision record tool (`dm_record`) and Decide's step layer, reasons resting on model nodes (`basis`), the first step and review date as confirm cards, the record composed from the session with its provenance and update offers, Review on the feedback analysis via `reviewState`, and the scripted coach's whole decision. Split from the old Plan 5 on 21 Oct, because the server work and the app were too much for one plan |
 | 6 | The app | **Done** (`2026-10-21-decision-maker-plan-6-app.md`, HEAD `54e9947fc`) | Nav and route; landing (hero, New decision, Quick decision placeholder, decisions with the medal, the four sections with Start from this, the shared skills ribbon); session (track, compass, canvas with strip, coach, tray, review panel, cards); Problem Solver's client taking a tool's API, look, origin, record and chips; the record on a page with its provenance image and graphic retry; the mock API route |
-| 7 | Quick decision and checks | To write after Plan 6 | Quick route and Go deeper; light source check; live coach evaluation; Playwright walks at desktop and 390px; `pre-pr-check`; the PR |
+| 7 | Quick decision and checks | **Written:** `2026-10-21-decision-maker-plan-7-quick-checks.md` (code drafted, run green and walked in Playwright at both widths, then removed) | Quick route and Go deeper; light source check; live coach evaluation; Playwright walks at desktop and 390px; `pre-pr-check`; the PR |
 
 ## What each later plan must cover (from the spec)
 
@@ -49,7 +49,7 @@ There are seven plans and **one PR**, opened at the end of Plan 7 with auto-merg
 - The decision record on a linked page: its page blocks with a provenance image block, the bridge with a graphic retry, and the mock API's `/api/decision-book` route.
 - The shared skill tally ribbon on both landing pages.
 
-**Plan 7: Quick decision and checks** (Plan 6's "Notes for Plan 7" add detail)
+**Plan 7: Quick decision and checks** (written)
 - `packages/decision-book/quick.mjs` as data: decision, then three yes/no questions, then proceed or not, then a Stop Rule, then learn and next.
 - A `quick` session kind on `/api/decision-book`, with its chart, It came back, and Go deeper (which carries the decision and criteria into a full session).
 - The light check of Drexler/Sibbet, Hersey–Blanchard, Belbin, Whitmore and de Bono against their sources.
