@@ -988,9 +988,20 @@ var AudioBlockSchema = z6.object({
   block_type: z6.literal("audio"),
   variant: z6.string().default("medium"),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z6.object({
     url: z6.string(),
-    title: z6.string().optional()
+    title: z6.string().optional(),
+    mode: z6.enum(["listen", "respond", "viva"]).default("listen"),
+    prompt: z6.string().max(4e3).optional(),
+    time_limit_s: z6.number().int().min(30).max(300).optional(),
+    student_chooses_time: z6.boolean().optional(),
+    scaffold: z6.array(z6.object({ label: z6.string().max(80), weight: z6.number().min(0.5).max(3).default(1) })).max(8).optional(),
+    code_groups: z6.array(z6.enum(["composition", "viva", "speaking"])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1600,6 +1611,14 @@ var AnnotationTechniqueRefSchema = z6.object({
   id: z6.string().min(1),
   table_version: z6.string().min(1)
 });
+var AnnotationCodeRefSchema = z6.object({
+  id: z6.string().min(1).max(40),
+  code: z6.string().regex(/^[A-Z]{1,3}$/),
+  label: z6.string().max(60),
+  descriptor: z6.string().max(600).default(""),
+  colour: z6.enum(["blue", "sage", "peach", "gold", "lilac"]).default("blue"),
+  positive: z6.boolean().default(false)
+});
 var AnnotationAttachmentSchema = z6.discriminatedUnion("kind", [
   z6.object({
     kind: z6.literal("link"),
@@ -1703,6 +1722,7 @@ var AnnotationItemSchema = z6.object({
   thread: AnnotationThreadSchema.optional(),
   anthology: AnthologyTagSchema.optional(),
   technique: AnnotationTechniqueRefSchema.optional(),
+  code: AnnotationCodeRefSchema.optional(),
   body: z6.object({
     html: z6.string(),
     attachments: z6.array(AnnotationAttachmentSchema).default([])
@@ -3665,7 +3685,7 @@ var NEW_BLOCK_LABEL = {
   gallery: "Gallery",
   video: "Video",
   embed: "Embed",
-  audio: "Audio",
+  audio: "Voice",
   attachment: "Attachment",
   accordion: "Accordion",
   table: "Table",
@@ -4074,7 +4094,7 @@ function createBlock(type, id) {
         ...shared,
         block_type: "audio",
         variant: "medium",
-        content: { url: "" }
+        content: { url: "", mode: "listen" }
       };
     case "attachment":
       return {
@@ -5676,7 +5696,11 @@ function ownIssue(block, discernHosts) {
     }
   }
   if (block.block_type === "audio") {
-    if (!isHttpUrl(block.content.url)) {
+    const mode = block.content.mode ?? "listen";
+    if (mode !== "listen" && !block.content.prompt?.trim()) {
+      return "Voice blocks need a question to publish";
+    }
+    if (mode === "listen" && !isHttpUrl(block.content.url)) {
       return "Audio blocks need a valid http(s) URL to publish";
     }
   }
