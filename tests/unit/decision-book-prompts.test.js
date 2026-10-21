@@ -134,12 +134,12 @@ test('minimum met: another angle from the book\'s see also, then ours, or Decide
   assert.deepEqual(anotherAngle('dm_eisenhower'), { book: [], ours: ['dm_project_portfolio', 'dm_stop_rule'] });
 });
 
-test('Decide has its own step layer and no model note', () => {
+test('Decide has its own step layer, naming the decision record, and no model note', () => {
   const s = moveOn(inModel('dm_eisenhower'), deps);
   const prompt = buildDecisionPrompt(s);
   assert.equal(s.phase, 'decide');
   assert.equal(prompt.system.length, 2);
-  assert.match(prompt.system[1], /CURRENT STEP: Decide\n.+Stop Rule/);
+  assert.match(prompt.system[1], /^CURRENT STEP: Decide\nSettle the decision on the decision record \(dm_record\)[^]+Stop Rule/);
   assert.match(prompt.user, /MODE: boundary.+what they learned about how they decide/);
 });
 

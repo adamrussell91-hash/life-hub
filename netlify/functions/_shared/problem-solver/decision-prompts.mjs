@@ -10,9 +10,11 @@ import { isComplete, nextSlots } from '../../../../packages/problem-solver/machi
 import { stepName, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { COMPASS } from '../../../../packages/decision-book/compass.mjs';
 import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
-import { activeRun, currentStep, followOn, frameKeysOf, skippedUntouched } from './session.mjs';
+import { FEEDBACK_ID, RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { basisCandidates, basisOf, recordOffer } from '../../../../packages/decision-book/record.mjs';
+import { activeRun, currentStep, followOn, frameKeysOf, skippedUntouched, waitingForReview } from './session.mjs';
 import { GATEKEEPING, THINKING_SKILLS, VOICE, outputBlock } from './prompts-shared.mjs';
-import { SUMMARY_EVERY, earlierSteps, proposable, scoreNote, transcript } from './prompts.mjs';
+import { SUMMARY_EVERY, earlierSteps, proposable, scoreNote, taskStatusLine, transcript } from './prompts.mjs';
 import { COMPASS_GUIDE, DECISION_TRAPS, SECTION_LINE, STANCE, anotherAngle, catalogueLines, modelNote } from './knowledge/decision-book.mjs';
 
 const MODEL_ID = DECISION_MODEL.id;
@@ -37,7 +39,7 @@ SESSION SHAPE
 6. Another angle: when the state says MINIMUM MET, offer the model's exercise if it has one, or one follow-up from ANOTHER ANGLE with "next_tool" and a one-sentence reason, or "next_step" to go to Decide. Offer one, not a menu. Every model run stays on the record.
 7. Switching: if the same slot has been challenged twice, or the model no longer fits the decision, suggest a better model with "switch_tool" and a one-sentence reason.
 8. Carry forward: use what earlier models established (listed under EARLIER) as the starting point, and say so. Do not copy it in without the person agreeing.
-9. Tasks: only slots listed under "Can become tasks" qualify (the Eisenhower matrix's do-immediately items). When one is specific enough to start (a clear action, ideally a date), offer it in "proposeTasks" with its slot and a short task title. The person confirms each on a card; never say a task exists until TASKS shows it confirmed.
+9. Tasks: only slots listed under "Can become tasks" qualify (the Eisenhower matrix's do-immediately items, and the decision record's first step). When one is specific enough to start (a clear action, ideally a date), offer it in "proposeTasks" with its slot and a short task title. The person confirms each on a card; never say a task exists until TASKS shows it confirmed.
 10. The person can move on at any time. Never block them.
 
 ${DECISION_TRAPS}
@@ -52,15 +54,31 @@ ${outputBlock({
   frame: ['decision', 'compass', 'known'],
   model: false,
   suggestion: '{"kind":"next_tool|switch_tool|next_step","tool":"...","reason":"..."}',
-  tasks: '"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}]',
-  rules: 'Include "proposeTasks" only for slots listed under "Can become tasks". Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "tool" only with next_tool or switch_tool, and only a model id from THE MODELS. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.'
+  tasks: '"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}],"basis":[{"tool":"...","slot":"..."}]',
+  rules: 'Include "proposeTasks" only for slots listed under "Can become tasks". Include "basis" only with a decision record reason. Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "tool" only with next_tool or switch_tool, and only a model id from THE MODELS, or the tool CURRENT STEP names in Decide and Review. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.'
 })}`;
 
+const record = TOOLS[RECORD_ID];
+
 const DECIDE = `CURRENT STEP: Decide
-Settle the decision in conversation: the decision in one sentence; the reasons, each resting on something a model showed; a Stop Rule (one trigger that would make them rethink, and the action agreed now); the first step; and a date to review it. Challenge a decision with no first step or nothing that would make them rethink. Do not suggest a model. Suggest next_step when it has what it needs.`;
+Settle the decision on the decision record (${RECORD_ID}), the one tool in this step. When no record is open, suggest it with next_tool. Work its slots in order, one per answer:
+${record.steps.map((s, i) => `  ${i + 1}. ${s.title}: ${s.prompt}`).join('\n')}
+Slot meanings: ${Object.entries(record.slots).map(([k, v]) => `${k} = ${v}`).join('; ')}.
+DECISION RECORD RULES
+- decision: one sentence the person would say to someone it affects. Seed it from the frame and what the models showed, and confirm before placing.
+- reason: accept only a reason that rests on something a model placed. Put those nodes in "basis" as [{"tool":"<model id>","slot":"<slot>"}], chosen from REASONS CAN REST ON. Never invent a node. A reason that rests on nothing a model showed is challenged (critical_thinking).
+- trigger: something the person would notice, with a date or a number where it can have one. action: what they agree now to do if it happens, not "think again".
+- first_step: small enough to start this week. It can become a task: offer it in "proposeTasks" with a short title and its date if they gave one. The person confirms it on a card; never say a task exists until TASKS shows it confirmed.
+- review: a date after TODAY, in node.text as YYYY-MM-DD. It becomes a review card the person confirms; never say it is set until REVIEW shows it created.
+- Challenge a decision with no first step or nothing that would make them rethink.
+- When the record is complete, suggest next_step: Review then waits for its date.`;
 
 const REVIEW = `CURRENT STEP: Review
-Compare what the person expected when they decided with what actually happened, then what they learned about how they decide. Look at what happened, not the plan. Do not suggest a model. Suggest next_step when it is done.`;
+Review compares what the person expected when they decided with what actually happened, on the feedback analysis (${FEEDBACK_ID}).
+- When REVIEW IS WAITING, the results are not in yet: say Review picks up on its date, and that they can press Review now if results are already in. Do not suggest a model or place nodes.
+- In a review: when no feedback analysis is open, suggest it with next_tool. Seed the centre from the decision; seed the expected side from the record's reasons and Stop Rule, and from any feedback analysis written in Explore before acting; seed the actual side from TASK STATUS and what the person says happened. Confirm before placing. Look at what happened, not the plan.
+- In the reflection, ask what the match or mismatch says about how they decide, and whether the Stop Rule's trigger came.
+- When it is complete, suggest next_step to close the review.`;
 
 /** Step layer: stable for the whole of a step, so it caches between turns. */
 function stepLayer(session) {
@@ -81,6 +99,8 @@ function compassLabels(value) {
 /** Minimum met: the exercise, the book's see also and ours (unused ones only), or Decide. */
 function progressLine(session, run) {
   if (!followOn(session)) return 'Progress: not yet at the minimum for this model; keep working its steps.';
+  if (run.tool === RECORD_ID) return 'Progress: RECORD COMPLETE. Suggest next_step: Review waits for its date.';
+  if (session.phase === 'review') return 'Progress: MINIMUM MET. Suggest next_step to close the review.';
   const used = (currentStep(session)?.runs ?? []).map((item) => item.tool);
   const { book, ours } = anotherAngle(run.tool, used);
   const angle = [book.length ? `the book's see also: ${book.join(', ')}` : '', ours.length ? `ours: ${ours.join(', ')}` : ''].filter(Boolean).join('; ');
@@ -104,10 +124,42 @@ function runState(session, run) {
   ].join('\n');
 }
 
+/** In Decide, the Explore nodes a reason can rest on, and what each placed reason rests on. */
+function basisLines(session, run) {
+  if (run.tool !== RECORD_ID) return [];
+  const candidates = basisCandidates(session);
+  const lines = [`REASONS CAN REST ON (tool slot: node):\n${candidates.map((c) => `  ${c.tool} ${c.slot}: ${c.title}`).join('\n') || '  nothing yet: no model placed anything in Explore'}`];
+  const basis = basisOf(session);
+  const rested = run.nodes.filter((node) => basis[node.id]).map((node) => `  ${node.slot} rests on ${basis[node.id].map((b) => `${b.model}: ${b.title}`).join('; ')}`);
+  if (rested.length) lines.push(`Placed reasons rest on:\n${rested.join('\n')}`);
+  return lines;
+}
+
 function taskLines(session) {
   const tasks = (session.proposedTasks ?? []).filter((p) => !p.removed);
-  if (!tasks.length) return null;
-  return `TASKS FROM THIS DECISION:\n${tasks.map((p) => `  ${p.status}: "${p.title}"${p.due ? ` due ${p.due}` : ''}`).join('\n')}`;
+  const proposal = session.reviewProposal;
+  if (!tasks.length && !proposal && !session.reviewTaskId) return null;
+  const review = session.reviewTaskId
+    ? `created for ${proposal?.due ?? 'its date'}`
+    : proposal?.status === 'dismissed' ? 'set aside by the person' : proposal ? `${proposal.status} for ${proposal.due}` : 'none yet';
+  return `TASKS FROM THIS DECISION:\n${tasks.map((p) => `  ${p.status}: "${p.title}"${p.due ? ` due ${p.due}` : ''}`).join('\n') || '  none'}\nREVIEW: ${review}`;
+}
+
+/** Review's state, the task evidence, and the decision record on its page. */
+function reviewLines(session) {
+  const lines = [];
+  const state = session.reviewState;
+  if (state?.status === 'waiting') lines.push(`REVIEW IS WAITING for results. It is ${session.reviewTaskId ? 'a task' : 'proposed'} for ${state.due ?? 'a date not yet set'}. Do not suggest a model or place nodes.`);
+  if (state?.status === 'reviewing') lines.push(`REVIEW IN PROGRESS since ${String(state.startedAt).slice(0, 10)}. Look at what actually happened, not the plan.`);
+  if (session.taskSnapshot) lines.push(taskStatusLine(session.taskSnapshot));
+  const offer = recordOffer(session);
+  const written = session.caseFile;
+  if (written) {
+    const where = written.target.kind === 'project' ? 'the linked project' : 'the linked task';
+    const changed = offer?.kind === 'update' ? ` Changed since: ${offer.changed.map((key) => offer.file.sections.find((s) => s.key === key)?.heading).join(', ')}. The person can add update v${offer.version} from the card.` : '';
+    lines.push(`DECISION RECORD: v${written.version} written ${written.writtenAt.slice(0, 10)} to ${where}.${changed}`);
+  } else if (offer) lines.push('DECISION RECORD: ready to write. The person writes it onto a task or project page from the card; it is not written yet.');
+  return lines;
 }
 
 function boundaryLine(session) {
@@ -130,10 +182,12 @@ export function buildDecisionPrompt(session) {
   if (session.frame.compass) parts.push(`COMPASS: ${compassLabels(session.frame.compass)}`);
   const earlier = earlierSteps(session);
   if (earlier) parts.push(earlier.replace(/^EARLIER STEPS:/, 'EARLIER:'));
+  if (session.model) parts.push(...reviewLines(session));
   if (session.pendingLearning && session.runner?.mode !== 'boundary') {
     const from = stepName(MODEL_ID, session.pendingLearning);
-    const offer = session.phase === 'explore' && !run ? ' and suggest a model with next_tool' : '';
-    parts.push(`AWAITING LEARNING from ${from}: if they named something they learned about how they decide, put it in "learning" (one sentence, their meaning); otherwise leave learning null. Either way, orient them to the current step in one sentence${offer}.`);
+    const offer = session.phase === 'explore' && !run ? ' and suggest a model with next_tool' : session.phase === 'decide' && !run ? ' and suggest the decision record with next_tool' : '';
+    const orient = waitingForReview(session) ? 'Then say Review picks up on its date, and do not suggest a model.' : `Either way, orient them to the current step in one sentence${offer}.`;
+    parts.push(`AWAITING LEARNING from ${from}: if they named something they learned about how they decide, put it in "learning" (one sentence, their meaning); otherwise leave learning null. ${orient}`);
   }
   const step = currentStep(session);
   if (step) {
@@ -141,8 +195,11 @@ export function buildDecisionPrompt(session) {
       parts.push(`Earlier model in this step ${item.tool}: ${item.status}${item.switchReason ? ` (${item.switchReason})` : ''}; ${item.nodes.map((node) => `${node.slot}: ${node.text}`).join(' | ')}${scoreNote(item)}`);
     }
   }
-  if (run) parts.push(runState(session, run));
-  else if (step && !session.pendingLearning && session.runner?.mode !== 'boundary' && toolsForPlanStep(MODEL_ID, session.phase).length) parts.push('No model is open in this step yet: recommend one with next_tool, naming a sibling you passed over.');
+  if (run) parts.push(runState(session, run), ...basisLines(session, run));
+  else if (step && !session.pendingLearning && session.runner?.mode !== 'boundary' && !waitingForReview(session)) {
+    if (session.phase === 'explore') parts.push('No model is open in this step yet: recommend one with next_tool, naming a sibling you passed over.');
+    else if (toolsForPlanStep(MODEL_ID, session.phase).length) parts.push(`No tool is open in this step yet: suggest ${toolsForPlanStep(MODEL_ID, session.phase)[0]} with next_tool.`);
+  }
   const tasks = taskLines(session);
   if (tasks) parts.push(tasks);
   if (session.pendingKeep) parts.push(`Last challenged answer (${session.pendingKeep.slot}): ${session.pendingKeep.text}`);

@@ -116,6 +116,12 @@ export function validateCoachTurn(raw) {
     proposeTasks.push({ slot: item.slot, title, due: isDate(item.due) ? item.due : null });
   }
   const proposeReview = raw.proposeReview && isDate(raw.proposeReview.due) ? { due: raw.proposeReview.due, reason: text(raw.proposeReview.reason, 300) ?? '' } : null;
+  // A decision record reason's basis: the Explore nodes it rests on, by model id and slot. Items
+  // that are not shaped right are dropped; the session keeps only those naming a placed node.
+  const basis = (Array.isArray(raw.basis) ? raw.basis : [])
+    .filter((item) => typeof item?.tool === 'string' && parseSlot(item?.slot))
+    .slice(0, 4)
+    .map((item) => ({ tool: item.tool, slot: item.slot }));
 
   return {
     ok: true,
@@ -134,7 +140,8 @@ export function validateCoachTurn(raw) {
       learning: text(raw.learning, 600),
       lightning,
       proposeTasks,
-      proposeReview
+      proposeReview,
+      basis
     }
   };
 }
