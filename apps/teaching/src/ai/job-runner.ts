@@ -4,6 +4,7 @@ import { emptySearchPack } from '@/ai/search-pack';
 import { validateMutatingProposal } from '@/ai/validate-proposal';
 import { quizProposalIssues } from '@/ai/quiz-proposal';
 import { findBlockById } from '@/blocks/find-block';
+import { visitBlocks } from '@/blocks/walk-blocks';
 import type { AiJob } from '@/ai/jobs';
 import type { Lesson } from '@/schemas/lesson';
 
@@ -57,12 +58,13 @@ export function webSearchTool(tier: ModelTier): ToolDefinition {
 
 /** A guard against runaway loops; a quiz build needs about four turns. */
 export const MAX_TURNS = 10;
-const MAX_TOKENS = 16000;
+/** Streamed, so one reply can hold a full 30-question proposal with explanations. */
+const MAX_TOKENS = 48000;
 
 export type SystemBlock = {
   type: 'text';
   text: string;
-  cache_control?: { type: 'ephemeral' };
+  cache_control?: { type: 'ephemeral'; ttl?: '1h' };
 };
 
 export type ToolDefinition = {
@@ -94,6 +96,7 @@ export interface ModelRequest {
 }
 
 export interface ModelUsage {
+  cache_creation?: { ephemeral_5m_input_tokens?: number | null; ephemeral_1h_input_tokens?: number | null } | null;
   input_tokens?: number | null;
   output_tokens?: number | null;
   cache_read_input_tokens?: number | null;
@@ -156,13 +159,20 @@ const PRICES: Record<string, { input: number; output: number; cacheRead: number 
 };
 const WEB_SEARCH_USD = 0.01;
 
+/** 5-minute cache writes cost 1.25x input, 1-hour writes 2x. */
+function cacheWriteCost(usage: ModelUsage, input: number, perToken: (rate: number) => number): number {
+  const hour = usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  const total = usage.cache_creation_input_tokens ?? 0;
+  return hour * perToken(input * 2) + Math.max(0, total - hour) * perToken(input * 1.25);
+}
+
 export function estimateCostUsd(model: string, usage: ModelUsage | undefined): number {
   if (!usage) return 0;
   const price = PRICES[model];
   const perToken = (rate: number) => rate / 1_000_000;
   const tokens = price
     ? (usage.input_tokens ?? 0) * perToken(price.input) +
-      (usage.cache_creation_input_tokens ?? 0) * perToken(price.input * 1.25) +
+      cacheWriteCost(usage, price.input, perToken) +
       (usage.cache_read_input_tokens ?? 0) * perToken(price.cacheRead) +
       (usage.output_tokens ?? 0) * perToken(price.output)
     : 0;
@@ -171,6 +181,45 @@ export function estimateCostUsd(model: string, usage: ModelUsage | undefined): n
 }
 
 const PROPOSAL_TOOLS = new Set<string>(AI_TOOLS.map((tool) => tool.name));
+
+/** The heading Ann puts on a plan, so the next turn can tell the plan was sent. */
+export const PLAN_MARKER = 'Plan to confirm';
+/** Builds bigger than this cost real money, so the teacher confirms a plan first. */
+export const BIG_BUILD = { blocks: 8, quizQuestions: 5 } as const;
+const GO_AHEAD = /\b(go ahead|just (build|do|make) it|no need to (confirm|check|ask)|skip the plan|don'?t (ask|check) first)\b/i;
+
+/** The teacher has seen a plan (and this message answers it), or told Ann to skip it. */
+export function planConfirmed(job: Pick<AiJob, 'history' | 'message'>): boolean {
+  if (GO_AHEAD.test(job.message)) return true;
+  return (job.history ?? []).some((turn) => turn.role === 'assistant' && turn.content.includes(PLAN_MARKER));
+}
+
+function countBuild(proposal: AiProposal): { blocks: number; quizQuestions: number } {
+  const blocks =
+    proposal.kind === 'insert_blocks' || proposal.kind === 'replace_lesson'
+      ? proposal.blocks
+      : proposal.kind === 'replace_section'
+        ? [proposal.section]
+        : [];
+  let total = 0;
+  let quizQuestions = 0;
+  visitBlocks(blocks, (block) => {
+    total += 1;
+    if (block.block_type === 'quiz_question') quizQuestions += 1;
+  });
+  return { blocks: total, quizQuestions };
+}
+
+export function isBigBuild(proposal: AiProposal): boolean {
+  const { blocks, quizQuestions } = countBuild(proposal);
+  return blocks > BIG_BUILD.blocks || quizQuestions > BIG_BUILD.quizQuestions;
+}
+
+function planStatus(job: AiJob): string {
+  return planConfirmed(job)
+    ? '[Plan status: the teacher has answered your plan or said to go ahead. Build to it, applying any changes they asked for.]'
+    : `[Plan status: no plan confirmed yet. If this is a big build (more than ${BIG_BUILD.quizQuestions} quiz questions or ${BIG_BUILD.blocks} blocks), do not research or build yet: reply with the plan, headed "${PLAN_MARKER}", and stop.]`;
+}
 
 function openingMessages(job: AiJob): ModelMessage[] {
   const history = (job.history ?? [])
@@ -184,9 +233,10 @@ function openingMessages(job: AiJob): ModelMessage[] {
     if (last && last.role === turn.role) last.content += `\n\n${turn.content}`;
     else messages.push({ ...turn });
   }
+  const current = `${job.message}\n\n${planStatus(job)}`;
   const last = messages[messages.length - 1];
-  if (last?.role === 'user') last.content += `\n\n${job.message}`;
-  else messages.push({ role: 'user', content: job.message });
+  if (last?.role === 'user') last.content += `\n\n${current}`;
+  else messages.push({ role: 'user', content: current });
   return messages;
 }
 
@@ -207,11 +257,13 @@ function safeValidate(proposal: AiProposal): { ok: true } | { ok: false; error: 
 export function checkProposalCall(name: string, input: unknown, lesson: Lesson): AiProposal | string {
   const parsed = parseToolProposal(name, input);
   if ('error' in parsed) return `${name}: ${truncate(parsed.error)}`;
-  // Report every problem in one round: the publish check already covers each
-  // question's content, so the quiz pass then only adds its lesson-level rules.
+  // Report every problem in one round. For a quiz question the quiz pass says
+  // exactly which field is wrong, so its words replace the publish check's
+  // generic ones; any other publish problem is kept.
   const checked = safeValidate(parsed);
-  const quiz = quizProposalIssues(parsed, lesson, { questions: checked.ok });
-  const problems = [...(checked.ok ? [] : [checked.error]), ...quiz, ...anchorIssues(parsed, lesson)];
+  const quiz = quizProposalIssues(parsed, lesson);
+  const publish = checked.ok || (quiz.length > 0 && /^Quiz question \d+:/.test(checked.error)) ? [] : [checked.error];
+  const problems = [...publish, ...quiz, ...anchorIssues(parsed, lesson)];
   return problems.length ? truncate(problems.join('\n')) : parsed;
 }
 
@@ -273,8 +325,10 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
   });
   // Two cache points: the agent's static prefix (shared by every lesson) and
   // the lesson context (shared by every turn on this lesson until it changes).
+  // The prefix keeps for an hour, so a plan and the build the teacher confirms
+  // later share it.
   const system: SystemBlock[] = [
-    { type: 'text', text: staticPrompt, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: staticPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } },
     { type: 'text', text: lessonContext, cache_control: { type: 'ephemeral' } }
   ];
   const toolsFor = (tier: ModelTier): ToolDefinition[] => [
@@ -334,6 +388,7 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
     if (reply.stop_reason === 'max_tokens') {
       // A cut-off tool call cannot be replayed; ask for a smaller piece instead.
       lastProblem = 'The answer was too long and got cut off. Try asking for a smaller piece.';
+      checks.push(`Turn ${turns}: reply cut off at the ${MAX_TOKENS}-token output limit`);
       const note = 'Your previous answer was cut off for length and was not shown. Propose a smaller change (split large builds across turns) and say so.';
       const last = messages[messages.length - 1]!;
       if (typeof last.content === 'string') last.content += `\n\n${note}`;
@@ -363,7 +418,11 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
           results.push({ type: 'tool_result', tool_use_id: call.id, content: 'Only one proposal is shown per answer. This one was skipped.', is_error: true });
           continue;
         }
-        const checked = checkProposalCall(call.name, call.input, lesson);
+        const parsedCall = checkProposalCall(call.name, call.input, lesson);
+        const checked =
+          typeof parsedCall !== 'string' && isBigBuild(parsedCall) && !planConfirmed(job)
+            ? `This is a big build and the teacher has not confirmed a plan. Do not build yet: reply without any tool call with a short plan headed "${PLAN_MARKER}" and wait for their answer.`
+            : parsedCall;
         if (typeof checked === 'string') {
           failedProposals += 1;
           checks.push(`Turn ${turns}: ${checked}`);
