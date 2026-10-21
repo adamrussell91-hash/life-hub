@@ -7,7 +7,7 @@ import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
-import { activeRun, reopenProblem, waitingForReview } from './session.mjs';
+import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
 
 const WORD_LIMIT = 60;
 const REWRITE_OVER = 70;
@@ -97,19 +97,30 @@ function withAcceptedNode(session, turn) {
   return { ...session, steps: { ...session.steps, [session.phase]: { ...step, runs } } };
 }
 
+/** Tools a frame-phase suggestion may name: Explore's models for a decision, else Define tools. */
+function frameTools(session) {
+  return session.kind === 'decision' ? toolsForPlanStep('decision_book', 'explore') : toolsForBookStep('define');
+}
+
+/** True when this reply ends framing: a decision's last frame answer, or a chosen model. */
+function endsFrame(session, value) {
+  if (session.kind === 'decision') return frameKeysOf(session).every((key) => Boolean(session.frame[key] || value.frame?.[key]));
+  return Boolean(value.model);
+}
+
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
   if (result.value.suggestion?.kind === 'escalate') result.value = { ...result.value, suggestion: null };
   if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null, proposeTasks: [], proposeReview: null } };
-  // In frame a suggestion only means something on the turn that sets the model (the frame
+  // In frame a suggestion only means something on the turn that ends framing (the frame
   // completes and the first step opens); otherwise accepting it would be refused.
-  if (session.phase === 'frame' && (!result.value.model || result.value.suggestion?.kind === 'next_step')) {
+  if (session.phase === 'frame' && (!endsFrame(session, result.value) || result.value.suggestion?.kind === 'next_step')) {
     result.value = { ...result.value, suggestion: null };
   }
   const suggested = result.value.suggestion;
   if (suggested && (suggested.kind === 'next_tool' || suggested.kind === 'switch_tool')) {
-    const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);
+    const allowed = session.phase === 'frame' || !session.model ? frameTools(session) : toolsForPlanStep(session.model.id, session.phase);
     if (!allowed.includes(suggested.tool)) return { ok: false, error: `Tool ${suggested.tool} is not available in this step. Available: ${allowed.join(', ') || 'none, so do not suggest a tool'}.` };
   }
   // A reopen the session would refuse (judged with this turn's accepted node in place) is dropped.
