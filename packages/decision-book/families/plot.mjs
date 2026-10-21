@@ -3,13 +3,16 @@
 // the names; the person places each point with the chart's controls, which send a score
 // snapshot { points: { nodeId: { x, y, size?, plot? } } } through Problem Solver's scores
 // action. Snapshots merge in order, so points can be placed one at a time and moved later.
-// Options: a bubble `size` (1–10), a shaded `band` and several `plots` that never share axes
-// (the project portfolio's two coordinate systems): a point then names its plot.
-import { countSlots, nextIndexed, open } from '../../problem-solver/slots.mjs';
+// Options: a bubble `size` (1–10), a shaded `band` (a rectangle, or a `diagonal` channel as in
+// the flow model), several `plots` that never share axes (the project portfolio's two
+// coordinate systems: a point then names its plot), and `dimensions` the person names first
+// (`dimension` slots), which axes use instead of a fixed label (the gap in the market).
+import { countSlots, nextIndexed, open, parseSlot } from '../../problem-solver/slots.mjs';
 import { baseTool, check, checkCommon, framing, isKey, nodesIn, reflected, subjectFirst } from './common.mjs';
 
 const isScale = (value) => Number.isInteger(value) && value >= 1 && value <= 10;
-const isAxes = (axes) => Boolean(axes?.x?.label && axes.x.low && axes.x.high && axes?.y?.label && axes.y.low && axes.y.high);
+const isAxis = (axis, dims) => Boolean(axis && (axis.label || dims.includes(axis.dim)) && axis.low && axis.high);
+const isAxes = (axes, dims = []) => isAxis(axes?.x, dims) && isAxis(axes?.y, dims);
 
 /** The plots a config draws: its own list, or one plot `main` on the shared axes. */
 export function plotsOf(chart) {
@@ -23,6 +26,13 @@ export function positionsOf(run) {
   return out;
 }
 
+/** An axis's words for this run: its fixed label, or the title the person gave its dimension. */
+export function axisLabel(run, axis) {
+  if (!axis.dim) return axis.label;
+  const named = run.nodes.find((node) => parseSlot(node.slot)?.name === 'dimension' && node.tag === axis.dim);
+  return named ? (named.title ?? named.text) : axis.label ?? 'Not named yet';
+}
+
 /**
  * @param {object} config
  * @param {object} config.chart
@@ -30,7 +40,8 @@ export function positionsOf(run) {
  * @param {{id: string, label: string, axes: object}[]} [config.chart.plots] separate plots instead
  * @param {string} config.chart.point what one point is
  * @param {{label: string}} [config.chart.size] a bubble size, 1–10
- * @param {{label: string, x: [number, number], y: [number, number]}} [config.chart.band] a shaded region
+ * @param {{label: string, x?: [number, number], y?: [number, number], diagonal?: number}} [config.chart.band] a shaded region, or a channel of that half-width (percent) along the diagonal
+ * @param {{id: string, label: string}[]} [config.chart.dimensions] axes the person names (2 or 3)
  * @param {number} [config.chart.max] points (10)
  * @param {number} [config.chart.minPoints] placed points before the reflection opens (2)
  */
@@ -38,13 +49,15 @@ export function plotTool(config) {
   checkCommon(config);
   const { id, chart } = config;
   const plots = plotsOf(chart);
-  check(chart.plots ? !chart.axes : isAxes(chart.axes), id, 'give either axes or plots, not both');
+  const dims = (chart.dimensions ?? []).map((dim) => dim.id);
+  if (chart.dimensions) check(dims.length >= 2 && dims.length <= 3 && dims.every(isKey) && chart.dimensions.every((dim) => dim.label), id, 'dimensions are two or three, each with a key and a label');
+  check(chart.plots ? !chart.axes : isAxes(chart.axes, dims), id, 'give either axes or plots, not both');
   for (const plot of plots) {
     check(isKey(plot.id), id, `plot id ${plot.id} must be a lower-case key`);
-    check(isAxes(plot.axes), id, `plot ${plot.id} needs x and y axes with label, low and high`);
+    check(isAxes(plot.axes, dims), id, `plot ${plot.id} needs x and y axes with label (or dim), low and high`);
   }
   check(typeof chart.point === 'string' && chart.point, id, 'needs a point description');
-  if (chart.band) check(chart.band.label && [...chart.band.x, ...chart.band.y].every(isScale), id, 'band needs a label and 1–10 bounds');
+  if (chart.band) check(chart.band.label && (chart.band.diagonal ? chart.band.diagonal > 0 && chart.band.diagonal < 50 : [...(chart.band.x ?? []), ...(chart.band.y ?? [])].length === 4 && [...chart.band.x, ...chart.band.y].every(isScale)), id, 'band needs a label and 1–10 bounds, or a diagonal half-width under 50');
   const max = chart.max ?? 10;
   const minPoints = chart.minPoints ?? 2;
   const plotIds = plots.map((plot) => plot.id);
@@ -56,12 +69,18 @@ export function plotTool(config) {
     return nodesIn(run, 'point').filter((node) => !(isScale(at[node.id]?.x) && isScale(at[node.id]?.y)));
   };
   const ready = (run) => countSlots(run, 'point') >= minPoints && unplaced(run).length === 0;
+  const unnamed = (run) => dims.filter((dim) => !nodesIn(run, 'dimension').some((node) => node.tag === dim));
 
-  return baseTool(config, 'plot', { point: chart.point }, {
-    ...(many ? { nodeTags: { point: plotIds } } : {}),
+  return baseTool(config, 'plot', { ...(dims.length ? { dimension: 'One dimension to compare on, named by you' } : {}), point: chart.point }, {
+    nodeTags: { ...(many ? { point: plotIds } : {}), ...(dims.length ? { dimension: dims } : {}) },
+    validateNode(run, node) {
+      if (node.slot.startsWith('dimension') && !unnamed(run).includes(node.tag)) return 'That dimension already has a name; name another.';
+      return null;
+    },
     nextSlots(run) {
       const first = subjectFirst(run, subject);
       if (first) return first;
+      if (unnamed(run).length) return [nextIndexed(run, 'dimension', dims.length)];
       if (reflection && countSlots(run, 'reflection')) return [];
       return open(nextIndexed(run, 'point', max), reflection && ready(run) ? 'reflection' : null);
     },

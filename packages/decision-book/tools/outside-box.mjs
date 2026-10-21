@@ -16,6 +16,8 @@ export const dmOutsideBox = baseTool({
     { id: 'attempt', title: 'Try the puzzle', prompt: 'Join the nine dots with four straight lines without lifting the pen.' },
     { id: 'assumption', title: 'Name your box', prompt: 'Which limit around this decision have you assumed rather than checked?' }
   ],
+  exercise: 'Try the puzzle before asking for the answer, then list two limits you have never checked.',
+  pairsWell: ['dm_gap_in_market', 'dm_crossroads'],
   chart: { reflection: 'What changes if that limit is not real' }
 }, 'oneoff', {
   attempt: 'How you would join the dots, or where you got stuck',

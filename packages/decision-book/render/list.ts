@@ -4,7 +4,8 @@
 //   checklist  rows in order, a tick and "Done" once a criterion has an entry;
 //   rows       full-width rows; lanes  columns side by side;
 //   routes     blocks around a centre disc, joined to it by dotted lines;
-//   pyramid    levels from the base up, each narrower than the one below, one pyramid per column;
+//   pyramid    levels from the base up, each narrower than the one below, one pyramid per column
+//              (an `inverted` column is drawn widest at the top);
 //   roles      a card grid.
 // Groups with a `column` are drawn in one stack per column, headed by the column's name.
 // Phone: everything becomes one column of labelled blocks; a pyramid keeps its narrowing.
@@ -15,6 +16,7 @@ export type ListChart = {
   layout: 'checklist' | 'rows' | 'lanes' | 'routes' | 'pyramid' | 'roles';
   groups: { id: string; label: string; prompt?: string; column?: string }[];
   entry: string;
+  inverted?: string[];
 };
 
 const FILL_CYCLE: Fill[] = ['green', 'red', 'tint'];
@@ -56,7 +58,9 @@ export function createListView(tool: ChartTool & { chart: ListChart }, doc: Docu
             block.setAttribute('role', 'group');
             block.setAttribute('aria-label', group.label);
             block.setAttribute('data-group', group.id);
-            block.style.setProperty('--dm-level', String(level));
+            // An inverted pyramid keeps its levels in order but is widest at the top.
+            const width = chart.inverted?.includes(columnKey) ? members.length - 1 - level : level;
+            block.style.setProperty('--dm-level', String(width));
             block.style.setProperty('--dm-levels', String(members.length));
             const head = el(doc, 'div', 'dm-list__head');
             head.setAttribute('aria-hidden', 'true');

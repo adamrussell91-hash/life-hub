@@ -15,6 +15,8 @@ export const dmBlackBox = baseTool({
     { id: 'ends', title: 'What goes in, what comes out', prompt: 'List what you put in and what you see come out.' },
     { id: 'inside', title: 'The hidden part', prompt: 'What happens inside that you cannot see?' }
   ],
+  exercise: 'Name one system you rely on without understanding, and one way to check its outputs.',
+  pairsWell: ['dm_rumsfeld', 'dm_future'],
   chart: { reflection: 'Whether you need to open the box to decide' }
 }, 'oneoff', {
   input: 'Something that goes in',

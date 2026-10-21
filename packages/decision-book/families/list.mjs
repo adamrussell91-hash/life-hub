@@ -5,7 +5,8 @@
 //   rows       a row per group (cognitive bias)
 //   lanes      a column per group (conflict responses)
 //   routes     groups as routes out from the centre (crossroads)
-//   pyramid    groups stacked from the base up, one pyramid per `column` (Maslow, then and now)
+//   pyramid    groups stacked from the base up, one pyramid per `column` (Maslow, then and now);
+//              a column listed in `inverted` is drawn widest at the top (Maslow's wants)
 //   roles      a card per group (Belbin roles, de Bono hats)
 import { countSlots, nextIndexed, open } from '../../problem-solver/slots.mjs';
 import { baseTool, check, checkCommon, framing, isKey, nodesIn, reflected, subjectFirst } from './common.mjs';
@@ -28,6 +29,7 @@ export function entriesByGroup(run, chart) {
  * @param {number} [config.chart.perGroup] (6)
  * @param {number} [config.chart.minGroups] groups with an entry before the reflection opens (2)
  * @param {number} [config.chart.minEntries] entries before the reflection opens (3)
+ * @param {string[]} [config.chart.inverted] pyramid columns drawn widest at the top
  */
 export function listTool(config) {
   checkCommon(config);
@@ -39,6 +41,7 @@ export function listTool(config) {
   const columns = chart.groups.map((group) => group.column ?? null);
   check(columns.every((c) => c === null) || columns.every((c) => isKey(c)), id, 'give every group a column, or none');
   if (columns[0] !== null) check(chart.layout === 'pyramid' || chart.layout === 'lanes', id, 'columns belong to pyramid or lanes');
+  check(!chart.inverted || (chart.layout === 'pyramid' && chart.inverted.every((column) => columns.includes(column))), id, 'inverted names pyramid columns');
   check(typeof chart.entry === 'string' && chart.entry, id, 'needs an entry description');
   const perGroup = chart.perGroup ?? 6;
   const minGroups = chart.minGroups ?? 2;

@@ -16,6 +16,7 @@ import { FILLS, baseTool, check, checkCommon, framing, isKey, nodesIn, reflected
  * @param {number} [config.chart.max] entries in all (16)
  * @param {number} [config.chart.minItems] entries before the reflection opens (3)
  * @param {number} [config.chart.minCells] distinct cells used before the reflection opens (2)
+ * @param {string[]} [config.chart.taskCells] cells whose items can become real tasks
  */
 export function quadrantTool(config) {
   checkCommon(config);
@@ -35,6 +36,8 @@ export function quadrantTool(config) {
   const minItems = chart.minItems ?? 3;
   const minCells = chart.minCells ?? 2;
   const cellIds = chart.cells.map((cell) => cell.id);
+  const taskCells = chart.taskCells ?? [];
+  check(taskCells.every((cell) => cellIds.includes(cell)), id, 'taskCells name cells of this chart');
   const { subject, reflection } = framing(config);
 
   const ready = (run) => {
@@ -44,6 +47,7 @@ export function quadrantTool(config) {
 
   return baseTool(config, 'quadrant', { item: chart.item }, {
     nodeTags: { item: cellIds },
+    ...(taskCells.length ? { taskSlots: { item: (node) => taskCells.includes(node.tag) } } : {}),
     nextSlots(run) {
       const first = subjectFirst(run, subject);
       if (first) return first;

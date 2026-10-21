@@ -42,6 +42,8 @@ export function checkCommon(config) {
   check(Array.isArray(config.steps) && config.steps.length > 0, id, 'needs coaching steps');
   check(['worksheet', 'lens'].includes(config.tier ?? 'worksheet'), id, 'tier is worksheet or lens');
   check(config.chart && typeof config.chart === 'object', id, 'needs a chart config');
+  check(config.exercise == null || (typeof config.exercise === 'string' && config.exercise), id, 'an exercise is a sentence');
+  check(config.pairsWell === undefined || (Array.isArray(config.pairsWell) && config.pairsWell.every((other) => typeof other === 'string' && other !== id)), id, 'pairsWell lists other tool ids');
 }
 
 /**
@@ -82,6 +84,10 @@ export function baseTool(config, family, slots, extra) {
     when: config.when,
     failureModes: freeze([...(config.failureModes ?? [])]),
     steps: freeze(config.steps.map((s) => ({ ...s }))),
+    // Our own coaching additions: the book's exercise in our words, and links we add beside the
+    // book's "see also" (catalogue.mjs keeps the book's).
+    exercise: config.exercise ?? null,
+    pairsWell: freeze([...(config.pairsWell ?? [])]),
     chart: freeze(structuredClone(config.chart)),
     slots: freeze({ ...(subject ? { subject } : {}), ...slots, ...(reflection ? { reflection } : {}) }),
     ...extra,

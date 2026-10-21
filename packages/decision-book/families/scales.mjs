@@ -5,9 +5,11 @@
 //   axes    independent 1–10 scales, drawn as bars or as a radar.
 //   shares  parts of a whole; the values sum to 100.
 // Series are the overlays a model compares (now and wanted, two dates, four perspectives).
-// Notes (`note` slots) are optional, each tagged with the scale it is about.
-import { countSlots, nextIndexed, open } from '../../problem-solver/slots.mjs';
-import { baseTool, check, checkCommon, framing, isKey, reflected, subjectFirst } from './common.mjs';
+// Notes (`note` slots) are optional, each tagged with the scale it is about. With `named`, the
+// person names each scale first (`scale_name` slots, axes and shares only), as the team model
+// names the skills a team needs; the config's labels are then only placeholders.
+import { countSlots, nextIndexed, open, parseSlot } from '../../problem-solver/slots.mjs';
+import { baseTool, check, checkCommon, framing, isKey, nodesIn, reflected, subjectFirst } from './common.mjs';
 
 const MODES = Object.freeze(['pairs', 'axes', 'shares']);
 
@@ -18,6 +20,12 @@ export function valuesOf(run) {
   return out;
 }
 
+/** A scale's words for this run: the name the person gave it, or its configured label. */
+export function scaleLabel(run, scale) {
+  const named = run.nodes.find((node) => parseSlot(node.slot)?.name === 'scale_name' && node.tag === scale.id);
+  return named ? (named.title ?? named.text) : (scale.label ?? `${scale.low} or ${scale.high}`);
+}
+
 /**
  * @param {object} config
  * @param {object} config.chart
@@ -25,6 +33,7 @@ export function valuesOf(run) {
  * @param {{id: string, label?: string, low?: string, high?: string}[]} config.chart.scales pairs need low and high, others a label
  * @param {{id: string, label: string}[]} [config.chart.series] defaults to one series, now
  * @param {'bars'|'radar'} [config.chart.layout] axes mode only (bars)
+ * @param {{label: string}} [config.chart.named] the person names every scale before scoring
  */
 export function scalesTool(config) {
   checkCommon(config);
@@ -41,22 +50,30 @@ export function scalesTool(config) {
   for (const s of series) check(isKey(s.id) && s.label, id, `series ${s.id} needs a key and a label`);
   const scaleIds = chart.scales.map((scale) => scale.id);
   const seriesIds = series.map((s) => s.id);
+  if (chart.named) check(chart.mode !== 'pairs' && typeof chart.named.label === 'string', id, 'named scales need axes or shares mode and a label');
   const { subject, reflection } = framing(config);
 
   const missing = (run) => seriesIds.filter((s) => !valuesOf(run)[s]);
+  const unnamed = (run) => (chart.named ? scaleIds.filter((scale) => !nodesIn(run, 'scale_name').some((node) => node.tag === scale)) : []);
 
-  return baseTool(config, 'scales', { note: 'A note on one scale: why it sits where it does' }, {
-    nodeTags: { note: scaleIds },
+  return baseTool(config, 'scales', { ...(chart.named ? { scale_name: chart.named.label } : {}), note: 'A note on one scale: why it sits where it does' }, {
+    nodeTags: { note: scaleIds, ...(chart.named ? { scale_name: scaleIds } : {}) },
+    validateNode(run, node) {
+      if (node.slot.startsWith('scale_name') && !unnamed(run).includes(node.tag)) return 'That scale already has a name; name another.';
+      return null;
+    },
     nextSlots(run) {
       const first = subjectFirst(run, subject);
       if (first) return first;
+      if (unnamed(run).length) return [nextIndexed(run, 'scale_name', scaleIds.length)];
       if (reflection && countSlots(run, 'reflection')) return [];
       return open(nextIndexed(run, 'note', scaleIds.length * 2), reflection && !missing(run).length ? 'reflection' : null);
     },
     pickScores(payload) {
       return { series: payload?.series, values: payload?.values };
     },
-    validateScores(_run, { series: which, values }) {
+    validateScores(run, { series: which, values }) {
+      if (unnamed(run).length) return 'Name every scale before scoring.';
       if (!seriesIds.includes(which)) return `Score one of: ${seriesIds.join(', ')}.`;
       if (!values || scaleIds.some((scale) => !Number.isInteger(values[scale])) || Object.keys(values).length !== scaleIds.length) return 'Give a whole number for every scale.';
       const list = scaleIds.map((scale) => values[scale]);
@@ -67,6 +84,7 @@ export function scalesTool(config) {
     },
     awaiting(run) {
       const left = missing(run);
+      if (unnamed(run).length) return null;
       return left.length ? `The person scores ${left.map((s) => series.find((x) => x.id === s).label.toLowerCase()).join(' and ')} with the chart's controls; ask them to, and wait.` : null;
     },
     complete(run) {

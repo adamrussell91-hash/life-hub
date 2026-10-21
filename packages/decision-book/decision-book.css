@@ -136,6 +136,10 @@
 .dm-plot__axis-label { font-weight: 700; color: var(--dm-ink); text-transform: uppercase; letter-spacing: 0.06em; }
 .dm-plot__field { position: relative; aspect-ratio: 1; max-width: 520px; width: 100%; border-left: 2px solid var(--dm-ink); border-bottom: 2px solid var(--dm-ink); background: var(--dm-paper); }
 .dm-plot__band { position: absolute; display: grid; place-items: start; padding: 4px 6px; border-radius: 10px; background: var(--dm-green-tint); font: 600 11px / 1.2 var(--font-ui); color: #3c7420; }
+.dm-plot__band--diagonal { left: 0; bottom: 0; width: 100%; height: 100%; place-items: center; }
+/* Names the person gave (plot dimensions, team skills) sit above the chart they label. */
+.dm-plot__dims, .dm-scales__names { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--dm-line); border-radius: 14px; }
+.dm-plot__dims .dm-chart__slot-label, .dm-scales__names .dm-chart__slot-label { flex-basis: 100%; }
 /* A point near an edge hangs inward (--dm-shift), so its pill never leaves the field. */
 .dm-plot__field .dm-entry { position: absolute; max-width: 60%; transform: translate(var(--dm-shift, -50%), 50%); }
 .dm-plot__field .dm-entry__pill { padding: calc(4px + var(--dm-size, 4) * 0.6px) 10px; }

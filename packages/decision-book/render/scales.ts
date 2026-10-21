@@ -6,17 +6,19 @@
 //   axes    a bar per series along a 1–10 track, or (layout radar) a polygon per series;
 //   shares  one bar per series cut into its parts of 100.
 // Notes sit under the scale they are about. Under the chart, a form per series scores every
-// scale and sends one snapshot (Save). Phone: rows stack, poles above their bar; a radar
-// becomes bars.
-import { valuesOf } from '../families/scales.mjs';
-import { type DmToolRun, type ChartView, type EntrySpec, createChart, el, setText, slotIndex, slotName, svg } from './core';
+// scale and sends one snapshot (Save). With `named` scales the person's names replace the
+// placeholder labels everywhere and sit above the rows. Phone: rows stack, poles above their
+// bar; a radar becomes bars.
+import { scaleLabel, valuesOf } from '../families/scales.mjs';
+import { type DmToolRun, type ChartView, type EntrySpec, createChart, el, setAttr, setText, slotIndex, slotName, svg } from './core';
 import type { ChartTool } from './quadrant';
 
 type Scale = { id: string; label?: string; low?: string; high?: string };
-export type ScalesChart = { mode: 'pairs' | 'axes' | 'shares'; scales: Scale[]; series?: { id: string; label: string }[]; layout?: 'bars' | 'radar' };
+export type ScalesChart = { mode: 'pairs' | 'axes' | 'shares'; scales: Scale[]; series?: { id: string; label: string }[]; layout?: 'bars' | 'radar'; named?: { label: string } };
 
 const STYLES = ['solid', 'outline', 'dotted'];
-const scaleName = (scale: Scale): string => scale.label ?? `${scale.low} or ${scale.high}`;
+/** The words a scale's form field shows, from its current name. */
+const fieldWords = (mode: ScalesChart['mode'], scale: Scale, name: string): string => (mode === 'pairs' ? `${scale.low} (0–10; ${scale.high} gets the rest)` : mode === 'shares' ? `${name} (% of 100)` : `${name} (1–10)`);
 
 /** The radar polygon's points for values on 1–10 axes, in a 100×100 box. */
 export function radarPoints(values: number[]): string {
@@ -36,6 +38,7 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
   let radarSvg: SVGSVGElement | null = null;
   const polygons = new Map<string, SVGPolygonElement>();
   const form = el(doc, 'form', 'dm-scales__form');
+  const names = el(doc, 'div', 'dm-scales__names');
   const inputs = new Map<string, Map<string, HTMLInputElement>>();
   const totals = new Map<string, HTMLSpanElement>();
   let emit: (payload: Record<string, unknown>) => void = () => {};
@@ -47,8 +50,9 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
       const map = new Map<string, HTMLInputElement>();
       for (const scale of chart.scales) {
         const label = el(doc, 'label', 'dm-scales__field');
-        const words = chart.mode === 'pairs' ? `${scale.low} (0–10; ${scale.high} gets the rest)` : chart.mode === 'shares' ? `${scale.label} (% of 100)` : `${scale.label} (1–10)`;
-        label.append(el(doc, 'span', 'dm-scales__field-label', words));
+        const words = el(doc, 'span', 'dm-scales__field-label', fieldWords(chart.mode, scale, scale.label ?? ''));
+        words.setAttribute('data-field-for', scale.id);
+        label.append(words);
         const input = el(doc, 'input', 'dm-scales__input');
         input.type = 'number';
         input.min = chart.mode === 'axes' ? '1' : '0';
@@ -101,6 +105,7 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
       chart.scales.forEach((scale, i) => {
         const angle = -Math.PI / 2 + (i * 2 * Math.PI) / chart.scales.length;
         const label = el(doc, 'span', 'dm-scales__radar-label', scale.label!);
+        label.setAttribute('data-label-for', scale.id);
         label.style.left = `${(50 + 49 * Math.cos(angle)).toFixed(1)}%`;
         label.style.top = `${(50 + 49 * Math.sin(angle)).toFixed(1)}%`;
         wrap.append(label);
@@ -125,11 +130,15 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
     for (const scale of chart.scales) {
       const row = el(doc, 'div', 'dm-scales__row');
       row.setAttribute('role', 'group');
-      row.setAttribute('aria-label', scaleName(scale));
+      row.setAttribute('aria-label', scale.label ?? `${scale.low} or ${scale.high}`);
       row.setAttribute('data-scale', scale.id);
       const track = el(doc, 'div', 'dm-scales__track');
       if (chart.mode === 'pairs') row.append(el(doc, 'span', 'dm-scales__pole dm-scales__pole--low', scale.low!), track, el(doc, 'span', 'dm-scales__pole dm-scales__pole--high', scale.high!));
-      else row.append(el(doc, 'span', 'dm-scales__row-label', scale.label!), track);
+      else {
+        const name = el(doc, 'span', 'dm-scales__row-label', scale.label!);
+        name.setAttribute('data-label-for', scale.id);
+        row.append(name, track);
+      }
       const notes = el(doc, 'div', 'dm-scales__notes');
       row.append(notes);
       if (chart.mode === 'shares') track.hidden = true;
@@ -147,8 +156,20 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
     draw(run: DmToolRun, ctx): EntrySpec[] {
       emit = ctx.emitScore;
       if (!rows.size) {
+        if (chart.named) {
+          names.setAttribute('role', 'group');
+          names.setAttribute('aria-label', 'Scales you named');
+          names.append(el(doc, 'span', 'dm-chart__slot-label', 'Scales you named'));
+          ctx.frame.append(names);
+        }
         buildRows(ctx.frame);
         buildForm();
+      }
+      const name = (scale: Scale): string => scaleLabel(run, scale);
+      for (const scale of chart.scales) {
+        for (const span of ctx.frame.querySelectorAll(`[data-label-for="${scale.id}"]`)) setText(span, name(scale));
+        for (const span of ctx.frame.querySelectorAll(`[data-field-for="${scale.id}"]`)) setText(span, fieldWords(chart.mode, scale, name(scale)));
+        setAttr(ctx.frame.querySelector(`.dm-scales__row[data-scale="${scale.id}"]`)!, 'aria-label', name(scale));
       }
       const values = valuesOf(run) as Record<string, Record<string, number>>;
       for (const scale of chart.scales) {
@@ -170,11 +191,11 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
         if (radar) polygons.get(s.id)!.setAttribute('points', values[s.id] ? radarPoints(chart.scales.map((scale) => values[s.id][scale.id])) : '');
         const bar = bars.get(s.id);
         if (bar) {
-          const words = values[s.id] ? chart.scales.map((scale) => `${scale.label} ${values[s.id][scale.id]}%`).join(', ') : 'not scored yet';
+          const words = values[s.id] ? chart.scales.map((scale) => `${name(scale)} ${values[s.id][scale.id]}%`).join(', ') : 'not scored yet';
           if (bar.title !== words) {
             bar.title = words;
             bar.replaceChildren(...(values[s.id] ? chart.scales.map((scale, j) => {
-              const part = el(doc, 'span', 'dm-scales__part', `${scale.label} ${values[s.id][scale.id]}%`);
+              const part = el(doc, 'span', 'dm-scales__part', `${name(scale)} ${values[s.id][scale.id]}%`);
               part.style.width = `${values[s.id][scale.id]}%`;
               part.setAttribute('data-part', String(j % 3));
               return part;
@@ -183,12 +204,15 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
         }
         for (const [scaleId, input] of inputs.get(s.id)!) if (values[s.id] && doc.activeElement !== input) input.value = String(values[s.id][scaleId]);
       }
-      return run.nodes
+      const named: EntrySpec[] = run.nodes
+        .filter((node) => slotName(node) === 'scale_name' && rows.has(node.tag ?? ''))
+        .map((node) => ({ node, host: names, fill: 'ink', label: `Name of scale ${chart.scales.findIndex((scale) => scale.id === node.tag) + 1}`, order: chart.scales.findIndex((scale) => scale.id === node.tag) }));
+      return [...named, ...run.nodes
         .filter((node) => slotName(node) === 'note' && rows.has(node.tag ?? ''))
-        .map((node) => {
+        .map((node): EntrySpec => {
           const scale = chart.scales.find((s) => s.id === node.tag)!;
-          return { node, host: rows.get(scale.id)!.notes, fill: 'tint', label: `Note ${slotIndex(node)} on ${scaleName(scale)}` };
-        });
+          return { node, host: rows.get(scale.id)!.notes, fill: 'tint', label: `Note ${slotIndex(node)} on ${name(scale)}` };
+        })];
     }
   }, doc);
 }
