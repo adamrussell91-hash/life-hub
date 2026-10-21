@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { reasoningSteps, reasoningWrite, LOGIC_CARDS } from '@/blocks/reasoning/content';
 import { renderReasoningChart } from '@/blocks/reasoning/chart';
+import { createReasoningWalk, emptyWalkState, renderReasoningPrint, type WalkState } from '@/blocks/reasoning/walk';
 import type { LensLevel } from '@/blocks/lenses/types';
 
 const ids = (logic: Parameters<typeof reasoningSteps>[0], level: LensLevel) => reasoningSteps(logic, level).map((s) => s.id);
@@ -86,5 +87,97 @@ describe('Reasoning chart', () => {
     const chart = renderReasoningChart({ logic: 'deductive', steps, answers: { r: 'kept' }, print: true });
     expect(chart.textContent).not.toContain('kept');
     expect(chart.querySelectorAll('.block-reasoning-chart__line').length).toBeGreaterThan(0);
+  });
+});
+
+describe('Reasoning walk', () => {
+  const buttons = (root: ParentNode) => [...root.querySelectorAll<HTMLButtonElement>('button')];
+  const press = (root: ParentNode, text: string | RegExp) => {
+    const b = buttons(root).find((x) => (typeof text === 'string' ? x.textContent?.trim() === text : text.test(x.textContent ?? '')));
+    expect(b, String(text)).toBeTruthy();
+    b!.click();
+  };
+  const type = (root: ParentNode, value: string) => {
+    const box = root.querySelector<HTMLTextAreaElement>('.block-reasoning__box')!;
+    box.value = value;
+    box.dispatchEvent(new Event('input'));
+  };
+  function walk(logic: 'inductive' | 'abductive' | 'deductive' | 'choice', level: LensLevel = 'core', state: WalkState = emptyWalkState()) {
+    let saves = 0;
+    const root = createReasoningWalk({ logic, level, state, persist: () => { saves += 1; }, preview: false });
+    document.body.append(root);
+    return { root, state, saves: () => saves };
+  }
+
+  it('refuses Next until the step is answered, and the starter alone does not count', () => {
+    const { root, state } = walk('inductive', 'support');
+    expect(root.querySelector<HTMLTextAreaElement>('.block-reasoning__box')!.value).toBe('In ___, ___ happens to ___.');
+    press(root, 'Next: Example 2');
+    expect(root.querySelector('.block-reasoning__error')!.textContent).toBe('Write your answer first.');
+    expect(state.step).toBe(0);
+    type(root, 'At the last Games both tributes died.');
+    expect(root.querySelector('.block-reasoning-chart__node--now')!.textContent).toContain('both tributes died');
+    press(root, 'Next: Example 2');
+    expect(state.step).toBe(1);
+  });
+  it('locks later tabs until earlier steps are answered', () => {
+    const { root } = walk('deductive');
+    const tabs = () => [...root.querySelectorAll<HTMLButtonElement>('.kaplan-progress__step')];
+    expect(tabs().map((t) => t.textContent)).toEqual(['Rule', 'This one', 'So it must', 'Write it down']);
+    expect(tabs()[1]!.disabled).toBe(true);
+    type(root, 'Every girl must go.');
+    expect(tabs()[1]!.disabled).toBe(true);
+    press(root, 'Next: This one');
+    expect(tabs()[1]!.disabled).toBe(false);
+  });
+  it('ticks the pattern against each example and shows the fit on the chart', () => {
+    const state = { ...emptyWalkState(), step: 2, answers: { e1: 'one', e2: 'two', pt: 'Every time.' } };
+    const { root, saves } = walk('inductive', 'support', state);
+    const ticks = root.querySelectorAll<HTMLInputElement>('.block-reasoning__checks input');
+    expect(ticks).toHaveLength(2);
+    ticks[1]!.click();
+    expect(state.ticks['fit.pt.e2']).toBe(true);
+    expect(saves()).toBeGreaterThan(0);
+    const example2 = root.querySelector('[data-step="e2"]')!;
+    expect(example2.textContent).toContain('✓ fits');
+  });
+  it('tests each maybe against each clue and counts what it explains', () => {
+    const answers = { c1: 'drunk', c2: 'mocks', c3: 'helps', m1: 'cruel', m2: 'grief' };
+    const { root, state } = walk('abductive', 'core', { ...emptyWalkState(), step: 5, answers });
+    const grid = root.querySelector('.block-reasoning__grid')!;
+    expect(grid.querySelectorAll('input')).toHaveLength(6);
+    grid.querySelector<HTMLInputElement>('[aria-label="Maybe 2 explains Clue 3"]')!.click();
+    expect(state.ticks['test.c3.m2']).toBe(true);
+    expect(grid.textContent).toContain('Explains 1 of 3');
+  });
+  it('starts from the three cards when students choose', () => {
+    const { root, state } = walk('choice');
+    expect(root.querySelectorAll('.block-reasoning__card')).toHaveLength(3);
+    root.querySelector<HTMLButtonElement>('.block-reasoning__card--abductive')!.click();
+    expect(state.choice).toBe('abductive');
+    expect(root.querySelector('.block-reasoning-chart')!.getAttribute('data-logic')).toBe('abductive');
+  });
+  it('shows the example at Support, behind a click at Core, and not at Extend', () => {
+    expect(walk('inductive', 'support').root.querySelector('div.block-reasoning__example')).toBeTruthy();
+    expect(walk('inductive', 'core').root.querySelector('details.block-reasoning__example')).toBeTruthy();
+    expect(walk('inductive', 'extend').root.querySelector('.block-reasoning__example')).toBeNull();
+  });
+  it('ends in Write it down with the frame, the handover and a done button', () => {
+    const answers = { r: 'rule', cs: 'case', sm: 'so' };
+    let done = false;
+    const state = { ...emptyWalkState(), step: 3, answers };
+    const root = createReasoningWalk({ logic: 'deductive', level: 'core', state, persist: () => {}, preview: false, onDone: () => { done = true; } });
+    expect(root.querySelector('.lens-frame')!.textContent).toContain('it must be that ___');
+    expect(root.textContent).toContain('This page won’t keep your answer');
+    press(root, 'I’ve written it down');
+    expect(state.done).toBe(true);
+    expect(done).toBe(true);
+  });
+  it('prints the empty chart, the questions and ruled lines', () => {
+    const sheet = renderReasoningPrint('abductive', 'support');
+    expect(sheet.querySelector('.block-reasoning-chart')).toBeTruthy();
+    expect(sheet.textContent).toContain('For example');
+    expect(sheet.querySelectorAll('.lens-lines__line').length).toBeGreaterThan(0);
+    expect(renderReasoningPrint('choice', 'core').textContent).toContain('Circle one');
   });
 });

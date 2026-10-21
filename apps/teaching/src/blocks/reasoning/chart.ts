@@ -93,3 +93,25 @@ function node(step: ReasoningStep, options: { answers: Record<string, string>; c
   }
   return box;
 }
+
+/** Small line drawings of each logic's shape, for the picker cards and the lens chip. */
+const SYMBOL_PATHS: Record<Logic, string> = {
+  // One box branching into three.
+  deductive: 'M2 9.5h5v5H2zM17 3h5v4h-5zM17 10h5v4h-5zM17 17h5v4h-5zM7 12h4M11 5v14M11 5h6M11 12h6M11 19h6',
+  // Three boxes joining into one.
+  inductive: 'M2 3h5v4H2zM2 10h5v4H2zM2 17h5v4H2zM17 9.5h5v5h-5zM7 5h4v14H7M11 12h6',
+  // Joined dots, then a dotted line to the best guess.
+  abductive: 'M4 5a1.5 1.5 0 1 0 .01 0M11 5a1.5 1.5 0 1 0 .01 0M4 17a1.5 1.5 0 1 0 .01 0M11 17a1.5 1.5 0 1 0 .01 0M20 17a2 2 0 1 0 .01 0M5 6.5l5 9M10 6.5l-5 9M5.5 5h4M5.5 17h4M11 6.5v9M12.5 17h1.5M15.5 17h1.5'
+};
+
+export function logicSymbol(logic: Logic): SVGSVGElement {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.classList.add('kaplan-symbol');
+  const path = document.createElementNS(SVG, 'path');
+  path.setAttribute('d', SYMBOL_PATHS[logic]);
+  svg.append(path);
+  return svg;
+}
