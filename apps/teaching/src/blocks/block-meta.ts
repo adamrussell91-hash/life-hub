@@ -33,6 +33,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   table: 'Present rows and columns of structured data.',
   peer_feedback: 'Write, exchange anonymous peer feedback, and reflect together.',
   brainstorm: 'Gather quick answers from the class and show them together on one board.',
+  hinge_question: 'A quick check at the turning point of a lesson. Each wrong answer names a misconception, so you know whether to move on.',
   curriculum_lines: 'Map the unit as a transit map: strands of learning, lesson stations and the assessment.',
   question_drop: 'Students write a question for a quiz lesson in this unit. You approve each one.',
   quiz_question: 'One question in a quiz lesson: choice, gaps, matching, ordering and more.',
@@ -80,7 +81,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   'embed:pdf': 'Embed a PDF document for inline viewing.'
 };
 
-const VECTOR_BLOCK_ICONS = new Set<string>(["analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy"]);
+const VECTOR_BLOCK_ICONS = new Set<string>(["analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy"]);
 
 /** Line-art block icons live in `public/assets/blocks/`, under the app base. */
 export function blockIconSrc(type: InsertMenuValue): string {

@@ -43,6 +43,7 @@ export const BlockTypeSchema = z.enum([
   'peer_feedback',
   'question_drop',
   'brainstorm',
+  'hinge_question',
   'curriculum_lines',
   'quiz_question',
   'question_set',
@@ -523,6 +524,32 @@ export const BrainstormBlockSchema = z.object({
     per_student: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).default(3),
     max_length: z.number().int().min(20).max(280).default(140),
     layout: z.enum(['grid', 'cloud', 'groups']).default('grid')
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Hinge question: one quick multiple-choice check at the turning point of a
+ * lesson. Each wrong option names the misconception it reveals. The right
+ * answer, the misconception notes and the move-on / reteach thresholds are
+ * teacher-only: publish strips them, and the server reads them from the draft.
+ */
+export const HingeOptionSchema = z.object({
+  id: z.string().min(1).max(40),
+  text: z.string().max(300).default(''),
+  misconception: z.string().max(300).default('')
+});
+
+export const HingeQuestionBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('hinge_question'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    prompt: z.string().max(500).default(''),
+    options: z.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z.string().max(40).default(''),
+    seconds: z.union([z.literal(0), z.literal(30), z.literal(60), z.literal(90), z.literal(120)]).default(60),
+    move_on: z.number().int().min(1).max(100).default(80),
+    reteach: z.number().int().min(0).max(99).default(50)
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1457,6 +1484,7 @@ const leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  HingeQuestionBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,

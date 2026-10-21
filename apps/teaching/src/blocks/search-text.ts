@@ -91,6 +91,10 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'brainstorm':
       push(parts, c.question);
       break;
+    case 'hinge_question':
+      push(parts, c.prompt);
+      for (const o of (c.options as Array<{ text?: string }> | undefined) ?? []) push(parts, o.text);
+      break;
     case 'curriculum_lines': {
       const lines = c as { title?: string; strands?: Array<{ name?: string }>; stations?: Array<{ label?: string }>; checkpoints?: Array<{ label?: string }>; terminus?: { label?: string; detail?: string } };
       push(parts, lines.title);
