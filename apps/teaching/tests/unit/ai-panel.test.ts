@@ -499,6 +499,24 @@ describe('mountAiPanel', () => {
     expect(acceptButton(mounted.host)).toBeUndefined();
   });
 
+  it('says on the card when Accept also turns the lesson into a Quiz, and passes set_mode on', async () => {
+    pollAiJobMock.mockResolvedValue(
+      workingJob({ agent: 'ann', status: 'done', proposal: { ...insertTwoHeadings, set_mode: 'quiz' } })
+    );
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Make a quiz');
+
+    await vi.waitFor(() => {
+      expect(mounted.host.querySelector('.ai-panel__proposal-mode')?.textContent).toBe(
+        'Accepting this also turns the lesson into a Quiz.'
+      );
+    });
+    [...mounted.host.querySelectorAll('button')].find((btn) => btn.textContent === 'Accept selected')?.click();
+    const applied = mounted.onAcceptProposal.mock.calls[0]?.[0] as AiProposal;
+    expect(applied).toMatchObject({ kind: 'insert_blocks', set_mode: 'quiz' });
+  });
+
   it('Accept selected applies only checked insert blocks', async () => {
     pollAiJobMock.mockResolvedValue(
       workingJob({ agent: 'ann', status: 'done', proposal: insertTwoHeadings })

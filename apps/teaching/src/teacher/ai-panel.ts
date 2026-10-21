@@ -453,6 +453,15 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     title.className = 'page-header__eyebrow ai-panel__proposal-title';
     title.textContent = proposalTitle(msg);
     card.append(title);
+    if (msg.proposal && 'set_mode' in msg.proposal && msg.proposal.set_mode === 'quiz') {
+      const mode = document.createElement('p');
+      mode.className = 'ai-panel__proposal-mode';
+      mode.textContent =
+        msg.proposalStatus === 'accepted'
+          ? 'This lesson is now a Quiz.'
+          : 'Accepting this also turns the lesson into a Quiz.';
+      card.append(mode);
+    }
 
     if (msg.proposalStatus !== 'pending' || !msg.proposal) return card;
 
