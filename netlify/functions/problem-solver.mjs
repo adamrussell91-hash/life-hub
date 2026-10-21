@@ -13,14 +13,14 @@ export function owner(env) {
 }
 
 export async function problemSolverServiceFor(env, deps = {}) {
-  const store = deps.getStore ? await deps.getStore(env) : await defaultGetProblemStore(env);
+  const store = deps.getStore ? await deps.getStore(env) : await defaultGetProblemStore(env, deps.prefix);
   if (!store) throw Object.assign(new Error('Problem Solver storage is not configured.'), { status: 503, code: 'store_unbound' });
   const coach = deps.coach ?? createModelCoach(anthropicModel(env, deps.fetchImpl ?? fetch));
-  return createProblemSolverService({ store, coach });
+  return createProblemSolverService({ store, coach, ...(deps.kinds ? { kinds: deps.kinds } : {}) });
 }
 
-export async function defaultInvokeRun(request, id, env, fetchImpl = fetch) {
-  const response = await fetchImpl(new URL('/api/problem-solver/run', request.url), {
+export async function defaultInvokeRun(request, id, env, fetchImpl = fetch, runPath = '/api/problem-solver/run') {
+  const response = await fetchImpl(new URL(runPath, request.url), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -56,7 +56,7 @@ export function createProblemSolverHandler(deps = {}) {
       const runId = body.action === 'escalate' ? session.lightning?.escalatedTo ?? null : session.runner.status === 'queued' ? session.id : null;
       if (!runId) return withCors(okResponse(200, { session }), request, env);
       let kicked = false;
-      try { kicked = await (deps.invokeRun ?? defaultInvokeRun)(request, runId, env, deps.fetchImpl ?? fetch); } catch { kicked = false; }
+      try { kicked = await (deps.invokeRun ?? defaultInvokeRun)(request, runId, env, deps.fetchImpl ?? fetch, deps.runPath); } catch { kicked = false; }
       if (kicked) return withCors(okResponse(202, { session }), request, env);
       if (runId !== session.id) {
         await service.run(owner(env), runId);

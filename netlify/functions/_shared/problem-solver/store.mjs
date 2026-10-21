@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { summaryRow } from './session.mjs';
 
 export const PROBLEM_SOLVER_PREFIX = 'problem-solver/v1';
+export const DECISION_BOOK_PREFIX = 'decision-book/v1';
 
 /** In-memory store with the same read/write/list contract as the R2 cognitive store. */
 export function createMemoryProblemStore() {
@@ -31,7 +32,7 @@ export function createMemoryProblemStore() {
 }
 
 /** Encrypted R2 store under problem-solver/v1, or null when R2 or SESSION_SECRET is not configured. */
-export async function defaultGetProblemStore(env) {
+export async function defaultGetProblemStore(env, prefix = PROBLEM_SOLVER_PREFIX) {
   const { defaultGetCognitiveStore } = await import('../cognitive-store.mjs');
-  return defaultGetCognitiveStore(env, { prefix: PROBLEM_SOLVER_PREFIX, indexRow: summaryRow });
+  return defaultGetCognitiveStore(env, { prefix, indexRow: summaryRow });
 }
