@@ -339,7 +339,9 @@ export async function saveVoiceMarking(store, lesson, block, id, body, deps = {}
   if (body.tags !== undefined) next.tags = cleanTags(body.tags, record.transcript?.words?.length ?? 0);
   if (body.comment !== undefined) next.comment = String(body.comment ?? '').slice(0, MAX_COMMENT);
   if (body.initials !== undefined) next.initials = cleanInitials(body.initials);
-  if (record.status === 'new' && (body.tags !== undefined || body.comment !== undefined)) next.status = 'marked';
+  if (body.fillers_suggested === true) next.fillers_suggested = true;
+  const marked = (next.tags ?? []).some((t) => t.confirmed !== false) || Boolean(next.comment?.trim());
+  if (record.status === 'new' && marked) next.status = 'marked';
   next.updated_at = new Date(deps.now ? deps.now() : Date.now()).toISOString();
   await store.setJSON(voiceKeys.submission(lesson, block, id), next);
   return teacherRecord(next);
