@@ -262,6 +262,14 @@
 .dm-path__stages::before { content: ''; position: absolute; left: 11px; right: 14px; top: 10px; border-top: 2px dotted var(--dm-ink); }
 .dm-path__stages::after { content: ''; position: absolute; right: 0; top: 4px; width: 12px; height: 14px; background: var(--dm-ink); clip-path: polygon(0 0, 100% 50%, 0 100%); }
 .dm-path__stage { position: relative; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.dm-path__round { container: dm-path / inline-size; }
+@container dm-path (max-width: 840px) {
+  .dm-path__stages[data-many] { grid-auto-flow: row; gap: 0; }
+  .dm-path__stages[data-many]::before, .dm-path__stages[data-many]::after { display: none; }
+  .dm-path__stages[data-many] .dm-path__stage { grid-template-columns: 22px minmax(0, 1fr); column-gap: 10px; row-gap: 6px; padding-bottom: 14px; }
+  .dm-path__stages[data-many] .dm-path__stage > :not(.dm-path__disc) { grid-column: 2; }
+  .dm-path__stages[data-many] .dm-path__stage:not(:last-child)::before { content: ''; position: absolute; left: 10px; top: 22px; bottom: 0; border-left: 2px dotted var(--dm-ink); }
+}
 .dm-path__layers { display: flex; flex-direction: column; gap: 8px; }
 .dm-path__layers:empty::before { content: attr(data-empty) 's go here'; font: 400 12px / 1.4 var(--font-ui); color: #66675d; }
 .dm-path__layer { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border-radius: 999px; background: var(--dm-green-tint); }

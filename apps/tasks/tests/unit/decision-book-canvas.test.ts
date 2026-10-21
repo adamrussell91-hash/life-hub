@@ -19,4 +19,12 @@ describe('Decision Maker canvas', () => {
     expect(createChartForRun({ tool: 'nope' })).toBeNull();
   });
 
+  it('marks a track of more than five stages, so a narrow card stacks it', () => {
+    const many = createChartForRun({ tool: 'dm_drexler_sibbet' })!;
+    many.update({ id: 'r', tool: 'dm_drexler_sibbet', status: 'active', nodes: [], edges: [] } as never);
+    expect(many.el.querySelector('.dm-path__stages')!.getAttribute('data-many')).toBe('true');
+    const few = createChartForRun({ tool: 'dm_result_optimisation' })!;
+    few.update({ id: 'r', tool: 'dm_result_optimisation', status: 'active', nodes: [], edges: [] } as never);
+    expect(few.el.querySelector('.dm-path__stages')!.hasAttribute('data-many')).toBe(false);
+  });
 });
