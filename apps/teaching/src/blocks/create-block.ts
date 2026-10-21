@@ -1,4 +1,5 @@
 import { blankQuestion } from '@/quiz/core';
+import { starterHingeOptions } from '@/blocks/hinge-question/shared';
 import { starterCurriculumLinesContent } from '@/blocks/curriculum-lines/starter';
 import { emptyColumnsForPreset } from '@/blocks/column-presets';
 import type { Block, EmbedProvider } from '@/schemas/block';
@@ -42,6 +43,8 @@ export const NEW_BLOCK_TYPES = [
   'peer_feedback',
   'question_drop',
   'brainstorm',
+  'hinge_question',
+  'continuum_line',
   'quiz_question',
   'question_set',
   'flashcards',
@@ -102,13 +105,15 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   gallery: 'Gallery',
   video: 'Video',
   embed: 'Embed',
-  audio: 'Audio',
+  audio: 'Voice',
   attachment: 'Attachment',
   accordion: 'Accordion',
   table: 'Table',
   peer_feedback: 'Peer feedback',
   question_drop: 'Question drop',
   brainstorm: 'Brainstorm',
+  hinge_question: 'Hinge question',
+  continuum_line: 'Continuum line',
   quiz_question: 'Quiz question',
   question_set: 'Question set',
   flashcards: 'Flashcards',
@@ -216,6 +221,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
       'thinking_move',
       'question_quadrant',
       'concept_features',
+      'continuum_line',
       'thinking_reflection'
     ]
   },
@@ -234,7 +240,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -267,6 +273,7 @@ const TOOLKIT_GROUP_TYPES = [
   'thinking_move',
   'question_quadrant',
   'concept_features',
+  'continuum_line',
   'thinking_reflection',
   'analogy_types',
   'analogy_close_reading',
@@ -283,6 +290,7 @@ const HOMEPAGE_EXCLUDED = new Set([
   ...UNIT_ONLY_TYPES,
   'peer_feedback',
   'brainstorm',
+  'hinge_question',
   'question_drop',
   'quiz_question',
   ...TOOLKIT_GROUP_TYPES,
@@ -306,7 +314,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'brainstorm', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -570,7 +578,7 @@ export function createBlock(type: NewBlockType, id: string): Block {
         ...shared,
         block_type: 'audio',
         variant: 'medium',
-        content: { url: '' }
+        content: { url: '', mode: 'listen' }
       };
     case 'attachment':
       return {
@@ -605,6 +613,17 @@ export function createBlock(type: NewBlockType, id: string): Block {
     case 'brainstorm':
       return { ...shared, block_type: 'brainstorm', variant: 'medium', content: {
         question: '', safety: 'approve', per_student: 3, max_length: 140, layout: 'grid'
+      } };
+    case 'hinge_question':
+      return { ...shared, block_type: 'hinge_question', variant: 'medium', content: {
+        prompt: '', options: starterHingeOptions(id), correct_id: '', seconds: 60, move_on: 80, reteach: 50
+      } };
+    case 'continuum_line':
+      return { ...shared, block_type: 'continuum_line', variant: 'medium', content: {
+        stimulus: { kind: 'text', text: '', url: '', alt_text: '' },
+        scale: { left: 'Implied', right: 'Not implied', stops: [] },
+        statements: [{ id: `${id}_s1`, text: '', snap: false }],
+        pace: 'teacher', replace: true
       } };
     case 'question_drop':
       return { ...shared, block_type: 'question_drop', variant: 'medium', content: {

@@ -388,6 +388,33 @@
     "Publish this lesson and block, then Start activity appears here.",
     "brainstorm.question filler"
   ],
+  "every-block/every_hinge_question/student": [
+    "Hinge question",
+    "Loading…",
+    "hinge_question.prompt filler"
+  ],
+  "every-block/every_hinge_question/teacher": [
+    "Hinge question",
+    "Loading…",
+    "hinge_question.prompt filler"
+  ],
+  "every-block/every_continuum_line/student": [
+    "Continuum line",
+    "Implied ↔ Not implied",
+    "Loading…",
+    "Stimulus",
+    "continuum_line.stimulus.text filler"
+  ],
+  "every-block/every_continuum_line/teacher": [
+    "Continuum line",
+    "Implied ↔ Not implied",
+    "Loading…",
+    "Not live yet",
+    "Placements hidden",
+    "Publish this lesson and block, then Start activity appears here.",
+    "Stimulus",
+    "continuum_line.stimulus.text filler"
+  ],
   "every-block/every_quiz_question/student": [
     "1 mark",
     "Multiple choice",

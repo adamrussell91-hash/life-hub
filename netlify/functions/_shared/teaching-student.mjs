@@ -165,6 +165,14 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
       if (block.block_type === 'annotation') {
         return stripAnnotationTeacherContent(block, teacherOnlyIds);
       }
+      if (block.block_type === 'hinge_question') {
+        // The right answer, misconception notes and move-on marks are the teacher's alone.
+        const { correct_id: _right, move_on: _move, reteach: _reteach, ...content } = block.content ?? {};
+        return {
+          ...block,
+          content: { ...content, options: (Array.isArray(content.options) ? content.options : []).map(({ misconception: _note, ...option }) => option) }
+        };
+      }
       if (block.block_type === 'flashcards') {
         return {
           ...block,
