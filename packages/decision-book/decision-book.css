@@ -5,8 +5,11 @@
 .dm-scope {
   --dm-paper: #faf8ef;
   --dm-ink: #171813;
-  --dm-red: #f43a25;
-  --dm-green: #60ba2c;
+  --dm-red: #e4301c;
+  --dm-green: #398000;
+  /* Red behind small text. --dm-red is too dark for ink text and too light for paper text
+     (4.0 and 4.4:1), so labels sit on the brighter red; green takes paper text instead. */
+  --dm-red-label: #f43a25;
   --dm-soft: #efeee4;
   --dm-line: #c9cabd;
   --dm-green-tint: #e3f1d8;
@@ -184,7 +187,7 @@
 .dm-scales__share { display: flex; min-height: 28px; border: 2px solid var(--dm-ink); border-radius: 999px; overflow: hidden; }
 .dm-scales__share[data-style='outline'] { border-style: dashed; }
 .dm-scales__part { display: grid; place-items: center; min-width: 0; padding: 0 4px; font: 600 11px / 1.2 var(--font-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dm-scales__part[data-part='0'] { background: var(--dm-green); color: var(--dm-ink); }
+.dm-scales__part[data-part='0'] { background: var(--dm-green); color: var(--dm-paper); }
 .dm-scales__part[data-part='1'] { background: var(--dm-red-tint); }
 .dm-scales__part[data-part='2'] { background: var(--dm-soft); }
 .dm-scales__unscored { padding: 0 10px; align-self: center; font: 400 12px / 1 var(--font-ui); color: #66675d; }
@@ -285,7 +288,7 @@
 .dm-list__head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .dm-list__label { font: 700 12px / 1.3 var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; }
 .dm-list__prompt { flex-basis: 100%; font: 400 11px / 1.4 var(--font-ui); color: #66675d; }
-.dm-list__done { padding: 0 8px; border-radius: 999px; background: var(--dm-green); font: 600 11px / 1.6 var(--font-ui); }
+.dm-list__done { padding: 0 8px; border-radius: 999px; background: var(--dm-green); color: var(--dm-paper); font: 600 11px / 1.6 var(--font-ui); }
 .dm-list__done::before { content: '✓ '; }
 .dm-list__items { display: flex; flex-wrap: wrap; gap: 6px; }
 .dm-list[data-layout='lanes'], .dm-list:has(.dm-list__column-name) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
@@ -388,12 +391,12 @@
 .dm-qk__row[data-box='end']:not([data-end]) :is(.dm-qk__disc, .dm-qk__label) { opacity: 0.4; }
 .dm-qk__label { font: 600 14px / 1.4 var(--font-ui); min-width: 0; overflow-wrap: anywhere; }
 .dm-qk__chip { padding: 0 10px; border-radius: 999px; background: var(--dm-ink); color: var(--dm-paper); font: 600 12px / 1.7 var(--font-ui); }
-.dm-qk__row[data-answer='no'] .dm-qk__chip { background: var(--dm-red); color: var(--dm-ink); }
+.dm-qk__row[data-answer='no'] .dm-qk__chip { background: var(--dm-red-label); color: var(--dm-ink); }
 .dm-qk__text { grid-column: 2 / -1; margin: 0; font: 400 13px / 1.45 var(--font-ui); overflow-wrap: anywhere; }
 .dm-qk__ask { grid-column: 2 / -1; display: flex; gap: 8px; }
 .dm-qk__answer { min-width: 64px; min-height: 40px; padding: 0 16px; border: 2px solid var(--dm-ink); border-radius: 999px; background: var(--dm-paper); color: var(--dm-ink); font: 600 14px / 1 var(--font-ui); cursor: pointer; }
-.dm-qk__answer[data-answer='yes'] { background: var(--dm-green); border-color: var(--dm-green); }
-.dm-qk__answer[data-answer='no'] { background: var(--dm-red); border-color: var(--dm-red); }
+.dm-qk__answer[data-answer='yes'] { background: var(--dm-green); border-color: var(--dm-green); color: var(--dm-paper); }
+.dm-qk__answer[data-answer='no'] { background: var(--dm-red-label); border-color: var(--dm-red-label); }
 .dm-qk__answer:focus-visible { outline: 2px solid var(--dm-ink); outline-offset: 2px; }
 .dm-qk__answer[aria-disabled='true'] { opacity: 0.5; cursor: default; }
 .dm-qk__band { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 6px 12px; padding: 12px 16px; border: 2px solid var(--dm-red); border-radius: 18px; background: var(--dm-red-tint); }
@@ -415,10 +418,10 @@
    yellow becomes green (with ink text, as on yellow). White on DM red is under 4.5:1, so text
    that sat white on red turns ink (5.0:1). */
 .dm-scope :is(.ps-swot, .ps-morph, .ps-pareto, .ps-dloop) {
-  --ps-red: var(--dm-red);
+  --ps-red: var(--dm-red-label);
   --ps-blue: var(--dm-ink);
   --ps-yellow: var(--dm-green);
-  --ps-on-yellow: var(--dm-ink);
+  --ps-on-yellow: var(--dm-paper);
 }
 .dm-scope :is(
   .ps-swot__quadrant--threat,
@@ -433,4 +436,7 @@
   .ps-dloop__shape.is-filled[data-tone='red'],
   .ps-dloop__key-item.is-filled[data-tone='red'] .ps-dloop__key-code
 ) { color: var(--dm-ink); }
+/* Morph rows alternate light and full green: ink reads on the light rows, paper on the full ones. */
+.dm-scope .ps-morph__cell:not(.is-picked) .ps-morph__oval { color: var(--dm-ink); }
+.dm-scope .ps-morph__subject > :nth-child(odd):not(.ps-morph__head, .is-picked) .ps-morph__oval { color: var(--dm-paper); }
 .dm-scope :is(.ps-swot, .ps-morph, .ps-pareto, .ps-dloop) .ps-details__card { box-shadow: none; border-top: 3px solid var(--dm-ink); }
