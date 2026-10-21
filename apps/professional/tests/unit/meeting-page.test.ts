@@ -43,7 +43,11 @@ vi.mock('@/api/universal-links', () => ({
 vi.mock('@/api/people-directory', () => ({
   fetchPeopleDirectory: vi.fn(async () => ({ people: [
     { ref: 'shared:person:rachel', display_name: 'Rachel Ford', initials: 'RF', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'warm', created_at: '2024-01-01T00:00:00.000Z' },
-    { ref: 'shared:person:ben', display_name: 'Ben C.', initials: 'BC', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'cooling', created_at: '2024-01-01T00:00:00.000Z' }
+    { ref: 'shared:person:ben', display_name: 'Ben C.', initials: 'BC', organisation: { ref: 'club', display_name: 'Greyhounds', monogram: 'G', logo_key: null, current: true },
+      organisations: [
+        { ref: 'club', display_name: 'Greyhounds', monogram: 'G', logo_key: null, current: true },
+        { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }
+      ], warmth_band: 'cooling', created_at: '2024-01-01T00:00:00.000Z' }
   ], organisations: [], counts: { people: 2, organisations: 1 } })),
   fetchPersonLedger: vi.fn(async (ref: string) => ({
     you_owe: ref === 'shared:person:rachel' ? [{ id: 'p1', text: 'Send Rachel the medal list', status: 'open' }] : [],
@@ -151,6 +155,32 @@ describe('meeting page', () => {
     expect(facts).toContain('6:00 pm');
     expect(facts).toContain('Teams');
     expect(facts).toContain('with Rachel Ford, Ben C., Rohan Arianayagam');
+  });
+
+  it('someone with two jobs sits under the one the room shares, and can be moved for this meeting', async () => {
+    const canvas = await render();
+    const room = canvas.querySelector('[data-part="room"]')!;
+    const halt = [...room.querySelectorAll('.room__org')].find((group) => group.textContent!.startsWith('HALT NSW'))!;
+    expect(halt.textContent).toContain('Ben C.');
+    const headings = () => [...canvas.querySelectorAll('.room__org-name')].map((node) => node.textContent);
+    expect(headings()).not.toContain('Greyhounds');
+    expect(room.querySelectorAll('[data-part="room-job-toggle"]').length).toBe(1);
+
+    room.querySelector<HTMLButtonElement>('[data-part="room-job-toggle"]')!.click();
+    room.querySelector<HTMLButtonElement>('[data-part="room-job"] [data-value="club"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(endUniversalLink).toHaveBeenCalledWith('a2');
+    expect(createUniversalLink).toHaveBeenCalledWith(expect.objectContaining({
+      target_ref: 'shared:person:ben', role: null, metadata: { organisation_ref: 'club' }
+    }));
+    expect(headings()).toContain('Greyhounds');
+  });
+
+  it('the add row puts the role choice before the field, like the task panels', async () => {
+    const canvas = await render();
+    const add = canvas.querySelector('.room__add')!;
+    expect(add.firstElementChild!.classList.contains('hub-pills')).toBe(true);
+    expect(add.children[1]!.getAttribute('aria-label')).toBe('Add attendee');
   });
 
   it('an attendee the directory misses keeps their name (never "Unknown person")', async () => {
