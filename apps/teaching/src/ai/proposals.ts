@@ -110,6 +110,16 @@ export type AiProposal =
     }
   | { kind: 'review_only'; summary: string };
 
+/**
+ * The agent's note shown with the proposal card. Sonnet 5.5 returns text it
+ * writes beside a tool call as hidden thinking, so the note travels in the call.
+ */
+const MESSAGE_PROPERTY = {
+  type: 'string',
+  description:
+    'Your note to the teacher, shown with the proposal: what you built and why, anything to check before accepting, and a "Sources:" list when you researched.'
+} as const;
+
 export const AI_TOOLS = [
   {
     name: 'propose_replace_block',
@@ -118,6 +128,7 @@ export const AI_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
+        message: MESSAGE_PROPERTY,
         block_id: { type: 'string' },
         block: { type: 'object', description: 'Full block object matching Teaching Hub schema' }
       },
@@ -130,6 +141,7 @@ export const AI_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
+        message: MESSAGE_PROPERTY,
         section_id: { type: 'string' },
         section: { type: 'object' }
       },
@@ -143,6 +155,7 @@ export const AI_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
+        message: MESSAGE_PROPERTY,
         title: { type: 'string' },
         cover: { type: 'object' },
         blocks: { type: 'array', items: { type: 'object' } },
@@ -162,6 +175,7 @@ export const AI_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
+        message: MESSAGE_PROPERTY,
         anchor_block_id: { type: 'string' },
         position: { type: 'string', enum: ['above', 'below'] },
         blocks: { type: 'array', items: { type: 'object' } },
@@ -180,6 +194,7 @@ export const AI_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
+        message: MESSAGE_PROPERTY,
         ids: { type: 'array', items: { type: 'string' } }
       },
       required: ['ids']
@@ -191,6 +206,7 @@ export const AI_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
+        message: MESSAGE_PROPERTY,
         parent: {
           type: 'object',
           properties: {

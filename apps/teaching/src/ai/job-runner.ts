@@ -145,6 +145,8 @@ export interface RunLessonJobResult {
   turns: number;
   usage: TurnUsage[];
   cost_usd: number;
+  /** Problems with proposals the agent had to fix, oldest first, for diagnosing slow or costly jobs. */
+  checks: string[];
 }
 
 /** USD per million tokens. Cache reads ~0.1x input, 5-minute cache writes 1.25x; $10 per 1,000 searches. */
@@ -238,6 +240,12 @@ function textOf(content: ModelContentBlock[]): string {
     .trim();
 }
 
+/** The note the agent put in the proposal call, if any. */
+function messageOf(input: unknown): string {
+  const message = input && typeof input === 'object' ? (input as { message?: unknown }).message : undefined;
+  return typeof message === 'string' ? message.trim() : '';
+}
+
 function isToolUse(block: ModelContentBlock): block is { type: 'tool_use'; id: string; name: string; input: unknown } {
   return block.type === 'tool_use' && typeof (block as { id?: unknown }).id === 'string';
 }
@@ -284,8 +292,9 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
   let lastProblem = 'The agent could not produce a usable answer.';
   let lastText = '';
   let turns = 0;
+  const checks: string[] = [];
 
-  const fail = (error: string): RunLessonJobResult => ({ status: 'error', error, turns, usage, cost_usd: totalCost(usage) });
+  const fail = (error: string): RunLessonJobResult => ({ status: 'error', error, turns, usage, cost_usd: totalCost(usage), checks });
 
   while (turns < MAX_TURNS) {
     if (input.signal?.aborted) return fail('The agent ran out of time. Try a smaller request.');
@@ -342,10 +351,11 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
 
     const calls = content.filter(isToolUse);
     if (calls.length === 0) {
-      return { status: 'done', response: text || lastText, model: servedBy, turns, usage, cost_usd: totalCost(usage) };
+      return { status: 'done', response: text || lastText, model: servedBy, turns, usage, cost_usd: totalCost(usage), checks };
     }
 
     let accepted: AiProposal | null = null;
+    let note = '';
     const results: ModelContentBlock[] = [];
     for (const call of calls) {
       if (PROPOSAL_TOOLS.has(call.name)) {
@@ -356,6 +366,7 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
         const checked = checkProposalCall(call.name, call.input, lesson);
         if (typeof checked === 'string') {
           failedProposals += 1;
+          checks.push(`Turn ${turns}: ${checked}`);
           lastProblem = `The proposal failed the checks: ${checked}`;
           results.push({
             type: 'tool_result',
@@ -365,6 +376,7 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
           });
         } else {
           accepted = checked;
+          note = messageOf(call.input);
           results.push({ type: 'tool_result', tool_use_id: call.id, content: 'Shown to the teacher for review.' });
         }
         continue;
@@ -392,12 +404,13 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
     if (accepted) {
       return {
         status: 'done',
-        response: text || lastText,
+        response: note || text || lastText,
         proposal: accepted,
         model: servedBy,
         turns,
         usage,
-        cost_usd: totalCost(usage)
+        cost_usd: totalCost(usage),
+        checks
       };
     }
     if (failedProposals >= 3) return fail(lastProblem);

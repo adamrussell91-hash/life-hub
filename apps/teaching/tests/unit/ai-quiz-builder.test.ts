@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
-import { parseToolProposal, type AiProposal } from '@/ai/proposals';
+import { AI_TOOLS, parseToolProposal, type AiProposal } from '@/ai/proposals';
 import { quizProposalIssues } from '@/ai/quiz-proposal';
 import { BLOCK_BUILD_RECIPES } from '@/ai/block-recipes';
 import { buildAiLessonContext } from '@/ai/context';
@@ -281,12 +281,53 @@ describe('runLessonAiJob', () => {
     expect(feedback).toContain('is_error');
   });
 
+  it('shows the note from the proposal call when the model writes no visible text', async () => {
+    // Sonnet 5.5 returns text beside a tool call as hidden thinking, so the note rides in the call.
+    const { complete } = scripted([
+      {
+        stop_reason: 'tool_use',
+        usage,
+        content: [
+          { type: 'thinking', thinking: '' },
+          toolUse('t1', 'propose_insert_blocks', {
+            position: 'below',
+            anchor_block_id: 'b_head',
+            blocks: [goodMc],
+            message: '  One question on the July Crisis.\n\nSources:\n- Britannica  '
+          })
+        ]
+      }
+    ]);
+    const result = await runLessonAiJob({ job: job('Quiz'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete });
+    expect(result.response).toBe('One question on the July Crisis.\n\nSources:\n- Britannica');
+    expect(result.checks).toEqual([]);
+  });
+
+  it('records each failed check with its turn', async () => {
+    const { complete } = scripted([
+      { stop_reason: 'tool_use', usage, content: [toolUse('t1', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [badMc] })] },
+      { stop_reason: 'tool_use', usage, content: [toolUse('t2', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [goodMc], message: 'Fixed.' })] }
+    ]);
+    const result = await runLessonAiJob({ job: job('Quiz'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete });
+    expect(result.status).toBe('done');
+    expect(result.response).toBe('Fixed.');
+    expect(result.checks).toHaveLength(1);
+    expect(result.checks[0]).toMatch(/^Turn 1: .*Tick the right answer/);
+  });
+
+  it('offers every proposal tool a message field', () => {
+    for (const tool of AI_TOOLS.filter((t) => t.name.startsWith('propose_'))) {
+      expect(Object.keys(tool.input_schema.properties)).toContain('message');
+    }
+  });
+
   it('gives up with the last problem after three failed proposals', async () => {
     const bad = { stop_reason: 'tool_use', usage, content: [toolUse('t', 'propose_insert_blocks', { position: 'below', anchor_block_id: 'b_head', blocks: [badMc] })] };
     const { complete } = scripted([structuredClone(bad), structuredClone(bad), structuredClone(bad)]);
     const result = await runLessonAiJob({ job: job('Quiz'), lesson: lesson('quiz'), agentName: 'Ann', protocol: '', complete });
     expect(result.status).toBe('error');
     expect(result.error).toMatch(/Tick the right answer/);
+    expect(result.checks).toHaveLength(3);
   });
 
   it('asks for an anchor the editor can use before showing the card', async () => {
