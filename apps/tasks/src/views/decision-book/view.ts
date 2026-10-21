@@ -4,6 +4,7 @@
 // (track, compass above the canvas, coach, skill tray, review panel, task and record cards).
 // Its structure is Problem Solver's: the coach panel, task cards, bridges, review panel and
 // syncs are Problem Solver's own components, given Decision Maker's API, look and record.
+// A quick decision has its own page (quick-view.ts), as a Lightning run does in Problem Solver.
 import '../../../../../packages/problem-solver/problem-solver.css';
 import '../../../../../packages/decision-book/decision-book.css';
 import '../problem-solver/problem-solver-view.css';
@@ -20,10 +21,11 @@ import { reviewStart, waitingForReview } from '../../../../../packages/problem-s
 import type { PsAction, PsRecordOffer, PsSession, PsSummary } from '../../../../../packages/problem-solver/types';
 import { SECTIONS, modelsInSection } from '../../../../../packages/decision-book/catalogue.mjs';
 import { composeRecord, recordOffer } from '../../../../../packages/decision-book/record.mjs';
+import { currentEntry as quickEntry, decisionOf } from '../../../../../packages/decision-book/quick.mjs';
 import { modelEmblem, sectionEmblem } from '../../../../../packages/decision-book/glyphs';
 import { decisionBookApi, isBusy, pollUntilSettled, problemSolverApi } from '../problem-solver/api';
 import { mountCoachPanel } from '../problem-solver/coach-panel';
-import { createTaskBridge, type TaskOrigin } from '../problem-solver/task-bridge';
+import { createTaskBridge, taskBody, type TaskOrigin } from '../problem-solver/task-bridge';
 import { mountReviewPanel, reviewBanner, type ReviewEntry } from '../problem-solver/review-panel';
 import { createReviewSync } from '../problem-solver/review-sync';
 import { compactToday, mountTaskCards, type PlaceOption } from '../problem-solver/task-cards';
@@ -34,6 +36,7 @@ import { caseFilePlaces, createSkillTray, section } from '../problem-solver/view
 import { BACK_DISC, DM_LOOK, FORWARD_DISC, createCompass, createShapeBoard, createTrack, decisionMedal, plainName, toolNamed } from './decor';
 import { mountDecisionCanvas, type DmRunScores } from './canvas';
 import { recordBlocks, recordGraphic } from './record-blocks';
+import { mountFromQuick, mountQuickPage } from './quick-view';
 
 let poll: AbortController | null = null;
 /** The open session's canvas and Tasks listeners, dropped when the page changes. */
@@ -54,12 +57,19 @@ function art(markup: string, className?: string): SVGSVGElement {
 
 /* ── Landing ────────────────────────────────────────────────────────── */
 
+const QUICK_LABELS = { proceed: 'Proceed', stop: 'Do not proceed' } as const;
+
+/** A quick row's label: where it went, how it came out, or still going. */
+const quickLabel = (row: PsSummary): string => (row.escalatedTo ? 'Went deeper' : row.outcome ? QUICK_LABELS[row.outcome] : 'Quick decision');
+
 const phaseLabel = (row: PsSummary): string =>
-  row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase;
+  row.kind === 'quick' ? quickLabel(row)
+    : row.phase === 'frame' ? 'Framing' : row.phase === 'finished' ? 'Finished' : row.model ? stepName(row.model, row.phase) : row.phase;
 const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--dm-red)' : phase === 'finished' ? 'var(--dm-ink)' : 'var(--dm-green)');
 
 /** The meta line's middle part: the question being framed, the model in hand, or the review date. */
 function metaNote(row: PsSummary): string {
+  if (row.kind === 'quick') return row.status === 'active' ? 'Quick decision' : '';
   if (row.phase === 'frame') return `Question ${Math.min((row.frame ?? 0) + 1, 3)} of 3`;
   if (row.reviewDue) return `Review due ${formatDisplayDate(row.reviewDue)}`;
   const model = row.main ?? row.tool;
@@ -72,12 +82,18 @@ function decisionCard(row: PsSummary, index: number): HTMLLIElement {
   const link = el('a', 'ps-prob__link') as HTMLAnchorElement;
   link.href = `#/decision-maker?id=${row.id}`;
   const medal = el('span', 'ps-prob__medal');
-  const frame = row.frame ?? (row.phase === 'frame' ? 0 : 3);
-  medal.append(decisionMedal(frame, row.main ?? null));
+  if (row.kind === 'quick') {
+    // A quick decision's badge is its end: green forward on proceed, red back on do not proceed.
+    medal.classList.add('ps-prob__medal--quick');
+    medal.append(art(row.outcome === 'stop' ? BACK_DISC : row.outcome === 'proceed' ? FORWARD_DISC : QUICK_PAIR));
+  } else {
+    const frame = row.frame ?? (row.phase === 'frame' ? 0 : 3);
+    medal.append(decisionMedal(frame, row.main ?? null));
+  }
   const body = el('span', 'ps-prob__body');
   const meta = el('span', 'ps-prob__meta');
   const phase = el('span', 'ps-prob__phase', phaseLabel(row));
-  phase.style.setProperty('--c', phaseColour(row.phase));
+  phase.style.setProperty('--c', row.kind === 'quick' ? (row.outcome === 'stop' ? 'var(--dm-red)' : 'var(--dm-green)') : phaseColour(row.phase));
   meta.append(phase, el('span', '', metaNote(row)), el('span', '', formatDisplayDate(row.updatedAt.slice(0, 10))));
   body.append(el('span', 'ps-prob__title', row.title), meta);
   const seen = Object.keys(row.skills ?? {});
@@ -150,14 +166,46 @@ function startForm(onType: () => void): StartForm {
   };
 }
 
-/** The quick route's card. Its flow arrives with the Quick decision plan; until then it says so. */
+/** The two cover discs side by side: the quick route's mark, and a quick run's badge while it is open. */
+const QUICK_PAIR = '<g transform="translate(-2 26) scale(0.52)">' + BACK_DISC + '</g><g transform="translate(50 26) scale(0.52)">' + FORWARD_DISC + '</g>';
+
+/** The quick route's card: one line, then a quick session (as Problem Solver's Lightning card). */
 function quickCard(): HTMLElement {
   const card = el('section', 'ps-lightning-card dm-quick');
   const head = el('div', 'ps-lightning-card__head');
   const mark = el('span', 'dm-quick__mark');
-  mark.append(art('<g transform="translate(-2 26) scale(0.52)">' + BACK_DISC + '</g><g transform="translate(50 26) scale(0.52)">' + FORWARD_DISC + '</g>'));
+  mark.append(art(QUICK_PAIR));
   head.append(mark, el('h2', 'ps-lightning-card__title', 'Quick decision'));
-  card.append(head, el('p', 'ps-lightning-card__line', 'A yes/no check and a Stop Rule for everyday calls. Coming soon: for now, start a decision above.'));
+  const form = el('form', 'ps-lightning-card__form') as HTMLFormElement;
+  const input = el('input', 'ps-lightning-card__input') as HTMLInputElement;
+  input.type = 'text';
+  input.placeholder = 'What is the call?';
+  input.setAttribute('aria-label', 'Describe the quick decision');
+  const go = el('button', 'ps-lightning-card__go', 'Go') as HTMLButtonElement;
+  go.type = 'submit';
+  const status = el('p', 'ps-lightning-card__status');
+  status.setAttribute('role', 'status');
+  const row = el('div', 'ps-lightning-card__row');
+  row.append(input, go);
+  form.append(row, status);
+  card.append(head, el('p', 'ps-lightning-card__line', 'Three yes/no tests and a Stop Rule, for everyday calls.'), form);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      return;
+    }
+    go.disabled = true;
+    status.textContent = '';
+    try {
+      const session = await decisionBookApi.create({ text, kind: 'quick' });
+      location.hash = `#/decision-maker?id=${session.id}`;
+    } catch (err) {
+      status.textContent = errorMessage(err);
+      go.disabled = false;
+    }
+  });
   return card;
 }
 
@@ -317,8 +365,124 @@ function syncFor(initial: PsSession, render: (session: PsSession) => void, alive
   });
 }
 
+const isConflict = (err: unknown): boolean => (err as { code?: string }).code === 'conflict';
+
+/**
+ * A quick decision: the Yes/No chart (Yes and No on the test being asked), the coach, the check
+ * card, It came back and Go deeper. Every action goes through the session sync; a conflict refetches.
+ */
+async function renderQuickSession(canvas: HTMLElement, initial: PsSession): Promise<void> {
+  const view = mountQuickPage(initial, {
+    onAnswer: (node, answer) => void answerTest(node, answer),
+    onSay: (text) => void say(text),
+    onAction: (action) => void coachAction(action),
+    onAgain: () => again(),
+    onCheck: (create) => check(create)
+  });
+  canvas.replaceChildren(view.el);
+  canvasNow = view;
+  const alive = () => view.el.isConnected;
+  const sync = syncFor(initial, (next) => view.update(next), alive);
+
+  async function recover(err: unknown): Promise<void> {
+    if (!alive()) return;
+    if (!isConflict(err)) return view.flash(err);
+    try {
+      sync.paint(await decisionBookApi.get(sync.session().id));
+    } catch (fetchErr) {
+      view.flash(fetchErr);
+    }
+  }
+
+  async function post(action: PsAction, payload: Record<string, unknown>): Promise<boolean> {
+    try {
+      await sync.confirmed(action, payload);
+      return true;
+    } catch (err) {
+      await recover(err);
+      return false;
+    }
+  }
+  const settleIfBusy = async () => {
+    if (alive() && isBusy(sync.session())) await sync.settle();
+  };
+
+  /** A click on a test that has moved on, or while the coach is thinking, is dropped, not posted. */
+  async function answerTest(node: string, answer: 'yes' | 'no'): Promise<void> {
+    const now = sync.session();
+    const current = now.quick ? quickEntry(now.quick) : null;
+    if (!current || current.node !== node || isBusy(now)) {
+      view.releaseAnswer();
+      return;
+    }
+    if (await post('quick_answer', { node, answer })) await settleIfBusy();
+    else view.releaseAnswer();
+  }
+
+  async function again(): Promise<void> {
+    if (!(await post('quick_again', {}))) return;
+    await settleIfBusy();
+    if (alive()) view.focusComposer();
+  }
+
+  /** The check card: a task due on the check date, then linked; or set aside. A failure stays on the card. */
+  let checkTask: string | null = null;
+  async function check(create: boolean): Promise<void> {
+    const now = sync.session();
+    const due = now.quick?.check?.due;
+    if (!create || !due) {
+      await sync.confirmed('quick_check', { dismissed: true });
+      return;
+    }
+    const title = `Check: ${decisionOf(now.quick!) || now.title}`;
+    if (!checkTask) checkTask = (await tasksApi.createTask({ ...taskBody(now, { title, due }, 'life', undefined, ORIGIN), tags: [ORIGIN.tag, 'check'] })).id;
+    await sync.confirmed('quick_check', { taskId: checkTask });
+    checkTask = null;
+  }
+
+  const openFull = (to: string) => {
+    if (alive()) location.hash = `#/decision-maker?id=${encodeURIComponent(to)}`;
+  };
+
+  /** Go deeper. A run that already went deeper (in another tab, say) opens its full decision. */
+  async function escalate(): Promise<void> {
+    view.setEscalating(true);
+    try {
+      await sync.confirmed('escalate', {});
+    } catch (err) {
+      const already = sync.session().quick?.escalatedTo;
+      if (already) return openFull(already);
+      view.setEscalating(false);
+      await recover(err);
+      return;
+    }
+    const to = sync.session().quick?.escalatedTo;
+    if (to) openFull(to);
+    else view.setEscalating(false);
+  }
+
+  async function coachAction(action: PsAction): Promise<void> {
+    if (action === 'escalate') return escalate();
+    if (await post(action, {})) await settleIfBusy();
+  }
+
+  async function say(text: string): Promise<void> {
+    try {
+      sync.paint(await sync.enqueue(() => decisionBookApi.act(sync.session(), 'say', text)));
+    } catch (err) {
+      await recover(err);
+      return;
+    }
+    await settleIfBusy();
+  }
+
+  view.update(initial);
+  await settleIfBusy();
+}
+
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await decisionBookApi.get(id);
+  if (session.kind === 'quick') return renderQuickSession(canvas, session);
   const page = el('div', 'ps-page ps-session ps-scope dm-scope dm-page');
   const back = el('a', 'ps-back', '← Decisions') as HTMLAnchorElement;
   back.href = '#/decision-maker';
@@ -330,7 +494,10 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const canvasHost = el('div', 'ps-canvas dm-canvas');
   const tray = createSkillTray();
   const review = mountReviewPanel({ start: () => void reviews.startReview() });
-  bench.append(review.el, compass.el, canvasHost, tray.el);
+  // A decision that went deeper from a quick run shows that run's chart, closed until opened.
+  const fromQuick = session.escalatedFrom ? mountFromQuick(session.escalatedFrom, (runId) => decisionBookApi.get(runId)) : null;
+  if (fromQuick) unsubscribeNow.push(() => fromQuick.destroy());
+  bench.append(review.el, compass.el, canvasHost, ...(fromQuick ? [fromQuick.el] : []), tray.el);
   const cards = mountTaskCards({
     create: (proposal, edits) => bridge.create(session, proposal, edits),
     dismiss: (proposal) => confirmed('dismiss_task', { proposalId: proposal.id }),

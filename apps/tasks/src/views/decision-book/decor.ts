@@ -289,5 +289,6 @@ export const DM_LOOK: CoachLook = {
       prompts: ['What are you deciding?', 'Who is it about, and what do you want?', 'What do you already know?']
     }
   },
-  noun: 'Decision'
+  noun: 'Decision',
+  escalate: { title: 'This needs a full decision', accept: 'Go deeper' }
 };

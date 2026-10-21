@@ -367,6 +367,48 @@
   .dm-record__stop, .dm-record__ends { grid-template-columns: 1fr; }
 }
 
+/* ------------------------------------------------------------------ quick decision
+   The Yes/No flow (render/quick.ts): discs on a dotted line, the answered path inked, a test
+   off the path faint; Proceed is a green disc, Do not proceed a red one; the Stop Rule is an
+   if/then band underneath. */
+.dm-qk { display: grid; gap: 14px; min-width: 0; color: var(--dm-ink); }
+.dm-qk [hidden] { display: none !important; }
+.dm-qk__rounds { margin: 0; font: 600 12px / 1.4 var(--font-ui); color: #66675d; }
+.dm-qk__flow { list-style: none; margin: 0; padding: 0; display: grid; }
+.dm-qk__row { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; padding-bottom: 18px; }
+.dm-qk__row:not(:last-child)::before { content: ''; position: absolute; left: 12px; top: 26px; bottom: 0; border-left: 2px dotted var(--dm-ink); }
+.dm-qk__disc { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--dm-ink); background: var(--dm-paper); }
+.dm-qk__row[data-box='decision'] .dm-qk__disc { border-color: var(--dm-red); background: var(--dm-red); }
+.dm-qk__row[data-answer='yes'] .dm-qk__disc { border-color: var(--dm-ink); background: var(--dm-ink); }
+.dm-qk__row[data-answer='no'] .dm-qk__disc { border-color: var(--dm-red); background: var(--dm-red); }
+.dm-qk__row[data-now='true'] .dm-qk__disc { border-style: dashed; }
+.dm-qk__row[data-off='true'] :is(.dm-qk__disc, .dm-qk__label) { opacity: 0.4; }
+.dm-qk__row[data-end='proceed'] .dm-qk__disc { border-color: var(--dm-green); background: var(--dm-green); }
+.dm-qk__row[data-end='stop'] .dm-qk__disc { border-color: var(--dm-red); background: var(--dm-red); }
+.dm-qk__row[data-box='end']:not([data-end]) :is(.dm-qk__disc, .dm-qk__label) { opacity: 0.4; }
+.dm-qk__label { font: 600 14px / 1.4 var(--font-ui); min-width: 0; overflow-wrap: anywhere; }
+.dm-qk__chip { padding: 0 10px; border-radius: 999px; background: var(--dm-ink); color: var(--dm-paper); font: 600 12px / 1.7 var(--font-ui); }
+.dm-qk__row[data-answer='no'] .dm-qk__chip { background: var(--dm-red); color: var(--dm-ink); }
+.dm-qk__text { grid-column: 2 / -1; margin: 0; font: 400 13px / 1.45 var(--font-ui); overflow-wrap: anywhere; }
+.dm-qk__ask { grid-column: 2 / -1; display: flex; gap: 8px; }
+.dm-qk__answer { min-width: 64px; min-height: 40px; padding: 0 16px; border: 2px solid var(--dm-ink); border-radius: 999px; background: var(--dm-paper); color: var(--dm-ink); font: 600 14px / 1 var(--font-ui); cursor: pointer; }
+.dm-qk__answer[data-answer='yes'] { background: var(--dm-green); border-color: var(--dm-green); }
+.dm-qk__answer[data-answer='no'] { background: var(--dm-red); border-color: var(--dm-red); }
+.dm-qk__answer:focus-visible { outline: 2px solid var(--dm-ink); outline-offset: 2px; }
+.dm-qk__answer[aria-disabled='true'] { opacity: 0.5; cursor: default; }
+.dm-qk__band { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 6px 12px; padding: 12px 16px; border: 2px solid var(--dm-red); border-radius: 18px; background: var(--dm-red-tint); }
+.dm-qk__band:not([data-set]) .dm-qk__band-text { color: #66675d; }
+.dm-qk__band-word { font: 700 11px / 1.3 var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: #b8301f; }
+.dm-qk__band-text { font: 400 14px / 1.45 var(--font-ui); overflow-wrap: anywhere; }
+.dm-qk__check { margin: 0; justify-self: start; padding: 4px 12px; border-radius: 999px; background: var(--dm-green-tint); font: 600 12px / 1.6 var(--font-ui); }
+.dm-qk__close { display: grid; gap: 4px 12px; grid-template-columns: max-content minmax(0, 1fr); margin: 0; }
+.dm-qk__term { font: 700 12px / 1.45 var(--font-ui); }
+.dm-qk__note { margin: 0; font: 400 13px / 1.45 var(--font-ui); overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .dm-qk__close { grid-template-columns: minmax(0, 1fr); }
+  .dm-qk__ask { flex-wrap: wrap; }
+}
+
 /* ------------------------------------------------------------------ reused Problem Solver charts
    SWOT, morphological analysis, Pareto and double-loop learning keep their own renderers. Inside
    Decision Maker their book colours become this palette: red stays red, blue becomes ink and

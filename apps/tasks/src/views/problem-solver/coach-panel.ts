@@ -19,6 +19,8 @@ export type CoachLook = {
   emblem(tool: string): Element;
   frames: Record<string, { keys: string[]; prompts: string[] }>;
   noun: string;
+  /** The card that offers a quick route's way on to a full session. */
+  escalate?: { title: string; accept: string };
 };
 
 const PS_LOOK: CoachLook = {
@@ -89,8 +91,8 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers, look: 
     title = `Reopen: ${model && target ? stepName(model, target) : suggestion.step}`;
     accept = 'Reopen it';
   } else if (suggestion.kind === 'escalate') {
-    title = 'This needs the full process';
-    accept = 'Start the full process';
+    title = look.escalate?.title ?? 'This needs the full process';
+    accept = look.escalate?.accept ?? 'Start the full process';
     acceptAction = 'escalate';
   } else {
     title = `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
@@ -157,7 +159,8 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
       const busy = session.runner.status === 'queued' || session.runner.status === 'running';
       // A failed boundary turn must be retried before anything else: the step has already moved.
       const boundaryFailed = session.runner.status === 'failed' && session.runner.mode === 'boundary';
-      const lightning = session.kind === 'lightning';
+      // A Lightning run or a quick decision: a fixed flow with no frame and no steps.
+      const lightning = session.kind === 'lightning' || session.kind === 'quick';
       // A finished Lightning run takes no more replies until It came back starts a new round.
       const closed = lightning && session.status !== 'active';
       const locked = busy || boundaryFailed || closed;
