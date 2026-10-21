@@ -9,6 +9,8 @@ import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor'
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { createFormatField, withFormat } from '@/blocks/formats/registry';
+import { LENS_LEVELS, LEVEL_LABELS, type LensLevel } from '@/blocks/lenses/types';
+import { LOGIC_LABELS, type LogicSetting } from '@/blocks/reasoning/content';
 import { QUESTION_LEVEL_LABELS, QUESTION_LEVELS, guessQuestionLevel, type QuestionLevel } from '@/blocks/lenses/question-levels';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
@@ -1531,6 +1533,7 @@ export function createQuestionSetEditor(
     options?: string[];
     response_space?: ResponseSpace;
     level?: QuestionLevel;
+    logic?: LogicSetting;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1551,7 +1554,8 @@ export function createQuestionSetEditor(
     kind: q.kind,
     options: q.options ? [...q.options] : undefined,
     response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined,
-    level: q.level
+    level: q.level,
+    logic: q.logic
   }));
 
   const emitChange = () => {
@@ -1570,7 +1574,8 @@ export function createQuestionSetEditor(
           ...(q.kind === 'short_answer' && q.response_space
             ? { response_space: q.response_space }
             : {}),
-          ...(q.level ? { level: q.level } : {})
+          ...(q.level ? { level: q.level } : {}),
+          ...(q.logic ? { logic: q.logic } : {})
         }))
       }
     });
@@ -1658,9 +1663,20 @@ export function createQuestionSetEditor(
         }
       });
 
+      // Shown only for the Reasoning chart format (see data-format on the fields).
+      const logic = createChoice({
+        key: 'Logic',
+        value: question.logic ?? 'choice',
+        options: (['deductive', 'inductive', 'abductive', 'all_three', 'choice'] as const)
+          .map((value) => ({ value, label: LOGIC_LABELS[value] })),
+        className: 'block-editor__question-logic',
+        ariaLabel: `Question ${n} logic`,
+        onChange: (value) => ctx.update({ ...ctx.current, logic: value === 'choice' ? undefined : value as LogicSetting })
+      });
+
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
-      settings.append(level.el, kind.el, responseSpace.el);
+      settings.append(level.el, kind.el, responseSpace.el, logic.el);
       return fragmentOf(prompt, settings, options);
     }
   });
@@ -1691,8 +1707,36 @@ export function createQuestionSetEditor(
     const table = { rows: 3, example: true, ...latest.content.table, ...patch };
     onChange({ ...latest, content: { ...latest.content, table } });
   };
+  // Reasoning chart settings, shown only for that format.
+  const reasoningSettings = document.createElement('div');
+  reasoningSettings.className = 'block-editor__inline-settings block-editor__reasoning-settings';
+  const setReasoning = (patch: { level?: LensLevel; student_level?: boolean }) => {
+    const latest = getLatest();
+    const reasoning = { level: 'core' as LensLevel, student_level: true, ...latest.content.reasoning, ...patch };
+    onChange({ ...latest, content: { ...latest.content, reasoning } });
+  };
+  const reasoningLevel = createChoice({
+    key: 'Level',
+    value: block.content.reasoning?.level ?? 'core',
+    options: LENS_LEVELS.map((value) => ({ value, label: LEVEL_LABELS[value] })),
+    className: 'block-editor__reasoning-level',
+    ariaLabel: 'Reasoning level',
+    onChange: (value) => setReasoning({ level: value as LensLevel })
+  });
+  const studentLevel = createChoice({
+    key: 'Students change level',
+    value: block.content.reasoning?.student_level === false ? 'no' : 'yes',
+    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }],
+    className: 'block-editor__reasoning-student-level',
+    ariaLabel: 'Students can change the level',
+    onChange: (value) => setReasoning({ student_level: value === 'yes' })
+  });
+  reasoningSettings.append(reasoningLevel.el, studentLevel.el);
+
   const showTableSettings = (format: string) => {
     tableSettings.hidden = format !== 'human_experience_table';
+    reasoningSettings.hidden = format !== 'reasoning_chart';
+    fields.dataset.format = format;
     fields.querySelectorAll<HTMLElement>('.block-editor__question-level').forEach((el) => { el.hidden = format !== 'question_levels'; });
   };
   showTableSettings(block.content.format ?? 'standard');
@@ -1704,7 +1748,7 @@ export function createQuestionSetEditor(
     }
   });
 
-  fields.append(...(format ? [format] : []), tableSettings, title, list.el);
+  fields.append(...(format ? [format] : []), tableSettings, reasoningSettings, title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
