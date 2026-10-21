@@ -2,6 +2,7 @@ import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
+import { createHingeQuestionEditor } from '@/blocks/hinge-question';
 import { createContinuumLineEditor } from '@/blocks/continuum-line';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
@@ -3019,6 +3020,8 @@ function createBlockEditorFields(
       return createQuestionDropEditor(block, onChange, context.lessonId);
     case 'brainstorm':
       return createBrainstormEditor(block, onChange);
+    case 'hinge_question':
+      return createHingeQuestionEditor(block, onChange);
     case 'continuum_line':
       return createContinuumLineEditor(block, onChange);
     case 'curriculum_lines':

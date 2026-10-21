@@ -384,6 +384,7 @@ describe('blockRegistry', () => {
       'fluid_analogy',
       'gallery',
       'heading',
+      'hinge_question',
       'html',
       'html_app',
       'image',
