@@ -195,7 +195,9 @@ export function renderQuestionLevels(block: QuestionSet, mode: Mode, ctx: Ctx = 
     const head = el('div', 'block-question-set__band-head');
     head.append(el('p', 'block-question-set__band-name block-eyebrow', QUESTION_LEVEL_LABELS[level]), el('p', 'block-secondary', QUESTION_LEVEL_STEMS[level]));
     const list = el('ol', 'block-question-set__list');
+    // Numbering runs on across bands; the list counts with a CSS counter.
     list.start = n + 1;
+    list.style.counterReset = `lesson-q ${n}`;
     for (const question of questions) {
       n += 1;
       const li = el('li', 'block-question-set__question');
