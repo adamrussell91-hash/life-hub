@@ -176,15 +176,15 @@ retells. Extend adds: names the weakness (break, wrong, gap).
 ### Engine change
 
 The stepped engine renders text steps. Reasoning needs the chart above the
-steps and two non-text steps (the fit check and the test grid). Add two
-optional hooks to `SteppedLens` in `src/blocks/lenses/types.ts`:
+steps and non-text steps (the fit check, the test grid, how sure). The Format
+needs the same walk without the lens chip. So the walk lives once, in
+`src/blocks/reasoning/walk.ts`, and `SteppedLens` in
+`src/blocks/lenses/types.ts` gains two optional hooks:
 
-- `header?(config, ctx, notes) → HTMLElement`: drawn above the step panel and
-  redrawn when notes change. Reasoning returns the chart.
-- `stepInput?(step, ctx, notes, update) → HTMLElement | undefined`: a custom
-  input for a step; `undefined` falls back to the textarea. Reasoning returns
-  the tick list and tick grid. Ticks are stored in `notes` as JSON strings
-  under the step id.
+- `walk?({ config, ctx, storageKey, preview, onDone }) → HTMLElement`: when
+  present, the engine draws the heading and level pills, then hands the rest
+  of the workspace to the lens.
+- `print?(config, ctx) → HTMLElement`: replaces the default print sheet.
 
 Kaplan and Windows & Mirrors do not implement them and are unchanged.
 
@@ -219,7 +219,9 @@ Matches `kaplan.css` (cotton glass): paper panel with the wave left border,
 underline step tabs, navy question, "For example" eyebrow with an italic
 example, glass input, navy Next button that names the next step
 ("Next: So probably"). Chart cards use white, `--pastel-blue` and
-`--pastel-peach`. New rules go in `src/styles/reasoning.css`; no new tokens.
+`--pastel-peach`. New rules are `block-reasoning*` classes in
+`src/styles/app.css`, so `scripts/generate-block-css.mjs` carries them to
+Tasks and Professional with the Format; no new tokens.
 Check against `docs/CURSOR-UI-FAILURES.md` before review.
 
 ## Out of scope
