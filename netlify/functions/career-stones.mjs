@@ -35,7 +35,9 @@ export function createCareerStonesHandler(deps = {}) {
           return withCors(okResponse(200, { stones: await repo.listSteppingStones() }), request, env);
         }
         if (request.method === 'POST') {
-          const body = await readJsonObject(request);
+          const parsed = await readJsonObject(request);
+          if (parsed.error) return withCors(parsed.error, request, env);
+          const body = parsed.value;
           // task: createTask + stone_action lands in Phase 4
           if (url.searchParams.get('action') === 'task' || body?.action === 'task') {
             return withCors(
@@ -52,8 +54,9 @@ export function createCareerStonesHandler(deps = {}) {
           if (!id || !isValidSteppingStoneId(id)) {
             return withCors(errorResponse(400, 'invalid_stepping_stone_id', 'id required.'), request, env);
           }
-          const body = await readJsonObject(request);
-          const stone = await repo.updateSteppingStone(id, body);
+          const parsed = await readJsonObject(request);
+          if (parsed.error) return withCors(parsed.error, request, env);
+          const stone = await repo.updateSteppingStone(id, parsed.value);
           return withCors(okResponse(200, { stone }), request, env);
         }
         return withCors(methodNotAllowed('GET, POST, PATCH, OPTIONS'), request, env);

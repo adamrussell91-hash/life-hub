@@ -64,7 +64,12 @@ export async function renderCareerApplications(
   }
 
   if (!applications.length) {
-    section.append(el('p', 'empty-state', 'No applications yet.'));
+    // Empty: one compact line, so a section with nothing in it doesn't dominate.
+    section.classList.add('career-page__section--empty');
+    compose.className = 'btn btn--secondary';
+    head.querySelector('.career-page__heading')?.after(
+      el('p', 'career-page__meta', 'No applications yet.')
+    );
     return;
   }
 

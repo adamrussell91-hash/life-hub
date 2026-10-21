@@ -298,3 +298,30 @@ test('PATCH action=update adopts a Notion-imported person on first edit instead 
   }));
   assert.equal(missing.status, 404, 'a person in neither store is still not found');
 });
+
+test('PATCH action=archive adopts a Notion-imported person, and activate restores them', async () => {
+  const store = memoryStore();
+  const importedId = 'person_33333333-3333-3333-3333-333333333333';
+  const handler = createEntitiesHandler(baseDeps({
+    getContentStore: async () => store,
+    getGithubPerson: async id => (id === importedId
+      ? {
+        schema_version: 1, id: importedId, kind: 'person', display_name: 'Pat Imported', sort_name: null,
+        aliases: [], lifecycle_status: 'active', is_self: false, retention_reason: null,
+        retention_review_at: null, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z'
+      }
+      : null)
+  }));
+  const ref = `shared:person:${importedId}`;
+  const transition = action => handler(request({
+    method: 'PATCH',
+    url: `https://api.adam-russell.com/api/entities?ref=${encodeURIComponent(ref)}&action=${action}`,
+    body: {}
+  }));
+  const archived = await transition('archive');
+  const archivedBody = await archived.json();
+  assert.equal(archived.status, 200, JSON.stringify(archivedBody));
+  assert.equal(archivedBody.data.lifecycle_status, 'archived');
+  const restored = await transition('activate');
+  assert.equal((await restored.json()).data.lifecycle_status, 'active');
+});

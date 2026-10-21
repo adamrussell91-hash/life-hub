@@ -144,6 +144,7 @@ export function createMockApi({ seed }: MockApiOptions) {
   }
 
   const personalLines = new Map<string, Record<string, unknown> & { slug: string }>();
+  const whiteboards = new Map<string, Record<string, unknown>>();
   const problemSolver = createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach });
 
   async function handle(method: string, urlPath: string, body?: unknown) {
@@ -209,6 +210,25 @@ export function createMockApi({ seed }: MockApiOptions) {
       } catch (error) {
         return seedFailure(error);
       }
+    }
+
+    // Mirrors netlify/functions/whiteboards.mjs so boards save in local dev.
+    const whiteboard = /^\/api\/whiteboards\/([A-Za-z0-9_-]{1,160})$/.exec(path);
+    if (whiteboard && (method === 'GET' || method === 'PUT')) {
+      const boardId = whiteboard[1]!;
+      if (method === 'GET') {
+        const record = whiteboards.get(boardId);
+        return record
+          ? json(200, { ok: true, data: record })
+          : json(404, { ok: false, error: { code: 'not_found', message: 'Whiteboard document not found.' } });
+      }
+      const snapshot = (body as { snapshot?: unknown } | null)?.snapshot;
+      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+        return json(400, { ok: false, error: { code: 'validation_error', message: 'Whiteboard snapshot is required.' } });
+      }
+      const record = { id: boardId, snapshot, schema_version: 1, updated_at: new Date().toISOString() };
+      whiteboards.set(boardId, record);
+      return json(200, { ok: true, data: record });
     }
 
     const taskItem = path.match(/^\/api\/tasks\/([^/]+)$/);
@@ -432,6 +452,7 @@ export function createMockApi({ seed }: MockApiOptions) {
     if (path === '/api/problem-solver') {
       try {
         if (method === 'GET') {
+          if (url.searchParams.has('linked')) return json(200, { ok: true, data: { sessions: await problemSolver.linked('operator', url.searchParams.get('linked') ?? '') } });
           if (url.searchParams.has('list')) return json(200, { ok: true, data: { sessions: await problemSolver.list('operator') } });
           return json(200, { ok: true, data: { session: await problemSolver.get('operator', url.searchParams.get('id') ?? '') } });
         }
@@ -441,6 +462,7 @@ export function createMockApi({ seed }: MockApiOptions) {
             ? await problemSolver.create('operator', payload.create as Record<string, unknown>)
             : await problemSolver.action('operator', payload);
           if (session.runner.status === 'queued') session = await problemSolver.run('operator', session.id);
+          if (payload.action === 'escalate' && session.lightning?.escalatedTo) await problemSolver.run('operator', session.lightning.escalatedTo);
           return json(200, { ok: true, data: { session } });
         }
       } catch (error) {

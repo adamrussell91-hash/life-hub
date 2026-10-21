@@ -59,6 +59,8 @@ async function loadNotionListCaches(): Promise<NotionListCaches | null> {
 }
 
 const LOCAL_PASSPHRASE = 'professional-hub-local';
+/** The operator's own Person in the mock (Career → Add a role links from here). */
+const MOCK_SELF_REF = 'shared:person:person_self_demo';
 /** Local-only: Blob copies the Duplicates sheet has merged this session. */
 const mockDedupeDone = new Set<string>();
 
@@ -459,6 +461,80 @@ export function createMockApi() {
       return json(200, { ok: true, data: overview });
     }
 
+    if (path === '/api/people/roles' && method === 'POST') {
+      const input = (body ?? {}) as Record<string, string | null | undefined>;
+      const now = new Date().toISOString();
+      const find = () => relationships.find((l) => l.id === input.link_id && l.source_ref === input.person_ref);
+      if (input.action === 'add') {
+        const link: RelationshipSeed = {
+          id: `ul_${randomUUID()}`,
+          source_ref: String(input.person_ref),
+          target_ref: String(input.organisation_ref),
+          relationship_type: String(input.relationship_type),
+          inverse_label: '',
+          context_key: null,
+          status: input.valid_to ? 'ended' : 'current',
+          temporal_mode: 'period',
+          valid_from: input.valid_from ?? null,
+          valid_to: input.valid_to ?? null,
+          occurred_at: null,
+          role: input.role ?? null,
+          metadata: {}
+        };
+        relationships.push(link);
+        return json(200, { ok: true, data: { link, chart_synced: true } });
+      }
+      const link = find();
+      if (!link) return json(404, { ok: false, error: { code: 'role_not_found', message: 'That role is not on this person.' } });
+      if (input.action === 'edit') {
+        if ('role' in input) link.role = input.role ?? null;
+        if ('valid_from' in input) link.valid_from = input.valid_from ?? null;
+        if ('valid_to' in input) {
+          link.valid_to = input.valid_to ?? null;
+          link.status = link.valid_to ? 'ended' : 'current';
+        }
+      } else if (input.action === 'end') {
+        link.valid_to = input.valid_to ?? now;
+        link.status = 'ended';
+      } else if (input.action === 'remove') {
+        link.status = 'suppressed';
+      } else {
+        return json(400, { ok: false, error: { code: 'invalid_action', message: 'action must be add, edit, end or remove.' } });
+      }
+      return json(200, { ok: true, data: { link, chart_synced: true } });
+    }
+
+    if (path === '/api/people/linkedin-parse' && method === 'POST') {
+      const input = (body ?? {}) as { text?: string; person_ref?: string | null };
+      const text = String(input.text ?? '').trim();
+      if (!text) return json(400, { ok: false, error: { code: 'missing_text', message: 'Paste the profile text first.' } });
+      if (text.length > 30000) return json(413, { ok: false, error: { code: 'paste_too_long', message: 'That’s longer than a profile.' } });
+      if (/fail/i.test(text)) return json(502, { ok: false, error: { code: 'linkedin_parse_failed', message: 'Couldn’t read that paste.' } });
+      // Local preview only: a canned reading built from the seed organisations.
+      const orgs = [...organisations.values()];
+      const a = orgs[0];
+      const b = orgs[1] ?? orgs[0];
+      const row = (id: string, section: string, type: string, title: string, org: { display_name: string; id: string } | null, name: string, start: string | null, end: string | null) => ({
+        id, section, relationship_type: type, title,
+        organisation: org ? { name: org.display_name, ref: `shared:organisation:${org.id}`, status: 'matched' } : { name, ref: null, status: 'new_organisation' },
+        start, end, current: section === 'current', diff: 'new', link_id: null
+      });
+      return json(200, {
+        ok: true,
+        data: {
+          name: 'Noor Vale',
+          headline: 'Head of English · writer',
+          about: 'English teacher and occasional essayist. Interested in reading for pleasure and student voice.',
+          rows: [
+            row('row_1', 'current', 'employee_at', 'Head of English', a ?? null, 'Tallowwood College', '2022-02', null),
+            row('row_2', 'current', 'member_of', 'Chair', null, 'Reading Circle Collective', '2020', null),
+            row('row_3', 'past', 'employee_at', 'English teacher', b ?? null, 'Old School', '2016', '2022-01'),
+            row('row_4', 'education', 'studied_at', 'BA (Hons) English', null, 'Marrow University', '2010', '2013')
+          ]
+        }
+      });
+    }
+
     if (path === '/api/people/directory' && method === 'GET') {
       const rows = [...people.values()]
         .filter((p) => !p.is_self && !['deleted', 'deidentified'].includes(p.lifecycle_status))
@@ -470,15 +546,29 @@ export function createMockApi() {
             parts.length <= 1
               ? (parts[0] ?? '?').slice(0, 2).toUpperCase()
               : `${parts[0]![0] ?? ''}${parts[parts.length - 1]![0] ?? ''}`.toUpperCase();
+          const ref = `shared:person:${p.id}`;
+          const orgLinks = relationships
+            .filter((l) => l.source_ref === ref && ['employee_at', 'member_of'].includes(l.relationship_type) && l.status !== 'suppressed')
+            .map((l) => {
+              const org = organisations.get(l.target_ref.split(':')[2] ?? '');
+              const name = org?.display_name ?? 'Organisation';
+              const mono = name.replace(/[^a-zA-Z0-9\s]/g, ' ').trim().split(/\s+/).slice(0, 3).map((w) => w[0]).join('').toUpperCase() || 'ORG';
+              return { ref: l.target_ref, display_name: name, monogram: mono, logo_key: null, current: l.status === 'current', role: l.role ?? null };
+            });
+          const currentOrgs = orgLinks.filter((o) => o.current);
+          const titled = currentOrgs.find((o) => o.role);
+          const more = currentOrgs.length > 1 ? ` +${currentOrgs.length - 1}` : '';
+          const primary = currentOrgs[0] ?? orgLinks[0] ?? null;
           return {
             id: p.id,
-            ref: `shared:person:${p.id}`,
+            ref,
             display_name: displayName,
             initials,
-            role_line: 'No relationship on record',
+            role_line: titled ? `${titled.role} · ${titled.display_name}${more}` : primary ? `${primary.current ? 'At' : 'Formerly'} ${primary.display_name}${primary.current ? more : ''}` : 'No relationship on record',
             relationship_roles: [],
-            organisation: null,
-            organisations: [],
+            organisation: primary ? { ref: primary.ref, display_name: primary.display_name, monogram: primary.monogram, logo_key: null, current: primary.current } : null,
+            organisations: orgLinks.map(({ role: _role, ...o }) => o),
+            lifecycle_status: p.lifecycle_status,
             warmth: 18,
             warmth_band: 'cold' as const,
             relationship_state: 'active',
@@ -1515,6 +1605,14 @@ export function createMockApi() {
       if (!ref || !record || !('kind' in record)) {
         return json(404, { ok: false, error: { code: 'entity_not_found', message: 'Entity not found.' } });
       }
+      const lifecycle: Record<string, string> = { archive: 'archived', activate: 'active', deidentify: 'deidentified', delete: 'deleted' };
+      if (lifecycle[action] && record.kind === 'person') {
+        if ((record as PersonRecord).is_self && action !== 'activate') {
+          return json(409, { ok: false, error: { code: 'self_protected', message: 'The self identity cannot be archived or deleted.' } });
+        }
+        (record as PersonRecord).lifecycle_status = lifecycle[action]!;
+        return json(200, { ok: true, data: { ...record, ref } });
+      }
       if (action !== 'update') {
         return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
       }
@@ -1606,7 +1704,7 @@ export function createMockApi() {
       });
       const ready = [
         { kind: 'copy', remove: p(1, 'Rohan'), into: [p(2, 'Rohan Arianayagam')], student: true, links: 2, blocked: null },
-        { kind: 'combined', remove: p(3, 'Joseph Histon, Thierry King'), into: [p(4, 'Joseph Histon'), p(5, 'Thierry King')], student: true, links: 1, blocked: null }
+        { kind: 'combined', remove: p(3, 'Wynn Fernleigh, Fern Redgum'), into: [p(4, 'Wynn Fernleigh'), p(5, 'Fern Redgum')], student: true, links: 1, blocked: null }
       ].filter((a) => !mockDedupeDone.has(a.remove.id));
       if (input.action === 'plan_people_dedupe') {
         return json(200, {
@@ -2693,115 +2791,63 @@ export function createMockApi() {
           href: `/professional/#/event/${event.id}`
         }));
       const pendingScan = [...scanProposals.values()].filter((p) => p.status === 'pending');
-      // Seeded from life-hub-data relationships.json (Adam / derived:person:adam-russell)
-      // so local Career river shows the real past role band during development.
-      const employmentItems = [
-        {
-          ref: 'shared:organisation:org_kooringal',
-          kind: 'organisation',
-          display_label: 'Kooringal High School',
-          role: 'English Teacher',
-          valid_from: '2012-12-02',
-          valid_to: '2014-12-19',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_xavier',
-          kind: 'organisation',
-          display_label: 'Xavier High School',
-          role: 'English/HSIE Teacher',
-          valid_from: '2015-01-26',
-          valid_to: '2018-10-01',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_all_areas',
-          kind: 'organisation',
-          display_label: 'All Areas Education',
-          role: 'Senior Education Project Officer',
-          valid_from: '2018-10-01',
-          valid_to: '2019-05-03',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_st_josephs',
-          kind: 'organisation',
-          display_label: "St Joseph's High School",
-          role: 'HSIE and Business Studies Teacher',
-          valid_from: '2019-05-01',
-          valid_to: '2019-12-31',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_st_pius',
-          kind: 'organisation',
-          display_label: 'St Pius X High School',
-          role: 'English Teacher',
-          valid_from: '2021-01-25',
-          valid_to: '2024-08-16',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_st_pius',
-          kind: 'organisation',
-          display_label: 'St Pius X High School',
-          role: 'Psychology Teacher',
-          valid_from: '2023-01-23',
-          valid_to: '2024-08-16',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_mcauley',
-          kind: 'organisation',
-          display_label: 'Catherine McAuley Catholic College',
-          role: 'English Teacher',
-          valid_from: '2024-08-19',
-          valid_to: '2024-12-20',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Gifted Education Teacher',
-          valid_from: '2025-01-22',
-          valid_to: null,
-          link_status: 'current'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Leader of Learning Enrichment',
-          valid_from: '2025-01-22',
-          valid_to: null,
-          link_status: 'current'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Curriculum Leader',
-          valid_from: '2024-01-01',
-          valid_to: '2024-12-20',
-          link_status: 'ended'
-        },
-        {
-          ref: 'shared:organisation:org_Redacted',
-          kind: 'organisation',
-          display_label: "Redacted' College",
-          role: 'Professional Learning Coordinator',
-          valid_from: '2024-08-19',
-          valid_to: '2024-12-20',
-          link_status: 'ended'
-        }
+      // Invented role history (public repo: no real people or workplaces).
+      // Shape matches career-overview employment items; roles added through
+      // Career → Add a role (employee_at links from MOCK_SELF_REF) join it.
+      const role = (
+        id: string,
+        display_label: string,
+        roleTitle: string,
+        valid_from: string,
+        valid_to: string | null
+      ) => ({
+        ref: `shared:organisation:${id}`,
+        kind: 'organisation',
+        display_label,
+        role: roleTitle,
+        valid_from,
+        valid_to,
+        link_status: valid_to ? 'ended' : 'current'
+      });
+      const employmentItems: Array<Record<string, unknown>> = [
+        role('org_demo_ridgeway', 'Ridgeway High School', 'English Teacher', '2012-12-03', '2014-12-19'),
+        role('org_demo_banksia', 'Banksia College', 'English/HSIE Teacher', '2015-01-27', '2018-09-28'),
+        role('org_demo_lakeside', 'Lakeside High School', 'English Teacher', '2017-05-01', '2017-12-15'),
+        role('org_demo_harbour', 'Harbour Education', 'Senior Project Officer', '2018-10-01', '2019-05-03'),
+        role('org_demo_hillcrest', 'Hillcrest High School', 'HSIE and Business Studies Teacher', '2019-05-06', '2019-12-18'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'HSIE Teacher', '2020-01-28', '2020-12-18'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Gifted Education Mentor', '2020-05-04', '2020-12-18'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'English Teacher', '2021-01-27', '2024-08-16'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Leader of Wellbeing (Special Projects)', '2021-05-03', '2021-12-17'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Psychology Teacher', '2023-01-30', '2024-08-16'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Curriculum Committee Coordinator', '2023-05-01', '2024-02-29'),
+        role('org_demo_wattle', 'Wattle Grove High School', 'Professional Experience Organiser', '2024-01-29', '2024-08-16'),
+        role('org_demo_seaview', 'Seaview College', 'English Teacher', '2024-08-19', '2024-12-20'),
+        role('org_demo_tallowwood', 'Tallowwood College', 'Gifted Education Teacher', '2025-01-28', null)
       ];
+      for (const link of relationships) {
+        if (link.source_ref !== MOCK_SELF_REF || link.relationship_type !== 'employee_at') continue;
+        if (link.status !== 'current' && link.status !== 'ended') continue;
+        const target = findByRef(link.target_ref);
+        employmentItems.push({
+          ref: link.target_ref,
+          kind: 'organisation',
+          display_label: target
+            ? endpointFor(target as PersonRecord | OrganisationRecord | CommunicationRecord).display_label
+            : link.target_ref,
+          role: link.role ?? null,
+          valid_from: link.valid_from ? String(link.valid_from).slice(0, 10) : null,
+          valid_to: link.valid_to ? String(link.valid_to).slice(0, 10) : null,
+          link_status: link.status
+        });
+      }
       return json(200, {
         ok: true,
         data: {
           applications: { status: 'ok', items: appItems },
           employment: { status: 'ok', items: employmentItems },
           employment_items: employmentItems,
+          self_ref: MOCK_SELF_REF,
           professional_development: { status: 'ok', items: pdItems },
           people: { status: 'ok', items: [] },
           organisations: { status: 'ok', items: [] },
@@ -2924,7 +2970,13 @@ export function createMockApi() {
 
     if (path === '/api/career-futures' && method === 'POST') {
       const action = url.searchParams.get('action');
-      const input = body as { title?: string; where?: string; criteria?: unknown[] };
+      const input = body as {
+        title?: string;
+        where?: string;
+        criteria?: unknown[];
+        colour_slot?: number;
+        lane_order?: number;
+      };
       if (action === 'draft') {
         return json(200, {
           ok: true,
@@ -2932,7 +2984,16 @@ export function createMockApi() {
             draft: {
               title: typeof input.title === 'string' ? input.title : 'Draft future',
               where: typeof input.where === 'string' ? input.where : null,
-              criteria: Array.isArray(input.criteria) ? input.criteria : []
+              // Mirrors the server's no-key fallback: starter criteria, marked Ann's.
+              criteria:
+                Array.isArray(input.criteria) && input.criteria.length
+                  ? input.criteria
+                  : [
+                      'Demonstrated leadership of teaching and learning practice',
+                      'Capacity to lead policy, programs and staff development',
+                      'Strong stakeholder communication with families and leaders'
+                    ].map((text, order) => ({ text, order, source: 'ann' })),
+              fallback: true
             }
           }
         });
@@ -2945,7 +3006,12 @@ export function createMockApi() {
         where: typeof input.where === 'string' ? input.where : null,
         status: 'active',
         criteria: Array.isArray(input.criteria) ? input.criteria : [],
-        colour_slot: futures.size % 6,
+        // Same contract as career-schema: the client picks slot and lane.
+        colour_slot:
+          Number.isInteger(input.colour_slot) && input.colour_slot! >= 1 && input.colour_slot! <= 6
+            ? input.colour_slot
+            : (futures.size % 6) + 1,
+        lane_order: Number.isInteger(input.lane_order) ? input.lane_order : futures.size,
         created_at: nowIso,
         updated_at: nowIso
       };
@@ -3099,10 +3165,11 @@ export function createMockApi() {
           link.source_ref === input.source_ref &&
           link.target_ref === input.target_ref &&
           link.relationship_type === input.relationship_type &&
+          (link.role ?? null) === (input.role ?? null) &&
+          (link.valid_from ?? null) === (input.valid_from ?? null) &&
           link.status === 'current'
       );
       if (existing) {
-        if (input.role !== undefined) existing.role = input.role;
         return json(200, {
           ok: true,
           data: {
@@ -3118,9 +3185,7 @@ export function createMockApi() {
           }
         });
       }
-      const id = `ul_${Buffer.from(`${input.source_ref}|${input.target_ref}|${input.relationship_type}`)
-        .toString('hex')
-        .slice(0, 24)}`;
+      const id = `ul_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
       relationships.push({
         id,
         source_ref: input.source_ref,

@@ -70,7 +70,7 @@ function makeResolveEntity(store, fetchImpl) {
 }
 
 const PEOPLE = [{ legacy_id: 'leg-person-1', display_name: 'Lauren Stuart', sort_name: 'Stuart, Lauren', aliases: [] }];
-const ORGANISATIONS = [{ legacy_id: 'leg-org-1', display_name: 'St. Redacted College', legal_name: null, aliases: [] }];
+const ORGANISATIONS = [{ legacy_id: 'leg-org-1', display_name: 'Tallowwood College', legal_name: null, aliases: [] }];
 const RELATIONSHIPS = [{
   person_legacy_id: 'leg-person-1',
   organisation_legacy_id: 'leg-org-1',
@@ -101,10 +101,10 @@ test('a GitHub-only Person overview shows a current employee_at relationship to 
   const [relationship] = overview.current_relationships;
   assert.equal(relationship.link.relationship_type, 'employee_at');
   assert.equal(relationship.endpoint.ref, `shared:organisation:${organisationId}`);
-  assert.equal(relationship.endpoint.display_label, 'St. Redacted College');
+  assert.equal(relationship.endpoint.display_label, 'Tallowwood College');
   assert.equal(overview.linked_records.organisations.length, 1);
   assert.equal(overview.timeline.length, 1);
-  assert.equal(overview.timeline[0].label, 'employee_at St. Redacted College');
+  assert.equal(overview.timeline[0].label, 'employee_at Tallowwood College');
 });
 
 test('the reciprocal Organisation overview shows the same relationship as incoming', async () => {
@@ -120,7 +120,7 @@ test('the reciprocal Organisation overview shows the same relationship as incomi
     resolveEntity: makeResolveEntity(store, fetchImpl)
   });
 
-  assert.equal(overview.entity.display_name, 'St. Redacted College');
+  assert.equal(overview.entity.display_name, 'Tallowwood College');
   assert.equal(overview.current_relationships.length, 1);
   assert.equal(overview.current_relationships[0].endpoint.ref, `shared:person:${personId}`);
   assert.equal(overview.linked_records.people.length, 1);
@@ -131,7 +131,7 @@ test('a colleague who shares a current workplace with the imported self gets sha
   const fetchImpl = githubFetch({
     people: [
       { legacy_id: 'leg-self', display_name: 'Adam Russell', is_self: true },
-      { legacy_id: 'leg-colleague', display_name: 'Natalie Shih' }
+      { legacy_id: 'leg-colleague', display_name: 'Yara Zephyrine' }
     ],
     organisations: ORGANISATIONS,
     relationships: [
@@ -163,11 +163,11 @@ test('a colleague who shares a current workplace with the imported self gets sha
     resolveEntity: makeResolveEntity(store, fetchImpl)
   });
 
-  assert.equal(overview.entity.display_name, 'Natalie Shih');
+  assert.equal(overview.entity.display_name, 'Yara Zephyrine');
   assert.deepEqual(overview.shared_contexts_with_self, [
     {
       ref: `shared:organisation:${organisationId}`,
-      display_label: 'St. Redacted College',
+      display_label: 'Tallowwood College',
       relationship_type: 'employee_at'
     }
   ]);

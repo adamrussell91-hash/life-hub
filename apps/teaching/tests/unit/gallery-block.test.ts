@@ -1,5 +1,6 @@
 import { holdDelete, menuItem } from './helpers/hub-list';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { kitValue, pickKitOption } from './kit-filter';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES, TAB_CHILD_TYPES } from '@/blocks/create-block';
 import { createGalleryEditor, renderGalleryBlock } from '@/blocks/registry';
@@ -191,8 +192,7 @@ describe('createGalleryEditor', () => {
     const changes: unknown[] = [];
     const el = createGalleryEditor(block, (next) => changes.push(next));
 
-    const layout = el.querySelector('.block-editor__gallery-layout') as HTMLSelectElement;
-    expect(layout.value).toBe('grid');
+    expect(kitValue(el.querySelector('.block-editor__gallery-layout'))).toBe('grid');
 
     const rows = el.querySelectorAll('.block-editor__gallery-items > .hub-list__row');
     expect(rows.length).toBe(3);
@@ -214,9 +214,7 @@ describe('createGalleryEditor', () => {
       latest = next;
     });
 
-    const layout = el.querySelector('.block-editor__gallery-layout') as HTMLSelectElement;
-    layout.value = 'comparison';
-    layout.dispatchEvent(new Event('change'));
+    pickKitOption(el.querySelector('.block-editor__gallery-layout'), 'comparison');
 
     expect(latest.content.layout).toBe('comparison');
     expect(latest.content.items).toHaveLength(2);

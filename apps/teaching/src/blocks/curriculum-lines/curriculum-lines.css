@@ -1,0 +1,252 @@
+/* Curriculum lines block: a unit curriculum map drawn as a transit map. */
+
+.block-curriculum-lines {
+  min-width: 0;
+  contain: inline-size;
+}
+
+.block-curriculum-lines .cl-title {
+  margin: 0 0 var(--space-3, 12px);
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 650;
+  color: var(--navy);
+}
+
+/* Editor */
+
+.cl-editor {
+  display: grid;
+  gap: var(--space-4, 16px);
+  min-width: 0;
+}
+
+.cl-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 12px);
+  align-items: end;
+}
+
+.cl-editor__field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cl-editor__field--grow {
+  flex: 1 1 220px;
+}
+
+.cl-editor__field input,
+.cl-editor__field select {
+  font: inherit;
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 400;
+  color: var(--ink);
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper);
+  min-width: 0;
+}
+
+.cl-editor__section {
+  display: grid;
+  gap: var(--space-2, 8px);
+  min-width: 0;
+}
+
+.cl-editor__heading {
+  margin: 0;
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 650;
+  color: var(--navy);
+}
+
+.cl-editor__hint {
+  margin: 0;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted);
+}
+
+.cl-editor__grid-wrap {
+  overflow-x: auto;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.cl-editor__grid {
+  border-collapse: collapse;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.cl-editor__grid th,
+.cl-editor__grid td {
+  border: 1px solid var(--line);
+  padding: 0;
+}
+
+.cl-editor__grid th {
+  padding: 6px 8px;
+  font-weight: 650;
+  color: var(--muted);
+  white-space: nowrap;
+  text-align: left;
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+}
+
+.cl-editor__cell {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--cl-colour, var(--wave));
+  cursor: pointer;
+}
+
+.cl-editor__cell:disabled {
+  cursor: default;
+}
+
+.cl-editor__cell:hover {
+  background: color-mix(in srgb, var(--wave) 6%, transparent);
+}
+
+.cl-editor__cell[aria-pressed='true'] {
+  outline: 2px solid var(--wave);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--wave) 8%, transparent);
+}
+
+.cl-editor__cell--empty {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.cl-editor__col {
+  text-align: center !important;
+  border-bottom: 3px solid var(--net-colour) !important;
+}
+
+.cl-editor__grid td.cl-editor__place {
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.cl-editor__place input {
+  margin: 0 4px 0 0;
+  vertical-align: middle;
+}
+
+.cl-editor__place .btn {
+  min-height: 28px;
+  padding: 0 8px;
+}
+
+.cl-editor__station--off > th,
+.cl-editor__station--off > td:not(.cl-editor__place) {
+  opacity: 0.45;
+}
+
+.cl-editor__grid tr > th:nth-child(2) {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cl-editor__stack {
+  display: grid;
+  gap: var(--space-4, 16px);
+  min-width: 0;
+}
+
+.cl-editor__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+  align-items: end;
+  padding: var(--space-2, 8px) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cl-editor__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cl-editor__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--ink);
+}
+
+.cl-editor__chip::before {
+  content: '';
+  width: 16px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--net-colour);
+}
+
+.cl-editor__chip--metro::before {
+  height: 8px;
+  background: var(--paper);
+  border: 2.5px solid var(--net-colour);
+  box-sizing: border-box;
+}
+
+.cl-editor__chip--light_rail::before {
+  height: 3px;
+}
+
+.cl-editor__upgrade {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px) var(--space-3, 12px);
+  align-items: center;
+  padding: var(--space-3, 12px);
+  border: 1px solid color-mix(in srgb, var(--wave) 30%, var(--line));
+  border-radius: var(--radius-sm, 8px);
+  background: color-mix(in srgb, var(--wave) 6%, var(--paper));
+  font-size: var(--text-sm, 0.8125rem);
+}
+
+.cl-editor__upgrade p {
+  flex: 1 1 260px;
+  margin: 0;
+}
+
+.cl-editor__map {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.cl-editor__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--ink);
+}
+
+.cl-editor__preview {
+  min-width: 0;
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--line);
+}

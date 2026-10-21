@@ -1,9 +1,18 @@
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
+import { createBrainstormEditor } from '@/blocks/brainstorm';
+import { createHingeQuestionEditor } from '@/blocks/hinge-question';
+import { createContinuumLineEditor } from '@/blocks/continuum-line';
+import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
+import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
-import { createKaplanEditor } from '@/blocks/kaplan-editor';
-import { createCalloutTargetPicker } from '@/blocks/callout-reference';
+import { createLensEditor } from '@/blocks/lenses/lens-editor';
+import { createFormatField, withFormat } from '@/blocks/formats/registry';
+import { LENS_LEVELS, LEVEL_LABELS, type LensLevel } from '@/blocks/lenses/types';
+import { LOGIC_LABELS, type LogicSetting } from '@/blocks/reasoning/content';
+import { QUESTION_LEVEL_LABELS, QUESTION_LEVELS, guessQuestionLevel, type QuestionLevel } from '@/blocks/lenses/question-levels';
+import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
   createAnalogyTypesEditor,
@@ -49,6 +58,8 @@ import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
+import { createEditorFilter, type HubFilterControl } from '@/blocks/editor-filter';
+import { classroomExtras } from '@/blocks/classroom-extras';
 import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
 import {
@@ -72,6 +83,14 @@ import {
   mountMediaLibraryPicker,
   resolveMediaLibraryUrl
 } from '@/teacher/media-library-picker';
+import { createAudioRecordButton } from '@/blocks/audio-record-button';
+import { createVoiceModePicker, createVoiceTaskFields } from '@/blocks/voice-block-editor';
+import {
+  AUDIO_ACCEPT,
+  createUploadButton,
+  rememberUploadedMedia,
+  withSessionUploads
+} from '@/blocks/upload-button';
 
 export type BlockChangeHandler<T extends Block = Block> = (block: T) => void;
 
@@ -84,6 +103,10 @@ export type BlockEditorContext = {
   getLessonBlocks?: () => Block[];
   setLessonBlocks?: (blocks: Block[]) => void;
   lessonId?: string;
+  /** The unit's lessons, for blocks that link to them (Curriculum lines). */
+  unitLessons?: Array<{ id: string; title: string; href: string }>;
+  /** Curriculum network for a unit map: lines, lessons with stops, and how to save them. */
+  network?: UnitNetworkEditorContext;
 };
 
 const VISIBILITY_OPTIONS = [
@@ -101,27 +124,20 @@ export function createVisibilitySelect<T extends Block>(
   block: T,
   onChange: BlockChangeHandler<T>,
   getLatest: () => T = () => block
-): HTMLSelectElement {
-  const select = document.createElement('select');
-  select.className = 'block-editor__visibility';
-  select.setAttribute('aria-label', 'Visibility');
-
-  for (const option of VISIBILITY_OPTIONS) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    opt.selected = block.visibility === option.value;
-    select.append(opt);
-  }
-
-  select.addEventListener('change', () => {
-    onChange({
-      ...getLatest(),
-      visibility: select.value as Block['visibility']
-    });
-  });
-
-  return select;
+): HTMLElement {
+  return createEditorFilter({
+    key: 'Shown to',
+    value: block.visibility,
+    options: VISIBILITY_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    className: 'block-editor__visibility',
+    ariaLabel: 'Visibility',
+    onChange: (value) => {
+      onChange({
+        ...getLatest(),
+        visibility: value as Block['visibility']
+      });
+    }
+  }).el;
 }
 
 function driveErrorMessage(error: unknown): string {
@@ -156,6 +172,7 @@ function createDrivePickButton(options: {
         if (!resolved) {
           throw new Error('Uploaded file has no usable URL.');
         }
+        rememberUploadedMedia(media);
         options.onPicked(resolved, pick.title);
       } catch (error) {
         options.onError?.(driveErrorMessage(error));
@@ -167,29 +184,54 @@ function createDrivePickButton(options: {
   return driveBtn;
 }
 
+/**
+ * Where a media block's file comes from. Upload from computer leads (it is the
+ * reliable path); library and Drive sit beside it; the URL field comes after.
+ */
+function mediaSourceRow(upload: HTMLElement, ...secondary: HTMLElement[]): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'block-editor__media-actions';
+  row.append(upload, ...secondary);
+  return row;
+}
+
+/** Compact upload for an image URL field inside a list item (gallery, timeline, cards). */
+function itemImageUpload(
+  urlField: HTMLInputElement | HTMLTextAreaElement,
+  label: string,
+  onUploaded: (url: string, media: Media) => void
+): HTMLElement {
+  const upload = createUploadButton({
+    accept: 'image/*',
+    noun: 'an image',
+    label: 'Upload image',
+    compact: true,
+    onUploaded: (url, media) => {
+      urlField.value = url;
+      onUploaded(url, media);
+    }
+  });
+  upload.button.setAttribute('aria-label', label);
+  return upload.el;
+}
+
 function createMediaSizeSelect(
   selected: 'small' | 'medium' | 'large',
   onChange: () => void
-): HTMLSelectElement {
-  const select = document.createElement('select');
-  select.className = 'block-editor__media-size';
-  select.setAttribute('aria-label', 'Size');
-
-  for (const option of MEDIA_SIZE_OPTIONS) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    opt.selected = selected === option.value;
-    select.append(opt);
-  }
-
-  select.addEventListener('change', onChange);
-  return select;
+): HubFilterControl {
+  return createEditorFilter({
+    key: 'Size',
+    value: selected,
+    options: MEDIA_SIZE_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    className: 'block-editor__media-size',
+    ariaLabel: 'Size',
+    onChange
+  });
 }
 
 type Choice = { el: HTMLElement; getValue(): string; setValue(value: string): void };
 
-/** One labelled choice control. Teaching uses a native select. */
+/** One labelled choice control: the kit filter pill, never a native select. */
 function createChoice(options: {
   key: string;
   value: string;
@@ -198,28 +240,7 @@ function createChoice(options: {
   ariaLabel: string;
   onChange: (value: string) => void;
 }): Choice {
-  const select = document.createElement('select');
-  select.className = options.className;
-  select.setAttribute('aria-label', options.ariaLabel);
-  for (const option of options.options) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    select.append(opt);
-  }
-  select.value = options.value;
-  select.addEventListener('change', () => options.onChange(select.value));
-  return asChoice(select);
-}
-
-function asChoice(select: HTMLSelectElement): Choice {
-  return {
-    el: select,
-    getValue: () => select.value,
-    setValue: (value) => {
-      select.value = value;
-    }
-  };
+  return createEditorFilter(options);
 }
 
 export function editorShell<T extends Block>(
@@ -238,7 +259,7 @@ export function editorShell<T extends Block>(
     fields.hidden = open;
     visibility.hidden = open;
   });
-  shell.append(visibility, createKaplanEditor({ getBlock: getLatest, onChange }), fields);
+  shell.append(visibility, createLensEditor({ getBlock: getLatest, onChange }), fields);
   return shell;
 }
 
@@ -322,10 +343,13 @@ export function createRichTextEditor(
     publish(html);
   });
 
-  const textTools = createRichTextTools({ tiptap, getLatest, onChange });
-  toolbar.append(...textTools.buttons);
-
-  fields.append(toolbar, textTools.status, tiptap.host, textTools.strip, source);
+  if (classroomExtras()) {
+    const textTools = createRichTextTools({ tiptap, getLatest, onChange });
+    toolbar.append(...textTools.buttons);
+    fields.append(toolbar, textTools.status, tiptap.host, textTools.strip, source);
+  } else {
+    fields.append(toolbar, tiptap.host, source);
+  }
   const shell = editorShell(block, onChange, fields, getLatest);
   shell.addEventListener(
     'remove',
@@ -351,30 +375,26 @@ export function createHeadingEditor(
   textInput.value = block.content.text;
   textInput.setAttribute('aria-label', 'Heading text');
 
-  const variantSelect = document.createElement('select');
-  variantSelect.className = 'block-editor__heading-variant';
-  variantSelect.setAttribute('aria-label', 'Heading level');
-
-  for (const variant of ['page', 'section', 'subsection'] as const) {
-    const opt = document.createElement('option');
-    opt.value = variant;
-    opt.textContent = variant;
-    opt.selected = block.variant === variant;
-    variantSelect.append(opt);
-  }
+  const variantSelect = createEditorFilter({
+    key: 'Level',
+    value: block.variant,
+    options: (['page', 'section', 'subsection'] as const).map((variant) => ({ value: variant, label: variant })),
+    className: 'block-editor__heading-variant',
+    ariaLabel: 'Heading level',
+    onChange: () => emitChange()
+  });
 
   const emitChange = () => {
     onChange({
       ...getLatest(),
-      variant: variantSelect.value as typeof block.variant,
+      variant: variantSelect.getValue() as typeof block.variant,
       content: { text: textInput.value }
     });
   };
 
   textInput.addEventListener('input', emitChange);
-  variantSelect.addEventListener('change', emitChange);
 
-  fields.append(textInput, variantSelect);
+  fields.append(textInput, variantSelect.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -387,26 +407,26 @@ export function createCalloutEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const styleSelect = document.createElement('select');
-  styleSelect.className = 'block-editor__callout-style';
-  styleSelect.setAttribute('aria-label', 'Callout style');
-
-  for (const style of [
-    'information',
-    'important',
-    'warning',
-    'extension',
-    'scaffold',
-    'example',
-    'remember',
-    'teacher'
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = style;
-    opt.textContent = style;
-    opt.selected = block.content.style === style;
-    styleSelect.append(opt);
-  }
+  const styleSelect = createEditorFilter({
+    key: 'Style',
+    value: resolvedCalloutStyle(block.content),
+    options: (
+      [
+        'cultural_warning',
+        'information',
+        'important',
+        'warning',
+        'extension',
+        'scaffold',
+        'example',
+        'remember',
+        'teacher'
+      ] as const
+    ).map((style) => ({ value: style, label: style === 'cultural_warning' ? 'Cultural warning' : style })),
+    className: 'block-editor__callout-style',
+    ariaLabel: 'Callout style',
+    onChange: () => emitChange()
+  });
 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
@@ -431,7 +451,7 @@ export function createCalloutEditor(
     onChange({
       ...getLatest(),
       content: {
-        style: styleSelect.value as typeof block.content.style,
+        style: styleSelect.getValue() as typeof block.content.style,
         title: title.length > 0 ? title : undefined,
         body: bodyInput.value,
         ...(relatedTo ? { related_to: relatedTo } : {})
@@ -439,14 +459,14 @@ export function createCalloutEditor(
     });
   };
 
-  styleSelect.addEventListener('change', emitChange);
   titleInput.addEventListener('input', emitChange);
   bodyInput.addEventListener('input', emitChange);
 
   const targetLabel = document.createElement('label');
   targetLabel.textContent = 'Related activity or question';
   targetLabel.append(targetSelect);
-  fields.append(styleSelect, titleInput, bodyInput, targetLabel);
+  fields.append(styleSelect.el, titleInput, bodyInput);
+  if (classroomExtras()) fields.append(targetLabel);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -496,7 +516,7 @@ export function createImageEditor(
   const emitChange = () => {
     onChange({
       ...getLatest(),
-      variant: sizeSelect.value as typeof block.variant,
+      variant: sizeSelect.getValue() as typeof block.variant,
       content: {
         url: url.value,
         alt_text: alt.value,
@@ -511,7 +531,7 @@ export function createImageEditor(
     libraryHost.hidden = !libraryHost.hidden;
     if (!libraryHost.hidden) {
       mountMediaLibraryPicker(libraryHost, {
-        media: context.media ?? [],
+        media: withSessionUploads(context.media ?? []),
         mediaTypes: ['image'],
         emptyMessage: 'No images in library',
         onPick: (media) => {
@@ -541,11 +561,33 @@ export function createImageEditor(
     }
   });
 
+  const upload = createUploadButton({
+    accept: 'image/*',
+    noun: 'an image',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl) => {
+      url.value = uploadedUrl;
+      driveHint.hidden = true;
+      libraryHost.hidden = true;
+      emitChange();
+      // A file name is not a description; ask for real alt text instead.
+      if (!alt.value.trim()) alt.focus();
+    }
+  });
+
   url.addEventListener('input', emitChange);
   alt.addEventListener('input', emitChange);
   caption.addEventListener('input', emitChange);
 
-  fields.append(url, alt, caption, sizeSelect, libraryBtn, driveBtn, driveHint, libraryHost);
+  fields.append(
+    mediaSourceRow(upload.el, libraryBtn, driveBtn),
+    driveHint,
+    libraryHost,
+    url,
+    alt,
+    caption,
+    sizeSelect.el
+  );
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -585,7 +627,7 @@ export function createVideoEditor(
       const { start_seconds: _previousStart, ...rest } = block.content;
       onChange({
         ...getLatest(),
-        variant: sizeSelect.value as typeof block.variant,
+        variant: sizeSelect.getValue() as typeof block.variant,
         content: {
           ...rest,
           provider: parsed.provider,
@@ -599,7 +641,7 @@ export function createVideoEditor(
       status.textContent = 'Unrecognised video link';
       onChange({
         ...getLatest(),
-        variant: sizeSelect.value as typeof block.variant,
+        variant: sizeSelect.getValue() as typeof block.variant,
         content: {
           ...block.content,
           external_id: '',
@@ -615,7 +657,7 @@ export function createVideoEditor(
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(url, status, title, sizeSelect);
+  fields.append(url, status, title, sizeSelect.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -639,9 +681,6 @@ export function createEmbedEditor(
   title.value = block.content.title ?? '';
   title.setAttribute('aria-label', 'Embed title');
 
-  const provider = document.createElement('select');
-  provider.className = 'block-editor__embed-provider';
-  provider.setAttribute('aria-label', 'Embed provider');
   const providerOptions: Array<{ value: EmbedProvider; label: string }> = [
     { value: 'google_maps', label: 'Google Maps' },
     { value: 'google_slides', label: 'Google Slides' },
@@ -649,20 +688,28 @@ export function createEmbedEditor(
     { value: 'pdf', label: 'PDF' },
     { value: 'generic', label: 'Generic' }
   ];
-  for (const opt of providerOptions) {
-    const option = document.createElement('option');
-    option.value = opt.value;
-    option.textContent = opt.label;
-    provider.append(option);
-  }
-  provider.value = block.content.provider ?? 'generic';
+  const provider = createEditorFilter({
+    key: 'Provider',
+    value: block.content.provider ?? 'generic',
+    options: providerOptions,
+    className: 'block-editor__embed-provider',
+    ariaLabel: 'Embed provider',
+    onChange: (value) => {
+      const parsed = parseEmbedInput(url.value);
+      if (parsed && parsed.provider === value) {
+        emitChange(parsed.embed_url);
+        return;
+      }
+      emitChange(undefined);
+    }
+  });
 
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
   hint.textContent = 'Share settings must allow viewers. Docs and Drive files preview in place.';
 
   const emitChange = (embedUrl?: string) => {
-    const selected = provider.value as EmbedProvider;
+    const selected = provider.getValue() as EmbedProvider;
     onChange({
       ...getLatest(),
       content: {
@@ -677,7 +724,7 @@ export function createEmbedEditor(
   const applyUrlDetection = () => {
     const parsed = parseEmbedInput(url.value);
     if (parsed) {
-      provider.value = parsed.provider;
+      provider.setValue(parsed.provider);
       emitChange(parsed.embed_url);
       return;
     }
@@ -688,14 +735,6 @@ export function createEmbedEditor(
   title.addEventListener('input', () => {
     const latest = getLatest();
     emitChange(latest.content.embed_url);
-  });
-  provider.addEventListener('change', () => {
-    const parsed = parseEmbedInput(url.value);
-    if (parsed && parsed.provider === provider.value) {
-      emitChange(parsed.embed_url);
-      return;
-    }
-    emitChange(undefined);
   });
 
   const driveBtn = createDrivePickButton({
@@ -709,7 +748,22 @@ export function createEmbedEditor(
     }
   });
 
-  fields.append(url, title, provider, driveBtn, hint);
+  // Uploaded files live at /api/media/<id>/file, which has no .pdf extension
+  // to detect, so the provider is set here. The renderer shows these inline.
+  const upload = createUploadButton({
+    accept: 'application/pdf,.pdf',
+    noun: 'a PDF',
+    label: 'Upload PDF',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl, media) => {
+      url.value = uploadedUrl;
+      if (!title.value.trim()) title.value = media.title;
+      provider.setValue('pdf');
+      emitChange(undefined);
+    }
+  });
+
+  fields.append(mediaSourceRow(upload.el, driveBtn), url, title, provider.el, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -771,19 +825,17 @@ export function createHtmlAppEditor(
   aiFields.className = 'block-editor__html-app-ai-fields';
   aiFields.hidden = !block.content.ai;
 
-  const provider = document.createElement('select');
-  provider.className = 'block-editor__html-app-ai-provider';
-  provider.setAttribute('aria-label', 'AI provider');
-  for (const [value, label] of [
-    ['openai', 'OpenAI'],
-    ['anthropic', 'Anthropic']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    provider.append(opt);
-  }
-  provider.value = block.content.ai?.provider ?? 'openai';
+  const provider = createEditorFilter({
+    key: 'Provider',
+    value: block.content.ai?.provider ?? 'openai',
+    options: [
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'anthropic', label: 'Anthropic' }
+    ],
+    className: 'block-editor__html-app-ai-provider',
+    ariaLabel: 'AI provider',
+    onChange: () => emitChange()
+  });
 
   const model = document.createElement('input');
   model.type = 'text';
@@ -807,7 +859,7 @@ export function createHtmlAppEditor(
   maxTokens.value = String(block.content.ai?.max_tokens ?? 512);
   maxTokens.setAttribute('aria-label', 'Max tokens');
 
-  aiFields.append(provider, model, system, maxTokens);
+  aiFields.append(provider.el, model, system, maxTokens);
 
   const emitChange = () => {
     const current = getLatest();
@@ -823,7 +875,7 @@ export function createHtmlAppEditor(
       const tokens = Number.parseInt(maxTokens.value, 10);
       content.ai = {
         enabled: true,
-        provider: provider.value === 'anthropic' ? 'anthropic' : 'openai',
+        provider: provider.getValue() === 'anthropic' ? 'anthropic' : 'openai',
         model: model.value.trim() || 'gpt-4o-mini',
         system: system.value,
         max_tokens:
@@ -837,7 +889,7 @@ export function createHtmlAppEditor(
   aiToggle.addEventListener('change', () => {
     aiFields.hidden = !aiToggle.checked;
     if (aiToggle.checked && !model.value.trim()) {
-      model.value = provider.value === 'anthropic' ? DEFAULT_ANTHROPIC_MODEL : 'gpt-4o-mini';
+      model.value = provider.getValue() === 'anthropic' ? DEFAULT_ANTHROPIC_MODEL : 'gpt-4o-mini';
     }
     emitChange();
   });
@@ -845,7 +897,6 @@ export function createHtmlAppEditor(
   title.addEventListener('input', emitChange);
   height.addEventListener('input', emitChange);
   html.addEventListener('input', emitChange);
-  provider.addEventListener('change', emitChange);
   model.addEventListener('input', emitChange);
   system.addEventListener('input', emitChange);
   maxTokens.addEventListener('input', emitChange);
@@ -1013,19 +1064,63 @@ export function createAudioEditor(
   title.setAttribute('aria-label', 'Audio title');
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         url: url.value,
         title: title.value.trim() || undefined
       }
     });
   };
 
+  let lastUploadedUrl = '';
+  const upload = createUploadButton({
+    accept: AUDIO_ACCEPT,
+    noun: 'an audio file',
+    label: 'Upload audio',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl, media) => {
+      lastUploadedUrl = uploadedUrl;
+      url.value = uploadedUrl;
+      if (!title.value.trim()) title.value = media.title.replace(/\.(webm|m4a|ogg)$/, '');
+      emitChange();
+    }
+  });
+
+  const record = createAudioRecordButton({
+    upload: (file) => {
+      lastUploadedUrl = '';
+      return upload.uploadFiles([file]);
+    },
+    uploaded: () => Boolean(lastUploadedUrl),
+    fileTitle: () => title.value
+  });
+
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(url, title);
+  const listen = document.createElement('div');
+  listen.className = 'block-editor__fields voice-editor__listen';
+  listen.append(mediaSourceRow(upload.el, record.el), url, title);
+  const task = createVoiceTaskFields(getLatest, onChange);
+  const paintMode = () => {
+    const isListen = (getLatest().content.mode ?? 'listen') === 'listen';
+    listen.hidden = !isListen;
+    task.el.hidden = isListen;
+    task.refresh();
+  };
+  fields.append(
+    createVoiceModePicker(getLatest, (mode) => {
+      const latest = getLatest();
+      onChange({ ...latest, content: { ...latest.content, mode } });
+      paintMode();
+    }),
+    listen,
+    task.el
+  );
+  paintMode();
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1083,7 +1178,7 @@ export function createAttachmentEditor(
     libraryHost.hidden = !libraryHost.hidden;
     if (!libraryHost.hidden) {
       mountMediaLibraryPicker(libraryHost, {
-        media: context.media ?? [],
+        media: withSessionUploads(context.media ?? []),
         emptyMessage: 'No media in library',
         onPick: (media) => {
           const resolved = resolveMediaLibraryUrl(media);
@@ -1120,11 +1215,31 @@ export function createAttachmentEditor(
     }
   });
 
+  const upload = createUploadButton({
+    noun: 'a file',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl, media) => {
+      url.value = uploadedUrl;
+      if (!title.value.trim()) title.value = media.title;
+      if (!filename.value.trim()) filename.value = media.file_name ?? media.title;
+      driveHint.hidden = true;
+      libraryHost.hidden = true;
+      emitChange();
+    }
+  });
+
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
   filename.addEventListener('input', emitChange);
 
-  fields.append(url, title, filename, libraryBtn, driveBtn, driveHint, libraryHost);
+  fields.append(
+    mediaSourceRow(upload.el, libraryBtn, driveBtn),
+    driveHint,
+    libraryHost,
+    url,
+    title,
+    filename
+  );
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1417,6 +1532,8 @@ export function createQuestionSetEditor(
     kind: 'short_answer' | 'multiple_choice';
     options?: string[];
     response_space?: ResponseSpace;
+    level?: QuestionLevel;
+    logic?: LogicSetting;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1436,13 +1553,18 @@ export function createQuestionSetEditor(
     prompt: q.prompt,
     kind: q.kind,
     options: q.options ? [...q.options] : undefined,
-    response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined
+    response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined,
+    level: q.level,
+    logic: q.logic
   }));
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        // Keep the format and its table settings, which have their own controls.
+        ...latest.content,
         title: title.value.trim() || undefined,
         questions: questions.map((q) => ({
           id: q.id,
@@ -1451,7 +1573,9 @@ export function createQuestionSetEditor(
           options: q.kind === 'multiple_choice' ? [...(q.options ?? [])] : undefined,
           ...(q.kind === 'short_answer' && q.response_space
             ? { response_space: q.response_space }
-            : {})
+            : {}),
+          ...(q.level ? { level: q.level } : {}),
+          ...(q.logic ? { logic: q.logic } : {})
         }))
       }
     });
@@ -1480,7 +1604,21 @@ export function createQuestionSetEditor(
     },
     renderItem: (question, ctx) => {
       const n = ctx.index + 1;
-      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => ctx.update({ ...ctx.current, prompt: value }), 'textarea', 2);
+      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => {
+        ctx.update({ ...ctx.current, prompt: value });
+        if (!ctx.current.level) level.setValue(guessQuestionLevel(value));
+      }, 'textarea', 2);
+
+      // The 4 levels format's band; untouched questions follow their opening words.
+      const level = createChoice({
+        key: 'Level',
+        value: question.level ?? guessQuestionLevel(question.prompt),
+        options: QUESTION_LEVELS.map((value) => ({ value, label: QUESTION_LEVEL_LABELS[value] })),
+        className: 'block-editor__question-level',
+        ariaLabel: `Question ${n} level`,
+        onChange: (value) => ctx.update({ ...ctx.current, level: value as QuestionLevel })
+      });
+      level.el.hidden = getLatest().content.format !== 'question_levels';
 
       const options = editorField(
         'block-editor__question-options',
@@ -1525,15 +1663,92 @@ export function createQuestionSetEditor(
         }
       });
 
+      // Shown only for the Reasoning chart format (see data-format on the fields).
+      const logic = createChoice({
+        key: 'Logic',
+        value: question.logic ?? 'choice',
+        options: (['deductive', 'inductive', 'abductive', 'all_three', 'choice'] as const)
+          .map((value) => ({ value, label: LOGIC_LABELS[value] })),
+        className: 'block-editor__question-logic',
+        ariaLabel: `Question ${n} logic`,
+        onChange: (value) => ctx.update({ ...ctx.current, logic: value === 'choice' ? undefined : value as LogicSetting })
+      });
+
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
-      settings.append(kind.el, responseSpace.el);
+      settings.append(level.el, kind.el, responseSpace.el, logic.el);
       return fragmentOf(prompt, settings, options);
     }
   });
   list.el.classList.add('block-editor__questions');
 
-  fields.append(title, list.el);
+  // Human experience table settings, shown only for that format.
+  const tableSettings = document.createElement('div');
+  tableSettings.className = 'block-editor__inline-settings block-editor__table-settings';
+  const tableRows = createChoice({
+    key: 'Rows',
+    value: String(block.content.table?.rows ?? 3),
+    options: ['3', '4', '5'].map((n) => ({ value: n, label: n })),
+    className: 'block-editor__table-rows',
+    ariaLabel: 'Table rows',
+    onChange: (value) => setTable({ rows: Number(value) })
+  });
+  const exampleRow = createChoice({
+    key: 'Example row',
+    value: block.content.table?.example === false ? 'hide' : 'show',
+    options: [{ value: 'show', label: 'Show' }, { value: 'hide', label: 'Hide' }],
+    className: 'block-editor__table-example',
+    ariaLabel: 'Example row',
+    onChange: (value) => setTable({ example: value === 'show' })
+  });
+  tableSettings.append(tableRows.el, exampleRow.el);
+  const setTable = (patch: { rows?: number; example?: boolean }) => {
+    const latest = getLatest();
+    const table = { rows: 3, example: true, ...latest.content.table, ...patch };
+    onChange({ ...latest, content: { ...latest.content, table } });
+  };
+  // Reasoning chart settings, shown only for that format.
+  const reasoningSettings = document.createElement('div');
+  reasoningSettings.className = 'block-editor__inline-settings block-editor__reasoning-settings';
+  const setReasoning = (patch: { level?: LensLevel; student_level?: boolean }) => {
+    const latest = getLatest();
+    const reasoning = { level: 'core' as LensLevel, student_level: true, ...latest.content.reasoning, ...patch };
+    onChange({ ...latest, content: { ...latest.content, reasoning } });
+  };
+  const reasoningLevel = createChoice({
+    key: 'Level',
+    value: block.content.reasoning?.level ?? 'core',
+    options: LENS_LEVELS.map((value) => ({ value, label: LEVEL_LABELS[value] })),
+    className: 'block-editor__reasoning-level',
+    ariaLabel: 'Reasoning level',
+    onChange: (value) => setReasoning({ level: value as LensLevel })
+  });
+  const studentLevel = createChoice({
+    key: 'Students change level',
+    value: block.content.reasoning?.student_level === false ? 'no' : 'yes',
+    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }],
+    className: 'block-editor__reasoning-student-level',
+    ariaLabel: 'Students can change the level',
+    onChange: (value) => setReasoning({ student_level: value === 'yes' })
+  });
+  reasoningSettings.append(reasoningLevel.el, studentLevel.el);
+
+  const showTableSettings = (format: string) => {
+    tableSettings.hidden = format !== 'human_experience_table';
+    reasoningSettings.hidden = format !== 'reasoning_chart';
+    fields.dataset.format = format;
+    fields.querySelectorAll<HTMLElement>('.block-editor__question-level').forEach((el) => { el.hidden = format !== 'question_levels'; });
+  };
+  showTableSettings(block.content.format ?? 'standard');
+  const format = createFormatField({
+    block,
+    onPick: (id) => {
+      onChange(withFormat(getLatest(), id));
+      showTableSettings(id);
+    }
+  });
+
+  fields.append(...(format ? [format] : []), tableSettings, reasoningSettings, title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1565,7 +1780,7 @@ export function createGalleryEditor(
     });
   };
 
-  const sizeSelect = asChoice(createMediaSizeSelect(block.variant, emitChange));
+  const sizeSelect = createMediaSizeSelect(block.variant, emitChange);
   const listHost = document.createElement('div');
 
   const emptyItem = (): GalleryItem => ({ id: itemId(`${getLatest().id}_i`), url: '', alt_text: '' });
@@ -1592,8 +1807,10 @@ export function createGalleryEditor(
       },
       renderItem: (entry, ctx) => {
         const n = ctx.index + 1;
+        const urlField = editorField('block-editor__gallery-url', entry.url, 'Image link (https://…)', `Gallery image ${n} URL`, (value) => ctx.update({ ...ctx.current, url: value }), 'url');
         return fragmentOf(
-          editorField('block-editor__gallery-url', entry.url, 'Image link (https://…)', `Gallery image ${n} URL`, (value) => ctx.update({ ...ctx.current, url: value }), 'url'),
+          itemImageUpload(urlField, `Upload gallery image ${n}`, (url) => ctx.update({ ...ctx.current, url })),
+          urlField,
           fieldPair(
             editorField('block-editor__gallery-alt', entry.alt_text, 'Alt text (required to publish)', `Gallery image ${n} alt text`, (value) => ctx.update({ ...ctx.current, alt_text: value })),
             editorField('block-editor__gallery-caption', entry.caption ?? '', 'Caption (optional)', `Gallery image ${n} caption`, (value) => ctx.update({ ...ctx.current, caption: value || undefined }))
@@ -1628,8 +1845,30 @@ export function createGalleryEditor(
   settings.className = 'block-editor__inline-settings';
   settings.append(layoutSelect.el, sizeSelect.el);
 
+  // Several images at once: fill empty slots first, then add new ones up to the cap.
+  const upload = createUploadButton({
+    accept: 'image/*',
+    multiple: true,
+    noun: 'an image',
+    label: 'Upload images',
+    dropTarget: fields,
+    onUploaded: (url) => {
+      const emptyIndex = items.findIndex((entry) => !entry.url.trim());
+      const max = layout === 'comparison' ? 2 : 12;
+      if (emptyIndex >= 0) {
+        items = items.map((entry, index) => (index === emptyIndex ? { ...entry, url } : entry));
+      } else if (items.length < max) {
+        items = [...items, { ...emptyItem(), url }];
+      } else {
+        return;
+      }
+      emitChange();
+      renderList();
+    }
+  });
+
   renderList();
-  fields.append(settings, listHost);
+  fields.append(mediaSourceRow(upload.el), settings, listHost);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1694,14 +1933,16 @@ export function createTimelineEditor(
     renderItem: (event, ctx) => {
       const n = ctx.index + 1;
       const patch = (partial: Partial<TimelineEventDraft>) => ctx.update({ ...ctx.current, ...partial });
+      const imageUrlField = editorField('block-editor__timeline-image-url', event.image_url ?? '', 'Image link (optional)', `Timeline event ${n} image URL`, (value) => patch({ image_url: value }), 'url');
       return fragmentOf(
         fieldPair(
           editorField('block-editor__timeline-when', event.when, 'When', `Timeline event ${n} when`, (value) => patch({ when: value })),
           editorField('block-editor__timeline-label', event.label, 'Label', `Timeline event ${n} label`, (value) => patch({ label: value }))
         ),
         editorField('block-editor__timeline-description', event.description, 'What happened', `Timeline event ${n} description`, (value) => patch({ description: value }), 'textarea'),
+        itemImageUpload(imageUrlField, `Upload timeline event ${n} image`, (url) => patch({ image_url: url })),
         fieldPair(
-          editorField('block-editor__timeline-image-url', event.image_url ?? '', 'Image link (optional)', `Timeline event ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          imageUrlField,
           editorField('block-editor__timeline-image-alt', event.image_alt ?? '', 'Image alt (required if image set)', `Timeline event ${n} image alt`, (value) => patch({ image_alt: value }))
         ),
         fieldPair(
@@ -1805,6 +2046,7 @@ export function createCardStackEditor(
     renderItem: (card, ctx) => {
       const n = ctx.index + 1;
       const patch = (partial: Partial<CardStackDraft>) => ctx.update({ ...ctx.current, ...partial });
+      const imageUrlField = editorField('block-editor__card-stack-image-url', card.image_url ?? '', 'Image link (optional)', `Card ${n} image URL`, (value) => patch({ image_url: value }), 'url');
       const tint = createChoice({
         key: 'Tint',
         value: card.tint,
@@ -1825,8 +2067,9 @@ export function createCardStackEditor(
           editorField('block-editor__card-stack-card-title', card.title, 'Title', `Card ${n} title`, (value) => patch({ title: value }))
         ),
         editorField('block-editor__card-stack-description', card.description, 'Description', `Card ${n} description`, (value) => patch({ description: value }), 'textarea'),
+        itemImageUpload(imageUrlField, `Upload card ${n} image`, (url) => patch({ image_url: url })),
         fieldPair(
-          editorField('block-editor__card-stack-image-url', card.image_url ?? '', 'Image link (optional)', `Card ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          imageUrlField,
           editorField('block-editor__card-stack-image-alt', card.image_alt ?? '', 'Image alt (required if image set)', `Card ${n} image alt`, (value) => patch({ image_alt: value }))
         ),
         settings
@@ -1906,13 +2149,15 @@ export function createFlashcardsEditor(
     renderItem: (card, ctx) => {
       const n = ctx.index + 1;
       const patch = (partial: Partial<FlashcardDraft>) => ctx.update({ ...ctx.current, ...partial });
+      const imageUrlField = editorField('block-editor__flashcards-image-url', card.image_url ?? '', 'Image link (optional)', `Flashcard ${n} image URL`, (value) => patch({ image_url: value }), 'url');
       const nodes: Node[] = [
         fieldPair(
           editorField('block-editor__flashcards-front', card.front, 'Front', `Flashcard ${n} front`, (value) => patch({ front: value })),
           editorField('block-editor__flashcards-back', card.back, 'Back', `Flashcard ${n} back`, (value) => patch({ back: value }))
         ),
+        itemImageUpload(imageUrlField, `Upload flashcard ${n} image`, (url) => patch({ image_url: url })),
         fieldPair(
-          editorField('block-editor__flashcards-image-url', card.image_url ?? '', 'Image link (optional)', `Flashcard ${n} image URL`, (value) => patch({ image_url: value }), 'url'),
+          imageUrlField,
           editorField('block-editor__flashcards-image-alt', card.image_alt ?? '', 'Image alt (required if image set)', `Flashcard ${n} image alt`, (value) => patch({ image_alt: value }))
         )
       ];
@@ -2401,19 +2646,21 @@ export function createDiagramEditor(
 
   let source = block.content.source;
 
-  const sourceSelect = document.createElement('select');
-  sourceSelect.className = 'block-editor__diagram-source';
-  sourceSelect.setAttribute('aria-label', 'Diagram source');
-  for (const [value, label] of [
-    ['image', 'Image URL'],
-    ['svg', 'Inline SVG']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    opt.selected = source === value;
-    sourceSelect.append(opt);
-  }
+  const sourceSelect = createEditorFilter({
+    key: 'Source',
+    value: source,
+    options: [
+      { value: 'image', label: 'Image URL' },
+      { value: 'svg', label: 'Inline SVG' }
+    ],
+    className: 'block-editor__diagram-source',
+    ariaLabel: 'Diagram source',
+    onChange: (value) => {
+      source = value as typeof source;
+      renderSourceFields();
+      emitChange();
+    }
+  });
 
   const imageUrl = document.createElement('input');
   imageUrl.type = 'url';
@@ -2468,8 +2715,27 @@ export function createDiagramEditor(
     }
   };
 
+  const upload = createUploadButton({
+    accept: 'image/*',
+    noun: 'an image',
+    label: 'Upload image',
+    dropTarget: fields,
+    onUploaded: (uploadedUrl) => {
+      if (source !== 'image') {
+        source = 'image';
+        sourceSelect.setValue('image');
+        renderSourceFields();
+      }
+      imageUrl.value = uploadedUrl;
+      emitChange();
+      if (!imageAlt.value.trim()) imageAlt.focus();
+    }
+  });
+  const uploadRow = mediaSourceRow(upload.el);
+
   const renderSourceFields = () => {
     const isImage = source === 'image';
+    uploadRow.hidden = !isImage;
     imageUrl.hidden = !isImage;
     imageAlt.hidden = !isImage;
     svgMarkup.hidden = isImage;
@@ -2489,11 +2755,6 @@ export function createDiagramEditor(
     });
   };
 
-  sourceSelect.addEventListener('change', () => {
-    source = sourceSelect.value as typeof source;
-    renderSourceFields();
-    emitChange();
-  });
   imageUrl.addEventListener('input', emitChange);
   imageAlt.addEventListener('input', emitChange);
   svgMarkup.addEventListener('input', emitChange);
@@ -2501,7 +2762,7 @@ export function createDiagramEditor(
 
   renderSourceFields();
   updatePreview();
-  fields.append(sourceSelect, imageUrl, imageAlt, svgMarkup, caption, preview);
+  fields.append(sourceSelect.el, uploadRow, imageUrl, imageAlt, svgMarkup, caption, preview);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2566,55 +2827,31 @@ export function createWhiteboardEditor(
   title.placeholder = 'Whiteboard title (optional)';
   title.setAttribute('aria-label', 'Whiteboard title');
 
-  const height = document.createElement('input');
-  height.type = 'number';
-  height.className = 'block-editor__whiteboard-height';
-  height.min = '360';
-  height.max = '1400';
-  height.step = '40';
-  height.value = String(block.content.height_px ?? 640);
-  height.setAttribute('aria-label', 'Whiteboard height in pixels');
-
   const status = document.createElement('span');
   status.className = 'block-editor__whiteboard-status';
   status.setAttribute('role', 'status');
 
   const surface = document.createElement('div');
   surface.className = 'block-editor__whiteboard-surface';
-  surface.style.height = `${block.content.height_px ?? 640}px`;
 
-  const emitMetadata = () => {
+  title.addEventListener('input', () => {
     const latest = getLatest();
-    const nextHeight = Math.max(360, Math.min(1400, Number(height.value) || 640));
-    surface.style.height = `${nextHeight}px`;
     onChange({
       ...latest,
-      content: {
-        ...latest.content,
-        title: title.value.trim() || undefined,
-        height_px: nextHeight
-      }
+      content: { ...latest.content, title: title.value.trim() || undefined }
     });
-  };
+  });
 
-  title.addEventListener('input', emitMetadata);
-  height.addEventListener('change', emitMetadata);
-
-  meta.append(title, height, status);
+  meta.append(title, status);
   fields.append(meta, surface);
 
-  void mountHubWhiteboard(surface, block, {
+  void mountHubWhiteboard(surface, getLatest(), {
     readOnly: false,
-    onBlockChange: (next) => {
+    getTitle: () => getLatest().content.title,
+    onBlockChange: () => {
       const latest = getLatest();
       const { seed_document_id: _seed, ...content } = latest.content;
-      onChange({
-        ...latest,
-        content: {
-          ...content,
-          document_id: next.content.document_id
-        }
-      });
+      onChange({ ...latest, content });
     },
     onStatus: (message, isError = false) => {
       status.textContent = message;
@@ -2640,21 +2877,19 @@ export function createAnthologyEditor(
   title.placeholder = 'Title (optional)';
   title.setAttribute('aria-label', 'Anthology title');
 
-  const view = document.createElement('select');
-  view.className = 'block-editor__anthology-view';
-  view.setAttribute('aria-label', 'Default view');
-  for (const [value, label] of [
-    ['text', 'By text'],
-    ['theme', 'By theme'],
-    ['technique', 'By technique'],
-    ['connections', 'Connections']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    opt.selected = (block.content.default_view ?? 'text') === value;
-    view.append(opt);
-  }
+  const view = createEditorFilter({
+    key: 'View',
+    value: block.content.default_view ?? 'text',
+    options: [
+      { value: 'text', label: 'By text' },
+      { value: 'theme', label: 'By theme' },
+      { value: 'technique', label: 'By technique' },
+      { value: 'connections', label: 'Connections' }
+    ],
+    className: 'block-editor__anthology-view',
+    ariaLabel: 'Default view',
+    onChange: () => emitChange()
+  });
 
   const hint = document.createElement('p');
   hint.className = 'block-editor__hint';
@@ -2666,15 +2901,14 @@ export function createAnthologyEditor(
       ...getLatest(),
       content: {
         title: title.value.trim() || undefined,
-        default_view: view.value as 'text' | 'theme' | 'technique' | 'connections'
+        default_view: view.getValue() as 'text' | 'theme' | 'technique' | 'connections'
       }
     });
   };
 
   title.addEventListener('input', emitChange);
-  view.addEventListener('change', emitChange);
 
-  fields.append(title, view, hint);
+  fields.append(title, view.el, hint);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2687,19 +2921,17 @@ export function createCollectionEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const source = document.createElement('select');
-  source.className = 'block-editor__collection-source';
-  source.setAttribute('aria-label', 'Collection source');
-  for (const [value, label] of [
-    ['unit_lessons', 'Unit lessons'],
-    ['recent_lessons', 'Recent lessons']
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    opt.selected = block.content.source === value;
-    source.append(opt);
-  }
+  const source = createEditorFilter({
+    key: 'Source',
+    value: block.content.source,
+    options: [
+      { value: 'unit_lessons', label: 'Unit lessons' },
+      { value: 'recent_lessons', label: 'Recent lessons' }
+    ],
+    className: 'block-editor__collection-source',
+    ariaLabel: 'Collection source',
+    onChange: () => emitChange()
+  });
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -2724,7 +2956,7 @@ export function createCollectionEditor(
     const draft = {
       ...getLatest(),
       content: {
-        source: source.value as 'unit_lessons' | 'recent_lessons',
+        source: source.getValue() as 'unit_lessons' | 'recent_lessons',
         title: title.value.trim() || undefined
       }
     };
@@ -2732,10 +2964,9 @@ export function createCollectionEditor(
     updatePreview(draft);
   };
 
-  source.addEventListener('change', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(source, title, preview);
+  fields.append(source.el, title, preview);
   updatePreview(getLatest());
   return editorShell(block, onChange, fields, getLatest);
 }
@@ -2825,10 +3056,22 @@ function createBlockEditorFields(
       return createGalleryEditor(block, onChange, latest as () => Extract<Block, { block_type: 'gallery' }>);
     case 'table':
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
-    case 'peer_feedback':
-      return createPeerFeedbackEditor(block, onChange);
+    case 'peer_feedback': {
+      const peer = latest as () => Extract<Block, { block_type: 'peer_feedback' }>;
+      return editorShell(block, onChange, createPeerFeedbackEditor(block, onChange, peer), peer);
+    }
     case 'question_drop':
       return createQuestionDropEditor(block, onChange, context.lessonId);
+    case 'brainstorm':
+      return createBrainstormEditor(block, onChange);
+    case 'hinge_question':
+      return createHingeQuestionEditor(block, onChange);
+    case 'continuum_line':
+      return createContinuumLineEditor(block, onChange);
+    case 'curriculum_lines':
+      return createCurriculumLinesEditor(block, onChange, context.network ?? (context.unitLessons
+        ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }
+        : undefined));
     case 'quiz_question':
       return createQuizQuestionEditor(block, onChange, context.getLessonBlocks);
     case 'question_set':
@@ -2940,6 +3183,15 @@ function createBlockEditorFields(
       return createAnalogyTypesEditor(block, onChange, latest as () => Extract<Block, { block_type: 'analogy_types' }>);
     case 'teacher_note':
       return createTeacherNoteBlockEditor(block, onChange, latest as () => Extract<Block, { block_type: 'teacher_note' }>);
+    case 'discern_confirm': {
+      const fields = document.createElement('div');
+      fields.className = 'block-editor__fields';
+      const note = document.createElement('p');
+      note.className = 'discern-caption';
+      note.textContent = 'Students finish their Discern tail here. It stays linked to its activity wherever you drag it. To remove it, remove Discern from that activity.';
+      fields.append(note);
+      return editorShell(block, onChange, fields, latest as () => Extract<Block, { block_type: 'discern_confirm' }>);
+    }
   }
 }
 

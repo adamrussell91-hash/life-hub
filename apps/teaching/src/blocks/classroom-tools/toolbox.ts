@@ -22,9 +22,18 @@ export type ToolboxOptions = {
   startTool?: ClassroomToolId;
   lessonId?: string;
   pageBlocks?: Block[];
+  /** Block id. With it, the tray and open tool survive the re-render that follows any edit. */
+  key?: string;
 };
 
 let uidSeed = 0;
+
+/** Last tray state per block, so a re-render keeps what the teacher opened or closed. */
+const remembered = new Map<string, { start: ClassroomToolId | null; trayOut: boolean; tool: ClassroomToolId | null }>();
+
+export function forgetToolboxStateForTests(): void {
+  remembered.clear();
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -81,7 +90,7 @@ export function mountToolbox(host: HTMLElement, options: ToolboxOptions): () => 
   if (options.kind === 'divider') {
     bar.append(el('hr', 'ct-rule'), tray, trigger);
   } else {
-    bar.append(el('span', 'ct-block-label', 'Classroom tools'), tray, trigger);
+    bar.append(el('span', 'ct-block-label block-eyebrow', 'Classroom tools'), tray, trigger);
   }
 
   const panel = el('div', 'ct-panel');
@@ -96,11 +105,18 @@ export function mountToolbox(host: HTMLElement, options: ToolboxOptions): () => 
   let current: ClassroomToolId | null = null;
   let stopTool: (() => void) | null = null;
 
+  const start = options.startTool && tools.includes(options.startTool) ? options.startTool : null;
+  const memoryKey = options.key ? `${options.viewer}:${options.key}` : null;
+  const remember = (): void => {
+    if (memoryKey) remembered.set(memoryKey, { start, trayOut: host.classList.contains('is-tray-out'), tool: current });
+  };
+
   const setTray = (out: boolean): void => {
     host.classList.toggle('is-tray-out', out);
     trigger.setAttribute('aria-expanded', String(out));
     trigger.setAttribute('aria-label', out ? 'Close classroom tools' : 'Open classroom tools');
     for (const chip of chips.values()) chip.tabIndex = out ? 0 : -1;
+    remember();
   };
 
   const close = (): void => {
@@ -110,6 +126,7 @@ export function mountToolbox(host: HTMLElement, options: ToolboxOptions): () => 
     host.classList.remove('is-open');
     for (const chip of chips.values()) chip.setAttribute('aria-pressed', 'false');
     card.replaceChildren();
+    remember();
   };
 
   const open = (tool: ClassroomToolId): void => {
@@ -158,6 +175,7 @@ export function mountToolbox(host: HTMLElement, options: ToolboxOptions): () => 
     };
     stopTool = TOOL_BUILDERS[tool](body, env) ?? null;
     host.classList.add('is-open');
+    remember();
   };
 
   trigger.addEventListener('click', () => {
@@ -180,9 +198,15 @@ export function mountToolbox(host: HTMLElement, options: ToolboxOptions): () => 
     }
   });
 
-  const start = options.startTool && tools.includes(options.startTool) ? options.startTool : null;
-  if (start || options.kind === 'block') setTray(true);
-  if (start) open(start);
+  // A changed start tool is a new setting, so it wins over what was remembered.
+  const saved = memoryKey ? remembered.get(memoryKey) : undefined;
+  if (saved && saved.start === start) {
+    if (saved.trayOut) setTray(true);
+    if (saved.tool && tools.includes(saved.tool)) open(saved.tool);
+  } else {
+    if (start || options.kind === 'block') setTray(true);
+    if (start) open(start);
+  }
 
   return () => close();
 }

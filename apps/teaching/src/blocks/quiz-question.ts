@@ -27,7 +27,7 @@ export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlo
     }
   });
   const root = el('div', 'qz-question-editor');
-  if (block.content.from_submission) root.append(el('p', 'qz-note', 'Written by a student and approved by you. Edit anything.'));
+  if (block.content.from_submission) root.append(el('p', 'qz-note block-secondary', 'Written by a student and approved by you. Edit anything.'));
   root.append(builder.root);
   return root;
 }
@@ -38,13 +38,13 @@ export function renderQuizQuestion(block: QuizBlock, mode: RenderMode, _ctx: Ren
   root.dataset.blockId = block.id;
   const info = QUIZ_KIND_INFO[q.kind];
   const head = el('div', 'qz-card__head');
-  head.append(el('span', 'qz-eyebrow', info?.label ?? 'Question'), el('span', 'qz-card__marks', `${formatMarks(q.marks ?? 1)} ${q.marks === 1 ? 'mark' : 'marks'}`));
+  head.append(el('span', 'qz-eyebrow block-eyebrow', info?.label ?? 'Question'), el('span', 'qz-card__marks block-secondary', `${formatMarks(q.marks ?? 1)} ${q.marks === 1 ? 'mark' : 'marks'}`));
   root.append(head);
   const promptText = q.prompt?.trim() || (q.kind === 'fill_gap' ? 'Fill the gaps.' : '');
-  root.append(el('p', 'qz-card__prompt', promptText || 'Write the question.'));
+  root.append(el('p', 'qz-card__prompt block-title', promptText || 'Write the question.'));
 
   if (mode === 'student') {
-    root.append(el('p', 'qz-note', 'This question is part of the quiz.'));
+    root.append(el('p', 'qz-note block-secondary', 'This question is part of the quiz.'));
     return root;
   }
   const answer = el('div', 'qz-card__answer');
@@ -56,8 +56,8 @@ export function renderQuizQuestion(block: QuizBlock, mode: RenderMode, _ctx: Ren
       const warn = el('p', 'qz-card__warn', `Not ready: ${checked.message}`);
       root.append(warn);
     }
-    if (q.hint) root.append(el('p', 'qz-note', `Hint: ${q.hint}`));
-    if (block.content.from_submission) root.append(el('p', 'qz-note', 'From a student’s question'));
+    if (q.hint) root.append(el('p', 'qz-note block-secondary', `Hint: ${q.hint}`));
+    if (block.content.from_submission) root.append(el('p', 'qz-note block-secondary', 'From a student’s question'));
   }
   return root;
 }

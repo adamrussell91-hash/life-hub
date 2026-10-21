@@ -36,6 +36,8 @@ export type MountVoiceRecorderOptions = {
   transcribeWaitMs?: number;
   /** Prefill kind; title is asked before first Record. */
   defaultKind?: VoiceRecorderKind;
+  /** A single note on one selection: no kind, no title prompt, no line taps. */
+  pinnedTo?: { anchor: AnnotationAnchor; title: string };
   onTrackReady: (track: AnnotationVoiceTrack) => void;
   onCancel: () => void;
 };
@@ -168,7 +170,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   header.className = 'block-editor__annotation-voice-header';
   const heading = document.createElement('h3');
   heading.className = 'block-editor__annotation-note-title';
-  heading.textContent = 'Record';
+  heading.textContent = options.pinnedTo ? 'Voice note' : 'Record';
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'btn btn--ghost block-editor__annotation-voice-close';
@@ -182,14 +184,16 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
     value === 'think_aloud'
       ? 'Think aloud: talk about the poem, and tap a line each time you move on to it. Each tap starts a clip pinned to that line.'
       : 'Reading: read the poem aloud. Lines are matched to your voice; tap a line to pin it exactly.';
-  status.textContent = `Pick a kind, then Record. ${kindHint(options.defaultKind ?? 'reading')}`;
+  status.textContent = options.pinnedTo
+    ? `Voice note on ${options.pinnedTo.title}: press Record, talk, then Stop.`
+    : `Pick a kind, then Record. ${kindHint(options.defaultKind ?? 'reading')}`;
 
   const kindRow = document.createElement('div');
   kindRow.className = 'block-editor__annotation-voice-kinds';
   kindRow.setAttribute('role', 'group');
   kindRow.setAttribute('aria-label', 'Recording kind');
 
-  let kind: VoiceRecorderKind = options.defaultKind ?? 'reading';
+  let kind: VoiceRecorderKind = options.defaultKind ?? (options.pinnedTo ? 'think_aloud' : 'reading');
   const kindDefs: Array<{ value: VoiceRecorderKind; label: string }> = [
     { value: 'reading', label: 'Reading' },
     { value: 'think_aloud', label: 'Think aloud' }
@@ -307,10 +311,10 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   importInput.className = 'block-editor__annotation-voice-import-input';
   importWrap.append(document.createTextNode('Or add an audio file: '), importInput);
 
-  el.append(header, recovered, status, kindRow, meter, elapsedEl, actions, rescue, live, pinsWrap, useLiveBtn, importWrap);
+  el.append(header, recovered, status, ...(options.pinnedTo ? [] : [kindRow]), meter, elapsedEl, actions, rescue, live, pinsWrap, useLiveBtn, importWrap);
 
   let disposed = false;
-  let title = '';
+  let title = options.pinnedTo?.title ?? '';
   let recording = false;
   let paused = false;
   let mediaRecorder: MediaRecorder | null = null;
@@ -445,7 +449,7 @@ export function mountVoiceRecorder(options: MountVoiceRecorderOptions): VoiceRec
   }
 
   function pushTap(anchor: AnnotationAnchor): void {
-    if (!recording && !paused) return;
+    if (options.pinnedTo || (!recording && !paused)) return;
     const t = elapsedMs() / 1000;
     taps.push({ t, anchor: { ...anchor, quote: { ...anchor.quote } } });
     status.textContent = `Pinned at ${formatElapsed(elapsedMs())}.`;

@@ -28,6 +28,33 @@ const RATE_LIMIT_MS = 10 * 60 * 1000;
 const WINDOW_CAP_DAYS = 21;
 const MODEL = 'claude-sonnet-5';
 
+/**
+ * Title key for "is this the same skill card?" — case, spacing and
+ * punctuation insensitive. The source-ref hash alone let one skill evidenced
+ * by two different records become two cards with the same title.
+ */
+export function skillTitleKey(title) {
+  return String(title ?? '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * A card dates from when the work happened: the latest date among its source
+ * records. Falls back to the model's date, then today.
+ */
+export function proposalOccurredOn(sourceRefs, sourceDates, modelDate, nowIso) {
+  const dates = (sourceRefs ?? [])
+    .map((ref) => sourceDates?.get(ref))
+    .filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort();
+  if (dates.length) return dates[dates.length - 1];
+  if (typeof modelDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(modelDate)) return modelDate;
+  return String(nowIso ?? new Date().toISOString()).slice(0, 10);
+}
+
 export function sourceRefsHash(refs) {
   const sorted = [...new Set((refs ?? []).map(String).filter(Boolean))].sort();
   return createHash('sha256').update(JSON.stringify(sorted)).digest('hex');
@@ -107,7 +134,7 @@ export async function listScanProposals(store, { status } = {}) {
   return out;
 }
 
-function validateProposalShape(raw, allowedRefs, futures) {
+function validateProposalShape(raw, allowedRefs, futures, sourceDates = new Map(), nowIso) {
   if (!raw || typeof raw !== 'object') return null;
   const title = typeof raw.title === 'string' ? raw.title.trim().slice(0, 200) : '';
   if (!title) return null;
@@ -139,10 +166,7 @@ function validateProposalShape(raw, allowedRefs, futures) {
     : [];
   return {
     title,
-    occurred_on:
-      typeof raw.occurred_on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.occurred_on)
-        ? raw.occurred_on
-        : new Date().toISOString().slice(0, 10),
+    occurred_on: proposalOccurredOn(source_refs, sourceDates, raw.occurred_on, nowIso),
     date_precision: ['day', 'month', 'year'].includes(raw.date_precision)
       ? raw.date_precision
       : 'day',
@@ -164,7 +188,11 @@ function validateProposalShape(raw, allowedRefs, futures) {
   };
 }
 
-async function persistProposal(store, proposal, nowIso) {
+async function persistProposal(store, proposal, nowIso, takenTitles = new Set()) {
+  const titleKey = skillTitleKey(proposal.title);
+  if (titleKey && takenTitles.has(titleKey)) {
+    return { skipped: true, reason: 'same_title', title_key: titleKey };
+  }
   const hash = sourceRefsHash(proposal.source_refs);
   const existingHash = await getJSON(store, careerScanProposalByHashKey(hash));
   if (existingHash?.status === 'binned' || existingHash?.status === 'kept') {
@@ -222,7 +250,13 @@ export async function keepScanProposal(deps, id) {
 
   const careerRepo =
     deps.careerRepo ?? createCareerRepository({ store, now: () => nowIso });
-  const achievement = await careerRepo.createAchievement({
+  // Same skill already in the ledger: add this proposal's evidence to that
+  // card instead of keeping a duplicate.
+  const titleKey = skillTitleKey(record.title);
+  const existing = (await careerRepo.listAchievements()).find(
+    (a) => a.lifecycle_status === 'active' && skillTitleKey(a.title) === titleKey
+  );
+  const achievement = existing ?? await careerRepo.createAchievement({
     title: record.title,
     occurred_on: record.occurred_on,
     date_precision: record.date_precision,
@@ -439,12 +473,24 @@ export async function runCareerScanPass(deps = {}) {
     drafted = deps.heuristicProposals(sources, futures);
   }
 
+  // Titles already in the ledger or waiting in the scan never come back as
+  // a second card; the same title twice in one batch keeps the first.
+  const takenTitles = new Set([
+    ...(await careerRepo.listAchievements())
+      .filter((a) => a.lifecycle_status === 'active')
+      .map((a) => skillTitleKey(a.title)),
+    ...(await listScanProposals(store, { status: 'pending' })).map((p) => skillTitleKey(p.title))
+  ]);
+  const sourceDates = new Map(sources.map((s) => [s.ref, s.date ? String(s.date).slice(0, 10) : null]));
   const saved = [];
   for (const raw of drafted) {
-    const shaped = validateProposalShape(raw, allowedRefs, futures);
+    const shaped = validateProposalShape(raw, allowedRefs, futures, sourceDates, nowIso);
     if (!shaped) continue;
-    const result = await persistProposal(store, shaped, nowIso);
-    if (!result.skipped) saved.push(result.record);
+    const result = await persistProposal(store, shaped, nowIso, takenTitles);
+    if (!result.skipped) {
+      saved.push(result.record);
+      takenTitles.add(skillTitleKey(shaped.title));
+    }
   }
 
   const weekKey = isoWeekKey(nowValue instanceof Date ? nowValue : new Date(nowIso));
@@ -540,12 +586,48 @@ export async function runCareerScanPass(deps = {}) {
   };
 }
 
-export async function getScanPanelPayload(store) {
+/**
+ * Attach source_labels / witness_labels ({ ref, label, href }) so the panel
+ * chips can name and open their records. Unreachable refs keep href null.
+ */
+export async function labelScanProposals(proposals, deps = {}) {
+  const resolveEntity = deps.resolveEntity ?? defaultResolveEntity;
+  const accessContext = createAccessContext({ workflow: 'life' });
+  const cache = new Map();
+  const labelFor = (ref) => {
+    if (!cache.has(ref)) {
+      cache.set(
+        ref,
+        Promise.resolve()
+          .then(() => resolveEntity(ref, accessContext))
+          .then((entity) => ({
+            ref,
+            label: typeof entity?.display_label === 'string' ? entity.display_label : null,
+            href: typeof entity?.href === 'string' && entity.href ? entity.href : null
+          }))
+          .catch(() => ({ ref, label: null, href: null }))
+      );
+    }
+    return cache.get(ref);
+  };
+  return Promise.all(
+    proposals.map(async (proposal) => ({
+      ...proposal,
+      source_labels: await Promise.all((proposal.source_refs ?? []).map(labelFor)),
+      witness_labels: await Promise.all((proposal.witness_refs ?? []).map(labelFor))
+    }))
+  );
+}
+
+export async function getScanPanelPayload(store, deps = {}) {
   const state = (await getJSON(store, CAREER_SCAN_STATE_KEY)) ?? {
     last_run_at: null,
     last_success_week: null
   };
-  const proposals = await listScanProposals(store, { status: 'pending' });
+  const proposals = await labelScanProposals(
+    await listScanProposals(store, { status: 'pending' }),
+    deps
+  );
   return {
     proposals,
     scan_state: state,

@@ -1,7 +1,7 @@
 # Organisations: fix brief 01 (Phase 1 defects, then finish the build)
 
 Written 27/09/26 after Adam opened the live umbrella and found the Organisations
-build broken. Diagnosed from the live screenshots (desktop, St. Redacted wall and
+build broken. Diagnosed from the live screenshots (desktop, Tallowwood wall and
 page) and the code on `main` after
 [PR 508](https://github.com/adamrussell91-hash/life-hub/pull/508).
 
@@ -11,7 +11,7 @@ page) and the code on `main` after
   ticked**. PR 508 was marked ready and merged with **only Phase 1** done. In
   `PROGRESS.md`, Phases 2, 3, 4, 5 and 7 still say "Pending" (P5).
 - `PROGRESS.md` ticks C1, C2, D4 and P3. On real data, C1 and C2 fail on
-  every tile, and the P3 acceptance case (St. Redacted) fails. The checks were
+  every tile, and the P3 acceptance case (Tallowwood) fails. The checks were
   named, not run (P1).
 - The mockup diff lists only "kit surfaces, no Compare, opportunities empty host,
   mock seed". It doesn't mention that the tile chart and the timeline look
@@ -33,12 +33,12 @@ Don't open a separate PR for Part B, and don't split Part A into fix PRs.
 ## Acceptance case (run live, D3 / P3)
 
 > Adam opens Organisations.
-> - The St. Redacted tile's small chart is a line on a 2019→now axis that steps
+> - The Tallowwood tile's small chart is a line on a 2019→now axis that steps
 >   up when he actually got to know people there. It has no number labels.
 > - The tile's warmth bar shows warm and cooling people in colour.
-> - Trinity's tile chart has a different shape from St. Redacted's.
+> - Banksia's tile chart has a different shape from Tallowwood's.
 >
-> He opens St. Redacted.
+> He opens Tallowwood.
 > - His current role is a **bar from 2025 to now**, labelled clear of every other
 >   label.
 > - The people line rises behind the lanes, and no dot stack sits on "now".
@@ -46,24 +46,24 @@ Don't open a separate PR for Part B, and don't split Part A into fix PRs.
 > - No text anywhere mentions a phase or something that "arrives" or "is built"
 >   later.
 >
-> After Part B, the St. Redacted scenario in `BUILD-PLAN.md` → Outcome also holds.
+> After Part B, the Tallowwood scenario in `BUILD-PLAN.md` → Outcome also holds.
 
 ## Phase 0: confirm with real numbers before changing code
 
 Write the answers into `PROGRESS.md` under a new `## Fix 01: Phase 0` heading.
 
-1. For St. Redacted and Trinity, list every person's `first_link_at` as the
+1. For Tallowwood and Banksia, list every person's `first_link_at` as the
    directory builds it (`organisations-directory.mjs`), and which field it came
    from: `valid_from`, `occurred_at` or `created_at`. If most come from
    `created_at`, they're import timestamps, not "when Adam got to know them".
-2. Give the warmth band counts (warm / cooling / cold) for St. Redacted, as the
+2. Give the warmth band counts (warm / cooling / cold) for Tallowwood, as the
    directory computes them today and as `warmthFor()` computes them on the People
    page for the same people. If they differ, that's defect A2.
 3. Count the links of each relationship type across all 112 organisations:
    `employee_at`, `member_of`, `venue`, `provider`, `applies_to`, `presenter`,
    `studied_at` and `placement_at`. Then explain the chip counts on the wall:
    Events & PD 0, Study & placement 0, Prospects 0.
-4. List Adam's own links to St. Redacted, each with its role text,
+4. List Adam's own links to Tallowwood, each with its role text,
    `valid_from` and `valid_to`.
 
 ## Part A: defects
@@ -74,7 +74,7 @@ has been run and its screenshot sits next to the mockup (P1).
 ### A1. Tile chart plots by list position, not by date (C5, C1, C2, D1)
 
 **Seen.**
-- Every tile draws the same straight diagonal. St. Redacted has 56 overlapping
+- Every tile draws the same straight diagonal. Tallowwood has 56 overlapping
   number labels ("1 2 3 … 56").
 
 **Cause.**
@@ -106,7 +106,7 @@ has been run and its screenshot sits next to the mockup (P1).
 - Unit test: the x of a point dated 01/01/2023 equals the same x on another tile.
 - A `getBBox` test at 390 and 1440 finds no text node inside the spark except
   the two axis labels.
-- A live screenshot of St. Redacted and Trinity tiles sits beside
+- A live screenshot of Tallowwood and Banksia tiles sits beside
   `01-crest-wall.png`.
 
 ### A2. Warmth bar is all grey; everyone is "cold" (D6, V4)
@@ -130,16 +130,16 @@ has been run and its screenshot sits next to the mockup (P1).
 - No second warmth number.
 
 **Check.**
-- Test: the St. Redacted spread built by the directory equals the per-person
+- Test: the Tallowwood spread built by the directory equals the per-person
   bands People's model gives for the same ids (Phase 0 item 2 as a test).
-- A live screenshot shows coloured segments on St. Redacted.
+- A live screenshot shows coloured segments on Tallowwood.
 - If the real spread is all cold even so, write that into the ledger with the
   numbers. Don't restyle it to look warmer.
 
 ### A3. Ongoing role drawn as a dot (C6)
 
 **Seen.**
-- "Your time with St. Redacted" shows Adam's current role, Gifted Education
+- "Your time with Tallowwood" shows Adam's current role, Gifted Education
   Teacher, 2025–now, as a single dot at 2025.
 
 **Cause.**
@@ -204,7 +204,7 @@ about the build:
   opportunity** button (Phase 4).
   - `BUILD-PLAN.md` I3 has been corrected. The old wording leaked the roadmap
     into the product, and that was our plan's mistake.
-- Ann's read before a first run: "Ann hasn't read St. Redacted yet." plus a
+- Ann's read before a first run: "Ann hasn't read Tallowwood yet." plus a
   working **Run now** (BUILD-PLAN Phase 5 I3).
 
 **Check.**
@@ -234,7 +234,7 @@ about the build:
 
 **Seen.**
 - 112 organisations, but Events & PD 0, Study & placement 0, Prospects 0.
-- St. Redacted has no **Event venue** chip, although the build plan's acceptance
+- Tallowwood has no **Event venue** chip, although the build plan's acceptance
   case expects one.
 
 **Fix.**
@@ -246,7 +246,7 @@ about the build:
 - The data backfill is a separate item for Adam to decide.
 
 **Check.**
-- A model test on real St. Redacted links asserts the chip list.
+- A model test on real Tallowwood links asserts the chip list.
 - The segment counts and the chip counts come from one `buildOrganisationModel()`
   pass (V4).
 
@@ -270,7 +270,7 @@ about the build:
 Follow `BUILD-PLAN.md` Phases 2, 3, 4, 5 and 7 exactly, including each phase's
 failure-mode table. Two additions from this review:
 
-- **Phase 3:** the flowchart's C1 `getBBox` test runs on **real** St. Redacted
+- **Phase 3:** the flowchart's C1 `getBBox` test runs on **real** Tallowwood
   structure at 1440 and in the 390 flow box. It doesn't run on a fixture.
 - **Phase 7:** the "Compare with…" button in the page header opens Compare
   with the current organisation preselected.
@@ -287,8 +287,8 @@ extended. Run every check before ticking anything.
 
 - `npm run pre-pr-check` at the repo root exits 0.
 - `cd apps/professional && npm test && npm run typecheck && npm run build`.
-- Take live 1440 and 390 screenshots on real data of the wall, St. Redacted and
-  Trinity. Put them in `screens/fix-01/`, each with a written diff against
+- Take live 1440 and 390 screenshots on real data of the wall, Tallowwood and
+  Banksia. Put them in `screens/fix-01/`, each with a written diff against
   `mockups/01` and `02`.
 - `PROGRESS.md` has every Part A item and every Part B phase ticked, each with:
   - the IDs checked;

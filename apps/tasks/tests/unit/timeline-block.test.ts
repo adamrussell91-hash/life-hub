@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
-import { createBlock } from '@/blocks/create-block';
-import { createBlockEditor } from '@/blocks/editors';
-import { renderBlock, splitTimelineWhen } from '@/blocks/render';
+import { createBlock } from '@teaching/blocks/create-block';
+import { createBlockEditor } from '@teaching/blocks/editors';
+import { renderBlock, splitTimelineWhen } from '@teaching/blocks/render';
 describe('splitTimelineWhen', () => {
   it('splits time and year ranges', () => {
     expect(splitTimelineWhen('9:23AM-9:40AM')).toEqual({ start: '9:23AM', end: '9:40AM' });

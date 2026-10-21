@@ -153,7 +153,7 @@ export function mountTaskLinkPanel(options: {
   const taskInput = document.createElement('input');
   taskInput.type = 'text';
   taskInput.className = 'hub-input';
-  taskInput.placeholder = 'Type @ to pick a Task';
+  taskInput.placeholder = 'Pick a Task';
   taskInput.setAttribute('aria-label', `${options.heading} task`);
   taskInput.hidden = true;
 
@@ -172,6 +172,7 @@ export function mountTaskLinkPanel(options: {
   );
 
   const picker = createEntityPicker({
+    mode: 'field',
     input: taskInput,
     allowedKinds: ['task'],
     emptyText: 'No matching tasks.',
@@ -302,6 +303,7 @@ export function mountKnowledgePagePicker(options: {
   onSelect: (item: { ref: string; display_label: string; href?: string | null }) => void;
 }): { root: HTMLElement } {
   const picker = createEntityPicker({
+    mode: 'field',
     input: options.input,
     allowedKinds: ['page'],
     emptyText: 'No matching Knowledge pages.',

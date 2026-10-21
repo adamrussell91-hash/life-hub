@@ -5,6 +5,7 @@ import { isHttpUrl } from '@/blocks/url-safety';
 import { validateConceptMap, validateMindMap } from '@/blocks/graph-layout';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block } from '@/schemas/block';
 import { checkQuestion } from '@/quiz/core';
+import { hingeIssue } from '@/blocks/hinge-question/shared';
 
 export type PublishBlockIssue = {
   blockId: string;
@@ -20,6 +21,11 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   html_app: 'HTML app',
   question_set: 'Question set',
   question_drop: 'Question drop',
+  brainstorm: 'Brainstorm',
+  hinge_question: 'Hinge question',
+  continuum_line: 'Continuum line',
+  curriculum_lines: 'Curriculum lines',
+  discern_confirm: 'Discern Confirm',
   quiz_question: 'Quiz question',
   self_check: 'Self check',
   mind_map: 'Mind map',
@@ -40,7 +46,9 @@ export function publishBlockIssues(blocks: Block[]): string | null {
 export function listPublishBlockIssues(blocks: Block[]): PublishBlockIssue[] {
   const typeOrder = collectTypeOrder(blocks);
   const issues: PublishBlockIssue[] = [];
-  walk(blocks, [], typeOrder, issues);
+  const discernHosts = new Set<string>();
+  visitBlocks(blocks, (block) => { if (block.discern) discernHosts.add(block.id); });
+  walk(blocks, [], typeOrder, issues, discernHosts);
   return issues;
 }
 
@@ -58,11 +66,12 @@ function walk(
   blocks: Block[],
   ancestors: string[],
   typeOrder: Map<string, string[]>,
-  issues: PublishBlockIssue[]
+  issues: PublishBlockIssue[],
+  discernHosts: Set<string>
 ): void {
   for (const block of blocks) {
     const label = locateBlock(block, ancestors, typeOrder);
-    const message = ownIssue(block);
+    const message = ownIssue(block, discernHosts);
     if (message) {
       issues.push({
         blockId: block.id,
@@ -73,20 +82,21 @@ function walk(
     }
 
     if (block.block_type === 'section') {
-      walk(block.content.blocks as Block[], [...ancestors, shortLabel(block)], typeOrder, issues);
+      walk(block.content.blocks as Block[], [...ancestors, shortLabel(block)], typeOrder, issues, discernHosts);
     } else if (block.block_type === 'columns') {
       block.content.columns.forEach((column, index) => {
         walk(
           column.blocks as Block[],
           [...ancestors, `Column ${index + 1}`],
           typeOrder,
-          issues
+          issues,
+          discernHosts
         );
       });
     } else if (block.block_type === 'tabs') {
       block.content.tabs.forEach((tab, index) => {
         const tabLabel = tab.label.trim() ? `Tab “${truncate(tab.label.trim())}”` : `Tab ${index + 1}`;
-        walk(tab.blocks as Block[], [...ancestors, tabLabel], typeOrder, issues);
+        walk(tab.blocks as Block[], [...ancestors, tabLabel], typeOrder, issues, discernHosts);
       });
     }
   }
@@ -176,12 +186,36 @@ function blockCaption(block: Block): string | null {
   }
 }
 
-function ownIssue(block: Block): string | null {
+function ownIssue(block: Block, discernHosts: Set<string>): string | null {
+  if (block.block_type === 'discern_confirm' && !discernHosts.has(block.content.target_block_id)) {
+    return 'This Confirm card is not linked to a block with Discern. Delete it or add Discern again';
+  }
+  if (block.discern?.initial.type === 'choose' && block.discern.initial.options.filter((o) => o.trim()).length < 2) {
+    return 'Discern needs at least two initial answer options';
+  }
+  if (block.discern?.mode === 'theirs' && !block.discern.who.trim()) {
+    return 'Discern needs the name of whose choice students are judging';
+  }
   if (block.block_type === 'collection') {
     return 'Collection blocks can only be used on class homepages';
   }
   if (block.block_type === 'question_drop' && !block.content.target_quiz_id) {
     return 'Choose the quiz this Question drop feeds into';
+  }
+  if (block.block_type === 'brainstorm' && !block.content.question.trim()) {
+    return 'Write the question for this Brainstorm';
+  }
+  if (block.block_type === 'hinge_question') {
+    const issue = hingeIssue(block.content);
+    if (issue) return issue;
+  }
+  if (block.block_type === 'continuum_line') {
+    const c = block.content;
+    if (!c.statements.some((s) => s.text.trim())) return 'Write at least one statement for this Continuum line';
+    if (!c.scale.left.trim() || !c.scale.right.trim()) return 'Label both ends of this Continuum line';
+    if (c.stimulus.kind === 'text' && !c.stimulus.text.trim()) return 'Add the stimulus for this Continuum line';
+    if (c.stimulus.kind === 'image' && !isHttpUrl(c.stimulus.url)) return 'Give the stimulus image a valid http(s) URL';
+    if (c.stimulus.kind === 'video' && !c.stimulus.url.trim()) return 'Paste the stimulus video link';
   }
   if (block.block_type === 'quiz_question') {
     const checked = checkQuestion(block.content.question);
@@ -234,7 +268,11 @@ function ownIssue(block: Block): string | null {
     }
   }
   if (block.block_type === 'audio') {
-    if (!isHttpUrl(block.content.url)) {
+    const mode = block.content.mode ?? 'listen';
+    if (mode !== 'listen' && !block.content.prompt?.trim()) {
+      return 'Voice blocks need a question to publish';
+    }
+    if (mode === 'listen' && !isHttpUrl(block.content.url)) {
       return 'Audio blocks need a valid http(s) URL to publish';
     }
   }

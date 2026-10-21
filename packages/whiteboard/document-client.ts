@@ -1,8 +1,9 @@
-import type { BlockSuiteSnapshot } from './blocksuite-adapter';
+/** Whatever the board editor saved; the server only checks it is an object. */
+export type WhiteboardSnapshot = Record<string, unknown>;
 
 export type WhiteboardDocument = {
   id: string;
-  snapshot: BlockSuiteSnapshot;
+  snapshot: WhiteboardSnapshot;
   schema_version: 1;
   updated_at: string;
 };
@@ -38,7 +39,7 @@ export async function loadWhiteboardDocument(
 export async function saveWhiteboardDocument(
   baseUrl: string,
   documentId: string,
-  snapshot: BlockSuiteSnapshot
+  snapshot: WhiteboardSnapshot
 ): Promise<WhiteboardDocument> {
   const response = await fetch(endpoint(baseUrl, documentId), {
     method: 'PUT',

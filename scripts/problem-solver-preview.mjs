@@ -1,6 +1,11 @@
 #!/usr/bin/env node
-// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next]
+// Usage: node scripts/problem-solver-preview.mjs <tool> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>] [--audit]
+// --audit runs scripts/problem-solver-audit.mjs at each width (and on hover) and prints problems or "audit: clean".
+// --click clicks a control first (such as a layout toggle); --name adds -<suffix> to the PNG names.
+// --widths 900,390,320 shoots those viewport widths instead of the default 900 and 390.
 // --next applies SAMPLES['<tool>:next'] after load and shoots <tool>-next-<width>.png (radar morph end state).
+// A sample's `tasks` (task links, as the canvas sends them) go to the view's setTasks after update,
+// and its `proposed` (node ids with a pending task proposal) to setProposed.
 // Bundles a renderer with a synthetic sample run, then screenshots it at 900px and 390px.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -18,10 +23,53 @@ const RENDERERS = {
   gap_basic: ['gap-basic', 'createGapBasicView'],
   gap_radar: ['gap-radar', 'createGapRadarView'],
   smart: ['smart', 'createSmartView'],
+  causal_map: ['causal-map', 'createCausalMapView'],
+  perspective_shift: ['perspective-shift', 'createPerspectiveShiftView'],
+  radial_tree: ['radial-tree', 'createRadialTreeView'],
+  force_field: ['force-field', 'createForceFieldView'],
+  force_field_unscored: ['force-field', 'createForceFieldView'],
+  from_to: ['from-to', 'createFromToView'],
+  intent_statement: ['intent-statement', 'createIntentStatementView'],
+  problem_reduction: ['problem-reduction', 'createProblemReductionView'],
+  analogical_reasoning: ['analogical-reasoning', 'createAnalogicalReasoningView'],
+  solution_tree: ['solution-tree', 'createSolutionTreeView'],
+  lotus_blossom: ['lotus-blossom', 'createLotusBlossomView'],
+  duncker: ['duncker', 'createDunckerView'],
+  contradiction: ['contradiction', 'createContradictionView'],
+  decision_matrix: ['decision-matrix', 'createDecisionMatrixView'],
+  decision_matrix_unscored: ['decision-matrix', 'createDecisionMatrixView'],
+  swot: ['swot', 'createSwotView'],
+  morphological: ['morphological', 'createMorphologicalView'],
+  morphological_clash: ['morphological', 'createMorphologicalView'],
+  morphological_scenarios: ['morphological', 'createMorphologicalView'],
+  pareto: ['pareto', 'createParetoView'],
+  pareto_unscored: ['pareto', 'createParetoView'],
+  pareto_many: ['pareto', 'createParetoView'],
+  dmaic: ['dmaic', 'createDmaicView'],
+  dmaic_first: ['dmaic', 'createDmaicView'],
+  fifteen_percent: ['fifteen-percent', 'createFifteenPercentView'],
+  fifteen_percent_now: ['fifteen-percent', 'createFifteenPercentView'],
+  kanban: ['kanban', 'createKanbanView'],
+  eisenhower: ['eisenhower', 'createEisenhowerView'],
+  after_action_review: ['after-action-review', 'createAfterActionReviewView'],
+  after_action_review_first: ['after-action-review', 'createAfterActionReviewView'],
+  double_loop: ['double-loop', 'createDoubleLoopView'],
+  double_loop_held: ['double-loop', 'createDoubleLoopView'],
+  feedback_matrix: ['feedback-matrix', 'createFeedbackMatrixView'],
+  feedback_matrix_first: ['feedback-matrix', 'createFeedbackMatrixView'],
+  five_cs: ['five-cs', 'createFiveCsView'],
+  five_cs_first: ['five-cs', 'createFiveCsView'],
+  knowledge_management: ['knowledge-management', 'createKnowledgeManagementView'],
+  knowledge_management_first: ['knowledge-management', 'createKnowledgeManagementView'],
   // The record takes a whole session, not a run.
   record: ['record', 'createRecordView'],
   record_polya: ['record', 'createRecordView'],
-  record_triz: ['record', 'createRecordView']
+  record_triz: ['record', 'createRecordView'],
+  // The Lightning chart takes a run's state, not a tool run. Its third item: it is given
+  // onAnswer (so the current box shows its Yes and No buttons) and a wider frame for the spread.
+  lightning: ['lightning', 'createLightningView', { answers: true, wide: true }],
+  lightning_loop: ['lightning', 'createLightningView', { answers: true, wide: true }],
+  lightning_again: ['lightning', 'createLightningView', { answers: true, wide: true }]
 };
 
 const args = process.argv.slice(2);
@@ -30,14 +78,24 @@ const openNode = openIndex >= 0 ? args.splice(openIndex, 2)[1] : null;
 const nextIndex = args.indexOf('--next');
 const applyNext = nextIndex >= 0;
 if (applyNext) args.splice(nextIndex, 1);
+const auditIndex = args.indexOf('--audit');
+const audit = auditIndex >= 0;
+if (audit) args.splice(auditIndex, 1);
+const clickIndex = args.indexOf('--click');
+const clickSelector = clickIndex >= 0 ? args.splice(clickIndex, 2)[1] : null;
+const nameIndex = args.indexOf('--name');
+const suffix = nameIndex >= 0 ? `-${args.splice(nameIndex, 2)[1]}` : '';
+const widthsIndex = args.indexOf('--widths');
+const widths = widthsIndex >= 0 ? args.splice(widthsIndex, 2)[1].split(',').map(Number).filter(Boolean) : [900, 390];
 const [tool, outDir] = args;
 if (!tool || !outDir || !RENDERERS[tool] || !SAMPLES[tool]) {
-  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next]`);
+  console.error(`Usage: problem-solver-preview.mjs <${Object.keys(RENDERERS).join('|')}> <out-dir> [--open <nodeId>] [--next] [--click <selector>] [--name <suffix>] [--widths <w,w>] [--audit]`);
   process.exit(2);
 }
 mkdirSync(outDir, { recursive: true });
 
-const [file, factory] = RENDERERS[tool];
+const [file, factory, options = {}] = RENDERERS[tool];
+const makeArgs = options.answers ? 'document, { onAnswer(node, answer) { (window.__answers ??= []).push([node, answer]); } }' : 'document';
 const rawPlugin = {
   name: 'raw-svg',
   setup(b) {
@@ -47,7 +105,7 @@ const rawPlugin = {
 };
 const bundle = await build({
   stdin: {
-    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(document);\nview.update(run);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
+    contents: `import { ${factory} as make } from './render/${file}';\nconst run = ${JSON.stringify(SAMPLES[tool])};\nconst next = ${JSON.stringify(SAMPLES[tool + ':next'] ?? null)};\nconst view = make(${makeArgs});\nview.update(run);\nif (run.tasks && view.setTasks) view.setTasks(run.tasks);\nif (run.proposed && view.setProposed) view.setProposed(run.proposed);\ndocument.querySelector('#mount').append(view.el);\nwindow.__view = view;\nwindow.__next = next;`,
     resolveDir: join(root, 'packages/problem-solver'),
     loader: 'ts'
   },
@@ -58,29 +116,54 @@ const bundle = await build({
   loader: { '.svg': 'text' }
 });
 const css = ['apps/tasks/design-kit/tokens.css', 'packages/graph-blocks/graph-blocks.css', 'packages/problem-solver/problem-solver.css'].map((p) => readFileSync(join(root, p), 'utf8')).join('\n');
-const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nbody{margin:0;background:var(--paper);font-family:var(--font-ui)}.wrap{padding:24px 16px;max-width:720px;margin:0 auto}</style></head><body><div class="ps-scope wrap"><div id="mount"></div></div><script>${bundle.outputFiles[0].text.replace(/<\/script/g, '<\\/script')}</script></body></html>`;
+const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nbody{margin:0;background:var(--paper);font-family:var(--font-ui)}.wrap{padding:24px 16px;max-width:${options.wide ? 1060 : 720}px;margin:0 auto}</style></head><body><div class="ps-scope wrap"><div id="mount"></div></div><script>${bundle.outputFiles[0].text.replace(/<\/script/g, '<\\/script')}</script></body></html>`;
 const page = join(outDir, `${tool}.html`);
 writeFileSync(page, html);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
-for (const width of [900, 390]) {
+const browser = await chromium.launch({ executablePath: process.env.PS_PREVIEW_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+for (const width of widths) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 2 });
   const tab = await ctx.newPage();
   tab.on('pageerror', (e) => console.error('page error:', e.message));
   await tab.goto(`file://${page}`);
   await tab.waitForTimeout(900);
+  if (clickSelector) {
+    await tab.click(clickSelector);
+    await tab.waitForTimeout(1000);
+  }
   if (openNode) {
     await tab.click(`[data-node="${openNode}"] button`);
     await tab.waitForTimeout(500);
   }
   if (applyNext) {
-    await tab.evaluate(() => window.__view.update(window.__next));
+    await tab.evaluate(() => {
+      window.__view.update(window.__next);
+      if (window.__next.tasks && window.__view.setTasks) window.__view.setTasks(window.__next.tasks);
+      if (window.__next.proposed && window.__view.setProposed) window.__view.setProposed(window.__next.proposed);
+    });
     await tab.waitForTimeout(1200);
   }
   const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (overflow > 0) console.warn(`horizontal overflow at ${width}px: ${overflow}px`);
-  await tab.screenshot({ path: join(outDir, `${tool}${applyNext ? '-next' : ''}-${width}.png`), fullPage: true });
+  await tab.screenshot({ path: join(outDir, `${tool}${applyNext ? '-next' : ''}${suffix}-${width}.png`), fullPage: true });
+  if (audit) {
+    const { auditChart } = await import('./problem-solver-audit.mjs');
+    const source = `(${auditChart.toString()})`;
+    const found = await tab.evaluate((src) => eval(src)(), source);
+    const shapes = await tab.$$('[data-shape] button, button[data-shape]');
+    // Shapes a layout hides (a phone shows one option at a time) cannot be hovered.
+    const visible = [];
+    for (const shape of shapes) if (await shape.isVisible()) visible.push(shape);
+    if (visible.length < shapes.length) console.log(`hover: skipped ${shapes.length - visible.length} hidden shapes`);
+    for (const shape of visible.slice(0, 16)) {
+      await shape.hover();
+      await tab.waitForTimeout(80);
+      found.push(...(await tab.evaluate(([src, el]) => eval(src)(el.closest('[data-shape]') ?? el), [source, shape])).map((p) => `hover: ${p}`));
+    }
+    console.log(found.length ? `audit at ${width}px: ${found.length} problems\n  ${found.join('\n  ')}` : `audit at ${width}px: clean`);
+  }
   await ctx.close();
 }
 await browser.close();
-console.log(`wrote ${outDir}/${tool}-900.png and ${tool}-390.png`);
+const stem = `${tool}${applyNext ? '-next' : ''}${suffix}`;
+console.log(`wrote ${widths.map((w) => `${outDir}/${stem}-${w}.png`).join(', ')}`);

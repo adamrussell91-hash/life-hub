@@ -7,6 +7,9 @@ import { gapBasic } from '../../packages/problem-solver/tools/gap-basic.mjs';
 import { gapRadar } from '../../packages/problem-solver/tools/gap-radar.mjs';
 import { problemStatement } from '../../packages/problem-solver/tools/problem-statement.mjs';
 import { smart } from '../../packages/problem-solver/tools/smart.mjs';
+import { TOOLS, toolsForBookStep } from '../../packages/problem-solver/tools/index.mjs';
+import { BOOK_STEP_IDS } from '../../packages/problem-solver/steps.mjs';
+import { newRun, placeNode, nextSlots, isComplete } from '../../packages/problem-solver/machine.mjs';
 
 const run = (tool, slots, extra = {}) => ({ id: 'r', tool, status: 'active', edges: [], nodes: slots.map((slot, i) => ({ id: `n${i}`, slot, text: slot })), ...extra });
 
@@ -59,4 +62,29 @@ test('smart: problem, then the five letters in any order', () => {
   assert.deepEqual(smart.nextSlots(run('smart', [])), ['problem']);
   assert.deepEqual(smart.nextSlots(run('smart', ['problem', 'm'])), ['s', 'a', 'r', 't']);
   assert.ok(smart.complete(run('smart', ['problem', 's', 'm', 'a', 'r', 't'])));
+});
+
+test('every tool names its book step and at least two failure modes', () => {
+  for (const tool of Object.values(TOOLS)) {
+    assert.ok(BOOK_STEP_IDS.includes(tool.step), `${tool.id}.step`);
+    assert.ok(Array.isArray(tool.failureModes) && tool.failureModes.length >= 2, `${tool.id}.failureModes`);
+    for (const line of tool.failureModes) assert.equal(typeof line, 'string');
+  }
+});
+
+test('v1 tools are all Define tools', () => {
+  assert.deepEqual(toolsForBookStep('define'), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart']);
+});
+
+test('contradiction: improving, worsening, then the statement', () => {
+  let run = newRun('contradiction', 'r');
+  assert.deepEqual(nextSlots(run), ['improving']);
+  run = placeNode(run, { id: 'a', slot: 'improving', text: 'Faster replies', state: 'accepted' });
+  assert.deepEqual(nextSlots(run), ['worsening']);
+  run = placeNode(run, { id: 'b', slot: 'worsening', text: 'Less careful answers', state: 'accepted' });
+  assert.deepEqual(nextSlots(run), ['statement']);
+  assert.equal(isComplete(run), false);
+  run = placeNode(run, { id: 'c', slot: 'statement', text: 'Speeding replies up makes them less careful.', state: 'accepted' });
+  assert.equal(isComplete(run), true);
+  assert.deepEqual(nextSlots(run), []);
 });

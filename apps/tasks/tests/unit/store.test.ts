@@ -6,11 +6,12 @@ import {
   backlogTasks,
   preferredDomains,
   searchEntities,
+  sortByDue,
   sortByPriorityThenDue,
   todayPlateTasks
 } from '@/domain/queries';
 import type { Task } from '@/schemas/task';
-import { createBlock } from '@/blocks/create-block';
+import { createBlock } from '@teaching/blocks/create-block';
 import { PageBlockSchema } from '@/schemas/page-block';
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
 import * as taskProperties from '@/services/task-properties';
@@ -322,6 +323,32 @@ describe('queries', () => {
     ]);
   });
 
+  it('sorts by due date, then clock, untimed after timed, undated last', () => {
+    const tasks = [
+      { title: 'undated', priority: 'urgent', due_date: null, due_time: null },
+      { title: 'tue untimed', priority: 'urgent', due_date: '2026-08-18', due_time: null },
+      { title: 'tue 2pm', priority: 'low', due_date: '2026-08-18', due_time: '14:00' },
+      { title: 'tue 9am', priority: 'low', due_date: '2026-08-18', due_time: '09:00' },
+      { title: 'mon', priority: 'low', due_date: '2026-08-17', due_time: null }
+    ] as Task[];
+    expect(sortByDue(tasks).map((t) => t.title)).toEqual([
+      'mon',
+      'tue 9am',
+      'tue 2pm',
+      'tue untimed',
+      'undated'
+    ]);
+  });
+
+  it('today plate runs by due time, not priority', () => {
+    const day = new Date('2026-08-17T12:00:00');
+    const base = seed.tasks.find((t) => t.id === 'task_demo_lesson_pack')!;
+    const late = { ...base, id: 'plate_late', title: 'Late', priority: 'urgent' as const, due_date: '2026-08-17', due_time: '16:00', status: 'open' as const };
+    const early = { ...base, id: 'plate_early', title: 'Early', priority: 'low' as const, due_date: '2026-08-17', due_time: '08:00', status: 'open' as const };
+    const ids = todayPlateTasks([late, early], day).map((t) => t.id);
+    expect(ids).toEqual(['plate_early', 'plate_late']);
+  });
+
   it('finds backlog and search hits', () => {
     const tasks = seed.tasks;
     expect(backlogTasks(tasks).some((t) => t.id === 'task_demo_backlog')).toBe(true);
@@ -345,8 +372,9 @@ describe('queries', () => {
       status: 'open' as const
     };
     const list = todayPlateTasks([...seed.tasks, late], day);
-    expect(list[0]?.id).toBe('task_overdue_plate');
-    expect(list.some((t) => t.id === 'task_demo_lesson_pack')).toBe(true);
+    const ids = list.map((t) => t.id);
+    expect(ids.indexOf('task_overdue_plate')).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf('task_overdue_plate')).toBeLessThan(ids.indexOf('task_demo_lesson_pack'));
   });
 
   it('creates a project from the standard term template', async () => {

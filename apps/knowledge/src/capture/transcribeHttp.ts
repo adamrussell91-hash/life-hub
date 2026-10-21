@@ -3,8 +3,12 @@ import { WHISPER_MODEL } from "./live";
 export type TranscribeBindings = {
   secret: string;
   allowedOrigin: string;
-  runWhisper: (audioBase64: string) => Promise<unknown>;
+  runWhisper: (audioBase64: string, options?: WhisperOptions) => Promise<unknown>;
 };
+
+/** `initial_prompt` steers Whisper's style; a prompt full of "um"s keeps disfluencies. */
+export type WhisperOptions = { initial_prompt?: string };
+const MAX_INITIAL_PROMPT = 400;
 
 function corsHeaders(origin: string | null, allowedOrigin: string) {
   const allow = allowedOrigin === "*" ? origin ?? "*" : allowedOrigin;
@@ -29,7 +33,7 @@ function bytesToBase64(bytes: ArrayBuffer) {
 
 /**
  * POST /transcribe — secret-checked Whisper pass-through.
- * Accepts JSON `{ audio: "<base64>" }` or `{ audio_base64 }` or raw binary body.
+ * Accepts JSON `{ audio: "<base64>", initial_prompt? }` or `{ audio_base64 }` or raw binary body.
  * Returns the raw model JSON. Never logs transcript text.
  */
 export async function handleTranscribeRequest(
@@ -54,15 +58,20 @@ export async function handleTranscribeRequest(
   }
 
   let audioBase64 = "";
+  let initialPrompt = "";
   const contentType = (request.headers.get("content-type") || "").toLowerCase();
   try {
     if (contentType.includes("application/json")) {
       const payload = (await request.json()) as {
         audio?: unknown;
         audio_base64?: unknown;
+        initial_prompt?: unknown;
       };
       if (typeof payload.audio === "string") audioBase64 = payload.audio.trim();
       else if (typeof payload.audio_base64 === "string") audioBase64 = payload.audio_base64.trim();
+      if (typeof payload.initial_prompt === "string") {
+        initialPrompt = payload.initial_prompt.trim().slice(0, MAX_INITIAL_PROMPT);
+      }
     } else {
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > 0) audioBase64 = bytesToBase64(bytes);
@@ -74,7 +83,9 @@ export async function handleTranscribeRequest(
   if (!audioBase64) return json(400, { error: "audio is required" }, headers);
 
   try {
-    const result = await bindings.runWhisper(audioBase64);
+    const result = initialPrompt
+      ? await bindings.runWhisper(audioBase64, { initial_prompt: initialPrompt })
+      : await bindings.runWhisper(audioBase64);
     return json(200, result ?? {}, headers);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Transcription failed";
@@ -82,13 +93,14 @@ export async function handleTranscribeRequest(
   }
 }
 
-export function whisperRunInput(audioBase64: string) {
+export function whisperRunInput(audioBase64: string, options: WhisperOptions = {}) {
   return {
     model: WHISPER_MODEL,
     input: {
       audio: audioBase64,
       task: "transcribe" as const,
       language: "en",
+      ...(options.initial_prompt ? { initial_prompt: options.initial_prompt } : {}),
     },
   };
 }

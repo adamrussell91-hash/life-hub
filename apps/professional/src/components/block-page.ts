@@ -1,5 +1,5 @@
-import { mountBlockCanvas, type Block } from '@tasks/teacher/lesson-canvas/mount-page';
-import { nextBlockIdFactory } from '@tasks/teacher/lesson-canvas/drop';
+import { mountBlockCanvas, type Block } from '@teaching/teacher/lesson-canvas/mount-page';
+import { nextBlockIdFactory } from '@teaching/teacher/lesson-canvas/drop';
 import { mountBlockInsert } from '@tasks/views/block-insert';
 
 export type BlockPageHandle = {
@@ -10,9 +10,9 @@ export type BlockPageHandle = {
 };
 
 /**
- * The Tasks block page (canvas + round "+"), saving through `onSave` after a
- * pause. Professional pages (comms, meetings, events) all use this, so they
- * edit exactly like Tasks and Lessons.
+ * The Tasks block page (Teaching's block canvas + the round "+"), saving
+ * through `onSave` after a pause. Professional pages (comms, meetings, events)
+ * all use this, so they edit exactly like Tasks and Lessons.
  */
 export function mountBlockPage(
   host: HTMLElement,
@@ -48,6 +48,7 @@ export function mountBlockPage(
   const canvas = mountBlockCanvas(canvasHost, {
     blocks,
     idFactory: nextBlockIdFactory('block', blocks),
+    editOnClick: true,
     editable: options.editable !== false,
     onChange: (next) => {
       blocks = next;

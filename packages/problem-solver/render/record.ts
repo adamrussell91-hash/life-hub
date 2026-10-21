@@ -1,18 +1,20 @@
 // packages/problem-solver/render/record.ts
 // The saved session's process record, in black and white: the chosen model's steps
 // as in the toolkit (seven step p.37, Polya p.21, TRIZ p.23) with their arrows and
-// loop labels, then a filmstrip of the Define chain. Done steps are solid ink,
-// the current step is outlined, future steps are faint. Clicking the define step
-// (or a filmstrip card) asks the canvas to open that run's coloured chart.
+// loop labels, any optional extra steps in a row beneath, then a filmstrip per step
+// that has runs. Done steps are solid ink, the current step is outlined, skipped steps
+// are dashed and struck through, future steps are faint. Clicking a step box with a
+// run (or a filmstrip card) asks the canvas to open that run's coloured chart.
 //
 // Step boxes are HTML laid over an SVG of arrows, both placed on one fixed grid
 // (W x H units) and scaled with the container, so a box is a real button and a
 // real element the morph can start from or land on.
-import type { PsSession, PsToolRun } from '../types';
+import type { PsCaseFileTarget, PsSession, PsToolRun } from '../types';
 import { MODELS } from '../models.mjs';
 import { TOOLS } from '../tools/index.mjs';
-import { toolEmblem } from '../glyphs';
+import { lightningGlyph, toolEmblem } from '../glyphs';
 import { nextId } from './details';
+import { planStepForBook, stepName, stepPlan } from '../steps.mjs';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const W = 360;
@@ -58,26 +60,60 @@ const LAYOUTS: Record<string, Layout> = {
   }
 };
 
-export type StepState = 'done' | 'current' | 'future';
+export type RecordOptions = {
+  /** The page a case file was written on; without it the version chips are plain text. */
+  pageHref?(target: PsCaseFileTarget): string;
+};
+
+/** A review's start day, as the review panel shows dates (a bare date is local midnight). */
+function reviewDay(at: string): string {
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(at) ? `${at}T00:00:00` : at);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** Where the latest review pass begins in Improve's runs, or null when there is no earlier pass to divide from. */
+function passStart(session: PsSession, step: string): number | null {
+  const review = session.reviewState;
+  const before = review?.runsBefore ?? 0;
+  if (!session.model || step !== planStepForBook(session.model.id, 'improve') || before <= 0) return null;
+  return (session.steps?.[step]?.runs.length ?? 0) > before ? before : null;
+}
+
+export type StepState = 'done' | 'skipped' | 'current' | 'future' | 'waiting';
 export type RecordView = {
   el: HTMLDivElement;
   update(session: PsSession): void;
   onOpenStep(cb: (runId: string, from: HTMLElement) => void): void;
-  /** Where a chart for this run morphs back to: its filmstrip card, or the define step box. */
+  /** Where a chart for this run morphs back to: its filmstrip card, or its step box. */
   anchor(runId: string, via: 'step' | 'film'): HTMLElement | null;
 };
 
-/** The define step's state from the session phase; every later step is still ahead. */
+/** A step's state from the session's steps and phase. */
 export function stepState(session: PsSession, step: string): StepState {
-  if (!session.model || step !== MODELS[session.model.id].define) return 'future';
-  if (session.phase === 'defined') return 'done';
-  return session.phase === 'define' ? 'current' : 'future';
+  const st = session.steps?.[step];
+  if (step === session.phase) return 'current';
+  if (isPaused(session, step) || st?.status === 'waiting') return 'waiting';
+  if (!st) return 'future';
+  if (st.status === 'skipped') return 'skipped';
+  if (st.status === 'done' || session.phase === 'finished') return 'done';
+  return 'future';
 }
 
-/** The run the define step opens: the last run of the chain that was not switched away. */
-export function defineRun(session: PsSession): PsToolRun | null {
-  const runs = session.define.runs;
+/** A step is paused when an open detour, or a review under way, will return to it. */
+export function isPaused(session: PsSession, step: string): boolean {
+  if (session.detour?.from === step) return true;
+  return session.reviewState?.status === 'reviewing' && session.reviewState.returnTo === step;
+}
+
+/** The run a step's box opens: the last run of that step that was not switched. */
+export function stepRun(session: PsSession, step: string): PsToolRun | null {
+  const runs = session.steps?.[step]?.runs ?? [];
   return [...runs].reverse().find((run) => run.status !== 'switched') ?? runs.at(-1) ?? null;
+}
+
+/** v1 name, kept for callers: the Define step's run. */
+export function defineRun(session: PsSession): PsToolRun | null {
+  return session.model ? stepRun(session, MODELS[session.model.id].define) : null;
 }
 
 const pct = (value: number, of: number) => `${((value / of) * 100).toFixed(3)}%`;
@@ -89,12 +125,13 @@ function place(el: HTMLElement, box: { x: number; y: number; w: number; h: numbe
   el.style.height = pct(box.h, h);
 }
 
-export function createRecordView(doc: Document = document): RecordView {
+export function createRecordView(doc: Document = document, options: RecordOptions = {}): RecordView {
   const root = doc.createElement('div');
   root.className = 'ps-record';
   let open: (runId: string, from: HTMLElement) => void = () => undefined;
   let painted = '';
-  let stepEl: HTMLElement | null = null;
+  const stepEls = new Map<string, HTMLElement>();
+  const runStep = new Map<string, string>();
   const cards = new Map<string, HTMLElement>();
 
   function span(className: string, text: string): HTMLSpanElement {
@@ -125,6 +162,39 @@ export function createRecordView(doc: Document = document): RecordView {
     return svg;
   }
 
+  function paintStep(session: PsSession, step: { id: string; name: string; detail: string }, position?: (item: HTMLElement) => void): HTMLElement {
+    const state = stepState(session, step.id);
+    const item = doc.createElement('div');
+    item.className = `ps-record__step is-${state}`;
+    item.setAttribute('role', 'listitem');
+    item.setAttribute('data-step', step.id);
+    item.setAttribute('data-state', state);
+    position?.(item);
+    const words = { done: 'Done', skipped: 'Skipped', current: 'In progress', future: 'Not started', waiting: 'Waiting' }[state];
+    const objection = session.steps?.[step.id]?.objection;
+    const objected = objection ? `Coach objected: ${objection}` : '';
+    const label = `${step.name}: ${step.detail}. ${words}${objected ? `. ${objected}` : ''}`;
+    const target = stepRun(session, step.id);
+    const box = doc.createElement(target ? 'button' : 'div') as HTMLElement;
+    box.className = 'ps-record__box';
+    if (target) {
+      // A button names itself; the list item stays unlabelled so the step is not read twice.
+      (box as HTMLButtonElement).type = 'button';
+      box.setAttribute('aria-label', `${label}. Show the chart`);
+      box.addEventListener('click', () => open(target.id, item));
+    } else {
+      // A plain div's aria-label is ignored by screen readers, so the list item carries it.
+      item.setAttribute('aria-label', label);
+    }
+    box.append(span('ps-record__name', step.name), span('ps-record__detail', step.detail));
+    if (objected) {
+      box.setAttribute('title', objected);
+      box.append(span('ps-record__objection', objected));
+    }
+    item.append(box);
+    return item;
+  }
+
   function paintMap(session: PsSession): HTMLElement | null {
     if (!session.model) return null;
     const model = MODELS[session.model.id];
@@ -136,37 +206,11 @@ export function createRecordView(doc: Document = document): RecordView {
     map.setAttribute('aria-label', model.name);
     map.style.aspectRatio = `${W} / ${layout.h}`;
     map.append(arrowsSvg(layout));
-    const target = defineRun(session);
-    stepEl = null;
     for (const box of layout.boxes) {
       const step = model.steps.find((s: { id: string }) => s.id === box.step);
       if (!step) continue;
-      const state = stepState(session, step.id);
-      const item = doc.createElement('div');
-      item.className = `ps-record__step is-${state}`;
-      item.setAttribute('role', 'listitem');
-      item.setAttribute('data-step', step.id);
-      item.setAttribute('data-state', state);
-      place(item, box, layout.h);
-      const isDefine = step.id === model.define;
-      const label = `${step.name}: ${step.detail}. ${state === 'done' ? 'Done' : state === 'current' ? 'In progress' : 'Not started'}`;
-      if (isDefine && target) {
-        const btn = doc.createElement('button');
-        btn.type = 'button';
-        btn.className = 'ps-record__box';
-        btn.setAttribute('aria-label', `${label}. Show the chart`);
-        btn.append(span('ps-record__name', step.name), span('ps-record__detail', step.detail));
-        btn.addEventListener('click', () => open(target.id, item));
-        item.append(btn);
-      } else {
-        const box = doc.createElement('div');
-        box.className = 'ps-record__box';
-        box.setAttribute('aria-label', label);
-        box.append(span('ps-record__name', step.name), span('ps-record__detail', step.detail));
-        item.append(box);
-      }
-      if (isDefine) stepEl = item;
-      map.append(item);
+      stepEls.set(step.id, paintStep(session, step, (item) => place(item, box, layout.h)));
+      map.append(stepEls.get(step.id)!);
     }
     if (layout.extra) {
       const extra = doc.createElement('div');
@@ -190,37 +234,133 @@ export function createRecordView(doc: Document = document): RecordView {
     return map;
   }
 
-  function paintFilm(session: PsSession): HTMLElement | null {
-    cards.clear();
-    const runs = session.define.runs;
-    if (!runs.length) return null;
+  function paintExtras(session: PsSession): HTMLElement | null {
+    if (!session.model) return null;
+    const modelId = session.model.id;
+    const extras = stepPlan(modelId).filter((s: { extra: boolean }) => s.extra);
+    if (!extras.length) return null;
+    const row = doc.createElement('div');
+    row.className = 'ps-record__extras';
+    row.setAttribute('role', 'list');
+    row.setAttribute('aria-label', 'Optional steps');
+    for (const extra of extras) {
+      const el = paintStep(session, { id: extra.step, name: stepName(modelId, extra.step), detail: 'Optional' });
+      stepEls.set(extra.step, el);
+      row.append(el);
+    }
+    return row;
+  }
+
+  function strip(id: string, title: string): { section: HTMLElement; film: HTMLOListElement } {
+    const section = doc.createElement('section');
+    section.className = 'ps-record__strip';
+    section.setAttribute('data-strip', id);
+    const heading = doc.createElement('h3');
+    heading.className = 'ps-record__strip-title';
+    heading.textContent = title;
     const film = doc.createElement('ol');
     film.className = 'ps-record__film';
-    film.setAttribute('aria-label', 'Define chain');
-    for (const run of runs) {
+    film.setAttribute('aria-label', `${title} tools`);
+    section.append(heading, film);
+    return { section, film };
+  }
+
+  /** A full session escalated from Lightning starts with the quick route it came from. */
+  function lightningStrip(from: string): HTMLElement {
+    const { section, film } = strip('lightning', 'Lightning');
+    film.setAttribute('aria-label', 'Lightning route');
+    const item = doc.createElement('li');
+    item.className = 'ps-record__card ps-record__card--lightning';
+    const link = doc.createElement('a');
+    link.className = 'ps-record__card-button ps-record__lightning';
+    link.href = `#/problem-solver?id=${encodeURIComponent(from)}`;
+    link.setAttribute('aria-label', 'Quick route. Where this began. Open the Lightning run');
+    link.append(lightningGlyph(doc), span('ps-record__card-name', 'Quick route'), span('ps-record__card-note', 'Where this began'));
+    item.append(link);
+    film.append(item);
+    return section;
+  }
+
+  function caseFileChips(session: PsSession): HTMLLIElement[] {
+    return (session.caseFile?.history ?? []).map((entry) => {
       const item = doc.createElement('li');
-      item.className = `ps-record__card is-${run.status}`;
-      item.setAttribute('data-run', run.id);
-      const btn = doc.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ps-record__card-button';
-      const name = TOOLS[run.tool]?.name ?? run.tool;
-      const note = run.status === 'switched' ? `Switched: ${run.switchReason ?? 'no reason given'}` : run.status === 'active' ? 'In progress' : `${run.nodes.length} ${run.nodes.length === 1 ? 'answer' : 'answers'}`;
-      btn.setAttribute('aria-label', `${name}. ${note}. Show the chart`);
-      btn.append(toolEmblem(run.tool, doc), span('ps-record__card-name', name), span('ps-record__card-note', note));
-      btn.addEventListener('click', () => open(run.id, item));
-      item.append(btn);
-      film.append(item);
-      cards.set(run.id, item);
+      item.className = 'ps-record__version';
+      const text = `Case file v${entry.version}`;
+      const href = options.pageHref?.(entry.target);
+      if (href) {
+        const link = doc.createElement('a');
+        link.className = 'ps-record__casefile';
+        link.href = href;
+        link.textContent = text;
+        link.setAttribute('aria-label', `${text}, on its ${entry.target.kind === 'task' ? 'task' : 'project'} page`);
+        item.append(link);
+      } else {
+        item.append(span('ps-record__casefile', text));
+      }
+      return item;
+    });
+  }
+
+  function paintFilm(session: PsSession): HTMLElement | null {
+    cards.clear();
+    if (!session.model) return null;
+    const modelId = session.model.id;
+    const wrap = doc.createElement('div');
+    wrap.className = 'ps-record__films';
+    if (session.escalatedFrom) wrap.append(lightningStrip(session.escalatedFrom));
+    const documentStep = planStepForBook(modelId, 'document');
+    for (const { step } of stepPlan(modelId)) {
+      const runs = session.steps?.[step]?.runs ?? [];
+      const chips = step === documentStep ? caseFileChips(session) : [];
+      if (!runs.length && !chips.length) continue;
+      const { section, film } = strip(step, stepName(modelId, step));
+      const pass = passStart(session, step);
+      runs.forEach((run, index) => {
+        if (index === pass && session.reviewState?.startedAt) {
+          // The item stays out of the list's count; the separator inside it carries the name.
+          const divider = doc.createElement('li');
+          divider.className = 'ps-record__pass';
+          divider.setAttribute('role', 'presentation');
+          const day = reviewDay(session.reviewState.startedAt);
+          const rule = span('ps-record__pass-label', day ? `Review on ${day}` : 'Review');
+          rule.setAttribute('role', 'separator');
+          rule.setAttribute('aria-label', rule.textContent ?? 'Review');
+          divider.append(rule);
+          film.append(divider);
+        }
+        runStep.set(run.id, step);
+        const item = doc.createElement('li');
+        item.className = `ps-record__card is-${run.status}`;
+        item.setAttribute('data-run', run.id);
+        const btn = doc.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ps-record__card-button';
+        const name = TOOLS[run.tool]?.name ?? run.tool;
+        const note = run.status === 'switched' ? `Switched: ${run.switchReason ?? 'no reason given'}` : run.status === 'active' ? 'In progress' : `${run.nodes.length} ${run.nodes.length === 1 ? 'answer' : 'answers'}`;
+        btn.setAttribute('aria-label', `${name}. ${note}. Show the chart`);
+        btn.append(toolEmblem(run.tool, doc), span('ps-record__card-name', name), span('ps-record__card-note', note));
+        btn.addEventListener('click', () => open(run.id, item));
+        item.append(btn);
+        film.append(item);
+        cards.set(run.id, item);
+      });
+      film.append(...chips);
+      wrap.append(section);
     }
-    return film;
+    return wrap.childElementCount ? wrap : null;
   }
 
   function update(session: PsSession): void {
-    const signature = JSON.stringify([session.model?.id, session.phase, session.define.runs.map((run) => [run.id, run.status, run.switchReason, run.nodes.length])]);
+    const signature = JSON.stringify([session.model?.id, session.phase, Object.entries(session.steps ?? {}).map(([id, st]) => [id, st.status, st.objection, st.runs.map((run) => [run.id, run.tool, run.status, run.switchReason, run.nodes.length])]), session.reviewState?.runsBefore, session.reviewState?.startedAt, session.caseFile?.history?.map((entry) => [entry.version, entry.target.kind, entry.target.id]), session.escalatedFrom]);
     if (signature === painted) return;
     painted = signature;
-    const parts = [paintMap(session), paintFilm(session)].filter((part): part is HTMLElement => !!part);
+    stepEls.clear();
+    runStep.clear();
+    const layout = session.model ? LAYOUTS[session.model.id] : undefined;
+    const inset = layout ? Math.min(...layout.boxes.map((box) => box.x)) : 0;
+    // A fraction of the grid width; the CSS multiplies it by the diagram's rendered width.
+    root.style.setProperty('--ps-record-inset', (inset / W).toFixed(4));
+    const parts = [paintMap(session), paintExtras(session), paintFilm(session)].filter((part): part is HTMLElement => !!part);
     root.replaceChildren(...parts);
   }
 
@@ -231,7 +371,7 @@ export function createRecordView(doc: Document = document): RecordView {
       open = cb;
     },
     anchor(runId, via) {
-      return (via === 'film' ? cards.get(runId) : null) ?? stepEl;
+      return (via === 'film' ? cards.get(runId) : null) ?? stepEls.get(runStep.get(runId) ?? '') ?? null;
     }
   };
 }

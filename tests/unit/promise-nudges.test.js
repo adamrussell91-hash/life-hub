@@ -16,7 +16,7 @@ test('selectLatePromises keeps your open ones at least 2 days late', () => {
 });
 
 test('latePromiseGhosts builds one draft_message ghost per promise, keyed by ledger id', () => {
-  const ghosts = latePromiseGhosts(selectLatePromises(items, '2026-09-26', 2), { 'shared:person:p_morgan': 'Morgan J.', 'shared:person:vicki': 'Vicki Sheehan' }, '2026-09-26T07:00:00+10:00');
+  const ghosts = latePromiseGhosts(selectLatePromises(items, '2026-09-26', 2), { 'shared:person:p_morgan': 'Morgan J.', 'shared:person:vicki': 'Jade Pemberly' }, '2026-09-26T07:00:00+10:00');
   assert.equal(ghosts[0].kind, 'draft_message');
   assert.equal(ghosts[0].to, 'Morgan J.');
   assert.match(ghosts[0].text, /summary/);
@@ -56,7 +56,7 @@ test('runPromiseNudges queues one draft per late promise it finds', async () => 
     now: new Date('2026-09-26T21:00:00.000Z'),
     deps: {
       getStore: async () => store,
-      names: async () => ({ 'shared:person:p_morgan': 'Morgan J.', 'shared:person:vicki': 'Vicki Sheehan' }),
+      names: async () => ({ 'shared:person:p_morgan': 'Morgan J.', 'shared:person:vicki': 'Jade Pemberly' }),
       enqueue: async (entry) => { queued.push(entry); return { added: true, id: entry.id }; }
     }
   });

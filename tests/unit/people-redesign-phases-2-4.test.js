@@ -95,7 +95,7 @@ test('warmthFor: Henry Inner tier; Bianca Former; ring equals score (V4/C2)', ()
 
 test('assemblePersonLedger: Henry mentoring task under you_owe (P3)', () => {
   const ledger = assemblePersonLedger({
-    person: { ref: 'shared:person:person_henry', display_name: 'Henry McLennan', aliases: ['Henry'] },
+    person: { ref: 'shared:person:person_henry', display_name: 'Isla Emberly', aliases: ['Henry'] },
     linkedTasks: [
       {
         ref: 'tasks:task:task_mentor_meet',
@@ -109,7 +109,7 @@ test('assemblePersonLedger: Henry mentoring task under you_owe (P3)', () => {
         id: 'task_wait',
         ref: 'tasks:task:task_wait',
         title: 'Draft Standard 5 annotation',
-        waiting_on: 'Henry McLennan',
+        waiting_on: 'Isla Emberly',
         status: 'open'
       }
     ],

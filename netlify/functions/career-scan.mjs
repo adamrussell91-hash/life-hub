@@ -25,12 +25,13 @@ export function createCareerScanHandler(deps = {}) {
       const url = new URL(request.url);
       try {
         if (request.method === 'GET') {
-          const payload = await getScanPanelPayload(store);
+          const payload = await getScanPanelPayload(store, deps);
           return withCors(okResponse(200, payload), request, env);
         }
         if (request.method === 'POST') {
           const action = url.searchParams.get('action') || 'run-now';
-          const body = await readJsonObject(request).catch(() => ({}));
+          // run-now may arrive with no body, so a parse failure means "no options".
+          const body = (await readJsonObject(request)).value ?? {};
           if (action === 'run-now') {
             const result = await runCareerScanPass({
               ...deps,
@@ -38,7 +39,7 @@ export function createCareerScanHandler(deps = {}) {
               professionalStore: store,
               force: Boolean(body?.force)
             });
-            const payload = await getScanPanelPayload(store);
+            const payload = await getScanPanelPayload(store, deps);
             return withCors(okResponse(200, { ...result, ...payload }), request, env);
           }
           if (action === 'bin') {

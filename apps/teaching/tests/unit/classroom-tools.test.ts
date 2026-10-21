@@ -26,6 +26,7 @@ import {
   toolsFor
 } from '@/blocks/classroom-tools/logic';
 import { renderCountdownContent } from '@/blocks/classroom-tools/render';
+import { forgetToolboxStateForTests } from '@/blocks/classroom-tools/toolbox';
 import { mountClassStudents } from '@/teacher/sections/class-students';
 import { filterBlocksForStudent } from '@/blocks/visibility';
 import { approveTechniques, createTechniqueScan, normaliseTechniqueFindings } from '@/blocks/technique-scan';
@@ -85,6 +86,7 @@ function chipLabels(root: HTMLElement): string[] {
 }
 
 afterEach(() => {
+  forgetToolboxStateForTests();
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
@@ -195,6 +197,18 @@ describe('divider and Tools block', () => {
     expect(host.querySelectorAll('.ct-die').length).toBe(2);
     host.querySelector<HTMLButtonElement>('[aria-label="Close tool"]')!.click();
     expect(host.classList.contains('is-open')).toBe(false);
+  });
+
+  it('keeps the tray as the teacher left it when the builder re-renders the block', () => {
+    const first = renderBlock(toolsBlock(), 'teacher').querySelector<HTMLElement>('.ct-host')!;
+    expect(first.classList.contains('is-tray-out')).toBe(true);
+    first.querySelector<HTMLButtonElement>('.ct-trigger')!.click();
+    expect(first.classList.contains('is-tray-out')).toBe(false);
+    const again = renderBlock(toolsBlock(), 'teacher').querySelector<HTMLElement>('.ct-host')!;
+    expect(again.classList.contains('is-tray-out')).toBe(false);
+    // A new start tool is a new setting and opens.
+    const changed = renderBlock(toolsBlock({ start_tool: 'dice' }), 'teacher').querySelector<HTMLElement>('.ct-host')!;
+    expect(changed.classList.contains('is-open')).toBe(true);
   });
 
   it('students get the student tools only', () => {

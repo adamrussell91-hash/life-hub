@@ -3,8 +3,8 @@ import type { Task } from '@/schemas/task';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import type { Block } from '@/schemas/block';
 import type { Program } from '@/schemas/program';
-import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
-import { mountBlockCanvas } from '@/teacher/lesson-canvas/mount-page';
+import { nextBlockIdFactory } from '@teaching/teacher/lesson-canvas/drop';
+import { mountBlockCanvas } from '@teaching/teacher/lesson-canvas/mount-page';
 import { renderEntityBanner } from '@/teacher/entity-banner';
 import { tasksApi } from '@/services/client-api';
 import {
@@ -573,6 +573,7 @@ export function paintExcursionPage(
     const handle = mountBlockCanvas(canvasHost, {
       blocks: pageBlocksOf(current),
       idFactory: nextBlockIdFactory('block', pageBlocksOf(current)),
+      editOnClick: true,
       onChange: (blocks) => persist({ page_blocks: blocks })
     });
     const add = el('div', 'page-editor__add');

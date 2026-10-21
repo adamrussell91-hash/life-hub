@@ -171,9 +171,26 @@ export function sortByPriorityThenDue(tasks: Task[]): Task[] {
   });
 }
 
+/** Soonest deadline first: due date, then clock (untimed after timed), then priority. Undated last. */
+export function compareByDue(a: Task, b: Task): number {
+  const ad = parseDue(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+  const bd = parseDue(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+  if (ad !== bd) return ad - bd;
+  const at = parseDueTimeHours(a.due_time) ?? Number.POSITIVE_INFINITY;
+  const bt = parseDueTimeHours(b.due_time) ?? Number.POSITIVE_INFINITY;
+  if (at !== bt) return at - bt;
+  const pr = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+  if (pr !== 0) return pr;
+  return a.title.localeCompare(b.title);
+}
+
+export function sortByDue(tasks: Task[]): Task[] {
+  return [...tasks].sort(compareByDue);
+}
+
 export function tasksForDay(tasks: Task[], day: Date): Task[] {
   const key = toDateKey(day);
-  return sortByPriorityThenDue(
+  return sortByDue(
     tasks.filter((t) => {
       if (t.status === 'done' || t.status === 'dead') return false;
       const due = parseDue(t.due_date);
@@ -207,7 +224,7 @@ export function backlogTasks(tasks: Task[]): Task[] {
 /** Open work whose due date is a local calendar day before `day`. */
 export function overdueTasks(tasks: Task[], day: Date = new Date()): Task[] {
   const start = startOfDay(day);
-  return sortByPriorityThenDue(
+  return sortByDue(
     tasks.filter((t) => {
       if (!isBoardTask(t)) return false;
       if (t.status === 'done' || t.status === 'dead') return false;
@@ -228,12 +245,12 @@ export function adaptiveTodayTasks(tasks: Task[], date: Date = new Date()): Task
 }
 
 /**
- * Work on today's plate: overdue first, then due today.
+ * Work on today's plate in due order: overdue first, then due today by clock.
  * Matches the dashboard Timeline TODAY bucket (daysOut <= 0) for tasks.
  */
 export function todayPlateTasks(tasks: Task[], date: Date = new Date()): Task[] {
   const overdue = overdueTasks(tasks, date);
-  const dueToday = adaptiveTodayTasks(tasks, date);
+  const dueToday = tasksForDay(tasks, date);
   if (!overdue.length) return dueToday;
   const seen = new Set(overdue.map((task) => task.id));
   return [...overdue, ...dueToday.filter((task) => !seen.has(task.id))];

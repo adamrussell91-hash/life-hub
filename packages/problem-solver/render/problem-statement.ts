@@ -8,7 +8,7 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type ProblemStatementView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
@@ -109,7 +109,8 @@ export function createProblemStatementView(doc: Document = document): ProblemSta
         item = name === 'statement' ? addStatement(node) : addBlock(node, name);
         drawn.set(node.id, item);
       }
-      item.classList.toggle('is-contested', node.state === 'contested');
+      const button = item.querySelector('button[aria-controls]');
+      syncContested(item, node, item.querySelector('.ps-statement__head') ?? button, button);
     }
     // Structure appears with the first block: square, then its details, then the statement.
     const statement = [...drawn.values()].find((item) => item.classList.contains('ps-statement__composed'));

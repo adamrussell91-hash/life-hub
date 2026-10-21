@@ -136,7 +136,7 @@ export async function renderCommunicationNewView(canvas: HTMLElement): Promise<v
 
   const recipientInput = document.createElement('input');
   recipientInput.type = 'text';
-  recipientInput.placeholder = 'Type @ to add a recipient';
+  recipientInput.placeholder = 'Add a recipient';
   recipientInput.setAttribute('aria-label', 'Recipient');
 
   const chipsHost = el('div', 'communication-form__chips');
@@ -147,6 +147,7 @@ export async function renderCommunicationNewView(canvas: HTMLElement): Promise<v
   });
 
   const picker = createEntityPicker({
+    mode: 'field',
     input: recipientInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { pickKitOption } from './kit-filter';
 import { BlockSchema } from '@/schemas/block';
 import { PublishableLessonSchema } from '@/schemas/lesson';
 import {
@@ -171,10 +172,7 @@ describe('createCollectionEditor', () => {
       'Unit link'
     );
 
-    const source = editor.querySelector<HTMLSelectElement>('.block-editor__collection-source');
-    expect(source).toBeTruthy();
-    source!.value = 'recent_lessons';
-    source!.dispatchEvent(new Event('change'));
+    pickKitOption(editor.querySelector('.block-editor__collection-source'), 'recent_lessons');
 
     expect(latest.content.source).toBe('recent_lessons');
     expect(editor.querySelector('.block-editor__collection-preview a')?.textContent).toBe(

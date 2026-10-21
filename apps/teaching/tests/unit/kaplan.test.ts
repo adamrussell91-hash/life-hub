@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createBlock, cloneBlockWithNewIds } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
-import { createKaplanEditor } from '@/blocks/kaplan-editor';
-import { kaplanSteps, suggestKaplanFocus, withKaplanQualifier, withoutKaplanQualifier } from '@/blocks/kaplan';
+import { createLensEditor } from '@/blocks/lenses/lens-editor';
+import { kaplanFocusText, kaplanSteps, suggestKaplanFocus, withKaplanQualifier, withoutKaplanQualifier } from '@/blocks/kaplan';
 import { renderBlock } from '@/blocks/render';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { LessonSchema } from '@/schemas/lesson';
@@ -76,6 +76,27 @@ describe('Kaplan attachments and saved lessons', () => {
   });
 });
 
+describe('Kaplan focus wording', () => {
+  it('keeps a short focus phrase inline in the step prompts', () => {
+    expect(kaplanSteps(qualifier)[0].prompt).toBe('Choose one specific detail from this activity that helps you explore reconciliation.');
+  });
+  it('treats a full statement as an idea to test rather than splicing it mid-sentence', () => {
+    const statement = { ...qualifier, focus: 'People make decisions that affect others based on the knowledge they have at the time..' };
+    const steps = kaplanSteps(statement);
+    for (const step of steps) expect(step.prompt).not.toContain('People make');
+    expect(steps[0].prompt).toBe('Choose one specific detail from this activity that connects to this idea.');
+    expect(kaplanFocusText(statement.focus)).toBe('People make decisions that affect others based on the knowledge they have at the time.');
+  });
+  it('shows the focus once as its own line and keeps the eyebrow to the step count', () => {
+    const block = withKaplanQualifier(questionBlock(), { ...qualifier, focus: 'People make decisions that affect others based on the knowledge they have at the time.' });
+    const view = renderBlock(block, 'student', { lessonId: 'lesson' });
+    document.body.append(view);
+    view.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
+    expect(view.querySelector('.kaplan-eyebrow')!.textContent).toBe('Step 1 of 4');
+    expect(view.querySelector('.kaplan-focus')!.textContent).toContain('People make decisions that affect others');
+  });
+});
+
 describe('guided authoring', () => {
   it('duplicates the current attachment state rather than the stale block captured by the toolbar', () => {
     let blocks: Block[] = [questionBlock()];
@@ -84,31 +105,31 @@ describe('guided authoring', () => {
     let id = 0;
     mountBlockCanvas(host, { blocks, onChange: (next) => { blocks = next; }, idFactory: () => `copy_${++id}` });
     enterBlockEdit(host);
-    click(host, 'Add Kaplan qualifier');
+    click(host, 'Add lens…');
     click(host, 'PatternsTwo details → a relationship → an explanation');
-    click(host, 'Add qualifier');
+    click(host, 'Add lens');
     clickBlockMenuAction(host, '.lesson-page__block', 'duplicate');
     expect(blocks[1]!.qualifiers?.[0]?.lens).toBe('patterns');
     expect(blocks[1]!.id).not.toBe(blocks[0]!.id);
   });
   it('adds a ready-made qualifier from block options without extra preparation', () => {
     let block: Block = questionBlock();
-    const editor = createKaplanEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
+    const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
     document.body.append(editor);
     expect(editor.querySelector('[aria-label="Block options"]')).toBeTruthy();
-    click(editor, 'Add Kaplan qualifier');
+    click(editor, 'Add lens…');
     click(editor, 'Multiple PerspectivesOne detail → two readings → a judgement');
     expect(editor.querySelector<HTMLInputElement>('input')!.value).toBe('reconciliation');
-    click(editor, 'Add qualifier');
+    click(editor, 'Add lens');
     expect(block.qualifiers).toEqual([qualifier]);
     expect(editor.querySelector('.kaplan-chip svg')).toBeTruthy();
   });
   it('reviews one instruction at a time, saves a custom hint and allows its removal', () => {
     let block: Block = withKaplanQualifier(questionBlock(), qualifier);
-    const editor = createKaplanEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
+    const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
     document.body.append(editor);
     editor.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
-    click(editor, 'Review the three steps');
+    click(editor, 'Review the steps');
     const textareas = editor.querySelectorAll<HTMLTextAreaElement>('textarea');
     textareas[0]!.value = 'Choose one visual image.';
     textareas[0]!.dispatchEvent(new Event('input'));
@@ -116,14 +137,15 @@ describe('guided authoring', () => {
     textareas[1]!.dispatchEvent(new Event('input'));
     click(editor, 'Next step');
     click(editor, 'Next step');
-    click(editor, 'Save qualifier');
+    click(editor, 'Save lens');
     expect(kaplanSteps(block.qualifiers![0]!)[0]).toMatchObject({ prompt: 'Choose one visual image.', support: '' });
   });
   it('does not resurrect a removed attachment when the question is edited in the same editor', () => {
     let block: Block = withKaplanQualifier(questionBlock(), qualifier);
     const editor = createBlockEditor(block, (next) => { block = next; }, () => block);
     document.body.append(editor);
-    click(editor, 'Remove Multiple Perspectives qualifier');
+    editor.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
+    click(editor, 'Remove lens');
     const prompt = editor.querySelector<HTMLTextAreaElement>('.block-editor__question-prompt')!;
     prompt.value = 'A revised question';
     prompt.dispatchEvent(new Event('input'));
@@ -134,7 +156,7 @@ describe('guided authoring', () => {
   it('cancels draft edits without changing the attachment or original activity', () => {
     let block: Block = withKaplanQualifier(questionBlock(), qualifier);
     const original = structuredClone(block);
-    const editor = createKaplanEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
+    const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
     editor.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
     const focus = editor.querySelector<HTMLInputElement>('input')!;
     focus.value = 'changed'; focus.dispatchEvent(new Event('input'));
@@ -180,7 +202,7 @@ describe('student and print views', () => {
     view.querySelector<HTMLButtonElement>('.kaplan-chip')!.click();
     expect(view.querySelector('textarea')).toBeNull();
     expect(view.querySelector<HTMLDetailsElement>('.kaplan-support')!.open).toBe(false);
-    click(view, 'Next step'); click(view, 'Next step'); click(view, 'Return to the activity');
+    click(view, 'Next step'); click(view, 'Next step'); click(view, 'Next step'); click(view, 'I’ve written it down');
     expect(view.querySelector<HTMLElement>('.kaplan-workspace')!.hidden).toBe(true);
   });
   it('prints all three steps, keeps the original question and escapes teacher supplied text', () => {

@@ -1,7 +1,8 @@
 import { setToolkitClasses } from '@/toolkit/class-context';
-import { mountBlockAssistant } from '@/alchemy/block-assistant';
+import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
+import { withAppBase } from '@/app/base-path';
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { agentColour, readLastAgentSlug, type AgentSlug } from '@/ai/agents';
@@ -25,7 +26,8 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
-import { mountPublicLinkControl, teacherPreviewUrl } from '@/teacher/public-link';
+import { mountPublicLinkControl } from '@/teacher/public-link';
+import { lessonDisplayPath } from '@/teacher/lesson-display';
 import {
   buildLinkedPreview,
   ensureCompositionCached,
@@ -129,7 +131,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
   let editSourceOpenSeq = 0;
   let aiPanel: AiPanelHandle | null = null;
   let alchemyLab: AlchemyLabHandle | null = null;
-  let blockAssistant: ReturnType<typeof mountBlockAssistant> | null = null;
+  let annReview: ReturnType<typeof mountAnnReview> | null = null;
   let page: LessonPageHandle | null = null;
   let palette: LessonPaletteHandle | null = null;
   let removeChromeKeys: (() => void) | null = null;
@@ -215,7 +217,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     compositionStatus.className = 'lesson-editor__composition-status';
     compositionStatus.hidden = true;
 
-    pageCol.append(publishPanel, tagsHost, pageHost, compositionStatus);
+    const annBarHost = document.createElement('div');
+    annBarHost.className = 'lesson-builder__ann';
+    pageCol.append(publishPanel, tagsHost, annBarHost, pageHost, compositionStatus);
     chatCol.append(aiHost, labHost);
     builder.append(railHost, pageCol, chatCol, chatFab);
     builder.insertAdjacentHTML('beforeend', fullPageExitHtml(false));
@@ -246,6 +250,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       } else {
         delete lesson.outcome_ids;
       }
+      // Saves merge into the stored lesson, so clearing sends an empty list.
+      if (next.line_stops) lesson.line_stops = next.line_stops;
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
       if (next.quiz) {
         lesson.quiz = next.quiz;
@@ -262,7 +268,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function markDirty(): void {
       bumpDraftClock();
       saveController?.notifyChange();
-      blockAssistant?.changed();
+      annReview?.changed();
     }
 
     function persistChrome(): void {
@@ -750,13 +756,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         'lesson-editor__publish-panel--success'
       );
       refreshPublicLink();
-      const preview = refs.contextBar.querySelector<HTMLAnchorElement>('.context-bar__preview');
-      if (preview) {
-        preview.href = teacherPreviewUrl('lesson', lesson.id);
-        preview.setAttribute('aria-disabled', 'false');
-        preview.tabIndex = 0;
-        preview.classList.remove('is-disabled');
-      }
       page?.revealPublishBlock('', []);
     }
 
@@ -838,9 +837,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       getLesson: () => lesson
     });
 
-    blockAssistant = mountBlockAssistant({
-      host: builder, kind: 'lesson', id: lesson.id, getEntity: () => lesson,
-      unit: curriculum.units.find(unit => unit.id === lesson.unit_id),
+    annReview = mountAnnReview({
+      host: builder, barHost: annBarHost, kind: 'lesson', id: lesson.id, getEntity: () => lesson,
       flush: async () => {
         await saveController?.flush();
         if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes before asking Ann.');
@@ -866,7 +864,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const historyHost = document.createElement('div');
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
-    const studentPath = teacherPreviewUrl('lesson', lesson.id);
+    const displayHref = withAppBase(lessonDisplayPath(lesson.id));
+    const openDisplay = () => {
+      window.open(displayHref, '_blank', 'noopener,noreferrer');
+    };
     const feedbackMenuLabel = () =>
       lesson.feedback_off ? 'Turn on student feedback' : 'Turn off student feedback';
     const optionsMenu = mountPageOptionsMenu(
@@ -886,14 +887,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           }
         },
         {
-          label: 'Student preview',
-          className: 'context-bar__preview',
-          href: studentPath,
-          target: '_blank',
-          onSelect: () => {
-            if (!lesson.published_at) return;
-            window.open(teacherPreviewUrl('lesson', lesson.id), '_blank', 'noopener,noreferrer');
-          }
+          label: 'Display view',
+          className: 'context-bar__display-item',
+          onSelect: openDisplay
         },
         {
           label: feedbackMenuLabel(),
@@ -926,6 +922,13 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         {
           label: 'Alchemy Lab',
           className: 'context-bar__alchemy-lab',
+          onSelect: () => {
+            annReview?.focusBar();
+          }
+        },
+        {
+          label: 'Cross-domain connections',
+          className: 'context-bar__connections-lab',
           onSelect: () => {
             openAlchemyLab();
           }
@@ -983,16 +986,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
     });
 
-    function syncPreviewLink(): void {
-      const preview = optionsMenu.el.querySelector<HTMLAnchorElement>('.context-bar__preview');
-      if (!preview) return;
-      preview.href = teacherPreviewUrl('lesson', lesson.id);
-      const published = Boolean(lesson.published_at);
-      preview.setAttribute('aria-disabled', published ? 'false' : 'true');
-      preview.classList.toggle('is-disabled', !published);
-    }
-    syncPreviewLink();
-
     if (actions) {
       actions.append(optionsMenu.el, publicLinkHost, historyHost);
     } else {
@@ -1003,7 +996,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       setActive: setFullPage
     });
     refreshPublicLink();
-    syncPreviewLink();
 
     function applyRestoredLesson(restored: Lesson): void {
       Object.assign(lesson, restored);
@@ -1049,8 +1041,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       publicLinkDispose = null;
       aiPanel?.dispose();
       aiPanel = null;
-      blockAssistant?.dispose();
-      blockAssistant = null;
+      annReview?.dispose();
+      annReview = null;
       alchemyLab?.dispose();
       alchemyLab = null;
       savePublishHandle?.dispose();

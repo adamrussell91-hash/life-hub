@@ -21,6 +21,7 @@ included_files = [
   "config/brisket-protocol.md",
   "config/sara-protocol.md",
   "config/hammond-protocol.md",
+  "apps/teaching/config/*-protocol.md",
   "config/humanizer/**",
   "config/physique-target.yml",
   "config/knowledge/**",
@@ -52,6 +53,9 @@ included_files = [
   timeout = 26
 
 [functions.alchemy-unit-notes]
+  timeout = 26
+
+[functions.alchemy-agent]
   timeout = 26
 
 # Network Ecology assembles the full professional graph (GitHub import +

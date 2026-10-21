@@ -1,9 +1,20 @@
 import { renderPeerFeedback } from '@/blocks/peer-feedback';
+import { mountCulturalWarningTracks } from '@/blocks/cultural-warning-tracks';
 import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
+import { renderBrainstorm } from '@/blocks/brainstorm';
+import { renderHingeQuestion } from '@/blocks/hinge-question';
+import { renderContinuumLine } from '@/blocks/continuum-line';
+import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
-import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
-import { calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
+import { attachedSteppedLenses } from '@/blocks/lenses/registry';
+import { renderAnchorBridge, renderBecauseButSo, renderHumanExperienceTable, renderQuestionLevels } from '@/blocks/formats/question-set-formats';
+import { renderReasoningChartFormat } from '@/blocks/formats/reasoning-chart';
+import { renderSteppedLenses } from '@/blocks/lenses/stepped-view';
+import { canHaveDiscern } from '@/blocks/discern';
+import { renderDiscern } from '@/blocks/discern-view';
+import { renderDiscernConfirm } from '@/blocks/discern-confirm';
+import { resolvedCalloutStyle, calloutIdentity, decorateCalloutReferences } from '@/blocks/callout-reference';
 import { FAILURE } from '@/app/failure';
 import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
@@ -38,11 +49,23 @@ import { renderOutcomeList } from '@/outcomes/display';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
 import { createHubAudioPlayer } from '../../design-kit/js/hub-audio-player.js';
+import { renderVoiceTask } from '@/blocks/voice-block';
 import { mountHubImageAnnotator } from '../../design-kit/js/hub-image-annotate.js';
 import { renderToolkitContent } from '@/toolkit/render';
 import 'photoswipe/dist/photoswipe.css';
+import type { NetworkLine } from '@/schemas/block';
+import type { NetLesson } from '@/network/model';
+// Last: the shared block anatomy roles win ties with block stylesheets above.
+import '@/styles/block-anatomy.css';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
+/** Lessons are in unit order and limited to what the viewer may see; `href` only on ones they may open. */
+export type UnitNetworkContext = {
+  lines: NetworkLine[];
+  lessons: NetLesson[];
+  bands?: ReadonlyMap<string, string>;
+};
+
 export type RenderContext = {
   lessonId?: string;
   attachedOutcomes?: PublicOutcome[];
@@ -50,6 +73,10 @@ export type RenderContext = {
   openNoteId?: string;
   /** Every block on the page, for blocks that read the whole lesson (Thinking reflection). */
   pageBlocks?: Block[];
+  /** Lessons a unit plan block may link to, resolved for this viewer (Curriculum lines). */
+  unitLessons?: Array<{ id: string; title: string; href: string }>;
+  /** Curriculum network for a unit map: the subject's lines, the unit's lessons and their week bands. */
+  network?: UnitNetworkContext;
   onMakeAnthologyCards?: (request: {
     items: AnthologyData['items'];
     view: 'text' | 'theme' | 'technique' | 'connections';
@@ -64,6 +91,7 @@ const HEADING_TAG = {
 
 /** Semantic callout styles mapped to design-token accent classes. */
 export const CALLOUT_STYLE_CLASS = {
+  cultural_warning: 'callout--cultural-warning',
   information: 'callout--wave',
   important: 'callout--high-sea',
   warning: 'callout--high-sea',
@@ -135,7 +163,7 @@ export function renderRichTextBlock(
   ctx: RenderContext = {}
 ): HTMLElement {
   const body = document.createElement('div');
-  body.className = 'block-rich-text';
+  body.className = 'block-rich-text block-body';
   body.innerHTML = sanitizeRichTextHtml(block.content.html);
   if (mode === 'print') return wrapBlock(body, block, mode);
 
@@ -166,25 +194,27 @@ export function renderCalloutBlock(
   mode: RenderMode
 ): HTMLElement {
   const callout = document.createElement('aside');
-  const styleClass = CALLOUT_STYLE_CLASS[block.content.style];
+  const style = resolvedCalloutStyle(block.content) as keyof typeof CALLOUT_STYLE_CLASS;
+  const styleClass = CALLOUT_STYLE_CLASS[style];
   callout.className = `callout ${styleClass}`;
   callout.setAttribute('role', 'note');
   const head = document.createElement('div');
   head.className = 'callout__head';
-  head.append(calloutIdentity(block.content.style));
+  head.append(calloutIdentity(style));
   callout.append(head);
 
   if (block.content.title) {
     const title = document.createElement('p');
-    title.className = 'callout__title';
+    title.className = 'callout__title block-subtitle';
     title.textContent = block.content.title;
     callout.append(title);
   }
 
   const body = document.createElement('p');
-  body.className = 'callout__body';
+  body.className = 'callout__body block-body';
   body.textContent = block.content.body;
   callout.append(body);
+  if (style === 'cultural_warning') mountCulturalWarningTracks(callout, mode !== 'print');
 
   return wrapBlock(callout, block, mode);
 }
@@ -202,7 +232,7 @@ export function renderImageBlock(
     img.loading = 'lazy';
     img.addEventListener('error', () => {
       const unavailable = document.createElement('p');
-      unavailable.className = 'block-image__unavailable';
+      unavailable.className = 'block-image__unavailable block-empty';
       unavailable.textContent = block.content.alt_text.trim() || FAILURE.imageUnavailable;
       img.replaceWith(unavailable);
     });
@@ -225,13 +255,13 @@ export function renderImageBlock(
     }
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-image__unavailable';
+    unavailable.className = 'block-image__unavailable block-empty';
     unavailable.textContent = block.content.alt_text.trim() || FAILURE.imageUnavailable;
     figure.append(unavailable);
   }
   if (block.content.caption) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-image__caption';
+    cap.className = 'block-image__caption block-secondary';
     cap.textContent = block.content.caption;
     figure.append(cap);
   }
@@ -258,7 +288,7 @@ export function renderVideoBlock(
     );
     if (block.content.caption) {
       const cap = document.createElement('p');
-      cap.className = 'block-video__caption';
+      cap.className = 'block-video__caption block-secondary';
       cap.textContent = block.content.caption;
       wrap.append(cap);
     }
@@ -267,14 +297,14 @@ export function renderVideoBlock(
 
   if (block.content.title) {
     const title = document.createElement('p');
-    title.className = 'block-video__title';
+    title.className = 'block-video__title block-subtitle';
     title.textContent = block.content.title;
     wrap.append(title);
   }
 
   if (!video) {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-video__unavailable';
+    unavailable.className = 'block-video__unavailable block-empty';
     unavailable.textContent = FAILURE.videoUnavailable;
     wrap.append(unavailable);
   } else if (video.provider === 'file') {
@@ -302,7 +332,7 @@ export function renderVideoBlock(
   }
   if (block.content.caption) {
     const cap = document.createElement('p');
-    cap.className = 'block-video__caption';
+    cap.className = 'block-video__caption block-secondary';
     cap.textContent = block.content.caption;
     wrap.append(cap);
   }
@@ -375,7 +405,7 @@ export function renderEmbedBlock(
 
   if (!safeUrl) {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-embed__unavailable';
+    unavailable.className = 'block-embed__unavailable block-empty';
     unavailable.textContent = FAILURE.embedUnavailable;
     wrap.append(unavailable);
     return wrapBlock(wrap, block, mode);
@@ -530,7 +560,7 @@ export function renderQuoteBlock(
   figure.className = 'block-quote';
 
   const quote = document.createElement('blockquote');
-  quote.className = 'block-quote__text';
+  quote.className = 'block-quote__text block-body';
   quote.textContent = block.content.quote;
   figure.append(quote);
 
@@ -539,7 +569,7 @@ export function renderQuoteBlock(
   const reference = block.content.reference?.trim();
   if (attribution || source || reference) {
     const caption = document.createElement('figcaption');
-    caption.className = 'block-quote__attribution';
+    caption.className = 'block-quote__attribution block-secondary';
     const parts = [attribution, source, reference].filter(Boolean);
     caption.textContent = parts.join(' — ');
     figure.append(caption);
@@ -564,11 +594,11 @@ export function renderDefinitionBlock(
   dl.className = 'block-definition';
 
   const dt = document.createElement('dt');
-  dt.className = 'block-definition__term';
+  dt.className = 'block-definition__term block-subtitle';
   dt.textContent = block.content.term;
 
   const dd = document.createElement('dd');
-  dd.className = 'block-definition__definition';
+  dd.className = 'block-definition__definition block-body';
   dd.textContent = block.content.definition;
 
   dl.append(dt, dd);
@@ -594,8 +624,12 @@ export function renderCodeBlock(
 
 export function renderAudioBlock(
   block: Extract<Block, { block_type: 'audio' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
+  if ((block.content.mode ?? 'listen') !== 'listen') {
+    return wrapBlock(renderVoiceTask(block, mode, ctx), block, mode);
+  }
   const wrap = document.createElement('div');
   wrap.className = 'block-audio';
 
@@ -612,7 +646,7 @@ export function renderAudioBlock(
 
   if (block.content.title?.trim()) {
     const title = document.createElement('p');
-    title.className = 'block-audio__title';
+    title.className = 'block-audio__title block-subtitle';
     title.textContent = block.content.title;
     wrap.append(title);
   }
@@ -626,7 +660,7 @@ export function renderAudioBlock(
     });
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-audio__unavailable';
+    unavailable.className = 'block-audio__unavailable block-empty';
     unavailable.textContent = 'Audio unavailable.';
     wrap.append(unavailable);
   }
@@ -664,7 +698,7 @@ export function renderAttachmentBlock(
     wrap.append(link);
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-attachment__unavailable';
+    unavailable.className = 'block-attachment__unavailable block-empty';
     unavailable.textContent = block.content.title.trim() || 'Attachment unavailable.';
     wrap.append(unavailable);
   }
@@ -681,14 +715,14 @@ export function renderAccordionBlock(
 
   for (const item of block.content.items) {
     const details = document.createElement('details');
-    details.className = 'block-accordion__item';
+    details.className = 'block-accordion__item block-disclosure';
 
     const summary = document.createElement('summary');
-    summary.className = 'block-accordion__title';
+    summary.className = 'block-accordion__title block-disclosure__toggle block-disclosure__toggle--title block-subtitle';
     summary.textContent = item.title;
 
     const body = document.createElement('div');
-    body.className = 'block-accordion__body';
+    body.className = 'block-accordion__body block-disclosure__panel block-body';
     body.textContent = item.body;
 
     if (mode === 'print') details.open = true;
@@ -705,7 +739,7 @@ export function renderTableBlock(
   mode: RenderMode
 ): HTMLElement {
   const table = document.createElement('table');
-  table.className = 'block-table';
+  table.className = 'block-table block-body';
 
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
@@ -736,8 +770,14 @@ export function renderTableBlock(
 
 export function renderQuestionSetBlock(
   block: Extract<Block, { block_type: 'question_set' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
+  if (block.content.format === 'human_experience_table') return wrapBlock(renderHumanExperienceTable(block, mode, ctx), block, mode);
+  if (block.content.format === 'anchor_bridge') return wrapBlock(renderAnchorBridge(block, mode, ctx), block, mode);
+  if (block.content.format === 'question_levels') return wrapBlock(renderQuestionLevels(block, mode, ctx), block, mode);
+  if (block.content.format === 'because_but_so') return wrapBlock(renderBecauseButSo(block, mode, ctx), block, mode);
+  if (block.content.format === 'reasoning_chart') return wrapBlock(renderReasoningChartFormat(block, mode, ctx), block, mode);
   const wrap = document.createElement('div');
   wrap.className = 'block-question-set';
 
@@ -757,7 +797,7 @@ export function renderQuestionSetBlock(
     li.dataset.questionId = question.id;
 
     const prompt = document.createElement('p');
-    prompt.className = 'block-question-set__prompt';
+    prompt.className = 'block-question-set__prompt block-body';
     prompt.textContent = question.prompt;
     li.append(prompt);
 
@@ -788,7 +828,7 @@ export function renderQuestionSetBlock(
       }
     } else if (question.kind === 'short_answer' && question.response_space !== 'none') {
       const label = document.createElement('p');
-      label.className = 'block-question-set__answer-label';
+      label.className = 'block-question-set__answer-label block-eyebrow';
       label.textContent = 'Your response';
       const box = document.createElement('div');
       box.className = 'block-question-set__answer';
@@ -822,7 +862,7 @@ export function renderSectionBlock(
   section.className = 'block-section';
 
   const title = document.createElement('h2');
-  title.className = 'block-section__title';
+  title.className = 'block-section__title block-title';
   title.textContent = block.content.title;
 
   const body = document.createElement('div');
@@ -893,7 +933,7 @@ export function renderTimelineBlock(
     if (layout === 'alternate') item.style.gridRow = `${index + 1} / span 2`;
 
     const when = document.createElement('p');
-    when.className = 'block-timeline__when';
+    when.className = 'block-timeline__when block-eyebrow';
     const { start, end } = splitTimelineWhen(event.when);
     if (end) {
       const startEl = document.createElement('span');
@@ -916,13 +956,13 @@ export function renderTimelineBlock(
     card.className = 'block-timeline__card';
 
     const label = document.createElement('h3');
-    label.className = 'block-timeline__label';
+    label.className = 'block-timeline__label block-subtitle';
     label.textContent = event.label;
     card.append(label);
 
     if (event.description.trim()) {
       const description = document.createElement('p');
-      description.className = 'block-timeline__description';
+      description.className = 'block-timeline__description block-body';
       description.textContent = event.description;
       card.append(description);
     }
@@ -962,7 +1002,7 @@ export function renderCardStackBlock(
 
   if (block.content.title?.trim()) {
     const heading = document.createElement('h2');
-    heading.className = 'block-card-stack__heading';
+    heading.className = 'block-card-stack__heading block-title';
     heading.textContent = block.content.title.trim();
     root.append(heading);
   }
@@ -990,19 +1030,19 @@ export function renderCardStackBlock(
   stage.append(viewport);
 
   const controls = document.createElement('div');
-  controls.className = 'block-card-stack__controls';
+  controls.className = 'block-card-stack__controls block-pager';
 
   const prev = document.createElement('button');
   prev.type = 'button';
-  prev.className = 'btn btn--ghost block-card-stack__prev';
+  prev.className = 'btn btn--secondary block-card-stack__prev';
   prev.textContent = 'Previous';
 
   const status = document.createElement('p');
-  status.className = 'block-card-stack__status';
+  status.className = 'block-card-stack__status block-pager__status';
 
   const next = document.createElement('button');
   next.type = 'button';
-  next.className = 'btn btn--ghost block-card-stack__next';
+  next.className = 'btn btn--secondary block-card-stack__next';
   next.textContent = 'Next';
 
   controls.append(prev, status, next);
@@ -1022,7 +1062,7 @@ export function renderOutcomesBlock(
   const root = document.createElement('div');
   root.className = 'block-outcomes';
   const heading = document.createElement('h2');
-  heading.className = 'block-outcomes__title';
+  heading.className = 'block-outcomes__title block-eyebrow';
   heading.textContent = 'Outcomes';
   root.append(heading);
   root.append(
@@ -1047,14 +1087,14 @@ export function renderCollectionBlock(
   const titleText = block.content.title?.trim();
   if (titleText) {
     const title = document.createElement('h3');
-    title.className = 'block-collection__title';
+    title.className = 'block-collection__title block-title';
     title.textContent = titleText;
     root.append(title);
   }
 
   if (resolved.links.length === 0) {
     const empty = document.createElement('p');
-    empty.className = 'block-collection__empty';
+    empty.className = 'block-collection__empty block-empty';
     empty.textContent = resolved.emptyMessage ?? 'No items.';
     root.append(empty);
     return root;
@@ -1104,7 +1144,7 @@ export function renderTabsBlock(
   }
 
   const tablist = document.createElement('div');
-  tablist.className = 'block-tabs__tablist';
+  tablist.className = 'hub-pills block-tabs__tablist';
   tablist.setAttribute('role', 'tablist');
   tablist.setAttribute('aria-label', 'Content tabs');
 
@@ -1138,7 +1178,7 @@ export function renderTabsBlock(
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'block-tabs__tab';
+    btn.className = 'hub-pills__btn block-tabs__tab';
     btn.setAttribute('role', 'tab');
     btn.id = tabId;
     btn.setAttribute('aria-controls', panelId);
@@ -1247,14 +1287,14 @@ function galleryFigure(
     }
   } else {
     const unavailable = document.createElement('p');
-    unavailable.className = 'block-gallery__unavailable';
+    unavailable.className = 'block-gallery__unavailable block-empty';
     unavailable.textContent = entry.alt_text.trim() || 'Image unavailable.';
     figure.append(unavailable);
   }
 
   if (entry.caption) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-gallery__caption';
+    cap.className = 'block-gallery__caption block-secondary';
     cap.textContent = entry.caption;
     figure.append(cap);
   }
@@ -1356,10 +1396,19 @@ export function renderGalleryBlock(
   return wrapBlock(root, block, mode);
 }
 
-function activityButton(label: string, className: string): HTMLButtonElement {
+function activityButton(label: string, className: string, variant: 'primary' | 'secondary' = 'secondary'): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = `btn ${className}`;
+  button.className = `btn btn--${variant} ${className}`;
+  button.textContent = label;
+  return button;
+}
+
+/** The shared show / hide toggle: kit chevron, left-aligned, above any actions. */
+export function disclosureToggle(label: string, className = ''): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `block-disclosure__toggle ${className}`.trim();
   button.textContent = label;
   return button;
 }
@@ -1408,7 +1457,7 @@ function flashcardImage(card: FlashcardItem): HTMLImageElement | null {
 function paintFlashcardFace(face: HTMLElement, text: string, card?: FlashcardItem): void {
   face.replaceChildren();
   const copy = document.createElement('span');
-  copy.className = 'block-flashcards__copy';
+  copy.className = 'block-flashcards__copy block-subtitle';
   copy.textContent = text;
   const image = card ? flashcardImage(card) : null;
   face.append(...(image ? [image, copy] : [copy]));
@@ -1498,10 +1547,10 @@ export function renderFlashcardsBlock(
   card.append(inner);
 
   const status = document.createElement('p');
-  status.className = 'block-flashcards__status';
+  status.className = 'block-flashcards__status block-pager__status';
   status.setAttribute('aria-live', 'polite');
   const prev = activityButton('Prev', 'block-flashcards__btn');
-  const flip = activityButton('Flip', 'block-flashcards__btn');
+  const flip = activityButton('Flip', 'block-flashcards__btn', 'primary');
   const next = activityButton('Next', 'block-flashcards__btn');
   const reset = activityButton('Reset', 'block-flashcards__btn');
 
@@ -1549,9 +1598,13 @@ export function renderFlashcardsBlock(
     persist();
   });
 
+  // Pager centred under the deck, then the deck's actions.
   const controls = document.createElement('div');
-  controls.className = 'block-flashcards__controls';
-  controls.append(prev, flip, next, reset);
+  controls.className = 'block-flashcards__controls block-pager';
+  controls.append(prev, status, next);
+  const actions = document.createElement('div');
+  actions.className = 'block-flashcards__actions block-actions';
+  actions.append(flip, reset);
   const printSummary = document.createElement('ol');
   printSummary.className = 'block-flashcards__print';
   printSummary.setAttribute('aria-hidden', 'true');
@@ -1564,7 +1617,7 @@ export function renderFlashcardsBlock(
     entry.append(frontCopy, backCopy);
     printSummary.append(entry);
   }
-  root.append(card, status, controls, printSummary);
+  root.append(card, controls, actions, printSummary);
   paint();
   persist();
   if (block.content.shuffle && !saved && !prefersReducedMotion()) {
@@ -1590,7 +1643,7 @@ export function renderClozeBlock(
   }
 
   const sentence = document.createElement('p');
-  sentence.className = 'block-cloze__sentence';
+  sentence.className = 'block-cloze__sentence block-body';
 
   if (mode === 'teacher') {
     for (const segment of segments) {
@@ -1681,7 +1734,7 @@ export function renderClozeBlock(
   bank.className = 'block-cloze__word-bank';
   bank.setAttribute('aria-label', 'Word bank');
   const score = document.createElement('p');
-  score.className = 'block-cloze__score';
+  score.className = 'block-cloze__score block-secondary';
   score.setAttribute('aria-live', 'polite');
 
   function answers(): string[] {
@@ -1723,7 +1776,7 @@ export function renderClozeBlock(
       persist();
     })
   );
-  const check = activityButton('Check', 'block-cloze__btn');
+  const check = activityButton('Check', 'block-cloze__btn', 'primary');
   const reveal = activityButton('Reveal', 'block-cloze__btn');
   const reset = activityButton('Reset', 'block-cloze__btn');
   check.addEventListener('click', () => {
@@ -1765,7 +1818,7 @@ export function renderClozeBlock(
   });
 
   const controls = document.createElement('div');
-  controls.className = 'block-cloze__controls';
+  controls.className = 'block-cloze__controls block-actions';
   controls.append(check, reveal, reset);
   const printSummary = document.createElement('p');
   printSummary.className = 'block-cloze__print';
@@ -1780,7 +1833,7 @@ export function renderClozeBlock(
       printSummary.append(blank);
     }
   }
-  root.append(sentence, bank, controls, score, printSummary);
+  root.append(sentence, bank, score, controls, printSummary);
   paintBank();
   paintScore();
   return wrapBlock(root, block, mode);
@@ -1820,14 +1873,14 @@ export function renderSelfCheckBlock(
 
   if (block.content.title?.trim()) {
     const title = document.createElement('h3');
-    title.className = 'block-self-check__title';
+    title.className = 'block-self-check__title block-subtitle';
     title.textContent = block.content.title;
     root.append(title);
   }
 
   if (mode === 'teacher') {
     const prompt = document.createElement('p');
-    prompt.className = 'block-self-check__prompt';
+    prompt.className = 'block-self-check__prompt block-body';
     prompt.textContent = block.content.prompt;
     root.append(prompt);
     if (block.content.mode === 'checklist') {
@@ -1854,7 +1907,7 @@ export function renderSelfCheckBlock(
   }
 
   const prompt = document.createElement('p');
-  prompt.className = 'block-self-check__prompt';
+  prompt.className = 'block-self-check__prompt block-body';
   prompt.textContent = block.content.prompt;
   root.append(prompt);
 
@@ -1875,7 +1928,7 @@ export function renderSelfCheckBlock(
     list.className = 'block-self-check__checklist';
     for (const item of block.content.items ?? []) {
       const label = document.createElement('label');
-      label.className = 'block-self-check__checklist-item';
+      label.className = 'block-self-check__checklist-item block-body';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'block-self-check__checkbox';
@@ -1904,7 +1957,7 @@ export function renderSelfCheckBlock(
   let revealed =
     rawSaved?.revealed === true && (block.content.mode === 'reveal' || rating !== undefined);
   const answer = document.createElement('div');
-  answer.className = 'block-self-check__answer';
+  answer.className = 'block-self-check__answer block-disclosure__panel block-body';
   answer.textContent = block.content.answer ?? '';
 
   function paintAnswer(): void {
@@ -1912,14 +1965,19 @@ export function renderSelfCheckBlock(
   }
 
   if (block.content.mode === 'reveal') {
-    const toggle = activityButton(revealed ? 'Hide answer' : 'Show answer', 'block-self-check__btn');
+    const toggle = disclosureToggle(revealed ? 'Hide answer' : 'Show answer', 'block-self-check__btn');
+    toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
     toggle.addEventListener('click', () => {
       revealed = !revealed;
       toggle.textContent = revealed ? 'Hide answer' : 'Show answer';
+      toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
       paintAnswer();
       saveActivityState(key, { revealed } satisfies AnswerState);
     });
-    root.append(toggle, answer);
+    const disclosure = document.createElement('div');
+    disclosure.className = 'block-self-check__disclosure block-disclosure';
+    disclosure.append(toggle, answer);
+    root.append(disclosure);
   } else {
     const scale = document.createElement('div');
     scale.className = 'block-self-check__confidence';
@@ -1958,7 +2016,7 @@ export function renderChartBlock(
 
   if (block.content.title?.trim()) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-chart__title';
+    cap.className = 'block-chart__title block-title';
     cap.textContent = block.content.title;
     root.append(cap);
   }
@@ -1969,8 +2027,9 @@ export function renderChartBlock(
   root.append(wrap);
 
   const details = document.createElement('details');
-  details.className = 'block-chart__data';
+  details.className = 'block-chart__data block-disclosure';
   const summary = document.createElement('summary');
+  summary.className = 'block-disclosure__toggle';
   summary.textContent = 'Chart data';
   const table = document.createElement('table');
   table.className = 'block-chart__table';
@@ -2051,7 +2110,7 @@ export function renderDiagramBlock(
       root.append(img);
     } else {
       const unavailable = document.createElement('p');
-      unavailable.className = 'block-diagram__unavailable';
+      unavailable.className = 'block-diagram__unavailable block-empty';
       unavailable.textContent =
         mode === 'teacher'
           ? DIAGRAM_IMAGE_PUBLISH_URL_ISSUE
@@ -2095,14 +2154,13 @@ export function renderWhiteboardBlock(
 
   if (block.content.title?.trim()) {
     const title = document.createElement('figcaption');
-    title.className = 'block-whiteboard__title';
+    title.className = 'block-whiteboard__title block-title';
     title.textContent = block.content.title;
     root.append(title);
   }
 
   const surface = document.createElement('div');
   surface.className = 'block-whiteboard__surface';
-  surface.style.height = `${block.content.height_px ?? 640}px`;
   root.append(surface);
 
   void mountHubWhiteboard(surface, block, {
@@ -2122,7 +2180,7 @@ export function renderMindMapBlock(
 
   if (block.content.title?.trim()) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-mind-map__title';
+    cap.className = 'block-mind-map__title block-title';
     cap.textContent = block.content.title;
     root.append(cap);
   }
@@ -2144,7 +2202,7 @@ export function renderConceptMapBlock(
 
   if (block.content.title?.trim()) {
     const cap = document.createElement('figcaption');
-    cap.className = 'block-concept-map__title';
+    cap.className = 'block-concept-map__title block-title';
     cap.textContent = block.content.title;
     root.append(cap);
   }
@@ -2243,7 +2301,7 @@ function renderBlockContent(
     case 'code':
       return renderCodeBlock(block, mode);
     case 'audio':
-      return renderAudioBlock(block, mode);
+      return renderAudioBlock(block, mode, ctx);
     case 'attachment':
       return renderAttachmentBlock(block, mode);
     case 'accordion':
@@ -2254,10 +2312,20 @@ function renderBlockContent(
       return wrapBlock(renderPeerFeedback(block, mode, ctx), block, mode);
     case 'question_drop':
       return wrapBlock(renderQuestionDrop(block, mode, ctx), block, mode);
+    case 'brainstorm':
+      return wrapBlock(renderBrainstorm(block, mode, ctx), block, mode);
+    case 'hinge_question':
+      return wrapBlock(renderHingeQuestion(block, mode, ctx), block, mode);
+    case 'continuum_line':
+      return wrapBlock(renderContinuumLine(block, mode, ctx), block, mode);
+    case 'curriculum_lines':
+      return wrapBlock(renderCurriculumLines(block, mode, ctx), block, mode);
+    case 'discern_confirm':
+      return wrapBlock(renderDiscernConfirm(block, mode, ctx), block, mode);
     case 'quiz_question':
       return wrapBlock(renderQuizQuestion(block, mode, ctx), block, mode);
     case 'question_set':
-      return renderQuestionSetBlock(block, mode);
+      return renderQuestionSetBlock(block, mode, ctx);
     case 'flashcards':
       return renderFlashcardsBlock(block, mode);
     case 'cloze':
@@ -2318,7 +2386,7 @@ function renderBlockContent(
     }
   } catch {
     const fallback = document.createElement('p');
-    fallback.className = 'block-unavailable';
+    fallback.className = 'block-unavailable block-empty';
     fallback.textContent = FAILURE.unsupportedBlock;
     return wrapBlock(fallback, block, mode);
   }
@@ -2327,18 +2395,25 @@ function renderBlockContent(
 export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {
   const wrapper = renderBlockContent(block, mode, ctx);
   decorateCalloutReferences(wrapper, block, mode, ctx.pageBlocks ?? []);
-  if (block.qualifiers?.length) {
-    const qualifiers = renderKaplanQualifiers(block.qualifiers, {
-      mode, blockId: block.id, lessonId: ctx.lessonId
-    });
+  const attachments: HTMLElement[] = [];
+  const lenses = attachedSteppedLenses(block);
+  if (lenses.length) {
+    attachments.push(renderSteppedLenses(lenses, block, { mode, blockId: block.id, lessonId: ctx.lessonId }));
+  }
+  if (block.discern && canHaveDiscern(block)) {
+    attachments.push(renderDiscern(block.discern, { mode, blockId: block.id, lessonId: ctx.lessonId }));
+  }
+  if (attachments.length) {
     // A question keeps its process next to its prompt, before the response space.
     // Other blocks carry the same optional attachment beneath their content.
     const question = block.block_type === 'question_set' && block.content.questions.length === 1
       ? wrapper.querySelector('.block-question-set__question') : null;
     const response = question?.querySelector('.block-question-set__answer-label, .block-question-set__response-lines');
-    if (response) question!.insertBefore(qualifiers, response);
-    else if (question) question.append(qualifiers);
-    else wrapper.append(qualifiers);
+    for (const attachment of attachments) {
+      if (response) question!.insertBefore(attachment, response);
+      else if (question) question.append(attachment);
+      else wrapper.append(attachment);
+    }
   }
   return wrapper;
 }

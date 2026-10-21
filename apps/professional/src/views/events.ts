@@ -259,7 +259,7 @@ export async function renderEventNewView(
 
   const orgInput = document.createElement('input');
   orgInput.type = 'text';
-  orgInput.placeholder = 'Type @ to add provider or venue';
+  orgInput.placeholder = 'Add a provider or venue';
   orgInput.setAttribute('aria-label', 'Organisation link');
 
   const orgRel = document.createElement('select');
@@ -273,12 +273,12 @@ export async function renderEventNewView(
 
   const presenterInput = document.createElement('input');
   presenterInput.type = 'text';
-  presenterInput.placeholder = 'Type @ to add a presenter';
+  presenterInput.placeholder = 'Add a presenter';
   presenterInput.setAttribute('aria-label', 'Presenter');
 
   const knowledgeInput = document.createElement('input');
   knowledgeInput.type = 'text';
-  knowledgeInput.placeholder = 'Type @ to link a Knowledge page';
+  knowledgeInput.placeholder = 'Link a Knowledge page';
   knowledgeInput.setAttribute('aria-label', 'Related knowledge page');
 
   const status = el('p', 'event-form__status');
@@ -301,6 +301,7 @@ export async function renderEventNewView(
   });
 
   const picker = createEntityPicker({
+    mode: 'field',
     input: orgInput,
     allowedKinds: ['organisation'],
     emptyText: 'No matching organisations.',
@@ -329,6 +330,7 @@ export async function renderEventNewView(
   });
 
   const presenterPicker = createEntityPicker({
+    mode: 'field',
     input: presenterInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',
@@ -366,7 +368,7 @@ export async function renderEventNewView(
 
   const attendeeInput = document.createElement('input');
   attendeeInput.type = 'text';
-  attendeeInput.placeholder = 'Type @ to add a person';
+  attendeeInput.placeholder = 'Add a person';
   attendeeInput.setAttribute('aria-label', 'Attendee');
 
   const attendeeRole = document.createElement('select');
@@ -383,6 +385,7 @@ export async function renderEventNewView(
   }
 
   const attendeePicker = createEntityPicker({
+    mode: 'field',
     input: attendeeInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',
@@ -923,15 +926,21 @@ export function buildEventConnections(record: EventRecord, _reload: () => Promis
   return host;
 }
 
-export function buildEventTaskPanel(record: EventRecord, reload: () => Promise<void>): HTMLElement {
+/** Follow-up task panel. Adding or retrying a task refreshes only this panel, not the page. */
+export function buildEventTaskPanel(initial: EventRecord): HTMLElement {
   const host = el('section', 'card event-page__tasks');
-  const load = async () => {
-    const loading = el('p', 'muted', 'Loading linked tasks…');
-    loading.setAttribute('role', 'status');
-    host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), loading);
+  let record = initial;
+  let seq = 0;
+  const load = async (quiet = false) => {
+    const mine = ++seq;
+    if (!quiet) {
+      const loading = el('p', 'muted', 'Loading linked tasks…');
+      loading.setAttribute('role', 'status');
+      host.replaceChildren(el('h3', undefined, 'Follow-up tasks'), loading);
+    }
     try {
       const entries = await loadEntityRelationships(`professional:event:${record.id}`);
-      if (!host.contains(loading)) return;
+      if (mine !== seq) return;
       const linkedOperations = entries.filter(entry => entry.link.relationship_type === 'learning_for' && entry.endpoint?.kind === 'task').map(entry => {
         const endpoint = entry.endpoint!;
         const taskId = endpoint.ref.replace(/^tasks:task:/, '');
@@ -944,14 +953,20 @@ export function buildEventTaskPanel(record: EventRecord, reload: () => Promise<v
         host, heading: 'Follow-up tasks', relationshipType: 'learning_for', linkedOperations,
         incompleteOperationId: record.learning_operation?.status === 'incomplete' ? record.learning_operation.operation_id : null,
         onSubmit: async input => {
-          try { await linkEventTask(record.id, {relationship_type: 'learning_for', ...input}); }
-          catch (error) { if (!isEventTaskLinkIncompleteError(error)) throw error; }
-          await reload();
+          try { record = (await linkEventTask(record.id, {relationship_type: 'learning_for', ...input})).event ?? record; }
+          catch (error) {
+            if (!isEventTaskLinkIncompleteError(error)) throw error;
+            record = (await getEvent(record.id).catch(() => null))?.event ?? record;
+          }
+          await load(true);
         },
-        onRetry: async operationId => { await retryEventTaskLink(record.id, operationId); await reload(); }
+        onRetry: async operationId => {
+          record = (await retryEventTaskLink(record.id, operationId)).event ?? record;
+          await load(true);
+        }
       });
     } catch {
-      if (!host.contains(loading)) return;
+      if (mine !== seq) return;
       const retry = el('button', 'btn btn--secondary', 'Try again');
       retry.type = 'button';
       retry.addEventListener('click', () => void load());

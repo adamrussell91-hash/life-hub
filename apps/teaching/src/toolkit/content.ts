@@ -308,6 +308,14 @@ export const QUADRANT_DEFINITION = {
   inquiry: 'The questions require discussion, may have more than one answer and many perspectives.'
 } as const;
 
+/** What each end of the two axes means, in students' words. */
+export const QUADRANT_AXIS_DEFINITION = {
+  closed: 'Closed: there is one right answer, and you can find it or check it.',
+  open: 'Open: there are many possible answers. You have to imagine, think or discuss.',
+  textual: 'Textual: the question is about the text itself and what happens in it.',
+  intellectual: 'Intellectual: the question is about big ideas and the world beyond the text.'
+} as const;
+
 export const QUADRANT_RESPOND = {
   comprehension: 'Look back to the text',
   research: 'Look up new information',
@@ -355,6 +363,7 @@ export function quadrantContent(_prefix: string): QuestionQuadrantBlock['content
     guide: GUIDE.quadrant,
     stimulus: '',
     procedure: 'sort',
+    collect_questions: false,
     questions: [],
     converters: [],
     teacher_note: quadrantNote('sort'),

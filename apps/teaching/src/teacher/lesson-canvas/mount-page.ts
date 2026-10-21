@@ -18,6 +18,8 @@ import {
   type BlockEditorContext
 } from '@/blocks/editors';
 import { findBlockById } from '@/blocks/find-block';
+import { createDiscernConfirmBlock, findDiscernConfirm, insertDiscernConfirm, removeDiscernConfirms } from '@/blocks/discern';
+import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-editor';
 import { renderBlock } from '@/blocks/render';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
 import { createTeacherBlockPulse } from '@/teacher/block-pulse';
@@ -26,9 +28,13 @@ import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import type { CurriculumOutcome } from '@/schemas/outcome';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
+import { mountLineChips } from '@/network/line-chips';
+import { revealBlockFromHash } from '@/app/block-hash';
+import type { NetworkLine } from '@/schemas/block';
 import {
   PEDAGOGICAL_MODES,
   PEDAGOGICAL_MODE_LABELS,
+  pedagogicalModeLabel,
   resolvePedagogicalMode,
   type PedagogicalMode
 } from '@/curriculum/pedagogical-mode';
@@ -73,6 +79,11 @@ export type MountBlockCanvasOptions = {
   decorateRow?: (row: HTMLElement, block: Block) => void;
   /** Author canvases only. Student / published surfaces omit the ⋯ menu. */
   editable?: boolean;
+  /**
+   * Clicking a published block opens its editor. Tasks and Professional pages
+   * (notes typed mid-meeting) want this; lessons wait for Edit in the ⋯ menu.
+   */
+  editOnClick?: boolean;
 };
 
 export type BlockCanvasHandle = {
@@ -98,7 +109,7 @@ export type MountLessonPageOptions = {
   onCompositionDrop?: (id: string) => void;
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
   outcomesCatalog?: CurriculumOutcome[];
-  subject?: { id: string; outcome_ids: string[] };
+  subject?: { id: string; outcome_ids: string[]; network_lines?: NetworkLine[] };
   onToggleFullPage?: () => void;
   /**
    * Render the in-canvas page menu (Export, Print, Trash…). The lesson
@@ -250,6 +261,18 @@ export function mountBlockCanvas(
   root.addEventListener('callout-reference-jump', event => {
     event.stopPropagation();
     select(null);
+  });
+
+  // Discern's Confirm card is its own block: added after its activity on attach,
+  // removed with it on detach. The teacher drags it later in the lesson.
+  root.addEventListener(DISCERN_ATTACH_EVENT, event => {
+    const hostId = (event as CustomEvent<{ blockId: string }>).detail.blockId;
+    if (findDiscernConfirm(blocks, hostId)) return;
+    emit(insertDiscernConfirm(blocks, hostId, createDiscernConfirmBlock(options.idFactory(), hostId)));
+  });
+  root.addEventListener(DISCERN_DETACH_EVENT, event => {
+    const hostId = (event as CustomEvent<{ blockId: string }>).detail.blockId;
+    if (findDiscernConfirm(blocks, hostId)) emit(removeDiscernConfirms(blocks, hostId));
   });
 
   function clearDnd(): void {
@@ -729,6 +752,13 @@ export function mountBlockCanvas(
       bindRowDropTarget(row, index);
       if (canEdit) {
         row.append(createGrip(block, row), createBlockMenu(block));
+        if (options.editOnClick) {
+          row.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest('button, a, input, textarea, select, .lesson-page__grip, .lesson-page__block-menu')) return;
+            select(block.id);
+          });
+        }
       }
 
       if (isLinkedSection(block)) {
@@ -755,7 +785,8 @@ export function mountBlockCanvas(
       const target = pendingReveal;
       pendingReveal = null;
       const row = root.querySelector(`.lesson-page__block[data-block-id="${target}"]`);
-      const editor = row?.querySelector('.lesson-page__inspector') ?? row;
+      const nested = row ? null : root.querySelector(`.hub-list__row[data-key="${CSS.escape(target)}"]`);
+      const editor = nested ?? row?.querySelector('.lesson-page__inspector') ?? row;
       if (editor) scrollElementIntoView(editor);
     }
   }
@@ -778,9 +809,20 @@ export function mountBlockCanvas(
         setHint(result.message);
         return;
       }
-      setHint('');
-      emit(result.blocks);
-      selectAndReveal(block.id);
+      // Only page-level rows can be selected. A block added inside a section,
+      // column or tab opens its container's editor, scrolled to the new block;
+      // selecting the nested id itself left nothing editable on the page.
+      const containerId = rootAncestorId(result.blocks, block.id) ?? block.id;
+      const container = findBlockById(result.blocks, containerId);
+      emit(result.blocks, false);
+      pendingReveal = block.id;
+      if (selectedId === containerId) render();
+      else select(containerId);
+      setHint(
+        containerId !== block.id && container
+          ? `Added inside the ${blockTypeLabel(container).toLowerCase()}. Choose Done to add blocks to the page instead.`
+          : ''
+      );
     },
     revealPublishBlock(blockId: string, errorIds: string[] = [blockId]) {
       publishErrorIds = new Set(errorIds);
@@ -900,7 +942,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     cover: lesson.cover ?? null,
     media,
     title: lesson.title,
-    eyebrow: 'Lesson',
+    eyebrow: pedagogicalModeLabel(lesson.pedagogical_mode),
     entityId: lesson.id,
     editable: true,
     size: 'hero',
@@ -939,6 +981,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   modeSelect.addEventListener('change', () => {
     const pedagogical_mode = modeSelect.value as PedagogicalMode;
     emitLesson({ ...lesson, pedagogical_mode });
+    banner.update({ eyebrow: PEDAGOGICAL_MODE_LABELS[pedagogical_mode] });
     syncQuizPanel();
   });
   metaRow.append(modeSelect);
@@ -1042,6 +1085,17 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         })
       : null;
 
+  revealBlockFromHash(root);
+
+  const networkLines = options.subject?.network_lines ?? [];
+  const lineChips = networkLines.length
+    ? mountLineChips(stripHost, {
+        lines: networkLines,
+        stops: lesson.line_stops,
+        onChange: (stops) => emitLesson({ ...lesson, line_stops: stops })
+      })
+    : null;
+
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
@@ -1053,10 +1107,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       banner.update({
         cover: lesson.cover ?? null,
         title: lesson.title,
+        eyebrow: pedagogicalModeLabel(lesson.pedagogical_mode),
         ...(nextMedia ? { media } : {})
       });
       canvas.update(lesson.blocks, media);
       strip?.update({ attached: lesson, catalog: options.outcomesCatalog ?? [] });
+      lineChips?.update(lesson.line_stops);
     },
     insertType(type: InsertMenuValue) {
       canvas.insertType(type);
@@ -1070,6 +1126,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       pulse.dispose();
       canvas.dispose();
       strip?.dispose();
+      lineChips?.dispose();
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();

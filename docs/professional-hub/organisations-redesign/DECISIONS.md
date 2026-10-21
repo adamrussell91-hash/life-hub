@@ -24,8 +24,8 @@ you know in it, what it could offer you next, and how you got here.
   - **Workplace** (current/former), **Studied**, **Placement**, **Member**,
     **Accreditation**, **Event venue**, **PD/event provider**, **You presented**,
     **Applied**, **Prospect**.
-- An organisation carries as many chips as it has relationships. St. Redacted is
-  both Workplace and Event venue, and Trinity is both a former Workplace and a Placement.
+- An organisation carries as many chips as it has relationships. Tallowwood is
+  both Workplace and Event venue, and Banksia is both a former Workplace and a Placement.
 
 ## How it is run: containers, not 80 lines
 - **Containers carry the structure.** Adam draws units (e.g. English faculty,

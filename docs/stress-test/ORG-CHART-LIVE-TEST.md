@@ -32,7 +32,7 @@ Hard rules:
 - Never print the session cookie or ask for the Life passphrase. If you are not signed in, write
   the log as BLOCKED and stop.
 - Only write to the SANDBOX organisation "ZZ Org Chart Test" (created in step S1). Never edit
-  St. Redacted College or any real organisation. The one exception is R-1 to R-6, which are read-only.
+  Tallowwood College or any real organisation. The one exception is R-1 to R-6, which are read-only.
 - Prefix every name you type with "ZZT " so leftovers are easy to find.
 - Run each test as written. Record PASS / FAIL / FLAKY / BLOCKED for every test ID, with timings.
 - Write exactly one log: docs/stress-test/reports/org-chart-YYYY-MM-DD.md (append -2, -3 if it exists),
@@ -103,13 +103,13 @@ Compare `units`, `positions`, `graph.edges`, `graph.members_by_unit` and `layout
 | ID | Step | Expect |
 |----|------|--------|
 | S1 | Organisations → **Add organisation** → name `ZZ Org Chart Test`. Open it. Record the id from `#/organisations/<id>` as `ORG_ID`. | Org page opens. "How ZZ Org Chart Test is run" shows **Draw the chart** and the empty-state text. |
-| S2 | You need at least 4 people who exist in Life Hub. In the editor's person search, type two letters of names you can see on St. Redacted (e.g. "Ni", "Jo", "Da", "Ph") and note 4 people who come back. **Do not create people.** If search returns no one, mark the people tests BLOCKED. | 4 real people noted as P1–P4. |
+| S2 | You need at least 4 people who exist in Life Hub. In the editor's person search, type two letters of names you can see on Tallowwood (e.g. "Ni", "Jo", "Da", "Ph") and note 4 people who come back. **Do not create people.** If search returns no one, mark the people tests BLOCKED. | 4 real people noted as P1–P4. |
 
 ---
 
-## R. Read-only on a real, populated org (St. Redacted College)
+## R. Read-only on a real, populated org (Tallowwood College)
 
-Open St. Redacted College from Organisations. **Do not click Edit chart, Run now or Add opportunity here.**
+Open Tallowwood College from Organisations. **Do not click Edit chart, Run now or Add opportunity here.**
 
 | ID | Step | Expect / what to log |
 |----|------|----------------------|
@@ -216,7 +216,7 @@ Faculties are added in Edit chart (**+ Faculty / team**) and drawn as containers
 |----|------|
 | C-1 | In the sandbox editor delete every `ZZT` box. Remove the old-sheet memberships if possible. |
 | C-2 | Read-back and list what is left (units can't be deleted). Leave the sandbox org in place and name it in the log so Adam can archive it. |
-| C-3 | Confirm St. Redacted College is unchanged: compare counts with R-3. |
+| C-3 | Confirm Tallowwood College is unchanged: compare counts with R-3. |
 
 ---
 

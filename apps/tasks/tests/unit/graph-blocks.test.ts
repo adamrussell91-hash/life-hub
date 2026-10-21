@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createBlock } from '@/blocks/create-block';
-import { createBlockEditor } from '@/blocks/editors';
-import { renderBlock } from '@/blocks/render';
+import { createBlock } from '@teaching/blocks/create-block';
+import { createBlockEditor } from '@teaching/blocks/editors';
+import { renderBlock } from '@teaching/blocks/render';
 import { BlockSchema } from '@/schemas/block';
 import type { Block } from '@/schemas/block';
 import { buildTree, colourOf, drawConceptLayered, modeOf, withParents, type GraphContent } from '../../../../packages/graph-blocks/graph';

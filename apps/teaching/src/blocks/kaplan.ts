@@ -12,7 +12,7 @@ export const KAPLAN_PATHS: Record<KaplanLens, string> = {
 };
 
 export function canHaveKaplanQualifier(block: Block): boolean {
-  return !['heading', 'divider', 'classroom_tools', 'countdown', 'spacer', 'columns', 'section', 'tabs', 'collection', 'outcomes'].includes(block.block_type);
+  return !['heading', 'divider', 'classroom_tools', 'countdown', 'spacer', 'columns', 'section', 'tabs', 'collection', 'outcomes', 'discern_confirm'].includes(block.block_type);
 }
 
 /** Plain-language symbol drawings: repeating tiles, spectacles, and balance scales. */
@@ -33,18 +33,34 @@ export function kaplanSymbol(lens: KaplanLens): SVGSVGElement {
   return svg;
 }
 
+/** Tidy teacher-typed focus text: one space between words and a single closing mark. */
+export function kaplanFocusText(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ').replace(/([.?!])[.?!]+$/, '$1');
+}
+
+/** A whole sentence reads badly mid-prompt, so it becomes "this idea" and is shown on its own line. */
+export function isKaplanFocusStatement(raw: string): boolean {
+  const text = kaplanFocusText(raw);
+  return /[.?!]$/.test(text) || text.split(' ').length > 6;
+}
+
 export type KaplanStep = { title: string; prompt: string; support: string };
 export function kaplanSteps(qualifier: KaplanQualifier): [KaplanStep, KaplanStep, KaplanStep] {
-  const focus = qualifier.focus || 'the idea in the original activity';
+  const text = kaplanFocusText(qualifier.focus);
+  const statement = isKaplanFocusStatement(text);
+  const focus = !text ? 'the idea in the original activity' : statement ? 'this idea' : text.replace(/[.?!]+$/, '');
+  const explore = statement ? 'connect to this idea' : `help you explore ${focus}`;
+  const explores = statement ? 'connects to this idea' : `helps you explore ${focus}`;
+  const about = statement ? 'in light of this idea' : `in relation to ${focus}`;
   const defaults: Record<KaplanLens, [KaplanStep, KaplanStep, KaplanStep]> = {
     patterns: [
-      { title: 'Choose two details', prompt: `Choose two specific details from this activity that help you explore ${focus}.`, support: 'Record a quotation, observation or example for each. Include where you found it.' },
+      { title: 'Choose two details', prompt: `Choose two specific details from this activity that ${explore}.`, support: 'Record a quotation, observation or example for each. Include where you found it.' },
       { title: 'Find the relationship', prompt: 'Do these details repeat, contrast or show a change? Explain the connection.', support: 'Try: “Both details…”, “Whereas the first…, the second…” or “From… to…”' },
       { title: 'Return to the question', prompt: `What does that relationship reveal about ${focus}? Use it to develop your answer to the original activity.`, support: 'Explain what the relationship suggests, rather than simply naming a pattern.' }
     ],
     multiple_perspectives: [
-      { title: 'Choose one detail', prompt: `Choose one specific detail from this activity that helps you explore ${focus}.`, support: 'Keep this same detail in view as you test both readings. Use a precise quotation, observation or example.' },
-      { title: 'Consider two readings', prompt: `What are two different ways of understanding this detail in relation to ${focus}? Explain what supports each reading.`, support: 'Try: “One reading is… because…” and “Another reading is… because…”. Consider what each reading notices or overlooks.' },
+      { title: 'Choose one detail', prompt: `Choose one specific detail from this activity that ${explores}.`, support: 'Keep this same detail in view as you test both readings. Use a precise quotation, observation or example.' },
+      { title: 'Consider two readings', prompt: `What are two different ways of understanding this detail ${about}? Explain what supports each reading.`, support: 'Try: “One reading is… because…” and “Another reading is… because…”. Consider what each reading notices or overlooks.' },
       { title: 'Make a judgement', prompt: 'Which reading is better supported, or what does their tension reveal? Use your judgement in your answer to the original activity.', support: 'You can favour one reading or explain why both matter. Ground your decision in the detail you chose.' }
     ],
     ethics: [

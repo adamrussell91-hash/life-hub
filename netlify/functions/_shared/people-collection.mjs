@@ -30,6 +30,24 @@ import { withoutSupersededImports } from './person-workplace.mjs';
 
 const PEOPLE_BATCH_SIZE = 10;
 
+/** Store view whose `get` reads each key once; every other method passes through. */
+function memoiseReads(store) {
+  const reads = new Map();
+  return new Proxy(store, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop, target);
+      if (prop !== 'get' || typeof value !== 'function') {
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      return (key, options) => {
+        const cacheKey = `${key}|${options ? JSON.stringify(options) : ''}`;
+        if (!reads.has(cacheKey)) reads.set(cacheKey, value.call(target, key, options));
+        return reads.get(cacheKey);
+      };
+    }
+  });
+}
+
 function personIdFromKey(key) {
   return key.startsWith(PERSON_PREFIX) ? key.slice(PERSON_PREFIX.length) : null;
 }
@@ -116,10 +134,20 @@ export async function loadAllPeopleWithRelationships({
     throw new Error('loadAllPeopleWithRelationships requires a store.');
   }
   const github = { env, fetchImpl };
-  const resolve = (ref, ctx, options = {}) =>
-    (resolveEntity ?? defaultResolveEntity)(ref, ctx, { ...github, ...options });
+  // One scan resolves the same endpoints over and over (every employee of an
+  // organisation, both ends of every person link) and reads every link from
+  // both sides. Memoise both for this scan only, so the cost tracks distinct
+  // records rather than relationship count. Nothing outlives the call.
+  const resolved = new Map();
+  const resolve = (ref, ctx, options = {}) => {
+    const key = `${typeof ref === 'string' ? ref : formatEntityRef(ref)}|${options.includeArchived ? 1 : 0}`;
+    if (!resolved.has(key)) {
+      resolved.set(key, (resolveEntity ?? defaultResolveEntity)(ref, ctx, { ...github, ...options }));
+    }
+    return resolved.get(key);
+  };
   const buildRepository = createRepository ?? createUniversalLinkRepository;
-  const repo = buildRepository({ store, resolveEntity: resolve });
+  const repo = buildRepository({ store: memoiseReads(store), resolveEntity: resolve });
   const accessContext = createAccessContext({ workflow: 'life' });
 
   const personKeys = await listAuthoritativePersonKeys(store);

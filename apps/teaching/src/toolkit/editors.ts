@@ -592,7 +592,6 @@ export function createToolkitSkillEditor(
 const PAIR_LEVEL_OPTIONS: Array<{ value: PairLevel; label: string }> = [
   { value: 'none', label: 'None' },
   { value: 'level1', label: 'Concrete' },
-  { value: 'level2', label: 'Abstract' },
   { value: 'level3', label: 'Harder' },
   { value: 'maths', label: 'Maths' },
   { value: 'inquiry', label: 'Inquiry' }
@@ -1093,6 +1092,10 @@ export function createQuestionQuadrantEditor(
           c.stimulus = value;
           api.emit();
         }, { multiline: true, rows: 3 }),
+        checkbox('Students send their own questions and place them on the quadrant', c.collect_questions, (checked) => {
+          c.collect_questions = checked;
+          api.emit();
+        }),
         el('span', 'tk-ed__label', 'Questions to sort'),
         questionList.el,
         empty

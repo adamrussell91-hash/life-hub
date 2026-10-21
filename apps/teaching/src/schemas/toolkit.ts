@@ -57,7 +57,11 @@ export const ToolkitSkillContentSchema = z.object({
 });
 
 export const ToolFrameSchema = z.enum(['fork', 'steps', 'converter', 'stress']);
-export const PairLevelSchema = z.enum(['none', 'level1', 'level2', 'level3', 'maths', 'inquiry']);
+// 'level2' (abstract pairs) was retired; saved blocks that chose it fall back to no pairs.
+export const PairLevelSchema = z.preprocess(
+  (value) => (value === 'level2' ? 'none' : value),
+  z.enum(['none', 'level1', 'level3', 'maths', 'inquiry'])
+);
 export const StressVerdictSchema = z.enum(['survives', 'fails', 'qualifies']);
 
 export const ForkSlotsSchema = z.object({
@@ -157,6 +161,8 @@ export const QuestionQuadrantContentSchema = z.object({
   guide: z.string().default(''),
   stimulus: z.string().default(''),
   procedure: z.enum(['sort', 'create']).default('sort'),
+  /** Students send their own questions and place them on the quadrant (live, published lesson). */
+  collect_questions: z.boolean().default(false),
   questions: z
     .array(z.object({ id: z.string().min(1), text: z.string(), quadrant: QuadrantSchema }))
     .max(16)

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
-import { BlockSchema } from './block';
+import { BlockSchema, LineStopSchema } from './block';
 import { QuizSettingsSchema } from '../quiz/core';
 import { visitBlocks } from '../blocks/walk-blocks';
 import { CoverSchema } from './cover';
@@ -32,6 +32,8 @@ export const LessonSchema = z.object({
   review_status: z.enum(['needs_review', 'none']).optional(),
   syllabus_outcomes: z.array(z.string().min(1).max(32)).max(24).optional(),
   outcome_ids: z.array(z.string().min(1).max(64)).max(24).optional(),
+  /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
+  line_stops: z.array(LineStopSchema).max(16).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */

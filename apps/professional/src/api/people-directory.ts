@@ -37,6 +37,8 @@ export interface DirectoryPersonRow {
   they_owe_count: number;
   pending_proposal_count?: number;
   next_label: string | null;
+  /** `active` unless archived; archived rows are hidden by default. */
+  lifecycle_status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +58,12 @@ export interface PeopleDirectoryResponse {
   students?: DirectoryPersonRow[];
   organisations: DirectoryOrganisation[];
   counts: { people: number; organisations: number; students?: number };
+}
+
+/** The last finished server scan, saved for a session's first paint. */
+export interface PeopleDirectorySnapshot extends PeopleDirectoryResponse {
+  /** ISO time of the scan that produced it. */
+  as_of: string;
 }
 
 let lastDirectory: PeopleDirectoryResponse | null = null;
@@ -82,6 +90,16 @@ export async function fetchPeopleDirectory(
     lastRevision = revision;
   }
   return data;
+}
+
+/** Saved copy of the last scan, or null if none yet. Never a substitute for `fetchPeopleDirectory`. */
+export async function fetchPeopleDirectorySnapshot(
+  options: { signal?: AbortSignal } = {}
+): Promise<PeopleDirectorySnapshot | null> {
+  const data = await apiGet<PeopleDirectorySnapshot | null>('/api/people/directory?snapshot=1', {
+    signal: options.signal
+  });
+  return data && typeof data.as_of === 'string' && Array.isArray(data.people) ? data : null;
 }
 
 export interface UpdateOrganisationInput {
