@@ -241,7 +241,7 @@ export function mountPageRelationshipsEditor(options: {
   const pickerInput = document.createElement('input');
   pickerInput.type = 'text';
   pickerInput.className = 'compose__relationship-picker';
-  pickerInput.placeholder = 'Type @ to link a page';
+  pickerInput.placeholder = 'Link a page';
   pickerInput.setAttribute('aria-label', 'Link a related page');
   pickerInput.disabled = Boolean(options.disabled);
 
@@ -300,6 +300,7 @@ export function mountPageRelationshipsEditor(options: {
   });
 
   const picker = createEntityPicker({
+    mode: 'field',
     input: pickerInput,
     allowedKinds: ['page'],
     emptyText: 'No matching pages.',

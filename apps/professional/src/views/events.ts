@@ -259,7 +259,7 @@ export async function renderEventNewView(
 
   const orgInput = document.createElement('input');
   orgInput.type = 'text';
-  orgInput.placeholder = 'Type @ to add provider or venue';
+  orgInput.placeholder = 'Add a provider or venue';
   orgInput.setAttribute('aria-label', 'Organisation link');
 
   const orgRel = document.createElement('select');
@@ -273,12 +273,12 @@ export async function renderEventNewView(
 
   const presenterInput = document.createElement('input');
   presenterInput.type = 'text';
-  presenterInput.placeholder = 'Type @ to add a presenter';
+  presenterInput.placeholder = 'Add a presenter';
   presenterInput.setAttribute('aria-label', 'Presenter');
 
   const knowledgeInput = document.createElement('input');
   knowledgeInput.type = 'text';
-  knowledgeInput.placeholder = 'Type @ to link a Knowledge page';
+  knowledgeInput.placeholder = 'Link a Knowledge page';
   knowledgeInput.setAttribute('aria-label', 'Related knowledge page');
 
   const status = el('p', 'event-form__status');
@@ -301,6 +301,7 @@ export async function renderEventNewView(
   });
 
   const picker = createEntityPicker({
+    mode: 'field',
     input: orgInput,
     allowedKinds: ['organisation'],
     emptyText: 'No matching organisations.',
@@ -329,6 +330,7 @@ export async function renderEventNewView(
   });
 
   const presenterPicker = createEntityPicker({
+    mode: 'field',
     input: presenterInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',
@@ -366,7 +368,7 @@ export async function renderEventNewView(
 
   const attendeeInput = document.createElement('input');
   attendeeInput.type = 'text';
-  attendeeInput.placeholder = 'Type @ to add a person';
+  attendeeInput.placeholder = 'Add a person';
   attendeeInput.setAttribute('aria-label', 'Attendee');
 
   const attendeeRole = document.createElement('select');
@@ -383,6 +385,7 @@ export async function renderEventNewView(
   }
 
   const attendeePicker = createEntityPicker({
+    mode: 'field',
     input: attendeeInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',

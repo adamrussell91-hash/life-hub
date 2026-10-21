@@ -55,7 +55,7 @@ export function renderTaskRelationshipsSection(taskId: string): TaskRelationship
   const pickerInput = document.createElement('input');
   pickerInput.type = 'text';
   pickerInput.className = 'task-editor__relationship-picker';
-  pickerInput.placeholder = 'Type @ to link a Person';
+  pickerInput.placeholder = 'Link a Person';
   pickerInput.setAttribute('aria-label', 'Link a Person');
 
   const chipsHost = el('div', 'task-editor__relationship-chips');
@@ -80,6 +80,7 @@ export function renderTaskRelationshipsSection(taskId: string): TaskRelationship
   });
 
   const picker = createEntityPicker({
+    mode: 'field',
     input: pickerInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',

@@ -235,6 +235,7 @@ export function renderFutureDetail(
     input.setAttribute('aria-label', 'Link existing task');
     linkExisting.append(input);
     createEntityPicker({
+      mode: 'field',
       input,
       allowedKinds: ['task'],
       emptyText: 'No matching tasks.',

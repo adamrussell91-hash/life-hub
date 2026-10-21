@@ -205,17 +205,17 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
 
   const orgInput = document.createElement('input');
   orgInput.type = 'text';
-  orgInput.placeholder = 'Type @ to add organisation (applies to)';
+  orgInput.placeholder = 'Add organisation (applies to)';
   orgInput.setAttribute('aria-label', 'Organisation');
 
   const contactInput = document.createElement('input');
   contactInput.type = 'text';
-  contactInput.placeholder = 'Type @ to add application contact';
+  contactInput.placeholder = 'Add application contact';
   contactInput.setAttribute('aria-label', 'Application contact');
 
   const refereeInput = document.createElement('input');
   refereeInput.type = 'text';
-  refereeInput.placeholder = 'Type @ to add referee';
+  refereeInput.placeholder = 'Add referee';
   refereeInput.setAttribute('aria-label', 'Referee');
 
   const refereeRole = document.createElement('select');
@@ -229,7 +229,7 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
 
   const knowledgeInput = document.createElement('input');
   knowledgeInput.type = 'text';
-  knowledgeInput.placeholder = 'Type @ to link a Knowledge page';
+  knowledgeInput.placeholder = 'Link a Knowledge page';
   knowledgeInput.setAttribute('aria-label', 'Related knowledge page');
 
   const chipsHost = el('div', 'application-form__chips');
@@ -240,6 +240,7 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
   });
 
   const orgPicker = createEntityPicker({
+    mode: 'field',
     input: orgInput,
     allowedKinds: ['organisation'],
     emptyText: 'No matching organisations.',
@@ -266,6 +267,7 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
   });
 
   const contactPicker = createEntityPicker({
+    mode: 'field',
     input: contactInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',
@@ -292,6 +294,7 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
   });
 
   const refereePicker = createEntityPicker({
+    mode: 'field',
     input: refereeInput,
     allowedKinds: ['person'],
     emptyText: 'No matching people.',
@@ -1197,6 +1200,7 @@ async function mountApplicationRelationshipEditor(options: {
       host.append(input, chipsHost);
       if (roleSelect) host.append(roleSelect);
       createEntityPicker({
+        mode: 'field',
         input,
         allowedKinds: kinds,
         emptyText: 'No matches.',
@@ -1235,8 +1239,8 @@ async function mountApplicationRelationshipEditor(options: {
       });
     }
 
-    addPicker('Organisation', 'Type @ to set organisation (applies to)', ['organisation'], 'applies_to');
-    addPicker('Application contact', 'Type @ to add application contact', ['person'], 'application_contact');
+    addPicker('Organisation', 'Set organisation (applies to)', ['organisation'], 'applies_to');
+    addPicker('Application contact', 'Add application contact', ['person'], 'application_contact');
     const refereeRole = document.createElement('select');
     refereeRole.setAttribute('aria-label', 'Referee role');
     for (const value of ['professional', 'character', 'academic'] as const) {
@@ -1245,11 +1249,11 @@ async function mountApplicationRelationshipEditor(options: {
       option.textContent = value;
       refereeRole.append(option);
     }
-    addPicker('Referee', 'Type @ to add referee', ['person'], 'referee', refereeRole);
+    addPicker('Referee', 'Add referee', ['person'], 'referee', refereeRole);
 
     const knowledgeInput = document.createElement('input');
     knowledgeInput.type = 'text';
-    knowledgeInput.placeholder = 'Type @ to link a Knowledge page';
+    knowledgeInput.placeholder = 'Link a Knowledge page';
     knowledgeInput.setAttribute('aria-label', 'Related knowledge page');
     host.append(knowledgeInput);
     mountKnowledgePagePicker({

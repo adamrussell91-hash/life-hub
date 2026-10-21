@@ -612,6 +612,26 @@ describe('renderEventNewView', () => {
     expect(canvas.querySelector('[aria-label="Organisation link"]')).toBeTruthy();
   });
 
+  it('searches people and organisations from a plain name, no @ needed', async () => {
+    vi.useFakeTimers();
+    try {
+      const canvas = document.createElement('div');
+      await renderEventNewView(canvas);
+      for (const label of ['Presenter', 'Attendee', 'Organisation link']) {
+        const input = canvas.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+        expect(input.placeholder).not.toMatch(/@/);
+        vi.mocked(fetch).mockClear();
+        input.value = 'Jo Bloggs';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(250);
+        const searched = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
+        expect(searched.some((url) => url.includes('/api/entities/search') && url.includes('Jo'))).toBe(true);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('posts selected type and hours on the hours log', async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'POST' && !String(input).includes('action=')) {
