@@ -82,10 +82,10 @@ export const dmRolePlaying = listTool({
       { id: 'resource_investigator', label: 'Resource investigator', prompt: 'Explores options, builds contacts' },
       { id: 'coordinator', label: 'Coordinator', prompt: 'Moves decisions along, hands out work' },
       { id: 'shaper', label: 'Shaper', prompt: 'Pushes past obstacles' },
-      { id: 'monitor_evaluator', label: 'Monitor', prompt: 'Tests whether it will work' },
-      { id: 'teamworker', label: 'Team worker', prompt: 'Keeps people talking and things moving' },
+      { id: 'monitor_evaluator', label: 'Monitor evaluator', prompt: 'Tests whether it will work' },
+      { id: 'teamworker', label: 'Teamworker', prompt: 'Keeps people talking and things moving' },
       { id: 'implementer', label: 'Implementer', prompt: 'Turns ideas into practice' },
-      { id: 'completer_finisher', label: 'Completer', prompt: 'Careful, and on time' },
+      { id: 'completer_finisher', label: 'Completer finisher', prompt: 'Careful, and on time' },
       { id: 'specialist', label: 'Specialist', prompt: 'Brings expert knowledge' }
     ],
     entry: 'What one hat brings to the decision, or who fills one role',
