@@ -6,6 +6,7 @@ import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { attachedSteppedLenses } from '@/blocks/lenses/registry';
+import { renderAnchorBridge, renderHumanExperienceTable } from '@/blocks/formats/question-set-formats';
 import { renderSteppedLenses } from '@/blocks/lenses/stepped-view';
 import { canHaveDiscern } from '@/blocks/discern';
 import { renderDiscern } from '@/blocks/discern-view';
@@ -761,8 +762,11 @@ export function renderTableBlock(
 
 export function renderQuestionSetBlock(
   block: Extract<Block, { block_type: 'question_set' }>,
-  mode: RenderMode
+  mode: RenderMode,
+  ctx: RenderContext = {}
 ): HTMLElement {
+  if (block.content.format === 'human_experience_table') return wrapBlock(renderHumanExperienceTable(block, mode, ctx), block, mode);
+  if (block.content.format === 'anchor_bridge') return wrapBlock(renderAnchorBridge(block, mode, ctx), block, mode);
   const wrap = document.createElement('div');
   wrap.className = 'block-question-set';
 
@@ -2306,7 +2310,7 @@ function renderBlockContent(
     case 'quiz_question':
       return wrapBlock(renderQuizQuestion(block, mode, ctx), block, mode);
     case 'question_set':
-      return renderQuestionSetBlock(block, mode);
+      return renderQuestionSetBlock(block, mode, ctx);
     case 'flashcards':
       return renderFlashcardsBlock(block, mode);
     case 'cloze':

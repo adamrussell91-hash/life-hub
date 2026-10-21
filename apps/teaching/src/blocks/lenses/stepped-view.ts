@@ -1,6 +1,7 @@
 import type { Block } from '@/schemas/block';
 import { kaplanFocusText } from '../kaplan';
 import { loadActivityState, saveActivityState, storageKey } from '../learning-activity';
+import { copyAnswerButton, HANDOVER_TEXT } from './handover';
 import { lensLevel, type AttachedLens } from './registry';
 import {
   LENS_LEVELS, STUDENT_LEVEL_LABELS, type LensConfig, type LensLevel, type LensStep, type StepContext, type SteppedLens
@@ -302,18 +303,14 @@ export function renderSteppedLenses(
       workspace.append(example);
     }
     workspace.append(el('p', 'lens-handover', notesMode
-      ? 'This page won’t keep your answer. Write it in your book or document now.'
+      ? HANDOVER_TEXT
       : 'Write your answer in your book or document now.'));
 
     const status = el('p', 'kaplan-caption');
     status.setAttribute('role', 'status');
     if (answer) {
       const box = answer;
-      actions.append(button('Copy', 'btn btn--ghost', () => {
-        const copied = navigator.clipboard?.writeText(box.value);
-        if (copied) copied.then(() => { status.textContent = 'Copied.'; }, () => { box.select(); status.textContent = 'Select your answer and copy it.'; });
-        else { box.select(); status.textContent = 'Select your answer and copy it.'; }
-      }));
+      actions.append(copyAnswerButton(box, status));
     }
     actions.append(button('I’ve written it down', 'btn btn--secondary', () => {
       state.done = true;

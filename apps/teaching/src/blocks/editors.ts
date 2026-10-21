@@ -6,6 +6,7 @@ import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
+import { createFormatField, withFormat } from '@/blocks/formats/registry';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
@@ -1527,9 +1528,12 @@ export function createQuestionSetEditor(
   }));
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        // Keep the format and its table settings, which have their own controls.
+        ...latest.content,
         title: title.value.trim() || undefined,
         questions: questions.map((q) => ({
           id: q.id,
@@ -1620,7 +1624,42 @@ export function createQuestionSetEditor(
   });
   list.el.classList.add('block-editor__questions');
 
-  fields.append(title, list.el);
+  // Human experience table settings, shown only for that format.
+  const tableSettings = document.createElement('div');
+  tableSettings.className = 'block-editor__inline-settings block-editor__table-settings';
+  const tableRows = createChoice({
+    key: 'Rows',
+    value: String(block.content.table?.rows ?? 3),
+    options: ['3', '4', '5'].map((n) => ({ value: n, label: n })),
+    className: 'block-editor__table-rows',
+    ariaLabel: 'Table rows',
+    onChange: (value) => setTable({ rows: Number(value) })
+  });
+  const exampleRow = createChoice({
+    key: 'Example row',
+    value: block.content.table?.example === false ? 'hide' : 'show',
+    options: [{ value: 'show', label: 'Show' }, { value: 'hide', label: 'Hide' }],
+    className: 'block-editor__table-example',
+    ariaLabel: 'Example row',
+    onChange: (value) => setTable({ example: value === 'show' })
+  });
+  tableSettings.append(tableRows.el, exampleRow.el);
+  const setTable = (patch: { rows?: number; example?: boolean }) => {
+    const latest = getLatest();
+    const table = { rows: 3, example: true, ...latest.content.table, ...patch };
+    onChange({ ...latest, content: { ...latest.content, table } });
+  };
+  const showTableSettings = (format: string) => { tableSettings.hidden = format !== 'human_experience_table'; };
+  showTableSettings(block.content.format ?? 'standard');
+  const format = createFormatField({
+    block,
+    onPick: (id) => {
+      onChange(withFormat(getLatest(), id));
+      showTableSettings(id);
+    }
+  });
+
+  fields.append(...(format ? [format] : []), tableSettings, title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
