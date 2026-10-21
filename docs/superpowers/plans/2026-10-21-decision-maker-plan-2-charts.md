@@ -4074,10 +4074,10 @@ await build({
 </html>
 ```
 
-Append to `.gitignore`:
+Append to `.gitignore` (the comment names no path: a `word/word` comment fails the `.gitignore` secrets-scanning test):
 
 ```
-# Decision Maker contact sheet build output: rebuild with scripts/build-decision-book-contact-sheet.mjs.
+# Decision Maker contact sheet build output: rebuild with the build-decision-book-contact-sheet script.
 /docs/mockups/decision-maker/contact-sheet.js
 /docs/mockups/decision-maker/contact-sheet.css
 ```
