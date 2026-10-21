@@ -43,6 +43,7 @@ export const BlockTypeSchema = z.enum([
   'peer_feedback',
   'question_drop',
   'brainstorm',
+  'continuum_line',
   'curriculum_lines',
   'quiz_question',
   'question_set',
@@ -507,6 +508,38 @@ export const PeerFeedbackBlockSchema = z.object({
     mode: z.enum(['comments', 'annotate']).default('comments'),
     strength_prompt: z.string().max(300).default('One thing that works well…'),
     suggestion_prompt: z.string().max(300).default('One suggestion or question…')
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Continuum line: students place their symbol on a line for each statement
+ * about one stimulus and give a reason. Snapped statements land on the ends
+ * or the named stops; the rules live on the server.
+ */
+export const ContinuumStatementSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().max(300).default(''),
+  snap: z.boolean().default(false)
+});
+export const ContinuumLineBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('continuum_line'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    stimulus: z.object({
+      kind: z.enum(['text', 'image', 'video']).default('text'),
+      text: z.string().max(2000).default(''),
+      url: z.string().max(2000).default(''),
+      alt_text: z.string().max(500).default('')
+    }).default({ kind: 'text', text: '', url: '', alt_text: '' }),
+    scale: z.object({
+      left: z.string().max(40).default('Implied'),
+      right: z.string().max(40).default('Not implied'),
+      stops: z.array(z.string().max(40)).max(3).default([])
+    }).default({ left: 'Implied', right: 'Not implied', stops: [] }),
+    statements: z.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z.enum(['teacher', 'student']).default('teacher'),
+    replace: z.boolean().default(true)
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -1459,6 +1492,7 @@ const leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,

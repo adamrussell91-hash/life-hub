@@ -593,6 +593,7 @@ var BlockTypeSchema = z7.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "continuum_line",
   "curriculum_lines",
   "quiz_question",
   "question_set",
@@ -1012,6 +1013,36 @@ var PeerFeedbackBlockSchema = z7.object({
     mode: z7.enum(["comments", "annotate"]).default("comments"),
     strength_prompt: z7.string().max(300).default("One thing that works well\u2026"),
     suggestion_prompt: z7.string().max(300).default("One suggestion or question\u2026")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var ContinuumStatementSchema = z7.object({
+  id: z7.string().min(1),
+  text: z7.string().max(300).default(""),
+  snap: z7.boolean().default(false)
+});
+var ContinuumLineBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("continuum_line"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    stimulus: z7.object({
+      kind: z7.enum(["text", "image", "video"]).default("text"),
+      text: z7.string().max(2e3).default(""),
+      url: z7.string().max(2e3).default(""),
+      alt_text: z7.string().max(500).default("")
+    }).default({ kind: "text", text: "", url: "", alt_text: "" }),
+    scale: z7.object({
+      left: z7.string().max(40).default("Implied"),
+      right: z7.string().max(40).default("Not implied"),
+      stops: z7.array(z7.string().max(40)).max(3).default([])
+    }).default({ left: "Implied", right: "Not implied", stops: [] }),
+    statements: z7.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z7.enum(["teacher", "student"]).default("teacher"),
+    replace: z7.boolean().default(true)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1842,6 +1873,7 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
@@ -2069,6 +2101,8 @@ export {
   ColumnsBlockSchema,
   ConceptFeaturesBlockSchema,
   ConceptMapBlockSchema,
+  ContinuumLineBlockSchema,
+  ContinuumStatementSchema,
   CountdownBlockSchema,
   CurriculumGateSchema,
   CurriculumLinesBlockSchema,
