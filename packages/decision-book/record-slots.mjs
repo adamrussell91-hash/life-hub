@@ -14,3 +14,9 @@ export const RECORD_SLOTS = Object.freeze({
 });
 
 export const RECORD_SLOT_NAMES = Object.freeze(Object.keys(RECORD_SLOTS));
+
+/** Reasons a record holds at most. */
+export const REASONS_MAX = 5;
+
+/** Review's tool: the feedback analysis compares what was expected with what happened. */
+export const FEEDBACK_ID = 'dm_feedback_analysis';
