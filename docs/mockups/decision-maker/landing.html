@@ -50,7 +50,7 @@ button, textarea, input { font: inherit; color: inherit; }
 .dm-glyph { display: inline-flex; width: 20px; height: 20px; flex: none; color: var(--dm-ink); }
 .dm-glyph svg, .dm-emblem svg { width: 100%; height: 100%; display: block; }
 .dm-emblem { display: inline-flex; width: 28px; height: 28px; flex: none; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; cursor: pointer; font-weight: 600; transition: transform 180ms var(--dm-ease), background 180ms; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; cursor: pointer; font-weight: 600; transition: transform 180ms var(--dm-ease), background 180ms; }
 .btn--primary { background: var(--dm-ink); color: var(--dm-paper); }
 .btn--primary:hover { transform: translateY(-1px); }
 .btn--ghost { background: transparent; border: 1px solid var(--dm-line); }
@@ -75,29 +75,31 @@ button, textarea, input { font: inherit; color: inherit; }
 .hero h1 .mark { width: 0.86em; height: 0.86em; flex: none; display: inline-flex; }
 .hero h1 .mark svg { width: 100%; height: 100%; }
 .hero h1 span { display: inline-flex; align-items: baseline; gap: 0.12em; }
-.hero h1 i { display: inline-block; width: 0.5em; height: 0.5em; background: var(--dm-red); font-style: normal; animation: bob 4s var(--dm-ease) infinite; }
-.hero h1 i:nth-of-type(2) { background: var(--dm-green); clip-path: polygon(0 0, 100% 100%, 0 100%); animation-delay: -1.3s; }
-.hero h1 i:nth-of-type(3) { background: var(--dm-ink); width: 0.25em; animation-delay: -2.6s; }
-@keyframes bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-0.08em) rotate(90deg); } }
+.hero h1 i { display: inline-block; width: 0.5em; height: 0.5em; border-radius: 50%; background: var(--dm-red); font-style: normal; animation: bob 4s var(--dm-ease) infinite; }
+.hero h1 i:nth-of-type(2) { background: var(--dm-green); animation-delay: -1.3s; }
+.hero h1 i:nth-of-type(3) { background: var(--dm-ink); border-radius: 0; width: 0.62em; height: 0.36em; clip-path: polygon(0 32%, 55% 32%, 50% 0, 100% 50%, 50% 100%, 55% 68%, 0 68%, 12% 50%); animation: nudge 4s var(--dm-ease) infinite -2.6s; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.08em); } }
+@keyframes nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(0.12em); } }
 .hero__lede { margin: 0; font-size: 17px; color: var(--muted); max-width: 46ch; }
 
-.start { position: relative; background: var(--card); border: 1.5px solid var(--dm-ink); padding: 20px; display: grid; gap: 14px; overflow: hidden; }
-.start::before { content: ""; position: absolute; right: 0; top: 0; width: 44px; height: 44px; background: var(--dm-red); clip-path: polygon(0 0, 100% 0, 100% 100%); transform: scale(var(--pulse, 1)); transform-origin: top right; transition: transform 260ms var(--dm-spring); }
+.start { position: relative; background: var(--card); border: 1px solid var(--dm-line); border-radius: 24px; padding: 20px; display: grid; gap: 14px; overflow: hidden; }
+.start__disc { position: absolute; right: -30px; top: -30px; width: 96px; height: 96px; transform: scale(var(--pulse, 1)); transition: transform 260ms var(--dm-spring); }
+.start__disc svg { width: 100%; height: 100%; }
 .start label { font-weight: 700; font-size: 17px; position: relative; }
-.start textarea { width: 100%; min-height: 84px; resize: vertical; border: 0; background: var(--dm-soft); padding: 14px 16px; font-size: 16px; line-height: 1.45; }
+.start textarea { width: 100%; min-height: 84px; resize: vertical; border: 0; border-radius: 14px; background: var(--dm-soft); padding: 14px 16px; font-size: 16px; line-height: 1.45; }
 .start textarea::placeholder { color: var(--muted); }
 .start__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
 .start__tries { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.try { border: 1px solid var(--dm-line); background: transparent; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.try { border: 1px solid var(--dm-line); border-radius: 999px; background: transparent; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }
 .try:hover { color: var(--dm-ink); background: var(--dm-soft); }
 
-.quick { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 14px 16px; background: var(--dm-green-tint); border: 1px solid var(--dm-line); }
+.quick { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 14px 16px; background: var(--dm-green-tint); border-radius: 20px; }
 .quick__mark { grid-row: span 2; width: 44px; height: 44px; }
 .quick__mark svg { width: 100%; height: 100%; }
 .quick p { margin: 0; font-size: 14px; }
 .quick p b { font-size: 15px; }
 .quick__row { display: flex; gap: 8px; min-width: 0; }
-.quick input { flex: 1 1 auto; min-width: 0; border: 0; background: var(--card); padding: 0 12px; min-height: 40px; font-size: 14.5px; }
+.quick input { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 999px; background: var(--card); padding: 0 12px; min-height: 40px; font-size: 14.5px; }
 .quick .btn { min-height: 40px; padding: 0 16px; }
 
 .board { position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 4 / 3; }
@@ -105,8 +107,8 @@ button, textarea, input { font: inherit; color: inherit; }
 .tile { transform-box: fill-box; transform-origin: center; }
 .tile.enter { animation: tileIn 720ms var(--dm-spring) both; }
 .tile.leave { animation: tileOut 300ms var(--dm-ease) both; }
-@keyframes tileIn { from { transform: scale(0) rotate(-90deg); } to { transform: scale(1) rotate(0); } }
-@keyframes tileOut { to { transform: scale(0) rotate(90deg); } }
+@keyframes tileIn { from { transform: translateX(-24px) scale(0); } to { transform: none; } }
+@keyframes tileOut { to { transform: translateX(24px) scale(0); } }
 .board__caption { position: absolute; left: 0; bottom: -28px; font: 500 11px var(--font-mono); color: var(--muted); letter-spacing: 0.02em; }
 
 /* ── Section heads ── */
@@ -117,59 +119,60 @@ button, textarea, input { font: inherit; color: inherit; }
 
 /* ── Decisions as built squares ── */
 .problems { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; list-style: none; margin: 0; padding: 0; }
-.prob { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; align-items: start; padding: 18px; background: var(--card); border: 1px solid var(--dm-line); text-decoration: none; color: inherit; transition: transform 260ms var(--dm-ease), border-color 260ms; animation: rise 600ms var(--dm-ease) both; animation-delay: calc(var(--i) * 90ms + 300ms); }
+.prob { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; align-items: start; padding: 18px; border-radius: 22px; background: var(--card); border: 1px solid var(--dm-line); text-decoration: none; color: inherit; transition: transform 260ms var(--dm-ease), border-color 260ms; animation: rise 600ms var(--dm-ease) both; animation-delay: calc(var(--i) * 90ms + 300ms); }
 .prob:hover { transform: translateY(-3px); border-color: var(--dm-ink); }
 @keyframes rise { from { transform: translateY(14px); } }
 .medal { width: 92px; height: 92px; }
 .medal svg { width: 100%; height: 100%; overflow: visible; }
 .medal .piece { transform-box: fill-box; transform-origin: center; transition: transform 420ms var(--dm-spring); }
-.prob:hover .medal .q0 { transform: translate(-3px, -3px); }
-.prob:hover .medal .q1 { transform: translate(3px, -3px); }
-.prob:hover .medal .q2 { transform: translate(-3px, 3px); }
-.prob:hover .medal .q3 { transform: translate(3px, 3px); }
-.prob:hover .medal .p-tool { transform: rotate(90deg); }
+.prob:hover .medal .p-l, .prob:hover .medal .p-back { transform: translateX(-4px); }
+.prob:hover .medal .p-r, .prob:hover .medal .p-fwd { transform: translateX(4px); }
+.prob:hover .medal .p-tool { transform: scale(1.1); }
 .prob__body { display: grid; gap: 6px; min-width: 0; }
 .prob__title { margin: 0; font-size: 16.5px; font-weight: 650; line-height: 1.3; text-wrap: pretty; }
 .prob__meta { margin: 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .phase { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--dm-ink); }
-.phase::before { content: ""; width: 9px; height: 9px; background: var(--c, var(--dm-red)); }
+.phase::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--dm-red)); }
 .prob__skills { display: flex; gap: 4px; margin-top: 4px; }
 .prob__skills .dm-glyph { width: 18px; height: 18px; opacity: 0.85; }
-.prob--new { place-items: center; grid-template-columns: 1fr; text-align: center; background: transparent; border: 1.5px dashed var(--dm-line); color: var(--muted); min-height: 128px; cursor: pointer; font-size: 15px; }
+.prob--new { place-items: center; grid-template-columns: 1fr; text-align: center; background: transparent; border: 1.5px dashed var(--dm-line); border-radius: 22px; color: var(--muted); min-height: 128px; cursor: pointer; font-size: 15px; }
 .prob--new:hover { color: var(--dm-ink); border-color: var(--dm-ink); }
 
 /* ── How a session builds: four square stations on a ruled line ── */
-.build { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--card); border: 1px solid var(--dm-line); padding: 26px 22px; position: relative; }
-.build::before { content: ""; position: absolute; left: 36px; right: 36px; top: 59px; height: 2px; background: var(--dm-ink); }
+.build { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--card); border: 1px solid var(--dm-line); border-radius: 26px; padding: 26px 22px; position: relative; }
+.build::before { content: ""; position: absolute; left: 36px; right: 44px; top: 59px; border-top: 2px dotted var(--dm-ink); }
+.build::after { content: ""; position: absolute; right: 30px; top: 53px; width: 14px; height: 14px; background: var(--dm-ink); clip-path: polygon(0 0, 100% 50%, 0 100%); }
 .build__step { display: grid; gap: 10px; justify-items: start; padding: 0 14px; position: relative; min-width: 0; }
-.build__art { width: 68px; height: 68px; background: var(--card); position: relative; }
+.build__art { width: 68px; height: 68px; background: var(--card); border-radius: 50%; position: relative; }
 .build__art svg { width: 100%; height: 100%; overflow: visible; }
 .build__step h3 { margin: 0; font-size: 15.5px; }
 .build__step p { margin: 0; font-size: 13.5px; color: var(--muted); }
 .build__n { font: 500 11px var(--font-mono); color: var(--muted); }
-.assemble rect { transform-box: fill-box; transform-origin: center; animation: drop 6s var(--dm-ease) infinite; }
-.assemble rect:nth-child(2) { animation-delay: 0.3s; } .assemble rect:nth-child(3) { animation-delay: 0.6s; } .assemble rect:nth-child(4) { animation-delay: 0.9s; }
+.assemble > * { transform-box: fill-box; transform-origin: center; animation: drop 6s var(--dm-ease) infinite; }
+.assemble > :nth-child(2) { animation-delay: 0.3s; } .assemble > :nth-child(3) { animation-delay: 0.6s; } .assemble > :nth-child(4) { animation-delay: 0.9s; }
 @keyframes drop { 0% { transform: translateY(-24px); opacity: 0; } 12%, 85% { transform: none; opacity: 1; } 100% { opacity: 0; } }
-.turn { transform-box: fill-box; transform-origin: center; animation: turn 8s var(--dm-spring) infinite; }
-@keyframes turn { 0%, 20% { transform: rotate(0); } 25%, 45% { transform: rotate(90deg); } 50%, 70% { transform: rotate(180deg); } 75%, 95% { transform: rotate(270deg); } 100% { transform: rotate(360deg); } }
+.turn { animation: back 2.4s var(--dm-ease) infinite; }
+@keyframes back { 50% { transform: translateX(-6px); } }
+.go { animation: go 2.4s var(--dm-ease) infinite; }
+@keyframes go { 50% { transform: translateX(6px); } }
 
 /* ── The four sections ── */
 .sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.sect { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 16px; padding: 18px; border: 1px solid var(--dm-line); background: transparent; transition: background 220ms; }
+.sect { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 16px; padding: 18px; border: 1px solid var(--dm-line); border-radius: 22px; background: transparent; transition: background 220ms; }
 .sect:hover { background: var(--card); }
 .sect__mark { width: 76px; height: 76px; }
 .sect__mark svg { width: 100%; height: 100%; }
 .sect h3 { margin: 0; font-size: 16px; }
 .sect p { margin: 2px 0 12px; font-size: 13.5px; color: var(--muted); }
 .sect__shelf { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.model { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border: 0; background: var(--dm-soft); cursor: pointer; text-align: center; min-width: 0; }
+.model { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border: 0; border-radius: 16px; background: var(--dm-soft); cursor: pointer; text-align: center; min-width: 0; }
 .model .dm-emblem { width: 40px; height: 40px; transition: transform 520ms var(--dm-spring); }
-.model:hover .dm-emblem, .model:focus-visible .dm-emblem { transform: rotate(-90deg); }
+.model:hover .dm-emblem, .model:focus-visible .dm-emblem { transform: translateX(4px) scale(1.06); }
 .model span:last-child { font-size: 11.5px; line-height: 1.25; color: var(--dm-ink); }
 
 /* ── Thinking skills ribbon (shared with Problem Solver) ── */
 .skills { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
-.skill { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border: 1px solid var(--dm-line); }
+.skill { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: var(--card); border: 1px solid var(--dm-line); }
 .skill .dm-glyph { width: 34px; height: 34px; transition: transform 600ms var(--dm-spring); }
 .skill:hover .dm-glyph { transform: rotate(180deg); }
 .skill b { display: block; font-size: 13px; font-weight: 600; line-height: 1.25; }
@@ -177,7 +180,7 @@ button, textarea, input { font: inherit; color: inherit; }
 .skill[data-n="0"] { background: transparent; }
 .skill[data-n="0"] .dm-glyph { opacity: 0.35; }
 .skill > span:last-child { display: block; min-width: 0; }
-.bar { display: flex; height: 4px; background: var(--dm-ghost); margin-top: 5px; overflow: hidden; }
+.bar { display: flex; height: 4px; border-radius: 4px; background: var(--dm-ghost); margin-top: 5px; overflow: hidden; }
 .bar i { display: block; height: 100%; width: var(--w); animation: grow 1.2s var(--dm-ease) both 0.6s; }
 .bar i.dm { background: var(--dm-ink); }
 .bar i.ps { background: #a9aa9f; }
@@ -229,6 +232,7 @@ button, textarea, input { font: inherit; color: inherit; }
           <h1><span class="mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><g font-family="Arial, Helvetica, sans-serif"><circle cx="47" cy="70" r="43" fill="#ef402b" /><circle cx="93" cy="70" r="43" fill="#60aa36" /><path d="M23 64H86V45L121 70L86 95V76H23Z" fill="#171813" stroke="none" stroke-width="2" /></g></svg></span>Decision <span>Maker<i></i><i></i><i></i></span></h1>
           <p class="hero__lede">Say what you are weighing. A coach frames it in three questions, picks the models from The Decision Book that fit, and works them with you.</p>
           <form class="start" id="start-form">
+            <span class="start__disc" aria-hidden="true"><svg viewBox="0 0 100 100"><g transform="translate(0 0) scale(1)"><circle cx="50" cy="50" r="46" fill="var(--dm-green)"/><path d="M20 41H54L48 28L82 50L48 72L54 59H20L27 50Z" fill="var(--dm-ink)"/></g></svg></span>
             <label for="start-text">New decision</label>
             <textarea id="start-text" rows="3" placeholder="What are you deciding, or trying to see clearly? Say it the way you would to a friend."></textarea>
             <div class="start__row">
@@ -240,7 +244,7 @@ button, textarea, input { font: inherit; color: inherit; }
             </div>
           </form>
           <form class="quick" id="quick-form">
-            <span class="quick__mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><rect x="26" y="20" width="88" height="25" rx="0" fill="#efeee4" stroke="none" /><rect x="26" y="57" width="88" height="25" rx="0" fill="#efeee4" stroke="none" /><line x1="70" y1="44" x2="70.0" y2="48.0" stroke="#60aa36" stroke-width="4"/><path d="M70 58L75.0 48.0L65.0 48.0Z" fill="#60aa36" stroke="none" stroke-width="2" /><circle cx="70" cy="111" r="15" fill="#60aa36" /></svg></span>
+            <span class="quick__mark" aria-hidden="true"><svg viewBox="0 0 100 100"><g transform="translate(-2 26) scale(0.5217391304347826)"><circle cx="50" cy="50" r="46" fill="var(--dm-red)"/><path d="M68 30H46L28 50L46 70H68V61H50L40 50L50 39H68Z" fill="var(--dm-ink)"/></g><g transform="translate(50 26) scale(0.5217391304347826)"><circle cx="50" cy="50" r="46" fill="var(--dm-green)"/><path d="M20 41H54L48 28L82 50L48 72L54 59H20L27 50Z" fill="var(--dm-ink)"/></g></svg></span>
             <p><b>Quick decision.</b> A yes/no check and a stop rule for everyday calls.</p>
             <div class="quick__row">
               <label for="quick-text" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Quick decision</label>
@@ -251,14 +255,14 @@ button, textarea, input { font: inherit; color: inherit; }
         </div>
         <div class="board" aria-hidden="true">
           <svg id="board" viewBox="0 0 400 300"></svg>
-          <span class="board__caption">squares from the book · rearranging</span>
+          <span class="board__caption">circles and arrows from the cover · rearranging</span>
         </div>
       </section>
 
       <section class="section" aria-labelledby="h-decisions">
         <div class="section__head">
           <h2 id="h-decisions">Decisions</h2>
-          <p class="section__aside">Each square fills a quarter per framing answer: the decision, who it is about, and what you know. The last quarter fills once a model is worked; its emblem sits in the middle.</p>
+          <p class="section__aside">Each badge is the cover, built as the session moves: the red disc is the decision, the green disc is who it is about, and the arrows and dotted line arrive with what you know. The model in use sits in the middle.</p>
         </div>
         <ul class="problems" id="problems"></ul>
         <p class="mock-note">Example decisions for the mockup.</p>
@@ -271,7 +275,7 @@ button, textarea, input { font: inherit; color: inherit; }
         </div>
         <div class="build">
           <div class="build__step">
-            <div class="build__art"><svg viewBox="0 0 100 100" class="assemble"><rect x="4" y="4" width="44" height="44" fill="var(--dm-red)"/><rect x="52" y="4" width="44" height="44" fill="var(--dm-green)"/><rect x="4" y="52" width="44" height="44" fill="var(--dm-ink)"/><rect x="52" y="52" width="44" height="44" fill="var(--dm-ghost)"/></svg></div>
+            <div class="build__art"><svg viewBox="0 0 100 100" class="assemble"><circle cx="27" cy="50" r="23" fill="var(--dm-red)"/><circle cx="73" cy="50" r="23" fill="var(--dm-green)"/><path d="M50 4V96" stroke="var(--dm-ink)" stroke-width="2" stroke-dasharray="3 3"/></svg></div>
             <span class="build__n">1 · FRAME</span>
             <h3>Three questions</h3>
             <p>What you are deciding, who it is about and what you want, and what you already know.</p>
@@ -283,16 +287,16 @@ button, textarea, input { font: inherit; color: inherit; }
             <p>An Eisenhower matrix for competing demands, a rubber band when you are pulled two ways.</p>
           </div>
           <div class="build__step">
-            <div class="build__art"><svg viewBox="0 0 100 100"><rect x="4" y="4" width="92" height="92" fill="var(--dm-green-tint)"/><path d="M50 92V54L22 22M50 54L78 22" fill="none" stroke="var(--dm-ink)" stroke-width="8"/><rect class="turn" x="64" y="8" width="28" height="28" fill="var(--dm-green)"/></svg></div>
+            <div class="build__art"><svg viewBox="0 0 100 100"><g class="go"><g transform="translate(0 0) scale(1)"><circle cx="50" cy="50" r="46" fill="var(--dm-green)"/><path d="M20 41H54L48 28L82 50L48 72L54 59H20L27 50Z" fill="var(--dm-ink)"/></g></g></svg></div>
             <span class="build__n">3 · DECIDE</span>
-            <h3>Settle it</h3>
+            <h3>Go forward</h3>
             <p>Name the decision and what would change your mind, so it can be checked later.</p>
           </div>
           <div class="build__step">
-            <div class="build__art"><svg viewBox="0 0 100 100"><rect x="4" y="4" width="92" height="92" fill="var(--dm-ink)"/><rect x="22" y="22" width="56" height="56" fill="var(--dm-paper)"/><path class="turn" d="M36 36H64V64Z" fill="var(--dm-red)"/></svg></div>
+            <div class="build__art"><svg viewBox="0 0 100 100"><g class="turn"><g transform="translate(0 0) scale(1)"><circle cx="50" cy="50" r="46" fill="var(--dm-red)"/><path d="M68 30H46L28 50L46 70H68V61H50L40 50L50 39H68Z" fill="var(--dm-ink)"/></g></g></svg></div>
             <span class="build__n">4 · REVIEW</span>
-            <h3>A record and a review task</h3>
-            <p>The decision goes on its task or project page, with a review task to compare what you expected with what happened.</p>
+            <h3>Look back</h3>
+            <p>A record on its task or project page, and a review task to compare what you expected with what happened.</p>
           </div>
         </div>
       </section>
@@ -335,27 +339,27 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rand = (n) => Math.floor(Math.random() * n);
 
 /* ── Board: a 4×3 grid of square tiles, after Albers and the Bauhaus grid ── */
-const C = ['var(--dm-red)', 'var(--dm-green)', 'var(--dm-ink)', 'var(--dm-green-tint)'];
+const C = ['var(--dm-red)', 'var(--dm-green)'];
 const SHAPES = [
-  (a, b) => `<rect x="6" y="6" width="42" height="42" fill="${a}"/><rect x="52" y="6" width="42" height="42" fill="${b}"/><rect x="6" y="52" width="42" height="42" fill="${b}"/><rect x="52" y="52" width="42" height="42" fill="${a}"/>`,
-  (a, b) => `<path d="M6 6H94L6 94Z" fill="${a}"/><path d="M94 6V94H6Z" fill="${b}"/>`,
-  (a) => `<path d="M6 6H94V94H6Z" fill="${a}"/><path d="M94 94H44A50 50 0 0 1 94 44Z" fill="var(--dm-paper)"/>`,
-  (a) => `<path d="M42 94V58L12 18L22 10L50 46L78 10L88 18L58 58V94Z" fill="${a}"/>`,
-  (a) => `<path d="M6 94V70H30V46H54V22H78V6H94V94Z" fill="${a}"/>`,
-  (a, b) => `<path d="M6 6H94L50 50Z" fill="${a}"/><path d="M6 94H94L50 50Z" fill="${b}"/>`,
-  (a, b) => `<rect x="6" y="6" width="88" height="88" fill="${a}"/><rect x="30" y="30" width="40" height="40" fill="${b}"/>`,
-  (a, b) => `<rect x="6" y="36" width="56" height="28" fill="${a}"/><rect x="62" y="36" width="32" height="28" fill="${b}"/><rect x="62" y="6" width="12" height="88" fill="${a}"/>`
+  (a) => `<circle cx="50" cy="50" r="44" fill="var(--dm-red)"/><path d="M68 30H46L28 50L46 70H68V61H50L40 50L50 39H68Z" fill="var(--dm-ink)"/>`,
+  (a) => `<circle cx="50" cy="50" r="44" fill="var(--dm-green)"/><path d="M20 41H54L48 28L82 50L48 72L54 59H20L27 50Z" fill="var(--dm-ink)"/>`,
+  (a, b) => `<path d="M50 6A44 44 0 0 0 50 94Z" fill="var(--dm-red)"/><path d="M50 6A44 44 0 0 1 50 94Z" fill="var(--dm-green)"/><path d="M50 2V98" stroke="var(--dm-ink)" stroke-width="3" stroke-dasharray="4 4"/>`,
+  (a) => `<path d="M8 40H60L52 22L94 50L52 78L60 60H8L16 50Z" fill="${a}"/>`,
+  (a) => `<circle cx="50" cy="50" r="44" fill="${a}"/><path d="M45 92V60L24 34L18 40L16 18L38 20L32 26L50 48L68 26L62 20L84 18L82 40L76 34L55 60V92Z" fill="var(--dm-paper)"/>`,
+  () => `<circle cx="34" cy="50" r="30" fill="var(--dm-red)"/><circle cx="66" cy="50" r="30" fill="var(--dm-green)"/><path d="M16 44H62V32L84 50L62 68V56H16Z" fill="var(--dm-ink)"/>`,
+  (a) => `<path d="M76 24A37 37 0 1 0 87 50" fill="none" stroke="${a}" stroke-width="14"/><path d="M74 54L87 34L100 54Z" fill="var(--dm-ink)"/>`,
+  (a, b) => `<circle cx="24" cy="50" r="16" fill="${a}"/><circle cx="76" cy="50" r="16" fill="${b}"/><path d="M42 50H60" stroke="var(--dm-ink)" stroke-width="3" stroke-dasharray="3 4"/><path d="M58 42L66 50L58 58Z" fill="var(--dm-ink)"/>`
 ];
 const board = document.getElementById('board');
 const cells = [];
 function tileMarkup() {
-  const a = rand(3), b = (a + 1 + rand(3)) % 4;
-  return { html: SHAPES[rand(SHAPES.length)](C[a], C[b]), rot: rand(4) * 90 };
+  const a = rand(2), b = 1 - a;
+  return { html: SHAPES[rand(SHAPES.length)](C[a], C[b]), rot: 0 };
 }
 for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('transform', `translate(${c * 100} ${r * 100})`);
-  g.innerHTML = '<rect x="4" y="4" width="92" height="92" fill="var(--dm-soft)"/><g class="tile"></g>';
+  g.innerHTML = `<rect x="4" y="4" width="92" height="92" rx="${(r + c) % 3 === 0 ? 46 : 18}" fill="var(--dm-soft)"/><g class="tile"></g>`;
   board.append(g);
   cells.push(g.lastChild);
 }
@@ -391,10 +395,12 @@ document.getElementById('quick-form').addEventListener('submit', (e) => e.preven
 
 /* ── Decisions ── */
 function medal(p) {
-  const fills = ['var(--dm-red)', 'var(--dm-green)', 'var(--dm-ink)', 'var(--dm-red)'];
-  const q = [[4, 4], [52, 4], [4, 52], [52, 52]].map(([x, y], i) => `<rect class="piece q${i}" x="${x}" y="${y}" width="44" height="44" fill="${i < p.filled ? fills[i] : 'var(--dm-ghost)'}"/>`).join('');
-  const core = p.model ? `<rect x="26" y="26" width="48" height="48" fill="var(--card)"/><g class="piece p-tool">${MODELS[p.model].replace('<svg ', '<svg x="28" y="28" width="44" height="44" ')}</g>` : '';
-  return `<svg viewBox="0 0 100 100">${q}${core}</svg>`;
+  const ghost = 'var(--dm-ghost)';
+  const red = p.filled >= 1 ? 'var(--dm-red)' : ghost, green = p.filled >= 2 ? 'var(--dm-green)' : ghost;
+  const marks = p.filled >= 3 ? '<path class="piece p-back" d="M36 37H27L19 50L27 63H36V57H29L25 50L29 43H36Z" fill="var(--dm-ink)"/><path class="piece p-fwd" d="M62 46H76L73 40L88 50L73 60L76 54H62L65 50Z" fill="var(--dm-ink)"/>' : '';
+  const line = `<path d="M50 4V96" stroke="${p.filled >= 3 ? 'var(--dm-ink)' : ghost}" stroke-width="1.6" stroke-dasharray="3 3"/>`;
+  const core = p.model ? `<circle cx="50" cy="50" r="21" fill="var(--card)"/><g class="piece p-tool">${MODELS[p.model].replace('<svg ', '<svg x="33" y="33" width="34" height="34" ')}</g>` : '';
+  return `<svg viewBox="0 0 100 100"><circle class="piece p-l" cx="27" cy="50" r="23" fill="${red}"/><circle class="piece p-r" cx="73" cy="50" r="23" fill="${green}"/>${line}${marks}${core}</svg>`;
 }
 const DECISIONS = [
   { title: 'Should I take the Sydney job offer?', phase: 'Framing', filled: 1, model: null, meta: 'Question 1 of 3', when: 'Today', skills: ['critical_thinking'] },
@@ -427,7 +433,7 @@ const toolArt = document.getElementById('build-tool');
 const order = ['dm_eisenhower', 'dm_rubber_band', 'dm_johari', 'dm_rumsfeld', 'dm_team'];
 let ti = 0;
 function nextTool() {
-  toolArt.innerHTML = `<svg viewBox="0 0 140 140"><rect x="6" y="6" width="128" height="128" fill="var(--card)"/><g class="tile enter">${MODELS[order[ti % order.length]]}</g></svg>`;
+  toolArt.innerHTML = `<svg viewBox="0 0 140 140"><circle cx="70" cy="70" r="66" fill="var(--dm-soft)"/><g class="tile enter">${MODELS[order[ti % order.length]]}</g></svg>`;
   ti += 1;
 }
 nextTool();
