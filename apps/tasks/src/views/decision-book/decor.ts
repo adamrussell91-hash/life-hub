@@ -47,7 +47,7 @@ const RING = '<circle cx="50" cy="50" r="46" fill="var(--dm-green)"/><circle cx=
 const SHAPES: Array<(a: string, b: string) => string> = [
   () => BACK_DISC,
   () => FORWARD_DISC,
-  () => '<path d="M50 6A44 44 0 0 0 50 94Z" fill="var(--dm-red)"/><path d="M50 6A44 44 0 0 1 50 94Z" fill="var(--dm-green)"/><path d="M50 2V98" stroke="var(--dm-ink)" stroke-width="3" stroke-dasharray="4 4"/>',
+  () => '<path d="M50 6A44 44 0 0 0 50 94Z" fill="var(--dm-red)"/><path d="M50 6A44 44 0 0 1 50 94Z" fill="var(--dm-green)"/><path d="M50 6V94" stroke="var(--dm-ink)" stroke-width="3" stroke-dasharray="4 4.4"/>',
   (a) => `<path d="M8 40H60L52 22L94 50L52 78L60 60H8L16 50Z" fill="${a}"/>`,
   (a) => `<circle cx="50" cy="50" r="44" fill="${a}"/><path d="M45 92V60L24 34L18 40L16 18L38 20L32 26L50 48L68 26L62 20L84 18L82 40L76 34L55 60V92Z" fill="var(--dm-paper)"/>`,
   () => '<circle cx="34" cy="50" r="30" fill="var(--dm-red)"/><circle cx="66" cy="50" r="30" fill="var(--dm-green)"/><path d="M16 44H62V32L84 50L62 68V56H16Z" fill="var(--dm-ink)"/>',
