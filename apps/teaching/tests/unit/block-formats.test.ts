@@ -22,7 +22,7 @@ describe('Format registry', () => {
     const parsed = BlockSchema.parse(JSON.parse(JSON.stringify(block))) as QuestionSet;
     expect(parsed.content.format).toBeUndefined();
     expect(blockFormat(parsed)).toBe('standard');
-    expect(formatsFor('question_set').map((f) => f.id)).toEqual(['standard', 'human_experience_table', 'anchor_bridge']);
+    expect(formatsFor('question_set').map((f) => f.id)).toEqual(['standard', 'human_experience_table', 'anchor_bridge', 'reasoning_chart']);
   });
   it('treats peer feedback’s comments and annotate modes as its formats', () => {
     const peer = createBlock('peer_feedback', 'peer');

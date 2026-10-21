@@ -10,6 +10,9 @@ import { STEPPED_LENSES } from '@/blocks/lenses/registry';
 import { renderBlock } from '@/blocks/render';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { ReasoningConfigSchema } from '@/schemas/lens';
+import { createBlockEditor } from '@/blocks/editors';
+import { withFormat } from '@/blocks/formats/registry';
+import { pickKitOption } from './kit-filter';
 
 const ids = (logic: Parameters<typeof reasoningSteps>[0], level: LensLevel) => reasoningSteps(logic, level).map((s) => s.id);
 beforeEach(() => { document.body.replaceChildren(); localStorage.clear(); });
@@ -238,5 +241,75 @@ describe('Reasoning lens', () => {
     const sheet = renderBlock(attach({ logic: 'inductive' }), 'print');
     expect(sheet.querySelector('.block-reasoning-chart')).toBeTruthy();
     expect(sheet.querySelectorAll('.lens-lines__line').length).toBeGreaterThan(0);
+  });
+});
+
+describe('Reasoning chart format', () => {
+  function chartSet(): Extract<Block, { block_type: 'question_set' }> {
+    const block = createBlock('question_set', 'qset');
+    if (block.block_type !== 'question_set') throw Error('wrong block');
+    const first = block.content.questions[0]!;
+    return {
+      ...block,
+      content: {
+        ...block.content,
+        format: 'reasoning_chart',
+        reasoning: { level: 'core', student_level: true },
+        questions: [
+          { ...first, id: 'q1', prompt: 'Will Katniss survive?', logic: 'inductive' },
+          { ...first, id: 'q2', prompt: 'Why is Haymitch cruel?', logic: 'abductive' },
+          { ...first, id: 'q3', prompt: 'Your pick.' }
+        ]
+      }
+    };
+  }
+  it('keeps logic per question and the level through the schema and a format switch', () => {
+    const block = chartSet();
+    const parsed = BlockSchema.parse(block);
+    if (parsed.block_type !== 'question_set') throw Error('wrong block');
+    expect(parsed.content.questions.map((q) => q.logic)).toEqual(['inductive', 'abductive', undefined]);
+    const back = withFormat(withFormat(block, 'standard'), 'reasoning_chart');
+    expect(back.content.reasoning).toEqual({ level: 'core', student_level: true });
+    expect(back.content.questions[1]!.logic).toBe('abductive');
+  });
+  it('opens the first question’s walk and shows the others as charts to come back to', () => {
+    const view = renderBlock(chartSet(), 'student', { lessonId: 'lesson' });
+    document.body.append(view);
+    const questions = view.querySelectorAll('.block-question-set__question');
+    expect(questions).toHaveLength(3);
+    expect(questions[0]!.querySelector('.block-reasoning')).toBeTruthy();
+    expect(questions[0]!.querySelector('.block-reasoning-chart')!.getAttribute('data-logic')).toBe('inductive');
+    expect(questions[1]!.querySelector('.block-reasoning')).toBeNull();
+    expect(questions[1]!.querySelector('.block-reasoning-chart')!.getAttribute('data-logic')).toBe('abductive');
+    [...questions[2]!.querySelectorAll('button')].find((b) => b.textContent === 'Work on this question')!.click();
+    expect(view.querySelector('[data-question-id="q3"] .block-reasoning__card')).toBeTruthy();
+  });
+  it('saves each question’s answers apart, on this device only', () => {
+    const view = renderBlock(chartSet(), 'student', { lessonId: 'lesson' });
+    document.body.append(view);
+    const box = view.querySelector<HTMLTextAreaElement>('.block-reasoning__box')!;
+    box.value = 'District 12 lost again.';
+    box.dispatchEvent(new Event('input'));
+    const keys = Object.keys(localStorage).filter((k) => k.includes('reasoning_chart'));
+    expect(keys.some((k) => k.endsWith('.q1'))).toBe(true);
+    const teacher = renderBlock(chartSet(), 'teacher', {});
+    expect(teacher.textContent).not.toContain('District 12 lost again.');
+  });
+  it('prints every question with its empty chart', () => {
+    const sheet = renderBlock(chartSet(), 'print');
+    expect(sheet.querySelectorAll('.block-reasoning-chart')).toHaveLength(2);
+    expect(sheet.textContent).toContain('Circle one');
+  });
+  it('lets the teacher set each question’s logic in the editor', () => {
+    let block: Block = chartSet();
+    const editor = createBlockEditor(block, (next) => { block = next; }, () => block);
+    document.body.append(editor);
+    expect(editor.querySelector<HTMLElement>('.block-editor__fields')!.dataset.format).toBe('reasoning_chart');
+    expect(editor.querySelector<HTMLElement>('.block-editor__reasoning-settings')!.hidden).toBe(false);
+    pickKitOption(editor.querySelectorAll('.block-editor__question-logic')[2] as HTMLElement, 'deductive');
+    pickKitOption(editor.querySelector('.block-editor__reasoning-level'), 'extend');
+    if (block.block_type !== 'question_set') throw Error('wrong block');
+    expect(block.content.questions.map((q) => q.logic)).toEqual(['inductive', 'abductive', 'deductive']);
+    expect(block.content.reasoning?.level).toBe('extend');
   });
 });
