@@ -80,6 +80,14 @@ Review compares what the person expected when they decided with what actually ha
 - In the reflection, ask what the match or mismatch says about how they decide, and whether the Stop Rule's trigger came.
 - When it is complete, suggest next_step to close the review.`;
 
+/** A decision that went deeper from a quick run: its seeds while framing, then where it came from. */
+function quickLines(session) {
+  const seeds = session.frameSeeds;
+  if (seeds?.from !== 'quick') return [];
+  if (session.phase === 'frame') return [`CARRIED FROM A QUICK DECISION (seeds, not answers: show them, ask the person to confirm or change each, and record only what they confirm in "frame"): decision: ${seeds.decision}; known: ${seeds.known ?? 'the tests were not set'}.`];
+  return [`CAME FROM A QUICK DECISION: ${seeds.known ?? 'the tests were not set.'} Its tests and Stop Rule can carry into dm_yes_no, dm_stop_rule and Decide, once the person agrees.`];
+}
+
 /** Step layer: stable for the whole of a step, so it caches between turns. */
 function stepLayer(session) {
   if (session.phase === 'finished') return 'The session is finished. Recap briefly when asked and help the person carry the learning forward. Do not suggest a model.';
@@ -181,6 +189,7 @@ export function buildDecisionPrompt(session) {
   parts.push(`Frame: ${JSON.stringify(session.frame)}${missing.length ? `\nMissing frame answers: ${missing.join(', ')}` : ''}`);
   if (session.frame.compass) parts.push(`COMPASS: ${compassLabels(session.frame.compass)}`);
   if (session.phase === 'frame' && session.startModel) parts.push(`SHELF PICK: the person started from ${TOOLS[session.startModel].name} (${session.startModel}). When framing ends it opens on that model: suggest it with next_tool and say in one sentence how it fits the frame.`);
+  parts.push(...quickLines(session));
   const earlier = earlierSteps(session);
   if (earlier) parts.push(earlier.replace(/^EARLIER STEPS:/, 'EARLIER:'));
   if (session.model) parts.push(...reviewLines(session));

@@ -5,6 +5,7 @@ import { TOOL_IDS } from '../../../../packages/problem-solver/tools/index.mjs';
 import { CATALOGUE_IDS } from '../../../../packages/decision-book/catalogue.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightning.mjs';
+import { QUICK_NODE_IDS } from '../../../../packages/decision-book/quick.mjs';
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
 
 const VERDICTS = ['accept', 'challenge', 'clarify'];
@@ -109,6 +110,16 @@ export function validateCoachTurn(raw) {
     lightning = { node: raw.lightning.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}) };
   }
 
+  // A quick decision's step: Lightning's shape, plus the three tests at the tests box.
+  let quick = null;
+  if (raw.quick != null) {
+    if (!QUICK_NODE_IDS.includes(raw.quick?.node)) return fail(`Unknown quick decision box: ${raw.quick?.node}`);
+    const answer = ['yes', 'no'].includes(raw.quick.answer) ? raw.quick.answer : null;
+    const note = text(raw.quick.note);
+    const tests = Array.isArray(raw.quick.tests) ? raw.quick.tests.map((item) => text(item, 120)).filter(Boolean).slice(0, 3) : [];
+    quick = { node: raw.quick.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}), ...(tests.length ? { tests } : {}) };
+  }
+
   const proposeTasks = [];
   for (const item of Array.isArray(raw.proposeTasks) ? raw.proposeTasks.slice(0, 5) : []) {
     const title = text(item?.title, 120);
@@ -139,6 +150,7 @@ export function validateCoachTurn(raw) {
       exitObjection: text(raw.exitObjection, 400),
       learning: text(raw.learning, 600),
       lightning,
+      ...(quick ? { quick } : {}),
       proposeTasks,
       proposeReview,
       basis

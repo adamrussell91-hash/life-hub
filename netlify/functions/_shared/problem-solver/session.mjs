@@ -8,6 +8,7 @@ import { parseCompass } from '../../../../packages/decision-book/compass.mjs';
 import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
 import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { mainModel, resolveBasis } from '../../../../packages/decision-book/record.mjs';
+import { outcomeOf } from '../../../../packages/decision-book/quick.mjs';
 
 export { waitingForReview };
 
@@ -633,7 +634,9 @@ export function summaryRow(session) {
     taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
     reviewTaskId: session.reviewTaskId ?? null,
     reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
-    escalatedTo: session.lightning?.escalatedTo ?? null,
+    escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? null,
+    // A quick decision's row says how its latest round came out.
+    ...(session.kind === 'quick' ? { outcome: outcomeOf(session.quick) } : {}),
     // A decision's medal shows the model its reasons lean on most.
     ...(session.kind === 'decision' ? { main: mainModel(session) } : {}),
     createdAt: session.createdAt,

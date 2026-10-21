@@ -6,6 +6,7 @@ import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { buildDecisionPrompt } from './decision-prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
+import { buildQuickPrompt, checkQuickTurn } from './quick-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
@@ -158,11 +159,23 @@ function parseLightning(session, text) {
   return result.ok ? checkLightningTurn(session, result.value) : result;
 }
 
+function parseQuick(session, text) {
+  const result = validateCoachTurn(extractJson(text));
+  return result.ok ? checkQuickTurn(session, result.value) : result;
+}
+
+/** Each session kind's prompt and reply check; full and decision sessions share the step parser. */
+const PROMPTS = {
+  lightning: { build: buildLightningPrompt, read: parseLightning },
+  quick: { build: buildQuickPrompt, read: parseQuick },
+  decision: { build: buildDecisionPrompt, read: parse },
+  full: { build: buildCoachPrompt, read: parse }
+};
+
 export function createModelCoach(model) {
   return async function modelCoach(session) {
-    const lightning = session.kind === 'lightning';
-    const prompt = lightning ? buildLightningPrompt(session) : session.kind === 'decision' ? buildDecisionPrompt(session) : buildCoachPrompt(session);
-    const read = lightning ? parseLightning : parse;
+    const { build, read } = PROMPTS[session.kind] ?? PROMPTS.full;
+    const prompt = build(session);
     const first = await model({ ...prompt, maxTokens: 900 });
     let result = read(session, first);
     if (!result.ok) result = read(session, await model({ ...repairPrompt(prompt, first, result.error), maxTokens: 900 }));
