@@ -584,41 +584,47 @@ export async function renderApplicationDetailView(
     const relationships = el('section', 'application-detail__relationships');
     relationships.append(el('p', undefined, 'Loading relationships…'));
 
-    const taskPanels = el('div', 'application-detail__task-panels');
-    mountTaskLinkPanel({
-      host: taskPanels,
-      heading: 'Application action Task',
-      relationshipType: 'application_action',
-      incompleteOperationId:
-        record.application_action_operation?.status === 'incomplete'
-          ? record.application_action_operation.operation_id
-          : null,
-      statusMessage:
-        record.application_action_operation?.status === 'committed'
-          ? `Application action Task ${record.application_action_operation.task_id}`
-          : record.application_action_operation?.status === 'incomplete'
-            ? 'Application action link incomplete.'
+    // Adding or retrying a task swaps only this panel, so the page does not redraw.
+    const buildTaskPanel = (current: ApplicationRecord): HTMLElement => {
+      const host = el('div', 'application-detail__task-panels');
+      const refresh = (next: ApplicationRecord) => host.replaceWith(buildTaskPanel(next));
+      mountTaskLinkPanel({
+        host,
+        heading: 'Application action Task',
+        relationshipType: 'application_action',
+        incompleteOperationId:
+          current.application_action_operation?.status === 'incomplete'
+            ? current.application_action_operation.operation_id
             : null,
-      onSubmit: async (input) => {
-        try {
-          const result = await linkApplicationTask(record.id, {
-            relationship_type: 'application_action',
-            ...input
-          });
-          paint(result.application);
-        } catch (err) {
-          if (isApplicationTaskLinkIncompleteError(err)) {
-            await load();
-            return;
+        statusMessage:
+          current.application_action_operation?.status === 'committed'
+            ? `Application action Task ${current.application_action_operation.task_id}`
+            : current.application_action_operation?.status === 'incomplete'
+              ? 'Application action link incomplete.'
+              : null,
+        onSubmit: async (input) => {
+          try {
+            const result = await linkApplicationTask(current.id, {
+              relationship_type: 'application_action',
+              ...input
+            });
+            refresh(result.application);
+          } catch (err) {
+            if (isApplicationTaskLinkIncompleteError(err)) {
+              refresh((await getApplication(current.id)).application);
+              return;
+            }
+            throw err;
           }
-          throw err;
+        },
+        onRetry: async (operationId) => {
+          const result = await retryApplicationTaskLink(current.id, operationId);
+          refresh(result.application);
         }
-      },
-      onRetry: async (operationId) => {
-        const result = await retryApplicationTaskLink(record.id, operationId);
-        paint(result.application);
-      }
-    });
+      });
+      return host;
+    };
+    const taskPanels = buildTaskPanel(record);
 
     canvas.append(
       back,
