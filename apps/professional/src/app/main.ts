@@ -1,3 +1,4 @@
+import '../../../../packages/stale-chunk-reload.js';
 import '../../design-kit/tokens.css';
 import '../../design-kit/overlays.css';
 import '../../design-kit/chrome.css';
