@@ -24,6 +24,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["--prefix", "apps/professional", "vite", "apps/professional", "--port", "5176", "--strictPort"],
       "port": 5176
+    },
+    {
+      "name": "mockups",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4317", "--directory", "docs/mockups"],
+      "port": 4317
     }
   ]
 }

@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Maker Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* packages/decision-book/decision-book.css
+   Decision Maker's tokens: the kit's paper, ink, red and green, with their tints, scoped to
+   .dm-scope the way Problem Solver scopes .ps-scope. Motion matches Problem Solver so the
+   two read as a set. */
+.dm-scope {
+  --dm-paper: #faf8ef;
+  --dm-ink: #171813;
+  --dm-red: #ef402b;
+  --dm-green: #60aa36;
+  --dm-soft: #efeee4;
+  --dm-line: #c9cabd;
+  --dm-green-tint: #e5edda;
+  --dm-red-tint: #f8e1d8;
+  --dm-ghost: rgba(23, 24, 19, 0.12);
+  --dm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dm-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+:root {
+  --rail: #17375e; --on-rail: rgba(255, 255, 255, 0.92); --on-rail-muted: rgba(255, 255, 255, 0.62); --on-rail-hover: rgba(255, 255, 255, 0.1);
+  --font-ui: Inter, ui-sans-serif, system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+.dm-scope { --muted: #66675d; --card: #ffffff; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--dm-paper, #faf8ef); color: #171813; font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+button, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--dm-ink); outline-offset: 3px; }
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.rail { background: var(--rail); color: var(--on-rail); padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.rail__brand { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 0 12px 18px; }
+.rail__group { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--on-rail-muted); padding: 14px 12px 6px; }
+.rail a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; color: var(--on-rail); text-decoration: none; font-size: 14.5px; }
+.rail a:hover { background: var(--on-rail-hover); }
+.rail a[aria-current="page"] { background: rgba(255, 255, 255, 0.12); font-weight: 600; }
+.rail .dot { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; }
+.rail .dot svg { width: 18px; height: 18px; }
+.canvas { min-width: 0; padding: 32px 16px 64px; background: var(--dm-paper); color: var(--dm-ink); }
+.canvas__inner { max-width: 1240px; margin: 0 auto; padding-inline: clamp(0px, 3vw, 32px); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.dm-glyph { display: inline-flex; width: 20px; height: 20px; flex: none; color: var(--dm-ink); }
+.dm-glyph svg, .dm-emblem svg { width: 100%; height: 100%; display: block; }
+.dm-emblem { display: inline-flex; width: 28px; height: 28px; flex: none; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; cursor: pointer; font-weight: 600; transition: transform 180ms var(--dm-ease), background 180ms; }
+.btn--primary { background: var(--dm-ink); color: var(--dm-paper); }
+.btn--primary:hover { transform: translateY(-1px); }
+.btn--ghost { background: transparent; border: 1px solid var(--dm-line); }
+.btn--ghost:hover { background: var(--dm-soft); }
+.mock-note { font-size: 12px; color: var(--muted); margin: 0; }
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 12px 16px; gap: 6px; }
+  .rail__brand { padding: 0 8px 0 0; white-space: nowrap; }
+  .rail__group, .rail a:not([aria-current="page"]) { display: none; }
+  .rail a { white-space: nowrap; }
+  .canvas { padding-block: 20px 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+/* ── Hero: the square shape board beside the start box ── */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(24px, 4vw, 56px); align-items: center; padding-block: 8px 40px; }
+.hero__copy { display: grid; gap: 18px; min-width: 0; }
+.hero h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; color: var(--dm-ink); text-wrap: balance; display: flex; flex-wrap: wrap; align-items: center; gap: 0.18em; }
+.hero h1 .mark { width: 0.86em; height: 0.86em; flex: none; display: inline-flex; }
+.hero h1 .mark svg { width: 100%; height: 100%; }
+.hero h1 span { display: inline-flex; align-items: baseline; gap: 0.12em; }
+.hero h1 i { display: inline-block; width: 0.5em; height: 0.5em; background: var(--dm-red); font-style: normal; animation: bob 4s var(--dm-ease) infinite; }
+.hero h1 i:nth-of-type(2) { background: var(--dm-green); clip-path: polygon(0 0, 100% 100%, 0 100%); animation-delay: -1.3s; }
+.hero h1 i:nth-of-type(3) { background: var(--dm-ink); width: 0.25em; animation-delay: -2.6s; }
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-0.08em) rotate(90deg); } }
+.hero__lede { margin: 0; font-size: 17px; color: var(--muted); max-width: 46ch; }
+
+.start { position: relative; background: var(--card); border: 1.5px solid var(--dm-ink); padding: 20px; display: grid; gap: 14px; overflow: hidden; }
+.start::before { content: ""; position: absolute; right: 0; top: 0; width: 44px; height: 44px; background: var(--dm-red); clip-path: polygon(0 0, 100% 0, 100% 100%); transform: scale(var(--pulse, 1)); transform-origin: top right; transition: transform 260ms var(--dm-spring); }
+.start label { font-weight: 700; font-size: 17px; position: relative; }
+.start textarea { width: 100%; min-height: 84px; resize: vertical; border: 0; background: var(--dm-soft); padding: 14px 16px; font-size: 16px; line-height: 1.45; }
+.start textarea::placeholder { color: var(--muted); }
+.start__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
+.start__tries { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.try { border: 1px solid var(--dm-line); background: transparent; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.try:hover { color: var(--dm-ink); background: var(--dm-soft); }
+
+.quick { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 14px 16px; background: var(--dm-green-tint); border: 1px solid var(--dm-line); }
+.quick__mark { grid-row: span 2; width: 44px; height: 44px; }
+.quick__mark svg { width: 100%; height: 100%; }
+.quick p { margin: 0; font-size: 14px; }
+.quick p b { font-size: 15px; }
+.quick__row { display: flex; gap: 8px; min-width: 0; }
+.quick input { flex: 1 1 auto; min-width: 0; border: 0; background: var(--card); padding: 0 12px; min-height: 40px; font-size: 14.5px; }
+.quick .btn { min-height: 40px; padding: 0 16px; }
+
+.board { position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 4 / 3; }
+.board svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.tile { transform-box: fill-box; transform-origin: center; }
+.tile.enter { animation: tileIn 720ms var(--dm-spring) both; }
+.tile.leave { animation: tileOut 300ms var(--dm-ease) both; }
+@keyframes tileIn { from { transform: scale(0) rotate(-90deg); } to { transform: scale(1) rotate(0); } }
+@keyframes tileOut { to { transform: scale(0) rotate(90deg); } }
+.board__caption { position: absolute; left: 0; bottom: -28px; font: 500 11px var(--font-mono); color: var(--muted); letter-spacing: 0.02em; }
+
+/* ── Section heads ── */
+.section { display: grid; gap: 18px; padding-block: 36px 8px; }
+.section__head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; }
+.section h2 { margin: 0; font-size: 26px; letter-spacing: -0.02em; font-weight: 750; text-wrap: balance; }
+.section__aside { color: var(--muted); font-size: 14px; margin: 0; max-width: 52ch; }
+
+/* ── Decisions as built squares ── */
+.problems { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; list-style: none; margin: 0; padding: 0; }
+.prob { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; align-items: start; padding: 18px; background: var(--card); border: 1px solid var(--dm-line); text-decoration: none; color: inherit; transition: transform 260ms var(--dm-ease), border-color 260ms; animation: rise 600ms var(--dm-ease) both; animation-delay: calc(var(--i) * 90ms + 300ms); }
+.prob:hover { transform: translateY(-3px); border-color: var(--dm-ink); }
+@keyframes rise { from { transform: translateY(14px); } }
+.medal { width: 92px; height: 92px; }
+.medal svg { width: 100%; height: 100%; overflow: visible; }
+.medal .piece { transform-box: fill-box; transform-origin: center; transition: transform 420ms var(--dm-spring); }
+.prob:hover .medal .q0 { transform: translate(-3px, -3px); }
+.prob:hover .medal .q1 { transform: translate(3px, -3px); }
+.prob:hover .medal .q2 { transform: translate(-3px, 3px); }
+.prob:hover .medal .q3 { transform: translate(3px, 3px); }
+.prob:hover .medal .p-tool { transform: rotate(90deg); }
+.prob__body { display: grid; gap: 6px; min-width: 0; }
+.prob__title { margin: 0; font-size: 16.5px; font-weight: 650; line-height: 1.3; text-wrap: pretty; }
+.prob__meta { margin: 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.phase { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--dm-ink); }
+.phase::before { content: ""; width: 9px; height: 9px; background: var(--c, var(--dm-red)); }
+.prob__skills { display: flex; gap: 4px; margin-top: 4px; }
+.prob__skills .dm-glyph { width: 18px; height: 18px; opacity: 0.85; }
+.prob--new { place-items: center; grid-template-columns: 1fr; text-align: center; background: transparent; border: 1.5px dashed var(--dm-line); color: var(--muted); min-height: 128px; cursor: pointer; font-size: 15px; }
+.prob--new:hover { color: var(--dm-ink); border-color: var(--dm-ink); }
+
+/* ── How a session builds: four square stations on a ruled line ── */
+.build { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--card); border: 1px solid var(--dm-line); padding: 26px 22px; position: relative; }
+.build::before { content: ""; position: absolute; left: 36px; right: 36px; top: 59px; height: 2px; background: var(--dm-ink); }
+.build__step { display: grid; gap: 10px; justify-items: start; padding: 0 14px; position: relative; min-width: 0; }
+.build__art { width: 68px; height: 68px; background: var(--card); position: relative; }
+.build__art svg { width: 100%; height: 100%; overflow: visible; }
+.build__step h3 { margin: 0; font-size: 15.5px; }
+.build__step p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.build__n { font: 500 11px var(--font-mono); color: var(--muted); }
+.assemble rect { transform-box: fill-box; transform-origin: center; animation: drop 6s var(--dm-ease) infinite; }
+.assemble rect:nth-child(2) { animation-delay: 0.3s; } .assemble rect:nth-child(3) { animation-delay: 0.6s; } .assemble rect:nth-child(4) { animation-delay: 0.9s; }
+@keyframes drop { 0% { transform: translateY(-24px); opacity: 0; } 12%, 85% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+.turn { transform-box: fill-box; transform-origin: center; animation: turn 8s var(--dm-spring) infinite; }
+@keyframes turn { 0%, 20% { transform: rotate(0); } 25%, 45% { transform: rotate(90deg); } 50%, 70% { transform: rotate(180deg); } 75%, 95% { transform: rotate(270deg); } 100% { transform: rotate(360deg); } }
+
+/* ── The four sections ── */
+.sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.sect { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 16px; padding: 18px; border: 1px solid var(--dm-line); background: transparent; transition: background 220ms; }
+.sect:hover { background: var(--card); }
+.sect__mark { width: 76px; height: 76px; }
+.sect__mark svg { width: 100%; height: 100%; }
+.sect h3 { margin: 0; font-size: 16px; }
+.sect p { margin: 2px 0 12px; font-size: 13.5px; color: var(--muted); }
+.sect__shelf { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.model { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border: 0; background: var(--dm-soft); cursor: pointer; text-align: center; min-width: 0; }
+.model .dm-emblem { width: 40px; height: 40px; transition: transform 520ms var(--dm-spring); }
+.model:hover .dm-emblem, .model:focus-visible .dm-emblem { transform: rotate(-90deg); }
+.model span:last-child { font-size: 11.5px; line-height: 1.25; color: var(--dm-ink); }
+
+/* ── Thinking skills ribbon (shared with Problem Solver) ── */
+.skills { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.skill { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border: 1px solid var(--dm-line); }
+.skill .dm-glyph { width: 34px; height: 34px; transition: transform 600ms var(--dm-spring); }
+.skill:hover .dm-glyph { transform: rotate(180deg); }
+.skill b { display: block; font-size: 13px; font-weight: 600; line-height: 1.25; }
+.skill small { font: 500 11px var(--font-mono); color: var(--muted); }
+.skill[data-n="0"] { background: transparent; }
+.skill[data-n="0"] .dm-glyph { opacity: 0.35; }
+.skill > span:last-child { display: block; min-width: 0; }
+.bar { display: flex; height: 4px; background: var(--dm-ghost); margin-top: 5px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: var(--w); animation: grow 1.2s var(--dm-ease) both 0.6s; }
+.bar i.dm { background: var(--dm-ink); }
+.bar i.ps { background: #a9aa9f; }
+@keyframes grow { from { width: 0; } }
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 4px; margin-right: 6px; vertical-align: middle; background: var(--c); }
+
+@media (max-width: 1100px) { .skills { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; }
+  .board { justify-self: stretch; max-width: none; order: -1; aspect-ratio: 2 / 1; margin-bottom: 24px; }
+  .build { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 24px; }
+  .build::before { display: none; }
+  .sections { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .skills { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .build { grid-template-columns: 1fr; }
+  .prob { grid-template-columns: 64px minmax(0, 1fr); }
+  .medal { width: 64px; height: 64px; }
+  .prob--new { grid-template-columns: 1fr; }
+  .sect { grid-template-columns: 1fr; }
+  .sect__mark { width: 56px; height: 56px; }
+  .sect__shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Tasks Hub">
+    <div class="rail__brand">TASKS HUB</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>Backlog</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 11l8-4M8 13l8 4"/></svg></span>Graph</a>
+    <div class="rail__group">TOOLS</div>
+    <a href="../problem-solver/landing.html"><span class="dot"><svg viewBox="0 0 100 100"><path fill="#f6be2c" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/><path fill="#d7262e" d="M2.38 56A48 48 0 0 0 97.62 56Z"/><path fill="#7ea2e6" d="M2.38 44A48 48 0 0 1 97.62 44Z"/></svg></span>Problem Solver</a>
+    <a href="landing.html" aria-current="page"><span class="dot"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><g font-family="Arial, Helvetica, sans-serif"><circle cx="47" cy="70" r="43" fill="#ef402b" /><circle cx="93" cy="70" r="43" fill="#60aa36" /><path d="M23 64H86V45L121 70L86 95V76H23Z" fill="#171813" stroke="none" stroke-width="2" /></g></svg></span>Decision Maker</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>Search</a>
+    <div class="rail__group">HUBS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9H4z"/></svg></span>Life</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h7v14H4zM13 5h7v14h-7z"/></svg></span>Teaching</a>
+  </nav>
+
+  <main class="canvas dm-scope">
+    <div class="canvas__inner">
+      <p class="eyebrow">Tasks Hub</p>
+
+      <section class="hero">
+        <div class="hero__copy">
+          <h1><span class="mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><g font-family="Arial, Helvetica, sans-serif"><circle cx="47" cy="70" r="43" fill="#ef402b" /><circle cx="93" cy="70" r="43" fill="#60aa36" /><path d="M23 64H86V45L121 70L86 95V76H23Z" fill="#171813" stroke="none" stroke-width="2" /></g></svg></span>Decision <span>Maker<i></i><i></i><i></i></span></h1>
+          <p class="hero__lede">Say what you are weighing. A coach frames it in three questions, picks the models from The Decision Book that fit, and works them with you.</p>
+          <form class="start" id="start-form">
+            <label for="start-text">New decision</label>
+            <textarea id="start-text" rows="3" placeholder="What are you deciding, or trying to see clearly? Say it the way you would to a friend."></textarea>
+            <div class="start__row">
+              <div class="start__tries" aria-label="Examples">
+                <button type="button" class="try" data-text="Should I take the Sydney job offer?">Job offer</button>
+                <button type="button" class="try" data-text="Who should lead the new Year 10 project?">Who leads</button>
+              </div>
+              <button class="btn btn--primary" type="submit">Start</button>
+            </div>
+          </form>
+          <form class="quick" id="quick-form">
+            <span class="quick__mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><rect x="26" y="20" width="88" height="25" rx="0" fill="#efeee4" stroke="none" /><rect x="26" y="57" width="88" height="25" rx="0" fill="#efeee4" stroke="none" /><line x1="70" y1="44" x2="70.0" y2="48.0" stroke="#60aa36" stroke-width="4"/><path d="M70 58L75.0 48.0L65.0 48.0Z" fill="#60aa36" stroke="none" stroke-width="2" /><circle cx="70" cy="111" r="15" fill="#60aa36" /></svg></span>
+            <p><b>Quick decision.</b> A yes/no check and a stop rule for everyday calls.</p>
+            <div class="quick__row">
+              <label for="quick-text" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Quick decision</label>
+              <input id="quick-text" placeholder="Do I say yes to the Saturday fixture?">
+              <button class="btn btn--primary" type="submit">Go</button>
+            </div>
+          </form>
+        </div>
+        <div class="board" aria-hidden="true">
+          <svg id="board" viewBox="0 0 400 300"></svg>
+          <span class="board__caption">squares from the book · rearranging</span>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="h-decisions">
+        <div class="section__head">
+          <h2 id="h-decisions">Decisions</h2>
+          <p class="section__aside">Each square fills a quarter per framing answer: the decision, who it is about, and what you know. The last quarter fills once a model is worked; its emblem sits in the middle.</p>
+        </div>
+        <ul class="problems" id="problems"></ul>
+        <p class="mock-note">Example decisions for the mockup.</p>
+      </section>
+
+      <section class="section" aria-labelledby="h-build">
+        <div class="section__head">
+          <h2 id="h-build">How a session builds</h2>
+          <p class="section__aside">Frame, then the coach discerns the models that fit. The book is a catalogue, so the coach chooses.</p>
+        </div>
+        <div class="build">
+          <div class="build__step">
+            <div class="build__art"><svg viewBox="0 0 100 100" class="assemble"><rect x="4" y="4" width="44" height="44" fill="var(--dm-red)"/><rect x="52" y="4" width="44" height="44" fill="var(--dm-green)"/><rect x="4" y="52" width="44" height="44" fill="var(--dm-ink)"/><rect x="52" y="52" width="44" height="44" fill="var(--dm-ghost)"/></svg></div>
+            <span class="build__n">1 · FRAME</span>
+            <h3>Three questions</h3>
+            <p>What you are deciding, who it is about and what you want, and what you already know.</p>
+          </div>
+          <div class="build__step">
+            <div class="build__art" id="build-tool"></div>
+            <span class="build__n">2 · EXPLORE</span>
+            <h3>The coach picks a model</h3>
+            <p>An Eisenhower matrix for competing demands, a rubber band when you are pulled two ways.</p>
+          </div>
+          <div class="build__step">
+            <div class="build__art"><svg viewBox="0 0 100 100"><rect x="4" y="4" width="92" height="92" fill="var(--dm-green-tint)"/><path d="M50 92V54L22 22M50 54L78 22" fill="none" stroke="var(--dm-ink)" stroke-width="8"/><rect class="turn" x="64" y="8" width="28" height="28" fill="var(--dm-green)"/></svg></div>
+            <span class="build__n">3 · DECIDE</span>
+            <h3>Settle it</h3>
+            <p>Name the decision and what would change your mind, so it can be checked later.</p>
+          </div>
+          <div class="build__step">
+            <div class="build__art"><svg viewBox="0 0 100 100"><rect x="4" y="4" width="92" height="92" fill="var(--dm-ink)"/><rect x="22" y="22" width="56" height="56" fill="var(--dm-paper)"/><path class="turn" d="M36 36H64V64Z" fill="var(--dm-red)"/></svg></div>
+            <span class="build__n">4 · REVIEW</span>
+            <h3>A record and a review task</h3>
+            <p>The decision goes on its task or project page, with a review task to compare what you expected with what happened.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="h-sections">
+        <div class="section__head">
+          <h2 id="h-sections">The four sections</h2>
+          <p class="section__aside">The book's four parts, as a compass: about you or others, to understand or to improve. A few models from each.</p>
+        </div>
+        <div class="sections" id="sections"></div>
+      </section>
+
+      <section class="section" aria-labelledby="h-skills">
+        <div class="section__head">
+          <h2 id="h-skills">Thinking skills you have used</h2>
+          <p class="section__aside">Across Problem Solver and Decision Maker. Faint marks have not come up yet.</p>
+        </div>
+        <div class="legend"><span style="--c:var(--dm-ink)">Decision Maker</span><span style="--c:#a9aa9f">Problem Solver</span></div>
+        <div class="skills" id="skills"></div>
+        <p class="mock-note">Example counts for the mockup.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const GLYPHS={"abstract_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>abstract thinking</title><defs><clipPath id=\"ps-abstract-clip\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-abstract-clip)\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M-100 0l100 100\"/><path d=\"M-95 0l100 100\"/><path d=\"M-90 0l100 100\"/><path d=\"M-85 0l100 100\"/><path d=\"M-80 0l100 100\"/><path d=\"M-75 0l100 100\"/><path d=\"M-70 0l100 100\"/><path d=\"M-65 0l100 100\"/><path d=\"M-60 0l100 100\"/><path d=\"M-55 0l100 100\"/><path d=\"M-50 0l100 100\"/><path d=\"M-45 0l100 100\"/><path d=\"M-40 0l100 100\"/><path d=\"M-35 0l100 100\"/><path d=\"M-30 0l100 100\"/><path d=\"M-25 0l100 100\"/><path d=\"M-20 0l100 100\"/><path d=\"M-15 0l100 100\"/><path d=\"M-10 0l100 100\"/><path d=\"M-5 0l100 100\"/><path d=\"M0 0l100 100\"/><path d=\"M5 0l100 100\"/><path d=\"M10 0l100 100\"/><path d=\"M15 0l100 100\"/><path d=\"M20 0l100 100\"/><path d=\"M25 0l100 100\"/><path d=\"M30 0l100 100\"/><path d=\"M35 0l100 100\"/><path d=\"M40 0l100 100\"/><path d=\"M45 0l100 100\"/><path d=\"M50 0l100 100\"/><path d=\"M55 0l100 100\"/><path d=\"M60 0l100 100\"/><path d=\"M65 0l100 100\"/><path d=\"M70 0l100 100\"/><path d=\"M75 0l100 100\"/><path d=\"M80 0l100 100\"/><path d=\"M85 0l100 100\"/><path d=\"M90 0l100 100\"/><path d=\"M95 0l100 100\"/><path d=\"M100 0l100 100\"/></g></svg>","analysis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>analysis</title><defs><clipPath id=\"ps-analysis\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-analysis)\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"><circle cx=\"50\" cy=\"50\" r=\"44\"/><circle cx=\"50\" cy=\"62\" r=\"44\"/><circle cx=\"50\" cy=\"74\" r=\"44\"/><circle cx=\"50\" cy=\"86\" r=\"44\"/><circle cx=\"50\" cy=\"98\" r=\"44\"/><circle cx=\"50\" cy=\"110\" r=\"44\"/><circle cx=\"50\" cy=\"122\" r=\"44\"/></g><circle cx=\"50\" cy=\"50\" r=\"44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/></svg>","creative_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>creative thinking</title><circle cx=\"50\" cy=\"73\" r=\"20\"/><path d=\"M47 73L4.000 53.000 53 73Z\"/><path d=\"M47 73L4.699 45.012 53 73Z\"/><path d=\"M47 73L6.774 37.267 53 73Z\"/><path d=\"M47 73L10.163 30.000 53 73Z\"/><path d=\"M47 73L14.762 23.432 53 73Z\"/><path d=\"M47 73L20.432 17.762 53 73Z\"/><path d=\"M47 73L27.000 13.163 53 73Z\"/><path d=\"M47 73L34.267 9.774 53 73Z\"/><path d=\"M47 73L42.012 7.699 53 73Z\"/><path d=\"M47 73L50.000 7.000 53 73Z\"/><path d=\"M47 73L57.988 7.699 53 73Z\"/><path d=\"M47 73L65.733 9.774 53 73Z\"/><path d=\"M47 73L73.000 13.163 53 73Z\"/><path d=\"M47 73L79.568 17.762 53 73Z\"/><path d=\"M47 73L85.238 23.432 53 73Z\"/><path d=\"M47 73L89.837 30.000 53 73Z\"/><path d=\"M47 73L93.226 37.267 53 73Z\"/><path d=\"M47 73L95.301 45.012 53 73Z\"/><path d=\"M47 73L96.000 53.000 53 73Z\"/></svg>","critical_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>critical thinking</title><defs><mask id=\"ps-critical-thinking\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"black\" stroke-width=\"22\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"white\" stroke-width=\"7\"/></mask></defs><g mask=\"url(#ps-critical-thinking)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","decision_making":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>decision making</title><defs><mask id=\"ps-decision-making\"><rect width=\"100\" height=\"100\" fill=\"white\"/><g fill=\"black\"><circle cx=\"30\" cy=\"50\" r=\"18\"/><circle cx=\"70\" cy=\"50\" r=\"18\"/></g></mask></defs><g mask=\"url(#ps-decision-making)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","inference":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>inference</title><defs><mask id=\"ps-inference\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M33 25V68H76 M49 25V52H76\" fill=\"none\" stroke=\"black\" stroke-width=\"5\"/></mask></defs><g mask=\"url(#ps-inference)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","learning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>learning</title><defs><mask id=\"ps-learning\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M16 63 45 25 85 38 55 76Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-learning)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","logical_reasoning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>logical reasoning</title><path d=\"M52.3028 6.0603A44 44 0 0 1 69.9756 10.7957L61.8038 26.8338A26 26 0 0 0 51.3607 24.0356Z\"/><path d=\"M73.9641 13.0985A44 44 0 0 1 86.9015 26.0359L71.8054 35.8394A26 26 0 0 0 64.1606 28.1946Z\"/><path d=\"M89.2043 30.0244A44 44 0 0 1 93.9397 47.6972L75.9644 48.6393A26 26 0 0 0 73.1662 38.1962Z\"/><path d=\"M93.9397 52.3028A44 44 0 0 1 89.2043 69.9756L73.1662 61.8038A26 26 0 0 0 75.9644 51.3607Z\"/><path d=\"M86.9015 73.9641A44 44 0 0 1 73.9641 86.9015L64.1606 71.8054A26 26 0 0 0 71.8054 64.1606Z\"/><path d=\"M69.9756 89.2043A44 44 0 0 1 52.3028 93.9397L51.3607 75.9644A26 26 0 0 0 61.8038 73.1662Z\"/><path d=\"M47.6972 93.9397A44 44 0 0 1 30.0244 89.2043L38.1962 73.1662A26 26 0 0 0 48.6393 75.9644Z\"/><path d=\"M26.0359 86.9015A44 44 0 0 1 13.0985 73.9641L28.1946 64.1606A26 26 0 0 0 35.8394 71.8054Z\"/><path d=\"M10.7957 69.9756A44 44 0 0 1 6.0603 52.3028L24.0356 51.3607A26 26 0 0 0 26.8338 61.8038Z\"/><path d=\"M6.0603 47.6972A44 44 0 0 1 10.7957 30.0244L26.8338 38.1962A26 26 0 0 0 24.0356 48.6393Z\"/><path d=\"M13.0985 26.0359A44 44 0 0 1 26.0359 13.0985L35.8394 28.1946A26 26 0 0 0 28.1946 35.8394Z\"/><path d=\"M30.0244 10.7957A44 44 0 0 1 47.6972 6.0603L48.6393 24.0356A26 26 0 0 0 38.1962 26.8338Z\"/></svg>","metacognition":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>metacognition</title><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(0 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(45 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(90 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(135 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(180 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(225 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(270 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(315 50 50)\"/></svg>","reflective_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>reflective thinking</title><path d=\"M50 50L94.0000 50.0000A44 44 0 0 1 92.6930 60.6446Z\"/><path d=\"M50 50L90.6507 66.8381A44 44 0 0 1 85.3697 76.1722Z\"/><path d=\"M50 50L81.1127 81.1127A44 44 0 0 1 72.6617 87.7154Z\"/><path d=\"M50 50L66.8381 90.6507A44 44 0 0 1 56.5036 93.5167Z\"/><path d=\"M50 50L50.0000 94.0000A44 44 0 0 1 39.3554 92.6930Z\"/><path d=\"M50 50L33.1619 90.6507A44 44 0 0 1 23.8278 85.3697Z\"/><path d=\"M50 50L18.8873 81.1127A44 44 0 0 1 12.2846 72.6617Z\"/><path d=\"M50 50L9.3493 66.8381A44 44 0 0 1 6.4833 56.5036Z\"/><path d=\"M50 50L6.0000 50.0000A44 44 0 0 1 7.3070 39.3554Z\"/><path d=\"M50 50L9.3493 33.1619A44 44 0 0 1 14.6303 23.8278Z\"/><path d=\"M50 50L18.8873 18.8873A44 44 0 0 1 27.3383 12.2846Z\"/><path d=\"M50 50L33.1619 9.3493A44 44 0 0 1 43.4964 6.4833Z\"/><path d=\"M50 50L50.0000 6.0000A44 44 0 0 1 60.6446 7.3070Z\"/><path d=\"M50 50L66.8381 9.3493A44 44 0 0 1 76.1722 14.6303Z\"/><path d=\"M50 50L81.1127 18.8873A44 44 0 0 1 87.7154 27.3383Z\"/><path d=\"M50 50L90.6507 33.1619A44 44 0 0 1 93.5167 43.4964Z\"/></svg>","searching":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>searching</title><defs><mask id=\"ps-searching\"><rect width=\"100\" height=\"100\" fill=\"white\"/><circle cx=\"50\" cy=\"50\" r=\"19\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-searching)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","synthesis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>synthesis</title><defs><mask id=\"ps-synthesis\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M50 8Q62 32 92 50Q63 67 50 92Q32 64 8 50Q34 35 50 8Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-synthesis)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>"};
+let copy = 0;
+function glyph(id) {
+  copy += 1;
+  return (GLYPHS[id] || '').replace(/id="(ps-[a-z-]+)"/g, `id="$1-${copy}"`).replace(/url\(#(ps-[a-z-]+)\)/g, `url(#$1-${copy})`);
+}
+const NAMES={"abstract_thinking":"Abstract thinking","searching":"Searching","learning":"Learning","decision_making":"Decision making","inference":"Inference","reflective_thinking":"Reflective thinking","synthesis":"Synthesis","analysis":"Analysis","logical_reasoning":"Logical reasoning","critical_thinking":"Critical thinking","metacognition":"Metacognition","creative_thinking":"Creative thinking"};
+const MODELS={"dm_eisenhower":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><rect x=\"22\" y=\"22\" width=\"44\" height=\"44\" rx=\"0\" fill=\"#60aa36\" stroke=\"none\" /><rect x=\"72\" y=\"22\" width=\"44\" height=\"44\" rx=\"0\" fill=\"#ef402b\" stroke=\"none\" /><rect x=\"22\" y=\"72\" width=\"44\" height=\"44\" rx=\"0\" fill=\"#e5edda\" stroke=\"none\" /><rect x=\"72\" y=\"72\" width=\"44\" height=\"44\" rx=\"0\" fill=\"#f8e1d8\" stroke=\"none\" /><path d=\"M82 34V48H99\" fill=\"none\" stroke=\"#171813\" stroke-width=\"5\" /></svg>","dm_rubber_band":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><line x1=\"63\" y1=\"70\" x2=\"46.0\" y2=\"70.0\" stroke=\"#ef402b\" stroke-width=\"13\"/><path d=\"M20 70L46.0 84.3L46.0 55.7Z\" fill=\"#ef402b\" stroke=\"none\" stroke-width=\"2\" /><line x1=\"77\" y1=\"70\" x2=\"94.0\" y2=\"70.0\" stroke=\"#60aa36\" stroke-width=\"13\"/><path d=\"M120 70L94.0 55.7L94.0 84.3Z\" fill=\"#60aa36\" stroke=\"none\" stroke-width=\"2\" /><circle cx=\"70\" cy=\"70\" r=\"16\" fill=\"#171813\" /></svg>","dm_yes_no":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><rect x=\"26\" y=\"20\" width=\"88\" height=\"25\" rx=\"0\" fill=\"#efeee4\" stroke=\"none\" /><rect x=\"26\" y=\"57\" width=\"88\" height=\"25\" rx=\"0\" fill=\"#efeee4\" stroke=\"none\" /><line x1=\"70\" y1=\"44\" x2=\"70.0\" y2=\"48.0\" stroke=\"#60aa36\" stroke-width=\"4\"/><path d=\"M70 58L75.0 48.0L65.0 48.0Z\" fill=\"#60aa36\" stroke=\"none\" stroke-width=\"2\" /><circle cx=\"70\" cy=\"111\" r=\"15\" fill=\"#60aa36\" /></svg>","dm_stop_rule":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><path d=\"M70 15L125 115H15Z\" fill=\"#60aa36\" stroke=\"none\" stroke-width=\"2\" /><rect x=\"34\" y=\"70\" width=\"72\" height=\"15\" rx=\"0\" fill=\"#ef402b\" stroke=\"none\" /></svg>","dm_flow":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><path d=\"M20 110L105 20H125L40 110Z\" fill=\"#60aa36\" stroke=\"none\" stroke-width=\"2\" /><circle cx=\"70\" cy=\"70\" r=\"13\" fill=\"#171813\" /></svg>","dm_johari":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><rect x=\"20\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#60aa36\" stroke=\"none\" /><rect x=\"74\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#ef402b\" stroke=\"none\" /><rect x=\"20\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#e5edda\" stroke=\"none\" /><rect x=\"74\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#f8e1d8\" stroke=\"none\" /></svg>","dm_energy":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><path d=\"M70 70L70.0 18.0A52 52 0 0 1 122.0 70.0Z\" fill=\"#60aa36\" stroke=\"none\" stroke-width=\"2\" /><path d=\"M70 70L122.0 70.0A52 52 0 0 1 36.57504429629995 109.83431104218685Z\" fill=\"#171813\" stroke=\"none\" stroke-width=\"2\" /><path d=\"M70 70L36.57504429629995 109.83431104218685A52 52 0 0 1 69.99999999999999 18.0Z\" fill=\"#ef402b\" stroke=\"none\" stroke-width=\"2\" /></svg>","dm_hard_choice":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><rect x=\"20\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#60aa36\" stroke=\"none\" /><rect x=\"74\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#ef402b\" stroke=\"none\" /><rect x=\"20\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#e5edda\" stroke=\"none\" /><rect x=\"74\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#f8e1d8\" stroke=\"none\" /><path d=\"M75 78L111 112M111 78L75 112\" fill=\"none\" stroke=\"#171813\" stroke-width=\"5\" /></svg>","dm_rumsfeld":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><rect x=\"20\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#60aa36\" stroke=\"none\" /><rect x=\"74\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#ef402b\" stroke=\"none\" /><rect x=\"20\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#e5edda\" stroke=\"none\" /><rect x=\"74\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#171813\" stroke=\"none\" /></svg>","dm_swiss_cheese":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><rect x=\"22\" y=\"20\" width=\"24\" height=\"98\" rx=\"0\" fill=\"#ef402b\" stroke=\"none\" /><rect x=\"58\" y=\"20\" width=\"24\" height=\"98\" rx=\"0\" fill=\"#60aa36\" stroke=\"none\" /><rect x=\"94\" y=\"20\" width=\"24\" height=\"98\" rx=\"0\" fill=\"#171813\" stroke=\"none\" /><circle cx=\"34\" cy=\"66\" r=\"9\" fill=\"#faf8ef\" /><circle cx=\"70\" cy=\"66\" r=\"9\" fill=\"#faf8ef\" /><circle cx=\"106\" cy=\"66\" r=\"9\" fill=\"#faf8ef\" /></svg>","dm_black_swan":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><path d=\"M26 83Q34 115 80 112Q117 110 116 83Q86 100 73 77Q61 50 88 38Q104 25 95 15Q66 -1 56 30Q50 48 64 71Z\" fill=\"#171813\" stroke=\"none\" stroke-width=\"2\" /><circle cx=\"92\" cy=\"22\" r=\"4\" fill=\"#faf8ef\" /></svg>","dm_prisoners":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><rect x=\"20\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#60aa36\" stroke=\"none\" /><rect x=\"74\" y=\"20\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#ef402b\" stroke=\"none\" /><rect x=\"20\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#e5edda\" stroke=\"none\" /><rect x=\"74\" y=\"74\" width=\"46\" height=\"46\" rx=\"0\" fill=\"#171813\" stroke=\"none\" /><path d=\"M36 41H56M84 41H105M36 96H56M84 96H105\" fill=\"none\" stroke=\"#171813\" stroke-width=\"5\" /></svg>","dm_team":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><path d=\"M20 115V25M20 115H125\" fill=\"none\" stroke=\"#171813\" stroke-width=\"5\" /><path d=\"M25 92L50 67 80 78 115 33\" fill=\"none\" stroke=\"#60aa36\" stroke-width=\"8\" /><path d=\"M25 62L50 81 80 41 115 55\" fill=\"none\" stroke=\"#ef402b\" stroke-width=\"5\" /></svg>","dm_hersey_blanchard":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><circle cx=\"70\" cy=\"70\" r=\"50\" fill=\"#60aa36\" /><path d=\"M30 94C55 94 35 33 70 33S88 94 114 94\" fill=\"none\" stroke=\"#171813\" stroke-width=\"10\" /></svg>","dm_pm_triangle":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><path d=\"M70 15L128 120H12Z\" fill=\"#60aa36\" stroke=\"none\" stroke-width=\"2\" /><circle cx=\"70\" cy=\"23\" r=\"11\" fill=\"#ef402b\" /><circle cx=\"21\" cy=\"112\" r=\"11\" fill=\"#171813\" /><circle cx=\"120\" cy=\"112\" r=\"11\" fill=\"#171813\" /></svg>","dm_drexler_sibbet":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\"><path d=\"M18 100L43 70 68 100 93 40 121 70\" fill=\"none\" stroke=\"#171813\" stroke-width=\"8\" /><circle cx=\"43\" cy=\"70\" r=\"13\" fill=\"#ef402b\" /><circle cx=\"93\" cy=\"40\" r=\"13\" fill=\"#60aa36\" /></svg>"};
+const SECTIONS={"improve_yourself":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\"><circle cx=\"120\" cy=\"120\" r=\"94\" fill=\"#60aa36\"/><path d=\"M26 120A94 94 0 0 0 120 214V120Z\" fill=\"#ef402b\"/><path d=\"M74 142L135 81H106V59H174V127H152V98L91 159Z\" fill=\"#171813\"/></svg>","understand_yourself":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\"><circle cx=\"120\" cy=\"120\" r=\"94\" fill=\"#ef402b\"/><path d=\"M161 82A58 58 0 1 0 174 144L151 134A33 33 0 1 1 144 102Z\" fill=\"#171813\"/><path d=\"M145 113L180 139 139 155Z\" fill=\"#171813\"/><circle cx=\"120\" cy=\"120\" r=\"13\" fill=\"#60aa36\"/></svg>","understand_others":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\"><path d=\"M114 39A81 81 0 0 0 114 201Z\" fill=\"#ef402b\"/><path d=\"M126 39A81 81 0 0 1 126 201Z\" fill=\"#60aa36\"/><path d=\"M81 120L120 81 159 120 120 159Z\" fill=\"#171813\"/></svg>","improve_others":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\"><circle cx=\"79\" cy=\"145\" r=\"61\" fill=\"#ef402b\"/><circle cx=\"161\" cy=\"95\" r=\"75\" fill=\"#60aa36\"/><path d=\"M47 159H104V105H150V84L190 118 150 152V131H130V185H47Z\" fill=\"#171813\"/></svg>"};
+const SHELF={"improve_yourself":["dm_eisenhower","dm_rubber_band","dm_yes_no","dm_stop_rule"],"understand_yourself":["dm_flow","dm_johari","dm_energy","dm_hard_choice"],"understand_others":["dm_rumsfeld","dm_swiss_cheese","dm_black_swan","dm_prisoners"],"improve_others":["dm_team","dm_hersey_blanchard","dm_pm_triangle","dm_drexler_sibbet"]};
+const SECTION_COPY={"improve_yourself":["How to improve yourself","Priorities, trade-offs and when to stop weighing."],"understand_yourself":["How to understand yourself better","What drives you, drains you and pulls you two ways."],"understand_others":["How to understand others better","Unknowns, risks and how other people decide."],"improve_others":["How to improve others","Teams, roles and leading the people involved."]};
+const MODEL_NAMES={"dm_eisenhower":"Eisenhower matrix","dm_rubber_band":"Rubber band","dm_yes_no":"Yes/No rule","dm_stop_rule":"Stop Rule","dm_flow":"Flow","dm_johari":"Johari window","dm_energy":"Energy","dm_hard_choice":"Hard choice","dm_rumsfeld":"Rumsfeld matrix","dm_swiss_cheese":"Swiss cheese","dm_black_swan":"Black swan","dm_prisoners":"Prisoner’s dilemma","dm_team":"Team","dm_hersey_blanchard":"Hersey–Blanchard","dm_pm_triangle":"Project triangle","dm_drexler_sibbet":"Drexler/Sibbet"};
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rand = (n) => Math.floor(Math.random() * n);
+
+/* ── Board: a 4×3 grid of square tiles, after Albers and the Bauhaus grid ── */
+const C = ['var(--dm-red)', 'var(--dm-green)', 'var(--dm-ink)', 'var(--dm-green-tint)'];
+const SHAPES = [
+  (a, b) => `<rect x="6" y="6" width="42" height="42" fill="${a}"/><rect x="52" y="6" width="42" height="42" fill="${b}"/><rect x="6" y="52" width="42" height="42" fill="${b}"/><rect x="52" y="52" width="42" height="42" fill="${a}"/>`,
+  (a, b) => `<path d="M6 6H94L6 94Z" fill="${a}"/><path d="M94 6V94H6Z" fill="${b}"/>`,
+  (a) => `<path d="M6 6H94V94H6Z" fill="${a}"/><path d="M94 94H44A50 50 0 0 1 94 44Z" fill="var(--dm-paper)"/>`,
+  (a) => `<path d="M42 94V58L12 18L22 10L50 46L78 10L88 18L58 58V94Z" fill="${a}"/>`,
+  (a) => `<path d="M6 94V70H30V46H54V22H78V6H94V94Z" fill="${a}"/>`,
+  (a, b) => `<path d="M6 6H94L50 50Z" fill="${a}"/><path d="M6 94H94L50 50Z" fill="${b}"/>`,
+  (a, b) => `<rect x="6" y="6" width="88" height="88" fill="${a}"/><rect x="30" y="30" width="40" height="40" fill="${b}"/>`,
+  (a, b) => `<rect x="6" y="36" width="56" height="28" fill="${a}"/><rect x="62" y="36" width="32" height="28" fill="${b}"/><rect x="62" y="6" width="12" height="88" fill="${a}"/>`
+];
+const board = document.getElementById('board');
+const cells = [];
+function tileMarkup() {
+  const a = rand(3), b = (a + 1 + rand(3)) % 4;
+  return { html: SHAPES[rand(SHAPES.length)](C[a], C[b]), rot: rand(4) * 90 };
+}
+for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${c * 100} ${r * 100})`);
+  g.innerHTML = '<rect x="4" y="4" width="92" height="92" fill="var(--dm-soft)"/><g class="tile"></g>';
+  board.append(g);
+  cells.push(g.lastChild);
+}
+function paint(tile, delay = 0) {
+  const t = tileMarkup();
+  tile.innerHTML = `<g transform="rotate(${t.rot} 50 50)">${t.html}</g>`;
+  tile.style.animationDelay = `${delay}ms`;
+  tile.classList.remove('leave', 'enter');
+  void tile.getBBox?.();
+  tile.classList.add('enter');
+}
+cells.forEach((tile, i) => paint(tile, i * 110));
+function swap(i = rand(cells.length)) {
+  const tile = cells[i];
+  tile.style.animationDelay = '0ms';
+  tile.classList.remove('enter');
+  tile.classList.add('leave');
+  setTimeout(() => paint(tile), 300);
+}
+if (!reduced) setInterval(() => swap(), 1700);
+
+const form = document.getElementById('start-form');
+const field = document.getElementById('start-text');
+let last = 0;
+field.addEventListener('input', () => {
+  form.style.setProperty('--pulse', 1.3);
+  setTimeout(() => form.style.setProperty('--pulse', 1), 160);
+  if (Date.now() - last > 260) { swap(); last = Date.now(); }
+});
+document.querySelectorAll('.try').forEach((b) => b.addEventListener('click', () => { field.value = b.dataset.text; field.focus(); swap(); swap(); }));
+form.addEventListener('submit', (e) => { e.preventDefault(); location.href = 'session.html'; });
+document.getElementById('quick-form').addEventListener('submit', (e) => e.preventDefault());
+
+/* ── Decisions ── */
+function medal(p) {
+  const fills = ['var(--dm-red)', 'var(--dm-green)', 'var(--dm-ink)', 'var(--dm-red)'];
+  const q = [[4, 4], [52, 4], [4, 52], [52, 52]].map(([x, y], i) => `<rect class="piece q${i}" x="${x}" y="${y}" width="44" height="44" fill="${i < p.filled ? fills[i] : 'var(--dm-ghost)'}"/>`).join('');
+  const core = p.model ? `<rect x="26" y="26" width="48" height="48" fill="var(--card)"/><g class="piece p-tool">${MODELS[p.model].replace('<svg ', '<svg x="28" y="28" width="44" height="44" ')}</g>` : '';
+  return `<svg viewBox="0 0 100 100">${q}${core}</svg>`;
+}
+const DECISIONS = [
+  { title: 'Should I take the Sydney job offer?', phase: 'Framing', filled: 1, model: null, meta: 'Question 1 of 3', when: 'Today', skills: ['critical_thinking'] },
+  { title: 'Which three projects do I drop this term?', phase: 'Exploring', filled: 3, model: 'dm_eisenhower', meta: 'Eisenhower matrix', when: '18 Oct', skills: ['analysis', 'decision_making', 'critical_thinking'] },
+  { title: 'Do we move the Year 10 trip to spring?', phase: 'Finished', filled: 4, model: 'dm_rubber_band', meta: 'Review due 4 Nov', when: '6 Oct', skills: ['decision_making', 'reflective_thinking', 'inference'] }
+];
+const PHASE_C = { Framing: 'var(--dm-red)', Exploring: 'var(--dm-green)', Finished: 'var(--dm-ink)' };
+const list = document.getElementById('problems');
+DECISIONS.forEach((p, i) => {
+  const li = document.createElement('li');
+  li.style.display = 'contents';
+  li.innerHTML = `<a class="prob" href="session.html" style="--i:${i}">
+    <span class="medal">${medal(p)}</span>
+    <span class="prob__body">
+      <h3 class="prob__title">${p.title}</h3>
+      <p class="prob__meta"><span class="phase" style="--c:${PHASE_C[p.phase]}">${p.phase}</span><span>${p.meta}</span><span>${p.when}</span></p>
+      <span class="prob__skills">${p.skills.map((s) => `<span class="dm-glyph" title="${NAMES[s]}">${glyph(s)}</span>`).join('')}</span>
+    </span>
+  </a>`;
+  list.append(li);
+});
+const add = document.createElement('li');
+add.style.display = 'contents';
+add.innerHTML = `<button class="prob prob--new" type="button" style="--i:${DECISIONS.length}">+ New decision</button>`;
+add.firstChild.addEventListener('click', () => { field.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+list.append(add);
+
+/* ── Explore station cycles through model emblems ── */
+const toolArt = document.getElementById('build-tool');
+const order = ['dm_eisenhower', 'dm_rubber_band', 'dm_johari', 'dm_rumsfeld', 'dm_team'];
+let ti = 0;
+function nextTool() {
+  toolArt.innerHTML = `<svg viewBox="0 0 140 140"><rect x="6" y="6" width="128" height="128" fill="var(--card)"/><g class="tile enter">${MODELS[order[ti % order.length]]}</g></svg>`;
+  ti += 1;
+}
+nextTool();
+if (!reduced) setInterval(nextTool, 2400);
+
+/* ── The four sections ── */
+document.getElementById('sections').innerHTML = Object.entries(SHELF).map(([key, ids]) => `<div class="sect">
+  <span class="sect__mark">${SECTIONS[key]}</span>
+  <div><h3>${SECTION_COPY[key][0]}</h3><p>${SECTION_COPY[key][1]}</p>
+  <div class="sect__shelf">${ids.map((id) => `<button class="model" type="button"><span class="dm-emblem">${MODELS[id]}</span><span>${MODEL_NAMES[id]}</span></button>`).join('')}</div></div>
+</div>`).join('');
+
+/* ── Skills: one shared tally, split by tool ── */
+const SK = [['abstract_thinking', 2, 6], ['searching', 1, 3], ['learning', 0, 0], ['decision_making', 7, 9], ['inference', 3, 5], ['reflective_thinking', 4, 4], ['synthesis', 1, 2], ['analysis', 5, 11], ['logical_reasoning', 1, 3], ['critical_thinking', 6, 7], ['metacognition', 2, 1], ['creative_thinking', 0, 0]];
+const max = Math.max(...SK.map(([, d, p]) => d + p));
+document.getElementById('skills').innerHTML = SK.map(([id, d, p]) => `<div class="skill" data-n="${d + p}"><span class="dm-glyph">${glyph(id)}</span><span><b>${NAMES[id]}</b><small>${d + p ? `${d + p}× · ${d} here` : 'not yet'}</small><span class="bar"><i class="dm" style="--w:${(d / max) * 100}%"></i><i class="ps" style="--w:${(p / max) * 100}%"></i></span></span></div>`).join('');
+</script>
+</body>
+</html>
