@@ -135,7 +135,7 @@ describe('Upload from computer in media block editors', () => {
     expect(input!.accept).toBe(AUDIO_ACCEPT);
     await pick(input!, [mp3()]);
     const block = latest() as Extract<Block, { block_type: 'audio' }>;
-    expect(block.content).toEqual({ url: urlOf('reading.mp3'), title: 'reading.mp3' });
+    expect(block.content).toEqual({ url: urlOf('reading.mp3'), title: 'reading.mp3', mode: 'listen' });
   });
 
   it('embed: uploading a PDF sets the url and the PDF provider', async () => {

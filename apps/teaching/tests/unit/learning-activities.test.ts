@@ -234,6 +234,7 @@ describe('createBlock learning activities', () => {
     expect(learning?.types).toEqual([
       'peer_feedback',
       'brainstorm',
+      'hinge_question',
       'question_drop',
       'quiz_question',
       'question_set',

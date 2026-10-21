@@ -59,6 +59,7 @@ import {
   type VoiceNoteSource
 } from '@/blocks/voice-note-player';
 import { renderElementCard, type TechniqueCardPoemSpot } from '@/blocks/technique-card';
+import { renderAnnotationCode } from '@/blocks/annotation-code-field';
 import type {
   AnnotationAttachment,
   AnnotationBlock,
@@ -510,6 +511,7 @@ function fillBody(
   const body = document.createElement('div');
   body.className = 'block-annotation__body';
   body.innerHTML = sanitizeRichTextHtml(annotation.body.html);
+  if (annotation.code) host.append(renderAnnotationCode(annotation.code));
   host.append(body);
   if (annotation.technique?.id && table) {
     const technique = lookupTechnique(table, annotation.technique.id);
@@ -1017,13 +1019,16 @@ function buildInteractiveView(
       const technique = lookupTechnique(table, ann.technique.id);
       if (technique) return marginNoteText(ann.body.html, technique.name);
     }
-    return marginNoteText(ann.body.html);
+    const text = marginNoteText(ann.body.html);
+    if (ann.code) return text ? `${ann.code.code}${ann.code.positive ? '+' : ''} · ${text}` : `${ann.code.code}${ann.code.positive ? '+' : ''}`;
+    return text;
   }
 
   /** The side window only earns its place when the handwriting cannot carry the note. */
   function readerNeeded(ann: AnnotationItem): boolean {
     if ((ann.also_anchors?.length ?? 0) > 0) return false;
     if (ann.technique?.id) return true;
+    if (ann.code?.descriptor) return true;
     if ((ann.body.attachments?.length ?? 0) > 0) return true;
     if (inkStyle !== 'fineliner') return true;
     if (isNarrowAnnotationViewport()) return true;

@@ -2,10 +2,16 @@ import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
 import { createBrainstormEditor } from '@/blocks/brainstorm';
+import { createHingeQuestionEditor } from '@/blocks/hinge-question';
+import { createContinuumLineEditor } from '@/blocks/continuum-line';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
-import { createKaplanEditor } from '@/blocks/kaplan-editor';
+import { createLensEditor } from '@/blocks/lenses/lens-editor';
+import { createFormatField, withFormat } from '@/blocks/formats/registry';
+import { LENS_LEVELS, LEVEL_LABELS, type LensLevel } from '@/blocks/lenses/types';
+import { LOGIC_LABELS, type LogicSetting } from '@/blocks/reasoning/content';
+import { QUESTION_LEVEL_LABELS, QUESTION_LEVELS, guessQuestionLevel, type QuestionLevel } from '@/blocks/lenses/question-levels';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
@@ -78,6 +84,7 @@ import {
   resolveMediaLibraryUrl
 } from '@/teacher/media-library-picker';
 import { createAudioRecordButton } from '@/blocks/audio-record-button';
+import { createVoiceModePicker, createVoiceTaskFields } from '@/blocks/voice-block-editor';
 import {
   AUDIO_ACCEPT,
   createUploadButton,
@@ -252,7 +259,7 @@ export function editorShell<T extends Block>(
     fields.hidden = open;
     visibility.hidden = open;
   });
-  shell.append(visibility, createKaplanEditor({ getBlock: getLatest, onChange }), fields);
+  shell.append(visibility, createLensEditor({ getBlock: getLatest, onChange }), fields);
   return shell;
 }
 
@@ -1057,9 +1064,11 @@ export function createAudioEditor(
   title.setAttribute('aria-label', 'Audio title');
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         url: url.value,
         title: title.value.trim() || undefined
       }
@@ -1092,7 +1101,26 @@ export function createAudioEditor(
   url.addEventListener('input', emitChange);
   title.addEventListener('input', emitChange);
 
-  fields.append(mediaSourceRow(upload.el, record.el), url, title);
+  const listen = document.createElement('div');
+  listen.className = 'block-editor__fields voice-editor__listen';
+  listen.append(mediaSourceRow(upload.el, record.el), url, title);
+  const task = createVoiceTaskFields(getLatest, onChange);
+  const paintMode = () => {
+    const isListen = (getLatest().content.mode ?? 'listen') === 'listen';
+    listen.hidden = !isListen;
+    task.el.hidden = isListen;
+    task.refresh();
+  };
+  fields.append(
+    createVoiceModePicker(getLatest, (mode) => {
+      const latest = getLatest();
+      onChange({ ...latest, content: { ...latest.content, mode } });
+      paintMode();
+    }),
+    listen,
+    task.el
+  );
+  paintMode();
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -1504,6 +1532,8 @@ export function createQuestionSetEditor(
     kind: 'short_answer' | 'multiple_choice';
     options?: string[];
     response_space?: ResponseSpace;
+    level?: QuestionLevel;
+    logic?: LogicSetting;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1523,13 +1553,18 @@ export function createQuestionSetEditor(
     prompt: q.prompt,
     kind: q.kind,
     options: q.options ? [...q.options] : undefined,
-    response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined
+    response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined,
+    level: q.level,
+    logic: q.logic
   }));
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        // Keep the format and its table settings, which have their own controls.
+        ...latest.content,
         title: title.value.trim() || undefined,
         questions: questions.map((q) => ({
           id: q.id,
@@ -1538,7 +1573,9 @@ export function createQuestionSetEditor(
           options: q.kind === 'multiple_choice' ? [...(q.options ?? [])] : undefined,
           ...(q.kind === 'short_answer' && q.response_space
             ? { response_space: q.response_space }
-            : {})
+            : {}),
+          ...(q.level ? { level: q.level } : {}),
+          ...(q.logic ? { logic: q.logic } : {})
         }))
       }
     });
@@ -1567,7 +1604,21 @@ export function createQuestionSetEditor(
     },
     renderItem: (question, ctx) => {
       const n = ctx.index + 1;
-      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => ctx.update({ ...ctx.current, prompt: value }), 'textarea', 2);
+      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => {
+        ctx.update({ ...ctx.current, prompt: value });
+        if (!ctx.current.level) level.setValue(guessQuestionLevel(value));
+      }, 'textarea', 2);
+
+      // The 4 levels format's band; untouched questions follow their opening words.
+      const level = createChoice({
+        key: 'Level',
+        value: question.level ?? guessQuestionLevel(question.prompt),
+        options: QUESTION_LEVELS.map((value) => ({ value, label: QUESTION_LEVEL_LABELS[value] })),
+        className: 'block-editor__question-level',
+        ariaLabel: `Question ${n} level`,
+        onChange: (value) => ctx.update({ ...ctx.current, level: value as QuestionLevel })
+      });
+      level.el.hidden = getLatest().content.format !== 'question_levels';
 
       const options = editorField(
         'block-editor__question-options',
@@ -1612,15 +1663,92 @@ export function createQuestionSetEditor(
         }
       });
 
+      // Shown only for the Reasoning chart format (see data-format on the fields).
+      const logic = createChoice({
+        key: 'Logic',
+        value: question.logic ?? 'choice',
+        options: (['deductive', 'inductive', 'abductive', 'all_three', 'choice'] as const)
+          .map((value) => ({ value, label: LOGIC_LABELS[value] })),
+        className: 'block-editor__question-logic',
+        ariaLabel: `Question ${n} logic`,
+        onChange: (value) => ctx.update({ ...ctx.current, logic: value === 'choice' ? undefined : value as LogicSetting })
+      });
+
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
-      settings.append(kind.el, responseSpace.el);
+      settings.append(level.el, kind.el, responseSpace.el, logic.el);
       return fragmentOf(prompt, settings, options);
     }
   });
   list.el.classList.add('block-editor__questions');
 
-  fields.append(title, list.el);
+  // Human experience table settings, shown only for that format.
+  const tableSettings = document.createElement('div');
+  tableSettings.className = 'block-editor__inline-settings block-editor__table-settings';
+  const tableRows = createChoice({
+    key: 'Rows',
+    value: String(block.content.table?.rows ?? 3),
+    options: ['3', '4', '5'].map((n) => ({ value: n, label: n })),
+    className: 'block-editor__table-rows',
+    ariaLabel: 'Table rows',
+    onChange: (value) => setTable({ rows: Number(value) })
+  });
+  const exampleRow = createChoice({
+    key: 'Example row',
+    value: block.content.table?.example === false ? 'hide' : 'show',
+    options: [{ value: 'show', label: 'Show' }, { value: 'hide', label: 'Hide' }],
+    className: 'block-editor__table-example',
+    ariaLabel: 'Example row',
+    onChange: (value) => setTable({ example: value === 'show' })
+  });
+  tableSettings.append(tableRows.el, exampleRow.el);
+  const setTable = (patch: { rows?: number; example?: boolean }) => {
+    const latest = getLatest();
+    const table = { rows: 3, example: true, ...latest.content.table, ...patch };
+    onChange({ ...latest, content: { ...latest.content, table } });
+  };
+  // Reasoning chart settings, shown only for that format.
+  const reasoningSettings = document.createElement('div');
+  reasoningSettings.className = 'block-editor__inline-settings block-editor__reasoning-settings';
+  const setReasoning = (patch: { level?: LensLevel; student_level?: boolean }) => {
+    const latest = getLatest();
+    const reasoning = { level: 'core' as LensLevel, student_level: true, ...latest.content.reasoning, ...patch };
+    onChange({ ...latest, content: { ...latest.content, reasoning } });
+  };
+  const reasoningLevel = createChoice({
+    key: 'Level',
+    value: block.content.reasoning?.level ?? 'core',
+    options: LENS_LEVELS.map((value) => ({ value, label: LEVEL_LABELS[value] })),
+    className: 'block-editor__reasoning-level',
+    ariaLabel: 'Reasoning level',
+    onChange: (value) => setReasoning({ level: value as LensLevel })
+  });
+  const studentLevel = createChoice({
+    key: 'Students change level',
+    value: block.content.reasoning?.student_level === false ? 'no' : 'yes',
+    options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }],
+    className: 'block-editor__reasoning-student-level',
+    ariaLabel: 'Students can change the level',
+    onChange: (value) => setReasoning({ student_level: value === 'yes' })
+  });
+  reasoningSettings.append(reasoningLevel.el, studentLevel.el);
+
+  const showTableSettings = (format: string) => {
+    tableSettings.hidden = format !== 'human_experience_table';
+    reasoningSettings.hidden = format !== 'reasoning_chart';
+    fields.dataset.format = format;
+    fields.querySelectorAll<HTMLElement>('.block-editor__question-level').forEach((el) => { el.hidden = format !== 'question_levels'; });
+  };
+  showTableSettings(block.content.format ?? 'standard');
+  const format = createFormatField({
+    block,
+    onPick: (id) => {
+      onChange(withFormat(getLatest(), id));
+      showTableSettings(id);
+    }
+  });
+
+  fields.append(...(format ? [format] : []), tableSettings, reasoningSettings, title, list.el);
   return editorShell(block, onChange, fields, getLatest);
 }
 
@@ -2928,12 +3056,18 @@ function createBlockEditorFields(
       return createGalleryEditor(block, onChange, latest as () => Extract<Block, { block_type: 'gallery' }>);
     case 'table':
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
-    case 'peer_feedback':
-      return createPeerFeedbackEditor(block, onChange);
+    case 'peer_feedback': {
+      const peer = latest as () => Extract<Block, { block_type: 'peer_feedback' }>;
+      return editorShell(block, onChange, createPeerFeedbackEditor(block, onChange, peer), peer);
+    }
     case 'question_drop':
       return createQuestionDropEditor(block, onChange, context.lessonId);
     case 'brainstorm':
       return createBrainstormEditor(block, onChange);
+    case 'hinge_question':
+      return createHingeQuestionEditor(block, onChange);
+    case 'continuum_line':
+      return createContinuumLineEditor(block, onChange);
     case 'curriculum_lines':
       return createCurriculumLinesEditor(block, onChange, context.network ?? (context.unitLessons
         ? { lines: [], lessons: context.unitLessons.map((l) => ({ id: l.id, title: l.title, href: l.href })) }

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
+import { LensAttachmentsSchema, LensLevelSchema, LogicSchema } from './lens';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -42,6 +43,8 @@ export const BlockTypeSchema = z.enum([
   'peer_feedback',
   'question_drop',
   'brainstorm',
+  'hinge_question',
+  'continuum_line',
   'curriculum_lines',
   'quiz_question',
   'question_set',
@@ -129,6 +132,7 @@ const blockTimestamps = {
 const blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
   discern: DiscernQualifierSchema.optional(),
+  lenses: LensAttachmentsSchema.optional(),
   layout: z.record(z.unknown()).default({}),
   print: z.record(z.unknown()).default({}),
   settings: z.record(z.unknown()).default({})
@@ -430,9 +434,23 @@ export const AudioBlockSchema = z.object({
   block_type: z.literal('audio'),
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z.object({
     url: z.string(),
-    title: z.string().optional()
+    title: z.string().optional(),
+    mode: z.enum(['listen', 'respond', 'viva']).default('listen'),
+    prompt: z.string().max(4000).optional(),
+    time_limit_s: z.number().int().min(30).max(300).optional(),
+    student_chooses_time: z.boolean().optional(),
+    scaffold: z
+      .array(z.object({ label: z.string().max(80), weight: z.number().min(0.5).max(3).default(1) }))
+      .max(8)
+      .optional(),
+    code_groups: z.array(z.enum(['composition', 'viva', 'speaking'])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -490,7 +508,11 @@ export const QuestionItemSchema = z.object({
   prompt: z.string(),
   kind: QuestionKindSchema,
   options: z.array(z.string()).optional(),
-  response_space: ResponseSpaceSchema.optional()
+  response_space: ResponseSpaceSchema.optional(),
+  /** The 4 levels format's band; absent means guessed from the question's opening words. */
+  level: z.enum(['beginner', 'detective', 'judge', 'inventor']).optional(),
+  /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
+  logic: LogicSchema.optional()
 });
 
 export const PeerFeedbackBlockSchema = z.object({
@@ -503,6 +525,38 @@ export const PeerFeedbackBlockSchema = z.object({
     mode: z.enum(['comments', 'annotate']).default('comments'),
     strength_prompt: z.string().max(300).default('One thing that works well…'),
     suggestion_prompt: z.string().max(300).default('One suggestion or question…')
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Continuum line: students place their symbol on a line for each statement
+ * about one stimulus and give a reason. Snapped statements land on the ends
+ * or the named stops; the rules live on the server.
+ */
+export const ContinuumStatementSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().max(300).default(''),
+  snap: z.boolean().default(false)
+});
+export const ContinuumLineBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('continuum_line'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    stimulus: z.object({
+      kind: z.enum(['text', 'image', 'video']).default('text'),
+      text: z.string().max(2000).default(''),
+      url: z.string().max(2000).default(''),
+      alt_text: z.string().max(500).default('')
+    }).default({ kind: 'text', text: '', url: '', alt_text: '' }),
+    scale: z.object({
+      left: z.string().max(40).default('Implied'),
+      right: z.string().max(40).default('Not implied'),
+      stops: z.array(z.string().max(40)).max(3).default([])
+    }).default({ left: 'Implied', right: 'Not implied', stops: [] }),
+    statements: z.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z.enum(['teacher', 'student']).default('teacher'),
+    replace: z.boolean().default(true)
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -521,6 +575,32 @@ export const BrainstormBlockSchema = z.object({
     per_student: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).default(3),
     max_length: z.number().int().min(20).max(280).default(140),
     layout: z.enum(['grid', 'cloud', 'groups']).default('grid')
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Hinge question: one quick multiple-choice check at the turning point of a
+ * lesson. Each wrong option names the misconception it reveals. The right
+ * answer, the misconception notes and the move-on / reteach thresholds are
+ * teacher-only: publish strips them, and the server reads them from the draft.
+ */
+export const HingeOptionSchema = z.object({
+  id: z.string().min(1).max(40),
+  text: z.string().max(300).default(''),
+  misconception: z.string().max(300).default('')
+});
+
+export const HingeQuestionBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('hinge_question'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    prompt: z.string().max(500).default(''),
+    options: z.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z.string().max(40).default(''),
+    seconds: z.union([z.literal(0), z.literal(30), z.literal(60), z.literal(90), z.literal(120)]).default(60),
+    move_on: z.number().int().min(1).max(100).default(80),
+    reteach: z.number().int().min(0).max(99).default(50)
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -695,7 +775,19 @@ export const QuestionSetBlockSchema = z.object({
   visibility: VisibilitySchema,
   content: z.object({
     title: z.string().optional(),
-    questions: z.array(QuestionItemSchema)
+    questions: z.array(QuestionItemSchema),
+    /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
+    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge', 'question_levels', 'because_but_so', 'reasoning_chart']).optional(),
+    /** Human experience table settings, kept when switching format away and back. */
+    table: z.object({
+      rows: z.number().int().min(3).max(5).default(3),
+      example: z.boolean().default(true)
+    }).optional(),
+    /** Reasoning chart settings, kept when switching format away and back. */
+    reasoning: z.object({
+      level: LensLevelSchema.default('core'),
+      student_level: z.boolean().default(true)
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1129,6 +1221,20 @@ export const AnnotationTechniqueRefSchema = z.object({
   table_version: z.string().min(1)
 });
 
+/**
+ * A feedback code on an annotation note (AR, TS+ …). The code's words are
+ * copied in when tagged, so students can read them without the teacher's
+ * code library, and a later edit to the library doesn't rewrite old notes.
+ */
+export const AnnotationCodeRefSchema = z.object({
+  id: z.string().min(1).max(40),
+  code: z.string().regex(/^[A-Z]{1,3}$/),
+  label: z.string().max(60),
+  descriptor: z.string().max(600).default(''),
+  colour: z.enum(['blue', 'sage', 'peach', 'gold', 'lilac']).default('blue'),
+  positive: z.boolean().default(false)
+});
+
 export const AnnotationAttachmentSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('link'),
@@ -1244,6 +1350,7 @@ export const AnnotationItemSchema = z
     thread: AnnotationThreadSchema.optional(),
     anthology: AnthologyTagSchema.optional(),
     technique: AnnotationTechniqueRefSchema.optional(),
+    code: AnnotationCodeRefSchema.optional(),
     body: z.object({
       html: z.string(),
       attachments: z.array(AnnotationAttachmentSchema).default([])
@@ -1367,6 +1474,7 @@ export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>;
 export type AnnotationAttachment = z.infer<typeof AnnotationAttachmentSchema>;
 export type AnnotationThread = z.infer<typeof AnnotationThreadSchema>;
 export type AnnotationVoiceTrack = z.infer<typeof AnnotationVoiceTrackSchema>;
+export type AnnotationCodeRef = z.infer<typeof AnnotationCodeRefSchema>;
 export type AnthologyTag = z.infer<typeof AnthologyTagSchema>;
 
 function toolkitBlockSchema<T extends string, C extends z.ZodTypeAny>(blockType: T, content: C) {
@@ -1448,6 +1556,8 @@ const leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  HingeQuestionBlockSchema,
+  ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,

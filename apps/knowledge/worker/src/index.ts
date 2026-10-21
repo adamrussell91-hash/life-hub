@@ -186,12 +186,13 @@ export default {
       return handleTranscribeRequest(request, {
         secret: env.RESEARCH_KERNEL_SHARED_SECRET,
         allowedOrigin: env.TEACHING_HUB_ORIGIN ?? "*",
-        runWhisper: async audioBase64 => {
+        runWhisper: async (audioBase64, options) => {
           if (!env.AI) throw new Error("Transcription is unavailable");
           return env.AI.run(WHISPER_MODEL, {
             audio: audioBase64,
             task: "transcribe",
             language: "en",
+            ...(options?.initial_prompt ? { initial_prompt: options.initial_prompt } : {}),
           });
         },
       });

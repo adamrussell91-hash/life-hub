@@ -71,6 +71,7 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, c.alt_text ?? c.image_alt);
       push(parts, c.title);
       push(parts, c.caption);
+      push(parts, c.prompt);
       break;
     case 'html_app':
       push(parts, c.title);
@@ -91,6 +92,18 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'brainstorm':
       push(parts, c.question);
       break;
+    case 'hinge_question':
+      push(parts, c.prompt);
+      for (const o of (c.options as Array<{ text?: string }> | undefined) ?? []) push(parts, o.text);
+      break;
+    case 'continuum_line': {
+      const line = c as { stimulus?: { text?: string }; scale?: { left?: string; right?: string }; statements?: Array<{ text?: string }> };
+      push(parts, line.stimulus?.text);
+      push(parts, line.scale?.left);
+      push(parts, line.scale?.right);
+      for (const s of line.statements ?? []) push(parts, s.text);
+      break;
+    }
     case 'curriculum_lines': {
       const lines = c as { title?: string; strands?: Array<{ name?: string }>; stations?: Array<{ label?: string }>; checkpoints?: Array<{ label?: string }>; terminus?: { label?: string; detail?: string } };
       push(parts, lines.title);

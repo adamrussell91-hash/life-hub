@@ -7,6 +7,7 @@ import {
 } from './knowledge-data.mjs';
 import { knowledgeKernelFetch, knowledgeKernelSecret } from './knowledge-kernel.mjs';
 import { loadKnowledgePrompt } from './knowledge-prompts.mjs';
+import { processVoiceTranscriptions, sweepVoiceAudio } from './voice-submissions.mjs';
 import { tidyPageDirect } from './knowledge-tidy.mjs';
 import {
   aiJobKey,
@@ -276,6 +277,7 @@ export async function runScheduledJobsTick(deps = {}) {
   const result = {
     expired: [],
     voice_transcribe: { processed: [], errors: [] },
+    voice_submissions: { transcribed: [], audio_deleted: [] },
     tidy: { ids: [], errors: [] }
   };
   try {
@@ -293,6 +295,20 @@ export async function runScheduledJobsTick(deps = {}) {
     }
   } catch {
     // Teaching store unbound — midnight tidy can still run.
+  }
+  // Voice block: transcribe anything the inbox hasn't, then drop audio older than 28 days.
+  try {
+    const store = deps.store ?? await (deps.getContentStore ?? defaultGetContentStore)(env);
+    if (store) {
+      const voice = await processVoiceTranscriptions({ store, env, fetchImpl: deps.fetchImpl, knowledgeFetch: deps.knowledgeFetch, limit: 20 });
+      const swept = await sweepVoiceAudio({ store, now: nowMs });
+      result.voice_submissions = {
+        transcribed: voice.results.filter((r) => r.done).map((r) => r.id),
+        audio_deleted: swept.deleted
+      };
+    }
+  } catch {
+    // Retention retries tomorrow; nothing is lost by waiting a day.
   }
   result.tidy = await runMidnightTidy({
     env,
