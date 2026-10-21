@@ -180,6 +180,7 @@ export function buildDecisionPrompt(session) {
   const missing = frameKeysOf(session).filter((key) => !session.frame[key]);
   parts.push(`Frame: ${JSON.stringify(session.frame)}${missing.length ? `\nMissing frame answers: ${missing.join(', ')}` : ''}`);
   if (session.frame.compass) parts.push(`COMPASS: ${compassLabels(session.frame.compass)}`);
+  if (session.phase === 'frame' && session.startModel) parts.push(`SHELF PICK: the person started from ${TOOLS[session.startModel].name} (${session.startModel}). When framing ends it opens on that model: suggest it with next_tool and say in one sentence how it fits the frame.`);
   const earlier = earlierSteps(session);
   if (earlier) parts.push(earlier.replace(/^EARLIER STEPS:/, 'EARLIER:'));
   if (session.model) parts.push(...reviewLines(session));

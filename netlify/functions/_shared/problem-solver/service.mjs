@@ -107,7 +107,7 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
       const kind = body.kind ?? kinds[0];
       if (!kinds.includes(kind)) throw httpError(400, 'validation_error', `This tool does not start ${kind} sessions.`);
       const make = kind === 'lightning' ? createLightningSession : (input, d) => createSession({ ...input, kind }, d);
-      const session = make({ title: body.title, text: body.text, links: Array.isArray(body.links) ? body.links : [] }, deps);
+      const session = make({ title: body.title, text: body.text, links: Array.isArray(body.links) ? body.links : [], startModel: body.startModel ?? null }, deps);
       session.requestIds = body.requestId ? [String(body.requestId)] : [];
       if (!ID_RE.test(String(body.requestId ?? ''))) return save(owner, session, null);
       session.id = String(body.requestId);

@@ -179,6 +179,6 @@ export function recordOffer(session) {
   if (!written) return session.caseFileDeclined === key ? null : { kind: 'write', version: file.version, file, digests, key, changed: file.sections.map((s) => s.key), provenance };
   const changed = file.sections.filter((s) => written.sections[s.key] !== digests[s.key]).map((s) => s.key);
   if (changed.some((k) => !QUIET.has(k)) && session.caseFileDeclined !== key) return { kind: 'update', version: written.version + 1, file, digests, key, changed, provenance };
-  if (written.graphic === false) return { kind: 'graphic', version: written.version, file, digests, key, changed: [], provenance };
+  if (written.graphic === false && session.caseFileDeclined !== key) return { kind: 'graphic', version: written.version, file, digests, key, changed: [], provenance };
   return null;
 }
