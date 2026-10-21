@@ -105,7 +105,9 @@ const QuizPinSchema = z.object({
 
 const base = {
   id: Id,
-  prompt: z.string().trim().max(QUIZ_LIMITS.prompt),
+  // A missing prompt reads as empty: fill-the-gap questions need none, and the
+  // other kinds are still told to write one by questionProblems.
+  prompt: z.string().trim().max(QUIZ_LIMITS.prompt).default(''),
   marks: z.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
