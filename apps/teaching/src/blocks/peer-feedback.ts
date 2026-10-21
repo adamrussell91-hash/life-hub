@@ -3,6 +3,7 @@ import { apiPost, ApiClientError } from '@/api/client';
 import { button, el, errorText, field, isNotPublished, notLivePanel, identityName, readJSON, token, writeJSON } from '@/blocks/peer-feedback-ui';
 import { giveView, receivedView as annotatedView, teacherLayers, type Code, type Piece, type ReceivedLayer, type TeacherLayer } from '@/blocks/peer-annotate';
 import { mountBankEditor } from '@/blocks/peer-annotate-bank';
+import { createFormatField } from '@/blocks/formats/registry';
 import { taskCard } from '@/blocks/peer-feedback-task';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import './peer-feedback.css';
@@ -100,14 +101,20 @@ const lastState = new Map<string, unknown>();
 
 /* ── Entry points ──────────────────────────────────────────────────── */
 
-const MODES: Array<{ mode: Mode; label: string }> = [
-  { mode: 'comments', label: 'Two feedback boxes' },
-  { mode: 'annotate', label: 'Notes on the text' }
-];
 
-export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlock) => void): HTMLElement {
+export function createPeerFeedbackEditor(
+  block: PeerBlock,
+  onChange: (b: PeerBlock) => void,
+  getLatest?: () => PeerBlock
+): HTMLElement {
   const root = el('div', 'peer-feedback peer-feedback--editor');
   let current = block;
+  // Start from the latest block so a lens added beside these fields is kept.
+  const update = (content: Partial<PeerBlock['content']>): void => {
+    const latest = getLatest?.() ?? current;
+    current = { ...latest, content: { ...latest.content, ...content } };
+    onChange(current);
+  };
   const fields = [
     { key: 'prompt', label: 'What should students write about?', hint: 'Keep it to a short answer: a paragraph or two.', max: 4000, rows: 3 },
     { key: 'strength_prompt', label: 'First feedback box', hint: 'Usually what works well.', max: 300, rows: 1 },
@@ -119,45 +126,28 @@ export function createPeerFeedbackEditor(block: PeerBlock, onChange: (b: PeerBlo
     input.rows = f.rows;
     input.maxLength = f.max;
     input.addEventListener('input', () => {
-      current = { ...current, content: { ...current.content, [f.key]: input.value } };
-      onChange(current);
+      update({ [f.key]: input.value });
     });
     return wrap;
   };
 
-  const modeWrap = el('div', 'pf-field');
-  modeWrap.append(el('span', 'pf-field__label', 'How students give feedback'));
-  const modes = el('div', 'pa-mode');
-  modes.setAttribute('role', 'group');
-  modes.setAttribute('aria-label', 'How students give feedback');
-  modeWrap.append(modes);
-  const modeHint = el('p', 'pf-field__hint block-secondary');
-  modeWrap.append(modeHint);
+  // How students give feedback is this block's Format: the shared control.
+  const modeWrap = createFormatField({
+    block,
+    onPick: (id) => {
+      if ((current.content.mode ?? 'comments') === id) return;
+      update({ mode: id as Mode });
+      paintMode();
+    }
+  });
   const perMode = el('div', 'pf-run');
 
   function paintMode(): void {
     const mode = current.content.mode ?? 'comments';
-    modes.replaceChildren(
-      ...MODES.map((m) => {
-        const b = button(m.label, 'ghost', () => {
-          if (mode === m.mode) return;
-          current = { ...current, content: { ...current.content, mode: m.mode } };
-          onChange(current);
-          paintMode();
-        });
-        b.className = 'pa-mode__option';
-        b.setAttribute('aria-pressed', String(mode === m.mode));
-        return b;
-      })
-    );
-    modeHint.textContent =
-      mode === 'annotate'
-        ? 'Each answer goes to two classmates. They highlight parts of it and press your feedback buttons; the writer gets it back as two layers.'
-        : 'Each answer goes to one classmate, who fills in your two boxes.';
     perMode.replaceChildren(...(mode === 'annotate' ? [mountBankEditor()] : [textField(fields[1]), textField(fields[2])]));
   }
 
-  root.append(textField(fields[0]), modeWrap, perMode);
+  root.append(textField(fields[0]), ...(modeWrap ? [modeWrap] : []), perMode);
   paintMode();
   root.append(
     el('p', 'pf-note block-secondary', 'To run it, publish the lesson, close this editor and press Start activity on the block.')

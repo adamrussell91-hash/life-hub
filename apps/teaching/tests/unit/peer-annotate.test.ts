@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { pickKitOption } from './kit-filter';
 
 vi.mock('@/api/client', async () => {
   const actual = await vi.importActual<typeof import('@/api/client')>('@/api/client');
@@ -163,7 +164,7 @@ describe('editor', () => {
     const editor = createBlockEditor(block, changed);
     document.body.replaceChildren(editor);
     expect(editor.textContent).toContain('First feedback box');
-    [...editor.querySelectorAll('button')].find((b) => b.textContent === 'Notes on the text')!.click();
+    pickKitOption(editor.querySelector('.block-editor__format-choice'), 'annotate');
     expect(changed.mock.calls.at(-1)![0].content.mode).toBe('annotate');
     expect(editor.textContent).not.toContain('First feedback box');
     await flush();
