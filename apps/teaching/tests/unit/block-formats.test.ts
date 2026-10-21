@@ -54,7 +54,7 @@ describe('Human experience table', () => {
     block.content.table = { rows: 4, example: true };
     const view = renderBlock(block, 'student', { lessonId: 'lesson' });
     document.body.append(view);
-    expect(view.querySelector('.block-question-set__prompt')!.textContent).toBe('How does your text explore sacrifice?');
+    expect(view.querySelector('.block-question-set__instruction')!.textContent).toBe('How does your text explore sacrifice?');
     expect(view.querySelector('.block-question-set__example')!.textContent).toContain('Sacrifice');
     expect(view.querySelectorAll('tbody tr')).toHaveLength(5);
     const pick = view.querySelector<HTMLButtonElement>('.block-question-set__lens-pick')!;

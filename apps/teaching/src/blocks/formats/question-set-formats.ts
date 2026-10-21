@@ -11,8 +11,8 @@ const PRINT_LINES = 4;
 const TABLE_INSTRUCTION = 'Complete the table for the human experiences your text explores.';
 const TABLE_COLUMNS = [
   { id: 'experience', label: 'Human experience', hint: 'e.g. sacrifice' },
-  { id: 'focus', label: 'Conceptual focus', hint: '2 or 3 ideas, e.g. love, fear, control' },
-  { id: 'sentence', label: 'In one sentence', hint: 'How the ideas connect' }
+  { id: 'focus', label: 'Conceptual focus', hint: 'e.g. love, fear' },
+  { id: 'sentence', label: 'In one sentence', hint: 'How they connect' }
 ] as const;
 const LENS_OPTIONS = ['Window', 'Mirror', 'Both'] as const;
 /** The same Hunger Games moment the Windows & Mirrors lens uses. */
@@ -86,7 +86,7 @@ function writeDown(mode: Mode, state: State, persist: () => void, id: string, fr
 export function renderHumanExperienceTable(block: QuestionSet, mode: Mode, ctx: Ctx = {}): HTMLElement {
   const wrap = el('div', 'block-question-set block-question-set--table');
   if (block.content.title?.trim()) wrap.append(el('p', 'block-question-set__title', block.content.title));
-  wrap.append(el('p', 'block-question-set__prompt block-body', block.content.questions[0]?.prompt.trim() || TABLE_INSTRUCTION));
+  wrap.append(el('p', 'block-question-set__instruction block-body', block.content.questions[0]?.prompt.trim() || TABLE_INSTRUCTION));
   const { state, persist } = formatState(block, mode, ctx);
   const rows = block.content.table?.rows ?? 3;
   const scroll = el('div', 'block-question-set__table-wrap');
@@ -120,7 +120,7 @@ export function renderHumanExperienceTable(block: QuestionSet, mode: Mode, ctx: 
     for (const column of TABLE_COLUMNS) {
       const td = cell(column.label);
       if (mode === 'print') td.append(lines(2));
-      else td.append(box(state, persist, `r${row}.${column.id}`, `Row ${row + 1} ${column.label.toLowerCase()}`, column.hint));
+      else td.append(box(state, persist, `r${row}.${column.id}`, `Row ${row + 1} ${column.label.toLowerCase()}`, column.hint, 3));
       tr.append(td);
     }
     const lens = cell('Window, mirror or both?');
@@ -160,8 +160,9 @@ export function renderAnchorBridge(block: QuestionSet, mode: Mode, ctx: Ctx = {}
     const boxes = el('div', 'block-question-set__boxes');
     for (const part of ANCHOR_BOXES) {
       const label = el('label', 'block-question-set__part');
-      label.append(el('span', 'block-eyebrow', part.label), el('span', 'block-secondary', part.hint));
-      if (mode === 'print') label.append(lines(3));
+      label.append(el('span', 'block-eyebrow', part.label));
+      // On paper there is no placeholder, so the hint prints under the label.
+      if (mode === 'print') label.append(el('span', 'block-secondary', part.hint), lines(3));
       else label.append(box(state, persist, `${question.id}.${part.id}`, `${part.label}: ${part.hint}`, part.hint));
       boxes.append(label);
     }

@@ -5424,7 +5424,11 @@ a.home-class-tile:hover {
 }
 .block-question-set__box:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
 .block-question-set__table-wrap { overflow-x: auto; margin-top: var(--space-3); }
-.block-question-set__table { width: 100%; border-collapse: collapse; font-family: var(--font-ui); font-size: var(--text-sm); }
+.block-question-set__table { width: 100%; border-collapse: collapse; table-layout: fixed; font-family: var(--font-ui); font-size: var(--text-sm); }
+.block-question-set__table th:nth-child(1) { width: 20%; }
+.block-question-set__table th:nth-child(2) { width: 22%; }
+.block-question-set__table th:nth-child(3) { width: 28%; }
+.block-question-set__instruction { margin: 0; font-weight: var(--weight-medium); color: var(--navy); }
 .block-question-set__table th {
   text-align: left; padding: var(--space-2); color: var(--navy);
   border-bottom: 2px solid var(--wave); font-weight: var(--weight-semibold);
