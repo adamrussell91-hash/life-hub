@@ -4,6 +4,7 @@ import { acceptProblem, addEdge, canEdge, canPlace, checkNode, nextSlots, placeN
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
+import { buildDecisionPrompt } from './decision-prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
@@ -142,7 +143,7 @@ function parseLightning(session, text) {
 export function createModelCoach(model) {
   return async function modelCoach(session) {
     const lightning = session.kind === 'lightning';
-    const prompt = lightning ? buildLightningPrompt(session) : buildCoachPrompt(session);
+    const prompt = lightning ? buildLightningPrompt(session) : session.kind === 'decision' ? buildDecisionPrompt(session) : buildCoachPrompt(session);
     const read = lightning ? parseLightning : parse;
     const first = await model({ ...prompt, maxTokens: 900 });
     let result = read(session, first);

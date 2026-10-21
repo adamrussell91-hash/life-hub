@@ -2,6 +2,7 @@
 import { isSkillId } from '../../../../packages/problem-solver/skills.mjs';
 import { MODEL_IDS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOL_IDS } from '../../../../packages/problem-solver/tools/index.mjs';
+import { CATALOGUE_IDS } from '../../../../packages/decision-book/catalogue.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightning.mjs';
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
@@ -45,6 +46,11 @@ export function isDate(value) {
 function suggestionOf(raw) {
   if (!raw || typeof raw !== 'object') return { value: null };
   const reason = text(raw.reason, 300) ?? '';
+  // next_model is Decision Maker's name for next_tool, limited to the book's models.
+  if (raw.kind === 'next_model') {
+    if (!CATALOGUE_IDS.includes(raw.tool) || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown model in suggestion: ${raw.tool}` };
+    return { value: { kind: 'next_tool', tool: raw.tool, reason } };
+  }
   if (raw.kind === 'next_tool' || raw.kind === 'switch_tool') {
     if (!TOOL_IDS.includes(raw.tool)) return { error: `Unknown tool in suggestion: ${raw.tool}` };
     return { value: { kind: raw.kind, tool: raw.tool, reason } };
