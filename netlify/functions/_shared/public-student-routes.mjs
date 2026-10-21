@@ -5,6 +5,8 @@
  */
 export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'POST', pattern: /^\/api\/published\/peer-feedback\/[^/]+\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/published\/voice\/[^/]+\/[^/]+(?:\/part)?$/ },
+  { method: 'GET', pattern: /^\/api\/published\/voice-audio\/[a-f0-9]{36}$/ },
   { method: 'POST', pattern: /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/brainstorm\/[^/]+\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/quiz\/[^/]+$/ },
