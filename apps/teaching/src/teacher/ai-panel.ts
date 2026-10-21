@@ -178,6 +178,22 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   const protocolTray = document.createElement('div');
   protocolTray.className = 'agent-protocol-pills';
 
+  // The protocol chips fill the panel before anyone has spoken, then fold to
+  // one small toggle so the thread and Confirm card keep the room.
+  let protocolsOpen = false;
+
+  const protocolToggle = document.createElement('button');
+  protocolToggle.type = 'button';
+  protocolToggle.className = 'btn btn--ghost ai-panel__protocols-toggle';
+  protocolToggle.addEventListener('click', () => {
+    protocolsOpen = !protocolsOpen;
+    renderProtocols();
+  });
+
+  function protocolTrayOpen(): boolean {
+    return messages.length === 0 || protocolsOpen;
+  }
+
   const scopeChip = document.createElement('p');
   scopeChip.className = 'ai-panel__scope';
 
@@ -188,6 +204,10 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   const suggestionsToggle = document.createElement('button');
   suggestionsToggle.type = 'button';
   suggestionsToggle.className = 'btn btn--ghost ai-panel__suggestions-toggle';
+
+  const chipToggles = document.createElement('div');
+  chipToggles.className = 'ai-panel__chip-toggles';
+  chipToggles.append(protocolToggle, suggestionsToggle);
 
   const actionsBar = document.createElement('div');
   actionsBar.className = 'ai-panel__actions';
@@ -248,7 +268,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     toolbar,
     protocolTray,
     scopeChip,
-    suggestionsToggle,
+    chipToggles,
     actionsBar,
     empty,
     thread,
@@ -338,6 +358,14 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     }
 
     protocolTray.replaceChildren(eyebrow, row);
+
+    const open = protocolTrayOpen();
+    protocolTray.hidden = !open;
+    protocolToggle.hidden = messages.length === 0;
+    protocolToggle.textContent = open
+      ? `Hide ${pack.firstName}'s tools`
+      : `${pack.firstName} can (${pack.pills.length})`;
+    protocolToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function renderScope(): void {
