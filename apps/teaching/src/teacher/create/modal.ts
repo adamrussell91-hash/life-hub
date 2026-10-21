@@ -96,6 +96,69 @@ function selectInput(
   return select;
 }
 
+function groupedSelectInput(
+  name: string,
+  groups: ReadonlyArray<{ label: string; options: ReadonlyArray<{ value: string; label: string }> }>
+): HTMLSelectElement {
+  const select = selectInput(name, []);
+  for (const group of groups) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = group.label;
+    for (const opt of group.options) {
+      const option = document.createElement('option');
+      option.value = opt.value;
+      option.textContent = opt.label;
+      optgroup.append(option);
+    }
+    select.append(optgroup);
+  }
+  const all = groups.flatMap((group) => group.options);
+  if (all.length === 1) select.value = all[0]!.value;
+  return select;
+}
+
+/**
+ * Units a new lesson can go into: live (not archived or trashed) and still
+ * attached to a year and subject that exist, grouped "Year · Subject".
+ */
+function lessonUnitGroups(
+  curriculum: CurriculumResponse
+): ReadonlyArray<{ label: string; options: ReadonlyArray<{ value: string; label: string }> }> {
+  const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
+  const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
+  const groups = new Map<
+    string,
+    { label: string; level: number; subject: string; options: { value: string; label: string }[] }
+  >();
+
+  for (const unit of curriculum.units) {
+    if (unit.status !== 'active') continue;
+    const year = yearsById.get(unit.year_id);
+    const subject = subjectsById.get(unit.subject_id);
+    if (!year || !subject) continue;
+    const subjectTitle = subject.display_title || subject.title;
+    const key = `${year.id}|${subject.id}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        label: `${year.title} · ${subjectTitle}`,
+        level: year.year_level,
+        subject: subjectTitle,
+        options: []
+      };
+      groups.set(key, group);
+    }
+    group.options.push({ value: unit.id, label: unit.title });
+  }
+
+  return [...groups.values()]
+    .sort((a, b) => a.level - b.level || a.subject.localeCompare(b.subject))
+    .map((group) => ({
+      label: group.label,
+      options: group.options.sort((a, b) => a.label.localeCompare(b.label))
+    }));
+}
+
 function allSubjectOptions(
   curriculum: CurriculumResponse
 ): ReadonlyArray<{ value: string; label: string }> {
@@ -119,11 +182,6 @@ function buildFields(kind: CreateKind, curriculum: CurriculumResponse): HTMLElem
 
   const allSubjects = allSubjectOptions(curriculum);
 
-  const units = curriculum.units
-    .slice()
-    .sort((a, b) => a.title.localeCompare(b.title))
-    .map((u) => ({ value: u.id, label: u.title }));
-
   appendLabeledField(form, 'Title', textInput('title'));
 
   if (kind === 'subject') {
@@ -139,7 +197,7 @@ function buildFields(kind: CreateKind, curriculum: CurriculumResponse): HTMLElem
     appendLabeledField(form, 'Year', selectInput('year_id', years));
     appendLabeledField(form, 'Subject', selectInput('subject_id', allSubjects));
   } else if (kind === 'lesson') {
-    appendLabeledField(form, 'Unit', selectInput('unit_id', units));
+    appendLabeledField(form, 'Unit', groupedSelectInput('unit_id', lessonUnitGroups(curriculum)));
     const modeOptions = PEDAGOGICAL_MODES.map((mode) => ({
       value: mode,
       label: PEDAGOGICAL_MODE_LABELS[mode]
