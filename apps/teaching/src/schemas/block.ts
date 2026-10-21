@@ -697,7 +697,14 @@ export const QuestionSetBlockSchema = z.object({
   visibility: VisibilitySchema,
   content: z.object({
     title: z.string().optional(),
-    questions: z.array(QuestionItemSchema)
+    questions: z.array(QuestionItemSchema),
+    /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
+    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge']).optional(),
+    /** Human experience table settings, kept when switching format away and back. */
+    table: z.object({
+      rows: z.number().int().min(3).max(5).default(3),
+      example: z.boolean().default(true)
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps

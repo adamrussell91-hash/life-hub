@@ -3,6 +3,7 @@ import { apiPost, ApiClientError } from '@/api/client';
 import { button, el, errorText, field, isNotPublished, notLivePanel, identityName, readJSON, token, writeJSON } from '@/blocks/peer-feedback-ui';
 import { giveView, receivedView as annotatedView, teacherLayers, type Code, type Piece, type ReceivedLayer, type TeacherLayer } from '@/blocks/peer-annotate';
 import { mountBankEditor } from '@/blocks/peer-annotate-bank';
+import { createFormatField } from '@/blocks/formats/registry';
 import { taskCard } from '@/blocks/peer-feedback-task';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import './peer-feedback.css';
@@ -100,10 +101,6 @@ const lastState = new Map<string, unknown>();
 
 /* ── Entry points ──────────────────────────────────────────────────── */
 
-const MODES: Array<{ mode: Mode; label: string }> = [
-  { mode: 'comments', label: 'Two feedback boxes' },
-  { mode: 'annotate', label: 'Notes on the text' }
-];
 
 export function createPeerFeedbackEditor(
   block: PeerBlock,
@@ -134,38 +131,23 @@ export function createPeerFeedbackEditor(
     return wrap;
   };
 
-  const modeWrap = el('div', 'pf-field');
-  modeWrap.append(el('span', 'pf-field__label', 'How students give feedback'));
-  const modes = el('div', 'pa-mode');
-  modes.setAttribute('role', 'group');
-  modes.setAttribute('aria-label', 'How students give feedback');
-  modeWrap.append(modes);
-  const modeHint = el('p', 'pf-field__hint block-secondary');
-  modeWrap.append(modeHint);
+  // How students give feedback is this block's Format: the shared control.
+  const modeWrap = createFormatField({
+    block,
+    onPick: (id) => {
+      if ((current.content.mode ?? 'comments') === id) return;
+      update({ mode: id as Mode });
+      paintMode();
+    }
+  });
   const perMode = el('div', 'pf-run');
 
   function paintMode(): void {
     const mode = current.content.mode ?? 'comments';
-    modes.replaceChildren(
-      ...MODES.map((m) => {
-        const b = button(m.label, 'ghost', () => {
-          if (mode === m.mode) return;
-          update({ mode: m.mode });
-          paintMode();
-        });
-        b.className = 'pa-mode__option';
-        b.setAttribute('aria-pressed', String(mode === m.mode));
-        return b;
-      })
-    );
-    modeHint.textContent =
-      mode === 'annotate'
-        ? 'Each answer goes to two classmates. They highlight parts of it and press your feedback buttons; the writer gets it back as two layers.'
-        : 'Each answer goes to one classmate, who fills in your two boxes.';
     perMode.replaceChildren(...(mode === 'annotate' ? [mountBankEditor()] : [textField(fields[1]), textField(fields[2])]));
   }
 
-  root.append(textField(fields[0]), modeWrap, perMode);
+  root.append(textField(fields[0]), ...(modeWrap ? [modeWrap] : []), perMode);
   paintMode();
   root.append(
     el('p', 'pf-note block-secondary', 'To run it, publish the lesson, close this editor and press Start activity on the block.')

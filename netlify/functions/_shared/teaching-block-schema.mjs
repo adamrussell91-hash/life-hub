@@ -1185,7 +1185,14 @@ var QuestionSetBlockSchema = z7.object({
   visibility: VisibilitySchema,
   content: z7.object({
     title: z7.string().optional(),
-    questions: z7.array(QuestionItemSchema)
+    questions: z7.array(QuestionItemSchema),
+    /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
+    format: z7.enum(["standard", "human_experience_table", "anchor_bridge"]).optional(),
+    /** Human experience table settings, kept when switching format away and back. */
+    table: z7.object({
+      rows: z7.number().int().min(3).max(5).default(3),
+      example: z7.boolean().default(true)
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
