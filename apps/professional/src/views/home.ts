@@ -316,7 +316,10 @@ function renderTimeline(events: EventRecord[]): HTMLElement {
   const withTime = events.map((event) => ({ event, startMs: Date.parse(event.start) }));
   const upcoming = withTime.filter((e) => e.startMs >= nowMs).sort((a, b) => a.startMs - b.startMs);
   const past = withTime.filter((e) => e.startMs < nowMs).sort((a, b) => b.startMs - a.startMs);
-  const ordered = [...upcoming, ...past].slice(0, 8);
+  // Up to three recent past events, the rest upcoming, then shown oldest to newest.
+  const pastCount = Math.min(past.length, Math.max(3, 8 - upcoming.length));
+  const ordered = [...past.slice(0, pastCount), ...upcoming.slice(0, 8 - pastCount)]
+    .sort((a, b) => a.startMs - b.startMs);
 
   for (const { event } of ordered) {
     const row = el('div', 'pro-home__timeline-row');
