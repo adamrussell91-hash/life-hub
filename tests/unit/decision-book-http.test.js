@@ -44,7 +44,7 @@ test('a decision is created, framed in three answers and opens Explore', async (
   }
   assert.equal(s.phase, 'explore');
   assert.equal(s.model.id, 'decision_book');
-  assert.equal(s.suggestion.tool, 'swot');
+  assert.equal(s.suggestion.tool, 'dm_eisenhower');
   const list = (await call('GET', null, '?list=1')).data.sessions;
   assert.equal(list[0].kind, 'decision');
 });

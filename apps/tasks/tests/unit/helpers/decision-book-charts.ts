@@ -33,7 +33,11 @@ export const CHARTS: string[] = [...Object.keys(TOOLS), 'record'];
 
 export function createChartFor(key: string): ChartView {
   if (key === 'record') return createRecordView();
-  const tool = TOOLS[key];
+  return createChartForTool(TOOLS[key]);
+}
+
+/** The chart for any Decision Book tool definition: its family's renderer, or its own. */
+export function createChartForTool(tool: SampleTool): ChartView {
   const make = BY_ID[tool.id] ?? BY_FAMILY[tool.family];
   return make(tool as never);
 }
