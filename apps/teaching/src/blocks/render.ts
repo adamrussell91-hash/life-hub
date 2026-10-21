@@ -5,7 +5,8 @@ import { renderQuestionDrop } from '@/blocks/question-drop';
 import { renderBrainstorm } from '@/blocks/brainstorm';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
-import { renderKaplanQualifiers } from '@/blocks/kaplan-view';
+import { attachedSteppedLenses } from '@/blocks/lenses/registry';
+import { renderSteppedLenses } from '@/blocks/lenses/stepped-view';
 import { canHaveDiscern } from '@/blocks/discern';
 import { renderDiscern } from '@/blocks/discern-view';
 import { renderDiscernConfirm } from '@/blocks/discern-confirm';
@@ -2376,10 +2377,9 @@ export function renderBlock(block: Block, mode: RenderMode, ctx: RenderContext =
   const wrapper = renderBlockContent(block, mode, ctx);
   decorateCalloutReferences(wrapper, block, mode, ctx.pageBlocks ?? []);
   const attachments: HTMLElement[] = [];
-  if (block.qualifiers?.length) {
-    attachments.push(renderKaplanQualifiers(block.qualifiers, {
-      mode, blockId: block.id, lessonId: ctx.lessonId
-    }));
+  const lenses = attachedSteppedLenses(block);
+  if (lenses.length) {
+    attachments.push(renderSteppedLenses(lenses, block, { mode, blockId: block.id, lessonId: ctx.lessonId }));
   }
   if (block.discern && canHaveDiscern(block)) {
     attachments.push(renderDiscern(block.discern, { mode, blockId: block.id, lessonId: ctx.lessonId }));

@@ -5,7 +5,7 @@ import { createBrainstormEditor } from '@/blocks/brainstorm';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
-import { createKaplanEditor } from '@/blocks/kaplan-editor';
+import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
@@ -252,7 +252,7 @@ export function editorShell<T extends Block>(
     fields.hidden = open;
     visibility.hidden = open;
   });
-  shell.append(visibility, createKaplanEditor({ getBlock: getLatest, onChange }), fields);
+  shell.append(visibility, createLensEditor({ getBlock: getLatest, onChange }), fields);
   return shell;
 }
 
@@ -2928,8 +2928,10 @@ function createBlockEditorFields(
       return createGalleryEditor(block, onChange, latest as () => Extract<Block, { block_type: 'gallery' }>);
     case 'table':
       return createTableEditor(block, onChange, latest as () => Extract<Block, { block_type: 'table' }>);
-    case 'peer_feedback':
-      return createPeerFeedbackEditor(block, onChange);
+    case 'peer_feedback': {
+      const peer = latest as () => Extract<Block, { block_type: 'peer_feedback' }>;
+      return editorShell(block, onChange, createPeerFeedbackEditor(block, onChange, peer), peer);
+    }
     case 'question_drop':
       return createQuestionDropEditor(block, onChange, context.lessonId);
     case 'brainstorm':
