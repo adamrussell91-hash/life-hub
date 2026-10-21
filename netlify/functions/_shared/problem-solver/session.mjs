@@ -4,18 +4,41 @@ import { defaultToolFor, firstStep, nextPhase, planStep, planStepForBook, stepNa
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
 import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
+import { parseCompass } from '../../../../packages/decision-book/compass.mjs';
+import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
 
 export { waitingForReview };
 
 const TITLE_MAX = 120;
 const TEXT_MAX = 12000;
 const LINKS_MAX = 20;
-const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone'];
 const PROPOSALS_MAX = 40;
 const REVIEW_AFTER_DAYS = 14;
 const DAY_MS = 86_400_000;
 
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
+
+/**
+ * Frame questions per session kind, and the model a kind starts in once framed (null: the
+ * coach chooses one). Lightning sessions never frame.
+ */
+export const KIND_FRAMES = Object.freeze({
+  full: Object.freeze({ keys: Object.freeze(['goal', 'whatIsTrue', 'whatCanBeDone']), model: null }),
+  decision: Object.freeze({ keys: Object.freeze(['decision', 'compass', 'known']), model: Object.freeze({ id: DECISION_MODEL.id, reason: 'Decision Maker works from The Decision Book.' }) })
+});
+
+export const frameKeysOf = (session) => (KIND_FRAMES[session.kind] ?? KIND_FRAMES.full).keys;
+
+/** The answers of this turn that belong to the session's frame; a compass keeps only known quadrants. */
+function pickFrame(session, frame) {
+  const out = {};
+  for (const key of frameKeysOf(session)) {
+    if (!frame?.[key]) continue;
+    if (key !== 'compass') out[key] = frame[key];
+    else if (parseCompass(frame[key]).length) out.compass = parseCompass(frame[key]).join('+');
+  }
+  return out;
+}
 
 function checkLength(text) {
   if (text.length > TEXT_MAX) throw fail(413, 'limit', 'That is too long; keep it under 12,000 characters.');
@@ -92,7 +115,8 @@ function replaceRun(session, run) {
   return { ...session, steps };
 }
 
-export function createSession({ title = '', text, links = [] }, deps) {
+export function createSession({ title = '', text, links = [], kind = 'full' }, deps) {
+  if (!KIND_FRAMES[kind]) throw fail(400, 'validation_error', `Unknown session kind: ${kind}`);
   const at = deps.now();
   const clean = String(text ?? '').trim();
   if (!clean) throw fail(400, 'validation_error', 'Describe the problem to start.');
@@ -101,7 +125,7 @@ export function createSession({ title = '', text, links = [] }, deps) {
     id: deps.newId(),
     title: (String(title).trim() || clean).slice(0, TITLE_MAX),
     revision: 0,
-    kind: 'full',
+    kind,
     status: 'active',
     phase: 'frame',
     frame: {},
@@ -160,8 +184,8 @@ export function followOn(session) {
   return { kind: 'next_step', reason: 'This step has what it needs; move on when you are ready.' };
 }
 
-function frameComplete(frame) {
-  return FRAME_KEYS.every((key) => Boolean(frame[key]));
+function frameComplete(session) {
+  return frameKeysOf(session).every((key) => Boolean(session.frame[key]));
 }
 
 const slotToId = (run, slot) => run.nodes.find((node) => node.slot === slot)?.id ?? null;
@@ -220,10 +244,11 @@ export function applyCoachTurn(session, turn, deps) {
     if (leaving && next.steps[leaving] && next.steps[leaving].status !== 'waiting') next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
     next = { ...next, pendingLearning: leaving && !skippedUntouched(next.steps[leaving]) ? leaving : null };
   } else if (next.phase === 'frame') {
-    if (turn.verdict === 'accept' && turn.frame) next = { ...next, frame: { ...next.frame, ...turn.frame } };
-    if (frameComplete(next.frame) && turn.model) {
-      const first = firstStep(turn.model.id);
-      next = { ...next, model: turn.model, phase: first, steps: { [first]: emptyStep() } };
+    if (turn.verdict === 'accept' && turn.frame) next = { ...next, frame: { ...next.frame, ...pickFrame(next, turn.frame) } };
+    const model = (KIND_FRAMES[next.kind] ?? KIND_FRAMES.full).model ?? turn.model;
+    if (frameComplete(next) && model) {
+      const first = firstStep(model.id);
+      next = { ...next, model: { id: model.id, reason: model.reason }, phase: first, steps: { [first]: emptyStep() } };
     }
   } else if (currentStep(next)) {
     const run = activeRun(next);
@@ -562,7 +587,7 @@ export function summaryRow(session) {
     phase: session.phase,
     model: session.model?.id ?? null,
     tool: last?.tool ?? null,
-    frame: FRAME_KEYS.filter((key) => Boolean(session.frame?.[key])).length,
+    frame: frameKeysOf(session).filter((key) => Boolean(session.frame?.[key])).length,
     skills: skillCounts(session.turns),
     links: session.links,
     taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
