@@ -59,6 +59,7 @@ export function roundOf(run, stages) {
  * @param {{id: string, label: string, kind?: string, yes?: string, no?: string, next?: string}[]} [config.chart.stages]
  * @param {boolean} [config.chart.loop] stages may repeat in rounds
  * @param {number} [config.chart.rounds] most rounds (3)
+ * @param {number} [config.chart.minRounds] complete rounds before the reflection (1)
  * @param {{layer: string, hole: string}} [config.chart.layers] what a layer and a hole are
  */
 export function pathTool(config) {
@@ -115,6 +116,9 @@ export function pathTool(config) {
   }
 
   const rounds = chart.loop ? (chart.rounds ?? 3) : 1;
+  // Rounds that must be complete before the reflection (result optimisation runs three full loops).
+  const minRounds = chart.minRounds ?? 1;
+  check(Number.isInteger(minRounds) && minRounds >= 1 && minRounds <= rounds, id, 'minRounds is between 1 and rounds');
   const inRound = (run, round) => chart.stages.filter((stage) => run.nodes.some((node) => node.slot === `${stage.id}:${round}`));
   return baseTool(config, 'path', slots, {
     nextSlots(run) {
@@ -123,10 +127,11 @@ export function pathTool(config) {
       const round = roundOf(run, chart.stages);
       const done = inRound(run, round).length;
       if (done < chart.stages.length) return [`${chart.stages[done].id}:${round}`];
-      return open(round < rounds ? `${chart.stages[0].id}:${round + 1}` : null, reflection ? 'reflection' : null);
+      return open(round < rounds ? `${chart.stages[0].id}:${round + 1}` : null, reflection && round >= minRounds ? 'reflection' : null);
     },
     complete(run) {
-      return inRound(run, 1).length === chart.stages.length && reflected(run, reflection);
+      const full = Array.from({ length: minRounds }, (_, i) => inRound(run, i + 1).length === chart.stages.length).every(Boolean);
+      return full && reflected(run, reflection);
     }
   });
 }
