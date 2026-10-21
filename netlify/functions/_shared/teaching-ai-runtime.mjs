@@ -667,6 +667,7 @@ var BlockTypeSchema = z7.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "continuum_line",
   "curriculum_lines",
   "quiz_question",
   "question_set",
@@ -1086,6 +1087,36 @@ var PeerFeedbackBlockSchema = z7.object({
     mode: z7.enum(["comments", "annotate"]).default("comments"),
     strength_prompt: z7.string().max(300).default("One thing that works well\u2026"),
     suggestion_prompt: z7.string().max(300).default("One suggestion or question\u2026")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var ContinuumStatementSchema = z7.object({
+  id: z7.string().min(1),
+  text: z7.string().max(300).default(""),
+  snap: z7.boolean().default(false)
+});
+var ContinuumLineBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("continuum_line"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    stimulus: z7.object({
+      kind: z7.enum(["text", "image", "video"]).default("text"),
+      text: z7.string().max(2e3).default(""),
+      url: z7.string().max(2e3).default(""),
+      alt_text: z7.string().max(500).default("")
+    }).default({ kind: "text", text: "", url: "", alt_text: "" }),
+    scale: z7.object({
+      left: z7.string().max(40).default("Implied"),
+      right: z7.string().max(40).default("Not implied"),
+      stops: z7.array(z7.string().max(40)).max(3).default([])
+    }).default({ left: "Implied", right: "Not implied", stops: [] }),
+    statements: z7.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z7.enum(["teacher", "student"]).default("teacher"),
+    replace: z7.boolean().default(true)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1912,6 +1943,7 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
   DiscernConfirmBlockSchema,
@@ -3644,6 +3676,7 @@ var NEW_BLOCK_TYPES = [
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "continuum_line",
   "quiz_question",
   "question_set",
   "flashcards",
@@ -3708,6 +3741,7 @@ var NEW_BLOCK_LABEL = {
   peer_feedback: "Peer feedback",
   question_drop: "Question drop",
   brainstorm: "Brainstorm",
+  continuum_line: "Continuum line",
   quiz_question: "Quiz question",
   question_set: "Question set",
   flashcards: "Flashcards",
@@ -3790,6 +3824,7 @@ var BLOCK_GROUPS = [
       "thinking_move",
       "question_quadrant",
       "concept_features",
+      "continuum_line",
       "thinking_reflection"
     ]
   },
@@ -3839,6 +3874,7 @@ var TOOLKIT_GROUP_TYPES = [
   "thinking_move",
   "question_quadrant",
   "concept_features",
+  "continuum_line",
   "thinking_reflection",
   "analogy_types",
   "analogy_close_reading",
@@ -4152,6 +4188,14 @@ function createBlock(type, id) {
         per_student: 3,
         max_length: 140,
         layout: "grid"
+      } };
+    case "continuum_line":
+      return { ...shared, block_type: "continuum_line", variant: "medium", content: {
+        stimulus: { kind: "text", text: "", url: "", alt_text: "" },
+        scale: { left: "Implied", right: "Not implied", stops: [] },
+        statements: [{ id: `${id}_s1`, text: "", snap: false }],
+        pace: "teacher",
+        replace: true
       } };
     case "question_drop":
       return { ...shared, block_type: "question_drop", variant: "medium", content: {
@@ -5503,6 +5547,7 @@ var KIND_LABEL = {
   question_set: "Question set",
   question_drop: "Question drop",
   brainstorm: "Brainstorm",
+  continuum_line: "Continuum line",
   curriculum_lines: "Curriculum lines",
   discern_confirm: "Discern Confirm",
   quiz_question: "Quiz question",
@@ -5660,6 +5705,14 @@ function ownIssue(block, discernHosts) {
   }
   if (block.block_type === "brainstorm" && !block.content.question.trim()) {
     return "Write the question for this Brainstorm";
+  }
+  if (block.block_type === "continuum_line") {
+    const c = block.content;
+    if (!c.statements.some((s2) => s2.text.trim())) return "Write at least one statement for this Continuum line";
+    if (!c.scale.left.trim() || !c.scale.right.trim()) return "Label both ends of this Continuum line";
+    if (c.stimulus.kind === "text" && !c.stimulus.text.trim()) return "Add the stimulus for this Continuum line";
+    if (c.stimulus.kind === "image" && !isHttpUrl(c.stimulus.url)) return "Give the stimulus image a valid http(s) URL";
+    if (c.stimulus.kind === "video" && !c.stimulus.url.trim()) return "Paste the stimulus video link";
   }
   if (block.block_type === "quiz_question") {
     const checked = checkQuestion(block.content.question);
