@@ -26,19 +26,19 @@ test('Kaplan stays attached through authoring, publication and removal', async (
   await expect(row.locator('.kaplan-author')).toBeVisible();
   for (const lens of ['Multiple Perspectives', 'Patterns', 'Ethics']) {
     await row.getByLabel('Block options', { exact: true }).click();
-    await row.getByRole('button', { name: 'Add Kaplan qualifier', exact: true }).click();
+    await row.getByRole('button', { name: 'Add lens…', exact: true }).click();
     await row.locator('.kaplan-lens-choice').filter({ hasText: lens }).click();
     await expect(row.getByLabel('What should students think about?')).toHaveValue('reconciliation');
-    await row.getByRole('button', { name: 'Add qualifier', exact: true }).click();
+    await row.getByRole('button', { name: 'Add lens', exact: true }).click();
   }
-  await row.getByRole('button', { name: 'Edit Multiple Perspectives qualifier', exact: true }).click();
-  await row.getByRole('button', { name: 'Review the three steps', exact: true }).click();
+  await row.getByRole('button', { name: 'Edit Multiple Perspectives lens', exact: true }).click();
+  await row.getByRole('button', { name: 'Review the steps', exact: true }).click();
   await expect(row.getByLabel('Student instruction')).toBeVisible();
   await expect(row.locator('.block-editor__fields')).toBeHidden();
   await expect(row.locator('.kaplan-setup > .kaplan-field textarea')).toHaveCount(1);
   await page.screenshot({ path: test.info().outputPath('teacher-setup.png'), fullPage: true });
   await row.getByRole('button', { name: 'Setup', exact: true }).click();
-  await row.getByRole('button', { name: 'Save qualifier', exact: true }).click();
+  await row.getByRole('button', { name: 'Save lens', exact: true }).click();
   await expect.poll(async () => {
     const result = await (await page.request.get(`/api/lessons/${id}`)).json();
     return result.data.blocks[0].qualifiers?.length;
@@ -70,8 +70,8 @@ test('Kaplan stays attached through authoring, publication and removal', async (
 
   await row.locator('.lesson-page__block-menu').click();
   await page.locator('.hub-action-menu [data-block-action="edit"]').click();
-  await row.getByLabel('Block options', { exact: true }).click();
-  await row.getByRole('button', { name: 'Remove Multiple Perspectives qualifier', exact: true }).click();
+  await row.getByRole('button', { name: 'Edit Multiple Perspectives lens', exact: true }).click();
+  await row.getByRole('button', { name: 'Remove lens', exact: true }).click();
   await row.getByLabel('Question 1 prompt').fill('A revised question that remains after qualifier removal.');
   await expect.poll(async () => {
     const result = await (await page.request.get(`/api/lessons/${id}`)).json();
