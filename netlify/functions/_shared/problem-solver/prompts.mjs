@@ -1,5 +1,4 @@
 // netlify/functions/_shared/problem-solver/prompts.mjs
-import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
 import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { canPropose, isComplete, nextSlots } from '../../../../packages/problem-solver/machine.mjs';
@@ -11,23 +10,17 @@ import { CHAPTERS } from './knowledge/chapters.mjs';
 import { FINAL_WORDS } from './knowledge/final-words.mjs';
 import { SELECTION } from './knowledge/selection.mjs';
 import { STEP_TRIGGERS } from './knowledge/triggers.mjs';
+import { GATEKEEPING, THINKING_SKILLS, VOICE, outputBlock } from './prompts-shared.mjs';
 
-const skillLines = SKILLS.map((skill) => `- ${skill.id} (${skill.name}): ${skill.description}`).join('\n');
 const modelLines = Object.values(MODELS).map((model) => `- ${model.id}: ${model.name}. Use when: ${model.when}`).join('\n');
 const chapterLines = Object.values(CHAPTERS).join('\n');
 
 /** Fixed layer: identical for every turn of every session, so it caches. */
 export const RUBRIC = `You are the Problem Solver coach. You coach one person through a real problem using the Problem Solver toolkit's process, from defining it to documenting what was learned. You are a coach, not an assistant: warm, direct, and never flattering. You do not agree by default.
 
-VOICE
-- Every message is between 25 and 60 words, usually two or three sentences.
-- Ask at most one question per message, and end with it when you ask one.
-- Every message leaves the person knowing what to do next: end with a question or a clear next step. Never end on agreement or praise alone.
-- When an answer is good, say so in one short clause and name the skill it shows. No praise beyond that.
-- Plain words. No lists, headings or markdown in the message.
+${VOICE}
 
-THINKING SKILLS (tag answers with these ids in skillsSeen and skillsMissing)
-${skillLines}
+${THINKING_SKILLS}
 
 ${PROCESS}
 
@@ -51,35 +44,22 @@ SESSION SHAPE
 
 9. Document: the case file is built from the 5 Cs (and knowledge management when it is done), together with what earlier steps established. In correspond, put the agreed name exactly in node.text. The machine refuses a name that breaks a strict rule, so challenge such a name and name the rule. The person writes the case file onto a page from a card. Never say it is written until CASE FILE says so. When CASE FILE lists changes since it was written, the person can add a dated update from the card; say so once.
 
-GATEKEEPING
-In phase frame, use "frame" for accepted answers instead of "node"; "node" is only used inside a tool.
-- verdict "accept": the answer holds up. Put it in "node" with the slot, a tidy version of their words (keep their meaning; add no ideas), and a "title" of two or three words naming the point.
-- verdict "challenge": the answer does not hold up. Include its tag and links as you would on accept. Still put their proposed answer in "node" (so they can press Keep it anyway), name the weak skill in skillsMissing, give one reason and one question.
-- verdict "clarify": you need more before judging, or you are suggesting something. No node.
-- To add links between nodes already placed, reply accept with node null and the links in "edges".
-- When a slot lists tag choices, put exactly one of them in node.tag; otherwise leave tag out.
-Challenge when:
-- a symptom is offered as a cause (analysis)
-- a perception, belief or opinion is stated as fact (critical_thinking)
-- the answer is generic, like "not enough time" or "not enough budget"
-- a solution is offered before its step (impulsive orientation; resist the quick fix)
-- an answer repeats an earlier one or blames a person rather than a process (logical_reasoning)
-- a goal or criterion cannot be measured
-- the answer shows thin metacognition: an unexamined assumption, confidence beyond the evidence, or no check on whether it is true (metacognition)
-- anything the current tool lists under "Watch for"
-If they argue back with a good reason, change your verdict and accept. If they press Keep it anyway, that is their call; do not repeat the objection.
+${GATEKEEPING}
 
 SWITCHING AND CHECK-INS
 - If the same slot has been challenged twice, or the tool no longer fits the problem, suggest a better tool with "switch_tool" and a one-sentence reason.
 - When the state says MINIMUM MET, the tool has enough to stop (more slots stay open only so the person can add more). In that reply, ask one metacognitive check-in tied to a stage, and put the named next step in "suggestion".
 
-OUTPUT
-Reply with one JSON object and nothing else:
-{"verdict":"accept|challenge|clarify","message":"...","node":{"slot":"...","text":"...","title":"...","tag":"..."}|null,"edges":[{"from":"slot","to":"slot","kind":"..."}],"skillsSeen":["..."],"skillsMissing":["..."],"frame":{"goal":"...","whatIsTrue":"...","whatCanBeDone":"..."}|null,"model":{"id":"...","reason":"..."}|null,"suggestion":{"kind":"next_tool|switch_tool|next_step|reopen_step","tool":"...","step":"define|analyse","reason":"..."}|null,"summary":"..."|null,"exitObjection":"..."|null,"learning":"..."|null,"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}],"proposeReview":{"due":"YYYY-MM-DD","reason":"..."}|null}
-Include "proposeTasks" and "proposeReview" only in Implement. Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "step" only with reopen_step, and "tool" only with next_tool or switch_tool. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.`;
+${outputBlock({
+  frame: ['goal', 'whatIsTrue', 'whatCanBeDone'],
+  model: true,
+  suggestion: '{"kind":"next_tool|switch_tool|next_step|reopen_step","tool":"...","step":"define|analyse","reason":"..."}',
+  tasks: '"proposeTasks":[{"slot":"...","title":"...","due":"YYYY-MM-DD"|null}],"proposeReview":{"due":"YYYY-MM-DD","reason":"..."}|null',
+  rules: 'Include "proposeTasks" and "proposeReview" only in Implement. Include "summary" (at most 120 words, a running record of what is established) only when the state says a summary is due. Include "step" only with reopen_step, and "tool" only with next_tool or switch_tool. Include "exitObjection" only in boundary mode. Include "learning" only when the state says AWAITING LEARNING.'
+})}`;
 
 const RECENT_TURNS = 12;
-const SUMMARY_EVERY = 6;
+export const SUMMARY_EVERY = 6;
 
 function toolKnowledge(id) {
   const tool = TOOLS[id];
@@ -122,11 +102,11 @@ function stepLayer(session) {
   ].join('\n\n');
 }
 
-function transcript(session) {
+export function transcript(session) {
   return session.turns.slice(-RECENT_TURNS).map((t) => `${t.role === 'user' ? 'PERSON' : 'COACH'}: ${t.text}`).join('\n');
 }
 
-const scoreNote = (run) => {
+export const scoreNote = (run) => {
   const line = TOOLS[run.tool].scoreLine?.(run);
   return line ? `; ${line}` : '';
 };
@@ -155,7 +135,7 @@ function runLines(session, run) {
  * Slots of placed nodes the tool lets become tasks and that have no live proposal. A node
  * whose task was deleted in Tasks is never offered again (Adam's decision).
  */
-function proposable(session, run) {
+export function proposable(session, run) {
   const proposals = session.proposedTasks ?? [];
   return run.nodes
     .filter((node) => canPropose(run, node) && !proposals.some((p) => p.source.nodeId === node.id && (p.status !== 'dismissed' || p.removed)))
@@ -216,7 +196,7 @@ function progressLine(session) {
   return `Progress: MINIMUM MET. Next step to suggest: ${what}.`;
 }
 
-function earlierSteps(session) {
+export function earlierSteps(session) {
   if (!session.model) return null;
   const lines = [];
   for (const { step } of stepPlan(session.model.id)) {
