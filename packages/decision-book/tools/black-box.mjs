@@ -10,7 +10,7 @@ export const dmBlackBox = baseTool({
   name: 'The black box model',
   tier: 'lens',
   when: 'A system gives results you can see but not explain: judge it by inputs and outputs, and name what stays hidden.',
-  failureModes: ['Inventing a story about the inside instead of saying it is unknown.'],
+  failureModes: ['Inventing a story about the inside instead of saying it is unknown.', 'Trusting whoever explains the box most confidently, rather than checking what they say.'],
   steps: [
     { id: 'ends', title: 'What goes in, what comes out', prompt: 'List what you put in and what you see come out.' },
     { id: 'inside', title: 'The hidden part', prompt: 'What happens inside that you cannot see?' }
