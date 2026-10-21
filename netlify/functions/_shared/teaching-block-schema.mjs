@@ -592,6 +592,7 @@ var BlockTypeSchema = z7.enum([
   "peer_feedback",
   "question_drop",
   "brainstorm",
+  "hinge_question",
   "continuum_line",
   "curriculum_lines",
   "quiz_question",
@@ -1056,6 +1057,28 @@ var BrainstormBlockSchema = z7.object({
     per_student: z7.union([z7.literal(0), z7.literal(1), z7.literal(3), z7.literal(5)]).default(3),
     max_length: z7.number().int().min(20).max(280).default(140),
     layout: z7.enum(["grid", "cloud", "groups"]).default("grid")
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var HingeOptionSchema = z7.object({
+  id: z7.string().min(1).max(40),
+  text: z7.string().max(300).default(""),
+  misconception: z7.string().max(300).default("")
+});
+var HingeQuestionBlockSchema = z7.object({
+  id: z7.string().min(1),
+  type: z7.literal("block"),
+  block_type: z7.literal("hinge_question"),
+  variant: z7.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z7.object({
+    prompt: z7.string().max(500).default(""),
+    options: z7.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z7.string().max(40).default(""),
+    seconds: z7.union([z7.literal(0), z7.literal(30), z7.literal(60), z7.literal(90), z7.literal(120)]).default(60),
+    move_on: z7.number().int().min(1).max(100).default(80),
+    reteach: z7.number().int().min(0).max(99).default(50)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1870,6 +1893,7 @@ var leafBlockSchemas = [
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
   BrainstormBlockSchema,
+  HingeQuestionBlockSchema,
   ContinuumLineBlockSchema,
   CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
@@ -2133,6 +2157,8 @@ export {
   GraphNodeSchema,
   HeadingBlockSchema,
   HeadingVariantSchema,
+  HingeOptionSchema,
+  HingeQuestionBlockSchema,
   HtmlAppAiProviderSchema,
   HtmlAppAiSchema,
   HtmlAppBlockSchema,
