@@ -7,7 +7,7 @@ import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightnin
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
 
 const VERDICTS = ['accept', 'challenge', 'clarify'];
-const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone'];
+const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone', 'decision', 'compass', 'known'];
 const TEXT_MAX = 600;
 
 /** First balanced JSON object in text, or null. */
