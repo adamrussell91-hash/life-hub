@@ -13,7 +13,8 @@ import {
   type ModelReply,
   type ModelRequest
 } from '@/ai/job-runner';
-import { QUIZ_QUESTION_KINDS } from '@/quiz/core';
+import { QUIZ_QUESTION_KINDS, checkQuestion } from '@/quiz/core';
+import { validateMutatingProposal } from '@/ai/validate-proposal';
 import type { AiJob } from '@/ai/jobs';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
@@ -123,6 +124,16 @@ describe('quizProposalIssues', () => {
     expect(quizProposalIssues(insertQuiz([goodMc], 'quiz'), lesson('direct_instruction'))).toEqual([]);
   });
 
+  it('accepts a fill-the-gap question written without a prompt key, and still asks other kinds for one', () => {
+    // Live test 21 Oct: Ann left prompt out of a fill_gap question and the check said "Write the question."
+    const gap = createBlock('quiz_question', 'q_gap');
+    if (gap.block_type !== 'quiz_question') throw new Error('expected quiz_question');
+    const noPrompt = { ...gap, content: { question: { id: 'q_gap', kind: 'fill_gap', marks: 2, passage: '[[Maiwar]] is the river.' } as never } } as Block;
+    expect(quizProposalIssues(insertQuiz([noPrompt]), lesson('quiz'))).toEqual([]);
+    expect(validateMutatingProposal(insertQuiz([noPrompt]), emptySearchPack(''))).toEqual({ ok: true });
+    expect(checkQuestion({ id: 'q_tf', kind: 'true_false', marks: 1, answer: true })).toEqual({ ok: false, message: 'Write the question.' });
+  });
+
   it('rejects set_mode without any quiz questions', () => {
     const heading = createBlock('heading', 'h2');
     expect(quizProposalIssues(insertQuiz([heading], 'quiz'), lesson())[0]).toMatch(/Only set set_mode/);
@@ -187,6 +198,11 @@ describe('quiz proposals on Accept', () => {
 });
 
 describe('quiz recipe and lesson context', () => {
+  it('tells Ann every question, fill_gap included, needs a prompt', () => {
+    expect(BLOCK_BUILD_RECIPES).toContain('Every question has prompt (always include it');
+    expect(BLOCK_BUILD_RECIPES).not.toContain('No prompt needed');
+  });
+
   it('describes every quiz question kind', () => {
     for (const kind of QUIZ_QUESTION_KINDS) expect(BLOCK_BUILD_RECIPES).toContain(`- ${kind}:`);
   });

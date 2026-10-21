@@ -129,7 +129,9 @@ var QuizPinSchema = z4.object({
 });
 var base = {
   id: Id,
-  prompt: z4.string().trim().max(QUIZ_LIMITS.prompt),
+  // A missing prompt reads as empty: fill-the-gap questions need none, and the
+  // other kinds are still told to write one by questionProblems.
+  prompt: z4.string().trim().max(QUIZ_LIMITS.prompt).default(""),
   marks: z4.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
@@ -1086,6 +1088,10 @@ var CurriculumLinesV2ContentSchema = z6.object({
   rail_stops: z6.array(CurriculumRailStopSchema).max(60).default([]),
   gates: z6.array(CurriculumGateSchema).max(12).default([]),
   nudges: NetworkNudgesSchema.default({}),
+  /** Map-only station order; lessons not listed follow in unit order. */
+  station_order: z6.array(z6.string().min(1).max(64)).max(200).optional(),
+  /** Lessons left off this map (they stay in the unit). */
+  hidden_lessons: z6.array(z6.string().min(1).max(64)).max(200).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
 });
 var CurriculumLinesBlockSchema = z6.object({
