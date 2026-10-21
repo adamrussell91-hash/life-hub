@@ -11,6 +11,7 @@ import { tasksApi } from '@/services/client-api';
 import { taskPageHash } from '@/domain/cards';
 import type { PlanningLayer } from '@/domain/calendar';
 import type { Task } from '@/schemas/task';
+import { sortByDue } from '@/domain/queries';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -128,7 +129,7 @@ function renderDayAgenda(tasks: Task[], dateKey: string): HTMLElement {
   const agenda = el('section', 'hub-calendar__detail');
   agenda.dataset.part = 'day-agenda';
   agenda.append(el('h3', 'hub-calendar__detail-heading', formatDisplayDate(dateKey)));
-  const dayTasks = tasks.filter((t) => t.due_date === dateKey && t.status !== 'done');
+  const dayTasks = sortByDue(tasks.filter((t) => t.due_date === dateKey && t.status !== 'done'));
   agenda.append(
     el(
       'p',
