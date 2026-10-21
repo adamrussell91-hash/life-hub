@@ -18,6 +18,14 @@ export const BLOCK_FORMATS: Partial<Record<Block['block_type'], FormatEntry[]>> 
     {
       id: 'anchor_bridge', label: 'Anchor & bridge',
       hint: 'Each question gets three boxes (anchor, human experience, bridge) and a response frame.'
+    },
+    {
+      id: 'question_levels', label: '4 levels',
+      hint: 'Questions sit under Beginner, Detective, Judge and Inventor, easiest first. Set each question’s level, or leave it to its opening words.'
+    },
+    {
+      id: 'because_but_so', label: 'Because, but, so',
+      hint: 'Write each question as an unfinished statement, like “Katniss volunteers for Prim”. Students finish it three ways: because, but and so.'
     }
   ],
   peer_feedback: [

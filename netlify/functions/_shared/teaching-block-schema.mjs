@@ -104,6 +104,7 @@ var WindowsMirrorsConfigSchema = z4.object({
   supports: z4.record(StepTextSchema.nullable()).optional(),
   examples: z4.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
+var SteppedLensConfigSchema = WindowsMirrorsConfigSchema.omit({ answer_with: true });
 
 // apps/teaching/src/quiz/core.ts
 import { z as z5 } from "zod";
@@ -1007,7 +1008,9 @@ var QuestionItemSchema = z7.object({
   prompt: z7.string(),
   kind: QuestionKindSchema,
   options: z7.array(z7.string()).optional(),
-  response_space: ResponseSpaceSchema.optional()
+  response_space: ResponseSpaceSchema.optional(),
+  /** The 4 levels format's band; absent means guessed from the question's opening words. */
+  level: z7.enum(["beginner", "detective", "judge", "inventor"]).optional()
 });
 var PeerFeedbackBlockSchema = z7.object({
   id: z7.string().min(1),
@@ -1229,7 +1232,7 @@ var QuestionSetBlockSchema = z7.object({
     title: z7.string().optional(),
     questions: z7.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z7.enum(["standard", "human_experience_table", "anchor_bridge"]).optional(),
+    format: z7.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so"]).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z7.object({
       rows: z7.number().int().min(3).max(5).default(3),
