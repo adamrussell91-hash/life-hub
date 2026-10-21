@@ -22,6 +22,7 @@ import {
   createFamilyLayerFromTable
 } from '@/blocks/annotation-technique';
 import { askTechniquePicker } from '@/blocks/annotation-technique-picker';
+import { mountAnnotationCodeField } from '@/blocks/annotation-code-field';
 import { blockTypeLabel } from '@/blocks/block-meta';
 import { createBlock } from '@/blocks/create-block';
 import {
@@ -580,6 +581,9 @@ export function createAnnotationEditorFields(
 
   const techniquePicker = document.createElement('div');
   techniquePicker.className = 'block-editor__annotation-technique';
+
+  const codeHost = document.createElement('div');
+  codeHost.className = 'block-editor__annotation-code-host';
 
   const missingTechniqueHost = document.createElement('div');
   missingTechniqueHost.className = 'block-editor__annotation-missing-techniques';
@@ -2215,6 +2219,15 @@ export function createAnnotationEditorFields(
       techniquePicker.append(techLabel, techBtn);
     }
 
+    codeHost.replaceChildren(
+      mountAnnotationCodeField(selected.code, (next) => {
+        annotations = annotations.map((ann) =>
+          ann.id === selected.id ? { ...ann, code: next, updated_at: nowIso() } : ann
+        );
+        emitChange();
+      })
+    );
+
     const attachmentsHost = document.createElement('div');
     attachmentsHost.className = 'block-editor__annotation-attachments';
     type AttRow = AnnotationAttachment & { id: string };
@@ -2513,6 +2526,7 @@ export function createAnnotationEditorFields(
       bodyLabel,
       tipTap.host,
       techniquePicker,
+      codeHost,
       layerLabel,
       threadHost,
       attachmentsHost,
