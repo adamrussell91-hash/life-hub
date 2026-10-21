@@ -29,7 +29,7 @@ function harness(make, path) {
 
 test('the API uses its own store prefix and run path', () => {
   assert.equal(DECISION_BOOK_PREFIX, 'decision-book/v1');
-  assert.deepEqual(DECISION_BOOK_DEPS, { prefix: 'decision-book/v1', runPath: '/api/decision-book/run', kinds: ['decision'] });
+  assert.deepEqual(DECISION_BOOK_DEPS, { prefix: 'decision-book/v1', runPath: '/api/decision-book/run', kinds: ['decision', 'quick'] });
 });
 
 test('a decision is created, framed in three answers and opens Explore', async () => {

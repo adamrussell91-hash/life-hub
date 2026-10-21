@@ -148,7 +148,7 @@ export function createMockApi({ seed }: MockApiOptions) {
   // Problem Solver and Decision Maker: one service each over its own memory store, both on the scripted coach.
   const coachServices: Record<string, ReturnType<typeof createProblemSolverService>> = {
     '/api/problem-solver': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach }),
-    '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision'] })
+    '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision', 'quick'] })
   };
 
   async function handle(method: string, urlPath: string, body?: unknown) {

@@ -53,7 +53,7 @@ export function createProblemSolverHandler(deps = {}) {
       if (parsed.error) return withCors(parsed.error, request, env);
       const body = parsed.value ?? {};
       const session = body.create ? await service.create(owner(env), body.create) : await service.action(owner(env), body);
-      const runId = body.action === 'escalate' ? session.lightning?.escalatedTo ?? null : session.runner.status === 'queued' ? session.id : null;
+      const runId = body.action === 'escalate' ? session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? null : session.runner.status === 'queued' ? session.id : null;
       if (!runId) return withCors(okResponse(200, { session }), request, env);
       let kicked = false;
       try { kicked = await (deps.invokeRun ?? defaultInvokeRun)(request, runId, env, deps.fetchImpl ?? fetch, deps.runPath); } catch { kicked = false; }

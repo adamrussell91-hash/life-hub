@@ -13,6 +13,7 @@ import { MODELS } from '../../../../packages/problem-solver/models.mjs';
 import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { applyStep, currentEntry, isQuestion, LIGHTNING_NODES } from '../../../../packages/problem-solver/lightning.mjs';
+import * as quickFlow from '../../../../packages/decision-book/quick.mjs';
 import { FEEDBACK_ID, RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { basisCandidates } from '../../../../packages/decision-book/record.mjs';
 import { isRecordDate } from '../../../../packages/decision-book/tools/record.mjs';
@@ -339,10 +340,73 @@ function lightningTurn(session, last) {
   return turn('clarify', asking);
 }
 
+/**
+ * A quick decision walked by rule. The tests are set with `tests: one? / two? / three?`, or `use
+ * those` for the suggested three; a test takes yes or no; the trigger, action and closing boxes
+ * take a few words; the check takes a date (YYYY-MM-DD) or `no`. `go deeper` (or `escalate`)
+ * suggests a full decision.
+ */
+const QUICK_ASKS = {
+  tests: `Set three yes/no tests before you answer any, such as: ${quickFlow.SUGGESTED_TESTS.join(' ')} Say "tests: one? / two? / three?", or "use those".`,
+  trigger: 'Now a Stop Rule. If this happens, you stop or rethink: what would you notice?',
+  action: 'And then you will do what? Agree it now.',
+  check: 'Do you want a dated check on how it went? Give a date, or say no.',
+  learn: 'What did this teach you about how you decide?',
+  next: 'What next?'
+};
+
+function quickMessage(state, before = '') {
+  const entry = quickFlow.currentEntry(state);
+  if (!entry) return `${before}That is decided. Press It came back if the call comes up again.`;
+  const outcome = quickFlow.outcomeOf(state);
+  const ended = entry.node === 'trigger' ? 'Three yeses: go ahead. ' : entry.node === 'learn' && outcome === 'stop' && !state.path.some((e) => e.round === state.rounds && e.node === 'learn' && e.note) ? 'A no, so do not go ahead. ' : '';
+  const ask = quickFlow.isTest(entry.node) ? quickFlow.testLabel(state, entry.node) : QUICK_ASKS[entry.node];
+  return `${before}${ended}${ask}`;
+}
+
+function quickTurn(session, last) {
+  const state = session.quick;
+  const entry = quickFlow.currentEntry(state);
+  const turn = (verdict, message, quick = null, extra = {}) => ({ ...base, verdict, message, quick, ...extra });
+  if (!entry) return turn('clarify', 'That is decided. Say "it came back" if the call comes up again.');
+  if (session.turns.length === 1 || last === 'It came back.') return turn('clarify', quickMessage(state));
+  if (/^(escalate|go deeper)$/i.test(last.trim())) {
+    return turn('clarify', 'This sounds bigger than a quick call. A full decision may suit it better.', null, { suggestion: { kind: 'escalate', reason: 'Named as needing a full decision.' } });
+  }
+  const accept = (step, skills = ['decision_making']) => turn('accept', quickMessage(quickFlow.applyStep(state, step, session.updatedAt)), step, { skillsSeen: skills });
+  const kind = quickFlow.QUICK_NODES[entry.node].kind;
+  if (kind === 'tests') {
+    const tests = /^use those\b/i.test(last.trim()) ? [...quickFlow.SUGGESTED_TESTS] : (/^tests:\s*(.+)$/is.exec(last.trim())?.[1].split('/').map((t) => t.trim()).filter(Boolean) ?? []);
+    if (tests.length !== 3) return turn('clarify', QUICK_ASKS.tests);
+    return accept({ node: 'tests', tests }, ['critical_thinking']);
+  }
+  if (kind === 'test') {
+    const reply = /^(yes|no)\b[\s,.]*(.*)$/is.exec(last.trim());
+    const answer = reply?.[1].toLowerCase();
+    const words = reply?.[2].trim() ?? '';
+    // A Yes or No pressed on the chart has already moved the run on.
+    if (reply && !words && /^(yes|no)\.$/i.test(last.trim()) && state.path.at(-2)?.answer === answer) return turn('clarify', quickMessage(state, 'Noted. '));
+    if (!answer) return turn('clarify', `Yes or no: ${quickFlow.testLabel(state, entry.node)}`);
+    return accept({ node: entry.node, answer, ...(words ? { note: words } : {}) });
+  }
+  if (kind === 'check') {
+    const date = /\b(\d{4}-\d{2}-\d{2})\b/.exec(last)?.[1];
+    if (date && quickFlow.isCheckDate(date)) return accept({ node: 'check', note: date }, ['metacognition']);
+    if (/^(no|skip)\b/i.test(last.trim())) return accept({ node: 'check', answer: 'no' });
+    return turn('clarify', QUICK_ASKS.check);
+  }
+  if (wordCount(last) < 2) return turn('clarify', 'Say a little more about that.');
+  return accept({ node: entry.node, note: last.trim() }, entry.node === 'learn' ? ['metacognition'] : ['decision_making']);
+}
+
 export async function scriptedCoach(session) {
   if (session.kind === 'lightning') {
     const turn = session.turns.at(-1);
     return lightningTurn(session, turn?.role === 'user' ? turn.text : '');
+  }
+  if (session.kind === 'quick') {
+    const turn = session.turns.at(-1);
+    return quickTurn(session, turn?.role === 'user' ? turn.text : '');
   }
   const latest = session.turns.at(-1);
   const last = latest?.role === 'user' ? latest.text : '';
