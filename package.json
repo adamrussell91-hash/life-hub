@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@annotorious/annotorious": "^3.8.10",
+    "@anthropic-ai/sdk": "0.133.0",
     "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",

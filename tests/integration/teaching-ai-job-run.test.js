@@ -225,25 +225,28 @@ test('the background function runs the stored job', async () => {
   assert.equal(bad.status, 400);
 });
 
-test('the Claude call sends effort, caching and the Sonnet fallback, and words errors plainly', async () => {
+test('the Claude call streams, sends effort, caching and the Sonnet fallback, and words errors plainly', async () => {
   const sent = [];
-  const fetchImpl = async (url, init) => {
-    sent.push({ url, init, body: JSON.parse(init.body) });
-    return sent.length === 1
-      ? new Response(JSON.stringify({ content: [], stop_reason: 'end_turn' }), { status: 200 })
-      : new Response(JSON.stringify({ error: { message: 'nope' } }), { status: 401 });
+  const message = { content: [], stop_reason: 'end_turn' };
+  const client = {
+    messages: { stream: (params, options) => { sent.push({ lane: 'fast', params, options }); return { finalMessage: async () => { throw new Error('Could not reach Claude. Try again.'); } }; } },
+    beta: { messages: { stream: (params, options) => { sent.push({ lane: 'standard', params, options }); return { finalMessage: async () => message }; } } }
   };
-  const complete = createAnthropicComplete({ apiKey: 'k', fetchImpl });
-  await complete({ model: 'claude-sonnet-5-5', tier: 'standard', effort: 'medium', max_tokens: 16000, system: [], tools: [], messages: [] });
-  assert.equal(sent[0].init.headers['anthropic-beta'], 'server-side-fallback-2026-07-01');
-  assert.equal(sent[0].body.fallbacks, 'default');
-  assert.deepEqual(sent[0].body.output_config, { effort: 'medium' });
-  assert.deepEqual(sent[0].body.cache_control, { type: 'ephemeral' });
-  assert.equal(sent[0].body.thinking, undefined);
+  const complete = createAnthropicComplete({ client });
+  const tools = [{ name: 'propose_insert_blocks', input_schema: {} }, { type: 'web_search_20260209', name: 'web_search', max_uses: 5 }];
+  assert.equal(await complete({ model: 'claude-sonnet-5-5', tier: 'standard', effort: 'medium', max_tokens: 48000, system: [], tools, messages: [] }), message);
+  assert.deepEqual(sent[0].params.betas, ['server-side-fallback-2026-07-01']);
+  assert.equal(sent[0].params.fallbacks, 'default');
+  assert.equal(sent[0].params.max_tokens, 48000);
+  assert.deepEqual(sent[0].params.output_config, { effort: 'medium' });
+  assert.deepEqual(sent[0].params.cache_control, { type: 'ephemeral' });
+  assert.equal(sent[0].params.thinking, undefined);
+  assert.equal(sent[0].params.tools[0].eager_input_streaming, true);
+  assert.equal(sent[0].params.tools[1].eager_input_streaming, undefined);
   await assert.rejects(
-    complete({ model: 'claude-haiku-5-5', tier: 'fast', effort: 'low', max_tokens: 16000, system: [], tools: [], messages: [] }),
-    /API key was rejected/
+    complete({ model: 'claude-haiku-5-5', tier: 'fast', effort: 'low', max_tokens: 48000, system: [], tools: [], messages: [] }),
+    /Could not reach Claude/
   );
-  assert.equal(sent[1].init.headers['anthropic-beta'], undefined);
-  assert.equal(sent[1].body.fallbacks, undefined);
+  assert.equal(sent[1].lane, 'fast');
+  assert.equal(sent[1].params.fallbacks, undefined);
 });
