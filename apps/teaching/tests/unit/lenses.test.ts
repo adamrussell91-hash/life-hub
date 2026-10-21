@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
 import { createBlockEditor } from '@/blocks/editors';
 import { withKaplanQualifier } from '@/blocks/kaplan';
+import { withLens } from '@/blocks/lenses/attachments';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { storageKey } from '@/blocks/learning-activity';
 import { renderBlock } from '@/blocks/render';
@@ -76,17 +77,18 @@ describe('Add lens picker', () => {
     const items = [...editor.querySelectorAll('.page-options__item')].map((item) => item.textContent);
     expect(items).toEqual(['Add lens…']);
     click(editor, 'Add lens…');
-    expect([...editor.querySelectorAll('.kaplan-lens-group')].map((h) => h.textContent)).toEqual(['Kaplan', 'Judgement']);
+    expect([...editor.querySelectorAll('.kaplan-lens-group')].map((h) => h.textContent)).toEqual(['Kaplan', 'Literature', 'Judgement']);
     click(editor, 'DiscernInitial answer → against → for → step back');
     expect(editor.querySelector<HTMLElement>('.discern-setup')!.hidden).toBe(false);
   });
   it('hides the menu once every lens is attached', () => {
     let block: Block = questionBlock();
     for (const lens of ['patterns', 'multiple_perspectives', 'ethics'] as const) block = withKaplanQualifier(block, { ...qualifier, lens });
+    block = withLens(block, 'windows_mirrors', { focus: '' });
     block = { ...block, discern: { mode: 'own', who: '', focus: '', source: '', initial: { type: 'write', preset: 'agree', options: [] } } };
     const editor = createLensEditor({ getBlock: () => block, onChange: (next) => { block = next; } });
     expect(editor.querySelector<HTMLElement>('.kaplan-author__options')!.hidden).toBe(true);
-    expect(editor.querySelectorAll('.kaplan-chip, .discern-chip')).toHaveLength(4);
+    expect(editor.querySelectorAll('.kaplan-chip, .discern-chip')).toHaveLength(5);
   });
 });
 
