@@ -507,7 +507,9 @@ export const QuestionItemSchema = z.object({
   prompt: z.string(),
   kind: QuestionKindSchema,
   options: z.array(z.string()).optional(),
-  response_space: ResponseSpaceSchema.optional()
+  response_space: ResponseSpaceSchema.optional(),
+  /** The 4 levels format's band; absent means guessed from the question's opening words. */
+  level: z.enum(['beginner', 'detective', 'judge', 'inventor']).optional()
 });
 
 export const PeerFeedbackBlockSchema = z.object({
@@ -746,7 +748,7 @@ export const QuestionSetBlockSchema = z.object({
     title: z.string().optional(),
     questions: z.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge']).optional(),
+    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge', 'question_levels', 'because_but_so']).optional(),
     /** Human experience table settings, kept when switching format away and back. */
     table: z.object({
       rows: z.number().int().min(3).max(5).default(3),

@@ -8,6 +8,7 @@ import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor'
 import { createQuizQuestionEditor } from '@/blocks/quiz-question';
 import { createLensEditor } from '@/blocks/lenses/lens-editor';
 import { createFormatField, withFormat } from '@/blocks/formats/registry';
+import { QUESTION_LEVEL_LABELS, QUESTION_LEVELS, guessQuestionLevel, type QuestionLevel } from '@/blocks/lenses/question-levels';
 import { resolvedCalloutStyle, createCalloutTargetPicker } from '@/blocks/callout-reference';
 import { createRichTextTools } from '@/blocks/rich-text-tools';
 import {
@@ -1528,6 +1529,7 @@ export function createQuestionSetEditor(
     kind: 'short_answer' | 'multiple_choice';
     options?: string[];
     response_space?: ResponseSpace;
+    level?: QuestionLevel;
   };
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
@@ -1547,7 +1549,8 @@ export function createQuestionSetEditor(
     prompt: q.prompt,
     kind: q.kind,
     options: q.options ? [...q.options] : undefined,
-    response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined
+    response_space: q.kind === 'short_answer' ? (q.response_space ?? 'medium') : undefined,
+    level: q.level
   }));
 
   const emitChange = () => {
@@ -1565,7 +1568,8 @@ export function createQuestionSetEditor(
           options: q.kind === 'multiple_choice' ? [...(q.options ?? [])] : undefined,
           ...(q.kind === 'short_answer' && q.response_space
             ? { response_space: q.response_space }
-            : {})
+            : {}),
+          ...(q.level ? { level: q.level } : {})
         }))
       }
     });
@@ -1594,7 +1598,21 @@ export function createQuestionSetEditor(
     },
     renderItem: (question, ctx) => {
       const n = ctx.index + 1;
-      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => ctx.update({ ...ctx.current, prompt: value }), 'textarea', 2);
+      const prompt = editorField('block-editor__question-prompt', question.prompt, 'Question', `Question ${n} prompt`, (value) => {
+        ctx.update({ ...ctx.current, prompt: value });
+        if (!ctx.current.level) level.setValue(guessQuestionLevel(value));
+      }, 'textarea', 2);
+
+      // The 4 levels format's band; untouched questions follow their opening words.
+      const level = createChoice({
+        key: 'Level',
+        value: question.level ?? guessQuestionLevel(question.prompt),
+        options: QUESTION_LEVELS.map((value) => ({ value, label: QUESTION_LEVEL_LABELS[value] })),
+        className: 'block-editor__question-level',
+        ariaLabel: `Question ${n} level`,
+        onChange: (value) => ctx.update({ ...ctx.current, level: value as QuestionLevel })
+      });
+      level.el.hidden = getLatest().content.format !== 'question_levels';
 
       const options = editorField(
         'block-editor__question-options',
@@ -1641,7 +1659,7 @@ export function createQuestionSetEditor(
 
       const settings = document.createElement('div');
       settings.className = 'block-editor__inline-settings';
-      settings.append(kind.el, responseSpace.el);
+      settings.append(level.el, kind.el, responseSpace.el);
       return fragmentOf(prompt, settings, options);
     }
   });
@@ -1672,7 +1690,10 @@ export function createQuestionSetEditor(
     const table = { rows: 3, example: true, ...latest.content.table, ...patch };
     onChange({ ...latest, content: { ...latest.content, table } });
   };
-  const showTableSettings = (format: string) => { tableSettings.hidden = format !== 'human_experience_table'; };
+  const showTableSettings = (format: string) => {
+    tableSettings.hidden = format !== 'human_experience_table';
+    fields.querySelectorAll<HTMLElement>('.block-editor__question-level').forEach((el) => { el.hidden = format !== 'question_levels'; });
+  };
   showTableSettings(block.content.format ?? 'standard');
   const format = createFormatField({
     block,
