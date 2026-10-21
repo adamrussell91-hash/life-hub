@@ -56,6 +56,18 @@ describe("handleTranscribeRequest", () => {
     expect(runWhisper).toHaveBeenCalledWith("QQ==");
   });
 
+  it("passes a short initial prompt through to Whisper", async () => {
+    const runWhisper = vi.fn(async () => ({ text: "um ok" }));
+    const response = await handleTranscribeRequest(
+      request("/transcribe", { body: JSON.stringify({ audio: "QQ==", initial_prompt: `  Um, so, like ${"x".repeat(500)}` }) }),
+      bindings({ runWhisper }),
+    );
+    expect(response.status).toBe(200);
+    const [, options] = runWhisper.mock.calls[0] as unknown as [string, { initial_prompt: string }];
+    expect(options.initial_prompt.startsWith("Um, so, like")).toBe(true);
+    expect(options.initial_prompt.length).toBe(400);
+  });
+
   it("requires audio", async () => {
     const response = await handleTranscribeRequest(
       request("/transcribe", { body: JSON.stringify({}) }),
