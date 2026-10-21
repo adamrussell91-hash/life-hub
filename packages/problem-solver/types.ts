@@ -63,7 +63,9 @@ export type PsSession = {
   suggestion: PsSuggestion | null;
   /** The step whose opening tool suggestion was dismissed with Not now; it stays away there. */
   dismissedOpening?: string | null;
-  pendingKeep: { slot: string; text: string; objection: string } | null;
+  pendingKeep: { slot: string; text: string; objection: string; basis?: PsBasisRef[] } | null;
+  /** Decision Maker: per decision-record reason node, the Explore nodes it rests on. */
+  basis?: Record<string, PsBasisRef[]>;
   runner: { status: 'idle' | 'queued' | 'running' | 'failed'; mode: 'turn' | 'boundary'; error: string | null; leaving?: string };
   /** Tasks the coach proposed from Implement nodes; the page creates them in Tasks. */
   proposedTasks: PsProposedTask[];
@@ -88,7 +90,14 @@ export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_su
 
 export type PsCaseFileTarget = { kind: 'task' | 'project'; id: string };
 /** What was written where: the section digests written, so later changes can be found. */
-export type PsCaseFileRecord = { title: string; version: number; target: PsCaseFileTarget; writtenAt: string; sections: Record<string, string>; history: { version: number; at: string; target: PsCaseFileTarget }[] };
+export type PsCaseFileRecord = { title: string; version: number; target: PsCaseFileTarget; writtenAt: string; sections: Record<string, string>; history: { version: number; at: string; target: PsCaseFileTarget }[]; graphic?: boolean };
 export type PsCaseFileSection = { key: string; heading: string; lines: string[] };
 export type PsCaseFile = { title: string; version: number; sections: PsCaseFileSection[] };
 export type PsCaseFileOffer = { kind: 'write' | 'update'; version: number; file: PsCaseFile; digests: Record<string, string>; key: string; changed: string[] };
+
+/** A decision record reason's basis: an Explore node, by run and node id. */
+export type PsBasisRef = { runId: string; nodeId: string };
+/** What a decision record's provenance graphic shows (packages/decision-book/record.mjs). */
+export type PsRecordProvenance = { model: string | null; section: number | null; models: string[]; date: string; caption: string };
+/** The decision record card's offer; `graphic` retries a provenance image that did not write. */
+export type PsRecordOffer = Omit<PsCaseFileOffer, 'kind'> & { kind: 'write' | 'update' | 'graphic'; provenance: PsRecordProvenance };
