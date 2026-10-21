@@ -15,8 +15,10 @@ import {
 import { analogyMove, type AnalogyMoveBlock, type AnalogyMoveType } from '@/toolkit/analogy-moves';
 import { analogyIconSvg } from '@/toolkit/analogy-icons';
 import { classLabel } from '@/toolkit/class-context';
+import { authoredPoint, mapLayer, mountClassQuestions, mountStudentQuestions, numberMarker } from '@/toolkit/quadrant-live';
 import {
   CONCEPT_CRITERIA,
+  QUADRANT_AXIS_DEFINITION,
   QUADRANT_DEFINITION,
   QUADRANT_LABEL,
   QUADRANT_RESPOND,
@@ -73,7 +75,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 /** Multi-line plain text as paragraphs. */
-function paragraphs(text: string, className = 'tk-text'): DocumentFragment {
+function paragraphs(text: string, className = 'tk-text block-body'): DocumentFragment {
   const fragment = document.createDocumentFragment();
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
@@ -109,27 +111,28 @@ function griffinIcon(className: string): HTMLImageElement {
 }
 
 function eyebrow(kind: string): HTMLElement {
-  const row = el('p', 'tk-eyebrow');
-  row.append(griffinIcon('tk-eyebrow__griffin'), el('span', undefined, kind));
+  const row = el('p', 'tk-eyebrow block-eyebrow block-eyebrow--thinking');
+  row.append(griffinIcon('tk-eyebrow__griffin block-eyebrow__icon'), el('span', undefined, kind));
   return row;
 }
 
 /** The student instruction at the top of a block. */
 function guideLine(text: string | undefined): HTMLElement | null {
   if (!text?.trim()) return null;
-  const guide = el('p', 'tk-guide');
-  guide.append(el('span', 'tk-guide__label', 'What to do'), document.createTextNode(text.trim()));
+  const guide = el('p', 'tk-guide block-body');
+  guide.append(el('span', 'tk-guide__label block-eyebrow', 'What to do'), document.createTextNode(text.trim()));
   return guide;
 }
 
 function teacherHint(mode: TkRenderMode, text: string): HTMLElement | null {
-  return mode === 'teacher' ? el('p', 'tk-note__hint tk-empty', text) : null;
+  return mode === 'teacher' ? el('p', 'tk-note__hint tk-empty block-secondary', text) : null;
 }
 
 function itemCard(kind: ToolkitKind, label: string, definition: string): HTMLElement {
-  const card = el('div', `block-definition tk-card tk-card--${kind}`);
-  card.append(el('p', 'tk-card__title', label || 'Untitled'));
-  if (definition.trim()) card.append(el('p', 'tk-card__definition', definition));
+  // Tool (navy) and Value (High Sea) boxes are filled: their roles take the fill's ink.
+  const card = el('div', `block-definition tk-card tk-card--${kind}${kind === 'skill' ? '' : ' block-on-fill'}`);
+  card.append(el('p', 'tk-card__title block-title', label || 'Untitled'));
+  if (definition.trim()) card.append(el('p', 'tk-card__definition block-body', definition));
   return card;
 }
 
@@ -151,15 +154,15 @@ function reveal(options: {
   className?: string;
 }): HTMLElement | null {
   if (options.mode === 'print') return null;
-  const wrap = el('div', `tk-reveal ${options.className ?? ''}`.trim());
+  const wrap = el('div', `tk-reveal block-disclosure ${options.className ?? ''}`.trim());
   const key = activityKey(options.ctx, options.blockId, options.part);
   const saved = loadActivityState<{ open?: unknown }>(key);
   let open = saved?.open === true;
   const panelId = nextDomId('tk-reveal');
-  const button = el('button', 'btn block-self-check__btn tk-reveal__btn');
+  const button = el('button', 'block-disclosure__toggle block-self-check__btn tk-reveal__btn');
   button.type = 'button';
   button.setAttribute('aria-controls', panelId);
-  const panel = el('div', 'block-self-check__answer tk-reveal__body');
+  const panel = el('div', 'block-self-check__answer block-disclosure__panel tk-reveal__body');
   panel.id = panelId;
   if (typeof options.body === 'string') panel.append(paragraphs(options.body));
   else panel.append(options.body());
@@ -186,9 +189,9 @@ function stepList(steps: Array<{ title: string; prompt: string }>): HTMLOListEle
   const list = el('ol', 'block-question-set__list');
   for (const step of steps) {
     const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt');
+    const prompt = el('p', 'block-question-set__prompt block-body');
     if (step.title.trim()) {
-      prompt.append(el('strong', 'tk-step__title', step.title.trim()));
+      prompt.append(el('strong', 'block-subtitle', step.title.trim()));
       if (step.prompt.trim()) prompt.append(document.createTextNode(` ${step.prompt.trim()}`));
     } else {
       prompt.textContent = step.prompt;
@@ -210,7 +213,7 @@ function chipDetailBody(id: string): HTMLElement[] {
   if (!item) return [];
   const out: HTMLElement[] = [el('p', 'tk-links__detail-title', item.label)];
   if (item.definition.trim()) out.push(el('p', 'tk-links__detail-text', item.definition));
-  if (item.kind === 'tool' && item.sentence.trim()) out.push(el('p', 'tk-sentence', item.sentence));
+  if (item.kind === 'tool' && item.sentence.trim()) out.push(el('p', 'tk-sentence block-body', item.sentence));
   if (item.kind === 'value' && item.instruction.trim()) out.push(el('p', 'tk-links__detail-text', item.instruction));
   if (item.kind !== 'value' && item.steps.length) {
     const list = el('ol', 'tk-links__detail-steps');
@@ -264,7 +267,7 @@ function chipRow(label: string, ids: readonly string[], detail: ChipDetail): HTM
   const chips = ids.map((id) => chip(id, detail)).filter((node): node is HTMLElement => node !== null);
   if (chips.length === 0) return null;
   const row = el('div', 'tk-links__row');
-  row.append(el('span', 'tk-links__label', label));
+  row.append(el('span', 'block-eyebrow', label));
   const list = el('span', 'tk-links__chips');
   list.append(...chips);
   row.append(list);
@@ -292,7 +295,7 @@ function noteList(items: string[], ordered: boolean): HTMLElement {
 
 function noteSection(label: string, content: Node): HTMLElement {
   const section = el('div', 'tk-note__section');
-  section.append(el('p', 'tk-note__label', label), content);
+  section.append(el('p', 'tk-note__label block-eyebrow', label), content);
   return section;
 }
 
@@ -326,7 +329,7 @@ function teacherNote(
   const aside = el('aside', 'tk-note');
   aside.setAttribute('aria-label', 'Teacher note');
   const bodyId = nextDomId('tk-note');
-  const toggle = el('button', 'tk-note__toggle');
+  const toggle = el('button', 'tk-note__toggle block-disclosure__toggle');
   toggle.type = 'button';
   toggle.setAttribute('aria-controls', bodyId);
   const head = el('div', 'tk-note__head');
@@ -340,7 +343,7 @@ function teacherNote(
     for (const [classId, text] of mine) {
       const item = el('div', 'tk-note__jot');
       if (classId) item.append(el('p', 'tk-note__jot-class', classLabel(classId)));
-      item.append(paragraphs(text, 'tk-note__text'));
+      item.append(paragraphs(text, 'tk-note__text block-body'));
       box.append(item);
     }
     const section = noteSection('My notes', box);
@@ -349,7 +352,7 @@ function teacherNote(
   }
   if (note) {
     if (note.what.trim()) {
-      const what = noteSection('About', paragraphs(note.what, 'tk-note__text'));
+      const what = noteSection('About', paragraphs(note.what, 'tk-note__text block-body'));
       what.classList.add('tk-note__section--wide');
       body.append(what);
     }
@@ -368,7 +371,7 @@ function teacherNote(
       body.append(noteSection(note.extra_label, noteList(note.extra, false)));
     }
   }
-  if (!body.childElementCount) body.append(el('p', 'tk-note__hint', 'Nothing here yet. Select the block to add your notes.'));
+  if (!body.childElementCount) body.append(el('p', 'tk-note__hint block-secondary', 'Nothing here yet. Select the block to add your notes.'));
 
   let open = noteOpenState(blockId);
   function paint(): void {
@@ -406,7 +409,7 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
   if (c.context.trim()) {
     const question = el('div', 'tk-question');
     const text = el('div', 'tk-question__body');
-    text.append(el('span', 'tk-question__label', 'Question'), el('p', 'tk-question__text', c.context));
+    text.append(el('span', 'tk-question__label block-eyebrow', 'Question'), el('p', 'tk-question__text', c.context));
     question.append(el('span', 'tk-question__mark', '?'), text);
     wrap.append(question);
   }
@@ -415,12 +418,12 @@ function renderSkill(block: ToolkitSkillBlock, mode: TkRenderMode, ctx: TkRender
   const list = stepList(steps);
   if (c.show_test && c.checks.some((line) => line.trim())) {
     const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt');
-    prompt.append(el('strong', 'tk-step__title', 'Check'));
+    const prompt = el('p', 'block-question-set__prompt block-body');
+    prompt.append(el('strong', 'block-subtitle', 'Check'));
     li.append(prompt);
     const checks = c.checks.filter((line) => line.trim());
     if (checks.length) {
-      const ul = el('ul', 'tk-checks');
+      const ul = el('ul', 'tk-checks block-body');
       for (const check of checks) ul.append(el('li', undefined, check));
       li.append(ul);
     }
@@ -451,7 +454,7 @@ const FORK_PLACEHOLDER = { kind: 'General kind', marker: 'Marker of difference',
 function forkSlot(part: keyof typeof FORK_PLACEHOLDER): HTMLElement {
   const slot = el('div', part === 'marker' ? 'tk-fork__slot tk-fork__slot--marker' : 'tk-fork__slot');
   slot.dataset.part = part;
-  slot.append(el('span', 'tk-fork__slot-label', FORK_PLACEHOLDER[part]), el('span', 'tk-fork__slot-value'));
+  slot.append(el('span', 'block-eyebrow', FORK_PLACEHOLDER[part]), el('span', 'tk-fork__slot-value'));
   return slot;
 }
 
@@ -471,7 +474,7 @@ function renderFork(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderCo
   sides.append(slots.a, slots.b);
   fork.append(slots.kind, el('span', 'tk-fork__stem'), slots.marker, el('span', 'tk-fork__stem'), sides);
   frag.append(fork);
-  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence', c.sentence));
+  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence block-body', c.sentence));
 
   const fill = (open: boolean) => {
     for (const part of ['kind', 'marker', 'a', 'b'] as const) {
@@ -494,8 +497,9 @@ function renderFork(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderCo
       })
     );
   }
-  if (c.pair_level !== 'none') {
-    const bank = DISTINCTION_PAIR_BANK[c.pair_level];
+  // Saved blocks can hold a retired level (e.g. 'level2'); render them with no pairs.
+  const bank = c.pair_level === 'none' ? undefined : DISTINCTION_PAIR_BANK[c.pair_level];
+  if (bank) {
     appendIf(
       frag,
       reveal({
@@ -524,7 +528,7 @@ const VERDICT_LABEL: Record<StressVerdict, string> = {
 function renderStress(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
   const c = block.content;
   const frag = el('div', 'tk-frame');
-  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence', c.sentence));
+  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence block-body', c.sentence));
   if (!c.statements.length) {
     appendIf(frag, teacherHint(mode, 'No statements yet. Select the block to add some or load an example.'));
     return frag;
@@ -532,7 +536,7 @@ function renderStress(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRender
   const list = el('ol', 'block-question-set__list');
   for (const statement of c.statements) {
     const li = el('li', 'block-question-set__question tk-stress__item');
-    li.append(el('p', 'block-question-set__prompt', statement.text));
+    li.append(el('p', 'block-question-set__prompt block-body', statement.text));
     if (mode !== 'print') {
       const key = activityKey(ctx, block.id, `${statement.id}.verdict`);
       const saved = loadActivityState<{ verdict?: unknown }>(key);
@@ -578,7 +582,7 @@ function renderStress(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRender
 function renderConverter(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
   const c = block.content;
   const frag = el('div', 'tk-frame');
-  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence', c.sentence));
+  if (c.sentence.trim()) frag.append(el('p', 'tk-sentence block-body', c.sentence));
   if (!c.converters.length) {
     appendIf(frag, teacherHint(mode, 'No questions yet. Select the block to add some or load an example.'));
     return frag;
@@ -586,7 +590,7 @@ function renderConverter(block: ToolkitToolBlock, mode: TkRenderMode, ctx: TkRen
   const list = el('ol', 'block-question-set__list');
   for (const pair of c.converters) {
     const li = el('li', 'block-question-set__question');
-    const prompt = el('p', 'block-question-set__prompt');
+    const prompt = el('p', 'block-question-set__prompt block-body');
     prompt.append(el('span', 'tk-tag', 'Closed'), document.createTextNode(` ${pair.closed}`));
     li.append(prompt);
     appendIf(
@@ -611,8 +615,8 @@ function renderToolSteps(block: ToolkitToolBlock): HTMLElement {
   const frag = el('div', 'tk-frame');
   if (c.steps.length) frag.append(stepList(c.steps));
   if (c.sentence.trim()) {
-    const sentence = el('p', 'tk-sentence');
-    sentence.append(el('span', 'tk-sentence__label', 'Frame'), document.createTextNode(c.sentence));
+    const sentence = el('p', 'tk-sentence block-body');
+    sentence.append(el('span', 'tk-sentence__label block-eyebrow', 'Frame'), document.createTextNode(c.sentence));
     frag.append(sentence);
   }
   return frag;
@@ -669,7 +673,7 @@ function renderValue(block: ToolkitValueBlock, mode: TkRenderMode, ctx: TkRender
     claim.setAttribute('role', 'note');
     if (c.claim.trim()) claim.append(el('p', 'callout__body tk-claim__text', c.claim));
     if (c.options.length) {
-      const list = el('ol', 'tk-options');
+      const list = el('ol', 'tk-options block-body');
       for (const option of c.options) list.append(el('li', undefined, option.text));
       claim.append(list);
     }
@@ -710,7 +714,7 @@ function renderValue(block: ToolkitValueBlock, mode: TkRenderMode, ctx: TkRender
   if (c.discussion.trim()) {
     const ask = el('aside', 'callout callout--wave');
     ask.setAttribute('role', 'note');
-    ask.append(el('p', 'callout__title', 'In discussion, ask'), el('p', 'callout__body', c.discussion));
+    ask.append(el('p', 'callout__title block-subtitle', 'In discussion, ask'), el('p', 'callout__body', c.discussion));
     wrap.append(ask);
   }
   if (mode === 'teacher') wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots));
@@ -730,7 +734,7 @@ function renderMove(block: ThinkingMoveBlock, mode: TkRenderMode, ctx: TkRenderC
   const c = block.content;
   const wrap = root(block.block_type);
   wrap.append(eyebrow('Thinking move'));
-  wrap.append(el('p', 'tk-move__sentence', moveSentence(c.skill, c.tools, c.value)));
+  wrap.append(el('p', 'tk-move__sentence block-title', moveSentence(c.skill, c.tools, c.value)));
   const cards = el('ol', 'tk-minis');
   cards.setAttribute('aria-label', 'Skill, tools and value in order');
   for (const id of [c.skill, ...c.tools, c.value]) appendIf(cards, miniCard(id));
@@ -738,18 +742,18 @@ function renderMove(block: ThinkingMoveBlock, mode: TkRenderMode, ctx: TkRenderC
   appendIf(wrap, guideLine(c.guide));
   if (c.stimulus.trim()) {
     const stimulus = el('p', 'tk-context');
-    stimulus.append(el('span', 'tk-context__label', 'Working on'), document.createTextNode(c.stimulus));
+    stimulus.append(el('span', 'tk-context__label block-eyebrow', 'Working on'), document.createTextNode(c.stimulus));
     wrap.append(stimulus);
   }
   const list = el('ol', 'block-question-set__list');
   for (const step of c.steps) {
     const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt');
+    const prompt = el('p', 'block-question-set__prompt block-body');
     const tool = itemLabel(step.tool);
     if (tool) prompt.append(el('span', `hub-list__chip tk-chip tk-chip--tool tk-step__chip`, tool));
     prompt.append(document.createTextNode(` ${step.prompt}`));
     li.append(prompt);
-    if (step.frame.trim()) li.append(el('p', 'tk-sentence tk-sentence--compact', step.frame));
+    if (step.frame.trim()) li.append(el('p', 'tk-sentence tk-sentence--compact block-body', step.frame));
     if (step.example.trim()) {
       appendIf(li, reveal({ ctx, mode, blockId: block.id, part: step.id, label: 'An example', body: step.example }));
     }
@@ -758,11 +762,11 @@ function renderMove(block: ThinkingMoveBlock, mode: TkRenderMode, ctx: TkRenderC
   const checks = c.check.filter((line) => line.trim());
   if (checks.length) {
     const li = el('li', 'block-question-set__question tk-step');
-    const prompt = el('p', 'block-question-set__prompt');
+    const prompt = el('p', 'block-question-set__prompt block-body');
     const value = itemLabel(c.value);
-    prompt.append(el('strong', 'tk-step__title', value ? `Check for ${value.toLowerCase()}` : 'Check'));
+    prompt.append(el('strong', 'block-subtitle', value ? `Check for ${value.toLowerCase()}` : 'Check'));
     li.append(prompt);
-    const ul = el('ul', 'tk-checks');
+    const ul = el('ul', 'tk-checks block-body');
     for (const check of checks) ul.append(el('li', undefined, check));
     li.append(ul);
     list.append(li);
@@ -771,7 +775,7 @@ function renderMove(block: ThinkingMoveBlock, mode: TkRenderMode, ctx: TkRenderC
   if (c.community.trim()) {
     const together = el('aside', 'callout callout--shore');
     together.setAttribute('role', 'note');
-    together.append(el('p', 'callout__title', 'Together'), el('p', 'callout__body', c.community));
+    together.append(el('p', 'callout__title block-subtitle', 'Together'), el('p', 'callout__body', c.community));
     wrap.append(together);
   }
   if (mode === 'teacher') wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots));
@@ -788,28 +792,40 @@ const QUADRANT_AXES: Record<Quadrant, string> = {
   inquiry: 'Intellectual · Open'
 };
 
-function quadrantGrid(): HTMLElement {
+function quadrantGrid(): { wrap: HTMLElement; grid: HTMLElement } {
   const wrap = el('div', 'tk-quadrant');
   wrap.setAttribute('role', 'group');
   wrap.setAttribute('aria-label', 'Question Quadrant');
   wrap.append(
-    el('span', 'tk-quadrant__axis tk-quadrant__axis--top', 'Textual questions'),
-    el('span', 'tk-quadrant__axis tk-quadrant__axis--left', 'Closed'),
-    el('span', 'tk-quadrant__axis tk-quadrant__axis--right', 'Open'),
-    el('span', 'tk-quadrant__axis tk-quadrant__axis--bottom', 'Intellectual questions')
+    el('span', 'tk-quadrant__axis tk-quadrant__axis--top block-eyebrow', 'Textual questions'),
+    el('span', 'tk-quadrant__axis tk-quadrant__axis--left block-eyebrow', 'Closed'),
+    el('span', 'tk-quadrant__axis tk-quadrant__axis--right block-eyebrow', 'Open'),
+    el('span', 'tk-quadrant__axis tk-quadrant__axis--bottom block-eyebrow', 'Intellectual questions')
   );
   const grid = el('div', 'tk-quadrant__grid');
   for (const quadrant of QUADRANT_ORDER) {
     const tile = el('div', `tk-quadrant__tile tk-quadrant__tile--${quadrant}`);
     tile.append(
-      el('p', 'tk-quadrant__where', QUADRANT_AXES[quadrant]),
-      el('p', 'tk-quadrant__name', QUADRANT_LABEL[quadrant]),
-      el('p', 'tk-quadrant__def', QUADRANT_DEFINITION[quadrant])
+      el('p', 'tk-quadrant__where block-eyebrow', QUADRANT_AXES[quadrant]),
+      el('p', 'tk-quadrant__name block-subtitle', QUADRANT_LABEL[quadrant]),
+      el('p', 'tk-quadrant__def block-secondary', QUADRANT_DEFINITION[quadrant])
     );
     grid.append(tile);
   }
   wrap.append(grid);
-  return wrap;
+  return { wrap, grid };
+}
+
+/** What closed, open, textual and intellectual mean, so students know what they are sorting by. */
+function quadrantAxisKey(): HTMLElement {
+  const key = el('dl', 'tk-axis-key');
+  for (const axis of ['closed', 'open', 'textual', 'intellectual'] as const) {
+    const [term, ...rest] = QUADRANT_AXIS_DEFINITION[axis].split(': ');
+    const row = el('div', 'tk-axis-key__row');
+    row.append(el('dt', undefined, term), el('dd', undefined, rest.join(': ')));
+    key.append(row);
+  }
+  return key;
 }
 
 function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: TkRenderContext): HTMLElement {
@@ -823,11 +839,35 @@ function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: T
     wrap.append(quote);
   }
   const scroll = el('div', 'tk-scroll');
-  scroll.append(quadrantGrid());
-  wrap.append(scroll);
+  const { wrap: map, grid } = quadrantGrid();
+  scroll.append(map);
+  wrap.append(scroll, quadrantAxisKey());
+
+  // Your own questions sit on the map by number: always for the teacher, once revealed for students.
+  const authored = mode === 'print' || !c.questions.length ? null : mapLayer(grid, 'tk-quadrant__layer--authored');
+  const markers = new Map<string, HTMLElement>();
+  if (authored) {
+    const seen: Record<string, number> = {};
+    c.questions.forEach((question, i) => {
+      const nth = (seen[question.quadrant] = (seen[question.quadrant] ?? -1) + 1);
+      const marker = numberMarker(i + 1, authoredPoint(question.quadrant, nth), question.text);
+      marker.hidden = mode !== 'teacher';
+      markers.set(question.id, marker);
+      authored.append(marker);
+    });
+  }
+
+  const live = c.collect_questions && !!ctx.lessonId && mode !== 'print';
+  if (live) {
+    const host = el('section', 'tk-class');
+    const layer = mapLayer(grid, mode === 'teacher' ? 'tk-quadrant__layer--class' : 'tk-quadrant__layer--ask');
+    if (mode === 'teacher') mountClassQuestions(host, layer, scroll, { lessonId: ctx.lessonId!, blockId: block.id });
+    else mountStudentQuestions(host, layer, { lessonId: ctx.lessonId!, blockId: block.id });
+    wrap.append(host);
+  }
 
   const test = el('div', 'tk-respond');
-  test.append(el('p', 'tk-respond__question', 'What do I need to do to respond to this question?'));
+  test.append(el('p', 'tk-respond__question block-subtitle', 'What do I need to do to respond to this question?'));
   const answers = el('div', 'tk-probes');
   for (const quadrant of ['comprehension', 'research', 'speculation', 'inquiry'] as const) {
     if (mode === 'print') {
@@ -852,11 +892,11 @@ function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: T
   wrap.append(test);
 
   if (c.questions.length) {
-    wrap.append(el('p', 'tk-subhead', 'Where does each question go?'));
+    wrap.append(el('p', 'tk-subhead block-subtitle', 'Where does each question go?'));
     const list = el('ol', 'block-question-set__list');
     for (const question of c.questions) {
       const li = el('li', 'block-question-set__question');
-      li.append(el('p', 'block-question-set__prompt', question.text));
+      li.append(el('p', 'block-question-set__prompt block-body', question.text));
       appendIf(
         li,
         reveal({
@@ -865,7 +905,11 @@ function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: T
           blockId: block.id,
           part: `${question.id}.where`,
           label: 'Where it goes',
-          body: QUADRANT_LABEL[question.quadrant]
+          body: QUADRANT_LABEL[question.quadrant],
+          onToggle: (open) => {
+            const marker = markers.get(question.id);
+            if (marker && mode !== 'teacher') marker.hidden = !open;
+          }
         })
       );
       list.append(li);
@@ -874,11 +918,11 @@ function renderQuadrant(block: QuestionQuadrantBlock, mode: TkRenderMode, ctx: T
   }
 
   if (c.converters.length) {
-    wrap.append(el('p', 'tk-subhead', 'Closed to open'));
+    wrap.append(el('p', 'tk-subhead block-subtitle', 'Closed to open'));
     const list = el('ol', 'block-question-set__list');
     for (const pair of c.converters) {
       const li = el('li', 'block-question-set__question');
-      const prompt = el('p', 'block-question-set__prompt');
+      const prompt = el('p', 'block-question-set__prompt block-body');
       prompt.append(el('span', 'tk-tag', 'Closed'), document.createTextNode(` ${pair.closed}`));
       li.append(prompt);
       appendIf(li, reveal({ ctx, mode, blockId: block.id, part: `${pair.id}.open`, label: 'An open version', body: pair.open }));
@@ -971,7 +1015,7 @@ function renderConcept(block: ConceptFeaturesBlock, mode: TkRenderMode, ctx: TkR
 
   if (c.analogy.stem.trim()) {
     const warm = el('div', 'tk-analogy');
-    warm.append(el('p', 'tk-subhead', 'Warm-up: analogy'), el('p', 'tk-sentence', c.analogy.stem));
+    warm.append(el('p', 'tk-subhead block-subtitle', 'Warm-up: analogy'), el('p', 'tk-sentence block-body', c.analogy.stem));
     if (c.analogy.example.trim()) {
       appendIf(warm, reveal({ ctx, mode, blockId: block.id, part: 'analogy', label: 'An example', body: c.analogy.example }));
     }
@@ -988,7 +1032,7 @@ function renderConcept(block: ConceptFeaturesBlock, mode: TkRenderMode, ctx: TkR
         : game.kind === 'word_sort'
           ? 'Sort the words'
           : 'Sort the scenarios';
-    board.append(el('p', 'tk-subhead', title));
+    board.append(el('p', 'tk-subhead block-subtitle', title));
     if (game.kind === 'degree_line') {
       const line = el('div', 'tk-game__line');
       line.append(el('span', 'tk-game__end', game.left), el('span', 'tk-game__rule'), el('span', 'tk-game__end', game.right));
@@ -1006,7 +1050,7 @@ function renderConcept(block: ConceptFeaturesBlock, mode: TkRenderMode, ctx: TkR
       const list = el('ol', 'block-question-set__list');
       for (const card of game.cards) {
         const li = el('li', 'block-question-set__question');
-        li.append(el('p', 'block-question-set__prompt', card.text));
+        li.append(el('p', 'block-question-set__prompt block-body', card.text));
         if (card.prompt.trim()) {
           appendIf(li, reveal({ ctx, mode, blockId: block.id, part: `${card.id}.prompt`, label: 'A question to ask', body: card.prompt }));
         }
@@ -1043,7 +1087,7 @@ function renderConcept(block: ConceptFeaturesBlock, mode: TkRenderMode, ctx: TkR
 
 function intentionRow(label: string, content: Node): HTMLElement {
   const row = el('div', 'tk-intent__row');
-  row.append(el('p', 'tk-intent__label', label), content);
+  row.append(el('p', 'tk-intent__label block-eyebrow', label), content);
   return row;
 }
 
@@ -1073,7 +1117,10 @@ function renderIntentions(block: ThinkingIntentionsBlock, mode: TkRenderMode): H
   wrap.append(eyebrow('Thinking intentions'));
   let filled = 0;
   if (c.content.trim()) {
-    wrap.append(intentionRow('We are learning', paragraphs(c.content)));
+    // The learning intention leads the block in its own panel, apart from the how-we-think rows.
+    const lead = el('div', 'tk-intent__lead');
+    lead.append(el('p', 'tk-intent__label block-eyebrow', 'We are learning'), paragraphs(c.content, 'tk-intent__focus'));
+    wrap.append(lead);
     filled += 1;
   }
   const thinking = [
@@ -1098,13 +1145,13 @@ function renderIntentions(block: ThinkingIntentionsBlock, mode: TkRenderMode): H
   }
   const success = c.success.filter((line) => line.trim());
   if (success.length) {
-    const list = el('ul', 'tk-checks');
+    const list = el('ul', 'tk-checks block-body');
     for (const line of success) list.append(el('li', undefined, line));
     wrap.append(intentionRow('I can', list));
     filled += 1;
   }
   if (filled === 0 && mode === 'teacher') {
-    wrap.append(el('p', 'tk-note__hint', "Select the block to set today's intentions."));
+    wrap.append(el('p', 'tk-note__hint block-secondary', "Select the block to set today's intentions."));
   }
   return wrap;
 }
@@ -1153,7 +1200,7 @@ export function collectLessonThinking(blocks: Block[] | undefined): {
 
 function reflectionBox(title: string, tone: 'wave' | 'shore' | 'sand'): HTMLElement {
   const box = el('section', `callout callout--${tone} tk-reflect__box`);
-  box.append(el('p', 'callout__title', title));
+  box.append(el('p', 'callout__title block-subtitle', title));
   return box;
 }
 
@@ -1166,22 +1213,22 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
   const concept = c.concept.trim() || 'the chosen concept';
 
   const progress = reflectionBox('Reflect on progress', 'wave');
-  progress.append(el('p', 'tk-reflect__q', `How well did we go in building / expanding our understanding of ${concept}?`));
-  progress.append(el('p', 'tk-reflect__q', 'What kinds of thinking / thinking tools did we use today?'));
+  progress.append(el('p', 'tk-reflect__q block-body', `How well did we go in building / expanding our understanding of ${concept}?`));
+  progress.append(el('p', 'tk-reflect__q block-body', 'What kinds of thinking / thinking tools did we use today?'));
   const detail = chipDetail();
   appendIf(progress, chipRow('Tools', used.tools, detail));
   if (used.values.length) {
-    progress.append(el('p', 'tk-reflect__q', 'Were our contributions …?'));
+    progress.append(el('p', 'tk-reflect__q block-body', 'Were our contributions …?'));
     appendIf(progress, chipRow('Values', used.values, detail));
   } else {
-    progress.append(el('p', 'tk-reflect__q', 'Were our contributions clear, relevant, precise, significant, coherent …?'));
+    progress.append(el('p', 'tk-reflect__q block-body', 'Were our contributions clear, relevant, precise, significant, coherent …?'));
   }
   if (used.tools.length || used.values.length) progress.append(detail.panel);
   wrap.append(progress);
 
   const process = reflectionBox('Reflect on process', 'shore');
   process.append(
-    el('p', 'tk-reflect__q', 'How well did we work together collaboratively? (Listening, turn-taking, tolerating differences of opinion …)')
+    el('p', 'tk-reflect__q block-body', 'How well did we work together collaboratively? (Listening, turn-taking, tolerating differences of opinion …)')
   );
   if (used.community.length) {
     const chips = el('div', 'tk-note__chips');
@@ -1193,7 +1240,7 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
   if (c.variant === 'unit') {
     const unit = reflectionBox('End of unit', 'sand');
     unit.append(
-      el('p', 'tk-reflect__q', "Think back to one's original view (original \"… is\" or analogy task)."),
+      el('p', 'tk-reflect__q block-body', "Think back to one's original view (original \"… is\" or analogy task)."),
       el(
         'p',
         'tk-reflect__q',
@@ -1208,13 +1255,19 @@ function renderReflection(block: ThinkingReflectionBlock, mode: TkRenderMode, ct
 
 // ─── Fluid analogy ──────────────────────────────────────────────────────────
 
-/** Same eyebrow as the toolkit, without the griffin: not a Newington framework block. */
+/** Same eyebrow as the toolkit. The griffin marks Newington framework blocks, so analogy carries its own chain mark. */
 function analogyEyebrow(text: string): HTMLElement {
-  return el('p', 'tk-eyebrow an-eyebrow', text);
+  const row = el('p', 'tk-eyebrow an-eyebrow block-eyebrow block-eyebrow--thinking');
+  const icon = el('span', 'tk-eyebrow__icon block-eyebrow__icon');
+  icon.setAttribute('aria-hidden', 'true');
+  // Static markup from analogy-icons.ts, never user content.
+  icon.innerHTML = analogyIconSvg('analogy_chains');
+  row.append(icon, el('span', undefined, text));
+  return row;
 }
 
 function analogyCheckList(checks: string[]): HTMLElement {
-  const list = el('ul', 'tk-checks an-checks');
+  const list = el('ul', 'tk-checks an-checks block-body');
   for (const line of checks) if (line.trim()) list.append(el('li', undefined, line));
   return list;
 }
@@ -1222,17 +1275,17 @@ function analogyCheckList(checks: string[]): HTMLElement {
 function analogyFocus(text: string): HTMLElement | null {
   if (!text.trim()) return null;
   const box = el('div', 'an-focus');
-  box.append(el('span', 'an-focus__label', 'Working with'), el('p', 'an-focus__text', text.trim()));
+  box.append(el('span', 'an-focus__label block-eyebrow', 'Working with'), el('p', 'an-focus__text block-subtitle', text.trim()));
   return box;
 }
 
 function analogyCard(title: string, tag: string | undefined, definition: string, cardName: string | null): HTMLElement {
   const card = el('div', 'block-definition tk-card tk-card--analogy');
-  const heading = el('p', 'tk-card__title', title || 'Untitled');
+  const heading = el('p', 'tk-card__title block-title', title || 'Untitled');
   if (tag) heading.append(el('span', 'an-tag', tag));
   card.append(heading);
-  if (definition.trim()) card.append(el('p', 'tk-card__definition', definition));
-  if (cardName) card.append(el('p', 'an-card-name', cardName));
+  if (definition.trim()) card.append(el('p', 'tk-card__definition block-body', definition));
+  if (cardName) card.append(el('p', 'an-card-name block-secondary', cardName));
   return card;
 }
 
@@ -1256,8 +1309,8 @@ function tierPanel(
     const list = el('ol', 'an-steps');
     for (const step of steps) {
       const item = el('li', 'an-step');
-      if (step.title.trim()) item.append(el('span', 'an-step__title', step.title.trim()));
-      if (step.prompt.trim()) item.append(el('span', 'an-step__frame', step.prompt.trim()));
+      if (step.title.trim()) item.append(el('span', 'an-step__title block-subtitle', step.title.trim()));
+      if (step.prompt.trim()) item.append(el('span', 'an-step__frame block-body', step.prompt.trim()));
       list.append(item);
     }
     panel.append(list);
@@ -1292,7 +1345,7 @@ function renderFluidAnalogy(block: FluidAnalogyBlock, mode: TkRenderMode, ctx: T
     wrap.append(el('p', 'an-level-badge', `Level ${c.level} · ${levelName(c.level)}`));
     wrap.append(tierPanel(block, c.tiers[c.level - 1]!, c.level, mode, ctx));
   } else {
-    const switcher = el('div', 'an-levels');
+    const switcher = el('div', 'hub-pills an-levels');
     switcher.setAttribute('role', 'group');
     switcher.setAttribute('aria-label', 'Level');
     const buttons: HTMLButtonElement[] = [];
@@ -1304,7 +1357,7 @@ function renderFluidAnalogy(block: FluidAnalogyBlock, mode: TkRenderMode, ctx: T
       });
     };
     ANALOGY_LEVELS.forEach(({ level, name }) => {
-      const button = el('button', 'an-levels__btn');
+      const button = el('button', 'hub-pills__btn an-levels__btn');
       button.type = 'button';
       button.append(el('span', 'an-levels__num', `Level ${level}`), el('span', 'an-levels__name', name));
       button.addEventListener('click', () => {
@@ -1323,7 +1376,7 @@ function renderFluidAnalogy(block: FluidAnalogyBlock, mode: TkRenderMode, ctx: T
   if (c.show_check && checks.length) {
     if (mode === 'print') {
       const box = el('div', 'an-check');
-      box.append(el('p', 'tk-subhead', 'Check your analogy'), analogyCheckList(checks));
+      box.append(el('p', 'tk-subhead block-subtitle', 'Check your analogy'), analogyCheckList(checks));
       wrap.append(box);
     } else {
       appendIf(
@@ -1350,11 +1403,11 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
     ] as const) {
       if (!text.trim()) continue;
       const side = el('div', `an-contrast__side an-contrast__side--${tone}`);
-      side.append(el('p', 'an-contrast__label', label), el('p', 'an-contrast__text', text));
+      side.append(el('p', 'an-contrast__label block-eyebrow', label), el('p', 'an-contrast__text block-body', text));
       contrast.append(side);
     }
     wrap.append(contrast);
-    if (c.why.trim()) wrap.append(el('p', 'an-contrast__why', c.why));
+    if (c.why.trim()) wrap.append(el('p', 'an-contrast__why block-body', c.why));
   }
 
   const chosen = new Set(c.types);
@@ -1364,19 +1417,19 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
     const item = el('li', 'an-types__item');
     if (chosen.has(type.id)) item.classList.add('is-chosen');
     const head = el('p', 'an-types__head');
-    head.append(el('span', 'an-types__num', String(type.order)), el('span', 'an-types__name', type.label), el('span', 'an-tag', type.tag));
-    if (chosen.has(type.id)) head.append(el('span', 'an-types__chosen', 'This lesson'));
-    item.append(head, el('p', 'an-types__text', type.definition));
+    head.append(el('span', 'an-types__num', String(type.order)), el('span', 'an-types__name block-subtitle', type.label), el('span', 'an-tag', type.tag));
+    if (chosen.has(type.id)) head.append(el('span', 'an-types__chosen block-eyebrow', 'This lesson'));
+    item.append(head, el('p', 'an-types__text block-body', type.definition));
     list.append(item);
   }
   wrap.append(list);
 
   const levels = el('div', 'an-tiers-box');
-  levels.append(el('p', 'tk-subhead', 'Every type has three levels'));
+  levels.append(el('p', 'tk-subhead block-subtitle', 'Every type has three levels'));
   const tiers = el('ol', 'an-tiers');
   for (const { level, name, summary } of ANALOGY_LEVELS) {
     const item = el('li', 'an-tiers__item');
-    item.append(el('span', 'an-tiers__num', `Level ${level}`), el('strong', 'an-tiers__name', name), el('span', 'an-tiers__text', summary));
+    item.append(el('span', 'an-tiers__num block-eyebrow', `Level ${level}`), el('strong', 'an-tiers__name block-subtitle', name), el('span', 'an-tiers__text block-body', summary));
     tiers.append(item);
   }
   levels.append(tiers);
@@ -1385,8 +1438,8 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
   const steps = c.process.filter((line) => line.trim());
   if (steps.length) {
     const box = el('div', 'an-process-box');
-    box.append(el('p', 'tk-subhead', 'A simple process you can use'));
-    const process = el('ol', 'an-process');
+    box.append(el('p', 'tk-subhead block-subtitle', 'A simple process you can use'));
+    const process = el('ol', 'an-process block-body');
     for (const line of steps) process.append(el('li', undefined, line));
     box.append(process);
     wrap.append(box);
@@ -1394,7 +1447,7 @@ function renderAnalogyTypes(block: AnalogyTypesBlock, mode: TkRenderMode): HTMLE
   const checks = c.checks.filter((line) => line.trim());
   if (c.show_check && checks.length) {
     const box = el('div', 'an-check');
-    box.append(el('p', 'tk-subhead', 'How to check your analogy'), analogyCheckList(checks));
+    box.append(el('p', 'tk-subhead block-subtitle', 'How to check your analogy'), analogyCheckList(checks));
     wrap.append(box);
   }
   if (mode === 'teacher') wrap.append(teacherNote(block.id, c.teacher_note, c.teacher_jots));
@@ -1422,9 +1475,9 @@ function box(slot: Slot | undefined, className = ''): HTMLElement | null {
   if (!hasSlot(slot)) return null;
   const node = el('div', `an-box ${className}`.trim());
   node.dataset.slot = slot.key;
-  if (slot.label.trim()) node.append(el('span', 'an-box__label', slot.label.trim()));
-  node.append(el('span', 'an-box__frame', slot.frame.trim() || ' '));
-  node.append(el('span', 'an-box__example', slot.example.trim() || slot.frame.trim() || ' '));
+  if (slot.label.trim()) node.append(el('span', 'an-box__label block-subtitle', slot.label.trim()));
+  node.append(el('span', 'an-box__frame block-body block-body--placeholder', slot.frame.trim() || ' '));
+  node.append(el('span', 'an-box__example block-body', slot.example.trim() || slot.frame.trim() || ' '));
   return node;
 }
 
@@ -1436,20 +1489,18 @@ function group(className: string, label: string | null, ...nodes: Array<Node | n
   const kept = nodes.filter((node): node is Node => node !== null);
   if (!kept.length) return null;
   const wrap = el('div', className);
-  if (label) wrap.append(el('p', 'an-org__caption', label));
+  if (label) wrap.append(el('p', 'an-org__caption block-eyebrow', label));
   wrap.append(...kept);
   return wrap;
 }
 
-/** Close Reading: two piers (the text, the thing outside it), links as planks, the limit as a broken plank. */
+/** Close Reading as a plain form: the text and the thing outside it side by side, the links, limit and insight full width under them. */
 function bridgeOrganiser(slots: Map<string, Slot>): HTMLElement {
   const org = el('div', 'an-org an-bridge');
   const outside = boxes(slots, ['outside', 'concrete', 'abstract', 'discipline'], 'an-bridge__option');
-  const span = el('div', 'an-bridge__span');
-  span.setAttribute('aria-hidden', 'true');
   appendIf(
     org,
-    group('an-bridge__piers', null, box(slots.get('text'), 'an-bridge__pier'), span, group('an-bridge__pier-stack', null, ...outside)),
+    group('an-bridge__piers', null, box(slots.get('text'), 'an-bridge__pier'), group('an-bridge__pier-stack', null, ...outside)),
     group('an-bridge__deck', null, ...boxes(slots, ['link1', 'link2'], 'an-plank')),
     box(slots.get('limit'), 'an-plank an-plank--broken'),
     ...boxes(slots, ['insight', 'use'], 'an-so')
@@ -1606,12 +1657,12 @@ function stagePanel(
   organiser.setAttribute('aria-label', shape);
   organiser.setAttribute('role', 'group');
   const head = el('div', 'an-stage__head');
-  head.append(el('p', 'an-stage__shape', shape));
+  head.append(el('p', 'an-stage__shape block-subtitle', shape));
   const hasExample = [...slots.values()].some((slot) => slot.example.trim());
   if (mode !== 'print' && hasExample) {
     const key = activityKey(ctx, block.id, `example-${level}`);
     let shown = loadActivityState<{ open?: unknown }>(key)?.open === true;
-    const button = el('button', 'btn block-self-check__btn an-stage__toggle');
+    const button = el('button', 'block-disclosure__toggle block-self-check__btn an-stage__toggle');
     button.type = 'button';
     const paint = () => {
       organiser.classList.toggle('is-example', shown);
@@ -1623,8 +1674,10 @@ function stagePanel(
       saveActivityState(key, { open: shown });
       paint();
     });
-    head.append(button);
     paint();
+    // Disclosure sits under the organiser it fills.
+    panel.append(head, organiser, button);
+    return panel;
   }
   panel.append(head, organiser);
   return panel;
@@ -1656,7 +1709,7 @@ function renderAnalogyMove(block: AnalogyMoveBlock, mode: TkRenderMode, ctx: TkR
   if (!choose) {
     wrap.append(el('p', 'an-level-badge', `Level ${c.level} · ${levelName(c.level)}`), panels[c.level - 1]!);
   } else {
-    const switcher = el('div', 'an-levels');
+    const switcher = el('div', 'hub-pills an-levels');
     switcher.setAttribute('role', 'group');
     switcher.setAttribute('aria-label', 'Level');
     const buttons: HTMLButtonElement[] = [];
@@ -1667,7 +1720,7 @@ function renderAnalogyMove(block: AnalogyMoveBlock, mode: TkRenderMode, ctx: TkR
       });
     };
     ANALOGY_LEVELS.forEach(({ level, name }) => {
-      const button = el('button', 'an-levels__btn');
+      const button = el('button', 'hub-pills__btn an-levels__btn');
       button.type = 'button';
       button.append(el('span', 'an-levels__num', `Level ${level}`), el('span', 'an-levels__name', name));
       button.addEventListener('click', () => {
@@ -1686,7 +1739,7 @@ function renderAnalogyMove(block: AnalogyMoveBlock, mode: TkRenderMode, ctx: TkR
   if (c.show_check && checks.length) {
     if (mode === 'print') {
       const boxNode = el('div', 'an-check');
-      boxNode.append(el('p', 'tk-subhead', 'Check your analogy'), analogyCheckList(checks));
+      boxNode.append(el('p', 'tk-subhead block-subtitle', 'Check your analogy'), analogyCheckList(checks));
       wrap.append(boxNode);
     } else {
       appendIf(
@@ -1710,10 +1763,10 @@ function renderTeacherNoteBlock(block: TeacherNoteBlock, mode: TkRenderMode): HT
   }
   aside.setAttribute('aria-label', block.content.title || 'Teacher note');
   const head = el('div', 'tk-note__head');
-  head.append(el('p', 'tk-note__title', block.content.title.trim() || 'Teacher note'), notePill());
+  head.append(el('p', 'tk-note__title block-subtitle', block.content.title.trim() || 'Teacher note'), notePill());
   const body = el('div', 'tk-note__body block-rich-text');
   body.innerHTML = sanitizeRichTextHtml(block.content.html);
-  if (!body.textContent?.trim()) body.append(el('p', 'tk-note__hint', 'Select the block to write your note.'));
+  if (!body.textContent?.trim()) body.append(el('p', 'tk-note__hint block-secondary', 'Select the block to write your note.'));
   aside.append(head, body);
   return aside;
 }

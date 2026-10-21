@@ -55,7 +55,11 @@ test("a visit photo loads from its signed URL without native lazy loading", asyn
   });
   try {
     view.show();
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    // Wait for the signed URL rather than a fixed delay, which flaked under a loaded full run.
+    const loaded = () => dom.window.document.querySelector(".fj-cover .food-photo")?.getAttribute("src");
+    for (let waited = 0; !loaded() && waited < 2000; waited += 20) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     const image = dom.window.document.querySelector(".fj-cover .food-photo");
     assert.ok(image);
     assert.notEqual(image.getAttribute("loading"), "lazy");

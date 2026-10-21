@@ -499,6 +499,24 @@ describe('mountAiPanel', () => {
     expect(acceptButton(mounted.host)).toBeUndefined();
   });
 
+  it('says on the card when Accept also turns the lesson into a Quiz, and passes set_mode on', async () => {
+    pollAiJobMock.mockResolvedValue(
+      workingJob({ agent: 'ann', status: 'done', proposal: { ...insertTwoHeadings, set_mode: 'quiz' } })
+    );
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Make a quiz');
+
+    await vi.waitFor(() => {
+      expect(mounted.host.querySelector('.ai-panel__proposal-mode')?.textContent).toBe(
+        'Accepting this also turns the lesson into a Quiz.'
+      );
+    });
+    [...mounted.host.querySelectorAll('button')].find((btn) => btn.textContent === 'Accept selected')?.click();
+    const applied = mounted.onAcceptProposal.mock.calls[0]?.[0] as AiProposal;
+    expect(applied).toMatchObject({ kind: 'insert_blocks', set_mode: 'quiz' });
+  });
+
   it('Accept selected applies only checked insert blocks', async () => {
     pollAiJobMock.mockResolvedValue(
       workingJob({ agent: 'ann', status: 'done', proposal: insertTwoHeadings })
@@ -682,6 +700,35 @@ describe('mountAiPanel', () => {
     expect(pollAiJobMock).toHaveBeenCalledWith('job_1', expect.anything());
     expect(mounted.host.textContent).toContain('Build a lesson');
     expect(mounted.host.textContent).not.toContain('Build again');
+    // The new message is not dropped: it waits in the box to send again.
+    expect(composer(mounted.host).input.value).toBe('Build again');
+  });
+
+  it('sends the new message when the conflicting job had already finished', async () => {
+    // Live, 21 Oct: the server's job list lagged a few seconds behind a finished
+    // job, so the next message got a 409 and was silently swapped for the old one.
+    writeLastAgentSlug('ann');
+    startAiJobMock
+      .mockRejectedValueOnce(new AiJobConflictError('job_old', 'working'))
+      .mockResolvedValueOnce({ id: 'job_2', status: 'working' });
+    pollAiJobMock.mockImplementation(async (id: string) =>
+      id === 'job_old'
+        ? workingJob({ id: 'job_old', agent: 'ann', status: 'done', message: 'Old question', response: 'Old answer' })
+        : workingJob({ id: 'job_2', agent: 'ann', status: 'done', message: 'New question', response: 'New answer' })
+    );
+
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'New question');
+
+    await vi.waitFor(() => {
+      expect(mounted.host.textContent).toContain('New answer');
+    });
+    expect(startAiJobMock).toHaveBeenCalledTimes(2);
+    expect(startAiJobMock.mock.calls[1]?.[0]).toMatchObject({ message: 'New question' });
+    expect(mounted.host.textContent).toContain('New question');
+    expect(mounted.host.textContent).not.toContain('Old question');
+    expect(composer(mounted.host).input.value).toBe('');
   });
 
   it('does not persist Aborted into the transcript when the request is cancelled', async () => {

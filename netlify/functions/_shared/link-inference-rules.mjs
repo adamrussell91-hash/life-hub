@@ -245,7 +245,7 @@ export const HENRY_INFERENCE_FIXTURES = {
     {
       person: {
         ref: 'shared:person:person_henry',
-        display_name: 'Henry McLennan',
+        display_name: 'Isla Emberly',
         aliases: ['Henry'],
         is_self: false
       },
@@ -259,7 +259,7 @@ export const HENRY_INFERENCE_FIXTURES = {
           endpoint: {
             ref: 'shared:organisation:org_sac',
             kind: 'organisation',
-            display_label: 'St. Aloysius College'
+            display_label: 'Tallowwood College'
           }
         }
       ]
@@ -272,7 +272,7 @@ export const HENRY_INFERENCE_FIXTURES = {
           endpoint: {
             ref: 'shared:organisation:org_sac',
             kind: 'organisation',
-            display_label: 'St. Aloysius College'
+            display_label: 'Tallowwood College'
           }
         }
       ]
@@ -282,7 +282,7 @@ export const HENRY_INFERENCE_FIXTURES = {
     {
       id: 'task_mentor_meet',
       ref: 'tasks:task:task_mentor_meet',
-      title: 'Set up mentoring meeting with Henry McLennan',
+      title: 'Set up mentoring meeting with Isla Emberly',
       body: '',
       status: 'open'
     }
@@ -292,7 +292,7 @@ export const HENRY_INFERENCE_FIXTURES = {
       id: 'proj_accreditation',
       ref: 'tasks:project:proj_accreditation',
       title: 'Accreditation Mentor',
-      body: 'Henry McLennan proficient pathway'
+      body: 'Isla Emberly proficient pathway'
     }
   ],
   events: []

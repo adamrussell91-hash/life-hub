@@ -330,6 +330,34 @@ describe('renderApplicationDetailView', () => {
     expect(canvas.textContent).toMatch(/Application action Task/);
     expect(canvas.querySelector('[data-task-link-submit="application_action"]')).toBeTruthy();
   });
+
+  it('adding an application action task swaps only the task panel', async () => {
+    const baseFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('action=link-task')) {
+        return Response.json({
+          ok: true,
+          data: {
+            application: sampleApplication({
+              application_action_operation: { operation_id: 'op_1', status: 'committed', task_id: 'task_9' }
+            })
+          }
+        });
+      }
+      return baseFetch(input, init);
+    });
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderApplicationDetailView(canvas, VALID_APPLICATION_ID);
+    const back = canvas.querySelector('a.btn--ghost');
+    const panel = canvas.querySelector('.application-detail__task-panels');
+    canvas.querySelector<HTMLInputElement>('[aria-label="Application action Task title"]')!.value = 'Ring referee';
+    canvas.querySelector<HTMLButtonElement>('[data-task-link-submit="application_action"]')!.click();
+    await vi.waitFor(() => expect(canvas.textContent).toContain('Application action Task task_9'));
+    expect(canvas.querySelector('.application-detail__task-panels')).not.toBe(panel);
+    expect(canvas.querySelector('a.btn--ghost')).toBe(back);
+    canvas.remove();
+  });
 });
 
 describe('renderCareerView', () => {
@@ -422,28 +450,28 @@ describe('renderCareerView', () => {
             status: 'ok',
             items: [
               {
-                display_label: 'St Pius X High School',
+                display_label: 'Wattle Grove High School',
                 role: 'English Teacher',
                 valid_from: '2021-01-25',
                 valid_to: '2024-08-16',
                 link_status: 'ended'
               },
               {
-                display_label: 'St Pius X High School',
+                display_label: 'Wattle Grove High School',
                 role: 'Psychology Teacher',
                 valid_from: '2023-01-23',
                 valid_to: '2024-08-16',
                 link_status: 'ended'
               },
               {
-                display_label: "St Aloysius' College",
+                display_label: "Tallowwood College",
                 role: 'Gifted Education Teacher',
                 valid_from: '2025-01-22',
                 valid_to: null,
                 link_status: 'current'
               },
               {
-                display_label: "St Aloysius' College",
+                display_label: "Tallowwood College",
                 role: 'Leader of Learning Enrichment',
                 valid_from: '2025-01-22',
                 valid_to: null,
@@ -453,25 +481,25 @@ describe('renderCareerView', () => {
           },
           employment_items: [
             {
-              display_label: 'St Pius X High School',
+              display_label: 'Wattle Grove High School',
               role: 'English Teacher',
               valid_from: '2021-01-25',
               valid_to: '2024-08-16'
             },
             {
-              display_label: 'St Pius X High School',
+              display_label: 'Wattle Grove High School',
               role: 'Psychology Teacher',
               valid_from: '2023-01-23',
               valid_to: '2024-08-16'
             },
             {
-              display_label: "St Aloysius' College",
+              display_label: "Tallowwood College",
               role: 'Gifted Education Teacher',
               valid_from: '2025-01-22',
               valid_to: null
             },
             {
-              display_label: "St Aloysius' College",
+              display_label: "Tallowwood College",
               role: 'Leader of Learning Enrichment',
               valid_from: '2025-01-22',
               valid_to: null
@@ -496,8 +524,8 @@ describe('renderCareerView', () => {
     expect(work?.textContent).toMatch(/Psychology Teacher/);
     expect(work?.textContent).toMatch(/Gifted Education Teacher/);
     expect(work?.textContent).toMatch(/Leader of Learning Enrichment/);
-    expect(work?.textContent).toMatch(/St Pius X/);
-    expect(work?.textContent).toMatch(/Aloysius/);
+    expect(work?.textContent).toMatch(/Wattle Grove/);
+    expect(work?.textContent).toMatch(/Tallowwood/);
     expect(work?.querySelectorAll('.relationship-timeline__entry').length).toBe(4);
     expect(canvas.querySelector('.career-river__svg-host')?.getAttribute('style') || '').toMatch(
       /pan-y/
@@ -507,7 +535,7 @@ describe('renderCareerView', () => {
     );
     expect(years.length).toBeGreaterThan(0);
     expect(years.every((y) => /^\d{4}$/.test(y || ''))).toBe(true);
-    // River is self-explanatory: labeled role bars below every span (one placement).
+    // Swimlanes: each label sits inside its bar or in free row space beside it.
     const roleLabelEls = [...canvas.querySelectorAll('[data-part="role-label"]')];
     const roleLabels = roleLabelEls.map((node) => node.textContent || '');
     expect(roleLabels.length).toBeGreaterThan(0);
@@ -516,7 +544,18 @@ describe('renderCareerView', () => {
     expect(roleLabels.join(' ')).toMatch(/Gifted Education/);
     expect(roleLabels.join(' ')).toMatch(/Leader of Learning/);
     expect(roleLabels.every((t) => t !== 'Leader of')).toBe(true);
-    expect(roleLabelEls.every((el) => el.getAttribute('data-place') === 'below')).toBe(true);
+    expect(
+      roleLabelEls.every((el) => ['inside', 'right', 'left'].includes(el.getAttribute('data-place') || ''))
+    ).toBe(true);
+    // Concurrent roles at one workplace get their own swimlane row.
+    const barYs = new Set(
+      [...canvas.querySelectorAll('[data-part="role-bar"]')].map((bar) => bar.getAttribute('y'))
+    );
+    expect(barYs.size).toBeGreaterThanOrEqual(3);
+    // No futures: starter branches and an Add a future action instead of a blank half.
+    expect(canvas.querySelectorAll('[data-part="starter-branch"]').length).toBe(2);
+    expect(canvas.querySelector('[data-part="starter-add"]')?.textContent).toBe('Add a future');
+    expect(canvas.querySelector('[data-part="add-role"]')?.textContent).toBe('Add a role');
     expect(roleLabels.every((t) => !t.includes('…') && !/\bof$/i.test(t.trim()))).toBe(true);
     expect(canvas.querySelectorAll('[data-part="role-bar"]').length).toBeGreaterThan(0);
     expect(canvas.querySelector('[data-part="trunk"]')).toBeTruthy();

@@ -64,20 +64,10 @@
   gap: var(--space-3);
 }
 
-.qz-eyebrow {
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .qz-drop__head {
   display: grid;
   gap: var(--space-1);
 }
-
-.qz-drop__prompt,
 .qz-player__prompt {
   margin: 0;
   font-size: var(--text-lg);
@@ -88,14 +78,18 @@
   overflow-wrap: anywhere;
 }
 
+.qz-drop__prompt {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .qz-h {
   margin: 0;
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
   color: var(--ink);
 }
-
-.qz-note,
 .qz-field__hint {
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
@@ -546,17 +540,14 @@
   justify-content: space-between;
   gap: var(--space-2);
 }
-
-.qz-card__marks {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  color: var(--muted);
-}
-
-.qz-card__prompt,
 .qz-sub__prompt {
   font-weight: var(--weight-semibold);
   color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.qz-card__prompt {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

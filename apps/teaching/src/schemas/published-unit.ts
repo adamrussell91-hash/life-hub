@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { BlockSchema } from './block';
+import { BlockSchema, LineStopSchema, NetworkLineSchema } from './block';
 import { CoverSchema } from './cover';
 
 export const PublishedUnitLessonSummarySchema = z.object({
   lesson_id: z.string().min(1),
-  title: z.string().min(1)
+  title: z.string().min(1),
+  line_stops: z.array(LineStopSchema).max(16).optional()
 });
 
 export const PublishedAnthologyItemSchema = z.object({
@@ -53,7 +54,9 @@ export const PublishedUnitSchema = z.object({
   cover: CoverSchema.optional(),
   blocks: z.array(BlockSchema).optional(),
   anthology: PublishedAnthologySchema.optional(),
-  outcome_ids: z.array(z.string().min(1)).max(24).optional()
+  outcome_ids: z.array(z.string().min(1)).max(24).optional(),
+  /** The subject's curriculum network lines, for the unit map. */
+  network_lines: z.array(NetworkLineSchema).max(24).optional()
 });
 
 export type PublishedUnitLessonSummary = z.infer<

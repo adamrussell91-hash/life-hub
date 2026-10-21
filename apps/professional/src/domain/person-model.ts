@@ -208,11 +208,13 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
     });
   }
 
+  const currentOrgCount = orgs.filter((e) => isCurrent(e.link)).length;
+  const moreRoles = currentOrgCount > 1 ? ` +${currentOrgCount - 1}` : '';
   const roleLine =
-    (jobTitle && primaryOrg ? `${jobTitle} · ${primaryOrg.endpoint.display_label}` : null) ??
+    (jobTitle && primaryOrg ? `${jobTitle} · ${primaryOrg.endpoint.display_label}${moreRoles}` : null) ??
     chips.find((c) => c.kind === 'relationship')?.label ??
     (primaryOrg
-      ? `${isCurrent(primaryOrg.link) ? 'At' : 'Formerly'} ${primaryOrg.endpoint.display_label}`
+      ? `${isCurrent(primaryOrg.link) ? 'At' : 'Formerly'} ${primaryOrg.endpoint.display_label}${isCurrent(primaryOrg.link) ? moreRoles : ''}`
       : 'No relationship on record');
 
   let ledgerYouOwe: PersonModelLedgerItem[];

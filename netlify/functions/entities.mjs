@@ -122,19 +122,22 @@ export function createEntitiesHandler(deps = {}) {
         if (parsed.error) return withCors(parsed.error, request, env);
         assertNoAccessFields(parsed.value);
 
-        if (action === 'update') {
-          let updated;
+        // People imported from Notion live only in GitHub until their first
+        // edit (or archive). Adopt them under the same id, then apply it.
+        const adoptingImported = async (write) => {
           try {
-            updated = await repo.updateFields({ ref, patch: parsed.value });
+            return await write();
           } catch (error) {
-            // People imported from Notion live only in GitHub until their
-            // first edit. Adopt them under the same id, then apply the edit.
             if (error?.code !== 'entity_not_found' || ref.kind !== 'person') throw error;
             const imported = await getPerson(ref.id, { env });
             if (!imported) throw error;
             await repo.adoptImportedIdentity({ kind: 'person', record: imported });
-            updated = await repo.updateFields({ ref, patch: parsed.value });
+            return write();
           }
+        };
+
+        if (action === 'update') {
+          const updated = await adoptingImported(() => repo.updateFields({ ref, patch: parsed.value }));
           return withCors(okResponse(200, projectEntity(ref.kind, updated)), request, env);
         }
 
@@ -143,12 +146,12 @@ export function createEntitiesHandler(deps = {}) {
           return withCors(errorResponse(400, 'invalid_action', 'Unsupported action.', false), request, env);
         }
 
-        const updated = await repo.transitionLifecycle({
+        const updated = await adoptingImported(() => repo.transitionLifecycle({
           ref,
           toStatus,
           retentionReason: parsed.value.retention_reason,
           retentionReviewAt: parsed.value.retention_review_at
-        });
+        }));
         return withCors(okResponse(200, projectEntity(ref.kind, updated)), request, env);
       }
 

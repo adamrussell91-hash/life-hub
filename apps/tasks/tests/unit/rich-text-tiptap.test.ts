@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mountRichTextTiptap } from '@/blocks/rich-text-tiptap';
+import { mountRichTextTiptap } from '@teaching/blocks/rich-text-tiptap';
 
 describe('mountRichTextTiptap', () => {
   afterEach(() => {

@@ -35,7 +35,29 @@ export async function mountHubAudioPlayer(audio, opts = {}) {
   if (!parent) return null;
   parent.insertBefore(controller, audio);
   controller.append(audio, bar);
+  measureUnknownDuration(audio);
   return { root: controller, audio };
+}
+
+/**
+ * Browser recordings (MediaRecorder WebM) carry no length, so the player would
+ * show no duration and a dead time bar. Seeking far past the end once makes the
+ * browser read to the end and report the real length; then return to the start.
+ * @param {HTMLAudioElement} audio
+ */
+export function measureUnknownDuration(audio) {
+  const check = () => {
+    if (audio.duration !== Infinity) return;
+    const settle = () => {
+      if (!Number.isFinite(audio.duration)) return;
+      audio.removeEventListener('durationchange', settle);
+      audio.currentTime = 0;
+    };
+    audio.addEventListener('durationchange', settle);
+    audio.currentTime = 1e101;
+  };
+  if (audio.readyState >= 1) check();
+  else audio.addEventListener('loadedmetadata', check, { once: true });
 }
 
 /**

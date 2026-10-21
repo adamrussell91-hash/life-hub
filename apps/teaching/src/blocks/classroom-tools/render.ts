@@ -32,7 +32,8 @@ export function renderDividerContent(block: DividerBlock, mode: RenderMode, ctx:
     viewer: viewerFor(mode),
     timerStack: block.content?.timer_stack ?? [],
     lessonId: ctx.lessonId,
-    pageBlocks: ctx.pageBlocks
+    pageBlocks: ctx.pageBlocks,
+    key: block.id
   });
   return host;
 }
@@ -49,7 +50,8 @@ export function renderClassroomToolsContent(block: ToolsBlock, mode: RenderMode,
     timerStack: block.content?.timer_stack ?? [],
     startTool: block.content?.start_tool,
     lessonId: ctx.lessonId,
-    pageBlocks: ctx.pageBlocks
+    pageBlocks: ctx.pageBlocks,
+    key: block.id
   });
   return host;
 }
@@ -59,9 +61,9 @@ export function renderCountdownContent(block: CountdownBlock, _mode: RenderMode,
   const { title, due_date, due_time, set_date, note } = block.content;
   const root = el('header', 'countdown');
   const text = el('div', 'countdown__text');
-  text.append(el('p', 'countdown__eyebrow', 'Assessment'));
-  text.append(el('h2', 'countdown__title', title.trim() || 'Assessment task'));
-  const dueLine = el('p', 'countdown__due');
+  text.append(el('p', 'countdown__eyebrow block-eyebrow', 'Assessment'));
+  text.append(el('h2', 'countdown__title block-title', title.trim() || 'Assessment task'));
+  const dueLine = el('p', 'countdown__due block-secondary');
   if (due_date) {
     const time = formatDueTime(due_time);
     dueLine.textContent = `Due ${formatDueDay(due_date)}${time ? `, ${time}` : ''}`;
@@ -69,21 +71,21 @@ export function renderCountdownContent(block: CountdownBlock, _mode: RenderMode,
     dueLine.textContent = 'Due date to be set';
   }
   text.append(dueLine);
-  if (note.trim()) text.append(el('p', 'countdown__note', note.trim()));
+  if (note.trim()) text.append(el('p', 'countdown__note block-body', note.trim()));
   root.append(text);
 
   const state = countdownState({ due_date, set_date }, today);
   const figure = el('div', 'countdown__figure');
   if (state.kind === 'upcoming') {
-    figure.append(el('span', 'countdown__n', String(state.days)), el('small', '', state.days === 1 ? 'day to go' : 'days to go'));
+    figure.append(el('span', 'countdown__n', String(state.days)), el('small', 'block-eyebrow', state.days === 1 ? 'day to go' : 'days to go'));
   } else if (state.kind === 'today') {
-    figure.append(el('span', 'countdown__n countdown__n--word', 'Today'), el('small', '', 'due today'));
+    figure.append(el('span', 'countdown__n countdown__n--word', 'Today'), el('small', 'block-eyebrow', 'due today'));
     root.classList.add('countdown--today');
   } else if (state.kind === 'past') {
-    figure.append(el('span', 'countdown__n countdown__n--word', 'Closed'), el('small', '', state.days === 1 ? 'due yesterday' : `due ${state.days} days ago`));
+    figure.append(el('span', 'countdown__n countdown__n--word', 'Closed'), el('small', 'block-eyebrow', state.days === 1 ? 'due yesterday' : `due ${state.days} days ago`));
     root.classList.add('countdown--past');
   } else {
-    figure.append(el('span', 'countdown__n', '–'), el('small', '', 'days to go'));
+    figure.append(el('span', 'countdown__n', '–'), el('small', 'block-eyebrow', 'days to go'));
   }
   root.append(figure);
 

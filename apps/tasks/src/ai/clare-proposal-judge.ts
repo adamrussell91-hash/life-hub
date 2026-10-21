@@ -7,7 +7,7 @@ import { parseAgentMutations, type AgentMutation } from '@/domain/agent-mutation
 import type { AgentProtocolSlug } from '@/domain/agent-protocol';
 import { buildHammondRebalanceSystem, proposalForDigest } from '@/domain/timeline-digest';
 import type { TaskDomain, TaskPriority } from '@/schemas/task';
-import { createEmbedBlock } from '@/blocks/create-block';
+import { createEmbedBlock } from '@teaching/blocks/create-block';
 
 const AGENT_NAMES: Record<AgentProtocolSlug, string> = {
   clare: 'Clare DeMind',

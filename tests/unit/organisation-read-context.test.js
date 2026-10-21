@@ -12,7 +12,7 @@ import { mergeOrganisationReadPreservingAdam } from '../../netlify/functions/_sh
 
 const ORG_REF = 'shared:organisation:organisation_00000000-0000-4000-8000-0000000000aa';
 
-function aloysiusFixtureContext() {
+function tallowwoodFixtureContext() {
   return assembleOrganisationReadContext({
     organisationRef: ORG_REF,
     structure: {
@@ -77,7 +77,7 @@ function memoryStore() {
 }
 
 test('Availability: context builder returns all six inputs for fixture', () => {
-  const context = aloysiusFixtureContext();
+  const context = tallowwoodFixtureContext();
   const keys = listContextInputKeys(context);
   assert.deepEqual(keys, [
     'structure',
@@ -96,7 +96,7 @@ test('Availability: context builder returns all six inputs for fixture', () => {
 });
 
 test('Delivery: structure block and three memberships reach final request string', () => {
-  const context = aloysiusFixtureContext();
+  const context = tallowwoodFixtureContext();
   const { finalRequest } = buildOrganisationReadRequestString(context);
   assert.match(finalRequest, /## STRUCTURE/);
   assert.match(finalRequest, /English faculty/);
@@ -116,7 +116,7 @@ test('Interpretation: instructions explain blocks and real_power source rule', (
     ANN_ORGANISATION_READ_INSTRUCTIONS,
     /real_power.*needs a meeting or note source/i
   );
-  const { instructions } = buildOrganisationReadRequestString(aloysiusFixtureContext());
+  const { instructions } = buildOrganisationReadRequestString(tallowwoodFixtureContext());
   assert.equal(instructions, ANN_ORGANISATION_READ_INSTRUCTIONS);
 });
 
@@ -147,7 +147,7 @@ test('Behaviour: meeting where deputy decides yields real_power naming the deput
 });
 
 test('Behaviour negative control: without meetings, real_power is not claimed', () => {
-  const context = aloysiusFixtureContext();
+  const context = tallowwoodFixtureContext();
   assert.equal(context.meetings.length, 0);
   assert.equal(deriveRealPowerThread(context), null);
 });

@@ -55,7 +55,8 @@ function lessonSummary(lesson, publishedIds) {
     ...(Array.isArray(lesson.outcome_ids) && lesson.outcome_ids.length
       ? { outcome_ids: lesson.outcome_ids }
       : {}),
-    ...(typeof lesson.pedagogical_mode === 'string' ? { pedagogical_mode: lesson.pedagogical_mode } : {})
+    ...(typeof lesson.pedagogical_mode === 'string' ? { pedagogical_mode: lesson.pedagogical_mode } : {}),
+    ...(Array.isArray(lesson.line_stops) && lesson.line_stops.length ? { line_stops: lesson.line_stops } : {})
   };
 }
 

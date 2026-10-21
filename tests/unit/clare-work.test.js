@@ -81,11 +81,11 @@ const LESSONS = [
   { id: 'l1', title: 'Year 10 essay', date: '2026-09-06', class_id: 'c1' }
 ];
 
-test('Clare workbench catalogues exactly 50 jobs and 25 tools', () => {
-  assert.equal(CLARE_JOBS.length, 50);
-  assert.equal(new Set(CLARE_JOBS.map(item => item.id)).size, 50);
+test('Clare workbench catalogues exactly 51 jobs and 26 tools', () => {
+  assert.equal(CLARE_JOBS.length, 51);
+  assert.equal(new Set(CLARE_JOBS.map(item => item.id)).size, 51);
   const schemas = clareWorkSchemas();
-  assert.equal(schemas.length, 25);
+  assert.equal(schemas.length, 26);
   for (const job of CLARE_JOBS) {
     assert.ok(isClareWorkTool(job.tool), job.tool);
   }

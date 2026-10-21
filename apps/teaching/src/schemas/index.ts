@@ -50,7 +50,13 @@ export {
   SectionBlockSchema,
   SectionLinkSchema,
   BlockSchema,
-  type Block
+  NetworkLineSchema,
+  LineStopSchema,
+  type Block,
+  type NetworkLine,
+  type NetworkLineMode,
+  type LineStop,
+  type NetworkNudges
 } from './block';
 export {
   LessonSchema,

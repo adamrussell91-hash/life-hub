@@ -12,6 +12,26 @@ export const config = { path: '/api/people/directory' };
 // that just changed something asks for `?fresh=1` to skip it.
 export const DIRECTORY_CACHE_TTL_MS = 20_000;
 
+// Every finished scan is also kept as one Blob, so a session's first open can
+// paint it in a fraction of a second (`?snapshot=1`, no scan) while a real
+// scan runs beside it. Derived and overwritten whole; never a source of truth.
+export const DIRECTORY_SNAPSHOT_KEY = 'people-directory/snapshot.json';
+
+async function readSnapshot(store) {
+  const saved = await store.get(DIRECTORY_SNAPSHOT_KEY, { type: 'json' });
+  if (!saved?.directory || typeof saved.as_of !== 'string') return null;
+  return { ...saved.directory, as_of: saved.as_of };
+}
+
+async function writeSnapshot(store, directory, asOf) {
+  try {
+    await store.setJSON(DIRECTORY_SNAPSHOT_KEY, { as_of: asOf.toISOString(), directory });
+  } catch (error) {
+    // A stale snapshot is only a slower first paint; never fail the scan.
+    console.warn('People directory snapshot write failed', error);
+  }
+}
+
 export function createPeopleDirectoryHandler(deps = {}) {
   let cached = null; // { at, data }
   let inflight = null; // { promise }
@@ -28,7 +48,11 @@ export function createPeopleDirectoryHandler(deps = {}) {
       }
       try {
         const nowValue = now();
-        const fresh = new URL(request.url).searchParams.has('fresh');
+        const params = new URL(request.url).searchParams;
+        if (params.has('snapshot')) {
+          return withCors(okResponse(200, await readSnapshot(store)), request, env);
+        }
+        const fresh = params.has('fresh');
         let data;
         if (!fresh && cached && nowValue.getTime() - cached.at < ttl) {
           data = cached.data;
@@ -45,7 +69,9 @@ export function createPeopleDirectoryHandler(deps = {}) {
                 fetchImpl: deps.fetchImpl,
                 includeStudents: true
               });
-              return assemble(peopleWithRelationships, { now: nowValue, includeStudents: true });
+              const directory = assemble(peopleWithRelationships, { now: nowValue, includeStudents: true });
+              await writeSnapshot(store, directory, nowValue);
+              return directory;
             })();
             inflight = promise;
             promise.then(

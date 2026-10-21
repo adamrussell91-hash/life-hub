@@ -9,7 +9,7 @@ import type { Accent } from './details';
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 export type ConceptMapView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
@@ -102,7 +102,8 @@ export function createConceptMapView(doc: Document = document): ConceptMapView {
         drawn.set(node.id, item);
       }
       if (isConcept) concept += 1;
-      item.classList.toggle('is-contested', node.state === 'contested');
+      const btn = item.querySelector('.ps-cmap__shape');
+      syncContested(item, node, btn, btn);
     }
     const content = conceptContent(run);
     const signature = JSON.stringify(content);

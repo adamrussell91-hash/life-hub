@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createPublishedLessonHandler } from '../../netlify/functions/published-lesson.mjs';
 import { createPublishedUnitHandler } from '../../netlify/functions/published-unit.mjs';
 import { createPublishedClassHandler } from '../../netlify/functions/published-class.mjs';
+import { createPublishedNetworkHandler } from '../../netlify/functions/published-network.mjs';
 import { createMediaFileHandler } from '../../netlify/functions/media-file.mjs';
 import { createHtmlAppAiHandler } from '../../netlify/functions/html-app-ai.mjs';
 
@@ -21,11 +22,14 @@ function memoryStore(entries = {}) {
       if (options.type === 'json') return value;
       return value;
     },
-    async getWithMetadata(key) {
+    async getWithMetadata(key, options = {}) {
       const value = map.get(key);
       if (value == null) return null;
-      if (value && typeof value === 'object' && 'data' in value) return value;
-      return { data: value, metadata: {} };
+      const stored = value && typeof value === 'object' && 'data' in value
+        ? value : { data: value, metadata: {} };
+      if (options.type === 'stream') return { ...stored, data: new Response(stored.data).body };
+      if (options.type === 'arrayBuffer') return { ...stored, data: await new Response(stored.data).arrayBuffer() };
+      return stored;
     },
     async list({ prefix }) {
       return {
@@ -278,6 +282,38 @@ test('media file streams large video blobs with the stored content type', async 
   assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3, 4]);
 });
 
+test('media file serves byte ranges so Safari can play and seek audio', async () => {
+  const bytes = new Uint8Array([10, 11, 12, 13, 14, 15]).buffer;
+  const handler = createMediaFileHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'media/voice-1': { id: 'voice-1', status: 'active', mime_type: 'audio/webm' },
+      'media_files/voice-1': { data: bytes, metadata: { contentType: 'audio/webm' } }
+    })
+  });
+  const url = 'https://api.adam-russell.com/api/media/voice-1/file';
+
+  const whole = await handler(jsonRequest(url));
+  assert.equal(whole.status, 200);
+  assert.equal(whole.headers.get('accept-ranges'), 'bytes');
+  assert.equal(whole.headers.get('content-length'), '6');
+
+  const part = await handler(jsonRequest(url, { headers: { range: 'bytes=2-3' } }));
+  assert.equal(part.status, 206);
+  assert.equal(part.headers.get('content-range'), 'bytes 2-3/6');
+  assert.deepEqual([...new Uint8Array(await part.arrayBuffer())], [12, 13]);
+
+  const open = await handler(jsonRequest(url, { headers: { range: 'bytes=4-' } }));
+  assert.equal(open.headers.get('content-range'), 'bytes 4-5/6');
+
+  const tail = await handler(jsonRequest(url, { headers: { range: 'bytes=-2' } }));
+  assert.deepEqual([...new Uint8Array(await tail.arrayBuffer())], [14, 15]);
+
+  const beyond = await handler(jsonRequest(url, { headers: { range: 'bytes=9-' } }));
+  assert.equal(beyond.status, 416);
+  assert.equal(beyond.headers.get('content-range'), 'bytes */6');
+});
+
 test('html-app-ai stays public, 503s without Blobs, and completes an enabled lane', async () => {
   const unbound = createHtmlAppAiHandler({
     env,
@@ -327,4 +363,58 @@ test('media file responses are nosniff', async () => {
   });
   const response = await handler(jsonRequest('https://api.adam-russell.com/api/media/f/file'));
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('published unit carries the subject lines and published lessons\' line stops only', async () => {
+  const handler = createPublishedUnitHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'subjects/subj-1': { id: 'subj-1', title: 'English', network_lines: [{ id: 'resp', mode: 'train', name: 'Responding', colour: 'wave', secret: 'x' }] },
+      'units/unit-1': { title: 'Unit 1', subject_id: 'subj-1', lesson_ids: ['lesson-a', 'lesson-b'] },
+      'lessons/lesson-a': { id: 'lesson-a', title: 'A', unit_id: 'unit-1', line_stops: [{ line_id: 'resp', level: 'mastered' }] },
+      'lessons/lesson-b': { id: 'lesson-b', title: 'B', unit_id: 'unit-1', line_stops: [{ line_id: 'resp' }] },
+      'published/lessons/lesson-a': { lesson_id: 'lesson-a', title: 'A', unit_id: 'unit-1' }
+    })
+  });
+  const body = await (await handler(jsonRequest('https://api.adam-russell.com/api/published/units/unit-1'))).json();
+  assert.deepEqual(body.data.network_lines, [{ id: 'resp', mode: 'train', name: 'Responding', colour: 'wave' }]);
+  assert.deepEqual(body.data.lessons, [{ lesson_id: 'lesson-a', title: 'A', line_stops: [{ line_id: 'resp', level: 'mastered' }] }]);
+});
+
+test('published network lists units with published lessons, in scope order, without lesson titles', async () => {
+  const handler = createPublishedNetworkHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'classes/class-1': { id: 'class-1', status: 'active', subject_id: 'subj-1' },
+      'subjects/subj-1': {
+        id: 'subj-1', title: 'English', scope_id: 'scope-1',
+        network_lines: [{ id: 'resp', mode: 'train', name: 'Responding', colour: 'wave' }, { id: 'oral', mode: 'light_rail', name: 'Oral', colour: 'amber' }],
+        network_nudges: { 'unit-2': { dx: 4, dy: 0 }, 'unit-gone': { dx: 1, dy: 1 } }
+      },
+      'scope_sequences/scope-1': { id: 'scope-1', timeline_items: [
+        { kind: 'unit', unit_id: 'unit-2', start_week: 1, order: 0 },
+        { kind: 'unit', unit_id: 'unit-1', start_week: 6, order: 1 },
+        { kind: 'unit', unit_id: 'unit-3', start_week: 9, order: 2 }
+      ] },
+      'units/unit-1': { id: 'unit-1', title: 'Later', subject_id: 'subj-1', lesson_ids: ['lesson-a'] },
+      'units/unit-2': { id: 'unit-2', title: 'First', subject_id: 'subj-1', lesson_ids: ['lesson-b', 'lesson-c'], blocks: [
+        { id: 'm', block_type: 'curriculum_lines', visibility: 'student_teacher', content: { version: 2, rail_stops: [{ id: 'r', line_id: 'oral', kind: 'stop', label: '' }], gates: [], nudges: {}, terminus: { label: 'Task' } } }
+      ] },
+      'units/unit-3': { id: 'unit-3', title: 'Unpublished', subject_id: 'subj-1', lesson_ids: ['lesson-d'] },
+      'lessons/lesson-a': { id: 'lesson-a', title: 'A', line_stops: [{ line_id: 'resp', level: 'introduced' }] },
+      'lessons/lesson-b': { id: 'lesson-b', title: 'B', line_stops: [{ line_id: 'resp', level: 'mastered' }] },
+      'lessons/lesson-c': { id: 'lesson-c', title: 'C draft only', line_stops: [{ line_id: 'oral' }] },
+      'lessons/lesson-d': { id: 'lesson-d', title: 'D' },
+      'published/lessons/lesson-a': { lesson_id: 'lesson-a', title: 'A' },
+      'published/lessons/lesson-b': { lesson_id: 'lesson-b', title: 'B' }
+    })
+  });
+  const response = await handler(jsonRequest('https://api.adam-russell.com/api/published/networks/class-1'));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.data.units.map(u => u.id), ['unit-2', 'unit-1']);
+  assert.deepEqual(body.data.units[0].lessons, [{ id: 'lesson-b', line_stops: [{ line_id: 'resp', level: 'mastered' }] }]);
+  assert.deepEqual(body.data.units[0].rail_line_ids, ['oral']);
+  assert.deepEqual(body.data.nudges, { 'unit-2': { dx: 4, dy: 0 } });
+  assert.equal(JSON.stringify(body.data).includes('C draft only'), false);
 });

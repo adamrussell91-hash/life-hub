@@ -36,7 +36,9 @@ export function createCareerFuturesHandler(deps = {}) {
           return withCors(okResponse(200, { futures: await repo.listFutures() }), request, env);
         }
         if (request.method === 'POST') {
-          const body = await readJsonObject(request);
+          const parsed = await readJsonObject(request);
+          if (parsed.error) return withCors(parsed.error, request, env);
+          const body = parsed.value;
           if (url.searchParams.get('action') === 'draft' || body?.action === 'draft') {
             const apiKey =
               typeof env?.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '';
@@ -61,8 +63,9 @@ export function createCareerFuturesHandler(deps = {}) {
           if (!id || !isValidFutureId(id)) {
             return withCors(errorResponse(400, 'invalid_future_id', 'id required.'), request, env);
           }
-          const body = await readJsonObject(request);
-          const future = await repo.updateFuture(id, body);
+          const parsed = await readJsonObject(request);
+          if (parsed.error) return withCors(parsed.error, request, env);
+          const future = await repo.updateFuture(id, parsed.value);
           return withCors(okResponse(200, { future }), request, env);
         }
         return withCors(methodNotAllowed('GET, POST, PATCH, OPTIONS'), request, env);

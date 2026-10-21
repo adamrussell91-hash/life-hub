@@ -150,7 +150,7 @@ The umbrella has its own tidy. `netlify/functions/ai-jobs-tick-scheduled.mjs` us
 - `workers/class-site/` → `class.adam-russell.com`
 - `apps/knowledge/worker/` → `knowledge-tidy.adam-russell.com`, R2 binding `knowledge-hub-archive`
 - `tools/grove-previews/`, `tools/voice-lab/`
-- Root dependencies that are actually imported: BlockSuite (whiteboard), TipTap (teaching, tasks, knowledge), Uppy (teaching uploads), Annotorious / PhotoSwipe / pdf.js / WaveSurfer / jscanify (design kit and knowledge capture), MapLibre (travel and the places map)
+- Root dependencies that are actually imported: Excalidraw + React (whiteboard, packages/whiteboard), TipTap (teaching, tasks, knowledge), Uppy (teaching uploads), Annotorious / PhotoSwipe / pdf.js / WaveSurfer / jscanify (design kit and knowledge capture), MapLibre (travel and the places map)
 
 Scheduled Netlify functions (no browser button, still live): watch radar, people-remember, promise nudges, ties infer, garage-home mail scan, Ann teaching forecast, calendar ghosts, career scan, Clare weekly judgment, day sense, AI jobs tick.
 

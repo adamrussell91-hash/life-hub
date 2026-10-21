@@ -12,7 +12,7 @@ test('assemblePeopleDirectory skips self and builds org groups', () => {
       {
         person: {
           id: PERSON_ID,
-          display_name: 'Henry McLennan',
+          display_name: 'Isla Emberly',
           is_self: false,
           lifecycle_status: 'active',
           created_at: '2026-09-01T00:00:00.000Z',
@@ -34,7 +34,7 @@ test('assemblePeopleDirectory skips self and builds org groups', () => {
             endpoint: {
               ref: `shared:organisation:${ORG_ID}`,
               kind: 'organisation',
-              display_label: 'St. Aloysius College'
+              display_label: 'Tallowwood College'
             },
             direction: 'outgoing'
           }
@@ -56,8 +56,8 @@ test('assemblePeopleDirectory skips self and builds org groups', () => {
     { now: '2026-09-26T00:00:00.000Z' }
   );
   assert.equal(data.counts.people, 1);
-  assert.equal(data.people[0].display_name, 'Henry McLennan');
-  assert.equal(data.people[0].organisation.display_name, 'St. Aloysius College');
+  assert.equal(data.people[0].display_name, 'Isla Emberly');
+  assert.equal(data.people[0].organisation.display_name, 'Tallowwood College');
   assert.equal(data.organisations.length, 1);
 });
 
@@ -91,7 +91,7 @@ test('assemblePeopleDirectory collapses hermit name twins', () => {
       {
         person: {
           id: 'person_c',
-          display_name: 'p/Carmel Cordaro',
+          display_name: 'p/Hope Tamberlin',
           is_self: false,
           lifecycle_status: 'active',
           created_at: '2026-01-03T00:00:00.000Z',
@@ -108,8 +108,8 @@ test('assemblePeopleDirectory collapses hermit name twins', () => {
     data.people.filter((p) => p.display_name === 'Edward Lenzner and Ethan Lum').length,
     1
   );
-  assert.equal(data.people.find((p) => p.id === 'person_c').display_name, 'Carmel Cordaro');
-  assert.equal(data.people.find((p) => p.id === 'person_c').initials, 'CC');
+  assert.equal(data.people.find((p) => p.id === 'person_c').display_name, 'Hope Tamberlin');
+  assert.equal(data.people.find((p) => p.id === 'person_c').initials, 'HT');
 });
 
 test('parseOrgCrestSignRequest accepts PNG under 512KB and rejects oversized', () => {
@@ -147,7 +147,7 @@ test('assemblePeopleDirectory hides Communications students even if collection l
       {
         person: {
           id: PERSON_ID,
-          display_name: 'Henry McLennan',
+          display_name: 'Isla Emberly',
           is_self: false,
           lifecycle_status: 'active',
           created_at: '2026-09-01T00:00:00.000Z',
@@ -174,7 +174,7 @@ test('assemblePeopleDirectory hides Communications students even if collection l
     { now: '2026-09-26T12:00:00.000Z' }
   );
   assert.equal(data.people.length, 1);
-  assert.equal(data.people[0].display_name, 'Henry McLennan');
+  assert.equal(data.people[0].display_name, 'Isla Emberly');
   assert.ok(!data.people.some((p) => p.display_name === 'Year 10 Student'));
 });
 
@@ -190,7 +190,7 @@ test('assemblePeopleDirectory lists students separately when asked — never mix
   const data = assemblePeopleDirectory(
     [
       {
-        person: { ...base, id: PERSON_ID, display_name: 'Henry McLennan', ref: `shared:person:${PERSON_ID}` },
+        person: { ...base, id: PERSON_ID, display_name: 'Isla Emberly', ref: `shared:person:${PERSON_ID}` },
         relationships: []
       },
       {
@@ -222,7 +222,7 @@ test('assemblePeopleDirectory lists students separately when asked — never mix
     ],
     { now: '2026-09-26T12:00:00.000Z', includeStudents: true }
   );
-  assert.deepEqual(data.people.map((p) => p.display_name), ['Henry McLennan']);
+  assert.deepEqual(data.people.map((p) => p.display_name), ['Isla Emberly']);
   assert.equal(data.people[0].person_type, 'colleague');
   assert.deepEqual(data.students.map((p) => p.display_name), ['Ava Tran', 'Year 10 Student']);
   assert.ok(data.students.every((p) => p.person_type === 'student'));
@@ -236,7 +236,7 @@ test('assemblePeopleDirectory leads with the job title at their current workplac
       {
         person: {
           id: PERSON_ID,
-          display_name: 'Henry McLennan',
+          display_name: 'Isla Emberly',
           is_self: false,
           lifecycle_status: 'active',
           created_at: '2026-09-01T00:00:00.000Z',
@@ -252,7 +252,7 @@ test('assemblePeopleDirectory leads with the job title at their current workplac
               status: 'current',
               metadata: {}
             },
-            endpoint: { kind: 'organisation', ref: 'shared:organisation:org-1', display_label: 'St Aloysius' },
+            endpoint: { kind: 'organisation', ref: 'shared:organisation:org-1', display_label: 'Tallowwood' },
             direction: 'outgoing'
           }
         ]
@@ -260,6 +260,26 @@ test('assemblePeopleDirectory leads with the job title at their current workplac
     ],
     { now: '2026-09-26T12:00:00.000Z' }
   );
-  assert.equal(data.people[0].role_line, 'Head of Department Learning Enrichment · St Aloysius');
+  assert.equal(data.people[0].role_line, 'Head of Department Learning Enrichment · Tallowwood');
   assert.equal(data.people[0].job_title, 'Head of Department Learning Enrichment');
+});
+
+test('assemblePeopleDirectory carries lifecycle_status so archived people can be hidden', () => {
+  const person = (id, name, lifecycle_status) => ({
+    person: {
+      id, display_name: name, is_self: false, lifecycle_status,
+      created_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-20T00:00:00.000Z',
+      ref: `shared:person:${id}`
+    },
+    relationships: []
+  });
+  const data = assemblePeopleDirectory([
+    person(PERSON_ID, 'Isla Emberly', 'active'),
+    person('person_00000000-0000-4000-8000-000000000003', 'Rowan Pike', 'archived'),
+    person('person_00000000-0000-4000-8000-000000000004', 'Gone Person', 'deleted')
+  ]);
+  assert.deepEqual(
+    data.people.map((p) => [p.display_name, p.lifecycle_status]),
+    [['Isla Emberly', 'active'], ['Rowan Pike', 'archived']]
+  );
 });

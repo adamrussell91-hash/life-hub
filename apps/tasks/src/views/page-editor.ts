@@ -2,8 +2,8 @@ import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task'
 import { isProjectArchived, type Project, type ProjectStatus, type QualityBar } from '@/schemas/project';
 import type { Program } from '@/schemas/program';
 import type { Block } from '@/schemas/block';
-import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
-import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
+import { nextBlockIdFactory } from '@teaching/teacher/lesson-canvas/drop';
+import { mountBlockCanvas, type BlockCanvasHandle } from '@teaching/teacher/lesson-canvas/mount-page';
 import { tasksApi } from '@/services/client-api';
 import { formatRelativeUpdated, projectChildTasks, projectProgress, statusLabel } from '@/domain/cards';
 import type { ExcursionTemplate } from '@/schemas/templates';
@@ -32,6 +32,7 @@ import {
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 import { projectNextActionHealth } from '@/views/projects';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
+import { problemSolverChips } from '@/views/problem-solver/link-chips';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -88,6 +89,7 @@ function mountEngine(
   const handle = mountBlockCanvas(canvasHost, {
     blocks,
     idFactory: nextBlockIdFactory('block', blocks),
+    editOnClick: true,
     onChange
   });
 
@@ -200,6 +202,7 @@ function paintTaskPage(
   const card = el('article', 'hub-card page-card');
   const head = el('header', 'task-card__head');
   head.append(backLink('#/board', '← Dashboard'));
+  head.append(problemSolverChips({ kind: 'task', id: task.id }));
 
   const fields = el('div', 'page-card__fields hub-toolbar');
   const status = pageFilter(
@@ -423,6 +426,7 @@ function paintProjectPage(
   const card = el('article', 'hub-card page-card');
   const head = el('header', 'task-card__head');
   head.append(backLink('#/projects', '← Projects'));
+  head.append(problemSolverChips({ kind: 'project', id: project.id }));
 
   const fields = el('div', 'page-card__fields hub-toolbar');
   const status = pageFilter(

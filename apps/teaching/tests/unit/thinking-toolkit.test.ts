@@ -94,7 +94,23 @@ describe('Thinking Toolkit library', () => {
       expect(libraryItem(preset.skill)?.kind).toBe('skill');
       for (const id of preset.tools) expect(libraryItem(id)?.kind).toBe('tool');
     }
-    expect(Object.keys(DISTINCTION_PAIR_BANK)).toEqual(['level1', 'level2', 'level3', 'maths', 'inquiry']);
+    expect(Object.keys(DISTINCTION_PAIR_BANK)).toEqual(['level1', 'level3', 'maths', 'inquiry']);
+  });
+
+  it('loads a saved distinction block that chose the retired abstract pairs', () => {
+    const block = createBlock('toolkit_tool', 'legacy_1');
+    const saved = { ...block, content: { ...(block.content as object), pair_level: 'level2' } };
+    const parsed = BlockSchema.parse(saved);
+    expect((parsed.content as { pair_level: string }).pair_level).toBe('none');
+  });
+
+  it('renders a saved distinction block that still holds the retired abstract pairs', () => {
+    const block = createBlock('toolkit_tool', 'legacy_2');
+    const saved = { ...block, content: { ...(block.content as object), pair_level: 'level2' } } as typeof block;
+    const el = renderBlock(saved, 'student');
+    expect(el.querySelector('.block-unavailable')).toBeNull();
+    expect(el.querySelector('.tk-fork')).not.toBeNull();
+    expect(el.textContent).not.toContain('Pairs to try');
   });
 
   it('gives every item a plain description and something students can use', () => {
@@ -167,7 +183,7 @@ describe('Thinking Toolkit blocks', () => {
     expect(labels.indexOf('Thinking Toolkit')).toBeLessThan(labels.indexOf('Learning'));
     expect(BLOCK_GROUPS.find((group) => group.label === 'Thinking Toolkit')?.types).toEqual([
       'thinking_intentions', 'toolkit_skill', 'toolkit_tool', 'toolkit_value', 'thinking_move',
-      'question_quadrant', 'concept_features', 'thinking_reflection'
+      'question_quadrant', 'concept_features', 'continuum_line', 'thinking_reflection'
     ]);
     expect(BLOCK_GROUPS.find((group) => group.label === 'Basic')?.types).toContain('teacher_note');
     expect(HOMEPAGE_BLOCK_GROUPS.some((group) => group.label === 'Thinking Toolkit')).toBe(false);

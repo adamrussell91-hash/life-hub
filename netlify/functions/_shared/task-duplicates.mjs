@@ -4,7 +4,7 @@
  * Two strengths:
  * - 'same_title': exact or near-exact wording of an open task → never create it again.
  * - 'same_person': different wording but the same named person (e.g. "Reply to Joseph" vs
- *   "Joseph Histon — Notes from meeting"). Could be genuine separate work (two James Blair
+ *   "Wynn Fernleigh — Notes from meeting"). Could be genuine separate work (two Mae Coolabah
  *   tasks), so it is never blocked — it must go to a Confirm card flagged for Adam.
  */
 

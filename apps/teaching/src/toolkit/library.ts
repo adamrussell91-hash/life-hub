@@ -706,7 +706,7 @@ export const THINKING_MOVE_PRESETS: ReadonlyArray<{
 
 /** Distinction pair bank: word pairs to practise distinctions with. */
 export const DISTINCTION_PAIR_BANK: Record<
-  'level1' | 'level2' | 'level3' | 'maths' | 'inquiry',
+  'level1' | 'level3' | 'maths' | 'inquiry',
   { label: string; pairs: string[] }
 > = {
   level1: {
@@ -729,33 +729,6 @@ export const DISTINCTION_PAIR_BANK: Record<
       'slippers / shoes',
       'a nail / a screw',
       'a friend / a sibling'
-    ]
-  },
-  level2: {
-    label: 'Level 2, abstract',
-    pairs: [
-      'disagree / differ',
-      'to cheat / to steal',
-      'being selfish / being greedy',
-      'being friendly / being a friend',
-      'knowing / believing',
-      'a phone call / an email',
-      'a hoax / a lie',
-      'a fort / a prison',
-      'a bus / a train',
-      'lying / tricking',
-      'joking / bullying',
-      'music / sound',
-      'to want / to need',
-      'being caring / being kind',
-      'being clever / being strong',
-      'to love / to like',
-      'to care / to love',
-      'to care / to worry',
-      'a dog / a chair',
-      'to hear / to listen',
-      'a drawing / a scribble',
-      'house / home'
     ]
   },
   level3: {

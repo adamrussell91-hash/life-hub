@@ -3,6 +3,7 @@ import { defineConfig, type Plugin } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { groveAnimalCatalogue } from '../../scripts/lib/grove-animal-catalogue.mjs';
+import { appSrcAlias } from '../../scripts/lib/app-src-alias.mjs';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,8 +58,16 @@ function groveAssetsPlugin(): Plugin {
 
 export default defineConfig({
   base: process.env.UMBRELLA_SPA === '1' ? '/tasks/' : '/',
-  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
-  plugins: [mockApiPlugin(), groveAssetsPlugin()],
+  // Blocks are Teaching's engine, used as it is: `@teaching/x` reaches it and
+  // its own `@/x` imports stay inside apps/teaching/src.
+  plugins: [
+    appSrcAlias({
+      self: 'tasks',
+      apps: { tasks: path.resolve(__dirname, 'src'), teaching: path.resolve(__dirname, '../teaching/src') }
+    }),
+    mockApiPlugin(),
+    groveAssetsPlugin()
+  ],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

@@ -6,6 +6,24 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 4173
+    },
+    {
+      "name": "tasks-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "apps/tasks", "vite", "apps/tasks", "--port", "5175", "--strictPort"],
+      "port": 5175
+    },
+    {
+      "name": "teaching-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "apps/teaching", "vite", "apps/teaching", "--port", "5173", "--strictPort"],
+      "port": 5173
+    },
+    {
+      "name": "professional-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "apps/professional", "vite", "apps/professional", "--port", "5176", "--strictPort"],
+      "port": 5176
     }
   ]
 }

@@ -1,8 +1,9 @@
 /**
- * Types for the Tasks block engine modules Professional imports through
- * `@tasks/*`. Vite resolves these to apps/tasks/src (see vite.config.ts).
+ * Types for the block engine modules Professional imports through `@tasks/*`
+ * and `@teaching/*`. Vite resolves these to apps/tasks/src and
+ * apps/teaching/src (see vite.config.ts).
  * TypeScript reads this file instead, so Professional's typecheck never walks
- * Tasks' own `@/` imports. Add an export here when Professional needs one.
+ * those apps' own `@/` imports. Add an export here when Professional needs one.
  */
 export type InsertMenuValue = string;
 
@@ -32,7 +33,10 @@ export function mountBlockCanvas(
     onChange: (blocks: Block[]) => void;
     idFactory: () => string;
     editable?: boolean;
+    editOnClick?: boolean;
   }
 ): BlockCanvasHandle;
 
 export function nextBlockIdFactory(prefix: string, blocks: Block[]): () => string;
+
+export function setClassroomExtras(on: boolean): void;

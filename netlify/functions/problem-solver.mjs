@@ -44,6 +44,7 @@ export function createProblemSolverHandler(deps = {}) {
       const service = await problemSolverServiceFor(env, deps);
       if (request.method === 'GET') {
         const url = new URL(request.url);
+        if (url.searchParams.has('linked')) return withCors(okResponse(200, { sessions: await service.linked(owner(env), url.searchParams.get('linked')) }), request, env);
         if (url.searchParams.has('list')) return withCors(okResponse(200, { sessions: await service.list(owner(env)) }), request, env);
         return withCors(okResponse(200, { session: await service.get(owner(env), url.searchParams.get('id')) }), request, env);
       }
@@ -52,10 +53,15 @@ export function createProblemSolverHandler(deps = {}) {
       if (parsed.error) return withCors(parsed.error, request, env);
       const body = parsed.value ?? {};
       const session = body.create ? await service.create(owner(env), body.create) : await service.action(owner(env), body);
-      if (session.runner.status !== 'queued') return withCors(okResponse(200, { session }), request, env);
+      const runId = body.action === 'escalate' ? session.lightning?.escalatedTo ?? null : session.runner.status === 'queued' ? session.id : null;
+      if (!runId) return withCors(okResponse(200, { session }), request, env);
       let kicked = false;
-      try { kicked = await (deps.invokeRun ?? defaultInvokeRun)(request, session.id, env, deps.fetchImpl ?? fetch); } catch { kicked = false; }
+      try { kicked = await (deps.invokeRun ?? defaultInvokeRun)(request, runId, env, deps.fetchImpl ?? fetch); } catch { kicked = false; }
       if (kicked) return withCors(okResponse(202, { session }), request, env);
+      if (runId !== session.id) {
+        await service.run(owner(env), runId);
+        return withCors(okResponse(200, { session }), request, env);
+      }
       return withCors(okResponse(200, { session: await service.run(owner(env), session.id) }), request, env);
     } catch (error) {
       return fail(error, request, env);

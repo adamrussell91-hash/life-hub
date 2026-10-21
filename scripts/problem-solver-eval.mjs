@@ -1,35 +1,28 @@
-// scripts/problem-solver-eval.mjs
-// Usage: ANTHROPIC_API_KEY=... node scripts/problem-solver-eval.mjs
+// Runs the live evaluation cases (scripts/problem-solver-eval-cases.mjs) against the real coach.
+// Usage: ANTHROPIC_API_KEY=... node scripts/problem-solver-eval.mjs [name filter]
+// Check the runner without a key: PS_EVAL_STUB=1 node scripts/problem-solver-eval.mjs
+//   swaps the model coach for a stub that always returns the same clarify reply, so the
+//   run prints a line per case and exits 1 because the stub fails most cases.
 import { anthropicModel, createModelCoach, wordCount } from '../netlify/functions/_shared/problem-solver/coach.mjs';
-import { acceptSuggestion, applyCoachTurn, createSession, say } from '../netlify/functions/_shared/problem-solver/session.mjs';
+import { CASES, judge, prepare } from './problem-solver-eval-cases.mjs';
 
-let n = 0;
-const deps = { now: () => new Date().toISOString(), newId: () => `eval-${(n += 1)}` };
-const coach = createModelCoach(anthropicModel(process.env));
+const STUB_REPLY = {
+  verdict: 'clarify',
+  message: 'Thanks for that. Could you tell me a little more about what you mean, with one concrete example from the last few weeks?',
+  node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, proposeTasks: [], proposeReview: null, lightning: null
+};
 
-async function inFiveWhys(problem) {
-  let s = createSession({ text: problem }, deps);
-  s = applyCoachTurn(s, { verdict: 'accept', message: 'x', node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: { goal: 'Work handed in on time', whatIsTrue: 'Half the class missed the last two deadlines', whatCanBeDone: 'Change how deadlines are set and checked' }, model: { id: 'seven_step', reason: 'Default.' }, suggestion: { kind: 'next_tool', tool: 'five_whys', reason: 'One symptom.' }, summary: null, exitObjection: null }, deps);
-  s = acceptSuggestion(s, deps);
-  s = applyCoachTurn(s, await coach(s), deps);
-  return s;
-}
-
-const CASES = [
-  { name: 'vague cause', answer: 'Because students are lazy.', expect: 'challenge' },
-  { name: 'perception as fact', answer: 'Everyone knows the deadlines are unfair.', expect: 'challenge' },
-  { name: 'premature solution', answer: 'We should just add a reminder app.', expect: 'challenge' },
-  { name: 'strong answer', answer: 'Half the class missed the last two deadlines for the Year 9 essay, set on a Friday and due the following Monday.', expect: 'accept' }
-];
+const coach = process.env.PS_EVAL_STUB ? async () => STUB_REPLY : createModelCoach(anthropicModel(process.env));
+const filter = process.argv[2]?.toLowerCase();
+const cases = filter ? CASES.filter((c) => c.name.toLowerCase().includes(filter)) : CASES;
 
 let failures = 0;
-for (const testCase of CASES) {
-  let s = await inFiveWhys('Year 9 students hand in work late.');
-  s = say(s, testCase.answer, deps);
-  const turn = await coach(s);
-  const words = wordCount(turn.message);
-  const ok = turn.verdict === testCase.expect && words >= 15 && words <= 60;
-  if (!ok) failures += 1;
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${testCase.name}: ${turn.verdict} (${words} words) ${turn.skillsMissing.join(',')}\n  ${turn.message}`);
+for (const testCase of cases) {
+  const reply = await coach(prepare(testCase));
+  const reason = judge(testCase, reply);
+  if (reason) failures += 1;
+  const suggestion = reply.suggestion?.kind ?? 'none';
+  console.log(`${reason ? `FAIL ${testCase.name}: ${reason}` : `PASS ${testCase.name}`}\n  verdict ${reply.verdict}, ${wordCount(reply.message)} words, suggestion ${suggestion}\n  ${reply.message}`);
 }
+console.log(`${cases.length - failures}/${cases.length} passed`);
 process.exitCode = failures ? 1 : 0;

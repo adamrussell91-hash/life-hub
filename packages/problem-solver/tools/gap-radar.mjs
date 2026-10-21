@@ -15,6 +15,12 @@ export const gapRadar = Object.freeze({
   name: 'Gap analysis (advanced)',
   kind: 'diagnostic',
   when: 'Several dimensions of the gap that can each be scored 1 to 10 and tracked over time.',
+  step: 'define',
+  failureModes: [
+    'Topics that overlap, so scores double count.',
+    'Scores given with no reason or evidence.',
+    'An inconsistent scale between snapshots, so progress cannot be compared.'
+  ],
   steps: [
     ...GAP_STEPS.slice(0, 3),
     { id: 'score', title: 'Score each topic', prompt: 'For each topic, give the current state and the objective a rating from 1 to 10, with 10 a perfect score. Rescore later to track progress.' }
@@ -35,6 +41,17 @@ export const gapRadar = Object.freeze({
       if (!list.every((n) => Number.isInteger(n) && n >= 1 && n <= 10)) return 'Scores run from 1 to 10.';
     }
     return null;
+  },
+  /** Where snapshots live on the run (kept as `radar` for v1 data). */
+  scoreKey: 'radar',
+  /** The score fields this tool keeps from a payload. */
+  pickScores(payload) {
+    return { current: payload?.current, objective: payload?.objective };
+  },
+  awaiting(run) {
+    return countSlots(run, 'axis') >= 3 && !(run.radar?.snapshots?.length)
+      ? 'The person scores each topic with the Score each topic button; ask them to, and wait.'
+      : null;
   },
   complete(run) {
     return countSlots(run, 'axis') >= 3 && (run.radar?.snapshots?.length ?? 0) >= 1;

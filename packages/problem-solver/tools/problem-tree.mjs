@@ -8,6 +8,13 @@ export const problemTree = Object.freeze({
   name: 'Problem tree',
   kind: 'diagnostic',
   when: 'Several causes and effects that need sorting, possibly interacting.',
+  step: 'define',
+  failureModes: [
+    'More than one focal problem on the trunk.',
+    'Effects listed as causes, or causes as effects.',
+    'Vague causes with no who, what, where or when.',
+    'Solutions slipped in as causes ("no new software").'
+  ],
   steps: [
     { id: 'state', title: 'State the problem', prompt: 'Clearly state the problem in general terms. This becomes the base or trunk of the tree.' },
     { id: 'causes_effects', title: 'Establish causes and effects', prompt: 'Identify causes of the problem; these become the roots. Then list their effects or impacts above the problem; these become the branches. Who, what, where, when, why, how.' },

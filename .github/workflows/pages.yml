@@ -40,6 +40,13 @@ jobs:
           set -o pipefail
           cd apps/tasks
           npx vitest run 2>&1 | tee ../../tasks-vitest-output.log
+      - name: Install Teaching Hub dependencies
+        run: npm ci --ignore-scripts --prefix apps/teaching
+      - name: Teaching Hub vitest
+        run: |
+          set -o pipefail
+          cd apps/teaching
+          npx vitest run tests/unit 2>&1 | tee ../../teaching-vitest-output.log
       - name: Upload test log on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -48,6 +55,7 @@ jobs:
           path: |
             test-output.log
             tasks-vitest-output.log
+            teaching-vitest-output.log
           if-no-files-found: ignore
 
   build:

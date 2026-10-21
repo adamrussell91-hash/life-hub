@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderPeoplePage } from '@/views/people';
 import { parseRoute, personRoute, peopleRoute } from '@/app/router';
+import { clearScheduleReadCache } from '@/api/schedule-read-cache';
 
 const PERSON_ID = 'person_00000000-0000-4000-8000-000000000001';
 
@@ -27,6 +28,7 @@ describe('people redesign Phase 1 routes', () => {
 describe('renderPeoplePage (W2 real entry)', () => {
   beforeEach(() => {
     document.body.replaceChildren();
+    history.replaceState(null, '', '#/people');
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo) => {
@@ -37,13 +39,13 @@ describe('renderPeoplePage (W2 real entry)', () => {
               {
                 id: PERSON_ID,
                 ref: `shared:person:${PERSON_ID}`,
-                display_name: 'Henry McLennan',
+                display_name: 'Isla Emberly',
                 initials: 'HM',
                 role_line: 'Mentee',
                 relationship_roles: [{ role: 'mentee', label: 'Mentee', current: true }],
                 organisation: {
                   ref: 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002',
-                  display_name: 'St. Aloysius College',
+                  display_name: 'Tallowwood College',
                   monogram: 'SAC',
                   logo_key: null,
                   current: true
@@ -71,7 +73,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
               schema_version: 1,
               id: PERSON_ID,
               kind: 'person',
-              display_name: 'Henry McLennan',
+              display_name: 'Isla Emberly',
               sort_name: null,
               aliases: [],
               lifecycle_status: 'active',
@@ -91,7 +93,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
         if (url.includes('/api/people/brief')) {
           return jsonResponse({
             header: {
-              person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Henry McLennan', href: null },
+              person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Isla Emberly', href: null },
               role: null,
               organisation: null,
               next_interaction: null
@@ -202,7 +204,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
     document.body.append(canvas);
     const loading = renderPeoplePage(canvas, {selectedId: PERSON_ID});
     try {
-      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__name')?.textContent).toBe('Henry McLennan'), {timeout:300});
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__name')?.textContent).toBe('Isla Emberly'), {timeout:300});
       canvas.querySelector<HTMLButtonElement>('.people-pane__edit')!.click();
       expect(canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')?.hidden).toBe(false);
       expect(canvas.querySelector('[data-section="ledger"] .people-pane__loading')).toBeTruthy();
@@ -230,6 +232,80 @@ describe('renderPeoplePage (W2 real entry)', () => {
     const canvas = document.createElement('div');
     await renderPeoplePage(canvas);
     expect(canvas.textContent).toContain('New workplace');
+  });
+
+  describe('first open of a session', () => {
+    const SNAPSHOT_AT = '2026-10-20T03:14:00.000Z';
+
+    function withSnapshot(fresh: (original: () => Promise<Response>) => Promise<Response>) {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.includes('/api/people/directory?snapshot=1')) {
+          const body = await (await original(input, init)).json();
+          body.data.people[0].display_name = 'Saved Copy';
+          return jsonResponse({ ...body.data, as_of: SNAPSHOT_AT });
+        }
+        if (url.includes('/api/people/directory?fresh=1')) return fresh(() => original(input, init));
+        return original(input, init);
+      });
+    }
+
+    it('paints the saved copy with an as-of note, then swaps in the fresh scan', async () => {
+      let release!: () => void;
+      withSnapshot(async (load) => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return load();
+      });
+      const canvas = document.createElement('div');
+      const loading = renderPeoplePage(canvas);
+      try {
+        await vi.waitFor(() => expect(canvas.textContent).toContain('Saved Copy'));
+        expect(canvas.querySelector('.people-page__count')?.textContent).toMatch(/Updating… \(as of .+\)/);
+        release();
+        await loading;
+        expect(canvas.textContent).toContain('Isla Emberly');
+        expect(canvas.textContent).not.toContain('Saved Copy');
+        expect(canvas.querySelector('.people-page__count')?.textContent).toBe('1 person · 1 organisation');
+      } finally { release?.(); await loading; }
+    });
+
+    it('keeps the saved copy when the fresh scan fails', async () => {
+      let fail!: () => void;
+      withSnapshot(async () => {
+        await new Promise<void>((resolve) => { fail = resolve; });
+        return new Response(JSON.stringify({ ok: false, error: { code: 'internal_error', message: 'Scan failed', retryable: true } }), { status: 500 });
+      });
+      const canvas = document.createElement('div');
+      const loading = renderPeoplePage(canvas);
+      try {
+        await vi.waitFor(() => expect(canvas.textContent).toContain('Saved Copy'));
+        fail();
+        await loading;
+        expect(canvas.textContent).toContain('Saved Copy');
+        expect(canvas.querySelector('.people-page__count')?.textContent).toMatch(/Couldn't refresh, showing .+/);
+      } finally { fail?.(); await loading; }
+    });
+
+    it('ignores a saved copy that arrives after the fresh scan', async () => {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      let releaseSnapshot!: () => void;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        if (String(input).includes('/api/people/directory?snapshot=1')) {
+          await new Promise<void>((resolve) => { releaseSnapshot = resolve; });
+          return jsonResponse({ people: [], organisations: [], counts: { people: 0, organisations: 0 }, as_of: SNAPSHOT_AT });
+        }
+        return original(input, init);
+      });
+      const canvas = document.createElement('div');
+      await renderPeoplePage(canvas);
+      releaseSnapshot();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(canvas.textContent).toContain('Isla Emberly');
+      expect(canvas.querySelector('.people-page__count')?.textContent).toBe('1 person · 1 organisation');
+    });
   });
 
   it('renders the ledger independently and keeps an open edit form when Remember finishes', async () => {
@@ -314,7 +390,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
 
   it('merging a selected duplicate removes the deleted profile from the pane', async () => {
     const original = vi.mocked(fetch).getMockImplementation()!;
-    const action = {kind:'twin',remove:{id:PERSON_ID,ref:`shared:person:${PERSON_ID}`,name:'Henry McLennan'},into:[{id:'survivor',ref:'shared:person:survivor',name:'Henry McLennan'}],student:false,links:1,blocked:null};
+    const action = {kind:'twin',remove:{id:PERSON_ID,ref:`shared:person:${PERSON_ID}`,name:'Isla Emberly'},into:[{id:'survivor',ref:'shared:person:survivor',name:'Isla Emberly'}],student:false,links:1,blocked:null};
     let merged=false;
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const url=String(input);
@@ -363,7 +439,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);
     await renderPeoplePage(canvas, { selectedId: PERSON_ID });
-    const edit = canvas.querySelector<HTMLButtonElement>('button.people-pane__edit, [aria-label="Edit Henry McLennan"]');
+    const edit = canvas.querySelector<HTMLButtonElement>('button.people-pane__edit, [aria-label="Edit Isla Emberly"]');
     expect(edit).toBeTruthy();
     const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]');
     expect(form).toBeTruthy();
@@ -389,5 +465,507 @@ describe('renderPeoplePage (W2 real entry)', () => {
     const today = canvas.querySelector('.people-page__today');
     expect(today).toBeTruthy();
     expect(today?.textContent).toMatch(/You usually meet Henry after lunch|Today/);
+  });
+
+  describe('people profiles: add, archive, delete', () => {
+    const NEW_ID = 'person_00000000-0000-4000-8000-0000000000aa';
+    const ORG_REF = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002';
+
+    function entity(id: string, name: string, extra: Record<string, unknown> = {}) {
+      return {
+        schema_version: 1, id, kind: 'person', display_name: name, sort_name: null, aliases: [],
+        lifecycle_status: 'active', is_self: false, retention_reason: null, retention_review_at: null,
+        created_at: '2026-10-20T00:00:00.000Z', updated_at: '2026-10-20T00:00:00.000Z',
+        ref: `shared:person:${id}`, ...extra
+      };
+    }
+
+    function lifecycleCalls(): string[] {
+      return vi.mocked(fetch).mock.calls
+        .filter(([, init]) => init?.method === 'PATCH')
+        .map(([input]) => new URL(String(input), 'https://x.test').searchParams.get('action') ?? '')
+        .filter((a) => ['archive', 'activate', 'deidentify', 'delete'].includes(a));
+    }
+
+    /** Wraps the default stub: `status` drives Isla's lifecycle in directory + overview. */
+    function stubLifecycle(state: { status: string; isSelf?: boolean }) {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (init?.method === 'PATCH' && url.includes('/api/entities?')) {
+          const action = new URL(url, 'https://x.test').searchParams.get('action');
+          state.status = ({ archive: 'archived', activate: 'active', deidentify: 'deidentified', delete: 'deleted' } as Record<string, string>)[action ?? ''] ?? state.status;
+          return jsonResponse(entity(PERSON_ID, 'Isla Emberly', { lifecycle_status: state.status }));
+        }
+        const response = await original(input, init);
+        if (url.includes('/api/people/directory')) {
+          const body = await response.json();
+          body.data.people = state.status === 'deleted' ? [] : body.data.people.map((p: Record<string, unknown>) => ({ ...p, lifecycle_status: state.status }));
+          return jsonResponse(body.data);
+        }
+        if (url.includes('/api/entities/overview')) {
+          const body = await response.json();
+          body.data.entity = { ...body.data.entity, lifecycle_status: state.status, is_self: Boolean(state.isSelf) };
+          return jsonResponse(body.data);
+        }
+        return response;
+      });
+    }
+
+    const rowFor = (canvas: HTMLElement, id: string) => canvas.querySelector(`a.people-page__row[href^="#/people/${id}"]`);
+    const button = (canvas: HTMLElement, text: string) =>
+      [...canvas.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === text);
+
+    it('Add closes the form, shows the toast and opens the person before the directory reload finishes', async () => {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      let created = false;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (init?.method === 'POST' && /\/api\/entities$/.test(url)) {
+          created = true;
+          return jsonResponse(entity(NEW_ID, 'Noor Vale'));
+        }
+        if (init?.method === 'POST') return jsonResponse({});
+        if (created && url.includes('/api/people/directory')) await held;
+        if (url.includes('/api/entities/overview') && url.includes(encodeURIComponent(NEW_ID))) {
+          const body = await (await original(input, init)).json();
+          return jsonResponse({ ...body.data, entity: entity(NEW_ID, 'Noor Vale') });
+        }
+        return original(input, init);
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      try {
+        button(canvas, 'Add person')!.click();
+        const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Add person"]')!;
+        form.querySelector<HTMLInputElement>('input[aria-label="Name"]')!.value = 'Noor Vale';
+        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        await vi.waitFor(() => {
+          expect(canvas.querySelector<HTMLElement>('.people-page__add-host')!.hidden).toBe(true);
+          expect(canvas.querySelector('.people-toast')?.textContent).toContain('Added Noor Vale');
+          expect(canvas.querySelector('[data-section="header"] .people-pane__name')?.textContent).toBe('Noor Vale');
+        });
+        expect(rowFor(canvas, NEW_ID)?.classList.contains('is-on')).toBe(true);
+        expect(form.querySelector<HTMLInputElement>('input[aria-label="Name"]')!.value).toBe('');
+        expect(button(canvas, 'Open')).toBeTruthy();
+      } finally {
+        release();
+      }
+    });
+
+    it('Undo on the added toast archives the new person', async () => {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (init?.method === 'POST' && /\/api\/entities$/.test(url)) return jsonResponse(entity(NEW_ID, 'Noor Vale'));
+        if (init?.method === 'PATCH') return jsonResponse(entity(NEW_ID, 'Noor Vale', { lifecycle_status: 'archived' }));
+        return original(input, init);
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      button(canvas, 'Add person')!.click();
+      const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Add person"]')!;
+      form.querySelector<HTMLInputElement>('input[aria-label="Name"]')!.value = 'Noor Vale';
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      await vi.waitFor(() => expect(button(canvas, 'Undo')).toBeTruthy());
+      button(canvas, 'Undo')!.click();
+      await vi.waitFor(() => {
+        expect(lifecycleCalls()).toEqual(['archive']);
+        expect(rowFor(canvas, NEW_ID)).toBeNull();
+        expect(canvas.querySelector('.people-toast')?.textContent).toContain('Archived Noor Vale');
+      });
+    });
+
+    it('Archive hides the row, Show archived reveals it, and Restore brings them back', async () => {
+      const state = { status: 'active' };
+      stubLifecycle(state);
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      canvas.querySelector<HTMLButtonElement>('[aria-label="More actions"]')!.click();
+      button(canvas, 'Archive person')!.click();
+      await vi.waitFor(() => {
+        expect(rowFor(canvas, PERSON_ID)).toBeNull();
+        expect(canvas.querySelector('.people-toast')?.textContent).toContain('Archived Isla Emberly');
+      });
+      button(canvas, 'Filter 0')!.click();
+      canvas.querySelector<HTMLInputElement>('input[aria-label="Show archived"]')!.checked = true;
+      button(canvas, 'Apply')!.click();
+      const row = rowFor(canvas, PERSON_ID) as HTMLAnchorElement;
+      expect(row.classList.contains('is-archived')).toBe(true);
+      expect(row.textContent).toContain('Archived');
+      row.click();
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__archived')).toBeTruthy());
+      expect(canvas.querySelector('[aria-label="More actions"]')).toBeNull();
+      button(canvas, 'Restore')!.click();
+      await vi.waitFor(() => {
+        expect(lifecycleCalls()).toEqual(['archive', 'activate']);
+        expect(canvas.querySelector('.people-pane__archived')).toBeNull();
+        expect(rowFor(canvas, PERSON_ID)?.classList.contains('is-archived')).toBe(false);
+      });
+    });
+
+    it('Delete permanently needs the typed name and runs deidentify then delete', async () => {
+      const state = { status: 'archived' };
+      stubLifecycle(state);
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      await vi.waitFor(() => expect(canvas.querySelector('.people-pane__archived')).toBeTruthy());
+      button(canvas, 'Delete permanently')!.click();
+      const dialog = canvas.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')!;
+      expect(dialog.textContent).toContain('can’t be undone');
+      const confirm = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Delete permanently')!;
+      const input = dialog.querySelector<HTMLInputElement>('input')!;
+      expect(confirm.disabled).toBe(true);
+      input.value = 'Isla';
+      input.dispatchEvent(new Event('input'));
+      expect(confirm.disabled).toBe(true);
+      input.value = ' isla  emberly ';
+      input.dispatchEvent(new Event('input'));
+      expect(confirm.disabled).toBe(false);
+      confirm.click();
+      await vi.waitFor(() => {
+        expect(lifecycleCalls()).toEqual(['deidentify', 'delete']);
+        expect(canvas.textContent).toContain('Select someone from the directory.');
+        expect(canvas.querySelector('[role="dialog"][aria-modal="true"]')).toBeNull();
+      });
+    });
+
+    it('the self profile offers no archive or delete', async () => {
+      stubLifecycle({ status: 'active', isSelf: true });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      expect(canvas.querySelector('[data-section="header"] .people-pane__name')).toBeTruthy();
+      const items = [...canvas.querySelectorAll('.person-menu__item')].map((b) => b.textContent);
+      expect(items).toEqual(['Update from LinkedIn', 'Check for links']);
+      expect(button(canvas, 'Archive person')).toBeUndefined();
+      expect(button(canvas, 'Delete permanently')).toBeUndefined();
+    });
+  });
+
+  describe('people profiles: roles editor', () => {
+    const ORG = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002';
+    const UNI = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000003';
+    const roleEntry = (id: string, type: string, ref: string, label: string, extra: Record<string, unknown> = {}) => ({
+      link: { id, relationship_type: type, status: 'current', temporal_mode: 'period', role: null, context_key: null, occurred_at: null,
+        valid_from: null, valid_to: null, source_ref: `shared:person:${PERSON_ID}`, target_ref: ref, metadata: {}, ...extra },
+      endpoint: { ref, kind: 'organisation', display_label: label },
+      direction: 'outgoing'
+    });
+
+    function stubRoles() {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      const roleCalls: Array<Record<string, unknown>> = [];
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/api/people/roles')) {
+          const body = JSON.parse(String(init?.body));
+          roleCalls.push(body);
+          return jsonResponse({ link: { id: 'new' }, chart_synced: true });
+        }
+        if (url.includes('/api/entities/search')) {
+          return jsonResponse({ groups: { organisation: [{ ref: UNI, kind: 'organisation', display_label: 'Marrow University', supporting_label: null, href: null }] } });
+        }
+        const response = await original(input, init);
+        if (url.includes('/api/entities/overview')) {
+          const body = await response.json();
+          body.data.current_relationships = [
+            roleEntry('r1', 'employee_at', ORG, 'Tallowwood College', { role: 'Head of English', valid_from: '2022-02-01T00:00:00.000Z' }),
+            roleEntry('r2', 'member_of', UNI, 'Marrow University', { role: 'Council member', import_source: 'notion' })
+          ];
+          body.data.historical_relationships = [
+            roleEntry('r3', 'employee_at', UNI, 'Marrow University', { status: 'ended', role: 'Tutor', valid_from: '2016-01-01T00:00:00.000Z', valid_to: '2019-01-01T00:00:00.000Z' })
+          ];
+          return jsonResponse(body.data);
+        }
+        return response;
+      });
+      return roleCalls;
+    }
+
+    const rolesBox = (canvas: HTMLElement) => canvas.querySelector<HTMLElement>('[data-section="roles"]')!;
+    const rowOf = (canvas: HTMLElement, id: string) => rolesBox(canvas).querySelector<HTMLElement>(`[data-link-id="${id}"]`)!;
+    const btn = (root: HTMLElement, text: string) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === text);
+
+    it('lists roles with ranges; imported roles have no Remove; End and Remove post to the roles endpoint', async () => {
+      const calls = stubRoles();
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      expect(rowOf(canvas, 'r1').textContent).toContain('Head of English');
+      expect(rowOf(canvas, 'r1').textContent).toContain('Tallowwood College · Feb 2022 – now');
+      expect(rowOf(canvas, 'r3').textContent).toContain('2016 – 2019');
+      expect(btn(rowOf(canvas, 'r2'), 'Remove')).toBeUndefined();
+      expect(btn(rowOf(canvas, 'r3'), 'End')).toBeUndefined();
+
+      btn(rowOf(canvas, 'r1'), 'End')!.click();
+      await vi.waitFor(() => expect(calls).toEqual([{ action: 'end', person_ref: `shared:person:${PERSON_ID}`, link_id: 'r1' }]));
+
+      await vi.waitFor(() => expect(btn(rowOf(canvas, 'r3'), 'Remove')).toBeTruthy());
+      btn(rowOf(canvas, 'r3'), 'Remove')!.click();
+      btn(rowOf(canvas, 'r3'), 'Yes')!.click();
+      await vi.waitFor(() => expect(calls.at(-1)).toEqual({ action: 'remove', person_ref: `shared:person:${PERSON_ID}`, link_id: 'r3' }));
+    });
+
+    it('Edit changes the role and dates; Add education picks an institution', async () => {
+      const calls = stubRoles();
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+
+      btn(rowOf(canvas, 'r1'), 'Edit')!.click();
+      const form = rolesBox(canvas).querySelector<HTMLElement>('.roles-editor__form')!;
+      expect(form.querySelector<HTMLInputElement>('[aria-label="From"]')!.value).toBe('2022-02');
+      form.querySelector<HTMLInputElement>('[aria-label="Role"]')!.value = 'Deputy Principal';
+      btn(form, 'Save')!.click();
+      await vi.waitFor(() => expect(calls[0]).toEqual({
+        action: 'edit', person_ref: `shared:person:${PERSON_ID}`, link_id: 'r1',
+        role: 'Deputy Principal', valid_from: '2022-02-01T00:00:00.000Z', valid_to: null
+      }));
+
+      // The person reloads after a save, which redraws the editor.
+      await vi.waitFor(() => expect(rolesBox(canvas).querySelector('.roles-editor__form')).toBeNull());
+      btn(rolesBox(canvas), '+ Add education')!.click();
+      const add = rolesBox(canvas).querySelector<HTMLElement>('.roles-editor__form')!;
+      const institution = add.querySelector<HTMLInputElement>('[aria-label="Institution"]')!;
+      institution.focus();
+      institution.value = 'Marrow';
+      institution.dispatchEvent(new Event('input', { bubbles: true }));
+      await vi.waitFor(() => expect(add.querySelector('.entity-picker__option')).toBeTruthy(), { timeout: 1500 });
+      add.querySelector<HTMLButtonElement>('.entity-picker__option')!.click();
+      add.querySelector<HTMLInputElement>('[aria-label="Qualification"]')!.value = 'BA (Hons)';
+      add.querySelector<HTMLInputElement>('[aria-label="From"]')!.value = '2010';
+      add.querySelector<HTMLInputElement>('[aria-label="To"]')!.value = '2013';
+      btn(add, 'Add education')!.click();
+      await vi.waitFor(() => expect(calls.at(-1)).toEqual({
+        action: 'add', person_ref: `shared:person:${PERSON_ID}`, organisation_ref: UNI, relationship_type: 'studied_at',
+        role: 'BA (Hons)', valid_from: '2010-01-01T00:00:00.000Z', valid_to: '2013-01-01T00:00:00.000Z'
+      }));
+    });
+
+    it('the header lists every current role, keeps two controls, and the timeline merges career and touchpoints', async () => {
+      stubRoles();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.includes('/api/observations')) {
+          return jsonResponse({ observations: [{ id: 'o1', about_ref: `shared:person:${PERSON_ID}`, text: 'Met at the Literacy Forum. Sharp on phonics.', occurred_at: '2026-05-14T00:00:00.000Z', source: 'manual', linked_ref: null }] });
+        }
+        const response = await original(input, init);
+        if (url.includes('/api/entities/overview')) {
+          const body = await response.json();
+          body.data.timeline = [{ id: 'm1', kind: 'meeting', label: 'Coffee catch-up', date: '2026-03-12T00:00:00.000Z', href: null }];
+          return jsonResponse(body.data);
+        }
+        return response;
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      const header = canvas.querySelector<HTMLElement>('[data-section="header"]')!;
+      expect([...header.querySelectorAll('.person-header__role-text')].map((li) => li.textContent)).toEqual([
+        'Head of English, Tallowwood College',
+        'Council member, Marrow University'
+      ]);
+      expect(header.querySelector('.person-header__warmth')?.textContent).toMatch(/Warming|Cooling|Cold/);
+      expect(header.querySelector('.people-pane__chip--organisation, .people-pane__chip--relationship')).toBeNull();
+      const controls = header.querySelector('.person-header__controls')!;
+      expect([...controls.children].map((c) => c.className)).toEqual(['person-icon-btn people-pane__edit', 'person-menu']);
+      expect(controls.querySelector('[aria-label="Edit Isla Emberly"]')).toBeTruthy();
+      await vi.waitFor(() => expect(header.querySelector('.person-header__met')?.textContent).toMatch(/^Met at the Literacy Forum · /));
+
+      const timeline = canvas.querySelector<HTMLElement>('[data-section="timeline"]')!;
+      expect(canvas.textContent).not.toContain('Your relationship so far');
+      expect([...timeline.querySelectorAll('.person-timeline__year-label')].map((n) => n.textContent)).toEqual(['2026', '2022', '2016', 'Undated']);
+      const rows = [...timeline.querySelectorAll<HTMLElement>('.person-timeline__row')];
+      expect(rows.map((r) => r.dataset.kind)).toEqual(['touchpoint', 'role', 'role', 'role']);
+      expect(rows[0]!.querySelector('.person-timeline__text')!.textContent).toBe('Coffee catch-up · 12 Mar');
+      expect(rows[1]!.querySelector('.person-timeline__text')!.textContent).toBe('Head of English, Tallowwood College · 2022 – now');
+      expect(rows[2]!.querySelector('.person-timeline__text')!.textContent).toBe('Tutor, Marrow University · 2016 – 2019');
+    });
+
+    it('a bad date shows an error and saves nothing', async () => {
+      const calls = stubRoles();
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      btn(rowOf(canvas, 'r1'), 'Edit')!.click();
+      const form = rolesBox(canvas).querySelector<HTMLElement>('.roles-editor__form')!;
+      form.querySelector<HTMLInputElement>('[aria-label="From"]')!.value = 'last spring';
+      btn(form, 'Save')!.click();
+      expect(rolesBox(canvas).querySelector('.roles-editor__status')?.textContent).toBe('Dates look like 2016 or 2016-03.');
+      expect(calls).toEqual([]);
+    });
+  });
+
+  describe('people profiles: paste from LinkedIn', () => {
+    const NEW_ID = 'person_00000000-0000-4000-8000-0000000000bb';
+    const ORG = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002';
+    const PARSED = {
+      name: 'Noor Vale',
+      headline: 'Head of English',
+      about: 'Teacher and writer.',
+      rows: [
+        { id: 'row_1', section: 'current', relationship_type: 'employee_at', title: 'Head of English', organisation: { name: 'Tallowwood College', ref: ORG, status: 'matched' }, start: '2022-02', end: null, current: true, diff: 'new', link_id: null },
+        { id: 'row_2', section: 'current', relationship_type: 'member_of', title: 'Chair', organisation: { name: 'Reading Circle', ref: null, status: 'new_organisation' }, start: '2020', end: null, current: true, diff: 'new', link_id: null },
+        { id: 'row_3', section: 'past', relationship_type: 'employee_at', title: 'Tutor', organisation: { name: 'Old School', ref: null, status: 'new_organisation' }, start: '2016', end: '2019', current: false, diff: 'new', link_id: null },
+        { id: 'row_4', section: 'education', relationship_type: 'studied_at', title: 'BA', organisation: { name: 'Marrow University', ref: null, status: 'new_organisation' }, start: '2010', end: '2013', current: false, diff: 'new', link_id: null }
+      ]
+    };
+
+    function stubPaste(parse: (body: Record<string, unknown>) => Response | Promise<Response>) {
+      clearScheduleReadCache();
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      const writes: string[] = [];
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/api/people/linkedin-parse')) return parse(JSON.parse(String(init?.body)));
+        if (init?.method === 'POST' && /\/api\/entities$/.test(url)) {
+          const body = JSON.parse(String(init.body));
+          writes.push(`${body.kind}:${body.display_name}`);
+          return body.kind === 'person'
+            ? jsonResponse({ schema_version: 1, id: NEW_ID, kind: 'person', display_name: body.display_name, sort_name: null, aliases: [], lifecycle_status: 'active', is_self: false, retention_reason: null, retention_review_at: null, created_at: '2026-10-20T00:00:00.000Z', updated_at: '2026-10-20T00:00:00.000Z', ref: `shared:person:${NEW_ID}` })
+            : jsonResponse({ id: 'organisation_x', kind: 'organisation', display_name: body.display_name, ref: `shared:organisation:new_${body.display_name.replace(/\s/g, '_')}` });
+        }
+        if (url.endsWith('/api/people/roles')) {
+          const body = JSON.parse(String(init?.body));
+          writes.push(`${body.action}:${body.organisation_ref ?? body.link_id}:${body.role ?? ''}`);
+          return jsonResponse({ link: { id: 'l' }, chart_synced: true });
+        }
+        if (url.endsWith('/api/observations') && init?.method === 'POST') {
+          writes.push(`observation:${JSON.parse(String(init.body)).text}`);
+          return jsonResponse({ observation: {}, created: true });
+        }
+        if (url.includes('/api/entities/overview') && url.includes(encodeURIComponent(NEW_ID))) {
+          const body = await (await original(input, init)).json();
+          return jsonResponse({ ...body.data, entity: { ...body.data.entity, id: NEW_ID, display_name: 'Noor Vale', ref: `shared:person:${NEW_ID}` } });
+        }
+        return original(input, init);
+      });
+      return writes;
+    }
+
+    const btn = (root: ParentNode, text: string) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === text);
+    async function openPaste(canvas: HTMLElement) {
+      btn(canvas, 'Add person')!.click();
+      const area = canvas.querySelector<HTMLTextAreaElement>('textarea[aria-label="LinkedIn profile text"]')!;
+      area.value = 'Noor Vale · Head of English at Tallowwood College';
+      area.dispatchEvent(new Event('input'));
+      btn(canvas, 'Read profile')!.click();
+    }
+
+    it('reads a paste into a ticked review card; unticked rows are left out; orgs, then person, then links', async () => {
+      const writes = stubPaste(() => jsonResponse(PARSED));
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      await openPaste(canvas);
+      const card = await vi.waitFor(() => {
+        const found = canvas.querySelector<HTMLElement>('[aria-label="Review LinkedIn details"]');
+        if (!found) throw new Error('no card');
+        return found;
+      });
+      expect([...card.querySelectorAll('.linkedin-review__h')].map((h) => h.textContent)).toEqual(['Current roles', 'Past work', 'Education', 'About']);
+      expect([...card.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every((c) => c.checked)).toBe(true);
+      expect(card.querySelector('[data-row-id="row_2"] .linkedin-review__pill')?.textContent).toBe('new organisation');
+      expect(card.querySelector('[data-row-id="row_1"] .linkedin-review__pill')?.textContent).toBe('matched');
+      expect(btn(card, 'Add Noor with 5 items')).toBeTruthy();
+      expect(canvas.querySelector<HTMLElement>('form[aria-label="Add person"]')!.closest<HTMLElement>('[hidden]')).toBeTruthy();
+
+      const tutor = card.querySelector<HTMLInputElement>('[data-row-id="row_3"] input')!;
+      tutor.checked = false;
+      tutor.dispatchEvent(new Event('change', { bubbles: true }));
+      btn(card, 'Add Noor with 4 items')!.click();
+
+      await vi.waitFor(() => expect(canvas.querySelector('.people-toast')?.textContent).toContain('Added Noor Vale'));
+      expect(writes.slice(0, 3)).toEqual(['organisation:Reading Circle', 'organisation:Marrow University', 'person:Noor Vale']);
+      expect(writes.slice(3).sort()).toEqual([
+        `add:${ORG}:Head of English`,
+        'add:shared:organisation:new_Marrow_University:BA',
+        'add:shared:organisation:new_Reading_Circle:Chair',
+        'observation:LinkedIn paste: Teacher and writer.'
+      ].sort());
+      expect(writes.some((w) => w.includes('Old School'))).toBe(false);
+      await vi.waitFor(() => expect(canvas.querySelector('[data-section="header"] .people-pane__name')?.textContent).toBe('Noor Vale'));
+      expect(canvas.querySelector<HTMLElement>('.people-page__add-host')!.hidden).toBe(true);
+    });
+
+    it('Back to paste returns to the paste box; Esc closes the panel', async () => {
+      stubPaste(() => jsonResponse(PARSED));
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      await openPaste(canvas);
+      await vi.waitFor(() => expect(btn(canvas, 'Back to paste')).toBeTruthy());
+      btn(canvas, 'Back to paste')!.click();
+      expect(canvas.querySelector('[aria-label="Review LinkedIn details"]')).toBeNull();
+      expect(canvas.querySelector<HTMLElement>('.add-person-panel__paste')!.hidden).toBe(false);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(canvas.querySelector<HTMLElement>('.people-page__add-host')!.hidden).toBe(true);
+    });
+
+    it('shows the not-set-up and unreadable messages, and the manual form still works', async () => {
+      let code = 'linkedin_parse_unconfigured';
+      stubPaste(() => new Response(JSON.stringify({ ok: false, error: { code, message: 'x', retryable: false } }), { status: code === 'linkedin_parse_unconfigured' ? 503 : 502 }));
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas);
+      await openPaste(canvas);
+      await vi.waitFor(() => expect(canvas.querySelector('.linkedin-paste__status')?.textContent).toMatch(/^Paste reading is not set up/));
+      expect(btn(canvas, 'Read profile')!.disabled).toBe(true);
+      expect(canvas.querySelector<HTMLElement>('form[aria-label="Add person"]')!.closest('[hidden]')).toBeNull();
+      code = 'linkedin_parse_failed';
+      const again = document.createElement('div');
+      document.body.append(again);
+      await renderPeoplePage(again);
+      await openPaste(again);
+      await vi.waitFor(() => expect(again.querySelector('.linkedin-paste__status')?.textContent).toBe('Couldn’t read that paste. Try again or type it in.'));
+      expect(btn(again, 'Read profile')!.disabled).toBe(false);
+    });
+
+    it('Update from LinkedIn on an existing person hides unchanged rows and saves changes', async () => {
+      const seen: Array<Record<string, unknown>> = [];
+      const writes = stubPaste((body) => {
+        seen.push(body);
+        return jsonResponse({
+          ...PARSED,
+          about: null,
+          rows: [
+            { ...PARSED.rows[0], diff: 'same', link_id: 'l1' },
+            { ...PARSED.rows[2], organisation: { name: 'Tallowwood College', ref: ORG, status: 'matched' }, diff: 'changed', link_id: 'l2' }
+          ]
+        });
+      });
+      const canvas = document.createElement('div');
+      document.body.append(canvas);
+      await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+      canvas.querySelector<HTMLButtonElement>('[aria-label="More actions"]')!.click();
+      btn(canvas, 'Update from LinkedIn')!.click();
+      const box = canvas.querySelector<HTMLElement>('[data-section="linkedin"]')!;
+      const area = box.querySelector<HTMLTextAreaElement>('textarea')!;
+      area.value = 'profile';
+      area.dispatchEvent(new Event('input'));
+      btn(box, 'Read profile')!.click();
+      await vi.waitFor(() => expect(btn(box, 'Save 1 change')).toBeTruthy());
+      expect(seen[0]).toEqual({ text: 'profile', person_ref: `shared:person:${PERSON_ID}` });
+      expect(box.querySelector<HTMLElement>('[data-row-id="row_1"]')!.hidden).toBe(true);
+      expect(box.querySelector('[data-row-id="row_3"]')?.textContent).toContain('dates differ');
+      btn(box, 'Show 1 unchanged')!.click();
+      expect(box.querySelector<HTMLElement>('[data-row-id="row_1"]')!.hidden).toBe(false);
+      btn(box, 'Save 1 change')!.click();
+      await vi.waitFor(() => expect(canvas.querySelector('.people-toast')?.textContent).toBe('Saved 1 change✕'));
+      expect(writes).toEqual(['edit:l2:']);
+      expect(canvas.querySelector('[data-section="linkedin"]')).toBeNull();
+    });
   });
 });

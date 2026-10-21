@@ -8,11 +8,11 @@ import type { PsEdge, PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
 import { slotLabel } from './outline';
-import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId } from './details';
+import { EASE, canAnimate, contestedTag, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
-export type ProblemTreeView = { el: HTMLDivElement; update(run: PsToolRun): void };
+export type ProblemTreeView = { el: HTMLDivElement; update(run: PsToolRun): void; destroy(): void };
 
 type Kind = 'trunk' | 'cause' | 'effect';
 const ACCENT: Record<Kind, Accent> = { trunk: 'red', cause: 'blue', effect: 'yellow' };
@@ -246,7 +246,8 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
       const row = regions[kind === 'trunk' ? 'trunk' : kind === 'cause' ? 'causes' : 'effects'].row;
       nodes.forEach((node, index) => {
         const item = items.get(node.id) ?? addNode(node, kind);
-        item.classList.toggle('is-contested', node.state === 'contested');
+        const button = item.querySelector('.ps-tree__shape');
+        syncContested(item, node, button, button);
         if (row.children[index] !== item) row.insertBefore(item, row.children[index] ?? null);
       });
     }
@@ -279,7 +280,13 @@ export function createProblemTreeView(doc: Document = document): ProblemTreeView
     refreshActive();
   }
 
-  if (typeof ResizeObserver === 'function') new ResizeObserver(() => layout()).observe(root);
+  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => layout()) : null;
+  observer?.observe(root);
 
-  return { el: root, update };
+  /** Stop watching the size once the canvas drops this view. */
+  function destroy(): void {
+    observer?.disconnect();
+  }
+
+  return { el: root, update, destroy };
 }

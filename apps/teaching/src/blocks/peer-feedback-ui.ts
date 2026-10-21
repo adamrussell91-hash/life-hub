@@ -69,7 +69,7 @@ export function field(label: string, hint?: string): { wrap: HTMLElement; input:
   const input = el('textarea', 'pf-field__input');
   input.id = id;
   wrap.append(lab);
-  if (hint) wrap.append(el('p', 'pf-field__hint', hint));
+  if (hint) wrap.append(el('p', 'pf-field__hint block-secondary', hint));
   wrap.append(input);
   return { wrap, input };
 }
@@ -92,6 +92,21 @@ export function writeJSON(key: string, value: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+/** The lesson or block isn't published yet, so there is no round to run. */
+export function isNotPublished(error: unknown): boolean {
+  return error instanceof ApiClientError && error.code === 'not_published';
+}
+
+/** Calm stand-in for the teacher's controls until the lesson is published. */
+export function notLivePanel(): HTMLElement {
+  const box = el('div', 'pf-panel pf-panel--quiet');
+  box.append(
+    el('p', 'pf-panel__title block-subtitle', 'Not live yet'),
+    el('p', 'pf-panel__text block-body', 'Publish this lesson and block, then Start activity appears here.')
+  );
+  return box;
 }
 
 export function errorText(error: unknown): string {

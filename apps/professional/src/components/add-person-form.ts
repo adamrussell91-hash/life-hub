@@ -1,9 +1,12 @@
-import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
-import { createEntity, searchEntities } from '@/api/entities';
+import { createEntity } from '@/api/entities';
+import { buildSingleEntityField, errorMessage, type SelectedEntity } from '@/components/entity-field';
 import { createUniversalLink } from '@/api/universal-links';
+import { addPersonRole } from '@/api/people-roles';
+import { buildRoleFields } from '@/components/role-fields';
 import { createObservation } from '@/api/observations';
-import { ApiClientError } from '@/api/client';
 import type { EntityRecord } from '@/domain/types';
+
+export { buildSingleEntityField, type SelectedEntity };
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -16,97 +19,6 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function errorMessage(err: unknown, fallback: string): string {
-  return err instanceof ApiClientError || err instanceof Error ? err.message : fallback;
-}
-
-interface SelectedEntity {
-  ref: string;
-  display_label: string;
-}
-
-/**
- * One `@`-picker field that resolves to a single Person or Organisation,
- * with inline "Create X '<name>'" support via the picker's own `onCreate`
- * (SOURCE-BRIEF.md section 5's "Organisation, when known" / "Who
- * introduced you" — unlike every other `@`-picker in this app, these two
- * genuinely may not exist yet, so typing a name with no match can create
- * one on the spot via `POST /api/entities` rather than requiring the
- * organisation/person to already exist).
- */
-function buildSingleEntityField(options: {
-  kind: 'organisation' | 'person';
-  placeholder: string;
-  emptyText: string;
-  ariaLabel: string;
-  onError: (message: string) => void;
-}): { root: HTMLElement; getSelected: () => SelectedEntity | null; reset: () => void } {
-  const wrap = el('div', 'add-person-form__field');
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = options.placeholder;
-  input.setAttribute('aria-label', options.ariaLabel);
-
-  let selected: SelectedEntity | null = null;
-
-  const selectedNote = el('p', 'add-person-form__selected-note');
-  selectedNote.hidden = true;
-  const clearBtn = document.createElement('button');
-  clearBtn.type = 'button';
-  clearBtn.className = 'add-person-form__clear';
-  clearBtn.textContent = 'Clear';
-
-  function setSelected(next: SelectedEntity | null): void {
-    selected = next;
-    if (next) {
-      input.hidden = true;
-      selectedNote.replaceChildren(document.createTextNode(`${next.display_label} `), clearBtn);
-      selectedNote.hidden = false;
-    } else {
-      input.value = '';
-      input.hidden = false;
-      selectedNote.hidden = true;
-    }
-  }
-
-  clearBtn.addEventListener('click', () => setSelected(null));
-
-  const picker = createEntityPicker({
-    input,
-    // A dedicated field: type the name (spaces and all), no `@` needed.
-    mode: 'field',
-    allowedKinds: [options.kind],
-    emptyText: options.emptyText,
-    search: async (query, signal) => {
-      const result = await searchEntities(query, options.kind, { signal });
-      return {
-        groups: {
-          person: result.groups.person ?? [],
-          organisation: result.groups.organisation ?? [],
-          task: result.groups.task ?? []
-        }
-      };
-    },
-    onSelect: (item) => setSelected({ ref: item.ref, display_label: item.display_label }),
-    onCreate: (query, createdKind) => {
-      void (async () => {
-        try {
-          const created = await createEntity({
-            kind: createdKind as 'person' | 'organisation',
-            display_name: query
-          });
-          setSelected({ ref: created.ref, display_label: created.display_name });
-        } catch (err) {
-          options.onError(errorMessage(err, `Could not create ${createdKind} "${query}".`));
-        }
-      })();
-    }
-  });
-
-  wrap.append(input, picker.root, selectedNote);
-  return { root: wrap, getSelected: () => selected, reset: () => setSelected(null) };
-}
-
 export interface AddPersonResult {
   person: EntityRecord;
   /** Non-fatal write failures after the person itself was created — the
@@ -114,6 +26,10 @@ export interface AddPersonResult {
    * the optional follow-up writes (organisation link, introduction link,
    * observation) didn't make it and can be added later from their page. */
   warnings: string[];
+  /** Short labels of the writes that didn't save ("Workplace"), for the toast. */
+  failed: string[];
+  /** The first role entered, so the new directory row can show it at once. */
+  role: { organisation: SelectedEntity; title: string | null; current: boolean } | null;
 }
 
 export interface AddPersonFormOptions {
@@ -136,7 +52,10 @@ function todayIsoDate(): string {
  * incomplete initial record ("additional structure appears through later
  * activity").
  */
-export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOptions): { focusName: () => void } {
+export function mountAddPersonForm(
+  host: HTMLElement,
+  options: AddPersonFormOptions
+): { focusName: () => void; reset: () => void } {
   const form = document.createElement('form');
   form.className = 'add-person-form';
   form.setAttribute('aria-label', 'Add person');
@@ -157,13 +76,8 @@ export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOpti
   whereInput.type = 'text';
   whereInput.setAttribute('aria-label', 'Where you met');
 
-  const orgField = buildSingleEntityField({
-    kind: 'organisation',
-    placeholder: 'Start typing an organisation…',
-    emptyText: 'No matching organisations.',
-    ariaLabel: 'Organisation, when known',
-    onError: showError
-  });
+  // The first role row: organisation, role, dates. Optional.
+  const roleFields = buildRoleFields({ kind: 'role', withOrganisation: true, onError: showError });
 
   const introducerField = buildSingleEntityField({
     kind: 'person',
@@ -204,10 +118,10 @@ export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOpti
     nameInput,
     el('label', 'add-person-form__label', 'Where you met'),
     whereInput,
-    el('label', 'add-person-form__label', 'Organisation, when known'),
-    orgField.root,
     el('label', 'add-person-form__label', 'Who introduced you'),
     introducerField.root,
+    el('label', 'add-person-form__label', 'Role, when known'),
+    roleFields.root,
     el('label', 'add-person-form__label', 'One optional observation'),
     observationInput,
     el('label', 'add-person-form__label', 'Date'),
@@ -223,6 +137,12 @@ export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOpti
       showError('Name is required.');
       return;
     }
+    const roleRead = roleFields.isEmpty() ? null : roleFields.read();
+    if (roleRead && 'error' in roleRead) {
+      showError(roleRead.error);
+      return;
+    }
+    const firstRole = roleRead && 'value' in roleRead ? roleRead.value : null;
     status.hidden = true;
     submit.disabled = true;
 
@@ -240,66 +160,86 @@ export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOpti
         return;
       }
 
-      const organisation = orgField.getSelected();
-      if (organisation) {
-        try {
-          // `member_of` rather than `employee_at` — a quick capture rarely
-          // knows employment status, just that this org came up.
-          await createUniversalLink({
-            source_ref: person.ref,
-            target_ref: organisation.ref,
-            relationship_type: 'member_of',
-            valid_from: occurredAt
-          });
-        } catch (err) {
-          warnings.push(
-            `Linking to ${organisation.display_label} failed: ${errorMessage(err, 'unknown error')}`
-          );
-        }
-      }
-
+      // The person exists now; the optional writes run together, and a
+      // failure in one is a warning, never a rollback.
       const introducer = introducerField.getSelected();
+      const whereMet = whereInput.value.trim();
+      const observationText = observationInput.value.trim();
+      const combinedText = [whereMet ? `Met at ${whereMet}.` : '', observationText].filter(Boolean).join(' ');
+      const writes: Array<{ label: string; detail: string; run: () => Promise<unknown> }> = [];
+      if (firstRole?.organisation) {
+        const organisation = firstRole.organisation;
+        writes.push({
+          label: 'Workplace',
+          detail: `Linking to ${organisation.display_label}`,
+          run: () => addPersonRole({
+            person_ref: person.ref,
+            organisation_ref: organisation.ref,
+            relationship_type: firstRole.type,
+            role: firstRole.title,
+            valid_from: firstRole.from,
+            valid_to: firstRole.to
+          })
+        });
+      }
       if (introducer) {
-        try {
+        writes.push({
+          label: 'Introduction',
+          detail: `Recording the introduction from ${introducer.display_label}`,
           // Source = the introducer (the earlier-known party), target =
           // the new person, per BUILD-PLAN.md Feature 1.1's documented
           // direction choice for `professional_relationship`.
-          await createUniversalLink({
+          run: () => createUniversalLink({
             source_ref: introducer.ref,
             target_ref: person.ref,
             relationship_type: 'professional_relationship',
             role: 'introduction',
             valid_from: occurredAt
-          });
-        } catch (err) {
-          warnings.push(
-            `Recording the introduction from ${introducer.display_label} failed: ${errorMessage(err, 'unknown error')}`
-          );
-        }
+          })
+        });
       }
-
-      const whereMet = whereInput.value.trim();
-      const observationText = observationInput.value.trim();
-      const combinedText = [whereMet ? `Met at ${whereMet}.` : '', observationText].filter(Boolean).join(' ');
       if (combinedText) {
-        try {
-          await createObservation({
+        writes.push({
+          label: 'Observation',
+          detail: 'Saving the observation',
+          run: () => createObservation({
             about_ref: person.ref,
             text: combinedText,
             occurred_at: occurredAt,
             source: 'manual',
             linked_ref: null
-          });
-        } catch (err) {
-          warnings.push(`Saving the observation failed: ${errorMessage(err, 'unknown error')}`);
-        }
+          })
+        });
       }
+      const failed: string[] = [];
+      const settled = await Promise.allSettled(writes.map((w) => w.run()));
+      settled.forEach((result, i) => {
+        if (result.status === 'fulfilled') return;
+        const write = writes[i]!;
+        failed.push(write.label);
+        warnings.push(`${write.detail} failed: ${errorMessage(result.reason, 'unknown error')}`);
+      });
 
       submit.disabled = false;
-      options.onCreated({ person, warnings });
+      options.onCreated({
+        person,
+        warnings,
+        failed,
+        role: firstRole?.organisation
+          ? { organisation: firstRole.organisation, title: firstRole.title, current: !firstRole.to }
+          : null
+      });
     })();
   });
 
+  function reset(): void {
+    form.reset();
+    dateInput.value = todayIsoDate();
+    roleFields.reset();
+    introducerField.reset();
+    status.hidden = true;
+  }
+
   host.append(form);
-  return { focusName: () => nameInput.focus() };
+  return { focusName: () => nameInput.focus(), reset };
 }

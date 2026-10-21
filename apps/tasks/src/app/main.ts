@@ -1,3 +1,4 @@
+import '../../../../packages/stale-chunk-reload.js';
 import '../../design-kit/tokens.css';
 import '../../design-kit/overlays.css';
 import '../../design-kit/chrome.css';
@@ -81,6 +82,10 @@ import { loadTaskProperties } from '@/services/task-properties';
 import { tasksApi } from '@/services/client-api';
 import { mapsOrSeed } from '@/domain/maps';
 import { getFocus, hydrateFocusFromHash, mergeFocusIntoHash } from '@/domain/focus';
+import { setClassroomExtras } from '@teaching/blocks/classroom-extras';
+
+// Pages here run Teaching's block editors without the classroom extras.
+setClassroomExtras(false);
 
 let kitCalendarHandle: HubCalendarHandle | null = null;
 
@@ -101,6 +106,8 @@ function renderNotFound(canvas: HTMLElement, hash: string): void {
 
 /** Grove owns a WebGL context; release it when another view takes the canvas. */
 let groveUnmount: (() => void) | null = null;
+/** Problem Solver polls the coach and listens for task changes; stop both when another view takes the canvas. */
+let problemSolverUnmount: (() => void) | null = null;
 
 async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<void> {
   switch (view) {
@@ -165,8 +172,9 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
     case 'term-dates':
       return renderTermDatesView(canvas);
     case 'problem-solver': {
-      const { renderProblemSolverView } = await import('@/views/problem-solver/view');
-      return renderProblemSolverView(canvas);
+      const problemSolver = await import('@/views/problem-solver/view');
+      problemSolverUnmount = problemSolver.unmountProblemSolverView;
+      return problemSolver.renderProblemSolverView(canvas);
     }
     case 'city': {
       const { renderCityView } = await import('@/views/city/view');
@@ -219,6 +227,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
       clare.park();
       groveUnmount?.();
       groveUnmount = null;
+      problemSolverUnmount?.();
+      problemSolverUnmount = null;
       // Leaving the kit calendar surface tears the mount down.
       if (nextView == null || viewSurface(nextView) !== 'kit-calendar') {
         unmountTasksCalendar();

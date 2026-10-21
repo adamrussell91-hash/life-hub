@@ -1,4 +1,4 @@
-import { startPassiveAlchemyApp } from '@/alchemy/passive-app';
+import '../../../../packages/stale-chunk-reload.js';
 import 'katex/dist/katex.min.css';
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { apiGet, ApiClientError } from '@/api/client';
@@ -42,6 +42,10 @@ import {
   mountStudentLessonView,
   type StudentLessonViewHandle
 } from '@/student/lesson-view';
+import {
+  mountLessonDisplayView,
+  type LessonDisplayViewHandle
+} from '@/teacher/lesson-display';
 import {
   mountStudentUnitView,
   type StudentUnitViewHandle
@@ -97,6 +101,7 @@ let teacherShellRefs: TeacherShellRefs | null = null;
 
 // The student lesson view mounted for the current public route, if any.
 let studentLessonViewHandle: StudentLessonViewHandle | null = null;
+let lessonDisplayViewHandle: LessonDisplayViewHandle | null = null;
 
 // The student unit view mounted for the current public route, if any.
 let studentUnitViewHandle: StudentUnitViewHandle | null = null;
@@ -137,6 +142,12 @@ async function teardownLessonEditor(): Promise<void> {
   lessonEditorHandle = null;
   await handle.flush();
   handle.dispose();
+}
+
+function teardownLessonDisplayView(): void {
+  if (!lessonDisplayViewHandle) return;
+  lessonDisplayViewHandle.dispose();
+  lessonDisplayViewHandle = null;
 }
 
 function teardownStudentLessonView(): void {
@@ -895,6 +906,14 @@ function renderTeacherLessonRoute(lessonId: string, token: number): void {
   });
 }
 
+function renderLessonDisplayRoute(lessonId: string, token: number): void {
+  lessonDisplayViewHandle = mountLessonDisplayView({
+    root: appRoot,
+    lessonId,
+    isStale: () => token !== renderToken
+  });
+}
+
 function renderStudentLessonRoute(
   lessonId: string,
   token: number,
@@ -1007,6 +1026,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-lesson':
       renderTeacherLessonRoute(match.params.lessonId, token);
       break;
+    case 'teacher-lesson-display':
+      renderLessonDisplayRoute(match.params.lessonId, token);
+      break;
     case 'student-lesson':
       renderStudentLessonRoute(match.params.lessonId, token);
       break;
@@ -1056,6 +1078,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownFeedbackSection();
   teardownUnitPage();
   teardownStudentLessonView();
+  teardownLessonDisplayView();
   teardownStudentUnitView();
   teardownStudentClassView();
   teardownStudentFeedbackView();
@@ -1089,7 +1112,6 @@ async function handleRoute(match: RouteMatch): Promise<void> {
 }
 
 async function init(): Promise<void> {
-  startPassiveAlchemyApp(() => session.authenticated);
   try {
     session = await fetchSession();
   } catch {

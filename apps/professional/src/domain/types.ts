@@ -576,6 +576,8 @@ export interface CareerOverview {
   stone_actions?: unknown[];
   scan?: { pending_count?: number; last_run_at?: string | null };
   employment_items?: CareerSectionItem[];
+  /** The operator's own Person ref; null when no self Person exists yet. */
+  self_ref?: string | null;
 }
 
 /**

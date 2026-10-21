@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discern qualifier mockup</title>
+<style>
+/* Copied from packages/design-kit/tokens.css so the mockup opens standalone. */
+:root {
+  color-scheme: light;
+
+  /* ── Palette ──────────────────────────────────────────────────────────── */
+  --warm-white: #fbf8f2;
+  --cotton: #f5f1e9;
+  --paper: #fbf8f2;
+  --depth: #0a1536;
+  --marine: #142b51;
+  --navy: #17375e;
+  --navy-2: #244f7c;
+  --orca: #424860;
+  --shallow: #a7abb9;
+  --wave: #376fb7;
+  --high-sea: #f68620;
+  --shore: #eae7da;
+  --sand: #f0cfac;
+  --ink: #13233a;
+  --muted: #6b7788;
+  --line: rgba(23, 55, 94, 0.10);
+  --glass: rgba(255, 255, 255, 0.70);
+
+  --pastel-blue: #dceafa;
+  --pastel-blue-ink: #294c71;
+  --pastel-sage: #dfe9e1;
+  --pastel-sage-ink: #3c5949;
+  --pastel-peach: #f2dfd0;
+  --pastel-peach-ink: #7a5038;
+  --pastel-gold: #f1e2b6;
+  --pastel-gold-ink: #6c581f;
+  --pastel-lilac: #e8e0f1;
+  --pastel-lilac-ink: #5d4e70;
+
+  --accent: var(--navy);
+  --ink-muted: var(--muted);
+  --text-muted: var(--muted);
+
+  /* On-dark surface (the left rail). Components on the rail must use these,
+     never --ink / --muted / --orca / --line (those are for the light canvas). */
+  --on-dark: rgba(255, 255, 255, 0.92);
+  --on-dark-muted: rgba(255, 255, 255, 0.66);
+  --on-dark-line: rgba(255, 255, 255, 0.16);
+  --on-dark-hover: rgba(255, 255, 255, 0.1);
+
+  /* High Sea is rail / decisive-accent only. White on #F68620 is 2.5:1.
+     Use --high-sea-ink for orange text on light, --depth for text on a High Sea fill. */
+  --high-sea-ink: #a85a0c;
+  --high-sea-hover: #e07818;
+
+  --danger: #9b2c2c;
+  --danger-hover: #8a2424;
+  --danger-surface: rgba(155, 44, 44, 0.08);
+  --danger-line: rgba(155, 44, 44, 0.28);
+  --success: #2f7a4f;
+  --success-surface: rgba(47, 122, 79, 0.1);
+  --warning: var(--high-sea-ink);
+  --warning-surface: rgba(246, 134, 32, 0.12);
+
+  /* ── Type ─────────────────────────────────────────────────────────────── */
+  --font-ui: Inter, ui-sans-serif, sans-serif;
+  --font-display: var(--font-ui);
+
+  /* 8 steps, base 16px. No two steps sit within 2px of each other. */
+  --text-2xs: 0.6875rem; /* 11px — uppercase micro-labels only */
+  --text-xs: 0.75rem; /*    12px — captions, timestamps */
+  --text-sm: 0.8125rem; /*  13px — secondary UI text, metadata */
+  --text-base: 0.9375rem; /* 15px — default UI text */
+  --text-md: 1.0625rem; /*  17px — reading copy, card titles */
+  --text-lg: 1.3125rem; /*  21px — section headings */
+  --text-xl: 2rem; /*      32px — small page titles */
+  --text-2xl: 2.625rem; /* 42px — page titles */
+
+  --font-size-meta: var(--text-sm);
+  --font-size-card: var(--text-base);
+  --font-size-body: var(--text-md);
+  --font-size-section: var(--text-lg);
+  --font-size-page: var(--text-xl);
+  --font-size-hero: var(--text-2xl);
+  --font-size-tile-value: var(--text-2xl);
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.08em;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+
+  /* ── Space (4px grid). --space-2 and --space-4 are the workhorses. ── */
+  --space-px: 0.125rem; /*  2px */
+  --space-1: 0.25rem; /*    4px */
+  --space-2: 0.5rem; /*     8px */
+  --space-3: 0.75rem; /*   12px */
+  --space-4: 1rem; /*      16px */
+  --space-5: 1.25rem; /*   20px */
+  --space-6: 1.5rem; /*    24px */
+  --space-8: 2rem; /*      32px */
+  --space-10: 2.5rem; /*   40px */
+  --space-12: 3rem; /*     48px */
+  --space-16: 4rem; /*     64px */
+
+  /* ── Radius ───────────────────────────────────────────────────────────── */
+  --radius-xs: 0.375rem; /*  6px — chips, tags */
+  --radius-sm: 0.875rem; /* 14px — buttons */
+  --radius-md: 1.25rem; /*  20px — cards */
+  --radius-lg: 1.5rem; /*   24px — panels */
+  --radius-xl: 1.75rem; /*  28px — page-level containers */
+  --radius-full: 999px;
+  --tab-radius: var(--radius-sm);
+
+  /* ── Elevation ────────────────────────────────────────────────────────── */
+  --elev-1: 0 1px 2px rgba(20, 35, 70, 0.06);
+  --elev-2:
+    0 1px 2px rgba(20, 35, 70, 0.05), 0 2px 6px rgba(20, 35, 70, 0.06);
+  --elev-3: 0 18px 48px rgba(39, 55, 74, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  --elev-4:
+    0 4px 8px rgba(20, 35, 70, 0.08), 0 20px 48px rgba(20, 35, 70, 0.14);
+  --shadow: var(--elev-3);
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
+  /* Locked. Every hub uses this labeled rail. Overlays and hub sheets must not
+     override it (Knowledge is not an icon column). Spec: RAIL.md. */
+  --rail-width: 15rem;
+  --measure: 68ch;
+
+  font-family: var(--font-ui);
+  font-synthesis: none;
+}
+</style>
+<style>
+  /* Mockup only. Mirrors kaplan.css: a quiet attachment, not a new palette. */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--cotton); color: var(--ink); font-family: var(--font-ui); font-size: var(--text-base); line-height: var(--leading-normal); }
+  .page { max-width: 46rem; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-12); }
+  .modebar { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; }
+  .modebar span { font-size: var(--text-sm); color: var(--muted); margin-right: var(--space-2); }
+  .seg { padding: var(--space-2) var(--space-4); border: 1px solid var(--line); border-radius: 999px; background: var(--glass); color: var(--navy); font: inherit; font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer; }
+  .seg[aria-pressed='true'] { background: var(--navy); color: var(--warm-white); border-color: var(--navy); }
+  h1 { font-size: var(--text-xl); color: var(--navy); letter-spacing: var(--tracking-tight); margin: 0 0 var(--space-1); line-height: var(--leading-tight); }
+  .sub { color: var(--muted); font-size: var(--text-sm); margin: 0 0 var(--space-6); }
+
+  .block { background: var(--warm-white); border: 1px solid var(--line); border-radius: 0.75rem; padding: var(--space-5); margin-bottom: var(--space-4); }
+  .block__type { font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); margin: 0 0 var(--space-2); }
+  .q { font-size: var(--text-md); color: var(--navy); font-weight: var(--weight-semibold); margin: 0 0 var(--space-3); line-height: var(--leading-snug); }
+  .q b { color: var(--wave); }
+  textarea, input[type=text] { width: 100%; padding: var(--space-3); border: 1px solid var(--line); border-radius: 0.375rem; background: var(--glass); color: var(--ink); font: inherit; line-height: var(--leading-normal); }
+  textarea:focus-visible, input:focus-visible, button:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+  .answer { min-height: 7rem; resize: vertical; }
+  .extract { font-family: Georgia, serif; font-size: var(--text-md); color: var(--orca); border-left: 3px solid var(--shallow); padding-left: var(--space-4); margin: 0; }
+  .muted { color: var(--muted); font-size: var(--text-sm); }
+
+  /* Chip, as Kaplan's */
+  .chips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+  .chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--navy); font: inherit; font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer; }
+  .chip:hover, .chip[aria-expanded='true'] { background: var(--pastel-lilac); }
+  .chip svg, .badge svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  .ws { margin-top: var(--space-3); padding: var(--space-5); border-left: 4px solid var(--pastel-lilac-ink); background: var(--paper); border-radius: 0.25rem; }
+  .ws[hidden] { display: none; }
+  .ws__title { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); color: var(--navy); font-weight: var(--weight-semibold); }
+  .progress { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4); }
+  .progress button { padding: var(--space-2) 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+  .progress button[aria-current='step'] { border-bottom-color: var(--pastel-lilac-ink); color: var(--navy); }
+  .progress button.done::after { content: ' ●'; color: var(--pastel-lilac-ink); font-size: var(--text-2xs); }
+  .step__title { font-size: var(--text-md); color: var(--navy); font-weight: var(--weight-semibold); margin: 0 0 var(--space-1); }
+  .step__prompt { margin: 0 0 var(--space-4); max-width: 38rem; }
+  .field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); color: var(--navy); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+  .field small { color: var(--muted); font-weight: var(--weight-regular); }
+  .count { align-self: flex-end; color: var(--muted); font-size: var(--text-xs); font-weight: var(--weight-regular); }
+
+  /* Settled scale */
+  .scale { border: 0; padding: 0; margin: 0 0 var(--space-4); }
+  .scale legend { color: var(--navy); font-size: var(--text-sm); font-weight: var(--weight-medium); margin-bottom: var(--space-2); padding: 0; }
+  .scale__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .scale__end { font-size: var(--text-xs); color: var(--muted); }
+  .scale__dots { display: flex; gap: var(--space-2); }
+  .scale__dots button { width: 2.25rem; height: 2.25rem; border-radius: 50%; border: 1.5px solid var(--shallow); background: var(--warm-white); cursor: pointer; }
+  .scale__dots button[aria-pressed='true'] { background: var(--pastel-lilac-ink); border-color: var(--pastel-lilac-ink); }
+  .actions { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+  .btn { padding: var(--space-2) var(--space-4); border-radius: 999px; border: 1px solid var(--navy); background: var(--navy); color: var(--warm-white); font: inherit; font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer; }
+  .btn--ghost { background: transparent; color: var(--navy); border-color: var(--line); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* Tail graph: HTML labels over an SVG line, so labels stay readable at 390px */
+  .tail { margin-top: var(--space-2); }
+  .tail__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+  .tail__head h4 { margin: 0; color: var(--navy); font-size: var(--text-base); }
+  .book { font-size: var(--text-xs); color: var(--pastel-lilac-ink); background: var(--pastel-lilac); padding: var(--space-1) var(--space-2); border-radius: 999px; }
+  .tail__frame { display: grid; gap: var(--space-1); }
+  .tail__cap { font-size: var(--text-2xs); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+    .tail__plot { position: relative; height: 17rem; }
+  .tail__grid { position: absolute; inset: 1.6rem 0; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 100% 25%, 20% 100%; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .tail__svg { position: absolute; inset: 1.6rem 0; width: 100%; height: calc(100% - 3.2rem); overflow: visible; }
+  .tail__dot { position: absolute; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--pastel-lilac-ink); transform: translate(-50%, -50%); box-shadow: 0 0 0 3px var(--warm-white); }
+  .tail__dot--ghost { background: var(--warm-white); border: 1.5px dashed var(--shallow); box-shadow: none; }
+  .tail__label { position: absolute; transform: translate(-50%, var(--ty)); max-width: 19%; padding: 2px 6px; border-radius: 0.375rem; background: var(--warm-white); box-shadow: 0 0 0 1px var(--line); text-align: center; font-size: var(--text-xs); line-height: var(--leading-tight); color: var(--ink); z-index: 1; }
+  .tail__label--ghost { color: var(--muted); font-style: italic; }
+  .tail__x { display: grid; grid-template-columns: repeat(5, 1fr);  font-size: var(--text-2xs); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-caps); text-align: center; }
+
+  .reading { margin-top: var(--space-4); padding: var(--space-4); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); border-radius: 0.5rem; }
+  .reading h5 { margin: 0 0 var(--space-1); font-size: var(--text-sm); }
+  .reading p { margin: 0; font-size: var(--text-sm); }
+
+  /* Confirm card */
+  .confirm { border-color: var(--pastel-lilac-ink); border-style: dashed; }
+  .badge { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--pastel-lilac-ink); background: var(--pastel-lilac); padding: var(--space-1) var(--space-2); border-radius: 999px; text-decoration: none; margin-bottom: var(--space-3); }
+  .positions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-4); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin: 0 0 var(--space-4); }
+  .pair div { padding: var(--space-3); background: var(--warm-white); border: 1px solid var(--line); border-radius: 0.375rem; font-size: var(--text-sm); }
+  .pair span { display: block; font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); margin-bottom: var(--space-1); }
+  .recall { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); background: var(--paper); border-radius: 0.375rem; font-size: var(--text-sm); }
+  .recall b { color: var(--navy); }
+  .drag { float: right; color: var(--shallow); font-size: var(--text-xs); cursor: grab; }
+
+  /* Teacher: class spread */
+  .spread { margin-top: var(--space-4); padding: var(--space-5); background: var(--paper); border-radius: 0.5rem; border: 1px solid var(--line); }
+  .spread h4 { margin: 0 0 var(--space-1); color: var(--navy); }
+  .spread .tail__svg path { transition: opacity .2s, stroke-width .2s; }
+  .shapes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0; }
+  .shape { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: 999px; border: 1px solid var(--line); background: var(--warm-white); color: var(--navy); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+  .shape[aria-pressed='true'] { background: var(--navy); color: var(--warm-white); }
+  .shape i { font-style: normal; font-weight: var(--weight-bold); }
+  .shape svg { width: 2rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
+  .insight { padding: var(--space-3); background: var(--warm-white); border-radius: 0.375rem; border: 1px solid var(--line); font-size: var(--text-sm); }
+  .insight strong { display: block; font-size: var(--text-lg); color: var(--navy); }
+  .steps-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-1); align-items: end; height: 3rem; margin-top: var(--space-2); }
+  .steps-bar div { background: var(--pastel-lilac-ink); opacity: .7; border-radius: 2px 2px 0 0; }
+  .steps-bar-x { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-1); font-size: var(--text-2xs); color: var(--muted); text-align: center; }
+  @media (max-width: 600px) {
+    .tail__plot { height: 20rem; }
+    .tail__label { max-width: 24%; padding: 2px 4px; }
+    .tail__x { letter-spacing: 0; text-transform: none; font-size: var(--text-xs); }
+  }
+  [data-view='student'] .t-only, [data-view='teacher'] .s-only { display: none; }
+</style>
+<style>
+  /* Setup panel and class split */
+  .modebar select { padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: 999px; background: var(--glass); color: var(--navy); font: inherit; font-size: var(--text-sm); max-width: 100%; }
+  .tabs { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+  .setup { margin-top: var(--space-3); padding: var(--space-5); border-left: 4px solid var(--pastel-lilac-ink); background: var(--paper); border-radius: 0.25rem; }
+  .setup[hidden], .spread[hidden] { display: none; }
+  .setup h4 { margin: 0 0 var(--space-4); color: var(--navy); font-size: var(--text-base); }
+  .setup__group { padding: var(--space-4) 0; border-top: 1px solid var(--line); }
+  .setup__group:first-of-type { border-top: 0; padding-top: 0; }
+  .setup__label { display: block; color: var(--navy); font-size: var(--text-sm); font-weight: var(--weight-semibold); margin-bottom: var(--space-2); }
+  .setup .field { margin-bottom: var(--space-3); }
+  .segs { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+  .opt-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--space-2); margin-bottom: var(--space-2); }
+  .suggest { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-xs); color: var(--pastel-lilac-ink); background: var(--pastel-lilac); padding: var(--space-2) var(--space-3); border-radius: 0.375rem; margin-bottom: var(--space-3); }
+  .suggest button { border: 0; background: none; color: var(--navy); font: inherit; font-weight: var(--weight-semibold); text-decoration: underline; cursor: pointer; padding: 0; }
+  select.select { width: 100%; padding: var(--space-3); border: 1px solid var(--line); border-radius: 0.375rem; background: var(--glass); color: var(--ink); font: inherit; margin-bottom: var(--space-3); }
+  details.prompts summary { cursor: pointer; color: var(--wave); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+  details.prompts textarea { min-height: 4.5rem; font-size: var(--text-sm); }
+  .swatch { width: 0.75rem; height: 0.75rem; border-radius: 50%; display: inline-block; }
+  .split { width: 100%; border-collapse: collapse; font-size: var(--text-sm); margin-top: var(--space-2); }
+  .split th, .split td { text-align: left; padding: var(--space-2); border-bottom: 1px solid var(--line); vertical-align: top; }
+  .split th { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--muted); font-weight: var(--weight-bold); }
+  .split td:first-child { white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body data-view="student">
+<main class="page">
+  <div class="modebar" role="group" aria-label="Mockup controls">
+    <span>Mockup view</span>
+    <button class="seg" data-view-btn="student" aria-pressed="true">Student</button>
+    <button class="seg" data-view-btn="teacher" aria-pressed="false">Teacher</button>
+    <select id="demoQ" aria-label="Try a different question"></select>
+  </div>
+
+  <h1>Discern on a question</h1>
+  <p class="sub">Mockup · pick a question above to see the same qualifier tailored</p>
+
+  <section class="block" id="q1">
+    <p class="block__type">Question</p>
+    <p class="q"><b>Q1.</b> <span id="qText"></span></p>
+    <textarea class="answer s-only" aria-label="Your answer" placeholder="Write your answer here once you've worked through Discern."></textarea>
+
+    <div class="chips s-only">
+      <button class="chip" id="discernChip" aria-expanded="false" aria-controls="ws">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18c3 0 3-9 6-9s3 6 6 6 3-9 6-9"/><circle cx="21" cy="6" r="1.4" fill="currentColor"/></svg>
+        Discern · 4 steps
+      </button>
+    </div>
+    <div class="tabs t-only" role="group" aria-label="Discern teacher tools">
+      <button class="chip" data-tab="setup" aria-expanded="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18c3 0 3-9 6-9s3 6 6 6 3-9 6-9"/><circle cx="21" cy="6" r="1.4" fill="currentColor"/></svg>
+        Discern · set up
+      </button>
+      <button class="chip" data-tab="spread" aria-expanded="false">Class spread</button>
+    </div>
+
+    <div class="ws s-only" id="ws" hidden>
+      <p class="ws__title" id="wsTitle"></p>
+      <nav class="progress" id="progress" aria-label="Discern steps"></nav>
+      <div id="step"></div>
+      <div id="graphOut"></div>
+    </div>
+
+    <div class="setup t-only" id="setup"></div>
+    <div class="spread t-only" id="spread" hidden></div>
+  </section>
+
+  <section class="block">
+    <p class="block__type">Extract</p>
+    <p class="extract">The text, source or data the question is about sits here in the real lesson.</p>
+  </section>
+
+  <section class="block">
+    <p class="block__type">Rich text</p>
+    <p style="margin:0">Paragraph scaffold, then the lesson carries on: the teacher dragged the Confirm card down to close the lesson.</p>
+  </section>
+
+  <section class="block confirm" id="confirm">
+    <span class="drag t-only" title="Drag to move">⋮⋮ drag</span>
+    <a class="badge" href="#q1">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18c3 0 3-9 6-9s3 6 6 6 3-9 6-9"/></svg>
+      Confirm · linked to Q1
+    </a>
+    <p class="block__type">Discern: Confirm</p>
+    <div class="s-only" id="confirmBody"></div>
+    <div class="t-only" id="confirmTeacher"></div>
+  </section>
+</main>
+
+<script>
+/* ── Setup (what the teacher tailors) ──────────────────── */
+const SCALES = {
+  agree:   { name: 'Agree', options: ['Disagree', 'Partly agree', 'Mostly agree', 'Fully agree'] },
+  extent:  { name: 'Extent', options: ['Not at all', 'To a small extent', 'To a large extent', 'Completely'] },
+  effect:  { name: 'Effectiveness', options: ['Ineffective', 'Somewhat effective', 'Effective', 'Highly effective'] },
+  verdict: { name: 'Verdict', options: ['Unjustified', 'Questionable', 'Defensible', 'Justified'] }
+};
+const DEMO = [
+  { label: 'English: SWW and hope', question: 'Wagan Watson often presents a darker, angry scenario of reconciliation, before offering a small piece of hope. How much do you agree with SWW that there is hope for reconciliation and why?', focus: 'whether there is hope for reconciliation', source: 'the poems', mode: 'own' },
+  { label: 'History: Versailles', question: 'To what extent was the Treaty of Versailles responsible for the outbreak of the Second World War?', focus: 'the Treaty’s responsibility for the war', source: 'Sources A to D', mode: 'own' },
+  { label: 'English: which technique', question: 'Which technique best conveys isolation in this extract?', focus: 'the technique that best conveys isolation', source: 'the extract', mode: 'own', choices: ['Imagery', 'Structure', 'Narrative voice'] },
+  { label: 'English: explain how', question: 'Explain how the composer represents grief.', focus: 'how grief is represented', source: 'the text', mode: 'own' },
+  { label: 'Their choice: Macbeth', question: 'Was Macbeth’s decision to kill Duncan truly his own?', focus: 'Macbeth’s decision to kill Duncan', source: 'Act 1', mode: 'theirs', who: 'Macbeth' }
+];
+const NAMES = ['Initial', 'Against', 'For', 'Step back', 'Confirm'];
+const LABEL_MAX = 32;
+let cfg;
+
+function suggest(question, mode) {
+  if (mode === 'theirs') return { type: 'scale', preset: 'verdict' };
+  if (/how much do you agree|do you agree/i.test(question)) return { type: 'scale', preset: 'agree' };
+  if (/to what extent/i.test(question)) return { type: 'scale', preset: 'extent' };
+  if (/how effective/i.test(question)) return { type: 'scale', preset: 'effect' };
+  if (/^\s*which\b/i.test(question)) return { type: 'choose', preset: null };
+  return { type: 'write', preset: null };
+}
+function loadDemo(d) {
+  const s = suggest(d.question, d.mode);
+  cfg = {
+    question: d.question, focus: d.focus, source: d.source, mode: d.mode, who: d.who || '',
+    type: s.type, preset: s.preset || 'agree',
+    scale: [...SCALES[s.preset || 'agree'].options],
+    choices: d.choices ? [...d.choices] : ['', ''],
+    prompts: Array(5).fill('')
+  };
+}
+const options = () => cfg.type === 'scale' ? cfg.scale.filter(Boolean) : cfg.type === 'choose' ? cfg.choices.filter(Boolean) : [];
+
+function steps() {
+  const own = cfg.mode === 'own';
+  const who = cfg.who.trim() || 'they';
+  const f = cfg.focus.trim() || (own ? 'the question' : `${who}’s choice`);
+  const ev = cfg.source.trim() ? `one moment from ${cfg.source.trim()}` : 'one piece of evidence';
+  const ev2 = cfg.source.trim() ? `a different moment from ${cfg.source.trim()}` : 'a different piece of evidence';
+  const verb = cfg.type === 'write' ? 'Write' : 'Tap';
+  const d = own ? [
+    ['Your initial answer, and what’s behind it', `${verb} your initial answer. Then be honest: why do you want that to be the answer? Maybe it feels right, sounds clever, or is what you think your teacher wants.`],
+    ['Argue against it first', `Make the strongest case that your initial answer on ${f} is wrong. Use ${ev} that pushes hardest against you.`],
+    ['Now argue for it', `Make the strongest case that your initial answer is right. Use ${ev2}.`],
+    ['Step back', `Pretend neither argument is yours. Judging only these two, where do you now stand on ${f}?`],
+    ['Reread and confirm', 'Is that pull still what holds your answer up, or is your evidence doing the work now? Does your answer feel settled, or uneasy?']
+  ] : [
+    [`Your initial verdict, and what pulled ${who}`, `${verb} your initial verdict on ${f}. Then: what was pulling ${who} towards that choice?`],
+    ['Argue against the choice', `Make the strongest case that ${who}’s choice was wrong. Use ${ev}.`],
+    ['Now argue for it', `Make the strongest case that ${who}’s choice was right. Use ${ev2}.`],
+    ['Step back', `Pretend you have no feelings about ${who} at all. Judging only these two arguments, where do you now stand?`],
+    ['Reread and confirm', `Did you judge the choice, or how you feel about ${who}? Does your verdict feel settled, or uneasy?`]
+  ];
+  return d.map(([title, prompt], i) => ({
+    name: NAMES[i], title, def: prompt, prompt: cfg.prompts[i].trim() || prompt,
+    jot: i === 0 ? (own ? 'What’s pulling you towards it?' : `What was pulling ${who}?`) : 'Jot it in a few words'
+  }));
+}
+
+/* ── Student state ─────────────────────────────────────── */
+let state;
+const resetStudent = () => { state = { i: 0, position: '', notes: Array(5).fill(''), dots: Array(5).fill(0) }; };
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ── Graph ─────────────────────────────────────────────── */
+function tailGraph(values, labels, { ghostLast = false, lines = null, highlight = null } = {}) {
+  const x = i => 10 + i * 20;
+  const y = v => 100 - (v - 1) * 25;
+  let svg = '';
+  if (lines) {
+    lines.forEach((l, n) => {
+      const on = !highlight || highlight === l.key;
+      const j = ((n * 37) % 9 - 4) * 0.9; // small offset so identical tails read as a bundle
+      svg += `<path d="${l.v.map((v, i) => `${i ? 'L' : 'M'}${x(i)} ${y(v) + j}`).join(' ')}" fill="none" stroke="${l.color || 'var(--pastel-lilac-ink)'}" stroke-width="${on && highlight ? 2.2 : 1.4}" opacity="${on ? (highlight ? .8 : (l.color ? .45 : .22)) : .05}" vector-effect="non-scaling-stroke"/>`;
+    });
+  }
+  const real = values.map((v, i) => v ? [i, v] : null).filter(Boolean);
+  if (real.length > 1) svg += `<path d="${real.map(([i, v], k) => `${k ? 'L' : 'M'}${x(i)} ${y(v)}`).join(' ')}" fill="none" stroke="var(--pastel-lilac-ink)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+  if (ghostLast && real.length) {
+    const [li, lv] = real[real.length - 1];
+    svg += `<path d="M${x(li)} ${y(lv)} L${x(4)} ${y(lv)}" stroke="var(--shallow)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`;
+  }
+  let html = '';
+  values.forEach((v, i) => {
+    if (!v) return;
+    // Peaks label above, troughs below, so the label sits outside the bend of the line.
+    const near = [values[i - 1], values[i + 1]].filter(Boolean);
+    const avg = near.length ? near.reduce((a, b) => a + b, 0) / near.length : v;
+    const above = v === 5 ? false : v === 1 ? true : v >= avg;
+    const top = `calc(1.6rem + (100% - 3.2rem) * ${y(v) / 100})`;
+    html += `<span class="tail__dot" style="left:${x(i)}%;top:${top}"></span>`;
+    if (labels && labels[i]) html += `<span class="tail__label" style="left:${x(i)}%;top:${top};--ty:${above ? 'calc(-100% - 0.7rem)' : '0.7rem'}">${esc(labels[i])}</span>`;
+  });
+  if (ghostLast) {
+    const lv = real.length ? real[real.length - 1][1] : 3;
+    html += `<span class="tail__dot tail__dot--ghost" style="left:${x(4)}%;top:calc(1.6rem + (100% - 3.2rem) * ${y(lv) / 100})"></span>`;
+    html += `<span class="tail__label tail__label--ghost" style="left:${x(4)}%;top:calc(1.6rem + (100% - 3.2rem) * ${y(lv) / 100});--ty:0.7rem">at the end of the lesson</span>`;
+  }
+  return `<div class="tail__frame">
+      <span class="tail__cap">↑ settled</span>
+      <div class="tail__plot"><div class="tail__grid"></div>
+        <svg class="tail__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>${html}</div>
+      <span class="tail__cap">↓ uneasy</span><div class="tail__x">${NAMES.map(n => `<span>${n}</span>`).join('')}</div>
+    </div>`;
+}
+
+/* ── Reading the tail ──────────────────────────────────── */
+const SHAPES = {
+  tested: { name: 'Tested, came back', icon: 'M2 3 L10 12 L18 5 L30 3', text: 'The case against shook you, then you came back. That is what testing looks like. Name the moment that brought you back in your answer.' },
+  stuck:  { name: 'Against stuck', icon: 'M2 3 L10 12 L18 10 L30 11', text: 'The case against shook you and you never fully recovered. Your Against note might be closer to your real answer. Does your paragraph admit that?' },
+  rose:   { name: 'Rose', icon: 'M2 12 L10 9 L18 6 L30 3', text: 'You grew more settled the whole way. Check: did anything really test you, or was your case against a soft one?' },
+  fell:   { name: 'Ended lower', icon: 'M2 3 L10 6 L18 9 L30 12', text: 'You finished less settled than you started. Follow the unease: what is it pointing at? Change one sentence, or explain why you are keeping it.' },
+  flat:   { name: 'Flat', icon: 'M2 7 L10 8 L18 7 L30 7', text: 'Your line barely moved. Were you free at the start, or decided before you began? Try Against again with the hardest evidence you can find.' },
+  wander: { name: 'Wandered', icon: 'M2 7 L10 3 L18 12 L30 6', text: 'Your line moved around. Find the step where it jumped most: that note is doing the most work in your thinking.' }
+};
+function classify(v) {
+  const max = Math.max(...v), min = Math.min(...v);
+  if (max - min <= 1) return 'flat';
+  if (v[1] < v[0] && v[1] === min) return v[4] >= v[0] ? 'tested' : 'stuck';
+  if (v[4] > v[0]) return 'rose';
+  if (v[4] < v[0]) return 'fell';
+  return 'wander';
+}
+
+/* ── Student workspace ─────────────────────────────────── */
+function renderProgress() {
+  $('#progress').innerHTML = steps().slice(0, 4).map((s, i) =>
+    `<button data-i="${i}" ${i === state.i ? 'aria-current="step"' : ''} class="${state.dots[i] && state.notes[i] ? 'done' : ''}">${i + 1}. ${s.name}</button>`).join('');
+  $('#progress').querySelectorAll('button').forEach(b => b.onclick = () => { state.i = +b.dataset.i; renderStep(); });
+}
+function scaleHTML(i) {
+  return `<fieldset class="scale"><legend>How settled are you in your ${cfg.mode === 'own' ? 'answer' : 'verdict'} right now?</legend>
+    <div class="scale__row"><span class="scale__end">uneasy</span><div class="scale__dots">
+    ${[1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" aria-label="${n} of 5" aria-pressed="${state.dots[i] === n}"></button>`).join('')}
+    </div><span class="scale__end">settled</span></div></fieldset>`;
+}
+function noteHTML(i, label) {
+  return `<label class="field">${label} <small>This becomes the label on your dot.</small>
+    <input type="text" maxlength="${LABEL_MAX}" data-note value="${esc(state.notes[i])}" placeholder="In a few words">
+    <span class="count">${state.notes[i].length}/${LABEL_MAX}</span></label>`;
+}
+function wire(root, i, after) {
+  const input = $('[data-note]', root);
+  input.oninput = () => { state.notes[i] = input.value; $('.count', root).textContent = `${input.value.length}/${LABEL_MAX}`; after(); };
+  root.querySelectorAll('.scale__dots button').forEach(b => b.onclick = () => {
+    state.dots[i] = +b.dataset.n;
+    root.querySelectorAll('.scale__dots button').forEach(o => o.setAttribute('aria-pressed', o === b));
+    after();
+  });
+}
+function renderStep() {
+  renderProgress();
+  const all = steps(), i = state.i, s = all[i], root = $('#step');
+  let initial = '';
+  if (i === 0) initial = cfg.type === 'write'
+    ? `<label class="field">Your initial ${cfg.mode === 'own' ? 'answer' : 'verdict'}<input type="text" maxlength="40" data-pos-input value="${esc(state.position)}" placeholder="In a few words"></label>`
+    : `<div class="positions" role="group" aria-label="Your initial answer">${options().map(p => `<button type="button" class="shape" data-pos="${esc(p)}" aria-pressed="${state.position === p}">${esc(p)}</button>`).join('')}</div>`;
+  const pair = i === 3 ? `<div class="pair"><div><span>Against</span>“${esc(state.notes[1])}”</div><div><span>For</span>“${esc(state.notes[2])}”</div></div>` : '';
+  root.innerHTML = `<p class="step__title">${esc(s.title)}</p><p class="step__prompt">${esc(s.prompt)}</p>${initial}${pair}${noteHTML(i, s.jot)}${scaleHTML(i)}
+    <div class="actions">${i ? '<button class="btn btn--ghost" data-back>Back</button>' : ''}<button class="btn" data-next>${i < 3 ? 'Next' : 'Draw my tail'}</button></div>`;
+  const ready = () => { $('[data-next]', root).disabled = !(state.notes[i].trim() && state.dots[i] && (i || state.position.trim())); renderProgress(); };
+  root.querySelectorAll('[data-pos]').forEach(btn => btn.onclick = () => {
+    state.position = btn.dataset.pos;
+    root.querySelectorAll('[data-pos]').forEach(o => o.setAttribute('aria-pressed', o === btn));
+    ready();
+  });
+  const posInput = $('[data-pos-input]', root);
+  if (posInput) posInput.oninput = () => { state.position = posInput.value; ready(); };
+  wire(root, i, ready); ready();
+  const back = $('[data-back]', root); if (back) back.onclick = () => { state.i--; renderStep(); };
+  $('[data-next]', root).onclick = () => { if (i < 3) { state.i++; renderStep(); } else showGraph(); };
+}
+function showGraph() {
+  $('#step').innerHTML = '';
+  $('#progress').innerHTML = '';
+  $('#graphOut').innerHTML = `<div class="tail"><div class="tail__head"><h4>Your tail so far</h4><span class="book">Copy this into your book</span></div>
+    ${tailGraph(state.dots, state.notes, { ghostLast: true })}
+    <p class="muted">Now write your answer above. The last dot comes from the Confirm card at the end of the lesson.</p>
+    <div class="actions"><button class="btn btn--ghost" id="edit">Change a step</button></div></div>`;
+  $('#edit').onclick = () => { $('#graphOut').innerHTML = ''; state.i = 0; renderStep(); };
+  renderConfirm();
+}
+function renderConfirm() {
+  const root = $('#confirmBody');
+  const own = cfg.mode === 'own', who = cfg.who.trim() || 'they';
+  if (!state.dots.slice(0, 4).every(Boolean)) {
+    root.innerHTML = `<p class="q" style="font-size:var(--text-base)">Confirm your ${own ? 'answer' : 'verdict'} to Q1</p>
+      <p class="muted">This opens once you have worked through Discern on Q1. If you refreshed the page, your earlier dots are in your book: add your last dot there.</p>`;
+    return;
+  }
+  const s = steps()[4];
+  const recall = own
+    ? `<b>You started at ${esc(state.position)},</b> pulled by “${esc(state.notes[0])}”.`
+    : `<b>Your initial verdict was ${esc(state.position)},</b> with ${esc(who)} pulled by “${esc(state.notes[0])}”.`;
+  root.innerHTML = `<p class="q" style="font-size:var(--text-base)">Reread your answer to Q1. Then confirm.</p>
+    <p class="recall">${recall}</p>
+    <p class="step__prompt">${esc(s.prompt)}</p>
+    ${noteHTML(4, s.jot)}${scaleHTML(4)}
+    <div class="actions"><button class="btn" data-finish>Finish my tail</button></div>
+    <div id="confirmGraph"></div>`;
+  const ready = () => { $('[data-finish]', root).disabled = !(state.notes[4].trim() && state.dots[4]); };
+  wire(root, 4, ready); ready();
+  $('[data-finish]', root).onclick = () => {
+    const shape = SHAPES[classify(state.dots)];
+    $('#confirmGraph').innerHTML = `<div class="tail" style="margin-top:var(--space-5)"><div class="tail__head"><h4>Your whole tail</h4><span class="book">Add the last dot in your book</span></div>
+      ${tailGraph(state.dots, state.notes)}
+      <div class="reading"><h5>Reading your tail: ${shape.name}</h5><p>${shape.text}</p></div>
+      <p class="muted">The shape does not tell you if you are right. It tells you where to look next.</p></div>`;
+  };
+}
+
+/* ── Teacher: setup panel ──────────────────────────────── */
+function renderSetup() {
+  const sug = suggest(cfg.question, cfg.mode);
+  const sugText = sug.type === 'scale' ? `${SCALES[sug.preset].name} scale` : sug.type === 'choose' ? 'Choose' : 'Write';
+  const matches = sug.type === cfg.type && (sug.type !== 'scale' || sug.preset === cfg.preset);
+  const s = steps();
+  const el = $('#setup');
+  el.innerHTML = `<h4>Discern on Q1</h4>
+    <div class="setup__group">
+      <span class="setup__label">Whose position is being tested?</span>
+      <div class="segs">
+        <button class="seg" data-mode="own" aria-pressed="${cfg.mode === 'own'}">The student’s own answer</button>
+        <button class="seg" data-mode="theirs" aria-pressed="${cfg.mode === 'theirs'}">Someone else’s choice</button>
+      </div>
+      ${cfg.mode === 'theirs' ? `<label class="field">Whose choice? <input type="text" data-cfg="who" value="${esc(cfg.who)}" placeholder="e.g. Macbeth, Chamberlain"></label>` : ''}
+    </div>
+    <div class="setup__group">
+      <label class="field">Focus <small>What is being judged. It fills every prompt.</small>
+        <input type="text" data-cfg="focus" value="${esc(cfg.focus)}"></label>
+      <label class="field">Evidence source <small>Optional. Against and For ask for “one moment from …”.</small>
+        <input type="text" data-cfg="source" value="${esc(cfg.source)}" placeholder="e.g. the poems, Source B, the data table"></label>
+    </div>
+    <div class="setup__group">
+      <span class="setup__label">Initial answer</span>
+      <div class="suggest">${matches ? `Matches the question: ${sugText}` : `Suggested from the question: ${sugText}. <button data-use-suggest>Use it</button>`}</div>
+      <div class="segs">
+        ${['scale', 'choose', 'write'].map(t => `<button class="seg" data-type="${t}" aria-pressed="${cfg.type === t}">${{ scale: 'Scale', choose: 'Choose', write: 'Write' }[t]}</button>`).join('')}
+      </div>
+      ${cfg.type === 'scale' ? `
+        <select class="select" data-preset aria-label="Scale preset">${Object.entries(SCALES).map(([k, v]) => `<option value="${k}" ${cfg.preset === k ? 'selected' : ''}>${v.name}: ${v.options.join(' / ')}</option>`).join('')}</select>
+        <div class="opt-list">${cfg.scale.map((o, n) => `<input type="text" data-scale="${n}" value="${esc(o)}" aria-label="Scale point ${n + 1}">`).join('')}</div>
+        <p class="muted" style="margin:0">Edit any wording. Students tap one.</p>` : ''}
+      ${cfg.type === 'choose' ? `
+        <div class="opt-list">${cfg.choices.map((o, n) => `<input type="text" data-choice="${n}" value="${esc(o)}" placeholder="Option ${n + 1}">`).join('')}</div>
+        <div class="actions">${cfg.choices.length < 5 ? '<button class="btn btn--ghost" data-add-choice>Add option</button>' : ''}<span class="muted">Students pick one. Two to five options.</span></div>` : ''}
+      ${cfg.type === 'write' ? `<p class="muted" style="margin:0">Students write their initial answer in a few words. Written answers can’t be grouped, so the class split by initial answer is off.</p>` : ''}
+    </div>
+    <div class="setup__group">
+      <details class="prompts"><summary>Edit step prompts</summary>
+        ${s.map((st, i) => `<label class="field" style="margin-top:var(--space-3)">${i + 1}. ${st.name}<textarea data-prompt="${i}" placeholder="${esc(st.def)}">${esc(cfg.prompts[i])}</textarea></label>`).join('')}
+        <p class="muted" style="margin:0">Leave a box empty to use the default, which updates with the focus and source.</p>
+      </details>
+    </div>
+    <div class="setup__group"><p class="muted" style="margin:0">Confirm card: added after Q1. Drag it anywhere later in the lesson and it stays linked.</p></div>`;
+
+  // Structural changes redraw the panel; typing only updates the setup.
+  el.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+    cfg.mode = b.dataset.mode;
+    if (cfg.mode === 'theirs' && cfg.type === 'scale') { cfg.preset = 'verdict'; cfg.scale = [...SCALES.verdict.options]; }
+    changed(true);
+  });
+  el.querySelectorAll('[data-type]').forEach(b => b.onclick = () => { cfg.type = b.dataset.type; changed(true); });
+  const useS = $('[data-use-suggest]', el);
+  if (useS) useS.onclick = () => { cfg.type = sug.type; if (sug.preset) { cfg.preset = sug.preset; cfg.scale = [...SCALES[sug.preset].options]; } changed(true); };
+  const preset = $('[data-preset]', el);
+  if (preset) preset.onchange = () => { cfg.preset = preset.value; cfg.scale = [...SCALES[preset.value].options]; changed(true); };
+  const add = $('[data-add-choice]', el);
+  if (add) add.onclick = () => { cfg.choices.push(''); changed(true); };
+  el.querySelectorAll('[data-cfg]').forEach(inp => inp.oninput = () => { cfg[inp.dataset.cfg] = inp.value; changed(false); });
+  el.querySelectorAll('[data-scale]').forEach(inp => inp.oninput = () => { cfg.scale[+inp.dataset.scale] = inp.value; changed(false); });
+  el.querySelectorAll('[data-choice]').forEach(inp => inp.oninput = () => { cfg.choices[+inp.dataset.choice] = inp.value; changed(false); });
+  el.querySelectorAll('[data-prompt]').forEach(inp => inp.oninput = () => { cfg.prompts[+inp.dataset.prompt] = inp.value; changed(false); });
+}
+function changed(redraw) {
+  if (redraw) renderSetup();
+  else el$prompts();
+  resetStudent();
+  renderStudentShell();
+  classKey = null;
+  if (!$('#spread').hidden) renderSpread();
+  renderConfirmTeacher();
+}
+// Keep the default-prompt placeholders current while the teacher types a focus or source.
+function el$prompts() {
+  const s = steps();
+  document.querySelectorAll('[data-prompt]').forEach(t => t.placeholder = s[+t.dataset.prompt].def);
+}
+
+/* ── Teacher: class spread (anonymous dots + initial answer) ─ */
+const GROUP_COLOURS = ['var(--wave)', 'var(--high-sea-ink)', 'var(--success)', 'var(--pastel-lilac-ink)', 'var(--danger)'];
+let classKey = null, CLASS = [], highlight = null, groupBy = 'shape';
+function fakeClass() {
+  const opts = options();
+  const key = opts.join('|') + cfg.type;
+  if (key === classKey) return CLASS;
+  classKey = key;
+  let seed = 7; const r = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const c = v => Math.max(1, Math.min(5, Math.round(v)));
+  CLASS = [];
+  for (let n = 0; n < 24; n++) {
+    const pos = opts.length ? Math.min(opts.length - 1, Math.floor(Math.pow(r(), 0.8) * opts.length)) : -1;
+    // Strong initial answers are more likely to be shaken by Against: a nudge so groups differ.
+    const kind = (r() + (pos === opts.length - 1 ? -0.2 : pos === 0 ? 0.25 : 0)) ;
+    const a = c(3 + r() * 2);
+    let v;
+    if (kind < .38) v = [a, c(a - 2 - r()), c(a - 1 + r() * 2), c(a), c(a + r())];
+    else if (kind < .55) v = [a, c(a - 2), c(a - 2 + r()), c(a - 1), c(a - 2 + r())];
+    else if (kind < .72) v = [c(a - 1), c(a - 1 + r()), c(a), c(a + r()), c(a + 1)];
+    else if (kind < .86) v = [a, c(a - r()), c(a - 1), c(a - 1 - r()), c(a - 2)];
+    else v = [a, a, c(a + r() - .5), a, a];
+    CLASS.push({ v, shape: classify(v), pos });
+  }
+  return CLASS;
+}
+function renderSpread() {
+  const tails = fakeClass();
+  const opts = options();
+  const canGroup = cfg.type !== 'write' && opts.length > 1;
+  if (!canGroup) groupBy = 'shape';
+  const lines = tails.map(t => groupBy === 'shape'
+    ? { v: t.v, key: t.shape }
+    : { v: t.v, key: 'p' + t.pos, color: GROUP_COLOURS[t.pos % GROUP_COLOURS.length] });
+  const counts = {}; tails.forEach(s => counts[s.shape] = (counts[s.shape] || 0) + 1);
+  const drops = [0, 0, 0, 0, 0];
+  tails.forEach(s => { for (let i = 1; i < 5; i++) if (s.v[i] < s.v[i - 1]) drops[i]++; });
+  const biggest = drops.indexOf(Math.max(...drops));
+  const maxDrop = Math.max(...drops) || 1;
+  const finalLow = tails.filter(s => s.v[4] <= 2).length;
+
+  let legend, detail;
+  if (groupBy === 'shape') {
+    legend = Object.keys(SHAPES).filter(k => counts[k]).map(k =>
+      `<button class="shape" data-hl="${k}" aria-pressed="${highlight === k}"><svg viewBox="0 0 32 15" aria-hidden="true"><path d="${SHAPES[k].icon}"/></svg>${SHAPES[k].name} <i>${counts[k]}</i></button>`).join('');
+    detail = `<div class="insights">
+      <div class="insight"><strong>${NAMES[biggest]}</strong>shook the most students (${drops[biggest]} dropped there)
+        <div class="steps-bar">${drops.map(d => `<div style="height:${Math.max(4, d / maxDrop * 100)}%"></div>`).join('')}</div>
+        <div class="steps-bar-x">${NAMES.map(s => `<span>${s}</span>`).join('')}</div></div>
+      <div class="insight"><strong>${counts.flat || 0}</strong>barely moved. Worth a harder case against next lesson.</div>
+      <div class="insight"><strong>${finalLow}</strong>finished uneasy. Good students to ask: what is the unease pointing at?</div>
+    </div>`;
+  } else {
+    legend = opts.map((o, p) => {
+      const n = tails.filter(t => t.pos === p).length;
+      return n ? `<button class="shape" data-hl="p${p}" aria-pressed="${highlight === 'p' + p}"><span class="swatch" style="background:${GROUP_COLOURS[p % GROUP_COLOURS.length]}"></span>${esc(o)} <i>${n}</i></button>` : '';
+    }).join('');
+    const rows = opts.map((o, p) => {
+      const g = tails.filter(t => t.pos === p);
+      if (!g.length) return '';
+      const dipped = g.filter(t => t.v[1] < t.v[0]).length;
+      const uneasy = g.filter(t => t.v[4] <= 2).length;
+      const sc = {}; g.forEach(t => sc[t.shape] = (sc[t.shape] || 0) + 1);
+      const top = Object.entries(sc).sort((a, b) => b[1] - a[1])[0][0];
+      return `<tr><td><span class="swatch" style="background:${GROUP_COLOURS[p % GROUP_COLOURS.length]}"></span> ${esc(o)}</td><td>${g.length}</td><td>${dipped} of ${g.length}</td><td>${uneasy}</td><td>${SHAPES[top].name}</td></tr>`;
+    }).join('');
+    detail = `<div class="table-wrap"><table class="split"><thead><tr><th>Initial answer</th><th>Students</th><th>Shaken by Against</th><th>Finished uneasy</th><th>Most common shape</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  const el = $('#spread');
+  el.innerHTML = `<h4>Class spread · ${tails.length} tails in</h4>
+    <p class="muted" style="margin:0">Anonymous: dots and initial answers only, no notes. Tap a chip to pick those tails out.</p>
+    <div class="segs" style="margin-top:var(--space-4)">
+      <button class="seg" data-group="shape" aria-pressed="${groupBy === 'shape'}">By shape</button>
+      <button class="seg" data-group="initial" aria-pressed="${groupBy === 'initial'}" ${canGroup ? '' : 'disabled title="Written initial answers can’t be grouped"'}>By initial answer</button>
+    </div>
+    <div class="tail">${tailGraph([0, 0, 0, 0, 0], null, { lines, highlight })}</div>
+    <div class="shapes">${legend}</div>
+    ${detail}`;
+  el.querySelectorAll('[data-hl]').forEach(b => b.onclick = () => { highlight = highlight === b.dataset.hl ? null : b.dataset.hl; renderSpread(); });
+  el.querySelectorAll('[data-group]').forEach(b => b.onclick = () => { if (b.disabled) return; groupBy = b.dataset.group; highlight = null; renderSpread(); });
+}
+function renderConfirmTeacher() {
+  const tails = fakeClass();
+  const finals = [1, 2, 3, 4, 5].map(n => tails.filter(s => s.v[4] === n).length);
+  const max = Math.max(...finals) || 1;
+  $('#confirmTeacher').innerHTML = `<p class="q" style="font-size:var(--text-base)">Confirm for Q1</p>
+    <p class="muted">Created when you attached Discern to Q1. Drag it anywhere later in the lesson; it stays linked.</p>
+    <div class="insight" style="margin-top:var(--space-3)"><b>Final dot, whole class</b>
+      <div class="steps-bar">${finals.map(f => `<div style="height:${Math.max(4, f / max * 100)}%"></div>`).join('')}</div>
+      <div class="steps-bar-x"><span>uneasy</span><span></span><span></span><span></span><span>settled</span></div></div>`;
+}
+
+/* ── Wiring ────────────────────────────────────────────── */
+function renderStudentShell() {
+  $('#qText').textContent = cfg.question;
+  $('#wsTitle').textContent = cfg.mode === 'own'
+    ? 'Discern: test your initial answer before you write it'
+    : `Discern: test ${cfg.who.trim() || 'their'}${cfg.who.trim() ? '’s' : ''} choice before you judge it`;
+  $('#graphOut').innerHTML = '';
+  if (!$('#ws').hidden) renderStep();
+  renderConfirm();
+}
+$('#discernChip').onclick = () => {
+  const open = $('#ws').hidden;
+  $('#ws').hidden = !open;
+  $('#discernChip').setAttribute('aria-expanded', open);
+  if (open && !$('#graphOut').innerHTML) renderStep();
+};
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+  const tab = b.dataset.tab;
+  $('#setup').hidden = tab !== 'setup';
+  $('#spread').hidden = tab !== 'spread';
+  document.querySelectorAll('[data-tab]').forEach(o => o.setAttribute('aria-expanded', o === b));
+  if (tab === 'spread') renderSpread();
+});
+document.querySelectorAll('[data-view-btn]').forEach(b => b.onclick = () => {
+  document.body.dataset.view = b.dataset.viewBtn;
+  document.querySelectorAll('[data-view-btn]').forEach(o => o.setAttribute('aria-pressed', o === b));
+});
+const demoSel = $('#demoQ');
+demoSel.innerHTML = DEMO.map((d, n) => `<option value="${n}">Try: ${d.label}</option>`).join('');
+demoSel.onchange = () => { loadDemo(DEMO[+demoSel.value]); highlight = null; groupBy = 'shape'; changed(true); };
+
+loadDemo(DEMO[0]);
+resetStudent();
+renderSetup();
+renderStudentShell();
+renderConfirmTeacher();
+</script>
+</body>
+</html>

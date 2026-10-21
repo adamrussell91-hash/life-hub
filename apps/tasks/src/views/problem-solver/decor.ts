@@ -5,8 +5,9 @@
  * Every string here is static markup; user text is always set with textContent elsewhere.
  */
 import { el } from '@/views/hub-kit';
-import { MODELS } from '../../../../../packages/problem-solver/models.mjs';
+import { stepName, stepPlan } from '../../../../../packages/problem-solver/steps.mjs';
 import { EMBLEM_SVG } from '../../../../../packages/problem-solver/glyphs';
+import { isPaused } from '../../../../../packages/problem-solver/render/record';
 import type { PsSession, PsToolId } from '../../../../../packages/problem-solver/types';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -154,25 +155,42 @@ export function createTrack(): TrackView {
   return {
     el: nav,
     update(session) {
-      const model = MODELS[session.model?.id ?? 'seven_step'];
-      const defineAt = 1 + Math.max(0, model.steps.findIndex((step: { id: string }) => step.id === model.define));
-      const names = ['Frame', ...model.steps.map((step: { name: string }) => step.name)];
-      const now = session.phase === 'frame' ? 0 : session.phase === 'define' ? defineAt : -1;
-      const doneUpTo = session.phase === 'frame' ? 0 : session.phase === 'define' ? defineAt : defineAt + 1;
-      const tool = session.define.runs.find((run) => run.status === 'active')?.tool ?? session.define.runs.at(-1)?.tool ?? null;
-      const next = `${model.id}|${now}|${doneUpTo}|${tool}`;
+      const modelId = session.model?.id ?? 'seven_step';
+      const plan = stepPlan(modelId);
+      const names = ['Frame', ...plan.map((s: { step: string }) => stepName(modelId, s.step))];
+      const index = plan.findIndex((s: { step: string }) => s.step === session.phase);
+      const now = session.phase === 'frame' ? 0 : index >= 0 ? index + 1 : -1;
+      const stateOf = (i: number): 'now' | 'done' | 'skipped' | 'waiting' | 'future' => {
+        if (i === now) return 'now';
+        if (i === 0) return session.phase === 'frame' ? 'now' : 'done';
+        const step = plan[i - 1].step;
+        const st = session.steps?.[step]?.status;
+        if (isPaused(session, step) || st === 'waiting') return 'waiting';
+        if (st === 'skipped') return 'skipped';
+        if (st === 'done') return 'done';
+        if (session.phase === 'finished' || (now > 0 && i < now)) return 'done';
+        return 'future';
+      };
+      const toolOf = (i: number): PsToolId | null => {
+        const runs = session.steps?.[plan[i - 1]?.step]?.runs ?? [];
+        return runs.find((run) => run.status === 'active')?.tool ?? runs.filter((run) => run.status !== 'switched').at(-1)?.tool ?? null;
+      };
+      const states = names.map((_, i) => stateOf(i));
+      const tools = names.map((_, i) => (i === 0 ? null : toolOf(i)));
+      const next = `${modelId}|${session.phase}|${states.join(',')}|${tools.join(',')}`;
       if (next === key) return;
       key = next;
-      const reach = now >= 0 ? now : doneUpTo - 1;
+      const reach = now >= 0 ? now : names.length - 1;
       list.style.setProperty('--ps-track-p', String(Math.max(0, reach) / Math.max(1, names.length - 1)));
       list.replaceChildren(
         ...names.map((name, i) => {
-          const state = i === now ? 'now' : i < doneUpTo ? 'done' : 'future';
+          const state = states[i];
           const item = el('li', 'ps-track__stn');
           item.dataset.state = state;
           if (state === 'now') item.setAttribute('aria-current', 'step');
-          const colour = state === 'future' ? 'var(--ps-ghost)' : COLOURS[(i + 2) % 3];
-          const markup = i === 0 ? FRAME_MARK : i === defineAt && tool && state !== 'future' ? EMBLEM_SVG[tool] ?? '' : STATION_MARKS[(i - 1) % STATION_MARKS.length];
+          const colour = state === 'future' || state === 'skipped' ? 'var(--ps-ghost)' : COLOURS[(i + 2) % 3];
+          const tool = tools[i];
+          const markup = i === 0 ? FRAME_MARK : tool && state !== 'future' ? EMBLEM_SVG[tool] ?? '' : STATION_MARKS[(i - 1) % STATION_MARKS.length];
           const mark = el('span', 'ps-track__mark');
           const drawing = svg('0 0 100 100', markup);
           drawing.style.setProperty('--c', colour);

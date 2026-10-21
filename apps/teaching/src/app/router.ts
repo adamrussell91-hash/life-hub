@@ -13,6 +13,7 @@ export type RouteName =
   | 'teacher-document'
   | 'teacher-lessons'
   | 'teacher-lesson'
+  | 'teacher-lesson-display'
   | 'teacher-resources'
   | 'teacher-templates'
   | 'teacher-feedback'
@@ -38,6 +39,7 @@ export type RouteParams = {
   'teacher-document': { documentId: string };
   'teacher-lessons': Record<string, never>;
   'teacher-lesson': { lessonId: string };
+  'teacher-lesson-display': { lessonId: string };
   'teacher-resources': Record<string, never>;
   'teacher-templates': Record<string, never>;
   'teacher-feedback': Record<string, never>;
@@ -287,6 +289,16 @@ export function match(pathname: string): RouteMatch | null {
     return {
       name: 'teacher-document',
       params: { documentId: teacherDocument[1] },
+      requiresAuth: true,
+      path
+    };
+  }
+
+  const lessonDisplay = path.match(/^\/lessons\/([^/]+)\/display$/);
+  if (lessonDisplay) {
+    return {
+      name: 'teacher-lesson-display',
+      params: { lessonId: lessonDisplay[1] },
       requiresAuth: true,
       path
     };

@@ -933,3 +933,73 @@ test("Find venue searches the typed venue and offers it when the map does not kn
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+// Invented recipes: a book big enough for the Just added spread.
+function seedBook(journal) {
+  const visit = journal.visits[0];
+  const extra = [
+    ["Burnt honey tart", "Dessert", "French", "2026-10-01T01:00:00.000Z"],
+    ["Charred corn tacos", "Lunch", "Mexican", "2026-10-03T01:00:00.000Z"],
+    ["Miso butter mushrooms", "Dinner", "Japanese", "2026-10-12T01:00:00.000Z"],
+    ["Anzac biscuits", "Snack", "Australian", null],
+  ];
+  for (const [title, meal, cuisine, added] of extra) {
+    const dish = { ...newDish(), title, meal_type: meal, cuisine };
+    visit.dishes.push(dish);
+    journal.recipes.push({
+      id: `recipe_${dish.id.slice(5)}`,
+      dish_id: dish.id,
+      title,
+      servings: 4,
+      ingredients: title === "Anzac biscuits" ? ["1 cup golden syrup", "1 cup oats"] : ["1 tbsp oil"],
+      steps: ["Cook."],
+      sources: [],
+      ...(added ? { added_at: added } : {}),
+    });
+  }
+}
+for (const width of [1440, 390])
+  test(`recipe book ${width}: browse, search, sort and open a recipe from the Recipes tab`, async () => {
+    const { page, read, errors } = await pageFor(width, { seed: seedBook });
+    await page.getByRole("tab", { name: "Recipes (5)" }).click();
+    const book = page.locator("[data-recipe-book]");
+    await book.waitFor();
+    assert.match(await book.locator(".fj-masthead").innerText(), /5 recipes/);
+    assert.deepEqual(
+      await book.locator(".fj-book__card-title").allInnerTexts(),
+      ["Miso butter mushrooms", "Charred corn tacos", "Burnt honey tart"],
+    );
+    await page.getByRole("button", { name: "A to Z", exact: true }).click();
+    assert.deepEqual(
+      await book.locator(".fj-book__letter").evaluateAll((n) => n.map((x) => x.firstChild.textContent)),
+      ["A", "B", "C", "L", "M"],
+    );
+    assert.equal(await book.getByRole("button", { name: "Jump to Z" }).isDisabled(), true);
+    await page.getByLabel("Search recipes").fill("golden syrup");
+    assert.equal(await book.locator(".fj-book__entry").count(), 1);
+    assert.equal(await book.locator(".fj-book__spread").isHidden(), true);
+    await page.getByLabel("Search recipes").fill("");
+    await book.getByRole("button", { name: /^Dessert/ }).click();
+    assert.deepEqual(await book.locator(".fj-book__entry-title").allInnerTexts(), ["Burnt honey tart"]);
+    await book.getByRole("button", { name: /^All/ }).click();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+      width,
+    );
+    await book.locator('.fj-book__entry:has-text("Lasagne")').click();
+    await page.locator(".food-sheet").waitFor();
+    if (width <= 720) await phoneGate(page);
+    assert.equal(await page.getByLabel("Recipe title").inputValue(), "Lasagne");
+    assert.equal(await page.locator(".food-cooking .food-check").count(), 2);
+    await page.getByRole("button", { name: "Save recipe", exact: true }).click();
+    await page.locator(".food-sheet").waitFor({ state: "detached" });
+    const saved = read().recipes.find((r) => r.title === "Lasagne");
+    assert.match(saved.added_at, /^\d{4}-\d{2}-\d{2}T/);
+    await book.waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "A to Z", exact: true }).getAttribute("aria-pressed"),
+      "true",
+    );
+    assert.deepEqual(errors, []);
+    await page.close();
+  });

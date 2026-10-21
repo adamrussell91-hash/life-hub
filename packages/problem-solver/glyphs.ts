@@ -12,6 +12,7 @@ import metacognition from './glyphs/skills/metacognition.svg?raw';
 import reflective_thinking from './glyphs/skills/reflective_thinking.svg?raw';
 import searching from './glyphs/skills/searching.svg?raw';
 import synthesis from './glyphs/skills/synthesis.svg?raw';
+import contradiction from './glyphs/tools/contradiction.svg?raw';
 import concept_map from './glyphs/tools/concept_map.svg?raw';
 import five_whys from './glyphs/tools/five_whys.svg?raw';
 import gap_basic from './glyphs/tools/gap_basic.svg?raw';
@@ -19,6 +20,31 @@ import gap_radar from './glyphs/tools/gap_radar.svg?raw';
 import problem_statement from './glyphs/tools/problem_statement.svg?raw';
 import problem_tree from './glyphs/tools/problem_tree.svg?raw';
 import smart from './glyphs/tools/smart.svg?raw';
+import causal_map from './glyphs/tools/causal_map.svg?raw';
+import perspective_shift from './glyphs/tools/perspective_shift.svg?raw';
+import radial_tree from './glyphs/tools/radial_tree.svg?raw';
+import force_field from './glyphs/tools/force_field.svg?raw';
+import from_to from './glyphs/tools/from_to.svg?raw';
+import intent_statement from './glyphs/tools/intent_statement.svg?raw';
+import problem_reduction from './glyphs/tools/problem_reduction.svg?raw';
+import analogical_reasoning from './glyphs/tools/analogical_reasoning.svg?raw';
+import solution_tree from './glyphs/tools/solution_tree.svg?raw';
+import lotus_blossom from './glyphs/tools/lotus_blossom.svg?raw';
+import duncker from './glyphs/tools/duncker.svg?raw';
+import decision_matrix from './glyphs/tools/decision_matrix.svg?raw';
+import swot from './glyphs/tools/swot.svg?raw';
+import morphological from './glyphs/tools/morphological.svg?raw';
+import pareto from './glyphs/tools/pareto.svg?raw';
+import dmaic from './glyphs/tools/dmaic.svg?raw';
+import fifteen_percent from './glyphs/tools/fifteen_percent.svg?raw';
+import kanban from './glyphs/tools/kanban.svg?raw';
+import eisenhower from './glyphs/tools/eisenhower.svg?raw';
+import after_action_review from './glyphs/tools/after_action_review.svg?raw';
+import double_loop from './glyphs/tools/double_loop.svg?raw';
+import feedback_matrix from './glyphs/tools/feedback_matrix.svg?raw';
+import five_cs from './glyphs/tools/five_cs.svg?raw';
+import knowledge_management from './glyphs/tools/knowledge_management.svg?raw';
+import lightning from './glyphs/lightning.svg?raw';
 import type { PsToolId } from './types';
 
 const SOURCES: Record<string, string> = {
@@ -26,7 +52,13 @@ const SOURCES: Record<string, string> = {
   learning, logical_reasoning, metacognition, reflective_thinking, searching, synthesis
 };
 
-const EMBLEMS: Record<PsToolId, string> = { five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart };
+const EMBLEMS: Record<PsToolId, string> = {
+  five_whys, concept_map, problem_tree, gap_basic, gap_radar, problem_statement, smart, contradiction,
+  causal_map, perspective_shift, radial_tree, force_field, from_to, intent_statement,
+  problem_reduction, analogical_reasoning, solution_tree, lotus_blossom, duncker,
+  decision_matrix, swot, morphological, pareto, dmaic, fifteen_percent, kanban, eisenhower,
+  after_action_review, double_loop, feedback_matrix, five_cs, knowledge_management
+};
 
 /** Raw emblem markup, for drawings that place an emblem inside a larger svg. */
 export const EMBLEM_SVG: Record<PsToolId, string> = EMBLEMS;
@@ -66,6 +98,15 @@ export function toolEmblem(id: PsToolId, doc: Document = document): HTMLSpanElem
   const span = doc.createElement('span');
   span.className = 'ps-emblem';
   span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = EMBLEMS[id] ?? '';
+  span.innerHTML = EMBLEMS[id];
+  return span;
+}
+
+/** The Lightning bolt: ink only (currentColor), for the black-and-white mode. */
+export function lightningGlyph(doc: Document = document): HTMLSpanElement {
+  const span = doc.createElement('span');
+  span.className = 'ps-lightning-glyph';
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = lightning;
   return span;
 }

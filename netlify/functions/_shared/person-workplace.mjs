@@ -27,27 +27,33 @@ function isImported(link) {
   return Boolean(link?.import_source);
 }
 
+// Workplace links pair across employee_at / member_of (a native member_of
+// supersedes an imported employee_at at the same organisation); education
+// pairs only with education, so studying and working at one place both stay.
+const SUPERSEDE_TYPES = new Set([...WORKPLACE_TYPES, 'studied_at']);
+
 function pairKey(link) {
-  return `${link.source_ref}→${link.target_ref}`;
+  const group = link.relationship_type === 'studied_at' ? 'studied' : 'work';
+  return `${link.source_ref}→${link.target_ref}|${group}`;
 }
 
 /**
- * Drop imported workplace links whose person + organisation pair also has a
- * native workplace link (current or ended). Works on any list of
+ * Drop imported workplace (or education) links whose person + organisation
+ * pair also has a native link of the same group (current or ended). Works on any list of
  * `{ link, ... }` entries; everything else passes through untouched.
  */
 export function withoutSupersededImports(entries) {
   const nativePairs = new Set();
   for (const entry of entries ?? []) {
     const link = entry?.link;
-    if (link && WORKPLACE_TYPES.has(link.relationship_type) && !isImported(link)) {
+    if (link && SUPERSEDE_TYPES.has(link.relationship_type) && !isImported(link)) {
       nativePairs.add(pairKey(link));
     }
   }
   if (!nativePairs.size) return entries ?? [];
   return (entries ?? []).filter((entry) => {
     const link = entry?.link;
-    if (!link || !isImported(link) || !WORKPLACE_TYPES.has(link.relationship_type)) return true;
+    if (!link || !isImported(link) || !SUPERSEDE_TYPES.has(link.relationship_type)) return true;
     return !nativePairs.has(pairKey(link));
   });
 }

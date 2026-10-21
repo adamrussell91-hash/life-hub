@@ -1,4 +1,4 @@
-/** Public page for a published personal line: `line.html#<code>`. No sign-in, no hub chrome. */
+/** Public page for a published personal line: `class.adam-russell.com/line#<code>` (`line.html#<code>` in dev). No sign-in, no hub chrome. */
 import { apiGet } from '@/api/client';
 import type { LineSnapshot } from '@/personal-line/model';
 import { mountPersonalLine } from '@/personal-line/render';

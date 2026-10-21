@@ -3,7 +3,7 @@ import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
 import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
-import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, MediaFolder, MediaUsage, CurriculumOutcome, TeachingDocument } from '@/schemas';
+import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, MediaFolder, MediaUsage, CurriculumOutcome, TeachingDocument, LineStop } from '@/schemas';
 
 export interface CurriculumLessonSummary {
   id: string;
@@ -23,6 +23,7 @@ export interface CurriculumLessonSummary {
   review_status?: 'needs_review' | 'none';
   syllabus_outcomes?: string[];
   outcome_ids?: string[];
+  line_stops?: LineStop[];
   excerpt?: string;
   attachment_count?: number;
   pedagogical_mode?: PedagogicalMode;

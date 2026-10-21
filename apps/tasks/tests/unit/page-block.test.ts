@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PageBlockSchema } from '@/schemas/page-block';
-import { taskPaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
+import { taskPaletteFamilies } from '@/views/block-insert';
 
 describe('page block schema', () => {
   it('accepts the calendar stub quote shape and fills Teaching Hub fields', () => {

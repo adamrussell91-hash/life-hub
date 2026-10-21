@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
+import { DiscernQualifierSchema } from './discern';
+import { LensAttachmentsSchema, LensLevelSchema, LogicSchema } from './lens';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -40,8 +42,13 @@ export const BlockTypeSchema = z.enum([
   'table',
   'peer_feedback',
   'question_drop',
+  'brainstorm',
+  'hinge_question',
+  'continuum_line',
+  'curriculum_lines',
   'quiz_question',
   'question_set',
+  'discern_confirm',
   'flashcards',
   'cloze',
   'self_check',
@@ -96,6 +103,7 @@ export type EmbedProvider = z.infer<typeof EmbedProviderSchema>;
 export const HeadingVariantSchema = z.enum(['page', 'section', 'subsection']);
 export const MediaSizeVariantSchema = z.enum(['small', 'medium', 'large']);
 export const CalloutStyleSchema = z.enum([
+  'cultural_warning',
   'information',
   'important',
   'warning',
@@ -123,6 +131,8 @@ const blockTimestamps = {
 
 const blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
+  discern: DiscernQualifierSchema.optional(),
+  lenses: LensAttachmentsSchema.optional(),
   layout: z.record(z.unknown()).default({}),
   print: z.record(z.unknown()).default({}),
   settings: z.record(z.unknown()).default({})
@@ -424,9 +434,23 @@ export const AudioBlockSchema = z.object({
   block_type: z.literal('audio'),
   variant: z.string().default('medium'),
   visibility: VisibilitySchema,
+  /**
+   * The Voice block. `listen` plays a clip (the original audio block); `respond`
+   * and `viva` have students record a spoken answer and submit their best take.
+   * Viva adds dot points the timer walks through. `url` is only used by listen.
+   */
   content: z.object({
     url: z.string(),
-    title: z.string().optional()
+    title: z.string().optional(),
+    mode: z.enum(['listen', 'respond', 'viva']).default('listen'),
+    prompt: z.string().max(4000).optional(),
+    time_limit_s: z.number().int().min(30).max(300).optional(),
+    student_chooses_time: z.boolean().optional(),
+    scaffold: z
+      .array(z.object({ label: z.string().max(80), weight: z.number().min(0.5).max(3).default(1) }))
+      .max(8)
+      .optional(),
+    code_groups: z.array(z.enum(['composition', 'viva', 'speaking'])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -484,7 +508,11 @@ export const QuestionItemSchema = z.object({
   prompt: z.string(),
   kind: QuestionKindSchema,
   options: z.array(z.string()).optional(),
-  response_space: ResponseSpaceSchema.optional()
+  response_space: ResponseSpaceSchema.optional(),
+  /** The 4 levels format's band; absent means guessed from the question's opening words. */
+  level: z.enum(['beginner', 'detective', 'judge', 'inventor']).optional(),
+  /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
+  logic: LogicSchema.optional()
 });
 
 export const PeerFeedbackBlockSchema = z.object({
@@ -499,6 +527,200 @@ export const PeerFeedbackBlockSchema = z.object({
     suggestion_prompt: z.string().max(300).default('One suggestion or question…')
   }), ...blockLayout, ...blockTimestamps
 });
+
+/**
+ * Continuum line: students place their symbol on a line for each statement
+ * about one stimulus and give a reason. Snapped statements land on the ends
+ * or the named stops; the rules live on the server.
+ */
+export const ContinuumStatementSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().max(300).default(''),
+  snap: z.boolean().default(false)
+});
+export const ContinuumLineBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('continuum_line'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    stimulus: z.object({
+      kind: z.enum(['text', 'image', 'video']).default('text'),
+      text: z.string().max(2000).default(''),
+      url: z.string().max(2000).default(''),
+      alt_text: z.string().max(500).default('')
+    }).default({ kind: 'text', text: '', url: '', alt_text: '' }),
+    scale: z.object({
+      left: z.string().max(40).default('Implied'),
+      right: z.string().max(40).default('Not implied'),
+      stops: z.array(z.string().max(40)).max(3).default([])
+    }).default({ left: 'Implied', right: 'Not implied', stops: [] }),
+    statements: z.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z.enum(['teacher', 'student']).default('teacher'),
+    replace: z.boolean().default(true)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Brainstorm: students send short answers to one question; the teacher's board
+ * shows them as orbiting symbols, then reveals them as a grid, cloud or groups.
+ * `per_student` 0 means unlimited (the server still caps it).
+ */
+export const BrainstormBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('brainstorm'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    question: z.string().max(500).default(''),
+    safety: z.enum(['instant', 'approve', 'reveal']).default('approve'),
+    per_student: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(5)]).default(3),
+    max_length: z.number().int().min(20).max(280).default(140),
+    layout: z.enum(['grid', 'cloud', 'groups']).default('grid')
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Hinge question: one quick multiple-choice check at the turning point of a
+ * lesson. Each wrong option names the misconception it reveals. The right
+ * answer, the misconception notes and the move-on / reteach thresholds are
+ * teacher-only: publish strips them, and the server reads them from the draft.
+ */
+export const HingeOptionSchema = z.object({
+  id: z.string().min(1).max(40),
+  text: z.string().max(300).default(''),
+  misconception: z.string().max(300).default('')
+});
+
+export const HingeQuestionBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('hinge_question'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    prompt: z.string().max(500).default(''),
+    options: z.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z.string().max(40).default(''),
+    seconds: z.union([z.literal(0), z.literal(30), z.literal(60), z.literal(90), z.literal(120)]).default(60),
+    move_on: z.number().int().min(1).max(100).default(80),
+    reteach: z.number().int().min(0).max(99).default(50)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Curriculum lines: a unit's curriculum map drawn as a transit map. Each strand
+ * of learning is a line, each station is one week's work on that strand at a
+ * depth (introduced, reinforced, mastered), and every line runs into the
+ * assessment terminus. A station is a lesson link or a text label; stations on
+ * several strands that link the same lesson in the same week join into an
+ * interchange. Checkpoints are interchanges made by hand.
+ */
+export const CurriculumLinesColourSchema = z.enum([
+  'wave', 'wave_deep', 'green', 'green_deep', 'amber', 'amber_deep', 'lilac', 'lilac_deep', 'navy', 'navy_deep'
+]);
+export const CurriculumLinesLevelSchema = z.enum(['introduced', 'reinforced', 'mastered']);
+export const CurriculumLinesStrandSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().max(60).default(''),
+  colour: CurriculumLinesColourSchema.default('wave')
+});
+export const CurriculumLinesStationSchema = z.object({
+  id: z.string().min(1).max(64),
+  strand_id: z.string().min(1).max(64),
+  week: z.number().int().min(1).max(20),
+  level: CurriculumLinesLevelSchema.default('reinforced'),
+  label: z.string().max(120).default(''),
+  lesson_id: z.string().min(1).max(64).optional()
+});
+export const CurriculumLinesCheckpointSchema = z.object({
+  id: z.string().min(1).max(64),
+  week: z.number().int().min(1).max(20),
+  label: z.string().max(80).default(''),
+  lesson_id: z.string().min(1).max(64).optional(),
+  strand_ids: z.array(z.string().min(1).max(64)).min(1).max(8)
+});
+export const CurriculumLinesTerminusSchema = z.object({
+  label: z.string().max(80).default('Assessment task'),
+  detail: z.string().max(160).optional(),
+  when: z.string().max(24).optional(),
+  lesson_id: z.string().min(1).max(64).optional()
+});
+/** Version 1: free-text strands, one station per strand per week. Converted on read. */
+export const CurriculumLinesV1ContentSchema = z.object({
+  title: z.string().max(120).optional(),
+  weeks: z.number().int().min(1).max(20).default(8),
+  strands: z.array(CurriculumLinesStrandSchema).min(1).max(8),
+  stations: z.array(CurriculumLinesStationSchema).max(160).default([]),
+  checkpoints: z.array(CurriculumLinesCheckpointSchema).max(20).default([]),
+  terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
+});
+
+/**
+ * Network lines live on the subject; which lines a lesson serves lives on the
+ * lesson. The block keeps only what belongs to this unit's map: light-rail
+ * stops, gates, drag nudges and the terminus.
+ */
+export const NetworkLineModeSchema = z.enum(['train', 'metro', 'light_rail']);
+export const NetworkLineSchema = z.object({
+  id: z.string().min(1).max(64),
+  mode: NetworkLineModeSchema,
+  name: z.string().max(60).default(''),
+  short: z.string().max(4).optional(),
+  colour: CurriculumLinesColourSchema.default('wave')
+});
+export const LineStopSchema = z.object({
+  line_id: z.string().min(1).max(64),
+  level: CurriculumLinesLevelSchema.optional()
+});
+export const NetworkNudgesSchema = z.record(
+  z.string().min(1).max(160),
+  z.object({ dx: z.number().min(-2000).max(2000), dy: z.number().min(-2000).max(2000) })
+).refine((value) => Object.keys(value).length <= 120, { message: 'At most 120 nudges' });
+export const CurriculumRailStopSchema = z.object({
+  id: z.string().min(1).max(64),
+  line_id: z.string().min(1).max(64),
+  after_lesson_id: z.string().min(1).max(64).optional(),
+  kind: z.enum(['stop', 'extension', 'support']).default('stop'),
+  lesson_id: z.string().min(1).max(64).optional(),
+  block_id: z.string().min(1).max(120).optional(),
+  label: z.string().max(120).default('')
+});
+export const CurriculumGateSchema = z.object({
+  id: z.string().min(1).max(64),
+  after_lesson_id: z.string().min(1).max(64).optional(),
+  label: z.string().max(80).default(''),
+  lesson_id: z.string().min(1).max(64).optional(),
+  line_ids: z.array(z.string().min(1).max(64)).max(24).default([])
+});
+export const CurriculumLinesV2ContentSchema = z.object({
+  version: z.literal(2),
+  title: z.string().max(120).optional(),
+  rail_stops: z.array(CurriculumRailStopSchema).max(60).default([]),
+  gates: z.array(CurriculumGateSchema).max(12).default([]),
+  nudges: NetworkNudgesSchema.default({}),
+  /** Map-only station order; lessons not listed follow in unit order. */
+  station_order: z.array(z.string().min(1).max(64)).max(200).optional(),
+  /** Lessons left off this map (they stay in the unit). */
+  hidden_lessons: z.array(z.string().min(1).max(64)).max(200).optional(),
+  terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
+});
+export const CurriculumLinesBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('curriculum_lines'), variant: z.string().default('large'),
+  visibility: VisibilitySchema,
+  content: z.union([CurriculumLinesV2ContentSchema, CurriculumLinesV1ContentSchema]),
+  ...blockLayout, ...blockTimestamps
+});
+export type CurriculumLinesBlock = z.infer<typeof CurriculumLinesBlockSchema>;
+export type CurriculumLinesV1Content = z.infer<typeof CurriculumLinesV1ContentSchema>;
+export type CurriculumLinesV2Content = z.infer<typeof CurriculumLinesV2ContentSchema>;
+export type NetworkLine = z.infer<typeof NetworkLineSchema>;
+export type NetworkLineMode = z.infer<typeof NetworkLineModeSchema>;
+export type LineStop = z.infer<typeof LineStopSchema>;
+export type NetworkNudges = z.infer<typeof NetworkNudgesSchema>;
+export type CurriculumRailStop = z.infer<typeof CurriculumRailStopSchema>;
+export type CurriculumGate = z.infer<typeof CurriculumGateSchema>;
+
+export function isCurriculumLinesV2(content: CurriculumLinesBlock['content']): content is CurriculumLinesV2Content {
+  return (content as { version?: number }).version === 2;
+}
 
 /**
  * Question drop: students write a question that feeds a quiz lesson in the
@@ -516,6 +738,20 @@ export const QuestionDropBlockSchema = z.object({
     marks_max: z.number().int().min(1).max(20).default(3),
     per_student: z.number().int().min(1).max(5).default(1),
     accepting: z.boolean().default(true)
+  }), ...blockLayout, ...blockTimestamps
+});
+
+/**
+ * Discern Confirm: the closing step of a Discern qualifier. Created after the
+ * block it belongs to and linked back by id; the teacher can drag it anywhere
+ * later in the lesson.
+ */
+export const DiscernConfirmBlockSchema = z.object({
+  id: z.string().min(1), type: z.literal('block'),
+  block_type: z.literal('discern_confirm'), variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    target_block_id: z.string().max(120).default('')
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -539,7 +775,19 @@ export const QuestionSetBlockSchema = z.object({
   visibility: VisibilitySchema,
   content: z.object({
     title: z.string().optional(),
-    questions: z.array(QuestionItemSchema)
+    questions: z.array(QuestionItemSchema),
+    /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
+    format: z.enum(['standard', 'human_experience_table', 'anchor_bridge', 'question_levels', 'because_but_so', 'reasoning_chart']).optional(),
+    /** Human experience table settings, kept when switching format away and back. */
+    table: z.object({
+      rows: z.number().int().min(3).max(5).default(3),
+      example: z.boolean().default(true)
+    }).optional(),
+    /** Reasoning chart settings, kept when switching format away and back. */
+    reasoning: z.object({
+      level: LensLevelSchema.default('core'),
+      student_level: z.boolean().default(true)
+    }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -973,6 +1221,20 @@ export const AnnotationTechniqueRefSchema = z.object({
   table_version: z.string().min(1)
 });
 
+/**
+ * A feedback code on an annotation note (AR, TS+ …). The code's words are
+ * copied in when tagged, so students can read them without the teacher's
+ * code library, and a later edit to the library doesn't rewrite old notes.
+ */
+export const AnnotationCodeRefSchema = z.object({
+  id: z.string().min(1).max(40),
+  code: z.string().regex(/^[A-Z]{1,3}$/),
+  label: z.string().max(60),
+  descriptor: z.string().max(600).default(''),
+  colour: z.enum(['blue', 'sage', 'peach', 'gold', 'lilac']).default('blue'),
+  positive: z.boolean().default(false)
+});
+
 export const AnnotationAttachmentSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('link'),
@@ -1088,6 +1350,7 @@ export const AnnotationItemSchema = z
     thread: AnnotationThreadSchema.optional(),
     anthology: AnthologyTagSchema.optional(),
     technique: AnnotationTechniqueRefSchema.optional(),
+    code: AnnotationCodeRefSchema.optional(),
     body: z.object({
       html: z.string(),
       attachments: z.array(AnnotationAttachmentSchema).default([])
@@ -1211,6 +1474,7 @@ export type AnnotationAnchor = z.infer<typeof AnnotationAnchorSchema>;
 export type AnnotationAttachment = z.infer<typeof AnnotationAttachmentSchema>;
 export type AnnotationThread = z.infer<typeof AnnotationThreadSchema>;
 export type AnnotationVoiceTrack = z.infer<typeof AnnotationVoiceTrackSchema>;
+export type AnnotationCodeRef = z.infer<typeof AnnotationCodeRefSchema>;
 export type AnthologyTag = z.infer<typeof AnthologyTagSchema>;
 
 function toolkitBlockSchema<T extends string, C extends z.ZodTypeAny>(blockType: T, content: C) {
@@ -1291,7 +1555,12 @@ const leafBlockSchemas = [
   TableBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
+  BrainstormBlockSchema,
+  HingeQuestionBlockSchema,
+  ContinuumLineBlockSchema,
+  CurriculumLinesBlockSchema,
   QuizQuestionBlockSchema,
+  DiscernConfirmBlockSchema,
   QuestionSetBlockSchema,
   FlashcardsBlockSchema,
   ClozeBlockSchema,

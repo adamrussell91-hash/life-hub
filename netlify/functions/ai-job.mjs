@@ -2,7 +2,7 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { aiJobKey, getJSON, readPublishedId, setJSON } from './_shared/teaching-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
-import { writeJobInbox } from './ai-jobs.mjs';
+import { jobIsStale, writeJobInbox } from './ai-jobs.mjs';
 import {
   createKnowledgeIntakeRuntime,
   isKnowledgeIntakeJob,
@@ -25,6 +25,12 @@ export function createAiJobHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Job not found', false), request, env);
     }
     if (request.method === 'GET') {
+      if (!job.kind && jobIsStale(job, (deps.now ?? Date.now)())) {
+        const expired = { ...job, status: 'error', phase: undefined, error: 'Job timed out after 10 minutes', updated_at: new Date().toISOString() };
+        await setJSON(store, aiJobKey(id), expired);
+        await writeJobInbox(store, expired);
+        return withCors(okResponse(200, expired), request, env);
+      }
       return withCors(okResponse(200, job), request, env);
     }
     if (request.method !== 'PATCH') {

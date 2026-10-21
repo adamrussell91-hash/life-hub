@@ -1,3 +1,4 @@
+import { revealBlockFromHash } from '@/app/block-hash';
 import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
@@ -36,14 +37,15 @@ export interface StudentLessonViewHandle {
   dispose(): void;
 }
 
-function renderPublishedLesson(
+/**
+ * The lesson's cover, title, class/date line and outcome chips. Shared with
+ * the teacher's Display view so the projector shows the same page students do.
+ */
+export function renderPublishedLessonHero(
   content: HTMLElement,
   lesson: PublishedLesson,
-  extras?: { cls?: PublishedClass }
-): void {
-  content.replaceChildren();
-
-  const cls = extras?.cls;
+  cls?: PublishedClass
+): PublicOutcome[] | undefined {
   const classTitle = cls?.title?.trim() ?? '';
   const scheduleDate =
     cls?.schedule.find((row) => row.lesson_id === lesson.lesson_id)?.date ?? '';
@@ -98,6 +100,16 @@ function renderPublishedLesson(
   if (publishedOutcomes && publishedOutcomes.length > 0) {
     mountPublicOutcomeChips(content, publishedOutcomes);
   }
+  return publishedOutcomes;
+}
+
+function renderPublishedLesson(
+  content: HTMLElement,
+  lesson: PublishedLesson,
+  extras?: { cls?: PublishedClass }
+): void {
+  content.replaceChildren();
+  const publishedOutcomes = renderPublishedLessonHero(content, lesson, extras?.cls);
 
   const openNoteId = readNoteHash();
   const blocks = document.createElement('div');
@@ -122,6 +134,7 @@ function renderPublishedLesson(
   });
   content.append(blocks);
   if (isQuiz) content.append(mountStudentQuiz(lesson));
+  revealBlockFromHash(content);
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {
     const url = new URL(window.location.href);

@@ -1,4 +1,5 @@
-import { canonical, contextSnapshot, blockRevision, findAlchemyBlock } from '../../../packages/alchemy/revisions.js';
+import { findAlchemyBlock } from '../../../packages/alchemy/revisions.js';
+import { editableFields, childBlocks } from '../../../packages/alchemy/patches.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -99,6 +100,12 @@ import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
+import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
+import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
+import { createPublishedQuadrantHandler } from '../../../netlify/functions/published-quadrant.mjs';
+import { createLessonQuadrantHandler } from '../../../netlify/functions/lesson-quadrant.mjs';
+import { createHingeHandler } from '../../../netlify/functions/hinge.mjs';
+import { createPublishedHingeHandler } from '../../../netlify/functions/published-hinge.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
@@ -506,6 +513,11 @@ const MEDIA_FOLDERS_KEY = 'meta/media_folders';
 
 type MockUnitNote={id:string;title:string;why:string;excerpt?:string};
 const mockJobs=new Map<string,{status:string;result:unknown;polls:number}>();let mockJobSerial=0;
+// Ann's lesson reviews: a job that reports a few steps, then suggests patches on the lesson's own text.
+type MockAgentJob={job:string;kind:string;id:string;blockId:string|null;scope:string;status:string;progress:Array<{at:string;text:string}>;result:unknown;error:null;decisions:Record<string,string>;created_at:string;polls:number;steps:string[];final:unknown};
+const mockAgentJobs=new Map<string,MockAgentJob>();const mockAgentLatest=new Map<string,string>();
+let mockAgentSettings:{rulesNoteId:string|null;rulesNoteTitle:string|null}={rulesNoteId:null,rulesNoteTitle:null};
+const MOCK_RULES_NOTES=[{id:'note_rules',title:'Lesson design rules'},{id:'note_questions',title:'Question design for close reading'},{id:'note_caesar',title:'Worked examples and scaffolding'}];
 const mockUnitNotes=new Map<string,{notes:MockUnitNote[];removed:string[]}>();
 function mockUnitNotesAdd(unitId:string,entries:MockUnitNote[]):MockUnitNote[]{
   const state=mockUnitNotes.get(unitId)??{notes:[],removed:[]};
@@ -662,6 +674,29 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     store.setJSON(MEDIA_FOLDERS_KEY, { folders, updated_at: nowIso() });
     return okResponse(200, { folders });
+  }
+
+  // Mirrors netlify/functions/whiteboards.mjs so boards save in local dev.
+  function handleWhiteboard(
+    cookie: string | null | undefined,
+    method: string,
+    id: string,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const key = `whiteboards/${id}`;
+    if (method === 'GET') {
+      const record = store.getJSON(key);
+      return record ? okResponse(200, record) : errorResponse(404, 'not_found', 'Whiteboard document not found.');
+    }
+    const snapshot = (body as { snapshot?: unknown } | null)?.snapshot;
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+      return errorResponse(400, 'validation_error', 'Whiteboard snapshot is required.');
+    }
+    const record = { id, snapshot, schema_version: 1, updated_at: nowIso() };
+    store.setJSON(key, record);
+    return okResponse(200, record);
   }
 
   function handleAuth(body: unknown): MockResponse {
@@ -1187,12 +1222,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       cover?: unknown;
       blocks?: unknown;
       outcome_ids?: string[];
+      subject_id?: string;
     }>(unitKey(id));
     if (!unit || typeof unit.title !== 'string' || !unit.title) {
       return notFoundResponse('Unit not found');
     }
 
-    const matching: { lesson_id: string; title: string }[] = [];
+    const matching: { lesson_id: string; title: string; line_stops?: import('../src/schemas/block').LineStop[] }[] = [];
     const anthologySnapshots: Array<{
       lesson_id: string;
       lesson_title: string;
@@ -1214,9 +1250,11 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         typeof snapshot.title === 'string' &&
         snapshot.title
       ) {
+        const draft = store.getJSON<Lesson>(draftLessonKey(snapshot.lesson_id));
         matching.push({
           lesson_id: snapshot.lesson_id,
-          title: snapshot.title
+          title: snapshot.title,
+          ...(draft?.line_stops?.length ? { line_stops: draft.line_stops } : {})
         });
         anthologySnapshots.push({
           lesson_id: snapshot.lesson_id,
@@ -1261,7 +1299,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       .filter((parsed) => parsed.success)
       .map((parsed) => toPublicOutcome(parsed.data));
 
+    const subject = unit.subject_id ? store.getJSON<{ network_lines?: unknown[] }>(subjectKey(unit.subject_id)) : null;
     return okResponse(200, {
+      ...(subject?.network_lines?.length ? { network_lines: subject.network_lines } : {}),
       unit_id: id,
       title: unit.title,
       lessons,
@@ -1273,6 +1313,52 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       outcome_ids: ids,
       outcomes
     });
+  }
+
+  /** Network fields only; the real handler merges any fields. */
+  function handlePatchSubjectNetwork(cookie: string | null | undefined, id: string, body: unknown): MockResponse {
+    if (!getSession(cookie).authenticated) return unauthorizedResponse();
+    const existing = store.getJSON<Record<string, unknown>>(subjectKey(id));
+    if (!existing) return notFoundResponse('Subject not found');
+    const record = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+    const next = { ...existing, updated_at: nowIso() };
+    if (record.network_lines !== undefined) next.network_lines = record.network_lines;
+    if (record.network_nudges !== undefined) next.network_nudges = record.network_nudges;
+    const parsed = SubjectSchema.safeParse(next);
+    if (!parsed.success) return errorResponse(400, 'validation_error', 'Subject network is invalid');
+    store.setJSON(subjectKey(id), parsed.data);
+    return okResponse(200, parsed.data);
+  }
+
+  function handleGetPublishedNetwork(classId: string): MockResponse {
+    const cls = store.getJSON<{ status?: string; subject_id?: string }>(classKey(classId));
+    if (!cls || cls.status !== 'active') return notFoundResponse('Class not found');
+    const subject = cls.subject_id ? store.getJSON<{ id: string; scope_id?: string; network_lines?: unknown[]; network_nudges?: Record<string, unknown> }>(subjectKey(cls.subject_id)) : null;
+    if (!subject?.network_lines?.length) return okResponse(200, { lines: [], units: [], nudges: {} });
+    const scope = subject.scope_id ? store.getJSON<{ timeline_items?: Array<{ kind: string; unit_id?: string; start_week: number; order: number }> }>(scopeSequenceKey(subject.scope_id)) : null;
+    const order = new Map<string, number>();
+    [...(scope?.timeline_items ?? [])].filter((i) => i.kind === 'unit').sort((a, b) => a.start_week - b.start_week || a.order - b.order)
+      .forEach((i, n) => { if (i.unit_id && !order.has(i.unit_id)) order.set(i.unit_id, n); });
+    const published = new Set(store.listKeys('published/lessons/').map((k) => k.slice('published/lessons/'.length)));
+    const units = store.listKeys('units/')
+      .map((k) => store.getJSON<{ id: string; title: string; subject_id: string; lesson_ids: string[]; blocks?: import('../src/schemas/block').Block[]; status?: string }>(k))
+      .filter((u): u is NonNullable<typeof u> => Boolean(u?.id) && u!.subject_id === subject.id && u!.status !== 'trashed' && u!.status !== 'archived')
+      .filter((u) => order.size === 0 || order.has(u.id))
+      .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+    const out = units.map((u) => {
+      const lessons = u.lesson_ids.filter((id) => published.has(id)).map((id) => {
+        const draft = store.getJSON<Lesson>(draftLessonKey(id));
+        return { id, ...(draft?.line_stops?.length ? { line_stops: draft.line_stops } : {}) };
+      });
+      const rail = new Set<string>();
+      for (const block of filterBlocksForStudent(u.blocks ?? [])) {
+        if (block.block_type === 'curriculum_lines' && (block.content as { version?: number }).version === 2) {
+          for (const stop of (block.content as { rail_stops: Array<{ line_id: string }> }).rail_stops) rail.add(stop.line_id);
+        }
+      }
+      return { id: u.id, title: u.title, lesson_ids: lessons.map((l) => l.id), lessons, rail_line_ids: [...rail] };
+    }).filter((u) => u.lessons.length);
+    return okResponse(200, { lines: subject.network_lines, units: out, nudges: subject.network_nudges ?? {} });
   }
 
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -3229,6 +3315,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(200, validated.data);
   }
 
+  /** Earlier parts of files sent in pieces, as the Netlify function takes them. */
+  const pendingMediaParts = new Map<string, Uint8Array[]>();
+
   async function handlePostMediaUpload(
     cookie: string | null | undefined,
     body: unknown
@@ -3282,7 +3371,32 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       provider_file_id = providerFileIdField.trim();
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bytes = new Uint8Array(await file.arrayBuffer());
+    const partCount = Number(body.get('part_count') ?? 1);
+    if (partCount > 1) {
+      const uploadId = String(body.get('upload_id') ?? '');
+      const partIndex = Number(body.get('part_index'));
+      const received = pendingMediaParts.get(uploadId) ?? [];
+      received[partIndex] = bytes;
+      pendingMediaParts.set(uploadId, received);
+      if (partIndex < partCount - 1) {
+        return okResponse(202, { upload_id: uploadId, part_index: partIndex });
+      }
+      pendingMediaParts.delete(uploadId);
+      if (received.length !== partCount || received.some((part) => !part)) {
+        return errorResponse(400, 'validation_error', 'An earlier part of the file is missing. Upload it again.');
+      }
+      const joined = new Uint8Array(received.reduce((sum, part) => sum + part.byteLength, 0));
+      let offset = 0;
+      for (const part of received) {
+        joined.set(part, offset);
+        offset += part.byteLength;
+      }
+      if (joined.byteLength > MAX_MEDIA_BYTES) {
+        return errorResponse(400, 'validation_error', `File exceeds maximum size of ${MAX_MEDIA_BYTES} bytes`);
+      }
+      bytes = joined;
+    }
     const id = newId('media');
     const fileUrl = `http://localhost/api/media/${id}/file`;
     const timestamp = nowIso();
@@ -3424,7 +3538,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     };
   }
 
-  /** Quiz lessons and Question drop run the real Functions against the mock store. */
+  /** Offline stand-in for the app's quadrant guess: keyword hints, so the teacher's faint marker shows locally. */
+  async function mockPlaceQuestion({ text }: { text: string }): Promise<{ x: number; y: number }> {
+    const t = text.toLowerCase();
+    const open = /\b(why|should|could|might|would|imagine|if)\b/.test(t) ? 0.75 : 0.25;
+    const intellectual = /\b(people|society|world|always|anyone|history|law|today)\b/.test(t) ? 0.72 : 0.28;
+    return { x: open, y: intellectual };
+  }
+
+  /** Quiz lessons, Question drop and Hinge question run the real Functions against the mock store. */
   async function handleQuiz(
     method: string,
     pathWithQuery: string,
@@ -3437,7 +3559,19 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
     };
     const path = pathWithQuery.split('?')[0]!;
-    const handler = path.startsWith('/api/lessons/')
+    const handler = /^\/api\/lessons\/[^/]+\/hinge\//.test(path)
+      ? createHingeHandler(deps)
+      : path.startsWith('/api/published/hinge/')
+        ? createPublishedHingeHandler(deps)
+      : /\/quadrant$/.test(path)
+      ? createLessonQuadrantHandler(deps)
+      : path.startsWith('/api/published/quadrant/')
+        ? createPublishedQuadrantHandler({ ...deps, placeQuestion: mockPlaceQuestion })
+      : /\/discern$/.test(path)
+      ? createLessonDiscernHandler(deps)
+      : path.startsWith('/api/published/discern/')
+        ? createPublishedDiscernHandler(deps)
+        : path.startsWith('/api/lessons/')
       ? createQuizHandler(deps)
       : path.startsWith('/api/published/quiz/')
         ? createPublishedQuizHandler(deps)
@@ -3446,7 +3580,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       new Request(`http://mock.local${pathWithQuery}`, {
         method,
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body ?? {})
+        ...(method === 'GET' || method === 'HEAD' ? {} : { body: JSON.stringify(body ?? {}) })
       }),
       {}
     );
@@ -3517,7 +3651,13 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
-      /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path)
+      /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
+      /^\/api\/published\/discern\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/quadrant$/.test(path) ||
+      /^\/api\/published\/quadrant\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/hinge\/[^/]+$/.test(path) ||
+      /^\/api\/published\/hinge\/[^/]+\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
     }
@@ -3594,33 +3734,41 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return okResponse(200, { text: 'mock-ai-reply' });
     }
 
-    if (method === 'POST' && path === '/api/alchemy-blocks') {
+    if (path === '/api/alchemy-agent/settings') {
       if (!getSession(cookie).authenticated) return unauthorizedResponse();
-      const query=body as {kind?:string;id?:string;blocks?:string[];validateOnly?:boolean;contextRevision?:string;instruction?:string};
-      if (!query || !['lesson','unit'].includes(query.kind||'') || !query.id || !Array.isArray(query.blocks) || query.blocks.length>4) return errorResponse(400,'alchemy_input','Choose up to four blocks.');
-      const entity=store.getJSON<Lesson|Unit>(query.kind==='lesson'?draftLessonKey(query.id):unitKey(query.id));
-      if(!entity) return errorResponse(404,'not_found','Lesson or unit not found.');
-      const unit=query.kind==='lesson'?store.getJSON<Unit>(unitKey((entity as Lesson).unit_id)):null;
-      const contextRevision=canonical({entity:contextSnapshot(entity),unit:unit?contextSnapshot(unit):null});
-      if(query.validateOnly)return okResponse(200,{valid:query.contextRevision===contextRevision});
-      // Row-level asks target the first editable text inside the row, as Ann may pick a nested block.
-      const textTarget=(b:any):any=>{if(['heading','rich_text'].includes(b.block_type))return b;const lists=b.block_type==='section'?[b.content.blocks]:b.block_type==='columns'?b.content.columns.map((c:any)=>c.blocks):b.block_type==='tabs'?b.content.tabs.map((t:any)=>t.blocks):[];for(const list of lists)for(const child of list||[]){const hit=textTarget(child);if(hit)return hit;}return null;};
-      const unitId=query.kind==='lesson'?(entity as Lesson).unit_id:query.id;
-      const proposals=query.blocks.flatMap(rowId=>{
-        const row=findAlchemyBlock(entity.blocks||[],rowId);
-        const block=row?textTarget(row):null;
-        if(!block)return [];const id=block.id;
-        const replacement=structuredClone(block);
-        if(replacement.block_type==='heading')replacement.content.text=(query.instruction?.trim()?'Model together, then try independently: ':'Start with a worked example: ')+replacement.content.text;
-        else if(replacement.block_type==='rich_text')replacement.content.html='<p>First, model the process together. Then try independently.</p>'+replacement.content.html;
-        else return [];
-        return [{blockId:id,original:blockRevision(block),contextRevision,rationale:'Make the modelling step explicit before independent practice.',replacement,sources:[{id:'note_caesar',title:'Worked examples and scaffolding',excerpt:'Local fixture: model the process before independent practice.'}]}];
-      });
-      if(unitId&&proposals.length)mockUnitNotesAdd(unitId,[{id:'note_caesar',title:'Worked examples and scaffolding',why:'Model the process before independent practice.'}]);
-      const data={proposals,assessed:query.blocks,contextRevision,mode:'local'};
-      // Like production, a teacher's ask comes back as a job the page polls.
-      if((body as {mode?:string}).mode==='manual'){const job=`00000000-0000-4000-8000-${String(++mockJobSerial).padStart(12,'0')}`;mockJobs.set(job,{status:'working',result:data,polls:0});return okResponse(202,{job,status:'working'});}
-      return okResponse(200,data);
+      const search=new URLSearchParams(pathWithQuery.split('?')[1]||'').get('search');
+      if(method==='GET'&&search!==null)return okResponse(200,{notes:MOCK_RULES_NOTES.filter(n=>n.title.toLowerCase().includes(search.toLowerCase()))});
+      if(method==='GET')return okResponse(200,mockAgentSettings);
+      const id=(body as {rulesNoteId?:string|null})?.rulesNoteId??null;const note=MOCK_RULES_NOTES.find(n=>n.id===id);
+      mockAgentSettings={rulesNoteId:note?.id??null,rulesNoteTitle:note?.title??null};return okResponse(200,mockAgentSettings);
+    }
+
+    if (path === '/api/alchemy-agent') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const params=new URLSearchParams(pathWithQuery.split('?')[1]||'');
+      const view=(j:MockAgentJob|undefined)=>{if(!j)return null;const {polls,steps,final,...rest}=j;return rest;};
+      if(method==='GET'){
+        const id=params.get('job')||mockAgentLatest.get((params.get('kind')||'lesson')+':'+(params.get('id')||''))||'';const j=mockAgentJobs.get(id);
+        if(!j)return params.get('id')?okResponse(200,null):errorResponse(404,'not_found','That review is no longer available.');
+        if(j.status==='working'){j.polls++;const next=j.steps[j.progress.length];if(next)j.progress.push({at:new Date().toISOString(),text:next});else{j.status='done';j.result=j.final;}}
+        return okResponse(200,view(j));
+      }
+      const req=(body||{}) as {kind?:string;id?:string;blockId?:string;action?:string;job?:string;proposal?:string};
+      if(req.action){const j=mockAgentJobs.get(req.job||'');if(!j)return errorResponse(404,'not_found','That suggestion is no longer available.');j.decisions[req.proposal||'']=req.action;return okResponse(200,view(j));}
+      const lesson=(req.kind==='unit'?store.getJSON<Unit>(unitKey(req.id||'')):store.getJSON<Lesson>(draftLessonKey(req.id||''))) as (Lesson|Unit|null);
+      if(!lesson)return errorResponse(404,'not_found','This page is unavailable.');
+      const fields:Array<{block:any;path:string;value:string}>=[];
+      const walk=(blocks:any[])=>{for(const b of blocks||[]){for(const [path,value] of editableFields(b))fields.push({block:b,path,value});walk(childBlocks(b));}};
+      walk(lesson.blocks||[]);
+      const focus=req.blockId?findAlchemyBlock(lesson.blocks||[],req.blockId):null;
+      const picks=(focus?fields.filter(f=>f.block.id===focus.id||findAlchemyBlock(childBlocks(focus),f.block.id)):fields).filter(f=>f.value.replace(/<[^>]*>/g,'').trim().split(/\s+/).length>=3).slice(0,3);
+      const proposals=picks.map((f,i)=>{const plain=f.value.match(/>([^<>]{12,})</)?.[1]??f.value;const words=plain.trim().split(/\s+/).slice(0,3).join(' ');return {id:'p'+(i+1),blockId:f.block.id,path:f.path,oldStr:words,newStr:i===0?'Retrieval first: '+words:words+' (model it together first)',why:i===0?'Opening with a quick retrieval question strengthens memory more than rereading.':'Students need to see the process modelled before trying it alone.',source:i<2?{noteId:i===0?'note_questions':'note_caesar',title:i===0?'Question design for close reading':'Worked examples and scaffolding',quote:i===0?'Short low-stakes retrieval questions at the start of a lesson strengthen memory.':'Model the process before independent practice.'}:null,blockLabel:String(f.block.block_type).replace(/_/g,' ')+': “'+words+'…”',blockType:f.block.block_type};});
+      const id=`00000000-0000-4000-9000-${String(++mockJobSerial).padStart(12,'0')}`;
+      const j:MockAgentJob={job:id,kind:req.kind==='unit'?'unit':'lesson',id:lesson.id,blockId:req.blockId??null,scope:req.blockId?'block':'lesson',status:'working',progress:[],result:null,error:null,decisions:{},created_at:new Date().toISOString(),polls:0,
+        steps:['Reading your rules','Checking your Knowledge Hub is up to date','Searching: retrieval practice at the start of a lesson','Reading: Question design for close reading','Reading: Worked examples and scaffolding',...proposals.map(p=>'Drafted a suggestion for '+p.blockLabel)],
+        final:{summary:proposals.length?'I looked for ways to strengthen recall and modelling. Two changes come from your notes; one is my own idea.':'Nothing in your notes clearly improves this lesson.',proposals,stoppedEarly:false,rules:mockAgentSettings.rulesNoteId?{id:mockAgentSettings.rulesNoteId,title:mockAgentSettings.rulesNoteTitle}:null}};
+      mockAgentJobs.set(id,j);if(!req.blockId)mockAgentLatest.set(j.kind+':'+lesson.id,id);
+      return okResponse(202,view(j));
     }
 
     if (method === 'GET' && path === '/api/alchemy-blocks') {
@@ -3875,6 +4023,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     if (method === 'POST' && path === '/api/classes') return handlePostClass(cookie, body);
     if (method === 'POST' && path === '/api/subjects') return handlePostSubject(cookie, body);
+    const subjectPatch = /^\/api\/subjects\/([^/]+)$/.exec(path);
+    if (subjectPatch && method === 'PATCH') return handlePatchSubjectNetwork(cookie, subjectPatch[1]!, body);
+    const networkMatch = /^\/api\/published\/networks\/([^/]+)$/.exec(path);
+    if (networkMatch && method === 'GET') return handleGetPublishedNetwork(networkMatch[1]!);
     if (method === 'POST' && path === '/api/outcomes') return handlePostOutcome(cookie, body);
     if (method === 'POST' && path === '/api/units') return handlePostUnit(cookie, body);
     if (method === 'POST' && path === '/api/lessons') return handlePostLesson(cookie, body);
@@ -3893,6 +4045,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (method === 'POST' && path === '/api/media') return handlePostMedia(cookie, body);
     if ((method === 'GET' || method === 'PUT') && path === '/api/media-folders') {
       return handleMediaFolders(cookie, method, body);
+    }
+    const whiteboardMatch = /^\/api\/whiteboards\/([A-Za-z0-9_-]{1,160})$/.exec(path);
+    if (whiteboardMatch && (method === 'GET' || method === 'PUT')) {
+      return handleWhiteboard(cookie, method, whiteboardMatch[1]!, body);
     }
 
     const compositionMatch = COMPOSITION_ID_RE.exec(path);

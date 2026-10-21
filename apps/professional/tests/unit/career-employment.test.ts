@@ -6,19 +6,19 @@ describe('employmentToTimeline', () => {
     const entries = employmentToTimeline(
       [
         {
-          display_label: 'St Pius X High School',
+          display_label: 'Wattle Grove High School',
           role: 'English Teacher',
           valid_from: '2021-01-25',
           valid_to: '2024-08-16'
         },
         {
-          display_label: 'St Pius X High School',
+          display_label: 'Wattle Grove High School',
           role: 'Psychology Teacher',
           valid_from: '2023-01-23',
           valid_to: '2024-08-16'
         },
         {
-          display_label: "St Aloysius' College",
+          display_label: "Tallowwood College",
           role: 'Gifted Education Teacher',
           valid_from: '2025-01-22',
           valid_to: null,
@@ -30,12 +30,12 @@ describe('employmentToTimeline', () => {
 
     expect(entries).toHaveLength(3);
     expect(entries[0]!.label).toContain('English Teacher');
-    expect(entries[0]!.label).toContain('St Pius X');
+    expect(entries[0]!.label).toContain('Wattle Grove');
     expect(entries[0]!.context_key).toMatch(/year/);
     expect(entries[1]!.label).toContain('Psychology Teacher');
     expect(entries[2]!.end_date).toBeNull();
     expect(entries[2]!.label).toContain('Gifted Education Teacher');
-    expect(entries[2]!.label).toContain('Aloysius');
+    expect(entries[2]!.label).toContain('Tallowwood');
   });
 
   it('keeps oldest-first career order', () => {

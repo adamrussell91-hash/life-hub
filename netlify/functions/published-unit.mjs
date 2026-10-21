@@ -12,8 +12,10 @@ import {
   outcomeKey,
   PUBLISHED_LESSON_PREFIX,
   readPublishedId,
+  subjectKey,
   unitKey
 } from './_shared/teaching-blobs.mjs';
+import { publicLineStops, publicNetworkLines } from './_shared/teaching-network.mjs';
 import { collectAnthology } from './_shared/teaching-anthology.mjs';
 import {
   attachedOutcomeIds,
@@ -56,7 +58,12 @@ export function createPublishedUnitHandler(deps = {}) {
       if (!snapshot.lesson_id || !snapshot.title) continue;
       const draft = await getJSON(store, draftLessonKey(snapshot.lesson_id));
       if (!draft || isDeletedRecord(draft)) continue;
-      matching.push({ lesson_id: snapshot.lesson_id, title: snapshot.title });
+      const lineStops = publicLineStops(draft.line_stops);
+      matching.push({
+        lesson_id: snapshot.lesson_id,
+        title: snapshot.title,
+        ...(lineStops.length ? { line_stops: lineStops } : {})
+      });
       anthologySnapshots.push({
         lesson_id: snapshot.lesson_id,
         lesson_title: snapshot.title,
@@ -96,7 +103,11 @@ export function createPublishedUnitHandler(deps = {}) {
       if (publicOutcome) outcomes.push(publicOutcome);
     }
 
+    const subject = typeof unit.subject_id === 'string' ? await getJSON(store, subjectKey(unit.subject_id)) : null;
+    const networkLines = publicNetworkLines(subject?.network_lines);
+
     return withCors(okResponse(200, {
+      ...(networkLines.length ? { network_lines: networkLines } : {}),
       unit_id: id,
       title: unit.title,
       lessons,

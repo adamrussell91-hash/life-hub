@@ -5,7 +5,13 @@
 
 import type { EntityOverview, PersonBrief } from '@/domain/types';
 import type { LedgerResponse, LinkProposal } from '@/api/people-directory';
-import { applyPeopleDedupe, fetchEntityOverview, fetchPeopleDedupePlan, type DedupeAction } from '@/api/entities';
+import {
+  applyPeopleDedupe,
+  fetchEntityOverview,
+  fetchPeopleDedupePlan,
+  transitionPerson,
+  type DedupeAction
+} from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
 import {
   acceptLinkProposal,
@@ -13,6 +19,7 @@ import {
   declineLinkProposal,
   fetchLinkProposals,
   fetchPeopleDirectory,
+  fetchPeopleDirectorySnapshot,
   peekPeopleDirectory,
   fetchPersonLedger,
   fetchRememberFacts,
@@ -31,7 +38,11 @@ import {
   type RememberFact,
   type TodayStripResponse
 } from '@/api/people-directory';
-import { mountAddPersonForm } from '@/components/add-person-form';
+import type { AddPersonResult } from '@/components/add-person-form';
+import { mountAddPersonPanel } from '@/components/add-person-panel';
+import { mountLinkedInPaste, renderLinkedInReview, saveLinkedInSelection } from '@/components/linkedin-review';
+import { createToastHost } from '@/components/people-toast';
+import { openDeletePersonDialog } from '@/components/delete-person-dialog';
 import { invalidateCrestUrl, resolveCrestUrl } from '@/components/org-ui';
 import { mountIdentityEditor } from '@/components/person-identity-editor';
 import { renderLinkedEverywhere } from '@/components/linked-everywhere';
@@ -54,7 +65,12 @@ import {
 } from '@/domain/directory-query';
 import { cleanIdentityDisplayName } from '@/domain/identity-display-name';
 import { buildPersonModel, type PersonModel } from '@/domain/person-model';
-import { renderRelationshipArcSvg } from '@/domain/relationship-arc';
+import { currentRoles, orgMonogram, rolesFromOverview, type PersonRole } from '@/domain/person-roles';
+import { buildPersonTimeline } from '@/domain/person-timeline';
+import { renderPersonTimeline } from '@/components/person-timeline';
+import { metLineFrom, renderPersonHeader } from '@/components/person-header';
+import { fetchObservations } from '@/api/observations';
+import { renderRolesEditor } from '@/components/person-roles-editor';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 export interface PeoplePageOptions {
@@ -110,11 +126,25 @@ function directoryCountLabel(d: PeopleDirectoryResponse): string {
   return `${people} ${people === 1 ? 'person' : 'people'} · ${organisations} ${organisations === 1 ? 'organisation' : 'organisations'}`;
 }
 
+/** "2:14 pm" today, "Mon 2:14 pm" on another day. */
+function snapshotTimeLabel(iso: string): string {
+  const at = new Date(iso);
+  const time = at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+  return at.toDateString() === new Date().toDateString()
+    ? time
+    : `${at.toLocaleDateString('en-AU', { weekday: 'short' })} ${time}`;
+}
+
 function isPhone(): boolean {
   return window.matchMedia(PHONE_MQ).matches;
 }
 
+function isArchived(row: DirectoryPersonRow): boolean {
+  return row.lifecycle_status === 'archived';
+}
+
 function matchesFilters(row: DirectoryPersonRow, query: DirectoryQueryState): boolean {
+  if (isArchived(row) && !query.showArchived) return false;
   if (query.q.trim()) {
     const q = query.q.trim().toLowerCase();
     const hay = [
@@ -304,6 +334,55 @@ function setSectionState(body: HTMLElement, state: 'loading' | 'empty' | 'error'
   body.append(p);
 }
 
+function initialsFor(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ''}${parts[parts.length - 1]![0] ?? ''}`.toUpperCase();
+}
+
+/** A directory row for someone just added, shown before the fresh scan lands. */
+export function rowForNewPerson(result: AddPersonResult): DirectoryPersonRow {
+  const { person } = result;
+  const role = result.role && !result.failed.includes('Workplace') ? result.role : null;
+  const org = role
+    ? {
+        ref: role.organisation.ref,
+        display_name: role.organisation.display_label,
+        monogram: orgMonogram(role.organisation.display_label),
+        logo_key: null,
+        current: role.current
+      }
+    : null;
+  const roleTitle = role?.current ? role.title : null;
+  return {
+    id: person.id,
+    person_type: 'colleague',
+    ref: person.ref,
+    display_name: person.display_name,
+    initials: initialsFor(person.display_name),
+    role_line: org
+      ? roleTitle ? `${roleTitle} · ${org.display_name}` : `${org.current ? 'At' : 'Formerly'} ${org.display_name}`
+      : 'No relationship on record',
+    relationship_roles: [],
+    job_title: roleTitle,
+    organisation: org,
+    organisations: org ? [org] : [],
+    warmth: 0,
+    warmth_band: 'cold',
+    relationship_state: 'new',
+    relationship_reasons: [],
+    open_item_count: 0,
+    you_owe_count: 0,
+    they_owe_count: 0,
+    pending_proposal_count: 0,
+    next_label: null,
+    lifecycle_status: 'active',
+    created_at: person.created_at,
+    updated_at: person.updated_at
+  };
+}
+
 /**
  * Real entry point for the People route controller (W2).
  */
@@ -359,7 +438,8 @@ export async function renderPeoplePage(
   const dir = el('section', 'people-page__dir card');
   const pane = el('section', 'people-page__pane card');
   split.append(dir, pane);
-  root.append(titleRow, addHost, todayStrip, askCard, split);
+  const toasts = createToastHost();
+  root.append(titleRow, addHost, todayStrip, askCard, split, toasts.root);
   canvas.append(root);
 
   let askResult: AskResponse | null = null;
@@ -431,10 +511,12 @@ export async function renderPeoplePage(
 
   function renderWhoSwitch(): void {
     whoSwitch.replaceChildren();
+    const visible = (rows: DirectoryPersonRow[] | undefined) =>
+      (rows ?? []).filter((r) => query.showArchived || !isArchived(r)).length;
     const counts: Record<DirectoryWho, number> = {
-      colleagues: directory?.people.length ?? 0,
-      students: directory?.students?.length ?? 0,
-      everyone: (directory?.people.length ?? 0) + (directory?.students?.length ?? 0)
+      colleagues: visible(directory?.people),
+      students: visible(directory?.students),
+      everyone: visible(directory?.people) + visible(directory?.students)
     };
     for (const key of ['colleagues', 'students', 'everyone'] as DirectoryWho[]) {
       const btn = el('button', `people-page__who-btn${query.who === key ? ' is-on' : ''}`) as HTMLButtonElement;
@@ -486,6 +568,17 @@ export async function renderPeoplePage(
       pill.type = 'button';
       pill.addEventListener('click', () => {
         query = { ...query, warmth: 'all' };
+        syncControlLabels();
+        applyQueryToHash();
+        renderDirectory();
+      });
+      pills.append(pill);
+    }
+    if (query.showArchived) {
+      const pill = el('button', 'people-page__pill', 'Showing archived ✕') as HTMLButtonElement;
+      pill.type = 'button';
+      pill.addEventListener('click', () => {
+        query = { ...query, showArchived: false };
         syncControlLabels();
         applyQueryToHash();
         renderDirectory();
@@ -576,7 +669,7 @@ export async function renderPeoplePage(
         const warmth = model?.warmth ?? row.warmth;
         const roleLine = model?.roleLine ?? row.role_line;
         const a = document.createElement('a');
-        a.className = `people-page__row${row.id === selectedId ? ' is-on' : ''}`;
+        a.className = `people-page__row${row.id === selectedId ? ' is-on' : ''}${isArchived(row) ? ' is-archived' : ''}`;
         a.href = peopleRoute(row.id, serializeDirectoryQuery(query));
         const org = row.organisation;
         a.append(
@@ -588,6 +681,9 @@ export async function renderPeoplePage(
         const nameLine = el('span', 'people-page__row-name', row.display_name);
         if (row.person_type === 'student') {
           nameLine.append(el('span', 'people-page__type-badge', 'Student'));
+        }
+        if (isArchived(row)) {
+          nameLine.append(el('span', 'people-page__type-badge people-page__archived-pill', 'Archived'));
         }
         stack.append(nameLine);
         stack.append(el('span', 'people-page__row-sub', roleLine));
@@ -658,6 +754,14 @@ export async function renderPeoplePage(
     row.organisation = model.organisation ? row.organisations.find(o => o.ref === model.organisation!.ref) ?? null : null;
   }
 
+  function crestFor(orgRef: string, orgName: string): HTMLElement {
+    return crestNode(orgMonogram(orgName), 'sm', {
+      orgRef,
+      logoKey: directory?.organisations.find((o) => o.ref === orgRef)?.logo_key ?? null
+    });
+  }
+
+  /** Link proposals waiting for a yes or no. Roles now live in the header lines. */
   function buildPersonChips(model: PersonModel, id: string): HTMLElement {
     const chips = el('div', 'people-pane__chips');
     for (const chip of model.chips) {
@@ -695,13 +799,6 @@ export async function renderPeoplePage(
         });
         c.append(accept, decline);
         chips.append(c);
-      } else {
-        // L6: one line; a long job title truncates, full text on hover.
-        const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`);
-        c.append(el('span', 'people-pane__chip-text', chip.label));
-        c.title = chip.title ?? chip.label;
-        if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
-        chips.append(c);
       }
     }
     return chips;
@@ -716,18 +813,20 @@ export async function renderPeoplePage(
     const rememberHost = pane.querySelector(
       '[data-section="remember"] .people-pane__section-body'
     ) as HTMLElement | null;
-    const arcHost = pane.querySelector('[data-section="arc"] .people-pane__section-body') as HTMLElement | null;
+    const timelineHost = pane.querySelector('[data-section="timeline"] .people-pane__section-body') as HTMLElement | null;
     const linkedHost = pane.querySelector(
       '[data-section="linked"] .people-pane__section-body'
     ) as HTMLElement | null;
+    const rolesHost = pane.querySelector('[data-section="roles"] .people-pane__section-body') as HTMLElement | null;
     const tagHost = pane.querySelector('[data-section="tags"]') as HTMLElement | null;
     const fullHost = pane.querySelector('[data-section="full"] .people-pane__section-body') as HTMLElement | null;
 
     if (nextHost) setSectionState(nextHost, 'loading');
     if (ledgerHost) setSectionState(ledgerHost, 'loading');
     if (rememberHost) setSectionState(rememberHost, 'loading');
-    if (arcHost) setSectionState(arcHost, 'loading');
+    if (timelineHost) setSectionState(timelineHost, 'loading');
     if (linkedHost) setSectionState(linkedHost, 'loading');
+    if (rolesHost) setSectionState(rolesHost, 'loading');
 
     try {
       const ref = personRef(id);
@@ -793,28 +892,25 @@ export async function renderPeoplePage(
 
         if (headerHost && changed === 'overview') {
           headerHost.replaceChildren();
-          const row = el('div', 'people-pane__header');
+          const personEntity = overview.entity;
+          const roles = rolesFromOverview(overview);
+          const mainOrg = currentRoles(roles)[0] ?? null;
+          const badgeRef = mainOrg?.orgRef ?? model.organisation?.ref ?? null;
+          const badgeName = mainOrg?.orgName ?? model.organisation?.displayName ?? '';
           const ring = warmthRing(
             model.warmth,
             model.initials,
             'lg',
-            model.organisation
+            badgeRef
               ? {
-                  monogram: model.organisation.monogram,
-                  orgRef: model.organisation.ref,
-                  logoKey:
-                    directory?.organisations.find((o) => o.ref === model.organisation?.ref)?.logo_key ??
-                    null
+                  monogram: orgMonogram(badgeName),
+                  orgRef: badgeRef,
+                  logoKey: directory?.organisations.find((o) => o.ref === badgeRef)?.logo_key ?? null
                 }
               : undefined,
             findRow(id)?.person_type === 'student'
           );
           ring.title = `${model.warmth} · ${model.warmthFeedNote}`;
-          row.append(ring);
-          const stack = el('div', 'people-pane__header-stack');
-          const nameRow = el('div', 'people-pane__name-row');
-          nameRow.append(el('h2', 'people-pane__name', model.displayName));
-          const personEntity = overview.entity;
           if (personEntity.kind === 'person') {
             const cleaned = cleanIdentityDisplayName(personEntity.display_name) || personEntity.display_name;
             const currentRels = overview.current_relationships ?? [];
@@ -843,43 +939,63 @@ export async function renderPeoplePage(
                 jobTitle: orgRel?.link.role ?? null
               }
             );
-            editor.button.classList.add('people-pane__edit');
-            nameRow.append(editor.button);
-            stack.append(nameRow);
-            const chips = buildPersonChips(model, id);
-            stack.append(chips);
-            const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
-            checkLinks.type = 'button';
+            const archived = personEntity.lifecycle_status === 'archived';
             const checkStatus = el('p', 'people-pane__check-status');
             checkStatus.hidden = true;
-            checkLinks.addEventListener('click', () => {
+            const checkForLinks = () => {
+              checkStatus.hidden = false;
+              checkStatus.textContent = 'Checking for links…';
               void (async () => {
-                checkLinks.disabled = true;
-                checkLinks.textContent = 'Checking…';
-                checkStatus.hidden = true;
                 try {
                   const result = await runLinkInference();
                   await loadPersonSections(id);
-                  checkStatus.hidden = false;
-                  if (result.created > 0) {
-                    checkStatus.textContent = `Found ${result.created} link proposal${result.created === 1 ? '' : 's'} — accept or decline on the chips above.`;
-                  } else {
-                    checkStatus.textContent = 'No new link proposals.';
-                  }
+                  toasts.show(
+                    result.created > 0
+                      ? `Found ${result.created} link proposal${result.created === 1 ? '' : 's'}. Accept or decline them under the name.`
+                      : 'No new link proposals.'
+                  );
                 } catch (err) {
-                  window.alert(err instanceof Error ? err.message : 'Check for links failed.');
-                } finally {
-                  checkLinks.disabled = false;
-                  checkLinks.textContent = 'Check for links';
+                  checkStatus.textContent = err instanceof Error ? err.message : 'Check for links failed.';
                 }
               })();
+            };
+            const menuItems = personEntity.is_self
+              ? [
+                  { label: 'Update from LinkedIn', onSelect: () => openLinkedInUpdate(id, ref, model.displayName, roles) },
+                  { label: 'Check for links', onSelect: checkForLinks }
+                ]
+              : archived
+                ? null
+                : [
+                    { label: 'Update from LinkedIn', onSelect: () => openLinkedInUpdate(id, ref, model.displayName, roles) },
+                    { label: 'Check for links', onSelect: checkForLinks },
+                    { label: 'Archive person', onSelect: () => void archivePerson(id, ref, model.displayName), danger: true }
+                  ];
+            const header = renderPersonHeader({
+              displayName: model.displayName,
+              warmthBand: model.warmthBand,
+              warmthTitle: `${model.warmth} · ${model.warmthFeedNote}`,
+              avatar: ring,
+              currentRoles: currentRoles(roles),
+              crest: (orgRef, orgName) => crestFor(orgRef, orgName),
+              editButton: editor.button,
+              menuItems,
+              chips: buildPersonChips(model, id),
+              banner: archived && !personEntity.is_self
+                ? archivedBanner(id, ref, model.displayName, personEntity.lifecycle_status)
+                : null
             });
-            stack.append(checkLinks, checkStatus);
-            row.append(stack);
-            headerHost.append(row, editor.form);
+            headerHost.append(header.root, checkStatus, editor.form);
+            void fetchObservations(ref)
+              .then((res) => {
+                if (current()) header.setMetLine(metLineFrom(res.observations ?? [], formatDisplayDate));
+              })
+              .catch(() => {});
           } else {
-            stack.append(nameRow);
-            row.append(stack);
+            const row = el('div', 'people-pane__header');
+            const stack = el('div', 'people-pane__header-stack');
+            stack.append(el('h2', 'people-pane__name', model.displayName));
+            row.append(ring, stack);
             headerHost.append(row);
           }
         }
@@ -968,21 +1084,24 @@ export async function renderPeoplePage(
           renderRememberSection(rememberHost, rememberRes.facts ?? [], id, model.displayName);
         }
 
-        if (arcHost && changed === 'overview') {
-          arcHost.replaceChildren();
-          if (model.arcPoints.length === 0) {
-            setSectionState(arcHost, 'empty', 'No dated touchpoints linked yet.');
-          } else {
-            arcHost.append(
-              renderRelationshipArcSvg(
-                model.arcPoints.map((p) => ({
-                  id: p.id,
-                  at: p.at,
-                  label: p.label
-                }))
-              )
-            );
-          }
+        if (timelineHost && changed === 'overview') {
+          renderPersonTimeline(
+            timelineHost,
+            buildPersonTimeline(rolesFromOverview(overview), model.arcPoints),
+            (orgRef, orgName) => crestFor(orgRef, orgName)
+          );
+        }
+
+        if (rolesHost && changed === 'overview') {
+          renderRolesEditor(rolesHost, {
+            personRef: ref,
+            roles: rolesFromOverview(overview),
+            crest: (orgRef, orgName) => crestFor(orgRef, orgName),
+            onChanged: () => {
+              void loadPersonSections(id);
+              void reloadDirectory();
+            }
+          });
         }
 
         if (linkedHost && changed === 'overview') {
@@ -1029,8 +1148,9 @@ export async function renderPeoplePage(
       if (nextHost) setSectionState(nextHost, 'error', msg);
       if (ledgerHost) setSectionState(ledgerHost, 'error', msg);
       if (rememberHost) setSectionState(rememberHost, 'error', msg);
-      if (arcHost) setSectionState(arcHost, 'error', msg);
+      if (timelineHost) setSectionState(timelineHost, 'error', msg);
       if (linkedHost) setSectionState(linkedHost, 'error', msg);
+      if (rolesHost) setSectionState(rolesHost, 'error', msg);
     }
   }
 
@@ -1206,6 +1326,11 @@ export async function renderPeoplePage(
     header.append(el('p', 'people-pane__loading', 'Loading…'));
     pane.append(header);
 
+    const roles = sectionHost('people-pane__roles', 'Roles and education');
+    roles.root.setAttribute('data-section', 'roles');
+    setSectionState(roles.body, 'loading');
+    pane.append(roles.root);
+
     const next = sectionHost('people-pane__next-wrap', 'Next');
     next.root.setAttribute('data-section', 'next');
     setSectionState(next.body, 'loading');
@@ -1265,13 +1390,13 @@ export async function renderPeoplePage(
     linked.root.append(tagHost);
     pane.append(linked.root);
 
-    const arc = sectionHost('people-pane__arc', 'Your relationship so far');
-    arc.root.setAttribute('data-section', 'arc');
-    arc.root.querySelector('.people-pane__h2')?.append(
-      el('span', 'people-pane__h2-sub', 'every touchpoint')
+    const timeline = sectionHost('people-pane__timeline', 'Timeline');
+    timeline.root.setAttribute('data-section', 'timeline');
+    timeline.root.querySelector('.people-pane__h2')?.append(
+      el('span', 'people-pane__h2-sub', 'career and time together')
     );
-    setSectionState(arc.body, 'loading');
-    pane.append(arc.root);
+    setSectionState(timeline.body, 'loading');
+    pane.append(timeline.root);
 
     const details = document.createElement('details');
     details.className = 'people-pane__full';
@@ -1435,6 +1560,14 @@ export async function renderPeoplePage(
     openCb.checked = query.hasOpen;
     open.append(openCb, document.createTextNode(' Needs you (open items or link proposals)'));
 
+    const archived = document.createElement('label');
+    archived.className = 'people-page__field';
+    const archivedCb = document.createElement('input');
+    archivedCb.type = 'checkbox';
+    archivedCb.checked = query.showArchived;
+    archivedCb.setAttribute('aria-label', 'Show archived');
+    archived.append(archivedCb, document.createTextNode(' Show archived'));
+
     const apply = el('button', 'btn btn--primary', 'Apply') as HTMLButtonElement;
     apply.type = 'button';
     apply.addEventListener('click', () => {
@@ -1445,6 +1578,7 @@ export async function renderPeoplePage(
         orgScope: orgScopeSelect.value as DirectoryQueryState['orgScope'],
         warmth: warmthSelect.value as DirectoryQueryState['warmth'],
         hasOpen: openCb.checked,
+        showArchived: archivedCb.checked,
         sort: (sortSelect?.value as DirectorySort | undefined) ?? query.sort,
         group: (groupSelect?.value as DirectoryGroup | undefined) ?? query.group
       };
@@ -1458,7 +1592,7 @@ export async function renderPeoplePage(
     close.addEventListener('click', () => {
       sheet.hidden = true;
     });
-    sheetInner.append(roleField, orgScopeField, orgField, warmth, open, apply, close);
+    sheetInner.append(roleField, orgScopeField, orgField, warmth, open, archived, apply, close);
     sheetInner.scrollTop = 0;
   }
 
@@ -1731,8 +1865,10 @@ export async function renderPeoplePage(
       if (!current()) return;
       todayData = result;
       renderTodayStrip();
-    } catch {
+    } catch (err) {
       if (!current()) return;
+      // Keep the cause visible: a server bug here once hid behind this line for weeks.
+      console.warn('People today strip failed', err);
       todayStrip.classList.add('people-page__today--compact');
       todayStrip.replaceChildren(
         el('p', 'people-pane__empty people-page__today-unavailable', 'Today strip unavailable.')
@@ -1740,16 +1876,189 @@ export async function renderPeoplePage(
     }
   }
 
-  addBtn.addEventListener('click', () => {
-    addHost.hidden = !addHost.hidden;
-    if (!addHost.hidden && !addHost.dataset.mounted) {
-      mountAddPersonForm(addHost, {
-        onCreated: () => {
-          void reloadDirectory();
+  function forgetPerson(id: string): void {
+    if (directory) {
+      directory = {
+        ...directory,
+        people: directory.people.filter((p) => p.id !== id),
+        students: (directory.students ?? []).filter((p) => p.id !== id)
+      };
+    }
+    personModels.delete(id);
+    personOverviews.delete(id);
+  }
+
+  /** Archive: the person leaves the list at once; Undo brings them back. */
+  async function archivePerson(id: string, ref: string, name: string): Promise<void> {
+    try {
+      await transitionPerson(ref, 'archive');
+    } catch (err) {
+      toasts.show(`Couldn't archive ${name}. ${err instanceof Error ? err.message : ''}`.trim());
+      return;
+    }
+    const row = findRow(id);
+    if (row) row.lifecycle_status = 'archived';
+    if (selectedId === id && !query.showArchived) {
+      selectedId = null;
+      applyQueryToHash();
+      void paintSelection();
+    } else if (selectedId === id) {
+      void paintSelection();
+    }
+    renderDirectory();
+    toasts.show(`Archived ${name}`, [{ label: 'Undo', onClick: () => void restorePerson(id, ref, name) }]);
+    void reloadDirectory();
+  }
+
+  async function restorePerson(id: string, ref: string, name: string): Promise<void> {
+    try {
+      await transitionPerson(ref, 'activate');
+    } catch (err) {
+      toasts.show(`Couldn't restore ${name}. ${err instanceof Error ? err.message : ''}`.trim());
+      return;
+    }
+    const row = findRow(id);
+    if (row) row.lifecycle_status = 'active';
+    if (selectedId === id) void paintSelection();
+    renderDirectory();
+    toasts.show(`Restored ${name}`);
+    void reloadDirectory();
+  }
+
+  function deletePermanently(id: string, ref: string, name: string, status: string): void {
+    openDeletePersonDialog(root, {
+      name,
+      alreadyDeidentified: status === 'deidentified',
+      transition: (action) => transitionPerson(ref, action),
+      onDeleted: () => {
+        forgetPerson(id);
+        if (directory) count.textContent = directoryCountLabel(directory);
+        if (selectedId === id) {
+          selectedId = null;
+          applyQueryToHash();
+          void paintSelection();
+        }
+        renderDirectory();
+        toasts.show(`Deleted ${name} permanently`);
+        void reloadDirectory();
+      }
+    });
+  }
+
+  function archivedBanner(id: string, ref: string, name: string, status: string): HTMLElement {
+    const banner = el('div', 'people-pane__archived');
+    banner.setAttribute('role', 'note');
+    banner.append(el('span', 'people-pane__archived-text', 'Archived. Hidden from the list.'));
+    const restore = el('button', 'btn btn--secondary', 'Restore') as HTMLButtonElement;
+    restore.type = 'button';
+    restore.addEventListener('click', () => void restorePerson(id, ref, name));
+    const remove = el('button', 'btn btn--ghost people-pane__delete', 'Delete permanently') as HTMLButtonElement;
+    remove.type = 'button';
+    remove.addEventListener('click', () => deletePermanently(id, ref, name, status));
+    banner.append(restore, remove);
+    return banner;
+  }
+
+  /** "…" → Update from LinkedIn: the same paste box and review card, in the pane. */
+  function openLinkedInUpdate(id: string, ref: string, name: string, _roles: PersonRole[]): void {
+    pane.querySelector('[data-section="linkedin"]')?.remove();
+    const box = el('section', 'people-pane__box people-pane__linkedin');
+    box.setAttribute('data-section', 'linkedin');
+    const head = el('div', 'people-pane__h2', 'Update from LinkedIn');
+    const close = el('button', 'person-icon-btn people-pane__linkedin-close', '✕') as HTMLButtonElement;
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close Update from LinkedIn');
+    close.addEventListener('click', () => box.remove());
+    head.append(close);
+    const body = el('div', 'people-pane__section-body');
+    box.append(head, body);
+    pane.querySelector('[data-section="header"]')?.after(box);
+
+    function showPaste(): void {
+      body.replaceChildren();
+      const paste = mountLinkedInPaste(body, {
+        personRef: ref,
+        onParsed: (result) => {
+          renderLinkedInReview(body, {
+            result,
+            existing: { name },
+            crest: (orgRef, orgName) => crestNode(orgMonogram(orgName), 'sm', orgRef ? { orgRef } : {}),
+            onBack: showPaste,
+            onSave: async (selection) => {
+              const saved = await saveLinkedInSelection(selection, { personRef: ref });
+              box.remove();
+              toasts.show(
+                saved.failed.length
+                  ? `Saved ${saved.saved} change${saved.saved === 1 ? '' : 's'}. ${saved.failed.join(' and ')} didn't save.`
+                  : `Saved ${saved.saved} change${saved.saved === 1 ? '' : 's'}`
+              );
+              void loadPersonSections(id);
+              void reloadDirectory();
+            }
+          });
         }
       });
-      addHost.dataset.mounted = '1';
+      paste.focus();
     }
+    showPaste();
+  }
+
+  function openPerson(id: string): void {
+    selectedId = id;
+    applyQueryToHash();
+    renderDirectory();
+    void paintSelection();
+  }
+
+  function onPersonAdded(result: AddPersonResult): void {
+    closeAddPanel();
+    const row = rowForNewPerson(result);
+    forgetPerson(row.id);
+    directory = directory
+      ? { ...directory, people: [row, ...directory.people], counts: { ...directory.counts, people: directory.counts.people + 1 } }
+      : { people: [row], students: [], organisations: [], counts: { people: 1, organisations: 0 } };
+    count.textContent = directoryCountLabel(directory);
+    if (query.who === 'students') query = { ...query, who: 'colleagues' };
+    openPerson(row.id);
+    const name = row.display_name;
+    const message = result.failed.length
+      ? `Added ${name}. ${result.failed.join(' and ')} didn't save.`
+      : `Added ${name}`;
+    toasts.show(message, [
+      { label: 'Open', onClick: () => openPerson(row.id) },
+      { label: 'Undo', onClick: () => void archivePerson(row.id, row.ref, name) }
+    ]);
+    // The fresh scan still runs, in the background.
+    void reloadDirectory();
+  }
+
+  let addPanel: { open: () => void; reset: () => void } | null = null;
+  function closeAddPanel(): void {
+    addHost.hidden = true;
+    addPanel?.reset();
+    addBtn.setAttribute('aria-expanded', 'false');
+  }
+  addBtn.setAttribute('aria-expanded', 'false');
+  addBtn.addEventListener('click', () => {
+    if (!addHost.hidden) {
+      closeAddPanel();
+      return;
+    }
+    addHost.hidden = false;
+    addBtn.setAttribute('aria-expanded', 'true');
+    if (!addPanel) {
+      addPanel = mountAddPersonPanel(addHost, {
+        crest: (orgRef, orgName) => crestNode(orgMonogram(orgName), 'sm', orgRef ? { orgRef } : {}),
+        onAdded: (result) => onPersonAdded(result),
+        onClose: closeAddPanel
+      });
+    }
+    addPanel.open();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || addHost.hidden || !isCurrent()) return;
+    if (document.querySelector('.person-dialog')) return;
+    closeAddPanel();
   });
   addIcon.addEventListener('click', () => addBtn.click());
 
@@ -1762,14 +2071,33 @@ export async function renderPeoplePage(
 
   async function reloadDirectory(): Promise<void> {
     const load = ++directoryLoad;
+    const live = () => isCurrent() && load === directoryLoad;
+    let snapshotAt: string | null = null;
+    // First open of a session waits on a full scan, so paint the server's
+    // saved copy of the last scan meanwhile. The fresh scan still replaces it.
+    if (!directory) {
+      void fetchPeopleDirectorySnapshot()
+        .then((snapshot) => {
+          if (!snapshot || !live() || directory) return;
+          directory = snapshot;
+          snapshotAt = snapshot.as_of;
+          count.textContent = `${directoryCountLabel(snapshot)} · Updating… (as of ${snapshotTimeLabel(snapshot.as_of)})`;
+          renderDirectory();
+        })
+        .catch(() => {});
+    }
     try {
       const result = await fetchPeopleDirectory({fresh:true});
-      if (!isCurrent() || load !== directoryLoad) return;
+      if (!live()) return;
       directory = result;
       count.textContent = directoryCountLabel(directory);
       renderDirectory();
     } catch (err) {
-      if (!isCurrent() || load !== directoryLoad) return;
+      if (!live()) return;
+      if (snapshotAt && directory) {
+        count.textContent = `${directoryCountLabel(directory)} · Couldn't refresh, showing ${snapshotTimeLabel(snapshotAt)}`;
+        return;
+      }
       count.textContent = 'Unavailable';
       listHost.replaceChildren(
         el('p', 'people-pane__error', err instanceof Error ? err.message : 'Directory failed to load.')

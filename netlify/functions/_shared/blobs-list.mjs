@@ -20,18 +20,22 @@ export function isIndexKey(key) {
   return key === '_index' || key.endsWith('/_index');
 }
 
-// Runs `fn` over `items` with concurrency bounded to `size` at a time —
-// items are processed in sequential batches, each batch's calls
-// concurrent via Promise.all. Used anywhere a set of Blob reads could grow
-// large enough that unbounded concurrent GETs would be a problem (Universal
-// Links membership and link hydration).
+// Runs `fn` over `items` with at most `size` calls in flight. A pool, not
+// fixed batches: a slow Blob read holds up only its own slot instead of
+// stalling the whole batch. Results keep input order; the first rejection
+// rejects the call. Used anywhere a set of Blob reads could grow large
+// enough that unbounded concurrent GETs would be a problem (Universal Links
+// membership and link hydration).
 export async function mapBounded(items, size, fn) {
-  const out = [];
-  for (let start = 0; start < items.length; start += size) {
-    const batch = items.slice(start, start + size);
-    const results = await Promise.all(batch.map(fn));
-    out.push(...results);
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next++;
+      out[index] = await fn(items[index], index, items);
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, size), items.length) }, worker));
   return out;
 }
 
