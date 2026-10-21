@@ -32,3 +32,6 @@ apps/*/.ua/
 
 # Decision Book page renders for builders: book scans, never committed.
 .db-book/
+# Decision Maker contact sheet build output: rebuild with scripts/build-decision-book-contact-sheet.mjs.
+/docs/mockups/decision-maker/contact-sheet.js
+/docs/mockups/decision-maker/contact-sheet.css
