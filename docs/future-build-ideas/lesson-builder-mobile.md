@@ -28,11 +28,11 @@ The phone mode should be built for those jobs, one thing at a time.
 | "Lesson" select and Lines chips in two cramped columns | `.lesson-page__meta` is `display: flex` with no wrap |
 | Chat button floats over blocks; no edit actions at the bottom | The FAB is the only phone affordance; the bottom bar is the hub's Dashboard / Chat / Classes / More |
 
-The author pill on the cover was not found in the banner or page code; it needs tracing before the cover is reworked.
+The "✦ Ann" pill on the cover is Ann's bar (`alchemy/ann-bar.ts`): at rest a chip that opens the Alchemy Lab review tray. It is not an author or publish control. On a phone it should move off the cover, either into the ⋮ menu or behind **Clare** in the bar.
 
 ## The idea: one thing at a time
 
-1. **Editing bottom bar.** Inside a lesson, the hub bar is replaced by **＋ Block · Arrange · Clare · Preview**, with a back chevron to the hub. The rail column and the chat FAB go. The lesson gets the full width.
+1. **Editing bottom bar.** Inside a lesson, the hub bar is replaced (not stacked) by **＋ Block · Arrange · Clare**, with a back chevron to the hub. No Preview: it is the student view, which is not needed on a phone. The rail column and the chat FAB go. The lesson gets the full width.
 2. **Read cleanly, tap to edit.** On the page, blocks show no grip, ⋯ or beaker. Tapping a block opens it full screen with a docked **Done** at the bottom. Edit, Duplicate, Ask Alchemy and Delete live in the sheet header. Long-press opens the same actions without opening the block. This gives back about 6rem of width on every block.
 3. **Arrange is its own view.** An outline with one row per block (icon and title) and large drag handles, like reordering a list on iOS. Moving blocks stops competing with editing them.
 4. **Add where you are.** A thin "＋" line between blocks as you scroll; tapping it opens a picker sheet: search, then Recent, then the block groups and Compositions. **＋ Block** in the bar inserts after the block in view. There is no slash menu today, and a picker sheet suits a phone keyboard better than one.
@@ -46,7 +46,7 @@ The author pill on the cover was not found in the banner or page code; it needs 
 |---|---|---|---|
 | **Fixes** | Title overlap and wrapping, meta row wrap, drop the rail column under 720px, flyout fits the screen | 1 PR, about 100–200 lines, mostly CSS | Low. The title overlay is shared with other page types, so keep the change to phones |
 | **A** | Phone mode in `lesson-editor.ts`, editing bottom bar, tap-to-edit sheet, add-block picker sheet | 2–3 PRs, about 1,000–1,500 lines | Highest. About 60 block types have to edit in the sheet; inline kinds (text, whiteboard, mind map) need a decision. Testing them at 390px is most of the work |
-| **B** | Arrange view, short cover with title below, one-line details sheet | 1–2 PRs, about 500–800 lines | Medium. Nested blocks (`section`, `columns`, `tabs`) complicate Arrange; v1 could reorder top-level blocks only |
+| **B** | Arrange view (including blocks inside sections, columns and tabs), short cover with title below, one-line details sheet | 2 PRs, about 700–1,100 lines | Medium. Nested blocks need indented rows and drags in and out of containers; that adds roughly 200–300 lines over top-level only |
 | **C** | "Describe it": add blocks by describing them | 1 PR, about 400–700 lines once cut down (below) | Medium |
 
 Fixes plus A and B: about 5–7 PRs and 2,000–2,500 lines, plus a lot of checking at 390px. Hardest part: keeping desktop and phone in one codebase without breaking desktop, and getting every block type to edit properly in a sheet.
@@ -88,15 +88,66 @@ From [`docs/CURSOR-UI-FAILURES.md`](../CURSOR-UI-FAILURES.md):
 - **S3:** the Alchemy Lab column showed the page through it as a see-through sheet at 390px
 - **T2:** no mid-word title breaks (wrapping title)
 
+## Decisions (21/10/26)
+
+| Question | Decision |
+|---|---|
+| Editing bar replaces the hub bar or sits above it? | **Replaces it.** Back chevron returns to the hub |
+| Preview in the bar? | **No.** Preview is the student view; not needed on a phone |
+| Arrange handles blocks inside sections, columns and tabs in v1? | **Yes.** Nested blocks show as indented rows under their container; columns show as one group per column, since columns stack on a phone anyway |
+| What is the "✦ Ann" pill? | Ann's bar (Alchemy Lab review), not authorship or publish. Moves off the cover on a phone |
+| In place or sheet? | See below |
+| Clare's list | See below |
+
+### In place or in the sheet
+
+- **In place** means you tap the block and type straight into it on the page, like Notes. The block stays where it is; the keyboard comes up.
+- **In the sheet** means tapping opens the block full screen on its own, with Done at the bottom, then drops you back on the page.
+
+On desktop, text-like blocks (`rich_text`, `heading`, `callout`, `quote`, `definition`, `code`) and canvas blocks (`mind_map`, `concept_map`) already edit in place (`lesson-canvas/kinds.ts`). Everything else opens an inspector.
+
+Proposed for the phone:
+
+- **Text-like blocks: in place.** Tap and type. It is the most natural thing on a phone and avoids a sheet for a one-word fix. Their actions (duplicate, delete, Ask Alchemy) come from long-press.
+- **Canvas blocks (mind map, concept map, whiteboard, diagram): sheet.** They need the whole screen to pan and zoom, and a finger on the canvas fights page scroll when they sit in the page.
+- **Everything else: sheet.**
+
+### Which blocks Clare can add, and which a phone cannot really author
+
+Clare's list for "Describe it" v1: blocks that are mostly words.
+
+- **Basic:** rich text, heading, callout, teacher note, quote, table, definition.
+- **Questions:** quiz question, question set, flashcards, cloze, self check. These are taken to be "question maker"; confirm.
+- **Thinking Toolkit:** thinking intentions, toolkit skill, tool and value, thinking move, question quadrant, concept features, thinking reflection.
+- **Analogous Thinking:** the analogy blocks.
+- **Layout:** section, divider.
+- **Saved compositions.**
+
+Not on Clare's list in v1:
+
+| Blocks | Why |
+|---|---|
+| Media (image, gallery, video, embed, audio, attachment) | Need a real file or link; Alchemy patches cannot write URLs (`PROTECTED_KEY` in `packages/alchemy/patches.js`) |
+| HTML, HTML app, code | Generated code is risky to drop into a lesson unreviewed |
+| Visual layout (whiteboard, diagram, mind map, concept map, chart, timeline, equation) | Output depends on spatial layout or data Clare would have to invent |
+| Containers (columns, tabs, accordion, card stack) | Only via compositions until single blocks prove reliable |
+| Class activities (peer feedback, brainstorm, question drop, annotation, classroom tools, countdown, outcomes) | Mostly configuration rather than words; open question |
+
+Hard to author on a phone at all, for anyone. Show a working preview with **"Edit on a computer"** instead of a cramped editor. This is a deliberate exception to R5, so the brief must say so:
+
+- HTML and HTML app
+- code (tolerable for small fixes in place, so it could stay editable)
+- columns layout (contents stay editable through Arrange and the sheet; only column widths are desktop-only)
+- chart data entry
+
 ## Open questions
 
-- Should the editing bar fully replace the hub bar, or slide up above it? Replacing gives more room but changes the hub's navigation inside one page.
-- Inline kinds (text, whiteboard, mind map): edit in place on the phone with only the actions moved, or always open the sheet?
-- Does Preview mean "as a student sees it" or "as it will project"?
-- Should Arrange handle nested blocks in v1?
-- Which 10–15 block types go on Clare's list for Slice C?
-- Where does the author pill on the cover come from, and does it survive the short cover?
+- Is "question maker" quiz question and question set, or a different block?
+- Do the class activity blocks (peer feedback, brainstorm, question drop, annotation) belong on Clare's list?
+- Should code stay editable on a phone, or join "Edit on a computer"?
+- Should Ann's bar move into the ⋮ menu or sit behind **Clare** in the bar?
 
 ## History
 
+- **2026-10-21:** Recorded decisions: the editing bar replaces the hub bar, no Preview on a phone, Arrange handles nested blocks in v1. Added in-place vs sheet rules, Clare's block list, phone-unfriendly blocks, and identified the "✦ Ann" pill as Ann's bar.
 - **2026-10-21:** First draft from a 390px screenshot of the lesson builder: diagnosis, phone mode concept, slice sizes, a cut-down Slice C built on Alchemy suggestions, and the failure register entries to cite.
