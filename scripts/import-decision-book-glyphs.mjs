@@ -16,7 +16,7 @@ if (!source) {
 }
 // The kit's red and green, lifted a little brighter and more saturated (Adam, 21 Oct), with
 // their tints. Ink and paper are unchanged.
-const PALETTE = { '#ef402b': '#f43a25', '#60aa36': '#60ba2c', '#e5edda': '#e3f1d8', '#f8e1d8': '#fcdfd5' };
+const PALETTE = { '#ef402b': '#e4301c', '#60aa36': '#398000', '#e5edda': '#e3f1d8', '#f8e1d8': '#fcdfd5' };
 async function copyFile(from, to) {
   let svg = await readFile(from, 'utf8');
   for (const [kit, ours] of Object.entries(PALETTE)) svg = svg.replaceAll(new RegExp(kit, 'gi'), ours);
