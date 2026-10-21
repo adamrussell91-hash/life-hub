@@ -315,7 +315,7 @@ test('export returns lesson, unit, and archive packs', async () => {
 
 test('AI jobs create, conflict, poll, and resolve', async () => {
   const store = memoryStore(seed);
-  const deps = { env, now, getContentStore: async () => store };
+  const deps = { env, now, getContentStore: async () => store, kickLessonJobRun: async () => true };
   const created = await read(await createAiJobsHandler(deps)(
     request('https://api.adam-russell.com/api/ai/jobs', {
       method: 'POST',

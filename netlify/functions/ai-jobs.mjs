@@ -15,10 +15,20 @@ import {
   runKnowledgeIntakeUntilReview,
   unresolvedJobForPage
 } from './_shared/knowledge-intake.mjs';
+import { kickLessonJobRun } from './_shared/teaching-ai-job-kick.mjs';
 
 export const config = { path: '/api/ai/jobs' };
 
 const AGENTS = new Set(['clementine', 'ann', 'hammond', 'clare']);
+
+/** Same 10-minute limit as the panel's poll and the nightly expiry tick. */
+export const LESSON_JOB_STALE_MS = 10 * 60 * 1000;
+
+export function jobIsStale(job, nowMs) {
+  if (job?.status !== 'working') return false;
+  const created = Date.parse(job.created_at || '');
+  return Number.isFinite(created) && nowMs - created >= LESSON_JOB_STALE_MS;
+}
 
 function inboxFrom(jobs) {
   return { jobs };
@@ -106,7 +116,15 @@ export function createAiJobsHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Lesson not found', false), request, env);
     }
     const inbox = (await getJSON(store, aiJobsInboxKey())) ?? { jobs: [] };
-    const existing = unresolvedJobForLesson(inbox, lesson_id);
+    let existing = unresolvedJobForLesson(inbox, lesson_id);
+    if (existing && jobIsStale(existing, (deps.now ?? Date.now)())) {
+      // A job no runner finished must not lock the lesson's chat until the nightly tick.
+      const stale = (await getJSON(store, aiJobKey(existing.id))) ?? existing;
+      const expired = { ...stale, status: 'error', phase: undefined, error: 'Timed out waiting for a runner', updated_at: new Date().toISOString() };
+      await setJSON(store, aiJobKey(existing.id), expired);
+      await writeJobInbox(store, expired);
+      existing = null;
+    }
     if (existing) {
       return withCors(jsonResponse(409, {
         ok: false,
@@ -137,6 +155,13 @@ export function createAiJobsHandler(deps = {}) {
     };
     await setJSON(store, aiJobKey(id), job);
     await writeJobInbox(store, job);
+    const kicked = await (deps.kickLessonJobRun ?? kickLessonJobRun)(request, id);
+    if (!kicked) {
+      const failed = { ...job, status: 'error', phase: undefined, error: 'Could not start the AI runner. Try again.' };
+      await setJSON(store, aiJobKey(id), failed);
+      await writeJobInbox(store, failed);
+      return withCors(okResponse(202, { id, status: 'error' }), request, env);
+    }
     return withCors(okResponse(202, { id, status: 'working' }), request, env);
   }, deps);
 }
