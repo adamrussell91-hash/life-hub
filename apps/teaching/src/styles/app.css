@@ -5467,6 +5467,145 @@ a.home-class-tile:hover {
   .block-question-set--anchor .block-question-set__write { margin-left: 0; }
 }
 
+/* Reasoning: a chart students build step by step (lens and question set format). Cotton glass, as kaplan.css. */
+.block-editor__fields:not([data-format='reasoning_chart']) .block-editor__question-logic { display: none; }
+/* hub-list.css gives the settings row display: flex, which beats [hidden] (UI failure register V1). */
+.block-editor__inline-settings[hidden], .block-reasoning__levels[hidden] { display: none; }
+.block-reasoning { min-width: 0; max-width: 100%; margin-top: var(--space-3); font-family: var(--font-ui); color: var(--ink); }
+/* Let the tab row and test grid scroll inside the panel instead of widening the question. */
+.block-reasoning__panel, .block-reasoning__charts, .block-question-set--reasoning .block-question-set__question { min-width: 0; }
+.block-question-set__list:has(.block-reasoning) { grid-template-columns: minmax(0, 1fr); }
+.block-question-set--reasoning .block-question-set__question { margin-top: var(--space-5); }
+.block-question-set--reasoning .block-question-set__question > .btn { margin-top: var(--space-2); }
+.block-reasoning__charts { display: grid; gap: var(--space-4); padding: var(--space-4); background: var(--cotton); border-radius: var(--radius-md); }
+.block-reasoning-chart__axis {
+  display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2);
+  font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted);
+}
+.block-reasoning-chart__axis-line { flex: 1; border-top: 1px solid var(--line); }
+.block-reasoning-chart__body { display: flex; align-items: stretch; min-height: 5rem; }
+.block-reasoning-chart__col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: space-around; gap: var(--space-2); }
+.block-reasoning-chart__links { flex: 0 0 2.5rem; width: 2.5rem; height: auto; align-self: stretch; fill: none; stroke: var(--wave); stroke-width: 1.5; }
+.block-reasoning-chart[data-logic='abductive'] .block-reasoning-chart__links { stroke: var(--pastel-peach-ink); }
+.block-reasoning-chart__node {
+  display: flex; flex-direction: column; gap: var(--space-1); min-height: 4rem; padding: var(--space-2) var(--space-3);
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); line-height: var(--leading-snug, 1.35); overflow-wrap: anywhere;
+}
+.block-reasoning-chart__node--now { background: var(--pastel-blue); border: 2px solid var(--wave); color: var(--pastel-blue-ink); }
+.block-reasoning-chart[data-logic='abductive'] .block-reasoning-chart__node--now { background: var(--pastel-peach); border-color: var(--pastel-peach-ink); color: var(--pastel-peach-ink); }
+.block-reasoning-chart__node--ghost { background: transparent; border: 1.5px dashed color-mix(in srgb, var(--wave) 35%, transparent); color: var(--muted); }
+.block-reasoning-chart[data-logic='abductive'] .block-reasoning-chart__node--ghost { border-color: color-mix(in srgb, var(--pastel-peach-ink) 35%, transparent); }
+.block-reasoning-chart__label {
+  display: flex; justify-content: space-between; gap: var(--space-2);
+  font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted);
+}
+.block-reasoning-chart__node--now .block-reasoning-chart__label { color: inherit; }
+.block-reasoning-chart__fit { color: var(--wave); letter-spacing: 0; text-transform: none; }
+.block-reasoning-chart__line { display: block; height: 1.4rem; border-bottom: 1px solid var(--line); }
+.block-reasoning__panel {
+  margin-top: var(--space-3); padding: var(--space-5);
+  background: var(--paper); border-left: var(--space-1) solid var(--wave); border-radius: var(--radius-xs);
+}
+/* Inside a lens the workspace already draws the paper panel and wave border. */
+.kaplan-workspace .block-reasoning__panel { padding: 0; border-left: 0; background: none; }
+.block-reasoning [tabindex='-1']:focus { outline: none; }
+.block-reasoning .kaplan-progress { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.block-reasoning .kaplan-progress__step {
+  padding: var(--space-2) 0; border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: var(--muted); font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
+.block-reasoning .kaplan-progress__step[aria-current='step'] { border-bottom-color: var(--wave); color: var(--navy); font-weight: var(--weight-medium); }
+.block-reasoning .kaplan-progress__step:disabled { cursor: default; opacity: 0.55; }
+.block-reasoning .kaplan-eyebrow {
+  margin: var(--space-3) 0 var(--space-2); font-size: var(--text-2xs); font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted);
+}
+.block-reasoning .kaplan-workspace__step-title { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--navy); }
+.block-reasoning .kaplan-workspace__prompt { margin: 0; max-width: var(--measure); font-size: var(--text-base); line-height: var(--leading-normal); }
+.block-reasoning .kaplan-field { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); color: var(--navy); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.block-reasoning .kaplan-notes {
+  width: 100%; max-width: var(--measure); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-xs);
+  background: var(--glass); color: var(--ink); font: inherit; font-size: var(--text-base); font-weight: var(--weight-regular); resize: vertical;
+}
+.block-reasoning .kaplan-notes:focus-visible, .block-reasoning button:focus-visible, .block-reasoning input:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.block-reasoning .kaplan-caption { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--muted); }
+.block-reasoning__example { margin-top: var(--space-3); max-width: var(--measure); }
+.block-reasoning__example-text { margin: 0; color: var(--navy); font-style: italic; }
+.block-reasoning details.block-reasoning__example summary { cursor: pointer; color: var(--wave); font-size: var(--text-sm); }
+.block-reasoning__error { margin: var(--space-2) 0 0; color: var(--danger); font-size: var(--text-sm); }
+.block-reasoning__error:empty { display: none; }
+.block-reasoning__checks { margin: var(--space-4) 0 0; padding: 0; border: 0; max-width: var(--measure); }
+.block-reasoning__check { display: flex; gap: var(--space-2); align-items: baseline; margin-top: var(--space-2); font-size: var(--text-sm); }
+.block-reasoning .lens-levels { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+.block-reasoning .lens-levels__option, .block-reasoning__levels .lens-levels__option {
+  padding: var(--space-1) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-full);
+  background: transparent; color: var(--muted); font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
+.block-reasoning .lens-levels__option[aria-pressed='true'], .block-reasoning__levels .lens-levels__option[aria-pressed='true'] { background: var(--pastel-blue); border-color: var(--wave); color: var(--navy); }
+.block-reasoning__levels { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-3); font-family: var(--font-ui); }
+.block-reasoning__grid-wrap { overflow-x: auto; margin-top: var(--space-4); }
+.block-reasoning__grid { border-collapse: collapse; font-size: var(--text-sm); }
+.block-reasoning__grid th, .block-reasoning__grid td { padding: var(--space-2); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.block-reasoning__grid thead th { color: var(--navy); border-bottom: 2px solid var(--pastel-peach-ink); max-width: 14rem; }
+.block-reasoning__grid tbody th { font-weight: var(--weight-regular); max-width: 16rem; }
+.block-reasoning__grid td { text-align: center; }
+.block-reasoning__grid-total { color: var(--pastel-peach-ink); font-weight: var(--weight-semibold); white-space: nowrap; }
+.block-reasoning__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: space-between; margin-top: var(--space-5); }
+.block-reasoning__actions .btn--primary { margin-left: auto; }
+.block-reasoning__rechoose { margin: 0 0 var(--space-2); padding-inline: 0; font-size: var(--text-sm); }
+.block-reasoning .lens-frame, .block-reasoning .lens-challenge {
+  margin-top: var(--space-4); padding: var(--space-3); max-width: var(--measure);
+  border: 1px dashed var(--wave); border-radius: var(--radius-xs); color: var(--navy);
+}
+.block-reasoning .kaplan-focus__label {
+  display: block; margin-bottom: var(--space-1); font-size: var(--text-2xs); font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted);
+}
+.block-reasoning .lens-checklist ul { margin: 0; padding-left: var(--space-5); font-size: var(--text-sm); }
+.block-reasoning .lens-handover { margin-top: var(--space-4); font-weight: var(--weight-semibold); color: var(--navy); max-width: var(--measure); }
+.block-reasoning .lens-lines__line { height: 2rem; border-bottom: 1px solid var(--line); }
+.block-reasoning__spectrum {
+  display: flex; justify-content: space-between; margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase;
+}
+.block-reasoning__spectrum-analytical { color: var(--wave); }
+.block-reasoning__spectrum-creative { color: var(--pastel-peach-ink); }
+.block-reasoning__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
+.block-reasoning__card {
+  display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: left;
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--ink); font: inherit; cursor: pointer;
+}
+button.block-reasoning__card:hover, .block-reasoning__card[aria-pressed='true'] { border-color: var(--wave); background: var(--pastel-blue); }
+button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive[aria-pressed='true'] { border-color: var(--pastel-peach-ink); background: var(--pastel-peach); }
+.block-reasoning__card .kaplan-symbol { width: 2rem; height: 2rem; fill: none; stroke: var(--wave); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.block-reasoning__card--abductive .kaplan-symbol { stroke: var(--pastel-peach-ink); }
+.block-reasoning__card-title { font-size: var(--text-md); color: var(--navy); }
+.block-reasoning__card--abductive .block-reasoning__card-title { color: var(--pastel-peach-ink); }
+.block-reasoning__card-detail { font-size: var(--text-sm); }
+.block-reasoning__card-example { font-size: var(--text-sm); color: var(--muted); font-style: italic; }
+.block-reasoning__print-steps { margin-top: var(--space-4); font-size: var(--text-sm); }
+.block-reasoning__print-steps li + li { margin-top: var(--space-2); }
+@media (max-width: 40rem) {
+  .block-reasoning__panel { padding: var(--space-3); }
+  /* Tabs wrap in rows, not kaplan.css's stacked list: walks have up to nine steps. */
+  .block-reasoning .kaplan-progress { flex-direction: row; flex-wrap: wrap; gap: 0 var(--space-3); }
+  .block-reasoning-chart__body { flex-direction: column; }
+  .block-reasoning-chart__links { flex: 0 0 auto; width: 100%; height: 1.25rem; }
+  .block-reasoning-chart__links path { display: none; }
+  .block-reasoning-chart__links {
+    background: linear-gradient(var(--wave), var(--wave)) center / 1.5px 100% no-repeat;
+  }
+  .block-reasoning-chart[data-logic='abductive'] .block-reasoning-chart__links {
+    background-image: linear-gradient(var(--pastel-peach-ink), var(--pastel-peach-ink));
+  }
+}
+@media print {
+  .block-reasoning__panel { border-left: 0; padding: 0; }
+  .block-reasoning__charts { background: none; padding: 0; }
+  .block-reasoning-chart__node { min-height: 0; break-inside: avoid; }
+}
+
 .block-spacer--small {
   height: 0.75rem;
 }
