@@ -39,10 +39,10 @@ test('one named chart container; phone rules for every family, never styling the
 
 test('the palette pairs the charts use are readable', () => {
   const [ink, paper, red, green, soft] = ['ink', 'paper', 'red', 'green', 'soft'].map(token);
-  const [redTint, greenTint] = ['red-tint', 'green-tint'].map(token);
+  const [redTint, greenTint, redLabel] = ['red-tint', 'green-tint', 'red-label'].map(token);
   const pairs = [
-    ['ink on red', ink, red],
-    ['ink on green', ink, green],
+    ['ink on red label', ink, redLabel],
+    ['paper on green', paper, green],
     ['paper on ink', paper, ink],
     ['ink on red tint', ink, redTint],
     ['ink on green tint', ink, greenTint],
@@ -52,10 +52,11 @@ test('the palette pairs the charts use are readable', () => {
     ['band green on green tint', '#3c7420', greenTint]
   ];
   for (const [name, fg, bg] of pairs) assert.ok(contrast(fg, bg) >= 4.5, `${name}: ${contrast(fg, bg).toFixed(2)}`);
-  // Why the re-skin turns white text on red to ink:
+  // Why text on red sits on the brighter label red: neither ink nor white reads on --dm-red.
   assert.ok(contrast('#ffffff', red) < 4.5);
+  assert.ok(contrast(ink, red) < 4.5);
 });
 
 test('the re-skin covers exactly the four reused Problem Solver charts', () => {
-  assert.match(rules, /\.dm-scope :is\(\.ps-swot, \.ps-morph, \.ps-pareto, \.ps-dloop\) \{\s*--ps-red: var\(--dm-red\);\s*--ps-blue: var\(--dm-ink\);\s*--ps-yellow: var\(--dm-green\);\s*--ps-on-yellow: var\(--dm-ink\);/);
+  assert.match(rules, /\.dm-scope :is\(\.ps-swot, \.ps-morph, \.ps-pareto, \.ps-dloop\) \{\s*--ps-red: var\(--dm-red-label\);\s*--ps-blue: var\(--dm-ink\);\s*--ps-yellow: var\(--dm-green\);\s*--ps-on-yellow: var\(--dm-paper\);/);
 });
