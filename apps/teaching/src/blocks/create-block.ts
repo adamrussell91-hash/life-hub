@@ -42,6 +42,7 @@ export const NEW_BLOCK_TYPES = [
   'peer_feedback',
   'question_drop',
   'brainstorm',
+  'continuum_line',
   'quiz_question',
   'question_set',
   'flashcards',
@@ -109,6 +110,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   peer_feedback: 'Peer feedback',
   question_drop: 'Question drop',
   brainstorm: 'Brainstorm',
+  continuum_line: 'Continuum line',
   quiz_question: 'Quiz question',
   question_set: 'Question set',
   flashcards: 'Flashcards',
@@ -216,6 +218,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
       'thinking_move',
       'question_quadrant',
       'concept_features',
+      'continuum_line',
       'thinking_reflection'
     ]
   },
@@ -267,6 +270,7 @@ const TOOLKIT_GROUP_TYPES = [
   'thinking_move',
   'question_quadrant',
   'concept_features',
+  'continuum_line',
   'thinking_reflection',
   'analogy_types',
   'analogy_close_reading',
@@ -605,6 +609,13 @@ export function createBlock(type: NewBlockType, id: string): Block {
     case 'brainstorm':
       return { ...shared, block_type: 'brainstorm', variant: 'medium', content: {
         question: '', safety: 'approve', per_student: 3, max_length: 140, layout: 'grid'
+      } };
+    case 'continuum_line':
+      return { ...shared, block_type: 'continuum_line', variant: 'medium', content: {
+        stimulus: { kind: 'text', text: '', url: '', alt_text: '' },
+        scale: { left: 'Implied', right: 'Not implied', stops: [] },
+        statements: [{ id: `${id}_s1`, text: '', snap: false }],
+        pace: 'teacher', replace: true
       } };
     case 'question_drop':
       return { ...shared, block_type: 'question_drop', variant: 'medium', content: {
