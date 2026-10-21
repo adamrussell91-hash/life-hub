@@ -1,6 +1,7 @@
 // packages/decision-book/contact-sheet.ts
 // The contact sheet: every Decision Book chart, empty, partial and full, at desktop width and
-// at 390px, then the four reused Problem Solver charts in the Decision Maker palette. Built by
+// at 390px, then the four reused Problem Solver charts in the Decision Maker palette, then every
+// Decision Maker model worked through (work-through.mjs). Built by
 // scripts/build-decision-book-contact-sheet.mjs into docs/mockups/decision-maker/; for one
 // look by Adam, not shipped in the app.
 import '../design-kit/tokens.css';
@@ -23,6 +24,9 @@ import { createParetoView } from '../problem-solver/render/pareto';
 import { createMorphologicalView } from '../problem-solver/render/morphological';
 import { createDoubleLoopView } from '../problem-solver/render/double-loop';
 import type { PsToolRun } from '../problem-solver/types';
+import { DECISION_TOOLS } from './models/index.mjs';
+import { workThrough } from './work-through.mjs';
+import { CATALOGUE } from './catalogue.mjs';
 
 type Sample = { id: string; name: string; family: string };
 const TOOLS = SAMPLE_TOOLS as unknown as Record<string, Sample>;
@@ -106,3 +110,21 @@ for (const [title, view, run] of reused) {
 }
 section.append(heading, row);
 sheet.append(section);
+
+// Every Decision Maker model, worked through by the patient driver, in book order.
+
+const models = document.createElement('section');
+models.className = 'sheet__row';
+const modelsHeading = document.createElement('h2');
+modelsHeading.textContent = 'Every model, worked through (placeholder answers)';
+const modelsRow = document.createElement('div');
+modelsRow.className = 'sheet__cells sheet__cells--wrap';
+for (const entry of CATALOGUE) {
+  const tool = (DECISION_TOOLS as unknown as Record<string, Sample>)[entry.id];
+  if (!tool) continue;
+  const view = tool.id === 'dm_outside_box' ? createOutsideBoxView(tool as never) : tool.id === 'dm_black_box' ? createBlackBoxView(tool as never) : BY_FAMILY[tool.family](tool as never);
+  view.update(workThrough(tool.id, (slot: string, i: number) => `Answer ${i + 1}`) as DmToolRun);
+  modelsRow.append(cell(`${entry.section}. ${tool.name}`, '560px', view));
+}
+models.append(modelsHeading, modelsRow);
+sheet.append(models);
