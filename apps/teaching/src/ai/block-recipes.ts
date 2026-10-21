@@ -13,12 +13,12 @@ Every proposed block must include all required metadata fields: id, type, block_
 - Use html or html_app only when the teacher explicitly asks for HTML. collection is homepage-only and must not appear in lessons.
 
 ## Quiz questions
-A quiz is one quiz_question block per question: content { question }. Set question.id to the block's id. Every question has prompt (the question, required except fill_gap), marks (1-20), and optional hint, explanation (shown after answering) and image { url, alt }. Choice ids are short unique strings within the question (e.g. "a", "b", "c").
+A quiz is one quiz_question block per question: content { question }. Set question.id to the block's id. Every question has prompt (always include it: the question itself, or for fill_gap a short instruction such as "Fill the gaps."), marks (1-20), and optional hint, explanation (shown after answering) and image { url, alt }. Choice ids are short unique strings within the question (e.g. "a", "b", "c").
 - multiple_choice: options [{ id, text }] 2-6, correct [one option id].
 - multi_select: options 2-8, correct [every right option id].
 - true_false: answer true|false.
 - short_answer: accepted ["answer", "other accepted spelling"] 1-10, case_sensitive optional.
-- fill_gap: passage with each gap written inline as [[answer]] or [[answer|also accepted]]; word_bank optional. No prompt needed.
+- fill_gap: prompt is a short instruction; passage with each gap written inline as [[answer]] or [[answer|also accepted]]; word_bank optional.
 - odd_one_out: options 3-6, correct [the odd one's id].
 - matching: pairs [{ id, left, right }] 2-8; every right side different.
 - ordering: items [{ id, text }] 3-8, written in the correct order (students get them shuffled).
