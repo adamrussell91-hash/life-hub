@@ -1,6 +1,8 @@
 import type { Block } from '@/schemas/block';
 import { loadActivityState, saveActivityState, storageKey } from '../learning-activity';
+import { CONJUNCTION_HINTS, CONJUNCTIONS } from '../lenses/because-but-so';
 import { copyAnswerButton, HANDOVER_TEXT } from '../lenses/handover';
+import { QUESTION_LEVEL_LABELS, QUESTION_LEVEL_STEMS, QUESTION_LEVELS, guessQuestionLevel } from '../lenses/question-levels';
 
 type QuestionSet = Extract<Block, { block_type: 'question_set' }>;
 type Mode = 'student' | 'teacher' | 'print';
@@ -29,6 +31,8 @@ const ANCHOR_BOXES = [
   { id: 'bridge', label: 'Bridge', hint: 'This reveals that…' }
 ] as const;
 const ANCHOR_FRAME = 'The text explores ___ through ___. In ___, ___, described as “___”. This reveals that ___. The text suggests that humans ___.';
+const LEVELS_FRAME = 'The key question is ___. I would argue that ___ because ___. If ___, then ___.';
+const BBS_FRAME = '___ because ___, but ___, so ___.';
 const TABLE_FRAME = 'In [text], ___ shows that ___. This is a [window / mirror / both] because ___.';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -170,5 +174,68 @@ export function renderAnchorBridge(block: QuestionSet, mode: Mode, ctx: Ctx = {}
     list.append(li);
   }
   wrap.append(list);
+  return wrap;
+}
+
+/** One answer box, or ruled lines on paper. */
+function answer(mode: Mode, state: State, persist: () => void, id: string, label: string, placeholder = '', printLines = PRINT_LINES): HTMLElement {
+  return mode === 'print' ? lines(printLines) : box(state, persist, id, label, placeholder, 3);
+}
+
+export function renderQuestionLevels(block: QuestionSet, mode: Mode, ctx: Ctx = {}): HTMLElement {
+  const wrap = el('div', 'block-question-set block-question-set--levels');
+  if (block.content.title?.trim()) wrap.append(el('p', 'block-question-set__title', block.content.title));
+  const { state, persist } = formatState(block, mode, ctx);
+  let n = 0;
+  for (const level of QUESTION_LEVELS) {
+    const questions = block.content.questions.filter((q) => (q.level ?? guessQuestionLevel(q.prompt)) === level);
+    if (!questions.length) continue;
+    const band = el('section', `block-question-set__band block-question-set__band--${level}`);
+    band.dataset.level = level;
+    const head = el('div', 'block-question-set__band-head');
+    head.append(el('p', 'block-question-set__band-name block-eyebrow', QUESTION_LEVEL_LABELS[level]), el('p', 'block-secondary', QUESTION_LEVEL_STEMS[level]));
+    const list = el('ol', 'block-question-set__list');
+    list.start = n + 1;
+    for (const question of questions) {
+      n += 1;
+      const li = el('li', 'block-question-set__question');
+      li.dataset.questionId = question.id;
+      li.append(el('p', 'block-question-set__prompt block-body', question.prompt), answer(mode, state, persist, question.id, `Question ${n} answer`));
+      list.append(li);
+    }
+    band.append(head, list);
+    wrap.append(band);
+  }
+  wrap.append(writeDown(mode, state, persist, 'answer', LEVELS_FRAME, 'Take your best Judge or Inventor answer and write it up as a paragraph.'));
+  return wrap;
+}
+
+/** "Katniss volunteers for Prim." reads as a stem once its end punctuation goes. */
+function stem(prompt: string): string {
+  return prompt.trim().replace(/[.?!…]+$/, '').replace(/\s+(because|but|so)$/i, '');
+}
+
+export function renderBecauseButSo(block: QuestionSet, mode: Mode, ctx: Ctx = {}): HTMLElement {
+  const wrap = el('div', 'block-question-set block-question-set--bbs');
+  if (block.content.title?.trim()) wrap.append(el('p', 'block-question-set__title', block.content.title));
+  const { state, persist } = formatState(block, mode, ctx);
+  const list = el('ol', 'block-question-set__list');
+  for (const question of block.content.questions) {
+    const li = el('li', 'block-question-set__question');
+    li.dataset.questionId = question.id;
+    const text = stem(question.prompt);
+    li.append(el('p', 'block-question-set__prompt block-body', text));
+    const parts = el('div', 'block-question-set__bbs');
+    for (const word of CONJUNCTIONS) {
+      const part = el('label', 'block-question-set__bbs-part');
+      const lead = el('span', 'block-question-set__bbs-lead');
+      lead.append(document.createTextNode(`${text}${word === 'because' ? '' : ','} `), el('strong', undefined, word));
+      part.append(lead, answer(mode, state, persist, `${question.id}.${word}`, `${text} ${word}: ${CONJUNCTION_HINTS[word]}`, `…${CONJUNCTION_HINTS[word]}`, 2));
+      parts.append(part);
+    }
+    li.append(parts);
+    list.append(li);
+  }
+  wrap.append(list, writeDown(mode, state, persist, 'answer', BBS_FRAME, 'Join your best three into one sentence, or pick the strongest and improve it.'));
   return wrap;
 }
