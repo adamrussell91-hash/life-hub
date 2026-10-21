@@ -1,6 +1,8 @@
 // packages/problem-solver/steps.mjs
 import { MODELS } from './models.mjs';
 import { TOOLS } from './tools/index.mjs';
+import { DECISION_MODEL } from '../decision-book/model.mjs';
+import { CATALOGUE_IDS } from '../decision-book/catalogue.mjs';
 
 /** Tool families. A tool's `step` is one of these. `contradiction` is TRIZ only. */
 export const BOOK_STEPS = Object.freeze([
@@ -16,7 +18,7 @@ export const BOOK_STEPS = Object.freeze([
 
 export const BOOK_STEP_IDS = Object.freeze(BOOK_STEPS.map((s) => s.id));
 
-const entry = (step, book, extra = false) => Object.freeze({ step, book: Object.freeze(book), extra });
+const entry = (step, book, extra = false, tools = null) => Object.freeze({ step, book: Object.freeze(book), extra, ...(tools ? { tools } : {}) });
 
 /**
  * Ordered steps a session walks for each model. `book` lists the tool families the
@@ -40,6 +42,13 @@ const PLANS = Object.freeze({
     entry('implement', ['implement'], true),
     entry('improve', ['improve'], true),
     entry('document', ['document'], true)
+  ]),
+  // Decision Maker: the coach discerns the model, so Explore names its tools (every catalogue
+  // model registered as a tool) and has no default.
+  decision_book: Object.freeze([
+    entry('explore', ['explore'], false, () => CATALOGUE_IDS.filter((id) => TOOLS[id])),
+    entry('decide', ['settle']),
+    entry('review', ['review'], true)
   ])
 });
 
@@ -76,20 +85,27 @@ export function nextStepAfter(modelId, stepId) {
   return i >= 0 && i < plan.length - 1 ? plan[i + 1].step : null;
 }
 
+const modelDef = (modelId) => MODELS[modelId] ?? (modelId === DECISION_MODEL.id ? DECISION_MODEL : null);
+
 export function stepName(modelId, stepId) {
-  const own = MODELS[modelId]?.steps.find((s) => s.id === stepId);
+  const own = modelDef(modelId)?.steps.find((s) => s.id === stepId);
   if (own) return own.name;
   return BOOK_STEPS.find((s) => s.id === stepId)?.name ?? stepId;
 }
 
-/** Tool ids usable in a plan step, in registry order. */
+/** Tool ids usable in a plan step: its own list when it names one, else registry order. */
 export function toolsForPlanStep(modelId, stepId) {
-  const books = planStep(modelId, stepId)?.book ?? [];
+  const step = planStep(modelId, stepId);
+  if (step?.tools) return step.tools();
+  const books = step?.book ?? [];
   return Object.values(TOOLS).filter((tool) => books.includes(tool.step)).map((tool) => tool.id);
 }
 
+/** A step that names its own tools has no default: the coach chooses. */
 export function defaultToolFor(modelId, stepId) {
-  for (const book of planStep(modelId, stepId)?.book ?? []) {
+  const step = planStep(modelId, stepId);
+  if (step?.tools) return null;
+  for (const book of step?.book ?? []) {
     const id = (DEFAULTS[book] ?? []).find((tool) => TOOLS[tool]?.step === book);
     if (id) return id;
   }
