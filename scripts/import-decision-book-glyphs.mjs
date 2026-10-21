@@ -4,7 +4,7 @@
 // and the book identity. The artwork is original to this project, so it may be committed;
 // book scans never are.
 // Usage: node scripts/import-decision-book-glyphs.mjs "/path/to/Decision Book Graphics"
-import { copyFile, mkdir, readdir } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE, SECTIONS } from '../packages/decision-book/catalogue.mjs';
@@ -14,6 +14,15 @@ if (!source) {
   console.error('Usage: node scripts/import-decision-book-glyphs.mjs "<Decision Book Graphics folder>"');
   process.exit(1);
 }
+// The kit's red and green, lifted a little brighter and more saturated (Adam, 21 Oct), with
+// their tints. Ink and paper are unchanged.
+const PALETTE = { '#ef402b': '#f43a25', '#60aa36': '#60ba2c', '#e5edda': '#e3f1d8', '#f8e1d8': '#fcdfd5' };
+async function copyFile(from, to) {
+  let svg = await readFile(from, 'utf8');
+  for (const [kit, ours] of Object.entries(PALETTE)) svg = svg.replaceAll(new RegExp(kit, 'gi'), ours);
+  await writeFile(to, svg);
+}
+
 const out = fileURLToPath(new URL('../packages/decision-book/glyphs/', import.meta.url));
 for (const sub of ['models', 'sections', 'identity']) await mkdir(join(out, sub), { recursive: true });
 

@@ -54,7 +54,7 @@ The book does not give the coaching layer: step order, a minimum before a model 
 
 ### Landing (`#/decision-maker`)
 
-The landing page mirrors Problem Solver's, in the Decision Book palette (paper `#faf8ef`, ink `#171813`, red `#ef402b`, green `#60aa36`):
+The landing page mirrors Problem Solver's, in the Decision Book palette (paper `#faf8ef`, ink `#171813`, red `#f43a25`, green `#60ba2c`):
 
 - **Hero:** the book emblem, one line, a **New decision** box ("What are you deciding, or trying to see clearly?") and a **Quick decision** card.
 - **Decisions:** one card per session. The medal is the section emblem with the main model's emblem at its centre. The meta line shows the phase, the model and the date.
@@ -198,7 +198,7 @@ Decision Maker should look like Problem Solver's sibling: clearly from the same 
 - One shared skills ribbon, with the tool split described above.
 
 **Decision Maker's own voice:**
-- **Palette:** paper `#faf8ef`, ink `#171813`, red `#ef402b`, green `#60aa36`, with their two tints. No yellow and no blue, so the two tools never blur together on the same rail.
+- **Palette:** paper `#faf8ef`, ink `#171813`, red `#f43a25`, green `#60ba2c`, with their two tints. No yellow and no blue, so the two tools never blur together on the same rail.
 - **Geometry: circles and arrows, after the book's cover.** The cover is a red disc carrying a turning-back chevron and a green disc carrying a forward arrow, with a dotted line between them. Decision Maker builds from that: whole discs that carry direction, arrows, and the dotted divide. Problem Solver breaks its circles into semicircles, bands and wedges beside triangles, in red, yellow and blue (after Kandinsky). Decision Maker keeps its discs whole and adds direction, in red, green and ink. That keeps the two distinct on the same rail. (Changed 21 Oct at Adam's request; the first mockups were square-led.)
 - **Shape board (landing hero):** a 4×3 board, in the same place as Problem Solver's. Its tiles are the red back disc, the green forward disc, a disc split red and green by a dotted line, a lone forward arrow, a disc with a forked arrow, the overlapping pair with an arrow through it (the book emblem), an open ring ending in an arrowhead, and two small discs joined by a dotted arrow.
 - **Medal:** the cover, built as the session moves. The red disc fills with the decision answer and the green disc with the compass answer. The dotted line and both arrows arrive with what is known. The main model's emblem sits in the middle once it is chosen.
