@@ -24,12 +24,21 @@ import { activeRun, reopenProblem, skippedUntouched, waitingForReview } from './
  * `next: <tool id>` suggests that tool when it belongs to the step, and `reopen: define` (or
  * `analyse`) suggests reopening that step once double-loop learning allows it. A third frame
  * answer containing `model: polya` (or `triz`) chooses that model. A 5 Cs name
- * that breaks a strict naming rule is challenged with that rule's advice.
+ * that breaks a strict naming rule is challenged with that rule's advice. A decision session
+ * takes its opening message as the decision, then asks who it is about and what is known; the
+ * compass comes from the wording (team, others, them … → others; improve, better, change … →
+ * improve).
  */
 const FRAME = [
   ['goal', 'What is the goal, as an ideal state rather than a fix? Say what good looks like.'],
   ['whatIsTrue', 'Good, that is a clear aim. Now, what is actually true here? Separate the facts and data from what you believe or feel.'],
   ['whatCanBeDone', 'That is evidence, not opinion. What can be done: can this be solved as it stands, or should we reframe it to something more achievable?']
+];
+
+const DECISION_FRAME = [
+  ['decision', 'What are you deciding, or trying to see clearly? Put it in one sentence.'],
+  ['compass', 'Clear. Who is this about, you or other people, and do you want to understand it or to improve it?'],
+  ['known', 'Good. What do you already know: the options, the facts, the deadline and what is at stake?']
 ];
 
 /**
@@ -183,6 +192,30 @@ function parseLink(text) {
 
 const base = { node: null, edges: [], skillsSeen: [], skillsMissing: [], frame: null, model: null, suggestion: null, summary: null, exitObjection: null, learning: null, lightning: null };
 
+/** The compass quadrant the scripted coach hears in an answer. */
+function heardCompass(text) {
+  const who = /\b(team|others?|they|them|staff|people|partner|colleagues?|my (son|daughter|kids|class))\b/i.test(text) ? 'others' : 'self';
+  const aim = /\b(improve|better|change|fix|grow|lead|develop)\b/i.test(text) ? 'improve' : 'understand';
+  return `${who}_${aim}`;
+}
+
+/** Decision framing: the opening message is the decision; then the compass, then what is known. */
+function decisionFrameTurn(session, last) {
+  const missing = DECISION_FRAME.filter(([key]) => !session.frame[key]);
+  const [key] = missing[0];
+  const frame = { [key]: key === 'compass' ? heardCompass(last) : last };
+  if (missing.length > 1) return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
+  const first = toolsForPlanStep('decision_book', 'explore')[0];
+  return {
+    ...base,
+    verdict: 'accept',
+    frame,
+    message: 'That frames it well. I suggest starting with one model that lays out the sides to weigh. Shall we begin?',
+    suggestion: first ? { kind: 'next_tool', tool: first, reason: 'A first model with clear sides to weigh.' } : null,
+    skillsSeen: ['decision_making']
+  };
+}
+
 /**
  * Lightning runs: the coach asks the current box, reads a reply starting yes or no (then
  * optional words) as the answer, takes a goal, learn, next or cannot line of three words or
@@ -259,6 +292,7 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'clarify', message: 'The whole problem is on the record. Anything you add now is a note for next time; what would you want to remember?' };
   }
   if (session.phase === 'frame') {
+    if (session.kind === 'decision') return decisionFrameTurn(session, last || session.turns[0].text);
     if (session.turns.length === 1) {
       // Escalated from Lightning: the carried seeds come first, for the person to confirm or change.
       const seeds = session.frameSeeds;
