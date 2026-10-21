@@ -1,11 +1,11 @@
-# Decision Book: a coached decision tool beside Problem Solver
+# Decision Maker: a coached decision tool beside Problem Solver
 
 Date: 21 October 2026. Status: decisions taken with Adam on 21 Oct; awaiting written-spec review.
 Builds on: `docs/superpowers/specs/2026-10-19-problem-solver-full-process-design.md` (Problem Solver v2, on `main`).
 
 ## Goal
 
-A second coach tool in the Tasks hub, built from *The Decision Book* (Krogerus and Tschäppeler, 50 models in four sections). It looks and works like Problem Solver. You name a decision, or something you want to see clearly. The coach frames it, works out which model or models fit, and builds each model's chart with you one answer at a time. It then helps you settle the decision and writes a decision record onto a linked Tasks page. A short "Quick decision" route covers everyday calls. Both tools share the same twelve thinking skills and a single skills tally.
+**Decision Maker** is a second coach tool in the Tasks hub, built from *The Decision Book* (Krogerus and Tschäppeler: 51 models and a closing essay, in four sections). Its nav label is "Decision Maker". In code it goes by `decision-book`, after its source, the same way Problem Solver's code is named after its toolkit. It looks and works like Problem Solver. You name a decision, or something you want to see clearly. The coach frames it, works out which model or models fit, and builds each model's chart with you one answer at a time. It then helps you settle the decision and writes a decision record onto a linked Tasks page. A short "Quick decision" route covers everyday calls. Both tools share the same twelve thinking skills and a single skills tally.
 
 Not in scope:
 - the book's "Now it's your turn" model and drawing lessons, and any free-drawing "My models" canvas (cut by Adam on 21 Oct);
@@ -38,6 +38,7 @@ The book does not give the coaching layer: step order, a minimum before a model 
 
 | Topic | Decision |
 | --- | --- |
+| Name | "Decision Maker" in the nav (`#/decision-maker`); `decision-book` in code |
 | Placement and layout | Same as Problem Solver: its own Tasks hub tab. The landing page has a hero, a start box, a quick-route card and a list of decisions. The session page has the canvas on one side, the coach on the other, a skill tray, a review panel and task cards |
 | Session shape | Frame the decision, then the coach discerns the right model or models, works them, offers another angle, then settles the decision. The four sections are for browsing, not stages |
 | Scope | All 51 models and the closing essay. 45 are coached worksheets and 7 are lenses (see Catalogue). The builder chose this scope |
@@ -51,7 +52,7 @@ The book does not give the coaching layer: step order, a minimum before a model 
 
 ## Experience
 
-### Landing (`#/decision-book`)
+### Landing (`#/decision-maker`)
 
 The landing page mirrors Problem Solver's, in the Decision Book palette (paper `#faf8ef`, ink `#171813`, red `#ef402b`, green `#60aa36`):
 
@@ -257,7 +258,7 @@ The step engine, machine, service, store, runner and coach pipeline all stay sin
 
 ### Client (`apps/tasks/src/views/decision-book/`)
 
-- `view.ts` contains the landing and session pages, with nav entry `Decision Book` at `#/decision-book`.
+- `view.ts` contains the landing and session pages, with nav entry `Decision Maker` at `#/decision-maker`.
 - Reused from Problem Solver, given a base path and a renderer map: `api.ts`, `coach-panel.ts`, `task-cards.ts`, `task-bridge.ts`, `review-panel.ts`, `review-sync.ts`, `session-sync.ts`, `case-file-bridge.ts` (with record blocks) and `link-chips.ts` (which gains a Decision Book chip).
 - New: `canvas.ts` maps tools to family renderers; also `compass.ts`, `quick-view.ts`, and `record-blocks.ts`, which builds the provenance image block from the shipped emblem assets.
 - Shared skill tally: both landing pages fetch both lists and sum `skills`, then draw the split ribbon.
@@ -319,12 +320,12 @@ Steps 4–7 are independent once step 3 lands, so they can run as parallel subag
 
 ## Rough cost
 
-The cost depends mainly on the number of renderers and how many review rounds they take. Family renderers cut the bespoke chart work from about 50 renderers to about 10. Most per-model work becomes a small config plus a coaching note.
+Problem Solver is the yardstick. Its build involved more bespoke work than this one: 38 one-off renderers, the Lightning chart, the step engine and the Tasks bridges. This build reuses that engine, the server, the bridges and the coach pipeline, and draws its charts with about 10 renderers. So it should cost **less to build than Problem Solver did**.
 
-- **Build:** a rough estimate of **A$150–300** in Claude usage for the whole PR. That assumes one review pass per family renderer and a single contact-sheet check, not per-model review loops. It is an estimate, not a quote. Running reviews per model, or bespoke charts, would push it well past this.
-- **Running:** the same model and pipeline as Problem Solver. Each turn sends the cached shared rubric plus one model's notes, so per-turn cost should be close to a Problem Solver turn today.
+The main things that would raise it are review loops for each model and bespoke charts. The plan avoids both: one review pass per renderer type and one contact-sheet check.
+
+Running costs are the same as Problem Solver's. It uses the same model and pipeline. Each turn sends the cached shared rubric plus one model's notes, so each turn should cost about the same as a Problem Solver turn today.
 
 ## Open points for Adam
 
-1. The nav label: "Decision Book" (assumed) or "Decisions".
-2. The seven lenses: is it fine that they are short one-marker cards rather than full worksheets?
+1. The seven lenses: is it fine that they are short one-marker cards rather than full worksheets?
