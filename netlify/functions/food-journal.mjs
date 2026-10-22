@@ -13,6 +13,12 @@ import {
   readableJournal,
   validateFoodJournal,
 } from "./_shared/food-journal-schema.mjs";
+import { createGitHubClient } from "./_shared/github-client.mjs";
+import { decodeBlob } from "./_shared/decode-blob.mjs";
+import { parseNutritionMealPath } from "./_shared/delete-meal.mjs";
+import { mealNamesDish } from "./_shared/food-journal-meal-sync.mjs";
+import { syncCentralNodeAfterMealDeletes } from "./_shared/persist-log.mjs";
+import { getSydneyDateKey } from "../../apps/life/js/core/time.js";
 export const config = { path: "/api/food-journal" };
 
 // Deleting a travel-linked visit also strips the meal from its moment, in the
@@ -71,6 +77,33 @@ const defaultUnlinkTravelMeals = (ctx, deps) => async (journal, version, links) 
   });
   return { journal, version: out.foodVersion };
 };
+// Removes one counted meal file, but only while it still names this dish.
+// A file that is already gone counts as removed; anything else throws.
+const defaultRemoveMeal = (ctx, deps) => async (path, dishId) => {
+  const parsed = parseNutritionMealPath(path);
+  if (!parsed) throw new Error("Not a meal path.");
+  const client = (deps.createGitHubClient ?? createGitHubClient)({ env: ctx.env });
+  const { tree } = await client.resolveTree();
+  const entry = tree.find((b) => b.path === path && b.type === "blob");
+  if (!entry) return;
+  const text = decodeBlob(await client.readBlob(entry.sha));
+  if (!mealNamesDish(text, dishId)) throw new Error("Meal is not this dish's.");
+  await client.deleteFile({
+    path,
+    sha: entry.sha,
+    message: "food-journal: remove counted meal",
+  });
+  try {
+    await (deps.syncCentralNodeAfterMealDeletes ?? syncCentralNodeAfterMealDeletes)(
+      client,
+      [{ date: parsed.date, meals: [parsed.meal] }],
+      { date: getSydneyDateKey(new Date()), now: new Date() },
+    );
+  } catch {
+    // The meal is gone; Status catches up on the next log.
+  }
+};
+
 export function createFoodJournalHandler(deps = {}) {
   return createTravelOperatorHandler(
     async (request, ctx) => {
@@ -155,9 +188,36 @@ export function createFoodJournalHandler(deps = {}) {
             links,
           )
         : await ctx.repo.saveJournal(clean, body.if_version);
+      // Only meal files linked to dishes that are now gone may be removed.
+      let mealsRemoved;
+      if (Array.isArray(body.remove_meals) && body.remove_meals.length) {
+        const liveDishes = new Set(
+          clean.visits
+            .filter((v) => !isDeletedRecord(v))
+            .flatMap((v) => v.dishes.map((d) => d.id)),
+        );
+        const goneLinks = new Map();
+        for (const d of current.journal.visits.flatMap((v) => v.dishes))
+          if (d.brisket?.meal_path && !liveDishes.has(d.id))
+            goneLinks.set(d.brisket.meal_path, d.id);
+        const remove = deps.removeMeal ?? defaultRemoveMeal(ctx, deps);
+        for (const p of new Set(body.remove_meals)) {
+          if (!goneLinks.has(p)) continue;
+          mealsRemoved ??= true;
+          try {
+            await remove(p, goneLinks.get(p));
+          } catch {
+            mealsRemoved = false;
+          }
+        }
+      }
       return okResponse(
         200,
-        { ...saved, journal: readableJournal(saved.journal) },
+        {
+          ...saved,
+          journal: readableJournal(saved.journal),
+          ...(mealsRemoved === undefined ? {} : { meals_removed: mealsRemoved }),
+        },
         PRIVATE_CACHE,
       );
     },

@@ -1619,3 +1619,110 @@ test("the default unlink refuses with 409 when the store's Food Journal version 
   assert.equal(res.status, 409);
   assert.equal(writes, 0);
 });
+
+const DINNER = "data/nutrition/2026/10/2026-10-22-dinner-1930.md";
+const countedBrisket = {
+  meal_path: DINNER,
+  portion: "All",
+  portion_fraction: 1,
+  counted_at: "2026-10-22T19:31:00+11:00",
+  needs_recount: false,
+};
+
+test("remove_meals deletes the meal files of dishes that are gone, and nothing else", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const r = repo(j);
+  const removed = [];
+  const h = createFoodJournalHandler(
+    deps(r, { removeMeal: async (p) => void removed.push(p) }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(
+    req("PUT", {
+      journal: first.journal,
+      if_version: first.version,
+      remove_meals: [DINNER, "data/nutrition/2026/10/2026-10-22-lunch-1200.md"],
+    }),
+  );
+  assert.deepEqual(removed, [DINNER]);
+  assert.equal((await res.json()).data.meals_removed, true);
+});
+
+test("remove_meals leaves the meal of a dish that is still in the journal", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const r = repo(j);
+  const removed = [];
+  const h = createFoodJournalHandler(
+    deps(r, { removeMeal: async (p) => void removed.push(p) }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  const res = await h(
+    req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+  );
+  assert.deepEqual(removed, []);
+  assert.equal((await res.json()).data.meals_removed, undefined);
+});
+
+test("remove_meals follows a removed dish inside a live visit, and reports a failed delete", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const r = repo(j);
+  const h = createFoodJournalHandler(
+    deps(r, {
+      removeMeal: async () => {
+        throw new Error("boom");
+      },
+    }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].dishes.splice(0, 1);
+  const res = await h(
+    req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+  );
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.meals_removed, false);
+});
+
+test("the default remove deletes only a file that names the dish, then resyncs the Central Node", async () => {
+  const j = fixture();
+  const dish = j.visits[0].dishes[0];
+  dish.brisket = { ...countedBrisket };
+  const meal = (id) =>
+    `---\ntype: meal\nfood_dish_id: ${id}\n---\nbody\n`;
+  for (const [text, expectDelete] of [
+    [meal(dish.id), true],
+    [meal("dsh_other"), false],
+  ]) {
+    const calls = { del: [], sync: [] };
+    const client = {
+      async resolveTree() {
+        return { tree: [{ path: DINNER, type: "blob", sha: "s".repeat(40) }] };
+      },
+      async readBlob() {
+        return { content: Buffer.from(text).toString("base64"), encoding: "base64" };
+      },
+      async deleteFile(a) {
+        calls.del.push(a);
+      },
+    };
+    const r = repo(j);
+    const h = createFoodJournalHandler(
+      deps(r, {
+        createGitHubClient: () => client,
+        syncCentralNodeAfterMealDeletes: async (_c, d) => void calls.sync.push(d),
+      }),
+    );
+    const first = (await (await h(req("GET"))).json()).data;
+    first.journal.visits[0].status = "deleted";
+    const res = await h(
+      req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+    );
+    assert.equal(calls.del.length, expectDelete ? 1 : 0);
+    assert.equal(calls.del[0]?.sha, expectDelete ? "s".repeat(40) : undefined);
+    assert.deepEqual(calls.sync, expectDelete ? [[{ date: "2026-10-22", meals: ["dinner"] }]] : []);
+    assert.equal((await res.json()).data.meals_removed, expectDelete ? true : false);
+  }
+});

@@ -35,11 +35,15 @@ export function createFoodJournalApi(fetchImpl) {
           new URLSearchParams({ lat: String(gps.lat), lon: String(gps.lon), q }),
       ),
     load: () => request("/api/food-journal"),
-    save: (journal, version) =>
+    save: (journal, version, removeMeals = []) =>
       request("/api/food-journal", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ journal, if_version: version }),
+        body: JSON.stringify({
+          journal,
+          if_version: version,
+          ...(removeMeals.length ? { remove_meals: removeMeals } : {}),
+        }),
       }),
     async assist(body) {
       // The API starts the background run itself; see food-journal-assist.
