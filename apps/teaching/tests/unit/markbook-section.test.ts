@@ -200,4 +200,30 @@ describe('markbook section', () => {
     expect(toggle.textContent).toBe('Outcomes');
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
   });
+
+  it('rolls a failed save back even when the reload fails too', async () => {
+    const { host, api } = await mount(view({ markbook: book({ marks: { hand00001: { s1: { status: 'late', at: '2026-10-26' } } } }) }));
+    (api.setMark as Mock).mockRejectedValueOnce(new Error('Server said no'));
+    (api.load as Mock).mockRejectedValueOnce(new Error('offline'));
+    const cell = () => host.querySelectorAll('tbody tr')[0]!.querySelector<HTMLButtonElement>('.mb-cell--handin')!;
+    cell().click();
+    expect(cell().textContent).toBe('Missing');
+    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Couldn’t save that, and couldn’t reach the server. Check your connection.'));
+    expect(cell().textContent).toBe('Late');
+  });
+
+  it('moves focus to the heading when the focused control goes away', async () => {
+    const quiz = { kind: 'quiz' as const, id: 'quiz:l1', lesson_id: 'l1', title: 'Quiz 1', date: '2026-10-20', hidden: false, confidence: false, questions: [], scores: {} };
+    const { host } = await mount(view({ quizzes: [quiz] }));
+    const hide = host.querySelector<HTMLButtonElement>('.mb-col__hide')!;
+    hide.focus();
+    hide.click();
+    expect(document.activeElement).toBe(host.querySelector('.mb__title'));
+    expect(host.querySelector<HTMLElement>('.mb__title')!.tabIndex).toBe(-1);
+  });
+
+  it('gives the full student name as a tooltip', async () => {
+    const { host } = await mount(view());
+    expect(host.querySelector<HTMLElement>('.mb-student__name')!.title).toBe('Bob Brown');
+  });
 });

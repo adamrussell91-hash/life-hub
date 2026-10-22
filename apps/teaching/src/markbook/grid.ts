@@ -127,7 +127,9 @@ function flag(label: string, reason: string): HTMLElement {
 
 export function studentHead(view: MarkbookView, student: RosterStudent): HTMLElement {
   const wrap = el('div', 'mb-student');
-  wrap.append(el('span', 'mb-student__initials', student.initials), el('span', 'mb-student__name', student.name));
+  const name = el('span', 'mb-student__name', student.name);
+  name.title = student.name;
+  wrap.append(el('span', 'mb-student__initials', student.initials), name);
   const series = quizSeries(view, student.id);
   if (series.length >= 2) wrap.append(sparkline(series));
   if (isDropping(series)) wrap.append(flag('Dropping', 'The last three quizzes are 15 or more points below the ones before.'));
