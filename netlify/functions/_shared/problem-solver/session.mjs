@@ -374,6 +374,8 @@ export function startReview(session, payload, deps) {
   if (!improve) throw fail(409, 'action_not_allowed', 'This problem has no Improve step.');
   if (session.reviewState?.status === 'reviewing' && session.phase === improve) return session;
   if (session.reviewState?.status === 'done') throw fail(409, 'action_not_allowed', 'This review is already done.');
+  // The learning question comes first: a review started now would have its opening read as the answer.
+  if (session.pendingLearning) throw fail(409, 'action_not_allowed', 'Answer the coach’s question first, then start the review.');
   if (!reviewLive(session)) throw fail(409, 'action_not_allowed', 'There is no review to start.');
   if (session.detour) throw fail(409, 'action_not_allowed', 'Finish the reopened step first.');
   const snap = cleanSnapshot(payload?.snapshot, deps);

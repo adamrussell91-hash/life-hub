@@ -136,11 +136,13 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await noOverflow(page);
     await shot(page, 'written', viewport);
 
-    // Review waits for its date: the learning question first (see the plan's open question), then Review now.
+    // Review waits for its date. Review now waits for the learning question too (Adam, 22 Oct).
     await page.getByRole('button', { name: 'Move on to Review' }).click();
     await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i, { timeout: 20_000 });
+    await expect(page.getByRole('button', { name: 'Review now' })).toBeDisabled();
+    await expect(page.locator('.ps-review__note')).toHaveText('Answer the coach’s question first, then start the review.');
     await answer(page, 'A dated check-back keeps me honest about the report.');
-    await expect(page.getByRole('button', { name: 'Review now' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: 'Review now' })).toBeEnabled({ timeout: 20_000 });
     await page.getByRole('button', { name: 'Review now' }).click();
     await expect.poll(async () => (await now()).reviewState?.status).toBe('reviewing');
     await noOverflow(page);
