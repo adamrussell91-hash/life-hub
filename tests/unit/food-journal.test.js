@@ -1323,16 +1323,19 @@ test("schema accepts dish ingredients, English text and a Brisket link, and reje
   });
   v.dishes[0].photos = [{ id: "photo_1", key: "food/photos/photo_1.jpg", from: "med_abcd1234" }];
   assert.doesNotThrow(() => validateFoodJournal(j));
-  for (const broken of [
-    (d) => (d.ingredients = 5),
-    (d) => (d.ingredients = "x".repeat(2001)),
-    (d) => (d.brisket = { ...d.brisket, portion_fraction: 1.5 }),
-    (d) => (d.brisket = { ...d.brisket, meal_path: "data/other/x.md" }),
-    (d) => (d.brisket = { ...d.brisket, needs_recount: "yes" }),
-    (d) => (d.brisket = { ...d.brisket, calories: -5 }),
+  for (const [broken, message] of [
+    [(d) => (d.ingredients = 5), /Ingredients/],
+    [(d) => (d.ingredients = "x".repeat(2001)), /Ingredients/],
+    [(d) => (d.brisket = { ...d.brisket, portion_fraction: 1.5 }), /Brisket portion/],
+    [(d) => (d.brisket = { ...d.brisket, portion_fraction: 0 }), /Brisket portion/],
+    [(d) => (d.brisket = { ...d.brisket, meal_path: "data/other/x.md" }), /Brisket link/],
+    [(d) => (d.brisket = { ...d.brisket, needs_recount: "yes" }), /Brisket link/],
+    [(d) => (d.brisket = { ...d.brisket, counted_at: "2026" }), /Brisket link/],
+    [(d) => (d.brisket = "x"), /Brisket link/],
+    [(d) => (d.brisket = { ...d.brisket, calories: -5 }), /Brisket numbers/],
   ]) {
     const copy = structuredClone(j);
     broken(copy.visits[0].dishes[0]);
-    assert.throws(() => validateFoodJournal(copy), /invalid/i);
+    assert.throws(() => validateFoodJournal(copy), message);
   }
 });

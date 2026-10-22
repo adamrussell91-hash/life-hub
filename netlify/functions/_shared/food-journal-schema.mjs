@@ -38,7 +38,11 @@ function brisketLink(b) {
     !(b.portion_fraction > 0 && b.portion_fraction <= 1)
   )
     bad("Brisket portion is invalid.");
-  if (typeof b.counted_at !== "string" || Number.isNaN(Date.parse(b.counted_at)))
+  if (
+    typeof b.counted_at !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T/.test(b.counted_at) ||
+    Number.isNaN(Date.parse(b.counted_at))
+  )
     bad("Brisket link is invalid.");
   if (typeof b.needs_recount !== "boolean") bad("Brisket link is invalid.");
   // The numbers Brisket confirmed, so a re-count can show old → new.
