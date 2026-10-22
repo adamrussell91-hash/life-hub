@@ -37,6 +37,7 @@ export function createUniversalLink(
     relationship_type: string;
     role?: string | null;
     valid_from?: string | null;
+    occurred_at?: string | null;
     metadata?: Record<string, unknown>;
   },
   options: { signal?: AbortSignal } = {}
