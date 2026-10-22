@@ -222,7 +222,13 @@ var QuizQuestionSchema = z5.discriminatedUnion("kind", [
     ...base,
     kind: z5.literal("spot_technique"),
     passage: Text(QUIZ_LIMITS.passage),
-    options: z5.array(QuizChoiceSchema.extend({ technique_id: z5.string().max(64).optional() })).min(2).max(10),
+    options: z5.array(
+      QuizChoiceSchema.extend({
+        technique_id: z5.string().max(64).optional(),
+        /** How many times students may name it: 2 for a passage with two similes. */
+        uses: z5.number().int().min(1).max(12).optional()
+      })
+    ).min(2).max(10),
     targets: z5.array(QuizSpotTargetSchema).min(1).max(12),
     /** How many students must find. Fewer than the targets means any of them will do. */
     find: z5.number().int().min(1).max(12).optional()
@@ -286,6 +292,12 @@ function questionProblems(q) {
         if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push("Name the technique for every answer.");
       }
       if ((q.find ?? q.targets.length) > q.targets.length) out.push("Students can\u2019t be asked to find more than there are answers.");
+      if ((q.find ?? q.targets.length) > 1) {
+        for (const option of q.options) {
+          const needed = q.targets.filter((t) => t.correct.length === 1 && t.correct[0] === option.id).length;
+          if (needed > (option.uses ?? 1)) out.push(`${option.text.trim() || "A technique"} is the answer ${needed} times. Set it to \xD7${needed}.`);
+        }
+      }
       break;
     }
     case "fill_gap":
@@ -4664,6 +4676,9 @@ var ProposeInsertBlocksSchema = z9.object({
   blocks: z9.array(BlockSchema).min(1).max(48),
   set_mode: ProposalSetModeSchema.optional()
 });
+var ProposeReplaceBlocksSchema = z9.object({
+  blocks: z9.array(BlockSchema).min(1).max(30)
+});
 var ProposeDeleteBlocksSchema = z9.object({
   ids: z9.array(z9.string().min(1)).min(1)
 });
@@ -4704,6 +4719,18 @@ var AI_TOOLS = [
         block: { type: "object", description: "Full block object matching Teaching Hub schema" }
       },
       required: ["block_id", "block"]
+    }
+  },
+  {
+    name: "propose_replace_blocks",
+    description: "Propose replacing several existing blocks at once, such as rewriting or converting a few quiz questions. Each block keeps the id of the block it replaces; blocks you leave out stay as they are.",
+    input_schema: {
+      type: "object",
+      properties: {
+        message: MESSAGE_PROPERTY,
+        blocks: { type: "array", items: { type: "object" }, description: "Full replacement blocks, each with the id of an existing block." }
+      },
+      required: ["blocks"]
     }
   },
   {
@@ -4809,6 +4836,13 @@ function parseToolProposal(name, input) {
     if (!parsed.success) return { error: parsed.error.message };
     const block = { ...parsed.data.block, id: parsed.data.block_id };
     return { kind: "replace_block", block_id: parsed.data.block_id, block };
+  }
+  if (name === "propose_replace_blocks") {
+    const parsed = ProposeReplaceBlocksSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    const ids = parsed.data.blocks.map((block) => block.id);
+    if (new Set(ids).size !== ids.length) return { error: "Each replacement needs a different block id." };
+    return { kind: "replace_blocks", blocks: parsed.data.blocks };
   }
   if (name === "propose_replace_section") {
     const parsed = ProposeReplaceSectionSchema.safeParse(input);
@@ -5063,12 +5097,12 @@ A quiz is one quiz_question block per question: content { question }. Set questi
 - categorise: groups [{ id, name }] 2-4, items [{ id, text, group: group id }] 2-16.
 - quote_technique: quote, options [{ id, text }] 2-6 naming techniques, correct [one id].
 - find_it: segments [{ id, text }] 2-40 (the lines of a passage), correct [the ids that answer]; leave at least one line that is not an answer.
-- spot_technique: passage (the poem or prose, line breaks kept), options [{ id, text }] 3-10 naming techniques (every right one plus a few plausible wrong ones), targets [{ id, quote, correct: [option ids] }] 1-12. Each quote is the few words that carry the technique, copied exactly from the passage; correct lists every technique a fair marker would accept for those words. find optional: how many students must find (leave it out to need them all; find 1 with several targets means any one counts). Say "Find two\u2026" or "Find one\u2026" in the prompt to match. Students select words and pick a name; a selection a few words bigger or smaller still counts, and right words with the wrong name earn half.
+- spot_technique: passage (the poem or prose, line breaks kept), options [{ id, text, uses? }] 3-10 naming techniques (every right one plus a few plausible wrong ones), targets [{ id, quote, correct: [option ids] }] 1-12. Each quote is the few words that carry the technique, copied exactly from the passage; correct lists every technique a fair marker would accept for those words. find optional: how many students must find (leave it out to need them all; find 1 with several targets means any one counts). Students' technique list drops each name once used, so set uses to the number of answers that need it (two similes: Simile uses 2). Say "Find two\u2026" or "Find one\u2026" in the prompt to match. Students select words and pick a name; a selection a few words bigger or smaller still counts, and right words with the wrong name earn half.
 - label_image: image { url, alt } from an image already in the lesson, pins [{ id, x, y, label }] 2-8 with x and y from 0 to 1. Skip this kind when the lesson has no image.
 - extended_response: model_answer and guide optional. Teacher-marked.
 - explain_effect: quote, technique optional, model_answer and guide optional. Teacher-marked.
 Mix kinds to suit the content: recall questions first, then structure (matching, ordering, categorise), then at most a few teacher-marked ones. Options must be plausible and distinct; no "all of the above".
-quiz_question only works in a lesson whose type is quiz. In any other lesson, put set_mode: "quiz" on propose_insert_blocks (Accept switches the lesson to a Quiz) and say so in your message. When the teacher wants questions without a quiz ("just questions", "a few checks for understanding"), use question_set instead and leave the lesson type alone. Keep each proposal to 30 quiz questions or fewer.
+quiz_question only works in a lesson whose type is quiz. In any other lesson, put set_mode: "quiz" on propose_insert_blocks (Accept switches the lesson to a Quiz) and say so in your message. When the teacher wants questions without a quiz ("just questions", "a few checks for understanding"), use question_set instead and leave the lesson type alone. Keep each proposal to 30 quiz questions or fewer. To rewrite or convert existing questions (e.g. turn find_it questions into spot_technique), use one propose_replace_blocks with every changed question, each keeping its block id; to convert a find_it, join its segments into the passage, keep line breaks, and quote the words that carry each technique.
 
 ## Limits: say so before you build
 Never agree to something these limits rule out. When a request hits one, say so plainly in your first sentence, then offer the nearest thing you can do. Do not quietly truncate, merge, or drop content to fit.
@@ -5127,7 +5161,7 @@ function buildAiStaticPrompt(input) {
     "",
     "## Output rules",
     "- Use tools to propose schema-valid block changes. Do not claim the lesson was already updated.",
-    "- Prefer propose_replace_block / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / review_only.",
+    "- Prefer propose_replace_block / propose_replace_blocks (several blocks at once) / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / review_only.",
     "- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.",
     "- Keep proposals minimal and schema-valid.",
     "- Write your explanation for the teacher in the proposal tool's message field; that is the text shown with the proposal.",
@@ -5375,6 +5409,7 @@ function collectProposalReferences(proposal) {
       collectTreeReferences(references, proposal.blocks, "blocks");
       break;
     case "insert_blocks":
+    case "replace_blocks":
       collectTreeReferences(references, proposal.blocks, "blocks");
       break;
     default:
@@ -6151,6 +6186,7 @@ function publishIssueForProposal(proposal) {
     case "replace_lesson":
       return publishBlockIssues(proposal.blocks);
     case "insert_blocks":
+    case "replace_blocks":
       return publishBlockIssues(proposal.blocks);
     default:
       return null;
@@ -6189,6 +6225,7 @@ function proposalBlocks(proposal) {
       return [proposal.section];
     case "replace_lesson":
     case "insert_blocks":
+    case "replace_blocks":
       return proposal.blocks;
     default:
       return [];
@@ -6290,7 +6327,7 @@ function planConfirmed(job) {
   return (job.history ?? []).some((turn) => turn.role === "assistant" && turn.content.includes(PLAN_MARKER));
 }
 function countBuild(proposal) {
-  const blocks = proposal.kind === "insert_blocks" || proposal.kind === "replace_lesson" ? proposal.blocks : proposal.kind === "replace_section" ? [proposal.section] : [];
+  const blocks = proposal.kind === "insert_blocks" || proposal.kind === "replace_lesson" || proposal.kind === "replace_blocks" ? proposal.blocks : proposal.kind === "replace_section" ? [proposal.section] : [];
   let total = 0;
   let quizQuestions = 0;
   visitBlocks(blocks, (block) => {

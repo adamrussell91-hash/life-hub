@@ -487,4 +487,52 @@ describe('runLessonAiJob', () => {
     expect(webSearchTool('standard')).toMatchObject({ type: 'web_search_20260209', max_uses: 5 });
     expect(webSearchTool('fast')).toMatchObject({ type: 'web_search_20250305' });
   });
+
+  it('converts several questions in one proposal, each keeping its block id', () => {
+    const findIt = (id: string) =>
+      quizBlock(id, {
+        kind: 'find_it',
+        prompt: 'Which line uses a simile?',
+        segments: [
+          { id: 's1', text: 'The night was black as ink.' },
+          { id: 's2', text: 'The stars kept silent watch.' }
+        ],
+        correct: ['s1']
+      });
+    const spot = (id: string) =>
+      quizBlock(id, {
+        kind: 'spot_technique',
+        prompt: 'Find the simile and name it.',
+        passage: 'The night was black as ink.\nThe stars kept silent watch.',
+        options: [
+          { id: 'a', text: 'Simile' },
+          { id: 'b', text: 'Metaphor' },
+          { id: 'c', text: 'Personification' }
+        ],
+        targets: [{ id: 't1', quote: 'black as ink', correct: ['a'] }]
+      });
+    const quiz = lesson('quiz', [findIt('f1'), goodTf, findIt('f2')]);
+    const parsed = parseToolProposal('propose_replace_blocks', { message: 'Converted both.', blocks: [spot('f1'), spot('f2')] });
+    if ('error' in parsed) throw new Error(parsed.error);
+    expect(parsed.kind).toBe('replace_blocks');
+    expect(quizProposalIssues(parsed, quiz)).toEqual([]);
+    expect(validateMutatingProposal(parsed, emptySearchPack('')).ok).toBe(true);
+    const applied = applyProposalToLesson(quiz, parsed, () => 'new');
+    if (!applied.ok) throw new Error(applied.message);
+    expect(applied.lesson.blocks.map((b) => (b.block_type === 'quiz_question' ? b.content.question.kind : b.block_type))).toEqual([
+      'spot_technique',
+      'true_false',
+      'spot_technique'
+    ]);
+    expect(applied.lesson.blocks.map((b) => b.id)).toEqual(['f1', 'q2', 'f2']);
+    // Partial accept can keep just one of them.
+    expect(listPartialAcceptUnits(parsed)).toHaveLength(2);
+    const one = filterProposal(parsed, new Set(['block:1']));
+    expect(one.ok && one.proposal.kind === 'replace_blocks' && one.proposal.blocks.map((b) => b.id)).toEqual(['f2']);
+    // A replacement for a block that isn't there is refused, not added.
+    const missing = parseToolProposal('propose_replace_blocks', { blocks: [spot('nope')] });
+    if ('error' in missing) throw new Error(missing.error);
+    expect(applyProposalToLesson(quiz, missing, () => 'new').ok).toBe(false);
+    expect(AI_TOOLS.map((t) => t.name)).toContain('propose_replace_blocks');
+  });
 });
