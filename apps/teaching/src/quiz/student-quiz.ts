@@ -12,6 +12,8 @@ import './quiz.css';
  * the server; answers are kept on the device as the student goes, so a reload
  * or a dropped connection loses nothing. When the teacher runs the quiz live,
  * a join box appears and the class answers together.
+ *
+ * A quiz takes answers only from its class page. The first time, the student types their initials from the class list, and this device keeps them for every quiz in that class.
  */
 
 type Settings = NonNullable<PublishedLesson['quiz']>;
@@ -35,6 +37,7 @@ type Status = {
   settings: Settings;
   questions: PublicQuestion[];
   live: boolean;
+  identity?: { need: 'class' | 'initials' | null; initials: string | null };
   now?: string;
   current: Current | null;
   results: Result[];
@@ -62,7 +65,7 @@ const FEEDBACK_TEXT = {
   released: 'Your teacher will share the marks later.'
 } as const;
 
-export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
+export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: string } = {}): HTMLElement {
   // The page's copy is only a first paint. The server sends the questions and
   // settings for each attempt, so a republish never leaves a student answering
   // against ids the marker no longer knows.
@@ -77,6 +80,9 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
     settings = next;
   };
   const token = deviceToken(`quiz:${lessonId}`);
+  // Initials are claimed per class, so the class keeps its own token for this device.
+  const classToken = options.classId ? deviceToken(`class:${options.classId}`) : null;
+  const classFields = options.classId ? { class_id: options.classId, ...(classToken ? { class_token: classToken } : {}) } : {};
 
   const root = el('section', 'qz-quiz');
   root.setAttribute('aria-label', 'Quiz');
@@ -105,7 +111,7 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
 
   async function call(action: string, extra: Record<string, unknown> = {}): Promise<Status | null> {
     try {
-      const next = await apiPost<Status>(endpoint, { action, ...(token ? { token } : {}), ...extra });
+      const next = await apiPost<Status>(endpoint, { action, ...(token ? { token } : {}), ...classFields, ...extra });
       if (next.now) clockOffset = Date.parse(next.now) - Date.now();
       status = next;
       if (next.current) useQuestions(next.current.questions, next.current.settings);
@@ -151,8 +157,16 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
       body.replaceChildren(el('p', 'qz-note', 'Loading the quiz…'));
       return;
     }
-    if (!token) {
-      body.replaceChildren(panel('This browser won’t save anything, so you can’t take the quiz here.', 'Try a normal (not private) window.'));
+    if (!token || (options.classId && !classToken)) {
+      body.replaceChildren(panel('This browser can’t remember you, so you can’t take the quiz here.', 'Use your usual browser, in a normal (not private) window.'));
+      return;
+    }
+    if (status.identity?.need === 'class') {
+      body.replaceChildren(panel('Open this quiz from your class page.', 'Your class page has the link that knows who you are.'));
+      return;
+    }
+    if (status.identity?.need === 'initials') {
+      body.replaceChildren(initialsView());
       return;
     }
     if (status.current && view !== 'review') view = 'quiz';
@@ -162,8 +176,36 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
     else body.replaceChildren(landingView(status));
   }
 
+  function initialsView(): HTMLElement {
+    const box = el('div', 'qz-panel qz-initials');
+    box.append(
+      el('p', 'qz-panel__title', 'Type your initials'),
+      el('p', 'qz-note', 'Use the initials your teacher gave you, like BB. This device keeps them for every quiz in this class.')
+    );
+    const input = el('input', 'qz-input qz-initials__input');
+    input.autocomplete = 'off';
+    input.maxLength = 5;
+    input.placeholder = 'BB';
+    input.setAttribute('autocapitalize', 'characters');
+    input.setAttribute('aria-label', 'Your initials');
+    const go = button('Continue', 'primary', async function () {
+      this.disabled = true;
+      const next = await call('claim', { initials: input.value });
+      this.disabled = false;
+      if (next && !next.identity?.need) paint();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') go.click();
+    });
+    const row = el('div', 'qz-actions');
+    row.append(input, go);
+    box.append(row);
+    return box;
+  }
+
   function landingView(s: Status): HTMLElement {
     const wrap = el('div', 'qz-landing');
+    if (s.identity?.initials) wrap.append(el('p', 'qz-note qz-who', `Quizzing as ${s.identity.initials}`));
     const facts = el('ul', 'qz-facts');
     const fact = (text: string) => facts.append(el('li', '', text));
     fact(`${plural(settings.question_count, 'question')} · ${plural(settings.total_marks, 'mark')}`);
@@ -526,7 +568,7 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
   async function pollLive(): Promise<void> {
     if (!token) return;
     try {
-      const res = await apiPost<{ live: LiveView | null }>(endpoint, { action: 'live_status', token, ...(liveSession ? { session: liveSession } : {}) });
+      const res = await apiPost<{ live: LiveView | null }>(endpoint, { action: 'live_status', token, ...classFields, ...(liveSession ? { session: liveSession } : {}) });
       liveState = res.live;
     } catch (error) {
       if (error instanceof ApiClientError && error.code === 'new_session') {
@@ -560,7 +602,7 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
       const join = button('Join', 'primary', async function () {
         this.disabled = true;
         try {
-          const res = await apiPost<{ live: LiveView | null }>(endpoint, { action: 'live_join', token, code: input.value });
+          const res = await apiPost<{ live: LiveView | null }>(endpoint, { action: 'live_join', token, ...classFields, code: input.value });
           liveState = res.live;
           if (res.live?.session) {
             liveSession = res.live.session;
@@ -605,7 +647,7 @@ export function mountStudentQuiz(lesson: PublishedLesson): HTMLElement {
             }
             this.disabled = true;
             try {
-              const res = await apiPost<{ live: LiveView | null }>(endpoint, { action: 'live_answer', token, index: l.index, response: liveResponse });
+              const res = await apiPost<{ live: LiveView | null }>(endpoint, { action: 'live_answer', token, ...classFields, index: l.index, response: liveResponse });
               liveState = res.live;
               alert.hidden = true;
             } catch (error) {

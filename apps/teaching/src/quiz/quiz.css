@@ -1618,3 +1618,5 @@
 .qz-spots__row .qz-icon-btn {
   margin-left: auto;
 }
+.qz-initials__input { width: 6rem; text-transform: uppercase; letter-spacing: 0.08em; text-align: center; }
+.qz-who { margin: 0 0 0.5rem; font-weight: 600; }
