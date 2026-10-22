@@ -40,7 +40,7 @@ export async function syncFoodJournalAfterMeal(client, record, mealPath, nowIso)
     JSON.parse(decodeBlob(await client.readBlob(blob.sha))),
   );
   const next = markDishCounted(journal, record, mealPath, nowIso);
-  if (!next) return { updated: false };
+  if (!next) return { updated: false, reason: "dish_missing" };
   validateFoodJournal(next);
   await client.writeFile({
     path: PATH,

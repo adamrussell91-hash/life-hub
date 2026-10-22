@@ -305,6 +305,23 @@ test('a meal with a Food Journal dish marks the dish counted and reports foodJou
   assert.equal(saved.visits[0].dishes[0].brisket.portion_fraction, 0.5);
 });
 
+test('a meal for a deleted Food Journal dish says the dish is missing', async () => {
+  const journalSha = '9'.repeat(40);
+  const journal = { schema_version: 1, recipes: [], visits: [] };
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    if (url.includes('/git/trees/')) return Response.json({ tree: [{ path: 'data/food-journal/journal.json', type: 'blob', sha: journalSha }] });
+    if (url.includes(`/git/blobs/${journalSha}`)) return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(journal), 'utf8').toString('base64') });
+    if (options?.method === 'PUT') return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+  const dinner = { ...candidate, fields: { ...candidate.fields, meal: 'dinner', food_dish_id: 'dish_1', portion: 'All', portion_fraction: 1 } };
+  const payload = await (await handler(request({ candidate: dinner, slug: 'brisket' }))).json();
+  assert.equal(payload.data.foodJournalUpdated, false);
+  assert.equal(payload.data.foodJournalReason, 'dish_missing');
+});
+
 test('a plain meal confirm leaves foodJournalUpdated out of the response', async () => {
   const { fetchImpl } = githubFetchStub();
   const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });

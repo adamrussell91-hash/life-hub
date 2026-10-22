@@ -130,7 +130,7 @@ test("sync without a journal or dish writes nothing", async () => {
   const other = fakeClient({ [JOURNAL_PATH]: journal() });
   assert.deepEqual(
     await syncFoodJournalAfterMeal(other, { ...record, food_dish_id: "dish_x" }, path, "2026-10-22T19:31:00+11:00"),
-    { updated: false },
+    { updated: false, reason: "dish_missing" },
   );
   assert.equal(none.writes.length + other.writes.length, 0);
 });
@@ -267,4 +267,17 @@ test("removeOldCountedMeal leaves a meal for another dish, or no dish, alone", a
     assert.equal(await removeOldCountedMeal(client, prior, "dish_1"), null);
     assert.equal(client.deletes.length, 0);
   }
+});
+
+test("persistLogEntry says why when the dish was deleted", async () => {
+  const client = persistClient({ [JOURNAL_PATH]: journal() });
+  const result = await persistLogEntry(client, {
+    record: { ...record, food_dish_id: "dish_gone" },
+    notes: "",
+    path,
+    nowDateKey: "2026-10-22",
+    now: new Date("2026-10-22T08:31:00Z"),
+  });
+  assert.equal(result.foodJournalUpdated, false);
+  assert.equal(result.foodJournalReason, "dish_missing");
 });

@@ -17,7 +17,6 @@ export interface FoodDish {
 export interface FoodVisit {
   id: string;
   title: string;
-  venue?: { name?: string };
   dishes: FoodDish[];
 }
 
@@ -38,7 +37,7 @@ export interface MealWrite {
 export interface MealPutBody {
   travel_version: string;
   food_version: string | null;
-  food: { title: string; venue_name?: string; dishes: FoodDish[] };
+  food: { title: string; dishes: FoodDish[] };
   extras: { mood?: string; vibe?: string; with?: string };
 }
 
