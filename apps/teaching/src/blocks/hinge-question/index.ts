@@ -19,7 +19,8 @@ export function renderHingeQuestion(block: HingeBlock, mode: RenderMode, ctx: Re
   const root = el('section', 'peer-feedback hinge-question');
   root.dataset.blockId = block.id;
   const head = el('header', 'pf-head');
-  head.append(el('p', 'pf-eyebrow block-eyebrow', 'Hinge question'), el('h3', 'pf-prompt block-title', block.content.prompt.trim() || 'Choose one answer.'));
+  const prompt = el('h3', 'pf-prompt block-title', block.content.prompt.trim() || 'Choose one answer.');
+  head.append(el('p', 'pf-eyebrow block-eyebrow', 'Hinge question'), prompt);
   root.append(head);
 
   if (mode === 'print') {
@@ -36,6 +37,6 @@ export function renderHingeQuestion(block: HingeBlock, mode: RenderMode, ctx: Re
     root.append(el('p', 'pf-note block-secondary', 'Students answer from the published lesson.'));
     return root;
   }
-  root.append(mode === 'teacher' ? mountTeacher(block, ctx.lessonId) : mountStudent(block, ctx.lessonId));
+  root.append(mode === 'teacher' ? mountTeacher(block, ctx.lessonId, prompt) : mountStudent(block, ctx.lessonId, prompt));
   return root;
 }

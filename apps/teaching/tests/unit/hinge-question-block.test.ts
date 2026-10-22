@@ -6,6 +6,7 @@ import { renderBlock } from '@/blocks/render';
 import { blockRegistry } from '@/blocks/registry';
 import { hingeIssue, nextStep, type HingeBlock } from '@/blocks/hinge-question/shared';
 import { openBoard } from '@/blocks/hinge-question/board';
+import { filterBlocksForStudent } from '@/blocks/visibility';
 
 const finished = (): HingeBlock => {
   const block = createBlock('hinge_question', 'hq1') as HingeBlock;
@@ -49,21 +50,53 @@ describe('Hinge question block', () => {
     const prompt = editor.querySelector('textarea')!;
     prompt.value = 'Which force keeps the Moon in orbit?';
     prompt.dispatchEvent(new Event('input'));
-    const radios = [...editor.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+    // The main answers; the back-up question has its own list further down.
+    const main = editor.querySelector<HTMLFieldSetElement>('.hq-editor__options')!;
+    const radios = [...main.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
     radios[0]!.checked = true;
     radios[0]!.dispatchEvent(new Event('change'));
     // The right answer loses its note field; the other three keep theirs.
-    const notes = [...editor.querySelectorAll<HTMLInputElement>('.hq-editor__note')];
+    const notes = [...main.querySelectorAll<HTMLInputElement>('.hq-editor__note')];
     expect(notes).toHaveLength(3);
     notes[0]!.value = 'Any pull at a distance is magnetic';
     notes[0]!.dispatchEvent(new Event('input'));
-    [...editor.querySelectorAll('button')].find((b) => b.textContent === 'Add an answer')!.click();
+    [...main.querySelectorAll('button')].find((b) => b.textContent === 'Add an answer')!.click();
     const content = changed.mock.calls.at(-1)![0].content;
     expect(content.prompt).toBe('Which force keeps the Moon in orbit?');
     expect(content.correct_id).toBe(content.options[0].id);
     expect(content.options[1].misconception).toBe('Any pull at a distance is magnetic');
     expect(content.options).toHaveLength(5);
-    expect([...editor.querySelectorAll('button')].some((b) => b.textContent === 'Add an answer')).toBe(false);
+    expect(content.backup).toBeUndefined();
+    expect([...main.querySelectorAll('button')].some((b) => b.textContent === 'Add an answer')).toBe(false);
+  });
+
+  it('the editor takes an optional back-up question, saved as the teacher’s own', () => {
+    const changed = vi.fn();
+    const editor = createBlockEditor(finished(), changed);
+    const backup = editor.querySelector<HTMLDetailsElement>('.hq-editor__backup')!;
+    expect(backup.open).toBe(false);
+    const prompt = backup.querySelector('textarea')!;
+    prompt.value = 'Which force keeps a satellite circling the Earth?';
+    prompt.dispatchEvent(new Event('input'));
+    const texts = [...backup.querySelectorAll<HTMLInputElement>('.hq-editor__text')];
+    expect(texts).toHaveLength(4);
+    texts[0]!.value = 'Gravity';
+    texts[0]!.dispatchEvent(new Event('input'));
+    const radio = backup.querySelector<HTMLInputElement>('input[type="radio"]')!;
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change'));
+    const content = changed.mock.calls.at(-1)![0].content;
+    expect(content.backup).toMatchObject({ prompt: 'Which force keeps a satellite circling the Earth?', source: 'teacher' });
+    expect(content.backup.options[0].text).toBe('Gravity');
+    expect(content.backup.correct_id).toBe(content.backup.options[0].id);
+    expect(BlockSchema.parse({ ...finished(), content }).block_type).toBe('hinge_question');
+  });
+
+  it('publish strips the back-up question from the student copy', () => {
+    const block = finished();
+    const withBackup = { ...block, content: { ...block.content, backup: { prompt: 'Secret', options: block.content.options, correct_id: block.content.correct_id, source: 'ann' as const } } };
+    const [student] = filterBlocksForStudent([withBackup]);
+    expect(JSON.stringify(student)).not.toContain('Secret');
   });
 
   it('print lists the answers with no right answer marked', () => {

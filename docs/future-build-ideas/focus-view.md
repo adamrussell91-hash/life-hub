@@ -2,7 +2,7 @@
 
 A **Focus** mode inside the teacher's Display view (`apps/teaching/src/teacher/lesson-display.ts`). Today Display renders every block in one long scrolling column, so on a projector the text is small, the teacher scrolls in front of the class and students read ahead. Focus mode walks the lesson one step at a time, each step scaled up to fill the screen, like a slideshow, Prezi or Pear Deck.
 
-**Status: concept and mockup.** Mockup: [focus-view/mockup.html](focus-view/mockup.html). Every count, delay and generated question in it is simulated.
+**Status: built (22 October 2026).** Code: `apps/teaching/src/teacher/focus/`, the hinge back-up in `netlify/functions/_shared/hinge.mjs` and `hinge-backup.mjs`. Mockup: [focus-view/mockup.html](focus-view/mockup.html); every count, delay and generated question in it is simulated.
 
 ## Adam's asks
 
@@ -33,7 +33,7 @@ Tools today hang off a divider (the faint gear) or sit in a Tools block, which t
 - **One tools button, always bottom left**, opening the existing tray.
 - **Saved timers keep their place.** A divider's saved timer stack marks the step after it with a gold dot on the tools button: one tap to start, never forced onto the screen.
 - **Running tools persist across steps.** The timer floats top right and keeps running through step changes and the lesson map. Groups opens as a side drawer that squeezes the stage rather than covering it; with both open, the timer docks at the top of the drawer.
-- While a timer runs, a thin bar drains along the top edge of the stage so the back row can read time left without reading the clock.
+- While a timer runs, a thin bar drains along the top edge of the stage so the back row can read time left without reading the clock. (Mockup only: not built, the toolbox's own timer card shows the time.)
 
 ## Design feature: the lesson map
 
@@ -55,17 +55,23 @@ When a hinge question is revealed under the bar (65% in the mockup, a setting), 
 
 Cost: one small Ann call, only when a hinge comes in under the bar and no saved back-up exists. Nothing else in Focus mode uses AI.
 
+## Decided when building (22 October 2026)
+
+- **The bar is the hinge block's existing move-on mark** ("Move on at or above", default 80%), set in the hinge settings when building the lesson. Quiz lessons get the same setting in quiz Settings.
+- **No private second-screen preview.** Adam pauses the projector, so the back-up preview marks the right answer.
+- **Quiz questions and spot the technique get the checkpoint too.** A quiz lesson runs live from focus view, one question at a time, and a question revealed under the mark stops. Quiz questions have no back-up question yet (Ann's back-up writer is hinge-only).
+
 ## Not now
 
 - **Students follow the teacher.** Pear Deck's headline feature: students' devices advance with the board. It needs live sync between devices (hosting and build time, not AI cost). Parked; maybe later.
 
 ## Open questions
 
-- Which blocks need their own "stage" styling to scale up well? Charts, whiteboards and annotation are the likely hard ones, and this is the bulk of the build.
-- A truly private teacher preview (Ann's back-up, teacher notes) needs a second screen, such as the teacher's phone or laptop showing something different from the projector. Worth it later?
-- Does the checkpoint apply to other live blocks with a right answer (quiz questions, spot the technique), or hinge questions only?
-- Where does the bar live: per lesson, per hinge block, or one teacher setting?
+- Which blocks need their own "stage" styling to scale up well? Steps scale with CSS zoom from an 820px layout; charts, whiteboards and annotation are the likely ones to check on a real projector.
+- A back-up question for quiz questions, drafted by Ann like the hinge one?
 
 ## History
+
+- **2026-10-22:** Built. Adam's calls: build it; no second-screen preview (he pauses the projector); checkpoint for quiz questions and spot the technique too; the bar is set in the hinge settings.
 
 - **2026-10-22:** Concept and mockup. Step rules (heading or section starts a step, column rows stay together), tools dock with persistent timer and groups drawer, lesson map zoom, hinge checkpoint with no-names talking point and Ann's auto back-up (parallel question, previewed before showing, answer hidden in the preview, saved to the lesson). Student follow-along parked.
