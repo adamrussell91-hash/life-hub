@@ -200,7 +200,8 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
   /** Closes straight away unless there is unsaved typing; then asks, and closes only on a yes. */
   function canClose(): boolean {
     if (typedState() === savedState(o.markFor(current))) return true;
-    void askThenClose();
+    // Next tick, so the Escape that asked has finished before the card starts listening.
+    setTimeout(() => void askThenClose(), 0);
     return false;
   }
 
@@ -232,8 +233,9 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
     return true;
   }
 
+  /** The first mark box, or for an exempt student Save and next, so Enter still moves on. */
   function focusFirst(): void {
-    (boxes.find((b) => !b.disabled) ?? exempt).focus();
+    (boxes.find((b) => !b.disabled) ?? body.querySelector<HTMLButtonElement>('.mb-panel__next'))?.focus();
   }
 
   function saveAndNext(): void {
@@ -258,6 +260,10 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
     onClose: () => unsubscribe?.()
   });
   unsubscribe = o.subscribeErrors?.((message) => {
+    if (!panel.isConnected) {
+      unsubscribe?.();
+      return;
+    }
     error.textContent = message;
   });
   focusFirst();
