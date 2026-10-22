@@ -1,0 +1,321 @@
+/* Unit map: syllabus coverage under the map (teacher views). Slate for dot points and skills, sage for concepts. */
+
+.cov {
+  --cov-slate: #424860;
+  --cov-sage: #6f9278;
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.cov__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.cov__title {
+  margin: 0;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.cov__area,
+.cov__legend,
+.cov__hint,
+.cov__what {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted);
+}
+
+.cov__legend {
+  margin: 0;
+}
+
+.cov__rows {
+  display: grid;
+  gap: 8px;
+}
+
+.cov__row {
+  display: grid;
+  grid-template-columns: 52px 150px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.cov__badge {
+  justify-self: start;
+  min-width: 40px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--net-colour);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.cov__badge--metro {
+  background: var(--paper);
+  border: 2px solid var(--net-colour);
+  color: var(--net-colour);
+}
+
+.cov__what--none {
+  font-style: italic;
+}
+
+.cov__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cov__item {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border: 1.5px solid var(--cov-slate);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--cov-slate);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cov__item--on {
+  background: var(--cov-slate);
+  color: #fff;
+}
+
+.cov__row--concept .cov__item {
+  border-color: var(--cov-sage);
+  color: var(--cov-sage);
+}
+
+.cov__row--concept .cov__item--on {
+  background: var(--cov-sage);
+  color: #fff;
+}
+
+.cov__item--pill {
+  padding: 0 10px;
+  font-weight: 500;
+}
+
+.cov__item:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.cov__outcomes {
+  display: flex;
+  gap: 4px;
+}
+
+.cov__outcome {
+  min-width: 20px;
+  height: 20px;
+  border: 1px solid var(--cov-slate);
+  border-radius: 4px;
+  color: var(--cov-slate);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.cov__gaps,
+.cov__detail {
+  margin: 0;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--amber-deep, #8a5a1a);
+}
+
+.cov__gaps--done {
+  color: var(--cov-sage);
+}
+
+.cov__detail {
+  min-height: 1.2em;
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .cov__row {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .cov__items,
+  .cov__outcomes {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Lesson page: dot points this lesson teaches. Chosen points only; more come from a menu. */
+
+.dots {
+  --cov-slate: #424860;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.dots__label {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.dots__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.dots__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 2px 4px 2px 4px;
+  border: 1px solid color-mix(in srgb, var(--cov-slate) 35%, var(--line));
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--ink);
+}
+
+.dots__chip-id {
+  min-width: 26px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--cov-slate);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.dots__chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.dots__remove {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dots__remove:hover,
+.dots__remove:focus-visible {
+  background: color-mix(in srgb, var(--cov-slate) 12%, transparent);
+  color: var(--ink);
+}
+
+.dots__add {
+  min-height: 30px;
+  padding: 3px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dots__add:hover,
+.dots__add:focus-visible {
+  border-color: var(--cov-slate);
+  color: var(--ink);
+}
+
+.dots__reach {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted);
+}
+
+.dots__menu {
+  --cov-slate: #424860;
+  position: absolute;
+  z-index: 60;
+  display: grid;
+  gap: 2px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 10px 30px rgba(20, 30, 50, 0.16);
+}
+
+.dots__menu-area,
+.dots__menu-group,
+.dots__menu-empty {
+  margin: 6px 8px 2px;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted);
+}
+
+.dots__menu-area {
+  margin-top: 2px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.dots__menu-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dots__menu-item:hover,
+.dots__menu-item:focus-visible {
+  background: color-mix(in srgb, var(--cov-slate) 9%, transparent);
+  outline: none;
+}
+
+.dots__menu-id {
+  padding: 1px 0;
+  border-radius: 999px;
+  background: var(--cov-slate);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
