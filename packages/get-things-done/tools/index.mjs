@@ -4,8 +4,10 @@
 // step, and Decision Maker's Explore lists only its own catalogue, so neither ever shows them.
 import { DOING_THINGS } from './doing-things.mjs';
 import { BEFORE_DOING } from './before-doing.mjs';
+import { WORKING_WITH_OTHERS } from './working-with-others.mjs';
 
 export const GEAR_TOOLS = Object.freeze({
   ...DOING_THINGS,
-  ...BEFORE_DOING
+  ...BEFORE_DOING,
+  ...WORKING_WITH_OTHERS
 });

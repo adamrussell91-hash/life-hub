@@ -7,17 +7,18 @@ import assert from 'node:assert/strict';
 import { TOOLS, toolsForBookStep } from '../../packages/problem-solver/tools/index.mjs';
 import { BOOK_STEPS, stepPlan, toolsForPlanStep } from '../../packages/problem-solver/steps.mjs';
 import { MODEL_IDS } from '../../packages/problem-solver/models.mjs';
-import { isComplete, newRun, nextSlots, placeNode } from '../../packages/problem-solver/machine.mjs';
+import { applyScores, isComplete, newRun, nextSlots, placeNode } from '../../packages/problem-solver/machine.mjs';
 import { workThrough } from '../../packages/decision-book/work-through.mjs';
 import { flowRoute } from '../../packages/decision-book/families/path.mjs';
 import { curveAt } from '../../packages/decision-book/curves.mjs';
+import { ratingsOf } from '../../packages/decision-book/families/ratings.mjs';
 import { sampleNode } from '../../packages/decision-book/fixtures.mjs';
 import { GT_SAMPLE_TOOLS } from '../../packages/get-things-done/fixtures.mjs';
 import { GEAR_TOOLS } from '../../packages/get-things-done/tools/index.mjs';
 import { CATALOGUE, entry } from '../../packages/get-things-done/catalogue.mjs';
 
 /** The sections built so far; each section's task adds its key. */
-const SECTIONS_DONE = ['doing_things', 'before_doing'];
+const SECTIONS_DONE = ['doing_things', 'before_doing', 'working_with_others'];
 const DONE = CATALOGUE.filter((e) => SECTIONS_DONE.includes(e.section));
 const T = GEAR_TOOLS;
 const ids = (list) => list.map((item) => item.id);
@@ -254,4 +255,62 @@ test('Routines: helpful, unhelpful and desired habits, as an experiment with a d
   assert.deepEqual(labels(def.chart.groups), ['Helpful habits', 'Unhelpful habits', 'Desired habits']);
   assert.match(def.exercise, /date/);
   assert.doesNotMatch(coaching(def).join(' '), /\btrack/i);
+});
+
+// ---------------------------------------------------------------- How to get others to do things
+
+test('Appreciation: a lens; acknowledge the contribution, own real harm; one entry is enough', () => {
+  const def = T.gt_appreciation;
+  assert.equal(def.tier, 'lens');
+  assert.deepEqual(labels(def.chart.groups), ['Acknowledge contribution', 'Own genuine harm']);
+  assert.deepEqual([def.chart.minEntries, def.chart.minGroups], [1, 1]);
+});
+
+test('Radical Transparency: agree a trial, be considerate, be direct and prompt, review the trial', () => {
+  const { chart } = T.gt_radical_transparency;
+  assert.equal(chart.layout, 'checklist');
+  assert.deepEqual(labels(chart.groups), ['Agree a trial', 'Be considerate', 'Be direct and prompt', 'Review the trial']);
+});
+
+test('Sandwich Feedback: a lens of three orders, and it questions the classic sandwich', () => {
+  const def = T.gt_sandwich_feedback;
+  assert.equal(def.tier, 'lens');
+  assert.equal(def.chart.layout, 'routes');
+  assert.deepEqual(labels(def.chart.groups), ['Good then bad: motivate change', 'Bad then good: preserve morale', 'Praise-criticism-praise: avoid camouflage']);
+  assert.match(def.when, /sandwich/i);
+});
+
+test('Likeability: likeability across, competence up; four caricatures, yourself included', () => {
+  const { axes } = T.gt_likeability.chart;
+  assert.deepEqual([axes.x.label, axes.y.label], ['Likeability', 'Competence']);
+  assert.deepEqual(cellLabels('gt_likeability'), { '00': 'Competent jerk', '10': 'A rainbow-farting unicorn', '01': 'Jerk of the month', '11': 'Loveable fool' });
+  assert.ok(T.gt_likeability.steps.some((s) => s.id === 'include_yourself'));
+});
+
+test('The Theory of Small Gifts: a lens of four ways to give', () => {
+  const def = T.gt_small_gifts;
+  assert.equal(def.chart.layout, 'roles');
+  assert.deepEqual(labels(def.chart.groups), ['Immediate exchange', 'Deferred debt', 'Expected mutual investment', 'Give because it is right']);
+});
+
+test('Brainstorming: analytic, creative, critical', () => {
+  assert.deepEqual(labels(T.gt_brainstorming.chart.stages), ['Analytic stage', 'Creative stage', 'Critical stage']);
+});
+
+test('Structured Evaluation: up to seven ideas, two or three criteria, each rater kept, a named owner, no winner', () => {
+  const def = T.gt_structured_evaluation;
+  assert.equal(def.family, 'ratings');
+  assert.equal(def.chart.maxIdeas ?? 7, 7);
+  assert.deepEqual(def.chart.criteria ?? [2, 3], [2, 3]);
+  for (const slot of ['idea', 'criterion', 'rater', 'recommendation', 'owner']) assert.ok(def.slots[slot], slot);
+  let run = fill(newRun(def.id, 'r'), ['idea:1', 'idea:2', 'criterion:1', 'criterion:2', 'rater:1', 'rater:2']);
+  const scores = (a, b) => ({ idea1: { criterion1: a, criterion2: a }, idea2: { criterion1: b, criterion2: b } });
+  run = applyScores(run, { rater: 'rater1', scores: scores(4, 9), ranking: ['idea2', 'idea1'] }, 'a');
+  run = applyScores(run, { rater: 'rater2', scores: scores(8, 1), ranking: ['idea1', 'idea2'] }, 'b');
+  const r = ratingsOf(run);
+  assert.deepEqual(r.rankings, { rater1: ['idea2', 'idea1'], rater2: ['idea1', 'idea2'] }, 'each rater’s own ranking, kept');
+  assert.equal(r.cells.idea1.criterion1.mean, 6, 'equal weights');
+  assert.equal(r.cells.idea1.criterion1.n, 2);
+  assert.equal('winner' in r, false);
+  assert.deepEqual(nextSlots(run), ['recommendation', 'owner']);
 });
