@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gear Shifter Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* packages/get-things-done/get-things-done.css
+   Gear Shifter's tokens: Adam's palette (22 Oct). Cobalt and vermilion draw shapes, rings and
+   gears; amber is a sparing accent (the centre gear, a done state). Small text on paper takes
+   the darker label shades. Motion matches Problem Solver and Decision Maker. */
+.gt-scope {
+  --gt-paper: #fefdf6;
+  --gt-ink: #2a3340;
+  --gt-blue: #2b7de9;
+  --gt-red: #ea4f2a;
+  --gt-amber: #f5a623;
+  --gt-blue-label: #2670d1;
+  --gt-red-label: #cd4524;
+  --gt-amber-label: #976615;
+  --gt-blue-tint: #e4eefb;
+  --gt-red-tint: #fbe9e4;
+  --gt-amber-tint: #fcf3e3;
+  --gt-soft: #f2f0e8;
+  --gt-line: #c9cbc4;
+  --gt-ghost: rgba(42, 51, 64, 0.12);
+  --gt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --gt-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+:root {
+  --rail: #17375e; --on-rail: rgba(255, 255, 255, 0.92); --on-rail-muted: rgba(255, 255, 255, 0.62); --on-rail-hover: rgba(255, 255, 255, 0.1);
+  --font-ui: Inter, ui-sans-serif, system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+.gt-scope { --muted: #5b6370; --card: #ffffff; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #fefdf6; color: #2a3340; font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+button, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--gt-ink, #2a3340); outline-offset: 3px; }
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.rail { background: var(--rail); color: var(--on-rail); padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.rail__brand { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 0 12px 18px; }
+.rail__group { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--on-rail-muted); padding: 14px 12px 6px; }
+.rail a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; color: var(--on-rail); text-decoration: none; font-size: 14.5px; }
+.rail a:hover { background: var(--on-rail-hover); }
+.rail a[aria-current="page"] { background: rgba(255, 255, 255, 0.12); font-weight: 600; }
+.rail .dot { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; }
+.rail .dot svg { width: 18px; height: 18px; }
+.canvas { min-width: 0; padding: 32px 16px 64px; background: var(--gt-paper); color: var(--gt-ink); }
+.canvas__inner { max-width: 1240px; margin: 0 auto; padding-inline: clamp(0px, 3vw, 32px); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.gt-glyph { display: inline-flex; width: 20px; height: 20px; flex: none; color: var(--gt-ink); }
+.gt-glyph svg, .gt-emblem svg { width: 100%; height: 100%; display: block; }
+.gt-emblem { display: inline-flex; width: 28px; height: 28px; flex: none; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; cursor: pointer; font-weight: 600; transition: transform 180ms var(--gt-ease), background 180ms; }
+.btn--primary { background: var(--gt-ink); color: var(--gt-paper); }
+.btn--primary:hover { transform: translateY(-1px); }
+.btn--blue { background: var(--gt-blue-label); color: #fff; }
+.btn--ghost { background: transparent; border: 1px solid var(--gt-line); }
+.btn--ghost:hover { background: var(--gt-soft); }
+.mock-note { font-size: 12px; color: var(--muted); margin: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 12px 16px; gap: 6px; }
+  .rail__brand { padding: 0 8px 0 0; white-space: nowrap; }
+  .rail__group, .rail a:not([aria-current="page"]) { display: none; }
+  .rail a { white-space: nowrap; }
+  .canvas { padding-block: 20px 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+/* ── Hero: the ring board beside the start box ── */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(24px, 4vw, 56px); align-items: center; padding-block: 8px 40px; }
+.hero__copy { display: grid; gap: 18px; min-width: 0; }
+.hero h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; color: var(--gt-ink); text-wrap: balance; display: flex; flex-wrap: wrap; align-items: center; gap: 0.18em; }
+.hero h1 .mark { width: 0.92em; height: 0.92em; flex: none; display: inline-flex; }
+.hero h1 i > svg, .hero h1 .mark > svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.hero h1 > span:last-child { display: inline-flex; align-items: center; gap: 0.12em; }
+.hero h1 i { display: inline-block; flex: none; font-style: normal; }
+.hero h1 .ring { width: 0.42em; height: 0.42em; border-radius: 50%; border: 0.09em solid var(--gt-blue); animation: bob 4s var(--gt-ease) infinite; }
+.hero h1 .cog { width: 0.5em; height: 0.5em; animation: spin 9s linear infinite; }
+.hero h1 .dart { width: 0.6em; height: 0.5em; animation: nudge 4s var(--gt-ease) infinite -2.6s; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.08em); } }
+@keyframes nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0.1em, -0.06em); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hero__lede { margin: 0; font-size: 17px; color: var(--muted); max-width: 46ch; }
+
+.start { position: relative; background: var(--card); border: 1px solid var(--gt-line); border-radius: 24px; padding: 20px; display: grid; gap: 14px; overflow: hidden; }
+.start__disc { position: absolute; right: -34px; top: -34px; width: 104px; height: 104px; transform: scale(var(--pulse, 1)) rotate(var(--turn, 0deg)); transition: transform 320ms var(--gt-spring); }
+.start__disc svg { width: 100%; height: 100%; }
+.start label { font-weight: 700; font-size: 17px; position: relative; max-width: calc(100% - 64px); }
+.start textarea { width: 100%; min-height: 84px; resize: vertical; border: 0; border-radius: 14px; background: var(--gt-soft); padding: 14px 16px; font-size: 16px; line-height: 1.45; }
+.start textarea::placeholder { color: var(--muted); }
+.start__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
+.start__tries { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.try { border: 1px solid var(--gt-line); border-radius: 999px; background: transparent; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.try:hover { color: var(--gt-ink); background: var(--gt-soft); }
+
+.quick { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 14px 16px; background: var(--gt-blue-tint); border-radius: 20px; }
+.quick__mark { grid-row: span 2; width: 48px; height: 48px; }
+.quick__mark svg { width: 100%; height: 100%; overflow: visible; }
+.quick p { margin: 0; font-size: 14px; }
+.quick p b { font-size: 15px; }
+.quick__row { display: flex; gap: 8px; min-width: 0; }
+.quick input { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 999px; background: var(--card); padding: 0 14px; min-height: 40px; font-size: 14.5px; }
+.quick .btn { min-height: 40px; padding: 0 16px; }
+
+.board { position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 4 / 3; }
+.board > svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.tile { transform-box: fill-box; transform-origin: center; }
+.tile.enter { animation: tileIn 760ms var(--gt-spring) both; }
+.tile.leave { animation: tileOut 320ms var(--gt-ease) both; }
+@keyframes tileIn { from { transform: rotate(-120deg) scale(0); } to { transform: none; } }
+@keyframes tileOut { to { transform: rotate(120deg) scale(0); } }
+.board__caption { position: absolute; left: 0; bottom: -28px; font: 500 11px var(--font-mono); color: var(--muted); letter-spacing: 0.02em; }
+
+/* ── Section heads ── */
+.section { display: grid; gap: 18px; padding-block: 36px 8px; }
+.section__head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; }
+.section h2 { margin: 0; font-size: 26px; letter-spacing: -0.02em; font-weight: 750; text-wrap: balance; }
+.section__aside { color: var(--muted); font-size: 14px; margin: 0; max-width: 52ch; }
+
+/* ── Your work: one card per session, with its medal ── */
+.problems { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; list-style: none; margin: 0; padding: 0; }
+.prob { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; align-items: start; padding: 18px; border-radius: 22px; background: var(--card); border: 1px solid var(--gt-line); text-decoration: none; color: inherit; transition: transform 260ms var(--gt-ease), border-color 260ms; animation: rise 600ms var(--gt-ease) both; animation-delay: calc(var(--i) * 90ms + 300ms); }
+.prob:hover { transform: translateY(-3px); border-color: var(--gt-ink); }
+@keyframes rise { from { transform: translateY(14px); } }
+.medal { width: 92px; height: 92px; }
+.medal > svg { width: 100%; height: 100%; overflow: visible; }
+.medal .piece { transform-box: view-box; transform-origin: 50px 50px; transition: transform 520ms var(--gt-spring); }
+.prob:hover .medal .p-loop { transform: rotate(40deg); }
+.prob:hover .medal .p-tool { transform: scale(1.1); }
+.prob:hover .medal .p-dart { transform: translate(-3px, 3px); }
+.prob__body { display: grid; gap: 6px; min-width: 0; }
+.prob__title { margin: 0; font-size: 16.5px; font-weight: 650; line-height: 1.3; text-wrap: pretty; }
+.prob__meta { margin: 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.phase { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--gt-ink); }
+.phase::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 2.5px solid var(--c, var(--gt-red)); }
+.prob__skills { display: flex; gap: 4px; margin-top: 4px; }
+.prob__skills .gt-glyph { width: 18px; height: 18px; opacity: 0.85; }
+.prob--new { place-items: center; grid-template-columns: 1fr; text-align: center; background: transparent; border: 1.5px dashed var(--gt-line); border-radius: 22px; color: var(--muted); min-height: 128px; cursor: pointer; font-size: 15px; }
+.prob--new:hover { color: var(--gt-ink); border-color: var(--gt-ink); }
+
+/* ── How a session builds: four round stations on a dotted line ── */
+.build { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--card); border: 1px solid var(--gt-line); border-radius: 26px; padding: 26px 22px; position: relative; }
+.build::before { content: ""; position: absolute; left: 60px; right: 44px; top: 60px; border-top: 3px dotted var(--gt-ink); }
+.build::after { content: ""; position: absolute; right: 30px; top: 53px; width: 14px; height: 16px; background: var(--gt-ink); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.build__step { display: grid; gap: 10px; justify-items: start; padding: 0 14px; position: relative; min-width: 0; }
+.build__art { width: 68px; height: 68px; background: var(--card); border-radius: 50%; position: relative; box-shadow: 0 0 0 8px var(--card); }
+.build__art svg { width: 100%; height: 100%; overflow: visible; }
+.build__step h3 { margin: 0; font-size: 15.5px; }
+.build__step p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.build__n { font: 500 11px var(--font-mono); color: var(--muted); }
+.turning { transform-box: view-box; transform-origin: 50px 50px; animation: spin 10s linear infinite; }
+.landing { animation: land 3.2s var(--gt-ease) infinite; }
+@keyframes land { 0% { transform: translate(14px, -14px); opacity: 0; } 25%, 85% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+.circling { transform-box: view-box; transform-origin: 50px 50px; animation: spin 7s linear infinite reverse; }
+
+/* ── The five sections: one shelf each, in route order ── */
+.sections { display: grid; gap: 16px; }
+.sect { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 20px; padding: 20px; border: 1px solid var(--gt-line); border-radius: 24px; background: transparent; transition: background 220ms; }
+.sect:hover { background: var(--card); }
+.sect__mark { width: 96px; height: 96px; display: grid; gap: 6px; justify-items: center; align-content: start; }
+.sect__mark svg { width: 96px; height: 96px; }
+.sect__stn { font: 500 11px var(--font-mono); color: var(--gt-blue-label); letter-spacing: 0.04em; }
+.sect h3 { margin: 0; font-size: 17px; }
+.sect__lede { margin: 2px 0 14px; font-size: 13.5px; color: var(--muted); }
+.sect__shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr)); gap: 8px; list-style: none; margin: 0; padding: 0; }
+.model { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 2px 12px; align-items: start; width: 100%; height: 100%; padding: 10px 12px; border: 0; border-radius: 16px; background: var(--gt-soft); cursor: pointer; text-align: left; min-width: 0; transition: background 200ms; }
+.model:hover, .model:focus-visible { background: var(--gt-blue-tint); }
+.model .gt-emblem { width: 44px; height: 44px; grid-row: span 2; transition: transform 520ms var(--gt-spring); }
+.model:hover .gt-emblem, .model:focus-visible .gt-emblem { transform: rotate(-24deg) scale(1.06); }
+.model b { font-size: 13.5px; font-weight: 650; line-height: 1.3; }
+.model small { font-size: 12.5px; line-height: 1.38; color: var(--muted); }
+.model em { font: 500 11px var(--font-mono); font-style: normal; color: var(--gt-blue-label); }
+
+/* ── Thinking skills ribbon, split three ways ── */
+.skills { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.skill { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: var(--card); border: 1px solid var(--gt-line); }
+.skill .gt-glyph { width: 34px; height: 34px; transition: transform 600ms var(--gt-spring); }
+.skill:hover .gt-glyph { transform: rotate(180deg); }
+.skill b { display: block; font-size: 13px; font-weight: 600; line-height: 1.25; }
+.skill small { font: 500 11px var(--font-mono); color: var(--muted); }
+.skill[data-n="0"] { background: transparent; }
+.skill[data-n="0"] .gt-glyph { opacity: 0.35; }
+.skill > span:last-child { display: block; min-width: 0; }
+.bar { display: flex; gap: 2px; height: 5px; margin-top: 5px; border-radius: 4px; background: var(--gt-ghost); overflow: hidden; }
+.bar i { display: block; height: 100%; width: var(--w); animation: grow 1.2s var(--gt-ease) both 0.6s; }
+.bar i:empty[style*="--w:0%"] { display: none; }
+.bar i.gs { background: var(--gt-blue); }
+.bar i.dm { background: var(--gt-ink); }
+.bar i.ps { background: #a9adb3; }
+@keyframes grow { from { width: 0; } }
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 5px; border-radius: 3px; margin-right: 6px; vertical-align: middle; background: var(--c); }
+
+@media (max-width: 1100px) { .skills { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; }
+  .board { justify-self: stretch; max-width: none; order: -1; margin-bottom: 24px; }
+  .build { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 24px; }
+  .build::before, .build::after { display: none; }
+}
+@media (max-width: 620px) {
+  .sect { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
+  .sect__mark { grid-template-columns: 64px auto; justify-items: start; align-items: center; gap: 12px; width: auto; height: auto; }
+  .sect__mark svg { width: 64px; height: 64px; }
+}
+@media (max-width: 520px) {
+  .skills { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .build { grid-template-columns: 1fr; }
+  .prob { grid-template-columns: 64px minmax(0, 1fr); }
+  .medal { width: 64px; height: 64px; }
+  .prob--new { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Tasks Hub">
+    <div class="rail__brand">TASKS HUB</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>Backlog</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 11l8-4M8 13l8 4"/></svg></span>Graph</a>
+    <div class="rail__group">TOOLS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/></svg></span>Maps</a>
+    <a href="../problem-solver/landing.html"><span class="dot"><svg viewBox="0 0 100 100"><path fill="#f6be2c" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/><path fill="#d7262e" d="M2.38 56A48 48 0 0 0 97.62 56Z"/><path fill="#7ea2e6" d="M2.38 44A48 48 0 0 1 97.62 44Z"/></svg></span>Problem Solver</a>
+    <a href="../decision-maker/landing.html"><span class="dot"><svg viewBox="0 0 140 140"><circle cx="47" cy="70" r="43" fill="#f43a25"/><circle cx="93" cy="70" r="43" fill="#60ba2c"/><path d="M23 64H86V45L121 70L86 95V76H23Z" fill="#171813"/></svg></span>Decision Maker</a>
+    <a href="landing.html" aria-current="page"><span class="dot"><svg viewBox="0 0 100 100"><path d="M11.4,39.6A40 40 0 0 1 74.9,18.7" fill="none" stroke="#7fb3f6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M92.4,37.3L89.4,14.5L70,32Z" fill="#7fb3f6" stroke="#7fb3f6" stroke-width="3.15" stroke-linejoin="round"/><path d="M88.6,60.4A40 40 0 0 1 25.1,81.3" fill="none" stroke="#7fb3f6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.6,62.7L10.6,85.5L30,68Z" fill="#7fb3f6" stroke="#7fb3f6" stroke-width="3.15" stroke-linejoin="round"/><path d="M46.3,32.6L46.3,26.3L53.7,26.3L53.7,32.6A17.8 17.8 0 0 1 59.6,35.1L59.6,35.1L64.1,30.6L69.4,35.9L64.9,40.4A17.8 17.8 0 0 1 67.4,46.3L67.4,46.3L73.7,46.3L73.7,53.7L67.4,53.7A17.8 17.8 0 0 1 64.9,59.6L64.9,59.6L69.4,64.1L64.1,69.4L59.6,64.9A17.8 17.8 0 0 1 53.7,67.4L53.7,67.4L53.7,73.7L46.3,73.7L46.3,67.4A17.8 17.8 0 0 1 40.4,64.9L40.4,64.9L35.9,69.4L30.6,64.1L35.1,59.6A17.8 17.8 0 0 1 32.6,53.7L32.6,53.7L26.3,53.7L26.3,46.3L32.6,46.3A17.8 17.8 0 0 1 35.1,40.4L35.1,40.4L30.6,35.9L35.9,30.6L40.4,35.1A17.8 17.8 0 0 1 46.3,32.6ZM57.7 50A7.7 7.7 0 1 0 42.3 50A7.7 7.7 0 1 0 57.7 50Z" fill="#ea4f2a" fill-rule="evenodd"/></svg></span>Gear Shifter</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>Search</a>
+    <div class="rail__group">HUBS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9H4z"/></svg></span>Life</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h7v14H4zM13 5h7v14h-7z"/></svg></span>Teaching</a>
+  </nav>
+
+  <main class="canvas gt-scope">
+    <div class="canvas__inner">
+      <p class="eyebrow">Tasks Hub</p>
+
+      <section class="hero">
+        <div class="hero__copy">
+          <h1><span class="mark" aria-hidden="true" id="h1-mark"></span>Gear <span>Shifter<i class="ring"></i><i class="cog" id="h1-cog"></i><i class="dart" id="h1-dart"></i></span></h1>
+          <p class="hero__lede">For when something will not move. Say what is stuck: a coach finds where, picks one technique from The Get Things Done Book and helps you try it as a small, dated experiment.</p>
+          <form class="start" id="start-form">
+            <span class="start__disc" aria-hidden="true" id="start-disc"></span>
+            <label for="start-text">What do you need to get moving?</label>
+            <textarea id="start-text" rows="3" placeholder="A project you cannot start, a task that keeps slipping, work that depends on someone else. Say it the way you would to a friend."></textarea>
+            <div class="start__row">
+              <div class="start__tries" aria-label="Examples">
+                <button type="button" class="try" data-text="I keep putting off the grant report and it is due on Friday.">Stalled report</button>
+                <button type="button" class="try" data-text="Our team handover keeps getting pushed back a week.">Team handover</button>
+              </div>
+              <button class="btn btn--primary" type="submit">Start</button>
+            </div>
+          </form>
+          <form class="quick" id="quick-form">
+            <span class="quick__mark" aria-hidden="true" id="quick-mark"></span>
+            <p><b>Quick start.</b> One stalled task: a small first move, how it starts, and when to check back.</p>
+            <div class="quick__row">
+              <label for="quick-text" class="sr">Quick start</label>
+              <input id="quick-text" placeholder="Book the boiler service">
+              <button class="btn btn--primary" type="submit">Go</button>
+            </div>
+          </form>
+        </div>
+        <div class="board" aria-hidden="true">
+          <svg id="board" viewBox="0 0 400 300"></svg>
+          <span class="board__caption">rings, gears and darts from the cover · shifting</span>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="h-work">
+        <div class="section__head">
+          <h2 id="h-work">Your work</h2>
+          <p class="section__aside">Each medal is the cover, built as the session moves: the red ring fills with the frame, the blue arrows arrive with the route and its section, the dart lands at Commit. The technique in use sits in the middle.</p>
+        </div>
+        <ul class="problems" id="problems"></ul>
+        <p class="mock-note">Example sessions for the mockup.</p>
+      </section>
+
+      <section class="section" aria-labelledby="h-build">
+        <div class="section__head">
+          <h2 id="h-build">How a session builds</h2>
+          <p class="section__aside">One technique per session, tried as an experiment. The coach chooses from the book; you can always pick from the shelf instead.</p>
+        </div>
+        <div class="build" id="build"></div>
+      </section>
+
+      <section class="section" aria-labelledby="h-sections">
+        <div class="section__head">
+          <h2 id="h-sections">The five sections</h2>
+          <p class="section__aside">The book's five parts, in the order a piece of work lives through them. Start from any technique to open a session already on it.</p>
+        </div>
+        <div class="sections" id="sections"></div>
+      </section>
+
+      <section class="section" aria-labelledby="h-skills">
+        <div class="section__head">
+          <h2 id="h-skills">Thinking skills you have used</h2>
+          <p class="section__aside">One tally across all three tools. Faint marks have not come up yet.</p>
+        </div>
+        <div class="legend"><span style="--c:var(--gt-blue)">Gear Shifter</span><span style="--c:var(--gt-ink)">Decision Maker</span><span style="--c:#a9adb3">Problem Solver</span></div>
+        <div class="skills" id="skills"></div>
+        <p class="mock-note">Example counts for the mockup.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const EMBLEMS={"gt_appreciation":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Appreciation</title><polygon points=\"71,55 75.9,49.5 80.6,50.9 81.6,58.2 84.4,60.6 91.8,60.1 94.1,64.4 89.6,70.3 90,74 95.5,78.9 94.1,83.6 86.8,84.6 84.4,87.4 84.9,94.8 80.6,97.1 74.7,92.6 71,93 66.1,98.5 61.4,97.1 60.4,89.8 57.6,87.4 50.2,87.9 47.9,83.6 52.4,77.7 52,74 46.5,69.1 47.9,64.4 55.2,63.4 57.6,60.6 57.1,53.2 61.4,50.9 67.3,55.4\" fill=\"#ea4f2a\"/><circle cx=\"71\" cy=\"74\" r=\"7.0\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><path d=\"M 30 84 A 43 43 0 1 1 112 84\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"112,94 101,78 119,79\" fill=\"#2b7de9\"/></svg>","gt_batching":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Batching</title><rect x=\"23\" y=\"34\" width=\"22\" height=\"13\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"23\" y=\"55\" width=\"22\" height=\"13\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"23\" y=\"76\" width=\"22\" height=\"13\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><line x1=\"61\" y1=\"99\" x2=\"76\" y2=\"37\" stroke=\"#ea4f2a\" stroke-width=\"9\" stroke-linecap=\"round\"/><polygon points=\"80,23 67,40 84,44\" fill=\"#ea4f2a\"/><circle cx=\"103\" cy=\"69\" r=\"13\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"103\" cy=\"69\" r=\"4\" fill=\"#ea4f2a\"/></svg>","gt_book_of_books":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Book of Books (Bob)</title><path d=\"M 28 35 L 28 109 L 108 109\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"39\" y=\"39\" width=\"15\" height=\"56\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><rect x=\"61\" y=\"31\" width=\"15\" height=\"64\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><rect x=\"83\" y=\"45\" width=\"22\" height=\"50\" rx=\"3\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><line x1=\"89\" y1=\"54\" x2=\"99\" y2=\"54\" stroke=\"#ea4f2a\" stroke-width=\"4\" stroke-linecap=\"round\"/><path d=\"M 105 32 C 80 23 58 25 41 30\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>","gt_brainstorming":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Brainstorming</title><rect x=\"25\" y=\"28\" width=\"21\" height=\"29\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"60\" y=\"23\" width=\"21\" height=\"29\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"95\" y=\"28\" width=\"21\" height=\"29\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><line x1=\"36\" y1=\"64\" x2=\"60\" y2=\"86\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"59\" x2=\"70\" y2=\"82\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"105\" y1=\"64\" x2=\"80\" y2=\"86\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><polygon points=\"70,87.1 73.3,83.3 76.5,84.3 77.2,89.3 79.1,90.9 84.1,90.6 85.7,93.5 82.7,97.5 82.9,100 86.7,103.3 85.7,106.5 80.7,107.2 79.1,109.1 79.4,114.1 76.5,115.7 72.5,112.7 70,112.9 66.7,116.7 63.5,115.7 62.8,110.7 60.9,109.1 55.9,109.4 54.3,106.5 57.3,102.5 57.1,100 53.3,96.7 54.3,93.5 59.3,92.8 60.9,90.9 60.6,85.9 63.5,84.3 67.5,87.3\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"100\" r=\"4.8\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>","gt_budgeting":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Budgeting</title><rect x=\"28\" y=\"91\" width=\"11\" height=\"22\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"44\" y=\"77\" width=\"11\" height=\"29\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"60\" y=\"63\" width=\"11\" height=\"36\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"76\" y=\"49\" width=\"11\" height=\"43\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"92\" y=\"35\" width=\"11\" height=\"50\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/></svg>","gt_bursty_communication":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Bursty Communication</title><path d=\"M 30 49 A 50 50 0 0 1 110 46\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"99,43 117,40 113,58\" fill=\"#2b7de9\"/><path d=\"M 110 91 A 50 50 0 0 1 30 94\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"41,97 23,100 27,82\" fill=\"#2b7de9\"/><line x1=\"32\" y1=\"79\" x2=\"32\" y2=\"65\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"43\" y1=\"79\" x2=\"43\" y2=\"56\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"54\" y1=\"79\" x2=\"54\" y2=\"68\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"86\" y1=\"79\" x2=\"86\" y2=\"68\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"97\" y1=\"79\" x2=\"97\" y2=\"56\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"108\" y1=\"79\" x2=\"108\" y2=\"65\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\"/></svg>","gt_circle_of_competence":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Circle of Competence</title><circle cx=\"62\" cy=\"72\" r=\"35\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\"/><polygon points=\"62,59.1 65.3,55.3 68.5,56.3 69.2,61.3 71.1,62.9 76.1,62.6 77.7,65.5 74.7,69.5 74.9,72 78.7,75.3 77.7,78.5 72.7,79.2 71.1,81.1 71.4,86.1 68.5,87.7 64.5,84.7 62,84.9 58.7,88.7 55.5,87.7 54.8,82.7 52.9,81.1 47.9,81.4 46.3,78.5 49.3,74.5 49.1,72 45.3,68.7 46.3,65.5 51.3,64.8 52.9,62.9 52.6,57.9 55.5,56.3 59.5,59.3\" fill=\"#ea4f2a\"/><circle cx=\"62\" cy=\"72\" r=\"4.8\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><line x1=\"109\" y1=\"29\" x2=\"109\" y2=\"49\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"99\" y1=\"39\" x2=\"118\" y2=\"39\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/></svg>","gt_circle_of_influence":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Circle of Influence</title><circle cx=\"70\" cy=\"70\" r=\"45\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"70\" cy=\"70\" r=\"31\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"70\" cy=\"70\" r=\"15\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><circle cx=\"70\" cy=\"70\" r=\"4\" fill=\"#ea4f2a\"/></svg>","gt_compartmentalisation":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Compartmentalisation</title><rect x=\"30\" y=\"25\" width=\"80\" height=\"90\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><line x1=\"30\" y1=\"55\" x2=\"110\" y2=\"55\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"30\" y1=\"85\" x2=\"110\" y2=\"85\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"60\" y1=\"40\" x2=\"80\" y2=\"40\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"60\" y1=\"100\" x2=\"80\" y2=\"100\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><polygon points=\"70,60.1 72.5,57.2 75,58 75.5,61.8 77,63 80.8,62.8 82,65 79.7,68.1 79.9,70 82.8,72.5 82,75 78.2,75.5 77,77 77.2,80.8 75,82 71.9,79.7 70,79.9 67.5,82.8 65,82 64.5,78.2 63,77 59.2,77.2 58,75 60.3,71.9 60.1,70 57.2,67.5 58,65 61.8,64.5 63,63 62.8,59.2 65,58 68.1,60.3\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"70\" r=\"3.6\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>","gt_deep_work":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Deep Work</title><rect x=\"25\" y=\"35\" width=\"90\" height=\"23\" rx=\"3\" fill=\"#2b7de9\" stroke=\"#2b7de9\" stroke-width=\"4\"/><rect x=\"25\" y=\"86\" width=\"11\" height=\"18\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"45\" y=\"86\" width=\"18\" height=\"18\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"73\" y=\"86\" width=\"9\" height=\"18\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"94\" y=\"86\" width=\"21\" height=\"18\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><polygon points=\"70,37.9 72.3,35.2 74.6,35.9 75.1,39.4 76.4,40.6 80,40.3 81.1,42.4 78.9,45.2 79.1,47 81.8,49.3 81.1,51.6 77.6,52.1 76.4,53.4 76.7,57 74.6,58.1 71.8,55.9 70,56.1 67.7,58.8 65.4,58.1 64.9,54.6 63.6,53.4 60,53.7 58.9,51.6 61.1,48.8 60.9,47 58.2,44.7 58.9,42.4 62.4,41.9 63.6,40.6 63.3,37 65.4,35.9 68.2,38.1\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"47\" r=\"3.4\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>","gt_delphi_method":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Delphi Method</title><circle cx=\"33\" cy=\"39\" r=\"10\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"70\" cy=\"32\" r=\"10\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"107\" cy=\"39\" r=\"10\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><line x1=\"33\" y1=\"50\" x2=\"62\" y2=\"76\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"41\" x2=\"70\" y2=\"72\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"107\" y1=\"50\" x2=\"78\" y2=\"76\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><polygon points=\"70,71.6 73.7,67.4 77.3,68.4 78,74 80.2,75.8 85.8,75.4 87.6,78.7 84.2,83.2 84.4,86 88.6,89.7 87.6,93.3 82,94 80.2,96.2 80.6,101.8 77.3,103.6 72.8,100.2 70,100.4 66.3,104.6 62.7,103.6 62,98 59.8,96.2 54.2,96.6 52.4,93.3 55.8,88.8 55.6,86 51.4,82.3 52.4,78.7 58,78 59.8,75.8 59.4,70.2 62.7,68.4 67.2,71.8\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"86\" r=\"5.3\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><path d=\"M 99 97 C 116 114 115 61 114 57\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"114,51 105,65 120,65\" fill=\"#2b7de9\"/></svg>","gt_disruptive_innovation":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Disruptive Innovation</title><path d=\"M 31 101 A 42 42 0 1 1 101 104\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"105,109 87,105 100,91\" fill=\"#2b7de9\"/><line x1=\"45\" y1=\"102\" x2=\"103\" y2=\"39\" stroke=\"#ea4f2a\" stroke-width=\"9\" stroke-linecap=\"round\"/><polygon points=\"113,28 93,36 106,48\" fill=\"#ea4f2a\"/><circle cx=\"110\" cy=\"30\" r=\"8\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"4\"/></svg>","gt_five_second_rule":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The 5-Second Rule</title><circle cx=\"29\" cy=\"43\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"49\" cy=\"43\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"69\" cy=\"43\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"89\" cy=\"43\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"109\" cy=\"43\" r=\"5\" fill=\"#2b7de9\"/><path d=\"M 29 64 L 29 95 L 83 95\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"97,95 80,84 80,106\" fill=\"#ea4f2a\"/><circle cx=\"105\" cy=\"95\" r=\"12\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"4\"/></svg>","gt_five_twenty_five_rule":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The 5/25 Rule</title><circle cx=\"30\" cy=\"30\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"50\" cy=\"30\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"70\" cy=\"30\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"90\" cy=\"30\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"110\" cy=\"30\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"50\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"50\" cy=\"50\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"70\" cy=\"50\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"90\" cy=\"50\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"110\" cy=\"50\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"70\" r=\"5\" fill=\"#ea4f2a\"/><circle cx=\"50\" cy=\"70\" r=\"5\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"70\" r=\"5\" fill=\"#ea4f2a\"/><circle cx=\"90\" cy=\"70\" r=\"5\" fill=\"#ea4f2a\"/><circle cx=\"110\" cy=\"70\" r=\"5\" fill=\"#ea4f2a\"/><circle cx=\"30\" cy=\"90\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"50\" cy=\"90\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"70\" cy=\"90\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"90\" cy=\"90\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"110\" cy=\"90\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"110\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"50\" cy=\"110\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"70\" cy=\"110\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"90\" cy=\"110\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"110\" cy=\"110\" r=\"5\" fill=\"#2b7de9\"/><path d=\"M 23 57 L 23 83 M 117 57 L 117 83\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>","gt_getting_a_project_done":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Getting a Project Done</title><path d=\"M 27 97 C 27 27 107 107 107 36\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"27\" cy=\"97\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"36\" cy=\"66\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"52\" cy=\"60\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"69\" cy=\"70\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"87\" cy=\"79\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"106\" cy=\"67\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"107\" cy=\"36\" r=\"6\" fill=\"#ea4f2a\"/><circle cx=\"107\" cy=\"36\" r=\"11\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"4\"/></svg>","gt_inbox_management":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Inbox Management</title><rect x=\"26\" y=\"31\" width=\"61\" height=\"23\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><rect x=\"26\" y=\"64\" width=\"61\" height=\"23\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><line x1=\"33\" y1=\"106\" x2=\"106\" y2=\"106\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><path d=\"M 100 35 L 113 35 L 113 76\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"113,86 104,70 120,70\" fill=\"#ea4f2a\"/><circle cx=\"56\" cy=\"76\" r=\"6\" fill=\"#ea4f2a\"/></svg>","gt_journalling":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Journalling</title><rect x=\"35\" y=\"28\" width=\"70\" height=\"85\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"48\" cy=\"47\" r=\"5\" fill=\"#ea4f2a\"/><line x1=\"62\" y1=\"47\" x2=\"91\" y2=\"47\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><circle cx=\"48\" cy=\"71\" r=\"5\" fill=\"#ea4f2a\"/><line x1=\"62\" y1=\"71\" x2=\"91\" y2=\"71\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><circle cx=\"48\" cy=\"95\" r=\"5\" fill=\"#ea4f2a\"/><line x1=\"62\" y1=\"95\" x2=\"91\" y2=\"95\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><path d=\"M 25 102 L 25 42 Q 25 23 45 23 L 84 23\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"93,23 80,20 80,28\" fill=\"#2b7de9\"/></svg>","gt_kotter_change":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Kotter’s 8-Step Model of Change</title><circle cx=\"70\" cy=\"26\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"102\" cy=\"38\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"114\" cy=\"70\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"102\" cy=\"102\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"70\" cy=\"114\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"38\" cy=\"102\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"26\" cy=\"70\" r=\"6\" fill=\"#2b7de9\"/><circle cx=\"38\" cy=\"38\" r=\"6\" fill=\"#ea4f2a\"/><polygon points=\"70,51 74.9,45.5 79.6,46.9 80.6,54.2 83.4,56.6 90.8,56.1 93.1,60.4 88.6,66.3 89,70 94.5,74.9 93.1,79.6 85.8,80.6 83.4,83.4 83.9,90.8 79.6,93.1 73.7,88.6 70,89 65.1,94.5 60.4,93.1 59.4,85.8 56.6,83.4 49.2,83.9 46.9,79.6 51.4,73.7 51,70 45.5,65.1 46.9,60.4 54.2,59.4 56.6,56.6 56.1,49.2 60.4,46.9 66.3,51.4\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"70\" r=\"7.0\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><path d=\"M 51 31 A 43 43 0 0 1 90 31\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>","gt_likeability":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Likeability</title><polygon points=\"50,35.8 54.7,30.5 59.2,31.8 60.1,38.8 62.9,41.1 70,40.7 72.2,44.8 67.9,50.4 68.2,54 73.5,58.7 72.2,63.2 65.2,64.1 62.9,66.9 63.3,74 59.2,76.2 53.6,71.9 50,72.2 45.3,77.5 40.8,76.2 39.9,69.2 37.1,66.9 30,67.3 27.8,63.2 32.1,57.6 31.8,54 26.5,49.3 27.8,44.8 34.8,43.9 37.1,41.1 36.7,34 40.8,31.8 46.4,36.1\" fill=\"#2b7de9\"/><circle cx=\"50\" cy=\"54\" r=\"6.7\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><polygon points=\"91,68.8 95.7,63.5 100.2,64.8 101.1,71.8 103.9,74.1 111,73.7 113.2,77.8 108.9,83.4 109.2,87 114.5,91.7 113.2,96.2 106.2,97.1 103.9,99.9 104.3,107 100.2,109.2 94.6,104.9 91,105.2 86.3,110.5 81.8,109.2 80.9,102.2 78.1,99.9 71,100.3 68.8,96.2 73.1,90.6 72.8,87 67.5,82.3 68.8,77.8 75.8,76.9 78.1,74.1 77.7,67 81.8,64.8 87.4,69.1\" fill=\"#ea4f2a\"/><circle cx=\"91\" cy=\"87\" r=\"6.7\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><path d=\"M 24 95 Q 34 118 62 114\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M 79 26 Q 105 19 116 44\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>","gt_motivation":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Motivation</title><path d=\"M 26 105 C 42 102 39 30 70 30 C 101 30 98 102 114 105\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"70,51.3 74.3,46.4 78.4,47.7 79.3,54.1 81.8,56.2 88.3,55.8 90.3,59.6 86.4,64.7 86.7,68 91.6,72.3 90.3,76.4 83.9,77.3 81.8,79.8 82.2,86.3 78.4,88.3 73.3,84.4 70,84.7 65.7,89.6 61.6,88.3 60.7,81.9 58.2,79.8 51.7,80.2 49.7,76.4 53.6,71.3 53.3,68 48.4,63.7 49.7,59.6 56.1,58.7 58.2,56.2 57.8,49.7 61.6,47.7 66.7,51.6\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"68\" r=\"6.2\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><circle cx=\"28\" cy=\"105\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"112\" cy=\"105\" r=\"5\" fill=\"#2b7de9\"/></svg>","gt_paralysis_by_analysis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Paralysis by Analysis</title><path d=\"M 26 96 C 94 110 45 25 32 50 C 13 89 94 87 83 48 C 75 20 49 38 58 64\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><line x1=\"58\" y1=\"64\" x2=\"107\" y2=\"40\" stroke=\"#ea4f2a\" stroke-width=\"9\" stroke-linecap=\"round\"/><polygon points=\"118,34 98,35 106,51\" fill=\"#ea4f2a\"/></svg>","gt_pomodoro":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Pomodoro Technique</title><path d=\"M 30 49 A 50 50 0 0 1 110 46\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"99,43 117,40 113,58\" fill=\"#2b7de9\"/><path d=\"M 110 91 A 50 50 0 0 1 30 94\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"41,97 23,100 27,82\" fill=\"#2b7de9\"/><rect x=\"29\" y=\"58\" width=\"14\" height=\"24\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"51\" y=\"58\" width=\"14\" height=\"24\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"73\" y=\"58\" width=\"14\" height=\"24\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"95\" y=\"58\" width=\"14\" height=\"24\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/></svg>","gt_procrastination":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Procrastination</title><path d=\"M 30 49 A 50 50 0 0 1 110 46\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"99,43 117,40 113,58\" fill=\"#2b7de9\"/><path d=\"M 110 91 A 50 50 0 0 1 30 94\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"41,97 23,100 27,82\" fill=\"#2b7de9\"/><circle cx=\"48\" cy=\"58\" r=\"9\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"87\" cy=\"58\" r=\"9\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"48\" cy=\"87\" r=\"9\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"87\" cy=\"87\" r=\"10\" fill=\"#ea4f2a\"/></svg>","gt_project_evaluation":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Project Evaluation</title><circle cx=\"70\" cy=\"43\" r=\"20\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"43\" cy=\"91\" r=\"20\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"97\" cy=\"91\" r=\"20\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><polygon points=\"70,58.8 73.1,55.3 76.1,56.2 76.8,60.9 78.6,62.4 83.3,62.1 84.8,64.9 81.9,68.6 82.2,71 85.7,74.1 84.8,77.1 80.1,77.8 78.6,79.6 78.9,84.3 76.1,85.8 72.4,82.9 70,83.2 66.9,86.7 63.9,85.8 63.2,81.1 61.4,79.6 56.7,79.9 55.2,77.1 58.1,73.4 57.8,71 54.3,67.9 55.2,64.9 59.9,64.2 61.4,62.4 61.1,57.7 63.9,56.2 67.6,59.1\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"71\" r=\"4.5\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>","gt_radical_transparency":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Radical Transparency</title><path d=\"M 32 103 C 13 44 49 19 91 28 C 111 33 119 50 111 73\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"92\" cy=\"48\" r=\"14\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><line x1=\"29\" y1=\"105\" x2=\"87\" y2=\"56\" stroke=\"#ea4f2a\" stroke-width=\"9\" stroke-linecap=\"round\"/><polygon points=\"98,46 78,50 89,64\" fill=\"#ea4f2a\"/></svg>","gt_rapid_prototyping":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Rapid Prototyping</title><path d=\"M 29 72 L 29 30 L 63 30 M 43 43 L 76 43 L 76 77 L 43 77 Z\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"92\" cy=\"86\" r=\"21\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"92\" cy=\"86\" r=\"10\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><circle cx=\"92\" cy=\"86\" r=\"4\" fill=\"#ea4f2a\"/><path d=\"M 98 40 C 127 23 119 115 49 109\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"49,109 63,101 64,117\" fill=\"#2b7de9\"/></svg>","gt_reversed_effort":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Law of Reversed Effort</title><circle cx=\"101\" cy=\"42\" r=\"16\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"101\" cy=\"42\" r=\"5\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><circle cx=\"101\" cy=\"42\" r=\"4\" fill=\"#ea4f2a\"/><path d=\"M 28 99 L 76 99 Q 94 99 94 81 Q 94 63 76 63 L 42 63\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"28,63 46,53 46,73\" fill=\"#ea4f2a\"/><circle cx=\"28\" cy=\"42\" r=\"3\" fill=\"#2b7de9\"/><circle cx=\"40\" cy=\"42\" r=\"3\" fill=\"#2b7de9\"/><circle cx=\"52\" cy=\"42\" r=\"3\" fill=\"#2b7de9\"/></svg>","gt_routines":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Routines</title><path d=\"M 29 43 L 103 43 M 111 96 L 37 96\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"115,43 99,33 99,53\" fill=\"#2b7de9\"/><polygon points=\"25,96 41,86 41,106\" fill=\"#2b7de9\"/><circle cx=\"47\" cy=\"67\" r=\"13\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><polygon points=\"91,57.8 94.1,54.3 97.1,55.2 97.8,59.9 99.6,61.4 104.3,61.1 105.8,63.9 102.9,67.6 103.2,70 106.7,73.1 105.8,76.1 101.1,76.8 99.6,78.6 99.9,83.3 97.1,84.8 93.4,81.9 91,82.2 87.9,85.7 84.9,84.8 84.2,80.1 82.4,78.6 77.7,78.9 76.2,76.1 79.1,72.4 78.8,70 75.3,66.9 76.2,63.9 80.9,63.2 82.4,61.4 82.1,56.7 84.9,55.2 88.6,58.1\" fill=\"#ea4f2a\"/><circle cx=\"91\" cy=\"70\" r=\"4.5\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>","gt_sandwich_feedback":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Sandwich Feedback</title><path d=\"M 28 45 Q 70 18 112 45\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M 28 96 Q 49 110 60 109 M 83 109 Q 101 105 112 96\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><line x1=\"29\" y1=\"70\" x2=\"110\" y2=\"70\" stroke=\"#ea4f2a\" stroke-width=\"9\" stroke-linecap=\"round\"/><polygon points=\"116,70 100,59 100,81\" fill=\"#ea4f2a\"/></svg>","gt_small_gifts":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Theory of Small Gifts</title><polygon points=\"46,55.5 50.5,50.4 54.8,51.8 55.7,58.5 58.4,60.6 65.1,60.2 67.2,64.2 63.1,69.6 63.5,73 68.6,77.5 67.2,81.8 60.5,82.7 58.4,85.4 58.8,92.1 54.8,94.2 49.4,90.1 46,90.5 41.5,95.6 37.2,94.2 36.3,87.5 33.6,85.4 26.9,85.8 24.8,81.8 28.9,76.4 28.5,73 23.4,68.5 24.8,64.2 31.5,63.3 33.6,60.6 33.2,53.9 37.2,51.8 42.6,55.9\" fill=\"#2b7de9\"/><circle cx=\"46\" cy=\"73\" r=\"6.4\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><circle cx=\"102\" cy=\"73\" r=\"15\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"76\" cy=\"73\" r=\"4\" fill=\"#ea4f2a\"/><path d=\"M 78 42 L 99 42 L 99 52\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"99,60 91,47 107,47\" fill=\"#ea4f2a\"/></svg>","gt_structured_evaluation":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Structured Evaluation</title><circle cx=\"33\" cy=\"37\" r=\"8\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"70\" cy=\"37\" r=\"8\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"107\" cy=\"37\" r=\"8\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><line x1=\"33\" y1=\"53\" x2=\"33\" y2=\"89\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"53\" x2=\"70\" y2=\"89\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"107\" y1=\"53\" x2=\"107\" y2=\"89\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><circle cx=\"33\" cy=\"60\" r=\"6\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"84\" r=\"6\" fill=\"#ea4f2a\"/><circle cx=\"107\" cy=\"60\" r=\"6\" fill=\"#ea4f2a\"/><path d=\"M 26 106 Q 70 119 114 106\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>","gt_tactics_versus_strategies":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Tactics Versus Strategies</title><circle cx=\"96\" cy=\"44\" r=\"21\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"96\" cy=\"44\" r=\"10\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><circle cx=\"96\" cy=\"44\" r=\"4\" fill=\"#ea4f2a\"/><path d=\"M 27 109 L 42 88 L 57 68 L 80 49\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"25\" y=\"99\" width=\"12\" height=\"12\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"42\" y=\"80\" width=\"12\" height=\"12\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><rect x=\"58\" y=\"60\" width=\"12\" height=\"12\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><polygon points=\"83,46 70,48 78,59\" fill=\"#2b7de9\"/></svg>","gt_to_do_list":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The To-Do List</title><circle cx=\"30\" cy=\"28\" r=\"4\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"44\" r=\"4\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"60\" r=\"4\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"76\" r=\"4\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"92\" r=\"4\" fill=\"#2b7de9\"/><circle cx=\"30\" cy=\"108\" r=\"4\" fill=\"#2b7de9\"/><line x1=\"45\" y1=\"28\" x2=\"65\" y2=\"28\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"45\" y1=\"44\" x2=\"65\" y2=\"44\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"45\" y1=\"60\" x2=\"65\" y2=\"60\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"45\" y1=\"76\" x2=\"65\" y2=\"76\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"45\" y1=\"92\" x2=\"65\" y2=\"92\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><line x1=\"45\" y1=\"108\" x2=\"65\" y2=\"108\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\"/><rect x=\"82\" y=\"25\" width=\"28\" height=\"87\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><rect x=\"82\" y=\"25\" width=\"28\" height=\"25\" rx=\"3\" fill=\"#ea4f2a\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><line x1=\"82\" y1=\"69\" x2=\"110\" y2=\"69\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"82\" y1=\"91\" x2=\"110\" y2=\"91\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/></svg>","gt_transactional_model":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Transactional Model</title><circle cx=\"70\" cy=\"31\" r=\"9\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"4\"/><circle cx=\"33\" cy=\"104\" r=\"9\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><circle cx=\"107\" cy=\"104\" r=\"9\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\"/><line x1=\"70\" y1=\"45\" x2=\"70\" y2=\"58\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"43\" y1=\"94\" x2=\"58\" y2=\"80\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"97\" y1=\"94\" x2=\"82\" y2=\"80\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><polygon points=\"70,57.1 73.3,53.3 76.5,54.3 77.2,59.3 79.1,60.9 84.1,60.6 85.7,63.5 82.7,67.5 82.9,70 86.7,73.3 85.7,76.5 80.7,77.2 79.1,79.1 79.4,84.1 76.5,85.7 72.5,82.7 70,82.9 66.7,86.7 63.5,85.7 62.8,80.7 60.9,79.1 55.9,79.4 54.3,76.5 57.3,72.5 57.1,70 53.3,66.7 54.3,63.5 59.3,62.8 60.9,60.9 60.6,55.9 63.5,54.3 67.5,57.3\" fill=\"#ea4f2a\"/><circle cx=\"70\" cy=\"70\" r=\"4.8\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><path d=\"M 28 43 A 46 46 0 0 0 24 79\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M 116 79 A 46 46 0 0 0 112 43\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>","gt_triage":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Triage</title><line x1=\"27\" y1=\"70\" x2=\"56\" y2=\"70\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><path d=\"M 56 70 L 77 34 L 108 34\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M 56 70 L 77 106 L 108 106\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><line x1=\"56\" y1=\"70\" x2=\"93\" y2=\"70\" stroke=\"#ea4f2a\" stroke-width=\"9\" stroke-linecap=\"round\"/><circle cx=\"105\" cy=\"70\" r=\"12\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><circle cx=\"108\" cy=\"34\" r=\"5\" fill=\"#2b7de9\"/><circle cx=\"108\" cy=\"106\" r=\"5\" fill=\"#2b7de9\"/></svg>"};
+const SECTIONS={"before_doing":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\" role=\"img\"><title>What to do before you do anything</title><rect x=\"42\" y=\"55\" width=\"34\" height=\"100\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><rect x=\"90\" y=\"70\" width=\"34\" height=\"85\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><rect x=\"138\" y=\"85\" width=\"34\" height=\"70\" rx=\"3\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"172\" cy=\"170\" r=\"27\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"172\" cy=\"170\" r=\"16\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><circle cx=\"172\" cy=\"170\" r=\"4\" fill=\"#ea4f2a\"/></svg>","doing_differently":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\" role=\"img\"><title>Doing things differently</title><circle cx=\"120\" cy=\"120\" r=\"77\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\"/><path d=\"M 62 177 L 166 73\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"181,59 156,65 174,84\" fill=\"#ea4f2a\"/><circle cx=\"170\" cy=\"70\" r=\"24\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/></svg>","doing_things":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\" role=\"img\"><title>Doing things</title><path d=\"M 40 89 A 85 85 0 0 1 192 86\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"202,99 180,83 200,76\" fill=\"#2b7de9\"/><path d=\"M 200 151 A 85 85 0 0 1 48 154\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"38,141 60,157 40,164\" fill=\"#2b7de9\"/><polygon points=\"120,89.6 127.8,80.8 135.3,83 136.9,94.7 141.5,98.5 153.3,97.8 157,104.7 149.8,114.1 150.4,120 159.2,127.8 157,135.3 145.3,136.9 141.5,141.5 142.2,153.3 135.3,157 125.9,149.8 120,150.4 112.2,159.2 104.7,157 103.1,145.3 98.5,141.5 86.7,142.2 83,135.3 90.2,125.9 89.6,120 80.8,112.2 83,104.7 94.7,103.1 98.5,98.5 97.8,86.7 104.7,83 114.1,90.2\" fill=\"#ea4f2a\"/><circle cx=\"120\" cy=\"120\" r=\"11.2\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>","reviewing":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\" role=\"img\"><title>What to do with the things you have done</title><circle cx=\"120\" cy=\"72\" r=\"31\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"77\" cy=\"151\" r=\"31\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"163\" cy=\"151\" r=\"31\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><polygon points=\"120,101.2 125.1,95.5 129.9,97 131,104.6 134,107 141.6,106.6 144,111.1 139.4,117.1 139.8,121 145.5,126.1 144,130.9 136.4,132 134,135 134.4,142.6 129.9,145 123.9,140.4 120,140.8 114.9,146.5 110.1,145 109,137.4 106,135 98.4,135.4 96,130.9 100.6,124.9 100.2,121 94.5,115.9 96,111.1 103.6,110 106,107 105.6,99.4 110.1,97 116.1,101.6\" fill=\"#ea4f2a\"/><circle cx=\"120\" cy=\"121\" r=\"7.3\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>","working_with_others":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 240\" role=\"img\"><title>How to get others to do things</title><circle cx=\"70\" cy=\"79\" r=\"24\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"170\" cy=\"79\" r=\"24\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"120\" cy=\"169\" r=\"24\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><line x1=\"91\" y1=\"92\" x2=\"110\" y2=\"112\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"149\" y1=\"92\" x2=\"130\" y2=\"112\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><line x1=\"120\" y1=\"143\" x2=\"120\" y2=\"135\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\"/><polygon points=\"120,102.5 124.5,97.4 128.8,98.8 129.7,105.5 132.4,107.6 139.1,107.2 141.2,111.2 137.1,116.6 137.5,120 142.6,124.5 141.2,128.8 134.5,129.7 132.4,132.4 132.8,139.1 128.8,141.2 123.4,137.1 120,137.5 115.5,142.6 111.2,141.2 110.3,134.5 107.6,132.4 100.9,132.8 98.8,128.8 102.9,123.4 102.5,120 97.4,115.5 98.8,111.2 105.5,110.3 107.6,107.6 107.2,100.9 111.2,98.8 116.6,102.9\" fill=\"#ea4f2a\"/><circle cx=\"120\" cy=\"120\" r=\"6.4\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/></svg>"};
+const BOOK="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>The Get Things Done Book</title><path d=\"M 25 54 A 23 23 0 0 1 61 48\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"65,55 53,51 61,40\" fill=\"#2b7de9\"/><path d=\"M 62 86 A 23 23 0 0 1 26 91\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><polygon points=\"22,84 35,88 26,98\" fill=\"#2b7de9\"/><polygon points=\"44,60.6 46.9,57.3 49.7,58.1 50.3,62.5 52.1,63.9 56.5,63.7 57.9,66.3 55.2,69.8 55.4,72 58.7,74.9 57.9,77.7 53.5,78.3 52.1,80.1 52.3,84.5 49.7,85.9 46.2,83.2 44,83.4 41.1,86.7 38.3,85.9 37.7,81.5 35.9,80.1 31.5,80.3 30.1,77.7 32.8,74.2 32.6,72 29.3,69.1 30.1,66.3 34.5,65.7 35.9,63.9 35.7,59.5 38.3,58.1 41.8,60.8\" fill=\"#ea4f2a\"/><circle cx=\"44\" cy=\"72\" r=\"4.2\" fill=\"#fefdf6\" stroke=\"#fefdf6\" stroke-width=\"4\"/><circle cx=\"73\" cy=\"29\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"39\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"49\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"59\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"69\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"79\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"89\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"99\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"73\" cy=\"109\" r=\"2\" fill=\"#2a3340\"/><circle cx=\"98\" cy=\"74\" r=\"17\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\"/><circle cx=\"98\" cy=\"74\" r=\"8\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\"/><circle cx=\"98\" cy=\"74\" r=\"4\" fill=\"#ea4f2a\"/><line x1=\"104\" y1=\"70\" x2=\"116\" y2=\"51\" stroke=\"#2a3340\" stroke-width=\"6\" stroke-linecap=\"round\"/><polygon points=\"119,42 105,50 114,57\" fill=\"#2a3340\"/></svg>";
+const WORDMARK="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\"><title>Get Things Done wordmark</title><path d=\"M 53 41 C 20 24 17 96 45 100 L 56 100 L 56 72 L 43 72\" fill=\"none\" stroke=\"#2b7de9\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M 66 40 L 93 40 M 80 40 L 80 100\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M 103 40 L 103 100 C 120 100 120 40 103 40\" fill=\"none\" stroke=\"#ea4f2a\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
+const TITLES={"gt_procrastination":"Procrastination","gt_pomodoro":"The Pomodoro Technique","gt_compartmentalisation":"Compartmentalisation","gt_rapid_prototyping":"Rapid Prototyping","gt_bursty_communication":"Bursty Communication","gt_inbox_management":"Inbox Management","gt_kanban":"Kanban","gt_five_whys":"The 5 Whys Method","gt_five_second_rule":"The 5-Second Rule","gt_triage":"Triage","gt_paralysis_by_analysis":"Paralysis by Analysis","gt_book_of_books":"The Book of Books (Bob)","gt_getting_a_project_done":"Getting a Project Done","gt_budgeting":"Budgeting","gt_batching":"Batching","gt_delphi_method":"The Delphi Method","gt_to_do_list":"The To-Do List","gt_motivation":"Motivation","gt_deep_work":"Deep Work","gt_tactics_versus_strategies":"Tactics Versus Strategies","gt_routines":"Routines","gt_appreciation":"Appreciation","gt_radical_transparency":"Radical Transparency","gt_sandwich_feedback":"Sandwich Feedback","gt_likeability":"Likeability","gt_small_gifts":"The Theory of Small Gifts","gt_brainstorming":"Brainstorming","gt_structured_evaluation":"Structured Evaluation","gt_circle_of_competence":"The Circle of Competence","gt_five_twenty_five_rule":"The 5/25 Rule","gt_circle_of_influence":"The Circle of Influence","gt_disruptive_innovation":"Disruptive Innovation","gt_kotter_change":"Kotter’s 8-Step Model of Change","gt_project_evaluation":"Project Evaluation","gt_transactional_model":"The Transactional Model","gt_journalling":"Journalling","gt_reversed_effort":"The Law of Reversed Effort"};
+const WHEN={"gt_procrastination":"A valued task keeps slipping despite a clear deadline.","gt_pomodoro":"Distractions keep preventing a first stretch of useful work.","gt_compartmentalisation":"Several life roles compete for your attention at the same moment.","gt_rapid_prototyping":"You need evidence about an idea before spending heavily on a polished version.","gt_bursty_communication":"A remote team needs lively exchange without a day of constant interruption.","gt_inbox_management":"Message handling expands until little time remains for your actual responsibilities.","gt_kanban":"Many partially completed tasks make it difficult to finish anything.","gt_five_whys":"A recurring symptom suggests an underlying cause that has not been checked.","gt_five_second_rule":"The next sensible action is clear, but reluctance delays the first movement.","gt_triage":"Limited capacity requires a consistent rule for where intervention makes a difference.","gt_paralysis_by_analysis":"After a setback, rehearsing every possible response prevents a familiar next action.","gt_book_of_books":"Books leave an impression but their useful ideas become hard to retrieve.","gt_getting_a_project_done":"A project needs direction from its initial idea through completion and review.","gt_budgeting":"You need a cost estimate whose effort matches the project’s complexity.","gt_batching":"You need to decide whether delaying a small problem saves effort or compounds harm.","gt_delphi_method":"Independent knowledgeable opinions differ and need a structured second look.","gt_to_do_list":"A task list exists, but important work still has no protected place in the day.","gt_motivation":"You avoid challenges by selecting work that is either trivial or effectively impossible.","gt_deep_work":"Complex work is fragmented by frequent changes of attention.","gt_tactics_versus_strategies":"You have energetic activity without direction, or a direction with no practical follow-through.","gt_routines":"Repeated daily choices consume energy that could go to more meaningful work.","gt_appreciation":"Habitual minor apologies obscure opportunities to recognise another person’s contribution.","gt_radical_transparency":"People avoid saying useful things because candid feedback feels unsafe.","gt_sandwich_feedback":"You need to communicate mixed feedback with a clear purpose.","gt_likeability":"Personal affinity is distorting who gets trusted or invited to contribute.","gt_small_gifts":"You want a working relationship to grow beyond short-term scorekeeping.","gt_brainstorming":"A group needs ideas without letting fast talkers determine the whole field.","gt_structured_evaluation":"Several people need to compare proposals while preserving disagreement and a clear decision owner.","gt_circle_of_competence":"You need to distinguish reliable expertise from confidence or curiosity.","gt_five_twenty_five_rule":"Meaningful secondary ambitions are crowding out your most important commitments.","gt_circle_of_influence":"Worry about uncontrollable events is displacing action within your reach.","gt_disruptive_innovation":"A successful approach may be blinding you to a different way customers meet the same need.","gt_kotter_change":"A worthwhile change lacks support or fades after its initial launch.","gt_project_evaluation":"A finished project needs review of both its result and the way people experienced the work.","gt_transactional_model":"You want to notice unmet psychological needs before sustained work drains your energy.","gt_journalling":"Difficult moments dominate your memory of a day that also contained worthwhile events.","gt_reversed_effort":"Repeated attempts are making a goal feel more remote and less useful."};
+const CATALOGUE=[{"id":"gt_procrastination","section":"doing_things","title":"Procrastination","family":"list","tier":"worksheet","reuse":null},{"id":"gt_pomodoro","section":"doing_things","title":"The Pomodoro Technique","family":"path","tier":"worksheet","reuse":null},{"id":"gt_compartmentalisation","section":"doing_things","title":"Compartmentalisation","family":"path","tier":"worksheet","reuse":null},{"id":"gt_rapid_prototyping","section":"doing_things","title":"Rapid Prototyping","family":"path","tier":"worksheet","reuse":null},{"id":"gt_bursty_communication","section":"doing_things","title":"Bursty Communication","family":"path","tier":"worksheet","reuse":null},{"id":"gt_inbox_management","section":"doing_things","title":"Inbox Management","family":"path","tier":"worksheet","reuse":null},{"id":"gt_kanban","section":"doing_things","title":"Kanban","family":null,"tier":"worksheet","reuse":"kanban"},{"id":"gt_five_whys","section":"doing_things","title":"The 5 Whys Method","family":null,"tier":"worksheet","reuse":"five_whys"},{"id":"gt_five_second_rule","section":"doing_things","title":"The 5-Second Rule","family":"quadrant","tier":"worksheet","reuse":null},{"id":"gt_triage","section":"doing_things","title":"Triage","family":"path","tier":"worksheet","reuse":null},{"id":"gt_paralysis_by_analysis","section":"doing_things","title":"Paralysis by Analysis","family":"list","tier":"lens","reuse":null},{"id":"gt_book_of_books","section":"doing_things","title":"The Book of Books (Bob)","family":"path","tier":"worksheet","reuse":null},{"id":"gt_getting_a_project_done","section":"before_doing","title":"Getting a Project Done","family":"path","tier":"worksheet","reuse":null},{"id":"gt_budgeting","section":"before_doing","title":"Budgeting","family":"list","tier":"worksheet","reuse":null},{"id":"gt_batching","section":"before_doing","title":"Batching","family":"list","tier":"worksheet","reuse":null},{"id":"gt_delphi_method","section":"before_doing","title":"The Delphi Method","family":"path","tier":"worksheet","reuse":null},{"id":"gt_to_do_list","section":"before_doing","title":"The To-Do List","family":"list","tier":"worksheet","reuse":null},{"id":"gt_motivation","section":"before_doing","title":"Motivation","family":"curve","tier":"lens","reuse":null},{"id":"gt_deep_work","section":"before_doing","title":"Deep Work","family":"list","tier":"worksheet","reuse":null},{"id":"gt_tactics_versus_strategies","section":"before_doing","title":"Tactics Versus Strategies","family":"quadrant","tier":"worksheet","reuse":null},{"id":"gt_routines","section":"before_doing","title":"Routines","family":"list","tier":"worksheet","reuse":null},{"id":"gt_appreciation","section":"working_with_others","title":"Appreciation","family":"list","tier":"lens","reuse":null},{"id":"gt_radical_transparency","section":"working_with_others","title":"Radical Transparency","family":"list","tier":"worksheet","reuse":null},{"id":"gt_sandwich_feedback","section":"working_with_others","title":"Sandwich Feedback","family":"list","tier":"lens","reuse":null},{"id":"gt_likeability","section":"working_with_others","title":"Likeability","family":"quadrant","tier":"worksheet","reuse":null},{"id":"gt_small_gifts","section":"working_with_others","title":"The Theory of Small Gifts","family":"list","tier":"lens","reuse":null},{"id":"gt_brainstorming","section":"working_with_others","title":"Brainstorming","family":"path","tier":"worksheet","reuse":null},{"id":"gt_structured_evaluation","section":"working_with_others","title":"Structured Evaluation","family":"ratings","tier":"worksheet","reuse":null},{"id":"gt_circle_of_competence","section":"doing_differently","title":"The Circle of Competence","family":"list","tier":"worksheet","reuse":null},{"id":"gt_five_twenty_five_rule","section":"doing_differently","title":"The 5/25 Rule","family":"list","tier":"worksheet","reuse":null},{"id":"gt_circle_of_influence","section":"doing_differently","title":"The Circle of Influence","family":"list","tier":"worksheet","reuse":null},{"id":"gt_disruptive_innovation","section":"doing_differently","title":"Disruptive Innovation","family":"list","tier":"lens","reuse":null},{"id":"gt_kotter_change","section":"doing_differently","title":"Kotter’s 8-Step Model of Change","family":"path","tier":"worksheet","reuse":null},{"id":"gt_project_evaluation","section":"reviewing","title":"Project Evaluation","family":"list","tier":"worksheet","reuse":null},{"id":"gt_transactional_model","section":"reviewing","title":"The Transactional Model","family":"scales","tier":"worksheet","reuse":null},{"id":"gt_journalling","section":"reviewing","title":"Journalling","family":"path","tier":"worksheet","reuse":null},{"id":"gt_reversed_effort","section":"reviewing","title":"The Law of Reversed Effort","family":"path","tier":"lens","reuse":null}];
+const SECTION_LIST=[{"key":"doing_things","title":"Doing things","chapter":[5,49],"route":"doing"},{"key":"before_doing","title":"What to do before you do anything","chapter":[51,85],"route":"before"},{"key":"working_with_others","title":"How to get others to do things","chapter":[87,117],"route":"others"},{"key":"doing_differently","title":"Doing things differently","chapter":[119,143],"route":"differently"},{"key":"reviewing","title":"What to do with the things you have done","chapter":[145,163],"route":"after"}];
+const ROUTE=[{"id":"before","section":"before_doing","label":"Before you start"},{"id":"doing","section":"doing_things","label":"Doing it"},{"id":"others","section":"working_with_others","label":"With other people"},{"id":"differently","section":"doing_differently","label":"Changing course"},{"id":"after","section":"reviewing","label":"After it is done"}];
+const GLYPHS={"abstract_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>abstract thinking</title><defs><clipPath id=\"ps-abstract-clip\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-abstract-clip)\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M-100 0l100 100\"/><path d=\"M-95 0l100 100\"/><path d=\"M-90 0l100 100\"/><path d=\"M-85 0l100 100\"/><path d=\"M-80 0l100 100\"/><path d=\"M-75 0l100 100\"/><path d=\"M-70 0l100 100\"/><path d=\"M-65 0l100 100\"/><path d=\"M-60 0l100 100\"/><path d=\"M-55 0l100 100\"/><path d=\"M-50 0l100 100\"/><path d=\"M-45 0l100 100\"/><path d=\"M-40 0l100 100\"/><path d=\"M-35 0l100 100\"/><path d=\"M-30 0l100 100\"/><path d=\"M-25 0l100 100\"/><path d=\"M-20 0l100 100\"/><path d=\"M-15 0l100 100\"/><path d=\"M-10 0l100 100\"/><path d=\"M-5 0l100 100\"/><path d=\"M0 0l100 100\"/><path d=\"M5 0l100 100\"/><path d=\"M10 0l100 100\"/><path d=\"M15 0l100 100\"/><path d=\"M20 0l100 100\"/><path d=\"M25 0l100 100\"/><path d=\"M30 0l100 100\"/><path d=\"M35 0l100 100\"/><path d=\"M40 0l100 100\"/><path d=\"M45 0l100 100\"/><path d=\"M50 0l100 100\"/><path d=\"M55 0l100 100\"/><path d=\"M60 0l100 100\"/><path d=\"M65 0l100 100\"/><path d=\"M70 0l100 100\"/><path d=\"M75 0l100 100\"/><path d=\"M80 0l100 100\"/><path d=\"M85 0l100 100\"/><path d=\"M90 0l100 100\"/><path d=\"M95 0l100 100\"/><path d=\"M100 0l100 100\"/></g></svg>","analysis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>analysis</title><defs><clipPath id=\"ps-analysis\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-analysis)\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"><circle cx=\"50\" cy=\"50\" r=\"44\"/><circle cx=\"50\" cy=\"62\" r=\"44\"/><circle cx=\"50\" cy=\"74\" r=\"44\"/><circle cx=\"50\" cy=\"86\" r=\"44\"/><circle cx=\"50\" cy=\"98\" r=\"44\"/><circle cx=\"50\" cy=\"110\" r=\"44\"/><circle cx=\"50\" cy=\"122\" r=\"44\"/></g><circle cx=\"50\" cy=\"50\" r=\"44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/></svg>","creative_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>creative thinking</title><circle cx=\"50\" cy=\"73\" r=\"20\"/><path d=\"M47 73L4.000 53.000 53 73Z\"/><path d=\"M47 73L4.699 45.012 53 73Z\"/><path d=\"M47 73L6.774 37.267 53 73Z\"/><path d=\"M47 73L10.163 30.000 53 73Z\"/><path d=\"M47 73L14.762 23.432 53 73Z\"/><path d=\"M47 73L20.432 17.762 53 73Z\"/><path d=\"M47 73L27.000 13.163 53 73Z\"/><path d=\"M47 73L34.267 9.774 53 73Z\"/><path d=\"M47 73L42.012 7.699 53 73Z\"/><path d=\"M47 73L50.000 7.000 53 73Z\"/><path d=\"M47 73L57.988 7.699 53 73Z\"/><path d=\"M47 73L65.733 9.774 53 73Z\"/><path d=\"M47 73L73.000 13.163 53 73Z\"/><path d=\"M47 73L79.568 17.762 53 73Z\"/><path d=\"M47 73L85.238 23.432 53 73Z\"/><path d=\"M47 73L89.837 30.000 53 73Z\"/><path d=\"M47 73L93.226 37.267 53 73Z\"/><path d=\"M47 73L95.301 45.012 53 73Z\"/><path d=\"M47 73L96.000 53.000 53 73Z\"/></svg>","critical_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>critical thinking</title><defs><mask id=\"ps-critical-thinking\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"black\" stroke-width=\"22\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"white\" stroke-width=\"7\"/></mask></defs><g mask=\"url(#ps-critical-thinking)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","decision_making":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>decision making</title><defs><mask id=\"ps-decision-making\"><rect width=\"100\" height=\"100\" fill=\"white\"/><g fill=\"black\"><circle cx=\"30\" cy=\"50\" r=\"18\"/><circle cx=\"70\" cy=\"50\" r=\"18\"/></g></mask></defs><g mask=\"url(#ps-decision-making)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","inference":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>inference</title><defs><mask id=\"ps-inference\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M33 25V68H76 M49 25V52H76\" fill=\"none\" stroke=\"black\" stroke-width=\"5\"/></mask></defs><g mask=\"url(#ps-inference)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","learning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>learning</title><defs><mask id=\"ps-learning\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M16 63 45 25 85 38 55 76Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-learning)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","logical_reasoning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>logical reasoning</title><path d=\"M52.3028 6.0603A44 44 0 0 1 69.9756 10.7957L61.8038 26.8338A26 26 0 0 0 51.3607 24.0356Z\"/><path d=\"M73.9641 13.0985A44 44 0 0 1 86.9015 26.0359L71.8054 35.8394A26 26 0 0 0 64.1606 28.1946Z\"/><path d=\"M89.2043 30.0244A44 44 0 0 1 93.9397 47.6972L75.9644 48.6393A26 26 0 0 0 73.1662 38.1962Z\"/><path d=\"M93.9397 52.3028A44 44 0 0 1 89.2043 69.9756L73.1662 61.8038A26 26 0 0 0 75.9644 51.3607Z\"/><path d=\"M86.9015 73.9641A44 44 0 0 1 73.9641 86.9015L64.1606 71.8054A26 26 0 0 0 71.8054 64.1606Z\"/><path d=\"M69.9756 89.2043A44 44 0 0 1 52.3028 93.9397L51.3607 75.9644A26 26 0 0 0 61.8038 73.1662Z\"/><path d=\"M47.6972 93.9397A44 44 0 0 1 30.0244 89.2043L38.1962 73.1662A26 26 0 0 0 48.6393 75.9644Z\"/><path d=\"M26.0359 86.9015A44 44 0 0 1 13.0985 73.9641L28.1946 64.1606A26 26 0 0 0 35.8394 71.8054Z\"/><path d=\"M10.7957 69.9756A44 44 0 0 1 6.0603 52.3028L24.0356 51.3607A26 26 0 0 0 26.8338 61.8038Z\"/><path d=\"M6.0603 47.6972A44 44 0 0 1 10.7957 30.0244L26.8338 38.1962A26 26 0 0 0 24.0356 48.6393Z\"/><path d=\"M13.0985 26.0359A44 44 0 0 1 26.0359 13.0985L35.8394 28.1946A26 26 0 0 0 28.1946 35.8394Z\"/><path d=\"M30.0244 10.7957A44 44 0 0 1 47.6972 6.0603L48.6393 24.0356A26 26 0 0 0 38.1962 26.8338Z\"/></svg>","metacognition":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>metacognition</title><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(0 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(45 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(90 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(135 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(180 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(225 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(270 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(315 50 50)\"/></svg>","reflective_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>reflective thinking</title><path d=\"M50 50L94.0000 50.0000A44 44 0 0 1 92.6930 60.6446Z\"/><path d=\"M50 50L90.6507 66.8381A44 44 0 0 1 85.3697 76.1722Z\"/><path d=\"M50 50L81.1127 81.1127A44 44 0 0 1 72.6617 87.7154Z\"/><path d=\"M50 50L66.8381 90.6507A44 44 0 0 1 56.5036 93.5167Z\"/><path d=\"M50 50L50.0000 94.0000A44 44 0 0 1 39.3554 92.6930Z\"/><path d=\"M50 50L33.1619 90.6507A44 44 0 0 1 23.8278 85.3697Z\"/><path d=\"M50 50L18.8873 81.1127A44 44 0 0 1 12.2846 72.6617Z\"/><path d=\"M50 50L9.3493 66.8381A44 44 0 0 1 6.4833 56.5036Z\"/><path d=\"M50 50L6.0000 50.0000A44 44 0 0 1 7.3070 39.3554Z\"/><path d=\"M50 50L9.3493 33.1619A44 44 0 0 1 14.6303 23.8278Z\"/><path d=\"M50 50L18.8873 18.8873A44 44 0 0 1 27.3383 12.2846Z\"/><path d=\"M50 50L33.1619 9.3493A44 44 0 0 1 43.4964 6.4833Z\"/><path d=\"M50 50L50.0000 6.0000A44 44 0 0 1 60.6446 7.3070Z\"/><path d=\"M50 50L66.8381 9.3493A44 44 0 0 1 76.1722 14.6303Z\"/><path d=\"M50 50L81.1127 18.8873A44 44 0 0 1 87.7154 27.3383Z\"/><path d=\"M50 50L90.6507 33.1619A44 44 0 0 1 93.5167 43.4964Z\"/></svg>","searching":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>searching</title><defs><mask id=\"ps-searching\"><rect width=\"100\" height=\"100\" fill=\"white\"/><circle cx=\"50\" cy=\"50\" r=\"19\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-searching)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","synthesis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>synthesis</title><defs><mask id=\"ps-synthesis\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M50 8Q62 32 92 50Q63 67 50 92Q32 64 8 50Q34 35 50 8Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-synthesis)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>"};
+/* ── Gear Shifter shapes: whole rings, gears with eight square-ended teeth, circular return
+   arrows, the target and the dart. Strokes 4/6/9, round joins, solid chunky arrowheads. ── */
+const f1 = (n) => Math.round(n * 10) / 10;
+const pt = (cx, cy, r, a) => [f1(cx + r * Math.cos(a)), f1(cy + r * Math.sin(a))];
+const RAD = Math.PI / 180;
+
+/** A gear with eight square-ended teeth and a round hole. */
+function gear(cx, cy, R, fill = 'var(--gt-red)', hole = 0.32) {
+  const r = R * 0.74, n = 8, step = (2 * Math.PI) / n;
+  const wr = step * 0.27, half = r * Math.sin(wr), wt = Math.asin(half / R);
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const a = i * step - Math.PI / 2;
+    const p1 = pt(cx, cy, r, a - wr), p2 = pt(cx, cy, R, a - wt), p3 = pt(cx, cy, R, a + wt), p4 = pt(cx, cy, r, a + wr);
+    const nx = pt(cx, cy, r, a + step - wr);
+    d += `${i ? 'L' : 'M'}${p1}L${p2}L${p3}L${p4}A${f1(r)} ${f1(r)} 0 0 1 ${nx}`;
+  }
+  d += 'Z';
+  const h = R * hole;
+  if (h > 0) d += `M${f1(cx + h)} ${cy}A${f1(h)} ${f1(h)} 0 1 0 ${f1(cx - h)} ${cy}A${f1(h)} ${f1(h)} 0 1 0 ${f1(cx + h)} ${cy}Z`;
+  return `<path d="${d}" fill="${fill}" fill-rule="evenodd"/>`;
+}
+
+/** An arc from a0 to a1 degrees (clockwise) with a chunky head at a1. */
+function arrowArc(cx, cy, R, a0, a1, sw, color) {
+  const h = sw * 2.1, w = sw * 1.45;
+  const back = (h / R) / RAD; // stop the stroke where the head starts
+  const end = a1 * RAD, s = pt(cx, cy, R, a0 * RAD), e = pt(cx, cy, R, (a1 - back * 0.35) * RAD);
+  const large = a1 - a0 > 180 ? 1 : 0;
+  const base = [cx + R * Math.cos(end), cy + R * Math.sin(end)];
+  const t = [-Math.sin(end), Math.cos(end)], nrm = [Math.cos(end), Math.sin(end)];
+  const tip = [base[0] + t[0] * h, base[1] + t[1] * h];
+  const c1 = [base[0] + nrm[0] * w, base[1] + nrm[1] * w], c2 = [base[0] - nrm[0] * w, base[1] - nrm[1] * w];
+  return `<path d="M${s}A${R} ${R} 0 ${large} 1 ${e}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="M${tip.map(f1)}L${c1.map(f1)}L${c2.map(f1)}Z" fill="${color}" stroke="${color}" stroke-width="${sw * 0.35}" stroke-linejoin="round"/>`;
+}
+/** The cover's two circular return arrows. */
+const returns = (cx, cy, R, sw = 6, color = 'var(--gt-blue)') => arrowArc(cx, cy, R, 195, 318, sw, color) + arrowArc(cx, cy, R, 15, 138, sw, color);
+/** One whole cycle: a ring that returns to itself. */
+const cycle = (cx, cy, R, sw = 9, color = 'var(--gt-blue)') => arrowArc(cx, cy, R, -70, 225, sw, color);
+/** The target: blue ring, red ring, red bull. */
+const target = (cx, cy, R, outer = 'var(--gt-blue)', inner = 'var(--gt-red)') =>
+  `<circle cx="${cx}" cy="${cy}" r="${f1(R * 0.82)}" fill="none" stroke="${outer}" stroke-width="${f1(R * 0.3)}"/>` +
+  `<circle cx="${cx}" cy="${cy}" r="${f1(R * 0.42)}" fill="none" stroke="${inner}" stroke-width="${f1(R * 0.22)}"/>` +
+  `<circle cx="${cx}" cy="${cy}" r="${f1(R * 0.16)}" fill="${inner}"/>`;
+/** The slate dart: a shaft and a solid head pointing at (x2, y2). */
+function dart(x1, y1, x2, y2, sw = 6, color = 'var(--gt-ink)') {
+  const a = Math.atan2(y2 - y1, x2 - x1), h = sw * 2.4, w = sw * 1.5;
+  const bx = x2 - Math.cos(a) * h, by = y2 - Math.sin(a) * h;
+  const c1 = [bx + Math.sin(a) * w, by - Math.cos(a) * w], c2 = [bx - Math.sin(a) * w, by + Math.cos(a) * w];
+  const fl = (k) => `<path d="M${f1(x1 + Math.cos(a) * k)} ${f1(y1 + Math.sin(a) * k)}l${f1(-Math.cos(a - 0.6) * sw * 1.6)} ${f1(-Math.sin(a - 0.6) * sw * 1.6)}M${f1(x1 + Math.cos(a) * k)} ${f1(y1 + Math.sin(a) * k)}l${f1(-Math.cos(a + 0.6) * sw * 1.6)} ${f1(-Math.sin(a + 0.6) * sw * 1.6)}" stroke="${color}" stroke-width="${f1(sw * 0.6)}" stroke-linecap="round" fill="none"/>`;
+  return `<path d="M${x1} ${y1}L${f1(bx)} ${f1(by)}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>` +
+    `<path d="M${x2} ${y2}L${c1.map(f1)}L${c2.map(f1)}Z" fill="${color}" stroke="${color}" stroke-width="${f1(sw * 0.3)}" stroke-linejoin="round"/>` + fl(sw * 0.4) + fl(sw * 1.6);
+}
+/** A dotted divider: a row of round dots. */
+function dots(x1, y1, x2, y2, gap = 8, r = 2, color = 'var(--gt-ink)') {
+  const len = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.round(len / gap));
+  let s = '';
+  for (let i = 0; i <= n; i++) s += `<circle cx="${f1(x1 + ((x2 - x1) * i) / n)}" cy="${f1(y1 + ((y2 - y1) * i) / n)}" r="${r}" fill="${color}"/>`;
+  return s;
+}
+/** The coach avatar and rail mark: the red gear inside the blue return arrows. */
+const gearMark = (blue = 'var(--gt-blue)', red = 'var(--gt-red)', sw = 7) => `<svg viewBox="0 0 100 100">${returns(50, 50, 40, sw, blue)}${gear(50, 50, 24, red)}</svg>`;
+
+/* ── Emblem helpers ── */
+const PLACEHOLDER = (title) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img"><title>${title}</title><circle cx="70" cy="70" r="44" fill="none" stroke="#2b7de9" stroke-width="9"/><circle cx="70" cy="70" r="22" fill="none" stroke="#2a3340" stroke-width="4" stroke-dasharray="0.1 9" stroke-linecap="round"/></svg>`;
+const emblem = (id) => EMBLEMS[id] || PLACEHOLDER(TITLES[id] || 'Placeholder');
+const nested = (svg, x, y, w) => svg.replace('<svg ', `<svg x="${x}" y="${y}" width="${w}" height="${w}" `);
+
+/* ── The medal: the cover, built as the session moves. Red ring = frame answered, blue return
+   arrows = placed on the route (with the section emblem as a badge), dart = committed, and
+   the main technique's emblem in the middle. ── */
+function medal(p) {
+  const ghost = 'var(--gt-ghost)';
+  const ring = `<circle class="piece p-ring" cx="50" cy="50" r="31" fill="var(--card)" stroke="${p.frame ? 'var(--gt-red)' : ghost}" stroke-width="6"/>`;
+  const arrows = `<g class="piece p-loop">${returns(50, 50, 44, 6, p.route ? 'var(--gt-blue)' : ghost)}</g>`;
+  const core = p.entry ? `<g class="piece p-tool">${nested(emblem(p.entry), 28, 28, 44)}</g>`
+    : `<circle cx="50" cy="50" r="10" fill="none" stroke="${ghost}" stroke-width="3" stroke-dasharray="0.1 6" stroke-linecap="round"/>`;
+  const badge = p.route && p.section ? `<g class="piece p-badge"><circle cx="14" cy="84" r="14" fill="var(--gt-paper)" stroke="var(--gt-line)" stroke-width="1"/>${nested(SECTIONS[p.section], 2, 72, 24)}</g>` : '';
+  const arrow = p.commit ? `<g class="piece p-dart">${dart(97, 3, 72, 28, 5)}</g>` : '';
+  const done = p.done ? `<circle cx="84" cy="84" r="9" fill="var(--gt-amber)"/><path d="M79.5 84.5l3 3 6-6.5" fill="none" stroke="var(--gt-ink)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>` : '';
+  return `<svg viewBox="0 0 100 100">${arrows}${ring}${core}${badge}${arrow}${done}</svg>`;
+}
+
+/* ── Skills glyphs: copies get unique ids ── */
+let copy = 0;
+function glyph(id) {
+  copy += 1;
+  return (GLYPHS[id] || '').replace(/id="(ps-[a-z-]+)"/g, `id="$1-${copy}"`).replace(/url\(#(ps-[a-z-]+)\)/g, `url(#$1-${copy})`);
+}
+const NAMES = {"abstract_thinking":"Abstract thinking","searching":"Searching","learning":"Learning","decision_making":"Decision making","inference":"Inference","reflective_thinking":"Reflective thinking","synthesis":"Synthesis","analysis":"Analysis","logical_reasoning":"Logical reasoning","critical_thinking":"Critical thinking","metacognition":"Metacognition","creative_thinking":"Creative thinking"};
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rand = (n) => Math.floor(Math.random() * n);
+
+/* ── Track stations: Frame, Explore, Commit, Review ── */
+const STATION_ART = [
+  () => target(50, 50, 44),
+  () => gear(50, 50, 44, 'var(--gt-red)'),
+  () => target(50, 50, 44) + dart(96, 4, 58, 42, 7),
+  () => returns(50, 50, 38, 9)
+];
+
+/* ── Hero marks ── */
+document.getElementById('h1-mark').innerHTML = gearMark();
+document.getElementById('h1-cog').innerHTML = `<svg viewBox="0 0 100 100">${gear(50, 50, 48, 'var(--gt-amber)', 0.3)}</svg>`;
+document.getElementById('h1-dart').innerHTML = `<svg viewBox="0 0 120 100">${dart(8, 84, 110, 14, 13)}</svg>`;
+document.getElementById('start-disc').innerHTML = `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="var(--gt-red-tint)"/>${target(50, 50, 40)}</svg>`;
+document.getElementById('quick-mark').innerHTML = `<svg viewBox="0 0 100 100">${target(58, 58, 40)}${dart(6, 6, 52, 52, 8)}</svg>`;
+
+/* ── Board: a 4×3 grid of round tiles. Whole rings, gears, the cycle and the dart. ── */
+const B = 'var(--gt-blue)', R = 'var(--gt-red)', A = 'var(--gt-amber)', I = 'var(--gt-ink)';
+const SHAPES = [
+  (a) => gear(50, 50, 40, a),
+  () => returns(50, 50, 38, 7) + gear(50, 50, 21, R),
+  () => target(50, 50, 44),
+  () => dart(16, 84, 84, 16, 9),
+  () => target(54, 54, 40) + dart(96, 4, 60, 40, 7),
+  (a) => cycle(50, 50, 32, 10, B),
+  (a) => dots(50, 8, 50, 92, 9, 2.6) + `<path d="M12 50H66" stroke="${a}" stroke-width="9" stroke-linecap="round"/><path d="M90 50L64 34V66Z" fill="${a}" stroke="${a}" stroke-width="3" stroke-linejoin="round"/>`,
+  () => [14, 32, 50, 68].map((x, i) => `<rect x="${x}" y="34" width="14" height="32" rx="3" fill="${i === 3 ? 'none' : R}" stroke="${R}" stroke-width="4"/>`).join(''),
+  () => `<rect x="20" y="22" width="60" height="14" rx="4" fill="${R}"/><rect x="26" y="43" width="48" height="14" rx="4" fill="none" stroke="${B}" stroke-width="6"/><rect x="32" y="64" width="36" height="14" rx="4" fill="none" stroke="${B}" stroke-width="6"/>`,
+  () => `<circle cx="50" cy="50" r="31" fill="none" stroke="${I}" stroke-width="3" stroke-dasharray="0.1 7.5" stroke-linecap="round"/>` + [0, 1, 2, 3, 4].map((k) => { const a = (k * 72 - 90) * Math.PI / 180; return `<circle cx="${f1(50 + 31 * Math.cos(a))}" cy="${f1(50 + 31 * Math.sin(a))}" r="9" fill="${k === 1 ? R : 'var(--gt-paper)'}" stroke="${k === 1 ? R : B}" stroke-width="5"/>`; }).join(''),
+  () => `<path d="M8 74C30 74 30 26 50 26S70 74 92 74" fill="none" stroke="${B}" stroke-width="6" stroke-linecap="round"/><circle cx="8" cy="74" r="5" fill="${B}"/><circle cx="92" cy="74" r="5" fill="${B}"/><circle cx="50" cy="26" r="12" fill="var(--gt-paper)" stroke="${R}" stroke-width="6"/><circle cx="50" cy="26" r="4" fill="${R}"/>`,
+  () => nested(BOOK, 4, 4, 92)
+];
+const board = document.getElementById('board');
+const cells = [];
+let last = -1;
+function tileMarkup(force) {
+  let k = force ?? rand(SHAPES.length);
+  const a = Math.random() < 0.12 ? A : (Math.random() < 0.5 ? R : B);
+  return SHAPES[k](a);
+}
+for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${c * 100} ${r * 100})`);
+  g.innerHTML = `<circle cx="50" cy="50" r="47" fill="${(r + c) % 2 ? 'var(--gt-soft)' : 'var(--gt-blue-tint)'}"/><g class="tile"></g>`;
+  board.append(g);
+  cells.push(g.lastChild);
+}
+function paint(tile, delay = 0, force) {
+  tile.innerHTML = tileMarkup(force);
+  tile.style.animationDelay = `${delay}ms`;
+  tile.classList.remove('leave', 'enter');
+  void tile.getBBox?.();
+  tile.classList.add('enter');
+}
+// The first deal shows every tile once, in the spec's order.
+cells.forEach((tile, i) => paint(tile, i * 110, i));
+function swap(i = rand(cells.length)) {
+  const tile = cells[i];
+  tile.style.animationDelay = '0ms';
+  tile.classList.remove('enter');
+  tile.classList.add('leave');
+  setTimeout(() => paint(tile), 320);
+}
+if (!reduced) setInterval(() => swap(), 2000);
+
+const form = document.getElementById('start-form');
+const field = document.getElementById('start-text');
+let typed = 0, turn = 0;
+field.addEventListener('input', () => {
+  turn += 45; form.style.setProperty('--turn', `${turn}deg`);
+  form.style.setProperty('--pulse', 1.2);
+  setTimeout(() => form.style.setProperty('--pulse', 1), 160);
+  if (!reduced && Date.now() - typed > 300) { swap(); typed = Date.now(); }
+});
+document.querySelectorAll('.try').forEach((b) => b.addEventListener('click', () => { field.value = b.dataset.text; field.focus(); if (!reduced) { swap(); swap(); } }));
+form.addEventListener('submit', (e) => { e.preventDefault(); location.href = 'session.html'; });
+document.getElementById('quick-form').addEventListener('submit', (e) => e.preventDefault());
+
+/* ── Your work ── */
+const WORK = [
+  { title: 'Start clearing the garage before winter', phase: 'Framing', c: 'var(--gt-red)', meta: 'Question 2 of 3', when: 'Today', frame: true, skills: ['searching'] },
+  { title: 'Finish the grant report draft', phase: 'Exploring', c: 'var(--gt-blue)', meta: 'The Pomodoro Technique', when: '21 Oct', frame: true, route: true, section: 'doing_things', entry: 'gt_pomodoro', skills: ['metacognition', 'analysis', 'decision_making'] },
+  { title: 'Hand the newsletter over to Priya', phase: 'Committed', c: 'var(--gt-amber)', meta: 'Radical Transparency · check back 6 Nov', when: '14 Oct', frame: true, route: true, commit: true, done: true, section: 'working_with_others', entry: 'gt_radical_transparency', skills: ['reflective_thinking', 'critical_thinking', 'inference'] }
+];
+const list = document.getElementById('problems');
+WORK.forEach((p, i) => {
+  const li = document.createElement('li');
+  li.style.display = 'contents';
+  li.innerHTML = `<a class="prob" href="session.html" style="--i:${i}">
+    <span class="medal">${medal(p)}</span>
+    <span class="prob__body">
+      <h3 class="prob__title">${p.title}</h3>
+      <p class="prob__meta"><span class="phase" style="--c:${p.c}">${p.phase}</span><span>${p.meta}</span><span>${p.when}</span></p>
+      <span class="prob__skills">${p.skills.map((s) => `<span class="gt-glyph" title="${NAMES[s]}">${glyph(s)}</span>`).join('')}</span>
+    </span>
+  </a>`;
+  list.append(li);
+});
+const add = document.createElement('li');
+add.style.display = 'contents';
+add.innerHTML = `<button class="prob prob--new" type="button" style="--i:${WORK.length}">+ New session</button>`;
+add.firstChild.addEventListener('click', () => { field.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+list.append(add);
+
+/* ── How a session builds ── */
+const BUILD = [
+  ['1 · FRAME', 'Three questions', 'What needs to move, where it is stuck on the route, and what you already know.', `<g>${target(50, 50, 44)}</g>`],
+  ['2 · EXPLORE', 'One technique', 'The coach names the obstacle and picks one technique to build with you, answer by answer.', `<g class="turning">${gear(50, 50, 44, 'var(--gt-red)')}</g>`],
+  ['3 · COMMIT', 'A small experiment', 'A next action you could start today, how it starts, and a date to check back.', `${target(50, 50, 44)}<g class="landing">${dart(96, 4, 58, 42, 7)}</g>`],
+  ['4 · REVIEW', 'Come back round', 'What changed, what it cost and what to keep. A finished project gets Project Evaluation.', `<g class="circling">${returns(50, 50, 38, 9)}</g><circle cx="50" cy="50" r="9" fill="var(--gt-amber)"/>`]
+];
+document.getElementById('build').innerHTML = BUILD.map(([n, h, p, art]) => `<div class="build__step"><div class="build__art"><svg viewBox="0 0 100 100">${art}</svg></div><span class="build__n">${n}</span><h3>${h}</h3><p>${p}</p></div>`).join('');
+
+/* ── The five sections, in route order ── */
+const SECTION_COPY = {
+  before_doing: 'Plan, budget and shape the day so the start is easy.',
+  doing_things: 'Get going, hold your attention and finish what is half done.',
+  working_with_others: 'Feedback, ideas and goodwill, when the work depends on other people.',
+  doing_differently: 'Know your limits, drop the extras and lead a change.',
+  reviewing: 'Look back at the result and at how the work felt, then reset.'
+};
+const FAMILY = { path: 'stages', list: 'list', quadrant: 'quadrant', curve: 'curve', scales: 'scales', ratings: 'ratings' };
+document.getElementById('sections').innerHTML = ROUTE.map((stn, k) => {
+  const s = SECTION_LIST.find((x) => x.key === stn.section);
+  const items = CATALOGUE.filter((e) => e.section === s.key);
+  return `<div class="sect">
+  <span class="sect__mark">${SECTIONS[s.key]}<span class="sect__stn">STATION ${k + 1}</span></span>
+  <div><h3>${s.title}</h3><p class="sect__lede">${stn.label}. ${SECTION_COPY[s.key]} ${items.length} techniques.</p>
+  <ul class="sect__shelf">${items.map((e) => `<li><button class="model" type="button"><span class="gt-emblem">${emblem(e.id)}</span><b>${e.title}${e.tier === 'lens' ? ' <em>lens</em>' : ''}${e.reuse ? ' <em>from Problem Solver</em>' : ''}</b><small>${WHEN[e.id]}</small></button></li>`).join('')}</ul></div>
+</div>`;
+}).join('');
+
+/* ── Skills: one shared tally, split three ways [Gear Shifter, Decision Maker, Problem Solver] ── */
+const SK = [['abstract_thinking', 1, 2, 6], ['searching', 3, 1, 3], ['learning', 0, 0, 0], ['decision_making', 2, 7, 9], ['inference', 1, 3, 5], ['reflective_thinking', 4, 4, 4], ['synthesis', 0, 1, 2], ['analysis', 3, 5, 11], ['logical_reasoning', 0, 1, 3], ['critical_thinking', 2, 6, 7], ['metacognition', 5, 2, 1], ['creative_thinking', 0, 0, 0]];
+const max = Math.max(...SK.map(([, g, d, p]) => g + d + p));
+document.getElementById('skills').innerHTML = SK.map(([id, g, d, p]) => `<div class="skill" data-n="${g + d + p}"><span class="gt-glyph">${glyph(id)}</span><span><b>${NAMES[id]}</b><small>${g + d + p ? `${g + d + p}× · ${g} here` : 'not yet'}</small><span class="bar">${[['gs', g], ['dm', d], ['ps', p]].filter(([, n]) => n).map(([c, n]) => `<i class="${c}" style="--w:${(n / max) * 100}%"></i>`).join('')}</span></span></div>`).join('');
+</script>
+</body>
+</html>
