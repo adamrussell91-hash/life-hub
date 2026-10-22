@@ -223,6 +223,44 @@ test('Knowledge compose focus forces vv-keyboard-open like chat composers', () =
   detachVisualViewportInset();
 });
 
+test('compose focus with a mouse (fine pointer) leaves keyboard mode off', () => {
+  const { classList, docListeners } = mockDocument();
+  globalThis.innerHeight = 900;
+  mockVisualViewport({ height: 900 });
+  globalThis.matchMedia = query => ({ matches: query !== '(pointer: coarse)' });
+  try {
+    attachVisualViewportInset();
+    docListeners.get('focusin')({
+      target: { closest: selector => (String(selector).includes('.compose') ? {} : null) }
+    });
+    assert.equal(
+      classList.contains('vv-keyboard-open'),
+      false,
+      'a physical keyboard must not resize sheets under the pointer'
+    );
+  } finally {
+    detachVisualViewportInset();
+    delete globalThis.matchMedia;
+  }
+});
+
+test('compose focus on a touch device (coarse pointer) opens keyboard mode', () => {
+  const { classList, docListeners } = mockDocument();
+  globalThis.innerHeight = 844;
+  mockVisualViewport({ height: 844 });
+  globalThis.matchMedia = query => ({ matches: query === '(pointer: coarse)' });
+  try {
+    attachVisualViewportInset();
+    docListeners.get('focusin')({
+      target: { closest: selector => (String(selector).includes('.compose') ? {} : null) }
+    });
+    assert.equal(classList.contains('vv-keyboard-open'), true);
+  } finally {
+    detachVisualViewportInset();
+    delete globalThis.matchMedia;
+  }
+});
+
 test('visualViewport jitter smaller than the stick threshold does not rewrite --vv-height', () => {
   const { style, docListeners } = mockDocument();
   const vvListeners = new Map();

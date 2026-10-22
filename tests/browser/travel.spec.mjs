@@ -236,12 +236,29 @@ for (const [label, viewport] of [
       await toggle.waitFor();
       assert.equal(await toggle.isChecked(), true);
       assert.equal(await sheet.getByLabel('Dish', { exact: true }).inputValue(), 'Arroz de pato');
-      // Focusing a field resizes the sheet (the keyboard-open layout); settle that
-      // first so the Save press is not lost to a moving button.
-      await sheet.getByLabel('Dish', { exact: true }).focus();
       await sheet.getByRole('button', { name: 'Save' }).click();
       await sheet.waitFor({ state: 'detached', timeout: 10000 });
       assert.equal(calls.mealPuts.length, 0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test(`travel edit sheet (${label}): Save as the first click closes the sheet`, { skip: !hasTravelBuild }, async () => {
+    const { context, page } = await openMealJournal(browser, appUrl, viewport, { ...noMeal, put: () => ok({}) });
+    try {
+      await openEdit(page, 'Plain lunch note');
+      const sheet = page.locator('.journal-edit-moment-sheet');
+      const save = sheet.getByRole('button', { name: 'Save' });
+      // Pressing Save moves focus into the form. With a mouse that must not switch
+      // on the keyboard layout, or the button moves before the click lands.
+      await save.click();
+      await sheet.waitFor({ state: 'detached', timeout: 10000 });
+      assert.equal(
+        await page.evaluate(() => document.documentElement.classList.contains('vv-keyboard-open')),
+        false,
+        'no keyboard layout without an on-screen keyboard'
+      );
     } finally {
       await context.close();
     }
