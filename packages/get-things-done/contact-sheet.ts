@@ -1,15 +1,15 @@
 // packages/get-things-done/contact-sheet.ts
 // The contact sheet: Gear Shifter's charts under .gt-scope, empty, partial and full at desktop
-// width and full at 390px. First the new and changed charts (the zero-min dated scales, ratings,
-// and the Kanban and 5 Whys variants), then the shared Decision Book families Gear Shifter uses
-// (path, list, quadrant, curve) re-skinned. Then every technique (Plan 3), worked to completion
+// width and full at 390px. First the new and changed charts (the experiment and its review, the
+// zero-min dated scales, ratings, and the Kanban and 5 Whys variants), then the shared Decision
+// Book families Gear Shifter uses (path, list, quadrant, curve) re-skinned. Then every technique (Plan 3), worked to completion
 // with placeholder answers, section by section, at desktop width and at 390px. Built by scripts/build-gear-shifter-contact-sheet.mjs
 // into docs/mockups/gear-shifter/; for one look by Adam, not shipped in the app.
 import '../design-kit/tokens.css';
 import '../problem-solver/problem-solver.css';
 import '../decision-book/decision-book.css';
 import './get-things-done.css';
-import { GT_SAMPLE_TOOLS, gtRunFor } from './fixtures.mjs';
+import { GT_COMMIT_TOOL, GT_REVIEW_TOOL, GT_SAMPLE_TOOLS, experimentRunFor, gtRunFor } from './fixtures.mjs';
 import { SAMPLE_TOOLS, runFor } from '../decision-book/fixtures.mjs';
 import { createGearChartForTool } from './render/charts';
 import { GEAR_TOOLS } from './tools/index.mjs';
@@ -41,7 +41,13 @@ const shared = (key: keyof typeof SAMPLE_TOOLS): Row => ({
   run: (stage) => runFor(key, stage)
 });
 
-const ROWS: Row[] = [gear('needs'), gear('ratings'), gear('kanban'), gear('fiveWhys'), shared('stages'), shared('flow'), shared('list'), shared('pyramid'), shared('quadrant'), shared('curve')];
+/** Commit's experiment and Review's experiment review (Plan 5). */
+const settle = (key: 'commit' | 'review'): Row => ({
+  title: `${(key === 'commit' ? GT_COMMIT_TOOL : GT_REVIEW_TOOL).name} (${key})`,
+  make: () => createGearChartForTool((key === 'commit' ? GT_COMMIT_TOOL : GT_REVIEW_TOOL) as never) as unknown as View,
+  run: (stage) => experimentRunFor(key, stage)
+});
+const ROWS: Row[] = [settle('commit'), settle('review'), gear('needs'), gear('ratings'), gear('kanban'), gear('fiveWhys'), shared('stages'), shared('flow'), shared('list'), shared('pyramid'), shared('quadrant'), shared('curve')];
 
 const sheet = document.getElementById('sheet')!;
 for (const row of ROWS) {

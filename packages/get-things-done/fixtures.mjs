@@ -105,3 +105,31 @@ export function gtRunFor(key, stage) {
   const scores = stage === 'partial' ? sample.partialScores ?? sample.scores : sample.scores;
   return sampleRun(toolId, sample[stage], { ...(scores ? { scores } : {}), ...(sample.edges && stage === 'full' ? { edges: sample.edges } : {}) });
 }
+
+/** Commit's and Review's tools, kept apart from GT_SAMPLE_TOOLS (a test registers and removes those). */
+export { gtCommit as GT_COMMIT_TOOL } from './tools/commit.mjs';
+export { gtReview as GT_REVIEW_TOOL } from './tools/review.mjs';
+
+const EXPERIMENT_NODES = Object.freeze({
+  commit: [
+    sampleNode('c1', 'result', 'A full first draft to Sam by Friday'),
+    sampleNode('c2', 'rests_on:1', 'Pomodoro: phone in the drawer'),
+    sampleNode('c3', 'next_action', 'Write the aims section in one round'),
+    sampleNode('c4', 'start', 'Tuesday after the school run'),
+    sampleNode('c5', 'check_back', '2026-10-30'),
+    sampleNode('c6', 'change_course', 'Two mornings in a row lost to email', contested)
+  ],
+  review: [
+    sampleNode('r1', 'changed', 'Three rounds most mornings; the draft went to Sam'),
+    sampleNode('r2', 'cost', 'Evenings were tired'),
+    sampleNode('r3', 'keep', 'Keep the drawer; drop the fourth round', contested)
+  ]
+});
+
+/** The experiment ('commit') or its review ('review') at a stage: empty, partial (half) or full. */
+export function experimentRunFor(key, stage) {
+  const nodes = EXPERIMENT_NODES[key];
+  const toolId = key === 'commit' ? 'gt_commit' : 'gt_review';
+  if (stage === 'empty') return sampleRun(toolId);
+  return sampleRun(toolId, stage === 'full' ? nodes : nodes.slice(0, Math.ceil(nodes.length / 2)), stage === 'full' ? { status: 'done' } : {});
+}
