@@ -97,4 +97,31 @@ describe('landing', () => {
     const analysis = [...page.querySelectorAll('.ps-skills__item')].find((i) => i.textContent!.includes('Analysis'))!;
     expect(analysis.querySelector('.ps-skills__count')!.textContent).toBe('3×');
   });
+
+  it('the Quick start card starts a start session for the stalled task', async () => {
+    api.gs.create.mockResolvedValue({ id: 'qs1' });
+    const page = await landing();
+    expect(page.querySelector('.gt-quick__soon')).toBeNull();
+    const input = page.querySelector<HTMLInputElement>('input[aria-label="Describe the stalled task"]')!;
+    page.querySelector<HTMLFormElement>('.gt-quick__form')!.requestSubmit();
+    expect(api.gs.create).not.toHaveBeenCalled();
+    input.value = '  Send the invoice to the printer  ';
+    page.querySelector<HTMLFormElement>('.gt-quick__form')!.requestSubmit();
+    await vi.waitFor(() => expect(api.gs.create).toHaveBeenCalledWith({ text: 'Send the invoice to the printer', kind: 'start' }));
+    await vi.waitFor(() => expect(location.hash).toBe('#/gear-shifter?id=qs1'));
+  });
+
+  it('a Quick start row carries the dart-in-target mark and says Quick start, Done or Went deeper', async () => {
+    const start = { kind: 'start', phase: 'start', model: null, tool: null, main: null, frame: 0, skills: {} } as Partial<PsSummary>;
+    api.gs.list.mockResolvedValue([
+      row({ ...start, id: 'q1', title: 'Ring the plumber' }),
+      row({ ...start, id: 'q2', title: 'Post the parcel', status: 'finished' }),
+      row({ ...start, id: 'q3', title: 'Plan the move', status: 'finished', escalatedTo: 'a9' })
+    ]);
+    const page = await landing();
+    const cards = [...page.querySelectorAll('.gt-prob')];
+    expect(cards.map((c) => c.querySelector('.ps-prob__phase')!.textContent)).toEqual(['Quick start', 'Done', 'Went deeper']);
+    expect(cards.every((c) => c.querySelector('.ps-prob__medal--quick svg'))).toBe(true);
+    expect(cards[0].querySelector('[data-piece]')).toBeNull();
+  });
 });

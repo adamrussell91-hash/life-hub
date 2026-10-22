@@ -159,8 +159,8 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
       const busy = session.runner.status === 'queued' || session.runner.status === 'running';
       // A failed boundary turn must be retried before anything else: the step has already moved.
       const boundaryFailed = session.runner.status === 'failed' && session.runner.mode === 'boundary';
-      // A Lightning run or a quick decision: a fixed flow with no frame and no steps.
-      const lightning = session.kind === 'lightning' || session.kind === 'quick';
+      // A Lightning run, a quick decision or a Quick start: a fixed flow with no frame and no steps.
+      const lightning = session.kind === 'lightning' || session.kind === 'quick' || session.kind === 'start';
       // A finished Lightning run takes no more replies until It came back starts a new round.
       const closed = lightning && session.status !== 'active';
       const locked = busy || boundaryFailed || closed;

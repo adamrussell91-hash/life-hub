@@ -2,7 +2,8 @@
 // Gear Shifter in the Tasks hub (#/gear-shifter): the landing page (hero, the New box, Quick
 // start, your work, how a session builds, the five sections in route order, the shared skills
 // ribbon) and the session page (track, route above the canvas, the medal, the shelf, coach,
-// skill tray, review panel, task and record cards). Its structure is Decision Maker's
+// skill tray, review panel, task and record cards). A Quick start has its own page
+// (quick-view.ts), as Decision Maker's quick decision does. Its structure is Decision Maker's
 // (decision-book/view.ts): the coach panel, task cards, bridges, review panel and syncs are
 // Problem Solver's own components, given Gear Shifter's API, look, origin and record.
 import '../../../../../packages/problem-solver/problem-solver.css';
@@ -19,14 +20,15 @@ import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js
 import { skillGlyph } from '../../../../../packages/problem-solver/glyphs';
 import { planStepForBook, stepName, toolsForPlanStep } from '../../../../../packages/problem-solver/steps.mjs';
 import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
-import type { PsAction, PsRecordOffer, PsSession, PsSummary } from '../../../../../packages/problem-solver/types';
+import type { GtStartWay, PsAction, PsRecordOffer, PsSession, PsSummary } from '../../../../../packages/problem-solver/types';
+import { currentEntry as startEntry, taskOf } from '../../../../../packages/get-things-done/quick.mjs';
 import { CATALOGUE, SECTIONS } from '../../../../../packages/get-things-done/catalogue.mjs';
 import { ROUTE, parseRoute } from '../../../../../packages/get-things-done/route.mjs';
 import { actionOffer, composeActionRecord } from '../../../../../packages/get-things-done/record.mjs';
 import { bookEmblem, entryEmblem, sectionEmblem } from '../../../../../packages/get-things-done/glyphs';
 import { decisionBookApi, gearShifterApi, isBusy, pollUntilSettled, problemSolverApi } from '../problem-solver/api';
 import { mountCoachPanel } from '../problem-solver/coach-panel';
-import { createTaskBridge, type TaskOrigin } from '../problem-solver/task-bridge';
+import { createTaskBridge, taskBody, type TaskOrigin } from '../problem-solver/task-bridge';
 import { mountReviewPanel, reviewBanner, type ReviewEntry } from '../problem-solver/review-panel';
 import { createReviewSync } from '../problem-solver/review-sync';
 import { compactToday, mountTaskCards, type PlaceOption } from '../problem-solver/task-cards';
@@ -37,6 +39,7 @@ import { caseFilePlaces, createSkillTray, section } from '../problem-solver/view
 import { GT_LOOK, createRoute, createShapeBoard, createTrack, dart, gear, gearMedal, medalOf, plainName, returns, svg, target, toolNamed } from './decor';
 import { mountGearCanvas, type GtRunScores } from './canvas';
 import { recordBlocks, recordGraphic } from './record-blocks';
+import { mountFromStart, mountStartPage } from './quick-view';
 
 let poll: AbortController | null = null;
 /** The open session's canvas and Tasks listeners, dropped when the page changes. */
@@ -58,8 +61,15 @@ const PHASES: Record<string, { label: string; colour: string }> = {
   finished: { label: 'Finished', colour: 'var(--gt-ink)' }
 };
 
+/** A Quick start row's label and colour: where it went, done, or still going. */
+function startPhase(row: PsSummary): { label: string; colour: string } {
+  if (row.escalatedTo) return { label: 'Went deeper', colour: 'var(--gt-ink)' };
+  return row.status === 'finished' ? { label: 'Done', colour: 'var(--gt-amber-label)' } : { label: 'Quick start', colour: 'var(--gt-blue)' };
+}
+
 /** The meta line's middle part: the question being framed, or the technique in hand and any check-back. */
 function metaNote(row: PsSummary): string {
+  if (row.kind === 'start') return '';
   if (row.phase === 'frame') return `Question ${Math.min((row.frame ?? 0) + 1, 3)} of 3`;
   const technique = row.main ?? row.tool;
   const name = technique ? plainName(technique) : '';
@@ -73,10 +83,14 @@ function workCard(row: PsSummary, index: number): HTMLLIElement {
   const link = el('a', 'ps-prob__link') as HTMLAnchorElement;
   link.href = `#/gear-shifter?id=${row.id}`;
   const medal = el('span', 'ps-prob__medal');
-  medal.append(gearMedal(medalOf(row)));
+  // A Quick start's badge is its own mark, the dart in the target; a session's is the medal.
+  if (row.kind === 'start') {
+    medal.classList.add('ps-prob__medal--quick');
+    medal.append(quickMark());
+  } else medal.append(gearMedal(medalOf(row)));
   const body = el('span', 'ps-prob__body');
   const meta = el('span', 'ps-prob__meta');
-  const phase = PHASES[row.phase] ?? { label: row.phase, colour: 'var(--gt-ink)' };
+  const phase = row.kind === 'start' ? startPhase(row) : PHASES[row.phase] ?? { label: row.phase, colour: 'var(--gt-ink)' };
   const chip = el('span', 'ps-prob__phase', phase.label);
   chip.style.setProperty('--c', phase.colour);
   meta.append(chip, el('span', '', metaNote(row)), el('span', '', formatDisplayDate(row.updatedAt.slice(0, 10))));
@@ -156,18 +170,50 @@ function startForm(onType: () => void): StartForm {
   };
 }
 
-/** Quick start's card. The route itself is built in Plan 6; until then the card says what it will do. */
+/** Quick start's mark: the dart flying into the target. */
+const quickMark = (): SVGSVGElement => svg('0 0 100 100', target(58, 58, 40) + dart(6, 6, 52, 52, 8));
+
+/** Quick start's card: one line, then a Quick start session (as Decision Maker's quick decision card). */
 function quickCard(): HTMLElement {
   const card = el('section', 'gt-quick');
   const mark = el('span', 'gt-quick__mark');
-  mark.append(svg('0 0 100 100', target(58, 58, 40) + dart(6, 6, 52, 52, 8)));
+  mark.append(quickMark());
   const text = el('div', 'gt-quick__text');
+  const form = el('form', 'gt-quick__form') as HTMLFormElement;
+  const input = el('input', 'gt-quick__input') as HTMLInputElement;
+  input.type = 'text';
+  input.placeholder = 'Which task has stalled?';
+  input.setAttribute('aria-label', 'Describe the stalled task');
+  const go = el('button', 'gt-quick__go', 'Go') as HTMLButtonElement;
+  go.type = 'submit';
+  const status = el('p', 'gt-quick__status');
+  status.setAttribute('role', 'status');
+  const row = el('div', 'gt-quick__row');
+  row.append(input, go);
+  form.append(row, status);
   text.append(
     el('h2', 'gt-quick__title', 'Quick start'),
     el('p', 'gt-quick__line', 'For one stalled task: a small first move, how it starts, and when to check back.'),
-    el('p', 'gt-quick__soon', 'Not open yet. Use the box above for now.')
+    form
   );
   card.append(mark, text);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const task = input.value.trim();
+    if (!task) {
+      input.focus();
+      return;
+    }
+    go.disabled = true;
+    status.textContent = '';
+    try {
+      const session = await gearShifterApi.create({ text: task, kind: 'start' });
+      location.hash = `#/gear-shifter?id=${session.id}`;
+    } catch (err) {
+      status.textContent = errorMessage(err);
+      go.disabled = false;
+    }
+  });
   return card;
 }
 
@@ -401,8 +447,124 @@ function syncFor(initial: PsSession, render: (session: PsSession) => void, alive
   });
 }
 
+const isConflict = (err: unknown): boolean => (err as { code?: string }).code === 'conflict';
+
+/**
+ * A Quick start: the route chart (the two ways to start on it), the coach, the check card, It
+ * came back and Go deeper. Every action goes through the session sync; a conflict refetches.
+ */
+async function renderStartSession(canvas: HTMLElement, initial: PsSession): Promise<void> {
+  const view = mountStartPage(initial, {
+    onPick: (node, way) => void pickWay(node, way),
+    onSay: (text) => void say(text),
+    onAction: (action) => void coachAction(action),
+    onAgain: () => again(),
+    onCheck: (create) => check(create)
+  });
+  canvas.replaceChildren(view.el);
+  canvasNow = view;
+  const alive = () => view.el.isConnected;
+  const sync = syncFor(initial, (next) => view.update(next), alive);
+
+  async function recover(err: unknown): Promise<void> {
+    if (!alive()) return;
+    if (!isConflict(err)) return view.flash(err);
+    try {
+      sync.paint(await gearShifterApi.get(sync.session().id));
+    } catch (fetchErr) {
+      view.flash(fetchErr);
+    }
+  }
+
+  async function post(action: PsAction, payload: Record<string, unknown>): Promise<boolean> {
+    try {
+      await sync.confirmed(action, payload);
+      return true;
+    } catch (err) {
+      await recover(err);
+      return false;
+    }
+  }
+  const settleIfBusy = async () => {
+    if (alive() && isBusy(sync.session())) await sync.settle();
+  };
+
+  /** A pick on a box that has moved on, or while the coach is thinking, is dropped, not posted. */
+  async function pickWay(node: string, way: GtStartWay): Promise<void> {
+    const now = sync.session();
+    const current = now.start ? startEntry(now.start) : null;
+    if (!current || current.node !== node || isBusy(now)) {
+      view.releasePick();
+      return;
+    }
+    if (await post('start_answer', { node, answer: way })) await settleIfBusy();
+    else view.releasePick();
+  }
+
+  async function again(): Promise<void> {
+    if (!(await post('start_again', {}))) return;
+    await settleIfBusy();
+    if (alive()) view.focusComposer();
+  }
+
+  /** The check card: a task due on the check-back date, then linked; or set aside. A failure stays on the card. */
+  let checkTask: string | null = null;
+  async function check(create: boolean): Promise<void> {
+    const now = sync.session();
+    const due = now.start?.check?.due;
+    if (!create || !due) {
+      await sync.confirmed('start_check', { dismissed: true });
+      return;
+    }
+    const title = `Check back: ${taskOf(now.start!) || now.title}`;
+    if (!checkTask) checkTask = (await tasksApi.createTask({ ...taskBody(now, { title, due }, 'life', undefined, ORIGIN), tags: [ORIGIN.tag, 'check'] })).id;
+    await sync.confirmed('start_check', { taskId: checkTask });
+    checkTask = null;
+  }
+
+  const openFull = (to: string) => {
+    if (alive()) location.hash = `#/gear-shifter?id=${encodeURIComponent(to)}`;
+  };
+
+  /** Go deeper. A run that already went deeper (in another tab, say) opens its full session. */
+  async function escalate(): Promise<void> {
+    view.setEscalating(true);
+    try {
+      await sync.confirmed('escalate', {});
+    } catch (err) {
+      const already = sync.session().start?.escalatedTo;
+      if (already) return openFull(already);
+      view.setEscalating(false);
+      await recover(err);
+      return;
+    }
+    const to = sync.session().start?.escalatedTo;
+    if (to) openFull(to);
+    else view.setEscalating(false);
+  }
+
+  async function coachAction(action: PsAction): Promise<void> {
+    if (action === 'escalate') return escalate();
+    if (await post(action, {})) await settleIfBusy();
+  }
+
+  async function say(text: string): Promise<void> {
+    try {
+      sync.paint(await sync.enqueue(() => gearShifterApi.act(sync.session(), 'say', text)));
+    } catch (err) {
+      await recover(err);
+      return;
+    }
+    await settleIfBusy();
+  }
+
+  view.update(initial);
+  await settleIfBusy();
+}
+
 async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   let session = await gearShifterApi.get(id);
+  if (session.kind === 'start') return renderStartSession(canvas, session);
   const page = el('div', 'ps-page ps-session ps-scope gt-scope gt-page');
   const back = el('a', 'ps-back', '← Your work') as HTMLAnchorElement;
   back.href = '#/gear-shifter';
@@ -415,7 +577,10 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
   const tray = createSkillTray();
   const review = mountReviewPanel({ start: () => void reviews.startReview() });
   const shelf = createShelf((technique) => void pick(technique));
-  bench.append(review.el, route.el, canvasHost, shelf.el, tray.el);
+  // A session that went deeper from a Quick start shows that run's chart, closed until opened.
+  const fromStart = session.escalatedFrom ? mountFromStart(session.escalatedFrom, (runId) => gearShifterApi.get(runId)) : null;
+  if (fromStart) unsubscribeNow.push(() => fromStart.destroy());
+  bench.append(review.el, route.el, canvasHost, ...(fromStart ? [fromStart.el] : []), shelf.el, tray.el);
   const medal = createMedalCard();
   const cards = mountTaskCards({
     create: (proposal, edits) => bridge.create(session, proposal, edits),
