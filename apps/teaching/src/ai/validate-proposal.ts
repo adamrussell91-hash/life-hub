@@ -12,6 +12,7 @@ export function publishIssueForProposal(proposal: AiProposal): string | null {
     case 'replace_lesson':
       return publishBlockIssues(proposal.blocks);
     case 'insert_blocks':
+    case 'replace_blocks':
       return publishBlockIssues(proposal.blocks);
     default:
       return null;

@@ -41,7 +41,7 @@ export function buildAiStaticPrompt(input: Pick<AiContextInput, 'agentName' | 'p
     '',
     '## Output rules',
     '- Use tools to propose schema-valid block changes. Do not claim the lesson was already updated.',
-    '- Prefer propose_replace_block / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / review_only.',
+    '- Prefer propose_replace_block / propose_replace_blocks (several blocks at once) / propose_replace_section / propose_insert_blocks / propose_replace_lesson / propose_delete_blocks / propose_reorder_blocks / review_only.',
     '- Never invent storage keys, publish, delete lessons, or change Class/Unit relationships.',
     '- Keep proposals minimal and schema-valid.',
     '- Write your explanation for the teacher in the proposal tool\'s message field; that is the text shown with the proposal.',

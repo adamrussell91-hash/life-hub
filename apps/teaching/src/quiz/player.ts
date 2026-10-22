@@ -100,7 +100,7 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
     }
     case 'spot_technique': {
       // Copied out: the closures below lose the narrowing on q.
-      const { passage, pick, options: choices } = q;
+      const { passage, pick, reuse, options: choices } = q;
       const spots: Spot[] = options.response && 'spots' in options.response ? [...options.response.spots] : [];
       const optionText = new Map(choices.map((o) => [o.id, o.text]));
       const keyTargets = key?.answer.type === 'spots' ? key.answer.targets : [];
@@ -108,17 +108,28 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
         el(
           'p',
           'qz-player__instruction',
-          pick === 1
-            ? 'Tap the first and last word of the technique, then name it.'
-            : `Find ${pick}. For each one, tap its first and last word, then name it.`
+          pick === 1 ? 'Find the technique: select its words, then name it.' : `Find ${pick} techniques: select the words of each one, then name it.`
         )
       );
-      const picker = mountWordPicker({ passage: passage, disabled: locked, label: 'Passage', onSelect: (span) => paintPick(span) });
+      // The next thing to do, in words, so the taps never feel like guesswork.
+      const step = el('p', 'qz-spot-step');
+      step.setAttribute('aria-live', 'polite');
+      const picker = mountWordPicker({ passage, disabled: locked, label: 'Passage', onSelect: (span) => paintPick(span) });
+      if (!locked) picker.root.classList.add('qz-words--live');
       const pickHost = el('div', 'qz-spot-pick');
       pickHost.setAttribute('aria-live', 'polite');
-      pickHost.hidden = true;
       const list = el('ol', 'qz-spots');
-      body.append(picker.root, pickHost, list);
+      if (!locked) body.append(step);
+      body.append(picker.root, list);
+
+      let selected = false;
+      const paintStep = () => {
+        const counter = pick > 1 ? `${Math.min(spots.length + 1, pick)} of ${pick}: ` : '';
+        if (spots.length >= pick) step.textContent = pick === 1 ? 'Done. Remove it below to choose again.' : `All ${pick} found. Remove one below to change it.`;
+        else if (picker.waiting()) step.textContent = `${counter}now tap the last word, or name it below if it’s just this word.`;
+        else if (selected) step.textContent = `${counter}name the technique below, or tap another word to start again.`;
+        else step.textContent = `${counter}tap the first word of a technique.`;
+      };
 
       const stateOf = (i: number) => (!result ? 'found' : parts[`s${i}`] ? 'right' : parts[`s${i}.found`] ? 'part' : 'wrong');
       const paintSpots = () => {
@@ -144,6 +155,7 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
             remove.setAttribute('aria-label', `Remove “${spanText(passage, spot)}”`);
             remove.addEventListener('click', () => {
               spots.splice(i, 1);
+              picker.clear();
               paintSpots();
               paintPick(null);
               emit({ spots: [...spots] });
@@ -154,22 +166,27 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
         });
       };
 
+      // The question sits under the line the selection ends on, where the eye already is.
       function paintPick(span: WordSpan | null): void {
         pickHost.replaceChildren();
-        pickHost.hidden = !span;
-        if (!span) return;
-        if (spots.length >= pick) {
-          pickHost.append(el('p', 'qz-spot-pick__ask', `You’ve found ${pick}. Remove one to choose different words.`));
+        if (span && spots.length >= pick) {
           picker.clear();
-          return;
+          span = null;
         }
-        pickHost.append(el('p', 'qz-spot-pick__ask', `“${spanText(passage, span)}”: which technique is this?`));
+        picker.placeAfter(pickHost, span);
+        selected = !!span;
+        paintStep();
+        if (!span) return;
+        const chosen = span;
+        pickHost.append(el('p', 'qz-spot-pick__ask', `“${spanText(passage, chosen)}”: which technique is this?`));
         const chips = el('div', 'qz-spot-pick__chips');
-        for (const option of order(choices)) {
+        // A technique leaves the list once used, unless the teacher lets one be used twice.
+        const used = new Set(reuse ? [] : spots.map((s) => s.option));
+        for (const option of order(choices).filter((o) => !used.has(o.id))) {
           const chip = el('button', 'qz-chip', option.text);
           chip.type = 'button';
           chip.addEventListener('click', () => {
-            spots.push({ ...span, option: option.id });
+            spots.push({ ...chosen, option: option.id });
             picker.clear();
             paintPick(null);
             paintSpots();
@@ -184,9 +201,11 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
           paintPick(null);
         });
         pickHost.append(chips, cancel);
+        pickHost.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
       }
 
       paintSpots();
+      paintStep();
       if (keyTargets.length && result?.mark.correct !== true) {
         body.append(
           rightAnswer(keyTargets.map((t) => `“${spanText(passage, t)}”: ${t.ids.map((id) => optionText.get(id)).join(' or ')}`).join(' · '))
