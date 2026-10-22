@@ -7,9 +7,10 @@ import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightning.mjs';
 import { QUICK_NODE_IDS } from '../../../../packages/decision-book/quick.mjs';
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
+import { BOOK_FRAME_KEYS } from '../../../../packages/problem-solver/books.mjs';
 
 const VERDICTS = ['accept', 'challenge', 'clarify'];
-const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone', 'decision', 'compass', 'known'];
+const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone', ...BOOK_FRAME_KEYS];
 const TEXT_MAX = 600;
 
 /** First balanced JSON object in text, or null. */

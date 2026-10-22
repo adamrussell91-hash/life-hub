@@ -53,6 +53,12 @@ const DECISION_FRAME = [
   ['known', 'Good. What do you already know: the options, the facts, the deadline and what is at stake?']
 ];
 
+const SHIFT_FRAME = [
+  ['need', 'What needs to move? Put it in one sentence.'],
+  ['route', 'Clear. Where is it stuck: before you start, while doing it, with other people, in changing course, or after it is done?'],
+  ['known', 'Good. What do you already know: the deadline, the people, what you have tried and what is at stake?']
+];
+
 /**
  * Why each model fits, for a third frame answer naming it with `model: polya` or `model: triz`
  * (the walks use it). Every model's first step takes Define tools, so 5 Whys comes first for all.
@@ -222,6 +228,32 @@ function heardCompass(text) {
   const who = /\b(team|others?|they|them|staff|people|partner|colleagues?|my (son|daughter|kids|class))\b/i.test(text) ? 'others' : 'self';
   const aim = /\b(improve|better|change|fix|grow|lead|develop)\b/i.test(text) ? 'improve' : 'understand';
   return `${who}_${aim}`;
+}
+
+/** The route station the scripted coach hears in an answer; doing it, when nothing else is named. */
+function heardRoute(text) {
+  if (/\b(finished|done with|afterwards|look back|review|wrapped up)\b/i.test(text)) return 'after';
+  if (/\b(team|others?|they|them|people|colleagues?|partner|staff)\b/i.test(text)) return 'others';
+  if (/\b(change|differently|direction|pivot|new way)\b/i.test(text)) return 'differently';
+  if (/\b(before|plan|planning|prepare|haven.t started|start)\b/i.test(text)) return 'before';
+  return 'doing';
+}
+
+/** Gear Shifter framing: the opening message is the need; then the route, then what is known. */
+function shiftFrameTurn(session, last) {
+  const missing = SHIFT_FRAME.filter(([key]) => !session.frame[key]);
+  const [key] = missing[0];
+  const frame = { [key]: key === 'route' ? heardRoute(last) : last };
+  if (missing.length > 1) return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
+  const first = toolsForPlanStep('gear_shifter', 'explore')[0];
+  return {
+    ...base,
+    verdict: 'accept',
+    frame,
+    message: first ? 'That frames it. I suggest starting with one technique that fits where it is stuck. Shall we begin?' : 'That frames it. Pick a technique from the shelf when you are ready.',
+    suggestion: first ? { kind: 'next_tool', tool: first, reason: 'A first technique that fits where it is stuck.' } : null,
+    skillsSeen: ['decision_making']
+  };
 }
 
 /** Decision framing: the opening message is the decision; then the compass, then what is known. */
@@ -416,12 +448,12 @@ export async function scriptedCoach(session) {
       const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here; the first tool for this step is ready below.';
       return { ...base, verdict: 'clarify', message: `Fair enough, nothing was done in that step, so there is nothing to look back on. ${then}` };
     }
-    const how = session.kind === 'decision' ? 'decide' : 'tend to work through problems';
+    const how = session.kind === 'decision' ? 'decide' : session.kind === 'shift' ? 'get things done' : 'tend to work through problems';
     return { ...base, verdict: 'clarify', message: `Fair enough, that step is behind us now. Before we go on: what did you learn about how you ${how} in that step?` };
   }
   if (session.pendingLearning) {
     if (waitingForReview(session)) {
-      const step = session.kind === 'decision' ? 'Review' : 'Improve';
+      const step = session.kind === 'decision' || session.kind === 'shift' ? 'Review' : 'Improve';
       return { ...base, verdict: 'clarify', learning: last || null, message: `Thank you, that is worth keeping. ${step} picks up at your review on ${dueText(session)}.` };
     }
     const hasTool = session.phase !== 'finished' && session.model && defaultToolFor(session.model.id, session.phase);
@@ -437,6 +469,7 @@ export async function scriptedCoach(session) {
   }
   if (session.phase === 'frame') {
     if (session.kind === 'decision') return decisionFrameTurn(session, last || session.turns[0].text);
+    if (session.kind === 'shift') return shiftFrameTurn(session, last || session.turns[0].text);
     if (session.turns.length === 1) {
       // Escalated from Lightning: the carried seeds come first, for the person to confirm or change.
       const seeds = session.frameSeeds;

@@ -4,8 +4,7 @@ import { defaultToolFor, firstStep, nextPhase, planStepForBook, stepName, stepSe
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
 import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
-import { parseCompass } from '../../../../packages/decision-book/compass.mjs';
-import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
+import { BOOK_KINDS, bookOf } from '../../../../packages/problem-solver/books.mjs';
 import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { mainModel, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 import { outcomeOf } from '../../../../packages/decision-book/quick.mjs';
@@ -23,22 +22,23 @@ const fail = (status, code, message) => Object.assign(new Error(message), { stat
 
 /**
  * Frame questions per session kind, and the model a kind starts in once framed (null: the
- * coach chooses one). Lightning sessions never frame.
+ * coach chooses one). Lightning sessions never frame. Each coached book (books.mjs) adds its own.
  */
 export const KIND_FRAMES = Object.freeze({
   full: Object.freeze({ keys: Object.freeze(['goal', 'whatIsTrue', 'whatCanBeDone']), model: null }),
-  decision: Object.freeze({ keys: Object.freeze(['decision', 'compass', 'known']), model: Object.freeze({ id: DECISION_MODEL.id, reason: 'Decision Maker works from The Decision Book.' }) })
+  ...Object.fromEntries(Object.entries(BOOK_KINDS).map(([kind, book]) => [kind, Object.freeze({ keys: book.frameKeys, model: Object.freeze({ id: book.model.id, reason: book.reason }) })]))
 });
 
 export const frameKeysOf = (session) => (KIND_FRAMES[session.kind] ?? KIND_FRAMES.full).keys;
 
-/** The answers of this turn that belong to the session's frame; a compass keeps only known quadrants. */
+/** The answers of this turn that belong to the session's frame; a placement (a compass, a route) keeps only known ids. */
 function pickFrame(session, frame) {
+  const book = bookOf(session.kind);
   const out = {};
   for (const key of frameKeysOf(session)) {
     if (!frame?.[key]) continue;
-    if (key !== 'compass') out[key] = frame[key];
-    else if (parseCompass(frame[key]).length) out.compass = parseCompass(frame[key]).join('+');
+    if (key !== book?.placeKey) out[key] = frame[key];
+    else if (book.parsePlace(frame[key]).length) out[key] = book.parsePlace(frame[key]).join('+');
   }
   return out;
 }
@@ -118,8 +118,8 @@ function replaceRun(session, run) {
   return { ...session, steps };
 }
 
-/** A model a decision starts from (picked on the shelf), when it is one Explore offers. */
-const shelfModel = (kind, model) => (kind === 'decision' && typeof model === 'string' && toolsForPlanStep(DECISION_MODEL.id, 'explore').includes(model) ? model : null);
+/** A model a book session starts from (picked on the shelf), when it is one Explore offers. */
+const shelfModel = (kind, model) => (bookOf(kind) && typeof model === 'string' && toolsForPlanStep(bookOf(kind).model.id, 'explore').includes(model) ? model : null);
 
 export function createSession({ title = '', text, links = [], kind = 'full', startModel = null }, deps) {
   if (!KIND_FRAMES[kind]) throw fail(400, 'validation_error', `Unknown session kind: ${kind}`);
