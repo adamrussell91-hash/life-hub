@@ -1155,6 +1155,16 @@ test("ticking a menu dish puts its ingredients in ingredients and leaves notes a
   const plain = toggleMenuDish(toggleMenuDish(v, v.menu_items[1]), v.menu_items[1]);
   assert.deepEqual([plain.dishes[0].title, plain.dishes[0].ingredients], ["", ""]);
 });
+test("unticking keeps a dish whose ingredients were typed over", () => {
+  const v = newVisit();
+  v.menu_items = [{ name: "Morning steak", description: "150g sirloin, hash", price: "32", kind: "dish" }];
+  const ticked = toggleMenuDish(v, v.menu_items[0]);
+  ticked.dishes[0].ingredients = "Sirloin, no hash";
+  const next = toggleMenuDish(ticked, v.menu_items[0]);
+  assert.equal(next.dishes.length, 1);
+  assert.equal(next.dishes[0].title, "Morning steak");
+  assert.equal(next.dishes[0].ingredients, "Sirloin, no hash");
+});
 test("an extra ticks onto the last dish, and is its own dish when nothing else is ticked", () => {
   const v = newVisit();
   v.menu_items = [
