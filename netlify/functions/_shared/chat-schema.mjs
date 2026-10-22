@@ -27,7 +27,10 @@ const DOMAIN_PROPERTIES = {
     omega3: { type: 'string', enum: ['high', 'medium', 'low', 'none'] },
     creatine_g: { type: 'number', minimum: 0, maximum: 100, description: 'Creatine supplement grams actually taken with this meal; omit when unreported.' },
     creatine_product: { type: 'string' },
-    creatine_time: { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$', description: 'Actual intake HH:MM when different from meal time.' }
+    creatine_time: { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$', description: 'Actual intake HH:MM when different from meal time.' },
+    food_dish_id: { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,100}$', description: 'Food Journal dish id from a Send to Brisket hand-off. Copy it exactly; omit otherwise.' },
+    portion: { type: 'string', maxLength: 40, description: 'Portion label from the hand-off, e.g. "½" or "2 of 8 slices". Omit otherwise.' },
+    portion_fraction: { type: 'number', exclusiveMinimum: 0, maximum: 1, description: 'Share of the whole dish eaten, from the hand-off. Omit otherwise.' }
   },
   creatine: {
     grams: { type: 'number', minimum: 0, maximum: 100, description: 'Actual supplement intake grams. Zero corrects/removes a previously recorded dose.' },
