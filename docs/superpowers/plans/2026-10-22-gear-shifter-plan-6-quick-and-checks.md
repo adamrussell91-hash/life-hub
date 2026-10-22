@@ -156,7 +156,7 @@ Selectors from Plan 5's walk: `Describe what needs to move`, `Your answer`, `.ps
 
 ### The coach evaluation
 
-`ANTHROPIC_API_KEY` is not available in this container, so the live run against the production model has not been made; it waits for a key (`ANTHROPIC_API_KEY=… node scripts/get-things-done-eval.mjs`). The stub run checks the runner (4/12 pass, as a stub should). In its place, a proxy run: each case's real prompt (`GT_EVAL_PROMPTS`) was answered by a separate model instance given only that prompt, and the replies were replayed through the real reply pipeline (`GT_EVAL_REPLIES`: parse, checks, word limit). This tests the prompts and the pipeline, not the production model.
+`ANTHROPIC_API_KEY` was not available in this container during the build, so the live run came after the merge (see The live run, below; run it with `ANTHROPIC_API_KEY=… node scripts/get-things-done-eval.mjs`). The stub run checks the runner (4/12 pass, as a stub should). In its place, a proxy run: each case's real prompt (`GT_EVAL_PROMPTS`) was answered by a separate model instance given only that prompt, and the replies were replayed through the real reply pipeline (`GT_EVAL_REPLIES`: parse, checks, word limit). This tests the prompts and the pipeline, not the production model.
 
 | Case | Result |
 | --- | --- |
@@ -174,6 +174,16 @@ Selectors from Plan 5's walk: `Describe what needs to move`, `Your answer`, `.ps
 | Quick: the route is not the book's | Pass: "this route is Gear Shifter's own, built from two of the book's techniques" |
 
 12/12 after the fix. The stand-in tended to open with a skill compliment ("which shows analysis") on discernment; that is the shared voice's skill-naming rule, not flattery, and the judge does not count it.
+
+### The live run (22 Oct, after the merge)
+
+Adam supplied a short-lived key, so the cases then ran against the production coach (`createModelCoach(anthropicModel(env))`).
+
+- **First live run: 7/12.** Every Quick start case (4), both Commit cases and the vague need passed. **All five discernment cases failed:** the coach accepted the last frame answer but recommended no technique (three), challenged a clear answer (one), or lost the thread (one). The proxy run had missed this.
+- **Fix 1** (`get-things-done-prompts.mjs`): when one frame answer is left, the turn now carries a LAST FRAME ANSWER line: settling it is the moment to name the obstacle and recommend one technique with `next_technique`, naming a sibling passed over. The rubric said so; the turn did not. After it, every discernment case recommended a Gear Shifter technique.
+- **Fix 2:** the same line now says the message must name both techniques by name, never by id (one reply had written `gt_radical_transparency` in prose, and several left the sibling out because the card shows the recommendation).
+- **The judge was too strict twice**, and was loosened with a test each: a name without its trailing "technique" or "model" counts ("Pomodoro"), and Kotter's 8-Step Model of Change counts as "Kotter". The cases' route answers are now a sentence a person might say, not the bare station id.
+- **After the fixes, four full runs: 10, 11, 10 and 10 of 12.** Quick start, Commit and the vague need passed every time. What is left is variance in discernment: now and then the message still leaves out the sibling, and once the coach asked one more question about a team meeting instead of discerning, which is defensible coaching. Further prompt work on this is a choice for Adam, not a defect that blocks anything.
 
 ### Adam's two decisions (22 Oct), built as Tasks 9 and 10
 
