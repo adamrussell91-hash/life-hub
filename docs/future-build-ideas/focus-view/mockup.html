@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus view mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #13233a;
+    --muted: #6b7484;
+    --paper: #fbf8f2;
+    --card: #ffffff;
+    --line: #e4ded2;
+    --accent: #13233a;
+    --gold: #c99a3b;
+    --sage: #5f8a72;
+    --rust: #b45a3c;
+    --font-ui: Inter, ui-sans-serif, sans-serif;
+    --font-read: Newsreader, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); }
+
+  /* ── Chrome ─────────────────────────────────────────── */
+  .chrome {
+    position: fixed; inset: 0 0 auto 0; height: 52px; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--line);
+  }
+  .chrome__brand { font-weight: 600; font-size: 13px; letter-spacing: .02em; color: var(--muted); }
+  .chrome__actions { display: flex; gap: 8px; }
+  .btn {
+    font: 500 13px var(--font-ui); color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  }
+  .btn:hover { background: #fff; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+  .seg button { border: 0; border-radius: 999px; padding: 5px 14px; font: 500 13px var(--font-ui); background: none; color: var(--muted); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+  /* ── Page (scroll) mode ─────────────────────────────── */
+  .lesson { max-width: 760px; margin: 0 auto; padding: 84px 20px 80px; }
+  body.is-page .step {
+    position: relative; margin: 0 0 22px; padding: 18px 18px 14px;
+    border: 1.5px dashed var(--line); border-radius: 14px;
+  }
+  body.is-page .step::before {
+    content: "Step " attr(data-n); position: absolute; top: -10px; left: 14px;
+    background: var(--paper); padding: 0 6px; font-size: 11px; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--gold);
+  }
+  body.is-page .step-note { display: block; }
+  .step-note { display: none; font-size: 12px; color: var(--muted); margin: 0 0 18px; }
+
+  /* ── Focus mode ─────────────────────────────────────── */
+  body.is-focus { overflow: hidden; }
+  body.is-focus .lesson { max-width: none; padding: 0; }
+  body.is-focus .step {
+    position: fixed; inset: 52px 0 64px 0; display: flex; flex-direction: column;
+    justify-content: center; padding: 2vh 7vw;
+    font-size: clamp(16px, 1.55vw, 30px);
+    opacity: 0; transform: translateY(14px); pointer-events: none;
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  body.is-focus .step.is-current { opacity: 1; transform: none; pointer-events: auto; }
+  body.is-focus .step > * { width: 100%; max-width: 62em; margin-left: auto; margin-right: auto; }
+
+  /* Progress strip */
+  .strip { display: none; }
+  body.is-focus .strip {
+    position: fixed; inset: auto 0 0 0; height: 64px; z-index: 5;
+    display: flex; align-items: center; gap: 6px; padding: 0 20px;
+    border-top: 1px solid var(--line); background: var(--paper);
+  }
+  .strip__nav { font-size: 18px; width: 36px; height: 36px; padding: 0; }
+  .strip__steps { display: flex; gap: 6px; flex: 1; justify-content: center; overflow-x: auto; }
+  .strip__step {
+    font: 500 12px var(--font-ui); color: var(--muted); background: none;
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .strip__step[aria-current="step"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .strip__count { font-size: 12px; color: var(--muted); min-width: 44px; text-align: right; }
+
+  /* ── Classroom tools: dock, floating timer, groups drawer ── */
+  .dock { position: relative; display: flex; align-items: center; gap: 4px; }
+  .dock__tray { display: none; gap: 4px; padding-left: 4px; border-left: 1px solid var(--line); margin-left: 4px; }
+  .dock.is-open .dock__tray { display: flex; }
+  .icon-btn {
+    width: 36px; height: 36px; display: grid; place-items: center; padding: 0; position: relative;
+    border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--ink); cursor: pointer;
+  }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .icon-btn:hover, .icon-btn.is-on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .icon-btn .ready {
+    position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--gold); border: 2px solid var(--paper);
+  }
+  .icon-btn[data-tip]:hover::after {
+    content: attr(data-tip); position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--paper); font: 500 11px var(--font-ui); padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+  }
+
+  /* Timer edge: drains along the top of the stage, readable from the back row */
+  .edge { position: fixed; top: 52px; left: 0; height: 5px; width: 100%; z-index: 6; transform-origin: left; display: none;
+          background: linear-gradient(90deg, var(--sage), var(--gold)); }
+  body.timer-on .edge { display: block; }
+
+  .float-timer {
+    position: fixed; top: 72px; right: 20px; z-index: 9; display: none; align-items: center; gap: 12px;
+    background: var(--ink); color: var(--paper); border-radius: 18px; padding: 10px 16px 10px 10px;
+    box-shadow: 0 10px 30px rgba(19, 35, 58, .25);
+  }
+  body.timer-on .float-timer { display: flex; }
+  .ring { width: 54px; height: 54px; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 5; }
+  .ring .track { stroke: rgba(255,255,255,.15); }
+  .ring .fill { stroke: var(--gold); stroke-linecap: round; }
+  .float-timer__clock { font: 700 26px/1 var(--font-ui); font-variant-numeric: tabular-nums; }
+  .float-timer__segs { display: flex; gap: 6px; font-size: 11px; margin-top: 4px; opacity: .65; }
+  .float-timer__segs b { opacity: 1; color: var(--gold); font-weight: 600; }
+
+  .drawer {
+    position: fixed; top: 52px; bottom: 64px; right: 0; width: 320px; z-index: 4;
+    background: #fff; border-left: 1px solid var(--line); padding: 20px; overflow-y: auto;
+    transform: translateX(100%); transition: transform .35s ease;
+  }
+  body.has-drawer .drawer { transform: none; }
+  body.has-drawer.is-focus .step { right: 320px; transition: opacity .35s, transform .35s, right .35s; }
+  /* With the drawer open the timer docks at its top, off the lesson. */
+  body.has-drawer .float-timer { right: 20px; left: auto; width: 280px; }
+  body.has-drawer.timer-on .drawer { padding-top: 104px; }
+  .drawer h3 { font: 600 15px var(--font-ui); margin: 0 0 14px; display: flex; justify-content: space-between; }
+  .group { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 14px; }
+  .group b { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
+
+  /* ── Design: the lesson map (zoom out / zoom in) ─────── */
+  .map {
+    position: fixed; inset: 52px 0 0 0; z-index: 7; background: var(--paper); display: none;
+    padding: 40px 6vw; overflow-y: auto;
+  }
+  body.is-map .map { display: block; }
+  .map__title { font: 600 13px var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 20px; }
+  .map__path { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 28px; }
+  .map__card {
+    position: relative; aspect-ratio: 16/10; border: 1px solid var(--line); border-radius: 14px; background: #fff;
+    overflow: hidden; cursor: pointer; transition: transform .2s, box-shadow .2s; text-align: left; padding: 0;
+  }
+  .map__card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(19,35,58,.12); }
+  .map__card.is-current { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .map__card.is-done::after {
+    content: "✓"; position: absolute; top: 10px; right: 12px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--sage); color: #fff; font-size: 12px; display: grid; place-items: center;
+  }
+  .map__thumb { position: absolute; inset: 0; padding: 18px 22px; font-size: 7px; pointer-events: none; }
+  .map__thumb > * { max-width: none; }
+  .map__label {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 14px; font: 600 13px var(--font-ui);
+    background: linear-gradient(transparent, #fff 40%); color: var(--ink);
+  }
+  ::view-transition-old(stage), ::view-transition-new(stage) { animation-duration: .5s; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
+
+  /* ── Learning: the checkpoint before moving on ───────── */
+  .gate {
+    position: fixed; left: 50%; bottom: 84px; z-index: 8; width: min(640px, calc(100% - 32px));
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: .3s ease;
+    background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px;
+    box-shadow: 0 18px 40px rgba(19,35,58,.18);
+  }
+  body.gate-on .gate { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .gate__head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .gate__score { font: 700 30px/1 var(--font-ui); color: var(--rust); }
+  .gate__text { font-size: 14px; line-height: 1.45; }
+  .gate__text small { display: block; color: var(--muted); margin-top: 2px; }
+  .gate__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .gate__actions[hidden], .gate__talk[hidden], .gate__preview[hidden] { display: none; }
+  .gate__talk, .gate__preview {
+    font: 400 14px/1.5 var(--font-read); background: var(--paper); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
+  }
+  .gate__talk b, .gate__preview b { display: block; font: 600 11px var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+  .gate__preview p { margin: 0 0 6px; font-size: 14px; }
+  .gate__preview ol { margin: 0; padding-left: 20px; font: 400 13px/1.5 var(--font-ui); list-style: upper-alpha; }
+  .btn:disabled { opacity: .55; cursor: progress; }
+  .btn.is-ready { border-color: var(--sage); color: var(--sage); font-weight: 600; }
+
+  /* Hinge states */
+  .hinge__tag { font: 600 .62em var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--sage); margin: 0 0 .5em; }
+  .hinge__tag:empty { display: none; }
+  .hinge .opt .bar { visibility: hidden; }
+  .hinge.is-revealed .opt .bar { visibility: visible; }
+  .hinge:not(.is-revealed) .opt.is-right { border-color: var(--line); background: #fff; }
+  .hinge.is-revealed .opt:not(.is-right) { opacity: .6; }
+  .ann { margin-top: .9em; font-size: .72em; color: var(--muted); display: flex; align-items: center; gap: .6em; }
+  .ann[hidden] { display: none; }
+  .ann.is-ready { color: var(--sage); }
+  .ann.is-pass { color: var(--sage); font-weight: 600; }
+  .spin { width: 1em; height: 1em; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Blocks (shared) ────────────────────────────────── */
+  .eyebrow { font-size: .72em; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); font-weight: 600; margin: 0 0 .6em; }
+  h1 { font: 600 2.6em/1.08 var(--font-ui); margin: 0 0 .35em; letter-spacing: -.02em; }
+  h2 { font: 600 1.7em/1.15 var(--font-ui); margin: 0 0 .6em; letter-spacing: -.01em; }
+  p { font: 400 1.05em/1.5 var(--font-read); margin: 0 0 .8em; }
+  .chips { display: flex; flex-wrap: wrap; gap: .5em; margin-top: .8em; }
+  .chip { font-size: .75em; border: 1px solid var(--line); border-radius: 999px; padding: .35em .9em; background: #fff; }
+
+  .hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 2em; align-items: center; }
+  .cover {
+    aspect-ratio: 4/3; border-radius: 16px;
+    background:
+      radial-gradient(circle at 30% 30%, #f0c87a 0 18%, transparent 19%),
+      linear-gradient(160deg, #2a4366, #13233a 70%);
+  }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.2em 1.4em; }
+
+  /* Hinge */
+  .hinge__q { font: 500 1.25em/1.35 var(--font-read); margin: 0 0 1em; }
+  .hinge__opts { display: grid; grid-template-columns: 1fr 1fr; gap: .7em; }
+  .opt { display: flex; gap: .8em; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: .7em .9em; background: #fff; font-size: .95em; }
+  .opt b { display: grid; place-items: center; width: 1.9em; height: 1.9em; border-radius: 50%; background: var(--paper); border: 1px solid var(--line); flex: none; }
+  .opt.is-right { border-color: var(--sage); background: #eef5f0; }
+  .opt .bar { margin-left: auto; font-size: .8em; color: var(--muted); }
+  .live { display: flex; justify-content: space-between; align-items: center; margin-top: 1em; font-size: .8em; color: var(--muted); }
+  .code { font-weight: 700; letter-spacing: .14em; color: var(--ink); }
+  .pill-btn { font: 600 .85em var(--font-ui); background: var(--ink); color: var(--paper); border: 0; border-radius: 999px; padding: .5em 1.1em; cursor: pointer; }
+
+  /* Columns */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.6em; align-items: stretch; }
+  blockquote { margin: 0; padding: .2em 0 .2em 1em; border-left: 3px solid var(--gold); font: italic 400 1.2em/1.45 var(--font-read); }
+  .cite { font-size: .75em; color: var(--muted); margin-top: .8em; font-style: normal; }
+  .poster {
+    border-radius: 14px; min-height: 12em; display: grid; place-items: center; text-align: center;
+    background: repeating-linear-gradient(135deg, #e9e2d4 0 10px, #efe9dd 10px 20px);
+    color: var(--muted); font-size: .8em; padding: 1em;
+  }
+
+  /* Continuum */
+  .cont__q { font: 500 1.3em/1.3 var(--font-read); margin: 0 0 1.4em; text-align: center; }
+  .cont__track { position: relative; height: 5em; margin: 0 1em; }
+  .cont__line { position: absolute; left: 0; right: 0; top: 50%; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--rust), #d9cdb5, var(--sage)); }
+  .cont__end { position: absolute; top: calc(50% + 1.1em); font-size: .75em; color: var(--muted); }
+  .cont__end--l { left: 0; } .cont__end--r { right: 0; }
+  .dot { position: absolute; top: calc(50% - .55em); width: 1.1em; height: 1.1em; border-radius: 50%; background: var(--ink); opacity: .75; animation: roam 6s ease-in-out infinite alternate; }
+
+  @keyframes roam { from { transform: translateX(-1.2em); } to { transform: translateX(1.2em); } }
+
+  /* Brainstorm join */
+  .join { text-align: center; }
+  .join__code { font: 700 4em/1 var(--font-ui); letter-spacing: .12em; margin: .3em 0; }
+  .join__count { font-size: .85em; color: var(--muted); }
+
+  @media (max-width: 700px) {
+    .hero, .cols, .hinge__opts { grid-template-columns: 1fr; }
+    body.is-focus .step { padding: 2vh 16px; font-size: 15px; }
+  }
+</style>
+</head>
+<body class="is-focus">
+
+<header class="chrome">
+  <span class="chrome__brand">Display</span>
+  <div class="chrome__actions">
+    <div class="seg" role="group" aria-label="View">
+      <button type="button" data-mode="page" aria-pressed="false">Page</button>
+      <button type="button" data-mode="focus" aria-pressed="true">Focus</button>
+    </div>
+    <button class="btn" type="button" id="mapBtn">Lesson map</button>
+    <button class="btn" type="button" id="fs">Full screen</button>
+  </div>
+</header>
+
+<main class="lesson">
+  <p class="step-note">Mockup only. Dashed boxes show how the page groups into focus steps: a heading starts a step, a section is a step, a column row stays together.</p>
+
+  <!-- Step 1: lesson hero -->
+  <section class="step" data-n="1" data-label="Start">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Year 9 English · Lesson 4</p>
+        <h1>Fear, hope and the persuasive speech</h1>
+        <div class="chips">
+          <span class="chip">Identify emotive appeals</span>
+          <span class="chip">Judge whether they're fair</span>
+        </div>
+      </div>
+      <div class="cover" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <!-- Step 2: heading + paragraph + hinge question -->
+  <section class="step" data-n="2" data-label="Do now" data-timer="ready">
+    <h2>Do now</h2>
+    <p>Read the line on the board. Don't name the technique. Pick what it does to the audience.</p>
+    <div class="card hinge" id="hinge">
+      <p class="hinge__tag" id="hingeTag"></p>
+      <p class="hinge__q" id="hingeQ"></p>
+      <div class="hinge__opts" id="hingeOpts"></div>
+      <div class="live">
+        <span id="hingeLive"></span>
+        <button class="pill-btn" type="button" id="reveal">Reveal</button>
+      </div>
+      <div class="ann" id="ann" hidden></div>
+    </div>
+  </section>
+
+  <!-- Step 3: heading + two-column row (stays together) -->
+  <section class="step" data-n="3" data-label="The speech">
+    <h2>The speech</h2>
+    <div class="cols">
+      <div class="card">
+        <blockquote>
+          We are not the last generation to love this coast, but we may be the last that can still keep it.
+          <div class="cite">Mira Holt, council address (invented example)</div>
+        </blockquote>
+      </div>
+      <div class="poster">Image block<br>campaign poster</div>
+    </div>
+  </section>
+
+  <!-- Step 4: section block with a continuum line -->
+  <section class="step" data-n="4" data-label="Take a side">
+    <h2>Take a side</h2>
+    <div class="card">
+      <p class="cont__q">Is fear a fair way to persuade people?</p>
+      <div class="cont__track">
+        <div class="cont__line"></div>
+        <span class="dot" style="left:12%;animation-delay:-1s"></span>
+        <span class="dot" style="left:28%;animation-delay:-3s"></span>
+        <span class="dot" style="left:41%"></span>
+        <span class="dot" style="left:47%;animation-delay:-2s"></span>
+        <span class="dot" style="left:63%;animation-delay:-4s"></span>
+        <span class="dot" style="left:71%;animation-delay:-1.5s"></span>
+        <span class="dot" style="left:86%;animation-delay:-5s"></span>
+        <span class="cont__end cont__end--l">Never fair</span>
+        <span class="cont__end cont__end--r">Always fair</span>
+      </div>
+      <div class="live"><span>7 placed · symbols hidden until reveal</span><button class="pill-btn" type="button">Reveal</button></div>
+    </div>
+  </section>
+
+  <!-- Step 5: exit ticket brainstorm -->
+  <section class="step" data-n="5" data-label="Exit ticket">
+    <h2>Exit ticket</h2>
+    <div class="card join">
+      <p>One fear appeal you've seen this week. Where was it, and did it work on you?</p>
+      <div class="join__code">K7QF</div>
+      <div class="join__count">12 ideas in · Open board</div>
+    </div>
+  </section>
+</main>
+
+<div class="edge" id="edge"></div>
+
+<div class="float-timer" id="floatTimer" role="timer">
+  <svg class="ring" viewBox="0 0 60 60"><circle class="track" cx="30" cy="30" r="25"/><circle class="fill" id="ringFill" cx="30" cy="30" r="25" stroke-dasharray="157" stroke-dashoffset="0"/></svg>
+  <div>
+    <div class="float-timer__clock" id="clock">1:00</div>
+    <div class="float-timer__segs" id="segs"></div>
+  </div>
+</div>
+
+<aside class="drawer" id="drawer" aria-label="Groups">
+  <h3>Groups of 3 <button class="btn" type="button" id="shuffle">Shuffle</button></h3>
+  <div id="groups"></div>
+</aside>
+
+<div class="map" id="map">
+  <p class="map__title">Lesson map · click a step to zoom in · Esc to go back</p>
+  <div class="map__path" id="mapPath"></div>
+</div>
+
+<div class="gate" id="gate" role="dialog" aria-label="Checkpoint">
+  <div class="gate__head">
+    <div class="gate__score" id="gateScore"></div>
+    <div class="gate__text">
+      <strong>Checkpoint: not everyone's there yet.</strong>
+      <small id="gateWhy"></small>
+    </div>
+  </div>
+  <div class="gate__talk" id="gateTalk" hidden>
+    <b>Talking point, no names</b>
+    "A few of you went for C. I can see why: fear really is the technique. But the question asks what the line <em>does</em> to us. Fear is the tool. Urgency, feeling we must act now, is the effect."
+  </div>
+  <div class="gate__preview" id="gatePreview" hidden>
+    <b>Back-up question from Ann · check it reads well · answer hidden, the class can see this</b>
+    <p id="previewQ"></p>
+    <ol id="previewOpts"></ol>
+  </div>
+  <div class="gate__actions" id="gateActions">
+    <button class="btn" type="button" id="gateTalkBtn">Explain why C is tempting</button>
+    <button class="btn" type="button" id="gateBackup" disabled>Ann is drafting a back-up…</button>
+    <button class="pill-btn" type="button" id="gateOn">Move on</button>
+  </div>
+  <div class="gate__actions" id="previewActions" hidden>
+    <button class="btn" type="button" id="previewSkip">Skip it</button>
+    <button class="pill-btn" type="button" id="previewShow">Show on the board</button>
+  </div>
+</div>
+
+<nav class="strip" aria-label="Steps">
+  <div class="dock" id="dock">
+    <button class="icon-btn" type="button" id="toolsBtn" data-tip="Classroom tools" aria-label="Classroom tools">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+      <span class="ready" id="readyDot" title="This step has a saved timer"></span>
+    </button>
+    <div class="dock__tray">
+      <button class="icon-btn" type="button" id="tTimer" data-tip="Timer: Think, Pair, Share" aria-label="Timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></button>
+      <button class="icon-btn" type="button" id="tGroups" data-tip="Groups" aria-label="Groups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></button>
+      <button class="icon-btn" type="button" data-tip="Names" aria-label="Names"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6 6 0 0 0-3.5-5.5"/></svg></button>
+      <button class="icon-btn" type="button" data-tip="Dice" aria-label="Dice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+  <button class="btn strip__nav" type="button" id="prev" aria-label="Previous step">‹</button>
+  <div class="strip__steps" id="steps"></div>
+  <button class="btn strip__nav" type="button" id="next" aria-label="Next step">›</button>
+  <span class="strip__count" id="count"></span>
+</nav>
+
+<script>
+  const steps = [...document.querySelectorAll('.step')];
+  const stepBar = document.getElementById('steps');
+  const count = document.getElementById('count');
+  let i = 0;
+
+  steps.forEach((s, n) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'strip__step';
+    b.textContent = s.dataset.label;
+    b.addEventListener('click', () => go(n));
+    stepBar.append(b);
+  });
+
+  const body = document.body;
+  const seen = new Set([0]);
+  const passed = new Set();
+
+  function go(n) {
+    i = Math.max(0, Math.min(steps.length - 1, n));
+    seen.add(i);
+    steps.forEach((s, k) => s.classList.toggle('is-current', k === i));
+    [...stepBar.children].forEach((b, k) =>
+      k === i ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+    count.textContent = `${i + 1} / ${steps.length}`;
+    // A divider's saved timer marks the step after it: gold dot on the tools button.
+    document.getElementById('readyDot').style.display = steps[i].dataset.timer ? 'block' : 'none';
+  }
+
+  // ── Learning: hinge checkpoint with Ann's auto back-up ──
+  const BAR = 65;
+  const $ = (id) => document.getElementById(id);
+  const ORIGINAL = {
+    tag: '',
+    q: '"If we wait one more year, there will be nothing left to save." What is the main effect of this line on the audience?',
+    opts: [
+      ['It shows the speaker is an expert the audience should trust', 2],
+      ['It creates urgency, so the audience feels they must act now', 15, true],
+      ['It uses an appeal to fear', 8],
+      ['It makes the audience feel part of a group', 1]
+    ]
+  };
+  // Ann writes this from the original question, the right answer and the votes,
+  // so it keeps the same trap: naming the technique instead of its effect.
+  const BACKUP = {
+    tag: 'Back-up question · drafted by Ann · saved to this lesson',
+    q: '"Every one of you will one day have to tell your children why you did nothing." What is the main effect of this line on the audience?',
+    opts: [
+      ['It gives the audience facts to weigh up', 1],
+      ['It uses emotive language and direct address', 3],
+      ['It makes each listener feel personally responsible, so they are more likely to act', 22, true],
+      ['It shows the speaker has done their research', 0]
+    ]
+  };
+  const HINGE_STEP = 1;
+  let current = ORIGINAL, revealed = false, backupReady = false, cleared = false;
+
+  const answered = (q) => q.opts.reduce((n, o) => n + o[1], 0);
+  const pct = (q) => Math.round(100 * q.opts.find((o) => o[2])[1] / answered(q));
+
+  function renderHinge(q, shown = answered(q)) {
+    $('hingeTag').textContent = q.tag;
+    $('hingeQ').textContent = q.q;
+    $('hingeOpts').innerHTML = q.opts.map((o, k) =>
+      `<div class="opt${o[2] ? ' is-right' : ''}"><b>${'ABCD'[k]}</b>${o[0]}<span class="bar">${o[1]}</span></div>`).join('');
+    $('hingeLive').innerHTML = `Join <span class="code">K7QF</span> · ${shown} of 28 answered`;
+    $('hinge').classList.toggle('is-revealed', revealed);
+  }
+
+  function setAnn(cls, html) {
+    const ann = $('ann');
+    ann.hidden = false;
+    ann.className = 'ann ' + cls;
+    ann.innerHTML = html;
+  }
+
+  $('reveal').onclick = () => {
+    if (revealed) return;
+    revealed = true;
+    renderHinge(current);
+    const score = pct(current);
+    if (score >= BAR) {
+      cleared = true;
+      setAnn('is-pass', `${score}% got it · above the ${BAR}% bar · clear to move on`);
+      return;
+    }
+    // Under the bar and no saved back-up: Ann starts drafting straight away.
+    setAnn('', `<span class="spin"></span>${score}% · under the ${BAR}% bar · Ann is drafting a back-up question while you re-teach`);
+    setTimeout(() => {
+      backupReady = true;
+      setAnn('is-ready', 'Back-up question ready · you check it before it goes on the board');
+      const btn = $('gateBackup');
+      btn.disabled = false;
+      btn.classList.add('is-ready');
+      btn.textContent = 'Preview back-up question';
+    }, 4000);
+  };
+
+  function openGate() {
+    const q = current;
+    const right = q.opts.findIndex((o) => o[2]);
+    const wrong = q.opts.map((o, k) => [o, k]).filter(([o]) => !o[2]).sort((a, b) => b[0][1] - a[0][1])[0];
+    $('gateScore').textContent = `${pct(q)}%`;
+    $('gateWhy').innerHTML =
+      `${q.opts[right][1]} of ${answered(q)} chose ${'ABCD'[right]}. Most common wrong answer: ${'ABCD'[wrong[1]]}, "${wrong[0][0]}" (${wrong[0][1]}). They named the technique, not its effect.`;
+    showGatePart('actions');
+    body.classList.add('gate-on');
+  }
+  function showGatePart(part) {
+    $('gateActions').hidden = part !== 'actions';
+    $('previewActions').hidden = part !== 'preview';
+    $('gatePreview').hidden = part !== 'preview';
+    if (part !== 'actions') $('gateTalk').hidden = true;
+  }
+
+  function next() {
+    if (i === HINGE_STEP && revealed && !cleared) { openGate(); return; }
+    go(i + 1);
+  }
+  const closeGate = () => body.classList.remove('gate-on');
+
+  $('gateTalkBtn').onclick = () => { $('gateTalk').hidden = !$('gateTalk').hidden; };
+  $('gateBackup').onclick = () => {
+    if (!backupReady) return;
+    $('previewQ').textContent = BACKUP.q;
+    // The preview is on the projected screen, so it never marks the right answer.
+    $('previewOpts').innerHTML = BACKUP.opts.map((o) => `<li>${o[0]}</li>`).join('');
+    showGatePart('preview');
+  };
+  $('previewSkip').onclick = () => showGatePart('actions');
+  $('previewShow').onclick = () => {
+    closeGate();
+    current = BACKUP;
+    revealed = false;
+    $('ann').hidden = true;
+    // Fresh responses trickle in (simulated).
+    let n = 0;
+    const target = answered(BACKUP);
+    renderHinge(BACKUP, 0);
+    const t = setInterval(() => {
+      n = Math.min(target, n + 2);
+      $('hingeLive').innerHTML = `Join <span class="code">K7QF</span> · ${n} of 28 answered`;
+      if (n >= target) clearInterval(t);
+    }, 180);
+  };
+  $('gateOn').onclick = () => { cleared = true; closeGate(); go(i + 1); };
+
+  renderHinge(ORIGINAL);
+
+  document.getElementById('prev').onclick = () => go(i - 1);
+  document.getElementById('next').onclick = next;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeGate(); if (body.classList.contains('is-map')) closeMap(); return; }
+    if (e.key === 'm' || e.key === 'M') { body.classList.contains('is-map') ? closeMap() : openMap(); return; }
+    if (!body.classList.contains('is-focus') || body.classList.contains('is-map')) return;
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); next(); }
+    if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); closeGate(); go(i - 1); }
+  });
+
+  // ── Tools ─────────────────────────────────────────────
+  const dock = document.getElementById('dock');
+  document.getElementById('toolsBtn').onclick = () => dock.classList.toggle('is-open');
+
+  const stack = [{ label: 'Think', s: 60 }, { label: 'Pair', s: 120 }, { label: 'Share', s: 180 }];
+  let seg = 0, left = 0, tick = null;
+  function drawTimer() {
+    const total = stack[seg].s;
+    const m = Math.floor(left / 60), s = Math.floor(left % 60);
+    document.getElementById('clock').textContent = `${m}:${String(s).padStart(2, '0')}`;
+    document.getElementById('ringFill').style.strokeDashoffset = 157 * (1 - left / total);
+    document.getElementById('edge').style.transform = `scaleX(${left / total})`;
+    document.getElementById('segs').innerHTML =
+      stack.map((x, k) => k === seg ? `<b>${x.label}</b>` : x.label).join(' → ');
+  }
+  document.getElementById('tTimer').onclick = (e) => {
+    const on = body.classList.toggle('timer-on');
+    e.currentTarget.classList.toggle('is-on', on);
+    clearInterval(tick);
+    if (!on) return;
+    seg = 0; left = stack[0].s; drawTimer();
+    // Mockup runs at 4x so you can watch it move between segments.
+    tick = setInterval(() => {
+      left -= 1;
+      if (left <= 0) { seg = (seg + 1) % stack.length; left = stack[seg].s; }
+      drawTimer();
+    }, 250);
+  };
+
+  const people = ['Ari', 'Bea', 'Cal', 'Dev', 'Eli', 'Fen', 'Gus', 'Hana', 'Ivo', 'Jun', 'Kit', 'Lou'];
+  function makeGroups() {
+    const p = [...people].sort(() => Math.random() - .5);
+    const out = [];
+    for (let k = 0; k < p.length; k += 3) out.push(p.slice(k, k + 3));
+    document.getElementById('groups').innerHTML =
+      out.map((g, k) => `<div class="group"><b>Group ${k + 1}</b>${g.join(', ')}</div>`).join('');
+  }
+  document.getElementById('tGroups').onclick = (e) => {
+    const on = body.classList.toggle('has-drawer');
+    e.currentTarget.classList.toggle('is-on', on);
+    if (on) makeGroups();
+  };
+  document.getElementById('shuffle').onclick = makeGroups;
+
+  // ── Design: lesson map with a zoom between map and stage ──
+  const mapPath = document.getElementById('mapPath');
+  function buildMap() {
+    mapPath.replaceChildren();
+    steps.forEach((s, k) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'map__card' + (k === i ? ' is-current' : '') + (seen.has(k) && k < i ? ' is-done' : '');
+      const thumb = document.createElement('div');
+      thumb.className = 'map__thumb';
+      thumb.innerHTML = s.innerHTML;
+      const label = document.createElement('div');
+      label.className = 'map__label';
+      label.textContent = `${k + 1}. ${s.dataset.label}`;
+      card.append(thumb, label);
+      card.onclick = () => zoomTo(k, card);
+      mapPath.append(card);
+    });
+  }
+  function morph(update) {
+    if (document.startViewTransition) document.startViewTransition(update);
+    else update();
+  }
+  function openMap() {
+    if (!body.classList.contains('is-focus')) return;
+    closeGate();
+    buildMap();
+    const card = mapPath.children[i];
+    steps[i].style.viewTransitionName = 'stage';
+    morph(() => {
+      steps[i].style.viewTransitionName = '';
+      card.style.viewTransitionName = 'stage';
+      body.classList.add('is-map');
+    });
+  }
+  function zoomTo(k, card) {
+    card.style.viewTransitionName = 'stage';
+    morph(() => {
+      card.style.viewTransitionName = '';
+      body.classList.remove('is-map');
+      go(k);
+      steps[k].style.viewTransitionName = 'stage';
+    });
+    setTimeout(() => { steps[k].style.viewTransitionName = ''; }, 700);
+  }
+  function closeMap() { zoomTo(i, mapPath.children[i]); }
+  document.getElementById('mapBtn').onclick = () =>
+    body.classList.contains('is-map') ? closeMap() : openMap();
+
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    const focus = b.dataset.mode === 'focus';
+    document.body.classList.toggle('is-focus', focus);
+    document.body.classList.toggle('is-page', !focus);
+    document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    window.scrollTo(0, 0);
+  }));
+
+  document.getElementById('fs').onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen?.();
+  };
+
+  go(0);
+</script>
+</body>
+</html>

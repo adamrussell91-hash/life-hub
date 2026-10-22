@@ -1136,6 +1136,11 @@
   gap: var(--space-3);
 }
 
+.qz-results__foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .qz-stat {
   display: grid;
   min-width: 7rem;
