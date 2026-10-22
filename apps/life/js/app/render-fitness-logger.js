@@ -31,7 +31,9 @@ import {
   formatBlockResult,
   formatBlockScheme,
   formatSupersetBlockLabel,
-  isGroupedBlock
+  intervalPosition,
+  isGroupedBlock,
+  isTimedFormat
 } from '../core/workout-plan-groups.js';
 import {
   CABLE_TYPES,
@@ -373,13 +375,40 @@ function pumpCircuitGhostBit(ghost) {
   return '';
 }
 
+/** "Get ready", "Round 3 of 10", "WORK · C1 Push-ups", "REST · next C2 Cable Row". */
+function intervalPhaseText(block, position) {
+  const member = index => {
+    const exercise = block.exercises?.[index];
+    const code = block.exercises?.length > 1 ? `${blockMemberCode(block, index)} ` : '';
+    return `${code}${exercise?.name ?? 'Exercise'}`;
+  };
+  const segment = position.segment;
+  if (position.phase === 'lead_in') {
+    return segment?.memberIndex != null ? `Get ready · first up ${member(segment.memberIndex)}` : 'Get ready';
+  }
+  if (position.phase === 'done') return 'Clock done';
+  if (position.phase === 'rest') return `REST · next ${member(segment.memberIndex)}`;
+  const rounds = `Round ${segment.round} of ${block.rounds || 1}`;
+  return segment.memberIndex != null ? `${block.format === 'intervals' ? 'WORK' : rounds} · ${member(segment.memberIndex)}` : `${rounds} · go`;
+}
+
 function renderCircuitClock(root, draft, { block, circuit, actions }) {
   const wrap = el(root, 'div', { className: 'gym-circuit', data: { fitnessLogger: 'circuit' } });
   const amrap = block.format === 'amrap';
+  const timed = isTimedFormat(block.format);
   const running = Boolean(circuit?.running);
   const elapsed = circuit?.elapsedMs ?? 0;
   const capMs = (block.timeCapSec ?? 0) * 1000;
-  const shown = amrap && capMs ? Math.max(0, capMs - elapsed) : elapsed;
+  const position = timed ? intervalPosition(block, elapsed) : null;
+  const shown = timed ? position.remainingMs : (amrap && capMs ? Math.max(0, capMs - elapsed) : elapsed);
+  if (timed && (running || elapsed > 0)) {
+    wrap.className += ` gym-circuit--${position.phase}`;
+    wrap.append(el(root, 'p', {
+      className: 'gym-circuit__phase',
+      text: intervalPhaseText(block, position),
+      data: { fitnessLogger: 'interval-phase', phase: position.phase }
+    }));
+  }
   wrap.append(el(root, 'p', {
     className: 'gym-circuit__clock',
     text: formatElapsed(shown),
@@ -388,11 +417,11 @@ function renderCircuitClock(root, draft, { block, circuit, actions }) {
   const row = el(root, 'div', { className: 'gym-circuit__actions' });
   row.append(button(root, {
     className: 'gym-chip gym-chip--strong',
-    text: running ? 'Pause clock' : (elapsed > 0 ? 'Resume clock' : (amrap ? 'Start AMRAP' : 'Start clock')),
+    text: running ? 'Pause clock' : (elapsed > 0 ? 'Resume clock' : (amrap ? 'Start AMRAP' : (block.format === 'emom' ? 'Start EMOM' : (block.format === 'intervals' ? 'Start intervals' : 'Start clock')))),
     marker: 'circuit-clock-toggle',
     onClick: () => actions.toggleCircuitClock?.(block)
   }));
-  if (amrap) {
+  if (amrap || block.format === 'emom') {
     row.append(button(root, {
       className: 'gym-chip',
       text: '+ Round',
