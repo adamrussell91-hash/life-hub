@@ -15,6 +15,7 @@ A **Focus** mode inside the teacher's Display view (`apps/teaching/src/teacher/l
 
 - A **heading** starts a new step; everything after it up to the next heading belongs to that step.
 - A **section** block is one step.
+- A step holds **one main block** (an activity, a toolkit block, an image, a chart, a column row). A second main block starts a new step and takes the text leading into it. Text, quotes, callouts and dividers ride along with the main block beside them. (Added after Adam saw three tools land in one step because none had a heading.)
 - A **multi-column row** always stays together. Adam uses columns to show two related things side by side; splitting them would be silly.
 - The lesson hero (title, outcomes, cover) is step 1.
 
