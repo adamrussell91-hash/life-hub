@@ -12225,12 +12225,6 @@ body.is-lesson-builder-full-page .hub-utilities {
   color: var(--muted);
 }
 
-.block-annotation__step-caption {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm, 0.35rem);
-  background: var(--paper);
-}
-
 .block-annotation__focus-nav {
   display: flex;
   flex-wrap: wrap;
@@ -12375,6 +12369,153 @@ body.is-lesson-builder-full-page .hub-utilities {
   color: var(--muted);
 }
 
+/* A thread place's own note, under its line while the thread is followed. */
+.block-annotation__stop-note {
+  --stop-c: var(--wave);
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: 0.15rem 0 var(--space-2) 0;
+  padding: var(--space-1) var(--space-2);
+  border-left: 3px solid color-mix(in srgb, var(--stop-c) 55%, transparent);
+  border-radius: 0 var(--radius-sm, 0.35rem) var(--radius-sm, 0.35rem) 0;
+  background: color-mix(in srgb, var(--stop-c) 7%, var(--paper, #fff));
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+/* Line the note up with the line's words, clear of the pips and joining line. */
+.block-annotation--ink.block-annotation--focus .block-annotation__stop-note {
+  margin-left: calc(var(--line-bars, 1) * 0.9rem + 1.85rem + var(--space-2));
+}
+
+.block-annotation__stop-note.is-current {
+  border-left-color: var(--stop-c);
+  background: color-mix(in srgb, var(--stop-c) 16%, var(--paper, #fff));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--stop-c) 35%, transparent);
+}
+
+.block-annotation__stop-note--wave { --stop-c: var(--wave); }
+.block-annotation__stop-note--sand { --stop-c: var(--sand); }
+.block-annotation__stop-note--high-sea { --stop-c: var(--high-sea); }
+.block-annotation__stop-note--shore { --stop-c: var(--shore); }
+.block-annotation__stop-note--marine { --stop-c: var(--marine); }
+.block-annotation__stop-note--navy { --stop-c: var(--navy, #1b2a4a); }
+.block-annotation__stop-note--coral { --stop-c: var(--coral, #c96b4a); }
+.block-annotation__stop-note--mist { --stop-c: var(--mist, #9aa4b2); }
+
+.block-annotation__stop-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.block-annotation__stop-main .block-annotation__body > :first-child {
+  margin-top: 0;
+}
+
+.block-annotation__stop-main .block-annotation__body > :last-child {
+  margin-bottom: 0;
+}
+
+.block-annotation__stop-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.block-annotation__stop-nav .block-annotation__step-meta {
+  margin: 0 auto 0 0;
+}
+
+.block-annotation__stop-step {
+  min-height: 2.25rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--paper);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.block-annotation__stop-step:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .block-annotation__stop-step {
+    min-height: 2.75rem;
+    flex: 1 1 auto;
+  }
+}
+
+/* Technique family colours: the toggle and its key. */
+.block-annotation__family-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.block-annotation__family-key[hidden] {
+  display: none;
+}
+
+.block-annotation__family-toggle {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink, #1b1c22);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.block-annotation__family-toggle[aria-pressed='true'] {
+  border-color: var(--ink, #1b1c22);
+  font-weight: 600;
+}
+
+.block-annotation__family-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.block-annotation__family-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ink, #1b1c22);
+}
+
+.block-annotation__family-dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+}
+
+.block-annotation__family-note {
+  flex-basis: 100%;
+}
+
+@media (max-width: 720px) {
+  .block-annotation__family-toggle {
+    min-height: 2.75rem;
+  }
+}
+
 .block-annotation__poem {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -12448,7 +12589,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 }
 
 .block-annotation__line.is-step .block-annotation__line-text {
-  background: color-mix(in srgb, var(--wave) 12%, transparent);
+  background: color-mix(in srgb, var(--thread-c, var(--wave)) 16%, transparent);
 }
 
 .block-annotation__pip {
@@ -12829,6 +12970,24 @@ body.is-lesson-builder-full-page .hub-utilities {
 .block-annotation__ink--navy { --ink-c: color-mix(in srgb, var(--navy, #1b2a4a) 85%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--navy, #1b2a4a) 16%, transparent); }
 .block-annotation__ink--coral { --ink-c: color-mix(in srgb, var(--coral, #c96b4a) 80%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--coral, #c96b4a) 30%, transparent); }
 .block-annotation__ink--mist { --ink-c: color-mix(in srgb, var(--mist, #9aa4b2) 45%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--mist, #9aa4b2) 42%, transparent); }
+
+
+/* Technique family mark colours: --fam-* is set from the Periodic Table data. */
+.block-annotation__ink--fam-descriptive { --ink-c: color-mix(in srgb, var(--fam-descriptive) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-descriptive) 34%, transparent); }
+.block-annotation__anchor--fam-descriptive { text-decoration-color: var(--fam-descriptive); }
+.block-annotation__panel--fam-descriptive { --note-c: var(--fam-descriptive); }
+.block-annotation__ink--fam-repetitive { --ink-c: color-mix(in srgb, var(--fam-repetitive) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-repetitive) 34%, transparent); }
+.block-annotation__anchor--fam-repetitive { text-decoration-color: var(--fam-repetitive); }
+.block-annotation__panel--fam-repetitive { --note-c: var(--fam-repetitive); }
+.block-annotation__ink--fam-comparative { --ink-c: color-mix(in srgb, var(--fam-comparative) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-comparative) 34%, transparent); }
+.block-annotation__anchor--fam-comparative { text-decoration-color: var(--fam-comparative); }
+.block-annotation__panel--fam-comparative { --note-c: var(--fam-comparative); }
+.block-annotation__ink--fam-structural { --ink-c: color-mix(in srgb, var(--fam-structural) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-structural) 34%, transparent); }
+.block-annotation__anchor--fam-structural { text-decoration-color: var(--fam-structural); }
+.block-annotation__panel--fam-structural { --note-c: var(--fam-structural); }
+.block-annotation__ink--fam-intertextual { --ink-c: color-mix(in srgb, var(--fam-intertextual) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-intertextual) 34%, transparent); }
+.block-annotation__anchor--fam-intertextual { text-decoration-color: var(--fam-intertextual); }
+.block-annotation__panel--fam-intertextual { --note-c: var(--fam-intertextual); }
 
 /* The ink replaces the old underline and coloured bars; anchors stay the click targets. */
 .block-annotation--ink .block-annotation__anchor--word,

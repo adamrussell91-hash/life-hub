@@ -30,8 +30,8 @@ import {
 } from '@/blocks/annotation-thread-keys';
 import {
   buildStopPip,
+  buildStopNote,
   buildThreadChip,
-  fillStepCaption,
   drawThreadLink,
   isNarrowAnnotationViewport,
   placesLabel,
@@ -310,6 +310,11 @@ function buildVoiceNotesList(
     }
   }
   return section;
+}
+
+/** Mark colour for a technique family, matching its Periodic Table card. */
+function familyColourKey(familyKey: string): string {
+  return `fam-${familyKey.toLowerCase()}`;
 }
 
 function layerById(layers: AnnotationLayer[], id: string): AnnotationLayer | undefined {
@@ -690,6 +695,25 @@ function renderLineText(
   );
 }
 
+/**
+ * Bring a thread place's line and its note into view together, moving the
+ * page as little as possible and not at all when both already show.
+ */
+function scrollPlaceIntoView(line: HTMLElement, note: HTMLElement | null): void {
+  if (typeof window === 'undefined' || typeof window.scrollBy !== 'function') return;
+  const top = line.getBoundingClientRect().top;
+  const bottom = (note ?? line).getBoundingClientRect().bottom;
+  const room = { top: 72, bottom: 16 };
+  let delta = 0;
+  if (top < room.top) delta = top - room.top;
+  else if (bottom > window.innerHeight - room.bottom) {
+    delta = Math.min(bottom - window.innerHeight + room.bottom, top - room.top);
+  }
+  if (delta === 0) return;
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  window.scrollBy({ top: delta, behavior: reduce ? 'auto' : 'smooth' });
+}
+
 function isTextControl(target: EventTarget | null): boolean {
   if (
     target instanceof HTMLInputElement ||
@@ -794,6 +818,12 @@ function buildInteractiveView(
   markKey.className = 'block-annotation__key';
   markKey.hidden = true;
 
+  // Recolours technique-tagged marks to match the Periodic Table cards, with a key.
+  const familyKey = document.createElement('div');
+  familyKey.className = 'block-annotation__family-key';
+  familyKey.hidden = true;
+  let colourByFamily = false;
+
   const threadIntro = document.createElement('p');
   threadIntro.className = 'block-annotation__threads-intro';
   threadIntro.hidden = true;
@@ -807,7 +837,7 @@ function buildInteractiveView(
   focusBar.className = 'block-annotation__focus-bar';
   focusBar.hidden = true;
 
-  controls.append(chips, markKey, threadIntro, threadStrip, focusBar);
+  controls.append(chips, markKey, familyKey, threadIntro, threadStrip, focusBar);
 
   layout.append(textCol, panel);
   // Reveal controls sit above the text so a long poem never hides them.
@@ -922,14 +952,23 @@ function buildInteractiveView(
     btn.textContent = label;
     btn.disabled = disabled;
     btn.dataset.step = delta > 0 ? 'next' : 'previous';
-    btn.addEventListener('click', () => {
-      state = {
-        ...state,
-        stepIndex: stepThreadIndex(state.stepIndex, stopCount, delta)
-      };
-      paint();
-    });
+    btn.addEventListener('click', () => stepBy(delta, stopCount));
     return btn;
+  }
+
+  /** Set once a step is asked for, so only that paint brings the place into view. */
+  let scrollToStep = false;
+
+  function stepTo(index: number): void {
+    state = { ...state, stepIndex: index };
+    root.dataset.stepIndex = String(index);
+    scrollToStep = true;
+    paint();
+  }
+
+  function stepBy(delta: -1 | 1, stopCount: number): void {
+    const next = stepThreadIndex(state.stepIndex, stopCount, delta);
+    if (next != null) stepTo(next);
   }
 
   const inkStyle = content.settings.ink_style ?? 'fineliner';
@@ -1074,8 +1113,86 @@ function buildInteractiveView(
     }
     const tail = document.createElement('span');
     tail.className = 'block-annotation__key-tail';
-    tail.textContent = 'Colour = which tick-box layer it belongs to. Click any mark to read its note.';
+    tail.textContent = colourByFamily
+      ? 'Colour = technique family (key below). Click any mark to read its note.'
+      : 'Colour = which tick-box layer it belongs to. Click any mark to read its note.';
     markKey.append(tail);
+  }
+
+  function techniqueFamilyOf(ann: AnnotationItem) {
+    if (!table || !ann.technique?.id) return undefined;
+    const technique = lookupTechnique(table, ann.technique.id);
+    return technique ? familyOfTechnique(table, technique) : undefined;
+  }
+
+  /**
+   * In family colours, a tagged mark takes its Periodic Table card's own colour
+   * (a `fam-*` mark colour fed from the table); the rest keep their layer's.
+   */
+  function recolourByFamily(placed: PlacedAnnotation[]): PlacedAnnotation[] {
+    if (!colourByFamily || !table) return placed;
+    for (const family of table.families) {
+      root.style.setProperty(`--${familyColourKey(family.key)}`, family.colour);
+    }
+    return placed.map((item) => {
+      const family = techniqueFamilyOf(item.annotation);
+      if (!family || !item.layer) return item;
+      const colour = familyColourKey(family.key) as AnnotationLayer['colour'];
+      return { ...item, layer: { ...item.layer, colour } };
+    });
+  }
+
+  /** The toggle, and when it is on, one swatch per technique family on screen. */
+  function fillFamilyKey(placed: PlacedAnnotation[]): void {
+    familyKey.replaceChildren();
+    const families = new Map<string, string>();
+    let untagged = false;
+    for (const item of placed) {
+      const family = techniqueFamilyOf(item.annotation);
+      if (family) families.set(family.key, family.name);
+      else untagged = true;
+    }
+    familyKey.hidden = families.size === 0;
+    if (familyKey.hidden) return;
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'block-annotation__family-toggle';
+    toggle.setAttribute('aria-pressed', colourByFamily ? 'true' : 'false');
+    toggle.textContent = colourByFamily ? '✓ Colour by technique family' : 'Colour by technique family';
+    toggle.title = colourByFamily
+      ? 'Go back to layer colours'
+      : 'Colour each technique to match its Periodic Table card';
+    toggle.addEventListener('click', () => {
+      colourByFamily = !colourByFamily;
+      paint();
+    });
+    familyKey.append(toggle);
+    if (!colourByFamily) return;
+
+    const list = document.createElement('ul');
+    list.className = 'block-annotation__family-swatches';
+    list.setAttribute('aria-label', 'Technique family colours');
+    const order = table?.families.map((fam) => fam.key) ?? [];
+    for (const key of order) {
+      const name = families.get(key);
+      if (!name) continue;
+      const item = document.createElement('li');
+      item.className = 'block-annotation__family-swatch';
+      const dot = document.createElement('span');
+      dot.className = 'block-annotation__family-dot';
+      dot.style.background = `var(--${familyColourKey(key)})`;
+      dot.setAttribute('aria-hidden', 'true');
+      item.append(dot, name);
+      list.append(item);
+    }
+    familyKey.append(list);
+    if (untagged) {
+      const note = document.createElement('span');
+      note.className = 'block-annotation__family-note';
+      note.textContent = 'Notes without a technique keep their layer colour.';
+      familyKey.append(note);
+    }
   }
 
   function paint(): void {
@@ -1198,7 +1315,7 @@ function buildInteractiveView(
       const hint = document.createElement('p');
       hint.className = 'block-annotation__focus-hint';
       hint.textContent =
-        'The rest of the text is faded. The coloured line on the left joins each place, in order.';
+        'The rest of the text is faded. The coloured line on the left joins each place, in order, and each place’s note sits under its line.';
 
       const nav = document.createElement('div');
       nav.className = 'block-annotation__focus-nav';
@@ -1223,17 +1340,11 @@ function buildInteractiveView(
       });
       nav.append(showAll);
 
-      focusBar.append(eyebrow, heading, body, hint);
-      if (stepping && stepIndex != null) {
-        const caption = document.createElement('div');
-        caption.className = 'block-annotation__step-caption';
-        fillStepCaption(caption, focusAnn, focusStops, stepIndex);
-        focusBar.append(caption);
-      }
-      focusBar.append(nav);
+      focusBar.append(eyebrow, heading, body, hint, nav);
     }
 
-    const placed = placedFor(content, mode, state);
+    const placed = recolourByFamily(placedFor(content, mode, state));
+    fillFamilyKey(placed);
     const byLine = new Map<string, LineMark[]>();
     const lineBars = new Map<string, PlacedAnnotation[]>();
     const stanzaBars = new Map<string, PlacedAnnotation[]>();
@@ -1340,6 +1451,7 @@ function buildInteractiveView(
         if (!stop.resolved.lineId) return;
         const pip = buildStopPip(index, layer?.colour, () => {
           enterFocus(ann.id, index);
+          scrollToStep = true;
           paint();
         });
         pushGrouped(pipsByLine, stop.resolved.lineId, pip);
@@ -1373,6 +1485,23 @@ function buildInteractiveView(
     const focusColour = focusAnn
       ? (layerById(content.layers, focusAnn.layer_id)?.colour ?? 'wave')
       : null;
+    // Each place's own note sits under its line (a stanza place: under its last line).
+    const stopNotesByLine = new Map<string, HTMLElement[]>();
+    focusStops.forEach((stop, index) => {
+      const lineId =
+        stop.resolved.lineId ??
+        content.text.stanzas.find((s) => s.id === stop.resolved.stanzaId)?.lines.at(-1)?.id;
+      if (!lineId) return;
+      const note = buildStopNote({
+        stopIndex: index,
+        stopCount: focusStops.length,
+        html: stop.note_html,
+        colour: focusColour ?? undefined,
+        current: stepIndex === index,
+        onStep: (delta) => stepBy(delta, focusStops.length)
+      });
+      if (note) pushGrouped(stopNotesByLine, lineId, note);
+    });
     if (focusColour) root.style.setProperty('--thread-c', `var(--${focusColour})`);
     else root.style.removeProperty('--thread-c');
 
@@ -1474,7 +1603,7 @@ function buildInteractiveView(
       linesCol.className = 'block-annotation__lines';
 
       for (const line of stanza.lines) {
-        linesCol.append(paintLineRow(line, stanza.id));
+        linesCol.append(paintLineRow(line, stanza.id), ...(stopNotesByLine.get(line.id) ?? []));
       }
 
       stanzaEl.append(linesCol);
@@ -1501,11 +1630,11 @@ function buildInteractiveView(
 
     voicePlayer.sync();
     textCol.scrollTop = scrollTop;
-    if (stepping) {
-      root
-        .querySelector<HTMLElement>('.block-annotation__line.is-step')
-        ?.scrollIntoView?.({ block: 'nearest' });
+    if (stepping && scrollToStep) {
+      const line = root.querySelector<HTMLElement>('.block-annotation__line.is-step');
+      if (line) scrollPlaceIntoView(line, root.querySelector<HTMLElement>('.block-annotation__stop-note.is-current'));
     }
+    scrollToStep = false;
 
     // Ink over every visible anchor; labels only for word / phrase / line notes.
     const placedById = new Map(placed.map((item) => [item.annotation.id, item]));
@@ -1596,13 +1725,7 @@ function buildInteractiveView(
       case 'step_thread': {
         const focusAnn = content.annotations.find((a) => a.id === state.focusThreadId);
         if (!focusAnn) break;
-        const focusStops = resolvedThreadStops(content, focusAnn);
-        state = {
-          ...state,
-          stepIndex: stepThreadIndex(state.stepIndex, focusStops.length, action.delta)
-        };
-        root.dataset.stepIndex = String(state.stepIndex ?? '');
-        paint();
+        stepBy(action.delta, resolvedThreadStops(content, focusAnn).length);
         break;
       }
     }
