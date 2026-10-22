@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
-import { AfterLessonIdsSchema, BlockSchema, LessonKindSchema, LineStopSchema } from './block';
+import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonKindSchema, LineStopSchema } from './block';
 import { QuizSettingsSchema } from '../quiz/core';
 import { visitBlocks } from '../blocks/walk-blocks';
 import { CoverSchema } from './cover';
@@ -40,6 +40,8 @@ export const LessonSchema = z.object({
    */
   after_lesson_ids: AfterLessonIdsSchema.nullable().optional(),
   lesson_kind: LessonKindSchema.optional(),
+  /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
+  dot_points: z.array(DotPointRefSchema).max(20).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */

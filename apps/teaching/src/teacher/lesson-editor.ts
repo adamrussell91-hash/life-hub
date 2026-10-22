@@ -4,6 +4,8 @@ import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
 import { withAppBase } from '@/app/base-path';
 import { apiGet, apiPatch, apiPost, ApiClientError } from '@/api/client';
+import { subjectUsesAlignment } from '@/alignment/model';
+import { isCurriculumLinesV2 } from '@/schemas/block';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { agentColour, readLastAgentSlug, type AgentSlug } from '@/ai/agents';
 import type { AiProposal, AiScope } from '@/ai/proposals';
@@ -255,6 +257,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       // null (follow unit order) is saved as null so the merge clears the old list.
       if (next.after_lesson_ids !== undefined) lesson.after_lesson_ids = next.after_lesson_ids;
       if (next.lesson_kind) lesson.lesson_kind = next.lesson_kind;
+      // Saves merge into the stored lesson, so clearing sends an empty list.
+      if (next.dot_points) lesson.dot_points = next.dot_points;
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
       if (next.quiz) {
         lesson.quiz = next.quiz;
@@ -606,6 +610,14 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           .map((id) => byId.get(id))
           .filter((l): l is NonNullable<typeof l> => Boolean(l))
           .map((l) => ({ id: l.id, title: l.title, ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}) }));
+      })(),
+      dotPoints: (() => {
+        const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
+        const subject = unit ? curriculum.subjects.find((entry) => entry.id === unit.subject_id) : undefined;
+        if (!unit || !subject || !subjectUsesAlignment(subject.title)) return undefined;
+        // The unit map's chosen focus area wins over the guess from the unit's title.
+        const chosen = (unit.blocks ?? []).flatMap((b) => (b.block_type === 'curriculum_lines' && isCurriculumLinesV2(b.content) && b.content.focus_area ? [b.content.focus_area] : []))[0];
+        return { unitTitle: unit.title, ...(chosen ? { focusArea: chosen } : {}) };
       })(),
       onFlowPeer: async (lessonId, after) => {
         await apiPatch(`/api/lessons/${lessonId}`, { after_lesson_ids: after });

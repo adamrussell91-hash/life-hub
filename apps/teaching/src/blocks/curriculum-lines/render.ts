@@ -4,6 +4,7 @@ import type { RenderContext, RenderMode } from '@/blocks/render';
 import { mountNetworkStage, networkLegend } from '@/network/draw';
 import { buildUnitNetwork, convertV1, withStops, type NetLesson } from '@/network/model';
 import type { NetInput } from '@/network/layout';
+import { mountCoveragePanel } from '@/alignment/coverage-panel';
 
 /** The map's input for this viewer. Version 1 blocks are converted in memory, never saved here. */
 export function unitNetworkInput(block: CurriculumLinesBlock, ctx: RenderContext): NetInput {
@@ -45,5 +46,14 @@ export function renderCurriculumLines(block: CurriculumLinesBlock, mode: RenderM
     mountNetworkStage(input, { print: mode === 'print', label: title ? `Curriculum map: ${title}` : 'Unit curriculum map' }),
     networkLegend('unit')
   );
+  // Teachers see what the lines cover in the syllabus, under the map.
+  if (mode === 'teacher' && ctx.network) {
+    mountCoveragePanel(root, {
+      lines: ctx.network.lines,
+      lessons: ctx.network.lessons.map((l) => ({ id: l.id, title: l.title, line_stops: l.line_stops ?? [], dot_points: l.dot_points ?? [] })),
+      unitTitle: ctx.network.unitTitle,
+      ...(isCurriculumLinesV2(block.content) && block.content.focus_area ? { focusArea: block.content.focus_area } : {})
+    });
+  }
   return root;
 }

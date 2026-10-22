@@ -60,7 +60,8 @@ function lessonSummary(lesson, publishedIds) {
     ...(typeof lesson.pedagogical_mode === 'string' ? { pedagogical_mode: lesson.pedagogical_mode } : {}),
     ...(Array.isArray(lesson.line_stops) && lesson.line_stops.length ? { line_stops: lesson.line_stops } : {}),
     ...(Array.isArray(lesson.after_lesson_ids) ? { after_lesson_ids: lesson.after_lesson_ids } : {}),
-    ...(LESSON_KINDS.has(lesson.lesson_kind) && lesson.lesson_kind !== 'lesson' ? { lesson_kind: lesson.lesson_kind } : {})
+    ...(LESSON_KINDS.has(lesson.lesson_kind) && lesson.lesson_kind !== 'lesson' ? { lesson_kind: lesson.lesson_kind } : {}),
+    ...(Array.isArray(lesson.dot_points) && lesson.dot_points.length ? { dot_points: lesson.dot_points } : {})
   };
 }
 

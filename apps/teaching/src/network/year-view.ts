@@ -1,4 +1,5 @@
 import { apiPatch } from '@/api/client';
+import { subjectUsesAlignment } from '@/alignment/model';
 import type { Subject } from '@/schemas';
 import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumResponse } from '@/teacher/nav';
@@ -73,6 +74,7 @@ export function mountYearNetworkView(host: HTMLElement, curriculum: CurriculumRe
     const units = yearNetworkUnits(curriculum, subjectId);
     mountLinesEditor(panel, {
       lines: subject!.network_lines ?? [],
+      syllabus: subjectUsesAlignment(subject!.title),
       onSave: async (next) => {
         await saveSubjectLines(curriculum, subjectId, next);
         paintMap();
