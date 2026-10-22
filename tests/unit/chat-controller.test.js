@@ -2489,3 +2489,51 @@ test('switching from Vera to Penelope flushes then pins Penelope', async () => {
   assert.equal(sendCalls[1].message, VERA_FLUSH);
   assert.equal(controller.getSelectedAgentSlug(), 'penelope');
 });
+
+test('a hand-off after a Vera thread goes to the new agent only once the Vera flush has finished', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let releaseFlush;
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      if (sendCalls.length === 2) await new Promise(resolve => { releaseFlush = resolve; });
+      yield { type: 'agent', slug: sendCalls.length === 3 ? 'brisket' : 'vera' };
+      yield { type: 'text', delta: 'Noted.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('vera');
+  await controller.send('Today felt long');
+  // Leaving the chat surface starts the flush without waiting for it.
+  void controller.flushVeraSession();
+  await flushMicrotasks();
+  await controller.selectAgent('brisket');
+  const idle = controller.waitUntilIdle();
+  let sent = false;
+  const handoff = idle.then(() => controller.send('Count this Food Journal dish.')).then(r => { sent = true; return r; });
+  await flushMicrotasks();
+  assert.equal(sendCalls.length, 2, 'the hand-off waits behind the flush');
+  assert.equal(sent, false);
+  releaseFlush();
+  const result = await handoff;
+  assert.equal(sendCalls.length, 3);
+  assert.equal(sendCalls[1].priorAgentSlug, 'vera');
+  assert.equal(sendCalls[2].message, 'Count this Food Journal dish.');
+  assert.equal(sendCalls[2].priorAgentSlug, 'brisket');
+  assert.deepEqual(result, { ok: true });
+});
+
+test('send reports a failed turn so a caller can say so', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    // eslint-disable-next-line require-yield
+    async *send() {
+      throw Object.assign(new Error('down'), { status: 502 });
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  assert.deepEqual(await controller.send('Count this'), { ok: false });
+});

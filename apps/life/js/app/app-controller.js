@@ -145,6 +145,7 @@ export function createAppController(dependencies) {
     renderMind,
     chatSelectAgent,
     chatSend,
+    chatWaitUntilIdle,
     chatSyncAccent,
     chatStartCentralNodeAudit,
     chatFlushVeraSession,
@@ -799,17 +800,19 @@ export function createAppController(dependencies) {
   }
 
   /** Food Journal → Brisket: open Brisket on Nutrition and send the hand-off. */
-  function openBrisketWith(message, attachments = []) {
-    if (!chatPanel) return;
+  async function openBrisketWith(message, attachments = []) {
+    if (!chatPanel || !chatSend) return { ok: false };
     // The chat slot lives in Nutrition, so it must be the visible section.
     if (currentSection !== 'nutrition') showSection('nutrition');
-    chatSelectAgent?.(NUTRITION_AGENT_SLUG);
+    // Switching may first save a Vera session; the hand-off must not ride on it.
+    await chatSelectAgent?.(NUTRITION_AGENT_SLUG);
     const slot = root.querySelector('#nutrition-dashboard');
     if (slot && !chatPanel.isOpen()) {
       chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, NUTRITION_AGENT_SLUG));
       chatClearUnread?.();
     }
-    void chatSend?.(message, { attachments });
+    await chatWaitUntilIdle?.();
+    return (await chatSend(message, { attachments })) ?? { ok: true };
   }
 
   function openCentralNodeAudit() {
