@@ -165,6 +165,57 @@ describe('annotation thread focus (3b)', () => {
     el.remove();
   });
 
+  it('shows every place note under its line without stepping', () => {
+    mockViewport(1440);
+    const fixture = structuredClone(threadFocusFixture);
+    const el = renderAnnotationBlock(fixture, 'student');
+    document.body.append(el);
+
+    el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!.click();
+    const notes = [...el.querySelectorAll<HTMLElement>('.block-annotation__stop-note')];
+    expect(notes.map((n) => n.dataset.stop)).toEqual(['1', '2', '3', '4', '5']);
+    // Each note follows its own line, not the card at the top.
+    expect(notes[0]!.previousElementSibling?.getAttribute('data-line-id')).toBe('line_1');
+    expect(el.querySelector('.block-annotation__focus-bar')!.textContent).not.toContain('Opening posture');
+    expect(el.querySelector('.block-annotation__stop-note.is-current')).toBeNull();
+
+    el.remove();
+  });
+
+  it('steps from the place note itself and scrolls only when the place is off screen', () => {
+    mockViewport(1440);
+    const scrollBy = vi.fn();
+    vi.spyOn(window, 'scrollBy').mockImplementation(scrollBy);
+    const fixture = structuredClone(threadFocusFixture);
+    const el = renderAnnotationBlock(fixture, 'student');
+    document.body.append(el);
+
+    el.querySelector<HTMLButtonElement>('[data-thread-id="ann_motif"]')!.click();
+    el.querySelector<HTMLButtonElement>('.block-annotation__step-btn[data-step="next"]')!.click();
+    const current = () => el.querySelector<HTMLElement>('.block-annotation__stop-note.is-current')!;
+    expect(current().dataset.stop).toBe('1');
+    expect(current().textContent).toContain('Place 1 of 5');
+
+    // Place on screen: the page stays still.
+    let top = 300;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ top, bottom: top + 40, left: 0, right: 0, width: 0, height: 40, x: 0, y: top }) as DOMRect
+    );
+    scrollBy.mockClear();
+    current().querySelector<HTMLButtonElement>('[data-step="next"]')!.click();
+    expect(current().dataset.stop).toBe('2');
+    expect(current().querySelector<HTMLButtonElement>('[data-step="previous"]')!.disabled).toBe(false);
+    expect(scrollBy).not.toHaveBeenCalled();
+
+    // Place below the fold: scroll just enough to show the line and its note.
+    top = window.innerHeight + 100;
+    current().querySelector<HTMLButtonElement>('[data-step="next"]')!.click();
+    expect(scrollBy).toHaveBeenCalledTimes(1);
+    expect(scrollBy.mock.calls[0]![0].top).toBe(156);
+
+    el.remove();
+  });
+
   it('uses pips instead of arcs at 390', () => {
     mockViewport(390);
     const fixture = structuredClone(threadFocusFixture);
