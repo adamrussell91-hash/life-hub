@@ -5,6 +5,8 @@ import type { AnyColumn, MarkbookView, QuizScore, RosterStudent } from './types'
 
 export type AssessmentResult = { exempt: boolean; score: number | null; max: number; percent: number | null; complete: boolean };
 
+const collator = new Intl.Collator('en-AU', { sensitivity: 'base', numeric: true });
+
 export const criteriaMax = (column: AssessmentColumn): number => column.criteria.reduce((sum, c) => sum + c.max, 0);
 
 export function assessmentResult(column: AssessmentColumn, mark: AssessmentMark | undefined): AssessmentResult {
@@ -63,12 +65,12 @@ export function dateOf(column: AnyColumn): string {
 /** Teacher columns and shown quizzes, oldest first. */
 export function orderedColumns(view: MarkbookView): AnyColumn[] {
   const all: AnyColumn[] = [...view.markbook.columns, ...view.quizzes.filter((q) => !q.hidden)];
-  return all.sort((a, b) => dateOf(a).localeCompare(dateOf(b)) || a.title.localeCompare(b.title));
+  return all.sort((a, b) => dateOf(a).localeCompare(dateOf(b)) || collator.compare(a.title, b.title));
 }
 
 const surname = (name: string): string => name.trim().split(/\s+/).pop() ?? '';
 export function sortStudents<T extends { name: string }>(students: readonly T[]): T[] {
-  return [...students].sort((a, b) => surname(a.name).localeCompare(surname(b.name)) || a.name.localeCompare(b.name));
+  return [...students].sort((a, b) => collator.compare(surname(a.name), surname(b.name)) || collator.compare(a.name, b.name));
 }
 
 export function removedStudentIds(view: MarkbookView): string[] {
@@ -82,15 +84,22 @@ export function removedStudentIds(view: MarkbookView): string[] {
 export function rowStudents(view: MarkbookView, showRemoved: boolean): RosterStudent[] {
   const rows = sortStudents(view.students);
   if (!showRemoved) return rows;
-  return [...rows, ...removedStudentIds(view).map((id) => ({ id, name: 'Removed student', initials: '–' }))];
+  return [...rows, ...removedStudentIds(view).map((id, i) => ({ id, name: `Removed student ${i + 1}`, initials: '–', removed: true as const }))];
 }
 
 export const formatPercent = (p: number | null): string => (p === null ? '–' : `${Math.round(p)}%`);
 
 export function formatDay(day: string): string {
-  return new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`));
+  const date = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return day;
+  return new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date);
 }
 
 export function todayInSydney(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  const parts = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const get = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
+
+/** The Sydney calendar day an ISO timestamp falls on. */
+export const sydneyDay = (iso: string): string => todayInSydney(new Date(iso));
