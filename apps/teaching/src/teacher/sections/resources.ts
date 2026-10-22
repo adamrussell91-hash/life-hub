@@ -1,3 +1,4 @@
+import { renderSkillsLibrary, selectSkill } from '@/skills/view';
 import type { Media, MediaFolder } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -48,7 +49,7 @@ function readStoredView(): LibraryView {
   try {
     const raw = localStorage.getItem(VIEW_STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as LibraryView) : null;
-    if (parsed && ['all', 'unfiled', 'unused', 'by-unit', 'outcomes'].includes(parsed.kind)) return { kind: parsed.kind } as LibraryView;
+    if (parsed && ['all', 'unfiled', 'unused', 'by-unit', 'outcomes', 'skills'].includes(parsed.kind)) return { kind: parsed.kind } as LibraryView;
     if (parsed?.kind === 'folder' && typeof parsed.id === 'string') return { kind: 'folder', id: parsed.id };
   } catch {
     // Storage blocked: start on All resources.
@@ -66,6 +67,13 @@ function setView(view: LibraryView): void {
   } catch {
     // Storage blocked: the view still holds for this session.
   }
+}
+
+/** Opens the Resource Library on the Skills continuum at one sub-strand, `strand.sub`. */
+export function showSkillInLibrary(ref?: string): void {
+  if (ref) selectSkill(ref);
+  setView({ kind: 'skills' });
+  navigate('/resources');
 }
 
 /** Opens the Resource Library on its Outcomes view (from the outcome picker). */
@@ -449,7 +457,7 @@ export function renderResourcesIndex(
     curriculumHeading.textContent = 'Curriculum';
     const curriculumViews = document.createElement('div');
     curriculumViews.className = 'resources-nav__views';
-    curriculumViews.append(navButton('Outcomes', { kind: 'outcomes' }, libraryOutcomeCount(curriculum)));
+    curriculumViews.append(navButton('Outcomes', { kind: 'outcomes' }, libraryOutcomeCount(curriculum)), navButton('Skills continuum', { kind: 'skills' }));
     nav.append(views, heading, tree, curriculumHeading, curriculumViews);
   }
 
@@ -460,8 +468,12 @@ export function renderResourcesIndex(
     main.replaceChildren();
     const data = curriculumView();
     // Upload, link and folder tools act on files, not outcomes.
-    toolbar.hidden = currentView.kind === 'outcomes';
+    toolbar.hidden = currentView.kind === 'outcomes' || currentView.kind === 'skills';
     if (toolbar.hidden) urlForm.hidden = true;
+    if (currentView.kind === 'skills') {
+      renderSkillsLibrary(main);
+      return;
+    }
     if (currentView.kind === 'outcomes') {
       // Outcome writes touch subjects, lessons and units, so refetch before the remount.
       renderOutcomesLibrary(main, curriculum, {
@@ -758,7 +770,8 @@ const VIEW_TITLES: Record<Exclude<LibraryView['kind'], 'folder'>, string> = {
   unfiled: 'Unfiled',
   unused: 'Not used anywhere',
   'by-unit': 'By class and unit',
-  outcomes: 'Outcomes'
+  outcomes: 'Outcomes',
+  skills: 'Skills continuum'
 };
 
 const VIEW_EMPTY: Record<'all' | 'unfiled' | 'unused', string> = {

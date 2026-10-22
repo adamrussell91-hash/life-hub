@@ -8,31 +8,16 @@
  * link edits live here. The syllabus and booklet wording never enters public code.
  */
 import { ALIGNMENT_ID, AlignmentPatchError, AlignmentPatchSchema, AlignmentSchema, applyAlignmentPatch, mergeMissingSkills, needsSkills } from './syllabus-alignment-schema.mjs';
-import { PROFESSIONAL_DATA_TOKEN_ENV, professionalDataRepo } from './github-professional-data.mjs';
+import { readPrivateJsonFile } from './private-data-file.mjs';
 import { reject } from './question-drop.mjs';
 
 export { ALIGNMENT_ID };
 const alignmentKey = (id) => `syllabus_alignment/${id}`;
 export const privateAlignmentPath = (id) => `data/teaching/syllabus/${id}.json`;
-const FETCH_TIMEOUT_MS = 12_000;
 
 /** Read the alignment's source file from the private data repository. */
-export async function readPrivateAlignment(id, { env = process.env, fetchImpl = fetch } = {}) {
-  const token = env?.[PROFESSIONAL_DATA_TOKEN_ENV];
-  if (typeof token !== 'string' || !token) reject(503, 'private_data_unbound', 'The private syllabus file can’t be reached from here.');
-  const url = `https://api.github.com/repos/${professionalDataRepo(env)}/contents/${privateAlignmentPath(id)}?ref=main`;
-  let response;
-  try {
-    response = await fetchImpl(url, {
-      headers: { accept: 'application/vnd.github.raw+json', authorization: `Bearer ${token}`, 'user-agent': 'life-hub' },
-      signal: typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(FETCH_TIMEOUT_MS) : undefined
-    });
-  } catch {
-    reject(502, 'private_data_unreachable', 'The private syllabus file didn’t load. Try again in a moment.');
-  }
-  if (response.status === 404) reject(404, 'not_found', 'The private syllabus file isn’t there yet.');
-  if (!response.ok) reject(502, 'private_data_unreachable', 'The private syllabus file didn’t load. Try again in a moment.');
-  const parsed = AlignmentSchema.safeParse(await response.json().catch(() => null));
+export async function readPrivateAlignment(id, deps = {}) {
+  const parsed = AlignmentSchema.safeParse(await readPrivateJsonFile(privateAlignmentPath(id), { ...deps, label: 'private syllabus file' }));
   if (!parsed.success) reject(500, 'corrupt', 'The private syllabus file couldn’t be read.');
   return parsed.data;
 }

@@ -27,7 +27,9 @@ export const CriterionSchema = z.object({
   label: z.string().trim().min(1, 'Name each criterion.').max(MARKBOOK_LIMITS.label),
   max: z.number().positive('Each criterion needs marks.').max(1000, 'A criterion is worth at most 1000 marks.'),
   outcomes: z.array(z.string().trim().min(1).max(64)).max(MARKBOOK_LIMITS.outcomes).default([]),
-  bands: z.array(BandSchema).max(MARKBOOK_LIMITS.bands).optional()
+  bands: z.array(BandSchema).max(MARKBOOK_LIMITS.bands).optional(),
+  /** A skills-continuum sub-strand, `strand.sub`, that this criterion assesses. */
+  skill: z.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, 'Pick a skill from the list.').optional()
 });
 
 export const AssessmentColumnSchema = z.object({

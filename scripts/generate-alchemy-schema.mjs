@@ -36,3 +36,9 @@ await build({
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
   banner: {js:'// Generated from apps/teaching/src/alignment/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
+await build({
+  entryPoints: ['apps/teaching/src/skills/schema.ts'],
+  outfile: 'netlify/functions/_shared/skills-continuum-schema.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/skills/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
