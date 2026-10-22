@@ -35,6 +35,44 @@ describe('outcomes view', () => {
     const tom = root.querySelectorAll('tbody tr')[1]!;
     expect(tom.querySelector('.mb-outcome-cell--none')?.textContent).toBe('No evidence');
   });
+  it('sorts Other outcomes last, codes numerically, and names unknown ids', () => {
+    const many: MarkbookView = {
+      ...view,
+      quizzes: [{ ...quiz, questions: [{ id: 'q1', prompt: 'P', marks: 1, outcomes: ['o10', 'zz9', 'o2b', 'o1'] }], scores: {} }],
+      markbook: { ...view.markbook, columns: [] }
+    };
+    const more = [
+      { id: 'o1', code: 'EN12-1', title: 'Responds', group: 'A' },
+      { id: 'o2b', code: 'EN12-2', title: 'Two', group: 'A' },
+      { id: 'o10', code: 'EN12-10', title: 'Ten', group: 'A' },
+      { id: 'zz9', code: 'ZZ-1', title: 'Late', group: 'Zulu' }
+    ];
+    const root = renderOutcomes(many, view.students, more);
+    expect([...root.querySelectorAll('thead .mb-outcome__code')].map((n) => n.textContent)).toEqual(['EN12-1', 'EN12-2', 'EN12-10', 'ZZ-1']);
+    const odd = renderOutcomes({ ...many, quizzes: [{ ...many.quizzes[0]!, questions: [{ id: 'q1', prompt: 'P', marks: 1, outcomes: ['gone1', 'o1'] }] }] }, view.students, [{ id: 'o1', code: 'EN12-1', title: 'Responds', group: 'Zulu' }]);
+    const heads = [...odd.querySelectorAll<HTMLElement>('thead th.mb-col')];
+    expect(heads.map((n) => n.querySelector('.mb-outcome__code')?.textContent)).toEqual(['EN12-1', 'Unknown outcome']);
+    expect(heads[1]!.title).toBe('gone1');
+  });
+  it('shows a group label only where the group changes', () => {
+    const root = renderOutcomes(view, view.students, [...labels, { id: 'o3', code: 'EN12-4', title: 'X', group: 'Objective B' }].map((l) => l));
+    expect([...root.querySelectorAll('thead th.mb-col')].map((n) => n.querySelector('.mb-col__kind')?.textContent ?? '')).toEqual(['Objective A', 'Objective B']);
+    const same = renderOutcomes(view, view.students, labels.map((l) => ({ ...l, group: 'Objective A' })));
+    expect([...same.querySelectorAll('thead th.mb-col')].map((n) => n.querySelector('.mb-col__kind')?.textContent ?? '')).toEqual(['Objective A', '']);
+  });
+  it('re-presses a remembered selection, reports changes, and clears on a second click', () => {
+    const picks: unknown[] = [];
+    const root = renderOutcomes(view, view.students, labels, { selected: { col: 'outcome:o2', student: 's1' }, onSelect: (s) => picks.push(s) });
+    const cell = root.querySelector<HTMLButtonElement>('button[data-col="outcome:o2"][data-student="s1"]')!;
+    expect(cell.getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('.mb-evidence__title')?.textContent).toBe('BB · EN12-3');
+    cell.click();
+    expect(cell.getAttribute('aria-pressed')).toBe('false');
+    expect(root.querySelector('.mb-evidence')?.textContent).toBe('');
+    expect(picks).toEqual([null]);
+    cell.click();
+    expect(picks).toEqual([null, { col: 'outcome:o2', student: 's1' }]);
+  });
   it('says so when nothing is tagged', () => {
     const root = renderOutcomes({ ...view, markbook: { ...view.markbook, columns: [] }, quizzes: [] }, view.students, labels);
     expect(root.textContent).toBe('No outcomes yet. Tag assessment criteria or quiz questions with outcome codes, or give the quiz lesson outcomes.');
@@ -73,6 +111,14 @@ describe('heatmap', () => {
     const dialog = root.querySelector<HTMLElement>('[role="dialog"]')!;
     const heading = document.getElementById(dialog.getAttribute('aria-labelledby')!);
     expect(heading?.textContent).toBe('Quiz 1');
+  });
+  it('moves focus into the sheet, gives row headers the full prompt, and draws a legend', () => {
+    const root = openHeatmap(quiz, view.students);
+    expect(root.querySelector('.mb-sheet')!.contains(document.activeElement)).toBe(true);
+    expect(root.querySelector<HTMLElement>('.mb-reteach li')!.title).toBe('Explain the ending');
+    const legend = root.querySelector('.mb-heat-legend')!;
+    expect([...legend.querySelectorAll('li')].map((n) => n.textContent)).toEqual(['Below 50', '50–69', '70–84', '85+', 'To mark', 'Not taken']);
+    expect([...legend.querySelectorAll('.mb-heat-legend__swatch')].every((n) => n.getAttribute('aria-hidden') === 'true')).toBe(true);
   });
   it('closes on Escape and returns focus where it is told', () => {
     const opener = document.createElement('button');

@@ -94,3 +94,8 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-heat--none { background: none; }
 .mb-attempt__link { color: var(--marine); font-weight: var(--weight-semibold); }
 .mb-outcomes { display: grid; gap: var(--space-3); }
+.mb-grid { position: relative; }
+.mb-heat th[scope="row"] { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; }
+.mb-heat-legend { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--text-xs); color: var(--muted); }
+.mb-heat-legend__item { display: inline-flex; align-items: center; gap: var(--space-1); }
+.mb-heat-legend__swatch { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--line); border-radius: 2px; }

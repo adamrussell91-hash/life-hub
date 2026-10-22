@@ -130,5 +130,13 @@ export function openOverlay(content: HTMLElement, opts: OverlayOptions = {}): { 
   stack.push(overlay);
   syncInert();
   document.addEventListener('keydown', onKey);
+  // Focus goes into the dialog. Owners that focus a field of their own do so after this returns, so theirs wins.
+  if (!content.contains(document.activeElement)) {
+    const heading = opts.labelledBy ? document.getElementById(opts.labelledBy.split(/\s+/)[0]!) : null;
+    if (heading && content.contains(heading)) {
+      if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
+      heading.focus();
+    } else focusables(content)[0]?.focus();
+  }
   return { overlay, close };
 }

@@ -12,31 +12,55 @@ export type SheetOptions = {
 
 let sheetCount = 0;
 
-/** A sheet with a Close button and a heading that names the dialog. */
-function sheet(heading: HTMLElement, opts: SheetOptions): { overlay: HTMLElement; body: HTMLElement } {
+/** A sheet with a Close button, its contents, and a heading among them that names the dialog. */
+function present(heading: HTMLElement, contents: Node[], opts: SheetOptions): HTMLElement {
   const body = el('div', 'mb-sheet');
   heading.id = `mb-sheet-${(sheetCount += 1)}`;
   const close = el('button', 'btn btn--secondary mb-sheet__close', 'Close');
   close.type = 'button';
-  body.append(close);
+  body.append(close, ...contents);
   const opened = openOverlay(body, { labelledBy: heading.id, returnFocus: opts.returnFocus });
   close.addEventListener('click', () => opened.close());
-  return { overlay: opened.overlay, body };
+  return opened.overlay;
+}
+
+const LEGEND: Array<[string, string]> = [
+  ['mb-band--low', 'Below 50'],
+  ['mb-band--mid', '50–69'],
+  ['mb-band--good', '70–84'],
+  ['mb-band--high', '85+'],
+  ['mb-heat--pending', 'To mark'],
+  ['mb-heat--none', 'Not taken']
+];
+
+function legend(): HTMLElement {
+  const list = el('ul', 'mb-heat-legend');
+  for (const [cls, text] of LEGEND) {
+    const item = el('li', 'mb-heat-legend__item');
+    const swatch = el('span', `mb-heat-legend__swatch ${cls}`);
+    swatch.setAttribute('aria-hidden', 'true');
+    item.append(swatch, text);
+    list.append(item);
+  }
+  return list;
 }
 
 const short = (text: string): string => (text.length > 60 ? `${text.slice(0, 57)}…` : text || 'Question');
 
 export function openHeatmap(quiz: QuizColumn, students: RosterStudent[], opts: SheetOptions = {}): HTMLElement {
   const heading = el('h3', 'mb-form__title', quiz.title);
-  const { overlay, body } = sheet(heading, opts);
-  body.append(heading);
+  const body: Node[] = [heading];
   const reteach = reteachList(quiz, students.map((s) => s.id));
-  body.append(el('h4', 'mb-form__label', 'Reteach'));
-  if (!reteach.length) body.append(el('p', 'mb__empty', 'No question averaged below 50%.'));
+  body.push(el('h4', 'mb-form__label', 'Reteach'));
+  if (!reteach.length) body.push(el('p', 'mb__empty', 'No question averaged below 50%.'));
   else {
     const list = el('ol', 'mb-reteach');
-    for (const r of reteach) list.append(el('li', undefined, `${short(r.prompt)} · ${Math.round(r.average * 100)}%`));
-    body.append(list);
+    for (const r of reteach) {
+      const item = el('li', undefined, `${short(r.prompt)} · ${Math.round(r.average * 100)}%`);
+      item.title = r.prompt;
+      list.append(item);
+    }
+    body.push(list);
   }
   const grid = el('div', 'mb-grid');
   const table = el('table', 'mb-grid__table mb-heat');
@@ -71,14 +95,12 @@ export function openHeatmap(quiz: QuizColumn, students: RosterStudent[], opts: S
   }
   table.append(thead, tbody);
   grid.append(table);
-  body.append(grid);
-  return overlay;
+  body.push(grid, legend());
+  return present(heading, body, opts);
 }
 
 export function openQuizAttempt(quiz: QuizColumn, student: RosterStudent, resultsHref: string, opts: SheetOptions = {}): HTMLElement {
   const heading = el('h3', 'mb-panel__student', `${student.initials} · ${student.name}`);
-  const { overlay, body } = sheet(heading, opts);
-  body.append(el('p', 'mb-panel__task', quiz.title), heading);
   const list = el('ul', 'mb-attempt');
   const score = quiz.scores[student.id];
   // Walks the quiz's questions, so rows from an older published key are left out.
@@ -88,6 +110,5 @@ export function openQuizAttempt(quiz: QuizColumn, student: RosterStudent, result
   }
   const link = el('a', 'mb-attempt__link', 'Mark in Results');
   link.href = resultsHref;
-  body.append(list, link);
-  return overlay;
+  return present(heading, [el('p', 'mb-panel__task', quiz.title), heading, list, link], opts);
 }

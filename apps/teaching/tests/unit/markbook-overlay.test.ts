@@ -39,6 +39,21 @@ describe('overlay', () => {
     expect(already.hasAttribute('inert')).toBe(true);
   });
 
+  it('moves focus into the content: to the labelling heading, else the first control', () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    outside.focus();
+    const one = panel();
+    const first = openOverlay(one.content, { labelledBy: 'panel-heading' });
+    expect(document.activeElement?.id).toBe('panel-heading');
+    expect((document.activeElement as HTMLElement).tabIndex).toBe(-1);
+    first.close();
+    expect(document.activeElement).toBe(outside);
+    const two = panel();
+    openOverlay(two.content, { label: 'No heading' });
+    expect(document.activeElement).toBe(two.first);
+  });
+
   it('uses aria-label when given one', () => {
     const { content } = panel();
     openOverlay(content, { label: 'Edit things' });
