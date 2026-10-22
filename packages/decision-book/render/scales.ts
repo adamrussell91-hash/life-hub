@@ -8,15 +8,22 @@
 // Notes sit under the scale they are about. Under the chart, a form per series scores every
 // scale and sends one snapshot (Save). With `named` scales the person's names replace the
 // placeholder labels everywhere and sit above the rows. Phone: rows stack, poles above their
-// bar; a radar becomes bars.
-import { scaleLabel, valuesOf } from '../families/scales.mjs';
+// bar; a radar becomes bars. A `dated` chart (one series) overlays its three latest saves instead
+// of its series, newest solid, the legend naming each save's date; `min: 0` lets axes go to 0.
+import { historyOf, scaleLabel, valuesOf } from '../families/scales.mjs';
 import { type DmToolRun, type ChartView, type EntrySpec, createChart, el, setAttr, setText, slotIndex, slotName, svg } from './core';
 import type { ChartTool } from './quadrant';
 
 type Scale = { id: string; label?: string; low?: string; high?: string };
-export type ScalesChart = { mode: 'pairs' | 'axes' | 'shares'; scales: Scale[]; series?: { id: string; label: string }[]; layout?: 'bars' | 'radar'; named?: { label: string } };
+export type ScalesChart = { mode: 'pairs' | 'axes' | 'shares'; scales: Scale[]; series?: { id: string; label: string }[]; layout?: 'bars' | 'radar'; named?: { label: string }; min?: 0 | 1; dated?: boolean };
 
 const STYLES = ['solid', 'outline', 'dotted'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** A save's date as the legend shows it: "8 Oct". */
+export const shortDate = (at: string): string => {
+  const date = new Date(at);
+  return Number.isNaN(date.getTime()) ? at : `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
+};
 /** The words a scale's form field shows, from its current name. */
 const fieldWords = (mode: ScalesChart['mode'], scale: Scale, name: string): string => (mode === 'pairs' ? `${scale.low} (0–10; ${scale.high} gets the rest)` : mode === 'shares' ? `${name} (% of 100)` : `${name} (1–10)`);
 
@@ -33,6 +40,10 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
   const { chart } = tool;
   const series = chart.series ?? [{ id: 'now', label: 'Now' }];
   const radar = chart.layout === 'radar';
+  const dated = Boolean(chart.dated);
+  /** What the chart overlays: the series, or (dated) its three latest saves. */
+  const layers = dated ? STYLES.map((_, i) => `save${i}`) : series.map((s) => s.id);
+  let legend: HTMLParagraphElement | null = null;
   const rows = new Map<string, { track: HTMLDivElement; notes: HTMLDivElement }>();
   const bars = new Map<string, HTMLDivElement>();
   let radarSvg: SVGSVGElement | null = null;
@@ -55,7 +66,7 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
         label.append(words);
         const input = el(doc, 'input', 'dm-scales__input');
         input.type = 'number';
-        input.min = chart.mode === 'axes' ? '1' : '0';
+        input.min = chart.mode === 'axes' ? String(chart.min ?? 1) : '0';
         input.max = chart.mode === 'shares' ? '100' : '10';
         input.step = '1';
         label.append(input);
@@ -84,22 +95,22 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
   }
 
   function buildRows(frame: HTMLDivElement): void {
-    const legend = el(doc, 'p', 'dm-scales__legend');
+    legend = el(doc, 'p', 'dm-scales__legend');
     legend.setAttribute('aria-hidden', 'true');
-    series.forEach((s, i) => {
+    if (!dated) series.forEach((s, i) => {
       const chip = el(doc, 'span', 'dm-scales__legend-item', s.label);
       chip.setAttribute('data-style', STYLES[i]);
-      legend.append(chip);
+      legend!.append(chip);
     });
     if (radar) {
       const wrap = el(doc, 'div', 'dm-scales__radar-wrap');
       wrap.setAttribute('aria-hidden', 'true');
       radarSvg = svg(doc, 'svg', { class: 'dm-scales__radar', viewBox: '0 0 100 100' });
       for (const ring of [42, 28, 14]) radarSvg.append(svg(doc, 'polygon', { class: 'dm-scales__ring', points: radarPoints(chart.scales.map(() => (ring / 42) * 10)) }));
-      series.forEach((s, i) => {
+      layers.forEach((layer, i) => {
         const poly = svg(doc, 'polygon', { class: 'dm-scales__poly', 'data-style': STYLES[i], points: '' });
         radarSvg!.append(poly);
-        polygons.set(s.id, poly);
+        polygons.set(layer, poly);
       });
       // Axis names sit just outside the outer ring, at the same angles as the polygon's corners.
       chart.scales.forEach((scale, i) => {
@@ -111,8 +122,8 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
         wrap.append(label);
       });
       wrap.prepend(radarSvg);
-      frame.append(legend, wrap);
-    } else frame.append(legend);
+      frame.append(legend!, wrap);
+    } else frame.append(legend!);
     const list = el(doc, 'div', 'dm-scales__rows');
     // A radar's rows keep its notes; their bars only show on a phone, where the radar is hidden.
     list.setAttribute('data-layout', radar ? 'radar' : chart.mode);
@@ -172,23 +183,40 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
         setAttr(ctx.frame.querySelector(`.dm-scales__row[data-scale="${scale.id}"]`)!, 'aria-label', name(scale));
       }
       const values = valuesOf(run) as Record<string, Record<string, number>>;
+      // The overlays drawn now, in style order: the scored series, or the latest saves.
+      const drawn: { layer: string; label: string; style: string; values: Record<string, number> }[] = dated
+        ? (historyOf(run, series[0].id, STYLES.length) as { at: string; values: Record<string, number> }[]).map((snap, i) => ({ layer: layers[i], label: shortDate(snap.at), style: STYLES[i], values: snap.values }))
+        : series.flatMap((s, i) => (values[s.id] ? [{ layer: s.id, label: s.label, style: STYLES[i], values: values[s.id] }] : []));
+      if (dated && legend) {
+        const words = drawn.length ? drawn.map((d) => d.label) : ['Not scored yet'];
+        if ([...legend.children].map((chip) => chip.textContent).join('|') !== words.join('|')) {
+          legend.replaceChildren(...words.map((word, i) => {
+            const chip = el(doc, 'span', 'dm-scales__legend-item', word);
+            if (drawn.length) chip.setAttribute('data-style', STYLES[i]);
+            return chip;
+          }));
+        }
+      }
       for (const scale of chart.scales) {
         if (chart.mode === 'shares') break;
         const { track } = rows.get(scale.id)!;
-        const wanted = series.filter((s) => values[s.id]).map((s) => {
-          const value = values[s.id][scale.id];
+        const wanted = drawn.map((d) => {
+          const value = d.values[scale.id];
           const bar = el(doc, 'span', 'dm-scales__bar');
-          bar.setAttribute('data-style', STYLES[series.indexOf(s)]);
+          bar.setAttribute('data-style', d.style);
           bar.style.width = `${value * 10}%`;
-          bar.title = chart.mode === 'pairs' ? `${s.label}: ${scale.low} ${value}, ${scale.high} ${10 - value}` : `${s.label}: ${value} of 10`;
+          bar.title = chart.mode === 'pairs' ? `${d.label}: ${scale.low} ${value}, ${scale.high} ${10 - value}` : `${d.label}: ${value} of 10`;
           bar.setAttribute('data-words', bar.title);
           return bar;
         });
         const now = [...track.children].map((child) => (child as HTMLElement).title).join('|');
         if (now !== wanted.map((bar) => bar.title).join('|')) track.replaceChildren(...wanted);
       }
+      if (radar) for (const layer of layers) {
+        const d = drawn.find((x) => x.layer === layer);
+        polygons.get(layer)!.setAttribute('points', d ? radarPoints(chart.scales.map((scale) => d.values[scale.id])) : '');
+      }
       for (const s of series) {
-        if (radar) polygons.get(s.id)!.setAttribute('points', values[s.id] ? radarPoints(chart.scales.map((scale) => values[s.id][scale.id])) : '');
         const bar = bars.get(s.id);
         if (bar) {
           const words = values[s.id] ? chart.scales.map((scale) => `${name(scale)} ${values[s.id][scale.id]}%`).join(', ') : 'not scored yet';
