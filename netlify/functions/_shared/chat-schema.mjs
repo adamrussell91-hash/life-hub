@@ -77,9 +77,12 @@ const DOMAIN_PROPERTIES = {
             description: 'Optional block settings, on the FIRST member of a superset_group only. Omit for a plain superset with default rest. A Cindy is scored as one circuit (block.result), not as per-move ghosts.',
             properties: {
               kind: { type: 'string', enum: ['superset', 'circuit'], description: 'superset = 2 moves alternated set-for-set; circuit = 3+ moves done back-to-back as a round (e.g. a Cindy finisher).' },
-              format: { type: 'string', enum: ['rounds', 'for_time', 'amrap'], description: 'rounds = fixed rounds (= sets per member); for_time = fixed rounds as fast as possible, logger runs a stopwatch; amrap = as many whole rounds as possible inside time_cap_sec (Cindy). For amrap, each member needs many identical sets as round slots — never only one set.' },
-              rest_sec: { type: 'number', description: 'Rest after each full round (not between members).' },
+              format: { type: 'string', enum: ['rounds', 'for_time', 'amrap', 'emom', 'intervals'], description: 'rounds = fixed rounds (= sets per member); for_time = fixed rounds as fast as possible, logger runs a stopwatch; amrap = as many whole rounds as possible inside time_cap_sec (Cindy). For amrap, each member needs many identical sets as round slots — never only one set. emom = a new round starts every interval_sec (gym mode runs the interval clock; sets per member = rounds; alternate: true gives each member its own interval; Death By = emom with rising reps per round, bodyweight only). intervals = work_sec on / rest_sec off station by station (Tabata = 20 / 10); cable stations need a fixed rep count of 20 or fewer and must alternate with bodyweight stations. emom and intervals also work on a single exercise with no superset_group.' },
+              rest_sec: { type: 'number', description: 'Rest after each full round (not between members). For intervals: rest after each station (Tabata 10).' },
               time_cap_sec: { type: 'number', description: 'amrap / for_time window in seconds (Cindy is often 180).' },
+              interval_sec: { type: 'number', description: 'emom only: seconds per interval (60 = EMOM, 120 = E2MOM). Leave the AEKE about 5 s for its 3-2-1 countdown plus real rest inside each interval.' },
+              work_sec: { type: 'number', description: 'intervals only: seconds of work per station (Tabata 20). rest_sec is the rest after each station.' },
+              alternate: { type: 'boolean', description: 'emom only: each member gets its own interval (odd minute B1, even minute B2) instead of the whole round every interval.' },
               result: {
                 type: 'object',
                 description: 'Completed sessions only: the whole-circuit score (rounds + optional extra_reps + time). This is what ghosts and Benchmark Wall race — not the individual member reps.',
