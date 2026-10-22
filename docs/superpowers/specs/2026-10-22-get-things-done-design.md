@@ -35,7 +35,7 @@ The pack's `questions.md` asked ten questions. Adam accepted the recommendations
 | 5 | Rater weights | Equal. Unequal weights are a later, deliberate choice |
 | 6 | Needs profile | Extend the existing scales family's `axes` mode with a minimum of 0 for this entry. No separate `radar_zero` family |
 | 7 | Timers and reminders | None. Daily practices are framed as experiments with a check-back date |
-| 8 | Placement and palette | The Tasks hub's Tools group, beside Problem Solver and Decision Maker (where both actually live; the pack said "Mind"). The pack's brighter screen palette |
+| 8 | Placement and palette | The Tasks hub's Tools group, beside Problem Solver and Decision Maker (where both actually live; the pack said "Mind"). A brighter palette than the pack's (see Design language) |
 | 9 | Page citations | Printed chapter ranges only, labelled as chapters |
 | 10 | Edition | *The Get Things Done Book*, Profile Books 2023, translated by Gesche Ipsen |
 
@@ -157,9 +157,9 @@ That makes 37 entries plus the Commit tool: 13 path, 16 list, 3 quadrant, 1 curv
 
 Gear Shifter is the third member of the set. It shares the grid, type, motion, cards, chips, coach panel, tray and skills ribbon through Problem Solver's components, as Decision Maker does. It brings its own tokens (`.gt-scope`) and shapes (`decor.ts`).
 
-- **Palette:** the pack's screen set. Paper `#fefdf6`, ink `#171c22`, blue `#367db0`, red `#d24c3a` and slate `#3e4852`, with the pack's tints and its two darker label colours for small text. No yellow and no green.
+- **Palette (chosen by Adam on 22 Oct):** brighter than the pack's sampled cover colours, which read as muted. Paper `#fefdf6`, ink `#2a3340`, cobalt blue `#2b7de9`, vermilion `#ea4f2a`, and one accent, amber `#f5a623`, used sparingly (the centre gear, a done state, the odd highlight). The bright colours draw shapes, rings and gears; small text uses darker label shades that pass 4.5:1 on paper: blue `#2670d1`, red `#cd4524`, amber `#976615`. Tints: blue `#e4eefb`, red `#fbe9e4`, amber `#fcf3e3`. No green. The pack's emblems are recoloured to this set; their shapes are unchanged.
 - **Geometry, after the book's cover:** a red gear held inside two blue circular arrows, a red-and-blue target with a slate dart, and a dotted divider. Blue carries process and routes; red marks the chosen work or goal. Strokes are 4, 6 and 9 units, with round joins and solid chunky arrowheads.
-- **Telling it apart from Problem Solver:** both use red and blue, so the difference is carried by shape and tone. Problem Solver is saturated primaries with yellow, in broken circles and triangles. Gear Shifter is steel blue and brick red with slate, in cycles, gears, targets and darts. Plan 1's mockups put all three tools side by side on the rail for Adam to check, and the palette can move then.
+- **Telling it apart from Problem Solver:** both use red and blue, so shape does most of the work. Problem Solver is Bauhaus: saturated primaries with yellow, in squares, triangles and broken circles. Gear Shifter is concentric: whole rings, targets, gears, circular arrows and the dart, in a brighter cobalt and vermilion with an amber accent. Plan 1's mockups put all three tools side by side on the rail for Adam to check.
 - **Shape board (landing hero):** a 4×3 board in the same place as its siblings'. Its tiles are a gear, a gear inside the return arrows, the target, the dart, the target with the dart in it, a blue cycle, a dotted divider with a forward arrow, four blocks in a row, a stack, a ring of five stations, a single red station on a blue route, and the book emblem.
 - **Medal:** the cover, built as the session moves. The target fills with the frame answer, the cycle arrives with the route, the dart lands at Commit, and the main technique's emblem sits in the middle.
 - **Track:** stations for Frame, Explore, Commit and Review, joined by a dotted line.
@@ -241,4 +241,4 @@ Lower than Decision Maker's. The engine, server, bridges, coach pipeline and six
 ## Open points for Adam
 
 1. ~~The name~~: **Gear Shifter**, chosen by Adam on 22 Oct.
-2. The palette and shape checks against Problem Solver happen at the Plan 1 mockups. Is that the right moment?
+2. ~~Palette~~: cobalt, vermilion and an amber accent, chosen by Adam on 22 Oct. The side-by-side check with Problem Solver happens at the Plan 1 mockups.
