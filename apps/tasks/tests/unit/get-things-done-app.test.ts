@@ -7,7 +7,12 @@ import { gearShifterChips } from '../../src/views/problem-solver/link-chips';
 import { skillsRibbon } from '../../src/views/problem-solver/skills-ribbon';
 import type { PsSession, PsSummary } from '../../../../packages/problem-solver/types';
 import { createRoute, createTrack, gearMedal, GT_LOOK, medalOf, plainName, trackStations } from '../../src/views/get-things-done/decor';
-import { committed, committing, explored } from '../../../../tests/unit/gear-shifter-test-helpers.mjs';
+import { committed, committing, explored, reply } from '../../../../tests/unit/gear-shifter-test-helpers.mjs';
+import { mountGearCanvas, shownRun } from '../../src/views/get-things-done/canvas';
+import { provenanceUrl, recordBlockId, recordBlocks, recordGraphic } from '../../src/views/get-things-done/record-blocks';
+import { actionOffer } from '../../../../packages/get-things-done/record.mjs';
+import { acceptSuggestion, linkCaseFile } from '../../../../netlify/functions/_shared/problem-solver/session.mjs';
+import type { PsRecordOffer } from '../../../../packages/problem-solver/types';
 import { createSession, moveOn, setReviewTask } from '../../../../netlify/functions/_shared/problem-solver/session.mjs';
 
 const deps = { now: () => '2026-10-22T10:00:00.000Z', newId: () => 'x1' };
@@ -101,5 +106,92 @@ describe('decor', () => {
     expect(plainName('gt_pomodoro')).toBe('Pomodoro Technique');
     expect(plainName('gt_commit')).toBe('Experiment');
     expect(GT_LOOK.emblem('gt_pomodoro').classList.contains('gt-emblem')).toBe(true);
+  });
+});
+
+/** A framed shift that accepted Getting a Project Done. */
+function onProject(): PsSession {
+  let s = createSession({ text: 'The community garden project has stalled.', kind: 'shift' }, deps);
+  s = reply(s, { frame: { need: 'Get the garden project moving' } });
+  s = reply(s, { frame: { route: 'before' } }, 'We never really planned it.');
+  s = reply(s, { frame: { known: 'Six volunteers; spring planting.' }, suggestion: { kind: 'next_technique', tool: 'gt_getting_a_project_done', reason: 'The whole project needs a look.' } }, 'Six volunteers.');
+  return acceptSuggestion(s, deps) as PsSession;
+}
+
+describe('session canvas', () => {
+  it('shows the empty state, then the technique in hand, and a strip once there are two runs', () => {
+    const host = document.createElement('div');
+    const canvas = mountGearCanvas(host);
+    canvas.update(fresh());
+    expect(host.querySelector('.gt-canvas__empty')).not.toBeNull();
+    const s = explored() as PsSession;
+    canvas.update(s);
+    expect(host.querySelector('.gt-canvas__name')!.textContent).toBe('Appreciation');
+    expect(shownRun(s)!.tool).toBe('gt_appreciation');
+    expect(host.querySelector('.gt-canvas__strip')).toBeNull();
+    const c = committed() as PsSession;
+    canvas.update(c);
+    expect(host.querySelector('.gt-canvas__name')!.textContent).toBe('The experiment');
+    expect([...host.querySelectorAll('.gt-canvas__run')].map((b) => b.querySelector('.gt-canvas__run-name')!.textContent)).toEqual(['Appreciation', 'Experiment']);
+    expect(host.querySelector('.gt-commit__rests .dm-entry__meta')!.textContent).toMatch(/^Rests on Appreciation: /);
+    host.querySelector<HTMLButtonElement>('.gt-canvas__run')!.click();
+    expect(host.querySelector('.gt-canvas__name')!.textContent).toBe('Appreciation');
+    expect(host.querySelector('.gt-canvas__back')).not.toBeNull();
+    canvas.destroy();
+  });
+
+  it('Getting a Project Done’s stations link the techniques for each stage', () => {
+    const host = document.createElement('div');
+    const picked: string[] = [];
+    const canvas = mountGearCanvas(host, { onTechnique: (id) => picked.push(id) });
+    canvas.update(onProject());
+    const stages = [...host.querySelectorAll<HTMLElement>('.dm-path__stage')];
+    expect(stages).toHaveLength(7);
+    const first = [...stages[0].querySelectorAll<HTMLButtonElement>('.gt-stage-links button')];
+    expect(first.map((b) => b.querySelector('.gt-stage-links__name')!.textContent)).toEqual(['Bursty Communication', 'Brainstorming', 'Structured Evaluation']);
+    expect(first[0].getAttribute('aria-label')).toBe('Try Bursty Communication');
+    first[1].click();
+    expect(picked).toEqual(['gt_brainstorming']);
+    canvas.update(onProject());
+    expect(stages[0].querySelectorAll('.gt-stage-links').length).toBe(1);
+    canvas.destroy();
+  });
+});
+
+describe('record blocks', () => {
+  const date = '2026-10-22';
+  it('a write is a heading, every section, then the caption and a link back; ids are fixed', () => {
+    const s = committed() as PsSession;
+    const offer = actionOffer(s) as PsRecordOffer;
+    const blocks = recordBlocks(offer, { sessionId: s.id, date });
+    expect(blocks[0]).toMatchObject({ block_type: 'heading', id: recordBlockId(s.id, 1, 1), content: { text: 'Action record: The team report keeps stalling.' } });
+    expect(blocks.length).toBe(offer.file.sections.length + 2);
+    const last = JSON.stringify(blocks.at(-1));
+    expect(last).toContain('Worked with The Get Things Done Book · Appreciation · ');
+    expect(last).toContain(`#/gear-shifter?id=${s.id}`);
+    expect(last).toContain('Open this session in Gear Shifter');
+    expect(recordBlockId(s.id, 2, 3)).toBe(`gt-rec-${s.id.slice(0, 8)}-v2-3`);
+  });
+
+  it('an update carries only the changed sections under a dated heading', () => {
+    let s = committed() as PsSession;
+    const offer = actionOffer(s) as PsRecordOffer;
+    s = linkCaseFile(s, { target: { kind: 'project', id: 'p1' }, version: 1, title: offer.file.title, sections: offer.digests, graphic: true }, deps) as PsSession;
+    s = { ...s, frame: { ...s.frame, known: 'Due Thursday now; Priya has the data.' } };
+    const update = actionOffer(s) as PsRecordOffer;
+    expect(update.kind).toBe('update');
+    const blocks = recordBlocks(update, { sessionId: s.id, date });
+    expect((blocks[0] as { content: { text: string } }).content.text).toMatch(/^Update: /);
+    expect(blocks.length).toBe(update.changed.length + 2);
+  });
+
+  it('the image is the technique’s file, absolute, and absent without a technique', () => {
+    const s = committed() as PsSession;
+    const offer = actionOffer(s) as PsRecordOffer;
+    expect(provenanceUrl('gt_appreciation', 'https://hub.example', '/tasks/')).toBe('https://hub.example/tasks/get-things-done/provenance/gt_appreciation.svg');
+    const image = recordGraphic(offer, { sessionId: s.id, date }, (id) => `https://x/${id}.svg`);
+    expect(image).toMatchObject({ block_type: 'image', id: recordBlockId(s.id, 1, 0), content: { url: 'https://x/gt_appreciation.svg', alt_text: 'Appreciation emblem, inside its section’s emblem' } });
+    const bare = { ...offer, provenance: { ...offer.provenance, technique: null } } as unknown as PsRecordOffer;
+    expect(recordGraphic(bare, { sessionId: s.id, date })).toBeNull();
   });
 });
