@@ -13,7 +13,7 @@ import {
   type QuizQuestionOf
 } from '@/quiz/core';
 import { loadLiteraryElements, type LiteraryTechnique } from '@/blocks/literary-elements';
-import { formatOutcomeCodes, parseOutcomeCodes } from '@/markbook/parse';
+import { formatOutcomeCodes, outcomeCodeExample, parseOutcomeCodes } from '@/markbook/parse';
 import { MARKBOOK_LIMITS } from '@/markbook/schema';
 import type { OutcomeLabel } from '@/markbook/types';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
@@ -1078,7 +1078,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     more.append(labelled('Hint', hint, 'Students can open it during the quiz. It costs some of the marks.'), labelled('Why this is the answer', why));
     if (offersOutcomes && options.outcomes) {
       const labels = options.outcomes;
-      const codes = textInput(formatOutcomeCodes(q.outcomes ?? [], labels), 200, 'EN12-1, EN12-3');
+      const codes = textInput(formatOutcomeCodes(q.outcomes ?? [], labels), 200, outcomeCodeExample(labels));
       codes.classList.add('qz-outcomes');
       const note = el('p', 'qz-note qz-outcomes__unknown');
       note.id = uid('qz-outcomes-note');

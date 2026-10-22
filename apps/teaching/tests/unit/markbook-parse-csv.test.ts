@@ -84,3 +84,12 @@ describe('csv', () => {
     expect(csvFileName('12 English Adv', '2026-11-03')).toBe('markbook-12-english-adv-2026-11-03.csv');
   });
 });
+
+describe('outcome code example', () => {
+  it('uses the class’s own first codes, with a plain fallback', async () => {
+    const { outcomeCodeExample } = await import('@/markbook/parse');
+    expect(outcomeCodeExample(labels)).toBe('EN12-1, EN12-3');
+    expect(outcomeCodeExample([labels[0]!])).toBe('EN12-1');
+    expect(outcomeCodeExample([])).toBe('Outcome codes, comma separated');
+  });
+});
