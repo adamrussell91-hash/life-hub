@@ -35,6 +35,25 @@ describe('outcome evidence', () => {
     expect(outcomeCell(evidenceFor(base, 's2'), 'o1')).toMatchObject({ mean: null, count: 0 });
     expect(outcomesInView(base)).toEqual(['o1', 'o2']);
   });
+  it('merges an old outcome code with its catalogue id, both pieces of evidence in one column', () => {
+    const labels = [{ id: 'cat-en12-1', code: 'EN12-1', title: 'Responds to texts', group: 'Reading' }];
+    const view: MarkbookView = {
+      ...base,
+      markbook: {
+        ...base.markbook,
+        columns: [{ id: 'essay0001', kind: 'assessment', title: 'Essay', date: '2026-11-01', weight: 40, criteria: [{ id: 'c1', label: 'Analysis', max: 20, outcomes: ['cat-en12-1'] }] }]
+      },
+      quizzes: [{
+        ...quiz('l1', '2026-10-20', { s1: score([{ id: 'q1', awarded: 2, max: 2, confidence: null, outcomes: ['en12-1'] }]) }),
+        questions: [{ id: 'q1', prompt: 'Name the device', marks: 2, outcomes: ['EN12-1'] }]
+      }]
+    };
+    expect(outcomesInView(view, labels)).toEqual(['cat-en12-1']);
+    const ev = evidenceFor(view, 's1', labels);
+    expect(ev.map((e) => e.outcome)).toEqual(['cat-en12-1', 'cat-en12-1']);
+    expect(outcomeCell(ev, 'cat-en12-1')).toMatchObject({ mean: 87.5, count: 2 });
+    expect(outcomesInView(view)).toEqual(['cat-en12-1', 'EN12-1', 'en12-1']);
+  });
   it('bands percentages in four steps', () => {
     expect([49.9, 50, 69.9, 70, 84.9, 85].map(band4)).toEqual(['low', 'mid', 'mid', 'good', 'good', 'high']);
   });

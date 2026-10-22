@@ -1,13 +1,28 @@
 import type { AssessmentMark } from './schema';
-import type { MarkbookView, QuizColumn, QuizRow } from './types';
+import type { MarkbookView, OutcomeLabel, QuizColumn, QuizRow } from './types';
 import { assessments, compareColumns, markOf, quizPercent } from './calc';
+import { outcomeIdOf } from './parse';
 
 /** Outcome evidence and quiz flags, worked out from what the markbook already holds. */
 
 export type Evidence = { outcome: string; percent: number; source: string; item: string };
 
-/** Every percentage that counts as evidence for an outcome, for one student. */
-export function evidenceFor(view: MarkbookView, studentId: string): Evidence[] {
+/** An outcome as its catalogue id, so a lesson's old code and a criterion's id land together. */
+const idFor = (labels: readonly OutcomeLabel[]) => {
+  const cache = new Map<string, string>();
+  return (token: string): string => {
+    let id = cache.get(token);
+    if (id === undefined) cache.set(token, (id = outcomeIdOf(token, labels)));
+    return id;
+  };
+};
+
+/**
+ * Every percentage that counts as evidence for an outcome, for one student.
+ * With `labels`, old outcome codes are matched to catalogue ids.
+ */
+export function evidenceFor(view: MarkbookView, studentId: string, labels: readonly OutcomeLabel[] = []): Evidence[] {
+  const norm = idFor(labels);
   const out: Evidence[] = [];
   for (const column of assessments(view.markbook)) {
     const mark = markOf<AssessmentMark>(view.markbook, column.id, studentId);
@@ -15,7 +30,7 @@ export function evidenceFor(view: MarkbookView, studentId: string): Evidence[] {
     for (const c of column.criteria) {
       const given = mark.criteria?.[c.id];
       if (typeof given !== 'number') continue;
-      for (const outcome of c.outcomes) out.push({ outcome, percent: (given / c.max) * 100, source: column.title, item: c.label });
+      for (const outcome of c.outcomes) out.push({ outcome: norm(outcome), percent: (given / c.max) * 100, source: column.title, item: c.label });
     }
   }
   for (const quiz of view.quizzes) {
@@ -25,7 +40,7 @@ export function evidenceFor(view: MarkbookView, studentId: string): Evidence[] {
     for (const row of s.rows) {
       if (row.awarded === null || row.max <= 0) continue;
       const prompt = quiz.questions.find((q) => q.id === row.id)?.prompt || 'Question';
-      for (const outcome of row.outcomes) out.push({ outcome, percent: (row.awarded / row.max) * 100, source: quiz.title, item: prompt });
+      for (const outcome of row.outcomes) out.push({ outcome: norm(outcome), percent: (row.awarded / row.max) * 100, source: quiz.title, item: prompt });
     }
   }
   return out;
@@ -36,14 +51,15 @@ export function outcomeCell(evidence: Evidence[], outcome: string): { mean: numb
   return { mean: items.length ? items.reduce((s, e) => s + e.percent, 0) / items.length : null, count: items.length, items };
 }
 
-/** Outcomes the markbook has any place for, criteria first. */
-export function outcomesInView(view: MarkbookView): string[] {
+/** Outcomes the markbook has any place for, criteria first. With `labels`, old codes become catalogue ids. */
+export function outcomesInView(view: MarkbookView, labels: readonly OutcomeLabel[] = []): string[] {
+  const norm = idFor(labels);
   const seen = new Set<string>();
-  for (const column of assessments(view.markbook)) for (const c of column.criteria) for (const o of c.outcomes) seen.add(o);
+  for (const column of assessments(view.markbook)) for (const c of column.criteria) for (const o of c.outcomes) seen.add(norm(o));
   for (const quiz of view.quizzes) {
     if (quiz.hidden) continue;
-    for (const q of quiz.questions) for (const o of q.outcomes) seen.add(o);
-    for (const s of Object.values(quiz.scores)) for (const r of s.rows) for (const o of r.outcomes) seen.add(o);
+    for (const q of quiz.questions) for (const o of q.outcomes) seen.add(norm(o));
+    for (const s of Object.values(quiz.scores)) for (const r of s.rows) for (const o of r.outcomes) seen.add(norm(o));
   }
   return [...seen];
 }

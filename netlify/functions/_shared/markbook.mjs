@@ -49,10 +49,11 @@ async function changeBook(store, classId, fn) {
 
 /** Quiz lessons in the class's active units that someone on the list has handed in. */
 export async function quizColumns(store, roster, book) {
+  const unitIds = (roster.cls.active_unit_ids ?? []).filter(isSafeId);
+  const units = await mapBounded(unitIds, 4, (unitId) => read(store, unitKey(unitId)));
+  // Lessons keep the order of the class's units.
   const lessonIds = new Set();
-  for (const unitId of roster.cls.active_unit_ids ?? []) {
-    if (!isSafeId(unitId)) continue;
-    const unit = await read(store, unitKey(unitId));
+  for (const unit of units) {
     if (!unit || isDeletedRecord(unit)) continue;
     for (const id of unit.lesson_ids ?? []) if (isSafeId(id)) lessonIds.add(id);
   }

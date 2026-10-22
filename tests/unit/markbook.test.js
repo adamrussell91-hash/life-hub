@@ -196,3 +196,23 @@ test('a deleted unit is skipped and a lesson in two units gives one column', asy
   const { quizzes } = await call(store, { action: 'load' });
   assert.deepEqual(quizzes.map((q) => q.id), ['quiz:quiz1']);
 });
+
+test('load reads the class’s units together', async () => {
+  const { store } = await setup();
+  const cls = store.data.get('classes/class1');
+  store.data.set('classes/class1', { ...cls, active_unit_ids: ['unit1', 'unit2', 'unit3'] });
+  store.data.set('units/unit2', { id: 'unit2', lesson_ids: [] });
+  store.data.set('units/unit3', { id: 'unit3', lesson_ids: [] });
+  const started = new Map();
+  let finished = 0;
+  const get = store.get.bind(store);
+  store.get = async (key) => {
+    started.set(key, finished);
+    await new Promise((r) => setTimeout(r, 1));
+    finished += 1;
+    return get(key);
+  };
+  await call(store, { action: 'load' });
+  const waves = ['units/unit1', 'units/unit2', 'units/unit3'].map((key) => started.get(key));
+  assert.equal(new Set(waves).size, 1, 'the three units go out together');
+});

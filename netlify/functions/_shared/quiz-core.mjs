@@ -84,8 +84,8 @@ var base = {
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
   image: QuizImageSchema.optional(),
-  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. */
-  outcomes: z.array(z.string().min(1).max(64)).max(6).optional()
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
+  outcomes: z.array(z.string().min(1).max(64)).max(8).optional()
 };
 var QuizQuestionSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("multiple_choice"), options: z.array(QuizChoiceSchema).min(2).max(6), correct: z.array(Id).length(1) }),

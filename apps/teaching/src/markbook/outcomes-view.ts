@@ -17,7 +17,7 @@ export type OutcomesOptions = {
 const OTHER = 'Other outcomes';
 
 export function renderOutcomes(view: MarkbookView, students: RosterStudent[], labels: OutcomeLabel[], options: OutcomesOptions = {}): HTMLElement {
-  const ids = outcomesInView(view);
+  const ids = outcomesInView(view, labels);
   if (!ids.length) return el('p', 'mb__empty', 'No outcomes yet. Tag assessment criteria or quiz questions with outcome codes, or give the quiz lesson outcomes.');
   const byId = new Map(labels.map((l) => [l.id, l]));
   const groupOf = (id: string) => byId.get(id)?.group || OTHER;
@@ -55,7 +55,7 @@ export function renderOutcomes(view: MarkbookView, students: RosterStudent[], la
   let pressed: HTMLButtonElement | null = null;
   const tbody = el('tbody');
   for (const s of students) {
-    const evidence = evidenceFor(view, s.id);
+    const evidence = evidenceFor(view, s.id, labels);
     const row = el('tr');
     const head = el('th', 'mb-grid__student');
     head.scope = 'row';
