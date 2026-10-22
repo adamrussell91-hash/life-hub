@@ -33,7 +33,17 @@ import {
   knownTags,
   tagKey,
 } from "./model.js";
-import { paintMagazine, paintTimeline, paintEntry, paintFixup, paintVenueCheck } from "./pages.js";
+import {
+  paintMagazine,
+  paintTimeline,
+  paintEntry,
+  paintFixup,
+  paintVenueCheck,
+  dishName,
+  dishOriginal,
+  dishIngredients,
+  dishNotes,
+} from "./pages.js";
 import { paintRecipeBook } from "./recipe-book.js";
 import { hasPoint, nameSimilarity, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
 import {
@@ -570,10 +580,8 @@ export function createFoodJournalView({
       card.append(box);
     }
     const content = el("div", "food-card__body");
-    content.append(
-      el("h3", "food-dish__title fj-serif", dish.title_en || dish.title),
-    );
-    if (dish.title_en) content.append(el("p", "food-original", dish.title));
+    content.append(el("h3", "food-dish__title fj-serif", dishName(dish)));
+    content.append(...[dishOriginal(dish)].filter(Boolean));
     content.append(
       el(
         "p",
@@ -583,14 +591,7 @@ export function createFoodJournalView({
           .join(" · "),
       ),
     );
-    if (dish.ingredients)
-      content.append(
-        el(
-          "p",
-          "food-ingredients",
-          dish.ingredients.split("\n").join(" · "),
-        ),
-      );
+    content.append(...[dishIngredients(dish)].filter(Boolean));
     if (dish.rating != null) {
       const stars = el("p", "fj-stars");
       stars.setAttribute("role", "img");
@@ -606,17 +607,7 @@ export function createFoodJournalView({
       for (const t of dish.tags) tags.append(el("span", "hub-chip", t));
       content.append(tags);
     }
-    if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes)) {
-      content.append(
-        el(
-          "p",
-          "food-notes fj-serif fj-italic",
-          plainNotes(dish.notes_en || dish.notes),
-        ),
-      );
-      if (dish.notes_en)
-        content.append(el("p", "food-original", plainNotes(dish.notes)));
-    }
+    content.append(...dishNotes(dish, visit, "food-notes fj-serif fj-italic"));
     const actions = el("div", "food-actions");
     actions.append(
       button("Recipe", (e) => openRecipe(dish, e.currentTarget)),
@@ -1106,7 +1097,8 @@ export function createFoodJournalView({
           checks = [];
           // Dishes first, then extras, which tick onto the last dish.
           const shown = visit.menu_items.filter((item) =>
-            `${item.name} ${item.name_en || ""} ${item.description} ${item.description_en || ""}`
+            [item.name, item.name_en, item.description, item.description_en]
+              .join(" ")
               .toLowerCase()
               .includes(query),
           );
