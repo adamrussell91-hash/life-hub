@@ -173,7 +173,19 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   hideBtn.textContent = 'Hide';
   hideBtn.setAttribute('aria-label', 'Hide chat');
   hideBtn.addEventListener('click', () => options.onRequestShelve?.());
-  toolbar.append(picker, hideBtn);
+
+  const newChatBtn = document.createElement('button');
+  newChatBtn.type = 'button';
+  newChatBtn.className = 'btn btn--ghost ai-panel__new-chat';
+  newChatBtn.textContent = 'New chat';
+  newChatBtn.addEventListener('click', () => {
+    void startNewChat();
+  });
+
+  const toolbarActions = document.createElement('div');
+  toolbarActions.className = 'ai-panel__toolbar-actions';
+  toolbarActions.append(newChatBtn, hideBtn);
+  toolbar.append(picker, toolbarActions);
 
   const protocolTray = document.createElement('div');
   protocolTray.className = 'agent-protocol-pills';
@@ -636,7 +648,44 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     thread.scrollTop = thread.scrollHeight;
   }
 
+  async function startNewChat(): Promise<void> {
+    if (busy || messages.length === 0) return;
+    const pending = messages.filter((msg) => msg.proposalStatus === 'pending');
+    if (pending.length > 0) {
+      const ok = await askConfirmCard({
+        eyebrow: 'New chat',
+        title: 'Start a new chat?',
+        supporting:
+          pending.length === 1
+            ? 'The proposal waiting on Confirm will be rejected.'
+            : `The ${pending.length} proposals waiting on Confirm will be rejected.`,
+        confirmLabel: 'Start new chat',
+        discardLabel: 'Keep this chat'
+      });
+      if (!ok || busy) return;
+    }
+    // Settle every open job so the inbox does not bring this chat back on
+    // the next load.
+    for (const msg of messages) {
+      if (!msg.jobId || msg.proposalStatus === 'accepted' || msg.proposalStatus === 'rejected') {
+        continue;
+      }
+      const resolution = msg.proposalStatus === 'pending' ? 'rejected' : 'dismissed';
+      void resolveAiJob(msg.jobId, resolution).catch(() => {
+        /* already settled, or offline; the chat still clears */
+      });
+    }
+    messages = [];
+    saveTranscript(options.lessonId, messages);
+    protocolsOpen = false;
+    suggestionsOpen = readBuilderChromePrefs().suggestions === 'open';
+    renderShell();
+    input.focus();
+  }
+
   function renderShell(): void {
+    newChatBtn.hidden = messages.length === 0;
+    newChatBtn.disabled = busy;
     empty.hidden = messages.length > 0;
     composer.hidden = false;
     thread.hidden = false;
