@@ -12,3 +12,7 @@
 .ps-linkchip--dm .ps-linkchip__dot i:nth-child(1) { background: #e4301c; }
 .ps-linkchip--dm .ps-linkchip__dot i:nth-child(2) { background: #398000; }
 .ps-linkchip--dm .ps-linkchip__dot i:nth-child(3) { display: none; }
+/* Gear Shifter's chip: the cover's cobalt and vermilion, with the amber centre gear. */
+.ps-linkchip--gt .ps-linkchip__dot i:nth-child(1) { background: #2b7de9; }
+.ps-linkchip--gt .ps-linkchip__dot i:nth-child(2) { background: #ea4f2a; }
+.ps-linkchip--gt .ps-linkchip__dot i:nth-child(3) { background: #f5a623; }
