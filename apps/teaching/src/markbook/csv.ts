@@ -3,7 +3,11 @@ import type { AnyColumn, MarkbookView } from './types';
 import { assessmentResult, formatPercent, markOf, orderedColumns, overallFor, quizPercent, sortStudents } from './calc';
 import { HANDIN_LABEL } from './cells';
 
-const cell = (text: string): string => (/[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
+/** Quote when needed, and defuse text a spreadsheet would run as a formula. */
+const cell = (raw: string): string => {
+  const text = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
 const blankDash = (text: string): string => (text === '–' ? '' : text);
 
 function value(view: MarkbookView, column: AnyColumn, studentId: string): string {

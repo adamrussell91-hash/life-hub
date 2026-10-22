@@ -11,6 +11,7 @@ describe('band text', () => {
     expect(parseBands('  ')).toEqual({ bands: [] });
     expect(parseBands('High distinction 18')).toEqual({ bands: [{ label: 'High distinction', min: 18 }] });
     expect(parseBands('A, B 10')).toEqual({ problem: 'Write each band as a name then its lowest mark, like A 13.' });
+    expect(parseBands('A 12.5')).toEqual({ bands: [{ label: 'A', min: 12.5 }] });
     expect(formatBands([{ label: 'A', min: 13 }, { label: 'B', min: 10 }])).toBe('A 13, B 10');
   });
 });
@@ -20,6 +21,12 @@ describe('outcome codes', () => {
     expect(parseOutcomeCodes('en12-1, EN12-3 EN99-9', labels)).toEqual({ ids: ['o1', 'o2'], unknown: ['EN99-9'] });
     expect(parseOutcomeCodes('o2', labels)).toEqual({ ids: ['o2'], unknown: [] });
     expect(formatOutcomeCodes(['o2', 'raw-id'], labels)).toBe('EN12-3, raw-id');
+  });
+  it('treats repeated codes as one, and finds codes before ids', () => {
+    expect(parseOutcomeCodes('EN12-1, en12-1', labels)).toEqual({ ids: ['o1'], unknown: [] });
+    expect(parseOutcomeCodes('EN99-9 en99-9', labels)).toEqual({ ids: [], unknown: ['EN99-9'] });
+    const tricky = [{ id: 'EN12-3', code: 'X1', title: 't', group: 'g' }, { id: 'o2', code: 'EN12-3', title: 't', group: 'g' }];
+    expect(parseOutcomeCodes('EN12-3', tricky)).toEqual({ ids: ['o2'], unknown: [] });
   });
   it('turns catalogue rows into labels, leaving out trashed ones', () => {
     const rows = [
@@ -56,6 +63,22 @@ describe('csv', () => {
     const pending = { ...view, quizzes: [{ ...view.quizzes[0]!, scores: { s2: { ...view.quizzes[0]!.scores.s2!, score: 1, max: 7, pending: 1 } } }] };
     const rows = markbookCsv(pending).split('\n');
     expect(rows[2]).toBe('TT,Tom Tills,14% (1 to mark),,,,');
+  });
+  it('guards cells against spreadsheet formulas and escapes quotes and newlines', () => {
+    const risky: MarkbookView = {
+      ...view,
+      markbook: { ...view.markbook, columns: [{ id: 'hand00001', kind: 'handin', title: '=SUM(A1)', due: '2026-10-25' }, { id: 'chck00001', kind: 'check', title: 'Say "hi"\nthere', date: '2026-10-26', scale: 'four' }], marks: { chck00001: { s1: 3 } } },
+      students: [{ id: 's1', name: '-Smith Jo', initials: 'SJ' }],
+      quizzes: []
+    };
+    expect(markbookCsv(risky)).toBe(['Initials,Name,\'=SUM(A1),"Say ""hi""\nthere",Overall', "SJ,'-Smith Jo,,3,"].join('\n'));
+  });
+  it('writes Exempt for an exempt assessment', () => {
+    const exempt: MarkbookView = { ...view, markbook: { ...view.markbook, marks: { essay0001: { s1: { exempt: true } } } } };
+    expect(markbookCsv(exempt).split('\n')[1]).toBe('BB,Bob Brown,,,,Exempt,');
+  });
+  it('falls back to "class" in the file name', () => {
+    expect(csvFileName('—', '2026-11-03')).toBe('markbook-class-2026-11-03.csv');
   });
   it('names the file after the class', () => {
     expect(csvFileName('12 English Adv', '2026-11-03')).toBe('markbook-12-english-adv-2026-11-03.csv');
