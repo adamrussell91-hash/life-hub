@@ -141,3 +141,75 @@ test('ratings: one rater scores alone, with no spread', () => {
   assert.deepEqual(r.scored, ['rater1']);
   assert.deepEqual(r.cells.idea2.criterion2, { mean: 9, sd: null, n: 1 });
 });
+
+// ---------------------------------------------------------------- Kanban and 5 Whys variants
+import { cardFieldsOf, kanban, kanbanTool, KANBAN_COLUMNS } from '../../packages/problem-solver/tools/kanban.mjs';
+import { fiveWhys, fiveWhysTool, MIN_WHYS } from '../../packages/problem-solver/tools/five-whys.mjs';
+
+test('kanban: the default build is Problem Solver\'s tool, unchanged', () => {
+  assert.equal(TOOLS.kanban, kanban);
+  const again = kanbanTool();
+  for (const key of ['id', 'name', 'kind', 'step', 'when']) assert.equal(again[key], kanban[key], key);
+  assert.deepEqual(again.nodeTags, { card: KANBAN_COLUMNS });
+  assert.deepEqual(KANBAN_COLUMNS, ['todo', 'doing', 'review', 'done']);
+  assert.deepEqual(again.steps, kanban.steps);
+  assert.deepEqual(again.slots, kanban.slots);
+  for (const def of [kanban, again]) {
+    assert.equal(def.validateScores, undefined, 'no card fields');
+    assert.equal(def.variantOf, undefined);
+    assert.equal(def.suggestedWip, undefined);
+  }
+});
+
+test('kanban variant: three columns, a suggested limit of three, optional card fields', () => {
+  const def = GT_SAMPLE_TOOLS.kanban;
+  assert.deepEqual(def.nodeTags.card, ['todo', 'doing', 'done']);
+  assert.equal(def.suggestedWip, 3);
+  assert.equal(def.variantOf, 'kanban');
+  assert.equal(def.step, 'explore');
+  assert.throws(() => kanbanTool({ columns: ['todo', 'review'] }), /columns must include todo, doing and done/);
+  let run = gtRun('kanban');
+  assert.deepEqual(nextSlots(run), ['card:1', 'wip']);
+  run = fill(run, ['card:1', 'card:2', 'card:3'], { tag: 'todo' });
+  assert.equal(isComplete(run), true, 'card fields are never required');
+  assert.equal(def.awaiting, undefined);
+  assert.equal(def.validateScores(run, { card: 'card1', effort: 'small', help: 'needs_help', urgency: 'now' }), null);
+  assert.match(def.validateScores(run, { card: 'nope', effort: 'small', help: 'alone', urgency: 'now' }), /one of the cards/);
+  assert.match(def.validateScores(run, { card: 'card1', effort: 'huge', help: 'alone', urgency: 'now' }), /effort is small, medium or large/);
+  assert.match(def.validateScores(run, { card: 'card1', effort: 'small', help: 'maybe', urgency: 'now' }), /help is alone or needs_help/);
+  assert.match(def.validateScores(run, { card: 'card1', effort: 'small', help: 'alone', urgency: 'never' }), /urgency is now, soon or later/);
+  run = applyScores(run, { card: 'card1', effort: 'large', help: 'alone', urgency: 'later' }, AT);
+  run = applyScores(run, { card: 'card2', effort: 'small', help: 'needs_help', urgency: 'now' }, AT);
+  run = applyScores(run, { card: 'card1', effort: 'medium', help: 'alone', urgency: 'soon' }, AT);
+  assert.deepEqual(cardFieldsOf(run), { card1: { effort: 'medium', help: 'alone', urgency: 'soon' }, card2: { effort: 'small', help: 'needs_help', urgency: 'now' } });
+});
+
+test('5 Whys: the default build is unchanged', () => {
+  assert.equal(TOOLS.five_whys, fiveWhys);
+  const again = fiveWhysTool();
+  for (const key of ['id', 'name', 'kind', 'step', 'when']) assert.equal(again[key], fiveWhys[key], key);
+  assert.deepEqual(again.slots, fiveWhys.slots);
+  assert.equal(MIN_WHYS, 5);
+  const whys = Array.from({ length: 4 }, (_, i) => `why:${i + 1}`);
+  assert.deepEqual(nextSlots(fill(sampleRun('five_whys'), ['problem', ...whys])), ['why:5']);
+});
+
+test('5 Whys variant: each why is checked before the chain goes on; five is a guide', () => {
+  const def = GT_SAMPLE_TOOLS.fiveWhys;
+  assert.equal(def.variantOf, 'five_whys');
+  assert.equal(def.step, 'explore');
+  assert.ok(def.slots.evidence);
+  let run = gtRun('fiveWhys');
+  assert.deepEqual(nextSlots(run), ['problem']);
+  run = fill(run, ['problem', 'why:1']);
+  assert.deepEqual(nextSlots(run), ['evidence:1'], 'no next why, and no root, until this one is checked');
+  run = fill(run, ['evidence:1']);
+  assert.deepEqual(nextSlots(run), ['why:2', 'root'], 'one checked why can be enough');
+  run = fill(run, ['why:2']);
+  assert.deepEqual(nextSlots(run), ['evidence:2']);
+  assert.equal(isComplete(run), false);
+  run = fill(run, ['evidence:2', 'root']);
+  assert.deepEqual(nextSlots(run), []);
+  assert.equal(isComplete(run), true);
+  assert.throws(() => fiveWhysTool({ minWhys: 0 }), /minWhys runs from 1 to maxWhys/);
+});

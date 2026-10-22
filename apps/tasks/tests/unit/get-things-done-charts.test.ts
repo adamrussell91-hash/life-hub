@@ -174,3 +174,83 @@ describe('ratings chart', () => {
     expect(v.el.querySelector('.dm-chart__state')!.textContent).toBe('Completed');
   });
 });
+
+// ---------------------------------------------------------------- Kanban and 5 Whys variants
+import { createKanbanView } from '../../../../packages/problem-solver/render/kanban';
+import { createFiveWhysView } from '../../../../packages/problem-solver/render/five-whys';
+import type { PsToolRun } from '../../../../packages/problem-solver/types';
+
+const psRun = (key: Key, stage: 'empty' | 'partial' | 'full') => gtRunFor(key, stage) as unknown as PsToolRun;
+const variant = () => {
+  const def = GT_SAMPLE_TOOLS.kanban as unknown as { nodeTags: { card: string[] }; suggestedWip: number };
+  return createKanbanView(document, { columns: def.nodeTags.card as never, suggestedWip: def.suggestedWip, cardFields: true });
+};
+
+describe('Kanban variant', () => {
+  it('draws To do, Doing and Done with no Review stop', () => {
+    const view = variant();
+    view.update(psRun('kanban', 'full'));
+    expect([...view.el.querySelectorAll('[data-region]')].map((r) => r.getAttribute('data-region'))).toEqual(['todo', 'doing', 'done']);
+    expect(view.el.querySelector('.ps-kanban__review')).toBeNull();
+  });
+
+  it('keeps Problem Solver\'s board, Review stop and all, by default', () => {
+    const view = createKanbanView();
+    view.update({ id: 'r', tool: 'kanban', status: 'active', edges: [], nodes: [{ id: 'a', slot: 'card:1', text: 'A', tag: 'review', state: 'accepted', skills: [], turnId: 't' }] });
+    expect([...view.el.querySelectorAll('[data-region]')].map((r) => r.getAttribute('data-region'))).toEqual(['todo', 'doing', 'review', 'done']);
+    expect(view.el.querySelector('.ps-kanban__suggested')).toBeNull();
+    expect(view.el.querySelector('.ps-kanban__fields-form')).toBeNull();
+  });
+
+  it('suggests a limit of three until one is set, and says when Doing is over it', () => {
+    const view = variant();
+    view.update(psRun('kanban', 'partial'));
+    expect(view.el.querySelector('.ps-kanban__suggested')!.textContent).toBe('Suggested limit 3');
+    view.update(psRun('kanban', 'full'));
+    expect(view.el.querySelector('.ps-kanban__suggested')!.textContent).toBe('Suggested limit 3');
+    const over = psRun('kanban', 'full');
+    over.nodes = over.nodes.map((n) => (n.id === 'k1' ? { ...n, tag: 'doing' } : n));
+    view.update(over);
+    const badge = view.el.querySelector('.ps-kanban__suggested')!;
+    expect(badge.textContent).toBe('Over suggested limit (4 of 3)');
+    expect(badge.classList.contains('is-over')).toBe(true);
+    const wip = { id: 'w', slot: 'wip', text: 'Two at most', title: 'Two', tag: undefined, state: 'accepted' as const, skills: [], turnId: 't' };
+    view.update({ ...over, nodes: [...over.nodes, wip] });
+    expect(view.el.querySelector('.ps-kanban__suggested')).toBeNull();
+    expect(view.el.querySelector('.ps-kanban__wip')).not.toBeNull();
+  });
+
+  it('shows each card\'s effort, help and urgency, and sets them through its form', () => {
+    const view = variant();
+    const sent: unknown[] = [];
+    view.onScore((payload) => sent.push(payload));
+    view.update(psRun('kanban', 'full'));
+    const fields = (id: string) => view.el.querySelector(`.ps-kanban__card[data-node="${id}"] .ps-kanban__fields`)!;
+    expect(fields('k2').textContent).toBe('Small · Alone · Now');
+    expect(fields('k3').textContent).toBe('Large · Needs help · Soon');
+    expect((fields('k1') as HTMLElement).hidden).toBe(true);
+    expect(view.el.querySelector(`.ps-kanban__card[data-node="k3"] button`)!.getAttribute('aria-label')).toContain('Large, Needs help, Soon');
+    const form = view.el.querySelector('.ps-kanban__fields-form')!;
+    const [card, effort, help, urgency] = [...form.querySelectorAll('select')];
+    expect([...card.options].map((o) => o.textContent)).toEqual(['Book the hall', 'Draft the flyer', 'Ask the school', 'Order chairs', 'Find a float']);
+    card.value = 'k1';
+    card.dispatchEvent(new Event('change'));
+    effort.value = 'medium';
+    help.value = 'needs_help';
+    urgency.value = 'later';
+    form.querySelector<HTMLButtonElement>('button')!.click();
+    expect(sent).toEqual([{ card: 'k1', effort: 'medium', help: 'needs_help', urgency: 'later' }]);
+  });
+});
+
+describe('5 Whys variant', () => {
+  it('draws each why\'s evidence right after it, as a note', () => {
+    const view = createFiveWhysView();
+    view.update(psRun('fiveWhys', 'full'));
+    const items = [...view.el.querySelectorAll('.ps-whys__item')];
+    expect(items.map((i) => i.getAttribute('data-node'))).toEqual(['w1', 'w2', 'w3', 'w4', 'w5', 'w6']);
+    expect(items[2].classList.contains('ps-whys__item--evidence')).toBe(true);
+    expect(items[2].querySelector('.ps-whys__shape')!.getAttribute('aria-label')).toBe('Evidence for why 1: Three of us said a different. Show details');
+    expect(items[2].querySelector('svg')).toBeNull();
+  });
+});
