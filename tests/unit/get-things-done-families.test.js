@@ -215,3 +215,14 @@ test('5 Whys variant: each why is checked before the chain goes on; five is a gu
   assert.equal(isComplete(run), true);
   assert.throws(() => fiveWhysTool({ minWhys: 0 }), /minWhys runs from 1 to maxWhys/);
 });
+
+test('list: a group may cap its own entries below perGroup; the default is unchanged', async () => {
+  const { listTool } = await import('../../packages/decision-book/families/list.mjs');
+  const chart = { layout: 'rows', entry: 'An entry', groups: [{ id: 'few', label: 'Few', max: 1 }, { id: 'many', label: 'Many' }] };
+  const def = listTool({ ...base, chart });
+  let run = { tool: def.id, nodes: [], edges: [] };
+  run = { ...run, nodes: [sampleNode('e1', 'entry:1', 'One', { tag: 'few' })] };
+  assert.match(def.validateNode(run, { slot: 'entry:2', tag: 'few' }), /already has 1 entries/);
+  assert.equal(def.validateNode(run, { slot: 'entry:2', tag: 'many' }), null);
+  assert.throws(() => listTool({ ...base, chart: { ...chart, groups: [{ id: 'few', label: 'Few', max: 7 }, { id: 'many', label: 'Many' }] } }), /max is a whole number from 1 to perGroup/);
+});
