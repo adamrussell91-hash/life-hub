@@ -1,4 +1,6 @@
-import type { JournalDocument } from '@/api/journal';
+import { getJournal, rememberJournalEnvelope, type JournalDocument } from '@/api/journal';
+import { deleteTravelMeal, getTravelMeal } from '@/api/travel-meal';
+import { isJournalSaveConflict } from '@/journal/conflict-resolve';
 import type {
   JournalDay,
   JournalLeg,
@@ -7,7 +9,7 @@ import type {
   JournalMoment,
 } from '@/journal/types';
 import { offerTimedUndo, showHubToast } from '../../design-kit/js/hub-feedback.js';
-import { persistJournalPatch } from '@/journal/journal-sheet-save';
+import { isFixtureVersion, persistJournalPatch } from '@/journal/journal-sheet-save';
 import {
   applySouvenirDeleteForMoment,
   applySouvenirRestoreForMoment,
@@ -474,20 +476,51 @@ export function runMomentDeleteWithUndo(options: {
   onSaved: (envelope: { journal: JournalDocument; version: string }) => void;
 }): void {
   const target: DeleteTarget = { kind: 'moment', id: options.momentId };
-  const before = options.journal;
-  const afterDelete = applySoftDelete(before, target);
+  const linked = options.journal.moments.find((m) => m.id === options.momentId)?.meal;
 
   void (async () => {
+    let before = options.journal;
+    let version = options.version;
+    let unlinked: { journal: JournalDocument; version: string } | null = null;
+    // A meal's Food Journal visit goes first, while the moment is still live.
+    // Undo brings the moment back but not the visit.
+    if (linked && !isFixtureVersion(version)) {
+      try {
+        const read = await getTravelMeal(options.tripId, options.momentId);
+        const result = await deleteTravelMeal(options.tripId, options.momentId, {
+          travel_version: version,
+          food_version: read.food_version,
+        });
+        const after = result.travel_version
+          ? rememberJournalEnvelope({ journal: result.travel, version: result.travel_version })
+          : await getJournal(options.tripId);
+        before = after.journal;
+        version = after.version;
+        unlinked = after;
+      } catch (err) {
+        showHubToast(
+          isJournalSaveConflict(err)
+            ? 'Your journal changed on another device. Reload before saving.'
+            : 'Could not delete. Check your connection and try again.',
+          { tone: 'danger' },
+        );
+        return;
+      }
+    }
     let saved: { journal: JournalDocument; version: string };
     try {
-      saved = await commitJournalDelete(options.tripId, options.version, afterDelete);
+      saved = await commitJournalDelete(options.tripId, version, applySoftDelete(before, target));
     } catch {
+      // The visit is already gone; keep the view on the server's copy.
+      if (unlinked) options.onSaved(unlinked);
       showHubToast('Could not delete. Check your connection and try again.', { tone: 'danger' });
       return;
     }
     options.onSaved(saved);
     offerTimedUndo({
-      message: `Deleted “${options.momentLabel}”`,
+      message: linked
+        ? `Deleted “${options.momentLabel}” and its Food Journal visit`
+        : `Deleted “${options.momentLabel}”`,
       durationMs: JOURNAL_UNDO_MS,
       onUndo: () => {
         void (async () => {
