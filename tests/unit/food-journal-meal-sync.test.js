@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  findCountedMealPath,
   markDishCounted,
   syncFoodJournalAfterMeal,
 } from "../../netlify/functions/_shared/food-journal-meal-sync.mjs";
@@ -180,4 +181,42 @@ test("a journal that can't be read reports foodJournalUpdated:false and keeps th
   assert.equal(result.foodJournalUpdated, false);
   assert.equal(client.writes[0].path, path);
   assert.equal(client.writes.some((w) => w.path === JOURNAL_PATH), false);
+});
+
+function countedJournal(mealPath) {
+  const j = journal();
+  j.visits[0].dishes[0].brisket = {
+    meal_path: mealPath,
+    portion: "All",
+    portion_fraction: 1,
+    counted_at: "2026-10-22T19:31:00+11:00",
+    needs_recount: false,
+  };
+  return j;
+}
+
+test("findCountedMealPath returns the counted meal path while it is still in the tree", async () => {
+  const client = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: "---\n---\n" });
+  const { tree } = await client.resolveTree();
+  assert.equal(await findCountedMealPath(client, tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), path);
+});
+
+test("findCountedMealPath returns null when the file is gone, the dish is uncounted or unknown", async () => {
+  const gone = fakeClient({ [JOURNAL_PATH]: countedJournal(path) });
+  assert.equal(await findCountedMealPath(gone, (await gone.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+  const fresh = fakeClient({ [JOURNAL_PATH]: journal(), [path]: "x" });
+  assert.equal(await findCountedMealPath(fresh, (await fresh.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+  const counted = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: "x" });
+  assert.equal(await findCountedMealPath(counted, (await counted.resolveTree()).tree, "dish_x", { date: "2026-10-22", meal: "dinner" }), null);
+  const noJournal = fakeClient({ [path]: "x" });
+  assert.equal(await findCountedMealPath(noJournal, (await noJournal.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+  const broken = fakeClient({ [JOURNAL_PATH]: "{not json", [path]: "x" });
+  assert.equal(await findCountedMealPath(broken, (await broken.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+});
+
+test("findCountedMealPath won't reuse a file for another date or meal slot", async () => {
+  const client = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: "x" });
+  const { tree } = await client.resolveTree();
+  assert.equal(await findCountedMealPath(client, tree, "dish_1", { date: "2026-10-23", meal: "dinner" }), null);
+  assert.equal(await findCountedMealPath(client, tree, "dish_1", { date: "2026-10-22", meal: "lunch" }), null);
 });

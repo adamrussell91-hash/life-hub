@@ -1,4 +1,5 @@
 import { decodeBlob } from "./decode-blob.mjs";
+import { parseNutritionMealPath } from "./delete-meal.mjs";
 import { validateFoodJournal } from "./food-journal-schema.mjs";
 
 const PATH = "data/food-journal/journal.json";
@@ -47,4 +48,27 @@ export async function syncFoodJournalAfterMeal(client, record, mealPath, nowIso)
     message: "food-journal: dish counted in Brisket",
   });
   return { updated: true };
+}
+
+// The meal file a dish was last counted into, when a re-count can safely
+// replace it: still in the tree, and the same date and meal slot, since
+// both are part of the path that delete-meal reads.
+export async function findCountedMealPath(client, tree, dishId, { date, meal } = {}) {
+  const blob = tree.find((b) => b.path === PATH && b.type === "blob");
+  if (!blob) return null;
+  let journal;
+  try {
+    journal = JSON.parse(decodeBlob(await client.readBlob(blob.sha)));
+  } catch {
+    return null;
+  }
+  const dish = (journal?.visits ?? [])
+    .flatMap((v) => v?.dishes ?? [])
+    .find((d) => d?.id === dishId);
+  const mealPath = dish?.brisket?.meal_path;
+  const parsed = parseNutritionMealPath(mealPath);
+  if (!parsed || parsed.date !== date || parsed.meal !== meal) return null;
+  return tree.some((b) => b.path === mealPath && b.type === "blob")
+    ? mealPath
+    : null;
 }
