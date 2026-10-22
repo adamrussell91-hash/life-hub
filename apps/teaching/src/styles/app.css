@@ -2400,6 +2400,20 @@ a:hover {
   gap: 2px;
 }
 
+.resources-nav__toggle {
+  justify-self: end;
+  margin-bottom: calc(var(--space-1) * -1);
+}
+
+.resources-layout--collapsed {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.resources-layout--collapsed .resources-nav > :not(.resources-nav__toggle) {
+  display: none;
+}
+
 .resources-nav__item {
   display: flex;
   align-items: center;
@@ -7134,6 +7148,10 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
   min-height: 14rem;
 }
 
+.scope-timeline__body:has(> .scope-timeline__inspector[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .scope-timeline__main {
   display: flex;
   flex-direction: column;
@@ -7667,32 +7685,6 @@ input.scope-timeline__note-title:focus-visible {
     margin-top: 0;
     min-width: 0;
     z-index: 50;
-  }
-
-  .scope-overview__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
-
-  .scope-overview__terms {
-    margin-left: 0;
-    height: auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
-
-  .scope-overview__term {
-    position: static;
-    flex: 1 1 auto;
-    min-width: 4rem;
-    border-right: 1px solid var(--line);
-    border-radius: var(--radius-sm);
-  }
-
-  .scope-overview__track {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .lessons-lib .list-row-actions {
@@ -8323,17 +8315,24 @@ input.scope-timeline__note-title:focus-visible {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--line);
-  border-right: none;
+  border-radius: var(--radius-md);
   box-sizing: border-box;
 }
 
-.scope-overview__term:last-child {
-  border-right: 1px solid var(--line);
-  border-radius: 0 var(--radius-md) 0 0;
+.scope-overview__months {
+  position: relative;
+  height: 1.25rem;
+  margin: calc(var(--space-3) * -1) 0 var(--space-3) 12.25rem;
 }
 
-.scope-overview__term:first-child {
-  border-radius: var(--radius-md) 0 0 0;
+.scope-overview__month {
+  position: absolute;
+  top: 0;
+  padding-left: 4px;
+  border-left: 1px solid var(--line);
+  font-size: var(--font-size-meta);
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .scope-overview__label {
@@ -8359,6 +8358,32 @@ input.scope-timeline__note-title:focus-visible {
   color: #fff;
   border-color: var(--navy);
   font-weight: var(--weight-medium);
+}
+
+/* Phone: subject name above its track, so the year gets the full width. */
+@media (max-width: 720px) {
+  .scope-overview {
+    padding: var(--space-4) var(--space-3) var(--space-1);
+  }
+
+  .scope-overview__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .scope-overview__terms,
+  .scope-overview__months {
+    margin-left: 0;
+  }
+
+  .scope-overview__term {
+    padding: 0;
+    letter-spacing: 0;
+  }
+
+  .scope-overview__month {
+    font-size: 0.65rem;
+  }
 }
 
 /* ── Visualisation blocks (chart, equation, diagram, maps) ─────────────── */

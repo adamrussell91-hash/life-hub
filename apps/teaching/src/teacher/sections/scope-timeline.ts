@@ -20,7 +20,10 @@ import { applyDragDelta } from '@/scope/timeline-drag';
 import { findFirstFreeStart } from '@/scope/timeline-weeks';
 import { resolveScheduleToday } from '@/schedule/today';
 import type { CurriculumResponse } from '@/teacher/nav';
-import { patchScopeSequence } from '@/teacher/scope-api';
+import { deleteScopeSequence, patchScopeSequence } from '@/teacher/scope-api';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
+import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
+import { invalidateCurriculum } from '@/app/curriculum-state';
 import { renderPageHeader } from '@/teacher/page-header';
 import { mountOutcomeStrip } from '@/outcomes/strip';
 import {
@@ -256,7 +259,35 @@ export function renderScopeTimelineEditor(
   const todayYmd = resolveScheduleToday(curriculum.schedule_anchor_date);
 
   canvas.replaceChildren();
-  const pageHeader = renderPageHeader(canvas, { eyebrow: 'Scope & Sequence', title: subject.title });
+  const optionsMenu = mountPageOptionsMenu(
+    [
+      {
+        label: 'Delete scope & sequence',
+        danger: true,
+        onSelect: () => {
+          void (async () => {
+            const ok = await askConfirmCard({
+              eyebrow: 'Delete scope & sequence',
+              title: `Delete the ${subject.title} scope & sequence?`,
+              supporting:
+                'Its timeline and notes go. Units and lessons stay in the library.',
+              confirmLabel: 'Delete'
+            });
+            if (!ok) return;
+            await deleteScopeSequence(scope.id);
+            invalidateCurriculum();
+            navigate('/scope-sequences');
+          })();
+        }
+      }
+    ],
+    { label: 'Scope & sequence options' }
+  );
+  const pageHeader = renderPageHeader(canvas, {
+    eyebrow: 'Scope & Sequence',
+    title: subject.title,
+    actions: [optionsMenu.el]
+  });
   const stripHost = document.createElement('div');
   pageHeader.insertAdjacentElement('afterend', stripHost);
   mountOutcomeStrip(stripHost, {
@@ -402,6 +433,22 @@ export function renderScopeTimelineEditor(
   body.append(main, inspector);
   root.append(tabs, toolbar, compareHost, banner, body);
   canvas.append(root);
+
+  let fittedWidth = 0;
+  const fitObserver = new (globalThis.ResizeObserver ?? class {
+    observe(): void {}
+    disconnect(): void {}
+  })(() => {
+    if (!main.isConnected) {
+      fitObserver.disconnect();
+      return;
+    }
+    const width = Math.floor(main.clientWidth);
+    if (Math.abs(width - fittedWidth) < 4) return;
+    fittedWidth = width;
+    if (tab === 'timeline' && zoom === 'year' && !activeDrag) paintTimeline();
+  });
+  fitObserver.observe(main);
 
   const showBanner = (message: string, tone: 'error' | 'info' = 'error'): void => {
     banner.hidden = false;
@@ -668,7 +715,12 @@ export function renderScopeTimelineEditor(
 
   const yearBounds = (): { start: string; days: number; ppd: number; totalW: number } => {
     const bounds = academicYearBounds(scope.academic_year);
-    const ppd = pxPerDay(zoom);
+    // Year zoom fills the space beside the inspector; Month keeps its fixed scale.
+    const fitWidth = Math.floor(main.clientWidth) - 2;
+    const ppd =
+      zoom === 'year' && fitWidth > 0
+        ? Math.max(pxPerDay('year'), fitWidth / bounds.days)
+        : pxPerDay(zoom);
     return { start: bounds.start, days: bounds.days, ppd, totalW: bounds.days * ppd };
   };
 
