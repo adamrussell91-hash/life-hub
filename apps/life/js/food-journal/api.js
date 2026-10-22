@@ -67,6 +67,16 @@ export function createFoodJournalApi(fetchImpl) {
     translate: (text) =>
       post("/api/food-journal-process", { action: "translate", text }),
     media: (body) => post("/api/food-journal-media", body),
+    // A dish photo's JPEG, read by the function rather than from the bucket.
+    async photo(key) {
+      const { jpeg } = await post("/api/food-journal-media", {
+        action: "bytes",
+        key,
+      });
+      return new Blob([Uint8Array.from(atob(jpeg), (c) => c.charCodeAt(0))], {
+        type: "image/jpeg",
+      });
+    },
     // The function stores the photo, so no browser PUT to R2 is needed.
     upload: (blob) =>
       request("/api/food-journal-media", {

@@ -8,6 +8,7 @@ import {
 } from "./_shared/travel-http.mjs";
 import {
   knowledgePutObject,
+  knowledgeGetObject,
   knowledgePresignGet,
 } from "./_shared/knowledge-r2.mjs";
 import { createFoodJournalRepository } from "./_shared/food-journal-repository.mjs";
@@ -81,6 +82,40 @@ export function createFoodJournalMediaHandler(deps = {}) {
               signGet: deps.signGet,
             });
         return okResponse(200, { urls }, PRIVATE_CACHE);
+      }
+      // The photo itself, for handing a dish to Brisket, so the page never
+      // depends on the bucket allowing browser reads.
+      if (
+        body?.action === "bytes" &&
+        /^food\/photos\/[a-zA-Z0-9_-]+\.jpg$/.test(body.key)
+      ) {
+        const { journal } = await ctx.repo.getJournal();
+        const found = readableJournal(journal).visits.some((v) =>
+          v.dishes.some((d) => d.photos.some((p) => p.key === body.key)),
+        );
+        let bytes = null;
+        if (found)
+          try {
+            bytes = await knowledgeGetObject(ctx.env, {
+              key: body.key,
+              getObject: deps.getObject,
+            });
+          } catch (e) {
+            if (e?.name !== "NoSuchKey") throw e;
+          }
+        if (!bytes)
+          return errorResponse(
+            404,
+            "not_found",
+            "Photo not found.",
+            false,
+            PRIVATE_CACHE,
+          );
+        return okResponse(
+          200,
+          { jpeg: Buffer.from(bytes).toString("base64") },
+          PRIVATE_CACHE,
+        );
       }
       if (
         body?.action === "read" &&
