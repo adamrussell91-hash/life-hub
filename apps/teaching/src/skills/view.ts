@@ -120,7 +120,14 @@ function ladder(c: SkillsContinuum, sub: SkillSubStrand): HTMLElement {
   const list = h('div', 'skl__ladder');
   RUNG_IDS.forEach((id, i) => {
     const info = rungs.find((r) => r.id === id)!;
-    const { i_can, build } = sub.rungs[id];
+    const { i_can, indicators, build } = sub.rungs[id];
+    const groups = new Map<string, HTMLElement>();
+    for (const x of indicators) {
+      if (!groups.has(x.group)) groups.set(x.group, h('ul', 'skl__inds'));
+      groups.get(x.group)!.append(h('li', '', x.text, x.eg ? h('span', 'skl__eg', ` (e.g. ${x.eg})`) : null));
+    }
+    const look = groups.size ? h('div', 'skl__sec skl__look', h('span', 'skl__label', 'Look for'),
+      ...[...groups].map(([g, ul]) => h('div', 'skl__group', h('span', 'skl__group-name', g), ul))) : null;
     const num = (k: number): HTMLElement => {
       const n = h('span', 'skl__num', String(k));
       n.style.setProperty('--pc', `var(--skl-p${k})`);
@@ -149,7 +156,7 @@ function ladder(c: SkillsContinuum, sub: SkillSubStrand): HTMLElement {
     const last = i === RUNG_IDS.length - 1;
     const card = h('article', 'skl__rung',
       h('div', 'skl__rung-head', h('span', 'skl__rung-name', info.name), h('span', 'skl__meta', `${info.marks} marks`), h('span', 'skl__words', info.marker_words)),
-      h('div', 'skl__col', h('div', 'skl__sec', h('span', 'skl__label', 'I can'), h('p', 'skl__ican', i_can)), h('div', 'skl__sec', h('span', 'skl__label', 'The build'), formula), parts, tech),
+      h('div', 'skl__col', h('div', 'skl__sec', h('span', 'skl__label', 'I can'), h('p', 'skl__ican', i_can)), look, h('div', 'skl__sec', h('span', 'skl__label', 'The build'), formula), parts, tech),
       h('div', 'skl__col', h('div', 'skl__sec', h('span', 'skl__label', 'Built'), built, h('p', 'skl__why', build.why_here)), steps,
         h('div', 'skl__sec', h('span', 'skl__label', 'Check it'), h('ul', 'skl__checks', ...build.checks.map((x) => h('li', '', x)))),
         h('div', 'skl__next', h('span', 'skl__label', last ? 'Keep refining' : 'Next move up'), h('p', '', build.next_move.replace(/^Keep refining: /, ''))))

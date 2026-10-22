@@ -18,7 +18,8 @@ var SkillBuildSchema = z.object({
   steps: z.array(Long).max(8).optional(),
   technique: z.object({ name: Short, how: Long, pairs: z.array(z.tuple([Long, Long])).max(8) }).optional()
 });
-var SkillRungSchema = z.object({ i_can: Long, build: SkillBuildSchema });
+var SkillIndicatorSchema = z.object({ group: Short, text: Long, eg: Long.optional() });
+var SkillRungSchema = z.object({ i_can: Long, indicators: z.array(SkillIndicatorSchema).max(12).default([]), build: SkillBuildSchema });
 var SkillSubStrandSchema = z.object({
   id: z.string().regex(/^[a-z-]{2,40}$/),
   name: Short,
@@ -45,6 +46,7 @@ export {
   RUNG_IDS,
   SKILL_STRANDS,
   SkillBuildSchema,
+  SkillIndicatorSchema,
   SkillPartSchema,
   SkillRefSchema,
   SkillRungInfoSchema,
