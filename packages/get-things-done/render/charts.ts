@@ -24,6 +24,6 @@ export function createGearChartForTool(tool: GearTool, doc: Document = document)
 
 /** The chart for a run, looked up through the shared tool registry. */
 export function createGearChartForRun(run: { tool: string }, doc: Document = document): RunChart | null {
-  const tool = (TOOLS as Record<string, GearTool>)[run.tool];
+  const tool = (TOOLS as unknown as Record<string, GearTool>)[run.tool];
   return tool ? createGearChartForTool(tool, doc) : null;
 }
