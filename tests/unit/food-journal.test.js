@@ -1400,3 +1400,58 @@ test("a dish from the photo read takes the ingredients of the menu item with its
     "Snapper, cabbage",
   );
 });
+test("capture keeps the original and the English for a non-English menu", async () => {
+  const r = repo(fixture());
+  const complete = async () =>
+    JSON.stringify({
+      title: "", venue: { name: "Bar Test", address: "" },
+      menu_text: "Tortilla 6€", menu_text_en: "Spanish omelette 6€",
+      menu_items: [{ name: "Tortilla", name_en: "Spanish omelette", description: "Huevo, patata", description_en: "Egg, potato", price: "6€", kind: "dish" }],
+      dishes: [{ title: "Tortilla", title_en: "Spanish omelette", cuisine: "Spanish", meal_type: "Lunch", tags: [], notes: "", photo_ids: [] }],
+    });
+  resetRateLimits();
+  const h = createFoodJournalProcessHandler(deps(r, { complete }));
+  const res = await h(req("POST", { action: "capture", images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }] }));
+  const { draft } = (await res.json()).data;
+  assert.equal(draft.menu_text_en, "Spanish omelette 6€");
+  assert.equal(draft.menu_items[0].name_en, "Spanish omelette");
+  assert.equal(draft.menu_items[0].description_en, "Egg, potato");
+  assert.equal(draft.dishes[0].title_en, "Spanish omelette");
+});
+test("capture leaves English fields out for an English menu", async () => {
+  const r = repo(fixture());
+  const complete = async () =>
+    JSON.stringify({
+      title: "", venue: { name: "", address: "" }, menu_text: "Chips $6",
+      menu_items: [{ name: "Chips", description: "", price: "$6", kind: "dish" }],
+      dishes: [],
+    });
+  resetRateLimits();
+  const h = createFoodJournalProcessHandler(deps(r, { complete }));
+  const res = await h(req("POST", { action: "capture", images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }] }));
+  const { draft } = (await res.json()).data;
+  assert.equal("menu_text_en" in draft, false);
+  assert.equal("name_en" in draft.menu_items[0], false);
+});
+test("a translated menu item gives English ingredients and keeps the original", () => {
+  const item = { name: "Tortilla", name_en: "Spanish omelette", description: "Huevo, patata", description_en: "Egg, potato", price: "6€", kind: "dish" };
+  const v = newVisit();
+  v.menu_items = [item];
+  // A tick.
+  const ticked = toggleMenuDish(v, item);
+  assert.equal(ticked.dishes[0].ingredients, "Egg, potato");
+  assert.equal(ticked.dishes[0].ingredients_original, "Huevo, patata");
+  // Unticking an untouched translated dish removes it again.
+  assert.equal(toggleMenuDish(ticked, item).dishes[0].title, "");
+  // A photo-read name match.
+  const merged = mergeCapture(newVisit(), {
+    title: "", venue: { name: "", address: "" },
+    menu_text: "Tortilla 6€", menu_text_en: "Spanish omelette 6€",
+    menu_items: [item],
+    dishes: [{ title: "Tortilla", title_en: "Spanish omelette", cuisine: "", meal_type: "Lunch", tags: [], notes: "", photo_ids: [] }],
+  });
+  assert.equal(merged.menu_text_en, "Spanish omelette 6€");
+  assert.equal(merged.dishes[0].title_en, "Spanish omelette");
+  assert.equal(merged.dishes[0].ingredients, "Egg, potato");
+  assert.equal(merged.dishes[0].ingredients_original, "Huevo, patata");
+});

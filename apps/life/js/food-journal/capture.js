@@ -55,6 +55,8 @@ export function mergeCapture(visit, draft, photos = []) {
   if (!next.venue.name) next.venue.name = draft.venue.name;
   if (!next.venue.address) next.venue.address = draft.venue.address;
   if (!next.menu_text) next.menu_text = draft.menu_text;
+  if (!next.menu_text_en && draft.menu_text_en)
+    next.menu_text_en = draft.menu_text_en;
   const items = next.menu_items || [];
   for (const item of draft.menu_items || [])
     if (!items.some((i) => sameName(i.name, item.name))) items.push(item);
@@ -67,6 +69,7 @@ export function mergeCapture(visit, draft, photos = []) {
       for (const key of ["cuisine", "notes"])
         if (!old[key]) old[key] = found[key];
       if (!old.tags.length) old.tags = found.tags;
+      if (!old.title_en && found.title_en) old.title_en = found.title_en;
     } else {
       const blank = next.dishes.find((d) => !d.title.trim());
       if (blank) {
@@ -74,6 +77,7 @@ export function mergeCapture(visit, draft, photos = []) {
         if (!blank.cuisine) blank.cuisine = found.cuisine;
         if (!blank.notes) blank.notes = found.notes;
         if (!blank.tags.length) blank.tags = found.tags;
+        if (!blank.title_en && found.title_en) blank.title_en = found.title_en;
         if (blank.meal_type === "Dinner") blank.meal_type = found.meal_type;
       } else
         next.dishes.push({
@@ -90,7 +94,10 @@ export function mergeCapture(visit, draft, photos = []) {
     const item = (next.menu_items || []).find(
       (i) => i.kind !== "extra" && sameName(i.name, dish.title),
     );
-    if (item?.description) dish.ingredients = item.description;
+    if (item?.description_en) {
+      dish.ingredients = item.description_en;
+      dish.ingredients_original = item.description;
+    } else if (item?.description) dish.ingredients = item.description;
   }
   for (const photo of photos) {
     const targets = draft.dishes
@@ -170,13 +177,22 @@ export function toggleMenuDish(visit, item) {
         .join("\n");
       return next;
     }
-    const ingredients = String(item.description || "");
+    const ingredients = String(item.description_en || item.description || "");
+    const original = item.description_en ? String(item.description || "") : "";
     const blank = next.dishes.find((d) => !d.title.trim());
     if (blank) {
       blank.title = item.name;
-      if (!String(blank.ingredients || "").trim())
+      if (!String(blank.ingredients || "").trim()) {
         blank.ingredients = ingredients;
-    } else next.dishes.push({ ...newDish(), title: item.name, ingredients });
+        if (original) blank.ingredients_original = original;
+      }
+    } else
+      next.dishes.push({
+        ...newDish(),
+        title: item.name,
+        ingredients,
+        ...(original ? { ingredients_original: original } : {}),
+      });
     return next;
   }
   const dish = next.dishes[index];
@@ -186,12 +202,21 @@ export function toggleMenuDish(visit, item) {
     return next;
   }
   if (!untouched(dish, item)) {
-    if (!String(dish.ingredients || "").trim())
-      dish.ingredients = String(item.description || "");
+    if (!String(dish.ingredients || "").trim()) {
+      dish.ingredients = String(item.description_en || item.description || "");
+      if (item.description_en)
+        dish.ingredients_original = String(item.description || "");
+    }
     return next;
   }
   if (next.dishes.length > 1) next.dishes.splice(index, 1);
-  else Object.assign(dish, { title: "", notes: "", ingredients: "" });
+  else
+    Object.assign(dish, {
+      title: "",
+      notes: "",
+      ingredients: "",
+      ingredients_original: "",
+    });
   return next;
 }
 
