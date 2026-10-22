@@ -115,7 +115,12 @@ const loadCached = async ({ date }) => loadLiveEvents({
 const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);
 const skincareApi = createSkincareApi(fetchImpl);
-const foodJournalView = createFoodJournalView({ root: document, api: createFoodJournalApi(fetchImpl) });
+const foodJournalView = createFoodJournalView({
+  root: document,
+  api: createFoodJournalApi(fetchImpl),
+  // The controller is created further down; look it up when a dish is sent.
+  sendToBrisket: (message, attachments) => controller?.openBrisketWith?.(message, attachments)
+});
 // Property renders inside Management's Property tab, so the page keeps the
 // Management title rather than taking the property's name.
 const propertyView = createPropertyView({
@@ -252,6 +257,7 @@ controller = createAppController({
   buildMindModel,
   renderMind,
   chatSelectAgent: slug => chatController?.selectAgent?.(slug),
+  chatSend: (message, opts) => chatController?.send?.(message, opts),
   chatSyncAccent: () => chatController?.syncAccent?.(),
   chatStartCentralNodeAudit: () => chatController?.startCentralNodeAudit?.(),
   chatFlushVeraSession: () => chatController?.flushVeraSession?.(),

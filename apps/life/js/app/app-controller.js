@@ -144,6 +144,7 @@ export function createAppController(dependencies) {
     buildMindModel,
     renderMind,
     chatSelectAgent,
+    chatSend,
     chatSyncAccent,
     chatStartCentralNodeAudit,
     chatFlushVeraSession,
@@ -795,6 +796,20 @@ export function createAppController(dependencies) {
       chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, agentSlug));
       chatClearUnread?.();
     }
+  }
+
+  /** Food Journal → Brisket: open Brisket on Nutrition and send the hand-off. */
+  function openBrisketWith(message, attachments = []) {
+    if (!chatPanel) return;
+    // The chat slot lives in Nutrition, so it must be the visible section.
+    if (currentSection !== 'nutrition') showSection('nutrition');
+    chatSelectAgent?.(NUTRITION_AGENT_SLUG);
+    const slot = root.querySelector('#nutrition-dashboard');
+    if (slot && !chatPanel.isOpen()) {
+      chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, NUTRITION_AGENT_SLUG));
+      chatClearUnread?.();
+    }
+    void chatSend?.(message, { attachments });
   }
 
   function openCentralNodeAudit() {
@@ -2196,6 +2211,7 @@ export function createAppController(dependencies) {
     applySkincareShelf,
     applyLoggedEvent,
     removeLoggedEvent,
+    openBrisketWith,
     openCalendarCompose: () => {
       calendarFocusCompose = true;
       if (currentSection !== 'calendar') showSection('calendar');
