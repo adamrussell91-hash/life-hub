@@ -100,7 +100,7 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
     }
     case 'spot_technique': {
       // Copied out: the closures below lose the narrowing on q.
-      const { passage, pick, reuse, options: choices } = q;
+      const { passage, pick, options: choices } = q;
       const spots: Spot[] = options.response && 'spots' in options.response ? [...options.response.spots] : [];
       const optionText = new Map(choices.map((o) => [o.id, o.text]));
       const keyTargets = key?.answer.type === 'spots' ? key.answer.targets : [];
@@ -180,9 +180,9 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
         const chosen = span;
         pickHost.append(el('p', 'qz-spot-pick__ask', `“${spanText(passage, chosen)}”: which technique is this?`));
         const chips = el('div', 'qz-spot-pick__chips');
-        // A technique leaves the list once used, unless the teacher lets one be used twice.
-        const used = new Set(reuse ? [] : spots.map((s) => s.option));
-        for (const option of order(choices).filter((o) => !used.has(o.id))) {
+        // A technique leaves the list once used up: once, or as many times as the teacher set.
+        const left = (o: { id: string; uses?: number }) => (o.uses ?? 1) - spots.filter((s) => s.option === o.id).length;
+        for (const option of order(choices).filter((o) => left(o) > 0)) {
           const chip = el('button', 'qz-chip', option.text);
           chip.type = 'button';
           chip.addEventListener('click', () => {

@@ -728,7 +728,10 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
         datalist.append(option);
       }
     });
-    wrap.append(el('p', 'qz-group__title', 'Techniques students choose from'));
+    wrap.append(
+      el('p', 'qz-group__title', 'Techniques students choose from'),
+      el('p', 'qz-field__hint', 'Each one leaves the list once used. Set ×2 when the passage has two, e.g. two similes.')
+    );
     let paintAnswers = () => {};
     const rows = el('ul', 'qz-rows');
     question.options.forEach((option, i) => {
@@ -744,7 +747,22 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
         paintAnswers();
         emit();
       });
-      row.append(text);
+      const uses = el('input', 'qz-input qz-input--count');
+      uses.type = 'number';
+      uses.min = '1';
+      uses.max = '12';
+      uses.value = String(option.uses ?? 1);
+      uses.title = 'How many times students can name it';
+      uses.setAttribute('aria-label', `Times technique ${i + 1} is used`);
+      uses.addEventListener('input', () => {
+        const n = Math.round(Number(uses.value));
+        if (n > 1 && n <= 12) option.uses = n;
+        else delete option.uses;
+        emit();
+      });
+      const times = el('label', 'qz-times');
+      times.append(el('span', 'qz-times__x', '×'), uses);
+      row.append(text, times);
       if (question.options.length > 2) {
         row.append(
           iconButton('×', `Remove technique ${i + 1}`, () => {
@@ -800,9 +818,12 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       pickHost.append(el('p', 'qz-spot-pick__ask', `“${spanText(question.passage, span)}”: which technique is it?`));
       const chips = el('div', 'qz-spot-pick__chips');
       const add = button('Add this answer', 'primary', () => {
-        // Two answers that need the same name keep that name on offer for students.
-        if (question.targets.some((t) => t.correct.some((id) => ticked.has(id)))) question.reuse = true;
         question.targets.push({ id: newId(), quote: spanText(question.passage, span), correct: [...ticked] });
+        // A second simile makes Simile ×2, so students can name it twice.
+        for (const option of question.options) {
+          const needed = question.targets.filter((t) => t.correct.includes(option.id)).length;
+          if (needed > (option.uses ?? 1)) option.uses = needed;
+        }
         paintBody();
         emit();
       });
@@ -872,14 +893,6 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       });
       wrap.append(labelled('Students must find', find, 'Choose “Any 1” to accept whichever answer they spot.'));
     }
-    wrap.append(
-      checkbox('A technique can be used more than once', !!question.reuse, (on) => {
-        if (on) question.reuse = true;
-        else delete question.reuse;
-        emit();
-      })
-    );
-    wrap.append(el('p', 'qz-field__hint', 'Off: each technique leaves the students’ list once they use it.'));
     return wrap;
   }
 

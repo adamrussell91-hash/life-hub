@@ -95,7 +95,8 @@ export function answerLines(q: QuizQuestion, hideAnswer = false): string[] {
     case 'spot_technique': {
       const names = new Map((q.options ?? []).map((o) => [o.id, o.text]));
       const find = q.find && q.find < (q.targets ?? []).length ? [`Students find any ${q.find}.`] : [];
-      if (hideAnswer) return [q.passage ?? '', `Techniques: ${(q.options ?? []).map((o) => o.text).join(', ')}`];
+      const named = (q.options ?? []).map((o) => ((o.uses ?? 1) > 1 ? `${o.text} ×${o.uses}` : o.text));
+      if (hideAnswer) return [q.passage ?? '', `Techniques: ${named.join(', ')}`];
       return [
         q.passage ?? '',
         ...(q.targets ?? []).map((t) => `✓ “${t.quote}”: ${t.correct.map((id) => names.get(id)).filter(Boolean).join(' or ')}`),

@@ -161,12 +161,19 @@ export const QuizQuestionSchema = z
       ...base,
       kind: z.literal('spot_technique'),
       passage: Text(QUIZ_LIMITS.passage),
-      options: z.array(QuizChoiceSchema.extend({ technique_id: z.string().max(64).optional() })).min(2).max(10),
+      options: z
+        .array(
+          QuizChoiceSchema.extend({
+            technique_id: z.string().max(64).optional(),
+            /** How many times students may name it: 2 for a passage with two similes. */
+            uses: z.number().int().min(1).max(12).optional()
+          })
+        )
+        .min(2)
+        .max(10),
       targets: z.array(QuizSpotTargetSchema).min(1).max(12),
       /** How many students must find. Fewer than the targets means any of them will do. */
-      find: z.number().int().min(1).max(12).optional(),
-      /** A technique stays on offer after it is used, for passages with two of the same. */
-      reuse: z.boolean().optional()
+      find: z.number().int().min(1).max(12).optional()
     }),
     z.object({ ...base, kind: z.literal('label_image'), image: QuizImageSchema, pins: z.array(QuizPinSchema).min(2).max(8) }),
     z.object({
@@ -246,10 +253,12 @@ export function questionProblems(q: QuizQuestion): string[] {
         if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push('Name the technique for every answer.');
       }
       if ((q.find ?? q.targets.length) > q.targets.length) out.push('Students can’t be asked to find more than there are answers.');
-      // Each technique leaves the list once used, so two answers that only one name fits need reuse.
-      const only = q.targets.filter((t) => t.correct.length === 1).map((t) => t.correct[0]);
-      if (!q.reuse && (q.find ?? q.targets.length) > 1 && new Set(only).size !== only.length) {
-        out.push('Two answers need the same technique. Turn on “A technique can be used more than once”.');
+      // A technique leaves the students' list once used up, so it must cover every answer only it fits.
+      if ((q.find ?? q.targets.length) > 1) {
+        for (const option of q.options) {
+          const needed = q.targets.filter((t) => t.correct.length === 1 && t.correct[0] === option.id).length;
+          if (needed > (option.uses ?? 1)) out.push(`${option.text.trim() || 'A technique'} is the answer ${needed} times. Set it to ×${needed}.`);
+        }
       }
       break;
     }
@@ -460,7 +469,7 @@ export type PublicQuestion =
   | (PublicBase & { kind: 'ordering'; items: Choice[] })
   | (PublicBase & { kind: 'categorise'; groups: Choice[]; items: Choice[] })
   | (PublicBase & { kind: 'find_it'; segments: Choice[]; pick: number })
-  | (PublicBase & { kind: 'spot_technique'; passage: string; options: Choice[]; pick: number; reuse: boolean })
+  | (PublicBase & { kind: 'spot_technique'; passage: string; options: Array<Choice & { uses?: number }>; pick: number })
   | (PublicBase & { kind: 'label_image'; image: QuizImage; pins: Array<{ id: string; x: number; y: number; n: number }>; labels: Choice[] })
   | (PublicBase & { kind: 'extended_response' })
   | (PublicBase & { kind: 'explain_effect'; quote: string; technique?: string });
@@ -627,14 +636,14 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
     }
     case 'spot_technique': {
       const ids = new Map(q.options.map((o) => [o.id, fresh()]));
-      const options = shuffled(q.options, random).map((o) => ({ id: ids.get(o.id) as string, text: o.text }));
+      const options = shuffled(q.options, random).map((o) => ({ id: ids.get(o.id) as string, text: o.text, ...((o.uses ?? 1) > 1 ? { uses: o.uses } : {}) }));
       const targets = q.targets.flatMap((t) => {
         const span = locateQuote(q.passage, t.quote);
         return span ? [{ ...span, ids: t.correct.map((id) => ids.get(id)).filter((id): id is string => !!id) }] : [];
       });
       const pick = Math.min(q.find ?? targets.length, targets.length);
       return {
-        question: { ...head, kind: 'spot_technique', passage: q.passage, options, pick, reuse: !!q.reuse },
+        question: { ...head, kind: 'spot_technique', passage: q.passage, options, pick },
         key: { ...keyHead, answer: { type: 'spots', passage: q.passage, targets, pick } }
       };
     }

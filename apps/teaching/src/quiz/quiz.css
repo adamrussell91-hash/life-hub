@@ -1655,3 +1655,16 @@
 .qz-spots__row .qz-icon-btn {
   grid-area: remove;
 }
+
+.qz-times {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  color: var(--muted);
+}
+
+.qz-input--count {
+  width: 4rem;
+  text-align: center;
+}

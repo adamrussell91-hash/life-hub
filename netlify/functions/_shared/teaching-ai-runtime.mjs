@@ -222,12 +222,16 @@ var QuizQuestionSchema = z5.discriminatedUnion("kind", [
     ...base,
     kind: z5.literal("spot_technique"),
     passage: Text(QUIZ_LIMITS.passage),
-    options: z5.array(QuizChoiceSchema.extend({ technique_id: z5.string().max(64).optional() })).min(2).max(10),
+    options: z5.array(
+      QuizChoiceSchema.extend({
+        technique_id: z5.string().max(64).optional(),
+        /** How many times students may name it: 2 for a passage with two similes. */
+        uses: z5.number().int().min(1).max(12).optional()
+      })
+    ).min(2).max(10),
     targets: z5.array(QuizSpotTargetSchema).min(1).max(12),
     /** How many students must find. Fewer than the targets means any of them will do. */
-    find: z5.number().int().min(1).max(12).optional(),
-    /** A technique stays on offer after it is used, for passages with two of the same. */
-    reuse: z5.boolean().optional()
+    find: z5.number().int().min(1).max(12).optional()
   }),
   z5.object({ ...base, kind: z5.literal("label_image"), image: QuizImageSchema, pins: z5.array(QuizPinSchema).min(2).max(8) }),
   z5.object({
@@ -288,9 +292,11 @@ function questionProblems(q) {
         if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push("Name the technique for every answer.");
       }
       if ((q.find ?? q.targets.length) > q.targets.length) out.push("Students can\u2019t be asked to find more than there are answers.");
-      const only = q.targets.filter((t) => t.correct.length === 1).map((t) => t.correct[0]);
-      if (!q.reuse && (q.find ?? q.targets.length) > 1 && new Set(only).size !== only.length) {
-        out.push("Two answers need the same technique. Turn on \u201CA technique can be used more than once\u201D.");
+      if ((q.find ?? q.targets.length) > 1) {
+        for (const option of q.options) {
+          const needed = q.targets.filter((t) => t.correct.length === 1 && t.correct[0] === option.id).length;
+          if (needed > (option.uses ?? 1)) out.push(`${option.text.trim() || "A technique"} is the answer ${needed} times. Set it to \xD7${needed}.`);
+        }
       }
       break;
     }
@@ -5091,7 +5097,7 @@ A quiz is one quiz_question block per question: content { question }. Set questi
 - categorise: groups [{ id, name }] 2-4, items [{ id, text, group: group id }] 2-16.
 - quote_technique: quote, options [{ id, text }] 2-6 naming techniques, correct [one id].
 - find_it: segments [{ id, text }] 2-40 (the lines of a passage), correct [the ids that answer]; leave at least one line that is not an answer.
-- spot_technique: passage (the poem or prose, line breaks kept), options [{ id, text }] 3-10 naming techniques (every right one plus a few plausible wrong ones), targets [{ id, quote, correct: [option ids] }] 1-12. Each quote is the few words that carry the technique, copied exactly from the passage; correct lists every technique a fair marker would accept for those words. find optional: how many students must find (leave it out to need them all; find 1 with several targets means any one counts). Students' technique list drops each name once used, so set reuse true when two answers share a technique (e.g. two similes). Say "Find two\u2026" or "Find one\u2026" in the prompt to match. Students select words and pick a name; a selection a few words bigger or smaller still counts, and right words with the wrong name earn half.
+- spot_technique: passage (the poem or prose, line breaks kept), options [{ id, text, uses? }] 3-10 naming techniques (every right one plus a few plausible wrong ones), targets [{ id, quote, correct: [option ids] }] 1-12. Each quote is the few words that carry the technique, copied exactly from the passage; correct lists every technique a fair marker would accept for those words. find optional: how many students must find (leave it out to need them all; find 1 with several targets means any one counts). Students' technique list drops each name once used, so set uses to the number of answers that need it (two similes: Simile uses 2). Say "Find two\u2026" or "Find one\u2026" in the prompt to match. Students select words and pick a name; a selection a few words bigger or smaller still counts, and right words with the wrong name earn half.
 - label_image: image { url, alt } from an image already in the lesson, pins [{ id, x, y, label }] 2-8 with x and y from 0 to 1. Skip this kind when the lesson has no image.
 - extended_response: model_answer and guide optional. Teacher-marked.
 - explain_effect: quote, technique optional, model_answer and guide optional. Teacher-marked.
