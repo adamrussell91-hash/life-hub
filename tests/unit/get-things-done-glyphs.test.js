@@ -8,9 +8,9 @@ const dir = (sub) => new URL(`../../packages/get-things-done/glyphs/${sub}/`, im
 const names = async (sub) => (await readdir(dir(sub))).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)).sort();
 const all = async () => (await Promise.all(['models', 'sections', 'identity'].map(async (sub) => (await readdir(dir(sub))).map((f) => [sub, f])))).flat();
 
-test('an emblem per entry except the two variants, five sections, three identity marks', async () => {
-  assert.deepEqual(await names('models'), CATALOGUE.filter((e) => !e.reuse).map((e) => e.id).sort());
-  assert.equal((await names('models')).length, 35);
+test('an emblem per entry (the two variants drawn for Gear Shifter), five sections, three identity marks', async () => {
+  assert.deepEqual(await names('models'), CATALOGUE.map((e) => e.id).sort());
+  assert.equal((await names('models')).length, 37);
   assert.deepEqual(await names('sections'), SECTIONS.map((s) => s.key).sort());
   assert.deepEqual(await names('identity'), ['book-emblem', 'book-emblem-mono', 'wordmark']);
 });

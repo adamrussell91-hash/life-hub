@@ -38,7 +38,7 @@
 
 **Design notes:**
 - **One structure, three looks.** The session page wires the same parts in the same order as Decision Maker's `renderSession`; only the canvas, route, track, medal card, shelf and options differ.
-- **The provenance image is a static file** in the Tasks build (`apps/tasks/public/get-things-done/provenance/<id>.svg`), made by a generator with a drift test, for Decision Maker's reason: an image block keeps the http(s) address it was written with. The Kanban and 5 Whys variants have no emblem of their own; their image is the book's emblem inside the section (Problem Solver's glyphs are in its own palette).
+- **The provenance image is a static file** in the Tasks build (`apps/tasks/public/get-things-done/provenance/<id>.svg`), made by a generator with a drift test, for Decision Maker's reason: an image block keeps the http(s) address it was written with. The Kanban and 5 Whys variants' images use the two emblems drawn for them (see As run).
 - **Picking a technique is a message to the coach**, not a new action. The shelf and a station's links send "Let's try <technique>." through `say`, so the coach's discernment and its gatekeeping still apply; the engine gains nothing. Starting from a technique on the landing uses the server's existing `startModel`.
 - **Station links are added by Gear Shifter's canvas**, after the path renderer draws Getting a Project Done, so Decision Maker's renderer is untouched.
 
@@ -78,7 +78,7 @@
 ### Task 3: The provenance images
 
 **Files:**
-- Create: `scripts/generate-get-things-done-provenance.mjs`: for every catalogue entry, its emblem (or, for the two variants, the book's emblem) on a paper disc with a cobalt ring, and its section's emblem as a badge at the lower right; `--check` exits 1 on drift. Written to `apps/tasks/public/get-things-done/provenance/<id>.svg` (37 files).
+- Create: `scripts/generate-get-things-done-provenance.mjs`: for every catalogue entry, its emblem on a paper disc with a cobalt ring, and its section's emblem as a badge at the lower right; `--check` exits 1 on drift. Written to `apps/tasks/public/get-things-done/provenance/<id>.svg` (37 files).
 - Create: `tests/unit/get-things-done-provenance.test.js`: one file per catalogue entry, each labelled "<technique>, from <section>", only palette colours, and `--check` passes.
 
 **Commit:** "Gear Shifter: the provenance images a record shows".
@@ -141,7 +141,7 @@
   - the track's dotted line started left of Frame: Problem Solver's fixed offset does not fit four wide columns, so Gear Shifter's runs centre to centre;
   - the experiment review showed the book's emblem in the canvas title and strip; it now has its own mark (the return arrows round an amber centre);
   - the board's book tile drew nothing: Problem Solver's `.ps-loom svg { width: 100% }` stretched the nested emblem off the board, so it is drawn as a scaled group.
-- **Variants:** Kanban and 5 Whys have no emblem of their own, so their shelf, station links and provenance image show the book's emblem (Problem Solver's glyphs are in its palette).
+- **Variants:** the pack has no emblems for Kanban and 5 Whys, and Problem Solver's are in its own flat red, yellow and blue. At Adam's ask, two were drawn for Gear Shifter in the pack's style (`glyphs/models/gt_kanban.svg`: three cobalt lanes with cards and a forward arrow; `gt_five_whys.svg`: a red problem, a dotted chain of four whys and a target for the root). They show on the shelf, station links, canvas and provenance images; the importer leaves them alone.
 - **UI register entries checked:** V1 (every `[hidden]` part has a `display: none` rule), R2 (no page scroll at 390), R3, I2 (every pick is a `<button>`), I3 (empty states say what to do), D5 (dates by `formatDisplayDate` or in words), M1 (the avatar's gear turns only while the coach thinks; hovers settle), P4 (see below).
 - **Quick start** is a card with its line and "Not open yet. Use the box above for now.", with no dead control. P4 forbids roadmap talk in the product; the PR goes ready only after Plan 6 replaces the card, so it never ships.
 

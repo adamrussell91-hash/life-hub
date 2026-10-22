@@ -1,6 +1,6 @@
 // packages/get-things-done/glyphs.ts
 // The book pack's emblems as markup, recoloured to Gear Shifter's palette: one per catalogue
-// entry with its own (the Kanban and 5 Whys variants draw Problem Solver's), the five
+// entry (the Kanban and 5 Whys variants' drawn for Gear Shifter in the same style), the five
 // sections and the book. Vite inlines them at build (`?raw`), as Decision Maker's glyphs.ts
 // does. Every string is a static asset from this package, never user text.
 import bookEmblemSvg from './glyphs/identity/book-emblem.svg?raw';

@@ -165,7 +165,7 @@ Gear Shifter is the third member of the set. It shares the grid, type, motion, c
 - **Track:** stations for Frame, Explore, Commit and Review, joined by a dotted line.
 - **Route:** the five section emblems on a loop above the canvas, in place of Decision Maker's compass. The lit station is ringed and the rest are faded.
 - **Coach avatar:** the gear inside the return arrows.
-- **Emblems:** the pack's 35 entry emblems, 5 section emblems and identity marks, copied as they are into `packages/get-things-done/glyphs/`. Kanban and 5 Whys keep Problem Solver's glyphs. There is no emblem review round; any change goes on one contact sheet.
+- **Emblems:** the pack's 35 entry emblems, 5 section emblems and identity marks, copied as they are into `packages/get-things-done/glyphs/`. Kanban and 5 Whys, which the pack has no emblems for, have two drawn for Gear Shifter in the same style (Adam, 22 Oct): three cobalt lanes with cards and a forward arrow, and a dotted chain of whys down to a target. There is no emblem review round; any change goes on one contact sheet.
 
 ## Diagrams
 
