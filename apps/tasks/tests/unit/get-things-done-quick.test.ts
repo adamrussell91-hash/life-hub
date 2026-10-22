@@ -4,7 +4,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { again, applyStep, newStart } from '../../../../packages/get-things-done/quick.mjs';
 import { checkPointText, createStartView } from '../../../../packages/get-things-done/render/quick';
-import type { GtStartState } from '../../../../packages/problem-solver/types';
+import type { GtStartState, PsSession } from '../../../../packages/problem-solver/types';
+import { mountFromStart, mountStartPage, type StartPageHandlers } from '../../src/views/get-things-done/quick-view';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -56,7 +57,7 @@ describe('the Quick start chart', () => {
   it('offers the two ways on the how station only with onPick, labelled, locking once pressed', () => {
     const plain = createStartView(document);
     plain.update(walk(1));
-    expect(plain.el.querySelector('.gt-qs__ask')!.hasAttribute('hidden')).toBe(true);
+    expect(plain.el.querySelector('.gt-qs__ask, .gt-qs__pick')).toBeNull();
     const onPick = vi.fn();
     const view = createStartView(document, { onPick });
     view.update(walk(1));
@@ -92,5 +93,100 @@ describe('the Quick start chart', () => {
     expect(view.el.querySelector('.gt-qs__rounds')!.textContent).toBe('Round 2. Round 1: Archive everything older than a month, with a protected interval.');
     expect(view.el.querySelector('.gt-qs__action')!.textContent).toBe('Not named yet');
     expect(view.el.querySelector('[data-now="true"]')!.getAttribute('data-box')).toBe('action');
+  });
+});
+
+const session = (start: GtStartState, over: Partial<PsSession> = {}): PsSession => ({
+  id: 'q1', title: TASK, revision: 3, kind: 'start', status: start.finishedAt ? 'finished' : 'active', phase: 'start', frame: {}, model: null, links: [], steps: {}, learnings: [],
+  pendingLearning: null, turns: [{ id: 't1', role: 'user', text: TASK, createdAt: AT }], summary: '', suggestion: null, pendingKeep: null,
+  runner: { status: 'idle', mode: 'turn', error: null }, proposedTasks: [], reviewProposal: null, reviewTaskId: null, reviewState: null, caseFile: null,
+  caseFileDeclined: null, lightning: null, start, escalatedFrom: null, frameSeeds: null, taskSnapshot: null, detour: null, createdAt: AT, updatedAt: AT, ...over
+} as PsSession);
+
+const handlers = (): StartPageHandlers & Record<string, ReturnType<typeof vi.fn>> => ({
+  onPick: vi.fn(), onSay: vi.fn(), onAction: vi.fn(), onAgain: vi.fn().mockResolvedValue(undefined), onCheck: vi.fn().mockResolvedValue(undefined)
+}) as never;
+
+describe('the Quick start page', () => {
+  it('shows the chart and coach; It came back waits until the run is done', () => {
+    const page = mountStartPage(session(walk(1)), handlers());
+    document.body.append(page.el);
+    page.update(session(walk(1)));
+    expect(page.el.querySelector('.gt-qs')).not.toBeNull();
+    expect(page.el.querySelector('.ps-coach')).not.toBeNull();
+    expect(page.el.querySelector<HTMLElement>('.gt-qs-page__again')!.hidden).toBe(true);
+    expect(page.el.querySelector<HTMLElement>('.gt-qs-page__deeper')!.hidden).toBe(false);
+    page.update(session(walk(6)));
+    expect(page.el.querySelector<HTMLElement>('.gt-qs-page__again')!.hidden).toBe(false);
+    expect(page.el.querySelector<HTMLElement>('.gt-qs-page__done-line')!.hidden).toBe(false);
+    expect(page.el.querySelector('textarea')!.disabled).toBe(true);
+  });
+
+  it('a pick on the chart calls onPick; Go deeper asks to escalate', () => {
+    const h = handlers();
+    const page = mountStartPage(session(walk(1)), h);
+    page.update(session(walk(1)));
+    page.el.querySelector<HTMLButtonElement>('.gt-qs__pick[data-way="interval"]')!.click();
+    expect(h.onPick).toHaveBeenCalledWith('how', 'interval');
+    page.el.querySelector<HTMLButtonElement>('.gt-qs-page__deeper')!.click();
+    expect(h.onAction).toHaveBeenCalledWith('escalate');
+    page.setEscalating(true);
+    expect(page.el.querySelector<HTMLButtonElement>('.gt-qs-page__deeper')!.disabled).toBe(true);
+    expect(page.el.querySelector<HTMLElement>('.gt-qs-page__pending')!.hidden).toBe(false);
+  });
+
+  it('the check card offers a dated check-back and hides once linked or set aside', async () => {
+    const h = handlers();
+    const dated = walk(4);
+    const page = mountStartPage(session(dated), h);
+    page.update(session(dated));
+    const card = page.el.querySelector<HTMLElement>('.gt-qs-check')!;
+    expect(card.hidden).toBe(false);
+    expect(card.textContent).toContain(`Check back on "${TASK}" on 24 Oct 2026.`);
+    card.querySelector<HTMLButtonElement>('.btn--primary')!.click();
+    await vi.waitFor(() => expect(h.onCheck).toHaveBeenCalledWith(true));
+    page.update(session({ ...dated, check: { due: '2026-10-24', taskId: 'task-1', dismissed: false } }));
+    expect(card.hidden).toBe(true);
+    page.update(session({ ...dated, check: { due: '2026-10-24', taskId: null, dismissed: true } }));
+    expect(card.hidden).toBe(true);
+    const words = applyStep(walk(3), { node: 'check', note: 'after lunch' }, AT) as GtStartState;
+    page.update(session(words));
+    expect(card.hidden).toBe(true);
+  });
+
+  it('once gone deeper, the actions go and a link opens the full session', () => {
+    const page = mountStartPage(session(walk(2)), handlers());
+    page.update(session({ ...walk(2), escalatedTo: 'full-1', finishedAt: AT }, { status: 'finished' }));
+    expect(page.el.querySelector<HTMLElement>('.gt-qs-page__actions')!.hidden).toBe(true);
+    const sent = page.el.querySelector<HTMLElement>('.gt-qs-page__sent')!;
+    expect(sent.hidden).toBe(false);
+    expect(sent.getAttribute('role')).toBe('status');
+    expect(sent.querySelector('a')!.getAttribute('href')).toBe('#/gear-shifter?id=full-1');
+  });
+});
+
+describe('the Began as a Quick start panel', () => {
+  it('loads the run once it is opened, read-only, with a link back', async () => {
+    const get = vi.fn().mockResolvedValue(session(walk(3)));
+    const panel = mountFromStart('q1', get);
+    document.body.append(panel.el);
+    expect(get).not.toHaveBeenCalled();
+    panel.el.open = true;
+    panel.el.dispatchEvent(new Event('toggle'));
+    await vi.waitFor(() => expect(panel.el.querySelector('.gt-qs')).not.toBeNull());
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(panel.el.querySelector('.gt-qs__pick')).toBeNull();
+    expect(panel.el.querySelector('.ps-ltn-from__link')!.getAttribute('href')).toBe('#/gear-shifter?id=q1');
+    expect(panel.el.querySelector('summary')!.textContent).toBe('Began as a Quick start: the first action tried');
+  });
+
+  it('offers a retry when the run cannot be loaded', async () => {
+    const get = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(session(walk(2)));
+    const panel = mountFromStart('q1', get);
+    panel.el.open = true;
+    panel.el.dispatchEvent(new Event('toggle'));
+    await vi.waitFor(() => expect(panel.el.querySelector('[role="alert"]')).not.toBeNull());
+    panel.el.querySelector<HTMLButtonElement>('.ps-ltn-from__retry')!.click();
+    await vi.waitFor(() => expect(panel.el.querySelector('.gt-qs')).not.toBeNull());
   });
 });

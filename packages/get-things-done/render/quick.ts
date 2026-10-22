@@ -75,7 +75,8 @@ export function createStartView(doc: Document = document, opts: { onPick?(node: 
 
   const ask = el(doc, 'div', 'gt-qs__ask');
   ask.hidden = true;
-  const buttons = WAYS.map((id) => {
+  // Read-only charts (the panel on a full session) carry no buttons at all.
+  const buttons = (opts.onPick ? WAYS : []).map((id) => {
     const button = el(doc, 'button', 'gt-qs__pick', START_WAYS[id].label) as HTMLButtonElement;
     button.type = 'button';
     button.dataset.way = id;
@@ -88,7 +89,7 @@ export function createStartView(doc: Document = document, opts: { onPick?(node: 
     ask.append(button);
     return button;
   });
-  rows.get('how')!.item.append(ask);
+  if (buttons.length) rows.get('how')!.item.append(ask);
 
   const credit = el(doc, 'p', 'gt-qs__credit', 'Gear Shifter’s own short route, borrowing two ideas from the book: The 5-Second Rule for the countdown and The Pomodoro Technique for the interval.');
   root.append(rounds, hit, route, credit);
