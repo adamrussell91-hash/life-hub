@@ -124,7 +124,7 @@ export function mountLessonDisplayView(
       // Page keeps the self-paced quiz; Focus runs it live from the board.
       const quiz = document.createElement('section');
       quiz.className = 'lesson-display__step';
-      const selfPaced = mountStudentQuiz(lesson);
+      const selfPaced = mountStudentQuiz(lesson, { pickClass: false });
       selfPaced.classList.add('fv-quiz-page');
       const live = mountQuizLive(lesson.lesson_id, () => focus.refreshCheckpoint());
       quiz.append(selfPaced, live.root);

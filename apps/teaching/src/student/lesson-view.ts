@@ -106,7 +106,7 @@ export function renderPublishedLessonHero(
 function renderPublishedLesson(
   content: HTMLElement,
   lesson: PublishedLesson,
-  extras?: { cls?: PublishedClass }
+  extras?: { cls?: PublishedClass; quizClassId?: string }
 ): void {
   content.replaceChildren();
   const publishedOutcomes = renderPublishedLessonHero(content, lesson, extras?.cls);
@@ -133,7 +133,7 @@ function renderPublishedLesson(
     feedbackOff: lesson.feedback_off === true
   });
   content.append(blocks);
-  if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: extras?.cls?.id }));
+  if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: extras?.cls?.id ?? extras?.quizClassId }));
   revealBlockFromHash(content);
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {
@@ -288,7 +288,9 @@ export function mountStudentLessonView(
       .then((lesson) => {
         if (disposed || isStale()) return;
         renderStudentChrome(header, {});
-        renderPublishedLesson(content, lesson);
+        // The teacher's per-class Share link adds ?class= so the quiz knows the class list.
+        const quizClassId = new URLSearchParams(window.location.search).get('class') ?? undefined;
+        renderPublishedLesson(content, lesson, { quizClassId });
         mountExamples(content);
       })
       .catch((error: unknown) => {
