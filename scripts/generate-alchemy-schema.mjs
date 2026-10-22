@@ -11,3 +11,9 @@ await build({
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
   banner: {js:'// Generated from apps/teaching/src/quiz/core.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
+await build({
+  entryPoints: ['apps/teaching/src/schemas/student-initials.ts'],
+  outfile: 'netlify/functions/_shared/student-initials.mjs',
+  bundle: true, platform: 'node', format: 'esm',
+  banner: {js:'// Generated from apps/teaching/src/schemas/student-initials.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
