@@ -81,6 +81,10 @@ function parse(text) {
     throw new Error("Invalid model output");
   }
 }
+// True when every letter is A-Z or a-z; punctuation, digits and emoji are ignored.
+function looksEnglish(text) {
+  return !/[^\P{L}A-Za-z]/u.test(text);
+}
 export function createFoodJournalProcessHandler(deps = {}) {
   return createTravelOperatorHandler(
     async (request, ctx) => {
@@ -202,8 +206,8 @@ export function createFoodJournalProcessHandler(deps = {}) {
               false,
               PRIVATE_CACHE,
             );
-          // Plain ASCII is English for our purposes; only call the model otherwise.
-          if (/^[\x00-\x7F]*$/.test(note))
+          // Only call the model when a note has a non-English letter.
+          if (looksEnglish(note))
             return okResponse(200, { text_en: "" }, PRIVATE_CACHE);
           const raw = await (deps.complete ?? completeMessage)({
             apiKey: ctx.env.ANTHROPIC_API_KEY,

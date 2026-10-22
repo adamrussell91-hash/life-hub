@@ -1096,10 +1096,13 @@ test("translate action returns English for non-English notes and nothing for Eng
   const h = createFoodJournalProcessHandler(deps(repo(fixture()), { complete }));
   let res = await h(req("POST", { action: "translate", text: "riquísimo, mucho ajo" }));
   assert.deepEqual((await res.json()).data, { text_en: "delicious, very garlicky" });
-  res = await h(req("POST", { action: "translate", text: "Great chips" }));
+  res = await h(req("POST", { action: "translate", text: "Great chips — loved it ’cause it’s crispy 😋" }));
   assert.deepEqual((await res.json()).data, { text_en: "" });
-  assert.equal(calls.length, 1, "plain ASCII English skips the model");
+  assert.equal(calls.length, 1, "English with curly quotes, dashes and emoji skips the model");
   assert.equal(calls[0], "claude-haiku-5-5");
+  res = await h(req("POST", { action: "translate", text: "Café was fine" }));
+  assert.deepEqual((await res.json()).data, { text_en: "" });
+  assert.equal(calls.length, 2, "an accented letter calls the model");
   res = await h(req("POST", { action: "translate", text: "x".repeat(20001) }));
   assert.equal(res.status, 400);
 });

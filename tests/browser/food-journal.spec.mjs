@@ -549,10 +549,10 @@ test("capture, private upload, menu text, backup and restore work through the re
   assert.equal(await gyoza.isChecked(), false);
   await gyoza.check();
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 2);
-  // A ticked dish brings its ingredients into its notes.
+  // A ticked dish brings its ingredients into ingredients, not the notes.
   assert.equal(
     await page.getByLabel("Dish notes", { exact: true }).nth(1).inputValue(),
-    "Pan fried",
+    "",
   );
   // Extras sit apart from the dishes and tick onto the last dish.
   const names = await onMenu.locator(".food-onmenu__list > *").allInnerTexts();
@@ -563,18 +563,22 @@ test("capture, private upload, menu text, backup and restore work through the re
   assert.equal(await page.getByLabel("Dish title", { exact: true }).count(), 2);
   assert.equal(
     await page.getByLabel("Dish notes", { exact: true }).nth(1).inputValue(),
-    "Pan fried\n+ Extra egg",
+    "",
   );
   await egg.uncheck();
   // Long descriptions keep their rows, even when the list is capped and
   // scrolls; nothing runs into the next item.
   await page.setViewportSize({ width: 390, height: 420 });
-  const rows = await onMenu
-    .locator(".food-onmenu__list > *")
-    .evaluateAll((nodes) => nodes.map((n) => [n.getBoundingClientRect().top, n.getBoundingClientRect().bottom, n.scrollHeight, n.clientHeight]));
-  assert.ok(
-    await onMenu.locator(".food-onmenu__list").evaluate((n) => n.scrollHeight > n.clientHeight),
-  );
+  // dvh does not follow the emulated viewport here, so cap the list directly
+  // (no transition) and measure in the same step.
+  const { rows, scrolls } = await onMenu.locator(".food-onmenu__list").evaluate((list) => {
+    list.style.transition = "none"; list.style.maxHeight = "190px";
+    return {
+      scrolls: list.scrollHeight > list.clientHeight,
+      rows: [...list.children].map((n) => [n.getBoundingClientRect().top, n.getBoundingClientRect().bottom, n.scrollHeight, n.clientHeight]),
+    };
+  });
+  assert.ok(scrolls, JSON.stringify(rows));
   for (let i = 0; i < rows.length; i++) {
     assert.ok(rows[i][2] <= rows[i][3] + 1, JSON.stringify(rows));
     if (i) assert.ok(rows[i][0] >= rows[i - 1][1] - 1, JSON.stringify(rows));
@@ -615,7 +619,8 @@ test("capture, private upload, menu text, backup and restore work through the re
     ],
   );
   assert.equal(read().visits[1].menu_items.length, 4);
-  assert.equal(read().visits[1].dishes[1].notes, "Pan fried");
+  assert.equal(read().visits[1].dishes[1].ingredients, "Pan fried");
+  assert.equal(read().visits[1].dishes[1].notes, "");
   assert.ok(read().visits[1].dishes[0].tags.includes("Spicy"));
   const photoState = await page.evaluate(() => {
     const node = document.querySelector(".fj-portrait .food-photo");
