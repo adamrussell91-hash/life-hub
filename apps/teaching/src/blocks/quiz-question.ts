@@ -1,6 +1,8 @@
 import type { Block } from '@/schemas/block';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import { QUIZ_KIND_INFO, checkQuestion, parseGapPassage, type QuizQuestion } from '@/quiz/core';
+import { peekCurriculum } from '@/app/curriculum-state';
+import { outcomeLabels } from '@/markbook/parse';
 import { mountQuestionBuilder } from '@/quiz/builder';
 import { el, formatMarks } from '@/quiz/dom';
 import { lessonImages } from '@/quiz/images';
@@ -20,6 +22,7 @@ export function createQuizQuestionEditor(block: QuizBlock, onChange: (b: QuizBlo
     question: { ...block.content.question, id: block.id },
     audience: 'teacher',
     allowImageUrl: true,
+    outcomes: outcomeLabels(peekCurriculum()?.outcomes ?? []),
     images: lessonImages(getLessonBlocks?.() ?? []),
     onChange: (question) => {
       current = { ...current, content: { ...current.content, question } };

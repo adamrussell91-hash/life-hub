@@ -628,6 +628,70 @@ export async function quizTeacherAction(store, lessonId, body) {
   };
 }
 
+/* ── Markbook ──────────────────────────────────────────────────────── */
+
+/** A lesson's own outcomes: canonical ids first, else its older outcome codes. */
+const lessonOutcomes = (draft) => (draft.outcome_ids?.length ? draft.outcome_ids : draft.syllabus_outcomes ?? []);
+
+/**
+ * Each listed student's first handed-in attempt at this quiz in one class,
+ * scored as the Results tab scores it. Null when the lesson isn't a published
+ * quiz. Goes before a teacher's clear (`quiz/{lesson}/cleared/{owner}`) are
+ * skipped.
+ */
+export async function classQuizScores(store, lessonId, classId, studentIds) {
+  let loaded;
+  try {
+    loaded = await loadQuiz(store, lessonId);
+  } catch (error) {
+    if (error instanceof QuizError) return null;
+    throw error;
+  }
+  const { draft, record, settings, k } = loaded;
+  const fallback = lessonOutcomes(draft);
+  const outcomesOf = (rec, id) => entryFor(rec, id)?.key.outcomes ?? fallback;
+  const owners = new Map(studentIds.map((id) => [deviceHash(`student:${classId}:${id}`), id]));
+  const handedIn = new Map();
+  // Listings can lag a just-written hand-in; the next load picks it up, the same as Results.
+  for (const key of await listBlobKeys(store, `quiz/${lessonId}/results/`)) {
+    const [, , , owner, nText] = key.split('/');
+    if (owners.has(owner)) handedIn.set(owner, [...(handedIn.get(owner) ?? []), Number(nText)]);
+  }
+  const scores = {};
+  let firstAt = null;
+  await mapBounded([...handedIn], 8, async ([owner, ns]) => {
+    const sorted = [...ns].sort((a, b) => a - b);
+    const readAttempt = (n) => Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n)), read(store, k.marks(owner, n))]);
+    // Most students were never cleared, so their first go is read alongside the cleared record.
+    const [cleared, firstRead] = await Promise.all([read(store, `quiz/${lessonId}/cleared/${owner}`), readAttempt(sorted[0])]);
+    const from = cleared?.from ?? 0;
+    for (const n of sorted.filter((x) => x >= from)) {
+      const [start, result, marks] = n === sorted[0] ? firstRead : await readAttempt(n);
+      if (!start || !result) continue;
+      const rec = await recordFor(store, lessonId, start.version, record);
+      const scored = scoreAttempt(rec, result, marks);
+      scores[owners.get(owner)] = {
+        attempt_id: attemptId(owner, n),
+        submitted_at: result.submitted_at,
+        score: scored.score,
+        max: scored.max,
+        pending: scored.pending,
+        rows: scored.rows.map((r) => ({ id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, outcomes: outcomesOf(rec, r.id) }))
+      };
+      if (!firstAt || result.submitted_at < firstAt) firstAt = result.submitted_at;
+      return;
+    }
+  });
+  return {
+    lesson_id: lessonId,
+    title: draft.title,
+    confidence: !!settings.confidence,
+    first_at: firstAt,
+    questions: record.order.map((id) => ({ id, prompt: record.questions[id].question.prompt, marks: record.questions[id].key.marks, outcomes: outcomesOf(record, id) })),
+    scores
+  };
+}
+
 /* ── Live ──────────────────────────────────────────────────────────── */
 
 async function liveState(store, k) {
