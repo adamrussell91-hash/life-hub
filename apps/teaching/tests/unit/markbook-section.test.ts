@@ -507,4 +507,115 @@ describe('markbook section', () => {
     expect(document.activeElement).toBe(cell);
     host.remove();
   });
+
+  it('shows one student at a time on a phone, with the same tap controls', async () => {
+    const { host, api } = await mount(view(), true);
+    expect(host.querySelector('.mb-grid')).toBeNull();
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('BB · Bob Brown');
+    expect([...host.querySelectorAll('.mb-phone__row .mb-phone__label')].map((n) => n.firstChild?.textContent)).toEqual(['Draft', 'Bookwork', 'Essay']);
+    expect(host.querySelector('.mb-phone__overall')?.textContent).toBe('75%');
+    host.querySelector<HTMLButtonElement>('.mb-phone__row .mb-cell--handin')!.click();
+    await vi.waitFor(() => expect(api.calls[0]).toEqual(['hand00001', 's1', { status: 'submitted', at: '2026-11-03' }]));
+    host.querySelector<HTMLButtonElement>('.mb-phone__next')!.click();
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('TT · Tom Tills');
+    expect(host.querySelector<HTMLButtonElement>('.mb-phone__next')!.disabled).toBe(true);
+    expect(host.querySelector<HTMLButtonElement>('.mb-phone__prev')!.disabled).toBe(false);
+  });
+
+  it('keeps the outcomes table on a phone', async () => {
+    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }), true);
+    expect(host.querySelector('.mb-phone')).not.toBeNull();
+    host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
+    expect(host.querySelector('.mb-phone')).toBeNull();
+    expect(host.querySelector('.mb-outcomes .mb-grid')).not.toBeNull();
+  });
+
+  it('keeps focus on a tapped phone cell, and on the student through a redraw', async () => {
+    const { host } = await mount(view(), true);
+    host.querySelector<HTMLButtonElement>('.mb-phone__next')!.click();
+    const cell = host.querySelector<HTMLButtonElement>('.mb-phone .mb-cell--check')!;
+    cell.focus();
+    cell.click();
+    const active = document.activeElement as HTMLElement;
+    expect(active).not.toBe(cell);
+    expect(active.dataset.col).toBe('chck00001');
+    expect(active.dataset.student).toBe('s2');
+    expect(active.textContent).toBe('1');
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('TT · Tom Tills');
+  });
+
+  it('clears a hand-in from the phone card’s Clear button', async () => {
+    const { host, api } = await mount(view({ markbook: book({ marks: { hand00001: { s1: { status: 'late', at: '2026-10-26' } } } }) }), true);
+    const clears = [...host.querySelectorAll<HTMLButtonElement>('.mb-phone__clear')];
+    expect(clears.map((b) => b.getAttribute('aria-label'))).toEqual(['Clear Draft']);
+    expect(clears[0]!.textContent).toBe('Clear');
+    clears[0]!.focus();
+    clears[0]!.click();
+    await vi.waitFor(() => expect(api.calls[0]).toEqual(['hand00001', 's1', null]));
+    expect(host.querySelector('.mb-phone .mb-cell--handin')?.textContent).toBe('–');
+    expect(host.querySelector('.mb-phone__clear')).toBeNull();
+    expect((document.activeElement as HTMLElement).dataset.col).toBe('hand00001');
+  });
+
+  it('keeps focus on Previous and Next after moving', async () => {
+    const three = view({ students: [...view().students, { id: 's3', name: 'Ava Moss', initials: 'AM' }] });
+    const { host } = await mount(three, true);
+    host.querySelector<HTMLButtonElement>('.mb-phone__next')!.focus();
+    host.querySelector<HTMLButtonElement>('.mb-phone__next')!.click();
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('AM · Ava Moss');
+    expect(document.activeElement).toBe(host.querySelector('.mb-phone__next'));
+    host.querySelector<HTMLButtonElement>('.mb-phone__prev')!.focus();
+    host.querySelector<HTMLButtonElement>('.mb-phone__prev')!.click();
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('BB · Bob Brown');
+    // Back on the first student Previous is disabled, so focus goes to the picker.
+    expect(host.querySelector<HTMLButtonElement>('.mb-phone__prev')!.disabled).toBe(true);
+    expect(document.activeElement).toBe(host.querySelector('.mb-phone__pick'));
+  });
+
+  it('picks a student from the list, and keeps focus on it', async () => {
+    const { host } = await mount(view(), true);
+    const pick = host.querySelector<HTMLSelectElement>('.mb-phone__pick')!;
+    expect([...pick.options].map((o) => o.textContent)).toEqual(['BB · Bob Brown', 'TT · Tom Tills']);
+    pick.focus();
+    pick.value = '1';
+    pick.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('TT · Tom Tills');
+    expect(document.activeElement).toBe(host.querySelector('.mb-phone__pick'));
+  });
+
+  it('shows removed students read-only on the phone, and clamps the card when they are hidden again', async () => {
+    const { host } = await mount(view({ markbook: book({ marks: { hand00001: { s9: { status: 'late', at: '2026-10-26' } } } }) }), true);
+    host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
+    const pick = host.querySelector<HTMLSelectElement>('.mb-phone__pick')!;
+    expect(pick.options).toHaveLength(3);
+    pick.value = '2';
+    pick.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(host.querySelector('.mb-phone__name')?.textContent).toContain('Removed student 1');
+    expect(host.querySelectorAll('.mb-phone button.mb-cell')).toHaveLength(0);
+    expect(host.querySelector('.mb-phone .mb-cell--handin')?.textContent).toBe('Late');
+    expect(host.querySelector('.mb-phone__clear')).toBeNull();
+    host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('TT · Tom Tills');
+    expect(host.querySelector<HTMLSelectElement>('.mb-phone__pick')!.value).toBe('1');
+    expect(host.querySelector<HTMLButtonElement>('.mb-phone__next')!.disabled).toBe(true);
+  });
+
+  it('exports a CSV named after the class, with a byte-order mark for Excel', async () => {
+    const { host } = await mount(view());
+    const blobs: Blob[] = [];
+    Object.assign(URL, { createObjectURL: vi.fn((b: Blob) => { blobs.push(b); return 'blob:x'; }), revokeObjectURL: vi.fn() });
+    const clicked: string[] = [];
+    const realClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) { clicked.push(this.download); };
+    try {
+      host.querySelector<HTMLButtonElement>('.mb__export')!.click();
+    } finally {
+      HTMLAnchorElement.prototype.click = realClick;
+    }
+    expect(clicked).toEqual(['markbook-12eng-2026-11-03.csv']);
+    expect(blobs[0]!.type).toBe('text/csv;charset=utf-8');
+    const bytes = new Uint8Array(await blobs[0]!.arrayBuffer());
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder().decode(bytes.slice(3))).toContain('Initials,Name,Draft,Bookwork,Essay,Overall');
+  });
 });

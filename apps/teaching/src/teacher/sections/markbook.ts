@@ -14,6 +14,8 @@ import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
 import { renderOutcomes, type OutcomeSelection } from '@/markbook/outcomes-view';
 import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
+import { renderPhone, type PhoneControl } from '@/markbook/phone';
+import { csvFileName, markbookCsv } from '@/markbook/csv';
 import { withAppBase } from '@/app/base-path';
 import '@/markbook/markbook.css';
 
@@ -98,7 +100,24 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     b.addEventListener('click', () => openForm(kind));
     addGroup.append(b);
   }
-  tools.append(addGroup, toggle, hiddenToggle, removedToggle);
+  const exportButton = el('button', 'btn btn--secondary mb__export', 'Export CSV');
+  exportButton.type = 'button';
+  exportButton.addEventListener('click', () => {
+    if (!view) return;
+    // The BOM makes Excel read the file as UTF-8, so names keep their accents.
+    const blob = new Blob(['﻿', markbookCsv(view)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = el('a');
+    link.href = url;
+    link.download = csvFileName(cls.title || cls.code || 'class', today());
+    link.hidden = true;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    // Safari needs the URL alive until the click's download has started.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  });
+  tools.append(addGroup, toggle, hiddenToggle, removedToggle, exportButton);
   head.append(title, tools);
   const hiddenList = el('ul', 'mb__hidden-list');
   hiddenList.id = `mb-hidden-${cls.id}`;
@@ -250,15 +269,25 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   };
 
   /** Which cell or column title had focus, so a redraw can put it back. */
-  function focusKey(): { col: string; student?: string } | null {
+  type FocusKey = { col: string; student?: string } | { phone: PhoneControl };
+
+  function focusKey(): FocusKey | null {
     const active = document.activeElement;
-    if (!(active instanceof HTMLElement) || !body.contains(active) || !active.dataset.col) return null;
+    if (!(active instanceof HTMLElement) || !body.contains(active)) return null;
+    if (active.dataset.phone) return { phone: active.dataset.phone as PhoneControl };
+    if (!active.dataset.col) return null;
     if (active.classList.contains('mb-col__title')) return { col: active.dataset.col };
     return active.dataset.student ? { col: active.dataset.col, student: active.dataset.student } : null;
   }
 
-  function restoreFocus(key: { col: string; student?: string } | null): void {
+  function restoreFocus(key: FocusKey | null): void {
     if (!key) return;
+    if ('phone' in key) {
+      const control = body.querySelector<HTMLButtonElement | HTMLSelectElement>(`[data-phone="${key.phone}"]`);
+      // Previous on the first student or Next on the last is disabled now: go to the picker.
+      (control && !control.disabled ? control : body.querySelector<HTMLElement>('[data-phone="pick"]'))?.focus();
+      return;
+    }
     findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell, .mb-outcome-cell', key.col, key.student)?.focus();
   }
 
@@ -317,6 +346,15 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
         })
       );
     }
+    else if (narrow()) {
+      phoneIndex = Math.max(0, Math.min(students.length - 1, phoneIndex));
+      body.replaceChildren(
+        renderPhone(current, students, actions, phoneIndex, (i) => {
+          phoneIndex = i;
+          paint();
+        }, today())
+      );
+    }
     else body.replaceChildren(renderGrid(current, students, actions, today()));
     restoreFocus(key);
   }
@@ -350,8 +388,6 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   const onMedia = () => paint();
   media?.addEventListener('change', onMedia);
   void load();
-  void phoneIndex;
-  void narrow;
   return () => {
     disposed = true;
     media?.removeEventListener('change', onMedia);
