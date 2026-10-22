@@ -340,6 +340,7 @@ html[data-hub="life"] .hub-card.food-dish {
   color: var(--navy);
 }
 .food-counted {
+  align-self: center;
   background: var(--success-surface);
   color: var(--success);
   white-space: normal;

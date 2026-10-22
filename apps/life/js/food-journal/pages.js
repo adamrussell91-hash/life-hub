@@ -676,6 +676,7 @@ function menuDish(ctx, visit, dish) {
   }
   const actions = el("div", "fj-dish__actions");
   actions.append(
+    ...ctx.brisketActions(visit, dish),
     ctx.button(ctx.hasRecipe(dish.id) ? "Open recipe" : "Find a recipe", (e) => ctx.openRecipe(dish, e.currentTarget), ctx.hasRecipe(dish.id) ? "primary" : "secondary"),
     ctx.button("Eat it again", (e) => ctx.openRestaurant(visit, e.currentTarget, dish), "ghost"),
   );

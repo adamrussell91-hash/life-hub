@@ -1354,3 +1354,32 @@ for (const answer of ["Yes", "No"])
     assert.deepEqual(errors, []);
     await page.close();
   });
+
+for (const width of [1440, 390])
+  test(`brisket ${width}: the visit entry offers the same Brisket actions`, async () => {
+    const { page, read, errors } = await pageFor(width, {
+      seed: (j) => countedDish(j, { brisket: brisketLink() }),
+    });
+    const sent = await mockChat(page);
+    await openFirstEntry(page);
+    const counted = page.locator(".fj-dish", { hasText: "Lasagne" });
+    const fresh = page.locator(".fj-dish", { hasText: "Croquettes" });
+    await counted.getByText("Counted in Brisket · ½", { exact: true }).waitFor();
+    assert.equal(await counted.getByRole("button", { name: "Change portion" }).count(), 1);
+    assert.equal(await counted.getByRole("button", { name: "Send to Brisket" }).count(), 0);
+    assert.equal(await fresh.locator(".food-counted").count(), 0);
+    assert.ok(
+      await page.locator(".fj-entry").evaluate((n) => n.scrollWidth <= n.clientWidth + 1),
+      "entry overflows",
+    );
+    await fresh.getByRole("button", { name: "Send to Brisket", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Send to Brisket" });
+    await sheet.getByRole("radio", { name: "¾" }).click();
+    await sheet.getByRole("button", { name: "Send", exact: true }).click();
+    await page.locator("#nutrition-dashboard #chat-view").waitFor();
+    await expectSent(sent, 1);
+    assert.match(sent[0].message, new RegExp(`food_dish_id: ${read().visits[0].dishes[1].id}`));
+    assert.match(sent[0].message, /portion: ¾/);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
