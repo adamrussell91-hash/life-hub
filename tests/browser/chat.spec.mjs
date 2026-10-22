@@ -352,7 +352,7 @@ test('mobile full-page Chat docks the composer to the keyboard viewport', async 
 });
 
 test('focusing the composer on phone hides the tab bar and frees reading room (iOS inset≈0)', async () => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
   const page = await context.newPage();
   await signIn(page);
 

@@ -1,7 +1,7 @@
 /** Shared hub chat keyboard / visual-viewport contract.
  *
  * Sets `html.vv-keyboard-open` and `--vv-offset-top` / `--vv-height` / `--vv-offset-bottom`
- * only while a chat composer or Knowledge `.compose` note form is focused, geometry
+ * only while a chat composer or `.compose` form is focused on a touch device, geometry
  * says the keyboard is open, or `.chat-view.is-busy`. Closed keyboard leaves the
  * vars unset so shells sit on `100dvh` without URL-bar flicker.
  *
@@ -57,6 +57,15 @@ function keyboardOpenFromGeometry(vv) {
   return { open: false, insetBottom: 0 };
 }
 
+/** Focus only implies an on-screen keyboard on touch-first devices. With a mouse
+ * the keyboard is physical, so keyboard mode would only resize sheets under the
+ * pointer (Save moves between pointerdown and click). No matchMedia: assume touch. */
+function focusOpensKeyboard() {
+  const mq = globalThis.matchMedia;
+  if (typeof mq !== 'function') return true;
+  return Boolean(mq.call(globalThis, '(pointer: coarse)')?.matches);
+}
+
 function chatViewBusy() {
   return Boolean(globalThis.document?.querySelector?.('.chat-view.is-busy'));
 }
@@ -93,7 +102,7 @@ function syncVisualViewport() {
   if (!root?.style) return;
 
   const { open: geometryOpen, insetBottom } = keyboardOpenFromGeometry(vv);
-  const open = composerFocused || geometryOpen || chatViewBusy();
+  const open = (composerFocused && focusOpensKeyboard()) || geometryOpen || chatViewBusy();
 
   if (!open) {
     if (vv.height > 0) {
