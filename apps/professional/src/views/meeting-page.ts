@@ -3,7 +3,6 @@ import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
 import {
-  createTask,
   createUniversalLink,
   endUniversalLink,
   listUniversalLinksForEntity
@@ -14,6 +13,7 @@ import { ApiClientError } from '@/api/client';
 import { mountBlockPage, type BlockPageHandle } from '@/components/block-page';
 import { mountComposeWhen } from '@/components/compose-when';
 import { buildMeetingTaskLinks, roleLabel } from '@/views/meetings';
+import { makeActionTask } from '@/lib/action-task';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
 import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
@@ -280,7 +280,7 @@ export async function renderMeetingPage(
   let prepPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-preparation"]');
   let followPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-follow_up"]');
   const tagCard = el('section', 'card meeting-page__tags');
-  mountTagAnythingSection(tagCard, meetingRef);
+  const tags = mountTagAnythingSection(tagCard, meetingRef);
   side.append(roomHost, taskLinks, tagCard);
   const grid = el('div', 'meeting-page__grid');
   grid.append(main, side);
@@ -890,10 +890,10 @@ export async function renderMeetingPage(
         toggle.addEventListener('click', async () => {
           toggle.disabled = true;
           try {
-            const task = await createTask({ title: item.text });
-            Object.assign(item, (await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` })).item);
+            Object.assign(item, await makeActionTask(item, meetingRef));
             toggle.setAttribute('aria-checked', 'true');
             toggle.title = 'Task made';
+            void tags.refresh();
           } catch (err) {
             toggle.disabled = false;
             toggle.title = err instanceof ApiClientError ? `Couldn't make the task: ${err.message}` : "Couldn't make the task. Try again.";
