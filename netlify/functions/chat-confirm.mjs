@@ -502,8 +502,33 @@ export function createChatConfirmHandler({
       let centralNodeUpdated = persisted.centralNodeUpdated === true;
       const foodJournalUpdated = persisted.foodJournalUpdated ?? null;
       let oldCountRemoved = null;
-      if (staleCountedMeal && staleCountedMeal.path !== path && foodJournalUpdated !== true) {
-        // The dish still links to the old file, so keep it; the next re-count finds it.
+      let recountRollbackFailed = null;
+      if (staleCountedMeal && staleCountedMeal.path !== path && foodJournalUpdated !== true && !existingSha) {
+        // The dish still links to the old file, so the new one would double count.
+        // Undo it; the old count stays and the next re-count finds it.
+        try {
+          await client.deleteFile({
+            path,
+            sha: persisted.sha,
+            message: `chore(nutrition): undo unlinked re-count ${path.split('/').pop()}`
+          });
+        } catch {
+          recountRollbackFailed = true;
+        }
+        if (!recountRollbackFailed) {
+          try {
+            await syncCentralNodeAfterMealDeletes(client, [{ date: validation.record.date, meals: [validation.record.meal] }], {
+              date: getSydneyDateKey(new Date(now())),
+              now: new Date(now())
+            });
+          } catch {
+            // The re-count is undone; Status catches up on the next log.
+          }
+          return errorResponse(409, 'recount_not_saved', 'The re-count didn\u2019t save; try again.', true, PRIVATE_CACHE);
+        }
+      } else if (staleCountedMeal && staleCountedMeal.path !== path && foodJournalUpdated !== true) {
+        // The new meal replaced a file already at its path, so it can't be undone.
+        // Keep the old count too; the dish still links to it.
         oldCountRemoved = false;
       } else if (staleCountedMeal && staleCountedMeal.path !== path) {
         try {
@@ -567,6 +592,7 @@ export function createChatConfirmHandler({
           centralNodeUpdated,
           ...(foodJournalUpdated != null ? { foodJournalUpdated } : {}),
           ...(oldCountRemoved != null ? { oldCountRemoved } : {}),
+          ...(recountRollbackFailed ? { recountRollbackFailed } : {}),
           record: validation.record,
           notes: validation.notes ?? null,
           ...(exercisePersonalBests !== undefined ? { personalBests: exercisePersonalBests } : {}),

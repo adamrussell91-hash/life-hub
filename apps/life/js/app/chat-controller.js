@@ -1148,13 +1148,17 @@ export function createChatController({
       });
       moveConfirmReceiptToTranscript(root, proposal.card);
       // One message that says "Logged" once, so a second warning never hides the first.
+      const twice = result?.recountRollbackFailed === true;
       const saveWarnings = [
-        result?.foodJournalUpdated === false ? 'The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.' : null,
+        result?.foodJournalUpdated === false && !twice ? 'The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.' : null,
         result?.oldCountRemoved === false ? 'The old count for this dish couldn\u2019t be removed; delete it from Nutrition.' : null
       ].filter(Boolean);
-      const lead = result?.centralNodeUpdated === false
-        ? 'Logged, but Central Node didn\u2019t update — try Refresh.'
-        : saveWarnings.length ? 'Logged.' : null;
+      const lead = twice
+        ? 'Logged twice: the re-count couldn\u2019t be linked to the dish. Delete the newer one from Nutrition.'
+          + (result?.centralNodeUpdated === false ? ' Central Node didn\u2019t update — try Refresh.' : '')
+        : result?.centralNodeUpdated === false
+          ? 'Logged, but Central Node didn\u2019t update — try Refresh.'
+          : saveWarnings.length ? 'Logged.' : null;
       if (lead) showChatError(root, [lead, ...saveWarnings].join(' '));
       // Earned hype: a genuine PB (Phase 1's library upsert) gets a specific, loud reaction
       // right in the transcript -- confirm is a plain POST, not an LLM turn, so this is a
@@ -1198,6 +1202,8 @@ export function createChatController({
             ? error.message
             : 'That session is already finished — I won\'t replace it with a plan'
         );
+      } else if (error.code === 'recount_not_saved') {
+        showChatError(root, 'The re-count didn\u2019t save; try again.');
       } else if (error.code === 'github_unavailable' || error.code === 'repository_not_found') {
         showChatError(root, `The record was not saved because the data store was unavailable (${error.code}). Confirm again.`);
       } else {
