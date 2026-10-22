@@ -1,6 +1,14 @@
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
-import { getJSON, readPublishedId, scopeSequenceKey, setJSON, unitKey } from './_shared/teaching-blobs.mjs';
+import {
+  deleteKey,
+  getJSON,
+  readPublishedId,
+  scopeSequenceKey,
+  setJSON,
+  subjectKey,
+  unitKey
+} from './_shared/teaching-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
 export const config = { path: '/api/scope-sequences/:id' };
@@ -47,8 +55,18 @@ export function createScopeSequenceHandler(deps = {}) {
     if (request.method === 'GET') {
       return withCors(okResponse(200, existing), request, env);
     }
+    if (request.method === 'DELETE') {
+      // Removing a scope unlinks it from its subject; units and lessons stay put.
+      const subject = existing.subject_id ? await getJSON(store, subjectKey(existing.subject_id)) : null;
+      if (subject && subject.scope_id === id) {
+        const { scope_id: _dropped, ...rest } = subject;
+        await setJSON(store, subjectKey(subject.id), { ...rest, updated_at: new Date().toISOString() });
+      }
+      await deleteKey(store, scopeSequenceKey(id));
+      return withCors(okResponse(200, { deleted: true, id }), request, env);
+    }
     if (request.method !== 'PATCH') {
-      return withCors(methodNotAllowed('GET, PATCH, OPTIONS'), request, env);
+      return withCors(methodNotAllowed('GET, PATCH, DELETE, OPTIONS'), request, env);
     }
     const parsed = await readJsonObject(request);
     if (parsed.error) return withCors(parsed.error, request, env);

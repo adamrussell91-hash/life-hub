@@ -1,4 +1,4 @@
-import { normalizeScopeTerms } from '@/scope/timeline-dates';
+import { fillDefaultTermDates, normalizeScopeTerms } from '@/scope/timeline-dates';
 import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
@@ -56,7 +56,7 @@ export async function fetchCurriculum(): Promise<CurriculumResponse> {
     ...curriculum,
     scope_sequences: (curriculum.scope_sequences ?? []).map((scope) => ({
       ...scope,
-      terms: normalizeScopeTerms(scope.terms ?? [])
+      terms: fillDefaultTermDates(normalizeScopeTerms(scope.terms ?? []), scope.academic_year)
     }))
   };
 }
