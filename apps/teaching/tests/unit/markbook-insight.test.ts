@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MarkbookView, QuizColumn, QuizScore } from '@/markbook/types';
-import { band4, evidenceFor, isConfidentlyWrong, isDropping, outcomeCell, outcomesInView, quizSeries, reteachList } from '@/markbook/insight';
+import { band4, evidenceFor, heatShare, isConfidentlyWrong, isDropping, outcomeCell, outcomesInView, quizSeries, reteachList } from '@/markbook/insight';
 
 const score = (rows: QuizScore['rows'], extra: Partial<QuizScore> = {}): QuizScore => ({
   attempt_id: 'a~0', submitted_at: '2026-10-20T00:00:00Z', score: rows.reduce((s, r) => s + (r.awarded ?? 0), 0), max: rows.reduce((s, r) => s + r.max, 0), pending: rows.filter((r) => r.awarded === null).length, rows, ...extra
@@ -61,5 +61,33 @@ describe('quiz insight', () => {
     expect(isConfidentlyWrong(make([sure(0), sure(0), sure(1)]), 's1')).toBe(false);
     expect(isConfidentlyWrong(make([sure(0), sure(0), sure(0), sure(1), sure(1), sure(1), sure(1), sure(1)]), 's1')).toBe(false);
     expect(isConfidentlyWrong(make([sure(0), sure(0), sure(0)], false), 's1')).toBe(false);
+  });
+});
+
+describe('boundaries', () => {
+  const sure = (awarded: number) => ({ id: 'q1', awarded, max: 1, confidence: 3 as const, outcomes: [] });
+  const make = (rows: QuizScore['rows'], extra: Partial<QuizColumn> = {}): MarkbookView => ({ ...base, quizzes: [{ ...quiz('l9', '2026-10-01', { s1: score(rows) }, true), ...extra }] });
+  it('treats exactly 15 points as dropping', () => {
+    expect(isDropping([80, 80, 65, 65, 65])).toBe(true);
+  });
+  it('treats exactly 40% confidently wrong as flagged', () => {
+    expect(isConfidentlyWrong(make([sure(0), sure(0), sure(0), sure(0), sure(1), sure(1), sure(1), sure(1), sure(1), sure(1)]), 's1')).toBe(true);
+  });
+  it('ignores a hidden quiz for calibration', () => {
+    expect(isConfidentlyWrong(make([sure(0), sure(0), sure(0)], { hidden: true }), 's1')).toBe(false);
+  });
+  it('leaves out a reteach question at exactly 50%', () => {
+    expect(reteachList(base.quizzes[0]!, ['s1', 's2']).map((r) => r.id)).not.toContain('q1');
+  });
+  it('heatShare is null without a mark and a share otherwise', () => {
+    expect(heatShare(undefined)).toBeNull();
+    expect(heatShare({ id: 'q', awarded: null, max: 2, confidence: null, outcomes: [] })).toBeNull();
+    expect(heatShare({ id: 'q', awarded: 0, max: 0, confidence: null, outcomes: [] })).toBeNull();
+    expect(heatShare({ id: 'q', awarded: 1, max: 2, confidence: null, outcomes: [] })).toBe(0.5);
+  });
+  it('orders same-date quizzes by title in quizSeries', () => {
+    const full = (pct: number) => score([{ id: 'q1', awarded: pct / 50, max: 2, confidence: null, outcomes: [] }]);
+    const view: MarkbookView = { ...base, quizzes: [quiz('b', '2026-10-02', { s1: full(50) }), quiz('a', '2026-10-02', { s1: full(100) })] };
+    expect(quizSeries(view, 's1')).toEqual([100, 50]);
   });
 });
