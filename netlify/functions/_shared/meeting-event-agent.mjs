@@ -66,7 +66,7 @@ export function proposeMeetingSchema() {
         attendee_refs: {
           type: 'array',
           items: { type: 'string' },
-          description: 'shared:person:… refs from search_people'
+          description: 'shared:person:… refs from search_people. Never Adam: he is always in the room.'
         },
         key: { type: 'string', description: 'Optional short handle for the Confirm path id' }
       },
