@@ -8,7 +8,7 @@ import {
 } from "./_shared/travel-http.mjs";
 import { createMealLinkStore } from "./_shared/meal-link-store.mjs";
 import { upsertLinkedVisit, pickFoodPhotoKey } from "./_shared/travel-meal-link.mjs";
-import { knowledgeGetObject, knowledgePutObject } from "./_shared/knowledge-r2.mjs";
+import { knowledgePutObject, readStoredPhoto } from "./_shared/knowledge-r2.mjs";
 import { isDeletedRecord, withoutDeleted } from "./_shared/record-liveness.mjs";
 import { validateFoodJournal } from "./_shared/food-journal-schema.mjs";
 import { validateJournal } from "./_shared/travel-journal-schema.mjs";
@@ -22,10 +22,11 @@ const MAX_PHOTOS = 20;
 const readable = (visit) => (visit ? { ...visit, dishes: withoutDeleted(visit.dishes) } : null);
 
 // Same naming as a Food Journal upload, so its photo read serves the copy.
+// A source over the upload limit throws, so it counts as photo_failed.
 async function defaultCopyPhoto(env, sourceKey, deps) {
   const id = `photo_${randomUUID()}`;
   const key = `food/photos/${id}.jpg`;
-  const body = await knowledgeGetObject(env, { key: sourceKey, getObject: deps.getObject });
+  const body = await readStoredPhoto(env, sourceKey, deps);
   await knowledgePutObject(env, { key, body, contentType: "image/jpeg", putObject: deps.putObject });
   return { id, key };
 }

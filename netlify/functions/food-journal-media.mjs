@@ -8,13 +8,14 @@ import {
 } from "./_shared/travel-http.mjs";
 import {
   knowledgePutObject,
-  knowledgeGetObject,
+  readStoredPhoto,
   knowledgePresignGet,
 } from "./_shared/knowledge-r2.mjs";
 import { createFoodJournalRepository } from "./_shared/food-journal-repository.mjs";
 import { readableJournal } from "./_shared/food-journal-schema.mjs";
 import { checkRateLimit } from "./_shared/travel-rate-limit.mjs";
 export const config = { path: "/api/food-journal-media" };
+const missing = (e) => e?.name === "NoSuchKey" || e?.name === "NotFound";
 export function createFoodJournalMediaHandler(deps = {}) {
   return createTravelOperatorHandler(
     async (request, ctx) => {
@@ -96,12 +97,17 @@ export function createFoodJournalMediaHandler(deps = {}) {
         let bytes = null;
         if (found)
           try {
-            bytes = await knowledgeGetObject(ctx.env, {
-              key: body.key,
-              getObject: deps.getObject,
-            });
+            bytes = await readStoredPhoto(ctx.env, body.key, deps);
           } catch (e) {
-            if (e?.name !== "NoSuchKey") throw e;
+            if (e?.tooLarge)
+              return errorResponse(
+                413,
+                "too_large",
+                "That photo is too large.",
+                false,
+                PRIVATE_CACHE,
+              );
+            if (!missing(e)) throw e;
           }
         if (!bytes)
           return errorResponse(
