@@ -14,6 +14,7 @@ export interface MealDishState {
   meal_type: string;
   rating: number | null;
   ingredients?: string;
+  counted?: boolean;
 }
 
 export interface MealState {
@@ -283,6 +284,11 @@ export function mountMealSection(
       row.append(ingredients);
     }
 
+    // The Food Journal removes a counted dish, and can remove its meal with it.
+    if (dish.counted) {
+      row.append(hint('Counted in Brisket. Remove it in the Food Journal.'));
+      return row;
+    }
     remove.type = 'button';
     remove.setAttribute('aria-label', removeDishLabel(dish, index));
     remove.className = 'btn btn--ghost journal-edit-moment__dish-remove';

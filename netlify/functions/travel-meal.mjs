@@ -19,7 +19,9 @@ const newId = (prefix) => `${prefix}_${randomUUID()}`;
 const EXTRAS = ["mood", "vibe", "with"];
 // The Food Journal's photo limit per dish.
 const MAX_PHOTOS = 20;
-const readable = (visit) => (visit ? { ...visit, dishes: withoutDeleted(visit.dishes) } : null);
+// Travel only needs to know a dish is counted, not its Brisket link.
+const readableDish = ({ brisket, ...dish }) => (brisket ? { ...dish, counted: true } : dish);
+const readable = (visit) => (visit ? { ...visit, dishes: withoutDeleted(visit.dishes).map(readableDish) } : null);
 
 // Same naming as a Food Journal upload, so its photo read serves the copy.
 // A source over the upload limit throws, so it counts as photo_failed.
