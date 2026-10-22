@@ -1061,6 +1061,8 @@ test("capture action returns the items on a menu photo, cleaned", async () => {
           menu_items: [
             { name: "The Cheese", description: "Smashed beef, pickles", price: "$16" },
             { name: "  Oklahoma ", price: 18 },
+            { name: "Add bacon", price: "+5", kind: "extra" },
+            { name: "Fries", kind: "side" },
             { name: "" },
             "Fries",
           ],
@@ -1076,8 +1078,10 @@ test("capture action returns the items on a menu photo, cleaned", async () => {
   assert.equal(res.status, 200);
   const { draft } = (await res.json()).data;
   assert.deepEqual(draft.menu_items, [
-    { name: "The Cheese", description: "Smashed beef, pickles", price: "$16" },
-    { name: "Oklahoma", description: "", price: "18" },
+    { name: "The Cheese", description: "Smashed beef, pickles", price: "$16", kind: "dish" },
+    { name: "Oklahoma", description: "", price: "18", kind: "dish" },
+    { name: "Add bacon", description: "", price: "+5", kind: "extra" },
+    { name: "Fries", description: "", price: "", kind: "dish" },
   ]);
 });
 test("menu items merge across photos without repeats and are kept on the visit", () => {
@@ -1124,18 +1128,69 @@ test("ticking a menu item adds it as a dish; unticking removes it only if untouc
   assert.equal(plain.dishes.length, 1);
   assert.equal(plain.dishes[0].title, "");
 });
+test("ticking a menu dish copies its ingredients into the dish notes", () => {
+  const v = newVisit();
+  v.menu_items = [
+    { name: "Morning steak", description: "150g sirloin, hash, chimichurri", price: "32", kind: "dish" },
+    { name: "Smashed avo", description: "Poached eggs, feta", price: "22", kind: "dish" },
+  ];
+  let next = toggleMenuDish(v, v.menu_items[0]);
+  assert.equal(next.dishes[0].notes, "150g sirloin, hash, chimichurri");
+  next = toggleMenuDish(next, v.menu_items[1]);
+  assert.equal(next.dishes[1].notes, "Poached eggs, feta");
+  // Still the menu's words, so unticking removes it.
+  next = toggleMenuDish(next, v.menu_items[1]);
+  assert.deepEqual(next.dishes.map((d) => d.title), ["Morning steak"]);
+  // Once Adam writes his own notes, it stays.
+  next.dishes[0].notes += ". Cooked perfectly";
+  assert.equal(toggleMenuDish(next, v.menu_items[0]).dishes.length, 1);
+  assert.equal(menuDishIndex(next, v.menu_items[0]), 0);
+  // The last dish goes blank, notes and all.
+  const plain = toggleMenuDish(toggleMenuDish(v, v.menu_items[1]), v.menu_items[1]);
+  assert.deepEqual([plain.dishes[0].title, plain.dishes[0].notes], ["", ""]);
+});
+test("an extra ticks onto the last dish, and is its own dish when nothing else is ticked", () => {
+  const v = newVisit();
+  v.menu_items = [
+    { name: "Big breakfast", description: "Bacon, eggs", price: "29", kind: "dish" },
+    { name: "Hash brown", description: "", price: "6", kind: "extra" },
+    { name: "Add avocado", description: "", price: "+4", kind: "extra" },
+  ];
+  const [breakfast, hash, avo] = v.menu_items;
+  // Alone, an extra is a dish of its own.
+  const alone = toggleMenuDish(v, hash);
+  assert.deepEqual(alone.dishes.map((d) => d.title), ["Hash brown"]);
+  assert.equal(menuDishIndex(alone, hash), 0);
+  let next = toggleMenuDish(v, breakfast);
+  next = toggleMenuDish(next, hash);
+  next = toggleMenuDish(next, avo);
+  assert.equal(next.dishes.length, 1);
+  assert.equal(next.dishes[0].notes, "Bacon, eggs\n+ Hash brown\n+ Add avocado");
+  assert.equal(menuDishIndex(next, avo), 0);
+  // Unticking an extra takes only its line.
+  next = toggleMenuDish(next, hash);
+  assert.equal(next.dishes[0].notes, "Bacon, eggs\n+ Add avocado");
+  assert.equal(menuDishIndex(next, hash), -1);
+  // Extras do not count as Adam's own notes.
+  next = toggleMenuDish(next, breakfast);
+  assert.deepEqual([next.dishes[0].title, next.dishes[0].notes], ["", ""]);
+});
 test("every page of a menu is read when no dish photos are chosen", () => {
   const menus = Array.from({ length: 3 }, (_, i) => ({ role: "menu", id: `m${i}`, data: "x".repeat(10) }));
   assert.deepEqual(captureBatches(menus), [menus]);
 });
 test("schema checks stored menu items", () => {
   const ok = fixture();
-  ok.visits[0].menu_items = [{ name: "Lasagne", description: "", price: "$25" }];
+  ok.visits[0].menu_items = [
+    { name: "Lasagne", description: "", price: "$25" },
+    { name: "Garlic bread", description: "", price: "$6", kind: "extra" },
+  ];
   assert.doesNotThrow(() => validateFoodJournal(ok));
   for (const broken of [
     "Lasagne",
     [{ name: 4, description: "", price: "" }],
     [{ name: "x".repeat(201), description: "", price: "" }],
+    [{ name: "Bacon", description: "", price: "", kind: "side" }],
     Array.from({ length: 201 }, () => ({ name: "a", description: "", price: "" })),
   ]) {
     const bad = fixture();

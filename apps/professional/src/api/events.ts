@@ -78,7 +78,7 @@ export function rescheduleEvent(
 
 export function eventStateAction(
   id: string,
-  action: 'complete' | 'cancel',
+  action: 'complete' | 'cancel' | 'reopen',
   options: { signal?: AbortSignal } = {}
 ): Promise<{ event: EventRecord }> {
   const params = new URLSearchParams({ id, action });

@@ -34,3 +34,15 @@ for (const width of [1440, 390]) {
     await expect(page.locator('.block-annotation__element')).toBeVisible();
   });
 }
+
+test('technique family colours recolour the marks and show a key', async ({ page }) => {
+  await page.goto('/annotation-technique.html');
+  const toggle = page.getByRole('button', { name: 'Colour by technique family' });
+  await toggle.click();
+  await expect(page.locator('.block-annotation__family-swatch')).toHaveText([
+    'Descriptive',
+    'Repetitive',
+    'Comparative'
+  ]);
+  await expect(page.locator('[data-annotation-id="ann_beggars"]')).toHaveClass(/--fam-comparative/);
+});

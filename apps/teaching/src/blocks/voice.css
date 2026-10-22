@@ -423,9 +423,26 @@
 }
 
 .voice-summary__items {
+  display: grid;
+  gap: var(--space-1);
   margin: 0;
-  font-weight: var(--weight-semibold);
   color: var(--ink);
+}
+
+.voice-summary__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.voice-summary__count {
+  font-weight: var(--weight-semibold);
+}
+
+.voice-summary__foot {
+  grid-column: 1 / -1;
+  margin: var(--space-1) 0 0;
 }
 
 .voice-card__note {

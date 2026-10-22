@@ -289,8 +289,7 @@ async function openCriteriaMirror(
             });
             await createTask({
               title: criterion.criterion.slice(0, 200),
-              status: 'todo',
-              domain: 'work'
+              status: 'todo'
             });
             gap.textContent = 'Stepping stone added · in Tasks';
             options.onChanged();

@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Maker Session</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* packages/decision-book/decision-book.css
+   Decision Maker's tokens: the kit's paper, ink, red and green, with their tints, scoped to
+   .dm-scope the way Problem Solver scopes .ps-scope. Motion matches Problem Solver so the
+   two read as a set. */
+.dm-scope {
+  --dm-paper: #faf8ef;
+  --dm-ink: #171813;
+  --dm-red: #f43a25;
+  --dm-green: #60ba2c;
+  --dm-soft: #efeee4;
+  --dm-line: #c9cabd;
+  --dm-green-tint: #e3f1d8;
+  --dm-red-tint: #fcdfd5;
+  --dm-ghost: rgba(23, 24, 19, 0.12);
+  --dm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dm-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+:root {
+  --rail: #17375e; --on-rail: rgba(255, 255, 255, 0.92); --on-rail-muted: rgba(255, 255, 255, 0.62); --on-rail-hover: rgba(255, 255, 255, 0.1);
+  --font-ui: Inter, ui-sans-serif, system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+.dm-scope { --muted: #66675d; --card: #ffffff; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--dm-paper, #faf8ef); color: #171813; font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+button, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--dm-ink); outline-offset: 3px; }
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.rail { background: var(--rail); color: var(--on-rail); padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.rail__brand { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 0 12px 18px; }
+.rail__group { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--on-rail-muted); padding: 14px 12px 6px; }
+.rail a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; color: var(--on-rail); text-decoration: none; font-size: 14.5px; }
+.rail a:hover { background: var(--on-rail-hover); }
+.rail a[aria-current="page"] { background: rgba(255, 255, 255, 0.12); font-weight: 600; }
+.rail .dot { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; }
+.rail .dot svg { width: 18px; height: 18px; }
+.canvas { min-width: 0; padding: 32px 16px 64px; background: var(--dm-paper); color: var(--dm-ink); }
+.canvas__inner { max-width: 1240px; margin: 0 auto; padding-inline: clamp(0px, 3vw, 32px); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.dm-glyph { display: inline-flex; width: 20px; height: 20px; flex: none; color: var(--dm-ink); }
+.dm-glyph svg, .dm-emblem svg { width: 100%; height: 100%; display: block; }
+.dm-emblem { display: inline-flex; width: 28px; height: 28px; flex: none; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; cursor: pointer; font-weight: 600; transition: transform 180ms var(--dm-ease), background 180ms; }
+.btn--primary { background: var(--dm-ink); color: var(--dm-paper); }
+.btn--primary:hover { transform: translateY(-1px); }
+.btn--ghost { background: transparent; border: 1px solid var(--dm-line); }
+.btn--ghost:hover { background: var(--dm-soft); }
+.mock-note { font-size: 12px; color: var(--muted); margin: 0; }
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 12px 16px; gap: 6px; }
+  .rail__brand { padding: 0 8px 0 0; white-space: nowrap; }
+  .rail__group, .rail a:not([aria-current="page"]) { display: none; }
+  .rail a { white-space: nowrap; }
+  .canvas { padding-block: 20px 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+.top { display: grid; gap: 10px; }
+.back { color: var(--muted); text-decoration: none; font-size: 14px; width: fit-content; }
+.back:hover { color: var(--dm-ink); }
+.title { margin: 0; font-size: clamp(22px, 2.6vw, 30px); line-height: 1.2; letter-spacing: -0.02em; font-weight: 750; text-wrap: balance; max-width: 34ch; }
+
+/* ── Track: square stations on a ruled line ── */
+.track { position: relative; margin: 22px 0 26px; }
+.track ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); position: relative; max-width: 640px; }
+.track ol::before, .track ol::after { content: ""; position: absolute; left: 12.5%; top: 16px; }
+.track ol::before { right: 12.5%; border-top: 2px dotted var(--dm-line); }
+.track ol::after { width: calc(75% * var(--p, 0)); border-top: 2px dotted var(--dm-ink); transition: width 900ms var(--dm-ease); }
+.stn { display: grid; justify-items: center; gap: 8px; position: relative; z-index: 1; text-align: center; }
+.stn__mark { width: 34px; height: 34px; display: grid; place-items: center; background: var(--dm-paper); border-radius: 50%; }
+.stn__mark svg { width: 100%; height: 100%; }
+.stn b { font-size: 12.5px; font-weight: 600; }
+.stn small { font-size: 11px; color: var(--muted); }
+.stn[data-state="future"] b { color: var(--muted); font-weight: 500; }
+.stn[data-state="future"] .stn__mark { opacity: 0.35; }
+.stn[data-state="now"] .stn__mark { animation: breathe 2.4s var(--dm-ease) infinite; }
+@keyframes breathe { 50% { transform: scale(1.12); } }
+
+/* ── Board ── */
+.board { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); gap: 24px; align-items: start; }
+.bench { background: var(--card); border: 1px solid var(--dm-line); border-radius: 28px; padding: clamp(18px, 2.4vw, 28px); display: grid; gap: 22px; min-width: 0; }
+.bench__head { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.bench__head h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+.bench__head h2 .dm-emblem { width: 28px; height: 28px; }
+.count { font: 500 12px var(--font-mono); color: var(--muted); }
+
+/* Section compass: the four section emblems in a 2×2, lit where the decision sits */
+.compass { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; }
+.compass__grid { display: grid; grid-template-columns: repeat(2, 40px); gap: 4px; }
+.compass__q { width: 40px; height: 40px; position: relative; }
+.compass__q svg { width: 100%; height: 100%; display: block; }
+.compass__q[data-lit="false"] svg { opacity: 0.22; filter: grayscale(1); }
+.compass__q[data-lit="true"]::after { content: ""; position: absolute; inset: -3px; border: 2px solid var(--dm-ink); border-radius: 50%; }
+.compass p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.compass p b { color: var(--dm-ink); }
+
+/* The Eisenhower matrix in this edition: urgency rises to the right, importance upwards */
+.eis { display: grid; grid-template-columns: 22px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 22px; gap: 6px; }
+.eis__y, .eis__x { font: 600 11px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.eis__y { writing-mode: vertical-rl; transform: rotate(180deg); justify-content: flex-end; }
+.eis__x { grid-column: 2; justify-content: flex-end; }
+.eis__y::after, .eis__x::after { content: "→"; color: var(--dm-ink); }
+.eis__grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; aspect-ratio: 1.25; }
+.quad { padding: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; min-width: 0; }
+.quad h3 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.quad--when { background: var(--dm-green-tint); }
+.quad--now { background: var(--dm-red-tint); }
+.quad--later { background: var(--dm-soft); }
+.quad--delegate { background: var(--dm-soft); }
+.quad--when h3 { color: #3c7420; } .quad--now h3 { color: #b8301f; }
+.pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 12px; border-radius: 999px; background: var(--card); border: 1.5px solid var(--dm-ink); font-size: 13px; line-height: 1.3; animation: place 600ms var(--dm-spring) both; animation-delay: calc(var(--i) * 140ms + 200ms); }
+@keyframes place { from { transform: translateY(-10px) scale(0.9); opacity: 0; } }
+.pill--contested { border-color: var(--dm-red); border-style: dashed; }
+.pill--contested::before { content: "!"; display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; border-radius: 50%; background: var(--dm-red); color: #fff; font-weight: 800; font-size: 11px; }
+.pill small { font: 600 10px var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--dm-red); }
+
+/* Skills tray */
+.tray { display: grid; gap: 10px; border-top: 1px solid var(--dm-line); padding-top: 18px; }
+.tray__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tray__head h3 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.slots { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; }
+.slot { aspect-ratio: 1; display: grid; place-items: center; }
+.slot .dm-glyph { width: 100%; height: 100%; opacity: 0.16; }
+.slot.on .dm-glyph { opacity: 1; }
+
+/* ── Coach ── */
+.coach { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.msgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.msg { display: grid; gap: 6px; max-width: 92%; animation: msgIn 420ms var(--dm-spring) both; animation-delay: calc(var(--i) * 120ms); }
+@keyframes msgIn { from { transform: translateY(8px); opacity: 0; } }
+.msg--user { align-self: end; justify-items: end; }
+.msg--user .bubble { background: var(--dm-ink); color: var(--dm-paper); border-radius: 20px 20px 6px 20px; }
+.msg--coach { grid-template-columns: 30px minmax(0, 1fr); align-items: start; column-gap: 10px; }
+.msg--coach .bubble { background: var(--card); border: 1px solid var(--dm-line); border-radius: 20px 20px 20px 6px; }
+.msg--coach .chips { grid-column: 2; }
+.bubble { padding: 12px 16px; font-size: 14.5px; line-height: 1.5; }
+.av { width: 30px; height: 30px; }
+.av svg { width: 100%; height: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--dm-soft); font-size: 12px; }
+.chip .dm-glyph { width: 20px; height: 20px; }
+.suggest { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; padding: 16px; border-radius: 22px; background: var(--card); border: 2px solid var(--dm-green); animation: msgIn 600ms var(--dm-spring) both 500ms; }
+.suggest .dm-emblem { width: 56px; height: 56px; }
+.suggest h3 { margin: 0; font-size: 15.5px; }
+.suggest p { margin: 4px 0 12px; font-size: 13.5px; color: var(--muted); }
+.suggest__row { display: flex; gap: 8px; flex-wrap: wrap; }
+.composer { display: grid; gap: 8px; background: var(--card); border: 1px solid var(--dm-line); border-radius: 22px; padding: 12px; }
+.composer textarea { width: 100%; border: 0; border-radius: 14px; resize: none; min-height: 72px; background: var(--dm-soft); padding: 12px 14px; font-size: 15px; line-height: 1.45; }
+.composer__row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.dots { display: inline-flex; gap: 5px; align-items: end; height: 14px; }
+.dots i { width: 11px; height: 11px; animation: hop 900ms var(--dm-ease) infinite; }
+.dots i:nth-child(1) { background: var(--dm-red); border-radius: 50%; }
+.dots i:nth-child(2) { background: var(--dm-green); border-radius: 50%; animation-delay: 120ms; }
+.dots i:nth-child(3) { background: var(--dm-ink); width: 14px; height: 9px; clip-path: polygon(0 30%, 55% 30%, 50% 0, 100% 50%, 50% 100%, 55% 70%, 0 70%); animation-delay: 240ms; }
+@keyframes hop { 40% { transform: translateY(-6px); } }
+
+@media (max-width: 980px) { .board { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 620px) {
+  /* The matrix reflows into four labelled cards, as the kit's README asks. */
+  .eis { grid-template-columns: 1fr; grid-template-rows: auto; }
+  .eis__y, .eis__x { display: none; }
+  .eis__grid { grid-template-columns: 1fr; grid-template-rows: none; aspect-ratio: auto; }
+  .quad { padding: 14px; }
+  .quad h3::after { content: attr(data-axes); display: block; margin-top: 2px; font: 500 11px var(--font-mono); letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .quad--now { order: -1; }
+  .slots { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .track small { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Tasks Hub">
+    <div class="rail__brand">TASKS HUB</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>Backlog</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 11l8-4M8 13l8 4"/></svg></span>Graph</a>
+    <div class="rail__group">TOOLS</div>
+    <a href="../problem-solver/landing.html"><span class="dot"><svg viewBox="0 0 100 100"><path fill="#f6be2c" d="M2.38 44H97.62A48 48 0 0 1 97.62 56H2.38A48 48 0 0 1 2.38 44Z"/><path fill="#d7262e" d="M2.38 56A48 48 0 0 0 97.62 56Z"/><path fill="#7ea2e6" d="M2.38 44A48 48 0 0 1 97.62 44Z"/></svg></span>Problem Solver</a>
+    <a href="landing.html" aria-current="page"><span class="dot"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><g font-family="Arial, Helvetica, sans-serif"><circle cx="47" cy="70" r="43" fill="#f43a25" /><circle cx="93" cy="70" r="43" fill="#60ba2c" /><path d="M23 64H86V45L121 70L86 95V76H23Z" fill="#171813" stroke="none" stroke-width="2" /></g></svg></span>Decision Maker</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>Search</a>
+    <div class="rail__group">HUBS</div>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9H4z"/></svg></span>Life</a>
+    <a href="#"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h7v14H4zM13 5h7v14h-7z"/></svg></span>Teaching</a>
+  </nav>
+
+  <main class="canvas dm-scope">
+    <div class="canvas__inner">
+      <div class="top">
+        <p class="eyebrow">Tasks Hub · Decision Maker</p>
+        <a class="back" href="landing.html">← Decisions</a>
+        <h1 class="title">Should I take the Sydney job offer?</h1>
+      </div>
+
+      <nav class="track" aria-label="Process"><ol id="track" style="--p:0.3333333333333333"></ol></nav>
+
+      <div class="board">
+        <section class="bench" aria-labelledby="bench-title">
+          <div class="compass" aria-label="Section compass">
+            <div class="compass__grid"><span class="compass__q" data-lit="true" title="Understand yourself"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><circle cx="120" cy="120" r="94" fill="#f43a25"/><path d="M161 82A58 58 0 1 0 174 144L151 134A33 33 0 1 1 144 102Z" fill="#171813"/><path d="M145 113L180 139 139 155Z" fill="#171813"/><circle cx="120" cy="120" r="13" fill="#60ba2c"/></svg></span><span class="compass__q" data-lit="false" title="Improve yourself"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><circle cx="120" cy="120" r="94" fill="#60ba2c"/><path d="M26 120A94 94 0 0 0 120 214V120Z" fill="#f43a25"/><path d="M74 142L135 81H106V59H174V127H152V98L91 159Z" fill="#171813"/></svg></span><span class="compass__q" data-lit="false" title="Understand others"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><path d="M114 39A81 81 0 0 0 114 201Z" fill="#f43a25"/><path d="M126 39A81 81 0 0 1 126 201Z" fill="#60ba2c"/><path d="M81 120L120 81 159 120 120 159Z" fill="#171813"/></svg></span><span class="compass__q" data-lit="false" title="Improve others"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><circle cx="79" cy="145" r="61" fill="#f43a25"/><circle cx="161" cy="95" r="75" fill="#60ba2c"/><path d="M47 159H104V105H150V84L190 118 150 152V131H130V185H47Z" fill="#171813"/></svg></span></div>
+            <p><b>Understand yourself.</b> The decision is about you, and you want to see what you really want before you choose.</p>
+          </div>
+          <div class="bench__head">
+            <h2 id="bench-title"><span class="dm-emblem"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><rect x="22" y="22" width="44" height="44" rx="0" fill="#60ba2c" stroke="none" /><rect x="72" y="22" width="44" height="44" rx="0" fill="#f43a25" stroke="none" /><rect x="22" y="72" width="44" height="44" rx="0" fill="#e3f1d8" stroke="none" /><rect x="72" y="72" width="44" height="44" rx="0" fill="#fcdfd5" stroke="none" /><path d="M82 34V48H99" fill="none" stroke="#171813" stroke-width="5" /></svg></span>The Eisenhower matrix</h2>
+            <span class="count">4 placed · 1 contested</span>
+          </div>
+          <div class="eis">
+            <span class="eis__y">Important</span>
+            <div class="eis__grid">
+              <div class="quad quad--when"><h3 data-axes="Important, not urgent">Decide when</h3><span class="pill" style="--i:0">Talk it through properly at home</span></div>
+              <div class="quad quad--now"><h3 data-axes="Important and urgent">Do immediately</h3><span class="pill" style="--i:1">Reply to the offer by Friday</span></div>
+              <div class="quad quad--later"><h3 data-axes="Not important, not urgent">Do later</h3><span class="pill" style="--i:2">Look at suburbs near the office</span></div>
+              <div class="quad quad--delegate"><h3 data-axes="Urgent, not important">Delegate</h3><span class="pill pill--contested" style="--i:3">Ask HR about relocation <small>contested</small></span></div>
+            </div>
+            <span class="eis__x">Urgent</span>
+          </div>
+          <div class="tray">
+            <div class="tray__head"><h3>Thinking skills this session</h3><span class="count">3 of 12</span></div>
+            <div class="slots" id="slots"></div>
+          </div>
+        </section>
+
+        <section class="coach" aria-label="Coach">
+          <ul class="msgs" id="msgs"></ul>
+          <div class="suggest">
+            <span class="dm-emblem"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140"><line x1="63" y1="70" x2="46.0" y2="70.0" stroke="#f43a25" stroke-width="13"/><path d="M20 70L46.0 84.3L46.0 55.7Z" fill="#f43a25" stroke="none" stroke-width="2" /><line x1="77" y1="70" x2="94.0" y2="70.0" stroke="#60ba2c" stroke-width="13"/><path d="M120 70L94.0 55.7L94.0 84.3Z" fill="#60ba2c" stroke="none" stroke-width="2" /><circle cx="70" cy="70" r="16" fill="#171813" /></svg></span>
+            <div><h3>Another angle: The rubber band model</h3><p>What holds you and what pulls you.</p>
+            <div class="suggest__row"><button class="btn btn--primary" type="button">Accept</button><button class="btn btn--ghost" type="button">Not now</button></div></div>
+          </div>
+          <form class="composer" onsubmit="event.preventDefault()">
+            <label for="answer" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Your answer</label>
+            <textarea id="answer" rows="3" placeholder="Answer the coach, or say where a card belongs."></textarea>
+            <div class="composer__row"><span class="thinking"><span class="dots"><i></i><i></i><i></i></span>Coach is ready</span><button class="btn btn--primary" type="submit">Send</button></div>
+          </form>
+        </section>
+      </div>
+      <p class="mock-note" style="margin-top:16px">Example session for the mockup.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+const GLYPHS={"abstract_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>abstract thinking</title><defs><clipPath id=\"ps-abstract-clip\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-abstract-clip)\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M-100 0l100 100\"/><path d=\"M-95 0l100 100\"/><path d=\"M-90 0l100 100\"/><path d=\"M-85 0l100 100\"/><path d=\"M-80 0l100 100\"/><path d=\"M-75 0l100 100\"/><path d=\"M-70 0l100 100\"/><path d=\"M-65 0l100 100\"/><path d=\"M-60 0l100 100\"/><path d=\"M-55 0l100 100\"/><path d=\"M-50 0l100 100\"/><path d=\"M-45 0l100 100\"/><path d=\"M-40 0l100 100\"/><path d=\"M-35 0l100 100\"/><path d=\"M-30 0l100 100\"/><path d=\"M-25 0l100 100\"/><path d=\"M-20 0l100 100\"/><path d=\"M-15 0l100 100\"/><path d=\"M-10 0l100 100\"/><path d=\"M-5 0l100 100\"/><path d=\"M0 0l100 100\"/><path d=\"M5 0l100 100\"/><path d=\"M10 0l100 100\"/><path d=\"M15 0l100 100\"/><path d=\"M20 0l100 100\"/><path d=\"M25 0l100 100\"/><path d=\"M30 0l100 100\"/><path d=\"M35 0l100 100\"/><path d=\"M40 0l100 100\"/><path d=\"M45 0l100 100\"/><path d=\"M50 0l100 100\"/><path d=\"M55 0l100 100\"/><path d=\"M60 0l100 100\"/><path d=\"M65 0l100 100\"/><path d=\"M70 0l100 100\"/><path d=\"M75 0l100 100\"/><path d=\"M80 0l100 100\"/><path d=\"M85 0l100 100\"/><path d=\"M90 0l100 100\"/><path d=\"M95 0l100 100\"/><path d=\"M100 0l100 100\"/></g></svg>","analysis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>analysis</title><defs><clipPath id=\"ps-analysis\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></clipPath></defs><g clip-path=\"url(#ps-analysis)\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"><circle cx=\"50\" cy=\"50\" r=\"44\"/><circle cx=\"50\" cy=\"62\" r=\"44\"/><circle cx=\"50\" cy=\"74\" r=\"44\"/><circle cx=\"50\" cy=\"86\" r=\"44\"/><circle cx=\"50\" cy=\"98\" r=\"44\"/><circle cx=\"50\" cy=\"110\" r=\"44\"/><circle cx=\"50\" cy=\"122\" r=\"44\"/></g><circle cx=\"50\" cy=\"50\" r=\"44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/></svg>","creative_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>creative thinking</title><circle cx=\"50\" cy=\"73\" r=\"20\"/><path d=\"M47 73L4.000 53.000 53 73Z\"/><path d=\"M47 73L4.699 45.012 53 73Z\"/><path d=\"M47 73L6.774 37.267 53 73Z\"/><path d=\"M47 73L10.163 30.000 53 73Z\"/><path d=\"M47 73L14.762 23.432 53 73Z\"/><path d=\"M47 73L20.432 17.762 53 73Z\"/><path d=\"M47 73L27.000 13.163 53 73Z\"/><path d=\"M47 73L34.267 9.774 53 73Z\"/><path d=\"M47 73L42.012 7.699 53 73Z\"/><path d=\"M47 73L50.000 7.000 53 73Z\"/><path d=\"M47 73L57.988 7.699 53 73Z\"/><path d=\"M47 73L65.733 9.774 53 73Z\"/><path d=\"M47 73L73.000 13.163 53 73Z\"/><path d=\"M47 73L79.568 17.762 53 73Z\"/><path d=\"M47 73L85.238 23.432 53 73Z\"/><path d=\"M47 73L89.837 30.000 53 73Z\"/><path d=\"M47 73L93.226 37.267 53 73Z\"/><path d=\"M47 73L95.301 45.012 53 73Z\"/><path d=\"M47 73L96.000 53.000 53 73Z\"/></svg>","critical_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>critical thinking</title><defs><mask id=\"ps-critical-thinking\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"black\" stroke-width=\"22\"/><path d=\"M0 0 100 100M0 100 100 0\" stroke=\"white\" stroke-width=\"7\"/></mask></defs><g mask=\"url(#ps-critical-thinking)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","decision_making":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>decision making</title><defs><mask id=\"ps-decision-making\"><rect width=\"100\" height=\"100\" fill=\"white\"/><g fill=\"black\"><circle cx=\"30\" cy=\"50\" r=\"18\"/><circle cx=\"70\" cy=\"50\" r=\"18\"/></g></mask></defs><g mask=\"url(#ps-decision-making)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","inference":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>inference</title><defs><mask id=\"ps-inference\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M33 25V68H76 M49 25V52H76\" fill=\"none\" stroke=\"black\" stroke-width=\"5\"/></mask></defs><g mask=\"url(#ps-inference)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","learning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>learning</title><defs><mask id=\"ps-learning\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M16 63 45 25 85 38 55 76Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-learning)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","logical_reasoning":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>logical reasoning</title><path d=\"M52.3028 6.0603A44 44 0 0 1 69.9756 10.7957L61.8038 26.8338A26 26 0 0 0 51.3607 24.0356Z\"/><path d=\"M73.9641 13.0985A44 44 0 0 1 86.9015 26.0359L71.8054 35.8394A26 26 0 0 0 64.1606 28.1946Z\"/><path d=\"M89.2043 30.0244A44 44 0 0 1 93.9397 47.6972L75.9644 48.6393A26 26 0 0 0 73.1662 38.1962Z\"/><path d=\"M93.9397 52.3028A44 44 0 0 1 89.2043 69.9756L73.1662 61.8038A26 26 0 0 0 75.9644 51.3607Z\"/><path d=\"M86.9015 73.9641A44 44 0 0 1 73.9641 86.9015L64.1606 71.8054A26 26 0 0 0 71.8054 64.1606Z\"/><path d=\"M69.9756 89.2043A44 44 0 0 1 52.3028 93.9397L51.3607 75.9644A26 26 0 0 0 61.8038 73.1662Z\"/><path d=\"M47.6972 93.9397A44 44 0 0 1 30.0244 89.2043L38.1962 73.1662A26 26 0 0 0 48.6393 75.9644Z\"/><path d=\"M26.0359 86.9015A44 44 0 0 1 13.0985 73.9641L28.1946 64.1606A26 26 0 0 0 35.8394 71.8054Z\"/><path d=\"M10.7957 69.9756A44 44 0 0 1 6.0603 52.3028L24.0356 51.3607A26 26 0 0 0 26.8338 61.8038Z\"/><path d=\"M6.0603 47.6972A44 44 0 0 1 10.7957 30.0244L26.8338 38.1962A26 26 0 0 0 24.0356 48.6393Z\"/><path d=\"M13.0985 26.0359A44 44 0 0 1 26.0359 13.0985L35.8394 28.1946A26 26 0 0 0 28.1946 35.8394Z\"/><path d=\"M30.0244 10.7957A44 44 0 0 1 47.6972 6.0603L48.6393 24.0356A26 26 0 0 0 38.1962 26.8338Z\"/></svg>","metacognition":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>metacognition</title><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(0 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(45 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(90 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(135 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(180 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(225 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(270 50 50)\"/><path d=\"M53 47 53 6 73 27Z\" transform=\"rotate(315 50 50)\"/></svg>","reflective_thinking":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>reflective thinking</title><path d=\"M50 50L94.0000 50.0000A44 44 0 0 1 92.6930 60.6446Z\"/><path d=\"M50 50L90.6507 66.8381A44 44 0 0 1 85.3697 76.1722Z\"/><path d=\"M50 50L81.1127 81.1127A44 44 0 0 1 72.6617 87.7154Z\"/><path d=\"M50 50L66.8381 90.6507A44 44 0 0 1 56.5036 93.5167Z\"/><path d=\"M50 50L50.0000 94.0000A44 44 0 0 1 39.3554 92.6930Z\"/><path d=\"M50 50L33.1619 90.6507A44 44 0 0 1 23.8278 85.3697Z\"/><path d=\"M50 50L18.8873 81.1127A44 44 0 0 1 12.2846 72.6617Z\"/><path d=\"M50 50L9.3493 66.8381A44 44 0 0 1 6.4833 56.5036Z\"/><path d=\"M50 50L6.0000 50.0000A44 44 0 0 1 7.3070 39.3554Z\"/><path d=\"M50 50L9.3493 33.1619A44 44 0 0 1 14.6303 23.8278Z\"/><path d=\"M50 50L18.8873 18.8873A44 44 0 0 1 27.3383 12.2846Z\"/><path d=\"M50 50L33.1619 9.3493A44 44 0 0 1 43.4964 6.4833Z\"/><path d=\"M50 50L50.0000 6.0000A44 44 0 0 1 60.6446 7.3070Z\"/><path d=\"M50 50L66.8381 9.3493A44 44 0 0 1 76.1722 14.6303Z\"/><path d=\"M50 50L81.1127 18.8873A44 44 0 0 1 87.7154 27.3383Z\"/><path d=\"M50 50L90.6507 33.1619A44 44 0 0 1 93.5167 43.4964Z\"/></svg>","searching":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>searching</title><defs><mask id=\"ps-searching\"><rect width=\"100\" height=\"100\" fill=\"white\"/><circle cx=\"50\" cy=\"50\" r=\"19\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-searching)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>","synthesis":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" fill=\"currentColor\"><title>synthesis</title><defs><mask id=\"ps-synthesis\"><rect width=\"100\" height=\"100\" fill=\"white\"/><path d=\"M50 8Q62 32 92 50Q63 67 50 92Q32 64 8 50Q34 35 50 8Z\" fill=\"black\"/></mask></defs><g mask=\"url(#ps-synthesis)\"><circle cx=\"50\" cy=\"50\" r=\"44\"/></g></svg>"};
+let copy = 0;
+function glyph(id) {
+  copy += 1;
+  return (GLYPHS[id] || '').replace(/id="(ps-[a-z-]+)"/g, `id="$1-${copy}"`).replace(/url\(#(ps-[a-z-]+)\)/g, `url(#$1-${copy})`);
+}
+const NAMES={"abstract_thinking":"Abstract thinking","searching":"Searching","learning":"Learning","decision_making":"Decision making","inference":"Inference","reflective_thinking":"Reflective thinking","synthesis":"Synthesis","analysis":"Analysis","logical_reasoning":"Logical reasoning","critical_thinking":"Critical thinking","metacognition":"Metacognition","creative_thinking":"Creative thinking"};
+/* ── Track ── */
+const STEPS = [['Frame', 'Done', 'done'], ['Explore', 'Eisenhower', 'now'], ['Decide', '', 'future'], ['Review', '', 'future']];
+const MARKS = [
+  '<circle cx="27" cy="50" r="23" fill="var(--dm-red)"/><circle cx="73" cy="50" r="23" fill="var(--dm-green)"/><path d="M50 2V98" stroke="var(--dm-ink)" stroke-width="3" stroke-dasharray="5 4"/>',
+  '<circle cx="50" cy="50" r="46" fill="var(--dm-green)"/><circle cx="50" cy="50" r="20" fill="var(--dm-paper)"/>',
+  "<g transform=\"translate(0 0) scale(1)\"><circle cx=\"50\" cy=\"50\" r=\"46\" fill=\"var(--dm-green)\"/><path d=\"M20 41H54L48 28L82 50L48 72L54 59H20L27 50Z\" fill=\"var(--dm-ink)\"/></g>",
+  "<g transform=\"translate(0 0) scale(1)\"><circle cx=\"50\" cy=\"50\" r=\"46\" fill=\"var(--dm-red)\"/><path d=\"M68 30H46L28 50L46 70H68V61H50L40 50L50 39H68Z\" fill=\"var(--dm-ink)\"/></g>"
+];
+document.getElementById('track').innerHTML = STEPS.map(([name, note, state], i) => `<li class="stn" data-state="${state}" ${state === 'now' ? 'aria-current="step"' : ''}><span class="stn__mark"><svg viewBox="0 0 100 100">${MARKS[i]}</svg></span><b>${name}</b><small>${note || '&nbsp;'}</small></li>`).join('');
+
+/* ── Skills tray ── */
+const earned = new Set(['critical_thinking', 'decision_making', 'analysis']);
+document.getElementById('slots').innerHTML = Object.keys(NAMES).map((id) => `<span class="slot${earned.has(id) ? ' on' : ''}" title="${NAMES[id]}"><span class="dm-glyph">${glyph(id)}</span></span>`).join('');
+
+/* ── Coach thread: the avatar is Problem Solver's construction, in squares ── */
+const AV = '<svg viewBox="0 0 100 100"><circle cx="32" cy="58" r="28" fill="var(--dm-red)"/><circle cx="68" cy="42" r="28" fill="var(--dm-green)"/><path d="M30 52H64V42L86 56L64 70V60H30Z" fill="var(--dm-ink)"/></svg>';
+const chips = (ids) => `<div class="chips">${ids.map((id) => `<span class="chip"><span class="dm-glyph">${glyph(id)}</span>${NAMES[id]}</span>`).join('')}</div>`;
+const THREAD = [
+  ['user', 'Reply by Friday is the urgent one. Talking it through at home matters more, but it has no deadline yet.'],
+  ['coach', 'Good: you have separated what is pressing from what matters. Asking HR about relocation sits under Delegate, but you said it decides the money. Is it really not important?', ['critical_thinking', 'analysis']],
+  ['user', 'Fair. It might be important. I will leave it as contested for now.']
+];
+document.getElementById('msgs').innerHTML = THREAD.map(([role, text, skills], i) => role === 'coach'
+  ? `<li class="msg msg--coach" style="--i:${i}"><span class="av">${AV}</span><div class="bubble">${text}</div>${chips(skills)}</li>`
+  : `<li class="msg msg--user" style="--i:${i}"><div class="bubble">${text}</div></li>`).join('');
+</script>
+</body>
+</html>

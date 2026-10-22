@@ -6,7 +6,6 @@ import {
   codeText,
   descriptorFor,
   summariseByCriterion,
-  summaryLineText,
   type FeedbackCode
 } from '@/blocks/feedback-codes';
 import { buildPaper, commonestFiller, pointIndexAt, transcriptWords } from '@/blocks/voice-marking';
@@ -36,18 +35,34 @@ export function tagChip(tag: Pick<VoiceTag, 'positive' | 'code' | 'code_id'>, by
   return chip;
 }
 
-/** "Criterion 1 · Ideas — TS+ · AR ×2", plus a speaking line naming the commonest filler. */
+/**
+ * The summary doubles as the key: each heading is a rubric criterion (or
+ * Speaking), and each code it holds is spelled out, "AR Analysis – relevance
+ * ×2", so nobody has to know the shorthand. Only codes this recording got.
+ */
 export function summaryList(tags: readonly VoiceTag[], codes: readonly FeedbackCode[], words: readonly VoiceWord[]): HTMLElement {
   const list = el('dl', 'voice-summary');
+  const fillerIds = new Set(codes.filter((c) => c.code === 'FW').map((c) => c.id));
+  const filler = commonestFiller(words, tags.filter((t) => fillerIds.has(t.code_id) && !t.positive).map((t) => t.w));
+  let strengths = false;
   for (const line of summariseByCriterion(tags, codes)) {
-    let text = summaryLineText(line);
-    if (line.heading === 'Speaking') {
-      const fillerIds = new Set(codes.filter((c) => c.code === 'FW').map((c) => c.id));
-      const filler = commonestFiller(words, tags.filter((t) => fillerIds.has(t.code_id) && !t.positive).map((t) => t.w));
-      if (filler) text += ` (mostly “${filler}”)`;
+    const items = el('dd', 'voice-summary__items');
+    for (const item of line.items) {
+      strengths ||= item.positive;
+      const row = el('span', 'voice-summary__item');
+      const chip = el('span', 'fc-chip', item.text);
+      chip.style.setProperty('--fc-ink', codeInk(item.positive ? STRENGTH_COLOUR : item.code.colour));
+      if (item.positive) chip.classList.add('fc-chip--strength');
+      let label = item.code.label;
+      if (item.positive) label += ' (strength)';
+      if (filler && fillerIds.has(item.code.id) && !item.positive) label += ` (mostly “${filler}”)`;
+      row.append(chip, el('span', 'voice-summary__label', label));
+      if (item.count > 1) row.append(el('span', 'voice-summary__count', `×${item.count}`));
+      items.append(row);
     }
-    list.append(el('dt', 'voice-summary__heading', line.heading), el('dd', 'voice-summary__items', text));
+    list.append(el('dt', 'voice-summary__heading', line.heading), items);
   }
+  if (strengths) list.append(el('p', 'voice-summary__foot block-secondary', 'A + after a code marks a strength.'));
   return list;
 }
 

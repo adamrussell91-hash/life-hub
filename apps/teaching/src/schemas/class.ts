@@ -3,6 +3,7 @@ import { BlockSchema } from './block';
 import { CommonFields, TrashFields } from './common';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
+import { INITIALS_PATTERN, STUDENT_ID_PATTERN } from './student-initials';
 import { validateTimetable, type ClassTimetable } from '../schedule/timetable';
 
 export const ClassTimetableSchema = z.unknown().transform((value, ctx): ClassTimetable => {
@@ -21,13 +22,17 @@ export const ClassHomepageSchema = z.object({
 export type ClassHomepage = z.infer<typeof ClassHomepageSchema>;
 
 /**
- * One student on a class list, for the classroom name picker and groups.
+ * One student on a class list, for the classroom name picker, groups and quiz initials.
  * Lives only on the class record (teacher side). `skip_picker` quietly leaves
  * the student out of the name picker and is never shown on a lesson page.
  */
 export const ClassStudentSchema = z.object({
   name: z.string().min(1).max(80),
-  skip_picker: z.boolean().default(false)
+  skip_picker: z.boolean().default(false),
+  /** Never changes once saved, so renames keep a student's quiz results. */
+  id: z.string().regex(STUDENT_ID_PATTERN).optional(),
+  /** What the student types to take a quiz. Unique within the class. */
+  initials: z.string().regex(INITIALS_PATTERN).optional()
 });
 
 export type ClassStudent = z.infer<typeof ClassStudentSchema>;

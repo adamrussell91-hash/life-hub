@@ -1,7 +1,7 @@
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
-import { findActiveSelfPerson } from './_shared/career-overview.mjs';
+import { findActiveSelfPerson, listSelfEmployment } from './_shared/career-overview.mjs';
 import { formatEntityRef } from './_shared/entity-ref.mjs';
 
 // Self Person lookup (Phase 4, Feature 4.4 "Your Network" support).
@@ -21,6 +21,10 @@ import { formatEntityRef } from './_shared/entity-ref.mjs';
 // heavier existing one. See PHASE-1-PROGRESS.md for the documented
 // decision between this, extending `/api/career`'s response, and adding a
 // `self_ref` field elsewhere.
+//
+// `?include=workplaces` adds `workplaces`: the organisations self currently
+// works at (deduped), so a meeting room can tell which job a colleague with
+// several is there for.
 export const config = { path: '/api/people/self' };
 
 function toErrorResponse(error) {
@@ -33,6 +37,7 @@ function toErrorResponse(error) {
 
 export function createPeopleSelfHandler(deps = {}) {
   const findSelf = deps.findActiveSelfPerson ?? findActiveSelfPerson;
+  const listEmployment = deps.listSelfEmployment ?? listSelfEmployment;
 
   return createOperatorHandler(
     async (request, context) => {
@@ -46,13 +51,31 @@ export function createPeopleSelfHandler(deps = {}) {
         if (!self) {
           return withCors(okResponse(200, { self: null }), request, env);
         }
+        const payload = {
+          self: {
+            ref: formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id }),
+            display_name: self.display_name ?? null
+          }
+        };
+        if (new URL(request.url).searchParams.get('include') === 'workplaces') {
+          const today = (deps.now ? new Date(deps.now()) : new Date()).toISOString().slice(0, 10);
+          const items = await listEmployment(self, {
+            universalStore: store,
+            env,
+            fetchImpl: deps.fetchImpl,
+            now: deps.now
+          });
+          const workplaces = [];
+          for (const item of items) {
+            if (item.link_status !== 'current') continue;
+            if (item.valid_to && item.valid_to.slice(0, 10) < today) continue;
+            if (workplaces.some((entry) => entry.ref === item.ref)) continue;
+            workplaces.push({ ref: item.ref, display_name: item.display_label });
+          }
+          payload.workplaces = workplaces;
+        }
         return withCors(
-          okResponse(200, {
-            self: {
-              ref: formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id }),
-              display_name: self.display_name ?? null
-            }
-          }),
+          okResponse(200, payload),
           request,
           env
         );

@@ -11,12 +11,16 @@ const base = {
   talks: [{ id: 't1', time: '09:00', title: 'Keynote · Reading against the grain', presenter: 'Dr Mia L.', hours: 1.5 }],
   blocks: []
 };
-let current = { ...base };
+let current: Record<string, unknown> = { ...base };
 
 vi.mock('@/api/events', () => ({
   deleteEvent: vi.fn(async () => ({deleted: true})),
   getEvent: vi.fn(async () => ({ event: current })),
-  updateEvent: vi.fn(async (_id: string, patch: object) => { current = { ...current, ...patch }; return { event: current }; })
+  updateEvent: vi.fn(async (_id: string, patch: object) => { current = { ...current, ...patch }; return { event: current }; }),
+  eventStateAction: vi.fn(async (_id: string, action: string) => {
+    current = { ...current, occurrence_state: action === 'complete' ? 'completed' : 'scheduled' };
+    return { event: current };
+  })
 }));
 vi.mock('@/views/events', () => ({
   renderEventNewView: vi.fn(async () => {}),
@@ -53,7 +57,7 @@ import { renderEventNewView } from '@/views/events';
 import { renderEventPage } from '@/views/event-page';
 import { createPdGroup } from '@/api/pd-groups';
 import { mountBlockPage } from '@/components/block-page';
-import { updateEvent, deleteEvent } from '@/api/events';
+import { updateEvent, deleteEvent, eventStateAction } from '@/api/events';
 import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { createUniversalLink, listUniversalLinksForEntity, endUniversalLink } from '@/api/universal-links';
 
@@ -119,6 +123,24 @@ describe('event page', () => {
     save.click();
     await vi.waitFor(() => expect(createPdGroup).toHaveBeenCalledWith({shape:'program', title:base.title}));
     await vi.waitFor(() => expect(endUniversalLink).toHaveBeenCalledWith('g'));
+  });
+
+  it('Done ticks a scheduled event off as completed and attended', async () => {
+    current = { ...base, occurrence_state: 'scheduled', attendance_state: null };
+    const canvas = await render();
+    const done = canvas.querySelector<HTMLButtonElement>('[data-part="done-switch"]')!;
+    expect(done.getAttribute('aria-checked')).toBe('false');
+    done.click();
+    await vi.waitFor(() => expect(canvas.querySelector('[data-part="done-switch"]')?.getAttribute('aria-checked')).toBe('true'));
+    expect(eventStateAction).toHaveBeenCalledWith(EVENT_ID, 'complete');
+    expect(updateEvent).toHaveBeenCalledWith(EVENT_ID, { attendance_state: 'attended' });
+  });
+
+  it('Done unticks a completed event back to scheduled', async () => {
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-part="done-switch"]')!.click();
+    await vi.waitFor(() => expect(eventStateAction).toHaveBeenCalledWith(EVENT_ID, 'reopen'));
+    await vi.waitFor(() => expect(canvas.querySelector('[data-part="done-switch"]')?.getAttribute('aria-checked')).toBe('false'));
   });
 
   it('turning PD off makes it a general event and hides the PD panels', async () => {

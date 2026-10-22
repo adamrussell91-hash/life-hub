@@ -16,6 +16,7 @@ import {
 import { answerLines } from '@/blocks/quiz-question';
 import { mountQuestionBuilder } from '@/quiz/builder';
 import { mountQuestionPlayer } from '@/quiz/player';
+import { spanText } from '@/quiz/word-picker';
 import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
 import './quiz.css';
 
@@ -51,7 +52,10 @@ type Submission = {
 };
 
 type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey };
-type AttemptSummary = { id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
+/** Initials and name from the class list; both null when the student was removed. */
+type StudentLabel = { initials: string | null; name: string | null };
+
+type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
 type QuestionStats = {
   id: string;
   question: PublicQuestion;
@@ -534,14 +538,14 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     wrap.append(qs);
 
     wrap.append(el('h4', 'qz-h', 'Attempts'));
-    const names = deviceNames(r.attempts.map((a) => a.device));
+    const names = deviceNames(r.attempts.filter((a) => !a.student).map((a) => a.device));
     const list = el('ul', 'qz-attempts');
     for (const a of r.attempts) {
       const li = el('li');
       const b = el('button', 'qz-attempt');
       b.type = 'button';
       b.append(
-        el('span', 'qz-attempt__who', `${names.get(a.device) ?? 'A student'}${a.n > 0 ? ` · go ${a.n + 1}` : ''}`),
+        el('span', 'qz-attempt__who', `${whoLabel(a, names)}${a.n > 0 ? ` · go ${a.n + 1}` : ''}`),
         el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}`),
         el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
       );
@@ -586,7 +590,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     return li;
   }
 
-  type AttemptDetail = { id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; rows: Row[] };
+  type AttemptDetail = { student: StudentLabel | null; id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; rows: Row[] };
 
   function attemptView(a: AttemptDetail): HTMLElement {
     const wrap = el('div', 'qz-attempt-detail');
@@ -597,6 +601,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         paint();
         void refresh();
       }),
+      el('span', 'qz-attempt__who', a.student ? whoLabel(a, new Map()) : 'Anonymous attempt'),
       el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}${a.pending ? ` · ${a.pending} to mark` : ''}${a.overtime ? ' · Late' : ''}`)
     );
     wrap.append(bar);
@@ -746,7 +751,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     stage.append(el('p', 'qz-player__meta', `Question ${l.index + 1} of ${l.total} · ${QUIZ_KIND_INFO[q.kind].label}`));
     if (q.prompt) stage.append(el('h3', `qz-player__prompt${big ? ' qz-player__prompt--board' : ''}`, q.prompt));
     if (q.kind === 'quote_technique' && q.quote) stage.append(el('blockquote', 'qz-quote', q.quote));
-    if (q.kind === 'explain_effect') stage.append(el('blockquote', 'qz-quote', q.quote));
+    if (q.kind === 'explain_effect' || q.kind === 'spot_technique') stage.append(el('blockquote', 'qz-quote', q.kind === 'spot_technique' ? q.passage : q.quote));
     if (q.image && q.kind !== 'label_image') {
       const img = el('img', 'qz-live__img');
       img.src = q.image.url;
@@ -834,6 +839,12 @@ function meter(pct: number): HTMLElement {
   return track;
 }
 
+/** "BB · Bob Brown" for a known student, else the anonymous "Student A" style label. */
+function whoLabel(a: { device: string; student: StudentLabel | null }, names: Map<string, string>): string {
+  if (a.student) return a.student.initials ? `${a.student.initials} · ${a.student.name}` : 'Removed student';
+  return names.get(a.device) ?? 'A student';
+}
+
 /** "Student A", "Student B" in order of first appearance. Never a name. */
 function deviceNames(devices: string[]): Map<string, string> {
   const out = new Map<string, string>();
@@ -900,6 +911,10 @@ export function keySummary(q: PublicQuestion, key: QuestionKey): string {
       return `Answer: ${a.accepted.join(' / ')}`;
     case 'gaps':
       return `Answer: ${Object.values(a.gaps).map((g) => g[0]).join(', ')}`;
+    case 'spots': {
+      const names = 'options' in q ? new Map(q.options.map((o) => [o.id, o.text])) : new Map<string, string>();
+      return `Answer: ${a.targets.map((t) => `“${spanText(a.passage, t)}” ${t.ids.map((id) => names.get(id)).join(' or ')}`).join(' · ')}`;
+    }
     case 'order':
       return q.kind === 'ordering' ? `Order: ${a.ids.map((id, i) => `${i + 1}. ${q.items.find((x) => x.id === id)?.text ?? ''}`).join('  ')}` : '';
     case 'map': {

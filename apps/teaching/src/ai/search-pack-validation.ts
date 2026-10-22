@@ -188,6 +188,7 @@ function collectProposalReferences(proposal: AiProposal): ExternalReference[] {
       collectTreeReferences(references, proposal.blocks, 'blocks');
       break;
     case 'insert_blocks':
+    case 'replace_blocks':
       collectTreeReferences(references, proposal.blocks, 'blocks');
       break;
     default:

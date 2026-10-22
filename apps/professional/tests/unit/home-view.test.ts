@@ -329,13 +329,14 @@ describe('renderHomeView', () => {
     expect(priority).toBeTruthy();
   });
 
-  it('lists both events in the compact timeline, ordered upcoming-then-past', async () => {
+  it('lists the events in the compact timeline in date order, oldest first', async () => {
     const canvas = document.createElement('div');
     await renderHomeView(canvas);
     const rows = [...canvas.querySelectorAll('.pro-home__timeline-row')];
     expect(rows).toHaveLength(3);
-    expect(rows[0]?.textContent).toMatch(/NESA English Educators Conference/);
+    expect(rows[0]?.textContent).toMatch(/Cancelled workshop/);
     expect(rows[1]?.textContent).toMatch(/Critical Study PD Day/);
+    expect(rows[2]?.textContent).toMatch(/NESA English Educators Conference/);
   });
 
   it('links "+ Log PD event" to the new-event route', async () => {

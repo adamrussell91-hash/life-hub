@@ -173,21 +173,54 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   hideBtn.textContent = 'Hide';
   hideBtn.setAttribute('aria-label', 'Hide chat');
   hideBtn.addEventListener('click', () => options.onRequestShelve?.());
-  toolbar.append(picker, hideBtn);
+
+  const newChatBtn = document.createElement('button');
+  newChatBtn.type = 'button';
+  newChatBtn.className = 'btn btn--ghost ai-panel__new-chat';
+  newChatBtn.textContent = 'New chat';
+  newChatBtn.addEventListener('click', () => {
+    void startNewChat();
+  });
+
+  const toolbarActions = document.createElement('div');
+  toolbarActions.className = 'ai-panel__toolbar-actions';
+  toolbarActions.append(newChatBtn, hideBtn);
+  toolbar.append(picker, toolbarActions);
 
   const protocolTray = document.createElement('div');
   protocolTray.className = 'agent-protocol-pills';
+
+  // The protocol chips fill the panel before anyone has spoken, then fold to
+  // one small toggle so the thread and Confirm card keep the room.
+  let protocolsOpen = false;
+
+  const protocolToggle = document.createElement('button');
+  protocolToggle.type = 'button';
+  protocolToggle.className = 'btn btn--ghost ai-panel__protocols-toggle';
+  protocolToggle.addEventListener('click', () => {
+    protocolsOpen = !protocolsOpen;
+    renderProtocols();
+  });
+
+  function protocolTrayOpen(): boolean {
+    return messages.length === 0 || protocolsOpen;
+  }
 
   const scopeChip = document.createElement('p');
   scopeChip.className = 'ai-panel__scope';
 
   // Ten suggestion buttons pushed the thread off a laptop screen, so they stay
-  // folded away until the teacher asks for them.
-  let suggestionsOpen = readBuilderChromePrefs().suggestions === 'open';
+  // folded away until the teacher asks for them, and once a chat is under way
+  // they start folded whatever the saved preference says.
+  let suggestionsOpen = readBuilderChromePrefs().suggestions === 'open' && messages.length === 0;
 
   const suggestionsToggle = document.createElement('button');
   suggestionsToggle.type = 'button';
   suggestionsToggle.className = 'btn btn--ghost ai-panel__suggestions-toggle';
+
+  const chipToggles = document.createElement('div');
+  chipToggles.className = 'ai-panel__chip-toggles';
+  chipToggles.append(scopeChip, protocolToggle, suggestionsToggle);
 
   const actionsBar = document.createElement('div');
   actionsBar.className = 'ai-panel__actions';
@@ -247,8 +280,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   host.replaceChildren(
     toolbar,
     protocolTray,
-    scopeChip,
-    suggestionsToggle,
+    chipToggles,
     actionsBar,
     empty,
     thread,
@@ -338,6 +370,14 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     }
 
     protocolTray.replaceChildren(eyebrow, row);
+
+    const open = protocolTrayOpen();
+    protocolTray.hidden = !open;
+    protocolToggle.hidden = messages.length === 0;
+    protocolToggle.textContent = open
+      ? `Hide ${pack.firstName}'s tools`
+      : `${pack.firstName} can (${pack.pills.length})`;
+    protocolToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function renderScope(): void {
@@ -608,7 +648,44 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     thread.scrollTop = thread.scrollHeight;
   }
 
+  async function startNewChat(): Promise<void> {
+    if (busy || messages.length === 0) return;
+    const pending = messages.filter((msg) => msg.proposalStatus === 'pending');
+    if (pending.length > 0) {
+      const ok = await askConfirmCard({
+        eyebrow: 'New chat',
+        title: 'Start a new chat?',
+        supporting:
+          pending.length === 1
+            ? 'The proposal waiting on Confirm will be rejected.'
+            : `The ${pending.length} proposals waiting on Confirm will be rejected.`,
+        confirmLabel: 'Start new chat',
+        discardLabel: 'Keep this chat'
+      });
+      if (!ok || busy) return;
+    }
+    // Settle every open job so the inbox does not bring this chat back on
+    // the next load.
+    for (const msg of messages) {
+      if (!msg.jobId || msg.proposalStatus === 'accepted' || msg.proposalStatus === 'rejected') {
+        continue;
+      }
+      const resolution = msg.proposalStatus === 'pending' ? 'rejected' : 'dismissed';
+      void resolveAiJob(msg.jobId, resolution).catch(() => {
+        /* already settled, or offline; the chat still clears */
+      });
+    }
+    messages = [];
+    saveTranscript(options.lessonId, messages);
+    protocolsOpen = false;
+    suggestionsOpen = readBuilderChromePrefs().suggestions === 'open';
+    renderShell();
+    input.focus();
+  }
+
   function renderShell(): void {
+    newChatBtn.hidden = messages.length === 0;
+    newChatBtn.disabled = busy;
     empty.hidden = messages.length > 0;
     composer.hidden = false;
     thread.hidden = false;
@@ -794,6 +871,12 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       status: pickAgentWaitLine(turnAgent, { random })
     });
     saveTranscript(options.lessonId, messages);
+    // Every turn folds the chips back up so the thread gets the room. This is
+    // for this chat only; the saved Suggestions preference is left alone.
+    protocolsOpen = false;
+    suggestionsOpen = false;
+    renderProtocols();
+    renderSuggestionsToggle();
     renderThread();
 
     abort?.abort();

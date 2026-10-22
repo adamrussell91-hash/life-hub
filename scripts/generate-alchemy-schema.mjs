@@ -18,3 +18,9 @@ await build({
   alias: { '@': './apps/teaching/src' },
   banner: {js:'// Generated from apps/teaching/src/notion-import/server-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
+await build({
+  entryPoints: ['apps/teaching/src/schemas/student-initials.ts'],
+  outfile: 'netlify/functions/_shared/student-initials.mjs',
+  bundle: true, platform: 'node', format: 'esm',
+  banner: {js:'// Generated from apps/teaching/src/schemas/student-initials.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});

@@ -4,9 +4,12 @@ import {
   type MarkResult,
   type PublicQuestion,
   type QuestionKey,
-  type QuizResponse
+  type QuizResponse,
+  type Spot,
+  type WordSpan
 } from '@/quiz/core';
 import { el, formatMarks, select, textArea, textInput, uid } from '@/quiz/dom';
+import { mountWordPicker, spanText } from '@/quiz/word-picker';
 import './quiz.css';
 
 /**
@@ -93,6 +96,121 @@ export function mountQuestionPlayer(options: PlayerOptions): HTMLElement {
       body.append(el('p', 'qz-player__instruction', q.pick === 1 ? 'Tap the line that answers the question.' : `Tap the ${q.pick} lines that answer the question.`));
       const picked = new Set(responseSelected(options.response));
       body.append(choiceList(q.segments, picked, q.pick > 1, (ids) => emit({ selected: ids }), 'qz-choice--line'));
+      break;
+    }
+    case 'spot_technique': {
+      // Copied out: the closures below lose the narrowing on q.
+      const { passage, pick, options: choices } = q;
+      const spots: Spot[] = options.response && 'spots' in options.response ? [...options.response.spots] : [];
+      const optionText = new Map(choices.map((o) => [o.id, o.text]));
+      const keyTargets = key?.answer.type === 'spots' ? key.answer.targets : [];
+      body.append(
+        el(
+          'p',
+          'qz-player__instruction',
+          pick === 1 ? 'Find the technique: select its words, then name it.' : `Find ${pick} techniques: select the words of each one, then name it.`
+        )
+      );
+      // The next thing to do, in words, so the taps never feel like guesswork.
+      const step = el('p', 'qz-spot-step');
+      step.setAttribute('aria-live', 'polite');
+      const picker = mountWordPicker({ passage, disabled: locked, label: 'Passage', onSelect: (span) => paintPick(span) });
+      if (!locked) picker.root.classList.add('qz-words--live');
+      const pickHost = el('div', 'qz-spot-pick');
+      pickHost.setAttribute('aria-live', 'polite');
+      const list = el('ol', 'qz-spots');
+      if (!locked) body.append(step);
+      body.append(picker.root, list);
+
+      let selected = false;
+      const paintStep = () => {
+        const counter = pick > 1 ? `${Math.min(spots.length + 1, pick)} of ${pick}: ` : '';
+        if (spots.length >= pick) step.textContent = pick === 1 ? 'Done. Remove it below to choose again.' : `All ${pick} found. Remove one below to change it.`;
+        else if (picker.waiting()) step.textContent = `${counter}now tap the last word, or name it below if it’s just this word.`;
+        else if (selected) step.textContent = `${counter}name the technique below, or tap another word to start again.`;
+        else step.textContent = `${counter}tap the first word of a technique.`;
+      };
+
+      const stateOf = (i: number) => (!result ? 'found' : parts[`s${i}`] ? 'right' : parts[`s${i}.found`] ? 'part' : 'wrong');
+      const paintSpots = () => {
+        picker.paint((n) => {
+          const i = spots.findIndex((s) => n >= s.from && n <= s.to);
+          if (i >= 0) return { state: stateOf(i), ...(n === spots[i]!.from ? { badge: String(i + 1) } : {}) };
+          if (keyTargets.some((t) => n >= t.from && n <= t.to)) return { state: 'answer' };
+          return undefined;
+        });
+        list.replaceChildren();
+        spots.forEach((spot, i) => {
+          const row = el('li', 'qz-spots__row');
+          if (result) row.dataset.state = stateOf(i);
+          row.append(
+            el('span', 'qz-spots__num', String(i + 1)),
+            el('span', 'qz-spots__quote', `“${spanText(passage, spot)}”`),
+            el('span', 'qz-spots__name', optionText.get(spot.option) ?? '')
+          );
+          if (result && stateOf(i) === 'part') row.append(el('span', 'qz-spots__note', 'Right words, wrong technique'));
+          if (!locked) {
+            const remove = el('button', 'qz-icon-btn', '×');
+            remove.type = 'button';
+            remove.setAttribute('aria-label', `Remove “${spanText(passage, spot)}”`);
+            remove.addEventListener('click', () => {
+              spots.splice(i, 1);
+              picker.clear();
+              paintSpots();
+              paintPick(null);
+              emit({ spots: [...spots] });
+            });
+            row.append(remove);
+          }
+          list.append(row);
+        });
+      };
+
+      // The question sits under the line the selection ends on, where the eye already is.
+      function paintPick(span: WordSpan | null): void {
+        pickHost.replaceChildren();
+        if (span && spots.length >= pick) {
+          picker.clear();
+          span = null;
+        }
+        picker.placeAfter(pickHost, span);
+        selected = !!span;
+        paintStep();
+        if (!span) return;
+        const chosen = span;
+        pickHost.append(el('p', 'qz-spot-pick__ask', `“${spanText(passage, chosen)}”: which technique is this?`));
+        const chips = el('div', 'qz-spot-pick__chips');
+        // A technique leaves the list once used up: once, or as many times as the teacher set.
+        const left = (o: { id: string; uses?: number }) => (o.uses ?? 1) - spots.filter((s) => s.option === o.id).length;
+        for (const option of order(choices).filter((o) => left(o) > 0)) {
+          const chip = el('button', 'qz-chip', option.text);
+          chip.type = 'button';
+          chip.addEventListener('click', () => {
+            spots.push({ ...chosen, option: option.id });
+            picker.clear();
+            paintPick(null);
+            paintSpots();
+            emit({ spots: [...spots] });
+          });
+          chips.append(chip);
+        }
+        const cancel = el('button', 'btn btn--ghost', 'Cancel');
+        cancel.type = 'button';
+        cancel.addEventListener('click', () => {
+          picker.clear();
+          paintPick(null);
+        });
+        pickHost.append(chips, cancel);
+        pickHost.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      }
+
+      paintSpots();
+      paintStep();
+      if (keyTargets.length && result?.mark.correct !== true) {
+        body.append(
+          rightAnswer(keyTargets.map((t) => `“${spanText(passage, t)}”: ${t.ids.map((id) => optionText.get(id)).join(' or ')}`).join(' · '))
+        );
+      }
       break;
     }
     case 'true_false': {

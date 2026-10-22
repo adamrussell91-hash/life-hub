@@ -12,7 +12,14 @@ type Deps = {
   confirm(proposalId: string, taskId: string): Promise<void>;
   dismiss(proposalId: string, reason?: 'removed'): Promise<void>;
   setReview(taskId: string, due: string): Promise<void>;
+  /** Which tool the tasks come from (Problem Solver's by default). */
+  origin?: TaskOrigin;
 };
+
+/** How a tool's tasks are labelled in Tasks: its name, source, tag and the word for a session. */
+export type TaskOrigin = { name: string; source: string; tag: string; noun: string; review: string };
+
+export const PS_ORIGIN: TaskOrigin = { name: 'Problem Solver', source: 'problem_solver', tag: 'problem-solver', noun: 'problem', review: 'the plan for "%s" is going, then open the problem to work through Improve' };
 
 export type TaskDetail = { status: string; due_date?: string | null; title?: string } | 'removed' | 'unknown';
 type SnapshotStatus = keyof PsTaskSnapshot['byStatus'];
@@ -50,22 +57,22 @@ function startStatus(session: PsSession, source: PsProposedTask['source'] | unde
   return node?.tag === 'doing' ? 'in_progress' : null;
 }
 
-export function taskBody(session: PsSession, edits: TaskEdits, domain: string, source?: PsProposedTask['source']): Record<string, unknown> {
+export function taskBody(session: PsSession, edits: TaskEdits, domain: string, source?: PsProposedTask['source'], origin: TaskOrigin = PS_ORIGIN): Record<string, unknown> {
   const status = startStatus(session, source);
   return {
     ...(status ? { status } : {}),
     title: edits.title.trim().slice(0, 120),
     domain,
     due_date: edits.due,
-    description: `From Problem Solver: ${session.title}`,
-    source: 'problem_solver',
-    tags: ['problem-solver'],
+    description: `From ${origin.name}: ${session.title}`,
+    source: origin.source,
+    tags: [origin.tag],
     parent_project_id: projectOf(session)
   };
 }
 
-export function reviewBody(session: PsSession, edits: { title: string; due: string }, domain: string): Record<string, unknown> {
-  return { ...taskBody(session, edits, domain), review_at: edits.due, description: `Review how the plan for "${session.title}" is going, then open the problem to work through Improve.`, tags: ['problem-solver', 'review'] };
+export function reviewBody(session: PsSession, edits: { title: string; due: string }, domain: string, origin: TaskOrigin = PS_ORIGIN): Record<string, unknown> {
+  return { ...taskBody(session, edits, domain, undefined, origin), review_at: edits.due, description: `Review how ${origin.review.replace('%s', session.title)}.`, tags: [origin.tag, 'review'] };
 }
 
 /**
@@ -75,10 +82,10 @@ export function reviewBody(session: PsSession, edits: { title: string; due: stri
  */
 export class TaskNotLinkedError extends Error {
   readonly taskId: string;
-  constructor(taskId: string, review = false) {
+  constructor(taskId: string, review = false, noun = 'problem') {
     super(review
-      ? 'The review task was created in Tasks but is not linked to this problem.'
-      : 'The task was created in Tasks but is not linked to this problem.');
+      ? `The review task was created in Tasks but is not linked to this ${noun}.`
+      : `The task was created in Tasks but is not linked to this ${noun}.`);
     this.name = 'TaskNotLinkedError';
     this.taskId = taskId;
   }
@@ -92,6 +99,7 @@ function refused(err: unknown): boolean {
 }
 
 export function createTaskBridge(deps: Deps) {
+  const origin = deps.origin ?? PS_ORIGIN;
   /** Proposal id → created task id, kept until the confirm lands so a retry never creates twice. */
   const created = new Map<string, string>();
   let reviewCreated: string | null = null;
@@ -115,7 +123,7 @@ export function createTaskBridge(deps: Deps) {
     async create(session: PsSession, proposal: PsProposedTask, edits: TaskEdits): Promise<void> {
       let taskId = created.get(proposal.id);
       if (!taskId) {
-        taskId = (await deps.createTask(taskBody(session, edits, await deps.domainFor(session), proposal.source))).id;
+        taskId = (await deps.createTask(taskBody(session, edits, await deps.domainFor(session), proposal.source, origin))).id;
         created.set(proposal.id, taskId);
       }
       try {
@@ -123,19 +131,19 @@ export function createTaskBridge(deps: Deps) {
       } catch (err) {
         if (!refused(err)) throw err;
         created.delete(proposal.id);
-        throw new TaskNotLinkedError(taskId);
+        throw new TaskNotLinkedError(taskId, false, origin.noun);
       }
       created.delete(proposal.id);
     },
     async createReview(session: PsSession, edits: { title: string; due: string }): Promise<void> {
-      if (!reviewCreated) reviewCreated = (await deps.createTask(reviewBody(session, edits, await deps.domainFor(session)))).id;
+      if (!reviewCreated) reviewCreated = (await deps.createTask(reviewBody(session, edits, await deps.domainFor(session), origin))).id;
       const taskId = reviewCreated;
       try {
         await deps.setReview(taskId, edits.due);
       } catch (err) {
         if (!refused(err)) throw err;
         reviewCreated = null;
-        throw new TaskNotLinkedError(taskId, true);
+        throw new TaskNotLinkedError(taskId, true, origin.noun);
       }
       reviewCreated = null;
     },

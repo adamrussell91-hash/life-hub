@@ -1,21 +1,47 @@
 // netlify/functions/_shared/problem-solver/session.mjs
 import { acceptProblem, addEdge, applyScores, canEdge, canPlace, canPropose, isComplete as isRunComplete, newRun, placeNode, toolDef } from '../../../../packages/problem-solver/machine.mjs';
-import { defaultToolFor, firstStep, nextPhase, planStep, planStepForBook, stepName } from '../../../../packages/problem-solver/steps.mjs';
+import { defaultToolFor, firstStep, nextPhase, planStepForBook, stepName, stepServes, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
 import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
+import { parseCompass } from '../../../../packages/decision-book/compass.mjs';
+import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
+import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { mainModel, resolveBasis } from '../../../../packages/decision-book/record.mjs';
+import { outcomeOf } from '../../../../packages/decision-book/quick.mjs';
 
 export { waitingForReview };
 
 const TITLE_MAX = 120;
 const TEXT_MAX = 12000;
 const LINKS_MAX = 20;
-const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone'];
 const PROPOSALS_MAX = 40;
 const REVIEW_AFTER_DAYS = 14;
 const DAY_MS = 86_400_000;
 
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
+
+/**
+ * Frame questions per session kind, and the model a kind starts in once framed (null: the
+ * coach chooses one). Lightning sessions never frame.
+ */
+export const KIND_FRAMES = Object.freeze({
+  full: Object.freeze({ keys: Object.freeze(['goal', 'whatIsTrue', 'whatCanBeDone']), model: null }),
+  decision: Object.freeze({ keys: Object.freeze(['decision', 'compass', 'known']), model: Object.freeze({ id: DECISION_MODEL.id, reason: 'Decision Maker works from The Decision Book.' }) })
+});
+
+export const frameKeysOf = (session) => (KIND_FRAMES[session.kind] ?? KIND_FRAMES.full).keys;
+
+/** The answers of this turn that belong to the session's frame; a compass keeps only known quadrants. */
+function pickFrame(session, frame) {
+  const out = {};
+  for (const key of frameKeysOf(session)) {
+    if (!frame?.[key]) continue;
+    if (key !== 'compass') out[key] = frame[key];
+    else if (parseCompass(frame[key]).length) out.compass = parseCompass(frame[key]).join('+');
+  }
+  return out;
+}
 
 function checkLength(text) {
   if (text.length > TEXT_MAX) throw fail(413, 'limit', 'That is too long; keep it under 12,000 characters.');
@@ -55,7 +81,7 @@ const reviewTitle = (session) => `Review: ${session.title}`.slice(0, TITLE_MAX);
 const addDays = (iso, days) => new Date(Date.parse(iso) + days * DAY_MS).toISOString().slice(0, 10);
 /** A coach date counts only when it is after today; a date in the past cannot be a plan. */
 const afterToday = (due, deps) => typeof due === 'string' && due > deps.now().slice(0, 10);
-const inBook = (session, stepId, book) => Boolean(session.model && planStep(session.model.id, stepId)?.book.includes(book));
+const inBook = (session, stepId, book) => Boolean(session.model && stepServes(session.model.id, stepId, book));
 
 /** A clean snapshot, or null when none was sent. Unknown statuses are dropped; removed tasks are never counted. */
 function cleanSnapshot(raw, deps) {
@@ -92,7 +118,11 @@ function replaceRun(session, run) {
   return { ...session, steps };
 }
 
-export function createSession({ title = '', text, links = [] }, deps) {
+/** A model a decision starts from (picked on the shelf), when it is one Explore offers. */
+const shelfModel = (kind, model) => (kind === 'decision' && typeof model === 'string' && toolsForPlanStep(DECISION_MODEL.id, 'explore').includes(model) ? model : null);
+
+export function createSession({ title = '', text, links = [], kind = 'full', startModel = null }, deps) {
+  if (!KIND_FRAMES[kind]) throw fail(400, 'validation_error', `Unknown session kind: ${kind}`);
   const at = deps.now();
   const clean = String(text ?? '').trim();
   if (!clean) throw fail(400, 'validation_error', 'Describe the problem to start.');
@@ -101,7 +131,7 @@ export function createSession({ title = '', text, links = [] }, deps) {
     id: deps.newId(),
     title: (String(title).trim() || clean).slice(0, TITLE_MAX),
     revision: 0,
-    kind: 'full',
+    kind,
     status: 'active',
     phase: 'frame',
     frame: {},
@@ -125,6 +155,7 @@ export function createSession({ title = '', text, links = [] }, deps) {
     lightning: null,
     escalatedFrom: null,
     frameSeeds: null,
+    ...(shelfModel(kind, startModel) ? { startModel } : {}),
     requestIds: [],
     runner: { status: 'queued', mode: 'turn', error: null },
     createdAt: at,
@@ -160,8 +191,8 @@ export function followOn(session) {
   return { kind: 'next_step', reason: 'This step has what it needs; move on when you are ready.' };
 }
 
-function frameComplete(frame) {
-  return FRAME_KEYS.every((key) => Boolean(frame[key]));
+function frameComplete(session) {
+  return frameKeysOf(session).every((key) => Boolean(session.frame[key]));
 }
 
 const slotToId = (run, slot) => run.nodes.find((node) => node.slot === slot)?.id ?? null;
@@ -179,13 +210,34 @@ function addAllowedEdges(run, edges) {
 
 function placeAccepted(next, turn, coachTurnId, deps) {
   const run = activeRun(next);
-  let placed = placeNode(run, { id: deps.newId(), slot: turn.node.slot, text: turn.node.text, title: turn.node.title, ...(turn.node.tag ? { tag: turn.node.tag } : {}), state: 'accepted', skills: turn.skillsSeen, turnId: coachTurnId });
+  const id = deps.newId();
+  let placed = placeNode(run, { id, slot: turn.node.slot, text: turn.node.text, title: turn.node.title, ...(turn.node.tag ? { tag: turn.node.tag } : {}), state: 'accepted', skills: turn.skillsSeen, turnId: coachTurnId });
   for (const edge of turn.edges) {
     const from = slotToId(placed, edge.from);
     const to = slotToId(placed, edge.to);
     if (canEdge(placed, from, to, edge.kind)) placed = addEdge(placed, { from, to, kind: edge.kind });
   }
-  return { ...replaceRun(next, placed), pendingKeep: null };
+  return recordPlaced({ ...replaceRun(next, placed), pendingKeep: null }, placed, id, turn.basis, deps);
+}
+
+/**
+ * After a node lands in the decision record: a reason keeps the Explore nodes it rests on
+ * (`basis`, on the session, since they sit in other runs), and the review date becomes the
+ * session's review proposal, the page's confirm card (unless one is created or set aside).
+ */
+function recordPlaced(session, run, nodeId, refs, deps) {
+  if (run.tool !== RECORD_ID) return session;
+  const node = run.nodes.find((item) => item.id === nodeId);
+  const name = parseSlot(node.slot)?.name;
+  if (name === 'reason') {
+    const basis = resolveBasis(session, refs);
+    return basis.length ? { ...session, basis: { ...(session.basis ?? {}), [nodeId]: basis } } : session;
+  }
+  const open = !session.reviewTaskId && session.reviewProposal?.status !== 'dismissed';
+  if (name === 'review' && open && afterToday(node.text, deps)) {
+    return { ...session, reviewProposal: { title: reviewTitle(session), due: node.text, reason: 'The review date set in the decision record.', status: 'proposed' } };
+  }
+  return session;
 }
 
 /** The tool suggestion a new step opens with when the coach forgets to give one. */
@@ -220,10 +272,11 @@ export function applyCoachTurn(session, turn, deps) {
     if (leaving && next.steps[leaving] && next.steps[leaving].status !== 'waiting') next = withStep(next, leaving, { objection: turn.exitObjection ?? next.steps[leaving].objection });
     next = { ...next, pendingLearning: leaving && !skippedUntouched(next.steps[leaving]) ? leaving : null };
   } else if (next.phase === 'frame') {
-    if (turn.verdict === 'accept' && turn.frame) next = { ...next, frame: { ...next.frame, ...turn.frame } };
-    if (frameComplete(next.frame) && turn.model) {
-      const first = firstStep(turn.model.id);
-      next = { ...next, model: turn.model, phase: first, steps: { [first]: emptyStep() } };
+    if (turn.verdict === 'accept' && turn.frame) next = { ...next, frame: { ...next.frame, ...pickFrame(next, turn.frame) } };
+    const model = (KIND_FRAMES[next.kind] ?? KIND_FRAMES.full).model ?? turn.model;
+    if (frameComplete(next) && model) {
+      const first = firstStep(model.id);
+      next = { ...next, model: { id: model.id, reason: model.reason }, phase: first, steps: { [first]: emptyStep() } };
     }
   } else if (currentStep(next)) {
     const run = activeRun(next);
@@ -234,7 +287,7 @@ export function applyCoachTurn(session, turn, deps) {
     } else if (run && !turn.node && turn.verdict === 'accept' && turn.edges?.length) {
       next = replaceRun(next, addAllowedEdges(run, turn.edges));
     } else if (run && turn.node && turn.verdict === 'challenge') {
-      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, tag: turn.node.tag, edges: turn.edges ?? [], objection: turn.message, skills: turn.skillsSeen, runId: run.id } };
+      next = { ...next, pendingKeep: { slot: turn.node.slot, text: turn.node.text, title: turn.node.title, tag: turn.node.tag, edges: turn.edges ?? [], objection: turn.message, skills: turn.skillsSeen, runId: run.id, ...(turn.basis?.length ? { basis: turn.basis } : {}) } };
     }
   }
 
@@ -252,7 +305,9 @@ export function applyCoachTurn(session, turn, deps) {
   // Leaving a step untouched asks no learning question, so the next step's opening tool comes at once.
   const untouched = mode === 'boundary' && skippedUntouched(next.steps?.[session.runner?.leaving]);
   const quiet = next.phase === 'finished' || (mode === 'boundary' && !untouched) || waitingForReview(next);
-  const suggestion = quiet ? null : (turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
+  // A decision started from a model on the shelf opens on that model once it is framed.
+  const shelf = session.phase === 'frame' && next.phase !== 'frame' && next.startModel ? { kind: 'next_tool', tool: next.startModel, reason: 'You started from this model on the shelf.' } : null;
+  const suggestion = quiet ? null : (shelf ?? turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
   return touch({ ...next, turns: [...next.turns, coachTurn], suggestion, summary: turn.summary ?? next.summary }, deps);
 }
 
@@ -263,13 +318,15 @@ export function keepAnyway(session, deps) {
   if (!canPlace(run, keep.slot)) throw fail(409, 'action_not_allowed', 'That answer no longer fits here.');
   const refused = acceptProblem(run, keep);
   if (refused) throw fail(409, 'action_not_allowed', refused);
-  let placed = placeNode(run, { id: deps.newId(), slot: keep.slot, text: keep.text, title: keep.title, ...(keep.tag ? { tag: keep.tag } : {}), state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
+  const id = deps.newId();
+  let placed = placeNode(run, { id, slot: keep.slot, text: keep.text, title: keep.title, ...(keep.tag ? { tag: keep.tag } : {}), state: 'contested', objection: keep.objection, skills: keep.skills, turnId: null });
   for (const edge of keep.edges ?? []) {
     const from = slotToId(placed, edge.from);
     const to = slotToId(placed, edge.to);
     if (canEdge(placed, from, to, edge.kind)) placed = addEdge(placed, { from, to, kind: edge.kind });
   }
-  return touch({ ...replaceRun(session, placed), pendingKeep: null, turns: [...session.turns, userTurn('Keep it anyway.', deps)] }, deps);
+  const next = recordPlaced({ ...replaceRun(session, placed), pendingKeep: null }, placed, id, keep.basis, deps);
+  return touch({ ...next, turns: [...session.turns, userTurn('Keep it anyway.', deps)] }, deps);
 }
 
 /**
@@ -493,15 +550,21 @@ function cleanDigests(raw) {
 
 const sameTarget = (a, b) => Boolean(a && b) && a.kind === b.kind && a.id === b.id;
 
+/** A session that writes a page record: Problem Solver's case file (a Document step) or a decision record. */
+const keepsRecord = (session) => Boolean(session.model && (planStepForBook(session.model.id, 'document') || session.kind === 'decision'));
+
 /**
  * The page wrote the case file (or an update) to a task or project page; record it. No coach call.
  * A first write or a move (`moved`: the old page is gone) replaces the section digests; an update
  * merges them and must be the next version on the same page. The same version on the same page
  * again is a no-op, so a retry after a lost response is safe. The page joins the problem's links.
+ * A decision record also says whether its provenance graphic wrote (`graphic`); the same version
+ * on the same page with `graphic: true` records a retried graphic.
  */
 export function linkCaseFile(session, payload, deps) {
   if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
-  if (!session.model || !planStepForBook(session.model.id, 'document')) throw fail(409, 'action_not_allowed', 'This problem has no Document step.');
+  if (!keepsRecord(session)) throw fail(409, 'action_not_allowed', 'This problem has no Document step.');
+  const graphic = session.kind === 'decision' && typeof payload?.graphic === 'boolean' ? { graphic: payload.graphic } : {};
   const target = cleanTarget(payload?.target);
   const version = payload?.version;
   if (!Number.isInteger(version) || version < 1 || version > 999) throw fail(400, 'validation_error', 'A case file version is required.');
@@ -509,7 +572,9 @@ export function linkCaseFile(session, payload, deps) {
   if (!title) throw fail(400, 'validation_error', 'A case file title is required.');
   const sections = cleanDigests(payload?.sections);
   const record = session.caseFile;
-  if (record && record.version === version && sameTarget(record.target, target)) return session;
+  if (record && record.version === version && sameTarget(record.target, target)) {
+    return graphic.graphic === true && record.graphic === false ? touch({ ...session, caseFile: { ...record, graphic: true } }, deps) : session;
+  }
   const moved = payload?.moved === true;
   if (record && version !== record.version + 1) throw fail(409, 'action_not_allowed', `The next case file version is v${record.version + 1}.`);
   if (record && !moved && !sameTarget(record.target, target)) throw fail(409, 'action_not_allowed', 'An update goes on the page the case file is already on.');
@@ -520,7 +585,8 @@ export function linkCaseFile(session, payload, deps) {
     target,
     writtenAt: at,
     sections: record && !moved ? { ...record.sections, ...sections } : sections,
-    history: [...(record?.history ?? []), { version, at, target }]
+    history: [...(record?.history ?? []), { version, at, target }],
+    ...graphic
   };
   const linked = session.links.some((link) => sameTarget(link, target));
   const links = linked ? session.links : [...session.links, target];
@@ -562,13 +628,17 @@ export function summaryRow(session) {
     phase: session.phase,
     model: session.model?.id ?? null,
     tool: last?.tool ?? null,
-    frame: FRAME_KEYS.filter((key) => Boolean(session.frame?.[key])).length,
+    frame: frameKeysOf(session).filter((key) => Boolean(session.frame?.[key])).length,
     skills: skillCounts(session.turns),
     links: session.links,
     taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
     reviewTaskId: session.reviewTaskId ?? null,
     reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
-    escalatedTo: session.lightning?.escalatedTo ?? null,
+    escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? null,
+    // A quick decision's row says how its latest round came out.
+    ...(session.kind === 'quick' ? { outcome: outcomeOf(session.quick) } : {}),
+    // A decision's medal shows the model its reasons lean on most.
+    ...(session.kind === 'decision' ? { main: mainModel(session) } : {}),
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   };

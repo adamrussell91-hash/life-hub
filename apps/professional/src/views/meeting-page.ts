@@ -3,7 +3,6 @@ import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
 import {
-  createTask,
   createUniversalLink,
   endUniversalLink,
   listUniversalLinksForEntity
@@ -14,10 +13,12 @@ import { ApiClientError } from '@/api/client';
 import { mountBlockPage, type BlockPageHandle } from '@/components/block-page';
 import { mountComposeWhen } from '@/components/compose-when';
 import { buildMeetingTaskLinks, roleLabel } from '@/views/meetings';
+import { makeActionTask } from '@/lib/action-task';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
 import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
-import { groupRoom, type RoomCluster } from '@/lib/room';
+import { groupRoom, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
+import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
 import { searchPickerPeople } from '@/lib/person-picker';
 import { utcIsoToWallLocal, wallLocalToUtcIso } from '@/lib/wall-time';
@@ -41,7 +42,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   return node;
 }
 
-type Attendee = { linkId: string; ref: string; role: string | null; name: string };
+type Attendee = { linkId: string; ref: string; role: string | null; name: string; organisationRef: string | null };
 type OpenPromise = { id: string; text: string; direction: 'you_owe' | 'they_owe'; personName: string };
 
 const STATE_LABEL: Record<string, string> = {
@@ -84,8 +85,40 @@ async function loadAttendees(meetingRef: string): Promise<Attendee[]> {
       linkId: entry.link.id,
       ref: entry.endpoint!.ref,
       role: entry.link.role ?? null,
-      name: entry.endpoint!.display_label
+      name: entry.endpoint!.display_label,
+      organisationRef: typeof entry.link.metadata?.organisation_ref === 'string' ? entry.link.metadata.organisation_ref : null
     }));
+}
+
+/**
+ * You, shaped as a directory row: People leaves you out, but the room needs
+ * your workplaces to tell which job a colleague with several is here for.
+ */
+async function loadSelfRow(): Promise<RoomDirectoryRow | null> {
+  try {
+    const { self, workplaces = [] } = await fetchSelfPerson({ workplaces: true });
+    if (!self) return null;
+    const organisations = workplaces.map((org) => ({
+      ref: org.ref,
+      display_name: org.display_name,
+      monogram: initialsFor(org.display_name),
+      logo_key: null,
+      current: true
+    }));
+    const name = self.display_name ?? 'You';
+    return {
+      ref: self.ref,
+      display_name: name,
+      initials: initialsFor(name),
+      organisation: organisations[0] ?? null,
+      organisations,
+      warmth_band: 'warm',
+      created_at: '1970-01-01T00:00:00.000Z',
+      is_self: true
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function loadDirectory(): Promise<DirectoryPersonRow[]> {
@@ -108,16 +141,20 @@ export async function renderMeetingPage(
   let record: MeetingRecord;
   let attendees: Attendee[];
   let directory: DirectoryPersonRow[];
+  let selfRow: RoomDirectoryRow | null;
   let ledger: LedgerItem[];
   try {
-    const [meetingResult, loadedAttendees, loadedDirectory, ledgerResult] = await Promise.all([
+    const [meetingResult, loadedAttendees, loadedDirectory, ledgerResult, loadedSelf] = await Promise.all([
       getMeeting(id),
       loadAttendees(meetingRef),
       loadDirectory(),
-      listLedgerForSources([meetingRef])
+      listLedgerForSources([meetingRef]),
+      loadSelfRow()
     ]);
     record = meetingResult.meeting;
-    attendees = loadedAttendees;
+    selfRow = loadedSelf;
+    // You're in every meeting: never listed, never named to Clare.
+    attendees = loadedAttendees.filter((attendee) => !isSelfAttendee(attendee, selfRow));
     directory = loadedDirectory;
     ledger = ledgerResult.items;
   } catch (err) {
@@ -243,7 +280,7 @@ export async function renderMeetingPage(
   let prepPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-preparation"]');
   let followPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-follow_up"]');
   const tagCard = el('section', 'card meeting-page__tags');
-  mountTagAnythingSection(tagCard, meetingRef);
+  const tags = mountTagAnythingSection(tagCard, meetingRef);
   side.append(roomHost, taskLinks, tagCard);
   const grid = el('div', 'meeting-page__grid');
   grid.append(main, side);
@@ -331,12 +368,29 @@ export async function renderMeetingPage(
 
   // ── The room: attendees by organisation, add / remove ──
   function paintRoom(): void {
-    const room = groupRoom(attendees, directory, new Date());
-    roomHost.replaceChildren(roomCard(room, attendees, async (attendee) => {
-      await endUniversalLink(attendee.linkId);
-      attendees = attendees.filter((entry) => entry.linkId !== attendee.linkId);
-      people = attendees.map((entry) => ({ ref: entry.ref, name: entry.name }));
-      paintRoom();
+    const room = groupRoom(attendees, directory, new Date(), selfRow);
+    roomHost.replaceChildren(roomCard(room, attendees, {
+      onRemove: async (attendee) => {
+        await endUniversalLink(attendee.linkId);
+        attendees = attendees.filter((entry) => entry.linkId !== attendee.linkId);
+        people = attendees.map((entry) => ({ ref: entry.ref, name: entry.name }));
+        paintRoom();
+      },
+      // A link's metadata never changes in place: end it and add the same person
+      // again with the organisation they're here for.
+      onPickOrganisation: async (attendee, organisationRef) => {
+        await endUniversalLink(attendee.linkId);
+        const { link } = await createUniversalLink({
+          source_ref: meetingRef,
+          target_ref: attendee.ref,
+          relationship_type: 'attendee',
+          role: attendee.role,
+          occurred_at: new Date().toISOString(),
+          metadata: { organisation_ref: organisationRef }
+        });
+        attendees = attendees.map((entry) => (entry.linkId === attendee.linkId ? { ...entry, linkId: link.id, organisationRef } : entry));
+        paintRoom();
+      }
     }));
     roomHost.append(addPersonRow());
   }
@@ -361,7 +415,7 @@ export async function renderMeetingPage(
       mode: 'field',
       search: (query, signal) => searchPickerPeople(query, signal),
       onSelect: async (item) => {
-        if (attendees.some((attendee) => attendee.ref === item.ref)) {
+        if (isSelfAttendee({ ref: item.ref, name: item.display_label }, selfRow) || attendees.some((attendee) => attendee.ref === item.ref)) {
           input.value = '';
           return;
         }
@@ -373,7 +427,7 @@ export async function renderMeetingPage(
             relationship_type: 'attendee',
             role: picked
           });
-          attendees = [...attendees, { linkId: link.id, ref: item.ref, role: picked, name: item.display_label }];
+          attendees = [...attendees, { linkId: link.id, ref: item.ref, role: picked, name: item.display_label, organisationRef: null }];
           people = attendees.map((entry) => ({ ref: entry.ref, name: entry.name }));
           paintRoom();
         } catch (err) {
@@ -382,7 +436,8 @@ export async function renderMeetingPage(
         }
       }
     });
-    wrap.append(input, picker.root, role.root, status);
+    // Choice first, then the field: the same order as the task panels.
+    wrap.append(role.root, input, picker.root, status);
     return wrap;
   }
 
@@ -834,10 +889,15 @@ export async function renderMeetingPage(
         toggle.disabled = Boolean(item.task_ref);
         toggle.addEventListener('click', async () => {
           toggle.disabled = true;
-          const task = await createTask({ title: item.text });
-          Object.assign(item, (await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` })).item);
-          toggle.setAttribute('aria-checked', 'true');
-          toggle.title = 'Task made';
+          try {
+            Object.assign(item, await makeActionTask(item, meetingRef));
+            toggle.setAttribute('aria-checked', 'true');
+            toggle.title = 'Task made';
+            void tags.refresh();
+          } catch (err) {
+            toggle.disabled = false;
+            toggle.title = err instanceof ApiClientError ? `Couldn't make the task: ${err.message}` : "Couldn't make the task. Try again.";
+          }
         });
         row.append(toggle);
         mine.append(row);
@@ -896,7 +956,52 @@ export async function renderMeetingPage(
   scheduleClock();
 }
 
-function roomCard(room: RoomCluster[], attendees: Attendee[], onRemove: (attendee: Attendee) => Promise<void>): DocumentFragment {
+/** "Here for": which of someone's jobs this meeting is about. */
+function organisationPicker(
+  person: RoomPerson,
+  attendee: Attendee,
+  onPick: (attendee: Attendee, organisationRef: string) => Promise<void>
+): { toggle: HTMLButtonElement; panel: HTMLElement } {
+  const toggle = el('button', 'quiet-link room__job-toggle', 'Here for…') as HTMLButtonElement;
+  toggle.type = 'button';
+  toggle.dataset.part = 'room-job-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.title = `Which of ${person.name}'s organisations this meeting is for`;
+  const panel = el('div', 'room__job');
+  panel.dataset.part = 'room-job';
+  panel.hidden = true;
+  const status = el('p', 'meeting-form__status');
+  status.hidden = true;
+  const pills = createPillGroup({
+    label: `${person.name} is here for`,
+    choices: person.organisationChoices.map((org) => [org.ref, org.display_name] as const),
+    value: person.organisationRef ?? person.organisationChoices[0]!.ref,
+    onChange: async (ref) => {
+      status.hidden = true;
+      try {
+        await onPick(attendee, ref);
+      } catch (err) {
+        status.hidden = false;
+        status.textContent = err instanceof ApiClientError ? err.message : 'Could not save that.';
+      }
+    }
+  });
+  panel.append(pills.root, status);
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+  });
+  return { toggle, panel };
+}
+
+function roomCard(
+  room: RoomCluster[],
+  attendees: Attendee[],
+  actions: {
+    onRemove: (attendee: Attendee) => Promise<void>;
+    onPickOrganisation: (attendee: Attendee, organisationRef: string) => Promise<void>;
+  }
+): DocumentFragment {
   const frag = document.createDocumentFragment();
   const count = room.reduce((total, cluster) => total + cluster.people.length, 0);
   frag.append(el('h3', undefined, count ? `The room · ${count}` : 'The room'));
@@ -920,6 +1025,8 @@ function roomCard(room: RoomCluster[], attendees: Attendee[], onRemove: (attende
       const dots = el('span', 'room__warmth');
       dots.setAttribute('aria-label', `Warmth ${person.warmthDots} of 3`);
       for (let i = 1; i <= 3; i += 1) dots.append(el('i', i <= person.warmthDots ? 'is-on' : ''));
+      const jobs = attendee && person.organisationChoices.length > 1 ? organisationPicker(person, attendee, actions.onPickOrganisation) : null;
+      if (jobs) row.append(jobs.toggle);
       row.append(dots);
       if (attendee) {
         const remove = el('button', 'hub-icon-btn room__remove', '×') as HTMLButtonElement;
@@ -929,7 +1036,7 @@ function roomCard(room: RoomCluster[], attendees: Attendee[], onRemove: (attende
         remove.addEventListener('click', async () => {
           remove.disabled = true;
           try {
-            await onRemove(attendee);
+            await actions.onRemove(attendee);
           } catch {
             remove.disabled = false;
           }
@@ -937,6 +1044,7 @@ function roomCard(room: RoomCluster[], attendees: Attendee[], onRemove: (attende
         row.append(remove);
       }
       group.append(row);
+      if (jobs) group.append(jobs.panel);
     }
     frag.append(group);
   }

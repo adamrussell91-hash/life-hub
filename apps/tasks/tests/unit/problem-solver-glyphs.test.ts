@@ -24,10 +24,11 @@ describe('skill glyphs', () => {
 });
 
 describe('tool emblems', () => {
-  it('every tool has an emblem in book colours with no ids', async () => {
+  it('every toolkit tool has an emblem in book colours with no ids', async () => {
     const { toolEmblem } = await import('../../../../packages/problem-solver/glyphs');
     const { TOOLS } = await import('../../../../packages/problem-solver/tools/index.mjs');
-    for (const id of Object.keys(TOOLS) as Array<keyof typeof TOOLS>) {
+    // Decision Maker's models (dm_) carry their own emblems in packages/decision-book/glyphs.
+    for (const id of (Object.keys(TOOLS) as Array<keyof typeof TOOLS>).filter((key) => !String(key).startsWith('dm_'))) {
       const emblem = toolEmblem(id);
       expect(emblem.className).toBe('ps-emblem');
       expect(emblem.getAttribute('aria-hidden')).toBe('true');

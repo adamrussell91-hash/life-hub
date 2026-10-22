@@ -22,7 +22,7 @@ export const EVENT_OCCURRENCE_STATES = new Set([
 export const EVENT_STATE_TRANSITIONS = Object.freeze({
   scheduled: Object.freeze(['completed', 'cancelled', 'rescheduled']),
   rescheduled: Object.freeze(['completed', 'cancelled', 'rescheduled', 'scheduled']),
-  completed: Object.freeze([]),
+  completed: Object.freeze(['scheduled']),
   cancelled: Object.freeze([])
 });
 

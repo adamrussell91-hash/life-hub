@@ -69,4 +69,42 @@ describe('groupRoom', () => {
     expect(people.find((p) => p.ref === 'shared:person:student-rohan')?.student).toBe(true);
     expect(people.find((p) => p.ref === directory[0]!.ref)?.student).toBe(false);
   });
+
+  it('puts someone with several jobs under the organisation others in the room share', () => {
+    const halt = { ref: 'shared:organisation:HALT NSW', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true };
+    const club = { ref: 'shared:organisation:Greyhounds', display_name: 'Greyhounds', monogram: 'G', logo_key: null, current: true };
+    const twoJobs = { ...row('shared:person:bea', 'Bea D.', null, 'warm'), organisation: club, organisations: [club, halt] };
+    const people = [...directory, twoJobs];
+    const room = groupRoom([{ ref: 'shared:person:bea', role: null }, { ref: 'shared:person:rachel', role: 'chair' }], people, new Date('2026-09-24T08:00:00.000Z'));
+    expect(room.map((cluster) => cluster.organisation)).toEqual(['HALT NSW']);
+    const bea = room[0]!.people.find((person) => person.name === 'Bea D.')!;
+    expect(bea.organisationRef).toBe(halt.ref);
+    expect(bea.organisationChoices.map((org) => org.display_name)).toEqual(['Greyhounds', 'HALT NSW']);
+
+    const alone = groupRoom([{ ref: 'shared:person:bea', role: null }], people, new Date('2026-09-24T08:00:00.000Z'));
+    expect(alone[0]!.organisation).toBe('Greyhounds');
+
+    const picked = groupRoom(
+      [{ ref: 'shared:person:bea', role: null, organisationRef: club.ref }, { ref: 'shared:person:rachel', role: 'chair' }],
+      people,
+      new Date('2026-09-24T08:00:00.000Z')
+    );
+    expect(picked.map((cluster) => cluster.organisation).sort()).toEqual(['Greyhounds', 'HALT NSW']);
+  });
+
+  it('never lists you, by ref or by a copy with your name, yet your workplace still pulls a two-job colleague', () => {
+    const halt = { ref: 'shared:organisation:HALT NSW', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true };
+    const club = { ref: 'shared:organisation:Greyhounds', display_name: 'Greyhounds', monogram: 'G', logo_key: null, current: true };
+    const twoJobs = { ...row('shared:person:bea', 'Bea D.', null, 'warm'), organisation: club, organisations: [club, halt] };
+    const me = { ...row('shared:person:me', 'Sam Writer', null, 'warm'), organisation: halt, is_self: true };
+    const room = groupRoom(
+      [{ ref: 'shared:person:bea', role: null }, { ref: 'shared:person:me', role: 'chair' }, { ref: 'shared:person:me-copy', role: null, name: 'Sam Writer' }],
+      [...directory, twoJobs],
+      new Date('2026-09-24T08:00:00.000Z'),
+      me
+    );
+    const names = room.flatMap((cluster) => cluster.people.map((person) => person.name));
+    expect(names).toEqual(['Bea D.']);
+    expect(room[0]!.organisation).toBe('HALT NSW');
+  });
 });

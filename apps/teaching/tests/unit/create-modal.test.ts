@@ -308,6 +308,38 @@ describe('mountCreateControl', () => {
     expect(labels.some((label) => /year\s*12/i.test(label))).toBe(false);
   });
 
+  it('lesson unit picker lists only active units with a real year and subject, grouped', () => {
+    const extraUnits: Unit[] = [
+      { ...unitPartial, id: 'unit_archived', title: 'Archived Unit', status: 'archived' },
+      { ...unitPartial, id: 'unit_trashed', title: 'Trashed Unit', status: 'trashed' },
+      { ...unitPartial, id: 'unit_orphan', title: 'Orphan Unit', subject_id: 'subject_gone' },
+      {
+        ...unitPartial,
+        id: 'unit_psych',
+        title: 'Memory',
+        year_id: 'year_11',
+        subject_id: 'subject_psych'
+      }
+    ];
+    const result = mountCreateControl(host, {
+      context: 'lessons',
+      curriculum: { ...curriculum, units: [...curriculum.units, ...extraUnits] },
+      onCreated: vi.fn()
+    });
+    dispose = result.dispose;
+
+    host.querySelector<HTMLButtonElement>('[data-create-trigger]')?.click();
+
+    const unitSelect = document.querySelector<HTMLSelectElement>(
+      '[data-create-field="unit_id"]'
+    );
+    expect(unitSelect).toBeTruthy();
+    const values = [...(unitSelect?.options ?? [])].map((opt) => opt.value).filter(Boolean);
+    expect(values).toEqual(['unit_psych', 'unit_partial']);
+    const groups = [...(unitSelect?.querySelectorAll('optgroup') ?? [])].map((g) => g.label);
+    expect(groups).toEqual(['Year 11 · Psychology', 'Year 12 · English Advanced']);
+  });
+
   it('Create Subject requests only a title and calls postSubject', async () => {
     const created = { ...psychology, id: 'subject_new', title: 'History' };
     vi.mocked(postSubject).mockResolvedValue(created);

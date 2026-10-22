@@ -2,12 +2,14 @@
 import { isSkillId } from '../../../../packages/problem-solver/skills.mjs';
 import { MODEL_IDS } from '../../../../packages/problem-solver/models.mjs';
 import { TOOL_IDS } from '../../../../packages/problem-solver/tools/index.mjs';
+import { CATALOGUE_IDS } from '../../../../packages/decision-book/catalogue.mjs';
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightning.mjs';
+import { QUICK_NODE_IDS } from '../../../../packages/decision-book/quick.mjs';
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
 
 const VERDICTS = ['accept', 'challenge', 'clarify'];
-const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone'];
+const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone', 'decision', 'compass', 'known'];
 const TEXT_MAX = 600;
 
 /** First balanced JSON object in text, or null. */
@@ -45,6 +47,11 @@ export function isDate(value) {
 function suggestionOf(raw) {
   if (!raw || typeof raw !== 'object') return { value: null };
   const reason = text(raw.reason, 300) ?? '';
+  // next_model is Decision Maker's name for next_tool, limited to the book's models.
+  if (raw.kind === 'next_model') {
+    if (!CATALOGUE_IDS.includes(raw.tool) || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown model in suggestion: ${raw.tool}` };
+    return { value: { kind: 'next_tool', tool: raw.tool, reason } };
+  }
   if (raw.kind === 'next_tool' || raw.kind === 'switch_tool') {
     if (!TOOL_IDS.includes(raw.tool)) return { error: `Unknown tool in suggestion: ${raw.tool}` };
     return { value: { kind: raw.kind, tool: raw.tool, reason } };
@@ -103,6 +110,16 @@ export function validateCoachTurn(raw) {
     lightning = { node: raw.lightning.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}) };
   }
 
+  // A quick decision's step: Lightning's shape, plus the three tests at the tests box.
+  let quick = null;
+  if (raw.quick != null) {
+    if (!QUICK_NODE_IDS.includes(raw.quick?.node)) return fail(`Unknown quick decision box: ${raw.quick?.node}`);
+    const answer = ['yes', 'no'].includes(raw.quick.answer) ? raw.quick.answer : null;
+    const note = text(raw.quick.note);
+    const tests = Array.isArray(raw.quick.tests) ? raw.quick.tests.map((item) => text(item, 120)).filter(Boolean).slice(0, 3) : [];
+    quick = { node: raw.quick.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}), ...(tests.length ? { tests } : {}) };
+  }
+
   const proposeTasks = [];
   for (const item of Array.isArray(raw.proposeTasks) ? raw.proposeTasks.slice(0, 5) : []) {
     const title = text(item?.title, 120);
@@ -110,6 +127,12 @@ export function validateCoachTurn(raw) {
     proposeTasks.push({ slot: item.slot, title, due: isDate(item.due) ? item.due : null });
   }
   const proposeReview = raw.proposeReview && isDate(raw.proposeReview.due) ? { due: raw.proposeReview.due, reason: text(raw.proposeReview.reason, 300) ?? '' } : null;
+  // A decision record reason's basis: the Explore nodes it rests on, by model id and slot. Items
+  // that are not shaped right are dropped; the session keeps only those naming a placed node.
+  const basis = (Array.isArray(raw.basis) ? raw.basis : [])
+    .filter((item) => typeof item?.tool === 'string' && parseSlot(item?.slot))
+    .slice(0, 4)
+    .map((item) => ({ tool: item.tool, slot: item.slot }));
 
   return {
     ok: true,
@@ -127,8 +150,10 @@ export function validateCoachTurn(raw) {
       exitObjection: text(raw.exitObjection, 400),
       learning: text(raw.learning, 600),
       lightning,
+      ...(quick ? { quick } : {}),
       proposeTasks,
-      proposeReview
+      proposeReview,
+      basis
     }
   };
 }
