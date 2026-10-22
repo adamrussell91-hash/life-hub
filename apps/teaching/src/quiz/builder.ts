@@ -3,6 +3,7 @@ import {
   QUIZ_LIMITS,
   blankQuestion,
   checkQuestion,
+  locateQuote,
   parseGapPassage,
   segmentPassage,
   writeGapPassage,
@@ -13,6 +14,7 @@ import {
 } from '@/quiz/core';
 import { loadLiteraryElements, type LiteraryTechnique } from '@/blocks/literary-elements';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
+import { mountWordPicker, spanText } from '@/quiz/word-picker';
 import './quiz.css';
 
 /**
@@ -108,6 +110,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       categorise: 'Sort each quote into the right group.',
       quote_technique: 'Which technique is used in this quote?',
       find_it: 'Which line shows the speaker’s anger?',
+      spot_technique: 'Find two techniques the poet uses and name them.',
       label_image: 'Label the parts of the diagram.',
       explain_effect: 'Explain the effect of this technique on the reader.'
     };
@@ -147,6 +150,8 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
         return categoriseEditor(q);
       case 'find_it':
         return findItEditor(q);
+      case 'spot_technique':
+        return spotEditor(q);
       case 'label_image':
         return labelImageEditor(q);
       case 'extended_response':
@@ -693,6 +698,179 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       lines
     );
     paintLines();
+    return wrap;
+  }
+
+  function spotEditor(question: QuizQuestionOf<'spot_technique'>): HTMLElement {
+    const wrap = el('div', 'qz-group');
+    const passage = textArea(question.passage, QUIZ_LIMITS.passage, 5, 'Paste a passage or a few lines of a poem.');
+    const refresh = () => {
+      if (passage.value === question.passage) return;
+      question.passage = passage.value;
+      paintBody();
+      emit();
+    };
+    passage.addEventListener('change', refresh);
+    passage.addEventListener('blur', refresh);
+    wrap.append(labelled('Passage', passage));
+
+    // Techniques students choose from: the right ones and some that aren't.
+    const listId = uid('qz-techniques');
+    const datalist = el('datalist');
+    datalist.id = listId;
+    wrap.append(datalist);
+    let techniques: LiteraryTechnique[] = [];
+    void loadLiteraryElements().then((table) => {
+      techniques = table.techniques;
+      for (const t of techniques) {
+        const option = el('option');
+        option.value = t.name;
+        datalist.append(option);
+      }
+    });
+    wrap.append(el('p', 'qz-group__title', 'Techniques students choose from'));
+    let paintAnswers = () => {};
+    const rows = el('ul', 'qz-rows');
+    question.options.forEach((option, i) => {
+      const row = el('li', 'qz-row');
+      const text = textInput(option.text, QUIZ_LIMITS.option, i === 0 ? 'Start typing, e.g. Simile' : `Technique ${i + 1}`);
+      text.setAttribute('list', listId);
+      text.setAttribute('aria-label', `Technique ${i + 1}`);
+      text.addEventListener('input', () => {
+        option.text = text.value;
+        const hit = techniques.find((t) => t.name.toLowerCase() === text.value.trim().toLowerCase());
+        if (hit) option.technique_id = hit.id;
+        else delete option.technique_id;
+        paintAnswers();
+        emit();
+      });
+      row.append(text);
+      if (question.options.length > 2) {
+        row.append(
+          iconButton('×', `Remove technique ${i + 1}`, () => {
+            question.options.splice(i, 1);
+            for (const target of question.targets) target.correct = target.correct.filter((id) => id !== option.id);
+            paintBody();
+            emit();
+          })
+        );
+      }
+      rows.append(row);
+    });
+    wrap.append(rows);
+    if (question.options.length < 10) {
+      wrap.append(
+        button('Add technique', 'ghost', () => {
+          question.options.push({ id: newId(), text: '' });
+          paintBody();
+          focusLast(bodyHost, '.qz-row .qz-input');
+          emit();
+        })
+      );
+    }
+
+    if (!question.passage.trim()) {
+      wrap.append(el('p', 'qz-field__hint', 'Once the passage is in, select the words of each answer here.'));
+      return wrap;
+    }
+
+    wrap.append(
+      el('p', 'qz-group__title', 'Answers'),
+      el('p', 'qz-field__hint', 'Tap the first and last word of a technique, then tick every name you’d accept. Students who select a few words more or less still get it.')
+    );
+    const picker = mountWordPicker({ passage: question.passage, label: 'Passage: select an answer', onSelect: (span) => paintPick(span) });
+    const pickHost = el('div', 'qz-spot-pick');
+    pickHost.hidden = true;
+    wrap.append(picker.root, pickHost);
+    const spans = question.targets.map((t) => locateQuote(question.passage, t.quote));
+    picker.paint((n) => {
+      const i = spans.findIndex((s) => !!s && n >= s.from && n <= s.to);
+      return i < 0 ? undefined : { state: 'answer', ...(n === spans[i]!.from ? { badge: String(i + 1) } : {}) };
+    });
+
+    function paintPick(span: { from: number; to: number } | null): void {
+      pickHost.replaceChildren();
+      pickHost.hidden = !span;
+      if (!span) return;
+      const named = question.options.filter((o) => o.text.trim());
+      if (!named.length) {
+        pickHost.append(el('p', 'qz-spot-pick__ask', 'Fill in the techniques first.'));
+        return;
+      }
+      const ticked = new Set<string>();
+      pickHost.append(el('p', 'qz-spot-pick__ask', `“${spanText(question.passage, span)}”: which technique is it?`));
+      const chips = el('div', 'qz-spot-pick__chips');
+      const add = button('Add this answer', 'primary', () => {
+        question.targets.push({ id: newId(), quote: spanText(question.passage, span), correct: [...ticked] });
+        paintBody();
+        emit();
+      });
+      add.disabled = true;
+      for (const option of named) {
+        const chip = el('button', 'qz-chip', option.text.trim());
+        chip.type = 'button';
+        chip.setAttribute('aria-pressed', 'false');
+        chip.addEventListener('click', () => {
+          if (ticked.has(option.id)) ticked.delete(option.id);
+          else ticked.add(option.id);
+          chip.setAttribute('aria-pressed', String(ticked.has(option.id)));
+          add.disabled = !ticked.size;
+        });
+        chips.append(chip);
+      }
+      const actions = el('div', 'qz-actions');
+      actions.append(
+        add,
+        button('Cancel', 'ghost', () => {
+          picker.clear();
+          paintPick(null);
+        })
+      );
+      pickHost.append(chips, actions);
+    }
+
+    const list = el('ol', 'qz-spots');
+    paintAnswers = () => {
+      const names = new Map(question.options.map((o) => [o.id, o.text.trim()]));
+      list.replaceChildren();
+      question.targets.forEach((target, i) => {
+        const row = el('li', 'qz-spots__row');
+        row.append(
+          el('span', 'qz-spots__num', String(i + 1)),
+          el('span', 'qz-spots__quote', `“${target.quote}”`),
+          el('span', 'qz-spots__name', target.correct.map((id) => names.get(id)).filter(Boolean).join(' or ') || 'No technique')
+        );
+        if (!spans[i]) {
+          row.dataset.state = 'wrong';
+          row.append(el('span', 'qz-spots__note', 'Not in the passage any more'));
+        }
+        row.append(
+          iconButton('×', `Remove answer ${i + 1}`, () => {
+            question.targets.splice(i, 1);
+            if (question.find && question.find > question.targets.length) delete question.find;
+            paintBody();
+            emit();
+          })
+        );
+        list.append(row);
+      });
+    };
+    paintAnswers();
+    wrap.append(list);
+
+    if (question.targets.length > 1) {
+      const n = question.targets.length;
+      const find = select(
+        [{ value: '', label: `All ${n}` }, ...Array.from({ length: n - 1 }, (_, i) => ({ value: String(i + 1), label: `Any ${i + 1}` }))],
+        question.find && question.find < n ? String(question.find) : ''
+      );
+      find.addEventListener('change', () => {
+        if (find.value) question.find = Number(find.value);
+        else delete question.find;
+        emit();
+      });
+      wrap.append(labelled('Students must find', find, 'Choose “Any 1” to accept whichever answer they spot.'));
+    }
     return wrap;
   }
 

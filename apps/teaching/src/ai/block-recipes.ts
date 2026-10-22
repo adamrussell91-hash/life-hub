@@ -25,6 +25,7 @@ A quiz is one quiz_question block per question: content { question }. Set questi
 - categorise: groups [{ id, name }] 2-4, items [{ id, text, group: group id }] 2-16.
 - quote_technique: quote, options [{ id, text }] 2-6 naming techniques, correct [one id].
 - find_it: segments [{ id, text }] 2-40 (the lines of a passage), correct [the ids that answer]; leave at least one line that is not an answer.
+- spot_technique: passage (the poem or prose, line breaks kept), options [{ id, text }] 3-10 naming techniques (every right one plus a few plausible wrong ones), targets [{ id, quote, correct: [option ids] }] 1-12. Each quote is the few words that carry the technique, copied exactly from the passage; correct lists every technique a fair marker would accept for those words. find optional: how many students must find (leave it out to need them all; find 1 with several targets means any one counts). Say "Find two…" or "Find one…" in the prompt to match. Students select words and pick a name; a selection a few words bigger or smaller still counts, and right words with the wrong name earn half.
 - label_image: image { url, alt } from an image already in the lesson, pins [{ id, x, y, label }] 2-8 with x and y from 0 to 1. Skip this kind when the lesson has no image.
 - extended_response: model_answer and guide optional. Teacher-marked.
 - explain_effect: quote, technique optional, model_answer and guide optional. Teacher-marked.
