@@ -1,15 +1,25 @@
 import type {
   CurriculumLinesV1Content,
   CurriculumLinesV2Content,
+  LessonKind,
   LineStop,
   NetworkLine,
   NetworkLineMode
 } from '@/schemas/block';
 import { lineColour } from './colour';
+import { buildFlow } from './flow';
 import type { NetInput, NetLevel, NetLine, NetRow, NetTarget } from './layout';
 
 /** A lesson as the map sees it: unit order, the lines it serves, and a link when the viewer may open it. */
-export type NetLesson = { id: string; title: string; href?: string; line_stops?: readonly LineStop[] };
+export type NetLesson = {
+  id: string;
+  title: string;
+  href?: string;
+  line_stops?: readonly LineStop[];
+  /** Lessons after this one; unset follows the map's order. */
+  after?: readonly string[];
+  kind?: LessonKind;
+};
 
 export const MODE_ORDER: readonly NetworkLineMode[] = ['train', 'metro', 'light_rail'];
 export const MODE_LABEL: Record<NetworkLineMode, string> = { train: 'Train', metro: 'Metro', light_rail: 'Light rail' };
@@ -84,13 +94,18 @@ export function buildUnitNetwork(
   const byId = new Map(lessons.map((l) => [l.id, l]));
   const hidden = new Set(content.hidden_lessons ?? []);
   const ordered = orderStations(lessons, content.station_order);
-  const shown = ordered.filter((l) => !hidden.has(l.id));
+  // Rows run in the flow's order: a branch at a time, splits where a lesson offers a choice.
+  const flow = buildFlow(ordered.map((l) => ({ id: l.id, ...(l.after ? { after: l.after } : {}) })), {
+    hidden,
+    title: (id) => byId.get(id)?.title || 'Untitled lesson'
+  });
+  const shown = flow.order.map((id) => byId.get(id)!);
   // A lesson left off the map hands its gap to the nearest shown station before it.
-  const rowIndex = new Map<string, number>();
+  const rowIndex = new Map<string, number>(flow.order.map((id, i) => [id, i]));
   let row = -1;
   for (const lesson of ordered) {
-    if (!hidden.has(lesson.id)) row += 1;
-    rowIndex.set(lesson.id, row);
+    if (rowIndex.has(lesson.id)) row = rowIndex.get(lesson.id)!;
+    else rowIndex.set(lesson.id, row);
   }
   // A stop whose lesson left the unit falls to the end rather than vanishing.
   const afterRow = (id: string | undefined) => (id === undefined ? -1 : rowIndex.get(id) ?? shown.length - 1);
@@ -111,7 +126,8 @@ export function buildUnitNetwork(
         lineId: stop.line_id,
         afterRow: afterRow(stop.after_lesson_id),
         kind: lines.get(stop.line_id)!.mode === 'light_rail' ? stop.kind : 'stop',
-        target: lessonTarget(stop.label, stop.lesson_id, stop.block_id, byId)
+        target: lessonTarget(stop.label, stop.lesson_id, stop.block_id, byId),
+        ...(stop.skip_rule?.trim() && stop.kind !== 'stop' ? { skip: stop.skip_rule.trim() } : {})
       })),
     gates: content.gates.map((gate) => ({
       id: gate.id,
@@ -125,7 +141,9 @@ export function buildUnitNetwork(
       ...(t.detail?.trim() ? { detail: t.detail.trim() } : {}),
       when: t.when?.trim() || 'Task'
     },
-    rowKind: 'lesson'
+    rowKind: 'lesson',
+    flow: flow.seq,
+    flowProblems: flow.problems
   };
 }
 

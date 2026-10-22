@@ -1112,7 +1112,9 @@ var base = {
   marks: z6.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
-  image: QuizImageSchema.optional()
+  image: QuizImageSchema.optional(),
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
+  outcomes: z6.array(z6.string().min(1).max(64)).max(8).optional()
 };
 var QuizQuestionSchema = z6.discriminatedUnion("kind", [
   z6.object({ ...base, kind: z6.literal("multiple_choice"), options: z6.array(QuizChoiceSchema).min(2).max(6), correct: z6.array(Id).length(1) }),
@@ -1312,7 +1314,9 @@ var QuizSettingsSchema = z6.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z6.number().min(0).max(1).optional(),
   confidence: z6.boolean().optional(),
-  closes_at: z6.string().datetime().optional()
+  closes_at: z6.string().datetime().optional(),
+  /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
+  move_on: z6.number().int().min(1).max(100).optional()
 });
 function norm(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();
@@ -2125,6 +2129,12 @@ var HingeOptionSchema = z8.object({
   text: z8.string().max(300).default(""),
   misconception: z8.string().max(300).default("")
 });
+var HingeBackupSchema = z8.object({
+  prompt: z8.string().max(500).default(""),
+  options: z8.array(HingeOptionSchema).max(5).default([]),
+  correct_id: z8.string().max(40).default(""),
+  source: z8.enum(["teacher", "ann"]).default("teacher")
+});
 var HingeQuestionBlockSchema = z8.object({
   id: z8.string().min(1),
   type: z8.literal("block"),
@@ -2137,7 +2147,9 @@ var HingeQuestionBlockSchema = z8.object({
     correct_id: z8.string().max(40).default(""),
     seconds: z8.union([z8.literal(0), z8.literal(30), z8.literal(60), z8.literal(90), z8.literal(120)]).default(60),
     move_on: z8.number().int().min(1).max(100).default(80),
-    reteach: z8.number().int().min(0).max(99).default(50)
+    reteach: z8.number().int().min(0).max(99).default(50),
+    /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
+    backup: HingeBackupSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2197,6 +2209,8 @@ var NetworkLineSchema = z8.object({
   short: z8.string().max(4).optional(),
   colour: CurriculumLinesColourSchema.default("wave")
 });
+var LessonKindSchema = z8.enum(["lesson", "workshop", "lecture"]);
+var AfterLessonIdsSchema = z8.array(z8.string().min(1).max(64)).max(6);
 var LineStopSchema = z8.object({
   line_id: z8.string().min(1).max(64),
   level: CurriculumLinesLevelSchema.optional()
@@ -2212,7 +2226,9 @@ var CurriculumRailStopSchema = z8.object({
   kind: z8.enum(["stop", "extension", "support"]).default("stop"),
   lesson_id: z8.string().min(1).max(64).optional(),
   block_id: z8.string().min(1).max(120).optional(),
-  label: z8.string().max(120).default("")
+  label: z8.string().max(120).default(""),
+  /** Who may take the straight track past a support stop, e.g. "90%+ on the techniques quiz". */
+  skip_rule: z8.string().max(80).optional()
 });
 var CurriculumGateSchema = z8.object({
   id: z8.string().min(1).max(64),
@@ -3856,6 +3872,12 @@ var LessonSchema = z11.object({
   outcome_ids: z11.array(z11.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
   line_stops: z11.array(LineStopSchema).max(16).optional(),
+  /**
+   * Lessons that come after this one. Unset (or null: saves merge, so null is
+   * how a lesson goes back) follows unit order; an empty list ends the unit here.
+   */
+  after_lesson_ids: AfterLessonIdsSchema.nullable().optional(),
+  lesson_kind: LessonKindSchema.optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */

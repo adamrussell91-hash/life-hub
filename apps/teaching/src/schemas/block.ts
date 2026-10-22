@@ -674,6 +674,11 @@ export const NetworkLineSchema = z.object({
   short: z.string().max(4).optional(),
   colour: CurriculumLinesColourSchema.default('wave')
 });
+/** What kind of session a lesson is, for the student's next-step choices. */
+export const LessonKindSchema = z.enum(['lesson', 'workshop', 'lecture']);
+/** The lessons that can come after this one; more than one is a choice, and the map splits. */
+export const AfterLessonIdsSchema = z.array(z.string().min(1).max(64)).max(6);
+export type LessonKind = z.infer<typeof LessonKindSchema>;
 export const LineStopSchema = z.object({
   line_id: z.string().min(1).max(64),
   level: CurriculumLinesLevelSchema.optional()
@@ -689,7 +694,9 @@ export const CurriculumRailStopSchema = z.object({
   kind: z.enum(['stop', 'extension', 'support']).default('stop'),
   lesson_id: z.string().min(1).max(64).optional(),
   block_id: z.string().min(1).max(120).optional(),
-  label: z.string().max(120).default('')
+  label: z.string().max(120).default(''),
+  /** Who may take the straight track past a support stop, e.g. "90%+ on the techniques quiz". */
+  skip_rule: z.string().max(80).optional()
 });
 export const CurriculumGateSchema = z.object({
   id: z.string().min(1).max(64),
