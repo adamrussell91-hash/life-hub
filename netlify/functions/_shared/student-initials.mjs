@@ -3,11 +3,14 @@
 // apps/teaching/src/schemas/student-initials.ts
 var INITIALS_PATTERN = /^[A-Z]{1,4}[0-9]?$/;
 var STUDENT_ID_PATTERN = /^st_[a-z0-9_]{1,24}$/;
+function stripMarks(text) {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 function normaliseInitials(text) {
-  return String(text ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+  return stripMarks(String(text ?? "")).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
 }
 function deriveInitials(name) {
-  const letters = String(name ?? "").split(/[\s-]+/).map((word) => word.replace(/[^A-Za-z]/g, "").charAt(0)).join("").toUpperCase().slice(0, 4);
+  const letters = stripMarks(String(name ?? "")).split(/[\s-]+/).map((word) => word.replace(/[^A-Za-z]/g, "").charAt(0)).join("").toUpperCase().slice(0, 4);
   return letters || "S";
 }
 function fnv1a(text) {
@@ -40,15 +43,28 @@ function assignInitials(students) {
     if (INITIALS_PATTERN.test(own)) held.add(own);
   }
   const used = /* @__PURE__ */ new Set();
+  const reserved = /* @__PURE__ */ new Set();
+  const keeps = students.map((s) => {
+    if (s.id && STUDENT_ID_PATTERN.test(s.id) && !reserved.has(s.id)) {
+      reserved.add(s.id);
+      return true;
+    }
+    return false;
+  });
   const ids = /* @__PURE__ */ new Set();
-  return students.map((s) => {
+  return students.map((s, index) => {
     const own = normaliseInitials(s.initials ?? "");
     let initials;
     if (INITIALS_PATTERN.test(own) && !used.has(own)) initials = own;
     else initials = freeInitials(deriveInitials(s.name), /* @__PURE__ */ new Set([...held, ...used]));
     used.add(initials);
-    let id = s.id && STUDENT_ID_PATTERN.test(s.id) && !ids.has(s.id) ? s.id : studentIdFor(s.name);
-    for (let n = 2; ids.has(id); n += 1) id = `${studentIdFor(s.name)}_${n}`;
+    let id;
+    if (keeps[index]) id = s.id;
+    else {
+      const base = studentIdFor(s.name);
+      id = base;
+      for (let n = 2; ids.has(id) || reserved.has(id); n += 1) id = `${base}_${n}`;
+    }
     ids.add(id);
     return { ...s, id, initials };
   });

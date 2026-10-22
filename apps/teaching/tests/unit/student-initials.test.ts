@@ -14,6 +14,8 @@ describe('student initials', () => {
     expect(deriveInitials('Mary-Jane Ann Smith Lee')).toBe('MJAS');
     expect(deriveInitials('Ava')).toBe('A');
     expect(deriveInitials('  ')).toBe('S');
+    expect(deriveInitials('Émile Zoë')).toBe('EZ');
+    expect(normaliseInitials('É')).toBe('E');
   });
 
   it('gives a stable id from the name when one is missing', () => {
@@ -47,6 +49,23 @@ describe('student initials', () => {
       { name: 'Ben Bates', skip_picker: false, initials: 'BB' }
     ]);
     expect(once.map((s) => s.initials)).toEqual(['BB', 'BB2']);
+    expect(assignInitials(once)).toEqual(once);
+  });
+
+  it('never takes a saved id from its owner', () => {
+    const out = assignInitials([{ name: 'Bob' }, { name: 'Robert', id: studentIdFor('Bob') }]);
+    expect(out[1]!.id).toBe(studentIdFor('Bob'));
+    expect(out[0]!.id).not.toBe(out[1]!.id);
+  });
+
+  it('gives a repeated explicit id to the first holder only, and stays stable', () => {
+    const once = assignInitials([
+      { name: 'Bob Brown', id: 'st_same' },
+      { name: 'Ben Bates', id: 'st_same' },
+      { name: 'Tom Tills' }
+    ]);
+    expect(once[0]!.id).toBe('st_same');
+    expect(new Set(once.map((s) => s.id)).size).toBe(3);
     expect(assignInitials(once)).toEqual(once);
   });
 
