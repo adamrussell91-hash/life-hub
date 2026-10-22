@@ -58,31 +58,53 @@ export function createMealLinkStore({
       if (travel !== snap.travel.version || (food ?? null) !== snap.food.version) throw conflict();
     },
 
-    // travels: [{ tripId, journal }], one or more trip files in the same commit.
+    // travels: [{ tripId, journal, version? }], one or more trip files in the same commit.
+    // A trip other than the snapshot's passes the version it was read at.
     async write(snap, { food, travels, message }) {
       validateFood(food);
       for (const t of travels) validateTravel(t.journal);
       const foodContent = encode(food);
       const trips = travels.map((t) => ({ tripId: t.tripId, content: encode(t.journal) }));
-      try {
-        const out = await client.commitFiles({
+      const commit = (base) =>
+        client.commitFiles({
           files: [
             { path: FOOD_PATH, content: foodContent },
             ...trips.map((t) => ({ path: travelPath(t.tripId), content: t.content })),
           ],
           message,
-          parentSha: snap.base.commitSha,
-          baseTreeSha: snap.base.treeSha,
+          parentSha: base.commitSha,
+          baseTreeSha: base.treeSha,
         });
-        return {
-          commitSha: out.commitSha,
-          foodVersion: blobSha(foodContent),
-          travelVersions: Object.fromEntries(trips.map((t) => [t.tripId, blobSha(t.content)])),
-        };
+      const isConflict = (e) => e instanceof GitHubClientError && e.code === 'write_conflict';
+      let out;
+      try {
+        out = await commit(snap.base);
       } catch (e) {
-        if (e instanceof GitHubClientError && e.code === 'write_conflict') throw conflict();
-        throw e;
+        if (!isConflict(e)) throw e;
+        // Retry once when the branch moved but neither journal did.
+        const read = [
+          [FOOD_PATH, snap.food.version],
+          ...travels.map((t) => [
+            travelPath(t.tripId),
+            t.version !== undefined ? t.version : t.tripId === snap.tripId ? snap.travel.version : undefined,
+          ]),
+        ];
+        if (read.some(([, v]) => v === undefined)) throw conflict();
+        const { commitSha, treeSha, tree } = await client.resolveTree();
+        const shaAt = (path) => tree.find((b) => b.path === path && b.type === 'blob')?.sha ?? null;
+        if (read.some(([path, v]) => shaAt(path) !== v)) throw conflict();
+        try {
+          out = await commit({ commitSha, treeSha });
+        } catch (e2) {
+          if (isConflict(e2)) throw conflict();
+          throw e2;
+        }
       }
+      return {
+        commitSha: out.commitSha,
+        foodVersion: blobSha(foodContent),
+        travelVersions: Object.fromEntries(trips.map((t) => [t.tripId, blobSha(t.content)])),
+      };
     },
   };
 }
