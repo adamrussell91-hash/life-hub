@@ -254,3 +254,24 @@ describe('5 Whys variant', () => {
     expect(items[2].querySelector('svg')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------- chart lookup
+import { createGearChartForTool } from '../../../../packages/get-things-done/render/charts';
+import { SAMPLE_TOOLS } from '../../../../packages/decision-book/fixtures.mjs';
+
+describe('Gear Shifter chart lookup', () => {
+  const chart = (def: unknown) => createGearChartForTool(def as never)!.el;
+  it('draws the variants with Problem Solver\'s renderers and the variant\'s options', () => {
+    const board = createGearChartForTool(GT_SAMPLE_TOOLS.kanban as never)!;
+    board.update(psRun('kanban', 'full') as never);
+    expect(board.el.classList.contains('ps-kanban')).toBe(true);
+    expect(board.el.querySelector('.ps-kanban__review')).toBeNull();
+    expect(board.el.querySelector('.ps-kanban__fields-form')).not.toBeNull();
+    expect(chart(GT_SAMPLE_TOOLS.fiveWhys).classList.contains('ps-whys')).toBe(true);
+  });
+  it('draws ratings and every shared family through Decision Maker\'s charts', () => {
+    expect(chart(GT_SAMPLE_TOOLS.ratings).classList.contains('dm-chart--ratings')).toBe(true);
+    expect(chart(GT_SAMPLE_TOOLS.needs).classList.contains('dm-chart--scales')).toBe(true);
+    for (const [key, family] of [['quadrant', 'quadrant'], ['curve', 'curve'], ['stages', 'path'], ['list', 'list']] as const) expect(chart(SAMPLE_TOOLS[key]).classList.contains(`dm-chart--${family}`), key).toBe(true);
+  });
+});
