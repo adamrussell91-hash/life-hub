@@ -8,6 +8,7 @@ import type { Markbook } from '@/markbook/schema';
 import type { MarkbookApi } from '@/markbook/api';
 import type { MarkbookView } from '@/markbook/types';
 import { mountMarkbook } from '@/teacher/sections/markbook';
+import { withAppBase } from '@/app/base-path';
 
 const cls: Class = ClassSchema.parse({
   id: 'class1', type: 'class', title: '12ENG', slug: '12eng', schema_version: 1, code: '12ENG', academic_year: 2026, year_id: 'year_12',
@@ -435,5 +436,64 @@ describe('markbook section', () => {
     expect(document.querySelector('.mb-panel')).toBeNull();
     await new Promise((r) => setTimeout(r, 0));
     expect(api.setMark).not.toHaveBeenCalled();
+  });
+
+  const outcomeQuiz = () => ({
+    kind: 'quiz' as const, id: 'quiz:l1', lesson_id: 'l1', title: 'Quiz 1', date: '2026-10-20', hidden: false, confidence: false,
+    questions: [{ id: 'q1', prompt: 'Name the device', marks: 2, outcomes: ['o2'] }],
+    scores: { s1: { attempt_id: 'x~0', submitted_at: '', score: 1, max: 2, pending: 0, rows: [{ id: 'q1', awarded: 1, max: 2, confidence: null, outcomes: ['o2'] }] } }
+  });
+
+  it('draws the outcomes view from the Outcomes toggle, and goes back to the grid', async () => {
+    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+    const toggle = host.querySelector<HTMLButtonElement>('.mb__toggle')!;
+    toggle.click();
+    expect(host.querySelector('.mb-outcomes')).not.toBeNull();
+    expect(host.querySelector('.mb-col__title')).toBeNull();
+    expect(host.querySelector('.mb-outcome__code')?.textContent).toBe('o2');
+    toggle.click();
+    expect(host.querySelector('.mb-outcomes')).toBeNull();
+    expect(host.querySelector('.mb-col__title')).not.toBeNull();
+    host.remove();
+  });
+
+  it('keeps focus on an outcome cell through a redraw', async () => {
+    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+    host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
+    host.querySelector<HTMLButtonElement>('button.mb-outcome-cell')!.focus();
+    host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
+    const active = document.activeElement as HTMLElement;
+    expect(active.classList.contains('mb-outcome-cell')).toBe(true);
+    expect(active.dataset.col).toBe('outcome:o2');
+    expect(active.dataset.student).toBe('s1');
+    host.remove();
+  });
+
+  it('opens the heatmap from a quiz column title, and Escape returns focus to it', async () => {
+    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+    const title = [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((n) => n.dataset.col === 'quiz:l1')!;
+    title.focus();
+    title.click();
+    const sheet = document.querySelector<HTMLElement>('.mb-sheet')!;
+    expect(sheet.getAttribute('role')).toBe('dialog');
+    expect(sheet.querySelector('.mb-heat')).not.toBeNull();
+    sheet.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(document.querySelector('.mb-sheet')).toBeNull();
+    expect(document.activeElement).toBe(title);
+    host.remove();
+  });
+
+  it('opens the attempt summary from a quiz cell, linking to the lesson', async () => {
+    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+    const cell = host.querySelectorAll('tbody tr')[0]!.querySelector<HTMLButtonElement>('.mb-cell--quiz')!;
+    cell.focus();
+    cell.click();
+    const sheet = document.querySelector<HTMLElement>('.mb-sheet')!;
+    expect(sheet.querySelector('.mb-attempt li')?.textContent).toBe('Name the device · 1/2');
+    expect(sheet.querySelector<HTMLAnchorElement>('.mb-attempt__link')!.getAttribute('href')).toBe(withAppBase('/lessons/l1'));
+    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
+    expect(document.querySelector('.mb-sheet')).toBeNull();
+    expect(document.activeElement).toBe(cell);
+    host.remove();
   });
 });
