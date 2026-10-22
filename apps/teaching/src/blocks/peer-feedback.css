@@ -63,6 +63,10 @@
   align-items: baseline;
 }
 
+.pf-task__steps--single .pf-task__step {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .pf-task__num {
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
