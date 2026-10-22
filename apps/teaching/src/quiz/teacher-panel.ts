@@ -52,7 +52,10 @@ type Submission = {
 };
 
 type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey };
-type AttemptSummary = { id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
+/** Initials and name from the class list; both null when the student was removed. */
+type StudentLabel = { initials: string | null; name: string | null };
+
+type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
 type QuestionStats = {
   id: string;
   question: PublicQuestion;
@@ -535,14 +538,14 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     wrap.append(qs);
 
     wrap.append(el('h4', 'qz-h', 'Attempts'));
-    const names = deviceNames(r.attempts.map((a) => a.device));
+    const names = deviceNames(r.attempts.filter((a) => !a.student).map((a) => a.device));
     const list = el('ul', 'qz-attempts');
     for (const a of r.attempts) {
       const li = el('li');
       const b = el('button', 'qz-attempt');
       b.type = 'button';
       b.append(
-        el('span', 'qz-attempt__who', `${names.get(a.device) ?? 'A student'}${a.n > 0 ? ` · go ${a.n + 1}` : ''}`),
+        el('span', 'qz-attempt__who', `${whoLabel(a, names)}${a.n > 0 ? ` · go ${a.n + 1}` : ''}`),
         el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}`),
         el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
       );
@@ -587,7 +590,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     return li;
   }
 
-  type AttemptDetail = { id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; rows: Row[] };
+  type AttemptDetail = { student: StudentLabel | null; id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; rows: Row[] };
 
   function attemptView(a: AttemptDetail): HTMLElement {
     const wrap = el('div', 'qz-attempt-detail');
@@ -598,6 +601,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         paint();
         void refresh();
       }),
+      el('span', 'qz-attempt__who', a.student ? whoLabel(a, new Map()) : 'Anonymous attempt'),
       el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}${a.pending ? ` · ${a.pending} to mark` : ''}${a.overtime ? ' · Late' : ''}`)
     );
     wrap.append(bar);
@@ -833,6 +837,12 @@ function meter(pct: number): HTMLElement {
   fill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
   track.append(fill);
   return track;
+}
+
+/** "BB · Bob Brown" for a known student, else the anonymous "Student A" style label. */
+function whoLabel(a: { device: string; student: StudentLabel | null }, names: Map<string, string>): string {
+  if (a.student) return a.student.initials ? `${a.student.initials} · ${a.student.name}` : 'Removed student';
+  return names.get(a.device) ?? 'A student';
 }
 
 /** "Student A", "Student B" in order of first appearance. Never a name. */
