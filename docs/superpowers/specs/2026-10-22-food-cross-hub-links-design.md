@@ -45,13 +45,13 @@ A moment gains an optional `meal` block:
 
 - `food_visit_id` is required while the block exists. `mood`, `vibe` and `with` are optional travel-only extras, free-text strings (`mood` up to 40 chars, `vibe` up to 600, `with` up to 200).
 - Food fields (dish titles, meal type, rating, venue, ingredients) are not stored on the moment. They live only in the visit.
-- The linked visit carries `source_id: "travel:<moment id>"`. The schema already accepts `source_id`.
+- The linked visit carries `source_id: "travel:<trip id>:<moment id>"`, so the Food Journal can find the trip file. The schema already accepts `source_id`.
 
 ### Flow
 
 1. On a moment Adam wrote, the edit sheet shows a Meal switch. It is hidden on Redacted's moments.
 2. Switching it on shows the Food Journal fields inline: dishes (title, meal type, rating), venue prefilled from the moment's place. The travel extras sit above.
-3. Saving sends the moment and the food fields to `/api/travel-journal`. The server:
+3. Saving saves the moment as usual, then sends the food fields to a new `/api/travel-meal` endpoint. Ordinary `/api/travel-journal` saves keep `meal` blocks exactly as the server has them, so only this endpoint can set or clear one. The endpoint:
    - validates both documents,
    - builds or updates the visit (date from `local_date`, venue lat/lon from the moment's coordinates),
    - copies each moment photo's display derivative into `food/photos/<new id>.jpg` (same R2 bucket) if not already copied,
@@ -60,9 +60,8 @@ A moment gains an optional `meal` block:
 
 ### Delete and unlink
 
-- Moment deleted, or Meal switched off: the visit is tombstoned in the same commit (Food Journal trash, restorable). Its `source_id` is reserved so reimport cannot resurrect it.
+- Moment deleted, or Meal switched off: the visit is deleted in the same commit. The Food Journal has no trash, so this is a permanent tombstone. Its `source_id` is reserved so a re-link cannot resurrect it; switching Meal on again makes a new visit.
 - Visit deleted in Food Journal: the Food Journal save also clears `meal` on the moment, in one commit. The moment stays.
-- Visit restored from trash: the `meal` link is put back on the moment if the moment still exists.
 
 ### Translation
 
@@ -89,22 +88,23 @@ A moment gains an optional `meal` block:
 - optional note ("skipped the chips")
 - Send
 
-Stored portion shape: `{ "fraction": 0.5 }` or `{ "pieces": 2, "of": 8 }`, plus optional `note`.
+Stored portion: a label (`"½"` or `"2 of 8"`) and a fraction from 0 to 1 (`0.5`, `0.25`). The note goes into the hand-off message only.
 
 ### Hand-off
 
 - Send opens Brisket's chat with a structured hand-off: dish title, ingredients, extras, venue, date, meal type, photo, portion.
 - Brisket follows its normal order: Food Library, then search (a chain venue's published nutrition), then an estimate from the ingredients and photo. It scales by the portion and proposes `log_entry`.
-- The Confirm card shows the portion line. On Confirm the meal record gets three new optional fields: `source: food-journal`, `food_dish_id`, `portion`.
+- On Confirm the meal record gets three new optional fields: `food_dish_id`, `portion` and `portion_fraction`. `food_dish_id` is the marker that the meal came from the Food Journal.
+- Right after the meal is saved, a second write marks the dish counted. It records `brisket: { meal_path, portion, portion_fraction, counted_at, needs_recount, calories, protein_g, fat_g }` on the dish, in the same best-effort way the Central Node sync works. If that write fails, the meal stays saved and the chat says the badge didn't save.
 - The dish shows a badge: "Counted in Brisket · ½". A dish with a live linked meal cannot be sent again; the button becomes "Change portion".
 
 ### Re-estimate on edit
 
 - Nutrition-relevant edits are title, ingredients, portion and photos. Rating, tags, notes and cuisine never trigger it.
 - After such an edit to a counted dish, the badge reads "Counted in Brisket · needs a re-count" and a Re-count button hands the dish to Brisket again with the previous numbers attached.
-- Brisket's Confirm card shows old → new. Confirm replaces the meal file; Dismiss keeps the old numbers and clears the flag.
+- Brisket's reply shows old → new before its Confirm card, and the card shows the new numbers. Confirm replaces the dish's existing meal file, never adds a second one. Dismiss keeps the old numbers and clears the flag.
 - No silent change to a confirmed number.
-- Deleting a counted dish asks "Also remove it from your nutrition log?" and, on yes, uses the existing delete-meal path.
+- Deleting a counted dish asks "Also remove it from your nutrition log?" On yes, the Food Journal save removes that dish's meal file. Only meal files linked to dishes that are now gone can be removed.
 
 ### Cost
 
@@ -134,4 +134,4 @@ About the same as a Brisket meal log today, roughly A$0.05–0.20 per send or re
 
 ## Build shape
 
-One PR, three commits: A (Travel → Food), B (ingredients), C (Food → Brisket). B has no dependency and can be built first.
+One PR, built in the order B (ingredients and English), A (Travel → Food), C (Food → Brisket). Each task commits. The plan is `docs/superpowers/plans/2026-10-22-food-cross-hub-links.md`.
