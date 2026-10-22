@@ -3318,6 +3318,15 @@ body.is-gym-mode { overflow: hidden; }
   font-variant-numeric: tabular-nums;
 }
 .gym-circuit__result { margin: 0; font-weight: 700; }
+/* Interval clock: what's happening now reads before the countdown. */
+.gym-circuit__phase {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.gym-circuit--rest .gym-circuit__phase,
+.gym-circuit--lead_in .gym-circuit__phase { color: var(--on-dark-muted); }
 .gym-circuit__extra {
   display: flex;
   align-items: center;

@@ -213,6 +213,32 @@ test('rest panel offers Turn off, and the plan sheet shows the rest timer switch
   assert.deepEqual(calls, [false, true]);
 });
 
+test('the interval clock says what is happening now: work, rest and who is next', () => {
+  const sets = (reps, kg) => Array.from({ length: 4 }, () => ({ reps, weight_kg: kg, cable_type: kg ? 'constant_force' : 'none' }));
+  const draft = draftWithCues();
+  draft.exercises = [
+    { name: 'Cable Row', superset_group: 1, superset_label: 'Tabata', block: { kind: 'circuit', format: 'intervals', work_sec: 20, rest_sec: 10 }, sets: sets(12, 15) },
+    { name: 'Mountain Climber', tracking: 'bodyweight_reps', superset_group: 1, sets: sets(20, 0) }
+  ];
+  const idle = render(draft);
+  assert.equal(byMarker(idle.logger, 'circuit-clock-toggle')[0].textContent, 'Start intervals');
+  assert.equal(byMarker(idle.logger, 'interval-phase').length, 0, 'no phase line before the clock starts');
+  const working = render(draft, { circuits: { 0: { elapsedMs: 15_000, running: true } } });
+  assert.equal(byMarker(working.logger, 'interval-phase')[0].textContent, 'WORK · A1 Cable Row');
+  assert.equal(byMarker(working.logger, 'circuit-clock')[0].textContent, '00:15');
+  const resting = render(draft, { circuits: { 0: { elapsedMs: 32_000, running: true } } });
+  assert.equal(byMarker(resting.logger, 'interval-phase')[0].textContent, 'REST · next A2 Mountain Climber');
+});
+
+test('an EMOM shows the round and a Start EMOM button', () => {
+  const sets = Array.from({ length: 6 }, (_, index) => ({ reps: index + 1, weight_kg: 0, cable_type: 'none' }));
+  const draft = draftWithCues();
+  draft.exercises = [{ name: 'Push-Up', tracking: 'bodyweight_reps', superset_label: 'Death By', block: { format: 'emom' }, sets }];
+  assert.equal(byMarker(render(draft).logger, 'circuit-clock-toggle')[0].textContent, 'Start EMOM');
+  const going = render(draft, { circuits: { 0: { elapsedMs: 75_000, running: true } } });
+  assert.equal(byMarker(going.logger, 'interval-phase')[0].textContent, 'Round 2 of 6 · go');
+});
+
 test('the plan sheet keeps add-exercise, reorder, session details and a docked Finish', () => {
   const root = render(draftWithCues(), { panel: 'plan' });
   const sheet = byMarker(root.logger, 'plan-sheet')[0];
