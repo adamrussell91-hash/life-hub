@@ -454,6 +454,55 @@ describe('mountAiPanel', () => {
     expect(mounted.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(true);
   });
 
+  it('starts a new chat, settling the finished job so it does not come back', async () => {
+    pollAiJobMock.mockResolvedValue({ ...workingJob(), status: 'done', response: 'All done' });
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    const newChat = () => mounted.host.querySelector<HTMLButtonElement>('.ai-panel__new-chat')!;
+    expect(newChat().hidden).toBe(true);
+
+    submitMessage(mounted.host, 'Hello');
+    await vi.waitFor(() => expect(handle!.isWorking()).toBe(false));
+    expect(newChat().hidden).toBe(false);
+
+    newChat().click();
+    await vi.waitFor(() => expect(mounted.host.querySelectorAll('.ai-panel__msg')).toHaveLength(0));
+    expect(newChat().hidden).toBe(true);
+    expect(mounted.host.querySelector<HTMLElement>('.agent-protocol-pills')!.hidden).toBe(false);
+    expect(localStorage.getItem('teaching_hub_ai_transcript_lesson_1')).toBe('[]');
+    expect(resolveAiJobMock).toHaveBeenCalledWith('job_1', 'dismissed');
+  });
+
+  it('asks before a new chat drops a proposal waiting on Confirm', async () => {
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Build a lesson');
+    await vi.waitFor(() => expect(acceptButton(mounted.host)).toBeDefined());
+
+    mounted.host.querySelector<HTMLButtonElement>('.ai-panel__new-chat')!.click();
+    const keep = await vi.waitFor(() => {
+      const btn = [...document.querySelectorAll<HTMLButtonElement>('.confirm-card-overlay button')]
+        .find((el) => el.textContent === 'Keep this chat');
+      expect(btn).toBeDefined();
+      return btn!;
+    });
+    keep.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mounted.host.querySelectorAll('.ai-panel__msg').length).toBeGreaterThan(0);
+    expect(resolveAiJobMock).not.toHaveBeenCalled();
+
+    mounted.host.querySelector<HTMLButtonElement>('.ai-panel__new-chat')!.click();
+    const start = await vi.waitFor(() => {
+      const btn = [...document.querySelectorAll<HTMLButtonElement>('.confirm-card-overlay button')]
+        .find((el) => el.textContent === 'Start new chat');
+      expect(btn).toBeDefined();
+      return btn!;
+    });
+    start.click();
+    await vi.waitFor(() => expect(mounted.host.querySelectorAll('.ai-panel__msg')).toHaveLength(0));
+    expect(resolveAiJobMock).toHaveBeenCalledWith('job_1', 'rejected');
+  });
+
   it('remembers that suggestions were opened', () => {
     const first = mountPanel();
     first.handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
