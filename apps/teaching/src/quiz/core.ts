@@ -120,7 +120,9 @@ const base = {
   marks: z.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
-  image: QuizImageSchema.optional()
+  image: QuizImageSchema.optional(),
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. */
+  outcomes: z.array(z.string().min(1).max(64)).max(6).optional()
 };
 
 export const QuizQuestionSchema = z
@@ -481,6 +483,7 @@ export type QuestionKey = {
   marks: number;
   hint?: string;
   explanation?: string;
+  outcomes?: string[];
   answer:
     | { type: 'choice'; ids: string[] }
     | { type: 'boolean'; value: boolean }
@@ -547,7 +550,8 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
     kind: q.kind,
     marks: q.marks,
     ...(q.hint?.trim() ? { hint: q.hint.trim() } : {}),
-    ...(q.explanation?.trim() ? { explanation: q.explanation.trim() } : {})
+    ...(q.explanation?.trim() ? { explanation: q.explanation.trim() } : {}),
+    ...(q.outcomes?.length ? { outcomes: [...q.outcomes] } : {})
   };
 
   switch (q.kind) {
