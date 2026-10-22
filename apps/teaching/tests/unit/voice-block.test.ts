@@ -6,7 +6,7 @@ vi.mock('@/api/client', async () => {
 });
 
 import { apiGet, apiPut } from '@/api/client';
-import { clock, livePoint, paceSlots, slotAt } from '@/blocks/voice-pacing';
+import { clock, livePoint, paceSlots, pointProgress, slotAt } from '@/blocks/voice-pacing';
 import { buildPaper, commonestFiller, fillerSuggestions, pointIndexAt, tapTarget, wordAt } from '@/blocks/voice-marking';
 import { keepTake, memoryTakes, MAX_TAKES } from '@/blocks/voice-takes';
 import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
@@ -32,6 +32,14 @@ describe('pacing', () => {
     expect(livePoint(slots, 65, 1)).toBe(2);
     expect(livePoint(slots, 5, 9)).toBe(2);
     expect(clock(84.6)).toBe('1:24');
+  });
+  it('fills a point’s bar from when it began, even after an early Next', () => {
+    const slots = paceSlots([1, 1, 1], 90);
+    expect(pointProgress(slots[0]!, 0, 15)).toBeCloseTo(0.5);
+    // Next pressed at 10 s: point 2 is scheduled 30–60, so it runs 10 → 60.
+    expect(pointProgress(slots[1]!, 10, 10)).toBe(0);
+    expect(pointProgress(slots[1]!, 10, 35)).toBeCloseTo(0.5);
+    expect(pointProgress(slots[1]!, 10, 70)).toBe(1);
   });
 });
 
