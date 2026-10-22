@@ -28,25 +28,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --ignore-scripts
+      # The one job that saves the npm download cache. It installs every
+      # hub the PR checks install, so their restores hit in full.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm ci --ignore-scripts --prefer-offline
       - name: Run tests
         run: |
           set -o pipefail
           npm test 2>&1 | tee test-output.log
       - name: Install Tasks Hub dependencies
-        run: npm ci --ignore-scripts --prefix apps/tasks
+        run: npm ci --ignore-scripts --prefer-offline --prefix apps/tasks
       - name: Tasks Hub vitest
         run: |
           set -o pipefail
           cd apps/tasks
           npx vitest run 2>&1 | tee ../../tasks-vitest-output.log
       - name: Install Teaching Hub dependencies
-        run: npm ci --ignore-scripts --prefix apps/teaching
+        run: npm ci --ignore-scripts --prefer-offline --prefix apps/teaching
       - name: Teaching Hub vitest
         run: |
           set -o pipefail
           cd apps/teaching
           npx vitest run tests/unit 2>&1 | tee ../../teaching-vitest-output.log
+      # Not tested here; installed only so the PR check's cache restore
+      # finds Professional's packages.
+      - name: Install Professional Hub dependencies
+        run: npm ci --ignore-scripts --prefer-offline --prefix apps/professional
       - name: Upload test log on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -67,10 +78,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --ignore-scripts
+      # Reuse the npm download cache that the main deploy's test job saves,
+      # so installs skip the registry when npm is slow.
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm ci --ignore-scripts --prefer-offline
       # The Tasks Hub build resolves its own node_modules.
       - name: Install Tasks Hub dependencies
-        run: npm ci --ignore-scripts --prefix apps/tasks
+        run: npm ci --ignore-scripts --prefer-offline --prefix apps/tasks
       - name: Transfer Grove release input
         if: ${{ hashFiles('apps/life/assets/grove/deployment/release-input.enc') != '' }}
         run: node scripts/transfer-grove-release.mjs
