@@ -1726,3 +1726,25 @@ test("the default remove deletes only a file that names the dish, then resyncs t
     assert.equal((await res.json()).data.meals_removed, expectDelete ? true : false);
   }
 });
+
+test("remove_meals ignores a tombstoned visit's path and a stale version", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  j.visits[0].status = "deleted";
+  const r = repo(j);
+  const removed = [];
+  const h = createFoodJournalHandler(
+    deps(r, { removeMeal: async (p) => void removed.push(p) }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  const res = await h(
+    req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual(removed, []);
+  const stale = await h(
+    req("PUT", { journal: first.journal, if_version: "f".repeat(40), remove_meals: [DINNER] }),
+  );
+  assert.equal(stale.status, 409);
+  assert.deepEqual(removed, []);
+});
