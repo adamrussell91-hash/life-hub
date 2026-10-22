@@ -554,7 +554,7 @@ export function createChatController({
       });
   }
 
-  async function send(message, { hiddenUser = false, attachments } = {}) {
+  async function send(message, { hiddenUser = false, attachments, onAccepted } = {}) {
     // Callers such as the Food Journal hand-off need to know the turn failed.
     let failed = false;
     const fail = text => {
@@ -700,6 +700,11 @@ export function createChatController({
         ...(sessionForSend ? { auditSession: sessionForSend } : {}),
         ...(protocolId ? { protocolId } : {})
       })) {
+        // The agent has the turn once anything but an error arrives.
+        if (onAccepted && event.type !== 'error') {
+          onAccepted();
+          onAccepted = null;
+        }
         if (event.type === 'agent') {
           const slug = lockedSlug && event.slug !== lockedSlug ? lockedSlug : event.slug;
           if (slug !== 'hammond') clearAuditSession();

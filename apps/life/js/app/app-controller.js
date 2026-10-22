@@ -802,6 +802,7 @@ export function createAppController(dependencies) {
   /** Food Journal → Brisket: open Brisket on Nutrition and send the hand-off. */
   async function openBrisketWith(message, attachments = []) {
     if (!chatPanel || !chatSend) return { ok: false };
+    const from = currentSection;
     // The chat slot lives in Nutrition, so it must be the visible section.
     if (currentSection !== 'nutrition') showSection('nutrition');
     // Switching may first save a Vera session; the hand-off must not ride on it.
@@ -812,7 +813,18 @@ export function createAppController(dependencies) {
       chatClearUnread?.();
     }
     await chatWaitUntilIdle?.();
-    return (await chatSend(message, { attachments })) ?? { ok: true };
+    // Settles once Brisket has the turn, or when the send fails before that,
+    // so the Food Journal's sheet is not held for the whole reply.
+    const result = await new Promise(resolve => {
+      Promise.resolve(chatSend(message, { attachments, onAccepted: () => resolve({ ok: true }) }))
+        .then(outcome => resolve(outcome ?? { ok: true }), () => resolve({ ok: false }));
+    });
+    // A failed hand-off goes back where it came from, so its sheet can retry.
+    if (result.ok === false && currentSection === 'nutrition' && from !== 'nutrition') {
+      if (chatPanel.isOpen()) chatPanel.close();
+      showSection(from);
+    }
+    return result;
   }
 
   function openCentralNodeAudit() {

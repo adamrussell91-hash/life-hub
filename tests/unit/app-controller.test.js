@@ -1542,3 +1542,15 @@ test('a Food Journal hand-off waits for the switch to Brisket and an idle chat b
   assert.deepEqual(order, ['select brisket', 'switched', 'wait', 'idle', 'send Count this 1']);
   assert.equal(state.chatPanelCalls.opens.at(-1).slot, state.root.querySelector('#nutrition-dashboard'));
 });
+
+test('a failed Food Journal hand-off returns to the section it came from', async () => {
+  const state = harness({
+    chatSelectAgent: async () => {},
+    chatWaitUntilIdle: async () => {},
+    chatSend: async () => ({ ok: false })
+  });
+  await state.controller.start();
+  assert.deepEqual(await state.controller.openBrisketWith('Count this', []), { ok: false });
+  assert.equal(state.controller.getCurrentSection(), 'home');
+  assert.equal(state.chatPanelCalls.isOpen(), false);
+});

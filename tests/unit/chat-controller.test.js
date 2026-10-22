@@ -2537,3 +2537,42 @@ test('send reports a failed turn so a caller can say so', async () => {
   await controller.selectAgent('brisket');
   assert.deepEqual(await controller.send('Count this'), { ok: false });
 });
+
+test('send tells the caller once the agent has taken the turn, before the reply ends', async () => {
+  const root = new FakeDocument();
+  let release;
+  const order = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      await new Promise(resolve => { release = resolve; });
+      yield { type: 'text', delta: 'Counting.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  const done = controller.send('Count this', { onAccepted: () => order.push('accepted') }).then(r => {
+    order.push('done');
+    return r;
+  });
+  await flushMicrotasks();
+  assert.deepEqual(order, ['accepted']);
+  release();
+  assert.deepEqual(await done, { ok: true });
+  assert.deepEqual(order, ['accepted', 'done']);
+});
+
+test('an error before the agent takes the turn is not reported as accepted', async () => {
+  const root = new FakeDocument();
+  let accepted = 0;
+  const chatApi = {
+    async *send() {
+      yield { type: 'error', code: 'upstream' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  assert.deepEqual(await controller.send('Count this', { onAccepted: () => { accepted += 1; } }), { ok: false });
+  assert.equal(accepted, 0);
+});
