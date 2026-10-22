@@ -683,8 +683,8 @@ export function createFoodJournalView({
     let chip = piecesNow ? null : fixed ? current : "All",
       note = "";
     const row = el("div", "hub-chips food-portion");
-    row.setAttribute("role", "radiogroup");
-    row.setAttribute("aria-label", "How much you had");
+    row.setAttribute("role", "group");
+    row.setAttribute("aria-label", "Portion");
     const pieces = el("div", "food-portion__pieces");
     const count = (label, value) => {
       const n = el("input", "hub-input food-portion__count");
@@ -714,7 +714,6 @@ export function createFoodJournalView({
         if (!chip) eaten.focus();
       });
       b.className = "hub-chip food-portion__chip";
-      b.setAttribute("role", "radio");
       b.dataset.portion = label;
       return b;
     });
@@ -746,7 +745,7 @@ export function createFoodJournalView({
       for (const b of chips) {
         const on = chip ? b.dataset.portion === chip : b.dataset.portion === "Pieces";
         b.classList.toggle("is-active", on);
-        b.setAttribute("aria-checked", String(on));
+        b.setAttribute("aria-pressed", String(on));
       }
       pieces.hidden = chip != null;
       send.disabled = !choice();
