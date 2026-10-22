@@ -10,7 +10,7 @@
  */
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
-import { classKey, deleteKey } from './teaching-blobs.mjs';
+import { CLASS_PREFIX, classKey, deleteKey, draftLessonKey, SCHEDULED_LESSON_PREFIX } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { deviceHash, read, reject, validToken } from './question-drop.mjs';
 import { assignInitials, normaliseInitials, STUDENT_ID_PATTERN } from './student-initials.mjs';
@@ -27,6 +27,26 @@ export async function loadRoster(store, classId) {
   const cls = await read(store, classKey(classId));
   if (!cls || isDeletedRecord(cls)) return null;
   return { cls, students: assignInitials(Array.isArray(cls.students) ? cls.students : []) };
+}
+
+/**
+ * The live classes a lesson belongs to: scheduled into the class, or part of
+ * a unit the class is teaching. A plain lesson link uses this to find the
+ * class list, and the teacher's Share box to offer one link per class.
+ */
+export async function classesForLesson(store, lessonId) {
+  if (!isSafeId(lessonId)) return [];
+  const lesson = await read(store, draftLessonKey(lessonId));
+  if (!lesson || isDeletedRecord(lesson)) return [];
+  const [rowKeys, classKeys] = await Promise.all([listBlobKeys(store, SCHEDULED_LESSON_PREFIX), listBlobKeys(store, CLASS_PREFIX)]);
+  const rows = await Promise.all(rowKeys.map((key) => read(store, key)));
+  const scheduled = new Set(rows.filter((row) => row && !isDeletedRecord(row) && row.lesson_id === lessonId).map((row) => row.class_id));
+  const classes = await Promise.all(classKeys.filter((key) => !key.slice(CLASS_PREFIX.length).includes('/')).map((key) => read(store, key)));
+  return classes
+    .filter((cls) => cls?.id && cls.status === 'active' && !isDeletedRecord(cls))
+    .filter((cls) => scheduled.has(cls.id) || (lesson.unit_id && (cls.current_unit_id === lesson.unit_id || (cls.active_unit_ids ?? []).includes(lesson.unit_id))))
+    .map((cls) => ({ id: cls.id, title: cls.display_name || cls.title || cls.code || 'Class' }))
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /** The student this device holds in the class, or null. */

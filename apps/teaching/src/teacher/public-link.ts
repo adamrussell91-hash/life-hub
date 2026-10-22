@@ -52,6 +52,13 @@ export interface PublicLinkControlOptions {
   lead?: string;
   copyLabel?: string;
   openLabel?: string;
+  /** Extra per-class links, loaded when the popover opens. */
+  loadClassLinks?: () => Promise<Array<{ label: string; url: string }>>;
+}
+
+/** Lesson link for one class: the quiz on it knows the class list without asking. */
+export function classLessonUrl(lessonId: string, classId: string): string {
+  return `${absolutePublicUrl('lesson', lessonId)}?class=${encodeURIComponent(classId)}`;
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -77,6 +84,34 @@ async function copyText(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function copyButton(url: string, label: string): HTMLButtonElement {
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'btn btn--secondary';
+  copyBtn.textContent = label;
+  copyBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const resetLabel = () => {
+      window.setTimeout(() => {
+        copyBtn.textContent = label;
+      }, 1500);
+    };
+    void import('../../design-kit/js/hub-feedback.js')
+      .then(({ showCopyConfirm }) => showCopyConfirm(copyBtn, url))
+      .then(() => {
+        copyBtn.textContent = 'Copied';
+        resetLabel();
+      })
+      .catch(() => {
+        void copyText(url).then((ok) => {
+          copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
+          resetLabel();
+        });
+      });
+  });
+  return copyBtn;
 }
 
 let activeClose: (() => void) | null = null;
@@ -133,30 +168,7 @@ export function mountPublicLinkControl(
     const actions = document.createElement('div');
     actions.className = 'public-link__actions';
 
-    const copyBtn = document.createElement('button');
-    copyBtn.type = 'button';
-    copyBtn.className = 'btn btn--secondary';
-    copyBtn.textContent = options.copyLabel ?? 'Copy';
-    copyBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const resetLabel = () => {
-        window.setTimeout(() => {
-          copyBtn.textContent = options.copyLabel ?? 'Copy';
-        }, 1500);
-      };
-      void import('../../design-kit/js/hub-feedback.js')
-        .then(({ showCopyConfirm }) => showCopyConfirm(copyBtn, absolute))
-        .then(() => {
-          copyBtn.textContent = 'Copied';
-          resetLabel();
-        })
-        .catch(() => {
-          void copyText(absolute).then((ok) => {
-            copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
-            resetLabel();
-          });
-        });
-    });
+    const copyBtn = copyButton(absolute, options.copyLabel ?? 'Copy');
 
     const openBtn = document.createElement('a');
     openBtn.className = 'btn btn--secondary';
@@ -170,6 +182,34 @@ export function mountPublicLinkControl(
 
     actions.append(copyBtn, openBtn);
     popover.append(urlEl, actions);
+    if (options.loadClassLinks) paintClassLinks(options.loadClassLinks);
+  }
+
+  function paintClassLinks(load: () => Promise<Array<{ label: string; url: string }>>): void {
+    const section = document.createElement('div');
+    section.className = 'public-link__classes';
+    popover.append(section);
+    void load()
+      .then((links) => {
+        if (!links.length) return;
+        const lead = document.createElement('p');
+        lead.className = 'public-link__lead';
+        lead.textContent = 'Give students their class’s link, so the quiz asks for their initials:';
+        section.append(lead);
+        for (const link of links) {
+          const row = document.createElement('div');
+          row.className = 'public-link__class';
+          const name = document.createElement('span');
+          name.className = 'public-link__class-name';
+          name.textContent = link.label;
+          row.title = link.url;
+          row.append(name, copyButton(link.url, 'Copy link'));
+          section.append(row);
+        }
+      })
+      .catch(() => {
+        /* the plain link still works: the quiz asks which class */
+      });
   }
 
   function setOpen(open: boolean): void {

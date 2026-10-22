@@ -13,7 +13,11 @@ import './quiz.css';
  * or a dropped connection loses nothing. When the teacher runs the quiz live,
  * a join box appears and the class answers together.
  *
- * A quiz takes answers only from its class page. The first time, the student types their initials from the class list, and this device keeps them for every quiz in that class.
+ * A quiz takes answers only for a class. The class page names it; a plain
+ * lesson link picks the lesson's class by itself, or asks the student which
+ * when the lesson is in several. The first time, the student types their
+ * initials from the class list, and this device keeps them for every quiz in
+ * that class.
  */
 
 type Settings = NonNullable<PublishedLesson['quiz']>;
@@ -37,7 +41,7 @@ type Status = {
   settings: Settings;
   questions: PublicQuestion[];
   live: boolean;
-  identity?: { need: 'class' | 'initials' | null; initials: string | null };
+  identity?: { need: 'class' | 'initials' | null; initials: string | null; classes?: Array<{ id: string; title: string }> };
   now?: string;
   current: Current | null;
   results: Result[];
@@ -65,7 +69,7 @@ const FEEDBACK_TEXT = {
   released: 'Your teacher will share the marks later.'
 } as const;
 
-export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: string } = {}): HTMLElement {
+export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: string; pickClass?: boolean } = {}): HTMLElement {
   // The page's copy is only a first paint. The server sends the questions and
   // settings for each attempt, so a republish never leaves a student answering
   // against ids the marker no longer knows.
@@ -80,9 +84,20 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     settings = next;
   };
   const token = deviceToken(`quiz:${lessonId}`);
+  // A class picked on a plain lesson link is kept, so the next visit goes straight in.
+  const pickClass = options.pickClass !== false && !options.classId;
+  const pickedKey = `quiz-class:${lessonId}`;
+  let classId = options.classId ?? (pickClass ? readJSON<string>(pickedKey) ?? undefined : undefined);
   // Initials are claimed per class, so the class keeps its own token for this device.
-  const classToken = options.classId ? deviceToken(`class:${options.classId}`) : null;
-  const classFields = options.classId ? { class_id: options.classId, ...(classToken ? { class_token: classToken } : {}) } : {};
+  let classToken: string | null = null;
+  let classFields: Record<string, string> = {};
+  const useClass = (id: string | undefined) => {
+    classId = id;
+    classToken = id ? deviceToken(`class:${id}`) : null;
+    classFields = id ? { class_id: id, ...(classToken ? { class_token: classToken } : {}) } : {};
+  };
+  useClass(classId);
+  let autoPick = true;
 
   const root = el('section', 'qz-quiz');
   root.setAttribute('aria-label', 'Quiz');
@@ -119,6 +134,13 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       alert.hidden = true;
       return next;
     } catch (error) {
+      if (pickClass && classId && error instanceof ApiClientError && error.code === 'need_class') {
+        // The class this device picked is gone: forget it and ask again.
+        writeJSON(pickedKey, null);
+        useClass(undefined);
+        autoPick = false;
+        return call('status');
+      }
       showError(errorText(error));
       if (error instanceof ApiClientError && action !== 'status') {
         // Whatever went wrong, show the server's view of things rather than a stale one.
@@ -157,12 +179,17 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       body.replaceChildren(el('p', 'qz-note', 'Loading the quiz…'));
       return;
     }
-    if (!token || (options.classId && !classToken)) {
+    if (!token || (classId && !classToken)) {
       body.replaceChildren(panel('This browser can’t remember you, so you can’t take the quiz here.', 'Use your usual browser, in a normal (not private) window.'));
       return;
     }
     if (status.identity?.need === 'class') {
-      body.replaceChildren(panel('Open this quiz from your class page.', 'Your class page has the link that knows who you are.'));
+      const classes = pickClass ? status.identity.classes ?? [] : [];
+      if (classes.length === 1 && autoPick) {
+        body.replaceChildren(el('p', 'qz-note', 'Loading the quiz…'));
+        void chooseClass((classes[0] as { id: string }).id);
+      } else if (classes.length) body.replaceChildren(classPicker(classes));
+      else body.replaceChildren(panel('Open this quiz from your class page.', 'Your class page has the link that knows who you are.'));
       return;
     }
     if (status.identity?.need === 'initials') {
@@ -174,6 +201,34 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     else if (view === 'review' && status.current) body.replaceChildren(reviewView(status.current));
     else if (view === 'result') body.replaceChildren(resultView());
     else body.replaceChildren(landingView(status));
+  }
+
+  async function chooseClass(id: string): Promise<void> {
+    useClass(id);
+    writeJSON(pickedKey, id);
+    const next = await call('status');
+    if (next?.current) {
+      draft = loadDraft(next.current);
+      questionStarted = Date.now();
+    }
+    paint();
+    if (next?.live) await pollLive();
+  }
+
+  function classPicker(classes: Array<{ id: string; title: string }>): HTMLElement {
+    const box = el('div', 'qz-panel qz-class-pick');
+    box.append(el('p', 'qz-panel__title', 'Which class are you in?'));
+    const row = el('div', 'qz-actions');
+    for (const c of classes) {
+      row.append(
+        button(c.title, 'secondary', async function () {
+          for (const b of row.querySelectorAll('button')) b.disabled = true;
+          await chooseClass(c.id);
+        })
+      );
+    }
+    box.append(row);
+    return box;
   }
 
   function initialsView(): HTMLElement {
@@ -671,7 +726,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
         if (liveState || status?.live) await pollLive();
         // While the student is typing initials, a refresh would repaint the box
         // and wipe what they typed; nothing (not even live) opens before a claim.
-        else if (view === 'landing' && status?.identity?.need !== 'initials') {
+        else if (view === 'landing' && !status?.identity?.need) {
           await call('status');
           if (view === 'landing') paint();
           if (status?.live) await pollLive();
