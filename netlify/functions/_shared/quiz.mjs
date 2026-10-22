@@ -32,7 +32,7 @@ import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
-import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
+import { claimFor, claimInitials, classesForLesson, loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, listSubmissions, read, reject, reviewSubmission, validToken, walkBlocks } from './question-drop.mjs';
 import {
   QuizSettingsSchema,
@@ -300,6 +300,9 @@ export async function quizAction(store, lessonId, body) {
     questions: publicQuestions(record),
     live: !!live && live.expires > now && live.phase !== 'done'
   };
+  // A plain lesson link names no class: offer the lesson's classes so the
+  // student can pick theirs (the page picks by itself when there is one).
+  if (who.need === 'class' && action === 'status') shared.identity.classes = await classesForLesson(store, lessonId);
   // Until this device is known, it has no history here: the anonymous go it
   // may have made elsewhere is not shown, so nothing vanishes after claiming.
   if (who.need) return { ...shared, attempts_used: 0, current: null, results: [] };
@@ -502,6 +505,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     return { submissions: await listSubmissions(store, lessonId) };
   }
   if (action.startsWith('live_')) return liveTeacher(store, lessonId, body, action);
+  if (action === 'classes') return { classes: await classesForLesson(store, lessonId) };
   if (!['results', 'attempt', 'mark', 'release', 'reset', 'clear_all'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
 
   let loaded;
