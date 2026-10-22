@@ -1147,12 +1147,13 @@ export function createChatController({
         label: 'Confirmed'
       });
       moveConfirmReceiptToTranscript(root, proposal.card);
-      if (result?.centralNodeUpdated === false) {
-        showChatError(root, 'Logged, but Central Node didn\u2019t update — try Refresh.');
-      }
-      if (result?.foodJournalUpdated === false) {
-        showChatError(root, 'Logged. The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.');
-      }
+      // One message, so a second warning never hides the first.
+      const saveWarnings = [
+        result?.centralNodeUpdated === false ? 'Logged, but Central Node didn\u2019t update — try Refresh.' : null,
+        result?.foodJournalUpdated === false ? 'Logged. The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.' : null,
+        result?.oldCountRemoved === false ? 'Logged. The old count for this dish couldn\u2019t be removed; delete it from Nutrition.' : null
+      ].filter(Boolean);
+      if (saveWarnings.length) showChatError(root, saveWarnings.join(' '));
       // Earned hype: a genuine PB (Phase 1's library upsert) gets a specific, loud reaction
       // right in the transcript -- confirm is a plain POST, not an LLM turn, so this is a
       // templated in-voice line rather than a model-generated one. Workout-only: personalBests
