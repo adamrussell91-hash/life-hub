@@ -462,6 +462,31 @@ function readGroupSettings(text, settings) {
   if (/\bcircuit\b/i.test(text)) settings.kind = 'circuit';
   const rest = /rest\s*(\d+)\s*(s|secs?|seconds|min)\b/i.exec(text);
   if (rest) settings.rest_sec = Number(rest[1]) * (/^min/i.test(rest[2]) ? 60 : 1);
+  readTimedSettings(text, settings);
+}
+
+// "EMOM 10 min", "E2MOM, 6 rounds", "every 90 s, alternating", "Death By",
+// "Tabata", "30 s on / 15 s off".
+function readTimedSettings(text, settings) {
+  const onOff = /(\d+)\s*(?:s|secs?|seconds)?\s*on\s*[/,·]?\s*(\d+)\s*(?:s|secs?|seconds)?\s*off\b/i.exec(text);
+  if (/\btabata\b/i.test(text) || onOff) {
+    settings.format = 'intervals';
+    settings.work_sec = onOff ? Number(onOff[1]) : 20;
+    settings.rest_sec = onOff ? Number(onOff[2]) : 10;
+    return;
+  }
+  const eNmom = /\be(\d+)mom\b/i.exec(text);
+  const every = /\bevery\s*(\d+)\s*(s|secs?|seconds|min(?:ute)?s?)\b/i.exec(text);
+  if (!(eNmom || /\b(?:emom|death by)\b/i.test(text) || every)) return;
+  settings.format = 'emom';
+  if (eNmom) settings.interval_sec = Number(eNmom[1]) * 60;
+  if (every) settings.interval_sec = Number(every[1]) * (/^min/i.test(every[2]) ? 60 : 1);
+  if (/\balternat/i.test(text)) settings.alternate = true;
+  const mins = /(\d+)\s*min(?:ute)?s?\b(?!\s*rest)/i.exec(text.replace(every?.[0] ?? '\u0000', ''));
+  if (mins && settings.rounds == null) {
+    const interval = settings.interval_sec ?? 60;
+    settings.rounds = Math.max(1, Math.round((Number(mins[1]) * 60) / interval));
+  }
 }
 
 export function parseLetteredWorkoutChat(text) {
@@ -488,9 +513,11 @@ export function parseLetteredWorkoutChat(text) {
       const match = LETTER_LINE.exec(part.trim());
       if (!match) continue;
       const [, letter, digit, content] = match;
-      if (!digit && !hasLoadSpec(content)) {
+      // A bracketed block descriptor wins over load specs: "rest 120 s" is not a set.
+      const bracketHeader = !digit && /\([^)]*\b(?:circuit|superset|rounds?|amrap|for time|e\d*mom|tabata|death by|intervals?|every)\b[^)]*\)/i.test(content);
+      if (!digit && (bracketHeader || !hasLoadSpec(content))) {
         // Block header: "C  Cindy (circuit, 3 rounds for time)".
-        if (!/\b(?:circuit|superset|rounds?|amrap|for time)\b/i.test(content)) continue;
+        if (!/\b(?:circuit|superset|rounds?|amrap|for time|e\d*mom|tabata|death by|intervals?)\b/i.test(content)) continue;
         const group = groupFor(letter);
         const label = content.replace(/\(.*\)/, '').replace(/[—–-]\s*$/, '').trim();
         if (label && !/^(?:circuit|superset)$/i.test(label)) group.label = label;
@@ -530,7 +557,8 @@ export function parseLetteredWorkoutChat(text) {
 
   let groupNumber = 0;
   for (const [letter, group] of groups) {
-    if (group.members.length < 2) {
+    const timedSolo = group.members.length === 1 && ['emom', 'intervals'].includes(group.settings.format);
+    if (group.members.length < 2 && !timedSolo) {
       for (const member of group.members) {
         const entry = exercises.find(item => item.exercise === member);
         if (entry) entry.grouped = false;
@@ -539,7 +567,9 @@ export function parseLetteredWorkoutChat(text) {
     }
     groupNumber += 1;
     const { settings } = group;
-    const kind = settings.kind ?? (group.members.length >= 3 ? 'circuit' : 'superset');
+    const kind = ['emom', 'intervals'].includes(settings.format)
+      ? 'circuit'
+      : settings.kind ?? (group.members.length >= 3 ? 'circuit' : 'superset');
     // Explicit "N rounds" expands here; AMRAP time-cap slots come from
     // provisionAmrapCircuitRounds after the block is attached.
     const expandTo = settings.rounds ?? null;
@@ -555,6 +585,9 @@ export function parseLetteredWorkoutChat(text) {
       if (settings.format) block.format = settings.format;
       if (settings.rest_sec) block.rest_sec = settings.rest_sec;
       if (settings.time_cap_sec) block.time_cap_sec = settings.time_cap_sec;
+      if (settings.interval_sec) block.interval_sec = settings.interval_sec;
+      if (settings.work_sec) block.work_sec = settings.work_sec;
+      if (settings.alternate) block.alternate = true;
       if (Object.keys(block).length) member.block = block;
     });
     void letter;

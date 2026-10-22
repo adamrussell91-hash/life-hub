@@ -80,7 +80,9 @@ export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): 
       id: l.id,
       title: l.title,
       href: withAppBase(`/lessons/${l.id}`),
-      ...(l.line_stops ? { line_stops: l.line_stops } : {})
+      ...(l.line_stops ? { line_stops: l.line_stops } : {}),
+      ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}),
+      ...(l.lesson_kind ? { kind: l.lesson_kind } : {})
     })),
     ...(bands ? { bands } : {}),
     ...(subject ? { saveLines: (lines: NetworkLine[]) => saveSubjectLines(curriculum, subject.id, lines) } : {}),

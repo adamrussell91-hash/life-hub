@@ -137,6 +137,8 @@ describe('student feedback view', () => {
     expect(key).toContain('TS+');
     expect(key).toContain('Topic sentence (strength)');
     expect(key).toContain('Filler word');
+    const meanings = [...view.querySelectorAll('.voice-summary__meaning')].map((m) => m.textContent);
+    expect(meanings).toEqual(expect.arrayContaining(['Great opening concept.', 'Filler word.']));
     expect(key).toContain('A + after a code marks a strength.');
     expect(view.textContent).toContain('Audio removed after 4 weeks');
     const marks = view.querySelectorAll<HTMLElement>('.pa-run--mark');

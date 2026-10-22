@@ -266,6 +266,9 @@ function validateWorkout(record, errors) {
           if (block.format != null) enumeration(block, 'format', BLOCK_FORMATS, errors);
           finiteNumber(block, 'rest_sec', errors, { minimum: 0, maximum: 3600 });
           finiteNumber(block, 'time_cap_sec', errors, { minimum: 1, maximum: 7200 });
+          finiteNumber(block, 'interval_sec', errors, { minimum: 5, maximum: 600 });
+          finiteNumber(block, 'work_sec', errors, { minimum: 5, maximum: 600 });
+          if (block.alternate != null && typeof block.alternate !== 'boolean') errors.push(`${prefix}.block.alternate must be a boolean`);
           if (block.result != null) {
             if (!isObject(block.result)) {
               errors.push(`${prefix}.block.result must be an object`);

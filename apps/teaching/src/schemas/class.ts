@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BlockSchema } from './block';
 import { CommonFields, TrashFields } from './common';
 import { CoverSchema } from './cover';
+import { SourceSchema } from './source';
 import { INITIALS_PATTERN, STUDENT_ID_PATTERN } from './student-initials';
 import { validateTimetable, type ClassTimetable } from '../schedule/timetable';
 
@@ -54,7 +55,8 @@ export const ClassSchema = z.object({
   timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
   cover: CoverSchema.optional(),
-  students: z.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional()
+  students: z.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
+  source: SourceSchema.optional()
 });
 
 export type Class = z.infer<typeof ClassSchema>;

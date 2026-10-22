@@ -444,3 +444,20 @@
     padding-left: 0;
   }
 }
+
+/* A back-up round: the parallel question asked after re-teaching. */
+.hq-round-tag {
+  justify-self: start;
+  margin: 0 0 var(--space-2);
+}
+
+.hq-editor__backup {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.hq-editor__backup > summary {
+  cursor: pointer;
+}

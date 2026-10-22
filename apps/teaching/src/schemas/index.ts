@@ -37,6 +37,8 @@ export {
   type ScheduledLesson
 } from './scheduled-lesson';
 export { UnitSchema, type Unit } from './unit';
+export { SourceSchema, type Source } from './source';
+export { DocumentSchema, DocumentKindSchema, type TeachingDocument } from './document';
 export {
   VisibilitySchema,
   BlockTypeSchema,
@@ -50,6 +52,9 @@ export {
   BlockSchema,
   NetworkLineSchema,
   LineStopSchema,
+  LessonKindSchema,
+  AfterLessonIdsSchema,
+  type LessonKind,
   type Block,
   type NetworkLine,
   type NetworkLineMode,
