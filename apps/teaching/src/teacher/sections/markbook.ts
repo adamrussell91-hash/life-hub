@@ -70,6 +70,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let selectedOutcome: OutcomeSelection | null = null;
   let showRemoved = false;
   let showHiddenList = false;
+  /** The student on the phone card, by id, so a reload that adds or removes someone keeps the card on them. */
+  let phoneStudentId: string | null = null;
+  /** Where that student was, for when they leave the list. */
   let phoneIndex = 0;
   let disposed = false;
   const queued: Change[] = [];
@@ -114,8 +117,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     document.body.append(link);
     link.click();
     link.remove();
-    // Safari needs the URL alive until the click's download has started.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    // Safari reads the file after the click returns; a slow download needs the URL a while longer.
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
   });
   tools.append(addGroup, toggle, hiddenToggle, removedToggle, exportButton);
   head.append(title, tools);
@@ -127,8 +130,11 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   warning.hidden = true;
   const status = el('p', 'mb__status');
   status.setAttribute('role', 'status');
+  // Outside the body, which is redrawn, so a screen reader hears each change.
+  const announce = el('p', 'mb-sr mb__announce');
+  announce.setAttribute('aria-live', 'polite');
   const body = el('div', 'mb__body');
-  section.append(head, hiddenList, warning, status, body);
+  section.append(head, hiddenList, warning, status, announce, body);
   host.replaceChildren(section);
 
   /**
@@ -347,10 +353,17 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       );
     }
     else if (narrow()) {
-      phoneIndex = Math.max(0, Math.min(students.length - 1, phoneIndex));
+      const found = students.findIndex((s) => s.id === phoneStudentId);
+      // Clamp only when the student has left the list (or none was chosen yet).
+      phoneIndex = found >= 0 ? found : Math.max(0, Math.min(students.length - 1, phoneIndex));
+      phoneStudentId = students[phoneIndex]?.id ?? null;
       body.replaceChildren(
         renderPhone(current, students, actions, phoneIndex, (i) => {
+          const s = students[i];
+          if (!s) return;
           phoneIndex = i;
+          phoneStudentId = s.id;
+          announce.textContent = `${s.name}, ${i + 1} of ${students.length}`;
           paint();
         }, today())
       );
@@ -386,10 +399,13 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     paint();
   });
   const onMedia = () => paint();
-  media?.addEventListener('change', onMedia);
+  // Safari before 14 only has the older addListener.
+  if (typeof media?.addEventListener === 'function') media.addEventListener('change', onMedia);
+  else media?.addListener?.(onMedia);
   void load();
   return () => {
     disposed = true;
-    media?.removeEventListener('change', onMedia);
+    if (typeof media?.removeEventListener === 'function') media.removeEventListener('change', onMedia);
+    else media?.removeListener?.(onMedia);
   };
 }

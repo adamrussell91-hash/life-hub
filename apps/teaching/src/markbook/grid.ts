@@ -18,9 +18,12 @@ function button(className: string, text: string, label: string): HTMLButtonEleme
   return b;
 }
 
-/** A right-click (or a long press on a phone), Delete or Backspace clears the cell. */
-function clearOn(b: HTMLElement, clear: () => void): void {
-  b.setAttribute('aria-label', `${b.getAttribute('aria-label') ?? ''}, Delete to clear`);
+/**
+ * A right-click, Delete or Backspace clears the cell. `hint` adds that to the
+ * label; the phone card leaves it off, since it has a visible Clear button.
+ */
+function clearOn(b: HTMLElement, clear: () => void, hint: boolean): void {
+  if (hint) b.setAttribute('aria-label', `${b.getAttribute('aria-label') ?? ''}, Delete to clear`);
   b.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     clear();
@@ -32,8 +35,17 @@ function clearOn(b: HTMLElement, clear: () => void): void {
   });
 }
 
-export function cellFor(view: MarkbookView, column: AnyColumn, student: RosterStudent, actions: MarkbookActions, today: string): HTMLElement {
-  let cell = cellButton(view, column, student, actions, today);
+export type CellOptions = { /** Say "Delete to clear" in the label. Defaults to true. */ clearHint?: boolean };
+
+export function cellFor(
+  view: MarkbookView,
+  column: AnyColumn,
+  student: RosterStudent,
+  actions: MarkbookActions,
+  today: string,
+  options: CellOptions = {}
+): HTMLElement {
+  let cell = cellButton(view, column, student, actions, today, options.clearHint ?? true);
   if (student.removed && cell instanceof HTMLButtonElement) {
     // The server refuses writes for students no longer on the class list, so their rows are read-only.
     const span = el('span', cell.className);
@@ -45,7 +57,7 @@ export function cellFor(view: MarkbookView, column: AnyColumn, student: RosterSt
   return cell;
 }
 
-function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStudent, actions: MarkbookActions, today: string): HTMLElement {
+function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStudent, actions: MarkbookActions, today: string, hint: boolean): HTMLElement {
   const sid = student.id;
   if (column.kind === 'quiz') {
     const score = column.scores[sid];
@@ -72,14 +84,14 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
     const text = mark ? HANDIN_LABEL[mark.status] : '–';
     const b = button(`mb-cell mb-cell--handin${mark ? ` mb-chip--${mark.status}` : ''}`, text, `${column.title}, ${student.name}: ${text}`);
     b.addEventListener('click', () => actions.setMark(column.id, sid, nextHandin(mark, today)));
-    clearOn(b, () => actions.setMark(column.id, sid, null));
+    clearOn(b, () => actions.setMark(column.id, sid, null), hint);
     return b;
   }
   const mark = markOf<CheckMark>(view.markbook, column.id, sid);
   const text = mark === true ? '✓' : mark === false ? '✗' : typeof mark === 'number' ? String(mark) : '–';
   const b = button('mb-cell mb-cell--check', text, `${column.title}, ${student.name}: ${text}`);
   b.addEventListener('click', () => actions.setMark(column.id, sid, nextCheck(column.scale, mark)));
-  clearOn(b, () => actions.setMark(column.id, sid, null));
+  clearOn(b, () => actions.setMark(column.id, sid, null), hint);
   return b;
 }
 
