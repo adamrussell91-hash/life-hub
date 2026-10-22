@@ -314,6 +314,82 @@ test('a plain meal confirm leaves foodJournalUpdated out of the response', async
   assert.equal('foodJournalUpdated' in payload.data, false);
 });
 
+function recountFetch({ mealPath, mealSha, files = {} }) {
+  const journalSha = '9'.repeat(40);
+  const journal = {
+    schema_version: 1, recipes: [],
+    visits: [{ id: 'v1', date: '2026-08-01', title: '', notes: '', menu_text: '', venue: { name: '', address: '' },
+      dishes: [{ id: 'dish_1', title: 'Margherita', cuisine: '', meal_type: 'Dinner', tags: [], rating: null, notes: '', photos: [],
+        brisket: { meal_path: mealPath, portion: 'All', portion_fraction: 1, counted_at: '2026-08-01T15:00:00+10:00', needs_recount: false } }] }]
+  };
+  const tree = [
+    { path: 'data/food-journal/journal.json', type: 'blob', sha: journalSha },
+    { path: mealPath, type: 'blob', sha: mealSha },
+    ...Object.keys(files).map(path => ({ path, type: 'blob', sha: files[path] }))
+  ];
+  const meal = '---\ntype: "meal"\ndate: "2026-08-01"\nmeal: "dinner"\ncalories: 900\nprotein_g: 30\nfat_g: 40\n---\n';
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree });
+    if (url.includes(`/git/blobs/${journalSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(journal), 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${mealSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(meal, 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  return { calls, fetchImpl, tree };
+}
+
+const recountDinner = {
+  ...candidate,
+  time: '19:45',
+  fields: { ...candidate.fields, meal: 'dinner', food_dish_id: 'dish_1', portion: '½', portion_fraction: 0.5 }
+};
+
+test('re-counting a Food Journal dish overwrites its counted meal file', async () => {
+  const mealPath = 'data/nutrition/2026/08/2026-08-01-dinner-1930.md';
+  const mealSha = '7'.repeat(40);
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, mealPath);
+
+  const mealPuts = calls.filter(call => call.options?.method === 'PUT' && call.url.includes('/contents/data/nutrition/2026/08/'));
+  assert.equal(mealPuts.length, 1, 'only one dinner file is written for the date');
+  assert.match(mealPuts[0].url, /2026-08-01-dinner-1930\.md/);
+  assert.equal(JSON.parse(mealPuts[0].options.body).sha, mealSha);
+  assert.ok(!calls.some(call => call.url.includes('dinner-1945')));
+});
+
+test('re-counting on a different date writes a new meal file and leaves the old one alone', async () => {
+  const mealPath = 'data/nutrition/2026/07/2026-07-31-dinner-1930.md';
+  const mealSha = '7'.repeat(40);
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+
+  const mealPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('2026-08-01-dinner-1945.md'));
+  assert.ok(mealPut);
+  assert.equal(JSON.parse(mealPut.options.body).sha, undefined);
+  assert.ok(!calls.some(call => call.url.includes('2026-07-31-dinner-1930') && call.options?.method && call.options.method !== 'GET'));
+});
+
 test('enriches Exercise status and Recent Actions on completed workout confirm (no Day Type directive)', async () => {
   const workoutCandidate = {
     type: 'workout',

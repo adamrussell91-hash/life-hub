@@ -30,6 +30,7 @@ import {
 } from './_shared/exercise-library.mjs';
 import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes, syncCentralNodeAfterCreatineWrites } from './_shared/persist-log.mjs';
 import { mealDeletesFromWrites, resolveMealWritePath } from './_shared/delete-meal.mjs';
+import { findCountedMealPath } from './_shared/food-journal-meal-sync.mjs';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
@@ -388,17 +389,29 @@ export function createChatConfirmHandler({
         existingSha = target.existingSha;
         workoutNotesAmend = target.notesAmend === true || target.existingStatus === 'completed';
         retirePaths = Array.isArray(target.retirePaths) ? target.retirePaths : [];
-      } else if (validation.record.type === 'meal' && parsed.overwrite) {
+      } else if (validation.record.type === 'meal' && (validation.record.food_dish_id || parsed.overwrite)) {
         const current = await client.resolveTree();
-        const target = resolveMealWritePath(current.tree, {
-          date: validation.record.date,
-          meal: validation.record.meal,
-          slug: pathSlug,
-          overwrite: true
-        });
-        if (target) {
-          path = target.path;
-          existingSha = target.existingSha;
+        // A re-count of a Food Journal dish replaces the meal it was counted into.
+        const prior = validation.record.food_dish_id
+          ? await findCountedMealPath(client, current.tree, validation.record.food_dish_id, {
+            date: validation.record.date,
+            meal: validation.record.meal
+          })
+          : null;
+        if (prior) {
+          path = prior;
+          existingSha = current.tree.find(entry => entry.path === prior && entry.type === 'blob')?.sha;
+        } else if (parsed.overwrite) {
+          const target = resolveMealWritePath(current.tree, {
+            date: validation.record.date,
+            meal: validation.record.meal,
+            slug: pathSlug,
+            overwrite: true
+          });
+          if (target) {
+            path = target.path;
+            existingSha = target.existingSha;
+          }
         }
       } else if (parsed.overwrite) {
         const current = await client.resolveTree();
