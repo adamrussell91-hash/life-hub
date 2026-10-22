@@ -1,0 +1,26 @@
+/* packages/get-things-done/get-things-done.css
+   Gear Shifter's tokens, scoped to .gt-scope the way Decision Maker scopes .dm-scope. Adam's
+   palette (22 Oct): cobalt and vermilion for shapes, rings and gears, with amber as a sparing
+   accent (the centre gear, a done state). The bright colours fall under 4.5:1 on paper, so
+   small text takes the darker label shades. Motion matches the other two tools. */
+.gt-scope {
+  --gt-paper: #fefdf6;
+  --gt-ink: #2a3340;
+  --gt-blue: #2b7de9;
+  --gt-red: #ea4f2a;
+  --gt-amber: #f5a623;
+  --gt-blue-label: #2670d1;
+  --gt-red-label: #cd4524;
+  --gt-amber-label: #976615;
+  --gt-blue-tint: #e4eefb;
+  --gt-red-tint: #fbe9e4;
+  --gt-amber-tint: #fcf3e3;
+  --gt-soft: #f2f0e8;
+  --gt-line: #c9cbc4;
+  --gt-ghost: rgba(42, 51, 64, 0.12);
+  --gt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --gt-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gt-emblem { display: inline-flex; line-height: 0; }
+.gt-emblem svg { width: 100%; height: 100%; }
