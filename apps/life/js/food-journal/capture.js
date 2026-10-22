@@ -126,12 +126,24 @@ export const menuDishIndex = (visit, item) =>
       sameName(d.title, item.name) ||
       (isExtra(item) && hasLine(d, extraLine(item))),
   );
-// A ticked dish is untouched while Adam has added nothing of his own.
-const untouched = (dish) =>
+// A ticked dish is untouched while Adam has added nothing of his own: no
+// rating, tags, photos or notes, and ingredients still the menu's words.
+const untouched = (dish, item) =>
   dish.rating == null &&
   !dish.tags.length &&
   !dish.photos.length &&
-  !String(dish.notes || "").trim();
+  !String(dish.notes || "").trim() &&
+  [
+    "",
+    String(item.description || "").trim(),
+    String(item.description_en || "").trim(),
+  ].includes(
+    String(dish.ingredients || "")
+      .split("\n")
+      .filter((l) => !l.startsWith("+ "))
+      .join("\n")
+      .trim(),
+  );
 // Ticking a menu item adds it as a dish, using the blank starter dish first,
 // with the menu's ingredients in ingredients. Ticking an extra adds a line to
 // the last dish's ingredients. Unticking removes it only while untouched.
@@ -142,7 +154,10 @@ export function toggleMenuDish(visit, item) {
   if (index < 0) {
     const last = next.dishes.findLast((d) => d.title.trim());
     if (isExtra(item) && last) {
-      last.ingredients = [String(last.ingredients || "").trimEnd(), extraLine(item)]
+      last.ingredients = [
+        String(last.ingredients || "").trimEnd(),
+        extraLine(item),
+      ]
         .filter(Boolean)
         .join("\n");
       return next;
@@ -151,7 +166,8 @@ export function toggleMenuDish(visit, item) {
     const blank = next.dishes.find((d) => !d.title.trim());
     if (blank) {
       blank.title = item.name;
-      if (!String(blank.ingredients || "").trim()) blank.ingredients = ingredients;
+      if (!String(blank.ingredients || "").trim())
+        blank.ingredients = ingredients;
     } else next.dishes.push({ ...newDish(), title: item.name, ingredients });
     return next;
   }
@@ -161,7 +177,7 @@ export function toggleMenuDish(visit, item) {
     dish.notes = dropLine(dish.notes, extraLine(item));
     return next;
   }
-  if (!untouched(dish)) {
+  if (!untouched(dish, item)) {
     if (!String(dish.ingredients || "").trim())
       dish.ingredients = String(item.description || "");
     return next;
