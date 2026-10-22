@@ -48,6 +48,15 @@ export type DmQuickState = { path: DmQuickEntry[]; rounds: number; finishedAt: s
 /** What a full decision starts from when a quick run goes deeper; seeds, not answers. */
 export type DmQuickSeeds = { from: 'quick'; decision: string; known: string | null; tests: { test: string; answer: 'yes' | 'no' | null }[]; stopRule: { trigger: string; action: string | null } | null };
 
+/** Gear Shifter's Quick start (packages/get-things-done/quick.mjs). */
+export type GtStartNodeId = 'task' | 'action' | 'how' | 'cue' | 'check' | 'happened' | 'next';
+export type GtStartWay = 'countdown' | 'interval';
+export type GtStartEntry = { node: GtStartNodeId; round: number; at: string; answer?: GtStartWay; note?: string };
+/** The latest dated check-back, and the task made for it (or set aside with Not now). */
+export type GtStartState = { path: GtStartEntry[]; rounds: number; finishedAt: string | null; escalatedTo: string | null; check: DmQuickCheck | null };
+/** What a full session starts from when a Quick start goes deeper; seeds, not answers. */
+export type GtStartSeeds = { from: 'start'; need: string; known: string | null; action: string | null; way: GtStartWay | null; cue: string | null };
+
 /** A confirmed task's live state, passed from the page to a chart (never stored). */
 export type PsTaskLink = { nodeId: string; taskId: string; status: string };
 
@@ -88,8 +97,10 @@ export type PsSession = {
   lightning: PsLightningState | null;
   /** Decision Maker: a quick decision's run. */
   quick?: DmQuickState | null;
+  /** Gear Shifter: a Quick start's run. */
+  start?: GtStartState | null;
   escalatedFrom: string | null;
-  frameSeeds: PsFrameSeeds | DmQuickSeeds | null;
+  frameSeeds: PsFrameSeeds | DmQuickSeeds | GtStartSeeds | null;
   taskSnapshot: PsTaskSnapshot | null;
   detour: PsDetour | null;
   createdAt: string;
@@ -98,7 +109,7 @@ export type PsSession = {
 
 export type PsSummary = Pick<PsSession, 'id' | 'title' | 'status' | 'phase' | 'links' | 'createdAt' | 'updatedAt'> & { kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift' | 'start'; escalatedTo?: string | null; outcome?: 'proceed' | 'stop' | null; model: PsModelId | null; tool: PsToolId | null; frame?: number; skills?: Record<string, number>; taskIds?: string[]; reviewTaskId?: string | null; reviewDue?: string | null; main?: string | null };
 
-export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file' | 'lightning_answer' | 'lightning_again' | 'quick_answer' | 'quick_again' | 'quick_check' | 'escalate';
+export type PsAction = 'say' | 'keep_anyway' | 'accept_suggestion' | 'dismiss_suggestion' | 'move_on' | 'rename' | 'archive' | 'score' | 'rescore_radar' | 'retry' | 'confirm_task' | 'dismiss_task' | 'set_review_task' | 'dismiss_review' | 'start_review' | 'task_status' | 'link_case_file' | 'dismiss_case_file' | 'lightning_answer' | 'lightning_again' | 'quick_answer' | 'quick_again' | 'quick_check' | 'start_answer' | 'start_again' | 'start_check' | 'escalate';
 
 export type PsCaseFileTarget = { kind: 'task' | 'project'; id: string };
 /** What was written where: the section digests written, so later changes can be found. */
