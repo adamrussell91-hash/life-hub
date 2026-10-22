@@ -109,8 +109,15 @@ const sameName = (a, b) =>
 // Extras (add bacon, a side of hash brown) ride on a dish as "+ name" lines.
 const isExtra = (item) => item.kind === "extra";
 const extraLine = (item) => `+ ${item.name}`;
-const hasLine = (dish, line) =>
-  dish.notes.split("\n").some((l) => sameName(l, line));
+// Older dishes carry extras in notes; new ones carry them in ingredients.
+const lines = (dish) =>
+  [dish.ingredients || "", dish.notes || ""].join("\n").split("\n");
+const hasLine = (dish, line) => lines(dish).some((l) => sameName(l, line));
+const dropLine = (value, line) =>
+  String(value || "")
+    .split("\n")
+    .filter((l) => !sameName(l, line))
+    .join("\n");
 // The dish a menu item became, or -1. An extra is on the dish that carries
 // its line, or is a dish of its own when nothing was ticked before it.
 export const menuDishIndex = (visit, item) =>
@@ -119,51 +126,48 @@ export const menuDishIndex = (visit, item) =>
       sameName(d.title, item.name) ||
       (isExtra(item) && hasLine(d, extraLine(item))),
   );
-// A ticked dish is untouched while its notes are still the menu's own
-// ingredients plus any ticked extras.
-const untouched = (dish, item) =>
+// A ticked dish is untouched while Adam has added nothing of his own.
+const untouched = (dish) =>
   dish.rating == null &&
   !dish.tags.length &&
   !dish.photos.length &&
-  dish.notes
-    .split("\n")
-    .filter((l) => !l.startsWith("+ "))
-    .join("\n")
-    .trim() === String(item.description || "").trim();
+  !String(dish.notes || "").trim();
 // Ticking a menu item adds it as a dish, using the blank starter dish first,
-// with the menu's ingredients as its notes so a recipe has them. Ticking an
-// extra adds it to the last dish instead. Unticking removes it only while it
-// is untouched. The last dish turns blank rather than going.
+// with the menu's ingredients in ingredients. Ticking an extra adds a line to
+// the last dish's ingredients. Unticking removes it only while untouched.
+// The last dish turns blank rather than going.
 export function toggleMenuDish(visit, item) {
   const next = structuredClone(visit),
     index = menuDishIndex(next, item);
   if (index < 0) {
     const last = next.dishes.findLast((d) => d.title.trim());
     if (isExtra(item) && last) {
-      last.notes = [last.notes.trimEnd(), extraLine(item)]
+      last.ingredients = [String(last.ingredients || "").trimEnd(), extraLine(item)]
         .filter(Boolean)
         .join("\n");
       return next;
     }
-    const notes = String(item.description || "");
+    const ingredients = String(item.description || "");
     const blank = next.dishes.find((d) => !d.title.trim());
     if (blank) {
       blank.title = item.name;
-      if (!blank.notes.trim()) blank.notes = notes;
-    } else next.dishes.push({ ...newDish(), title: item.name, notes });
+      if (!String(blank.ingredients || "").trim()) blank.ingredients = ingredients;
+    } else next.dishes.push({ ...newDish(), title: item.name, ingredients });
     return next;
   }
   const dish = next.dishes[index];
   if (!sameName(dish.title, item.name)) {
-    dish.notes = dish.notes
-      .split("\n")
-      .filter((l) => !sameName(l, extraLine(item)))
-      .join("\n");
+    dish.ingredients = dropLine(dish.ingredients, extraLine(item));
+    dish.notes = dropLine(dish.notes, extraLine(item));
     return next;
   }
-  if (!untouched(dish, item)) return next;
+  if (!untouched(dish)) {
+    if (!String(dish.ingredients || "").trim())
+      dish.ingredients = String(item.description || "");
+    return next;
+  }
   if (next.dishes.length > 1) next.dishes.splice(index, 1);
-  else Object.assign(dish, { title: "", notes: "" });
+  else Object.assign(dish, { title: "", notes: "", ingredients: "" });
   return next;
 }
 
