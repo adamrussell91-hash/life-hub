@@ -280,7 +280,9 @@ const REGISTRY = new Map([
       cardinality: 'many_to_many',
       temporalMode: 'point',
       roleMode: 'optional_text',
-      allowedRoles: ['chair', 'minute_taker', 'facilitator', 'presenter']
+      allowedRoles: ['chair', 'minute_taker', 'facilitator', 'presenter'],
+      // The organisation they attend for, when they hold more than one job.
+      metadataKeys: ['organisation_ref']
     })
   ],
   [

@@ -10,10 +10,16 @@ export type RoomPerson = {
   /** False when neither the People directory nor its Students list knows this person. */
   known: boolean;
   student: boolean;
+  /** The organisation this person is grouped under for this meeting. */
+  organisationRef: string | null;
+  /** Their current organisations when there is more than one to choose from. */
+  organisationChoices: RoomOrganisation[];
 };
+export type RoomOrganisation = { ref: string; display_name: string; monogram: string };
 export type RoomCluster = { organisation: string | null; monogram: string | null; people: RoomPerson[] };
 
-type DirectoryLike = Pick<DirectoryPersonRow, 'ref' | 'display_name' | 'initials' | 'organisation' | 'warmth_band' | 'created_at'> & Partial<Pick<DirectoryPersonRow, 'person_type'>>;
+type DirectoryLike = Pick<DirectoryPersonRow, 'ref' | 'display_name' | 'initials' | 'organisation' | 'warmth_band' | 'created_at'> &
+  Partial<Pick<DirectoryPersonRow, 'person_type' | 'organisations'>>;
 
 const DOTS: Record<DirectoryPersonRow['warmth_band'], 1 | 2 | 3> = { warm: 3, cooling: 2, cold: 1 };
 const NEW_MS = 14 * 86_400_000;
@@ -57,23 +63,69 @@ export function indexDirectory<T extends Pick<DirectoryLike, 'ref' | 'display_na
   return { byRef, byName };
 }
 
+/** A person's current organisations, their main one first. */
+function currentOrganisations(row: DirectoryLike): RoomOrganisation[] {
+  const list: RoomOrganisation[] = [];
+  const add = (org: { ref: string; display_name: string; monogram: string } | null | undefined) => {
+    if (org && !list.some((entry) => entry.ref === org.ref)) list.push({ ref: org.ref, display_name: org.display_name, monogram: org.monogram });
+  };
+  if (row.organisation?.current !== false) add(row.organisation);
+  for (const org of row.organisations ?? []) if (org.current) add(org);
+  return list;
+}
+
 /**
- * Attendees grouped by their current organisation (biggest group first, chairs first
- * inside a group). Warmth comes from the People directory, the same number People shows.
+ * Which job someone is here in: the one picked for this meeting, else the
+ * organisation most others in the room share, else their main one.
+ */
+function organisationFor(
+  row: DirectoryLike,
+  picked: string | null | undefined,
+  shared: Map<string, number>
+): RoomOrganisation | null {
+  const choices = currentOrganisations(row);
+  const all = [...choices, ...(row.organisations ?? [])];
+  const chosen = picked ? all.find((org) => org.ref === picked) : undefined;
+  if (chosen) return { ref: chosen.ref, display_name: chosen.display_name, monogram: chosen.monogram };
+  if (choices.length < 2) return choices[0] ?? (row.organisation ? { ...row.organisation } : null);
+  let best = choices[0]!;
+  let bestCount = 0;
+  for (const org of choices) {
+    // Shared counts include this person once; only others decide.
+    const others = (shared.get(org.ref) ?? 0) - 1;
+    if (others > bestCount) {
+      best = org;
+      bestCount = others;
+    }
+  }
+  return best;
+}
+
+/**
+ * Attendees grouped by the organisation they're here for (biggest group first, chairs first
+ * inside a group). Someone with several jobs sits under the one picked for this
+ * meeting, else the one most others in the room share. Warmth comes from the People directory, the same number People shows.
  * An attendee the directory doesn't know keeps the name on its link.
  */
 export function groupRoom(
-  attendees: Array<{ ref: string; role: string | null; name?: string | null }>,
+  attendees: Array<{ ref: string; role: string | null; name?: string | null; organisationRef?: string | null }>,
   directory: DirectoryLike[],
   now: Date
 ): RoomCluster[] {
   const { byRef, byName } = indexDirectory(directory);
+  const rows = attendees.map((attendee) => directoryRowFor(attendee, byRef, byName));
+  const shared = new Map<string, number>();
+  for (const row of rows) {
+    if (!row) continue;
+    for (const org of currentOrganisations(row)) shared.set(org.ref, (shared.get(org.ref) ?? 0) + 1);
+  }
   const clusters = new Map<string, RoomCluster>();
-  for (const attendee of attendees) {
-    const row = directoryRowFor(attendee, byRef, byName);
-    const orgName = row?.organisation?.display_name ?? null;
+  attendees.forEach((attendee, index) => {
+    const row = rows[index];
+    const org = row ? organisationFor(row, attendee.organisationRef, shared) : null;
+    const orgName = org?.display_name ?? null;
     const key = orgName ?? '\u0000none';
-    if (!clusters.has(key)) clusters.set(key, { organisation: orgName, monogram: row?.organisation?.monogram ?? null, people: [] });
+    if (!clusters.has(key)) clusters.set(key, { organisation: orgName, monogram: org?.monogram ?? null, people: [] });
     const name = row?.display_name ?? attendee.name ?? 'Unknown person';
     clusters.get(key)!.people.push({
       ref: attendee.ref,
@@ -83,9 +135,11 @@ export function groupRoom(
       warmthDots: row ? DOTS[row.warmth_band] : 1,
       isNew: row ? now.getTime() - Date.parse(row.created_at) <= NEW_MS : false,
       known: Boolean(row),
-      student: row?.person_type === 'student'
+      student: row?.person_type === 'student',
+      organisationRef: org?.ref ?? null,
+      organisationChoices: row ? currentOrganisations(row) : []
     });
-  }
+  });
   const rolesFirst = (person: RoomPerson) => (person.role === 'chair' ? 0 : person.role ? 1 : 2);
   const list = [...clusters.values()];
   for (const cluster of list) cluster.people.sort((a, b) => rolesFirst(a) - rolesFirst(b));
