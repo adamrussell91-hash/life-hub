@@ -35,11 +35,16 @@ export function createFoodJournalApi(fetchImpl) {
           new URLSearchParams({ lat: String(gps.lat), lon: String(gps.lon), q }),
       ),
     load: () => request("/api/food-journal"),
-    save: (journal, version) =>
+    save: (journal, version, removeMeals = [], clearRecount = []) =>
       request("/api/food-journal", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ journal, if_version: version }),
+        body: JSON.stringify({
+          journal,
+          if_version: version,
+          ...(removeMeals.length ? { remove_meals: removeMeals } : {}),
+          ...(clearRecount.length ? { clear_recount: clearRecount } : {}),
+        }),
       }),
     async assist(body) {
       // The API starts the background run itself; see food-journal-assist.
@@ -60,7 +65,19 @@ export function createFoodJournalApi(fetchImpl) {
       }
       throw new Error("Research took too long. Try again.");
     },
+    translate: (text) =>
+      post("/api/food-journal-process", { action: "translate", text }),
     media: (body) => post("/api/food-journal-media", body),
+    // A dish photo's JPEG, read by the function rather than from the bucket.
+    async photo(key) {
+      const { jpeg } = await post("/api/food-journal-media", {
+        action: "bytes",
+        key,
+      });
+      return new Blob([Uint8Array.from(atob(jpeg), (c) => c.charCodeAt(0))], {
+        type: "image/jpeg",
+      });
+    },
     // The function stores the photo, so no browser PUT to R2 is needed.
     upload: (blob) =>
       request("/api/food-journal-media", {

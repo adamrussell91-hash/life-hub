@@ -1,5 +1,5 @@
 import { loadCreatineSnapshot, applyCreatineSummary } from './creatine-store.mjs';
-import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
+import { getSydneyDateKey, getSydneyTimestamp } from '../../../apps/life/js/core/time.js';
 import { load } from 'js-yaml';
 import { parseEventDocument, TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
 import {
@@ -19,6 +19,7 @@ import {
 } from '../../../apps/life/js/core/governance-log.js';
 import { AGENTS } from './agent-directory.mjs';
 import { decodeBlob } from './decode-blob.mjs';
+import { syncFoodJournalAfterMeal } from './food-journal-meal-sync.mjs';
 import { loadCentralNodeSeed } from './load-central-node-seed.mjs';
 import {
   plannedWriteWouldDowngrade,
@@ -137,6 +138,18 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
       centralNodeUpdated = false;
     }
   }
+  // null when the meal names no dish, so the chat only warns about a real miss.
+  let foodJournalUpdated = null;
+  let foodJournalReason;
+  if (record.type === 'meal' && record.food_dish_id) {
+    try {
+      const out = await retryWriteConflict(() => syncFoodJournalAfterMeal(client, record, path, getSydneyTimestamp(now)));
+      foodJournalUpdated = out?.updated === true;
+      if (out?.reason) foodJournalReason = out.reason;
+    } catch {
+      foodJournalUpdated = false;
+    }
+  }
   let governanceUpdated = false;
   if (record.type === 'mind_session' && typeof record.insight === 'string' && record.insight.trim()) {
     try {
@@ -146,7 +159,14 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
       governanceUpdated = false;
     }
   }
-  return { sha: result.sha, commitSha: result.commitSha, centralNodeUpdated, governanceUpdated };
+  return {
+    sha: result.sha,
+    commitSha: result.commitSha,
+    centralNodeUpdated,
+    governanceUpdated,
+    foodJournalUpdated,
+    ...(foodJournalReason ? { foodJournalReason } : {})
+  };
 }
 
 function agentNameForType(type) {

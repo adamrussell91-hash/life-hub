@@ -265,6 +265,237 @@ test('confirm still succeeds and reports centralNodeUpdated:false when the centr
   assert.equal(putCalls.length, 1, 'only the meal write should happen; central-node.md must not be written on a decode failure');
 });
 
+test('a meal with a Food Journal dish marks the dish counted and reports foodJournalUpdated', async () => {
+  const journalSha = '9'.repeat(40);
+  const journal = {
+    schema_version: 1, recipes: [],
+    visits: [{ id: 'v1', date: '2026-08-01', title: '', notes: '', menu_text: '', venue: { name: '', address: '' },
+      dishes: [{ id: 'dish_1', title: 'Margherita', cuisine: '', meal_type: 'Dinner', tags: [], rating: null, notes: '', photos: [] }] }]
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'data/food-journal/journal.json', type: 'blob', sha: journalSha }] });
+    }
+    if (url.includes(`/git/blobs/${journalSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(journal), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+  const dinner = { ...candidate, fields: { ...candidate.fields, meal: 'dinner', food_dish_id: 'dish_1', portion: '½', portion_fraction: 0.5 } };
+
+  const response = await handler(request({ candidate: dinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.foodJournalUpdated, true);
+  const journalPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('food-journal/journal.json'));
+  assert.ok(journalPut, 'expected a journal.json write');
+  const body = JSON.parse(journalPut.options.body);
+  assert.equal(body.sha, journalSha);
+  const saved = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+  assert.equal(saved.visits[0].dishes[0].brisket.meal_path, payload.data.path);
+  assert.equal(saved.visits[0].dishes[0].brisket.portion_fraction, 0.5);
+});
+
+test('a meal for a deleted Food Journal dish says the dish is missing', async () => {
+  const journalSha = '9'.repeat(40);
+  const journal = { schema_version: 1, recipes: [], visits: [] };
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    if (url.includes('/git/trees/')) return Response.json({ tree: [{ path: 'data/food-journal/journal.json', type: 'blob', sha: journalSha }] });
+    if (url.includes(`/git/blobs/${journalSha}`)) return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(journal), 'utf8').toString('base64') });
+    if (options?.method === 'PUT') return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+  const dinner = { ...candidate, fields: { ...candidate.fields, meal: 'dinner', food_dish_id: 'dish_1', portion: 'All', portion_fraction: 1 } };
+  const payload = await (await handler(request({ candidate: dinner, slug: 'brisket' }))).json();
+  assert.equal(payload.data.foodJournalUpdated, false);
+  assert.equal(payload.data.foodJournalReason, 'dish_missing');
+});
+
+test('a plain meal confirm leaves foodJournalUpdated out of the response', async () => {
+  const { fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+  const response = await handler(request({ candidate, slug: 'breakfast' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal('foodJournalUpdated' in payload.data, false);
+});
+
+function recountFetch({ mealPath, mealSha, files = {}, oldDishId = 'dish_1', deleteStatus = 200, journalPutStatus = 200 }) {
+  const journalSha = '9'.repeat(40);
+  const journal = {
+    schema_version: 1, recipes: [],
+    visits: [{ id: 'v1', date: '2026-08-01', title: '', notes: '', menu_text: '', venue: { name: '', address: '' },
+      dishes: [{ id: 'dish_1', title: 'Margherita', cuisine: '', meal_type: 'Dinner', tags: [], rating: null, notes: '', photos: [],
+        brisket: { meal_path: mealPath, portion: 'All', portion_fraction: 1, counted_at: '2026-08-01T15:00:00+10:00', needs_recount: false } }] }]
+  };
+  const tree = [
+    { path: 'data/food-journal/journal.json', type: 'blob', sha: journalSha },
+    { path: mealPath, type: 'blob', sha: mealSha },
+    ...Object.keys(files).map(path => ({ path, type: 'blob', sha: files[path] }))
+  ];
+  const meal = `---\ntype: "meal"\ndate: "2026-08-01"\nmeal: "dinner"\ncalories: 900\nprotein_g: 30\nfat_g: 40\n${oldDishId ? `food_dish_id: "${oldDishId}"\n` : ''}---\n`;
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree });
+    if (url.includes(`/git/blobs/${journalSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(journal), 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${mealSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(meal, 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT' && url.includes('food-journal/journal.json') && journalPutStatus !== 200) {
+      return Response.json({ message: 'boom' }, { status: journalPutStatus });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (options?.method === 'DELETE') {
+      return deleteStatus === 200
+        ? Response.json({ commit: { sha: 'e'.repeat(40) } })
+        : Response.json({ message: 'boom' }, { status: deleteStatus });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  return { calls, fetchImpl, tree };
+}
+
+const recountDinner = {
+  ...candidate,
+  time: '19:45',
+  fields: { ...candidate.fields, meal: 'dinner', food_dish_id: 'dish_1', portion: '½', portion_fraction: 0.5 }
+};
+
+test('re-counting a Food Journal dish overwrites its counted meal file', async () => {
+  const mealPath = 'data/nutrition/2026/08/2026-08-01-dinner-1930.md';
+  const mealSha = '7'.repeat(40);
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, mealPath);
+
+  const mealPuts = calls.filter(call => call.options?.method === 'PUT' && call.url.includes('/contents/data/nutrition/2026/08/'));
+  assert.equal(mealPuts.length, 1, 'only one dinner file is written for the date');
+  assert.match(mealPuts[0].url, /2026-08-01-dinner-1930\.md/);
+  assert.equal(JSON.parse(mealPuts[0].options.body).sha, mealSha);
+  assert.ok(!calls.some(call => call.url.includes('dinner-1945')));
+});
+
+test('re-counting on a different date writes a new meal file and deletes the old count', async () => {
+  const mealPath = 'data/nutrition/2026/07/2026-07-31-dinner-1930.md';
+  const mealSha = '7'.repeat(40);
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+  assert.equal(payload.data.oldCountRemoved, true);
+
+  const mealPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('2026-08-01-dinner-1945.md'));
+  assert.ok(mealPut);
+  assert.equal(JSON.parse(mealPut.options.body).sha, undefined);
+  const deletes = calls.filter(call => call.options?.method === 'DELETE');
+  assert.equal(deletes.length, 1);
+  assert.match(deletes[0].url, /2026-07-31-dinner-1930\.md/);
+  assert.equal(JSON.parse(deletes[0].options.body).sha, mealSha);
+  assert.ok(calls.indexOf(mealPut) < calls.indexOf(deletes[0]), 'the new meal lands before the old one goes');
+});
+
+test('re-counting into another slot leaves an old file that names a different dish alone', async () => {
+  const mealPath = 'data/nutrition/2026/08/2026-08-01-lunch-1230.md';
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), oldDishId: 'dish_2' });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+  assert.equal('oldCountRemoved' in payload.data, false);
+  assert.equal(calls.some(call => call.options?.method === 'DELETE'), false);
+});
+
+test('a failed delete of the old count still confirms and reports oldCountRemoved:false', async () => {
+  const mealPath = 'data/nutrition/2026/07/2026-07-31-dinner-1930.md';
+  const { fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), deleteStatus: 500 });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+  assert.equal(payload.data.oldCountRemoved, false);
+});
+
+test('a re-count never overwrites a meal at the counted path that is not this dish\'s', async () => {
+  const mealPath = 'data/nutrition/2026/08/2026-08-01-dinner-1930.md';
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), oldDishId: null });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+  assert.equal('oldCountRemoved' in payload.data, false);
+  const mealPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('2026-08-01-dinner-1945.md'));
+  assert.equal(JSON.parse(mealPut.options.body).sha, undefined);
+  assert.ok(!calls.some(call => call.url.includes('dinner-1930') && ['PUT', 'DELETE'].includes(call.options?.method)));
+});
+
+test('a cross-date re-count keeps the old file when the Food Journal write fails', async () => {
+  const mealPath = 'data/nutrition/2026/07/2026-07-31-dinner-1930.md';
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), journalPutStatus: 500 });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 409);
+  assert.equal(payload.error.code, 'recount_not_saved');
+  assert.equal(payload.error.message, 'The re-count didn\u2019t save; try again.');
+  assert.equal(payload.data, undefined, 'no oldCountRemoved or other flags on a rollback');
+
+  const newPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('2026-08-01-dinner-1945.md'));
+  assert.ok(newPut, 'the new meal was written first');
+  const deletes = calls.filter(call => call.options?.method === 'DELETE');
+  assert.equal(deletes.length, 1, 'only the new file is deleted');
+  assert.match(deletes[0].url, /2026-08-01-dinner-1945\.md/);
+  assert.equal(JSON.parse(deletes[0].options.body).sha, 'a'.repeat(40), 'deleted with the sha the write returned');
+  assert.ok(!calls.some(call => call.url.includes('2026-07-31-dinner-1930') && ['PUT', 'DELETE'].includes(call.options?.method)));
+});
+
+test('a failed rollback of an unlinked re-count reports recountRollbackFailed', async () => {
+  const mealPath = 'data/nutrition/2026/07/2026-07-31-dinner-1930.md';
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), journalPutStatus: 500, deleteStatus: 500 });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+  assert.equal(payload.data.foodJournalUpdated, false);
+  assert.equal(payload.data.recountRollbackFailed, true);
+  assert.equal('oldCountRemoved' in payload.data, false);
+  assert.ok(!calls.some(call => call.url.includes('2026-07-31-dinner-1930') && call.options?.method === 'DELETE'));
+});
+
 test('enriches Exercise status and Recent Actions on completed workout confirm (no Day Type directive)', async () => {
   const workoutCandidate = {
     type: 'workout',

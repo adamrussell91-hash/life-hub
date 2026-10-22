@@ -593,3 +593,30 @@ test('planned Cindy AMRAP gets round-slots; completed trimmed AMRAP stays trimme
   assert.equal(completed.record.exercises[1].sets.length, 2);
   assert.equal(completed.record.exercises[0].block.result.rounds, 2);
 });
+
+const dishLinkBase = {
+  type: 'meal', date: '2026-10-22', time: '19:30', notes: 'Pizza, half',
+  fields: { meal: 'dinner', calories: 620, protein_g: 26, fat_g: 24, sodium_mg: 900, calcium_mg: 150, polyphenol_score: 2, omega3: 'none' }
+};
+const dishLinkCtx = { id: 'meal-x', now: '2026-10-22T19:31:00+11:00' };
+
+test('a meal may name its Food Journal dish and portion', () => {
+  const out = validateLogEntry({ ...dishLinkBase, fields: { ...dishLinkBase.fields, food_dish_id: 'dish_1f2e', portion: '½', portion_fraction: 0.5 } }, dishLinkCtx);
+  assert.equal(out.valid, true, JSON.stringify(out.errors));
+  assert.equal(out.record.food_dish_id, 'dish_1f2e');
+  assert.equal(out.record.portion, '½');
+  assert.equal(out.record.portion_fraction, 0.5);
+});
+
+test('a bad dish id or portion fraction is refused', () => {
+  for (const extra of [
+    { food_dish_id: 'dish_1', portion: 'x', portion_fraction: 2 },
+    { food_dish_id: 'dish_1', portion_fraction: 0 },
+    { food_dish_id: 'bad id!', portion_fraction: 0.5 },
+    { food_dish_id: 'a'.repeat(101), portion_fraction: 0.5 },
+    { food_dish_id: 'dish_1', portion: 'x'.repeat(41) }
+  ]) {
+    const out = validateLogEntry({ ...dishLinkBase, fields: { ...dishLinkBase.fields, ...extra } }, dishLinkCtx);
+    assert.equal(out.valid, false, JSON.stringify(extra));
+  }
+});

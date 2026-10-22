@@ -128,6 +128,17 @@ test("Custom Menu combines independent filters and searchable dish text", () => 
   j.visits[0].status = "deleted";
   assert.equal(menuDishes(j).length, 0);
 });
+test("Custom Menu search finds English titles, ingredients and English notes", () => {
+  const j = fixture();
+  Object.assign(j.visits[0].dishes[0], {
+    title: "Tortilla",
+    title_en: "Spanish omelette",
+    ingredients: "Egg, potato",
+    notes_en: "Very tasty",
+  });
+  for (const query of ["omelette", "potato", "tasty"])
+    assert.equal(menuDishes(j, { query }).length, 1, query);
+});
 test("schema rejects invalid ratings, dates, duplicate dishes and foreign photo keys", () => {
   for (const mutate of [
     (j) => (j.visits[0].dishes[0].rating = 6),
@@ -344,6 +355,55 @@ test("media reads require a live journal reference and uploads use food namespac
   assert.match(key, /^food\/photos\/photo_[\w-]+\.jpg$/);
   assert.deepEqual([...stored.get(key)], [...jpeg]);
   assert.equal((await upload(new Uint8Array([1, 2, 3, 4]))).status, 400);
+});
+test("media bytes serve a live photo's JPEG and 404 for an unreferenced key", async () => {
+  resetRateLimits();
+  const j = fixture();
+  j.visits[0].dishes[0].photos = [
+    { id: "photo_1", key: "food/photos/photo_1.jpg" },
+  ];
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 7, 8, 9]);
+  const asked = [];
+  const h = createFoodJournalMediaHandler(
+    deps(repo(j), {
+      headObject: async () => ({ size: jpeg.length }),
+      getObject: async ({ key }) => {
+        asked.push(key);
+        if (key !== "food/photos/photo_1.jpg")
+          throw Object.assign(new Error("missing"), { name: "NoSuchKey" });
+        return jpeg;
+      },
+      env: {
+        ...env,
+        R2_ACCOUNT_ID: "a",
+        R2_BUCKET: "b",
+        R2_ACCESS_KEY_ID: "k",
+        R2_SECRET_ACCESS_KEY: "s",
+      },
+    }),
+  );
+  const ok = await h(req("POST", { action: "bytes", key: "food/photos/photo_1.jpg" }));
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(
+    [...Buffer.from((await ok.json()).data.jpeg, "base64")],
+    [...jpeg],
+  );
+  const other = await h(req("POST", { action: "bytes", key: "food/photos/other.jpg" }));
+  assert.equal(other.status, 404);
+  // An unreferenced key is never read from the bucket.
+  assert.deepEqual(asked, ["food/photos/photo_1.jpg"]);
+  assert.equal(
+    (await h(req("POST", { action: "bytes", key: "../secret.jpg" }))).status,
+    400,
+  );
+  const signedOut = createFoodJournalMediaHandler(
+    deps(repo(j), { verifySessionToken: () => ({ valid: false }) }),
+  );
+  assert.equal(
+    (await signedOut(req("POST", { action: "bytes", key: "food/photos/photo_1.jpg" }))).status,
+    401,
+  );
 });
 // The page lives on life-hub.adam-russell.com and the API on another host, so
 // Safari reports "Load failed" for any answer that lacks CORS headers.
@@ -1084,6 +1144,32 @@ test("capture action returns the items on a menu photo, cleaned", async () => {
     { name: "Fries", description: "", price: "", kind: "dish" },
   ]);
 });
+test("translate action returns English for non-English notes and nothing for English", async () => {
+  resetRateLimits();
+  const calls = [];
+  const complete = async (opts) => {
+    calls.push(opts.model);
+    return opts.messages[0].content.includes("riquísimo")
+      ? JSON.stringify({ english: false, text: "delicious, very garlicky" })
+      : JSON.stringify({ english: true, text: "" });
+  };
+  const h = createFoodJournalProcessHandler(deps(repo(fixture()), { complete }));
+  let res = await h(req("POST", { action: "translate", text: "riquísimo, mucho ajo" }));
+  assert.deepEqual((await res.json()).data, { text_en: "delicious, very garlicky" });
+  res = await h(req("POST", { action: "translate", text: "Great chips — loved it ’cause it’s crispy 😋" }));
+  assert.deepEqual((await res.json()).data, { text_en: "" });
+  assert.equal(calls.length, 1, "English with curly quotes, dashes and emoji skips the model");
+  assert.equal(calls[0], "claude-haiku-5-5");
+  res = await h(req("POST", { action: "translate", text: "Café was fine" }));
+  assert.deepEqual((await res.json()).data, { text_en: "" });
+  assert.equal(calls.length, 2, "an accented letter calls the model");
+  res = await h(req("POST", { action: "translate", text: "x".repeat(20001) }));
+  assert.equal(res.status, 400);
+  for (let i = 0; i < 9; i++) {
+    res = await h(req("POST", { action: "translate", text: "riquísimo " + i }));
+    assert.equal(res.status, 200, "translate has its own limit bucket");
+  }
+});
 test("menu items merge across photos without repeats and are kept on the visit", () => {
   const v = newVisit();
   let next = mergeCapture(v, {
@@ -1128,26 +1214,42 @@ test("ticking a menu item adds it as a dish; unticking removes it only if untouc
   assert.equal(plain.dishes.length, 1);
   assert.equal(plain.dishes[0].title, "");
 });
-test("ticking a menu dish copies its ingredients into the dish notes", () => {
+test("ticking a menu dish puts its ingredients in ingredients and leaves notes alone", () => {
   const v = newVisit();
   v.menu_items = [
     { name: "Morning steak", description: "150g sirloin, hash, chimichurri", price: "32", kind: "dish" },
     { name: "Smashed avo", description: "Poached eggs, feta", price: "22", kind: "dish" },
   ];
   let next = toggleMenuDish(v, v.menu_items[0]);
-  assert.equal(next.dishes[0].notes, "150g sirloin, hash, chimichurri");
+  assert.equal(next.dishes[0].ingredients, "150g sirloin, hash, chimichurri");
+  assert.equal(next.dishes[0].notes, "");
   next = toggleMenuDish(next, v.menu_items[1]);
-  assert.equal(next.dishes[1].notes, "Poached eggs, feta");
-  // Still the menu's words, so unticking removes it.
+  assert.equal(next.dishes[1].ingredients, "Poached eggs, feta");
   next = toggleMenuDish(next, v.menu_items[1]);
   assert.deepEqual(next.dishes.map((d) => d.title), ["Morning steak"]);
-  // Once Adam writes his own notes, it stays.
-  next.dishes[0].notes += ". Cooked perfectly";
+  // Adam's own words make it stay.
+  next.dishes[0].notes = "Cooked perfectly";
   assert.equal(toggleMenuDish(next, v.menu_items[0]).dishes.length, 1);
-  assert.equal(menuDishIndex(next, v.menu_items[0]), 0);
-  // The last dish goes blank, notes and all.
+  // A dish that already has notes still gets the ingredients.
+  const noted = newVisit();
+  noted.menu_items = v.menu_items;
+  noted.dishes[0].title = "Morning steak";
+  noted.dishes[0].notes = "From the photo";
+  const filled = toggleMenuDish(noted, v.menu_items[0]);
+  assert.equal(filled.dishes[0].ingredients, "150g sirloin, hash, chimichurri");
+  assert.equal(filled.dishes[0].notes, "From the photo");
   const plain = toggleMenuDish(toggleMenuDish(v, v.menu_items[1]), v.menu_items[1]);
-  assert.deepEqual([plain.dishes[0].title, plain.dishes[0].notes], ["", ""]);
+  assert.deepEqual([plain.dishes[0].title, plain.dishes[0].ingredients], ["", ""]);
+});
+test("unticking keeps a dish whose ingredients were typed over", () => {
+  const v = newVisit();
+  v.menu_items = [{ name: "Morning steak", description: "150g sirloin, hash", price: "32", kind: "dish" }];
+  const ticked = toggleMenuDish(v, v.menu_items[0]);
+  ticked.dishes[0].ingredients = "Sirloin, no hash";
+  const next = toggleMenuDish(ticked, v.menu_items[0]);
+  assert.equal(next.dishes.length, 1);
+  assert.equal(next.dishes[0].title, "Morning steak");
+  assert.equal(next.dishes[0].ingredients, "Sirloin, no hash");
 });
 test("an extra ticks onto the last dish, and is its own dish when nothing else is ticked", () => {
   const v = newVisit();
@@ -1165,15 +1267,24 @@ test("an extra ticks onto the last dish, and is its own dish when nothing else i
   next = toggleMenuDish(next, hash);
   next = toggleMenuDish(next, avo);
   assert.equal(next.dishes.length, 1);
-  assert.equal(next.dishes[0].notes, "Bacon, eggs\n+ Hash brown\n+ Add avocado");
+  assert.equal(next.dishes[0].ingredients, "Bacon, eggs\n+ Hash brown\n+ Add avocado");
   assert.equal(menuDishIndex(next, avo), 0);
   // Unticking an extra takes only its line.
   next = toggleMenuDish(next, hash);
-  assert.equal(next.dishes[0].notes, "Bacon, eggs\n+ Add avocado");
+  assert.equal(next.dishes[0].ingredients, "Bacon, eggs\n+ Add avocado");
   assert.equal(menuDishIndex(next, hash), -1);
   // Extras do not count as Adam's own notes.
   next = toggleMenuDish(next, breakfast);
-  assert.deepEqual([next.dishes[0].title, next.dishes[0].notes], ["", ""]);
+  assert.deepEqual([next.dishes[0].title, next.dishes[0].ingredients], ["", ""]);
+});
+test("older dishes with extras in notes are still found and unticked", () => {
+  const v = newVisit();
+  v.menu_items = [{ name: "Hash brown", description: "", price: "6", kind: "extra" }];
+  v.dishes[0].title = "Big breakfast";
+  v.dishes[0].notes = "Bacon, eggs\n+ Hash brown";
+  assert.equal(menuDishIndex(v, v.menu_items[0]), 0);
+  const next = toggleMenuDish(v, v.menu_items[0]);
+  assert.equal(next.dishes[0].notes, "Bacon, eggs");
 });
 test("every page of a menu is read when no dish photos are chosen", () => {
   const menus = Array.from({ length: 3 }, (_, i) => ({ role: "menu", id: `m${i}`, data: "x".repeat(10) }));
@@ -1296,4 +1407,511 @@ test("schema accepts a recipe added date and rejects a malformed one", () => {
   assert.throws(() => validateFoodJournal(j), /added date/);
   j.recipes[0].added_at = 5;
   assert.throws(() => validateFoodJournal(j), /added date/);
+});
+
+test("schema accepts dish ingredients, English text and a Brisket link, and rejects bad ones", () => {
+  const j = fixture();
+  const v = j.visits[0];
+  v.menu_text_en = "Lasagne $25";
+  v.menu_items = [
+    { name: "Lasaña", name_en: "Lasagne", description: "Carne, bechamel", description_en: "Beef, bechamel", price: "$25", kind: "dish" },
+  ];
+  Object.assign(v.dishes[0], {
+    title_en: "Lasagne",
+    ingredients: "Beef, bechamel\n+ Extra cheese",
+    ingredients_original: "Carne, bechamel",
+    notes_en: "",
+    brisket: {
+      meal_path: "data/nutrition/2026/10/2026-10-22-dinner-1930.md",
+      portion: "½",
+      portion_fraction: 0.5,
+      counted_at: "2026-10-22T19:31:00+11:00",
+      needs_recount: false,
+      calories: 620,
+      protein_g: 26,
+      fat_g: 24,
+    },
+  });
+  v.dishes[0].photos = [{ id: "photo_1", key: "food/photos/photo_1.jpg", from: "med_abcd1234" }];
+  assert.doesNotThrow(() => validateFoodJournal(j));
+  for (const [broken, message] of [
+    [(d) => (d.ingredients = 5), /Ingredients/],
+    [(d) => (d.ingredients = "x".repeat(2001)), /Ingredients/],
+    [(d) => (d.brisket = { ...d.brisket, portion_fraction: 1.5 }), /Brisket portion/],
+    [(d) => (d.brisket = { ...d.brisket, portion_fraction: 0 }), /Brisket portion/],
+    [(d) => (d.brisket = { ...d.brisket, meal_path: "data/other/x.md" }), /Brisket link/],
+    [(d) => (d.brisket = { ...d.brisket, needs_recount: "yes" }), /Brisket link/],
+    [(d) => (d.brisket = { ...d.brisket, counted_at: "2026" }), /Brisket link/],
+    [(d) => (d.brisket = "x"), /Brisket link/],
+    [(d) => (d.brisket = { ...d.brisket, calories: -5 }), /Brisket numbers/],
+  ]) {
+    const copy = structuredClone(j);
+    broken(copy.visits[0].dishes[0]);
+    assert.throws(() => validateFoodJournal(copy), message);
+  }
+});
+
+test("a dish from the photo read takes the ingredients of the menu item with its name", () => {
+  const v = newVisit();
+  const draft = {
+    title: "",
+    venue: { name: "", address: "" },
+    menu_text: "",
+    menu_items: [
+      {
+        name: "Fish tacos",
+        description: "Battered snapper, slaw, lime",
+        price: "$19",
+        kind: "dish",
+      },
+    ],
+    dishes: [
+      {
+        title: "Fish tacos",
+        cuisine: "Mexican",
+        meal_type: "Lunch",
+        tags: [],
+        notes: "Two tacos on a tray",
+        photo_ids: [],
+      },
+    ],
+  };
+  const next = mergeCapture(v, draft);
+  assert.equal(next.dishes[0].ingredients, "Battered snapper, slaw, lime");
+  assert.equal(next.dishes[0].notes, "Two tacos on a tray");
+  // Ingredients Adam already has are kept.
+  next.dishes[0].ingredients = "Snapper, cabbage";
+  assert.equal(
+    mergeCapture(next, draft).dishes[0].ingredients,
+    "Snapper, cabbage",
+  );
+});
+test("capture keeps the original and the English for a non-English menu", async () => {
+  const r = repo(fixture());
+  const complete = async () =>
+    JSON.stringify({
+      title: "", venue: { name: "Bar Test", address: "" },
+      menu_text: "Tortilla 6€", menu_text_en: "Spanish omelette 6€",
+      menu_items: [{ name: "Tortilla", name_en: "Spanish omelette", description: "Huevo, patata", description_en: "Egg, potato", price: "6€", kind: "dish" }],
+      dishes: [{ title: "Tortilla", title_en: "Spanish omelette", cuisine: "Spanish", meal_type: "Lunch", tags: [], notes: "", photo_ids: [] }],
+    });
+  resetRateLimits();
+  const h = createFoodJournalProcessHandler(deps(r, { complete }));
+  const res = await h(req("POST", { action: "capture", images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }] }));
+  const { draft } = (await res.json()).data;
+  assert.equal(draft.menu_text_en, "Spanish omelette 6€");
+  assert.equal(draft.menu_items[0].name_en, "Spanish omelette");
+  assert.equal(draft.menu_items[0].description_en, "Egg, potato");
+  assert.equal(draft.dishes[0].title_en, "Spanish omelette");
+});
+test("capture leaves English fields out for an English menu", async () => {
+  const r = repo(fixture());
+  const complete = async () =>
+    JSON.stringify({
+      title: "", venue: { name: "", address: "" }, menu_text: "Chips $6",
+      menu_items: [{ name: "Chips", description: "", price: "$6", kind: "dish" }],
+      dishes: [],
+    });
+  resetRateLimits();
+  const h = createFoodJournalProcessHandler(deps(r, { complete }));
+  const res = await h(req("POST", { action: "capture", images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }] }));
+  const { draft } = (await res.json()).data;
+  assert.equal("menu_text_en" in draft, false);
+  assert.equal("name_en" in draft.menu_items[0], false);
+});
+test("a translated menu item gives English ingredients and keeps the original", () => {
+  const item = { name: "Tortilla", name_en: "Spanish omelette", description: "Huevo, patata", description_en: "Egg, potato", price: "6€", kind: "dish" };
+  const v = newVisit();
+  v.menu_items = [item];
+  // A tick.
+  const ticked = toggleMenuDish(v, item);
+  assert.equal(ticked.dishes[0].ingredients, "Egg, potato");
+  assert.equal(ticked.dishes[0].ingredients_original, "Huevo, patata");
+  // Unticking an untouched translated dish removes it again.
+  assert.equal(toggleMenuDish(ticked, item).dishes[0].title, "");
+  // A photo-read name match.
+  const merged = mergeCapture(newVisit(), {
+    title: "", venue: { name: "", address: "" },
+    menu_text: "Tortilla 6€", menu_text_en: "Spanish omelette 6€",
+    menu_items: [item],
+    dishes: [{ title: "Tortilla", title_en: "Spanish omelette", cuisine: "", meal_type: "Lunch", tags: [], notes: "", photo_ids: [] }],
+  });
+  assert.equal(merged.menu_text_en, "Spanish omelette 6€");
+  assert.equal(merged.dishes[0].title_en, "Spanish omelette");
+  assert.equal(merged.dishes[0].ingredients, "Egg, potato");
+  assert.equal(merged.dishes[0].ingredients_original, "Huevo, patata");
+});
+test("a dish that goes blank loses its English title and original ingredients", () => {
+  const item = { name: "Tortilla", name_en: "Spanish omelette", description: "Huevo, patata", description_en: "Egg, potato", price: "6€", kind: "dish" };
+  const draft = (title, title_en) => ({
+    title: "", venue: { name: "", address: "" }, menu_text: "",
+    menu_items: [item],
+    dishes: [{ title, title_en, cuisine: "", meal_type: "Lunch", tags: [], notes: "", photo_ids: [] }],
+  });
+  const v = mergeCapture(newVisit(), draft("Tortilla", "Spanish omelette"));
+  assert.equal(v.dishes.length, 1);
+  assert.equal(v.dishes[0].title_en, "Spanish omelette");
+  const blank = toggleMenuDish(v, item);
+  assert.equal(blank.dishes[0].title, "");
+  assert.equal("title_en" in blank.dishes[0], false);
+  assert.equal("ingredients_original" in blank.dishes[0], false);
+  const next = mergeCapture(blank, draft("Paella", "Rice dish"));
+  assert.equal(next.dishes[0].title_en, "Rice dish");
+});
+
+test("deleting a travel-linked visit clears the moment's meal link in the same commit", async () => {
+  const j = fixture();
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234";
+  const r = repo(j);
+  const unlinks = [];
+  const h = createFoodJournalHandler(deps(r, {
+    unlinkTravelMeals: async (journal, version, links) => {
+      unlinks.push(links);
+      return r.saveJournal(journal, version);
+    },
+  }));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 200);
+  assert.deepEqual(unlinks, [[{ tripId: "trp_test1", momentId: "mom_abcd1234" }]]);
+});
+
+test("the default unlink strips only the matching moment's meal and skips missing trips", async () => {
+  const j = fixture();
+  const visitId = j.visits[0].id;
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234:2";
+  const moment = (id, meal) => ({ id, leg_id: "leg_test01", local_date: "2026-11-03", media_ids: [], display_order: 1, lifecycle: "live", place: { name: "Mercado Test" }, ...(meal ? { meal } : {}) });
+  const tripJournal = {
+    id: "jrn_abcd", schema_version: 1, trip_id: "trp_test1", title: "", revision: 0, lifecycle: "live",
+    leg_ids: ["leg_test01"], preferences: {},
+    legs: [{ id: "leg_test01", trip_id: "trp_test1", destination: "Test", timezone: "UTC", pattern_id: "generic", order: 0, lifecycle: "live" }],
+    days: [], media: [], transitions: [], operations: [],
+    moments: [
+      moment("mom_abcd1234", { food_visit_id: visitId, mood: "happy" }),
+      moment("mom_other567", { food_visit_id: "visit_elsewhere" }),
+    ],
+  };
+  const writes = [];
+  const store = {
+    async read(tripId) {
+      if (tripId !== "trp_test1") throw Object.assign(new Error("Journal not found."), { status: 404, code: "not_found" });
+      return { tripId, base: {}, travel: { journal: structuredClone(tripJournal), version: "t".repeat(40) }, food: { journal: j, version: "a".repeat(40) } };
+    },
+    async write(_snap, out) {
+      writes.push(out);
+      return { commitSha: "d".repeat(40), foodVersion: "e".repeat(40), travelVersions: {} };
+    },
+  };
+  const r = repo(j);
+  const h = createFoodJournalHandler(deps(r, { createMealLinkStore: () => store }));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.version, "e".repeat(40));
+  assert.equal(writes.length, 1);
+  const moments = writes[0].travels[0].journal.moments;
+  assert.equal(moments[0].meal, undefined);
+  assert.deepEqual(moments[1].meal, { food_visit_id: "visit_elsewhere" });
+  assert.equal(writes[0].food.visits[0].status, "deleted");
+
+  // A visit whose trip file is gone still deletes, through the ordinary save.
+  const j2 = fixture();
+  j2.visits[0].source_id = "travel:trp_gone1:mom_abcd1234";
+  const r2 = repo(j2);
+  const h2 = createFoodJournalHandler(deps(r2, { createMealLinkStore: () => store }));
+  const g = (await (await h2(req("GET"))).json()).data;
+  g.journal.visits[0].status = "deleted";
+  const res2 = await h2(req("PUT", { journal: g.journal, if_version: g.version }));
+  assert.equal(res2.status, 200);
+  assert.equal(writes.length, 1);
+  assert.equal((await r2.getJournal()).journal.visits[0].status, "deleted");
+});
+
+test("deleting an already-deleted travel visit does not touch the trip", async () => {
+  const j = fixture();
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234";
+  j.visits[0].status = "deleted";
+  const r = repo(j);
+  let called = false;
+  const h = createFoodJournalHandler(deps(r, { unlinkTravelMeals: async () => { called = true; } }));
+  const first = (await (await h(req("GET"))).json()).data;
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 200);
+  assert.equal(called, false);
+});
+
+test("the default unlink refuses with 409 when the store's Food Journal version is stale", async () => {
+  const j = fixture();
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234";
+  let writes = 0;
+  const store = {
+    async read(tripId) {
+      return {
+        tripId,
+        base: {},
+        travel: { journal: { moments: [] }, version: "t".repeat(40) },
+        food: { journal: j, version: "f".repeat(40) },
+      };
+    },
+    async write() {
+      writes += 1;
+      return { commitSha: "d".repeat(40), foodVersion: "e".repeat(40), travelVersions: {} };
+    },
+  };
+  const r = repo(j);
+  const h = createFoodJournalHandler(deps(r, { createMealLinkStore: () => store }));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 409);
+  assert.equal(writes, 0);
+});
+
+const DINNER = "data/nutrition/2026/10/2026-10-22-dinner-1930.md";
+const countedBrisket = {
+  meal_path: DINNER,
+  portion: "All",
+  portion_fraction: 1,
+  counted_at: "2026-10-22T19:31:00+11:00",
+  needs_recount: false,
+};
+
+test("remove_meals deletes the meal files of dishes that are gone, and nothing else", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const r = repo(j);
+  const removed = [];
+  const h = createFoodJournalHandler(
+    deps(r, { removeMeal: async (p) => void removed.push(p) }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(
+    req("PUT", {
+      journal: first.journal,
+      if_version: first.version,
+      remove_meals: [DINNER, "data/nutrition/2026/10/2026-10-22-lunch-1200.md"],
+    }),
+  );
+  assert.deepEqual(removed, [DINNER]);
+  assert.equal((await res.json()).data.meals_removed, true);
+});
+
+test("remove_meals leaves the meal of a dish that is still in the journal", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const r = repo(j);
+  const removed = [];
+  const h = createFoodJournalHandler(
+    deps(r, { removeMeal: async (p) => void removed.push(p) }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  const res = await h(
+    req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+  );
+  assert.deepEqual(removed, []);
+  assert.equal((await res.json()).data.meals_removed, undefined);
+});
+
+test("remove_meals follows a removed dish inside a live visit, and reports a failed delete", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const r = repo(j);
+  const h = createFoodJournalHandler(
+    deps(r, {
+      removeMeal: async () => {
+        throw new Error("boom");
+      },
+    }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].dishes.splice(0, 1);
+  const res = await h(
+    req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+  );
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.meals_removed, false);
+});
+
+test("the default remove deletes only a file that names the dish, then resyncs the Central Node", async () => {
+  const j = fixture();
+  const dish = j.visits[0].dishes[0];
+  dish.brisket = { ...countedBrisket };
+  const meal = (id) =>
+    `---\ntype: meal\nfood_dish_id: ${id}\n---\nbody\n`;
+  for (const [text, expectDelete] of [
+    [meal(dish.id), true],
+    [meal("dsh_other"), false],
+  ]) {
+    const calls = { del: [], sync: [] };
+    const client = {
+      async resolveTree() {
+        return { tree: [{ path: DINNER, type: "blob", sha: "s".repeat(40) }] };
+      },
+      async readBlob() {
+        return { content: Buffer.from(text).toString("base64"), encoding: "base64" };
+      },
+      async deleteFile(a) {
+        calls.del.push(a);
+      },
+    };
+    const r = repo(j);
+    const h = createFoodJournalHandler(
+      deps(r, {
+        createGitHubClient: () => client,
+        syncCentralNodeAfterMealDeletes: async (_c, d) => void calls.sync.push(d),
+      }),
+    );
+    const first = (await (await h(req("GET"))).json()).data;
+    first.journal.visits[0].status = "deleted";
+    const res = await h(
+      req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+    );
+    assert.equal(calls.del.length, expectDelete ? 1 : 0);
+    assert.equal(calls.del[0]?.sha, expectDelete ? "s".repeat(40) : undefined);
+    assert.deepEqual(calls.sync, expectDelete ? [[{ date: "2026-10-22", meals: ["dinner"] }]] : []);
+    assert.equal((await res.json()).data.meals_removed, expectDelete ? true : false);
+  }
+});
+
+test("remove_meals ignores a tombstoned visit's path and a stale version", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  j.visits[0].status = "deleted";
+  const r = repo(j);
+  const removed = [];
+  const h = createFoodJournalHandler(
+    deps(r, { removeMeal: async (p) => void removed.push(p) }),
+  );
+  const first = (await (await h(req("GET"))).json()).data;
+  const res = await h(
+    req("PUT", { journal: first.journal, if_version: first.version, remove_meals: [DINNER] }),
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual(removed, []);
+  const stale = await h(
+    req("PUT", { journal: first.journal, if_version: "f".repeat(40), remove_meals: [DINNER] }),
+  );
+  assert.equal(stale.status, 409);
+  assert.deepEqual(removed, []);
+});
+
+test("a save keeps each dish's Brisket link, whatever the client sends", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket, calories: 640 };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const saveWith = async (edit) => {
+    const first = (await (await h(req("GET"))).json()).data;
+    edit(first.journal);
+    const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+    assert.equal(res.status, 200);
+    return (await res.json()).data.journal.visits[0].dishes;
+  };
+  // A stale draft that never saw the link does not drop it.
+  let dishes = await saveWith((jj) => {
+    delete jj.visits[0].dishes[0].brisket;
+  });
+  assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640 });
+  // A link the server never wrote is stripped, on an old dish or a new one.
+  const forged = { ...countedBrisket, meal_path: "data/nutrition/2026/10/2026-10-22-lunch-1200.md" };
+  dishes = await saveWith((jj) => {
+    jj.visits[0].dishes[1].brisket = { ...forged };
+    jj.visits[0].dishes.push({ ...newDish(), title: "Flan", brisket: { ...forged } });
+    jj.visits[0].dishes[0].brisket = { ...forged, portion: "¼", portion_fraction: 0.25 };
+  });
+  assert.equal(dishes[1].brisket, undefined);
+  assert.equal(dishes[2].brisket, undefined);
+  assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640 });
+  // The one change a client may make: mark a counted dish for a re-count.
+  dishes = await saveWith((jj) => {
+    jj.visits[0].dishes[0].brisket = { ...forged, needs_recount: true };
+  });
+  assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640, needs_recount: true });
+});
+
+test("media bytes refuse a photo over 3 MB, by its size or after reading", async () => {
+  resetRateLimits();
+  const j = fixture();
+  j.visits[0].dishes[0].photos = [
+    { id: "photo_1", key: "food/photos/photo_1.jpg" },
+  ];
+  const big = 3 * 1024 * 1024 + 1;
+  const r2 = {
+    ...env,
+    R2_ACCOUNT_ID: "a",
+    R2_BUCKET: "b",
+    R2_ACCESS_KEY_ID: "k",
+    R2_SECRET_ACCESS_KEY: "s",
+  };
+  let reads = 0;
+  const byHead = createFoodJournalMediaHandler(
+    deps(repo(j), {
+      env: r2,
+      headObject: async () => ({ size: big }),
+      getObject: async () => {
+        reads += 1;
+        return Buffer.alloc(10);
+      },
+    }),
+  );
+  const ask = (h) => h(req("POST", { action: "bytes", key: "food/photos/photo_1.jpg" }));
+  assert.equal((await ask(byHead)).status, 413);
+  assert.equal(reads, 0, "a photo too large by its size is never read");
+  const byLength = createFoodJournalMediaHandler(
+    deps(repo(j), {
+      env: r2,
+      headObject: async () => ({}),
+      getObject: async () => Buffer.alloc(big),
+    }),
+  );
+  assert.equal((await ask(byLength)).status, 413);
+});
+
+test("the server flags a re-count when a counted dish's nutrition fields change", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const saveWith = async (edit) => {
+    const first = (await (await h(req("GET"))).json()).data;
+    edit(first.journal.visits[0].dishes[0]);
+    const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+    assert.equal(res.status, 200);
+    return (await res.json()).data.journal.visits[0].dishes[0].brisket;
+  };
+  // A client that forgets to flag it, such as an older page, still gets it flagged.
+  assert.equal((await saveWith((d) => void (d.rating = 2))).needs_recount, false);
+  assert.equal((await saveWith((d) => void (d.ingredients = "Pasta, beef"))).needs_recount, true);
+});
+
+test("clear_recount keeps the old numbers only while the dish is unchanged", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket, calories: 640, needs_recount: true };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const saveWith = async (edit) => {
+    const first = (await (await h(req("GET"))).json()).data;
+    const dish = first.journal.visits[0].dishes[0];
+    edit(dish);
+    const res = await h(
+      req("PUT", { journal: first.journal, if_version: first.version, clear_recount: [dish.id] }),
+    );
+    assert.equal(res.status, 200);
+    return (await res.json()).data.journal.visits[0].dishes[0].brisket;
+  };
+  // A changed dish still needs counting again, whatever the client asks.
+  assert.equal((await saveWith((d) => void (d.title = "Lasagne al forno"))).needs_recount, true);
+  // An unchanged dish keeps its old numbers and drops the flag.
+  const kept = await saveWith((d) => void (d.brisket = { ...d.brisket, needs_recount: false }));
+  assert.deepEqual(kept, { ...countedBrisket, calories: 640, needs_recount: false });
+});
+
+test("without clear_recount a re-count flag stays put", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket, needs_recount: true };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].dishes[0].brisket.needs_recount = false;
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal((await res.json()).data.journal.visits[0].dishes[0].brisket.needs_recount, true);
 });

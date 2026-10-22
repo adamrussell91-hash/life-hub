@@ -190,6 +190,15 @@ function validateMeal(record, errors) {
   if (record.creatine_time != null && !isTime(record.creatine_time)) {
     errors.push('creatine_time must be HH:MM');
   }
+  if (record.food_dish_id != null && (typeof record.food_dish_id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(record.food_dish_id))) {
+    errors.push('food_dish_id must be 1-100 letters, digits, underscores or hyphens');
+  }
+  optionalString(record, 'portion', errors);
+  if (typeof record.portion === 'string' && record.portion.length > 40) {
+    errors.push('portion must be 40 characters or fewer');
+  }
+  finiteNumber(record, 'portion_fraction', errors, { maximum: 1 });
+  if (record.portion_fraction === 0) errors.push('portion_fraction must be above 0');
 }
 
 function validateCreatine(record, errors) {

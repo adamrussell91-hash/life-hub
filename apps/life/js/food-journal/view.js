@@ -33,7 +33,17 @@ import {
   knownTags,
   tagKey,
 } from "./model.js";
-import { paintMagazine, paintTimeline, paintEntry, paintFixup, paintVenueCheck } from "./pages.js";
+import {
+  paintMagazine,
+  paintTimeline,
+  paintEntry,
+  paintFixup,
+  paintVenueCheck,
+  dishName,
+  dishOriginal,
+  dishIngredients,
+  dishNotes,
+} from "./pages.js";
 import { paintRecipeBook } from "./recipe-book.js";
 import { hasPoint, nameSimilarity, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
 import {
@@ -45,6 +55,12 @@ import {
   toggleMenuDish,
   menuDishIndex,
 } from "./capture.js";
+import { PORTION_CHIPS, portionOf } from "./portion.js";
+import { handoffMessage, needsRecount } from "./brisket-handoff.js";
+import {
+  fileToChatAttachment,
+  MAX_CHAT_IMAGE_BYTES,
+} from "../../../../packages/design-kit/js/hub-chat-attachments.js";
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -173,6 +189,7 @@ export function createFoodJournalView({
   root = document,
   api,
   storage = globalThis.localStorage,
+  sendToBrisket,
 } = {}) {
   const host = root.querySelector("#food-journal-dashboard");
   let journal = emptyJournal(),
@@ -184,9 +201,15 @@ export function createFoodJournalView({
     entryId = null,
     fixIndex = 0,
     venueIndex = 0,
-    dialog = null;
+    dialog = null,
+    // Brisket writes the counted link on confirm, so look again on return.
+    sentToBrisket = false;
   let editorialRunning = false;
   const editorialFailed = new Set();
+  let translating = false;
+  let translateRerun = false;
+  // dish id -> notes as loaded or last handled, so only edits are translated.
+  const notesHandled = new Map();
   let filterControls = [],
     journalQuery = "",
     filters = {},
@@ -294,12 +317,39 @@ export function createFoodJournalView({
     };
     return handle;
   }
-  async function persist(next, { quiet = false } = {}) {
+  // Counted dishes that a save drops, so the person can say whether their
+  // nutrition log should lose the meal too.
+  const countedPaths = (dishes) =>
+    dishes.filter((d) => d.brisket?.meal_path).map((d) => d.brisket.meal_path);
+  function askRemoveMeals(s) {
+    return new Promise((resolve) => {
+      const old = [...s.actions.childNodes];
+      const watch = setInterval(() => {
+        if (!s.isOpen()) answer(null);
+      }, 200);
+      const answer = (yes) => {
+        clearInterval(watch);
+        question.remove();
+        s.actions.replaceChildren(...old);
+        resolve(yes);
+      };
+      const question = el("p", "", "Also remove it from your nutrition log?");
+      s.fields.append(question);
+      s.actions.replaceChildren(
+        button("No", () => answer(false), "ghost"),
+        button("Yes", () => answer(true), "primary"),
+      );
+    });
+  }
+  async function persist(
+    next,
+    { quiet = false, removeMeals = [], clearRecount = [] } = {},
+  ) {
     if (busy) throw new Error("A save is already running.");
     busy = true;
     const token = epoch;
     try {
-      const value = await api.save(next, version);
+      const value = await api.save(next, version, removeMeals, clearRecount);
       if (token !== epoch)
         throw new Error("Your session changed. Sign in again.");
       journal = value.journal;
@@ -308,7 +358,12 @@ export function createFoodJournalView({
       if (!quiet) {
         showHubToast("Saved.");
         void refreshEditorial();
+        void refreshTranslations();
       }
+      if (value.meals_removed === false)
+        showHubToast(
+          "The Food Journal saved, but a nutrition entry couldn't be removed. Delete it from Nutrition.",
+        );
       return value;
     } finally {
       busy = false;
@@ -359,6 +414,69 @@ export function createFoodJournalView({
       editorialRunning = false;
     }
   }
+  // Typed dish notes get an English copy after the save. Best effort: a
+  // failed translation never touches the save, and a second save only
+  // happens when notes_en actually changed.
+  async function refreshTranslations() {
+    if (!loaded) return;
+    if (translating) {
+      translateRerun = true;
+      return;
+    }
+    translating = true;
+    const token = epoch;
+    try {
+      const found = [];
+      for (const v of liveVisits(journal))
+        for (const d of v.dishes) {
+          const notes = (d.notes || "").trim();
+          if (notesHandled.get(d.id) === notes) continue;
+          // Dishes seen at load are the baseline; an unseen dish is new.
+          if (!notesHandled.has(d.id) && !notes) continue;
+          found.push({ id: d.id, notes });
+        }
+      const changes = new Map();
+      for (const { id, notes } of found) {
+        let text_en = "";
+        if (notes) {
+          try {
+            ({ text_en } = await api.translate(notes));
+          } catch {
+            // Leave it for the next save; the notes are already safe.
+            continue;
+          }
+        }
+        changes.set(id, { notes, text_en: text_en || "" });
+      }
+      if (token !== epoch || !changes.size) return;
+      for (let wait = 0; (busy || dialog) && wait < 600; wait++)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (token !== epoch || busy || dialog) return;
+      const next = structuredClone(journal);
+      let changed = false;
+      for (const v of next.visits)
+        for (const d of v.dishes) {
+          const c = changes.get(d.id);
+          // Skip a dish whose notes were edited while we were translating.
+          if (!c || (d.notes || "").trim() !== c.notes) continue;
+          if ((d.notes_en || "") === c.text_en) continue;
+          if (c.text_en) d.notes_en = c.text_en;
+          else delete d.notes_en;
+          changed = true;
+        }
+      if (changed) await persist(next, { quiet: true });
+      // Handled only once saved, so a failed save is retried next time.
+      for (const [id, c] of changes) notesHandled.set(id, c.notes);
+    } catch {
+      // Best effort only.
+    } finally {
+      translating = false;
+      if (translateRerun) {
+        translateRerun = false;
+        void refreshTranslations();
+      }
+    }
+  }
   async function load() {
     const token = epoch;
     status("Loading Food Journal.");
@@ -374,6 +492,9 @@ export function createFoodJournalView({
         await persist(tidy.journal, { quiet: true }).catch(() => {});
       if (token !== epoch) return;
       void refreshEditorial();
+      // Loaded notes are the baseline; only later edits get translated.
+      for (const v of journal.visits)
+        for (const d of v.dishes) notesHandled.set(d.id, (d.notes || "").trim());
     } catch (e) {
       if (token !== epoch) return;
       status(e.message, true);
@@ -499,7 +620,8 @@ export function createFoodJournalView({
       card.append(box);
     }
     const content = el("div", "food-card__body");
-    content.append(el("h3", "food-dish__title fj-serif", dish.title));
+    content.append(el("h3", "food-dish__title fj-serif", dishName(dish)));
+    content.append(...[dishOriginal(dish)].filter(Boolean));
     content.append(
       el(
         "p",
@@ -509,6 +631,7 @@ export function createFoodJournalView({
           .join(" · "),
       ),
     );
+    content.append(...[dishIngredients(dish)].filter(Boolean));
     if (dish.rating != null) {
       const stars = el("p", "fj-stars");
       stars.setAttribute("role", "img");
@@ -524,12 +647,10 @@ export function createFoodJournalView({
       for (const t of dish.tags) tags.append(el("span", "hub-chip", t));
       content.append(tags);
     }
-    if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes))
-      content.append(
-        el("p", "food-notes fj-serif fj-italic", plainNotes(dish.notes)),
-      );
+    content.append(...dishNotes(dish, visit, "food-notes fj-serif fj-italic"));
     const actions = el("div", "food-actions");
     actions.append(
+      ...brisketActions(visit, dish),
       button("Recipe", (e) => openRecipe(dish, e.currentTarget)),
       button(
         "Eat it again",
@@ -541,6 +662,144 @@ export function createFoodJournalView({
     content.append(actions);
     card.append(content);
     return card;
+  }
+  function brisketActions(visit, dish) {
+    const open = (e) => openPortion(visit, dish, e.currentTarget);
+    if (!sendToBrisket) return [];
+    if (!dish.brisket) return [button("Send to Brisket", open, "primary")];
+    if (dish.brisket.needs_recount)
+      return [
+        el("span", "hub-chip food-counted", "Counted in Brisket · needs a re-count"),
+        button("Re-count", open, "primary"),
+        button("Keep old numbers", (e) => keepOldNumbers(dish, e.currentTarget), "ghost"),
+      ];
+    return [
+      el("span", "hub-chip food-counted", `Counted in Brisket · ${dish.brisket.portion}`),
+      button("Change portion", open),
+    ];
+  }
+  // The server clears the flag only while the dish matches what was counted.
+  async function keepOldNumbers(dish, trigger) {
+    trigger.disabled = true;
+    try {
+      const next = structuredClone(journal);
+      const d = next.visits.flatMap((v) => v.dishes).find((x) => x.id === dish.id);
+      if (d?.brisket) d.brisket.needs_recount = false;
+      await persist(next, { clearRecount: [dish.id] });
+    } catch (err) {
+      showHubToast(err.message);
+    } finally {
+      trigger.disabled = false;
+    }
+  }
+  // How much of the dish was eaten, then the hand-off goes to Brisket's chat.
+  function openPortion(visit, dish, trigger) {
+    const s = modal("Send to Brisket", trigger);
+    const current = dish.brisket?.portion;
+    const fixed = PORTION_CHIPS.some((c) => c.label === current);
+    const piecesNow = !fixed && /^(\d+) of (\d+)$/.exec(current || "");
+    let chip = piecesNow ? null : fixed ? current : "All",
+      note = "",
+      // Fetched once, so a retry sends the same photo without asking again.
+      photo;
+    const row = el("div", "hub-chips food-portion");
+    row.setAttribute("role", "group");
+    row.setAttribute("aria-label", "Portion");
+    const pieces = el("div", "food-portion__pieces");
+    const count = (label, value) => {
+      const n = el("input", "hub-input food-portion__count");
+      n.type = "number";
+      n.inputMode = "numeric";
+      n.min = "1";
+      n.max = "99";
+      n.step = "1";
+      n.value = value ?? "";
+      n.setAttribute("aria-label", label);
+      n.addEventListener("input", paint);
+      return n;
+    };
+    const eaten = count("Pieces eaten", piecesNow?.[1]),
+      total = count("Pieces in total", piecesNow?.[2]);
+    pieces.append(eaten, el("span", "", "of"), total);
+    const choice = () =>
+      portionOf(
+        chip
+          ? { chip }
+          : { pieces: Number(eaten.value || NaN), of: Number(total.value || NaN) },
+      );
+    const chips = [...PORTION_CHIPS.map((c) => c.label), "Pieces"].map((label) => {
+      const b = button(label, () => {
+        chip = label === "Pieces" ? null : label;
+        paint();
+        if (!chip) eaten.focus();
+      });
+      b.className = "hub-chip food-portion__chip";
+      b.dataset.portion = label;
+      return b;
+    });
+    row.append(...chips);
+    const send = button(
+      "Send",
+      async (e) => {
+        const picked = choice();
+        if (!picked) return;
+        e.currentTarget.disabled = true;
+        s.error.textContent = "Sending to Brisket.";
+        const message = handoffMessage({
+          visit,
+          dish,
+          portion: { ...picked, note: note.trim() },
+          previous: dish.brisket || undefined,
+        });
+        if (photo === undefined) photo = await dishAttachment(dish);
+        if (!s.isOpen()) return;
+        const result = await Promise.resolve(
+          sendToBrisket(message, photo ? [photo] : []),
+        ).catch(() => ({ ok: false }));
+        if (!s.isOpen()) return;
+        if (result?.ok === false) {
+          s.error.textContent = "Couldn't reach Brisket. Try again.";
+          paint();
+          return;
+        }
+        sentToBrisket = true;
+        s.close();
+      },
+      "primary",
+    );
+    function paint() {
+      for (const b of chips) {
+        const on = chip ? b.dataset.portion === chip : b.dataset.portion === "Pieces";
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", String(on));
+      }
+      pieces.hidden = chip != null;
+      send.disabled = !choice();
+    }
+    s.fields.append(
+      row,
+      pieces,
+      field("Anything else", note, (v) => (note = v), { max: 200 }),
+    );
+    s.actions.append(button("Cancel", s.close, "ghost"), send);
+    paint();
+  }
+  // The dish's first photo as a chat image, or null when it can't be had.
+  async function dishAttachment(dish) {
+    const key = dish.photos?.[0]?.key;
+    if (!key) return null;
+    try {
+      const blob = await compressPhoto(
+        new File([await api.photo(key)], "dish.jpg", { type: "image/jpeg" }),
+        1200,
+      );
+      if (blob.size > MAX_CHAT_IMAGE_BYTES) return null;
+      return await fileToChatAttachment(
+        new File([blob], "dish.jpg", { type: "image/jpeg" }),
+      );
+    } catch {
+      return null;
+    }
   }
   function openEntry(id) {
     entryId = id;
@@ -630,6 +889,7 @@ export function createFoodJournalView({
     editVisit,
     deleteVisit,
     openRecipe,
+    brisketActions,
     openBookRecipe: (recipe, trigger) => recipeEditor(recipe, trigger),
     get book() {
       return book;
@@ -843,9 +1103,13 @@ export function createFoodJournalView({
         async (e) => {
           e.currentTarget.disabled = true;
           try {
+            const paths = countedPaths(visit.dishes);
+            const yes = paths.length ? await askRemoveMeals(s) : false;
+            if (yes === null) return;
+            const removeMeals = yes ? paths : [];
             const next = structuredClone(journal);
             next.visits.find((v) => v.id === visit.id).status = "deleted";
-            await persist(next);
+            await persist(next, { removeMeals });
             s.close();
           } catch (err) {
             s.error.textContent = err.message;
@@ -1017,7 +1281,10 @@ export function createFoodJournalView({
           checks = [];
           // Dishes first, then extras, which tick onto the last dish.
           const shown = visit.menu_items.filter((item) =>
-            `${item.name} ${item.description}`.toLowerCase().includes(query),
+            [item.name, item.name_en, item.description, item.description_en]
+              .join(" ")
+              .toLowerCase()
+              .includes(query),
           );
           const extras = shown.filter((item) => item.kind === "extra");
           for (const item of [
@@ -1051,9 +1318,21 @@ export function createFoodJournalView({
             });
             checks.push([check, item]);
             const text = el("span", "food-onmenu__text");
-            text.append(el("span", "food-onmenu__name", item.name));
-            if (item.description)
-              text.append(el("span", "food-meta", item.description));
+            text.append(
+              el("span", "food-onmenu__name", item.name_en || item.name),
+            );
+            if (item.name_en)
+              text.append(el("span", "food-original", item.name));
+            if (item.description_en || item.description)
+              text.append(
+                el(
+                  "span",
+                  "food-meta",
+                  item.description_en || item.description,
+                ),
+              );
+            if (item.description_en && item.description)
+              text.append(el("span", "food-original", item.description));
             row.append(check, text);
             if (item.price) row.append(el("span", "food-onmenu__price", item.price));
             list.append(row);
@@ -1223,6 +1502,8 @@ export function createFoodJournalView({
           const block = el("div", "food-dish-editor");
           const set = (key, v) => {
             d[key] = v;
+            // An old translation never shows against new text.
+            if (key === "notes") delete d.notes_en;
             ctx.update({ ...d });
             persistDraft();
             if (key === "title") repaintMenu();
@@ -1254,7 +1535,14 @@ export function createFoodJournalView({
             }),
             tagField(d.tags, tags, (v) => set("tags", v)),
           );
-          block.append(top, notes, more);
+          const ingredients = field(
+            "Ingredients",
+            d.ingredients || "",
+            (v) => set("ingredients", v),
+            { type: "textarea", max: 2000 },
+          );
+          ingredients.classList.add("food-field--short");
+          block.append(top, ingredients, notes, more);
           const photos = el("div", "food-thumbnails");
           const tile = (p) => {
             const wrap = el("div", "food-photo-wrap");
@@ -1462,7 +1750,22 @@ export function createFoodJournalView({
             next.visits.flatMap((v) => v.dishes.map((d) => d.id)),
           );
           next.recipes = next.recipes.filter((r) => ids.has(r.dish_id));
-          await persist(next);
+          const kept = new Set(visit.dishes.map((d) => d.id));
+          const saved = journal.visits.find((v) => v.id === visit.id);
+          for (const d of visit.dishes) {
+            const before = saved?.dishes.find((b) => b.id === d.id);
+            if (d.brisket && needsRecount(before, d)) d.brisket.needs_recount = true;
+          }
+          const paths = countedPaths(
+            (saved?.dishes ?? []).filter((d) => !kept.has(d.id)),
+          );
+          const yes = paths.length ? await askRemoveMeals(s) : false;
+          if (yes === null) {
+            persistDraft();
+            return;
+          }
+          const removeMeals = yes ? paths : [];
+          await persist(next, { removeMeals });
           clearDraft();
           s.close();
           render();
@@ -1965,7 +2268,8 @@ export function createFoodJournalView({
   return {
     show() {
       if (!host) return;
-      if (!loaded) {
+      if (!loaded || sentToBrisket) {
+        sentToBrisket = false;
         render();
         void load();
       } else render();

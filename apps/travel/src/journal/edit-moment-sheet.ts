@@ -1,5 +1,15 @@
-import type { JournalDocument } from '@/api/journal';
+import { getJournal, rememberJournalEnvelope, type JournalDocument } from '@/api/journal';
+import { deleteTravelMeal, getTravelMeal, putTravelMeal } from '@/api/travel-meal';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
+import {
+  canBeMeal,
+  MEAL_MESSAGES,
+  mealPayload,
+  mountMealSection,
+  saveErrorMessage,
+  type MealSectionHandle,
+} from '@/journal/meal-section';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { searchPlaces } from '@/api/travel';
 import type { JournalCoordinates, JournalMoment, JournalPlace } from '@/journal/types';
 import { openPinEditor } from '@/journal/pin-editor';
@@ -28,6 +38,11 @@ export function patchMomentInJournal(
   };
 }
 
+/** JSON drops undefined fields, the same way the save does. */
+export function samePatch(a: Partial<JournalMoment> | null, b: Partial<JournalMoment>): boolean {
+  return a !== null && JSON.stringify(a) === JSON.stringify(b);
+}
+
 function isFixtureVersion(version: string): boolean {
   return version === 'fixture';
 }
@@ -36,6 +51,10 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   attachVisualViewportInset();
 
   const moment = options.moment;
+  let journal = options.journal;
+  let version = options.version;
+  // A retry after a failed meal call skips the moment save it already made.
+  let savedPatch: Partial<JournalMoment> | null = null;
   let text = moment.text ?? '';
   let localDate = moment.local_date;
   let localTime = moment.local_time ?? '';
@@ -131,6 +150,25 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   status.className = 'journal-edit-moment__status';
   status.hidden = true;
 
+  // Your own moments can be meals; the meal lives in the Food Journal.
+  let meal: MealSectionHandle | null = null;
+  let mealHost: HTMLElement | null = null;
+  if (canBeMeal(moment) && !isFixtureVersion(options.version)) {
+    mealHost = document.createElement('div');
+    mealHost.className = 'journal-edit-moment__meal-host';
+    mealHost.append(Object.assign(document.createElement('p'), {
+      className: 'journal-edit-moment__section-hint',
+      textContent: 'Loading meal…',
+    }));
+    const host = mealHost;
+    getTravelMeal(options.tripId, moment.id)
+      .then((read) => mountMealSection(host, { moment, read, media: journal.media, onChange: markDirty }))
+      .catch(() => mountMealSection(host, { moment, read: null }))
+      .then((handle) => {
+        meal = handle;
+      });
+  }
+
   scroll.append(
     photosNote,
     field('Writing', textArea),
@@ -142,6 +180,7 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     suggestions,
     placeActions,
     placeSummary,
+    ...(mealHost ? [mealHost] : []),
     advanced,
     status,
   );
@@ -337,7 +376,7 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       location_source: coordinates ? 'manual' : undefined,
     };
 
-    const nextJournal = patchMomentInJournal(options.journal, moment.id, patch);
+    const nextJournal = patchMomentInJournal(journal, moment.id, patch);
 
     if (isFixtureVersion(options.version)) {
       options.onSaved?.({ journal: nextJournal, version: options.version });
@@ -345,15 +384,69 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       return;
     }
 
-    try {
-      const envelope = await persistJournalPatch(options.tripId, options.version, nextJournal);
-      options.onSaved?.(envelope);
-      finishClose();
-    } catch {
-      saveBtn.disabled = false;
-      status.hidden = false;
-      status.textContent = 'Could not save. Try again.';
+    // Read the meal once: it may still be loading, and then nothing changed.
+    const mealNow = meal as MealSectionHandle | null;
+    // The visit takes its venue, date and place from the moment, so those count too.
+    const momentFedVisit =
+      placeName.trim() !== (moment.place?.name ?? '') ||
+      localDate !== moment.local_date ||
+      JSON.stringify(coordinates ?? null) !== JSON.stringify(moment.coordinates ?? null);
+    // Photos that didn't copy last time count as a change, so Save retries them.
+    const mealOn = Boolean(
+      mealNow?.available &&
+        mealNow.enabled() &&
+        (mealNow.changed() || mealNow.photosPending.length > 0 || momentFedVisit),
+    );
+    const mealOff = Boolean(mealNow?.available && mealNow.wasLinked && !mealNow.enabled());
+    const mealState = mealOn ? mealNow!.state() : null;
+    if (mealState && !mealState.dishes.some((d) => d.title.trim())) {
+      fail('Add at least one dish.');
+      return;
     }
+
+    let step: 'moment' | 'meal' = 'moment';
+    try {
+      // The ordinary save never touches the meal; the meal call follows on its version.
+      if (!samePatch(savedPatch, patch)) {
+        const envelope = await persistJournalPatch(options.tripId, version, nextJournal);
+        journal = envelope.journal;
+        version = envelope.version;
+        options.onSaved?.(envelope);
+        if (envelope.queued) {
+          if (mealOn || mealOff) showHubToast(MEAL_MESSAGES.queued);
+          dirty = false;
+          finishClose();
+          return;
+        }
+        savedPatch = patch;
+      }
+      if (!mealOn && !mealOff) {
+        finishClose();
+        return;
+      }
+      step = 'meal';
+      const versions = { travel_version: version, food_version: mealNow!.foodVersion };
+      const result = mealOn
+        ? await putTravelMeal(options.tripId, moment.id, mealPayload(mealState!, versions))
+        : await deleteTravelMeal(options.tripId, moment.id, versions);
+      const after = result.travel_version
+        ? rememberJournalEnvelope({ journal: result.travel, version: result.travel_version })
+        : await getJournal(options.tripId);
+      journal = after.journal;
+      version = after.version;
+      options.onSaved?.(after);
+      dirty = false;
+      finishClose();
+      if (result.photo_failed) showHubToast(MEAL_MESSAGES.photoFailed);
+    } catch (err) {
+      fail(saveErrorMessage(err, step));
+    }
+  }
+
+  function fail(message: string): void {
+    saveBtn.disabled = false;
+    status.hidden = false;
+    status.textContent = message;
   }
 
   form.append(scroll, discardBar, actions);

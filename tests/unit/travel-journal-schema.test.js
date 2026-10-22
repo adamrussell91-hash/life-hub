@@ -65,6 +65,57 @@ test('validateJournal rejects unknown location_source on moments', () => {
   );
 });
 
+function journalWithOneMoment() {
+  const journal = emptyJournal('trp_test01');
+  journal.legs = [
+    {
+      id: 'leg_test01',
+      trip_id: 'trp_test01',
+      destination: 'Test',
+      timezone: 'UTC',
+      pattern_id: 'generic',
+      order: 0,
+      lifecycle: 'live'
+    }
+  ];
+  journal.leg_ids = ['leg_test01'];
+  journal.moments = [
+    {
+      id: 'mom_meal01',
+      leg_id: 'leg_test01',
+      local_date: '2026-03-01',
+      media_ids: [],
+      display_order: 1,
+      lifecycle: 'live'
+    }
+  ];
+  return journal;
+}
+
+test('a moment may carry a meal link with travel extras', () => {
+  const doc = journalWithOneMoment();
+  doc.moments[0].meal = {
+    food_visit_id: 'visit_3f2a',
+    mood: 'buzzing',
+    vibe: 'tiny bar, standing room',
+    with: 'the group'
+  };
+  assert.doesNotThrow(() => validateJournal(doc));
+  doc.moments[0].meal = null;
+  assert.doesNotThrow(() => validateJournal(doc));
+  for (const meal of [
+    { mood: 'x' },
+    { food_visit_id: 'bad id!' },
+    { food_visit_id: 'visit_1', mood: 'x'.repeat(41) },
+    { food_visit_id: 'visit_1', vibe: 'x'.repeat(601) },
+    { food_visit_id: 'visit_1', with: 4 }
+  ]) {
+    const copy = structuredClone(doc);
+    copy.moments[0].meal = meal;
+    assert.throws(() => validateJournal(copy));
+  }
+});
+
 test('validateJournal rejects media keys outside travel/journal trip namespace', () => {
   const tripId = 'trp_test01';
   const journal = emptyJournal(tripId);

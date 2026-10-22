@@ -144,6 +144,8 @@ export function createAppController(dependencies) {
     buildMindModel,
     renderMind,
     chatSelectAgent,
+    chatSend,
+    chatWaitUntilIdle,
     chatSyncAccent,
     chatStartCentralNodeAudit,
     chatFlushVeraSession,
@@ -795,6 +797,34 @@ export function createAppController(dependencies) {
       chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, agentSlug));
       chatClearUnread?.();
     }
+  }
+
+  /** Food Journal → Brisket: open Brisket on Nutrition and send the hand-off. */
+  async function openBrisketWith(message, attachments = []) {
+    if (!chatPanel || !chatSend) return { ok: false };
+    const from = currentSection;
+    // The chat slot lives in Nutrition, so it must be the visible section.
+    if (currentSection !== 'nutrition') showSection('nutrition');
+    // Switching may first save a Vera session; the hand-off must not ride on it.
+    await chatSelectAgent?.(NUTRITION_AGENT_SLUG);
+    const slot = root.querySelector('#nutrition-dashboard');
+    if (slot && !chatPanel.isOpen()) {
+      chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, NUTRITION_AGENT_SLUG));
+      chatClearUnread?.();
+    }
+    await chatWaitUntilIdle?.();
+    // Settles once Brisket has the turn, or when the send fails before that,
+    // so the Food Journal's sheet is not held for the whole reply.
+    const result = await new Promise(resolve => {
+      Promise.resolve(chatSend(message, { attachments, onAccepted: () => resolve({ ok: true }) }))
+        .then(outcome => resolve(outcome ?? { ok: true }), () => resolve({ ok: false }));
+    });
+    // A failed hand-off goes back where it came from, so its sheet can retry.
+    if (result.ok === false && currentSection === 'nutrition' && from !== 'nutrition') {
+      if (chatPanel.isOpen()) chatPanel.close();
+      showSection(from);
+    }
+    return result;
   }
 
   function openCentralNodeAudit() {
@@ -2196,6 +2226,7 @@ export function createAppController(dependencies) {
     applySkincareShelf,
     applyLoggedEvent,
     removeLoggedEvent,
+    openBrisketWith,
     openCalendarCompose: () => {
       calendarFocusCompose = true;
       if (currentSection !== 'calendar') showSection('calendar');

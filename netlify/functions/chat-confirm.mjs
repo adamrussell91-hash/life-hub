@@ -30,6 +30,7 @@ import {
 } from './_shared/exercise-library.mjs';
 import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes, syncCentralNodeAfterCreatineWrites } from './_shared/persist-log.mjs';
 import { mealDeletesFromWrites, resolveMealWritePath } from './_shared/delete-meal.mjs';
+import { findCountedMeal, removeOldCountedMeal } from './_shared/food-journal-meal-sync.mjs';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
@@ -363,6 +364,7 @@ export function createChatConfirmHandler({
     let existingSha;
     let workoutNotesAmend = false;
     let retirePaths = [];
+    let staleCountedMeal = null;
     try {
       if (validation.record.type === 'workout') {
         const target = await resolveWorkoutConfirmTarget(client, {
@@ -388,17 +390,30 @@ export function createChatConfirmHandler({
         existingSha = target.existingSha;
         workoutNotesAmend = target.notesAmend === true || target.existingStatus === 'completed';
         retirePaths = Array.isArray(target.retirePaths) ? target.retirePaths : [];
-      } else if (validation.record.type === 'meal' && parsed.overwrite) {
+      } else if (validation.record.type === 'meal' && (validation.record.food_dish_id || parsed.overwrite)) {
         const current = await client.resolveTree();
-        const target = resolveMealWritePath(current.tree, {
-          date: validation.record.date,
-          meal: validation.record.meal,
-          slug: pathSlug,
-          overwrite: true
-        });
-        if (target) {
-          path = target.path;
-          existingSha = target.existingSha;
+        // A re-count of a Food Journal dish replaces the meal it was counted into.
+        const counted = validation.record.food_dish_id
+          ? await findCountedMeal(client, current.tree, validation.record.food_dish_id)
+          : null;
+        if (counted && counted.date === validation.record.date && counted.meal === validation.record.meal) {
+          path = counted.path;
+          existingSha = counted.sha;
+        } else if (counted) {
+          // Another date or slot: write a new file, then remove the old count.
+          staleCountedMeal = counted;
+        }
+        if (path !== counted?.path && parsed.overwrite) {
+          const target = resolveMealWritePath(current.tree, {
+            date: validation.record.date,
+            meal: validation.record.meal,
+            slug: pathSlug,
+            overwrite: true
+          });
+          if (target) {
+            path = target.path;
+            existingSha = target.existingSha;
+          }
         }
       } else if (parsed.overwrite) {
         const current = await client.resolveTree();
@@ -484,7 +499,57 @@ export function createChatConfirmHandler({
           exercisePersonalBests = [];
         }
       }
-      const centralNodeUpdated = persisted.centralNodeUpdated === true;
+      let centralNodeUpdated = persisted.centralNodeUpdated === true;
+      const foodJournalUpdated = persisted.foodJournalUpdated ?? null;
+      let oldCountRemoved = null;
+      let recountRollbackFailed = null;
+      if (staleCountedMeal && staleCountedMeal.path !== path && foodJournalUpdated !== true && !existingSha) {
+        // The dish still links to the old file, so the new one would double count.
+        // Undo it; the old count stays and the next re-count finds it.
+        try {
+          await client.deleteFile({
+            path,
+            sha: persisted.sha,
+            message: `chore(nutrition): undo unlinked re-count ${path.split('/').pop()}`
+          });
+        } catch {
+          recountRollbackFailed = true;
+        }
+        if (!recountRollbackFailed) {
+          try {
+            await syncCentralNodeAfterMealDeletes(client, [{ date: validation.record.date, meals: [validation.record.meal] }], {
+              date: getSydneyDateKey(new Date(now())),
+              now: new Date(now())
+            });
+          } catch {
+            // The re-count is undone; Status catches up on the next log.
+          }
+          return errorResponse(409, 'recount_not_saved', 'The re-count didn\u2019t save; try again.', true, PRIVATE_CACHE);
+        }
+      } else if (staleCountedMeal && staleCountedMeal.path !== path && foodJournalUpdated !== true) {
+        // The new meal replaced a file already at its path, so it can't be undone.
+        // Keep the old count too; the dish still links to it.
+        oldCountRemoved = false;
+      } else if (staleCountedMeal && staleCountedMeal.path !== path) {
+        try {
+          const removed = await removeOldCountedMeal(client, staleCountedMeal, validation.record.food_dish_id);
+          if (removed) {
+            oldCountRemoved = true;
+            try {
+              const cn = await syncCentralNodeAfterMealDeletes(client, [{ date: removed.date, meals: [removed.meal] }], {
+                date: getSydneyDateKey(new Date(now())),
+                now: new Date(now())
+              });
+              if (cn?.updated !== true) centralNodeUpdated = false;
+            } catch {
+              centralNodeUpdated = false;
+            }
+          }
+        } catch {
+          // The new meal is saved; the chat asks for the old one to be deleted.
+          oldCountRemoved = false;
+        }
+      }
 
       let dayoneSent = null;
       let dayoneReason = null;
@@ -525,6 +590,10 @@ export function createChatConfirmHandler({
           sha,
           commitSha,
           centralNodeUpdated,
+          ...(foodJournalUpdated != null ? { foodJournalUpdated } : {}),
+          ...(persisted.foodJournalReason ? { foodJournalReason: persisted.foodJournalReason } : {}),
+          ...(oldCountRemoved != null ? { oldCountRemoved } : {}),
+          ...(recountRollbackFailed ? { recountRollbackFailed } : {}),
           record: validation.record,
           notes: validation.notes ?? null,
           ...(exercisePersonalBests !== undefined ? { personalBests: exercisePersonalBests } : {}),
