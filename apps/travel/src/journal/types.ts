@@ -56,6 +56,13 @@ export interface JournalTransitionDisplayOverride {
   arrival_label?: string;
 }
 
+export interface JournalMomentMeal {
+  food_visit_id: string;
+  mood?: string;
+  vibe?: string;
+  with?: string;
+}
+
 export interface JournalMoment extends JournalDeletedMeta {
   id: string;
   leg_id: string;
@@ -69,6 +76,7 @@ export interface JournalMoment extends JournalDeletedMeta {
   location_source?: JournalLocationSource;
   text?: string;
   author?: JournalMomentAuthor;
+  meal?: JournalMomentMeal;
 }
 
 export interface JournalDay extends JournalDeletedMeta {
