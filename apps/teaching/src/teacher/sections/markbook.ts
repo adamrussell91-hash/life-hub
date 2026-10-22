@@ -12,7 +12,7 @@ import { assessments, markOf, removedStudentIds, rowStudents, todayInSydney, wei
 import { renderGrid } from '@/markbook/grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
-import { renderOutcomes } from '@/markbook/outcomes-view';
+import { renderOutcomes, type OutcomeSelection } from '@/markbook/outcomes-view';
 import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
 import { withAppBase } from '@/app/base-path';
 import '@/markbook/markbook.css';
@@ -64,6 +64,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   /** The last view the server confirmed, with no local changes on it. */
   let confirmed: MarkbookView | null = null;
   let mode: 'grid' | 'outcomes' = 'grid';
+  /** The outcome cell whose evidence is open, kept across redraws. */
+  let selectedOutcome: OutcomeSelection | null = null;
   let showRemoved = false;
   let showHiddenList = false;
   let phoneIndex = 0;
@@ -305,7 +307,16 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
-    if (mode === 'outcomes') body.replaceChildren(renderOutcomes(current, students, options.outcomes ?? []));
+    if (mode === 'outcomes') {
+      body.replaceChildren(
+        renderOutcomes(current, students, options.outcomes ?? [], {
+          selected: selectedOutcome,
+          onSelect: (next) => {
+            selectedOutcome = next;
+          }
+        })
+      );
+    }
     else body.replaceChildren(renderGrid(current, students, actions, today()));
     restoreFocus(key);
   }

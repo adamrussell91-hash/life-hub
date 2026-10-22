@@ -450,7 +450,7 @@ describe('markbook section', () => {
     toggle.click();
     expect(host.querySelector('.mb-outcomes')).not.toBeNull();
     expect(host.querySelector('.mb-col__title')).toBeNull();
-    expect(host.querySelector('.mb-outcome__code')?.textContent).toBe('o2');
+    expect(host.querySelector('.mb-outcome__code')?.textContent).toBe('Unknown outcome');
     toggle.click();
     expect(host.querySelector('.mb-outcomes')).toBeNull();
     expect(host.querySelector('.mb-col__title')).not.toBeNull();
@@ -469,6 +469,16 @@ describe('markbook section', () => {
     host.remove();
   });
 
+  it('keeps the outcome selection through a redraw', async () => {
+    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+    host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
+    host.querySelector<HTMLButtonElement>('button.mb-outcome-cell')!.click();
+    host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
+    expect(host.querySelector('button.mb-outcome-cell')?.getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('.mb-evidence__title')?.textContent).toBe('BB · Unknown outcome');
+    host.remove();
+  });
+
   it('opens the heatmap from a quiz column title, and Escape returns focus to it', async () => {
     const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
     const title = [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((n) => n.dataset.col === 'quiz:l1')!;
@@ -477,6 +487,7 @@ describe('markbook section', () => {
     const sheet = document.querySelector<HTMLElement>('.mb-sheet')!;
     expect(sheet.getAttribute('role')).toBe('dialog');
     expect(sheet.querySelector('.mb-heat')).not.toBeNull();
+    expect(sheet.contains(document.activeElement)).toBe(true);
     sheet.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     expect(document.querySelector('.mb-sheet')).toBeNull();
     expect(document.activeElement).toBe(title);

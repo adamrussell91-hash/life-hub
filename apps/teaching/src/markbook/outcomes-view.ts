@@ -4,13 +4,31 @@ import { band4, evidenceFor, outcomeCell, outcomesInView } from './insight';
 
 /** Students down the side, outcomes across, each cell the mean of its evidence. */
 
-export function renderOutcomes(view: MarkbookView, students: RosterStudent[], labels: OutcomeLabel[]): HTMLElement {
+/** The cell whose evidence is shown, by its `data-col` and `data-student`. */
+export type OutcomeSelection = { col: string; student: string };
+
+export type OutcomesOptions = {
+  /** Re-pressed on draw, so a redraw keeps what the teacher was reading. */
+  selected?: OutcomeSelection | null;
+  /** Told each time the selection changes; null when it is cleared. */
+  onSelect?: (selection: OutcomeSelection | null) => void;
+};
+
+const OTHER = 'Other outcomes';
+
+export function renderOutcomes(view: MarkbookView, students: RosterStudent[], labels: OutcomeLabel[], options: OutcomesOptions = {}): HTMLElement {
   const ids = outcomesInView(view);
   if (!ids.length) return el('p', 'mb__empty', 'No outcomes yet. Tag assessment criteria or quiz questions with outcome codes, or give the quiz lesson outcomes.');
   const byId = new Map(labels.map((l) => [l.id, l]));
-  const groupOf = (id: string) => byId.get(id)?.group ?? 'Other outcomes';
-  const codeOf = (id: string) => byId.get(id)?.code ?? id;
-  const ordered = [...ids].sort((a, b) => groupOf(a).localeCompare(groupOf(b)) || codeOf(a).localeCompare(codeOf(b), undefined, { numeric: true }));
+  const groupOf = (id: string) => byId.get(id)?.group || OTHER;
+  const codeOf = (id: string) => byId.get(id)?.code ?? 'Unknown outcome';
+  const ordered = [...ids].sort(
+    (a, b) =>
+      Number(groupOf(a) === OTHER) - Number(groupOf(b) === OTHER) ||
+      groupOf(a).localeCompare(groupOf(b)) ||
+      codeOf(a).localeCompare(codeOf(b), undefined, { numeric: true }) ||
+      a.localeCompare(b)
+  );
 
   const wrap = el('div', 'mb-outcomes');
   const grid = el('div', 'mb-grid');
@@ -20,11 +38,15 @@ export function renderOutcomes(view: MarkbookView, students: RosterStudent[], la
   const corner = el('th', 'mb-grid__student', 'Student');
   corner.scope = 'col';
   headRow.append(corner);
+  let lastGroup: string | null = null;
   for (const id of ordered) {
     const th = el('th', 'mb-col');
     th.scope = 'col';
     th.title = byId.get(id)?.title ?? id;
-    th.append(el('span', 'mb-col__kind', groupOf(id)), el('span', 'mb-outcome__code', codeOf(id)));
+    // The group shows once, over the first of its outcomes.
+    if (groupOf(id) !== lastGroup) th.append(el('span', 'mb-col__kind', groupOf(id)));
+    lastGroup = groupOf(id);
+    th.append(el('span', 'mb-outcome__code', codeOf(id)));
     headRow.append(th);
   }
   thead.append(headRow);
@@ -54,14 +76,27 @@ export function renderOutcomes(view: MarkbookView, students: RosterStudent[], la
         b.setAttribute('aria-pressed', 'false');
         b.append(`${percent}%`, el('small', 'mb-outcome-cell__count', `·${cell.count}`));
         b.setAttribute('aria-label', `${s.name}, ${codeOf(id)}: ${percent}% from ${cell.count} ${cell.count === 1 ? 'piece' : 'pieces'} of evidence`);
-        b.addEventListener('click', () => {
+        const show = (): void => {
           pressed?.setAttribute('aria-pressed', 'false');
           b.setAttribute('aria-pressed', 'true');
           pressed = b;
           const list = el('ul', 'mb-evidence__list');
           for (const e of cell.items) list.append(el('li', undefined, `${e.source} · ${e.item} · ${Math.round(e.percent)}%`));
           detail.replaceChildren(el('h3', 'mb-evidence__title', `${s.initials} · ${codeOf(id)}`), list);
+        };
+        b.addEventListener('click', () => {
+          if (pressed === b) {
+            // A second click on the same cell puts the evidence away.
+            b.setAttribute('aria-pressed', 'false');
+            pressed = null;
+            detail.replaceChildren();
+            options.onSelect?.(null);
+            return;
+          }
+          show();
+          options.onSelect?.({ col: b.dataset.col!, student: s.id });
         });
+        if (options.selected && options.selected.col === b.dataset.col && options.selected.student === s.id) show();
         td.append(b);
       }
       row.append(td);
