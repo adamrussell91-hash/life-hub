@@ -1592,3 +1592,30 @@ test("deleting an already-deleted travel visit does not touch the trip", async (
   assert.equal(res.status, 200);
   assert.equal(called, false);
 });
+
+test("the default unlink refuses with 409 when the store's Food Journal version is stale", async () => {
+  const j = fixture();
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234";
+  let writes = 0;
+  const store = {
+    async read(tripId) {
+      return {
+        tripId,
+        base: {},
+        travel: { journal: { moments: [] }, version: "t".repeat(40) },
+        food: { journal: j, version: "f".repeat(40) },
+      };
+    },
+    async write() {
+      writes += 1;
+      return { commitSha: "d".repeat(40), foodVersion: "e".repeat(40), travelVersions: {} };
+    },
+  };
+  const r = repo(j);
+  const h = createFoodJournalHandler(deps(r, { createMealLinkStore: () => store }));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 409);
+  assert.equal(writes, 0);
+});
