@@ -8,8 +8,8 @@ import { addEdge, applyScores, canEdge, canPropose, checkNode, canPlace, isCompl
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
-test('registry lists every tool in order: the toolkit, Decision Maker’s models and record, then Gear Shifter’s techniques', () => {
-  const gear = Object.keys(GEAR_TOOLS);
+test('registry lists every tool in order: the toolkit, Decision Maker’s models and record, then Gear Shifter’s techniques, Commit and Review tools', () => {
+  const gear = [...Object.keys(GEAR_TOOLS), 'gt_commit', 'gt_review'];
   assert.deepEqual(TOOL_IDS.slice(-gear.length), gear);
   const rest = TOOL_IDS.slice(0, -gear.length);
   assert.deepEqual(rest.slice(-Object.keys(DECISION_TOOLS).length - 1, -1), Object.keys(DECISION_TOOLS));

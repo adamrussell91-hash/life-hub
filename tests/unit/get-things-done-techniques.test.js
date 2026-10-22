@@ -354,7 +354,7 @@ test('Project Evaluation: fun, money and impact, all three; luck and support fol
   assert.equal(def.chart.minGroups, 3);
   assert.ok(def.steps.some((s) => s.id === 'name_the_luck_and_help'), 'The Myth of Achievement’s step');
   assert.ok(def.failureModes.some((f) => /luck|help/i.test(f)), 'The Myth of Achievement’s watch-for');
-  assert.deepEqual(toolsForPlanStep('gear_shifter', 'review'), ['gt_project_evaluation']);
+  assert.ok(toolsForPlanStep('gear_shifter', 'review').includes('gt_project_evaluation'));
 });
 
 test('Transactional Model: three needs scored 0 to 10, never a sum; recognition at the top; dated', () => {

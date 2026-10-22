@@ -5,7 +5,6 @@ import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
 import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
 import { BOOK_KINDS, bookOf } from '../../../../packages/problem-solver/books.mjs';
-import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { mainModel, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 import { outcomeOf } from '../../../../packages/decision-book/quick.mjs';
 
@@ -221,21 +220,23 @@ function placeAccepted(next, turn, coachTurnId, deps) {
 }
 
 /**
- * After a node lands in the decision record: a reason keeps the Explore nodes it rests on
- * (`basis`, on the session, since they sit in other runs), and the review date becomes the
- * session's review proposal, the page's confirm card (unless one is created or set aside).
+ * After a node lands in a book's record tool (Decision Maker's decision record, Gear Shifter's
+ * experiment; books.mjs): its basis slot keeps the Explore nodes it rests on (`basis`, on the
+ * session, since they sit in other runs), and its date becomes the session's review proposal,
+ * the page's confirm card (unless one is created or set aside).
  */
 function recordPlaced(session, run, nodeId, refs, deps) {
-  if (run.tool !== RECORD_ID) return session;
+  const record = bookOf(session.kind)?.record;
+  if (!record || run.tool !== record.tool) return session;
   const node = run.nodes.find((item) => item.id === nodeId);
   const name = parseSlot(node.slot)?.name;
-  if (name === 'reason') {
+  if (name === record.basisSlot) {
     const basis = resolveBasis(session, refs);
     return basis.length ? { ...session, basis: { ...(session.basis ?? {}), [nodeId]: basis } } : session;
   }
   const open = !session.reviewTaskId && session.reviewProposal?.status !== 'dismissed';
-  if (name === 'review' && open && afterToday(node.text, deps)) {
-    return { ...session, reviewProposal: { title: reviewTitle(session), due: node.text, reason: 'The review date set in the decision record.', status: 'proposed' } };
+  if (name === record.dateSlot && open && afterToday(node.text, deps)) {
+    return { ...session, reviewProposal: { title: reviewTitle(session), due: node.text, reason: record.dateReason, status: 'proposed' } };
   }
   return session;
 }
