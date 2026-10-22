@@ -499,21 +499,25 @@ export function createChatConfirmHandler({
           exercisePersonalBests = [];
         }
       }
-      const centralNodeUpdated = persisted.centralNodeUpdated === true;
+      let centralNodeUpdated = persisted.centralNodeUpdated === true;
       const foodJournalUpdated = persisted.foodJournalUpdated ?? null;
       let oldCountRemoved = null;
-      if (staleCountedMeal && staleCountedMeal.path !== path) {
+      if (staleCountedMeal && staleCountedMeal.path !== path && foodJournalUpdated !== true) {
+        // The dish still links to the old file, so keep it; the next re-count finds it.
+        oldCountRemoved = false;
+      } else if (staleCountedMeal && staleCountedMeal.path !== path) {
         try {
           const removed = await removeOldCountedMeal(client, staleCountedMeal, validation.record.food_dish_id);
           if (removed) {
             oldCountRemoved = true;
             try {
-              await syncCentralNodeAfterMealDeletes(client, [{ date: removed.date, meals: [removed.meal] }], {
+              const cn = await syncCentralNodeAfterMealDeletes(client, [{ date: removed.date, meals: [removed.meal] }], {
                 date: getSydneyDateKey(new Date(now())),
                 now: new Date(now())
               });
+              if (cn?.updated !== true) centralNodeUpdated = false;
             } catch {
-              // The old meal is gone; Status catches up on the next log.
+              centralNodeUpdated = false;
             }
           }
         } catch {

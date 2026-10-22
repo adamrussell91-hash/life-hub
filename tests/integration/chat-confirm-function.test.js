@@ -314,7 +314,7 @@ test('a plain meal confirm leaves foodJournalUpdated out of the response', async
   assert.equal('foodJournalUpdated' in payload.data, false);
 });
 
-function recountFetch({ mealPath, mealSha, files = {}, oldDishId = 'dish_1', deleteStatus = 200 }) {
+function recountFetch({ mealPath, mealSha, files = {}, oldDishId = 'dish_1', deleteStatus = 200, journalPutStatus = 200 }) {
   const journalSha = '9'.repeat(40);
   const journal = {
     schema_version: 1, recipes: [],
@@ -327,7 +327,7 @@ function recountFetch({ mealPath, mealSha, files = {}, oldDishId = 'dish_1', del
     { path: mealPath, type: 'blob', sha: mealSha },
     ...Object.keys(files).map(path => ({ path, type: 'blob', sha: files[path] }))
   ];
-  const meal = `---\ntype: "meal"\ndate: "2026-08-01"\nmeal: "dinner"\ncalories: 900\nprotein_g: 30\nfat_g: 40\nfood_dish_id: "${oldDishId}"\n---\n`;
+  const meal = `---\ntype: "meal"\ndate: "2026-08-01"\nmeal: "dinner"\ncalories: 900\nprotein_g: 30\nfat_g: 40\n${oldDishId ? `food_dish_id: "${oldDishId}"\n` : ''}---\n`;
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
@@ -340,6 +340,9 @@ function recountFetch({ mealPath, mealSha, files = {}, oldDishId = 'dish_1', del
     }
     if (url.includes(`/git/blobs/${mealSha}`)) {
       return Response.json({ encoding: 'base64', content: Buffer.from(meal, 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT' && url.includes('food-journal/journal.json') && journalPutStatus !== 200) {
+      return Response.json({ message: 'boom' }, { status: journalPutStatus });
     }
     if (options?.method === 'PUT') {
       return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
@@ -423,6 +426,35 @@ test('a failed delete of the old count still confirms and reports oldCountRemove
   assert.equal(response.status, 200);
   assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
   assert.equal(payload.data.oldCountRemoved, false);
+});
+
+test('a re-count never overwrites a meal at the counted path that is not this dish\'s', async () => {
+  const mealPath = 'data/nutrition/2026/08/2026-08-01-dinner-1930.md';
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), oldDishId: null });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+  assert.equal('oldCountRemoved' in payload.data, false);
+  const mealPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('2026-08-01-dinner-1945.md'));
+  assert.equal(JSON.parse(mealPut.options.body).sha, undefined);
+  assert.ok(!calls.some(call => call.url.includes('dinner-1930') && ['PUT', 'DELETE'].includes(call.options?.method)));
+});
+
+test('a cross-date re-count keeps the old file when the Food Journal write fails', async () => {
+  const mealPath = 'data/nutrition/2026/07/2026-07-31-dinner-1930.md';
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), journalPutStatus: 500 });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
+  assert.equal(payload.data.foodJournalUpdated, false);
+  assert.equal(payload.data.oldCountRemoved, false);
+  assert.equal(calls.some(call => call.options?.method === 'DELETE'), false);
 });
 
 test('enriches Exercise status and Recent Actions on completed workout confirm (no Day Type directive)', async () => {

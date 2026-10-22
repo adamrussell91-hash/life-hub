@@ -437,8 +437,8 @@ test('Central Node, Food Journal and old-count warnings show together in one mes
   assert.equal(
     root.querySelector('#chat-error').textContent,
     'Logged, but Central Node didn\u2019t update — try Refresh. '
-      + 'Logged. The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again. '
-      + 'Logged. The old count for this dish couldn\u2019t be removed; delete it from Nutrition.'
+      + 'The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again. '
+      + 'The old count for this dish couldn\u2019t be removed; delete it from Nutrition.'
   );
 });
 
