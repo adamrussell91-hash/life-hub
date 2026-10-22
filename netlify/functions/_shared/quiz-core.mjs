@@ -323,7 +323,9 @@ var QuizSettingsSchema = z.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z.number().min(0).max(1).optional(),
   confidence: z.boolean().optional(),
-  closes_at: z.string().datetime().optional()
+  closes_at: z.string().datetime().optional(),
+  /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
+  move_on: z.number().int().min(1).max(100).optional()
 });
 var DEFAULT_QUIZ_SETTINGS = {
   attempts: 1,

@@ -1,0 +1,577 @@
+/* Display view: Page / Focus layout, the step strip, tools dock, checkpoint and lesson map. */
+
+/* ── Page / Focus toggle ─────────────────────────────────────────── */
+.fv-mode {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.fv-mode__btn {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--muted);
+  font: var(--weight-medium) var(--text-sm) / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+.fv-mode__btn[aria-pressed='true'] {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.fv-mode__btn:focus-visible,
+.fv-strip button:focus-visible,
+.fv-map__card:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.fv-map-btn[hidden] {
+  display: none;
+}
+
+.fv-map-btn[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--wave) 12%, transparent);
+  color: var(--wave);
+}
+
+/* ── Page layout: steps simply stack ─────────────────────────────── */
+.lesson-display__step + .lesson-display__step {
+  margin-top: var(--space-4);
+}
+
+.lesson-display__step[hidden] {
+  display: none !important;
+}
+
+/* ── Focus layout: header, stage, strip ──────────────────────────── */
+.lesson-display.is-focus {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lesson-display.is-focus > .student-chrome {
+  position: relative;
+  flex: none;
+}
+
+.lesson-display.is-focus > .student-surface__content {
+  flex: 1 1 auto;
+  width: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 2vh clamp(var(--space-4), 4vw, var(--space-12));
+  transition: margin-right 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Auto margins centre the step and still let a tall step scroll from its top. */
+.lesson-display.is-focus .lesson-display__step {
+  width: min(820px, 100%);
+  margin: auto;
+  flex: none;
+}
+
+/* The cover banner is laid out for a wide page: narrower, its title wraps over the eyebrow. */
+.lesson-display.is-focus .lesson-display__step--hero {
+  width: min(1040px, 100%);
+}
+
+.lesson-display.is-focus .lesson-display__step.is-current {
+  animation: fv-step-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lesson-display.is-focus .student-hero {
+  margin-bottom: 0;
+}
+
+@keyframes fv-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-display.is-focus .lesson-display__step.is-current {
+    animation: none;
+  }
+}
+
+.fv-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) clamp(var(--space-4), 3vw, var(--space-10));
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.fv-strip[hidden] {
+  display: none;
+}
+
+.fv-strip__nav {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--navy);
+  font: 400 1.4rem / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+.fv-strip__nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The class came in under the mark: the next arrow will stop at the checkpoint. */
+.fv-has-checkpoint .fv-strip__nav[aria-label='Next step'] {
+  border-color: var(--high-sea);
+  box-shadow: 0 0 0 3px var(--warning-surface);
+}
+
+.fv-strip__steps {
+  flex: 1 1 auto;
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-x: auto;
+  justify-content: safe center;
+  scrollbar-width: none;
+}
+
+.fv-strip__step {
+  flex: none;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--muted);
+  font: var(--weight-medium) var(--text-sm) / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+.fv-strip__step[aria-current='step'] {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--paper);
+}
+
+.fv-strip__count {
+  flex: none;
+  min-width: 3rem;
+  text-align: right;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Tools dock: the classroom toolbox, pinned bottom left ───────── */
+.fv-dock {
+  position: relative;
+  flex: none;
+}
+
+.fv-dock .ct-bar {
+  min-height: 2.5rem;
+}
+
+.fv-dock .ct-rule {
+  display: none;
+}
+
+.fv-dock .ct-trigger {
+  order: -1;
+  position: relative;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  opacity: 1;
+}
+
+/* A divider before or on this step has saved timers ready to start. */
+.fv-dock.has-saved-timer .ct-trigger::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--high-sea);
+}
+
+/* The tray opens upwards, over the stage, not along the strip. */
+.fv-dock .ct-tray {
+  position: absolute;
+  bottom: calc(100% + var(--space-3));
+  left: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: min(30rem, calc(100vw - 2rem));
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--elev-2, 0 10px 30px rgba(19, 35, 58, 0.14));
+  visibility: hidden;
+}
+
+.fv-dock.is-tray-out .ct-tray {
+  max-width: min(30rem, calc(100vw - 2rem));
+  visibility: visible;
+}
+
+.fv-dock.is-folded .ct-tray {
+  visibility: hidden;
+}
+
+/* An open tool sits in a column on the right and keeps running from step to step. */
+.fv-dock .ct-panel {
+  position: fixed;
+  top: 4.75rem;
+  right: var(--space-4);
+  bottom: 5rem;
+  z-index: 25;
+  display: none;
+  width: min(25rem, calc(100vw - 2rem));
+  overflow: auto;
+}
+
+.fv-dock.is-open .ct-panel {
+  display: block;
+}
+
+.fv-dock .ct-panel__inner {
+  overflow: visible;
+}
+
+.fv-dock .ct-card {
+  margin: 0;
+}
+
+@media (min-width: 900px) {
+  .lesson-display.is-focus:has(.fv-dock.is-open) > .student-surface__content {
+    margin-right: calc(min(25rem, 100vw - 2rem) + var(--space-4));
+  }
+
+  .lesson-display.is-focus:has(.fv-dock.is-open) > .fv-map {
+    padding-right: calc(min(25rem, 100vw - 2rem) + var(--space-8));
+  }
+}
+
+/* ── Checkpoint ──────────────────────────────────────────────────── */
+.fv-checkpoint {
+  position: fixed;
+  left: 50%;
+  bottom: 5rem;
+  z-index: 40;
+  width: min(44rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 10rem);
+  overflow: auto;
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 18px);
+  background: #fff;
+  box-shadow: 0 18px 44px rgba(19, 35, 58, 0.2);
+  transform: translateX(-50%);
+  animation: fv-checkpoint-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.fv-checkpoint[hidden] {
+  display: none;
+}
+
+@keyframes fv-checkpoint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+}
+
+.fv-checkpoint__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.fv-checkpoint__score {
+  margin: 0;
+  color: var(--high-sea-ink);
+  font: 700 2.25rem / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.fv-checkpoint__title {
+  margin: 0;
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.fv-checkpoint__sub {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.fv-checkpoint__talk,
+.fv-checkpoint__preview {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  line-height: 1.5;
+}
+
+.fv-checkpoint__talk p,
+.fv-checkpoint__preview p {
+  margin: 0;
+}
+
+.fv-checkpoint__label {
+  margin-bottom: var(--space-2) !important;
+  color: var(--high-sea-ink);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fv-checkpoint__question {
+  font-weight: var(--weight-medium);
+}
+
+.fv-checkpoint__options {
+  margin: var(--space-2) 0;
+  padding-left: 1.4rem;
+  list-style: upper-alpha;
+  font-size: var(--text-sm);
+}
+
+.fv-checkpoint__options li {
+  margin: 0.15rem 0;
+}
+
+.fv-checkpoint__options li.is-right {
+  color: var(--success);
+  font-weight: var(--weight-semibold);
+}
+
+.fv-checkpoint__right {
+  margin-left: var(--space-2);
+  padding: 0 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--success-surface);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+}
+
+.fv-checkpoint__hint {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.fv-checkpoint__error {
+  margin: 0 0 var(--space-3);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.fv-checkpoint__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.fv-checkpoint .btn.is-ready {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.fv-checkpoint .btn.is-working {
+  cursor: progress;
+}
+
+/* ── Lesson map ──────────────────────────────────────────────────── */
+.fv-map {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  overflow: auto;
+  padding: 5.5rem clamp(var(--space-4), 5vw, var(--space-16)) var(--space-10);
+  background: var(--paper);
+}
+
+.fv-map__title {
+  margin: 0 0 var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fv-map__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-6);
+}
+
+.fv-map__card {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.fv-map__card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(19, 35, 58, 0.12);
+}
+
+.fv-map__card[aria-current='step'] {
+  outline: 3px solid var(--wave);
+  outline-offset: 3px;
+}
+
+.fv-map__card.is-done::after {
+  content: '✓';
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  font-size: var(--text-xs);
+}
+
+.fv-map__thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 820px;
+  margin: 0 !important;
+  padding: 32px;
+  pointer-events: none;
+  animation: none !important;
+}
+
+.fv-map__label {
+  position: absolute;
+  inset: auto 0 0;
+  padding: var(--space-5) var(--space-3) var(--space-2);
+  background: linear-gradient(transparent, #fff 55%);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+::view-transition-group(fv-stage) {
+  animation-duration: 480ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (max-width: 600px) {
+  .fv-strip__step {
+    display: none;
+  }
+
+  .fv-strip__step[aria-current='step'] {
+    display: block;
+  }
+}
+
+/* ── Quiz lessons: self-paced on the page, live in focus ─────────── */
+.lesson-display.is-focus .fv-quiz-page,
+.lesson-display:not(.is-focus) .fv-quiz-live {
+  display: none;
+}
+
+.fv-quiz-live {
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  background: #fff;
+  text-align: center;
+}
+
+.fv-quiz-live__body {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+}
+
+.fv-quiz-live__body .qz-live__stage {
+  justify-self: stretch;
+  text-align: left;
+}
+
+.fv-quiz-live__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.fv-quiz-live__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* Sized for the step: focus view's zoom scales it up to the board. */
+.fv-quiz-live__label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-md);
+}
+
+.fv-quiz-live__code {
+  margin: 0;
+  color: var(--ink);
+  font-size: 4.5rem;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}

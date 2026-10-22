@@ -13363,8 +13363,9 @@ button.block-annotation__margin-note.is-collapsed:hover {
   position: relative;
 }
 
-/* Showing, not authoring: no "add class example" on the projector. */
-.lesson-display .cx-add {
+/* Showing, not authoring: no "add class example" on the projector, columns included. */
+.lesson-display .cx-add,
+.lesson-display .cx-nested-target > .cx-add {
   display: none;
 }
 
