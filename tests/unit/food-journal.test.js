@@ -1868,3 +1868,19 @@ test("media bytes refuse a photo over 4 MB, by its size or after reading", async
   );
   assert.equal((await ask(byLength)).status, 413);
 });
+
+test("the server flags a re-count when a counted dish's nutrition fields change", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const saveWith = async (edit) => {
+    const first = (await (await h(req("GET"))).json()).data;
+    edit(first.journal.visits[0].dishes[0]);
+    const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+    assert.equal(res.status, 200);
+    return (await res.json()).data.journal.visits[0].dishes[0].brisket;
+  };
+  // A client that forgets to flag it, such as an older page, still gets it flagged.
+  assert.equal((await saveWith((d) => void (d.rating = 2))).needs_recount, false);
+  assert.equal((await saveWith((d) => void (d.ingredients = "Pasta, beef"))).needs_recount, true);
+});
