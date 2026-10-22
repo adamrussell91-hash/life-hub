@@ -30,6 +30,7 @@ import type { Media } from '@/schemas/media';
 import type { CurriculumOutcome } from '@/schemas/outcome';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountLineChips } from '@/network/line-chips';
+import { mountLessonFlow, type FlowPeer } from '@/network/lesson-flow';
 import { revealBlockFromHash } from '@/app/block-hash';
 import type { NetworkLine } from '@/schemas/block';
 import {
@@ -111,6 +112,9 @@ export type MountLessonPageOptions = {
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
   outcomesCatalog?: CurriculumOutcome[];
   subject?: { id: string; outcome_ids: string[]; network_lines?: NetworkLine[] };
+  /** The unit's lessons in order, for "Before and after" at the foot of the page. */
+  flowPeers?: FlowPeer[];
+  onFlowPeer?: (lessonId: string, after: string[]) => Promise<void>;
   onToggleFullPage?: () => void;
   /**
    * Render the in-canvas page menu (Export, Print, Trash…). The lesson
@@ -1106,9 +1110,25 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       })
     : null;
 
+  // Before and after: what leads here and what comes next (the unit map splits on a choice).
+  const flowHost = document.createElement('div');
+  flowHost.className = 'lesson-page__flow';
+  root.append(flowHost);
+  const lessonFlow = options.flowPeers && options.onFlowPeer
+    ? mountLessonFlow(flowHost, {
+        lessonId: lesson.id,
+        peers: options.flowPeers,
+        after: lesson.after_lesson_ids ?? undefined,
+        kind: lesson.lesson_kind,
+        onSelf: (patch) => emitLesson({ ...lesson, ...patch }),
+        onPeer: options.onFlowPeer
+      })
+    : null;
+
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
+      lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.lesson_kind);
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
@@ -1139,6 +1159,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.dispose();
       strip?.dispose();
       lineChips?.dispose();
+      lessonFlow?.dispose();
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();

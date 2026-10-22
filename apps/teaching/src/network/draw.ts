@@ -25,6 +25,7 @@ const FONT_LABEL = `500 13px ${FONT}`;
 const FONT_UNIT = `650 14px ${FONT}`;
 const FONT_SMALL = `500 12px ${FONT}`;
 const FONT_BADGE = `700 10px ${FONT}`;
+const FONT_NOTE = `italic 500 11.5px ${FONT}`;
 
 /* Same text fitting as the Tasks Lines chart kit. */
 const measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
@@ -95,10 +96,31 @@ function pathD(points: Pt[]): string {
   return points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
 }
 
-function drawPath(parent: Element, path: PathView): void {
+/** Stroke widths: a bundle draws a white casing under each line so crossings read cleanly. */
+const WIDTH = { metro: 9, train: 7, light_rail: 3.6 } as const;
+
+const bundleWidth = (path: PathView) => (path.mode === 'light_rail' ? (path.style === 'main' || path.style === 'loop' ? 4.4 : 3) : WIDTH[path.mode]);
+
+/** A bundle line: casings for all its tracks first, then the colour, so its own branches never notch each other. */
+function drawBundleLine(parent: Element, tracks: PathView[]): void {
+  const base = 'fill:none;stroke-linecap:round;stroke-linejoin:round';
+  for (const path of tracks) {
+    s('path', { d: pathD(path.points), class: 'net-casing', style: `${base};stroke:${PAPER};stroke-width:${bundleWidth(path) + 4.5}` }, parent);
+  }
+  for (const path of tracks) drawPath(parent, path, true);
+}
+
+function drawPath(parent: Element, path: PathView, bundle = false): void {
   const d = pathD(path.points);
   const base = 'fill:none;stroke-linecap:round;stroke-linejoin:round';
   const attrs = { d, 'data-line': path.lineId, class: `net-path net-path--${path.mode}` };
+  if (bundle) {
+    const w = bundleWidth(path);
+    const dash = path.style === 'spur' ? ';stroke-dasharray:5 5' : '';
+    s('path', { ...attrs, style: `${base};stroke:${path.colour};stroke-width:${w}${dash}` }, parent);
+    if (path.mode === 'metro') s('path', { d, style: `${base};stroke:${PAPER};stroke-width:2.4` }, parent);
+    return;
+  }
   if (path.mode === 'metro') {
     s('path', { ...attrs, style: `${base};stroke:${path.colour};stroke-width:9` }, parent);
     s('path', { d, style: `${base};stroke:${PAPER};stroke-width:3.6` }, parent);
@@ -112,8 +134,18 @@ function drawPath(parent: Element, path: PathView): void {
 
 const LEVEL_WORD = { introduced: 'introduced', reinforced: 'reinforced', mastered: 'mastered' } as const;
 
-function marker(parent: Element, m: MarkerView): void {
+function marker(parent: Element, m: MarkerView, compact = false): void {
   const { x: cx, y: cy, colour } = m;
+  if (compact) {
+    // Inside a bundle capsule: small dots, so neighbours 18px apart never touch.
+    if (m.level === 'introduced') s('circle', { cx, cy, r: 3.8, style: `fill:${PAPER};stroke:${colour};stroke-width:2.2` }, parent);
+    else if (m.level === 'reinforced') s('circle', { cx, cy, r: 4.4, style: `fill:${colour}` }, parent);
+    else {
+      s('circle', { cx, cy, r: 5.6, style: `fill:${PAPER};stroke:${colour};stroke-width:2.2` }, parent);
+      s('circle', { cx, cy, r: 2.4, style: `fill:${colour}` }, parent);
+    }
+    return;
+  }
   if (m.level === 'introduced') {
     s('circle', { cx, cy, r: 6, style: `fill:${PAPER};stroke:${colour};stroke-width:3` }, parent);
   } else if (m.level === 'reinforced') {
@@ -127,13 +159,21 @@ function marker(parent: Element, m: MarkerView): void {
 
 function label(parent: Element, view: LabelView, font: string, fill: string, extraClass = ''): void {
   if (!view.text) return;
-  const parts = view.wrap ? wrapTwo(view.text, font, view.maxW) : [fitText(view.text, font, view.maxW)];
+  const face = view.bold ? font.replace(/^\d+/, '650') : font;
+  const parts = view.wrap ? wrapTwo(view.text, face, view.maxW) : [fitText(view.text, face, view.maxW)];
   parts.forEach((part, i) => {
     text(parent, part, {
       x: view.x, y: view.down ? view.y + i * 15 : view.y - (parts.length - 1 - i) * 15, 'text-anchor': view.anchor,
-      class: `net-halo ${extraClass}`.trim(), style: `font:${font};fill:${fill}`
+      class: `net-halo ${extraClass}`.trim(), style: `font:${face};fill:${fill}`
     });
   });
+  // A note (a skip rule) sits under the name, quieter.
+  if (view.note) {
+    const y = view.down ? view.y + parts.length * 15 - 1 : view.y + 14;
+    text(parent, fitText(view.note, FONT_NOTE, view.maxW + 20), {
+      x: view.x, y, 'text-anchor': view.anchor, class: 'net-halo net-note', style: `font:${FONT_NOTE};fill:${MUTED}`
+    });
+  }
 }
 
 function badge(parent: Element, x: number, y: number, short: string, name: string, colour: string, mode: string, anchor: 'middle' | 'end'): void {
@@ -168,7 +208,15 @@ export function drawNetwork(L: NetLayout, options: DrawOptions = {}): SVGSVGElem
     if (band.shade) s('rect', { x: band.x, y: band.y, width: band.w, height: band.h, class: 'net-band' }, svg);
     text(svg, band.label, { x: band.labelX, y: band.labelY, class: 'net-band__label', style: `font:650 12px ${FONT};fill:${MUTED};letter-spacing:.04em` });
   }
-  for (const path of L.paths) drawPath(svg, path);
+  const bundle = L.style === 'bundle';
+  if (bundle) {
+    let run: PathView[] = [];
+    for (const path of L.paths) {
+      if (run.length && run[0]!.lineId !== path.lineId) { drawBundleLine(svg, run); run = []; }
+      run.push(path);
+    }
+    if (run.length) drawBundleLine(svg, run);
+  } else for (const path of L.paths) drawPath(svg, path);
 
   const unit = L.rowKind === 'unit';
   for (const pill of L.pills) {
@@ -176,12 +224,17 @@ export function drawNetwork(L: NetLayout, options: DrawOptions = {}): SVGSVGElem
     g.classList.add('net-station');
     if (options.onNudge && options.nudgeRows) g.dataset.nudgeKey = pill.rowId;
     const r = Math.min(14, Math.min(pill.w, pill.h) / 2);
-    s('rect', { x: pill.x, y: pill.y, width: pill.w, height: pill.h, rx: r, class: 'net-pill',
-      style: unit
+    // A bundle station no line stops at is dashed: the lesson is on the map, nothing calls there.
+    const style = bundle
+      ? pill.markers.length
         ? `fill:${PAPER};stroke:${DARK};stroke-width:2.4`
-        : `fill:${PAPER};stroke:color-mix(in srgb, ${INK} 40%, transparent);stroke-width:1.6` }, g);
-    for (const m of pill.markers) marker(g, m);
-    label(g, pill.label, unit ? FONT_UNIT : FONT_LABEL, INK, pill.target.href ? 'net-label--link' : '');
+        : `fill:${PAPER};stroke:${MUTED};stroke-width:1.6;stroke-dasharray:3 2.5`
+      : unit
+        ? `fill:${PAPER};stroke:${DARK};stroke-width:2.4`
+        : `fill:${PAPER};stroke:color-mix(in srgb, ${INK} 40%, transparent);stroke-width:1.6`;
+    s('rect', { x: pill.x, y: pill.y, width: pill.w, height: pill.h, rx: bundle ? pill.h / 2 : r, class: 'net-pill', style }, g);
+    for (const m of pill.markers) marker(g, m, bundle);
+    label(g, pill.label, unit ? FONT_UNIT : FONT_LABEL, bundle && !pill.markers.length ? MUTED : INK, pill.target.href ? 'net-label--link' : '');
   }
 
   for (const gate of L.gates) {
@@ -209,9 +262,16 @@ export function drawNetwork(L: NetLayout, options: DrawOptions = {}): SVGSVGElem
   }
 
   for (const dot of L.dots) {
-    const g = linkOrGroup(svg, dot.target, `${dot.kind === 'extension' ? 'Extension' : dot.kind === 'support' ? 'Support' : 'Stop'}: ${dot.target.text || 'untitled'}`);
+    const g = linkOrGroup(svg, dot.target, `${dot.kind === 'extension' ? 'Extension' : dot.kind === 'support' ? 'Optional detour' : 'Stop'}: ${dot.target.text || 'untitled'}`);
     g.classList.add('net-dot', `net-dot--${dot.kind}`);
     if (options.onNudge) g.dataset.nudgeKey = dot.id;
+    if (bundle) {
+      // On the bundle a stop is a small station: a white ring, the line's colour inside.
+      s('circle', { cx: dot.x, cy: dot.y, r: 7.5, style: `fill:${PAPER};stroke:${DARK};stroke-width:2.2${dot.kind === 'extension' ? ';stroke-dasharray:3 2' : ''}` }, g);
+      s('circle', { cx: dot.x, cy: dot.y, r: 3.6, style: `fill:${dot.colour}` }, g);
+      label(g, dot.label, FONT_SMALL, INK, dot.target.href ? 'net-label--link' : '');
+      continue;
+    }
     s('circle', { cx: dot.x, cy: dot.y, r: 5.5,
       style: dot.kind === 'support'
         ? `fill:${dot.colour};stroke:${PAPER};stroke-width:1.5`
@@ -305,8 +365,10 @@ export function mountNetworkStage(input: NetInput, options: DrawOptions & { prin
     if (key === drawn) return;
     drawn = key;
     stage.dataset.orientation = orientation;
-    const svg = drawNetwork(layoutNetwork(input, orientation, { width: Math.floor(width), measure }), options);
-    if (orientation === 'vertical') {
+    const layout = layoutNetwork(input, orientation, { width: Math.floor(width), measure });
+    const svg = drawNetwork(layout, options);
+    // A unit map with wide splits stays upright and scrolls sideways when it can't fit.
+    if (orientation === 'vertical' && layout.width <= Math.ceil(width)) {
       stage.replaceChildren(svg);
       return;
     }
@@ -339,13 +401,13 @@ export function mountNetworkStage(input: NetInput, options: DrawOptions & { prin
 export function networkLegend(kind: 'unit' | 'year'): HTMLElement {
   const items: Array<[string, string]> = [
     ['train', 'Train · syllabus grouping'],
-    ['metro', 'Metro · concept, runs underneath'],
+    ['metro', kind === 'unit' ? 'Metro · concept' : 'Metro · concept, runs underneath'],
     ['light_rail', 'Light rail · skill'],
     ['introduced', 'Introduced'],
     ['reinforced', 'Reinforced'],
     ['mastered', 'Mastered'],
     ...(kind === 'unit'
-      ? ([['extension', 'Extension (optional)'], ['support', 'Support loop'], ['gate', 'Gate · diagnostic or quiz']] as Array<[string, string]>)
+      ? ([['extension', 'Extension (optional)'], ['support', 'Optional detour (fork)'], ['gate', 'Gate · diagnostic or quiz']] as Array<[string, string]>)
       : ([['now', 'Class now']] as Array<[string, string]>)),
     ['terminus', kind === 'unit' ? 'Terminus · assessed' : 'HSC']
   ];
