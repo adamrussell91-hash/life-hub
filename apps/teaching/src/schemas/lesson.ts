@@ -5,6 +5,7 @@ import { BlockSchema, LineStopSchema } from './block';
 import { QuizSettingsSchema } from '../quiz/core';
 import { visitBlocks } from '../blocks/walk-blocks';
 import { CoverSchema } from './cover';
+import { SourceSchema } from './source';
 import {
   formatPublishBlockIssue,
   listPublishBlockIssues
@@ -38,7 +39,8 @@ export const LessonSchema = z.object({
   /** Hides the student feedback dot on every block of this lesson. */
   feedback_off: z.boolean().optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
-  quiz: QuizSettingsSchema.optional()
+  quiz: QuizSettingsSchema.optional(),
+  source: SourceSchema.optional()
 });
 
 export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {

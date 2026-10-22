@@ -5468,7 +5468,7 @@ function validateProposalAgainstSearchPack(proposal, pack) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z11 } from "zod";
+import { z as z12 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z as z10 } from "zod";
@@ -5488,6 +5488,15 @@ var PEDAGOGICAL_MODES = [
   "quiz"
 ];
 var PedagogicalModeSchema = z10.enum(PEDAGOGICAL_MODES);
+
+// apps/teaching/src/schemas/source.ts
+import { z as z11 } from "zod";
+var SourceSchema = z11.object({
+  system: z11.literal("notion"),
+  page_id: z11.string().min(1).max(64),
+  imported_at: IsoDateSchema,
+  last_edited_at: IsoDateSchema
+});
 
 // apps/teaching/src/blocks/learning-activity.ts
 var CLOZE_MARKER = /\[\[([^\]]+)\]\]/g;
@@ -6135,33 +6144,34 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z11.object({
+var LessonSchema = z12.object({
   ...CommonFields,
   ...TrashFields,
-  type: z11.literal("lesson"),
-  unit_id: z11.string().min(1),
-  sequence: z11.number().int(),
-  blocks: z11.array(BlockSchema),
+  type: z12.literal("lesson"),
+  unit_id: z12.string().min(1),
+  sequence: z12.number().int(),
+  blocks: z12.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z11.array(z11.string().min(1).max(40)).max(24).optional(),
-  author_id: z11.string().min(1).optional(),
-  review_status: z11.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z11.array(z11.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z11.array(z11.string().min(1).max(64)).max(24).optional(),
+  tags: z12.array(z12.string().min(1).max(40)).max(24).optional(),
+  author_id: z12.string().min(1).optional(),
+  review_status: z12.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z12.array(z12.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z12.array(z12.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z11.array(LineStopSchema).max(16).optional(),
+  line_stops: z12.array(LineStopSchema).max(16).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z11.boolean().optional(),
+  feedback_off: z12.boolean().optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
-  quiz: QuizSettingsSchema.optional()
+  quiz: QuizSettingsSchema.optional(),
+  source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z11.ZodIssueCode.custom,
+      code: z12.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
@@ -6173,7 +6183,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
     });
     if (stray) {
       ctx.addIssue({
-        code: z11.ZodIssueCode.custom,
+        code: z12.ZodIssueCode.custom,
         message: "Quiz questions only work in a lesson set to Quiz. Change the lesson type or remove them.",
         path: ["blocks"]
       });
@@ -6181,7 +6191,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   }
   for (const issue of listPublishBlockIssues(lesson.blocks)) {
     ctx.addIssue({
-      code: z11.ZodIssueCode.custom,
+      code: z12.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });

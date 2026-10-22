@@ -40,6 +40,9 @@ export function applyScheduleUnit({
   nowIso,
   idFactory
 }) {
+  if (unit.kind === 'program') {
+    return { ok: false, code: 'program_not_schedulable', message: "Programs aren't scheduled into classes." };
+  }
   const scheduledLessonIds = new Set(
     existing
       .filter(row => row.class_id === cls.id && row.unit_id === unit.id)

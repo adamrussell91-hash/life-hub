@@ -97,3 +97,12 @@ test('a physically removed unit or lesson cannot leave orphan calendar lessons',
   assert.equal(curriculum.scheduled_lessons.length,0);
  }
 });
+
+test('a program unit is refused with a clear 400 and nothing is written',async()=>{
+ const {map,handler,req}=setup(); map.get('units/u').kind='program';
+ const before=JSON.stringify([...map].filter(([key])=>!key.startsWith('locks/')));
+ const res=await handler(req()); assert.equal(res.status,400);
+ assert.match(JSON.stringify(await res.json()),/Programs aren't scheduled into classes\./);
+ assert.equal(JSON.stringify([...map].filter(([key])=>!key.startsWith('locks/'))),before);
+ assert.deepEqual(map.get('classes/c').active_unit_ids,[]);
+});
