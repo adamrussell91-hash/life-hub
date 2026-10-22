@@ -62,6 +62,14 @@ function outcomeLines(session) {
   return [...entries, reflection && `What it shows: ${reflection}`];
 }
 
+/** A session that went deeper from a Quick start: its first action and how it started. */
+function startLines(session) {
+  const seeds = session.frameSeeds;
+  if (seeds?.from !== 'start') return [];
+  const way = seeds.way === 'countdown' ? 'a countdown cue' : seeds.way === 'interval' ? 'a protected interval' : null;
+  return [seeds.action && `First action: ${seeds.action}`, way && `Started with ${way}${seeds.cue ? `: ${seeds.cue}` : ''}`];
+}
+
 /**
  * `{ title, version, sections: [{ key, heading, lines }] }`, or null before a complete
  * experiment. Empty sections are left out. Once Review has a run, what happened joins the
@@ -84,6 +92,7 @@ export function composeActionRecord(session) {
     ['check_back', 'Check back on', [dateWords(firstIn(run, 'check_back'))]],
     ['change_course', 'What would change course', [firstIn(run, 'change_course')]],
     ['need', 'What needed to move', [session.frame?.need]],
+    ['quick_start', 'Began as a Quick start', startLines(session)],
     ['known', 'What was known', [session.frame?.known]],
     ['techniques', 'Techniques used', techniques],
     ['outcome', 'What happened', outcomeLines(session)],

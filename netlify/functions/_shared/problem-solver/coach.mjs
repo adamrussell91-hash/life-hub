@@ -8,6 +8,7 @@ import { buildDecisionPrompt } from './decision-prompts.mjs';
 import { buildGearPrompt } from './get-things-done-prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { buildQuickPrompt, checkQuickTurn } from './quick-prompts.mjs';
+import { buildStartPrompt, checkStartTurn } from './start-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
@@ -168,10 +169,16 @@ function parseQuick(session, text) {
   return result.ok ? checkQuickTurn(session, result.value) : result;
 }
 
+function parseStart(session, text) {
+  const result = validateCoachTurn(extractJson(text));
+  return result.ok ? checkStartTurn(session, result.value) : result;
+}
+
 /** Each session kind's prompt and reply check; full and book sessions share the step parser. */
 const PROMPTS = {
   lightning: { build: buildLightningPrompt, read: parseLightning },
   quick: { build: buildQuickPrompt, read: parseQuick },
+  start: { build: buildStartPrompt, read: parseStart },
   decision: { build: buildDecisionPrompt, read: parse },
   shift: { build: buildGearPrompt, read: parse },
   full: { build: buildCoachPrompt, read: parse }

@@ -176,6 +176,14 @@ function boundaryLine(session) {
   return `MODE: boundary. The person has just left ${left} (${leftStep?.status ?? 'unknown'}). In one message: a one-sentence recap of what ${left} established; if it was left unfinished in a way that matters, say so once, kindly, and put a one-sentence reason in exitObjection; then ask what they learned about how they get things done. No technique suggestion yet.`;
 }
 
+/** A session that went deeper from a Quick start: its seeds while framing, then where it came from. */
+function startLines(session) {
+  const seeds = session.frameSeeds;
+  if (seeds?.from !== 'start') return [];
+  if (session.phase === 'frame') return [`CARRIED FROM A QUICK START (seeds, not answers: show them, ask the person to confirm or change each, and record only what they confirm in "frame"): need: ${seeds.need}; known: ${seeds.known ?? 'no first action was set'}.`];
+  return [`CAME FROM A QUICK START: ${seeds.known ?? 'no first action was set.'} Its first action can carry into the experiment's next action, once the person agrees.`];
+}
+
 /** @returns {{ system: string[], user: string }} */
 export function buildGearPrompt(session) {
   const run = activeRun(session);
@@ -187,6 +195,7 @@ export function buildGearPrompt(session) {
   parts.push(`Frame: ${JSON.stringify(session.frame)}${missing.length ? `\nMissing frame answers: ${missing.join(', ')}` : ''}`);
   if (session.frame.route) parts.push(`ROUTE: ${routeLabels(session.frame.route)}`);
   if (session.phase === 'frame' && session.startModel) parts.push(`SHELF PICK: the person started from ${TOOLS[session.startModel].name} (${session.startModel}). When framing ends it opens on that technique: suggest it with next_technique and say in one sentence how it fits the frame.`);
+  parts.push(...startLines(session));
   const earlier = earlierSteps(session);
   if (earlier) parts.push(earlier.replace(/^EARLIER STEPS:/, 'EARLIER:'));
   if (session.model) parts.push(...reviewLines(session));

@@ -54,14 +54,17 @@ export function readPackTexts(dir) {
   return texts;
 }
 
-/** The app's own copy: every quoted string in Gear Shifter's Tasks views (section and route lines, step text, cards). */
+/** The app's own copy: every quoted string in Gear Shifter's Tasks views (section and route lines, step text, cards) and the Quick start chart. */
 const APP_DIR = new URL('../../apps/tasks/src/views/get-things-done/', import.meta.url);
+const QUICK_CHART = fileURLToPath(new URL('../../packages/get-things-done/render/quick.ts', import.meta.url));
 function appStrings() {
   const dir = fileURLToPath(APP_DIR);
   if (!existsSync(dir)) return [];
   const out = [];
-  for (const file of readdirSync(dir).filter((name) => name.endsWith('.ts'))) {
-    const source = readFileSync(join(dir, file), 'utf8');
+  const files = [...readdirSync(dir).filter((name) => name.endsWith('.ts')).map((name) => join(dir, name)), ...(existsSync(QUICK_CHART) ? [QUICK_CHART] : [])];
+  for (const path of files) {
+    const file = path.split('/').at(-1);
+    const source = readFileSync(path, 'utf8');
     for (const match of source.matchAll(/'((?:[^'\\\n]|\\.){20,})'|`([^`]{20,})`/g)) out.push([`app ${file}`, match[1] ?? match[2]]);
   }
   return out;
@@ -80,6 +83,10 @@ export async function gearShifterStrings() {
   for (const [id, tool] of Object.entries({ ...GEAR_TOOLS, gt_commit: gtCommit, gt_review: gtReview })) for (const text of shippedStrings(tool)) out.push([id, text]);
   for (const key of ['STANCE', 'ROUTE_GUIDE', 'OBSTACLE_GUIDE', 'GEAR_TRAPS']) out.push([`knowledge ${key}`, knowledge[key]]);
   out.push(['rubric GEAR_RUBRIC', GEAR_RUBRIC]);
+  const start = await import('../../netlify/functions/_shared/problem-solver/start-prompts.mjs');
+  const flow = await import('../../packages/get-things-done/quick.mjs');
+  out.push(['rubric START_RUBRIC', start.START_RUBRIC], ...Object.entries(start.START_INTENTS).map(([id, text]) => [`quick start ${id}`, text]));
+  for (const [id, item] of Object.entries({ ...flow.START_NODES, ...flow.START_WAYS })) for (const text of shippedStrings(item)) out.push([`quick start ${id}`, text]);
   for (const entry of [...CATALOGUE, ...SECTIONS]) for (const text of shippedStrings(entry)) out.push([`catalogue ${entry.id ?? entry.key}`, text]);
   for (const folder of readdirSync(glyphs, { withFileTypes: true }).filter((d) => d.isDirectory())) {
     for (const file of readdirSync(join(glyphs, folder.name)).filter((name) => name.endsWith('.svg'))) {
