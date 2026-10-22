@@ -29,8 +29,18 @@ function fakeApi(view: MarkbookView): MarkbookApi & { calls: unknown[][] } {
   return {
     calls,
     load: vi.fn(async () => structuredClone(current)),
-    saveColumn: vi.fn(async () => current.markbook),
-    deleteColumn: vi.fn(async () => current.markbook),
+    saveColumn: vi.fn(async (_c, column) => {
+      const columns = current.markbook.columns.some((c) => c.id === column.id)
+        ? current.markbook.columns.map((c) => (c.id === column.id ? column : c))
+        : [...current.markbook.columns, column];
+      current = { ...current, markbook: { ...current.markbook, columns } };
+      return current.markbook;
+    }),
+    deleteColumn: vi.fn(async (_c, columnId) => {
+      const { [columnId]: _gone, ...marks } = current.markbook.marks;
+      current = { ...current, markbook: { ...current.markbook, columns: current.markbook.columns.filter((c) => c.id !== columnId), marks } };
+      return current.markbook;
+    }),
     hideQuiz: vi.fn(async (_c, lessonId, hidden) => {
       current.markbook.hidden_quizzes = hidden ? [lessonId] : [];
       return current.markbook;
@@ -225,5 +235,75 @@ describe('markbook section', () => {
   it('gives the full student name as a tooltip', async () => {
     const { host } = await mount(view());
     expect(host.querySelector<HTMLElement>('.mb-student__name')!.title).toBe('Bob Brown');
+  });
+
+  it('adds an assessment task from the Add task pill', async () => {
+    const { host, api } = await mount(view());
+    const pill = [...host.querySelectorAll<HTMLButtonElement>('.mb__add-kind')].find((b) => b.textContent === 'Add task')!;
+    pill.click();
+    const form = document.querySelector<HTMLElement>('.mb-form')!;
+    expect(form.getAttribute('aria-label')).toBe('Add assessment task');
+    const field = (name: string) => form.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
+    const type = (name: string, value: string) => {
+      field(name).value = value;
+      field(name).dispatchEvent(new Event('input'));
+    };
+    type('title', 'Speech');
+    type('weight', '60');
+    type('criterion-label', 'Delivery');
+    type('criterion-max', '10');
+    form.querySelector<HTMLButtonElement>('.mb-form__save')!.click();
+    await vi.waitFor(() => expect(api.saveColumn).toHaveBeenCalled());
+    expect((api.saveColumn as Mock).mock.calls[0]![1]).toMatchObject({ kind: 'assessment', title: 'Speech', date: '2026-11-03', weight: 60 });
+    await vi.waitFor(() => expect([...host.querySelectorAll('.mb-col__title')].map((n) => n.textContent)).toContain('Speech'));
+    expect(document.querySelector('.mb-form')).toBeNull();
+    expect(host.querySelector('.mb__warning')?.hidden).toBe(true);
+  });
+
+  it('opens a teacher column’s form filled in from its title', async () => {
+    const { host, api } = await mount(view());
+    const title = [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((b) => b.textContent === 'Draft')!;
+    title.click();
+    const form = document.querySelector<HTMLElement>('.mb-form')!;
+    expect(form.getAttribute('aria-label')).toBe('Edit hand-in');
+    expect(form.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe('Draft');
+    expect(form.querySelector<HTMLInputElement>('[name="date"]')!.value).toBe('2026-10-25');
+    const name = form.querySelector<HTMLInputElement>('[name="title"]')!;
+    name.value = 'Final draft';
+    form.querySelector<HTMLButtonElement>('.mb-form__save')!.click();
+    await vi.waitFor(() => expect(api.saveColumn).toHaveBeenCalledWith('class1', { id: 'hand00001', kind: 'handin', title: 'Final draft', due: '2026-10-25' }));
+    await vi.waitFor(() => expect([...host.querySelectorAll('.mb-col__title')].map((n) => n.textContent)).toEqual(['Final draft', 'Bookwork', 'Essay']));
+  });
+
+  it('shows a failed column save in the form and keeps it open', async () => {
+    const { host, api } = await mount(view());
+    (api.saveColumn as Mock).mockRejectedValueOnce(new Error('Server said no'));
+    [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((b) => b.textContent === 'Draft')!.click();
+    const form = document.querySelector<HTMLElement>('.mb-form')!;
+    form.querySelector<HTMLButtonElement>('.mb-form__save')!.click();
+    await vi.waitFor(() => expect(form.querySelector('.mb-form__error')?.textContent).toBe('Server said no'));
+    expect(document.body.contains(form)).toBe(true);
+    form.querySelector<HTMLButtonElement>('.btn--secondary')!.click();
+  });
+
+  it('deletes a column through the form, and rolls a failed delete back', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { host, api } = await mount(view());
+    const titles = () => [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].map((n) => n.textContent);
+    const remove = (name: string) => {
+      [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((b) => b.textContent === name)!.click();
+      document.querySelector<HTMLButtonElement>('.mb-form__delete')!.click();
+    };
+    remove('Draft');
+    expect(titles()).toEqual(['Bookwork', 'Essay']);
+    expect(document.querySelector('.mb-form')).toBeNull();
+    await vi.waitFor(() => expect(api.deleteColumn).toHaveBeenCalledWith('class1', 'hand00001'));
+    (api.deleteColumn as Mock).mockRejectedValueOnce(new Error('Server said no'));
+    remove('Essay');
+    expect(titles()).toEqual(['Bookwork']);
+    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Server said no'));
+    expect(titles()).toEqual(['Bookwork', 'Essay']);
+    expect(host.querySelectorAll('tbody tr')[0]!.querySelector('.mb-cell--assessment')?.textContent).toBe('15/20 · 75%');
+    confirm.mockRestore();
   });
 });

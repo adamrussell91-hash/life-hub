@@ -5,11 +5,12 @@
  */
 import type { Class } from '@/schemas';
 import { el } from '@/quiz/dom';
-import type { Markbook } from '@/markbook/schema';
+import type { Column, Markbook } from '@/markbook/schema';
 import { httpMarkbookApi, type MarkbookApi } from '@/markbook/api';
 import type { MarkbookActions, MarkbookView, OutcomeLabel } from '@/markbook/types';
 import { assessments, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
+import { openColumnForm } from '@/markbook/column-form';
 import '@/markbook/markbook.css';
 
 type Options = {
@@ -26,11 +27,16 @@ type Options = {
 /** A local change still waiting for the server, re-applied after a reload. */
 type Change =
   | { kind: 'mark'; columnId: string; studentId: string; mark: unknown | null }
-  | { kind: 'hide'; lessonId: string; hidden: boolean };
+  | { kind: 'hide'; lessonId: string; hidden: boolean }
+  | { kind: 'delete_column'; columnId: string };
 
 function applyChange(view: MarkbookView, change: Change): MarkbookView {
   if (change.kind === 'hide') {
     return { ...view, quizzes: view.quizzes.map((q) => (q.lesson_id === change.lessonId ? { ...q, hidden: change.hidden } : q)) };
+  }
+  if (change.kind === 'delete_column') {
+    const { [change.columnId]: _gone, ...marks } = view.markbook.marks;
+    return { ...view, markbook: { ...view.markbook, columns: view.markbook.columns.filter((c) => c.id !== change.columnId), marks } };
   }
   const byStudent = { ...(view.markbook.marks[change.columnId] ?? {}) };
   if (change.mark === null) delete byStudent[change.studentId];
@@ -75,7 +81,16 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   hiddenToggle.hidden = true;
   const removedToggle = el('button', 'btn btn--secondary mb__removed', 'Show removed students');
   removedToggle.type = 'button';
-  tools.append(toggle, hiddenToggle, removedToggle);
+  const addGroup = el('div', 'mb__add');
+  addGroup.setAttribute('role', 'group');
+  addGroup.setAttribute('aria-label', 'Add column');
+  for (const [kind, text] of [['assessment', 'Add task'], ['handin', 'Add hand-in'], ['check', 'Add check']] as const) {
+    const b = el('button', 'btn btn--secondary mb__add-kind', text);
+    b.type = 'button';
+    b.addEventListener('click', () => openForm(kind));
+    addGroup.append(b);
+  }
+  tools.append(addGroup, toggle, hiddenToggle, removedToggle);
   head.append(title, tools);
   const hiddenList = el('ul', 'mb__hidden-list');
   hiddenList.id = `mb-hidden-${cls.id}`;
@@ -127,11 +142,35 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     save(next, run);
   }
 
+  /** Add a column of `kind`, or edit the teacher column `columnId`. */
+  function openForm(kind: Column['kind'], columnId?: string): void {
+    const column = columnId ? view?.markbook.columns.find((c) => c.id === columnId) : undefined;
+    if (columnId && !column) return;
+    openColumnForm({
+      kind: column?.kind ?? kind,
+      column,
+      outcomes: options.outcomes ?? [],
+      today: today(),
+      // A throw stays in the form, which shows the message and keeps the teacher's typing.
+      onSave: async (saved) => {
+        const markbook = await api.saveColumn(cls.id, saved);
+        if (disposed || !confirmed) return;
+        confirmed = withServerCopy(confirmed, markbook, []);
+        view = queued.reduce(applyChange, confirmed);
+        status.textContent = '';
+        paint();
+      },
+      onDelete: column
+        ? () => change({ kind: 'delete_column', columnId: column.id }, () => api.deleteColumn(cls.id, column.id))
+        : undefined
+    });
+  }
+
   const actions: MarkbookActions = {
     setMark: (columnId, studentId, mark) =>
       change({ kind: 'mark', columnId, studentId, mark }, () => api.setMark(cls.id, columnId, studentId, mark)),
     hideQuiz: (lessonId, hidden) => change({ kind: 'hide', lessonId, hidden }, () => api.hideQuiz(cls.id, lessonId, hidden)),
-    editColumn: () => { status.textContent = 'Column editing arrives in the next step.'; },
+    editColumn: (columnId) => openForm('assessment', columnId),
     openAssessment: () => { status.textContent = 'Assessment marking arrives in the next step.'; },
     openQuiz: () => { status.textContent = 'Attempt summaries arrive in the next step.'; },
     openHeatmap: () => { status.textContent = 'Heatmaps arrive in the next step.'; }
