@@ -485,6 +485,7 @@ export function createChatConfirmHandler({
         }
       }
       const centralNodeUpdated = persisted.centralNodeUpdated === true;
+      const foodJournalUpdated = persisted.foodJournalUpdated ?? null;
 
       let dayoneSent = null;
       let dayoneReason = null;
@@ -525,6 +526,7 @@ export function createChatConfirmHandler({
           sha,
           commitSha,
           centralNodeUpdated,
+          ...(foodJournalUpdated != null ? { foodJournalUpdated } : {}),
           record: validation.record,
           notes: validation.notes ?? null,
           ...(exercisePersonalBests !== undefined ? { personalBests: exercisePersonalBests } : {}),

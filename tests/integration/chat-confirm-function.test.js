@@ -265,6 +265,55 @@ test('confirm still succeeds and reports centralNodeUpdated:false when the centr
   assert.equal(putCalls.length, 1, 'only the meal write should happen; central-node.md must not be written on a decode failure');
 });
 
+test('a meal with a Food Journal dish marks the dish counted and reports foodJournalUpdated', async () => {
+  const journalSha = '9'.repeat(40);
+  const journal = {
+    schema_version: 1, recipes: [],
+    visits: [{ id: 'v1', date: '2026-08-01', title: '', notes: '', menu_text: '', venue: { name: '', address: '' },
+      dishes: [{ id: 'dish_1', title: 'Margherita', cuisine: '', meal_type: 'Dinner', tags: [], rating: null, notes: '', photos: [] }] }]
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'data/food-journal/journal.json', type: 'blob', sha: journalSha }] });
+    }
+    if (url.includes(`/git/blobs/${journalSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(journal), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+  const dinner = { ...candidate, fields: { ...candidate.fields, meal: 'dinner', food_dish_id: 'dish_1', portion: '½', portion_fraction: 0.5 } };
+
+  const response = await handler(request({ candidate: dinner, slug: 'brisket' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.foodJournalUpdated, true);
+  const journalPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('food-journal/journal.json'));
+  assert.ok(journalPut, 'expected a journal.json write');
+  const body = JSON.parse(journalPut.options.body);
+  assert.equal(body.sha, journalSha);
+  const saved = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+  assert.equal(saved.visits[0].dishes[0].brisket.meal_path, payload.data.path);
+  assert.equal(saved.visits[0].dishes[0].brisket.portion_fraction, 0.5);
+});
+
+test('a plain meal confirm leaves foodJournalUpdated out of the response', async () => {
+  const { fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+  const response = await handler(request({ candidate, slug: 'breakfast' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal('foodJournalUpdated' in payload.data, false);
+});
+
 test('enriches Exercise status and Recent Actions on completed workout confirm (no Day Type directive)', async () => {
   const workoutCandidate = {
     type: 'workout',
