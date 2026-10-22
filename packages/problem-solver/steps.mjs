@@ -6,6 +6,7 @@ import { CATALOGUE_IDS } from '../decision-book/catalogue.mjs';
 import { FEEDBACK_ID } from '../decision-book/record-slots.mjs';
 import { GEAR_SHIFTER_MODEL, REVIEW_TOOL as GEAR_REVIEW_TOOL } from '../get-things-done/model.mjs';
 import { CATALOGUE as GEAR_CATALOGUE } from '../get-things-done/catalogue.mjs';
+import { EXPERIMENT_REVIEW_ID as GEAR_EXPERIMENT_REVIEW } from '../get-things-done/commit-slots.mjs';
 
 /** Tool families. A tool's `step` is one of these. `contradiction` is TRIZ only. */
 export const BOOK_STEPS = Object.freeze([
@@ -61,11 +62,12 @@ const PLANS = Object.freeze({
   ]),
   // Gear Shifter: as Decision Maker, the coach discerns the technique, so Explore names its
   // tools. Commit's tools carry their own step, 'commit', so no other book's settle tool joins
-  // it; Review names Project Evaluation.
+  // it. Review names the experiment review and, for a finished project, Project Evaluation;
+  // with two it has no default, so the coach chooses.
   gear_shifter: Object.freeze([
     entry('explore', ['explore'], false, () => GEAR_CATALOGUE.map((e) => e.id).filter((id) => TOOLS[id])),
     entry('commit', ['commit'], false, null, 'implement'),
-    entry('review', ['review'], true, () => [GEAR_REVIEW_TOOL].filter((id) => TOOLS[id]), 'improve')
+    entry('review', ['review'], true, () => [GEAR_EXPERIMENT_REVIEW, GEAR_REVIEW_TOOL].filter((id) => TOOLS[id]), 'improve')
   ])
 });
 

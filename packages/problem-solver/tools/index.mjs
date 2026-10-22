@@ -34,6 +34,8 @@ import { knowledgeManagement } from './knowledge-management.mjs';
 import { DECISION_TOOLS } from '../../decision-book/models/index.mjs';
 import { dmRecord } from '../../decision-book/tools/record.mjs';
 import { GEAR_TOOLS } from '../../get-things-done/tools/index.mjs';
+import { gtCommit } from '../../get-things-done/tools/commit.mjs';
+import { gtReview } from '../../get-things-done/tools/review.mjs';
 
 // The container is not frozen (tests register fakes); every definition is frozen.
 export const TOOLS = {
@@ -74,7 +76,10 @@ export const TOOLS = {
   // Decision Maker's Decide step (step settle, likewise not a toolkit step).
   dm_record: dmRecord,
   // Gear Shifter's techniques (step explore too; Gear Shifter's Explore lists its own catalogue).
-  ...GEAR_TOOLS
+  ...GEAR_TOOLS,
+  // Gear Shifter's Commit and Review tools (steps commit and review, neither a toolkit step).
+  gt_commit: gtCommit,
+  gt_review: gtReview
 };
 
 export const TOOL_IDS = Object.freeze(Object.keys(TOOLS));

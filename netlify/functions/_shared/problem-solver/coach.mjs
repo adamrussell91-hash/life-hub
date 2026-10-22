@@ -11,7 +11,6 @@ import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs'
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
 import { bookOf } from '../../../../packages/problem-solver/books.mjs';
-import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { basisCandidates, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 
 const WORD_LIMIT = 60;
@@ -142,18 +141,20 @@ function parse(session, text) {
 }
 
 /**
- * A basis belongs only to a decision record reason. An accepted reason must rest on at least one
- * placed Explore node when any exist (the repair names them); a reason with nothing behind it is
- * challenged instead.
+ * A basis belongs only to a book record's basis slot (a decision record reason, the technique an
+ * experiment rests on; books.mjs). An accepted answer there must rest on at least one placed
+ * Explore node when any exist (the repair names them); one with nothing behind it is challenged
+ * instead.
  */
 function withBasis(session, value) {
   const run = activeRun(session);
-  const reason = run?.tool === RECORD_ID && value.node && parseSlot(value.node.slot)?.name === 'reason';
+  const record = bookOf(session.kind)?.record;
+  const reason = Boolean(record) && run?.tool === record.tool && value.node && parseSlot(value.node.slot)?.name === record.basisSlot;
   if (!reason) return value.basis?.length ? { ...value, basis: [] } : value;
   if (value.verdict !== 'accept' || resolveBasis(session, value.basis).length) return value;
   const candidates = basisCandidates(session);
   if (!candidates.length) return value;
-  return { error: `A reason rests on what a model showed: put at least one of these in "basis" as {"tool","slot"}, or challenge the reason. ${candidates.slice(0, 20).map((c) => `${c.tool} ${c.slot}`).join('; ')}.` };
+  return { error: `${record.basisRule}: put at least one of these in "basis" as {"tool","slot"}, or challenge ${record.basisSlot === 'reason' ? 'the reason' : 'it'}. ${candidates.slice(0, 20).map((c) => `${c.tool} ${c.slot}`).join('; ')}.` };
 }
 
 function parseLightning(session, text) {
