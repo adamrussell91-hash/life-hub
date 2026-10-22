@@ -8513,6 +8513,12 @@ input.scope-timeline__note-title:focus-visible {
   display: none;
 }
 
+/* The chat keeps its full height whatever the trays above the thread are
+ * doing; folding them gives the room to the thread, not back to the page. */
+.lesson-builder__chat > .ai-panel {
+  height: calc(100dvh - 8rem);
+}
+
 .lesson-builder__chat-fab {
   position: fixed;
   right: var(--space-6);
@@ -8592,6 +8598,12 @@ input.scope-timeline__note-title:focus-visible {
   box-shadow: var(--elev-4);
 }
 
+.lesson-builder--full-page:not(.lesson-builder--chat-shelved) .lesson-builder__chat > .ai-panel {
+  flex: 1 1 auto;
+  height: auto;
+  max-height: none;
+}
+
 .lesson-builder--full-page .lesson-page {
   max-width: none;
 }
@@ -8635,6 +8647,7 @@ input.scope-timeline__note-title:focus-visible {
   }
 
   .lesson-builder__chat .ai-panel {
+    height: auto;
     max-height: none;
     flex: 1 1 auto;
     min-height: 0;
