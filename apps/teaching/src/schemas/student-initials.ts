@@ -11,14 +11,19 @@ export const STUDENT_ID_PATTERN = /^st_[a-z0-9_]{1,24}$/;
 export type RosterStudent = { name: string; skip_picker?: boolean; id?: string; initials?: string };
 export type RosterEntry<T extends RosterStudent = RosterStudent> = T & { id: string; initials: string };
 
+/** Drops accents: É → E. */
+function stripMarks(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 /** " b.b " → "BB". Anything but letters and digits is dropped. */
 export function normaliseInitials(text: string): string {
-  return String(text ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  return stripMarks(String(text ?? '')).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
 }
 
 /** First letter of each word, up to four: "Bob Brown" → "BB". */
 export function deriveInitials(name: string): string {
-  const letters = String(name ?? '')
+  const letters = stripMarks(String(name ?? ''))
     .split(/[\s-]+/)
     .map((word) => word.replace(/[^A-Za-z]/g, '').charAt(0))
     .join('')
@@ -69,15 +74,28 @@ export function assignInitials<T extends RosterStudent>(students: readonly T[]):
     if (INITIALS_PATTERN.test(own)) held.add(own);
   }
   const used = new Set<string>();
+  const reserved = new Set<string>();
+  const keeps = students.map((s) => {
+    if (s.id && STUDENT_ID_PATTERN.test(s.id) && !reserved.has(s.id)) {
+      reserved.add(s.id);
+      return true;
+    }
+    return false;
+  });
   const ids = new Set<string>();
-  return students.map((s) => {
+  return students.map((s, index) => {
     const own = normaliseInitials(s.initials ?? '');
     let initials: string;
     if (INITIALS_PATTERN.test(own) && !used.has(own)) initials = own;
     else initials = freeInitials(deriveInitials(s.name), new Set([...held, ...used]));
     used.add(initials);
-    let id = s.id && STUDENT_ID_PATTERN.test(s.id) && !ids.has(s.id) ? s.id : studentIdFor(s.name);
-    for (let n = 2; ids.has(id); n += 1) id = `${studentIdFor(s.name)}_${n}`;
+    let id: string;
+    if (keeps[index]) id = s.id as string;
+    else {
+      const base = studentIdFor(s.name);
+      id = base;
+      for (let n = 2; ids.has(id) || reserved.has(id); n += 1) id = `${base}_${n}`;
+    }
     ids.add(id);
     return { ...s, id, initials };
   });
