@@ -6,6 +6,7 @@ import {
   formatDateRange,
   pxPerDay,
   resolveItemSpan,
+  fillDefaultTermDates,
   resolveTermSpan,
   weekToDate
 } from '@/scope/timeline-dates';
@@ -102,5 +103,19 @@ describe('timeline dates', () => {
 
   it('addDays crosses month boundaries', () => {
     expect(addDays('2026-01-28', 7)).toBe('2026-02-04');
+  });
+});
+
+describe('fillDefaultTermDates', () => {
+  it('gives undated terms the NSW template dates and keeps stored ones', () => {
+    const filled = fillDefaultTermDates(
+      [
+        { term_number: 1, start_week: 1, end_week: 10, start_date: '2026-02-02', end_date: '2026-04-09' },
+        { term_number: 4, start_week: 31, end_week: 40 }
+      ],
+      2026
+    );
+    expect(filled[0]).toMatchObject({ start_date: '2026-02-02', end_date: '2026-04-09' });
+    expect(filled[1]).toMatchObject({ start_date: '2026-10-12', end_date: '2026-12-18' });
   });
 });

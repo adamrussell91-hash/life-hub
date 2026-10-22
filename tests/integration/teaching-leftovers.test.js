@@ -298,6 +298,25 @@ test('scope sequence create links the subject and accepts a timeline patch', asy
   assert.equal(patched.body.data.timeline_items[0].unit_id, 'unit_1');
 });
 
+test('scope sequence delete removes it and unlinks the subject', async () => {
+  const store = memoryStore(seed);
+  const deps = { env, now, getContentStore: async () => store };
+  const created = await read(await createScopeSequencesHandler(deps)(
+    request('https://api.adam-russell.com/api/scope-sequences', {
+      method: 'POST',
+      body: { title: 'Y12 English', subject_id: 'subject_1', academic_year: 2026 }
+    })
+  ));
+  const id = created.body.data.id;
+  assert.equal((await store.get('subjects/subject_1', { type: 'json' })).scope_id, id);
+  const deleted = await read(await createScopeSequenceHandler(deps)(
+    request(`https://api.adam-russell.com/api/scope-sequences/${id}`, { method: 'DELETE' })
+  ));
+  assert.equal(deleted.status, 200);
+  assert.equal(await store.get(`scope_sequences/${id}`, { type: 'json' }), null);
+  assert.equal((await store.get('subjects/subject_1', { type: 'json' })).scope_id, undefined);
+});
+
 test('export returns lesson, unit, and archive packs', async () => {
   const store = memoryStore(seed);
   const deps = { env, now, getContentStore: async () => store };

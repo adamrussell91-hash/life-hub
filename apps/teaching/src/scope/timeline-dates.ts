@@ -197,3 +197,21 @@ export function normalizeScopeTerms<T extends { id: string; start_week: number }
     return { ...term, title, term_number };
   });
 }
+
+/**
+ * Older scopes stored terms as week ranges only, which the timeline then read
+ * from 1 January (Term 4 ending in early October). Give undated terms the NSW
+ * template dates for their academic year so both views sit on the real calendar.
+ */
+export function fillDefaultTermDates<T extends ScopeTermLike>(
+  terms: readonly T[],
+  academicYear: number | undefined
+): T[] {
+  if (academicYear == null) return [...terms];
+  return terms.map((term) => {
+    if (isYmd(term.start_date) && isYmd(term.end_date)) return term;
+    if (term.term_number < 1 || term.term_number > 4) return term;
+    const dates = defaultTermDatesForYear(academicYear, term.term_number);
+    return { ...term, start_date: dates.start, end_date: dates.end };
+  });
+}
