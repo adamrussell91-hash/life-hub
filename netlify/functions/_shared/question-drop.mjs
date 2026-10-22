@@ -149,6 +149,7 @@ export async function questionDropAction(store, lessonId, blockId, body) {
     const checked = checkQuestion({ ...(body.question ?? {}), id: 'q' });
     if (!checked.ok) reject(400, 'bad_question', checked.message);
     const question = { ...checked.question, id: randomBytes(6).toString('hex') };
+    delete question.outcomes; // outcomes are the teacher's to set; a student must not tag their own question
     if (!settings.kinds.includes(question.kind)) reject(400, 'bad_kind', 'Your teacher hasn’t turned on that question type here.');
     if (question.marks < settings.marks_min || question.marks > settings.marks_max) {
       reject(400, 'bad_marks', `Marks must be between ${settings.marks_min} and ${settings.marks_max}.`);

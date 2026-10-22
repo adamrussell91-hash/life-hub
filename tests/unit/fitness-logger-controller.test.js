@@ -313,6 +313,35 @@ const supersetSession = () => ({
   ]
 });
 
+test('the rest timer can be switched off, and the choice is remembered on the device', () => {
+  const saved = new Map();
+  const storage = { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value), removeItem: key => saved.delete(key) };
+  const { controller } = makeController({ storage });
+  controller.mount(supersetSession());
+  controller.doneStep();
+  controller.doneStep();
+  assert.ok(controller.getRest(), 'rest runs by default');
+  controller.setRestTimer(false);
+  assert.equal(controller.getRest(), null, 'turning it off clears the running rest');
+  controller.doneStep();
+  controller.doneStep();
+  assert.equal(controller.getRest(), null, 'no rest after the next round');
+  controller.destroy();
+
+  // Carry only the switch over; the resumed draft would already have rounds done.
+  const kept = new Map([['life-hub:gym-rest-timer', saved.get('life-hub:gym-rest-timer')]]);
+  const again = makeController({ storage: { getItem: key => kept.get(key) ?? null, setItem: (key, value) => kept.set(key, value), removeItem: key => kept.delete(key) } });
+  again.controller.mount(supersetSession());
+  again.controller.doneStep();
+  again.controller.doneStep();
+  assert.equal(again.controller.getRest(), null, 'still off next session');
+  again.controller.setRestTimer(true);
+  again.controller.doneStep();
+  again.controller.doneStep();
+  assert.ok(again.controller.getRest(), 'back on when switched on');
+  again.controller.destroy();
+});
+
 test('supersets run set-for-set: B1 B2, B1 B2 — not AAA BBB', () => {
   const { controller } = makeController();
   controller.mount(supersetSession());
@@ -571,5 +600,63 @@ test('AEKE stats land on the record; an AMRAP drops the rounds you never played'
   assert.equal(persisted.record.exercises[0].sets.length, 2);
   assert.equal(persisted.record.exercises[1].sets.length, 2);
   assert.equal(persisted.record.exercises[0].block.result.rounds, 2);
+  controller.destroy();
+});
+
+test('a Tabata block runs the interval clock: lead-in, work and rest buzz, then the clock stops itself', async () => {
+  const vibrations = [];
+  const round = (reps, kg = 0) => Array.from({ length: 2 }, () => ({ reps, weight_kg: kg, cable_type: kg ? 'constant_force' : 'none' }));
+  const harness = makeController({ vibrate: pattern => vibrations.push(pattern) });
+  const { controller, confirms } = harness;
+  controller.mount({
+    ...session(),
+    exercises: [
+      { name: 'Cable Row', superset_group: 1, superset_label: 'Tabata', block: { kind: 'circuit', format: 'intervals', work_sec: 20, rest_sec: 10 }, sets: round(12, 15) },
+      { name: 'Mountain Climber', tracking: 'bodyweight_reps', superset_group: 1, sets: round(20) }
+    ]
+  });
+  const [block] = controller.getBlocks();
+  controller.toggleCircuitClock(block);
+  assert.equal(controller.getCircuitClock(), 10_000, 'ten-second lead-in first');
+  harness.advance(10_000);
+  harness.tickTimers();
+  assert.deepEqual(vibrations.at(-1), [220], 'buzz when work starts');
+  assert.equal(controller.getCircuitClock(), 20_000);
+  harness.advance(20_000);
+  harness.tickTimers();
+  assert.deepEqual(vibrations.at(-1), [90, 60, 90], 'double buzz into rest');
+  controller.doneStep();
+  // Rest of the block: 10 rest + 20 + 10 + 20 + 10 + 20 seconds left.
+  harness.advance(90_000);
+  harness.tickTimers();
+  assert.deepEqual(vibrations.at(-1), [300, 120, 300], 'long buzz when the last interval ends');
+  assert.equal(controller.getRest(), null, 'no rest timer mid-block');
+  await controller.finish();
+  const [row, climber] = confirms[0].candidate.fields.exercises;
+  assert.equal(row.sets.length, 1, 'the unplayed round is dropped');
+  assert.equal(climber.sets.length, 1);
+  assert.equal(row.block.format, 'intervals');
+  assert.equal(row.block.work_sec, 20);
+  assert.equal(row.block.result.rounds, 1);
+  assert.equal(row.block.result.time_sec, 110, 'score time leaves out the lead-in');
+  const { validateLogEntry } = await import('../../netlify/functions/_shared/chat-schema.mjs');
+  const persisted = validateLogEntry(confirms[0].candidate, { id: 'tabata-finish', now: '2026-10-10T20:00:00+11:00' });
+  assert.equal(persisted.valid, true, JSON.stringify(persisted.errors));
+  assert.equal(persisted.record.exercises[0].block.work_sec, 20, 'interval settings survive Confirm');
+  controller.destroy();
+});
+
+test('a one-move Death By runs as an EMOM circuit with a round per minute', () => {
+  const { controller } = makeController();
+  controller.mount({
+    ...session(),
+    exercises: [
+      { name: 'Push Up', tracking: 'bodyweight_reps', superset_label: 'Death By', block: { format: 'emom' }, sets: [1, 2, 3, 4].map(reps => ({ reps, weight_kg: 0, cable_type: 'none' })) }
+    ]
+  });
+  const [block] = controller.getBlocks();
+  assert.equal(block.kind, 'circuit');
+  assert.equal(controller.getSteps().length, 4);
+  assert.equal(controller.getSteps()[0].kind, 'round');
   controller.destroy();
 });

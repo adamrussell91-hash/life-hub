@@ -100,6 +100,7 @@ import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
+import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
 import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
@@ -3524,8 +3525,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       async get(key: string) {
         return store.getJSON(key) ?? null;
       },
-      async setJSON(key: string, value: unknown, options?: { onlyIfNew?: boolean }) {
+      // The stored text doubles as the etag, as in the schedule-timetable store below.
+      async getWithMetadata(key: string) {
+        const raw = store.get(key);
+        return raw === undefined ? null : { data: store.getJSON(key), etag: raw };
+      },
+      async setJSON(key: string, value: unknown, options?: { onlyIfNew?: boolean; onlyIfMatch?: string }) {
         if (options?.onlyIfNew && store.getJSON(key) != null) return { modified: false };
+        if (options?.onlyIfMatch !== undefined && store.get(key) !== options.onlyIfMatch) return { modified: false };
         store.setJSON(key, value);
         return { modified: true };
       },
@@ -3596,6 +3603,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createLessonDiscernHandler(deps)
       : path.startsWith('/api/published/discern/')
         ? createPublishedDiscernHandler(deps)
+      : /^\/api\/classes\/[^/]+\/markbook$/.test(path)
+      ? createMarkbookHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
       ? createClassClaimsHandler(deps)
         : path.startsWith('/api/lessons/')
@@ -3676,6 +3685,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handleClassExamples(method, pathWithQuery, cookie, body);
     }
     if (
+      /^\/api\/classes\/[^/]+\/markbook$/.test(path) ||
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
