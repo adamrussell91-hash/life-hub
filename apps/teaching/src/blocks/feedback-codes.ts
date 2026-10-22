@@ -97,7 +97,7 @@ export function descriptorFor(code: FeedbackCode, positive: boolean): string {
 
 export type TaggedCode = { code_id: string; positive: boolean };
 
-export type SummaryLine = { heading: string; items: Array<{ text: string; count: number; positive: boolean }> };
+export type SummaryLine = { heading: string; items: Array<{ code: FeedbackCode; text: string; count: number; positive: boolean }> };
 
 /**
  * Tags grouped by rubric criterion, then speaking. Strengths and corrections
@@ -124,7 +124,7 @@ export function summariseByCriterion(tags: readonly TaggedCode[], codes: readonl
       heading,
       items: [...buckets.get(heading)!.values()]
         .sort((a, b) => Number(b.positive) - Number(a.positive) || b.count - a.count)
-        .map((hit) => ({ text: codeText(hit.code, hit.positive), count: hit.count, positive: hit.positive }))
+        .map((hit) => ({ code: hit.code, text: codeText(hit.code, hit.positive), count: hit.count, positive: hit.positive }))
     }));
 }
 

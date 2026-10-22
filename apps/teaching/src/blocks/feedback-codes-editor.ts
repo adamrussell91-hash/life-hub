@@ -2,8 +2,8 @@ import { apiGet, apiPut } from '@/api/client';
 import { button, el, errorText } from '@/blocks/peer-feedback-ui';
 import type { CodeColour } from '@/blocks/peer-annotate';
 import {
-  CRITERION_LABELS,
   FEEDBACK_CODES_ENDPOINT,
+  CRITERION_LABELS,
   GROUP_LABELS,
   codeInk,
   primeFeedbackCodes,
@@ -94,8 +94,8 @@ export function mountFeedbackCodesEditor(): HTMLElement {
     head.setAttribute('aria-expanded', String(openIndex === index));
     const chip = el('span', 'fc-chip', code.code || '?');
     chip.style.setProperty('--fc-ink', codeInk(code.colour));
-    const where = code.criterion ? `C${code.criterion}` : GROUP_LABELS[code.group];
-    head.append(chip, el('span', 'fc-editor__name', code.label || 'New code'), el('span', 'fc-editor__where block-secondary', code.key ? `${where} · key ${code.key}` : where));
+    const where = code.criterion ? CRITERION_LABELS[code.criterion] : GROUP_LABELS[code.group];
+    head.append(chip, el('span', 'fc-editor__name', code.label || 'New code'), el('span', 'fc-editor__where block-secondary', code.key ? `${where} · shortcut ${code.key}` : where));
     if (code.hidden) head.append(el('span', 'fc-editor__hidden', 'Hidden'));
     item.append(head);
     if (openIndex !== index) return item;
