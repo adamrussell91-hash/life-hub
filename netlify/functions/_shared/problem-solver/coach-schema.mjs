@@ -53,6 +53,11 @@ function suggestionOf(raw) {
     if (!CATALOGUE_IDS.includes(raw.tool) || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown model in suggestion: ${raw.tool}` };
     return { value: { kind: 'next_tool', tool: raw.tool, reason } };
   }
+  // next_technique is Gear Shifter's name for next_tool, limited to its own (gt_) tools.
+  if (raw.kind === 'next_technique') {
+    if (!String(raw.tool).startsWith('gt_') || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown technique in suggestion: ${raw.tool}` };
+    return { value: { kind: 'next_tool', tool: raw.tool, reason } };
+  }
   if (raw.kind === 'next_tool' || raw.kind === 'switch_tool') {
     if (!TOOL_IDS.includes(raw.tool)) return { error: `Unknown tool in suggestion: ${raw.tool}` };
     return { value: { kind: raw.kind, tool: raw.tool, reason } };

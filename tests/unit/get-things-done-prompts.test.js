@@ -84,3 +84,13 @@ test('another angle: the book’s see also first, then ours, Gear Shifter techni
   assert.deepEqual(anotherAngle('gt_to_do_list'), { book: ['gt_deep_work'], ours: [] });
   assert.deepEqual(anotherAngle('unknown'), { book: [], ours: [] });
 });
+
+// ---------------------------------------------------------------- schema
+
+test('next_technique is next_tool for Gear Shifter tools only; next_model stays Decision Maker’s', async () => {
+  const { validateCoachTurn } = await import('../../netlify/functions/_shared/problem-solver/coach-schema.mjs');
+  const turn = (kind, tool) => validateCoachTurn({ verdict: 'clarify', message: 'Try this next.', suggestion: { kind, tool, reason: 'Fits.' } });
+  assert.deepEqual(turn('next_technique', 'gt_pomodoro').value.suggestion, { kind: 'next_tool', tool: 'gt_pomodoro', reason: 'Fits.' });
+  for (const tool of ['dm_eisenhower', 'kanban', 'gt_nope']) assert.equal(turn('next_technique', tool).ok, false, tool);
+  assert.equal(turn('next_model', 'gt_pomodoro').ok, false);
+});
