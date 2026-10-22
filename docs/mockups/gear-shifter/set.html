@@ -124,7 +124,7 @@ button, textarea, input { font: inherit; color: inherit; }
 .compare td:first-child { font-weight: 600; white-space: nowrap; }
 
 @media (max-width: 1180px) { .tools { grid-template-columns: 1fr; } .tool { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tool__head { grid-column: 1 / -1; } }
-@media (max-width: 760px) { .tool { grid-template-columns: 1fr; } .strip { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .tool { grid-template-columns: 1fr; } .strip { grid-template-columns: 1fr; } .strip__big { gap: 16px; flex-wrap: nowrap; justify-content: space-between; } .strip__big figure > span { width: 72px; height: 72px; } .strip__big svg { width: 46px; height: 46px; } }
 @media (max-width: 560px) {
   .compare { padding: 14px; }
   .compare table, .compare tbody, .compare tr, .compare td { display: block; }
@@ -279,7 +279,7 @@ function medal(p) {
   const ghost = 'var(--gt-ghost)';
   const ring = `<circle class="piece p-ring" cx="50" cy="50" r="31" fill="var(--card)" stroke="${p.frame ? 'var(--gt-red)' : ghost}" stroke-width="6"/>`;
   const arrows = `<g class="piece p-loop">${returns(50, 50, 44, 6, p.route ? 'var(--gt-blue)' : ghost)}</g>`;
-  const core = p.entry ? `<g class="piece p-tool">${nested(emblem(p.entry), 28, 28, 44)}</g>`
+  const core = p.entry ? `<g class="piece p-tool">${nested(emblem(p.entry), 21, 21, 58)}</g>`
     : `<circle cx="50" cy="50" r="10" fill="none" stroke="${ghost}" stroke-width="3" stroke-dasharray="0.1 6" stroke-linecap="round"/>`;
   const badge = p.route && p.section ? `<g class="piece p-badge"><circle cx="14" cy="84" r="14" fill="var(--gt-paper)" stroke="var(--gt-line)" stroke-width="1"/>${nested(SECTIONS[p.section], 2, 72, 24)}</g>` : '';
   const arrow = p.commit ? `<g class="piece p-dart">${dart(97, 3, 72, 28, 5)}</g>` : '';

@@ -8,7 +8,7 @@ There are six plans and one PR, as with Decision Maker. Each plan is written onc
 
 | Plan | Phase | Status | Ends with |
 | --- | --- | --- | --- |
-| 1 | Foundations | **In progress** | Catalogue, route, glyphs recoloured to Adam's palette, tokens, the `gear_shifter` model, a book register replacing the `'decision'` checks in the engine, the `shift` and `start` session kinds, `/api/get-things-done`, and mockups. **Adam approves the design before Plan 2** |
+| 1 | Foundations | **Built; awaiting Adam's design approval** | Catalogue, route, glyphs recoloured to Adam's palette, tokens, the `gear_shifter` model, a book register replacing the `'decision'` checks in the engine, the `shift` and `start` session kinds, `/api/get-things-done`, and mockups. **Adam approves the design before Plan 2** |
 | 2 | Charts | Not started | The scales `min`, the ratings family, the Kanban and 5 Whys variants, the `.gt-scope` re-skin, and a contact sheet |
 | 3 | The techniques | Not started | The importer, then configs and notes for all 37 entries, one section per commit |
 | 4 | Coach, Commit, Record and Review | Not started | Rubric, catalogue lines, discernment, `gt_commit`, the action record and Review |
