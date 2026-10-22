@@ -65,3 +65,79 @@ test('scales: a dated tool completes on its first save and its reflection', () =
   run = fill(run, ['reflection']);
   assert.equal(isComplete(run), true);
 });
+
+// ---------------------------------------------------------------- ratings
+import { ratingsOf, ratingsTool, sampleSd } from '../../packages/decision-book/families/ratings.mjs';
+import { GT_SAMPLE_RUNS, gtRunFor } from '../../packages/get-things-done/fixtures.mjs';
+
+const ratingChart = { idea: 'i', criterion: 'c', rater: 'r' };
+const scoresFor = (rater, n) => ({
+  rater,
+  scores: Object.fromEntries(['idea1', 'idea2', 'idea3'].map((idea) => [idea, { criterion1: n, criterion2: n }])),
+  ranking: ['idea1', 'idea2', 'idea3']
+});
+
+test('ratings: config bounds', () => {
+  assert.throws(() => ratingsTool({ ...base, chart: { ...ratingChart, criteria: [1, 3] } }), /criteria run from 2 to 3/);
+  assert.throws(() => ratingsTool({ ...base, chart: { ...ratingChart, criteria: [2, 4] } }), /criteria run from 2 to 3/);
+  assert.throws(() => ratingsTool({ ...base, chart: { ...ratingChart, maxIdeas: 8 } }), /at most seven ideas/);
+  assert.throws(() => ratingsTool({ ...base, chart: { idea: 'i', criterion: 'c' } }), /needs a rater label/);
+  assert.equal(GT_SAMPLE_TOOLS.ratings.family, 'ratings');
+});
+
+test('ratings: ideas, criteria and raters first, then scores, then recommendation and owner', () => {
+  const def = GT_SAMPLE_TOOLS.ratings;
+  let run = gtRun('ratings');
+  assert.deepEqual(nextSlots(run), ['idea:1', 'criterion:1', 'rater:1']);
+  assert.match(def.validateScores(run, scoresFor('rater1', 5)), /Name at least two ideas, 2 criteria and one rater/);
+  run = fill(run, ['idea:1', 'idea:2', 'idea:3', 'criterion:1', 'criterion:2', 'rater:1', 'rater:2']);
+  assert.deepEqual(nextSlots(run), ['idea:4', 'criterion:3', 'rater:3']);
+  assert.match(def.awaiting(run), /form: Answer for rater, Answer for rater still to score every idea/);
+  assert.match(def.validateScores(run, { rater: 'nobody', scores: {}, ranking: [] }), /one of the named raters/);
+  assert.match(def.validateScores(run, { rater: 'rater1', scores: {}, ranking: [] }), /every idea on every criterion/);
+  assert.match(def.validateScores(run, scoresFor('rater1', 11)), /from 1 to 10/);
+  assert.match(def.validateScores(run, scoresFor('rater1', 0)), /from 1 to 10/);
+  assert.match(def.validateScores(run, { ...scoresFor('rater1', 5), ranking: ['idea1', 'idea1', 'idea2'] }), /rank every idea once/);
+  run = applyScores(run, scoresFor('rater1', 5), AT);
+  assert.deepEqual(nextSlots(run), [], 'the shortlist closes once scoring starts; waiting on rater 2');
+  assert.equal(isComplete(run), false);
+  run = applyScores(run, scoresFor('rater2', 7), AT);
+  assert.equal(def.awaiting(run), null);
+  assert.deepEqual(nextSlots(run), ['recommendation', 'owner']);
+  run = fill(run, ['recommendation']);
+  assert.deepEqual(nextSlots(run), ['owner']);
+  run = fill(run, ['owner']);
+  assert.deepEqual(nextSlots(run), []);
+  assert.equal(isComplete(run), true);
+});
+
+test('ratings: a rater re-scoring replaces their own snapshot only', () => {
+  let run = fill(gtRun('ratings'), ['idea:1', 'idea:2', 'idea:3', 'criterion:1', 'criterion:2', 'rater:1', 'rater:2']);
+  run = applyScores(run, scoresFor('rater1', 5), AT);
+  run = applyScores(run, scoresFor('rater2', 7), AT);
+  run = applyScores(run, scoresFor('rater1', 9), AT);
+  const r = ratingsOf(run);
+  assert.deepEqual(r.cells.idea1.criterion1, { mean: 8, sd: Math.SQRT2, n: 2 });
+  assert.equal(r.raterMeans.rater1, 9);
+});
+
+test('ratings: means, sample SD with n, pooled and rater means; no winner', () => {
+  const r = ratingsOf(gtRunFor('ratings', 'full'));
+  assert.deepEqual(r.cells.idea1.criterion1, { mean: 6, sd: 2, n: 3 });
+  assert.equal(sampleSd([4, 6, 8]), 2);
+  assert.equal(sampleSd([5]), null, 'one rater has no sample spread');
+  assert.deepEqual(Object.keys(r.pooled), ['idea1', 'idea2', 'idea3'], 'ideas keep slot order');
+  assert.equal(r.pooled.idea1.n, 3);
+  assert.equal(r.pooled.idea1.mean, 6);
+  assert.equal(r.raterMeans.rater1, (4 + 6 + 8 + 9 + 3 + 5) / 6);
+  assert.deepEqual(r.rankings.rater1, ['idea2', 'idea1', 'idea3']);
+  assert.deepEqual(r.rankings.rater3, ['idea1', 'idea3', 'idea2']);
+  for (const key of ['winner', 'total', 'ranking', 'weights']) assert.equal(key in r, false, key);
+  assert.equal(GT_SAMPLE_RUNS.ratings.full.length, 10);
+});
+
+test('ratings: one rater scores alone, with no spread', () => {
+  const r = ratingsOf(gtRunFor('ratings', 'partial'));
+  assert.deepEqual(r.scored, ['rater1']);
+  assert.deepEqual(r.cells.idea2.criterion2, { mean: 9, sd: null, n: 1 });
+});
