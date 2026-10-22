@@ -25,7 +25,7 @@ export const BandSchema = z.object({ label: z.string().trim().min(1).max(MARKBOO
 export const CriterionSchema = z.object({
   id: MarkbookIdSchema,
   label: z.string().trim().min(1, 'Name each criterion.').max(MARKBOOK_LIMITS.label),
-  max: z.number().positive('Each criterion needs marks.').max(1000),
+  max: z.number().positive('Each criterion needs marks.').max(1000, 'A criterion is worth at most 1000 marks.'),
   outcomes: z.array(z.string().trim().min(1).max(64)).max(MARKBOOK_LIMITS.outcomes).default([]),
   bands: z.array(BandSchema).max(MARKBOOK_LIMITS.bands).optional()
 });
@@ -35,7 +35,7 @@ export const AssessmentColumnSchema = z.object({
   kind: z.literal('assessment'),
   title: Title,
   date: Day,
-  weight: z.number().min(0).max(100),
+  weight: z.number().min(0, 'Weight can’t be below 0.').max(100, 'Weight is at most 100.'),
   criteria: z.array(CriterionSchema).min(1, 'Add at least one criterion.').max(MARKBOOK_LIMITS.criteria)
 });
 export const HandinColumnSchema = z.object({ id: MarkbookIdSchema, kind: z.literal('handin'), title: Title, due: Day });

@@ -1,4 +1,8 @@
 import { describe, expect, it, vi, type Mock } from 'vitest';
+
+vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: vi.fn() }));
+
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { ClassSchema, type Class } from '@/schemas';
 import type { Markbook } from '@/markbook/schema';
 import type { MarkbookApi } from '@/markbook/api';
@@ -13,12 +17,12 @@ const cls: Class = ClassSchema.parse({
 
 const book = (over: Partial<Markbook> = {}): Markbook => ({
   columns: [
-    { id: 'essay0001', kind: 'assessment', title: 'Essay', date: '2026-11-03', weight: 40, criteria: [{ id: 'c1', label: 'Analysis', max: 20, outcomes: [] }] },
+    { id: 'essay0001', kind: 'assessment', title: 'Essay', date: '2026-11-03', weight: 40, criteria: [{ id: 'crit0001', label: 'Analysis', max: 20, outcomes: [] }] },
     { id: 'hand00001', kind: 'handin', title: 'Draft', due: '2026-10-25' },
     { id: 'chck00001', kind: 'check', title: 'Bookwork', date: '2026-10-26', scale: 'four' }
   ],
   hidden_quizzes: [],
-  marks: { essay0001: { s1: { criteria: { c1: 15 } } } },
+  marks: { essay0001: { s1: { criteria: { crit0001: 15 } } } },
   updated_at: '',
   ...over
 });
@@ -121,7 +125,7 @@ describe('markbook section', () => {
   });
 
   it('shows removed students read-only', async () => {
-    const { host } = await mount(view({ markbook: book({ marks: { essay0001: { s1: { criteria: { c1: 15 } } }, hand00001: { s9: { status: 'late', at: '2026-10-26' } } } }) }));
+    const { host } = await mount(view({ markbook: book({ marks: { essay0001: { s1: { criteria: { crit0001: 15 } } }, hand00001: { s9: { status: 'late', at: '2026-10-26' } } } }) }));
     host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
     await vi.waitFor(() => expect(host.querySelectorAll('tbody tr')).toHaveLength(3));
     const removed = host.querySelectorAll('tbody tr')[2]!;
@@ -242,7 +246,7 @@ describe('markbook section', () => {
     const pill = [...host.querySelectorAll<HTMLButtonElement>('.mb__add-kind')].find((b) => b.textContent === 'Add task')!;
     pill.click();
     const form = document.querySelector<HTMLElement>('.mb-form')!;
-    expect(form.getAttribute('aria-label')).toBe('Add assessment task');
+    expect(document.getElementById(form.getAttribute('aria-labelledby')!)?.textContent).toBe('Add assessment task');
     const field = (name: string) => form.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
     const type = (name: string, value: string) => {
       field(name).value = value;
@@ -265,7 +269,7 @@ describe('markbook section', () => {
     const title = [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((b) => b.textContent === 'Draft')!;
     title.click();
     const form = document.querySelector<HTMLElement>('.mb-form')!;
-    expect(form.getAttribute('aria-label')).toBe('Edit hand-in');
+    expect(document.getElementById(form.getAttribute('aria-labelledby')!)?.textContent).toBe('Edit hand-in');
     expect(form.querySelector<HTMLInputElement>('[name="title"]')!.value).toBe('Draft');
     expect(form.querySelector<HTMLInputElement>('[name="date"]')!.value).toBe('2026-10-25');
     const name = form.querySelector<HTMLInputElement>('[name="title"]')!;
@@ -283,11 +287,11 @@ describe('markbook section', () => {
     form.querySelector<HTMLButtonElement>('.mb-form__save')!.click();
     await vi.waitFor(() => expect(form.querySelector('.mb-form__error')?.textContent).toBe('Server said no'));
     expect(document.body.contains(form)).toBe(true);
-    form.querySelector<HTMLButtonElement>('.btn--secondary')!.click();
+    form.querySelector<HTMLButtonElement>('.mb-form__actions .btn--secondary')!.click();
   });
 
   it('deletes a column through the form, and rolls a failed delete back', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(askConfirmCard).mockResolvedValue(true);
     const { host, api } = await mount(view());
     const titles = () => [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].map((n) => n.textContent);
     const remove = (name: string) => {
@@ -295,15 +299,56 @@ describe('markbook section', () => {
       document.querySelector<HTMLButtonElement>('.mb-form__delete')!.click();
     };
     remove('Draft');
-    expect(titles()).toEqual(['Bookwork', 'Essay']);
+    await vi.waitFor(() => expect(titles()).toEqual(['Bookwork', 'Essay']));
     expect(document.querySelector('.mb-form')).toBeNull();
     await vi.waitFor(() => expect(api.deleteColumn).toHaveBeenCalledWith('class1', 'hand00001'));
-    (api.deleteColumn as Mock).mockRejectedValueOnce(new Error('Server said no'));
+    let refuse: () => void = () => {};
+    const gate = new Promise<void>((r) => { refuse = r; });
+    (api.deleteColumn as Mock).mockImplementationOnce(async () => {
+      await gate;
+      throw new Error('Server said no');
+    });
     remove('Essay');
-    expect(titles()).toEqual(['Bookwork']);
+    await vi.waitFor(() => expect(titles()).toEqual(['Bookwork']));
+    refuse();
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Server said no'));
     expect(titles()).toEqual(['Bookwork', 'Essay']);
     expect(host.querySelectorAll('tbody tr')[0]!.querySelector('.mb-cell--assessment')?.textContent).toBe('15/20 · 75%');
-    confirm.mockRestore();
+    vi.mocked(askConfirmCard).mockReset();
+  });
+
+  it('returns focus to the column title when the form closes', async () => {
+    const { host } = await mount(view());
+    const title = () => [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((b) => b.textContent === 'Draft')!;
+    title().focus();
+    title().click();
+    expect(document.activeElement?.getAttribute('name')).toBe('title');
+    document.querySelector<HTMLButtonElement>('.mb-form__actions .btn--secondary')!.click();
+    expect(document.querySelector('.mb-form')).toBeNull();
+    expect(document.activeElement).toBe(title());
+  });
+
+  it('queues a column save behind a pending mark, and keeps both', async () => {
+    const { host, api } = await mount(view());
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    const real = (api.setMark as Mock).getMockImplementation()!;
+    (api.setMark as Mock).mockImplementationOnce(async (...args: unknown[]) => {
+      await gate;
+      return real(...args);
+    });
+    host.querySelectorAll('tbody tr')[0]!.querySelector<HTMLButtonElement>('.mb-cell--handin')!.click();
+    host.querySelector<HTMLButtonElement>('.mb__add-kind:nth-child(3)')!.click();
+    const form = document.querySelector<HTMLElement>('.mb-form')!;
+    const name = form.querySelector<HTMLInputElement>('[name="title"]')!;
+    name.value = 'Homework';
+    form.querySelector<HTMLButtonElement>('.mb-form__save')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(api.saveColumn).not.toHaveBeenCalled();
+    release();
+    await vi.waitFor(() => expect(api.saveColumn).toHaveBeenCalled());
+    await vi.waitFor(() => expect([...host.querySelectorAll('.mb-col__title')].map((n) => n.textContent)).toContain('Homework'));
+    expect(host.querySelectorAll('tbody tr')[0]!.querySelector('.mb-cell--handin')?.textContent).toBe('Submitted');
+    expect(document.querySelector('.mb-form')).toBeNull();
   });
 });

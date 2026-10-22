@@ -53,9 +53,13 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-form__label { font-weight: var(--weight-semibold); color: var(--muted); }
 .mb-form__input { min-height: 36px; padding: var(--space-1) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; background: var(--paper); color: var(--ink); }
 .mb-form__criterion { display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.mb-form__remove-criterion { justify-self: start; border: 0; background: none; color: var(--danger); font: inherit; cursor: pointer; }
+.mb-form__remove-criterion { justify-self: start; min-height: 44px; padding: var(--space-2) var(--space-3); border: 0; background: none; color: var(--danger); font: inherit; cursor: pointer; }
 .mb-form__remove-criterion:disabled { color: var(--muted); cursor: default; }
 .mb-form__error { margin: 0; color: var(--danger); }
 .mb-form__error:empty { display: none; }
 .mb-form__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .mb-form__delete { margin-left: auto; color: var(--danger); }
+
+@media (max-width: 600px) {
+  .mb-form__input { font-size: max(16px, 1em); }
+}
