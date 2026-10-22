@@ -5,6 +5,7 @@ import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { buildDecisionPrompt } from './decision-prompts.mjs';
+import { buildGearPrompt } from './get-things-done-prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { buildQuickPrompt, checkQuickTurn } from './quick-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
@@ -167,11 +168,12 @@ function parseQuick(session, text) {
   return result.ok ? checkQuickTurn(session, result.value) : result;
 }
 
-/** Each session kind's prompt and reply check; full and decision sessions share the step parser. */
+/** Each session kind's prompt and reply check; full and book sessions share the step parser. */
 const PROMPTS = {
   lightning: { build: buildLightningPrompt, read: parseLightning },
   quick: { build: buildQuickPrompt, read: parseQuick },
   decision: { build: buildDecisionPrompt, read: parse },
+  shift: { build: buildGearPrompt, read: parse },
   full: { build: buildCoachPrompt, read: parse }
 };
 
