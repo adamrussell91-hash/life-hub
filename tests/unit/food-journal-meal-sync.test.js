@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   findCountedMeal,
+  mealNamesDish,
   removeOldCountedMeal,
   markDishCounted,
   syncFoodJournalAfterMeal,
@@ -196,8 +197,27 @@ function countedJournal(mealPath) {
   return j;
 }
 
+const ownMeal = '---\ntype: "meal"\nmeal: "dinner"\nfood_dish_id: "dish_1"\n---\n';
+
+test("mealNamesDish is true only for this dish's meal", () => {
+  assert.equal(mealNamesDish(ownMeal, "dish_1"), true);
+  assert.equal(mealNamesDish(ownMeal, "dish_2"), false);
+  assert.equal(mealNamesDish('---\ntype: "meal"\nmeal: "dinner"\n---\n', "dish_1"), false);
+  assert.equal(mealNamesDish('---\ntype: "diary"\nfood_dish_id: "dish_1"\n---\n', "dish_1"), false);
+  assert.equal(mealNamesDish("---\nfood_dish_id: [unclosed\n---\n", "dish_1"), false);
+  assert.equal(mealNamesDish("no frontmatter", "dish_1"), false);
+  assert.equal(mealNamesDish(null, "dish_1"), false);
+});
+
+test("findCountedMeal won't return a file that now holds another meal", async () => {
+  for (const other of ['---\ntype: "meal"\nmeal: "dinner"\n---\n', '---\ntype: "meal"\nfood_dish_id: "dish_2"\n---\n', "---\n: : bad\n---\n"]) {
+    const client = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: other });
+    assert.equal(await findCountedMeal(client, (await client.resolveTree()).tree, "dish_1"), null);
+  }
+});
+
 test("findCountedMeal returns the counted meal while it is still in the tree", async () => {
-  const client = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: "---\n---\n" });
+  const client = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: ownMeal });
   const { tree } = await client.resolveTree();
   assert.deepEqual(await findCountedMeal(client, tree, "dish_1"), {
     path,

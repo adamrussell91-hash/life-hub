@@ -51,7 +51,31 @@ export async function syncFoodJournalAfterMeal(client, record, mealPath, nowIso)
   return { updated: true };
 }
 
-// The meal file a dish was last counted into, while it is still in the tree.
+// True only when a meal file's frontmatter says it is this dish's meal.
+// Unreadable or odd frontmatter counts as someone else's meal.
+export function mealNamesDish(text, dishId) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(
+    typeof text === "string" ? text.trim() : "",
+  );
+  if (!match) return false;
+  try {
+    const front = load(match[1]);
+    return front?.type === "meal" && front.food_dish_id === dishId;
+  } catch {
+    return false;
+  }
+}
+
+async function blobNamesDish(client, sha, dishId) {
+  try {
+    return mealNamesDish(decodeBlob(await client.readBlob(sha)), dishId);
+  } catch {
+    return false;
+  }
+}
+
+// The meal file a dish was last counted into, while it is still in the tree
+// and still holds this dish's meal. Anything else at that path is left alone.
 export async function findCountedMeal(client, tree, dishId) {
   const blob = tree.find((b) => b.path === PATH && b.type === "blob");
   if (!blob) return null;
@@ -67,17 +91,15 @@ export async function findCountedMeal(client, tree, dishId) {
   const parsed = parseNutritionMealPath(dish?.brisket?.meal_path);
   if (!parsed) return null;
   const entry = tree.find((b) => b.path === parsed.path && b.type === "blob");
-  return entry ? { ...parsed, sha: entry.sha } : null;
+  if (!entry || !(await blobNamesDish(client, entry.sha, dishId))) return null;
+  return { ...parsed, sha: entry.sha };
 }
 
 // After a re-count lands in a new file, remove the old one, but only when it
 // still names this dish, so an unrelated meal is never deleted.
 // Returns null when there was nothing of ours to remove.
 export async function removeOldCountedMeal(client, prior, dishId) {
-  const text = decodeBlob(await client.readBlob(prior.sha));
-  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text?.trim() ?? "");
-  const front = match ? load(match[1]) : null;
-  if (front?.type !== "meal" || front.food_dish_id !== dishId) return null;
+  if (!(await blobNamesDish(client, prior.sha, dishId))) return null;
   await client.deleteFile({
     path: prior.path,
     sha: prior.sha,
