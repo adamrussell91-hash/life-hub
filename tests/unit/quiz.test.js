@@ -442,3 +442,39 @@ test('live mode needs claimed initials to join', async () => {
   const player = [...store.data.entries()].find(([k]) => k.includes('/players/'))[1];
   assert.match(player.student_id, /^st_/);
 });
+
+test('an unclaimed device sees no history from the anonymous quiz', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  await quizAction(store, 'quiz1', { token: token(1), action: 'start' });
+  await quizAction(store, 'quiz1', { token: token(1), action: 'submit', responses: {} });
+  const seen = await rawQuizAction(store, 'quiz1', bobDevice);
+  assert.equal(seen.attempts_used, 0);
+  assert.deepEqual(seen.results, []);
+});
+
+test('an unclaimed device is refused hints, checks and hand-ins', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  for (const action of ['hint', 'check', 'submit']) {
+    await assert.rejects(rawQuizAction(store, 'quiz1', { ...bobDevice, action, question_id: 'qa', responses: {} }), /Type your initials first/);
+  }
+});
+
+test('live answers need a class page', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+  await assert.rejects(rawQuizAction(store, 'quiz1', { token: token(1), action: 'live_answer', index: 0, response: {} }), /Open this quiz from your class page/);
+});
+
+test('a claimed device needs no device token', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  const me = { class_id: 'class1', class_token: token(3) };
+  await rawQuizAction(store, 'quiz1', { ...me, action: 'claim', initials: 'BB' });
+  const started = await rawQuizAction(store, 'quiz1', { ...me, action: 'start' });
+  assert.ok(started.current);
+  const done = await rawQuizAction(store, 'quiz1', { ...me, action: 'submit', responses: {} });
+  assert.equal(done.attempts_used, 1);
+});
