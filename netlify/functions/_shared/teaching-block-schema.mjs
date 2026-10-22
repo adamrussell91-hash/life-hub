@@ -180,7 +180,9 @@ var base = {
   marks: z5.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
-  image: QuizImageSchema.optional()
+  image: QuizImageSchema.optional(),
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. */
+  outcomes: z5.array(z5.string().min(1).max(64)).max(6).optional()
 };
 var QuizQuestionSchema = z5.discriminatedUnion("kind", [
   z5.object({ ...base, kind: z5.literal("multiple_choice"), options: z5.array(QuizChoiceSchema).min(2).max(6), correct: z5.array(Id).length(1) }),
