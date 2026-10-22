@@ -488,7 +488,9 @@ export function parseLetteredWorkoutChat(text) {
       const match = LETTER_LINE.exec(part.trim());
       if (!match) continue;
       const [, letter, digit, content] = match;
-      if (!digit && !hasLoadSpec(content)) {
+      // A bracketed block descriptor wins over load specs: "rest 120 s" is not a set.
+      const bracketHeader = !digit && /\([^)]*\b(?:circuit|superset|rounds?|amrap|for time)\b[^)]*\)/i.test(content);
+      if (!digit && (bracketHeader || !hasLoadSpec(content))) {
         // Block header: "C  Cindy (circuit, 3 rounds for time)".
         if (!/\b(?:circuit|superset|rounds?|amrap|for time)\b/i.test(content)) continue;
         const group = groupFor(letter);
