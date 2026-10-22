@@ -55,7 +55,7 @@ type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boole
 /** Initials and name from the class list; both null when the student was removed. */
 type StudentLabel = { initials: string | null; name: string | null };
 
-type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
+type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; go: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
 type QuestionStats = {
   id: string;
   question: PublicQuestion;
@@ -545,7 +545,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       const b = el('button', 'qz-attempt');
       b.type = 'button';
       b.append(
-        el('span', 'qz-attempt__who', `${whoLabel(a, names)}${a.n > 0 ? ` · go ${a.n + 1}` : ''}`),
+        el('span', 'qz-attempt__who', `${whoLabel(a, names)}${a.go > 0 ? ` · go ${a.go + 1}` : ''}`),
         el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}`),
         el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
       );
@@ -558,6 +558,20 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       list.append(li);
     }
     wrap.append(list);
+    const foot = el('div', 'qz-results__foot');
+    foot.append(
+      button('Clear all attempts', 'ghost', async function () {
+        if (!window.confirm(`${total === 1 ? 'Clear the 1 attempt' : `Clear all ${total} attempts`} so everyone can start again? Answers and marks are deleted for good.`)) return;
+        this.disabled = true;
+        try {
+          results = await post<Results>({ action: 'clear_all' });
+        } catch (error) {
+          showError(error);
+        }
+        paint();
+      })
+    );
+    wrap.append(foot);
     return wrap;
   }
 
@@ -602,7 +616,20 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         void refresh();
       }),
       el('span', 'qz-attempt__who', a.student ? whoLabel(a, new Map()) : 'Anonymous attempt'),
-      el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}${a.pending ? ` · ${a.pending} to mark` : ''}${a.overtime ? ' · Late' : ''}`)
+      el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}${a.pending ? ` · ${a.pending} to mark` : ''}${a.overtime ? ' · Late' : ''}`),
+      button('Give another go', 'ghost', async function () {
+        const who = a.student ? whoLabel(a, new Map()) : 'this student';
+        if (!window.confirm(`Clear every attempt by ${who} on this quiz so they can start again? Their answers and marks are deleted for good.`)) return;
+        this.disabled = true;
+        try {
+          results = await post<Results>({ action: 'reset', attempt_id: a.id });
+          openAttempt = null;
+          paint();
+        } catch (error) {
+          showError(error);
+          this.disabled = false;
+        }
+      })
     );
     wrap.append(bar);
     a.rows.forEach((r, i) => {
