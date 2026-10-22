@@ -227,6 +227,11 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {} } = {
       assets.set(key, Buffer.from(body));
     },
     signGet: async ({ key }) => "https://food-media.test/" + key,
+    getObject: async ({ key }) => {
+      if (!assets.has(key))
+        throw Object.assign(new Error("missing"), { name: "NoSuchKey" });
+      return assets.get(key);
+    },
   };
   // Production starts the background run from the assist function; do the
   // same here so the test fails if the browser ever calls the run directly.
@@ -1194,6 +1199,13 @@ for (const width of [1440, 390]) {
     });
     const sent = await mockChat(page);
     const dishId = read().visits[0].dishes[0].id;
+    const photoReads = [];
+    page.on("request", (r) => {
+      if (r.url().endsWith("/api/food-journal-media") && r.method() === "POST")
+        try {
+          if (JSON.parse(r.postData()).action === "bytes") photoReads.push(r.url());
+        } catch {}
+    });
     await page.getByRole("tab", { name: "Custom Menu" }).click();
     await lasagneCard(page)
       .getByRole("button", { name: "Send to Brisket", exact: true })
@@ -1239,6 +1251,8 @@ for (const width of [1440, 390]) {
     assert.equal(sent[0].attachments.length, 1);
     assert.equal(sent[0].attachments[0].kind, "image");
     assert.match(sent[0].attachments[0].dataUrl, /^data:image\//);
+    // The photo comes through the API, not from the bucket's signed URL.
+    assert.equal(photoReads.length, 1);
     // Brisket confirms the meal; back in the Food Journal the dish is counted.
     write((j) => {
       j.visits[0].dishes[0].brisket = brisketLink();

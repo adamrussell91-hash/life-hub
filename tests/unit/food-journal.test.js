@@ -356,6 +356,54 @@ test("media reads require a live journal reference and uploads use food namespac
   assert.deepEqual([...stored.get(key)], [...jpeg]);
   assert.equal((await upload(new Uint8Array([1, 2, 3, 4]))).status, 400);
 });
+test("media bytes serve a live photo's JPEG and 404 for an unreferenced key", async () => {
+  resetRateLimits();
+  const j = fixture();
+  j.visits[0].dishes[0].photos = [
+    { id: "photo_1", key: "food/photos/photo_1.jpg" },
+  ];
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 7, 8, 9]);
+  const asked = [];
+  const h = createFoodJournalMediaHandler(
+    deps(repo(j), {
+      getObject: async ({ key }) => {
+        asked.push(key);
+        if (key !== "food/photos/photo_1.jpg")
+          throw Object.assign(new Error("missing"), { name: "NoSuchKey" });
+        return jpeg;
+      },
+      env: {
+        ...env,
+        R2_ACCOUNT_ID: "a",
+        R2_BUCKET: "b",
+        R2_ACCESS_KEY_ID: "k",
+        R2_SECRET_ACCESS_KEY: "s",
+      },
+    }),
+  );
+  const ok = await h(req("POST", { action: "bytes", key: "food/photos/photo_1.jpg" }));
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(
+    [...Buffer.from((await ok.json()).data.jpeg, "base64")],
+    [...jpeg],
+  );
+  const other = await h(req("POST", { action: "bytes", key: "food/photos/other.jpg" }));
+  assert.equal(other.status, 404);
+  // An unreferenced key is never read from the bucket.
+  assert.deepEqual(asked, ["food/photos/photo_1.jpg"]);
+  assert.equal(
+    (await h(req("POST", { action: "bytes", key: "../secret.jpg" }))).status,
+    400,
+  );
+  const signedOut = createFoodJournalMediaHandler(
+    deps(repo(j), { verifySessionToken: () => ({ valid: false }) }),
+  );
+  assert.equal(
+    (await signedOut(req("POST", { action: "bytes", key: "food/photos/photo_1.jpg" }))).status,
+    401,
+  );
+});
 // The page lives on life-hub.adam-russell.com and the API on another host, so
 // Safari reports "Load failed" for any answer that lacks CORS headers.
 test("research start and poll answer the Life Hub origin with CORS headers", async () => {

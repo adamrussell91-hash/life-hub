@@ -764,17 +764,8 @@ export function createFoodJournalView({
     const key = dish.photos?.[0]?.key;
     if (!key) return null;
     try {
-      const cached = photoCache.get(key);
-      const url =
-        cached &&
-        (cached.startsWith("blob:") || (photoExpires.get(key) || 0) > Date.now())
-          ? cached
-          : await signPhoto(key);
-      if (!url) return null;
-      const response = await fetch(url);
-      if (!response.ok) return null;
       const blob = await compressPhoto(
-        new File([await response.blob()], "dish.jpg", { type: "image/jpeg" }),
+        new File([await api.photo(key)], "dish.jpg", { type: "image/jpeg" }),
         1200,
       );
       if (blob.size > MAX_CHAT_IMAGE_BYTES) return null;
