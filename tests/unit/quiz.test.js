@@ -97,6 +97,14 @@ test('question drop: students send questions to the target quiz, capped per devi
   await assert.rejects(reviewSubmission(store, 'quiz1', { submission_id: '../x', status: 'approved' }), /Unknown question/);
 });
 
+test('question drop: a student cannot tag outcomes on their question', async () => {
+  const store = baseStore();
+  await questionDropAction(store, 'lesson1', 'drop1', { action: 'submit', token: token(1), question: { ...mc, outcomes: ['o1', 'o2'] } });
+  const subs = await listSubmissions(store, 'quiz1');
+  assert.equal(subs.length, 1);
+  assert.equal('outcomes' in subs[0].question, false, 'outcomes are the teacher’s to set');
+});
+
 test('question drop refuses targets that are not a quiz in the same unit, paused boxes and closed quizzes', async () => {
   const kinds = baseStore({ dropContent: { kinds: ['true_false'] } });
   await assert.rejects(questionDropAction(kinds, 'lesson1', 'drop1', { action: 'submit', token: token(1), question: mc }), /hasn’t turned on that question type/);
@@ -477,6 +485,78 @@ test('a claimed device needs no device token', async () => {
   assert.ok(started.current);
   const done = await rawQuizAction(store, 'quiz1', { ...me, action: 'submit', responses: {} });
   assert.equal(done.attempts_used, 1);
+});
+
+test('markbook: each student’s first handed-in attempt, scored like Results', async () => {
+  const { classQuizScores } = await import('../../netlify/functions/_shared/quiz.mjs');
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = withClass(baseStore({ quizSettings: { attempts: 3, confidence: true } }));
+  const draft = store.data.get('lessons/quiz1');
+  store.data.set('lessons/quiz1', { ...draft, outcome_ids: ['oLesson'], blocks: draft.blocks.map(b => b.id === 'qb' ? { ...b, content: { question: { ...b.content.question, outcomes: ['oShort'] } } } : b) });
+  await publishQuiz(store);
+  const roster = await loadRoster(store, 'class1');
+  const [bob, tom] = roster.students;
+
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Romeo' }, qc: { text: 'Because fate.' } }, confidence: { qb: 3 } });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: {} });
+  await quizAction(store, 'quiz1', { token: token(7), action: 'start' });
+  await quizAction(store, 'quiz1', { token: token(7), action: 'submit', responses: {} });
+
+  const found = await classQuizScores(store, 'quiz1', 'class1', [bob.id, tom.id]);
+  assert.equal(found.title, 'Week 4 review');
+  assert.equal(found.confidence, true);
+  assert.deepEqual(Object.keys(found.scores), [bob.id], 'Tom never handed in; the anonymous go is not on the list');
+  const first = found.scores[bob.id];
+  assert.match(first.attempt_id, /~0$/, 'the first go counts, not the later one');
+  assert.equal(first.score, 1);
+  assert.equal(first.max, 7);
+  assert.equal(first.pending, 1);
+  const qb = first.rows.find(r => r.id === 'qb');
+  assert.deepEqual(qb, { id: 'qb', awarded: 1, max: 1, confidence: 3, outcomes: ['oShort'] });
+  assert.deepEqual(first.rows.find(r => r.id === 'qa').outcomes, ['oLesson'], 'no outcomes of its own: the lesson’s');
+  assert.deepEqual(found.questions.map(q => q.id), ['qa', 'qb', 'qc']);
+  assert.ok(found.first_at);
+
+  await quizTeacherAction(store, 'quiz1', { action: 'mark', attempt_id: first.attempt_id, question_id: 'qc', score: 3 });
+  const marked = (await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id];
+  assert.equal(marked.score, 4, 'the teacher’s mark counts');
+  assert.equal(marked.pending, 0);
+
+  const owner = first.attempt_id.split('~')[0];
+  store.data.set(`quiz/quiz1/cleared/${owner}`, { from: 1 });
+  assert.match((await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id].attempt_id, /~1$/, 'cleared goes are skipped');
+
+  assert.equal(await classQuizScores(store, 'lesson1', 'class1', [bob.id]), null, 'an ordinary lesson is not a quiz');
+});
+
+test('markbook: a student’s cleared record and first attempt are read in one round trip', async () => {
+  const { classQuizScores } = await import('../../netlify/functions/_shared/quiz.mjs');
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = withClass(baseStore({ quizSettings: { attempts: 3 } }));
+  await publishQuiz(store);
+  const [bob] = (await loadRoster(store, 'class1')).students;
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Romeo' } } });
+  const owner = (await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id].attempt_id.split('~')[0];
+
+  // Each read notes how many reads had finished when it started; reads sent together share a number.
+  const started = new Map();
+  let finished = 0;
+  const get = store.get.bind(store);
+  store.get = async (key) => {
+    started.set(key, finished);
+    await new Promise((r) => setTimeout(r, 1));
+    finished += 1;
+    return get(key);
+  };
+  await classQuizScores(store, 'quiz1', 'class1', [bob.id]);
+  const waves = [`quiz/quiz1/cleared/${owner}`, `quiz/quiz1/attempts/${owner}/0`, `quiz/quiz1/results/${owner}/0`, `quiz/quiz1/marks/${owner}~0`].map((key) => started.get(key));
+  assert.ok(waves.every((w) => w !== undefined), 'all four are read');
+  assert.equal(new Set(waves).size, 1, 'cleared, start, result and marks go out together');
 });
 
 test('give another go clears one student’s attempts; numbering carries on', async () => {
