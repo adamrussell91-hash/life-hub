@@ -1,6 +1,6 @@
 # Gear Shifter Plan 3: The Techniques Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 2 to 6 (one book section each) depend only on Task 1 and on Task 2's registration, so after Task 2 they can run in parallel.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [x]`) syntax for tracking. Tasks 2 to 6 (one book section each) depend only on Task 1 and on Task 2's registration, so after Task 2 they can run in parallel.
 
 **Goal:** Turn all 37 catalogue entries into working Gear Shifter techniques:
 - a small, reusable **importer** (`scripts/book-pack/import.mjs`) that turns a private book pack's entries into tool code, with no anchor text, page text or PDF page numbers;
@@ -23,6 +23,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-22-get-things-done-design.md` ("Catalogue", "Coach knowledge", "Sources and the public-repo rule", decisions 1, 2, 6 and 7).
 **Plan set:** `docs/superpowers/plans/2026-10-22-gear-shifter-plans.md`. Plans 1 and 2 are done; Adam approved Plan 2 on 22 Oct.
+**Status:** done, 22 Oct. Every task ran test-first; see "As run" at the end for what changed on the way.
 **Branch:** `claude/tender-mccarthy-a298ad`, draft PR adamrussell91-hash/life-hub#1047.
 **Before starting:** `npm ci` at the root and in `apps/tasks`. Clone the private pack beside the repo: `life-hub-data` on `main`, `book-packs/get-things-done/`.
 **Public repo rule:** into life-hub go structure labels (the book's short names for stages, axes, cells and groups), the pack's own-words coaching fields and our own rewrites. Never `facts`, `anchor` text, `pages/` text, figures, renders or PDF page numbers. Test fixtures are invented.
@@ -52,7 +53,7 @@
 
 **Files:** create `scripts/book-pack/copy-check.mjs`, `scripts/book-pack/import.mjs`, `tests/unit/book-pack-import.test.js`.
 
-- [ ] **Step 1: Write the failing tests** on an invented pack (`book.prefix: 'zz'`, two sections, a kept list entry with a `facts` anchor, a kept path entry, a variant, a proposed family, a merged entry and a cut entry; the invented page text holds the anchor's sentence).
+- [x] **Step 1: Write the failing tests** on an invented pack (`book.prefix: 'zz'`, two sections, a kept list entry with a `facts` anchor, a kept path entry, a variant, a proposed family, a merged entry and a cut entry; the invented page text holds the anchor's sentence).
 
 ```js
 test('copy check: eight-word runs, case and apostrophes ignored', () => {
@@ -94,17 +95,17 @@ test('importer refuses to emit a copied run', () => {
 });
 ```
 
-- [ ] **Step 2: Run, see them fail.** `node --test tests/unit/book-pack-import.test.js`.
-- [ ] **Step 3: Implement.**
+- [x] **Step 2: Run, see them fail.** `node --test tests/unit/book-pack-import.test.js`.
+- [x] **Step 3: Implement.**
   - `copy-check.mjs`: words as in `check.mjs` (lower case, apostrophes dropped, `[a-z0-9]+`); `shinglesOf`, `copiedRun`, `shippedStrings`; `readPackTexts(dir)` returns every anchor and every page's text; the CLI imports `GEAR_TOOLS`, `CATALOGUE`, `SECTIONS` and the glyph titles and exits 1 naming the first copied run per string.
   - `import.mjs`: `readPack(dir)` → `{ book, entries, pages }` (pages only for the copy check); `importSection` as described above; `toJs(value, indent)` writes single-quoted strings (escaping `\` and `'`, keeping `’`), bare keys where they are identifiers, two-space indents. Steps use a local `step(id, title, prompt)` helper, as Decision Maker's sections do. Export names are camel case of the id. CLI: `node scripts/book-pack/import.mjs <pack-dir> --section <key> --out <file>` refuses to overwrite an existing file without `--force`, and prints the report.
-- [ ] **Step 4: Run the tests**, then commit: `Gear Shifter: the book-pack importer and copy check`.
+- [x] **Step 4: Run the tests**, then commit: `Gear Shifter: the book-pack importer and copy check`.
 
 ### Task 2: Doing things (12), and registration
 
 **Files:** create `packages/get-things-done/tools/doing-things.mjs`, `tools/index.mjs`, `tests/unit/get-things-done-techniques.test.js`; modify `packages/problem-solver/tools/index.mjs`, the three toolkit tests.
 
-- [ ] **Step 1: Write the failing tests.** Integrity tests, written once for all sections and scoped to the sections registered so far (`SECTIONS_DONE`, grown by each task, so each task's commit is green):
+- [x] **Step 1: Write the failing tests.** Integrity tests, written once for all sections and scoped to the sections registered so far (`SECTIONS_DONE`, grown by each task, so each task's commit is green):
 
 ```js
 test('every catalogue entry of a done section has its tool, registered once, in catalogue order', ...);
@@ -140,8 +141,8 @@ And one config test per entry of the section (the book's structure as assertions
 | `gt_paralysis_by_analysis` | list, checklist (lens) | Change your rhythm, Trust your abilities; both before the reflection |
 | `gt_book_of_books` | path, stages | Mark, Review chapter, Summarise book, Store searchable notes, Record reading |
 
-- [ ] **Step 2: Run, see them fail.**
-- [ ] **Step 3: Import and finish.** `node scripts/book-pack/import.mjs ../life-hub-data/book-packs/get-things-done --section doing_things --out packages/get-things-done/tools/doing-things.mjs`, then by hand:
+- [x] **Step 2: Run, see them fail.**
+- [x] **Step 3: Import and finish.** `node scripts/book-pack/import.mjs ../life-hub-data/book-packs/get-things-done --section doing_things --out packages/get-things-done/tools/doing-things.mjs`, then by hand:
   - `gt_kanban`: `kanbanTool({ id: 'gt_kanban', name: 'Kanban', kind: 'plan', step: 'explore', columns: ['todo', 'doing', 'done'], suggestedWip: 3, cardFields: true, … })` with the pack's coaching; its steps name To do, Doing and Done.
   - `gt_five_whys`: `fiveWhysTool({ id: 'gt_five_whys', name: 'The 5 Whys Method', kind: 'diagnostic', step: 'explore', minWhys: 1, evidence: true, … })`.
   - `gt_rapid_prototyping`: New Work folded in as a step (keep the need fixed while the route changes, and show each small result to the people it is for before the next) and a watch-for (saving feedback for the finished version).
@@ -149,7 +150,7 @@ And one config test per entry of the section (the book's structure as assertions
   - `entry` and `item` descriptions in our own words; minimums: Procrastination 4 groups, Paralysis by Analysis 2.
   - `tools/index.mjs` exports `GEAR_TOOLS = Object.freeze({ ...DOING_THINGS })`; `problem-solver/tools/index.mjs` spreads it after `dm_record`; the three toolkit tests skip `gt_`; `problem-solver-machine.test.js` checks that `TOOL_IDS` ends `dm_record`, then the `gt_` ids.
   - `workThrough` gains ratings support now (Task 4 needs it), with a test on the Plan 2 sample.
-- [ ] **Step 4: Run** `node --test tests/unit/*.test.js` and the Problem Solver and Decision Maker vitest suites, then commit: `Gear Shifter: Doing things techniques`.
+- [x] **Step 4: Run** `node --test tests/unit/*.test.js` and the Problem Solver and Decision Maker vitest suites, then commit: `Gear Shifter: Doing things techniques`.
 
 ### Task 3: What to do before you do anything (9)
 
@@ -167,7 +168,7 @@ And one config test per entry of the section (the book's structure as assertions
 | `gt_tactics_versus_strategies` | quadrant | Tactics across, Strategy up; Hot air top left, Walking the walk top right, Labyrinth bottom left, Mindless activity bottom right |
 | `gt_routines` | list, rows | Helpful, Unhelpful and Desired habits; the exercise sets a date to look back, and nothing tracks |
 
-- [ ] Steps as Task 2: tests first, import (`--section before_doing`), finish (Matthew Effect folded into Motivation as a step and a watch-for; Budgeting's formula watch-for, Deep Work's hours watch-for and Routines' tracking exercise rewritten; the stage `tools`), run, commit: `Gear Shifter: What to do before you do anything`.
+- [x] Steps as Task 2: tests first, import (`--section before_doing`), finish (Matthew Effect folded into Motivation as a step and a watch-for; Budgeting's formula watch-for, Deep Work's hours watch-for and Routines' tracking exercise rewritten; the stage `tools`), run, commit: `Gear Shifter: What to do before you do anything`.
 
 ### Task 4: How to get others to do things (7)
 
@@ -181,7 +182,7 @@ And one config test per entry of the section (the book's structure as assertions
 | `gt_brainstorming` | path, stages | Analytic stage, Creative stage, Critical stage |
 | `gt_structured_evaluation` | ratings | up to seven ideas, two or three criteria, raters named; sample SD; equal weights; no winner |
 
-- [ ] Steps as Task 2 (`--section working_with_others`); Structured Evaluation is finished by hand from its notes with `ratingsTool`. Commit: `Gear Shifter: How to get others to do things`.
+- [x] Steps as Task 2 (`--section working_with_others`); Structured Evaluation is finished by hand from its notes with `ratingsTool`. Commit: `Gear Shifter: How to get others to do things`.
 
 ### Task 5: Doing things differently (5)
 
@@ -193,7 +194,7 @@ And one config test per entry of the section (the book's structure as assertions
 | `gt_disruptive_innovation` | list, rows (lens) | Sustaining innovation, Disruptive innovation |
 | `gt_kotter_change` | path, stages | the eight stages in the book's order |
 
-- [ ] Steps as Task 2 (`--section doing_differently`); the 5/25 Rule's attribution watch-for and Kotter's edition watch-for rewritten. Commit: `Gear Shifter: Doing things differently`.
+- [x] Steps as Task 2 (`--section doing_differently`); the 5/25 Rule's attribution watch-for and Kotter's edition watch-for rewritten. Commit: `Gear Shifter: Doing things differently`.
 
 ### Task 6: What to do with the things you have done (4)
 
@@ -204,24 +205,36 @@ And one config test per entry of the section (the book's structure as assertions
 | `gt_journalling` | path, stages | Review the day, Record three good things, Repeat each evening |
 | `gt_reversed_effort` | path, stages (lens) | Notice counterproductive effort, Step away, Reassess later |
 
-- [ ] Steps as Task 2 (`--section reviewing`); the Transactional Model is finished by hand with `scalesTool`; Project Evaluation's "the book requires" step rewritten. Commit: `Gear Shifter: What to do with the things you have done`.
+- [x] Steps as Task 2 (`--section reviewing`); the Transactional Model is finished by hand with `scalesTool`; Project Evaluation's "the book requires" step rewritten. Commit: `Gear Shifter: What to do with the things you have done`.
 
 ### Task 7: Every technique drawn, and the copy check
 
 **Files:** create `apps/tasks/tests/unit/get-things-done-techniques-render.test.ts`, `tests/unit/get-things-done-copy.test.js`; modify `packages/get-things-done/contact-sheet.ts`.
 
-- [ ] **Step 1: Write the tests.** For every `gt_` tool: `createGearChartForTool` draws it empty, then a `workThrough` run completed, with every node drawn (Decision Book charts by `.dm-entry[data-node]`; the variants by their own node selectors). The copy test runs `shippedStrings` over `GEAR_TOOLS`, the catalogue and the glyph titles against the pack, skipping without it.
-- [ ] **Step 2: Run** (the copy check runs here, with the pack present), fix anything they find.
-- [ ] **Step 3: Contact sheet.** Add a "Techniques" part: each technique by section, worked to completion. Build, screenshot at 1280px and 390px, check no label under 11px and nothing overflowing. Commit: `Gear Shifter: every technique drawn and checked`.
+- [x] **Step 1: Write the tests.** For every `gt_` tool: `createGearChartForTool` draws it empty, then a `workThrough` run completed, with every node drawn (Decision Book charts by `.dm-entry[data-node]`; the variants by their own node selectors). The copy test runs `shippedStrings` over `GEAR_TOOLS`, the catalogue and the glyph titles against the pack, skipping without it.
+- [x] **Step 2: Run** (the copy check runs here, with the pack present), fix anything they find.
+- [x] **Step 3: Contact sheet.** Add a "Techniques" part: each technique by section, worked to completion. Build, screenshot at 1280px and 390px, check no label under 11px and nothing overflowing. Commit: `Gear Shifter: every technique drawn and checked`.
 
 ### Task 8: Plan 3 check
 
-- [ ] `node --test tests/unit/*.test.js` green; in `apps/tasks`, `npx vitest run` green; no new type errors in these paths.
-- [ ] `node scripts/book-pack/copy-check.mjs ../life-hub-data/book-packs/get-things-done` exits 0.
-- [ ] `npm run pre-pr-check` exits 0.
-- [ ] The plan set's status table says Plan 3 is done; push; the PR stays draft; stop for Adam before Plan 4.
+- [x] `node --test tests/unit/*.test.js` green; in `apps/tasks`, `npx vitest run` green; no new type errors in these paths.
+- [x] `node scripts/book-pack/copy-check.mjs ../life-hub-data/book-packs/get-things-done` exits 0.
+- [x] `npm run pre-pr-check` exits 0.
+- [x] The plan set's status table says Plan 3 is done; push; the PR stays draft; stop for Adam before Plan 4.
 
 ## Notes for later plans
 
 - Plan 4: the per-technique notes for the coach come straight from these definitions (`when`, steps, `failureModes`, `exercise`, slots and minimums); the catalogue lines from `catalogue.mjs`. Review opens `gt_project_evaluation`. Gear Shifter's commit tool uses step `'commit'`.
 - Plan 5: Getting a Project Done's stage `tools` become the stations' links; the shelf reads `GEAR_TOOLS` through `toolsForPlanStep('gear_shifter', 'explore')`.
+
+## As run (22 Oct)
+
+- Every task ran test-first and ended with a commit (one per section). Tests added: 8 importer and copy-check tests (`book-pack-import.test.js`), 47 technique tests (`get-things-done-techniques.test.js`: 9 integrity and driver tests, then one per entry and a count), 2 copy tests (`get-things-done-copy.test.js`, the second skipping without the pack), 1 list-family test, and 38 renderer tests (`get-things-done-techniques-render.test.ts`). Problem Solver's and Decision Maker's suites pass, with three toolkit tests now skipping `gt_` as they skip `dm_`.
+- `node scripts/book-pack/copy-check.mjs` against the pack: no copied runs.
+- **The importer** first named a merged entry in its source section's file (New Work sits in the pack's Before section); it now names it beside its home, whichever section it came from.
+- **The list family gained a per-group `max`** (default `perGroup`, so every existing tool is unchanged), so the 5/25 Rule holds Group A to five.
+- **Motivation's** pack entry listed the merged Matthew Effect under `pairsWell`; it is dropped, matching the catalogue. The integrity test caught it.
+- **Builder-facing lines** rewritten for the person: Pomodoro's "four rounds", Paralysis by Analysis's "odds", Budgeting's formula, Deep Work's hours, the 5/25 Rule's attribution, Disruptive Innovation's examples, Kotter's edition and Project Evaluation's "the book requires"; Kanban's steps name To do, Doing and Done; Routines' exercise sets a date to look back instead of tracking.
+- **Every list and quadrant** has its own `entry` or `item` line in place of the pack's generic one, and its own minimum (Procrastination 4 groups, Project Evaluation 3, Budgeting and Paralysis by Analysis 2, the one-entry lenses Appreciation, Sandwich Feedback and Small Gifts).
+- **The contact sheet** showed the Transactional Model's dated legend reading "work-through": the driver stamped scores with that word. It now stamps a fixed date. Problem Solver's Kanban and 5 Whys draw nothing for an empty run (unchanged from Problem Solver), so the empty-frame check covers the Decision Book charts only.
+- Family-built techniques keep the factories' default `kind` (`'decision'`); Plan 4 decides whether Gear Shifter's coach needs its own.
