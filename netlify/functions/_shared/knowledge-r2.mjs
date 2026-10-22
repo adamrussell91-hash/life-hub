@@ -52,6 +52,17 @@ export async function knowledgePutObject(env, { key, body, contentType, putObjec
   );
 }
 
+// Reads from the function, for server-side copies between namespaces.
+export async function knowledgeGetObject(env, { key, getObject } = {}) {
+  const config = knowledgeR2Config(env);
+  if (!config) throw knowledgeR2Unbound();
+  if (typeof getObject === 'function') return getObject({ ...config, key });
+  const { GetObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const client = new S3Client(knowledgeR2ClientOptions(config));
+  const out = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+  return Buffer.from(await out.Body.transformToByteArray());
+}
+
 export async function knowledgePresignGet(env, { key, signGet, expiresIn = 300 } = {}) {
   const config = knowledgeR2Config(env);
   if (!config) throw knowledgeR2Unbound();
