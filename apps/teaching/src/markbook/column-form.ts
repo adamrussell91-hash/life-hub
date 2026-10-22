@@ -197,7 +197,11 @@ export function openColumnForm(o: ColumnFormOptions): HTMLElement {
     del.addEventListener('click', async () => {
       if (saving) return;
       const sure = await askConfirmCard({ title: `Delete ${existing.title} and every mark in it?`, confirmLabel: 'Delete column' });
-      if (!sure || !overlay.isConnected) return;
+      if (!overlay.isConnected) return;
+      if (!sure) {
+        del.focus();
+        return;
+      }
       close();
       o.onDelete?.();
     });

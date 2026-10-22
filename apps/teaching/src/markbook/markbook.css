@@ -63,3 +63,9 @@ span.mb-cell { display: inline-block; cursor: default; }
 @media (max-width: 600px) {
   .mb-form__input { font-size: max(16px, 1em); }
 }
+
+.mb-panel__task { margin: 0; color: var(--muted); font-weight: var(--weight-semibold); }
+.mb-panel__student { margin: 0; font: 700 var(--text-lg) / 1.2 var(--font-ui); }
+.mb-panel__row { display: grid; grid-template-columns: 1fr 7ch 8ch; align-items: center; gap: var(--space-2); }
+.mb-panel__band { font-weight: var(--weight-semibold); color: var(--marine); }
+.mb-panel__exempt-row { display: flex; align-items: center; gap: var(--space-2); }

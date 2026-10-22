@@ -177,6 +177,7 @@ describe('column form', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(onDelete).not.toHaveBeenCalled();
     expect(document.body.contains(root)).toBe(true);
+    expect(document.activeElement).toBe(root.querySelector('.mb-form__delete'));
     vi.mocked(askConfirmCard).mockResolvedValueOnce(true);
     root.querySelector<HTMLButtonElement>('.mb-form__delete')!.click();
     await vi.waitFor(() => expect(onDelete).toHaveBeenCalled());

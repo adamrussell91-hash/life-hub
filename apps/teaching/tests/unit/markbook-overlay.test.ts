@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openOverlay } from '@/markbook/overlay';
 
 afterEach(() => document.body.replaceChildren());
@@ -80,5 +80,63 @@ describe('overlay', () => {
     opener.remove();
     two.close();
     expect(document.activeElement).toBe(fallback);
+  });
+
+  it('still handles Escape and Tab after focus leaves the content, for example a backdrop click', () => {
+    const { content, first } = panel();
+    const { overlay } = openOverlay(content, {});
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+    key(document.body, 'Tab');
+    expect(document.activeElement).toBe(first);
+    first.blur();
+    key(document.body, 'Escape');
+    expect(document.body.contains(overlay)).toBe(false);
+  });
+
+  it('stops listening once closed', () => {
+    const { content } = panel();
+    const canClose = vi.fn(() => true);
+    const { close } = openOverlay(content, { canClose });
+    close();
+    key(document.body, 'Escape');
+    expect(canClose).not.toHaveBeenCalled();
+  });
+
+  it('ignores keys meant for another dialog, such as a confirm card', () => {
+    const { content } = panel();
+    const { overlay } = openOverlay(content, {});
+    const card = document.createElement('button');
+    document.body.append(card);
+    card.focus();
+    key(card, 'Escape');
+    expect(document.body.contains(overlay)).toBe(true);
+  });
+
+  it('keeps the page inert while a later overlay is still open', () => {
+    const page = document.createElement('main');
+    document.body.append(page);
+    const a = openOverlay(panel().content, {});
+    const b = openOverlay(panel().content, {});
+    expect(a.overlay.hasAttribute('inert')).toBe(true);
+    a.close();
+    expect(page.hasAttribute('inert')).toBe(true);
+    expect(b.overlay.hasAttribute('inert')).toBe(false);
+    b.close();
+    expect(page.hasAttribute('inert')).toBe(false);
+  });
+
+  it('only the top overlay answers Escape, and closing it wakes the one under it', () => {
+    const page = document.createElement('main');
+    document.body.append(page);
+    const a = openOverlay(panel().content, {});
+    const b = openOverlay(panel().content, {});
+    key(document.body, 'Escape');
+    expect(document.body.contains(b.overlay)).toBe(false);
+    expect(document.body.contains(a.overlay)).toBe(true);
+    expect(a.overlay.hasAttribute('inert')).toBe(false);
+    expect(page.hasAttribute('inert')).toBe(true);
+    a.close();
+    expect(page.hasAttribute('inert')).toBe(false);
   });
 });
