@@ -100,10 +100,12 @@ export function taskCard(prompt: string): HTMLElement {
   const { steps, criteria } = parseTask(prompt);
   const card = el('div', 'pf-task');
 
-  const list = el('ol', 'pf-task__steps');
+  // A single step is the whole question, not step 1 of 1: no number.
+  const numbered = steps.length > 1;
+  const list = el('ol', numbered ? 'pf-task__steps' : 'pf-task__steps pf-task__steps--single');
   steps.forEach((step, i) => {
     const item = el('li', 'pf-task__step');
-    item.append(el('span', 'pf-task__num', `${i + 1}.`));
+    if (numbered) item.append(el('span', 'pf-task__num', `${i + 1}.`));
     const body = el('div', 'pf-task__body');
     const line = el('p', 'pf-task__text block-body');
     const meaning = step.verb ? verbMeaning(step.verb) : null;
