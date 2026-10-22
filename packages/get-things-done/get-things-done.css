@@ -128,3 +128,47 @@
   .gt-review__loop { gap: 22px; }
   .gt-review__loop::before { left: 50%; right: auto; top: 0; bottom: 0; height: auto; width: 0; border: 0; border-left: 3px dotted var(--gt-blue); border-radius: 0; }
 }
+
+/* ------------------------------------------------------------------ Quick start's route (render/quick.ts)
+   The first action is the target; the dart flies in once a way to start is picked. The stations
+   sit on a dotted cobalt line; the one waiting for an answer is dashed and says "Now". */
+.gt-qs { display: grid; gap: 16px; min-width: 0; color: var(--gt-ink); }
+.gt-qs [hidden] { display: none !important; }
+.gt-qs__rounds { margin: 0; font: 600 12px / 1.4 var(--font-ui, sans-serif); color: var(--gt-muted); }
+.gt-qs__hit { display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr); gap: 16px; align-items: center; padding: 14px 16px; border-radius: 18px; border: 1.5px solid var(--gt-line); background: var(--gt-paper); }
+.gt-qs__art { width: 100%; height: auto; display: block; overflow: visible; }
+.gt-qs__mark, .gt-qs__dart { opacity: 0; transition: opacity 0.3s var(--gt-ease), transform 0.5s var(--gt-spring); }
+.gt-qs__dart { transform: translate(-40px, 20px); }
+.gt-qs[data-way] .gt-qs__dart { opacity: 1; transform: none; }
+.gt-qs[data-way='countdown'] .gt-qs__mark--countdown, .gt-qs[data-way='interval'] .gt-qs__mark--interval { opacity: 1; }
+.gt-qs__hit-text { display: grid; gap: 6px; min-width: 0; }
+.gt-qs__kicker { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--gt-red-label); }
+.gt-qs__action { margin: 0; font: 700 18px / 1.35 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
+.gt-qs__action[data-empty] { font-weight: 600; font-size: 15px; color: var(--gt-muted); }
+.gt-qs__way { margin: 0; font: 400 14px / 1.45 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
+.gt-qs__route { list-style: none; margin: 0; padding: 0; display: grid; }
+.gt-qs__stn { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; padding-bottom: 18px; }
+.gt-qs__stn:not(:last-child)::before { content: ''; position: absolute; left: 11px; top: 28px; bottom: 2px; border-left: 3px dotted var(--gt-blue); }
+.gt-qs__disc { width: 26px; height: 26px; box-sizing: border-box; border-radius: 50%; border: 3px solid var(--gt-blue); background: var(--gt-paper); }
+.gt-qs__stn[data-done] .gt-qs__disc { background: var(--gt-blue); }
+.gt-qs__stn[data-box='action'][data-done] .gt-qs__disc { border-color: var(--gt-red); background: var(--gt-red); }
+.gt-qs__stn[data-box='check'][data-done] .gt-qs__disc { border-color: var(--gt-amber); background: var(--gt-amber); }
+.gt-qs__stn[data-now] .gt-qs__disc { border-style: dashed; border-color: var(--gt-ink); }
+.gt-qs__stn:not([data-done]):not([data-now]) .gt-qs__label { color: var(--gt-muted); }
+.gt-qs__label { font: 600 14px / 1.4 var(--font-ui, sans-serif); min-width: 0; overflow-wrap: anywhere; }
+.gt-qs__now { padding: 0 10px; border-radius: 999px; background: var(--gt-ink); color: var(--gt-paper); font: 700 11px / 1.8 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; }
+.gt-qs__text { grid-column: 2 / -1; margin: 0; font: 400 13px / 1.45 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
+.gt-qs__ask { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.gt-qs__pick { min-height: 44px; padding: 0 16px; border: 2px solid var(--gt-blue-label); border-radius: 999px; background: var(--gt-paper); color: var(--gt-blue-deep); font: 600 14px / 1 var(--font-ui, sans-serif); cursor: pointer; }
+.gt-qs__pick[data-way='interval'] { border-color: var(--gt-ink); color: var(--gt-ink); }
+.gt-qs__pick:hover { background: var(--gt-blue-tint); }
+.gt-qs__pick:focus-visible { outline: 2px solid var(--gt-ink); outline-offset: 2px; }
+.gt-qs__pick[aria-disabled='true'] { opacity: 0.5; cursor: default; }
+.gt-qs__credit { margin: 0; font: 400 12px / 1.45 var(--font-ui, sans-serif); color: var(--gt-muted); }
+@media (max-width: 480px) {
+  .gt-qs__hit { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+  .gt-qs__art { max-width: 180px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gt-qs__mark, .gt-qs__dart { transition: none; }
+}
