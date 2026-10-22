@@ -107,6 +107,9 @@ describe('decor', () => {
     expect(plainName('gt_pomodoro')).toBe('Pomodoro Technique');
     expect(plainName('gt_commit')).toBe('Experiment');
     expect(GT_LOOK.emblem('gt_pomodoro').classList.contains('gt-emblem')).toBe(true);
+    // Commit's and Review's own tools have marks of their own, not the book's emblem.
+    expect(GT_LOOK.emblem('gt_review').querySelector('circle[fill="var(--gt-amber)"]')).not.toBeNull();
+    expect(GT_LOOK.emblem('gt_commit').querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 100 100');
   });
 });
 
