@@ -54,6 +54,12 @@ vi.mock('@/api/people-directory', () => ({
     they_owe: [], you_owe_count: 0, they_owe_count: 0, open_item_count: 0
   }))
 }));
+vi.mock('@/api/network-ecology', () => ({
+  fetchSelfPerson: vi.fn(async () => ({
+    self: { ref: 'shared:person:me', display_name: 'Sam Writer' },
+    workplaces: [{ ref: 'o', display_name: 'HALT NSW' }]
+  }))
+}));
 vi.mock('@/api/ledger', () => ({
   listLedgerForSources: vi.fn(async () => ({ items: [] })),
   createLedgerItem: vi.fn(async (body: object) => ({ item: { id: 'l', status: 'open', ...body }, created: true })),
@@ -87,7 +93,7 @@ vi.mock('@/components/block-page', () => ({
 import { renderMeetingPage } from '@/views/meeting-page';
 import { mountBlockPage } from '@/components/block-page';
 import { meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
-import { createUniversalLink, endUniversalLink } from '@/api/universal-links';
+import { createUniversalLink, endUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
 
 describe('meeting page', () => {
   beforeEach(() => {
@@ -174,6 +180,22 @@ describe('meeting page', () => {
       target_ref: 'shared:person:ben', role: null, metadata: { organisation_ref: 'club' }
     }));
     expect(headings()).toContain('Greyhounds');
+  });
+
+  it('knows you: your workplaces pull a two-job colleague into your shared organisation', async () => {
+    vi.mocked(listUniversalLinksForEntity).mockResolvedValueOnce({ outgoing: [
+      { link: { id: 'a2', source_ref: MEETING_REF, target_ref: 'shared:person:ben', relationship_type: 'attendee', role: null, status: 'current' },
+        endpoint: { ref: 'shared:person:ben', kind: 'person', display_label: 'Ben C.', href: null }, direction: 'outgoing' },
+      { link: { id: 'a4', source_ref: MEETING_REF, target_ref: 'shared:person:me-copy', relationship_type: 'attendee', role: 'chair', status: 'current' },
+        endpoint: { ref: 'shared:person:me-copy', kind: 'person', display_label: 'Sam Writer', href: null }, direction: 'outgoing' }
+    ], incoming: [] });
+    const canvas = await render();
+    const groups = [...canvas.querySelectorAll('.room__org')];
+    expect(groups.map((group) => group.querySelector('.room__org-name')!.textContent)).toEqual(['HALT NSW']);
+    const room = canvas.querySelector('[data-part="room"]')!;
+    expect(room.textContent).toContain('You');
+    expect(room.textContent).not.toContain('Add to People');
+    expect(room.textContent).not.toContain('No organisation yet');
   });
 
   it('the add row puts the role choice before the field, like the task panels', async () => {

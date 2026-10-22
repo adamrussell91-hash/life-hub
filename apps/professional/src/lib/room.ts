@@ -10,6 +10,8 @@ export type RoomPerson = {
   /** False when neither the People directory nor its Students list knows this person. */
   known: boolean;
   student: boolean;
+  /** The operator themself. */
+  self: boolean;
   /** The organisation this person is grouped under for this meeting. */
   organisationRef: string | null;
   /** Their current organisations when there is more than one to choose from. */
@@ -18,8 +20,8 @@ export type RoomPerson = {
 export type RoomOrganisation = { ref: string; display_name: string; monogram: string };
 export type RoomCluster = { organisation: string | null; monogram: string | null; people: RoomPerson[] };
 
-type DirectoryLike = Pick<DirectoryPersonRow, 'ref' | 'display_name' | 'initials' | 'organisation' | 'warmth_band' | 'created_at'> &
-  Partial<Pick<DirectoryPersonRow, 'person_type' | 'organisations'>>;
+export type RoomDirectoryRow = Pick<DirectoryPersonRow, 'ref' | 'display_name' | 'initials' | 'organisation' | 'warmth_band' | 'created_at'> &
+  Partial<Pick<DirectoryPersonRow, 'person_type' | 'organisations'>> & { is_self?: boolean };
 
 const DOTS: Record<DirectoryPersonRow['warmth_band'], 1 | 2 | 3> = { warm: 3, cooling: 2, cold: 1 };
 const NEW_MS = 14 * 86_400_000;
@@ -38,7 +40,7 @@ export function initialsFor(name: string): string {
  * The directory row for an attendee: by ref, else by name when exactly one row
  * carries it (a Blob copy of an imported student has its own id but the same name).
  */
-export function directoryRowFor<T extends Pick<DirectoryLike, 'ref' | 'display_name'>>(
+export function directoryRowFor<T extends Pick<RoomDirectoryRow, 'ref' | 'display_name'>>(
   attendee: { ref: string; name?: string | null },
   byRef: Map<string, T>,
   byName: Map<string, T[]>
@@ -49,7 +51,7 @@ export function directoryRowFor<T extends Pick<DirectoryLike, 'ref' | 'display_n
   return matches.length === 1 ? matches[0]! : null;
 }
 
-export function indexDirectory<T extends Pick<DirectoryLike, 'ref' | 'display_name'>>(directory: T[]): {
+export function indexDirectory<T extends Pick<RoomDirectoryRow, 'ref' | 'display_name'>>(directory: T[]): {
   byRef: Map<string, T>;
   byName: Map<string, T[]>;
 } {
@@ -64,7 +66,7 @@ export function indexDirectory<T extends Pick<DirectoryLike, 'ref' | 'display_na
 }
 
 /** A person's current organisations, their main one first. */
-function currentOrganisations(row: DirectoryLike): RoomOrganisation[] {
+function currentOrganisations(row: RoomDirectoryRow): RoomOrganisation[] {
   const list: RoomOrganisation[] = [];
   const add = (org: { ref: string; display_name: string; monogram: string } | null | undefined) => {
     if (org && !list.some((entry) => entry.ref === org.ref)) list.push({ ref: org.ref, display_name: org.display_name, monogram: org.monogram });
@@ -79,7 +81,7 @@ function currentOrganisations(row: DirectoryLike): RoomOrganisation[] {
  * organisation most others in the room share, else their main one.
  */
 function organisationFor(
-  row: DirectoryLike,
+  row: RoomDirectoryRow,
   picked: string | null | undefined,
   shared: Map<string, number>
 ): RoomOrganisation | null {
@@ -109,7 +111,7 @@ function organisationFor(
  */
 export function groupRoom(
   attendees: Array<{ ref: string; role: string | null; name?: string | null; organisationRef?: string | null }>,
-  directory: DirectoryLike[],
+  directory: RoomDirectoryRow[],
   now: Date
 ): RoomCluster[] {
   const { byRef, byName } = indexDirectory(directory);
@@ -136,6 +138,7 @@ export function groupRoom(
       isNew: row ? now.getTime() - Date.parse(row.created_at) <= NEW_MS : false,
       known: Boolean(row),
       student: row?.person_type === 'student',
+      self: row?.is_self === true,
       organisationRef: org?.ref ?? null,
       organisationChoices: row ? currentOrganisations(row) : []
     });
