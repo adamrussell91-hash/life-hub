@@ -1,8 +1,15 @@
 import { getJournal, rememberJournalEnvelope, type JournalDocument } from '@/api/journal';
 import { deleteTravelMeal, getTravelMeal, putTravelMeal } from '@/api/travel-meal';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
-import { isJournalSaveConflict } from '@/journal/conflict-resolve';
-import { canBeMeal, mealPayload, mountMealSection, type MealSectionHandle } from '@/journal/meal-section';
+import {
+  canBeMeal,
+  MEAL_MESSAGES,
+  mealPayload,
+  mountMealSection,
+  saveErrorMessage,
+  type MealSectionHandle,
+} from '@/journal/meal-section';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import { searchPlaces } from '@/api/travel';
 import type { JournalCoordinates, JournalMoment, JournalPlace } from '@/journal/types';
 import { openPinEditor } from '@/journal/pin-editor';
@@ -31,6 +38,11 @@ export function patchMomentInJournal(
   };
 }
 
+/** JSON drops undefined fields, the same way the save does. */
+export function samePatch(a: Partial<JournalMoment> | null, b: Partial<JournalMoment>): boolean {
+  return a !== null && JSON.stringify(a) === JSON.stringify(b);
+}
+
 function isFixtureVersion(version: string): boolean {
   return version === 'fixture';
 }
@@ -41,6 +53,8 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   const moment = options.moment;
   let journal = options.journal;
   let version = options.version;
+  // A retry after a failed meal call skips the moment save it already made.
+  let savedPatch: Partial<JournalMoment> | null = null;
   let text = moment.text ?? '';
   let localDate = moment.local_date;
   let localTime = moment.local_time ?? '';
@@ -387,20 +401,27 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       return;
     }
 
+    let step: 'moment' | 'meal' = 'moment';
     try {
       // The ordinary save never touches the meal; the meal call follows on its version.
-      const envelope = await persistJournalPatch(options.tripId, version, nextJournal);
-      journal = envelope.journal;
-      version = envelope.version;
-      options.onSaved?.(envelope);
+      if (!samePatch(savedPatch, patch)) {
+        const envelope = await persistJournalPatch(options.tripId, version, nextJournal);
+        journal = envelope.journal;
+        version = envelope.version;
+        options.onSaved?.(envelope);
+        if (envelope.queued) {
+          if (mealOn || mealOff) showHubToast(MEAL_MESSAGES.queued);
+          dirty = false;
+          finishClose();
+          return;
+        }
+        savedPatch = patch;
+      }
       if (!mealOn && !mealOff) {
         finishClose();
         return;
       }
-      if (envelope.queued) {
-        fail('Could not save. Try again.');
-        return;
-      }
+      step = 'meal';
       const versions = { travel_version: version, food_version: mealNow!.foodVersion };
       const result = mealOn
         ? await putTravelMeal(options.tripId, moment.id, mealPayload(mealState!, versions))
@@ -411,18 +432,11 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       journal = after.journal;
       version = after.version;
       options.onSaved?.(after);
-      if (result.photo_failed) {
-        dirty = false;
-        fail("Saved. The photo didn't copy; open again to retry.");
-        return;
-      }
+      dirty = false;
       finishClose();
+      if (result.photo_failed) showHubToast(MEAL_MESSAGES.photoFailed);
     } catch (err) {
-      fail(
-        isJournalSaveConflict(err)
-          ? 'Your journal changed on another device. Reload before saving.'
-          : 'Could not save. Try again.',
-      );
+      fail(saveErrorMessage(err, step));
     }
   }
 

@@ -7,7 +7,7 @@ import type {
   JournalMoment,
 } from '@/journal/types';
 import { offerTimedUndo, showHubToast } from '../../design-kit/js/hub-feedback.js';
-import { persistJournalPatch } from '@/journal/journal-sheet-save';
+import { persistJournalPatch, type PersistedJournal } from '@/journal/journal-sheet-save';
 import {
   applySouvenirDeleteForMoment,
   applySouvenirRestoreForMoment,
@@ -461,8 +461,19 @@ export async function commitJournalDelete(
   tripId: string,
   version: string,
   journal: JournalDocument,
-): Promise<{ journal: JournalDocument; version: string }> {
+): Promise<PersistedJournal> {
   return persistJournalPatch(tripId, version, journal);
+}
+
+// Offline, the server removes the visit when the queued delete arrives.
+export function momentDeletedMessage(label: string, opts: { meal: boolean; queued: boolean }): string {
+  if (!opts.meal) return `Deleted “${label}”`;
+  if (opts.queued) return `Deleted “${label}”. The Food Journal visit goes when you’re back online.`;
+  return `Deleted “${label}” and its Food Journal visit`;
+}
+
+export function momentRestoredMessage(label: string): string {
+  return `Restored “${label}” without its meal.`;
 }
 
 export function runMomentDeleteWithUndo(options: {
@@ -479,7 +490,7 @@ export function runMomentDeleteWithUndo(options: {
   // The server deletes a meal moment's Food Journal visit in the same commit.
   // Undo brings the moment back but not the visit.
   void (async () => {
-    let saved: { journal: JournalDocument; version: string };
+    let saved: PersistedJournal;
     try {
       saved = await commitJournalDelete(
         options.tripId,
@@ -492,9 +503,10 @@ export function runMomentDeleteWithUndo(options: {
     }
     options.onSaved(saved);
     offerTimedUndo({
-      message: linked
-        ? `Deleted “${options.momentLabel}” and its Food Journal visit`
-        : `Deleted “${options.momentLabel}”`,
+      message: momentDeletedMessage(options.momentLabel, {
+        meal: Boolean(linked),
+        queued: Boolean(saved.queued),
+      }),
       durationMs: JOURNAL_UNDO_MS,
       onUndo: () => {
         void (async () => {
@@ -502,6 +514,8 @@ export function runMomentDeleteWithUndo(options: {
             const restored = applyRestore(saved.journal, target);
             const undone = await commitJournalDelete(options.tripId, saved.version, restored);
             options.onSaved(undone);
+            // A queued delete never reached the server, so the meal is still there.
+            if (linked && !saved.queued) showHubToast(momentRestoredMessage(options.momentLabel));
           } catch {
             showHubToast('Could not undo. The moment is in Trash — restore it from there.', {
               tone: 'danger',
