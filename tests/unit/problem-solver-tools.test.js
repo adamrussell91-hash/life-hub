@@ -65,8 +65,9 @@ test('smart: problem, then the five letters in any order', () => {
 });
 
 test('every toolkit tool names its book step and at least two failure modes', () => {
-  // Decision Maker's models (dm_) step through explore; decision-book-models.test.js checks them.
-  for (const tool of Object.values(TOOLS).filter((def) => !def.id.startsWith('dm_'))) {
+  // Decision Maker's models (dm_) and Gear Shifter's techniques (gt_) step through explore;
+  // decision-book-models.test.js and get-things-done-techniques.test.js check them.
+  for (const tool of Object.values(TOOLS).filter((def) => !def.id.startsWith('dm_') && !def.id.startsWith('gt_'))) {
     assert.ok(BOOK_STEP_IDS.includes(tool.step), `${tool.id}.step`);
     assert.ok(Array.isArray(tool.failureModes) && tool.failureModes.length >= 2, `${tool.id}.failureModes`);
     for (const line of tool.failureModes) assert.equal(typeof line, 'string');
