@@ -341,12 +341,15 @@ export function createFoodJournalView({
       );
     });
   }
-  async function persist(next, { quiet = false, removeMeals = [] } = {}) {
+  async function persist(
+    next,
+    { quiet = false, removeMeals = [], clearRecount = [] } = {},
+  ) {
     if (busy) throw new Error("A save is already running.");
     busy = true;
     const token = epoch;
     try {
-      const value = await api.save(next, version, removeMeals);
+      const value = await api.save(next, version, removeMeals, clearRecount);
       if (token !== epoch)
         throw new Error("Your session changed. Sign in again.");
       journal = value.journal;
@@ -668,11 +671,26 @@ export function createFoodJournalView({
       return [
         el("span", "hub-chip food-counted", "Counted in Brisket · needs a re-count"),
         button("Re-count", open, "primary"),
+        button("Keep old numbers", (e) => keepOldNumbers(dish, e.currentTarget), "ghost"),
       ];
     return [
       el("span", "hub-chip food-counted", `Counted in Brisket · ${dish.brisket.portion}`),
       button("Change portion", open),
     ];
+  }
+  // The server clears the flag only while the dish matches what was counted.
+  async function keepOldNumbers(dish, trigger) {
+    trigger.disabled = true;
+    try {
+      const next = structuredClone(journal);
+      const d = next.visits.flatMap((v) => v.dishes).find((x) => x.id === dish.id);
+      if (d?.brisket) d.brisket.needs_recount = false;
+      await persist(next, { clearRecount: [dish.id] });
+    } catch (err) {
+      showHubToast(err.message);
+    } finally {
+      trigger.disabled = false;
+    }
   }
   // How much of the dish was eaten, then the hand-off goes to Brisket's chat.
   function openPortion(visit, dish, trigger) {

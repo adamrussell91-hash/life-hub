@@ -1349,6 +1349,27 @@ for (const width of [1440, 390]) {
     await page.close();
   });
 }
+test("brisket: Keep old numbers clears a re-count without a hand-off", async () => {
+  const { page, read, errors } = await pageFor(390, {
+    seed: (j) => countedDish(j, { brisket: brisketLink({ needs_recount: true }) }),
+  });
+  const sent = await mockChat(page);
+  const puts = [];
+  page.on("request", (r) => {
+    if (r.url().endsWith("/api/food-journal") && r.method() === "PUT")
+      puts.push(JSON.parse(r.postData()));
+  });
+  await page.getByRole("tab", { name: "Custom Menu" }).click();
+  const card = lasagneCard(page);
+  await card.getByRole("button", { name: "Keep old numbers", exact: true }).click();
+  await card.getByText("Counted in Brisket · ½", { exact: true }).waitFor();
+  assert.deepEqual(puts.at(-1).clear_recount, [read().visits[0].dishes[0].id]);
+  assert.equal(read().visits[0].dishes[0].brisket.needs_recount, false);
+  assert.equal(read().visits[0].dishes[0].brisket.calories, 640);
+  assert.equal(sent.length, 0);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
 async function expectSent(sent, n) {
   for (let i = 0; i < 50 && sent.length < n; i++)
     await new Promise((r) => setTimeout(r, 100));
