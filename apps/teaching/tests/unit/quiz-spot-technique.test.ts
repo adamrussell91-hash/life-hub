@@ -195,22 +195,48 @@ describe('spot the technique', () => {
     expect(chips()).toHaveLength(3);
   });
 
-  it('keeps a technique on offer when the teacher allows it twice, and asks for that when two answers need it', () => {
+  it('offers a technique as many times as the teacher set, and asks for ×2 when two answers need it', () => {
+    const options = [
+      { id: 'per', text: 'Personification' },
+      { id: 'met', text: 'Metaphor' },
+      { id: 'sim', text: 'Simile' }
+    ];
     const twice = {
+      options,
       targets: [
         { id: 't1', quote: 'The wind whispered', correct: ['per'] },
         { id: 't2', quote: 'the city slept', correct: ['per'] }
       ]
     } as Partial<QuizQuestion>;
-    expect(checkQuestion(question(twice))).toEqual({
-      ok: false,
-      message: 'Two answers need the same technique. Turn on “A technique can be used more than once”.'
-    });
+    expect(checkQuestion(question(twice))).toEqual({ ok: false, message: 'Personification is the answer 2 times. Set it to ×2.' });
     expect(checkQuestion(question({ ...twice, find: 1 } as Partial<QuizQuestion>)).ok).toBe(true);
-    const { pub, id } = setUp({ ...twice, reuse: true } as Partial<QuizQuestion>);
-    const response = { spots: [{ ...locateQuote(PASSAGE, 'wind whispered')!, option: id('Personification') }] };
-    const root = mountQuestionPlayer({ question: pub, response });
-    root.querySelectorAll<HTMLButtonElement>('.qz-word')[locateQuote(PASSAGE, 'city')!.from]!.click();
-    expect([...root.querySelectorAll('.qz-spot-pick .qz-chip')].map((b) => b.textContent)).toContain('Personification');
+    const counted = { ...twice, options: options.map((o) => (o.id === 'per' ? { ...o, uses: 2 } : o)) } as Partial<QuizQuestion>;
+    expect(checkQuestion(question(counted)).ok).toBe(true);
+
+    const { pub, id } = setUp(counted);
+    const chipsAfter = (spots: Array<[string, string]>) => {
+      const response = { spots: spots.map(([phrase, name]) => ({ ...locateQuote(PASSAGE, phrase)!, option: id(name) })) };
+      const root = mountQuestionPlayer({ question: { ...pub, pick: 3 }, response });
+      root.querySelectorAll<HTMLButtonElement>('.qz-word')[locateQuote(PASSAGE, 'heavy')!.from]!.click();
+      return [...root.querySelectorAll('.qz-spot-pick .qz-chip')].map((b) => b.textContent);
+    };
+    expect(chipsAfter([['wind whispered', 'Personification']])).toContain('Personification');
+    expect(chipsAfter([['wind whispered', 'Personification'], ['city slept', 'Personification']])).not.toContain('Personification');
+  });
+
+  it('sets ×2 in the builder when a second answer uses the same technique', () => {
+    let latest: QuizQuestion | null = null;
+    const start = { ...question(), targets: [{ id: 't1', quote: 'The wind whispered', correct: ['per'] }] } as unknown as QuizQuestion;
+    const builder = mountQuestionBuilder({ question: start, audience: 'teacher', onChange: (q) => (latest = q) });
+    const words = [...builder.root.querySelectorAll<HTMLButtonElement>('.qz-word')];
+    words[locateQuote(PASSAGE, 'city')!.from]!.click();
+    words[locateQuote(PASSAGE, 'slept')!.from]!.click();
+    [...builder.root.querySelectorAll<HTMLButtonElement>('.qz-spot-pick .qz-chip')].find((b) => b.textContent === 'Personification')!.click();
+    [...builder.root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Add this answer')!.click();
+    const q = latest as unknown as { options: Array<{ id: string; uses?: number }> };
+    expect(q.options.find((o) => o.id === 'per')?.uses).toBe(2);
+    const count = builder.root.querySelector<HTMLInputElement>('input[aria-label="Times technique 1 is used"]')!;
+    expect(count.value).toBe('2');
+    expect(builder.problem()).toBeNull();
   });
 });
