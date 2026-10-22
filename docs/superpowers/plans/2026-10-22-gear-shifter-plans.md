@@ -1,7 +1,7 @@
 # Gear Shifter: plan set
 
 Spec: `docs/superpowers/specs/2026-10-22-get-things-done-design.md`.
-Branch: `claude/tender-mccarthy-a298ad`. PR: adamrussell91-hash/life-hub#1047 (draft until Plan 6, then ready with auto-merge).
+Branch: `claude/tender-mccarthy-a298ad`. PR: adamrussell91-hash/life-hub#1047 (ready with auto-merge after Plan 6).
 Source: the private pack at `life-hub-data/book-packs/get-things-done/` (checker exit 0 against `main` at `456f8e6e`).
 
 There are six plans and one PR, as with Decision Maker. Each plan is written once the plan before it has landed, against real code.
@@ -13,7 +13,7 @@ There are six plans and one PR, as with Decision Maker. Each plan is written onc
 | 3 | The techniques | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-3-techniques.md`; Adam gave the go-ahead for Plan 4 | The importer, then configs and notes for all 37 entries, one section per commit |
 | 4 | Coach, Commit, Record and Review | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-4-coach.md` | Rubric, catalogue lines, discernment, `gt_commit`, the action record and Review |
 | 5 | The app | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-5-app.md`. Adam gave the go-ahead for Plan 6 | Landing, session, route, medal, track and shelf; the record on a page; the mock API route |
-| 6 | Quick start and checks | **In progress**; plan in `2026-10-22-gear-shifter-plan-6-quick-and-checks.md` | Quick start, live coach evaluation, Playwright at both widths, `pre-pr-check` and the PR marked ready |
+| 6 | Quick start and checks | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-6-quick-and-checks.md` | Quick start, live coach evaluation, Playwright at both widths, `pre-pr-check` and the PR marked ready |
 
 ## Plan 1: Foundations
 
