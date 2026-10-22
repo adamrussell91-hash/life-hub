@@ -38,7 +38,8 @@ export function tagChip(tag: Pick<VoiceTag, 'positive' | 'code' | 'code_id'>, by
 /**
  * The summary doubles as the key: each heading is a rubric criterion (or
  * Speaking), and each code it holds is spelled out, "AR Analysis – relevance
- * ×2", so nobody has to know the shorthand. Only codes this recording got.
+ * ×2", with what it asks for underneath, so nobody has to know the shorthand.
+ * Only codes this recording got.
  */
 export function summaryList(tags: readonly VoiceTag[], codes: readonly FeedbackCode[], words: readonly VoiceWord[]): HTMLElement {
   const list = el('dl', 'voice-summary');
@@ -49,15 +50,19 @@ export function summaryList(tags: readonly VoiceTag[], codes: readonly FeedbackC
     const items = el('dd', 'voice-summary__items');
     for (const item of line.items) {
       strengths ||= item.positive;
-      const row = el('span', 'voice-summary__item');
+      const row = el('div', 'voice-summary__item');
+      const line = el('span', 'voice-summary__line');
       const chip = el('span', 'fc-chip', item.text);
       chip.style.setProperty('--fc-ink', codeInk(item.positive ? STRENGTH_COLOUR : item.code.colour));
       if (item.positive) chip.classList.add('fc-chip--strength');
       let label = item.code.label;
       if (item.positive) label += ' (strength)';
       if (filler && fillerIds.has(item.code.id) && !item.positive) label += ` (mostly “${filler}”)`;
-      row.append(chip, el('span', 'voice-summary__label', label));
-      if (item.count > 1) row.append(el('span', 'voice-summary__count', `×${item.count}`));
+      line.append(chip, el('span', 'voice-summary__label', label));
+      if (item.count > 1) line.append(el('span', 'voice-summary__count', `×${item.count}`));
+      row.append(line);
+      const meaning = descriptorFor(item.code, item.positive);
+      if (meaning) row.append(el('span', 'voice-summary__meaning', meaning));
       items.append(row);
     }
     list.append(el('dt', 'voice-summary__heading', line.heading), items);

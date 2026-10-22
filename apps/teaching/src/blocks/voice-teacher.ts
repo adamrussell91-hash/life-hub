@@ -290,7 +290,7 @@ export function mountVoiceTeacher(block: VoiceBlock, lessonId: string): HTMLElem
       for (const code of inGroup) {
         const b = button('', 'ghost', () => undefined);
         b.className = 'voice-strip__code';
-        b.title = `${code.label}${code.key ? ` (key ${code.key})` : ''}. Shift-click for a strength.`;
+        b.title = `${code.label}${code.key ? ` (key ${code.key})` : ''}${code.descriptor ? `: ${code.descriptor}` : '.'} Shift-click for a strength.`;
         b.addEventListener('click', (e) => {
           addTag(code, e.shiftKey);
           b.blur();
