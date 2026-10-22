@@ -1162,6 +1162,12 @@ var HingeOptionSchema = z7.object({
   text: z7.string().max(300).default(""),
   misconception: z7.string().max(300).default("")
 });
+var HingeBackupSchema = z7.object({
+  prompt: z7.string().max(500).default(""),
+  options: z7.array(HingeOptionSchema).max(5).default([]),
+  correct_id: z7.string().max(40).default(""),
+  source: z7.enum(["teacher", "ann"]).default("teacher")
+});
 var HingeQuestionBlockSchema = z7.object({
   id: z7.string().min(1),
   type: z7.literal("block"),
@@ -1174,7 +1180,9 @@ var HingeQuestionBlockSchema = z7.object({
     correct_id: z7.string().max(40).default(""),
     seconds: z7.union([z7.literal(0), z7.literal(30), z7.literal(60), z7.literal(90), z7.literal(120)]).default(60),
     move_on: z7.number().int().min(1).max(100).default(80),
-    reteach: z7.number().int().min(0).max(99).default(50)
+    reteach: z7.number().int().min(0).max(99).default(50),
+    /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
+    backup: HingeBackupSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2268,6 +2276,7 @@ export {
   GraphNodeSchema,
   HeadingBlockSchema,
   HeadingVariantSchema,
+  HingeBackupSchema,
   HingeOptionSchema,
   HingeQuestionBlockSchema,
   HtmlAppAiProviderSchema,
