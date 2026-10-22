@@ -53,6 +53,17 @@ html[data-hub="life"] .hub-card.food-dish {
   color: var(--muted);
   margin: 0;
 }
+.food-original {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.food-ingredients {
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
 .food-notes,
 .food-preview {
   margin: 0;

@@ -660,6 +660,71 @@ test("capture, private upload, menu text, backup and restore work through the re
   await page.close();
 });
 
+for (const width of [1440, 390])
+  test(`dish ${width}: English title, original beneath, ingredients and menu names`, async () => {
+    const { page, read, errors } = await pageFor(width, {
+      seed(j) {
+        const v = j.visits[0];
+        Object.assign(v.dishes[0], {
+          title: "Tortilla",
+          title_en: "Spanish omelette",
+          ingredients: "Egg, potato",
+          notes: "Muy bueno",
+          notes_en: "Very good",
+        });
+        v.menu_items = Array.from({ length: 13 }, (_, i) => ({
+          name: i === 0 ? "Gambas" : `Plato ${i}`,
+          ...(i === 0 ? { name_en: "Prawns" } : {}),
+          description: i === 0 ? "Ajo" : "",
+          ...(i === 0 ? { description_en: "Garlic" } : {}),
+          price: "",
+          kind: "dish",
+        }));
+      },
+    });
+    await page.getByRole("tab", { name: "Custom Menu" }).click();
+    const card = page.locator("[data-food-grid]>.food-dish", {
+      hasText: "Spanish omelette",
+    });
+    assert.equal(
+      await card.locator(".food-dish__title").innerText(),
+      "Spanish omelette",
+    );
+    assert.equal(await card.locator(".food-original").first().innerText(), "Tortilla");
+    assert.equal(await card.locator(".food-ingredients").innerText(), "Egg, potato");
+    assert.match(await card.locator(".food-notes").innerText(), /Very good/);
+    assert.match(await card.innerText(), /Muy bueno/);
+    // The card fits the screen with no sideways scroll.
+    assert.ok(
+      await card.evaluate((n) => n.scrollWidth <= n.clientWidth + 1),
+      "dish card overflows",
+    );
+    await page.getByRole("tab", { name: "Timeline" }).click();
+    await openFirstEntry(page);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator(".food-sheet").waitFor();
+    const ingredients = page.getByLabel("Ingredients", { exact: true }).first();
+    assert.equal(await ingredients.inputValue(), "Egg, potato");
+    // Menu names show in English, the original beside them, search finds both.
+    const menu = page.locator(".food-onmenu__list");
+    assert.match(await menu.innerText(), /Prawns/);
+    assert.match(await menu.innerText(), /Gambas/);
+    await page.getByLabel("Find on the menu").fill("gambas");
+    assert.equal(await menu.locator(".food-onmenu__item").count(), 1);
+    await page.getByLabel("Find on the menu").fill("prawns");
+    assert.equal(await menu.locator(".food-onmenu__item").count(), 1);
+    // Editing ingredients keeps the notes translation.
+    await ingredients.fill("Egg, potato, onion");
+    await page.getByLabel("Dish notes", { exact: true }).first().waitFor();
+    await page.getByRole("button", { name: "Save visit", exact: true }).click();
+    await page.locator(".food-sheet").waitFor({ state: "detached" });
+    const saved = read().visits[0].dishes[0];
+    assert.equal(saved.ingredients, "Egg, potato, onion");
+    assert.equal(saved.notes_en, "Very good");
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
 test("a conflicted visit draft survives reload and requires review before replacing newer data", async () => {
   const { page, read, otherDevice } = await pageFor(390);
   await openFirstEntry(page);
