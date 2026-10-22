@@ -258,7 +258,7 @@ test('Kanban and 5 Whys take the Gear Shifter palette inside .gt-scope only', ..
 
 ## As run (22 Oct)
 
-- Every task ran test-first and ended with a commit. Tests added: 21 factory and variant tests (`get-things-done-families.test.js`), 7 stylesheet tests (`get-things-done-css.test.js`) and 20 renderer and lookup tests (`get-things-done-charts.test.ts`). Problem Solver's and Decision Maker's suites pass unchanged, apart from one assertion that now lists `ratings` among the family factories.
+- Every task ran test-first and ended with a commit. Tests added: 13 factory and variant tests (`get-things-done-families.test.js`), 7 stylesheet tests (`get-things-done-css.test.js`) and 20 renderer and lookup tests (`get-things-done-charts.test.ts`). Problem Solver's and Decision Maker's suites pass unchanged, apart from one assertion that now lists `ratings` among the family factories.
 - `ratings` also joined Decision Maker's `render/charts.ts` family map, so `createGearChartForTool` falls through to it with no special case.
 - The contact sheet showed five things, fixed in the same commit: the zero-min form said "1–10"; `gt_` tools inherited "What this shows about the decision", so their default reflection is now "What this shows about getting it moving"; Problem Solver's 9 and 10px tags break the 11px rule, so `.gt-scope` raises them to 11px; amber covered Doing as well as Done, so Doing's pills and arrow are paper; and the newest scales overlay now draws in cobalt so it stands apart from the older ink outlines.
 - Gear Shifter adds three text shades to its tokens: `--gt-muted` (#5b6372), and `--gt-blue-deep` (#1f5fb4) and `--gt-red-deep` (#a8361b) for small text on the tints, where the label shades fall under 4.5:1.
