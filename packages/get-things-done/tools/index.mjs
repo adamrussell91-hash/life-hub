@@ -5,9 +5,11 @@
 import { DOING_THINGS } from './doing-things.mjs';
 import { BEFORE_DOING } from './before-doing.mjs';
 import { WORKING_WITH_OTHERS } from './working-with-others.mjs';
+import { DOING_DIFFERENTLY } from './doing-differently.mjs';
 
 export const GEAR_TOOLS = Object.freeze({
   ...DOING_THINGS,
   ...BEFORE_DOING,
-  ...WORKING_WITH_OTHERS
+  ...WORKING_WITH_OTHERS,
+  ...DOING_DIFFERENTLY
 });

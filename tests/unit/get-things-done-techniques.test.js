@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { TOOLS, toolsForBookStep } from '../../packages/problem-solver/tools/index.mjs';
 import { BOOK_STEPS, stepPlan, toolsForPlanStep } from '../../packages/problem-solver/steps.mjs';
 import { MODEL_IDS } from '../../packages/problem-solver/models.mjs';
-import { applyScores, isComplete, newRun, nextSlots, placeNode } from '../../packages/problem-solver/machine.mjs';
+import { applyScores, checkNode, isComplete, newRun, nextSlots, placeNode } from '../../packages/problem-solver/machine.mjs';
 import { workThrough } from '../../packages/decision-book/work-through.mjs';
 import { flowRoute } from '../../packages/decision-book/families/path.mjs';
 import { curveAt } from '../../packages/decision-book/curves.mjs';
@@ -18,7 +18,7 @@ import { GEAR_TOOLS } from '../../packages/get-things-done/tools/index.mjs';
 import { CATALOGUE, entry } from '../../packages/get-things-done/catalogue.mjs';
 
 /** The sections built so far; each section's task adds its key. */
-const SECTIONS_DONE = ['doing_things', 'before_doing', 'working_with_others'];
+const SECTIONS_DONE = ['doing_things', 'before_doing', 'working_with_others', 'doing_differently'];
 const DONE = CATALOGUE.filter((e) => SECTIONS_DONE.includes(e.section));
 const T = GEAR_TOOLS;
 const ids = (list) => list.map((item) => item.id);
@@ -313,4 +313,35 @@ test('Structured Evaluation: up to seven ideas, two or three criteria, each rate
   assert.equal(r.cells.idea1.criterion1.n, 2);
   assert.equal('winner' in r, false);
   assert.deepEqual(nextSlots(run), ['recommendation', 'owner']);
+});
+
+// ---------------------------------------------------------------- Doing things differently
+
+test('Circle of Competence: what I do know, and what I do not', () => {
+  assert.deepEqual(labels(T.gt_circle_of_competence.chart.groups), ['I do know this', 'I do not know this']);
+});
+
+test('5/25 Rule: five priorities at most, twenty distractions, and the twenty are dropped', () => {
+  const def = T.gt_five_twenty_five_rule;
+  assert.deepEqual(labels(def.chart.groups), ['Group A: five priorities', 'Group B: twenty distractions']);
+  assert.equal(def.chart.groups[0].max, 5);
+  let run = newRun(def.id, 'r');
+  for (let i = 1; i <= 5; i++) run = placeNode(run, sampleNode(`e${i}`, `entry:${i}`, `Goal ${i}`, { tag: 'group_a_five_priorities' }));
+  assert.match(checkNode(run, { slot: 'entry:6', text: 'A sixth', tag: 'group_a_five_priorities' }), /already has 5/);
+  assert.equal(checkNode(run, { slot: 'entry:6', text: 'A sixth', tag: 'group_b_twenty_distractions' }), null);
+  assert.match(coaching(def).join(' '), /drop/i);
+});
+
+test('Circle of Influence: concern, influence and control, from the outside in', () => {
+  assert.deepEqual(labels(T.gt_circle_of_influence.chart.groups), ['Circle of concern', 'Circle of influence', 'Circle of control']);
+});
+
+test('Disruptive Innovation: a lens; sustaining against disruptive', () => {
+  const def = T.gt_disruptive_innovation;
+  assert.equal(def.tier, 'lens');
+  assert.deepEqual(labels(def.chart.groups), ['Sustaining innovation', 'Disruptive innovation']);
+});
+
+test('Kotter: the eight stages in order', () => {
+  assert.deepEqual(labels(T.gt_kotter_change.chart.stages), ['Create urgency', 'Build a guiding coalition', 'Formulate a vision', 'Communicate the vision', 'Remove obstacles', 'Generate short-term wins', 'Stick with it', 'Embed the change']);
 });
