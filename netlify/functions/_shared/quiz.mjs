@@ -30,7 +30,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
-import { listBlobKeys } from './blobs-list.mjs';
+import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, listSubmissions, read, reject, reviewSubmission, validToken, walkBlocks } from './question-drop.mjs';
 import {
@@ -614,33 +614,32 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
   const outcomesOf = (rec, id) => entryFor(rec, id)?.key.outcomes ?? fallback;
   const owners = new Map(studentIds.map((id) => [deviceHash(`student:${classId}:${id}`), id]));
   const handedIn = new Map();
+  // Listings can lag a just-written hand-in; the next load picks it up, the same as Results.
   for (const key of await listBlobKeys(store, `quiz/${lessonId}/results/`)) {
     const [, , , owner, nText] = key.split('/');
     if (owners.has(owner)) handedIn.set(owner, [...(handedIn.get(owner) ?? []), Number(nText)]);
   }
   const scores = {};
   let firstAt = null;
-  await Promise.all(
-    [...handedIn].map(async ([owner, ns]) => {
-      const from = (await read(store, `quiz/${lessonId}/cleared/${owner}`))?.from ?? 0;
-      for (const n of ns.filter((x) => x >= from).sort((a, b) => a - b)) {
-        const [start, result] = await Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n))]);
-        if (!start || !result) continue;
-        const rec = await recordFor(store, lessonId, start.version, record);
-        const scored = scoreAttempt(rec, result, await read(store, k.marks(owner, n)));
-        scores[owners.get(owner)] = {
-          attempt_id: attemptId(owner, n),
-          submitted_at: result.submitted_at,
-          score: scored.score,
-          max: scored.max,
-          pending: scored.pending,
-          rows: scored.rows.map((r) => ({ id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, outcomes: outcomesOf(rec, r.id) }))
-        };
-        if (!firstAt || result.submitted_at < firstAt) firstAt = result.submitted_at;
-        return;
-      }
-    })
-  );
+  await mapBounded([...handedIn], 8, async ([owner, ns]) => {
+    const from = (await read(store, `quiz/${lessonId}/cleared/${owner}`))?.from ?? 0;
+    for (const n of ns.filter((x) => x >= from).sort((a, b) => a - b)) {
+      const [start, result] = await Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n))]);
+      if (!start || !result) continue;
+      const rec = await recordFor(store, lessonId, start.version, record);
+      const scored = scoreAttempt(rec, result, await read(store, k.marks(owner, n)));
+      scores[owners.get(owner)] = {
+        attempt_id: attemptId(owner, n),
+        submitted_at: result.submitted_at,
+        score: scored.score,
+        max: scored.max,
+        pending: scored.pending,
+        rows: scored.rows.map((r) => ({ id: r.id, awarded: r.awarded, max: r.mark.max, confidence: r.confidence, outcomes: outcomesOf(rec, r.id) }))
+      };
+      if (!firstAt || result.submitted_at < firstAt) firstAt = result.submitted_at;
+      return;
+    }
+  });
   return {
     lesson_id: lessonId,
     title: draft.title,
