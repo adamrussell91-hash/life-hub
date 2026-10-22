@@ -64,6 +64,11 @@ function sanitizeNode(node: Node): string {
     }
   }
 
+  if (tag === 'ol') {
+    const start = el.getAttribute('start');
+    if (start && /^\d{1,4}$/.test(start)) attrs = ` start="${start}"`;
+  }
+
   const inner = Array.from(el.childNodes).map(sanitizeNode).join('');
   return `<${tag}${attrs}>${inner}</${tag}>`;
 }

@@ -22,11 +22,14 @@ function memoryStore(entries = {}) {
       if (options.type === 'json') return value;
       return value;
     },
-    async getWithMetadata(key) {
+    async getWithMetadata(key, options = {}) {
       const value = map.get(key);
       if (value == null) return null;
-      if (value && typeof value === 'object' && 'data' in value) return value;
-      return { data: value, metadata: {} };
+      const stored = value && typeof value === 'object' && 'data' in value
+        ? value : { data: value, metadata: {} };
+      if (options.type === 'stream') return { ...stored, data: new Response(stored.data).body };
+      if (options.type === 'arrayBuffer') return { ...stored, data: await new Response(stored.data).arrayBuffer() };
+      return stored;
     },
     async list({ prefix }) {
       return {
@@ -262,6 +265,23 @@ test('media file is public for active media and 404 when archived', async () => 
   assert.equal(missing.status, 404);
 });
 
+test('media file streams large video blobs with the stored content type', async () => {
+  const stream = new Response(new Uint8Array([1, 2, 3, 4])).body;
+  const requested = [];
+  const store = memoryStore({
+    'media/vid-1': { id: 'vid-1', status: 'active', mime_type: 'video/mp4' },
+    'media_files/vid-1': { data: stream, metadata: { contentType: 'video/mp4' } }
+  });
+  const getWithMetadata = store.getWithMetadata;
+  store.getWithMetadata = async (key, options) => { requested.push(options?.type); return getWithMetadata(key, options); };
+  const handler = createMediaFileHandler({ env, getContentStore: async () => store });
+  const response = await handler(jsonRequest('https://api.adam-russell.com/api/media/vid-1/file'));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'video/mp4');
+  assert.deepEqual(requested, ['stream']);
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3, 4]);
+});
+
 test('media file serves byte ranges so Safari can play and seek audio', async () => {
   const bytes = new Uint8Array([10, 11, 12, 13, 14, 15]).buffer;
   const handler = createMediaFileHandler({
@@ -331,6 +351,18 @@ test('html-app-ai stays public, 503s without Blobs, and completes an enabled lan
   assert.equal(response.status, 200);
   assert.equal((await response.json()).data.text, 'hello');
   assert.equal(completed, 1);
+});
+
+test('media file responses are nosniff', async () => {
+  const handler = createMediaFileHandler({
+    env,
+    getContentStore: async () => memoryStore({
+      'media/f': { id: 'f', status: 'active', mime_type: 'image/png' },
+      'media_files/f': { data: new Uint8Array([1]).buffer, metadata: {} }
+    })
+  });
+  const response = await handler(jsonRequest('https://api.adam-russell.com/api/media/f/file'));
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
 });
 
 test('published unit carries the subject lines and published lessons\' line stops only', async () => {

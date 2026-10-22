@@ -125,6 +125,8 @@ export function renderUnitsIndex(
   const root = document.createElement('div');
   root.className = 'units-index';
   canvas.append(root);
+  const syllabuses = syllabusRow(curriculum, subjectsById);
+  if (syllabuses) root.append(syllabuses);
 
   if (units.length === 0) {
     const empty = document.createElement('p');
@@ -154,6 +156,31 @@ export function renderUnitsIndex(
 
   groupByHost.append(subjectBtn, yearBtn);
 
+  // Not persisted: the Units / Programs filter resets on every visit.
+  type UnitKindFilter = 'all' | 'units' | 'programs';
+  let kindFilter: UnitKindFilter = 'all';
+  const filterHost = document.createElement('div');
+  filterHost.className = 'hub-pills units-index__kind-filter';
+  filterHost.setAttribute('role', 'group');
+  filterHost.setAttribute('aria-label', 'Filter by kind');
+  const filterButtons = new Map<UnitKindFilter, HTMLButtonElement>();
+  for (const [value, label] of [['all', 'All'], ['units', 'Units'], ['programs', 'Programs']] as const) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hub-pills__btn units-index__group-by-btn';
+    btn.dataset.unitFilter = value;
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      if (kindFilter === value) return;
+      kindFilter = value;
+      syncGroupButtons();
+      renderGroupedList();
+    });
+    filterButtons.set(value, btn);
+    filterHost.append(btn);
+  }
+  if (units.some((unit) => unit.kind === 'program')) groupByHost.after(filterHost);
+
   const listHost = document.createElement('div');
   listHost.className = 'units-index__list';
   root.append(listHost);
@@ -167,12 +194,27 @@ export function renderUnitsIndex(
     yearBtn.setAttribute('aria-pressed', groupBy === 'year' ? 'true' : 'false');
     subjectBtn.classList.toggle('units-index__group-by-btn--active', groupBy === 'subject');
     yearBtn.classList.toggle('units-index__group-by-btn--active', groupBy === 'year');
+    for (const [value, btn] of filterButtons) {
+      btn.setAttribute('aria-pressed', kindFilter === value ? 'true' : 'false');
+      btn.classList.toggle('units-index__group-by-btn--active', kindFilter === value);
+    }
   }
 
   function renderGroupedList(): void {
     for (const dispose of cardDisposers.splice(0).reverse()) dispose();
     listHost.replaceChildren();
-    const groups = groupUnits(units, groupBy, yearsById, subjectsById);
+    const shown = units.filter((unit) =>
+      kindFilter === 'all' ? true : kindFilter === 'programs' ? unit.kind === 'program' : unit.kind !== 'program'
+    );
+    if (shown.length === 0) {
+      const none = document.createElement('p');
+      none.className = 'teacher-layout__canvas-status';
+      none.dataset.unitsEmptyFilter = '';
+      none.textContent = kindFilter === 'programs' ? 'No programs yet.' : 'No units yet.';
+      listHost.append(none);
+      return;
+    }
+    const groups = groupUnits(shown, groupBy, yearsById, subjectsById);
     for (const group of groups) {
       const section = document.createElement('section');
       section.className = 'units-index__group';
@@ -221,6 +263,39 @@ export function renderUnitsIndex(
       for (const dispose of disposers.splice(0).reverse()) dispose();
     }
   };
+}
+
+/** Every active Syllabus, always reachable regardless of group-by or filter. */
+function syllabusRow(
+  curriculum: CurriculumResponse,
+  subjectsById: Map<string, Subject>
+): HTMLElement | null {
+  const docs = (curriculum.documents ?? []).filter(
+    (doc) => doc.status === 'active' && doc.kind === 'syllabus'
+  );
+  if (docs.length === 0) return null;
+  const row = document.createElement('div');
+  row.className = 'units-index__documents';
+  row.dataset.syllabuses = '';
+  const label = document.createElement('h2');
+  label.className = 'units-index__group-title';
+  label.textContent = 'Syllabuses';
+  row.append(label);
+  for (const doc of docs.slice().sort((a, b) => a.title.localeCompare(b.title))) {
+    const subject = subjectsById.get(doc.subject_id);
+    const link = document.createElement('a');
+    link.className = 'units-index__meta';
+    link.href = `/documents/${doc.id}`;
+    link.dataset.documentId = doc.id;
+    link.textContent = subject ? `${doc.title} · ${subject.title}` : doc.title;
+    link.addEventListener('click', (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      event.preventDefault();
+      navigate(`/documents/${doc.id}`);
+    });
+    row.append(link);
+  }
+  return row;
 }
 
 type UnitGroup = { key: string; label: string; sort: number; units: Unit[] };
@@ -284,6 +359,7 @@ function renderUnitCard(
 
   const card = document.createElement('div');
   card.className = 'units-index__card';
+  card.dataset.unitId = unit.id;
 
   const tile = document.createElement('a');
   tile.className = 'glass-tile home-class-tile entity-cover-tile units-index__tile';
@@ -327,6 +403,12 @@ function renderUnitCard(
   meta.textContent = [year?.title, subject?.title].filter(Boolean).join(' · ');
 
   body.append(title, meta);
+  if (unit.kind === 'program') {
+    const badge = document.createElement('span');
+    badge.className = 'units-index__badge';
+    badge.textContent = 'Program';
+    body.append(badge);
+  }
   tile.append(mediaEl, body);
 
   const menu = mountPageOptionsMenu(
@@ -392,10 +474,12 @@ export function renderUnitPage(
 
   const optionsMenu = mountPageOptionsMenu(
     [
-      {
-        label: 'Schedule lessons',
-        onSelect: () => { openScheduleTimetableModal({ curriculum, unitId, onSuccess: () => options.onMutated?.() }); }
-      },
+      ...(unit.kind === 'program'
+        ? []
+        : [{
+            label: 'Schedule lessons',
+            onSelect: () => { openScheduleTimetableModal({ curriculum, unitId, onSuccess: () => options.onMutated?.() }); }
+          }]),
       {
         label: 'History',
         onSelect: () => {

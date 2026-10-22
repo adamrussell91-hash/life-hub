@@ -59,4 +59,10 @@ describe('sanitizeRichTextHtml', () => {
       sanitizeRichTextHtml('<a href="javascript:alert(1)">bad</a>')
     ).toBe('<a>bad</a>');
   });
+
+  it('keeps a numeric start on ol only', () => {
+    expect(sanitizeRichTextHtml('<ol start="3"><li>x</li></ol>')).toBe('<ol start="3"><li>x</li></ol>');
+    expect(sanitizeRichTextHtml('<ol start="x1" onclick="a()"><li>x</li></ol>')).toBe('<ol><li>x</li></ol>');
+    expect(sanitizeRichTextHtml('<ul start="3"><li>x</li></ul>')).toBe('<ul><li>x</li></ul>');
+  });
 });

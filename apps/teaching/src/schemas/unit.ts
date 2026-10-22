@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BlockSchema } from './block';
 import { CommonFields, TrashFields } from './common';
 import { CoverSchema } from './cover';
+import { SourceSchema } from './source';
 
 export const UnitSchema = z.object({
   ...CommonFields,
@@ -16,7 +17,10 @@ export const UnitSchema = z.object({
   description: z.string().optional(),
   cover: CoverSchema.optional(),
   blocks: z.array(BlockSchema).optional(),
-  outcome_ids: z.array(z.string().min(1)).max(24).optional()
+  outcome_ids: z.array(z.string().min(1)).max(24).optional(),
+  /** 'program': same level as a unit, never one of a class's active units. */
+  kind: z.enum(['program']).optional(),
+  source: SourceSchema.optional()
 });
 
 export type Unit = z.infer<typeof UnitSchema>;
