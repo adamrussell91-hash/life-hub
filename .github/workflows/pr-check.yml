@@ -26,8 +26,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --ignore-scripts
-      - run: npm ci --ignore-scripts --prefix apps/professional
+      # Reuse the npm download cache that the main deploy's test job saves,
+      # so installs skip the registry when npm is slow.
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm ci --ignore-scripts --prefer-offline
+      - run: npm ci --ignore-scripts --prefer-offline --prefix apps/professional
       - run: npm run pre-pr-check
         env:
           PRE_PR_BASE: HEAD^1
