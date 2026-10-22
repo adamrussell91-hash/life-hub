@@ -41,6 +41,19 @@ describe('focusSteps', () => {
     expect(steps[0]!.blocks.map((b) => b.id)).toEqual(['h1', 'c1']);
   });
 
+  it('gives each main block its own step, even with no heading between them', () => {
+    const tool = (id: string) => createBlock('hinge_question', id);
+    const steps = focusSteps([heading('h1', 'Thinking tools'), text('intro'), tool('a'), tool('b'), text('leadC'), tool('c')]);
+    expect(steps.map((s) => s.blocks.map((b) => b.id))).toEqual([['h1', 'intro', 'a'], ['b'], ['leadC', 'c']]);
+    expect(steps[0]!.label).toBe('Thinking tools');
+    expect(steps[1]!.label).toBe('Hinge question');
+  });
+
+  it('keeps text after the last main block with it', () => {
+    const steps = focusSteps([heading('h1', 'Do now'), createBlock('hinge_question', 'hq'), text('after')]);
+    expect(steps.map((s) => s.blocks.map((b) => b.id))).toEqual([['h1', 'hq', 'after']]);
+  });
+
   it('returns no steps for an empty lesson', () => {
     expect(focusSteps([])).toEqual([]);
   });
