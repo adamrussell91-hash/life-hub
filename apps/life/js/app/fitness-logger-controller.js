@@ -237,8 +237,27 @@ export function createFitnessLoggerController({
     return win;
   }
 
+  // Per-device switch: Adam can turn the rest countdown off entirely.
+  const REST_TIMER_KEY = 'life-hub:gym-rest-timer';
+  function restTimerOn() {
+    try {
+      return storage?.getItem?.(REST_TIMER_KEY) !== 'off';
+    } catch {
+      return true;
+    }
+  }
+  function setRestTimer(on) {
+    try {
+      storage?.setItem?.(REST_TIMER_KEY, on ? 'on' : 'off');
+    } catch {
+      // Per-device convenience only.
+    }
+    if (!on) clearRest();
+    rerender();
+  }
+
   function startRest(seconds, { cue = null, label = 'Rest', exercise = null } = {}) {
-    if (!(seconds > 0)) return;
+    if (!(seconds > 0) || !restTimerOn()) return;
     rest = { endsAt: now() + seconds * 1000, cue, label, win: pickRestWin(exercise) };
     stopRestInterval();
     restTimerId = setIntervalImpl(restTick, 1000);
@@ -935,6 +954,7 @@ export function createFitnessLoggerController({
     minimise,
     openGym,
     adjustRest,
+    setRestTimer,
     skipRest: () => {
       clearRest();
       rerender();
@@ -987,6 +1007,7 @@ export function createFitnessLoggerController({
       lastPainFlags: motivation.lastPainFlags,
       twingeOffer,
       treat: readTreat(),
+      restTimerOn: restTimerOn(),
       libraryByName: motivation.libraryByName,
       boardRows: motivation.buildBoard ? projectBuildBoard(motivation.buildBoard, draft, motivation.libraryByName) : null,
       actions
@@ -1180,6 +1201,7 @@ export function createFitnessLoggerController({
     getSteps: () => layout.steps,
     getView: () => view,
     getRest: restSnapshot,
+    setRestTimer,
     getCelebration: () => celebration,
     getLastReport: () => lastReport,
     applyTarget,
