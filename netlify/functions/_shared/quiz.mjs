@@ -293,6 +293,9 @@ export async function quizAction(store, lessonId, body) {
     questions: publicQuestions(record),
     live: !!live && live.expires > now && live.phase !== 'done'
   };
+  // Until this device is known, it has no history here: the anonymous go it
+  // may have made elsewhere is not shown, so nothing vanishes after claiming.
+  if (who.need) return { ...shared, attempts_used: 0, current: null, results: [] };
   if (!who.student) {
     if (!body.token) {
       if (!['status', 'claim'].includes(action)) reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
@@ -665,18 +668,19 @@ async function liveTeacher(store, lessonId, body, action) {
 async function liveStudent(store, lessonId, body, action) {
   if (!['live_status', 'live_join', 'live_answer'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const { record, k } = await loadQuiz(store, lessonId);
-  const who = await identify(store, body, action);
   const live = await liveState(store, k);
   if (!live || live.phase === 'done') return { live: null };
   if (body.session && body.session !== live.session) reject(409, 'new_session', 'Your teacher started a new live quiz. Join again.');
+  const who = await identify(store, body, action);
+  if (action === 'live_answer') needIdentity(who);
   const out = { session: live.session, phase: live.phase, index: live.index, total: live.order.length };
   if (!who.student && !body.token) return { live: { ...out, joined: false } };
   if (!who.student && !validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to join.');
   const device = ownerOf(who, body.token);
 
   if (action === 'live_join') {
-    if (String(body.code ?? '').replace(/\D/g, '') !== live.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
     needIdentity(who);
+    if (String(body.code ?? '').replace(/\D/g, '') !== live.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
     await store.setJSON(k.player(live.session, device), { joined_at: new Date().toISOString(), ...studentFields(who) }, { onlyIfNew: true });
   }
   const joined = !!(await read(store, k.player(live.session, device)));
@@ -688,7 +692,6 @@ async function liveStudent(store, lessonId, body, action) {
   const entry = rec.questions[id];
   const answerKey = k.answer(live.session, live.index, device);
   if (action === 'live_answer') {
-    needIdentity(who);
     if (live.phase !== 'question') reject(409, 'closed', 'Answers are closed for this question.');
     if (Number(body.index) !== live.index) reject(409, 'moved_on', 'Your teacher has moved on.');
     const response = cleanResponse(entry.key.kind, body.response);
