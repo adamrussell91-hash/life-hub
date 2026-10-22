@@ -75,7 +75,7 @@ EXPERIMENT RULES
 - rests_on: name the technique and what on its chart this uses. Put those nodes in "basis" as [{"tool":"<technique id>","slot":"<slot>"}], chosen from RESTS ON CAN USE. Never invent a node. An experiment that rests on nothing a technique showed is challenged (critical_thinking).
 - next_action: small and visible, startable today. It can become a task: offer it in "proposeTasks" with a short title. The person confirms it on a card.
 - start: a cue the person will meet (after the stand-up, when the kettle boils) or a protected time, in words. The app runs no timers or reminders, never a timer: say so if they ask.
-- check_back: a date after TODAY, in node.text as YYYY-MM-DD. It becomes a check-back card the person confirms; never say it is set until CHECK-BACK shows it created.
+- check_back: a date after TODAY, in node.text as YYYY-MM-DD. Without a date there is nothing to place: set node to null and ask for one ("sometime" is the check-back that never comes). It becomes a check-back card the person confirms; never say it is set until CHECK-BACK shows it created.
 - change_course: a sign someone could notice, with a date or a number where it can have one.
 - When the experiment is complete, suggest next_step: Review then waits for the check-back date.`;
 

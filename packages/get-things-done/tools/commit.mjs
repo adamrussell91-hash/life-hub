@@ -40,7 +40,7 @@ export const gtCommit = Object.freeze({
   edgeKinds: Object.freeze([]),
   taskSlots: Object.freeze({ next_action: () => true }),
   validateNode(run, node) {
-    if (node.slot === 'check_back' && !isRecordDate(node.text)) return 'The check-back is a date: put it in node.text as YYYY-MM-DD.';
+    if (node.slot === 'check_back' && !isRecordDate(node.text)) return 'The check-back is a date: put it in node.text as YYYY-MM-DD, or set node to null and ask for one.';
     return null;
   },
   nextSlots(run) {
