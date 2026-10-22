@@ -21,10 +21,10 @@ export function parseOutcomeCodes(text: string, labels: OutcomeLabel[]): { ids: 
   const ids: string[] = [];
   const unknown: string[] = [];
   for (const token of text.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)) {
-    const found = labels.find((l) => l.code.toLowerCase() === token.toLowerCase() || l.id === token);
+    const found = labels.find((l) => l.code.toLowerCase() === token.toLowerCase()) ?? labels.find((l) => l.id === token);
     if (found) {
       if (!ids.includes(found.id)) ids.push(found.id);
-    } else unknown.push(token.toUpperCase());
+    } else if (!unknown.includes(token.toUpperCase())) unknown.push(token.toUpperCase());
   }
   return { ids, unknown };
 }
