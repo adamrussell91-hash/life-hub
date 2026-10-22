@@ -74,3 +74,22 @@ describe('review banner', () => {
     });
   }
 });
+
+describe('review panel while the learning question waits (Adam, 22 Oct)', () => {
+  it('holds Review now with a note until the question is answered', () => {
+    const start = vi.fn();
+    const panel = mountReviewPanel({ start });
+    panel.update(session({ ...waiting, pendingLearning: 'implement' }));
+    const button = panel.el.querySelector<HTMLButtonElement>('.ps-review__go')!;
+    expect(button.disabled).toBe(true);
+    expect(panel.el.querySelector('.ps-review__note')!.textContent).toBe('Answer the coach’s question first, then start the review.');
+    button.click();
+    expect(start).not.toHaveBeenCalled();
+    panel.update(waiting);
+    expect(button.disabled).toBe(false);
+    expect(panel.el.querySelector('.ps-review__note')!.textContent).toBe('Or move on; the review brings you back here.');
+    button.click();
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+});
+
