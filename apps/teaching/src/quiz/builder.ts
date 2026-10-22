@@ -13,6 +13,8 @@ import {
   type QuizQuestionOf
 } from '@/quiz/core';
 import { loadLiteraryElements, type LiteraryTechnique } from '@/blocks/literary-elements';
+import { formatOutcomeCodes, parseOutcomeCodes } from '@/markbook/parse';
+import type { OutcomeLabel } from '@/markbook/types';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
 import './quiz.css';
@@ -37,6 +39,8 @@ export type BuilderOptions = {
   allowImageUrl?: boolean;
   /** Who is writing, for wording. */
   audience: 'student' | 'teacher';
+  /** Outcome catalogue for the teacher's outcome codes field. Students never get it. */
+  outcomes?: OutcomeLabel[];
   onChange: (question: QuizQuestion) => void;
 };
 
@@ -51,6 +55,7 @@ const newId = () => Math.random().toString(36).slice(2, 10);
 
 export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
   let q: QuizQuestion = structuredClone(options.question);
+  if (options.audience === 'student') delete q.outcomes;
   const marks = options.marks ?? { min: 1, max: QUIZ_LIMITS.marksMax };
   const kinds = (options.kinds?.length ? options.kinds : (Object.keys(QUIZ_KIND_INFO) as QuizQuestionKind[])).filter(
     (k) => k !== 'label_image' || options.allowImageUrl || (options.images?.length ?? 0) > 0
@@ -1056,7 +1061,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     extrasHost.append(row);
 
     const more = el('details', 'qz-more');
-    more.open = !!(q.hint || q.explanation || (q.image && q.kind !== 'label_image'));
+    more.open = !!(q.hint || q.explanation || q.outcomes?.length || (q.image && q.kind !== 'label_image'));
     more.append(el('summary', 'qz-more__summary', 'Hint, explanation and picture (optional)'));
     const hint = textInput(q.hint ?? '', QUIZ_LIMITS.hint, 'A nudge, not the answer.');
     hint.addEventListener('input', () => {
@@ -1069,6 +1074,29 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       emit();
     });
     more.append(labelled('Hint', hint, 'Students can open it during the quiz. It costs some of the marks.'), labelled('Why this is the answer', why));
+    if (!student && options.outcomes?.length) {
+      const labels = options.outcomes;
+      const codes = textInput(formatOutcomeCodes(q.outcomes ?? [], labels), 200, 'EN12-1, EN12-3');
+      codes.classList.add('qz-outcomes');
+      const note = el('p', 'qz-note qz-outcomes__unknown');
+      note.id = uid('qz-outcomes-note');
+      note.setAttribute('aria-live', 'polite');
+      const field = labelled('Outcomes (optional)', codes, 'For the markbook. Leave empty to use the lesson’s outcomes. Republish for changes to count.');
+      const hintEl = field.querySelector<HTMLElement>('.qz-field__hint');
+      if (hintEl) hintEl.id = uid('qz-outcomes-hint');
+      codes.setAttribute('aria-describedby', [hintEl?.id, note.id].filter(Boolean).join(' '));
+      codes.addEventListener('input', () => {
+        const parsed = parseOutcomeCodes(codes.value, labels);
+        if (parsed.ids.length) q.outcomes = parsed.ids.slice(0, 6);
+        else delete q.outcomes;
+        const lines: string[] = [];
+        if (parsed.unknown.length) lines.push(`Not an outcome code: ${parsed.unknown.join(', ')}`);
+        if (parsed.ids.length > 6) lines.push('Only the first 6 outcomes are kept.');
+        note.textContent = lines.join('. ');
+        emit();
+      });
+      more.append(field, note);
+    }
     if (q.kind !== 'label_image' && ((options.images?.length ?? 0) > 0 || options.allowImageUrl)) {
       const pictureHost = el('div', 'qz-field');
       const paintPicture = () => {

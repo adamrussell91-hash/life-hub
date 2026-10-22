@@ -97,6 +97,14 @@ test('question drop: students send questions to the target quiz, capped per devi
   await assert.rejects(reviewSubmission(store, 'quiz1', { submission_id: '../x', status: 'approved' }), /Unknown question/);
 });
 
+test('question drop: a student cannot tag outcomes on their question', async () => {
+  const store = baseStore();
+  await questionDropAction(store, 'lesson1', 'drop1', { action: 'submit', token: token(1), question: { ...mc, outcomes: ['o1', 'o2'] } });
+  const subs = await listSubmissions(store, 'quiz1');
+  assert.equal(subs.length, 1);
+  assert.equal('outcomes' in subs[0].question, false, 'outcomes are the teacher’s to set');
+});
+
 test('question drop refuses targets that are not a quiz in the same unit, paused boxes and closed quizzes', async () => {
   const kinds = baseStore({ dropContent: { kinds: ['true_false'] } });
   await assert.rejects(questionDropAction(kinds, 'lesson1', 'drop1', { action: 'submit', token: token(1), question: mc }), /hasn’t turned on that question type/);
