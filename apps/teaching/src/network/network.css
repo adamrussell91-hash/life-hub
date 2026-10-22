@@ -172,7 +172,13 @@
 }
 
 .net-lines__row input:first-of-type {
-  flex: 1 1 180px;
+  flex: 1 1 110px;
+}
+
+/* What the line stands for in the syllabus: shares the row's spare room with the name. */
+.net-lines__row .net-lines__syllabus {
+  flex: 0 1 140px;
+  max-width: 190px;
 }
 
 .net-lines__row .net-lines__short {
