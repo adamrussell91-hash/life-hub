@@ -8,6 +8,27 @@ import type { PsAction, PsSession } from '../../../../../packages/problem-solver
 import { coachAvatar, thinkingDots } from './decor';
 
 export type CoachPanelHandlers = { onSay: (text: string) => void; onAction: (action: PsAction) => void };
+
+/**
+ * How the panel looks in a tool: its coach avatar, the emblem beside a suggested tool, the
+ * framing questions per session kind and the word for the session. Problem Solver's is the
+ * default; Decision Maker passes its own (decision-book/decor.ts).
+ */
+export type CoachLook = {
+  avatar(): Element;
+  emblem(tool: string): Element;
+  frames: Record<string, { keys: string[]; prompts: string[] }>;
+  noun: string;
+  /** The card that offers a quick route's way on to a full session. */
+  escalate?: { title: string; accept: string };
+};
+
+const PS_LOOK: CoachLook = {
+  avatar: coachAvatar,
+  emblem: (tool) => toolEmblem(tool as never),
+  frames: { full: { keys: ['goal', 'whatIsTrue', 'whatCanBeDone'], prompts: ['What is the goal?', 'What is true?', 'What can be done?'] } },
+  noun: 'Problem'
+};
 export type CoachPanel = { el: HTMLElement; update(session: PsSession): void };
 
 function actionButton(label: string, action: PsAction, handlers: CoachPanelHandlers, kind = 'btn--ghost'): HTMLButtonElement {
@@ -28,11 +49,11 @@ function keepRefused(session: PsSession): boolean {
   return Boolean(keep && run && acceptProblem(run, keep));
 }
 
-function message(turn: PsSession['turns'][number], fresh: boolean): HTMLLIElement {
+function message(turn: PsSession['turns'][number], fresh: boolean, look: CoachLook): HTMLLIElement {
   const coach = turn.role !== 'user';
   const item = el('li', `chat-message chat-message--${coach ? 'assistant' : 'user'} ps-msg${fresh ? ' is-new' : ''}`) as HTMLLIElement;
   item.dataset.turn = turn.id;
-  if (coach) item.append(coachAvatar());
+  if (coach) item.append(look.avatar());
   item.append(el('div', 'chat-message__body', turn.text));
   const chips = [...(turn.skillsSeen ?? []).map((id) => skillChip(id)), ...(turn.skillsMissing ?? []).map((id) => skillChip(id, { missing: true }))];
   if (chips.length) {
@@ -44,15 +65,15 @@ function message(turn: PsSession['turns'][number], fresh: boolean): HTMLLIElemen
   return item;
 }
 
-function thinkingBubble(): HTMLLIElement {
+function thinkingBubble(look: CoachLook): HTMLLIElement {
   const item = el('li', 'chat-message chat-message--assistant ps-msg ps-msg--thinking is-new') as HTMLLIElement;
   const body = el('div', 'chat-message__body ps-thinking');
   body.append(thinkingDots(), el('span', '', 'Coach is thinking…'));
-  item.append(coachAvatar(), body);
+  item.append(look.avatar(), body);
   return item;
 }
 
-function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLElement | null {
+function suggestionCard(session: PsSession, handlers: CoachPanelHandlers, look: CoachLook): HTMLElement | null {
   const suggestion = session.suggestion;
   if (!suggestion) return null;
   const card = el('div', 'ps-suggestion confirm-card');
@@ -70,14 +91,14 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
     title = `Reopen: ${model && target ? stepName(model, target) : suggestion.step}`;
     accept = 'Reopen it';
   } else if (suggestion.kind === 'escalate') {
-    title = 'This needs the full process';
-    accept = 'Start the full process';
+    title = look.escalate?.title ?? 'This needs the full process';
+    accept = look.escalate?.accept ?? 'Start the full process';
     acceptAction = 'escalate';
   } else {
     title = `${suggestion.kind === 'switch_tool' ? 'Switch to' : 'Next'}: ${TOOLS[suggestion.tool].name}`;
   }
   const heading = el('p', 'ps-suggestion__title', title);
-  if (suggestion.kind === 'next_tool' || suggestion.kind === 'switch_tool') heading.prepend(toolEmblem(suggestion.tool));
+  if (suggestion.kind === 'next_tool' || suggestion.kind === 'switch_tool') heading.prepend(look.emblem(suggestion.tool));
   card.append(heading, el('p', 'ps-suggestion__reason', suggestion.reason));
   const row = el('div', 'ps-suggestion__actions');
   row.append(actionButton(accept, acceptAction, handlers, 'btn--primary'), actionButton('Not now', 'dismiss_suggestion', handlers));
@@ -91,7 +112,8 @@ function suggestionCard(session: PsSession, handlers: CoachPanelHandlers): HTMLE
  * page does not jump while the coach is polled. `slots.cards` (the task confirm cards) sits
  * between the extras and the composer and keeps its own DOM when the extras are replaced.
  */
-export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: HTMLElement } = {}): CoachPanel {
+export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: HTMLElement; look?: CoachLook } = {}): CoachPanel {
+  const look = slots.look ?? PS_LOOK;
   const panel = el('section', 'ps-coach');
   panel.setAttribute('aria-label', 'Coach');
   const list = el('ul', 'chat-messages ps-coach__messages');
@@ -137,7 +159,8 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
       const busy = session.runner.status === 'queued' || session.runner.status === 'running';
       // A failed boundary turn must be retried before anything else: the step has already moved.
       const boundaryFailed = session.runner.status === 'failed' && session.runner.mode === 'boundary';
-      const lightning = session.kind === 'lightning';
+      // A Lightning run or a quick decision: a fixed flow with no frame and no steps.
+      const lightning = session.kind === 'lightning' || session.kind === 'quick';
       // A finished Lightning run takes no more replies until It came back starts a new round.
       const closed = lightning && session.status !== 'active';
       const locked = busy || boundaryFailed || closed;
@@ -147,7 +170,7 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
         shown.add(turn.id);
         // Clear the composer once the answer is in the thread, so a failed send keeps the text.
         if (!first && turn.role === 'user' && input.value.trim() === turn.text.trim()) input.value = '';
-        const node = message(turn, !first);
+        const node = message(turn, !first, look);
         if (thinking && turn.role !== 'user') {
           thinking.replaceWith(node);
           thinking = null;
@@ -158,7 +181,7 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
         }
       }
       if (busy && !thinking) {
-        thinking = thinkingBubble();
+        thinking = thinkingBubble(look);
         list.append(thinking);
       } else if (!busy && thinking) {
         thinking.remove();
@@ -171,7 +194,7 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
         failed.append(el('span', '', session.runner.error ?? 'The coach could not answer.'), actionButton('Try again', 'retry', handlers));
         parts.push(failed);
       }
-      const card = boundaryFailed ? null : suggestionCard(session, handlers);
+      const card = boundaryFailed ? null : suggestionCard(session, handlers, look);
       if (card) parts.push(card);
       const actions = el('div', 'ps-coach__actions');
       if (session.pendingKeep && !locked) {
@@ -191,10 +214,10 @@ export function mountCoachPanel(handlers: CoachPanelHandlers, slots: { cards?: H
         extras.replaceChildren(...parts);
       }
 
-      const question = !lightning && session.phase === 'frame' ? (['goal', 'whatIsTrue', 'whatCanBeDone'] as const).findIndex((key) => !session.frame[key]) : -1;
-      const prompts = ['What is the goal?', 'What is true?', 'What can be done?'];
+      const frame = look.frames[session.kind] ?? look.frames.full ?? PS_LOOK.frames.full;
+      const question = !lightning && session.phase === 'frame' ? frame.keys.findIndex((key) => !session.frame[key as keyof PsSession['frame']]) : -1;
       const stepLabel = inStep ? `Step: ${stepName(session.model!.id, session.phase)}` : '';
-      now.textContent = lightning ? '' : question >= 0 ? `Answering: ${prompts[question]}` : session.phase === 'finished' ? 'Problem finished' : stepLabel;
+      now.textContent = lightning ? '' : question >= 0 ? `Answering: ${frame.prompts[question]}` : session.phase === 'finished' ? `${look.noun} finished` : stepLabel;
       now.dataset.q = String(question);
       input.placeholder = closed ? 'This run is done.' : !lightning && session.phase === 'finished' ? 'Add a note for next time…' : 'Your answer…';
       input.disabled = locked;

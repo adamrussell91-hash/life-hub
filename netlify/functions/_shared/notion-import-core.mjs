@@ -1063,6 +1063,7 @@ var QUIZ_QUESTION_KINDS = [
   "categorise",
   "quote_technique",
   "find_it",
+  "spot_technique",
   "label_image",
   "extended_response",
   "explain_effect"
@@ -1090,6 +1091,13 @@ var QuizChoiceSchema = z6.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
 var QuizPairSchema = z6.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
 var QuizGroupSchema = z6.object({ id: Id, name: Text(120) });
 var QuizSortItemSchema = z6.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
+var QuizSpotTargetSchema = z6.object({
+  id: Id,
+  /** The words, copied exactly from the passage. */
+  quote: Text(QUIZ_LIMITS.option),
+  /** Every technique a fair marker would accept for these words. */
+  correct: z6.array(Id).min(1).max(10)
+});
 var QuizPinSchema = z6.object({
   id: Id,
   x: z6.number().min(0).max(1),
@@ -1138,6 +1146,21 @@ var QuizQuestionSchema = z6.discriminatedUnion("kind", [
     kind: z6.literal("find_it"),
     segments: z6.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
     correct: z6.array(Id).min(1).max(40)
+  }),
+  z6.object({
+    ...base,
+    kind: z6.literal("spot_technique"),
+    passage: Text(QUIZ_LIMITS.passage),
+    options: z6.array(
+      QuizChoiceSchema.extend({
+        technique_id: z6.string().max(64).optional(),
+        /** How many times students may name it: 2 for a passage with two similes. */
+        uses: z6.number().int().min(1).max(12).optional()
+      })
+    ).min(2).max(10),
+    targets: z6.array(QuizSpotTargetSchema).min(1).max(12),
+    /** How many students must find. Fewer than the targets means any of them will do. */
+    find: z6.number().int().min(1).max(12).optional()
   }),
   z6.object({ ...base, kind: z6.literal("label_image"), image: QuizImageSchema, pins: z6.array(QuizPinSchema).min(2).max(8) }),
   z6.object({
@@ -1188,6 +1211,24 @@ function questionProblems(q) {
       if (q.correct.length >= q.segments.length) out.push("Leave at least one line that isn\u2019t an answer.");
       break;
     }
+    case "spot_technique": {
+      unique(q.options.map((o) => o.id), "techniques");
+      unique(q.targets.map((t) => t.id), "answers");
+      if (new Set(q.options.map((o) => norm(o.text))).size !== q.options.length) out.push("Two techniques say the same thing.");
+      const ids = new Set(q.options.map((o) => o.id));
+      for (const target of q.targets) {
+        if (!locateQuote(q.passage, target.quote)) out.push(`\u201C${target.quote}\u201D isn\u2019t in the passage. Copy the words exactly.`);
+        if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push("Name the technique for every answer.");
+      }
+      if ((q.find ?? q.targets.length) > q.targets.length) out.push("Students can\u2019t be asked to find more than there are answers.");
+      if ((q.find ?? q.targets.length) > 1) {
+        for (const option of q.options) {
+          const needed = q.targets.filter((t) => t.correct.length === 1 && t.correct[0] === option.id).length;
+          if (needed > (option.uses ?? 1)) out.push(`${option.text.trim() || "A technique"} is the answer ${needed} times. Set it to \xD7${needed}.`);
+        }
+      }
+      break;
+    }
     case "fill_gap":
       if (!parseGapPassage(q.passage).some((part) => part.type === "gap")) out.push("Blank out at least one word.");
       break;
@@ -1228,6 +1269,34 @@ function parseGapPassage(passage) {
   if (last < passage.length) parts.push({ type: "text", text: passage.slice(last) });
   return parts;
 }
+function passageWords(passage) {
+  const words = [];
+  const re = /\S+/g;
+  let line = 0;
+  let seen = 0;
+  for (let m = re.exec(passage); m; m = re.exec(passage)) {
+    line += (passage.slice(seen, m.index).match(/\n/g) ?? []).length;
+    seen = m.index;
+    words.push({ text: m[0], start: m.index, end: m.index + m[0].length, line });
+  }
+  return words;
+}
+function wordKey(word) {
+  return norm(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+function locateQuote(passage, quote) {
+  const words = passageWords(passage);
+  const keyed = words.map((w, i) => ({ i, key: wordKey(w.text) })).filter((w) => w.key);
+  const wanted = passageWords(quote).map((w) => wordKey(w.text)).filter(Boolean);
+  if (!wanted.length) return null;
+  for (let s = 0; s + wanted.length <= keyed.length; s++) {
+    if (wanted.every((key, j) => keyed[s + j].key === key)) return { from: keyed[s].i, to: keyed[s + wanted.length - 1].i };
+  }
+  return null;
+}
+var FILLER = new Set(
+  "a an the and or but of to in on at by for with from as is are was were be been it its this that these those i you he she we they his her their our my your so then than".split(" ")
+);
 var QuizFeedbackSchema = z6.enum(["instant", "end", "released"]);
 var QuizSettingsSchema = z6.object({
   /** Whole-quiz countdown in minutes. */
@@ -1271,10 +1340,13 @@ function checkQuestion(input) {
     groups: "Name every group.",
     quote: "Paste the quote.",
     segments: "Paste a passage of at least two lines.",
+    targets: "Select the words for at least one answer and name its technique.",
     pins: "Add at least two pins, each with a label.",
     image: "Choose an image.",
     marks: `Marks must be between 1 and ${QUIZ_LIMITS.marksMax}.`
   };
+  if (raw.kind === "spot_technique" && field === "passage") return { ok: false, message: "Paste the passage." };
+  if (raw.kind === "spot_technique" && field === "options") return { ok: false, message: "Fill in every technique." };
   return { ok: false, message: messages[field] ?? "Check the question: something is missing or too long." };
 }
 
@@ -3846,6 +3918,10 @@ var UnitSchema = z12.object({
 // apps/teaching/src/schemas/class.ts
 import { z as z13 } from "zod";
 
+// apps/teaching/src/schemas/student-initials.ts
+var INITIALS_PATTERN = /^[A-Z]{1,4}[0-9]?$/;
+var STUDENT_ID_PATTERN = /^st_[a-z0-9_]{1,24}$/;
+
 // apps/teaching/src/schedule/timetable.js
 var DAY_MS = 864e5;
 var TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -3900,7 +3976,11 @@ var ClassHomepageSchema = z13.object({
 });
 var ClassStudentSchema = z13.object({
   name: z13.string().min(1).max(80),
-  skip_picker: z13.boolean().default(false)
+  skip_picker: z13.boolean().default(false),
+  /** Never changes once saved, so renames keep a student's quiz results. */
+  id: z13.string().regex(STUDENT_ID_PATTERN).optional(),
+  /** What the student types to take a quiz. Unique within the class. */
+  initials: z13.string().regex(INITIALS_PATTERN).optional()
 });
 var MAX_CLASS_STUDENTS = 60;
 var ClassSchema = z13.object({

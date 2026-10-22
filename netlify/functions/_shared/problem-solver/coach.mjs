@@ -4,10 +4,14 @@ import { acceptProblem, addEdge, canEdge, canPlace, checkNode, nextSlots, placeN
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
+import { buildDecisionPrompt } from './decision-prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
+import { buildQuickPrompt, checkQuickTurn } from './quick-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
-import { activeRun, reopenProblem, waitingForReview } from './session.mjs';
+import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
+import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { basisCandidates, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 
 const WORD_LIMIT = 60;
 const REWRITE_OVER = 70;
@@ -97,19 +101,30 @@ function withAcceptedNode(session, turn) {
   return { ...session, steps: { ...session.steps, [session.phase]: { ...step, runs } } };
 }
 
+/** Tools a frame-phase suggestion may name: Explore's models for a decision, else Define tools. */
+function frameTools(session) {
+  return session.kind === 'decision' ? toolsForPlanStep('decision_book', 'explore') : toolsForBookStep('define');
+}
+
+/** True when this reply ends framing: a decision's last frame answer, or a chosen model. */
+function endsFrame(session, value) {
+  if (session.kind === 'decision') return frameKeysOf(session).every((key) => Boolean(session.frame[key] || value.frame?.[key]));
+  return Boolean(value.model);
+}
+
 function parse(session, text) {
   const result = validateCoachTurn(extractJson(text));
   if (!result.ok) return result;
   if (result.value.suggestion?.kind === 'escalate') result.value = { ...result.value, suggestion: null };
   if (session.runner?.mode === 'boundary' || session.phase === 'finished') return { ok: true, value: { ...result.value, suggestion: null, proposeTasks: [], proposeReview: null } };
-  // In frame a suggestion only means something on the turn that sets the model (the frame
+  // In frame a suggestion only means something on the turn that ends framing (the frame
   // completes and the first step opens); otherwise accepting it would be refused.
-  if (session.phase === 'frame' && (!result.value.model || result.value.suggestion?.kind === 'next_step')) {
+  if (session.phase === 'frame' && (!endsFrame(session, result.value) || result.value.suggestion?.kind === 'next_step')) {
     result.value = { ...result.value, suggestion: null };
   }
   const suggested = result.value.suggestion;
   if (suggested && (suggested.kind === 'next_tool' || suggested.kind === 'switch_tool')) {
-    const allowed = session.phase === 'frame' || !session.model ? toolsForBookStep('define') : toolsForPlanStep(session.model.id, session.phase);
+    const allowed = session.phase === 'frame' || !session.model ? frameTools(session) : toolsForPlanStep(session.model.id, session.phase);
     if (!allowed.includes(suggested.tool)) return { ok: false, error: `Tool ${suggested.tool} is not available in this step. Available: ${allowed.join(', ') || 'none, so do not suggest a tool'}.` };
   }
   // A reopen the session would refuse (judged with this turn's accepted node in place) is dropped.
@@ -118,9 +133,25 @@ function parse(session, text) {
   if (waitingForReview(session) && result.value.suggestion && result.value.suggestion.kind !== 'next_step') result.value = { ...result.value, suggestion: null };
   const fitted = fitToRun(session, result.value);
   if (fitted.error) return { ok: false, error: fitted.error };
-  const value = fitted.value;
+  const value = withBasis(session, fitted.value);
+  if (value.error) return { ok: false, error: value.error };
   if (value.suggestion?.kind === 'reopen_step' && reopenProblem(withAcceptedNode(session, value), value.suggestion.step)) return { ok: true, value: { ...value, suggestion: null } };
   return { ok: true, value };
+}
+
+/**
+ * A basis belongs only to a decision record reason. An accepted reason must rest on at least one
+ * placed Explore node when any exist (the repair names them); a reason with nothing behind it is
+ * challenged instead.
+ */
+function withBasis(session, value) {
+  const run = activeRun(session);
+  const reason = run?.tool === RECORD_ID && value.node && parseSlot(value.node.slot)?.name === 'reason';
+  if (!reason) return value.basis?.length ? { ...value, basis: [] } : value;
+  if (value.verdict !== 'accept' || resolveBasis(session, value.basis).length) return value;
+  const candidates = basisCandidates(session);
+  if (!candidates.length) return value;
+  return { error: `A reason rests on what a model showed: put at least one of these in "basis" as {"tool","slot"}, or challenge the reason. ${candidates.slice(0, 20).map((c) => `${c.tool} ${c.slot}`).join('; ')}.` };
 }
 
 function parseLightning(session, text) {
@@ -128,11 +159,23 @@ function parseLightning(session, text) {
   return result.ok ? checkLightningTurn(session, result.value) : result;
 }
 
+function parseQuick(session, text) {
+  const result = validateCoachTurn(extractJson(text));
+  return result.ok ? checkQuickTurn(session, result.value) : result;
+}
+
+/** Each session kind's prompt and reply check; full and decision sessions share the step parser. */
+const PROMPTS = {
+  lightning: { build: buildLightningPrompt, read: parseLightning },
+  quick: { build: buildQuickPrompt, read: parseQuick },
+  decision: { build: buildDecisionPrompt, read: parse },
+  full: { build: buildCoachPrompt, read: parse }
+};
+
 export function createModelCoach(model) {
   return async function modelCoach(session) {
-    const lightning = session.kind === 'lightning';
-    const prompt = lightning ? buildLightningPrompt(session) : buildCoachPrompt(session);
-    const read = lightning ? parseLightning : parse;
+    const { build, read } = PROMPTS[session.kind] ?? PROMPTS.full;
+    const prompt = build(session);
     const first = await model({ ...prompt, maxTokens: 900 });
     let result = read(session, first);
     if (!result.ok) result = read(session, await model({ ...repairPrompt(prompt, first, result.error), maxTokens: 900 }));

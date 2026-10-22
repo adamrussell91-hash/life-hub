@@ -31,6 +31,12 @@ export interface TeacherBlockPulseOptions {
 
 export interface TeacherBlockPulseHandle {
   decorate(row: HTMLElement, block: Block): void;
+  /** Latest counts, or null before the first load lands. */
+  current(): LessonPulse | null;
+  /** Called after every load or reset; returns an unsubscribe. */
+  subscribe(listener: (data: LessonPulse | null) => void): () => void;
+  /** Scrolls to a block's dot and opens its panel. */
+  focusBlock(blockId: string): void;
   dispose(): void;
 }
 
@@ -66,7 +72,8 @@ export function createTeacherBlockPulse(options: TeacherBlockPulseOptions): Teac
   let data: LessonPulse | null = null;
   let loadedAt = 0;
   let disposed = false;
-  const dots = new Map<string, { block: Block; paint: () => void }>();
+  const dots = new Map<string, { block: Block; paint: () => void; anchor: ReturnType<typeof createPulseAnchor> }>();
+  const listeners = new Set<(data: LessonPulse | null) => void>();
 
   function summary(blockId: string): BlockPulseSummary | undefined {
     return data?.blocks[blockId];
@@ -74,6 +81,7 @@ export function createTeacherBlockPulse(options: TeacherBlockPulseOptions): Teac
 
   function paintAll(): void {
     for (const dot of dots.values()) dot.paint();
+    for (const listener of listeners) listener(data);
   }
 
   async function load(): Promise<void> {
@@ -194,7 +202,7 @@ export function createTeacherBlockPulse(options: TeacherBlockPulseOptions): Teac
     anchor.root.classList.add('pulse--teacher');
     target.classList.add('pulse-host');
     target.append(anchor.root);
-    dots.set(block.id, { block, paint });
+    dots.set(block.id, { block, paint, anchor });
     paint();
   }
 
@@ -206,9 +214,22 @@ export function createTeacherBlockPulse(options: TeacherBlockPulseOptions): Teac
         attach(el, target);
       }
     },
+    current: () => data,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    focusBlock(blockId: string) {
+      const dot = dots.get(blockId);
+      if (!dot?.anchor.root.isConnected) return;
+      dot.anchor.root.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (!dot.anchor.isOpen()) dot.anchor.dot.click();
+      dot.anchor.dot.focus({ preventScroll: true });
+    },
     dispose() {
       disposed = true;
       dots.clear();
+      listeners.clear();
       document.removeEventListener('visibilitychange', onVisible);
     }
   };

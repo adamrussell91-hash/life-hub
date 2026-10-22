@@ -261,7 +261,8 @@ export function defaultClassId(
 
 /** Turn pasted text into a class list: one per line, or a spreadsheet column. Keeps skips by name. */
 export function parseStudentList(text: string, previous: readonly ClassStudent[] = [], max = 60): ClassStudent[] {
-  const skipped = new Set(previous.filter((s) => s.skip_picker).map((s) => s.name.trim().toLowerCase()));
+  // A student already on the list keeps their skip, id and initials when it is pasted again.
+  const before = new Map(previous.map((s) => [s.name.trim().toLowerCase(), s]));
   const seen = new Set<string>();
   const out: ClassStudent[] = [];
   for (const raw of text.split(/[\n\r\t]+/)) {
@@ -269,7 +270,13 @@ export function parseStudentList(text: string, previous: readonly ClassStudent[]
     const key = name.toLowerCase();
     if (!name || seen.has(key)) continue;
     seen.add(key);
-    out.push({ name, skip_picker: skipped.has(key) });
+    const old = before.get(key);
+    out.push({
+      name,
+      skip_picker: old?.skip_picker ?? false,
+      ...(old?.id ? { id: old.id } : {}),
+      ...(old?.initials ? { initials: old.initials } : {})
+    });
     if (out.length >= max) break;
   }
   return out;

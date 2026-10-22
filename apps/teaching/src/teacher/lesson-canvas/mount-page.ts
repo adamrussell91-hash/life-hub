@@ -23,6 +23,7 @@ import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-edi
 import { renderBlock } from '@/blocks/render';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
 import { createTeacherBlockPulse } from '@/teacher/block-pulse';
+import { mountPulseSummary } from '@/teacher/pulse-summary';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
@@ -1063,6 +1064,15 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const stripHost = document.createElement('div');
   stripHost.className = 'lesson-page__meta-outcomes';
   metaRow.append(stripHost);
+
+  // Every dot's counts in one panel above the canvas, opened from the meta row.
+  const pulseSummary = mountPulseSummary({
+    pulse,
+    getBlocks: () => lesson.blocks,
+    isLessonOff: () => lesson.feedback_off === true
+  });
+  metaRow.append(pulseSummary.chip);
+  canvasHost.before(pulseSummary.panel);
   const strip =
     options.subject && options.outcomesCatalog
       ? mountOutcomeStrip(stripHost, {
@@ -1111,6 +1121,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         ...(nextMedia ? { media } : {})
       });
       canvas.update(lesson.blocks, media);
+      pulseSummary.refresh();
       strip?.update({ attached: lesson, catalog: options.outcomesCatalog ?? [] });
       lineChips?.update(lesson.line_stops);
     },
@@ -1123,6 +1134,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     dispose() {
       quizPanel?.dispose();
       classExamples.dispose();
+      pulseSummary.dispose();
       pulse.dispose();
       canvas.dispose();
       strip?.dispose();

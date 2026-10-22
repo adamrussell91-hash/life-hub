@@ -376,6 +376,61 @@ describe('mountAiPanel', () => {
     });
   });
 
+  it('folds the protocol chips away once the chat has started', async () => {
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    const tray = () => mounted.host.querySelector<HTMLElement>('.agent-protocol-pills')!;
+    const toggle = () => mounted.host.querySelector<HTMLButtonElement>('.ai-panel__protocols-toggle')!;
+    expect(tray().hidden).toBe(false);
+    expect(toggle().hidden).toBe(true);
+
+    submitMessage(mounted.host, 'Hello');
+    await vi.waitFor(() => expect(tray().hidden).toBe(true));
+    expect(toggle().hidden).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+
+    toggle().click();
+    expect(tray().hidden).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('folds the chips the moment a message is sent, not when the reply lands', async () => {
+    pollAiJobMock.mockReturnValue(new Promise(() => {}));
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+    const tray = () => mounted.host.querySelector<HTMLElement>('.agent-protocol-pills')!;
+    const actions = () => mounted.host.querySelector<HTMLElement>('.ai-panel__actions')!;
+    const suggestions = () =>
+      mounted.host.querySelector<HTMLButtonElement>('.ai-panel__suggestions-toggle')!;
+    suggestions().click();
+    expect(actions().hidden).toBe(false);
+
+    submitMessage(mounted.host, 'Hello');
+    await vi.waitFor(() => expect(tray().hidden).toBe(true));
+    expect(actions().hidden).toBe(true);
+    expect(suggestions().getAttribute('aria-expanded')).toBe('false');
+    expect(handle.isWorking()).toBe(true);
+  });
+
+  it('starts a lesson with an existing chat folded, whatever the saved preference', () => {
+    const first = mountPanel();
+    first.handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+    first.host.querySelector<HTMLButtonElement>('.ai-panel__suggestions-toggle')!.click();
+    first.handle.dispose();
+    localStorage.setItem(
+      'teaching_hub_ai_transcript_lesson_1',
+      JSON.stringify([{ id: 'm1', role: 'user', text: 'Earlier' }])
+    );
+
+    const second = mountPanel();
+    handle = second.handle;
+    handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+
+    expect(second.host.querySelector<HTMLElement>('.agent-protocol-pills')!.hidden).toBe(true);
+    expect(second.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(true);
+  });
+
   it('keeps suggestion buttons out of the way until asked for', () => {
     const mounted = mountPanel();
     handle = mounted.handle;
@@ -397,6 +452,55 @@ describe('mountAiPanel', () => {
 
     toggle!.click();
     expect(mounted.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(true);
+  });
+
+  it('starts a new chat, settling the finished job so it does not come back', async () => {
+    pollAiJobMock.mockResolvedValue({ ...workingJob(), status: 'done', response: 'All done' });
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    const newChat = () => mounted.host.querySelector<HTMLButtonElement>('.ai-panel__new-chat')!;
+    expect(newChat().hidden).toBe(true);
+
+    submitMessage(mounted.host, 'Hello');
+    await vi.waitFor(() => expect(handle!.isWorking()).toBe(false));
+    expect(newChat().hidden).toBe(false);
+
+    newChat().click();
+    await vi.waitFor(() => expect(mounted.host.querySelectorAll('.ai-panel__msg')).toHaveLength(0));
+    expect(newChat().hidden).toBe(true);
+    expect(mounted.host.querySelector<HTMLElement>('.agent-protocol-pills')!.hidden).toBe(false);
+    expect(localStorage.getItem('teaching_hub_ai_transcript_lesson_1')).toBe('[]');
+    expect(resolveAiJobMock).toHaveBeenCalledWith('job_1', 'dismissed');
+  });
+
+  it('asks before a new chat drops a proposal waiting on Confirm', async () => {
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Build a lesson');
+    await vi.waitFor(() => expect(acceptButton(mounted.host)).toBeDefined());
+
+    mounted.host.querySelector<HTMLButtonElement>('.ai-panel__new-chat')!.click();
+    const keep = await vi.waitFor(() => {
+      const btn = [...document.querySelectorAll<HTMLButtonElement>('.confirm-card-overlay button')]
+        .find((el) => el.textContent === 'Keep this chat');
+      expect(btn).toBeDefined();
+      return btn!;
+    });
+    keep.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mounted.host.querySelectorAll('.ai-panel__msg').length).toBeGreaterThan(0);
+    expect(resolveAiJobMock).not.toHaveBeenCalled();
+
+    mounted.host.querySelector<HTMLButtonElement>('.ai-panel__new-chat')!.click();
+    const start = await vi.waitFor(() => {
+      const btn = [...document.querySelectorAll<HTMLButtonElement>('.confirm-card-overlay button')]
+        .find((el) => el.textContent === 'Start new chat');
+      expect(btn).toBeDefined();
+      return btn!;
+    });
+    start.click();
+    await vi.waitFor(() => expect(mounted.host.querySelectorAll('.ai-panel__msg')).toHaveLength(0));
+    expect(resolveAiJobMock).toHaveBeenCalledWith('job_1', 'rejected');
   });
 
   it('remembers that suggestions were opened', () => {

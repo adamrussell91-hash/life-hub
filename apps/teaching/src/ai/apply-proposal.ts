@@ -76,6 +76,15 @@ export function applyProposalToLesson(
       : { ok: false, message: 'Target block not found', lesson };
   }
 
+  if (proposal.kind === 'replace_blocks') {
+    let next = lesson.blocks;
+    for (const block of proposal.blocks) {
+      if (!findBlockById(next, block.id)) return { ok: false, message: `Block ${block.id} not found`, lesson };
+      next = replaceBlockInTree(next, block.id, block);
+    }
+    return { ok: true, lesson: withBlocks(lesson, next) };
+  }
+
   if (proposal.kind === 'replace_section') {
     if (proposal.section.block_type !== 'section') {
       return { ok: false, message: 'Not a section', lesson };

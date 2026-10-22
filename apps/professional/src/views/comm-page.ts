@@ -1,7 +1,7 @@
 import { mountTagAnythingSection } from '@/views/entity-tagger';
+import { makeActionTask } from '@/lib/action-task';
 import { createCommunication, getCommunication, updateCommunication } from '@/api/communications';
 import {
-  createTask,
   createUniversalLink,
   endUniversalLink,
   listUniversalLinksForEntity,
@@ -193,7 +193,7 @@ export async function renderCommPage(
   const main = el('div', 'comm-page__main');
   const rail = buildPeopleRail(data);
   const tagCard = el('section', 'card comm-page__tags');
-  mountTagAnythingSection(tagCard, `professional:communication:${data.record.id}`);
+  const tags = mountTagAnythingSection(tagCard, data.commRef);
   rail.append(tagCard);
   const grid = el('div', 'comm-page__grid');
   grid.append(main, rail);
@@ -485,10 +485,13 @@ export async function renderCommPage(
         toggle.disabled = Boolean(item.task_ref);
         toggle.addEventListener('click', async () => {
           toggle.disabled = true;
-          const task = await createTask({ title: item.text });
-          const { item: next } = await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` });
-          Object.assign(item, next);
-          toggle.setAttribute('aria-checked', 'true');
+          try {
+            Object.assign(item, await makeActionTask(item, data.commRef));
+            toggle.setAttribute('aria-checked', 'true');
+            void tags.refresh();
+          } catch {
+            toggle.disabled = false;
+          }
         });
         row.append(toggle);
         mine.append(row);

@@ -11,7 +11,8 @@ import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/
 import { BOOK_STEPS, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
 import type { PsAction, PsCaseFileOffer, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
-import { isBusy, pollUntilSettled, problemSolverApi } from './api';
+import { decisionBookApi, isBusy, pollUntilSettled, problemSolverApi } from './api';
+import { skillsRibbon } from './skills-ribbon';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
 import { createTaskBridge } from './task-bridge';
@@ -39,7 +40,7 @@ const phaseLabel = (row: PsSummary): string =>
 const phaseColour = (phase: string): string => (phase === 'frame' ? 'var(--ps-blue)' : phase === 'finished' ? 'var(--ps-red)' : 'var(--ps-yellow)');
 const COLOURS = ['var(--ps-red)', 'var(--ps-yellow)', 'var(--ps-blue)'];
 
-function section(title: string, aside: string, ...body: Node[]): HTMLElement {
+export function section(title: string, aside: string, ...body: Node[]): HTMLElement {
   const wrap = el('section', 'ps-section');
   const head = el('div', 'ps-section__head');
   head.append(el('h2', 'section-title ps-section__title', title), el('p', 'ps-section__aside', aside));
@@ -208,28 +209,6 @@ export function toolShelf(): HTMLElement {
   return groups;
 }
 
-function skillsRibbon(sessions: PsSummary[]): HTMLElement {
-  const totals: Record<string, number> = {};
-  for (const row of sessions) for (const [id, n] of Object.entries(row.skills ?? {})) totals[id] = (totals[id] ?? 0) + n;
-  const max = Math.max(1, ...Object.values(totals));
-  const grid = el('ul', 'ps-skills');
-  SKILLS.forEach((skill, i) => {
-    const n = totals[skill.id] ?? 0;
-    const item = el('li', `ps-skills__item${n ? '' : ' is-unused'}`);
-    item.title = skill.description;
-    const text = el('span', 'ps-skills__text');
-    const bar = el('span', 'ps-skills__bar');
-    const fill = el('i');
-    fill.style.setProperty('--w', `${(n / max) * 100}%`);
-    fill.style.setProperty('--c', COLOURS[i % 3]);
-    bar.append(fill);
-    text.append(el('span', 'ps-skills__name', skill.name), el('span', 'ps-skills__count', n ? `${n}×` : 'Not yet'), bar);
-    item.append(skillGlyph(skill.id), text);
-    grid.append(item);
-  });
-  return grid;
-}
-
 async function renderList(canvas: HTMLElement): Promise<void> {
   const page = el('div', 'ps-page ps-landing ps-scope');
   const board = createShapeBoard();
@@ -243,7 +222,11 @@ async function renderList(canvas: HTMLElement): Promise<void> {
   hero.append(copy, board.el);
   page.append(hero);
 
-  const sessions = (await problemSolverApi.list()).filter((item) => item.status !== 'archived');
+  const [sessions, decisions] = await Promise.all([
+    problemSolverApi.list().then((rows) => rows.filter((item) => item.status !== 'archived')),
+    // The shared tally only: a Decision Maker that cannot be reached leaves its share out.
+    decisionBookApi.list().catch(() => [] as PsSummary[])
+  ]);
   const problems = el('ul', 'ps-probs');
   problems.append(...sessions.map(problemCard));
   const fresh = el('li', 'ps-prob ps-prob--new');
@@ -260,13 +243,13 @@ async function renderList(canvas: HTMLElement): Promise<void> {
     section('Problems', sessions.length ? 'Each badge fills in as you go. Blue, yellow and red are the three framing questions; the centre is the tool in use.' : 'Nothing yet. Start with the problem that is bugging you most.', problems),
     section('How a session builds', 'The order follows the toolkit’s problem solving process.', buildSteps()),
     section('The toolkit', 'The coach picks from these for each step. Here is what each one is for.', toolShelf()),
-    section('Thinking skills you have used', 'Totals across your problems. Faint marks have not come up yet.', skillsRibbon(sessions))
+    section('Thinking skills you have used', 'Across Problem Solver and Decision Maker. Faint marks have not come up yet.', skillsRibbon({ name: 'Problem Solver', sessions }, { name: 'Decision Maker', sessions: decisions }, (i) => COLOURS[i % 3]))
   );
   canvas.replaceChildren(page);
 }
 
 /** The twelve skill marks; ones seen in this session fill in, newly earned ones pop. */
-function createSkillTray(): { el: HTMLElement; update(session: PsSession): void } {
+export function createSkillTray(): { el: HTMLElement; update(session: PsSession): void } {
   const tray = el('div', 'ps-tray');
   const head = el('div', 'ps-tray__head');
   const count = el('span', 'ps-tray__count');
@@ -319,7 +302,7 @@ export function reviewEntry(session: PsSession, wanted: string | null): ReviewEn
  * coach's proposals that are not linked already, then a new project named by the case file.
  * `labels` maps `kind:id` to a fetched title.
  */
-export function caseFilePlaces(session: PsSession, labels: Record<string, string>): PlaceOption[] {
+export function caseFilePlaces(session: PsSession, labels: Record<string, string>, newTitle = composeCaseFile(session)?.title ?? 'the case file'): PlaceOption[] {
   const out: PlaceOption[] = [];
   const seen = new Set<string>();
   const add = (value: string, label: string) => {
@@ -335,7 +318,7 @@ export function caseFilePlaces(session: PsSession, labels: Record<string, string
     const value = `task:${proposal.taskId}`;
     add(value, `Task: ${labels[value] ?? proposal.title}`);
   }
-  add('new', `New project: ${composeCaseFile(session)?.title ?? 'the case file'}`);
+  add('new', `New project: ${newTitle}`);
   return out;
 }
 
@@ -504,7 +487,7 @@ async function renderSession(canvas: HTMLElement, id: string): Promise<void> {
     createReview: (edits) => bridge.createReview(session, edits),
     dismissReview: () => confirmed('dismiss_review', {}),
     places: (s) => placesFor(s),
-    writeCaseFile: (offer, choice) => writeCaseFile(offer, choice),
+    writeCaseFile: (offer, choice) => writeCaseFile(offer as PsCaseFileOffer, choice),
     dismissCaseFile: (key) => confirmed('dismiss_case_file', { key })
   }, { fallbackFocus: () => coach.el.querySelector('textarea') });
   const coach = mountCoachPanel({ onSay: (text) => void act('say', text), onAction: (action) => void act(action) }, { cards: cards.el });

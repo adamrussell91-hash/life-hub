@@ -13,19 +13,25 @@
  *   quiz/{lesson}/live/{session}/players/{device}    { joined_at }
  *   quiz/{lesson}/live/{session}/answers/{i}/{device} create-only answer to question i
  *
+ * Students answer from a class page. Once a class has a list, a student
+ * claims their initials (class-claims.mjs) and their attempts are kept under
+ * the student, not the device, so they follow them to a new device after the
+ * teacher releases the old one. A class with no list stays anonymous.
+ *
  * Answers never reach the published lesson. On publish each question is split
  * into what students see and a key (quiz-core.mjs); keys are stored here by
  * publish version, so a republish never re-marks old attempts against new ids.
  * Every mark is worked out on the server.
  *
  * Students have no accounts. A device keeps a random token and the server
- * keeps a hash of it, which is how attempts and live answers are counted.
+ * keeps a hash of it. Attempts are counted by that hash, or by the student once initials are claimed.
  */
 import { randomBytes, randomInt } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
+import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, listSubmissions, read, reject, reviewSubmission, validToken, walkBlocks } from './question-drop.mjs';
 import {
   QuizSettingsSchema,
@@ -240,17 +246,46 @@ async function deviceAttempts(store, k, device) {
   return Promise.all(starts.map((start) => loadAttempt(store, k, device, start)));
 }
 
+/**
+ * Works out who is answering. With no class the quiz can be looked at but not
+ * answered. A class with no list stays anonymous. Otherwise the device must
+ * hold claimed initials, and `claim` is how it gets them.
+ */
+async function identify(store, body, action) {
+  if (!body.class_id) return { classId: null, student: null, need: 'class' };
+  const roster = await loadRoster(store, body.class_id);
+  if (!roster) reject(404, 'need_class', 'Open this quiz from your class page.');
+  if (!roster.students.length) return { classId: roster.cls.id, student: null, need: null };
+  const student = action === 'claim'
+    ? await claimInitials(store, roster, body.class_token, body.initials)
+    : await claimFor(store, roster, body.class_token);
+  return { classId: roster.cls.id, student, need: student ? null : 'initials' };
+}
+
+function needIdentity(who) {
+  if (who.need === 'class') reject(403, 'need_class', 'Open this quiz from your class page.');
+  if (who.need === 'initials') reject(403, 'need_initials', 'Type your initials first.');
+}
+
+/** Whose attempts these are: the student once known, else this device. Same 24-hex shape either way. */
+const ownerOf = (who, token) => (who.student ? deviceHash(`student:${who.classId}:${who.student.id}`) : deviceHash(token));
+const identityOf = (who) => ({ need: who.need, initials: who.student?.initials ?? null });
+const studentFields = (who) => (who.classId ? { class_id: who.classId, ...(who.student ? { student_id: who.student.id } : {}) } : {});
+
 export async function quizAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
   if (action.startsWith('live_')) return liveStudent(store, lessonId, body, action);
-  if (!['status', 'start', 'hint', 'check', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'claim', 'start', 'hint', 'check', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const { record, settings, k } = await loadQuiz(store, lessonId);
+  const who = await identify(store, body, action);
+  if (!['status', 'claim'].includes(action)) needIdentity(who);
   const now = Date.now();
   const closesAt = Date.parse(settings.closes_at ?? '');
   const closed = Number.isFinite(closesAt) && closesAt < now;
   const live = await read(store, k.live);
   const shared = {
+    identity: identityOf(who),
     version: record.version,
     open: !closed,
     attempts_allowed: settings.attempts,
@@ -258,12 +293,17 @@ export async function quizAction(store, lessonId, body) {
     questions: publicQuestions(record),
     live: !!live && live.expires > now && live.phase !== 'done'
   };
-  if (!body.token) {
-    if (action !== 'status') reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
-    return { ...shared, attempts_used: 0, current: null, results: [] };
+  // Until this device is known, it has no history here: the anonymous go it
+  // may have made elsewhere is not shown, so nothing vanishes after claiming.
+  if (who.need) return { ...shared, attempts_used: 0, current: null, results: [] };
+  if (!who.student) {
+    if (!body.token) {
+      if (!['status', 'claim'].includes(action)) reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
+      return { ...shared, attempts_used: 0, current: null, results: [] };
+    }
+    if (!validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
   }
-  if (!validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
-  const device = deviceHash(body.token);
+  const device = ownerOf(who, body.token);
   let attempts = await deviceAttempts(store, k, device);
   let current = attempts.find((a) => !a.result) ?? null;
   let reply = null;
@@ -290,7 +330,8 @@ export async function quizAction(store, lessonId, body) {
       n: attempts.reduce((top, a) => Math.max(top, a.n + 1), 0),
       version: record.version,
       started_at: new Date(now).toISOString(),
-      deadline: settings.timer_minutes ? new Date(now + settings.timer_minutes * 60_000).toISOString() : null
+      deadline: settings.timer_minutes ? new Date(now + settings.timer_minutes * 60_000).toISOString() : null,
+      ...studentFields(who)
     };
     await store.setJSON(k.attempt(device, start.n), start, { onlyIfNew: true });
     attempts = await deviceAttempts(store, k, device);
@@ -420,6 +461,14 @@ function confidenceOf(value) {
 
 /* ── Teacher ───────────────────────────────────────────────────────── */
 
+/** The teacher's label for an attempt: initials and name, or null when it was anonymous. */
+async function studentLabel(store, start, rosters) {
+  if (!start?.class_id || !start.student_id) return null;
+  if (!rosters.has(start.class_id)) rosters.set(start.class_id, loadRoster(store, start.class_id));
+  const found = (await rosters.get(start.class_id))?.students.find((s) => s.id === start.student_id);
+  return found ? { initials: found.initials, name: found.name } : { initials: null, name: null };
+}
+
 export async function quizTeacherAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   if (!isSafeId(lessonId)) reject(404, 'not_found', 'Quiz not found.');
@@ -440,6 +489,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     throw error;
   }
   const { record, settings, k } = loaded;
+  const rosters = new Map();
 
   if (action === 'release') {
     await store.setJSON(k.release, { released: body.released === true, at: new Date().toISOString() });
@@ -477,6 +527,7 @@ export async function quizTeacherAction(store, lessonId, body) {
       attempt: {
         id: attemptId(device, n),
         device: device.slice(0, 6),
+        student: await studentLabel(store, start, rosters),
         n,
         submitted_at: result.submitted_at,
         overtime: !!result.overtime,
@@ -503,6 +554,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     rows.push({
       id: attemptId(device, n),
       device: device.slice(0, 6),
+      student: await studentLabel(store, start, rosters),
       n,
       started_at: start.started_at,
       submitted_at: result.submitted_at,
@@ -619,14 +671,17 @@ async function liveStudent(store, lessonId, body, action) {
   const live = await liveState(store, k);
   if (!live || live.phase === 'done') return { live: null };
   if (body.session && body.session !== live.session) reject(409, 'new_session', 'Your teacher started a new live quiz. Join again.');
+  const who = await identify(store, body, action);
+  if (action === 'live_answer') needIdentity(who);
   const out = { session: live.session, phase: live.phase, index: live.index, total: live.order.length };
-  if (!body.token) return { live: { ...out, joined: false } };
-  if (!validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to join.');
-  const device = deviceHash(body.token);
+  if (!who.student && !body.token) return { live: { ...out, joined: false } };
+  if (!who.student && !validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to join.');
+  const device = ownerOf(who, body.token);
 
   if (action === 'live_join') {
+    needIdentity(who);
     if (String(body.code ?? '').replace(/\D/g, '') !== live.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
-    await store.setJSON(k.player(live.session, device), { joined_at: new Date().toISOString() }, { onlyIfNew: true });
+    await store.setJSON(k.player(live.session, device), { joined_at: new Date().toISOString(), ...studentFields(who) }, { onlyIfNew: true });
   }
   const joined = !!(await read(store, k.player(live.session, device)));
   if (!joined) return { live: { ...out, joined: false } };

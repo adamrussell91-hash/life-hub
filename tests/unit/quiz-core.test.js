@@ -38,7 +38,8 @@ const samples = {
   find_it: { ...base, id: 'q11', kind: 'find_it', segments: [{ id: 's1', text: 'Line one.' }, { id: 's2', text: 'The answer line.' }, { id: 's3', text: 'Line three.' }], correct: ['s2'] },
   label_image: { ...base, id: 'q12', kind: 'label_image', image: { url: 'https://example.com/a.png', alt: 'A heart' }, pins: [{ id: 'p1', x: 0.2, y: 0.3, label: 'Atrium' }, { id: 'p2', x: 0.7, y: 0.6, label: 'Ventricle' }] },
   extended_response: { ...base, id: 'q13', kind: 'extended_response', model_answer: 'A good answer.' },
-  explain_effect: { ...base, id: 'q14', kind: 'explain_effect', quote: 'The wind howled.', technique: 'Personification' }
+  explain_effect: { ...base, id: 'q14', kind: 'explain_effect', quote: 'The wind howled.', technique: 'Personification' },
+  spot_technique: { ...base, id: 'q15', kind: 'spot_technique', passage: 'The wind howled.\nHer heart was a stone.', options: [{ id: 'a', text: 'Personification' }, { id: 'b', text: 'Metaphor' }, { id: 'c', text: 'Simile' }], targets: [{ id: 't1', quote: 'wind howled', correct: ['a'] }, { id: 't2', quote: 'heart was a stone', correct: ['b'] }] }
 };
 
 test('every kind has a valid sample and splits without leaking its answer', () => {

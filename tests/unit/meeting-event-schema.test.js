@@ -160,6 +160,7 @@ test('event PD fields validate and reject relationship ids on the record', () =>
   assert.equal(parseEventRecord({ ...record, priority_area: 'x'.repeat(81) }), null);
   assert.equal(parseEventRecord({ ...record, provider_id: 'x' }), null);
   assertEventStateTransition('scheduled', 'completed');
+  assertEventStateTransition('completed', 'scheduled');
   assert.throws(() => assertEventStateTransition('cancelled', 'scheduled'), (e) => e.code === 'invalid_state_transition');
 });
 

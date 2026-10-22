@@ -18,7 +18,7 @@ import { importedPdEventById } from './_shared/notion-pd-events.mjs';
 export const config = { path: '/api/events' };
 
 const FORBIDDEN_ACCESS_FIELDS = ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds'];
-const STATE_ACTIONS = new Set(['complete', 'cancel']);
+const STATE_ACTIONS = new Set(['complete', 'cancel', 'reopen']);
 
 function assertNoAccessFields(value) {
   for (const key of FORBIDDEN_ACCESS_FIELDS) {
@@ -71,6 +71,7 @@ function readId(url) {
 function stateForAction(action) {
   if (action === 'complete') return 'completed';
   if (action === 'cancel') return 'cancelled';
+  if (action === 'reopen') return 'scheduled';
   return null;
 }
 

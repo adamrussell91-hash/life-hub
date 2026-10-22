@@ -40,5 +40,12 @@ describe('peer feedback task card', () => {
     expect(chip.getAttribute('aria-expanded')).toBe('true');
     expect(card.querySelectorAll('.pf-task__step')).toHaveLength(3);
     expect(card.querySelectorAll('.pf-criteria__item')).toHaveLength(2);
+    expect(card.querySelectorAll('.pf-task__num')).toHaveLength(3);
+  });
+
+  it('a one-step prompt is not numbered', () => {
+    const card = taskCard("Watson's poetry offers a qualified solution. What is it?");
+    expect(card.querySelectorAll('.pf-task__step')).toHaveLength(1);
+    expect(card.querySelector('.pf-task__num')).toBeNull();
   });
 });

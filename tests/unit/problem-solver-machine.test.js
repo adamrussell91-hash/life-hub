@@ -1,13 +1,16 @@
 // tests/unit/problem-solver-machine.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { DECISION_TOOLS } from '../../packages/decision-book/models/index.mjs';
 import { TOOL_IDS, TOOLS as REGISTRY } from '../../packages/problem-solver/tools/index.mjs';
 import { addEdge, applyScores, canEdge, canPropose, checkNode, canPlace, isComplete, newRun, nextSlots, placeNode, toolDef } from '../../packages/problem-solver/machine.mjs';
 
 const node = (id, slot) => ({ id, slot, text: slot, state: 'accepted', skills: [], turnId: 't' });
 
-test('registry lists every tool in order', () => {
-  assert.deepEqual(TOOL_IDS, ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction', 'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker', 'decision_matrix', 'swot', 'morphological', 'pareto', 'dmaic', 'fifteen_percent', 'kanban', 'eisenhower', 'after_action_review', 'double_loop', 'feedback_matrix', 'five_cs', 'knowledge_management']);
+test('registry lists every tool in order: the toolkit, then Decision Maker’s models, then its record', () => {
+  assert.deepEqual(TOOL_IDS.slice(-Object.keys(DECISION_TOOLS).length - 1, -1), Object.keys(DECISION_TOOLS));
+  assert.equal(TOOL_IDS.at(-1), 'dm_record');
+  assert.deepEqual(TOOL_IDS.filter((id) => !id.startsWith('dm_')), ['five_whys', 'problem_tree', 'concept_map', 'gap_basic', 'gap_radar', 'problem_statement', 'smart', 'contradiction', 'causal_map', 'perspective_shift', 'radial_tree', 'force_field', 'from_to', 'intent_statement', 'problem_reduction', 'analogical_reasoning', 'solution_tree', 'lotus_blossom', 'duncker', 'decision_matrix', 'swot', 'morphological', 'pareto', 'dmaic', 'fifteen_percent', 'kanban', 'eisenhower', 'after_action_review', 'double_loop', 'feedback_matrix', 'five_cs', 'knowledge_management']);
   assert.throws(() => toolDef('nope'), /Unknown tool/);
 });
 

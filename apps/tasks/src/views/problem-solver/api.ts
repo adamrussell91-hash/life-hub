@@ -4,25 +4,38 @@ import type { PsAction, PsModelId, PsSession, PsSummary } from '../../../../../p
 /** A session linked to a task or project: by its links, a confirmed task, or its review task. */
 export type PsLinkedSession = { id: string; title: string; phase: string; model: PsModelId | null; role: 'link' | 'task' | 'review' };
 
-export const problemSolverApi = {
-  list: () => apiGet<{ sessions: PsSummary[] }>('/api/problem-solver?list=1').then((r) => r.sessions),
-  get: (id: string) => apiGet<{ session: PsSession }>(`/api/problem-solver?id=${encodeURIComponent(id)}`).then((r) => r.session),
-  create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' }) =>
-    apiPost<{ session: PsSession }>('/api/problem-solver', { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
-  act: (session: PsSession, action: PsAction, text?: string) =>
-    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),
-  /** An action with a JSON payload (task confirmations, review). */
-  actWith: (session: PsSession, action: PsAction, payload: Record<string, unknown>) =>
-    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, payload }).then((r) => r.session),
-  /** Sessions linked to a task or project, for the chip on its page. */
-  linked: (ref: string) =>
-    apiGet<{ sessions: PsLinkedSession[] }>(`/api/problem-solver?linked=${encodeURIComponent(ref)}`).then((r) => r.sessions),
-  /** Score a run (radar now; force field, decision matrix and Pareto later). */
-  score: (session: PsSession, payload: Record<string, unknown> & { runId?: string }) =>
-    apiPost<{ session: PsSession }>('/api/problem-solver', { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: 'score', payload }).then((r) => r.session),
-  /** Score the topics of the Gap analysis (advanced) radar; one 1 to 10 score per topic for each overlay. */
-  rescore: (session: PsSession, payload: { current: number[]; objective: number[]; runId?: string }): Promise<PsSession> => problemSolverApi.score(session, payload)
-};
+export type SessionApi = ReturnType<typeof createSessionApi>;
+
+/**
+ * The session API at `base` (`/api/problem-solver`, or `/api/decision-book` for Decision Maker):
+ * both tools share one handler, so every call is the same apart from the path.
+ */
+export function createSessionApi(base: string) {
+  const api = {
+    list: () => apiGet<{ sessions: PsSummary[] }>(`${base}?list=1`).then((r) => r.sessions),
+    get: (id: string) => apiGet<{ session: PsSession }>(`${base}?id=${encodeURIComponent(id)}`).then((r) => r.session),
+    create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' | 'decision' | 'quick'; startModel?: string }) =>
+      apiPost<{ session: PsSession }>(base, { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
+    act: (session: PsSession, action: PsAction, text?: string) =>
+      apiPost<{ session: PsSession }>(base, { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),
+    /** An action with a JSON payload (task confirmations, review). */
+    actWith: (session: PsSession, action: PsAction, payload: Record<string, unknown>) =>
+      apiPost<{ session: PsSession }>(base, { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, payload }).then((r) => r.session),
+    /** Sessions linked to a task or project, for the chip on its page. */
+    linked: (ref: string) =>
+      apiGet<{ sessions: PsLinkedSession[] }>(`${base}?linked=${encodeURIComponent(ref)}`).then((r) => r.sessions),
+    /** Score a run (radar now; force field, decision matrix and Pareto later). */
+    score: (session: PsSession, payload: Record<string, unknown> & { runId?: string }) =>
+      apiPost<{ session: PsSession }>(base, { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: 'score', payload }).then((r) => r.session),
+    /** Score the topics of the Gap analysis (advanced) radar; one 1 to 10 score per topic for each overlay. */
+    rescore: (session: PsSession, payload: { current: number[]; objective: number[]; runId?: string }): Promise<PsSession> => api.score(session, payload)
+  };
+  return api;
+}
+
+export const problemSolverApi = createSessionApi('/api/problem-solver');
+/** Decision Maker's sessions: the same handler over its own store. */
+export const decisionBookApi = createSessionApi('/api/decision-book');
 
 export function isBusy(session: PsSession): boolean {
   return session.runner.status === 'queued' || session.runner.status === 'running';

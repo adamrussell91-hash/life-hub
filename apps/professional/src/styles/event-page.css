@@ -6,7 +6,7 @@
 .event-page {
   display: grid;
   gap: var(--space-4);
-  max-width: 72rem;
+  width: 100%;
 }
 
 .event-page__pd {

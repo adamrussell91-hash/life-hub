@@ -8,3 +8,7 @@
 .ps-linkchip__dot i:nth-child(1) { background: #c8372d; }
 .ps-linkchip__dot i:nth-child(2) { background: #e8b923; }
 .ps-linkchip__dot i:nth-child(3) { background: #2a5da8; }
+/* Decision Maker's chip: the cover's red and green discs. */
+.ps-linkchip--dm .ps-linkchip__dot i:nth-child(1) { background: #e4301c; }
+.ps-linkchip--dm .ps-linkchip__dot i:nth-child(2) { background: #398000; }
+.ps-linkchip--dm .ps-linkchip__dot i:nth-child(3) { display: none; }
