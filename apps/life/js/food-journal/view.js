@@ -570,7 +570,10 @@ export function createFoodJournalView({
       card.append(box);
     }
     const content = el("div", "food-card__body");
-    content.append(el("h3", "food-dish__title fj-serif", dish.title));
+    content.append(
+      el("h3", "food-dish__title fj-serif", dish.title_en || dish.title),
+    );
+    if (dish.title_en) content.append(el("p", "food-original", dish.title));
     content.append(
       el(
         "p",
@@ -580,6 +583,14 @@ export function createFoodJournalView({
           .join(" · "),
       ),
     );
+    if (dish.ingredients)
+      content.append(
+        el(
+          "p",
+          "food-ingredients",
+          dish.ingredients.split("\n").join(" · "),
+        ),
+      );
     if (dish.rating != null) {
       const stars = el("p", "fj-stars");
       stars.setAttribute("role", "img");
@@ -595,10 +606,17 @@ export function createFoodJournalView({
       for (const t of dish.tags) tags.append(el("span", "hub-chip", t));
       content.append(tags);
     }
-    if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes))
+    if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes)) {
       content.append(
-        el("p", "food-notes fj-serif fj-italic", plainNotes(dish.notes)),
+        el(
+          "p",
+          "food-notes fj-serif fj-italic",
+          plainNotes(dish.notes_en || dish.notes),
+        ),
       );
+      if (dish.notes_en)
+        content.append(el("p", "food-original", plainNotes(dish.notes)));
+    }
     const actions = el("div", "food-actions");
     actions.append(
       button("Recipe", (e) => openRecipe(dish, e.currentTarget)),
@@ -1088,7 +1106,9 @@ export function createFoodJournalView({
           checks = [];
           // Dishes first, then extras, which tick onto the last dish.
           const shown = visit.menu_items.filter((item) =>
-            `${item.name} ${item.description}`.toLowerCase().includes(query),
+            `${item.name} ${item.name_en || ""} ${item.description} ${item.description_en || ""}`
+              .toLowerCase()
+              .includes(query),
           );
           const extras = shown.filter((item) => item.kind === "extra");
           for (const item of [
@@ -1122,9 +1142,21 @@ export function createFoodJournalView({
             });
             checks.push([check, item]);
             const text = el("span", "food-onmenu__text");
-            text.append(el("span", "food-onmenu__name", item.name));
-            if (item.description)
-              text.append(el("span", "food-meta", item.description));
+            text.append(
+              el("span", "food-onmenu__name", item.name_en || item.name),
+            );
+            if (item.name_en)
+              text.append(el("span", "food-original", item.name));
+            if (item.description_en || item.description)
+              text.append(
+                el(
+                  "span",
+                  "food-meta",
+                  item.description_en || item.description,
+                ),
+              );
+            if (item.description_en && item.description)
+              text.append(el("span", "food-original", item.description));
             row.append(check, text);
             if (item.price) row.append(el("span", "food-onmenu__price", item.price));
             list.append(row);
@@ -1327,7 +1359,14 @@ export function createFoodJournalView({
             }),
             tagField(d.tags, tags, (v) => set("tags", v)),
           );
-          block.append(top, notes, more);
+          const ingredients = field(
+            "Ingredients",
+            d.ingredients || "",
+            (v) => set("ingredients", v),
+            { type: "textarea", max: 2000 },
+          );
+          ingredients.classList.add("food-field--short");
+          block.append(top, ingredients, notes, more);
           const photos = el("div", "food-thumbnails");
           const tile = (p) => {
             const wrap = el("div", "food-photo-wrap");

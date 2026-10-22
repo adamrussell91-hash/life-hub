@@ -259,7 +259,8 @@ export function createFoodJournalProcessHandler(deps = {}) {
               {
                 role: "user",
                 content: JSON.stringify({
-                  title: dish.title,
+                  title: dish.title_en || dish.title,
+                  ingredients: dish.ingredients || "",
                   cuisine: dish.cuisine,
                   notes: dish.notes,
                   tags: dish.tags,
