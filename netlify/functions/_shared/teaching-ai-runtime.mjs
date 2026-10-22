@@ -24,7 +24,8 @@ var SkillBuildSchema = z.object({
   steps: z.array(Long).max(8).optional(),
   technique: z.object({ name: Short, how: Long, pairs: z.array(z.tuple([Long, Long])).max(8) }).optional()
 });
-var SkillRungSchema = z.object({ i_can: Long, build: SkillBuildSchema });
+var SkillIndicatorSchema = z.object({ group: Short, text: Long, eg: Long.optional() });
+var SkillRungSchema = z.object({ i_can: Long, indicators: z.array(SkillIndicatorSchema).max(12).default([]), build: SkillBuildSchema });
 var SkillSubStrandSchema = z.object({
   id: z.string().regex(/^[a-z-]{2,40}$/),
   name: Short,
@@ -35,6 +36,8 @@ var SkillSubStrandSchema = z.object({
   example_note: Long.optional(),
   outcomes: z.array(z.number().int().min(1).max(12)).max(6).default([]),
   focus_areas: z.array(z.string().regex(/^[a-z0-9-]{2,40}$/)).max(8).default([]),
+  /** The syllabus dot points it builds. Outcomes and focus areas follow from these; without any, they stand alone. */
+  points: z.array(z.object({ area: z.string().regex(/^[a-z0-9-]{2,40}$/), point: z.string().regex(/^[UR]\d{1,2}$/), link: z.enum(["shared", "related"]) })).max(40).default([]),
   rungs: z.object({ capable: SkillRungSchema, skilled: SkillRungSchema, accomplished: SkillRungSchema, excellent: SkillRungSchema })
 });
 var SkillRungInfoSchema = z.object({ id: z.enum(RUNG_IDS), name: Short, marks: Short, marker_words: Short, meaning: Long });

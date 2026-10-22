@@ -977,7 +977,8 @@ var SkillBuildSchema = z3.object({
   steps: z3.array(Long).max(8).optional(),
   technique: z3.object({ name: Short, how: Long, pairs: z3.array(z3.tuple([Long, Long])).max(8) }).optional()
 });
-var SkillRungSchema = z3.object({ i_can: Long, build: SkillBuildSchema });
+var SkillIndicatorSchema = z3.object({ group: Short, text: Long, eg: Long.optional() });
+var SkillRungSchema = z3.object({ i_can: Long, indicators: z3.array(SkillIndicatorSchema).max(12).default([]), build: SkillBuildSchema });
 var SkillSubStrandSchema = z3.object({
   id: z3.string().regex(/^[a-z-]{2,40}$/),
   name: Short,
@@ -988,6 +989,8 @@ var SkillSubStrandSchema = z3.object({
   example_note: Long.optional(),
   outcomes: z3.array(z3.number().int().min(1).max(12)).max(6).default([]),
   focus_areas: z3.array(z3.string().regex(/^[a-z0-9-]{2,40}$/)).max(8).default([]),
+  /** The syllabus dot points it builds. Outcomes and focus areas follow from these; without any, they stand alone. */
+  points: z3.array(z3.object({ area: z3.string().regex(/^[a-z0-9-]{2,40}$/), point: z3.string().regex(/^[UR]\d{1,2}$/), link: z3.enum(["shared", "related"]) })).max(40).default([]),
   rungs: z3.object({ capable: SkillRungSchema, skilled: SkillRungSchema, accomplished: SkillRungSchema, excellent: SkillRungSchema })
 });
 var SkillRungInfoSchema = z3.object({ id: z3.enum(RUNG_IDS), name: Short, marks: Short, marker_words: Short, meaning: Long });
