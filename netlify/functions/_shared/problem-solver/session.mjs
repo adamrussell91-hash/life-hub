@@ -306,8 +306,8 @@ export function applyCoachTurn(session, turn, deps) {
   // Leaving a step untouched asks no learning question, so the next step's opening tool comes at once.
   const untouched = mode === 'boundary' && skippedUntouched(next.steps?.[session.runner?.leaving]);
   const quiet = next.phase === 'finished' || (mode === 'boundary' && !untouched) || waitingForReview(next);
-  // A decision started from a model on the shelf opens on that model once it is framed.
-  const shelf = session.phase === 'frame' && next.phase !== 'frame' && next.startModel ? { kind: 'next_tool', tool: next.startModel, reason: 'You started from this model on the shelf.' } : null;
+  // A session started from a model (or technique) on the shelf opens on it once it is framed.
+  const shelf = session.phase === 'frame' && next.phase !== 'frame' && next.startModel ? { kind: 'next_tool', tool: next.startModel, reason: `You started from this ${next.kind === 'shift' ? 'technique' : 'model'} on the shelf.` } : null;
   const suggestion = quiet ? null : (shelf ?? turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
   return touch({ ...next, turns: [...next.turns, coachTurn], suggestion, summary: turn.summary ?? next.summary }, deps);
 }

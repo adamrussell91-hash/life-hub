@@ -282,10 +282,10 @@
 .ps-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 12px; background: var(--ps-card); }
 .ps-resume__go { min-height: 44px; padding: 0 16px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--ps-paper); font: inherit; cursor: pointer; }
 
-/* ── Shared skills ribbon (skills-ribbon.ts): this tool's share in colour, the other's grey ── */
+/* ── Shared skills ribbon (skills-ribbon.ts): this tool's share in colour, the others' grey or their own ── */
 .ps-ribbon { display: grid; gap: var(--space-3); }
 .ps-ribbon__legend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: 0; color: var(--muted); font-size: var(--text-xs); }
 .ps-ribbon__key::before { content: ''; display: inline-block; width: 14px; height: 4px; margin-right: 6px; border-radius: 4px; vertical-align: middle; background: var(--c); }
 .ps-skills__bar--split { display: flex; }
 .ps-skills__bar--split i { border-radius: 0; }
-.ps-skills__bar--split .ps-skills__other { background: var(--ps-other, #a9aa9f); }
+.ps-skills__bar--split .ps-skills__other { background: var(--c, var(--ps-other, #a9aa9f)); }

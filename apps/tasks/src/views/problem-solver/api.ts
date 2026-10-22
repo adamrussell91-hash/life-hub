@@ -7,14 +7,15 @@ export type PsLinkedSession = { id: string; title: string; phase: string; model:
 export type SessionApi = ReturnType<typeof createSessionApi>;
 
 /**
- * The session API at `base` (`/api/problem-solver`, or `/api/decision-book` for Decision Maker):
- * both tools share one handler, so every call is the same apart from the path.
+ * The session API at `base` (`/api/problem-solver`, `/api/decision-book` for Decision Maker, or
+ * `/api/get-things-done` for Gear Shifter): the tools share one handler, so every call is the
+ * same apart from the path.
  */
 export function createSessionApi(base: string) {
   const api = {
     list: () => apiGet<{ sessions: PsSummary[] }>(`${base}?list=1`).then((r) => r.sessions),
     get: (id: string) => apiGet<{ session: PsSession }>(`${base}?id=${encodeURIComponent(id)}`).then((r) => r.session),
-    create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' | 'decision' | 'quick'; startModel?: string }) =>
+    create: (body: { text: string; title?: string; links?: PsSession['links']; kind?: 'full' | 'lightning' | 'decision' | 'quick' | 'shift'; startModel?: string }) =>
       apiPost<{ session: PsSession }>(base, { create: { ...body, requestId: crypto.randomUUID() } }).then((r) => r.session),
     act: (session: PsSession, action: PsAction, text?: string) =>
       apiPost<{ session: PsSession }>(base, { id: session.id, revision: session.revision, requestId: crypto.randomUUID(), action, ...(text ? { text } : {}) }).then((r) => r.session),
@@ -36,6 +37,8 @@ export function createSessionApi(base: string) {
 export const problemSolverApi = createSessionApi('/api/problem-solver');
 /** Decision Maker's sessions: the same handler over its own store. */
 export const decisionBookApi = createSessionApi('/api/decision-book');
+/** Gear Shifter's sessions: the same handler over its own store. */
+export const gearShifterApi = createSessionApi('/api/get-things-done');
 
 export function isBusy(session: PsSession): boolean {
   return session.runner.status === 'queued' || session.runner.status === 'running';

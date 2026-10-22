@@ -145,10 +145,11 @@ export function createMockApi({ seed }: MockApiOptions) {
 
   const personalLines = new Map<string, Record<string, unknown> & { slug: string }>();
   const whiteboards = new Map<string, Record<string, unknown>>();
-  // Problem Solver and Decision Maker: one service each over its own memory store, both on the scripted coach.
+  // Problem Solver, Decision Maker and Gear Shifter: one service each over its own memory store, all on the scripted coach.
   const coachServices: Record<string, ReturnType<typeof createProblemSolverService>> = {
     '/api/problem-solver': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach }),
-    '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision', 'quick'] })
+    '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision', 'quick'] }),
+    '/api/get-things-done': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['shift'] })
   };
 
   async function handle(method: string, urlPath: string, body?: unknown) {
