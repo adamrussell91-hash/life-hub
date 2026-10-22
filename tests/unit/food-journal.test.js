@@ -128,6 +128,17 @@ test("Custom Menu combines independent filters and searchable dish text", () => 
   j.visits[0].status = "deleted";
   assert.equal(menuDishes(j).length, 0);
 });
+test("Custom Menu search finds English titles, ingredients and English notes", () => {
+  const j = fixture();
+  Object.assign(j.visits[0].dishes[0], {
+    title: "Tortilla",
+    title_en: "Spanish omelette",
+    ingredients: "Egg, potato",
+    notes_en: "Very tasty",
+  });
+  for (const query of ["omelette", "potato", "tasty"])
+    assert.equal(menuDishes(j, { query }).length, 1, query);
+});
 test("schema rejects invalid ratings, dates, duplicate dishes and foreign photo keys", () => {
   for (const mutate of [
     (j) => (j.visits[0].dishes[0].rating = 6),

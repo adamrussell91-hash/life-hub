@@ -92,8 +92,11 @@ export function menuDishes(journal, filters = {}) {
     .filter(({ dish, visit }) => {
       const haystack = [
         dish.title,
+        dish.title_en,
         dish.cuisine,
+        dish.ingredients,
         dish.notes,
+        dish.notes_en,
         ...dish.tags,
         visit.venue.name,
       ]
