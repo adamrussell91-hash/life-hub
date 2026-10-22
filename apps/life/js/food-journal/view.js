@@ -188,7 +188,7 @@ export function createFoodJournalView({
   let editorialRunning = false;
   const editorialFailed = new Set();
   let translating = false;
-  // dish id -> the notes last handled, so each wording is translated once.
+  // dish id -> notes as loaded or last handled, so only edits are translated.
   const notesHandled = new Map();
   let filterControls = [],
     journalQuery = "",
@@ -376,11 +376,8 @@ export function createFoodJournalView({
         for (const d of v.dishes) {
           const notes = (d.notes || "").trim();
           if (notesHandled.get(d.id) === notes) continue;
-          // First sight of a dish that already has an English copy: trust it.
-          if (!notesHandled.has(d.id) && d.notes_en) {
-            notesHandled.set(d.id, notes);
-            continue;
-          }
+          // Dishes seen at load are the baseline; an unseen dish is new.
+          if (!notesHandled.has(d.id) && !notes) continue;
           found.push({ id: d.id, notes });
         }
       const changes = new Map();
@@ -435,7 +432,9 @@ export function createFoodJournalView({
         await persist(tidy.journal, { quiet: true }).catch(() => {});
       if (token !== epoch) return;
       void refreshEditorial();
-      void refreshTranslations();
+      // Loaded notes are the baseline; only later edits get translated.
+      for (const v of journal.visits)
+        for (const d of v.dishes) notesHandled.set(d.id, (d.notes || "").trim());
     } catch (e) {
       if (token !== epoch) return;
       status(e.message, true);
