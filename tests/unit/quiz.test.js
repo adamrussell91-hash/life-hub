@@ -376,9 +376,28 @@ test('a quiz only takes answers from a class page', async () => {
   const store = baseStore();
   await publishQuiz(store);
   const plain = await rawQuizAction(store, 'quiz1', { token: token(1) });
-  assert.deepEqual(plain.identity, { need: 'class', initials: null });
+  assert.deepEqual(plain.identity, { need: 'class', initials: null, classes: [] });
   await assert.rejects(rawQuizAction(store, 'quiz1', { token: token(1), action: 'start' }), /Open this quiz from your class page/);
   await assert.rejects(rawQuizAction(store, 'quiz1', { token: token(1), class_id: 'gone', action: 'status' }), /Open this quiz from your class page/);
+});
+
+test('a plain lesson link offers the lesson’s classes; the teacher gets the same list', async () => {
+  const store = baseStore();
+  await publishQuiz(store);
+  const cls = (id, extra) => ({ id, type: 'class', code: id.toUpperCase(), status: 'active', active_unit_ids: [], students: [], ...extra });
+  await store.setJSON('classes/b', cls('b', { display_name: 'Year 12 English B', current_unit_id: 'unit1' }));
+  await store.setJSON('classes/a', cls('a', { display_name: 'Year 12 English A', active_unit_ids: ['unit1'] }));
+  await store.setJSON('classes/sched', cls('sched'));
+  await store.setJSON('scheduled_lessons/r1', { id: 'r1', class_id: 'sched', lesson_id: 'quiz1' });
+  await store.setJSON('classes/other', cls('other', { current_unit_id: 'unit9' }));
+  await store.setJSON('classes/old', cls('old', { status: 'archived', current_unit_id: 'unit1' }));
+  const want = [{ id: 'sched', title: 'SCHED' }, { id: 'a', title: 'Year 12 English A' }, { id: 'b', title: 'Year 12 English B' }];
+  const plain = await rawQuizAction(store, 'quiz1', { token: token(1) });
+  assert.deepEqual(plain.identity.classes, want);
+  assert.deepEqual((await quizTeacherAction(store, 'quiz1', { action: 'classes' })).classes, want);
+  const viaClass = await rawQuizAction(store, 'quiz1', { token: token(1), class_id: 'a' });
+  assert.equal(viaClass.identity.classes, undefined, 'a named class needs no list');
+  await assert.rejects(rawQuizAction(store, 'quiz1', { token: token(1), action: 'start' }), /Open this quiz from your class page/);
 });
 
 test('initials: claim once, then start; someone else’s initials are refused', async () => {

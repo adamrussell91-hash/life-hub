@@ -43,6 +43,40 @@ describe('student quiz identity', () => {
     expect(root.textContent).toContain('Open this quiz from your class page.');
   });
 
+  it('a plain link with one class goes straight to initials for that class', async () => {
+    apiPost.mockImplementation(async (_url: string, body: Record<string, unknown>) =>
+      body.class_id ? { ...base, identity: { need: 'initials', initials: null } } : { ...base, identity: { need: 'class', initials: null, classes: [{ id: 'c1', title: '12 English' }] } }
+    );
+    const root = mountStudentQuiz(lesson);
+    await settle();
+    expect(root.querySelector('.qz-initials__input')).toBeTruthy();
+    expect(localStorage.getItem('quiz-class:l1')).toBe('"c1"');
+    apiPost.mockImplementation(async () => reply);
+  });
+
+  it('a plain link with several classes asks which, then uses it', async () => {
+    apiPost.mockImplementation(async (_url: string, body: Record<string, unknown>) =>
+      body.class_id === 'c2'
+        ? { ...base, identity: { need: 'initials', initials: null } }
+        : { ...base, identity: { need: 'class', initials: null, classes: [{ id: 'c1', title: '12 English A' }, { id: 'c2', title: '12 English B' }] } }
+    );
+    const root = mountStudentQuiz(lesson);
+    await settle();
+    expect(root.textContent).toContain('Which class are you in?');
+    [...root.querySelectorAll<HTMLButtonElement>('.qz-class-pick .btn')].find((b) => b.textContent === '12 English B')!.click();
+    await settle();
+    expect(root.querySelector('.qz-initials__input')).toBeTruthy();
+    apiPost.mockImplementation(async () => reply);
+  });
+
+  it('the teacher’s focus view never picks a class', async () => {
+    reply = { ...base, identity: { need: 'class', initials: null, classes: [{ id: 'c1', title: '12 English' }] } };
+    const root = mountStudentQuiz(lesson, { pickClass: false });
+    await settle();
+    expect(root.textContent).toContain('Open this quiz from your class page.');
+    expect(apiPost.mock.calls.every((c) => !(c[1] as Record<string, unknown>).class_id)).toBe(true);
+  });
+
   it('shows an initials box and claims with the class fields', async () => {
     reply = { ...base, identity: { need: 'initials', initials: null } };
     const root = mountStudentQuiz(lesson, { classId: 'c1' });

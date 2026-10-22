@@ -23,9 +23,14 @@ a stable class and student id so a gradebook can be built on top later.
   name a single tap.
 - **Checked against the class list.** Initials not on the list are refused,
   which stops random letters.
-- **Class link only.** A quiz takes answers only when opened at
-  `/s/classes/:classId/lessons/:lessonId`. The plain `/s/lessons/:lessonId`
-  link shows "Open this quiz from your class page."
+- **A class is always known.** A quiz takes answers only for a class.
+  *Revised 22 Oct, same day:* Publish only hands out the plain lesson link,
+  so that link has to work too. The class page link names the class; the
+  teacher's Share box offers one link per class (`/s/lessons/:lessonId?class=:classId`);
+  a plain link with no class uses the lesson's class when there is one
+  (scheduled into it, or in its current or active units) and asks "Which
+  class are you in?" when there are several. Only a lesson in no class
+  shows "Open this quiz from your class page."
 - **Strict device lock, per class.** Students use their own device every
   lesson. The first device to claim a set of initials in a class owns it
   for every quiz in that class until the teacher releases it.
