@@ -1,7 +1,11 @@
 // A Travel meal moment and its Food Journal visit. Food Journal owns the
 // meal; the moment only points at it. These helpers are pure so the
 // endpoint can read both files, change them and commit once.
-const SOURCE = /^travel:(trp_[a-z0-9_]{4,64}):(mom_[a-z0-9_]{4,64})$/i;
+import { isDeletedRecord } from "./record-liveness.mjs";
+
+// A deleted visit keeps its source id reserved, so a re-link after an unlink
+// takes the next free one: travel:<trip>:<moment>:2, :3 and so on.
+const SOURCE = /^travel:(trp_[a-z0-9_]{4,64}):(mom_[a-z0-9_]{4,64})(?::\d{1,4})?$/i;
 
 export const travelSourceId = (tripId, momentId) => `travel:${tripId}:${momentId}`;
 
@@ -12,17 +16,26 @@ export function parseTravelSourceId(sourceId) {
 
 const DISH_FIELDS = ["title", "title_en", "meal_type", "rating", "cuisine", "tags", "notes", "notes_en", "ingredients", "ingredients_original"];
 
-function dishFrom(input, old, newId) {
-  const dish = old ? structuredClone(old) : { id: input.id || newId("dish"), cuisine: "", tags: [], notes: "", ingredients: "", rating: null, meal_type: "Dinner", photos: [] };
+// Dish ids are unique across the whole journal, tombstones included.
+function dishFrom(input, old, newId, taken) {
+  const id = input.id && !taken.has(input.id) ? input.id : newId("dish");
+  const dish = old ? structuredClone(old) : { id, cuisine: "", tags: [], notes: "", ingredients: "", rating: null, meal_type: "Dinner", photos: [] };
   for (const key of DISH_FIELDS) if (input[key] !== undefined) dish[key] = input[key];
   return dish;
 }
 
 export function upsertLinkedVisit(journal, { tripId, moment, food, photos, visitId, newId }) {
   const next = structuredClone(journal);
-  const sourceId = travelSourceId(tripId, moment.id);
-  let visit = next.visits.find((v) => v.id === visitId || v.source_id === sourceId);
+  const base = travelSourceId(tripId, moment.id);
+  const forMoment = (v) => {
+    const s = parseTravelSourceId(v.source_id);
+    return s?.tripId === tripId && s.momentId === moment.id;
+  };
+  let visit = next.visits.find((v) => !isDeletedRecord(v) && (v.id === visitId || forMoment(v)));
   if (!visit) {
+    const taken = new Set(next.visits.map((v) => v.source_id));
+    let sourceId = base;
+    for (let n = 2; taken.has(sourceId); n += 1) sourceId = `${base}:${n}`;
     visit = { id: newId("visit"), source_id: sourceId, title: "", notes: "", menu_text: "", dishes: [], venue: { name: "", address: "" } };
     next.visits.push(visit);
   }
@@ -35,7 +48,12 @@ export function upsertLinkedVisit(journal, { tripId, moment, food, photos, visit
     ...(moment.coordinates ? { lat: moment.coordinates.lat, lon: moment.coordinates.lon } : {}),
   };
   const before = new Map(visit.dishes.map((d) => [d.id, d]));
-  visit.dishes = food.dishes.map((d) => dishFrom(d, before.get(d.id), newId));
+  const taken = new Set(next.visits.filter((v) => v !== visit).flatMap((v) => v.dishes.map((d) => d.id)));
+  visit.dishes = food.dishes.map((d) => {
+    const dish = dishFrom(d, before.get(d.id), newId, taken);
+    taken.add(dish.id);
+    return dish;
+  });
   // New copies of the moment's photos go on the first dish, once each.
   const first = visit.dishes[0];
   if (first) for (const p of photos) if (!visit.dishes.some((d) => d.photos.some((q) => q.key === p.key))) first.photos.push(p);
