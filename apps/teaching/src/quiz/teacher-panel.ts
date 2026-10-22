@@ -17,6 +17,7 @@ import { answerLines } from '@/blocks/quiz-question';
 import { mountQuestionBuilder } from '@/quiz/builder';
 import { mountQuestionPlayer } from '@/quiz/player';
 import { spanText } from '@/quiz/word-picker';
+import { formatCode, keySummary, meter, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
 import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
 import './quiz.css';
 
@@ -69,22 +70,6 @@ type QuestionStats = {
   picks: Record<string, number>;
 };
 type Results = { published: false } | { published: true; version: string; feedback: string; released: boolean; attempts: AttemptSummary[]; questions: QuestionStats[] };
-type Live = {
-  session: string;
-  code: string;
-  phase: 'lobby' | 'question' | 'reveal' | 'done';
-  index: number;
-  total: number;
-  joined: number;
-  question?: PublicQuestion;
-  key?: QuestionKey;
-  answered?: number;
-  right?: number;
-  marked?: number;
-  picks?: Record<string, number>;
-  written?: string[];
-};
-
 type Tab = 'tray' | 'settings' | 'results' | 'live';
 
 const TAB_KEY = 'quiz-panel:tab';
@@ -109,7 +94,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   let editing: string | null = null;
   let results: Results | null = null;
   let openAttempt: string | null = null;
-  let live: Live | null = null;
+  let live: LiveQuiz | null = null;
   let disposed = false;
   let timer: number | undefined;
 
@@ -155,7 +140,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       let data: unknown;
       if (tab === 'tray') data = submissions = (await post<{ submissions: Submission[] }>({ action: 'submissions' })).submissions;
       else if (tab === 'results' && !openAttempt) data = results = await post<Results>({ action: 'results' });
-      else if (tab === 'live') data = live = (await post<{ live: Live | null }>({ action: 'live_status' })).live;
+      else if (tab === 'live') data = live = (await post<{ live: LiveQuiz | null }>({ action: 'live_status' })).live;
       else return;
       paintTabs();
       if (tab === 'tray' && editing) return; // never repaint under a teacher who is editing
@@ -437,7 +422,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     const grid = el('div', 'qz-settings__grid');
     grid.append(
       number('Quiz timer (minutes)', raw.timer_minutes, 1, 180, 'Blank for no timer.', (n) => save({ timer_minutes: n })),
-      number('Time per question (seconds)', raw.question_seconds, 10, 600, 'Blank for no limit.', (n) => save({ question_seconds: n }))
+      number('Time per question (seconds)', raw.question_seconds, 10, 600, 'Blank for no limit.', (n) => save({ question_seconds: n })),
+      number('Live quiz: move on at or above (% right)', raw.move_on, 1, 100, 'Blank for 80%. Running live in focus view, a question revealed below this stops at a checkpoint.', (n) => save({ move_on: n }))
     );
     const attempts = select(
       [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: n === 1 ? 'One go' : `${n} goes` })),
@@ -685,11 +671,11 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       el('span', 'qz-note block-secondary', `${plural(l.joined, 'student')} joined${l.index >= 0 ? ` · Question ${l.index + 1} of ${l.total}` : ''}`),
       button('Show on board', 'ghost', () => showBoard())
     );
-    wrap.append(bar, liveStage(l, false), liveControls(l));
+    wrap.append(bar, renderLiveStage(l, false), liveControls(l));
     return wrap;
   }
 
-  function liveControls(l: Live): HTMLElement {
+  function liveControls(l: LiveQuiz): HTMLElement {
     const actions = el('div', 'qz-actions');
     if (l.phase === 'lobby') {
       actions.append(button('First question', 'primary', async function () {
@@ -720,7 +706,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
 
   async function liveAction(action: string): Promise<void> {
     try {
-      live = (await post<{ live: Live | null }>({ action })).live;
+      live = (await post<{ live: LiveQuiz | null }>({ action })).live;
       if (live?.phase === 'done') live = null;
       alert.hidden = true;
     } catch (error) {
@@ -749,7 +735,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       if (live.phase === 'lobby') {
         inner.append(el('p', 'qz-board__label', 'Open the quiz and type this code'), el('p', 'qz-board__code', formatCode(live.code)), el('p', 'qz-board__label', plural(live.joined, 'student') + ' joined'));
       } else {
-        inner.append(liveStage(live, true), liveControls(live));
+        inner.append(renderLiveStage(live, true), liveControls(live));
       }
     };
     const onKey = (e: KeyboardEvent) => {
@@ -765,58 +751,6 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     board = { refresh: paintBoard };
     paintBoard();
     close.focus();
-  }
-
-  function liveStage(l: Live, big: boolean): HTMLElement {
-    const stage = el('div', `qz-live__stage${big ? ' qz-live__stage--board' : ''}`);
-    if (l.phase === 'lobby' || !l.question) {
-      stage.append(el('p', 'qz-note block-secondary', 'Waiting for students to join. Start the first question when everyone’s in.'));
-      return stage;
-    }
-    const q = l.question;
-    const revealed = l.phase === 'reveal';
-    stage.append(el('p', 'qz-player__meta', `Question ${l.index + 1} of ${l.total} · ${QUIZ_KIND_INFO[q.kind].label}`));
-    if (q.prompt) stage.append(el('h3', `qz-player__prompt${big ? ' qz-player__prompt--board' : ''}`, q.prompt));
-    if (q.kind === 'quote_technique' && q.quote) stage.append(el('blockquote', 'qz-quote', q.quote));
-    if (q.kind === 'explain_effect' || q.kind === 'spot_technique') stage.append(el('blockquote', 'qz-quote', q.kind === 'spot_technique' ? q.passage : q.quote));
-    if (q.image && q.kind !== 'label_image') {
-      const img = el('img', 'qz-live__img');
-      img.src = q.image.url;
-      img.alt = q.image.alt;
-      stage.append(img);
-    }
-    const answered = l.answered ?? 0;
-    stage.append(el('p', 'qz-live__count', `${answered} of ${l.joined} answered`));
-    const picks = l.picks ?? {};
-    const picksTotal = Object.values(picks).reduce((a, b) => a + b, 0);
-    const right = l.key?.answer.type === 'choice' ? new Set(l.key.answer.ids) : new Set<string>();
-    const optionsList =
-      'options' in q ? q.options : q.kind === 'find_it' ? q.segments : q.kind === 'true_false' ? [{ id: 'true', text: 'True' }, { id: 'false', text: 'False' }] : null;
-    if (optionsList) {
-      const bars = el('ul', 'qz-bars qz-bars--live');
-      for (const o of optionsList) {
-        const n = picks[o.id] ?? 0;
-        const row = el('li', 'qz-bars__row');
-        const isRight = right.has(o.id) || (l.key?.answer.type === 'boolean' && String(l.key.answer.value) === o.id);
-        if (revealed && isRight) row.dataset.state = 'right';
-        row.append(el('span', 'qz-bars__label', o.text), meter(revealed && picksTotal ? Math.round((n / picksTotal) * 100) : 0), el('span', 'qz-bars__n', revealed ? String(n) : ''));
-        bars.append(row);
-      }
-      stage.append(bars);
-    } else if (revealed && l.key) {
-      stage.append(el('p', 'qz-live__count', `${l.right ?? 0} of ${l.marked ?? answered} got full marks`));
-    }
-    if (revealed && l.key) {
-      const shown = keySummary(q, l.key);
-      if (shown) stage.append(el('p', 'qz-right-answer', shown));
-      if (l.key.explanation) stage.append(el('p', 'qz-result__why', l.key.explanation));
-      if (l.written?.length) {
-        const list = el('ul', 'qz-written');
-        for (const text of l.written.slice(0, big ? 12 : 30)) list.append(el('li', '', text));
-        stage.append(list);
-      }
-    }
-    return stage;
   }
 
   paintTabs();
@@ -842,6 +776,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   };
 }
 
+export { keySummary };
+
 /* ── helpers ── */
 
 /** A question's words for a list: its prompt, or its passage with the gaps shown. */
@@ -855,15 +791,6 @@ function stat(value: string, label: string): HTMLElement {
   const box = el('div', 'qz-stat');
   box.append(el('span', 'qz-stat__value', value), el('span', 'qz-stat__label', label));
   return box;
-}
-
-function meter(pct: number): HTMLElement {
-  const track = el('span', 'qz-meter');
-  track.setAttribute('aria-hidden', 'true');
-  const fill = el('span', 'qz-meter__fill');
-  fill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
-  track.append(fill);
-  return track;
 }
 
 /** "BB · Bob Brown" for a known student, else the anonymous "Student A" style label. */
@@ -923,40 +850,6 @@ function blockExists(blocks: Block[], id: string): boolean {
     if (nested.some((children) => Array.isArray(children) && blockExists(children, id))) return true;
   }
   return false;
-}
-
-/** The right answer as one line, in the question's own words. */
-export function keySummary(q: PublicQuestion, key: QuestionKey): string {
-  const a = key.answer;
-  const text = (list: Array<{ id: string; text: string }>, ids: string[]) => ids.map((id) => list.find((x) => x.id === id)?.text ?? '').filter(Boolean).join(', ');
-  switch (a.type) {
-    case 'choice':
-      return `Answer: ${'options' in q ? text(q.options, a.ids) : q.kind === 'find_it' ? text(q.segments, a.ids) : ''}`;
-    case 'boolean':
-      return `Answer: ${a.value ? 'True' : 'False'}`;
-    case 'text':
-      return `Answer: ${a.accepted.join(' / ')}`;
-    case 'gaps':
-      return `Answer: ${Object.values(a.gaps).map((g) => g[0]).join(', ')}`;
-    case 'spots': {
-      const names = 'options' in q ? new Map(q.options.map((o) => [o.id, o.text])) : new Map<string, string>();
-      return `Answer: ${a.targets.map((t) => `“${spanText(a.passage, t)}” ${t.ids.map((id) => names.get(id)).join(' or ')}`).join(' · ')}`;
-    }
-    case 'order':
-      return q.kind === 'ordering' ? `Order: ${a.ids.map((id, i) => `${i + 1}. ${q.items.find((x) => x.id === id)?.text ?? ''}`).join('  ')}` : '';
-    case 'map': {
-      if (q.kind === 'matching') return Object.entries(a.map).map(([l, r]) => `${q.left.find((x) => x.id === l)?.text} → ${q.right.find((x) => x.id === r)?.text}`).join(' · ');
-      if (q.kind === 'categorise') return q.groups.map((g) => `${g.text}: ${q.items.filter((i) => a.map[i.id] === g.id).map((i) => i.text).join(', ')}`).join(' · ');
-      if (q.kind === 'label_image') return q.pins.map((p) => `${p.n}. ${q.labels.find((x) => x.id === a.map[p.id])?.text ?? ''}`).join(' · ');
-      return '';
-    }
-    case 'manual':
-      return a.model_answer ? `Model answer: ${a.model_answer}` : '';
-  }
-}
-
-function formatCode(code: string): string {
-  return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
 }
 
 function toLocalInput(iso: string): string {

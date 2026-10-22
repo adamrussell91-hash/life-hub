@@ -180,7 +180,9 @@ var base = {
   marks: z5.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
-  image: QuizImageSchema.optional()
+  image: QuizImageSchema.optional(),
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
+  outcomes: z5.array(z5.string().min(1).max(64)).max(8).optional()
 };
 var QuizQuestionSchema = z5.discriminatedUnion("kind", [
   z5.object({ ...base, kind: z5.literal("multiple_choice"), options: z5.array(QuizChoiceSchema).min(2).max(6), correct: z5.array(Id).length(1) }),
@@ -380,7 +382,9 @@ var QuizSettingsSchema = z5.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z5.number().min(0).max(1).optional(),
   confidence: z5.boolean().optional(),
-  closes_at: z5.string().datetime().optional()
+  closes_at: z5.string().datetime().optional(),
+  /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
+  move_on: z5.number().int().min(1).max(100).optional()
 });
 function norm(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();
@@ -1162,6 +1166,12 @@ var HingeOptionSchema = z7.object({
   text: z7.string().max(300).default(""),
   misconception: z7.string().max(300).default("")
 });
+var HingeBackupSchema = z7.object({
+  prompt: z7.string().max(500).default(""),
+  options: z7.array(HingeOptionSchema).max(5).default([]),
+  correct_id: z7.string().max(40).default(""),
+  source: z7.enum(["teacher", "ann"]).default("teacher")
+});
 var HingeQuestionBlockSchema = z7.object({
   id: z7.string().min(1),
   type: z7.literal("block"),
@@ -1174,7 +1184,9 @@ var HingeQuestionBlockSchema = z7.object({
     correct_id: z7.string().max(40).default(""),
     seconds: z7.union([z7.literal(0), z7.literal(30), z7.literal(60), z7.literal(90), z7.literal(120)]).default(60),
     move_on: z7.number().int().min(1).max(100).default(80),
-    reteach: z7.number().int().min(0).max(99).default(50)
+    reteach: z7.number().int().min(0).max(99).default(50),
+    /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
+    backup: HingeBackupSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2268,6 +2280,7 @@ export {
   GraphNodeSchema,
   HeadingBlockSchema,
   HeadingVariantSchema,
+  HingeBackupSchema,
   HingeOptionSchema,
   HingeQuestionBlockSchema,
   HtmlAppAiProviderSchema,

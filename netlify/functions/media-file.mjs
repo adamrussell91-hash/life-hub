@@ -47,7 +47,9 @@ export function createMediaFileHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Media file not found', false), request, env);
     }
 
-    const result = await store.getWithMetadata(mediaFileKey(id), { type: 'arrayBuffer' });
+    // Keep full video responses streaming; byte-range requests need sliceable bytes.
+    const streamVideo = /^video\//.test(raw.mime_type ?? '') && !request.headers.has('range');
+    const result = await store.getWithMetadata(mediaFileKey(id), { type: streamVideo ? 'stream' : 'arrayBuffer' });
     if (!result?.data) {
       return withCors(errorResponse(404, 'not_found', 'Media file not found', false), request, env);
     }
@@ -62,8 +64,12 @@ export function createMediaFileHandler(deps = {}) {
     const headers = {
       'content-type': contentType,
       'accept-ranges': 'bytes',
-      'cache-control': 'private, max-age=86400'
+      'cache-control': 'private, max-age=86400',
+      'x-content-type-options': 'nosniff'
     };
+    if (streamVideo) {
+      return withCors(new Response(result.data, { status: 200, headers }), request, env);
+    }
     const range = parseByteRange(request.headers.get('range'), size);
     if (range === 'unsatisfiable') {
       return withCors(new Response(null, {

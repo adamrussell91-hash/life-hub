@@ -590,6 +590,13 @@ export const HingeOptionSchema = z.object({
   misconception: z.string().max(300).default('')
 });
 
+export const HingeBackupSchema = z.object({
+  prompt: z.string().max(500).default(''),
+  options: z.array(HingeOptionSchema).max(5).default([]),
+  correct_id: z.string().max(40).default(''),
+  source: z.enum(['teacher', 'ann']).default('teacher')
+});
+
 export const HingeQuestionBlockSchema = z.object({
   id: z.string().min(1), type: z.literal('block'),
   block_type: z.literal('hinge_question'), variant: z.string().default('medium'),
@@ -600,7 +607,9 @@ export const HingeQuestionBlockSchema = z.object({
     correct_id: z.string().max(40).default(''),
     seconds: z.union([z.literal(0), z.literal(30), z.literal(60), z.literal(90), z.literal(120)]).default(60),
     move_on: z.number().int().min(1).max(100).default(80),
-    reteach: z.number().int().min(0).max(99).default(50)
+    reteach: z.number().int().min(0).max(99).default(50),
+    /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
+    backup: HingeBackupSchema.optional()
   }), ...blockLayout, ...blockTimestamps
 });
 

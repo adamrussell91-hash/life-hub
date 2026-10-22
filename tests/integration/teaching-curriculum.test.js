@@ -11,6 +11,7 @@ import { createMediaItemHandler } from '../../netlify/functions/media-item.mjs';
 import { createMediaUploadHandler } from '../../netlify/functions/media-upload.mjs';
 import { createScheduleUnitHandler } from '../../netlify/functions/schedule-unit.mjs';
 import { createOutcomesHandler } from '../../netlify/functions/outcomes.mjs';
+import { createOutcomeHandler } from '../../netlify/functions/outcome.mjs';
 import { createLessonsHandler } from '../../netlify/functions/lessons.mjs';
 import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
 import { createScheduledLessonsHandler } from '../../netlify/functions/scheduled-lessons.mjs';
@@ -119,7 +120,9 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
       'lessons/lesson-1': { id: 'lesson-1', title: 'Draft', unit_id: 'unit-1' },
       'published/lessons/lesson-1': { lesson_id: 'lesson-1' },
       'media/file-1': { id: 'file-1', status: 'archived' },
-      'media/file-2': { id: 'file-2', status: 'active', mime_type: 'image/png' }
+      'media/file-2': { id: 'file-2', status: 'active', mime_type: 'image/png' },
+      'documents/doc-1': { id: 'doc-1', type: 'document', kind: 'syllabus', status: 'active', subject_id: 'subject-1', blocks: [] },
+      'documents/doc-2': { id: 'doc-2', type: 'document', kind: 'syllabus', status: 'trashed', subject_id: 'subject-1', blocks: [] }
     })
   });
   const response = await handler(request());
@@ -138,6 +141,7 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
     updated_at: ''
   }]);
   assert.deepEqual(body.data.media.map(item => item.id), ['file-2']);
+  assert.deepEqual(body.data.documents.map(doc => doc.id), ['doc-1']);
   assert.equal(body.data.schedule_anchor_date, '2026-08-12');
 });
 
@@ -501,6 +505,80 @@ test('outcomes and media collections create behind the Life session', async () =
     })
   );
   assert.equal(anon.status, 401);
+});
+
+test('outcome create refuses a duplicate code even when the blob listing lags', async () => {
+  const store = memoryStore({
+    'subjects/subject_1': { id: 'subject_1', type: 'subject', title: 'English', outcome_ids: ['outcome_a'] },
+    'outcomes/outcome_a': {
+      id: 'outcome_a', type: 'curriculum_outcome', source: 'custom', subject_id: 'subject_1',
+      code: 'EAV-12-04', title: 'New contexts', description: 'Full wording', group: 'Custom', status: 'active'
+    }
+  });
+  // Listing has not caught up with the fresh write yet.
+  store.list = async () => ({ blobs: [] });
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+  const res = await createOutcomesHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/outcomes',
+    body: { subject_id: 'subject_1', code: ' eav-12-04 ', title: 'Again', description: 'Again' }
+  }));
+  assert.equal(res.status, 409);
+});
+
+test('outcome item edits, guards deletes in use, and merges duplicates', async () => {
+  const outcome = (id, code, extra = {}) => ({
+    id, type: 'curriculum_outcome', source: 'custom', subject_id: 'subject_1',
+    code, title: code, description: `${code} wording`, group: 'Custom', status: 'active', ...extra
+  });
+  const store = memoryStore({
+    'subjects/subject_1': { id: 'subject_1', type: 'subject', title: 'English', outcome_ids: ['o1', 'o2', 'o3', 'o4'] },
+    'outcomes/o1': outcome('o1', 'EAV-12-04'),
+    'outcomes/o2': outcome('o2', 'EAV-12-04'),
+    'outcomes/o3': outcome('o3', 'EAV-12-05'),
+    'outcomes/o4': outcome('o4', 'EAV-12-06'),
+    'lessons/lesson_1': { id: 'lesson_1', type: 'lesson', title: 'Poetry', outcome_ids: ['o2', 'o3'], updated_at: 'x' },
+    'lessons/lesson_2': { id: 'lesson_2', type: 'lesson', title: 'Drama', outcome_ids: ['o1', 'o2'] },
+    'published/lessons/lesson_1': { id: 'lesson_1', outcome_ids: ['o2'], updated_at: 'published' },
+    'units/unit_1': { id: 'unit_1', type: 'unit', title: 'Texts', outcome_ids: ['o2'] }
+  });
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+  const handler = createOutcomeHandler(deps);
+  const url = path => `https://api.adam-russell.com/api/outcomes/${path}`;
+
+  const patched = await handler(request({ method: 'PATCH', url: url('o3'), body: { title: 'Critical texts', group: 'Module B' } }));
+  assert.equal(patched.status, 200);
+  assert.equal((await store.get('outcomes/o3')).group, 'Module B');
+
+  const clash = await handler(request({ method: 'PATCH', url: url('o3'), body: { code: 'eav-12-06' } }));
+  assert.equal(clash.status, 409);
+  const empty = await handler(request({ method: 'PATCH', url: url('o3'), body: { title: '  ' } }));
+  assert.equal(empty.status, 400);
+
+  const usage = await (await handler(request({ url: url('o2/usage') }))).json();
+  assert.deepEqual(usage.data.usage.map(row => row.kind).sort(), ['lesson', 'lesson', 'published_lesson', 'unit']);
+
+  const blocked = await handler(request({ method: 'DELETE', url: url('o2') }));
+  assert.equal(blocked.status, 409);
+  assert.equal((await blocked.json()).data.usage.length, 3);
+
+  const merged = await handler(request({ method: 'POST', url: url('o2/merge'), body: { into: 'o1' } }));
+  assert.equal(merged.status, 200);
+  assert.equal((await merged.json()).data.retagged, 4);
+  assert.equal(await store.get('outcomes/o2'), null);
+  assert.deepEqual((await store.get('lessons/lesson_1')).outcome_ids, ['o1', 'o3']);
+  assert.deepEqual((await store.get('lessons/lesson_2')).outcome_ids, ['o1']);
+  assert.deepEqual((await store.get('published/lessons/lesson_1')).outcome_ids, ['o1']);
+  assert.equal((await store.get('published/lessons/lesson_1')).updated_at, 'published');
+  assert.deepEqual((await store.get('units/unit_1')).outcome_ids, ['o1']);
+  assert.deepEqual((await store.get('subjects/subject_1')).outcome_ids, ['o1', 'o3', 'o4']);
+
+  const deleted = await handler(request({ method: 'DELETE', url: url('o4') }));
+  assert.equal(deleted.status, 200);
+  assert.deepEqual((await store.get('subjects/subject_1')).outcome_ids, ['o1', 'o3']);
+
+  const self = await handler(request({ method: 'POST', url: url('o1/merge'), body: { into: 'o1' } }));
+  assert.equal(self.status, 400);
 });
 
 test('scheduled-lesson collection creates a dated row behind the Life session', async () => {

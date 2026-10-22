@@ -6,6 +6,9 @@
  *   fry         Rewrites a block as a Fry explainer (teacher only).
  *   techniques  Finds the Periodic Table techniques a passage uses, for the
  *               teacher to approve (see technique-scan.mjs).
+ *   hinge_backup  Drafts a parallel hinge question when the class comes in
+ *               under the bar (see hinge-backup.mjs). Started by the hinge
+ *               route from the draft lesson, never by POST /api/text-tools.
  *
  * The live deploy cuts synchronous functions off at about ten seconds, which
  * is shorter than either model call. So a request starts a job record keyed by
@@ -16,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { completeMessage as defaultCompleteMessage } from './anthropic-client.mjs';
 import { buildFryExplainerSystem } from './fry-explainer-prompt.mjs';
+import { HINGE_BACKUP_SYSTEM, parseHingeBackupResult } from './hinge-backup.mjs';
 import {
   MAX_TECHNIQUE_SCAN_CHARS,
   parseTechniqueResult,
@@ -41,14 +45,16 @@ export const TEXT_TOOL_ERROR_COOLDOWN_MS = 60_000;
 const DEFAULT_MODELS = {
   dictionary: 'claude-haiku-4-5',
   fry: 'claude-sonnet-5',
-  techniques: 'gpt-4o'
+  techniques: 'gpt-4o',
+  hinge_backup: 'claude-sonnet-5-5'
 };
 const MODEL_ENV = {
   dictionary: 'TEXT_TOOLS_DICTIONARY_MODEL',
   fry: 'TEXT_TOOLS_FRY_MODEL',
-  techniques: 'TEXT_TOOLS_TECHNIQUES_MODEL'
+  techniques: 'TEXT_TOOLS_TECHNIQUES_MODEL',
+  hinge_backup: 'TEXT_TOOLS_HINGE_BACKUP_MODEL'
 };
-const MAX_TOKENS = { dictionary: 4096, fry: 4096 };
+const MAX_TOKENS = { dictionary: 4096, fry: 4096, hinge_backup: 1500 };
 const KEY_RE = /^[a-f0-9]{64}$/;
 
 export function isTextTool(tool) {
@@ -303,6 +309,12 @@ export function fryLengthBudget(text) {
 }
 
 export function buildTextToolRequest(tool, text) {
+  if (tool === 'hinge_backup') {
+    return {
+      system: HINGE_BACKUP_SYSTEM,
+      messages: [{ role: 'user', content: `Here is the hinge question the class just answered.\n\n<hinge>\n${text}\n</hinge>` }]
+    };
+  }
   if (tool === 'fry') {
     const budget = fryLengthBudget(text);
     return {
@@ -365,7 +377,8 @@ export async function runTextToolJob({
         messages,
         signal: AbortSignal.timeout(120_000)
       });
-      const result = job.tool === 'fry' ? parseFryResult(raw) : parseDictionaryResult(raw, job.text);
+      const result =
+        job.tool === 'fry' ? parseFryResult(raw) : job.tool === 'hinge_backup' ? parseHingeBackupResult(raw) : parseDictionaryResult(raw, job.text);
       next = { ...job, status: 'done', result };
     } catch (error) {
       next = {

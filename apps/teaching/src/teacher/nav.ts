@@ -3,7 +3,7 @@ import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
 import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
-import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, MediaFolder, MediaUsage, CurriculumOutcome, LineStop } from '@/schemas';
+import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, MediaFolder, MediaUsage, CurriculumOutcome, TeachingDocument, LineStop } from '@/schemas';
 
 export interface CurriculumLessonSummary {
   id: string;
@@ -33,6 +33,7 @@ export interface CurriculumResponse {
   years: Year[];
   subjects: Subject[];
   units: Unit[];
+  documents?: TeachingDocument[];
   lessons: CurriculumLessonSummary[];
   classes: Class[];
   scheduled_lessons: ScheduledLesson[];
