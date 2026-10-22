@@ -62,10 +62,13 @@ export function dateOf(column: AnyColumn): string {
   return column.kind === 'handin' ? column.due : column.date;
 }
 
+/** Oldest first; same-day columns fall back to title. */
+export const compareColumns = (a: AnyColumn, b: AnyColumn): number => dateOf(a).localeCompare(dateOf(b)) || collator.compare(a.title, b.title);
+
 /** Teacher columns and shown quizzes, oldest first. */
 export function orderedColumns(view: MarkbookView): AnyColumn[] {
   const all: AnyColumn[] = [...view.markbook.columns, ...view.quizzes.filter((q) => !q.hidden)];
-  return all.sort((a, b) => dateOf(a).localeCompare(dateOf(b)) || collator.compare(a.title, b.title));
+  return all.sort(compareColumns);
 }
 
 const surname = (name: string): string => name.trim().split(/\s+/).pop() ?? '';

@@ -1,6 +1,6 @@
 import type { AssessmentMark } from './schema';
 import type { MarkbookView, QuizColumn, QuizRow } from './types';
-import { assessments, dateOf, markOf, quizPercent } from './calc';
+import { assessments, compareColumns, markOf, quizPercent } from './calc';
 
 /** Outcome evidence and quiz flags, worked out from what the markbook already holds. */
 
@@ -75,19 +75,20 @@ export function reteachList(quiz: QuizColumn, studentIds: string[]): Array<{ id:
 export function quizSeries(view: MarkbookView, studentId: string): number[] {
   return view.quizzes
     .filter((q) => !q.hidden)
-    .sort((a, b) => dateOf(a).localeCompare(dateOf(b)))
+    .sort(compareColumns)
     .map((q) => q.scores[studentId])
     .filter((s) => s && s.pending === 0)
     .map((s) => quizPercent(s))
     .filter((p): p is number => p !== null);
 }
 
+const EPS = 1e-9;
 const mean = (xs: number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
 
 /** Five or more quizzes, and the last three average 15 or more points below the ones before. */
 export function isDropping(series: number[]): boolean {
   if (series.length < 5) return false;
-  return mean(series.slice(0, -3)) - mean(series.slice(-3)) >= 15;
+  return mean(series.slice(0, -3)) - mean(series.slice(-3)) >= 15 - EPS;
 }
 
 /** Three or more most-confident answers scored zero, and they are 40% or more of the student's most-confident answers. */
@@ -102,5 +103,5 @@ export function isConfidentlyWrong(view: MarkbookView, studentId: string): boole
       if (row.awarded === 0) wrong += 1;
     }
   }
-  return wrong >= 3 && wrong / sure >= 0.4;
+  return wrong >= 3 && wrong / sure >= 0.4 - EPS;
 }
