@@ -547,7 +547,7 @@ describe('markbook section', () => {
   it('clears a hand-in from the phone card’s Clear button', async () => {
     const { host, api } = await mount(view({ markbook: book({ marks: { hand00001: { s1: { status: 'late', at: '2026-10-26' } } } }) }), true);
     const clears = [...host.querySelectorAll<HTMLButtonElement>('.mb-phone__clear')];
-    expect(clears.map((b) => b.getAttribute('aria-label'))).toEqual(['Clear Draft']);
+    expect(clears.map((b) => b.getAttribute('aria-label'))).toEqual(['Clear Draft for Bob Brown']);
     expect(clears[0]!.textContent).toBe('Clear');
     clears[0]!.focus();
     clears[0]!.click();
@@ -600,22 +600,139 @@ describe('markbook section', () => {
     expect(host.querySelector<HTMLButtonElement>('.mb-phone__next')!.disabled).toBe(true);
   });
 
-  it('exports a CSV named after the class, with a byte-order mark for Excel', async () => {
+  it('exports a CSV named after the class, with a byte-order mark for Excel, and frees the file after 30 seconds', async () => {
     const { host } = await mount(view());
+    // jsdom has no object URLs; give spyOn something to wrap.
+    const urls = URL as unknown as Record<string, unknown>;
+    for (const name of ['createObjectURL', 'revokeObjectURL']) if (typeof urls[name] !== 'function') urls[name] = () => '';
     const blobs: Blob[] = [];
-    Object.assign(URL, { createObjectURL: vi.fn((b: Blob) => { blobs.push(b); return 'blob:x'; }), revokeObjectURL: vi.fn() });
+    const create = vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => { blobs.push(b as Blob); return 'blob:x'; });
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     const clicked: string[] = [];
-    const realClick = HTMLAnchorElement.prototype.click;
-    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) { clicked.push(this.download); };
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { clicked.push(this.download); });
+    vi.useFakeTimers();
     try {
       host.querySelector<HTMLButtonElement>('.mb__export')!.click();
+      vi.advanceTimersByTime(0);
+      expect(revoke).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(29_999);
+      expect(revoke).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(revoke).toHaveBeenCalledWith('blob:x');
     } finally {
-      HTMLAnchorElement.prototype.click = realClick;
+      vi.useRealTimers();
+      click.mockRestore();
+      create.mockRestore();
+      revoke.mockRestore();
     }
     expect(clicked).toEqual(['markbook-12eng-2026-11-03.csv']);
+    expect(document.querySelector('a[download]')).toBeNull();
     expect(blobs[0]!.type).toBe('text/csv;charset=utf-8');
     const bytes = new Uint8Array(await blobs[0]!.arrayBuffer());
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     expect(new TextDecoder().decode(bytes.slice(3))).toContain('Initials,Name,Draft,Bookwork,Essay,Overall');
+  });
+
+  it('announces the student when the phone card moves, from a live region outside the redrawn body', async () => {
+    const { host } = await mount(view(), true);
+    const live = host.querySelector<HTMLElement>('.mb__announce')!;
+    expect(live.classList.contains('mb-sr')).toBe(true);
+    expect(live.getAttribute('aria-live')).toBe('polite');
+    expect(live.closest('.mb__body')).toBeNull();
+    expect(live.textContent).toBe('');
+    host.querySelector<HTMLButtonElement>('.mb-phone__next')!.click();
+    expect(live.textContent).toBe('Tom Tills, 2 of 2');
+    expect(host.querySelector('.mb__announce')).toBe(live);
+    const pick = host.querySelector<HTMLSelectElement>('.mb-phone__pick')!;
+    pick.value = '0';
+    pick.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(live.textContent).toBe('Bob Brown, 1 of 2');
+  });
+
+  it('keeps the same student on the phone card when a reload adds someone before them', async () => {
+    const { host, api } = await mount(view(), true);
+    host.querySelector<HTMLButtonElement>('.mb-phone__next')!.click();
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('TT · Tom Tills');
+    // A failed save reloads; the reload brings a new student who sorts before Tom.
+    const withAva = view({ students: [...view().students, { id: 's3', name: 'Ava Moss', initials: 'AM' }] });
+    (api.setMark as Mock).mockRejectedValueOnce(new Error('Nope.'));
+    (api.load as Mock).mockResolvedValueOnce(structuredClone(withAva));
+    host.querySelector<HTMLButtonElement>('.mb-phone .mb-cell--handin')!.click();
+    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Nope.'));
+    expect(host.querySelector<HTMLSelectElement>('.mb-phone__pick')!.options).toHaveLength(3);
+    expect(host.querySelector('.mb-phone__name')?.textContent).toBe('TT · Tom Tills');
+    expect(host.querySelector<HTMLSelectElement>('.mb-phone__pick')!.value).toBe('2');
+  });
+
+  it('offers Clear on hand-in and check rows only, named for the student, with no Delete hint on phone cells', async () => {
+    const marks = { hand00001: { s1: { status: 'late', at: '2026-10-26' } }, chck00001: { s1: 2 }, essay0001: { s1: { criteria: { crit0001: 15 } } } };
+    const { host, api } = await mount(view({ markbook: book({ marks }), quizzes: [outcomeQuiz()] }), true);
+    const clears = [...host.querySelectorAll<HTMLButtonElement>('.mb-phone__clear')];
+    expect(clears.map((b) => b.getAttribute('aria-label'))).toEqual(['Clear Draft for Bob Brown', 'Clear Bookwork for Bob Brown']);
+    const rows = [...host.querySelectorAll('.mb-phone__row')];
+    for (const kind of ['quiz', 'assessment']) {
+      const row = rows.find((r) => r.querySelector(`.mb-cell--${kind}`));
+      expect(row).toBeDefined();
+      expect(row!.querySelector('.mb-phone__clear')).toBeNull();
+    }
+    for (const cell of host.querySelectorAll('.mb-phone .mb-cell')) expect(cell.getAttribute('aria-label') ?? '').not.toContain('Delete to clear');
+    clears[1]!.click();
+    await vi.waitFor(() => expect(api.calls[0]).toEqual(['chck00001', 's1', null]));
+    expect(host.querySelector('.mb-phone .mb-cell--check')?.textContent).toBe('–');
+  });
+
+  it('keeps the Delete hint on grid cells', async () => {
+    const { host } = await mount(view());
+    expect(host.querySelector('.mb-grid .mb-cell--handin')?.getAttribute('aria-label')).toContain('Delete to clear');
+  });
+
+  describe('follows the phone-width media query', () => {
+    type Listener = () => void;
+    const stub = (legacy: boolean) => {
+      const listeners = new Set<Listener>();
+      const removed: Listener[] = [];
+      const mql = {
+        matches: false,
+        media: '(max-width: 600px)',
+        ...(legacy
+          ? { addListener: (fn: Listener) => listeners.add(fn), removeListener: (fn: Listener) => { listeners.delete(fn); removed.push(fn); } }
+          : {
+              addEventListener: (_t: string, fn: Listener) => listeners.add(fn),
+              removeEventListener: (_t: string, fn: Listener) => { listeners.delete(fn); removed.push(fn); }
+            })
+      };
+      vi.stubGlobal('matchMedia', vi.fn(() => mql));
+      const flip = (matches: boolean) => {
+        mql.matches = matches;
+        for (const fn of [...listeners]) fn();
+      };
+      return { listeners, removed, flip };
+    };
+
+    for (const legacy of [false, true]) {
+      it(legacy ? 'with the older addListener API' : 'with addEventListener', async () => {
+        const media = stub(legacy);
+        try {
+          const host = document.createElement('div');
+          document.body.append(host);
+          const dispose = mountMarkbook(host, cls, { api: fakeApi(view()), today: () => '2026-11-03' });
+          await vi.waitFor(() => expect(host.querySelector('.mb-grid')).not.toBeNull());
+          expect(media.listeners.size).toBe(1);
+          const listener = [...media.listeners][0]!;
+          media.flip(true);
+          expect(host.querySelector('.mb-phone')).not.toBeNull();
+          expect(host.querySelector('.mb-grid')).toBeNull();
+          media.flip(false);
+          expect(host.querySelector('.mb-grid')).not.toBeNull();
+          expect(host.querySelector('.mb-phone')).toBeNull();
+          dispose();
+          expect(media.listeners.size).toBe(0);
+          expect(media.removed).toEqual([listener]);
+          host.remove();
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
+    }
   });
 });

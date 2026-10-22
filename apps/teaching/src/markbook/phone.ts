@@ -57,11 +57,11 @@ export function renderPhone(
     const row = el('div', 'mb-phone__row');
     const label = el('div', 'mb-phone__label');
     label.append(el('span', undefined, c.title), el('small', undefined, `${KIND_LABEL[c.kind]} · ${formatDay(dateOf(c))}`));
-    row.append(label, cellFor(view, c, s, actions, today));
+    row.append(label, cellFor(view, c, s, actions, today, { clearHint: false }));
     if ((c.kind === 'handin' || c.kind === 'check') && !s.removed && markOf(view.markbook, c.id, s.id) !== undefined) {
       const clear = el('button', 'mb-phone__clear', 'Clear');
       clear.type = 'button';
-      clear.setAttribute('aria-label', `Clear ${c.title}`);
+      clear.setAttribute('aria-label', `Clear ${c.title} for ${s.name}`);
       // Same keys as the cell, so a redraw after clearing puts focus on the cell.
       clear.dataset.col = c.id;
       clear.dataset.student = s.id;
