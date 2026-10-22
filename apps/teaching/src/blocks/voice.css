@@ -430,10 +430,19 @@
 }
 
 .voice-summary__item {
+  display: grid;
+  gap: 2px;
+}
+
+.voice-summary__line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
+}
+
+.voice-summary__meaning {
+  color: var(--muted);
 }
 
 .voice-summary__count {
