@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SKILL_IDS } from '../../../../packages/problem-solver/skills.mjs';
 
 /**
  * A syllabus alignment: one subject's focus areas, their Understanding and
@@ -16,6 +17,8 @@ const Text = z.string().trim().min(1).max(2000);
 const Code = z.string().regex(/^[A-Z]{2,5}$/);
 const ConceptRef = z.string().regex(/^[A-Z]{2,5}\d{1,2}$/);
 const PointId = z.string().regex(/^[UR]\d{1,2}$/);
+/** A Problem Solver thinking skill id (packages/problem-solver/skills.mjs). */
+const SkillId = z.string().regex(/^[a-z_]{3,40}$/);
 
 export const AlignmentOutcomeSchema = z.object({ n: z.number().int().min(1).max(12), code: z.string().min(1).max(32), text: Text });
 export const AlignmentProcessSchema = z.object({ code: Code, name: z.string().min(1).max(80), text: Text });
@@ -33,6 +36,8 @@ export const AlignmentPointSchema = z.object({
   outcomes: z.array(z.object({ n: z.number().int().min(1).max(12), link: LinkStrengthSchema })).max(12),
   concepts: z.array(z.object({ ref: ConceptRef, link: LinkStrengthSchema })).max(30),
   processes: z.array(Code).max(6),
+  /** Problem Solver thinking skills, strongest first. Older saved copies have none yet. */
+  skills: z.array(SkillId).max(12).optional(),
   edited: z.boolean().optional()
 });
 export const AlignmentFocusAreaSchema = z.object({
@@ -61,7 +66,8 @@ export const AlignmentPatchSchema = z.object({
   point: PointId,
   outcomes: AlignmentPointSchema.shape.outcomes,
   concepts: AlignmentPointSchema.shape.concepts,
-  processes: AlignmentPointSchema.shape.processes
+  processes: AlignmentPointSchema.shape.processes,
+  skills: z.array(SkillId).max(12).default([])
 });
 export type AlignmentPatch = z.infer<typeof AlignmentPatchSchema>;
 
@@ -78,12 +84,34 @@ export function applyAlignmentPatch(doc: Alignment, patch: AlignmentPatch): Alig
   if (patch.outcomes.some((o) => !outcomeNs.has(o.n))) throw new AlignmentPatchError('One of those outcomes isn’t in this syllabus.');
   if (patch.concepts.some((c) => !refs.has(c.ref))) throw new AlignmentPatchError('One of those concept bullets isn’t in the booklet.');
   if (patch.processes.some((p) => !processCodes.has(p))) throw new AlignmentPatchError('One of those learning processes isn’t in the booklet.');
+  if (patch.skills.some((k) => !(SKILL_IDS as readonly string[]).includes(k))) throw new AlignmentPatchError('One of those thinking skills isn’t a Problem Solver skill.');
   const dedupe = <T>(rows: T[], key: (row: T) => string | number): T[] => [...new Map(rows.map((r) => [key(r), r])).values()];
   const next: Alignment = structuredClone(doc);
   const target = next.focus_areas.find((f) => f.id === area.id)!.points.find((p) => p.id === point.id)!;
   target.outcomes = dedupe(patch.outcomes, (o) => o.n).sort((a, b) => a.n - b.n);
   target.concepts = dedupe(patch.concepts, (c) => c.ref);
   target.processes = [...new Set(patch.processes)];
+  target.skills = [...new Set(patch.skills)];
   target.edited = true;
   return next;
 }
+
+/**
+ * Fill in thinking skills a saved copy predates, from the private file. Points that
+ * already have skills (including ones the teacher edited) keep them.
+ */
+export function mergeMissingSkills(saved: Alignment, source: Alignment): { doc: Alignment; changed: boolean } {
+  const next: Alignment = structuredClone(saved);
+  let changed = false;
+  for (const area of next.focus_areas) {
+    const from = source.focus_areas.find((f) => f.id === area.id);
+    for (const point of area.points) {
+      if (point.skills) continue;
+      point.skills = [...(from?.points.find((p) => p.id === point.id)?.skills ?? [])];
+      changed = true;
+    }
+  }
+  return { doc: next, changed };
+}
+
+export const needsSkills = (doc: Alignment): boolean => doc.focus_areas.some((f) => f.points.some((p) => !p.skills));
