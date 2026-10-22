@@ -4,7 +4,7 @@ vi.mock('@/skills/api', () => ({ loadSkills: vi.fn(), refreshSkills: vi.fn() }))
 vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: vi.fn() }));
 
 import { loadSkills, refreshSkills } from '@/skills/api';
-import { findSkill, nextMoveFor, rungForMark, skillsForArea, skillsForOutcome } from '@/skills/model';
+import { findSkill, nextMoveFor, rungForMark, servesPoint, skillsForArea, skillsForOutcome } from '@/skills/model';
 import type { SkillsContinuum, SkillStrand } from '@/skills/schema';
 import { renderSkillsLibrary, resetSkillsViewForTests, selectSkill } from '@/skills/view';
 import { openColumnForm } from '@/markbook/column-form';
@@ -14,11 +14,12 @@ import type { AssessmentColumn, Column } from '@/markbook/schema';
 // Invented content. The real continuum lives in the private data repo.
 const rung = (label: string, next: string) => ({
   i_can: `I can ${label}.`,
+  indicators: [] as { group: string; text: string; eg?: string }[],
   build: { formula: ['Claim', 'Reason'], parts: [{ id: 'c', name: 'Claim', job: 'Says it', language: ['so'] }, { id: 'r', name: 'Reason', job: 'Backs it', language: ['because'] }],
     example: [['A claim', 'c'], [' because a reason', 'r'], ['.', null]] as [string, string | null][], why_here: `Why ${label}`, checks: [`Check ${label}`], next_move: next }
 });
-const sub = (id: string, name: string, outcomes: number[], areas: string[]) => ({
-  id, name, in_hsc: `${name} in the HSC`, draws_on: 'Sources', outcomes, focus_areas: areas,
+const sub = (id: string, name: string, outcomes: number[], areas: string[], points: { area: string; point: string; link: 'shared' | 'related' }[] = []) => ({
+  id, name, in_hsc: `${name} in the HSC`, draws_on: 'Sources', outcomes, focus_areas: areas, points,
   rungs: { capable: rung('claim', 'Add a reason.'), skilled: rung('reason', 'Add a concept.'), accomplished: rung('concept', 'Qualify it.'), excellent: rung('qualify', 'Keep refining: cut words.') }
 });
 const rungs = (['capable', 'skilled', 'accomplished', 'excellent'] as const).map((id, i) => ({ id, name: id[0]!.toUpperCase() + id.slice(1), marks: `${13 + i * 2}`, marker_words: 'x', meaning: 'y' }));
@@ -49,6 +50,15 @@ describe('skills model', () => {
     expect(skillsForOutcome(continuum, 1, 'area-two').map((e) => e.ref)).toEqual(['arguing.evidence']);
     expect(skillsForArea(continuum, 'area-two').map((e) => e.ref)).toEqual(['arguing.evidence', 'composing.reflection']);
   });
+
+  it('serves the dot points a skill names, falling back to shared outcomes when it names none', () => {
+    const linked = sub('thesis', 'Thesis', [5], ['area-one'], [{ area: 'area-one', point: 'R1', link: 'shared' }]);
+    const r1 = { area: 'area-one', id: 'R1', outcomes: [{ n: 5 }] };
+    const u1 = { area: 'area-one', id: 'U1', outcomes: [{ n: 5 }] };
+    expect([servesPoint(linked, r1), servesPoint(linked, u1)]).toEqual([true, false]);
+    const loose = sub('evidence', 'Evidence', [5], ['area-one']);
+    expect([servesPoint(loose, u1), servesPoint(loose, { ...u1, area: 'area-two' })]).toEqual([true, false]);
+  });
 });
 
 describe('skills continuum in the Resource Library', () => {
@@ -68,6 +78,25 @@ describe('skills continuum in the Resource Library', () => {
     expect(host.querySelector('[data-skill-sub="evidence"]')?.getAttribute('aria-pressed')).toBe('true');
     expect([...host.querySelectorAll('.skl__rung')].map((r) => (r as HTMLElement).dataset.rung)).toEqual(['capable', 'skilled', 'accomplished', 'excellent']);
     expect(host.querySelectorAll('.skl__rung')[0]!.querySelectorAll('.skl__seg sup').length).toBe(2);
+  });
+
+  it('groups each rung\'s indicators under Look for, and leaves rungs without them unchanged', async () => {
+    const withIndicators = structuredClone(continuum);
+    withIndicators.strands[0]!.sub_strands[0]!.rungs.capable.indicators = [
+      { group: 'Claim', text: 'names the writer as the subject', eg: '“The poet shows…”' },
+      { group: 'Claim', text: 'uses one key term' },
+      { group: 'Language', text: 'writes in the present tense' }
+    ];
+    vi.mocked(loadSkills).mockResolvedValue(withIndicators);
+    selectSkill('arguing.thesis');
+    const host = document.createElement('div');
+    document.body.append(host);
+    renderSkillsLibrary(host);
+    await settle();
+    const [capable, skilled] = host.querySelectorAll('.skl__rung');
+    expect([...capable!.querySelectorAll('.skl__group-name')].map((g) => g.textContent)).toEqual(['Claim', 'Language']);
+    expect(capable!.querySelector('.skl__inds li')?.textContent).toBe('names the writer as the subject (e.g. “The poet shows…”)');
+    expect(skilled!.querySelector('.skl__look')).toBeNull();
   });
 
   it('switches strands, shows the whole-strand grid and refreshes', async () => {
