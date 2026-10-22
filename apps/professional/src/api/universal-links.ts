@@ -77,9 +77,10 @@ export function changeUniversalLinkRole(
   return apiPatch(`/api/universal-links?${params.toString()}`, body, { signal: options.signal });
 }
 
+/** Professional work files under Tasks' teaching domain; /api/tasks rejects a task with no valid domain. */
 export function createTask(
   body: { title: string; status?: string; domain?: string; priority?: string; kind?: string },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ id: string; title: string }> {
-  return apiPost('/api/tasks', body, { signal: options.signal });
+  return apiPost('/api/tasks', { domain: 'teaching', ...body }, { signal: options.signal });
 }

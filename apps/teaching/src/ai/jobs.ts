@@ -175,6 +175,7 @@ export function staleWorkingJobError(job: AiJob, now = Date.now()): AiJob | null
 
 const KERNEL_PROPOSAL_TO_TOOL = {
   replace_block: 'propose_replace_block',
+  replace_blocks: 'propose_replace_blocks',
   replace_section: 'propose_replace_section',
   replace_lesson: 'propose_replace_lesson',
   insert_blocks: 'propose_insert_blocks',
