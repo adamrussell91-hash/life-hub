@@ -1297,3 +1297,42 @@ test("schema accepts a recipe added date and rejects a malformed one", () => {
   j.recipes[0].added_at = 5;
   assert.throws(() => validateFoodJournal(j), /added date/);
 });
+
+test("schema accepts dish ingredients, English text and a Brisket link, and rejects bad ones", () => {
+  const j = fixture();
+  const v = j.visits[0];
+  v.menu_text_en = "Lasagne $25";
+  v.menu_items = [
+    { name: "Lasaña", name_en: "Lasagne", description: "Carne, bechamel", description_en: "Beef, bechamel", price: "$25", kind: "dish" },
+  ];
+  Object.assign(v.dishes[0], {
+    title_en: "Lasagne",
+    ingredients: "Beef, bechamel\n+ Extra cheese",
+    ingredients_original: "Carne, bechamel",
+    notes_en: "",
+    brisket: {
+      meal_path: "data/nutrition/2026/10/2026-10-22-dinner-1930.md",
+      portion: "½",
+      portion_fraction: 0.5,
+      counted_at: "2026-10-22T19:31:00+11:00",
+      needs_recount: false,
+      calories: 620,
+      protein_g: 26,
+      fat_g: 24,
+    },
+  });
+  v.dishes[0].photos = [{ id: "photo_1", key: "food/photos/photo_1.jpg", from: "med_abcd1234" }];
+  assert.doesNotThrow(() => validateFoodJournal(j));
+  for (const broken of [
+    (d) => (d.ingredients = 5),
+    (d) => (d.ingredients = "x".repeat(2001)),
+    (d) => (d.brisket = { ...d.brisket, portion_fraction: 1.5 }),
+    (d) => (d.brisket = { ...d.brisket, meal_path: "data/other/x.md" }),
+    (d) => (d.brisket = { ...d.brisket, needs_recount: "yes" }),
+    (d) => (d.brisket = { ...d.brisket, calories: -5 }),
+  ]) {
+    const copy = structuredClone(j);
+    broken(copy.visits[0].dishes[0]);
+    assert.throws(() => validateFoodJournal(copy), /invalid/i);
+  }
+});
