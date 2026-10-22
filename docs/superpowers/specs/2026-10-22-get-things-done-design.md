@@ -1,11 +1,11 @@
-# Get Things Done: a coached action tool beside Problem Solver and Decision Maker
+# Gear Shifter: a coached getting-unstuck tool beside Problem Solver and Decision Maker
 
 Date: 22 October 2026. Status: the pack's ten questions were settled with Adam on 22 Oct (see Decisions); awaiting written-spec review.
 Builds on: `docs/superpowers/specs/2026-10-21-decision-book-design.md` (Decision Maker, on `main`) and Problem Solver v2.
 
 ## Goal
 
-**Get Things Done** is a third coach tool in the Tasks hub, built from *The Get Things Done Book* (Krogerus and Tschäppeler, the authors of *The Decision Book*: 41 techniques in five sections). Its nav label is "Get Things Done". In code it goes by `get-things-done`, and its tool ids start with `gt_`.
+**Gear Shifter** is a third coach tool in the Tasks hub, built from *The Get Things Done Book* (Krogerus and Tschäppeler, the authors of *The Decision Book*: 41 techniques in five sections). It is for getting unstuck. Its nav label is "Gear Shifter", after the pattern of its siblings (the thing worked on, then the one who does it) and after the gear at the heart of its graphics. In code it goes by `get-things-done`, after its source, as Decision Maker's code goes by `decision-book`; its tool ids start with `gt_`.
 
 It looks and works like its two siblings. You name something you need to move: a project to start, a stuck task, work with other people, a change of direction or something finished. The coach frames it, finds where it is stuck, recommends one technique, and builds that technique's chart with you one answer at a time. It then helps you commit to a small, dated experiment, and writes an action record onto a linked Tasks page. A short "Quick start" route covers a single stalled task. All three tools share the twelve thinking skills and one skills tally.
 
@@ -41,9 +41,9 @@ The pack's `questions.md` asked ten questions. Adam accepted the recommendations
 
 ## Experience
 
-### Landing (`#/get-things-done`)
+### Landing (`#/gear-shifter`)
 
-The landing page mirrors Decision Maker's, in the Get Things Done palette:
+The landing page mirrors Decision Maker's, in the Gear Shifter palette:
 
 - **Hero:** the book emblem, one line, a **New** box ("What do you need to get moving?") and a **Quick start** card.
 - **Your work:** one card per session. The medal is the section emblem with the main technique's emblem at its centre. The meta line shows the stage, the technique and the date.
@@ -155,11 +155,11 @@ That makes 37 entries plus the Commit tool: 13 path, 16 list, 3 quadrant, 1 curv
 
 ## Design language
 
-Get Things Done is the third member of the set. It shares the grid, type, motion, cards, chips, coach panel, tray and skills ribbon through Problem Solver's components, as Decision Maker does. It brings its own tokens (`.gt-scope`) and shapes (`decor.ts`).
+Gear Shifter is the third member of the set. It shares the grid, type, motion, cards, chips, coach panel, tray and skills ribbon through Problem Solver's components, as Decision Maker does. It brings its own tokens (`.gt-scope`) and shapes (`decor.ts`).
 
 - **Palette:** the pack's screen set. Paper `#fefdf6`, ink `#171c22`, blue `#367db0`, red `#d24c3a` and slate `#3e4852`, with the pack's tints and its two darker label colours for small text. No yellow and no green.
 - **Geometry, after the book's cover:** a red gear held inside two blue circular arrows, a red-and-blue target with a slate dart, and a dotted divider. Blue carries process and routes; red marks the chosen work or goal. Strokes are 4, 6 and 9 units, with round joins and solid chunky arrowheads.
-- **Telling it apart from Problem Solver:** both use red and blue, so the difference is carried by shape and tone. Problem Solver is saturated primaries with yellow, in broken circles and triangles. Get Things Done is a softer steel blue and brick red with slate, in cycles, gears, targets and darts. Plan 1's mockups put all three tools side by side on the rail for Adam to check, and the palette can move then.
+- **Telling it apart from Problem Solver:** both use red and blue, so the difference is carried by shape and tone. Problem Solver is saturated primaries with yellow, in broken circles and triangles. Gear Shifter is steel blue and brick red with slate, in cycles, gears, targets and darts. Plan 1's mockups put all three tools side by side on the rail for Adam to check, and the palette can move then.
 - **Shape board (landing hero):** a 4×3 board in the same place as its siblings'. Its tiles are a gear, a gear inside the return arrows, the target, the dart, the target with the dart in it, a blue cycle, a dotted divider with a forward arrow, four blocks in a row, a stack, a ring of five stations, a single red station on a blue route, and the book emblem.
 - **Medal:** the cover, built as the session moves. The target fills with the frame answer, the cycle arrives with the route, the dart lands at Commit, and the main technique's emblem sits in the middle.
 - **Track:** stations for Frame, Explore, Commit and Review, joined by a dotted line.
@@ -169,7 +169,7 @@ Get Things Done is the third member of the set. It shares the grid, type, motion
 
 ## Diagrams
 
-The charts reuse Decision Maker's family factories and renderers. They move to a shared place, or Get Things Done imports them from `packages/decision-book/`, whichever Plan 1 finds cleaner. They are re-skinned under `.gt-scope`. Each pack entry's `structure` becomes its config, which the checker has already built through the real factories.
+The charts reuse Decision Maker's family factories and renderers. They move to a shared place, or Gear Shifter imports them from `packages/decision-book/`, whichever Plan 1 finds cleaner. They are re-skinned under `.gt-scope`. Each pack entry's `structure` becomes its config, which the checker has already built through the real factories.
 
 Two changes:
 
@@ -182,7 +182,7 @@ The shared rules are Decision Maker's: render from session data, never shrink la
 
 ## Coach knowledge
 
-The rubric reuses `prompts-shared.mjs` (voice, gatekeeping, output). Get Things Done adds:
+The rubric reuses `prompts-shared.mjs` (voice, gatekeeping, output). Gear Shifter adds:
 
 - **The book's stance, in our words:** these are tools to try, not rules; pick one, experiment, and keep what works. Getting more done is not the goal for its own sake.
 - **The route**, and how to place a piece of work on it.
@@ -193,7 +193,7 @@ The rubric reuses `prompts-shared.mjs` (voice, gatekeeping, output). Get Things 
 
 Schema additions:
 - `frame` keys `need`, `route` (`before | doing | others | differently | after`, up to two) and `known`;
-- a `next_technique` suggestion kind, an alias of `next_tool` limited to Get Things Done tools;
+- a `next_technique` suggestion kind, an alias of `next_tool` limited to Gear Shifter tools;
 - a `quick` payload for Quick start.
 
 ## Architecture
@@ -209,7 +209,7 @@ The engine stays single, exactly as in Decision Maker:
 | `packages/decision-book/families/ratings.mjs` and its renderer (new) | Structured Evaluation |
 | `session.mjs` | Two new kinds with their frame keys |
 | `netlify/functions/get-things-done.mjs`, `get-things-done-run.mjs` | Thin wrappers over the shared factories, store prefix `get-things-done/v1` |
-| `apps/tasks/src/views/get-things-done/` (new) | `view.ts`, `canvas.ts`, `decor.ts`, `route.ts`, `quick-view.ts`, `record-blocks.ts`, reusing Problem Solver's client pieces as Decision Maker does. Nav entry in Tools; route `#/get-things-done`; `get_things_done` task source |
+| `apps/tasks/src/views/get-things-done/` (new) | `view.ts`, `canvas.ts`, `decor.ts`, `route.ts`, `quick-view.ts`, `record-blocks.ts`, reusing Problem Solver's client pieces as Decision Maker does. Nav entry "Gear Shifter" in Tools; route `#/gear-shifter`; `gear_shifter` task source |
 | `scripts/book-pack/` | A small importer that turns a pack's entries into tool configs, so the next book costs less again. It reads the private pack and writes code with no `anchor` text. It runs locally, never in CI |
 
 Tasks hub writes, errors and confirm cards are Decision Maker's rules unchanged.
@@ -240,5 +240,5 @@ Lower than Decision Maker's. The engine, server, bridges, coach pipeline and six
 
 ## Open points for Adam
 
-1. The name: "Get Things Done" in the nav, or something shorter?
+1. ~~The name~~: **Gear Shifter**, chosen by Adam on 22 Oct.
 2. The palette and shape checks against Problem Solver happen at the Plan 1 mockups. Is that the right moment?
