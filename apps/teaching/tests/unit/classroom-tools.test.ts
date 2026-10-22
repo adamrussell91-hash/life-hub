@@ -309,17 +309,17 @@ describe('Students section on a class page', () => {
     host.querySelector<HTMLTextAreaElement>('textarea')!.value = 'Ava\nNoah\nMia';
     host.querySelector<HTMLButtonElement>('.btn--primary')!.click();
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
-    expect(save.mock.calls[0]).toEqual(['c1', [
-      { name: 'Ava', skip_picker: false },
-      { name: 'Noah', skip_picker: false },
-      { name: 'Mia', skip_picker: false }
-    ]]);
+    expect(save.mock.calls[0]![1]).toMatchObject([
+      { name: 'Ava', skip_picker: false, initials: 'A' },
+      { name: 'Noah', skip_picker: false, initials: 'N' },
+      { name: 'Mia', skip_picker: false, initials: 'M' }
+    ]);
     await vi.waitFor(() => expect(host.querySelectorAll('.class-students__row').length).toBe(3));
     const skip = host.querySelector<HTMLInputElement>('#class-students-skip-c1-1')!;
     skip.checked = true;
     skip.dispatchEvent(new Event('change'));
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2));
-    expect(save.mock.calls[1][1][1]).toEqual({ name: 'Noah', skip_picker: true });
+    expect(save.mock.calls[1][1][1]).toMatchObject({ name: 'Noah', skip_picker: true });
   });
 
   it('keeps the old list and says why when the save fails', async () => {

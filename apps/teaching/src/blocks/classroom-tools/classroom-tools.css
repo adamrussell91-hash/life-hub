@@ -974,6 +974,35 @@
   color: var(--ink);
 }
 
+.class-students__initials {
+  width: 4.5rem;
+  padding: 0.25rem 0.5rem;
+  font: 600 var(--text-sm) / 1.3 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.class-students__claim {
+  min-width: 5.5rem;
+  font: 500 var(--text-xs) / 1 var(--font-ui);
+  color: var(--muted);
+}
+
+.class-students__claim.is-claimed {
+  color: var(--success);
+}
+
+@media (max-width: 480px) {
+  .class-students__row {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+  }
+}
+
 .class-students__skip {
   display: inline-flex;
   align-items: center;
