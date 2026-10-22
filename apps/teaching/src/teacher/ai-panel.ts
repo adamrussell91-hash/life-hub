@@ -198,8 +198,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   scopeChip.className = 'ai-panel__scope';
 
   // Ten suggestion buttons pushed the thread off a laptop screen, so they stay
-  // folded away until the teacher asks for them.
-  let suggestionsOpen = readBuilderChromePrefs().suggestions === 'open';
+  // folded away until the teacher asks for them, and once a chat is under way
+  // they start folded whatever the saved preference says.
+  let suggestionsOpen = readBuilderChromePrefs().suggestions === 'open' && messages.length === 0;
 
   const suggestionsToggle = document.createElement('button');
   suggestionsToggle.type = 'button';
@@ -207,7 +208,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
   const chipToggles = document.createElement('div');
   chipToggles.className = 'ai-panel__chip-toggles';
-  chipToggles.append(protocolToggle, suggestionsToggle);
+  chipToggles.append(scopeChip, protocolToggle, suggestionsToggle);
 
   const actionsBar = document.createElement('div');
   actionsBar.className = 'ai-panel__actions';
@@ -267,7 +268,6 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   host.replaceChildren(
     toolbar,
     protocolTray,
-    scopeChip,
     chipToggles,
     actionsBar,
     empty,
@@ -822,6 +822,12 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       status: pickAgentWaitLine(turnAgent, { random })
     });
     saveTranscript(options.lessonId, messages);
+    // Every turn folds the chips back up so the thread gets the room. This is
+    // for this chat only; the saved Suggestions preference is left alone.
+    protocolsOpen = false;
+    suggestionsOpen = false;
+    renderProtocols();
+    renderSuggestionsToggle();
     renderThread();
 
     abort?.abort();
