@@ -1,3 +1,5 @@
+import { mountAlignmentView } from '@/alignment/view';
+import { subjectUsesAlignment } from '@/alignment/model';
 import { mountYearNetworkView } from '@/network/year-view';
 import { liveUnitLessonCount } from '@/curriculum/with-entity-status';
 import { navigate } from '@/app/router';
@@ -227,7 +229,7 @@ export function renderScopeTimelineEditor(
 
   let scope: ScopeSequence = initial;
   let selectedId: string | null = null;
-  let tab: 'timeline' | 'map' | 'network' = 'timeline';
+  let tab: 'timeline' | 'map' | 'network' | 'alignment' = 'timeline';
   let zoom = readZoom();
   let saving = false;
   let suppressClick = false;
@@ -297,7 +299,14 @@ export function renderScopeTimelineEditor(
   networkTab.dataset.scopeTab = 'network';
   networkTab.textContent = 'Network';
 
+  const alignmentTab = document.createElement('button');
+  alignmentTab.type = 'button';
+  alignmentTab.className = 'hub-pills__btn scope-timeline__tab';
+  alignmentTab.dataset.scopeTab = 'alignment';
+  alignmentTab.textContent = 'Alignment';
+
   tabs.append(timelineTab, mapTab, networkTab);
+  if (subjectUsesAlignment(subject.title)) tabs.append(alignmentTab);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'scope-timeline__toolbar';
@@ -1128,15 +1137,20 @@ export function renderScopeTimelineEditor(
     mapTab.classList.toggle('is-active', tab === 'map');
     networkTab.classList.toggle('scope-timeline__tab--active', tab === 'network');
     networkTab.classList.toggle('is-active', tab === 'network');
+    alignmentTab.classList.toggle('scope-timeline__tab--active', tab === 'alignment');
+    alignmentTab.classList.toggle('is-active', tab === 'alignment');
     controls.hidden = tab !== 'timeline';
-    actions.style.display = tab === 'network' ? 'none' : '';
+    actions.style.display = tab === 'network' || tab === 'alignment' ? 'none' : '';
     zoomMonth.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'month');
     zoomYear.classList.toggle('scope-timeline__zoom-btn--active', zoom === 'year');
     zoomMonth.setAttribute('aria-pressed', zoom === 'month' ? 'true' : 'false');
     zoomYear.setAttribute('aria-pressed', zoom === 'year' ? 'true' : 'false');
     if (tab === 'timeline') paintTimeline();
     else if (tab === 'map') paintMap();
-    else {
+    else if (tab === 'alignment') {
+      scrollEl = null;
+      mountAlignmentView(viewHost);
+    } else {
       scrollEl = null;
       mountYearNetworkView(viewHost, curriculum, subject.id);
     }
@@ -1257,6 +1271,11 @@ export function renderScopeTimelineEditor(
   networkTab.addEventListener('click', () => {
     if (tab === 'network') return;
     tab = 'network';
+    paintView();
+  });
+  alignmentTab.addEventListener('click', () => {
+    if (tab === 'alignment') return;
+    tab = 'alignment';
     paintView();
   });
 
