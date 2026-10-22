@@ -512,6 +512,11 @@ test('markbook: each student’s first handed-in attempt, scored like Results', 
   assert.deepEqual(found.questions.map(q => q.id), ['qa', 'qb', 'qc']);
   assert.ok(found.first_at);
 
+  await quizTeacherAction(store, 'quiz1', { action: 'mark', attempt_id: first.attempt_id, question_id: 'qc', score: 3 });
+  const marked = (await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id];
+  assert.equal(marked.score, 4, 'the teacher’s mark counts');
+  assert.equal(marked.pending, 0);
+
   const owner = first.attempt_id.split('~')[0];
   store.data.set(`quiz/quiz1/cleared/${owner}`, { from: 1 });
   assert.match((await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id].attempt_id, /~1$/, 'cleared goes are skipped');
