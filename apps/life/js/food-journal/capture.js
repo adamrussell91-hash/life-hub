@@ -79,10 +79,18 @@ export function mergeCapture(visit, draft, photos = []) {
         next.dishes.push({
           ...found,
           id: `dish_${crypto.randomUUID()}`,
+          ingredients: "",
           rating: null,
           photos: [],
         });
     }
+  }
+  for (const dish of next.dishes) {
+    if (String(dish.ingredients || "").trim()) continue;
+    const item = (next.menu_items || []).find(
+      (i) => i.kind !== "extra" && sameName(i.name, dish.title),
+    );
+    if (item?.description) dish.ingredients = item.description;
   }
   for (const photo of photos) {
     const targets = draft.dishes
