@@ -1,9 +1,9 @@
 // Gear Shifter's chart changes (Plan 2): dated zero-min scales, the ratings chart, the Kanban
 // and 5 Whys variants, and the chart lookup. Samples: packages/get-things-done/fixtures.mjs.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GT_SAMPLE_TOOLS, gtRunFor } from '../../../../packages/get-things-done/fixtures.mjs';
+import { GT_COMMIT_TOOL, GT_REVIEW_TOOL, GT_SAMPLE_TOOLS, experimentRunFor, gtRunFor } from '../../../../packages/get-things-done/fixtures.mjs';
 import { createScalesView, radarPoints } from '../../../../packages/decision-book/render/scales';
-import type { DmToolRun } from '../../../../packages/decision-book/render/core';
+import type { ChartView, DmToolRun } from '../../../../packages/decision-book/render/core';
 
 const proto = Element.prototype as unknown as { animate?: unknown };
 afterEach(() => {
@@ -274,5 +274,47 @@ describe('Gear Shifter chart lookup', () => {
     expect(chart(GT_SAMPLE_TOOLS.ratings).classList.contains('dm-chart--ratings')).toBe(true);
     expect(chart(GT_SAMPLE_TOOLS.needs).classList.contains('dm-chart--scales')).toBe(true);
     for (const [key, family] of [['quadrant', 'quadrant'], ['curve', 'curve'], ['stages', 'path'], ['list', 'list']] as const) expect(chart(SAMPLE_TOOLS[key]).classList.contains(`dm-chart--${family}`), key).toBe(true);
+  });
+});
+
+describe('the experiment and its review', () => {
+  const experiment = (stage: 'empty' | 'partial' | 'full') => experimentRunFor('commit', stage) as DmToolRun;
+  const looked = (stage: 'empty' | 'partial' | 'full') => experimentRunFor('review', stage) as DmToolRun;
+
+  it('the lookup draws both', () => {
+    expect(createGearChartForTool(GT_COMMIT_TOOL as never)!.el.classList.contains('dm-chart--commit')).toBe(true);
+    expect(createGearChartForTool(GT_REVIEW_TOOL as never)!.el.classList.contains('dm-chart--review')).toBe(true);
+  });
+
+  it('the experiment reads in slot order, with the check-back as a date in words and the basis under its node', () => {
+    const view = createGearChartForTool(GT_COMMIT_TOOL as never) as unknown as ChartView & { setBasis(b: Record<string, { model: string; title: string }[]>): void };
+    view.update(experiment('full'));
+    view.setBasis({ c2: [{ model: 'The Pomodoro Technique', title: 'Disconnect' }] });
+    expect(texts(view.el, '.gt-commit__title')).toEqual(['The result that matters', 'Rests on', 'Next action', 'How it starts', 'Check back', 'Change course if']);
+    expect([...view.el.querySelectorAll('.gt-commit__part')].map((part) => part.querySelector('.dm-entry__title')?.textContent)).toEqual([
+      'A full first draft to Sam', 'Pomodoro', 'Write the aims section in one', 'Tuesday after the school run', '2026-10-30', 'Two mornings in a row'
+    ]);
+    expect(view.el.querySelector('.gt-commit__back .dm-entry__meta')!.textContent).toBe('30 October 2026');
+    expect(view.el.querySelector('.gt-commit__rests .dm-entry__meta')!.textContent).toBe('Rests on The Pomodoro Technique: Disconnect');
+    expect(view.el.querySelector('.gt-commit__turn .dm-entry')!.getAttribute('data-fill')).toBe('red');
+  });
+
+  it('says Empty, In progress and Completed', () => {
+    const view = createGearChartForTool(GT_COMMIT_TOOL as never)!;
+    const states = (['empty', 'partial', 'full'] as const).map((stage) => {
+      view.update(experiment(stage) as never);
+      return view.el.querySelector('.dm-chart__state')!.textContent;
+    });
+    expect(states).toEqual(['Empty', 'In progress', 'Completed']);
+  });
+
+  it('the review puts changed, cost and keep on three numbered stations', () => {
+    const view = createGearChartForTool(GT_REVIEW_TOOL as never)!;
+    view.update(looked('partial') as never);
+    expect(texts(view.el, '.gt-review__title')).toEqual(['What changed', 'What it cost', 'What to keep']);
+    expect(texts(view.el, '.gt-review__n')).toEqual(['1', '2', '3']);
+    expect(view.el.querySelectorAll('.dm-entry').length).toBe(2);
+    view.update(looked('full') as never);
+    expect(view.el.querySelector('.gt-review__station--keep .dm-entry__title')!.textContent).toBe('Keep the drawer');
   });
 });

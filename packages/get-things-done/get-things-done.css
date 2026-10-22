@@ -93,3 +93,38 @@
 .gt-scope .dm-scales__poly[data-style='solid'] { stroke: var(--gt-blue); stroke-width: 2; }
 .gt-scope .dm-scales__legend-item[data-style='solid']::before,
 .gt-scope .dm-scales__bar[data-style='solid'] { background: var(--gt-blue-label); }
+
+/* ------------------------------------------------------------------ the experiment (render/commit.ts)
+   After the cover: the result inside the target, the next action on the dart, the check-back on
+   the return arrows and a vermilion band for changing course. Phone: one column. */
+.gt-commit__part { position: relative; display: grid; align-content: start; gap: 6px; padding: 12px 14px 12px 52px; border-radius: 18px; background: var(--gt-paper); border: 1.5px solid var(--gt-line); min-width: 0; }
+.gt-commit__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--gt-muted); }
+.gt-commit__mark { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; }
+.gt-commit__result { border: 2px solid var(--gt-ink); }
+.gt-commit__result .dm-entry__pill { font-size: 18px; font-weight: 700; padding: 10px 18px; }
+.gt-commit__rests { display: flex; flex-wrap: wrap; gap: 6px; }
+.gt-commit__rests .gt-commit__title { flex-basis: 100%; }
+.gt-commit__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.gt-commit__action { background: var(--gt-blue-tint); border-color: var(--gt-blue); }
+.gt-commit__action .gt-commit__title { color: var(--gt-blue-deep); }
+.gt-commit__back { background: var(--gt-amber-tint); border-color: var(--gt-amber); }
+.gt-commit__back .gt-commit__title { color: var(--gt-amber-label); }
+.gt-commit__turn { background: var(--gt-red-tint); border: 2px solid var(--gt-red); }
+.gt-commit__turn .gt-commit__title { color: var(--gt-red-deep); }
+.dm-chart--commit .dm-chart__frame { display: grid; gap: 10px; }
+
+/* ------------------------------------------------------------------ the experiment review (render/review.ts) */
+.gt-review__loop { list-style: none; margin: 0; padding: 18px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; position: relative; }
+/* The return loop the stations sit on: a dotted cobalt arc over all three. */
+.gt-review__loop::before { content: ''; position: absolute; left: 16%; right: 16%; top: 4px; height: 30px; border: 3px dotted var(--gt-blue); border-bottom: 0; border-radius: 30px 30px 0 0; }
+.gt-review__station { position: relative; display: grid; align-content: start; gap: 8px; padding: 30px 12px 12px; border-radius: 18px; border: 1.5px solid var(--gt-line); background: var(--gt-paper); min-width: 0; }
+.gt-review__n { position: absolute; left: 50%; top: -14px; width: 32px; height: 32px; margin-left: -16px; display: grid; place-items: center; border-radius: 50%; font: 800 14px / 1 var(--font-ui, sans-serif); color: var(--gt-paper); background: var(--gt-blue-label); }
+.gt-review__station--cost .gt-review__n { background: var(--gt-red-label); }
+.gt-review__station--keep .gt-review__n { background: var(--gt-amber); color: var(--gt-ink); }
+.gt-review__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--gt-muted); text-align: center; }
+
+@media (max-width: 480px) {
+  .gt-commit__row, .gt-review__loop { grid-template-columns: 1fr; }
+  .gt-review__loop { gap: 22px; }
+  .gt-review__loop::before { left: 50%; right: auto; top: 0; bottom: 0; height: auto; width: 0; border: 0; border-left: 3px dotted var(--gt-blue); border-radius: 0; }
+}
