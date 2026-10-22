@@ -927,4 +927,6 @@ export interface SelfPersonRef {
 
 export interface SelfPersonResponse {
   self: SelfPersonRef | null;
+  /** With `include=workplaces`: the organisations self works at now. */
+  workplaces?: Array<{ ref: string; display_name: string }>;
 }

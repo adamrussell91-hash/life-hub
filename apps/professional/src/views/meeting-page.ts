@@ -17,7 +17,8 @@ import { buildMeetingTaskLinks, roleLabel } from '@/views/meetings';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
 import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
-import { groupRoom, type RoomCluster, type RoomPerson } from '@/lib/room';
+import { groupRoom, initialsFor, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
+import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
 import { searchPickerPeople } from '@/lib/person-picker';
 import { utcIsoToWallLocal, wallLocalToUtcIso } from '@/lib/wall-time';
@@ -89,6 +90,37 @@ async function loadAttendees(meetingRef: string): Promise<Attendee[]> {
     }));
 }
 
+/**
+ * You, shaped as a directory row: People leaves you out, but the room needs
+ * your workplaces to tell which job a colleague with several is here for.
+ */
+async function loadSelfRow(): Promise<RoomDirectoryRow | null> {
+  try {
+    const { self, workplaces = [] } = await fetchSelfPerson({ workplaces: true });
+    if (!self) return null;
+    const organisations = workplaces.map((org) => ({
+      ref: org.ref,
+      display_name: org.display_name,
+      monogram: initialsFor(org.display_name),
+      logo_key: null,
+      current: true
+    }));
+    const name = self.display_name ?? 'You';
+    return {
+      ref: self.ref,
+      display_name: name,
+      initials: initialsFor(name),
+      organisation: organisations[0] ?? null,
+      organisations,
+      warmth_band: 'warm',
+      created_at: '1970-01-01T00:00:00.000Z',
+      is_self: true
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function loadDirectory(): Promise<DirectoryPersonRow[]> {
   try {
     const directory = await fetchPeopleDirectory();
@@ -109,18 +141,21 @@ export async function renderMeetingPage(
   let record: MeetingRecord;
   let attendees: Attendee[];
   let directory: DirectoryPersonRow[];
+  let selfRow: RoomDirectoryRow | null;
   let ledger: LedgerItem[];
   try {
-    const [meetingResult, loadedAttendees, loadedDirectory, ledgerResult] = await Promise.all([
+    const [meetingResult, loadedAttendees, loadedDirectory, ledgerResult, loadedSelf] = await Promise.all([
       getMeeting(id),
       loadAttendees(meetingRef),
       loadDirectory(),
-      listLedgerForSources([meetingRef])
+      listLedgerForSources([meetingRef]),
+      loadSelfRow()
     ]);
     record = meetingResult.meeting;
     attendees = loadedAttendees;
     directory = loadedDirectory;
     ledger = ledgerResult.items;
+    selfRow = loadedSelf;
   } catch (err) {
     if (!options.isCurrent()) return;
     renderLoadError(canvas, err, () => void renderMeetingPage(canvas, id, options));
@@ -332,7 +367,8 @@ export async function renderMeetingPage(
 
   // ── The room: attendees by organisation, add / remove ──
   function paintRoom(): void {
-    const room = groupRoom(attendees, directory, new Date());
+    const roomDirectory: RoomDirectoryRow[] = selfRow ? [...directory, selfRow] : directory;
+    const room = groupRoom(attendees, roomDirectory, new Date());
     roomHost.replaceChildren(roomCard(room, attendees, {
       onRemove: async (attendee) => {
         await endUniversalLink(attendee.linkId);
@@ -974,6 +1010,7 @@ function roomCard(
       row.dataset.warmth = String(person.warmthDots);
       row.append(el('span', `room__initials${person.student ? ' room__initials--student' : ''}`, person.initials), el('span', 'room__name', person.name));
       const role = roleLabel(person.role);
+      if (person.self) row.append(el('span', 'muted', 'You'));
       if (role) row.append(el('span', 'muted', role));
       if (person.isNew) row.append(el('span', 'chip chip--warn', 'New to you'));
       if (!person.known) {
@@ -986,7 +1023,8 @@ function roomCard(
       for (let i = 1; i <= 3; i += 1) dots.append(el('i', i <= person.warmthDots ? 'is-on' : ''));
       const jobs = attendee && person.organisationChoices.length > 1 ? organisationPicker(person, attendee, actions.onPickOrganisation) : null;
       if (jobs) row.append(jobs.toggle);
-      row.append(dots);
+      // You get no warmth; the empty slot still pushes × to the edge.
+      row.append(person.self ? el('span', 'room__warmth') : dots);
       if (attendee) {
         const remove = el('button', 'hub-icon-btn room__remove', '×') as HTMLButtonElement;
         remove.type = 'button';

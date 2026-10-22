@@ -81,6 +81,74 @@ export async function findActiveSelfPerson(universalStore, options = {}) {
 }
 
 /**
+ * The self Person's employee_at periods (current and ended), from Blob links and
+ * the GitHub-canonical import, oldest first. Career's river and the meeting room
+ * both read jobs through this.
+ */
+export async function listSelfEmployment(self, deps = {}) {
+  const universalStore = deps.universalStore ?? (await (deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore)());
+  const resolveEntity = deps.resolveEntity ?? defaultResolveEntity;
+  const createLinkRepo = deps.createUniversalLinkRepository ?? createUniversalLinkRepository;
+  const now = deps.now ?? (() => new Date().toISOString());
+  const github = { env: deps.env, fetchImpl: deps.fetchImpl };
+  const accessContext = createAccessContext({ workflow: 'life' });
+  const selfRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id });
+  const linkRepo = createLinkRepo({
+    store: universalStore,
+    resolveEntity,
+    now
+  });
+  const { outgoing } = await linkRepo.listForEntity(selfRef, accessContext);
+  const items = [];
+  // Career river needs the full employee_at period history (BUILD-PLAN §3.3
+  // Roles). Filtering to status=current left only Tallowwood and collapsed
+  // multi-role employers (e.g. Wattle Grove) to one band because seen keyed
+  // on org ref. Dedupe by link id so concurrent/stacked roles survive.
+  const seen = new Set();
+  for (const entry of outgoing) {
+    if (entry.link.relationship_type !== 'employee_at') continue;
+    if (entry.link.status !== 'current' && entry.link.status !== 'ended') continue;
+    const key = entry.link.id || `${entry.endpoint.ref}|${entry.link.role ?? ''}|${entry.link.valid_from ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({
+      ...endpointSummary(entry.endpoint),
+      role: entry.link.role ?? null,
+      valid_from: entry.link.valid_from ?? null,
+      valid_to: entry.link.valid_to ?? null,
+      link_status: entry.link.status
+    });
+  }
+  const githubRows = await listGithubRelationshipEntries('person', self.id, github);
+  for (const row of githubRows) {
+    if (row.link.relationship_type !== 'employee_at') continue;
+    if (row.link.status !== 'current' && row.link.status !== 'ended') continue;
+    const key = row.link.id || `${row.otherRef}|${row.link.role ?? ''}|${row.link.valid_from ?? ''}`;
+    if (seen.has(key)) continue;
+    try {
+      const endpoint = await resolveEntity(row.otherRef, accessContext, github);
+      seen.add(key);
+      items.push({
+        ...endpointSummary(endpoint),
+        role: row.link.role ?? null,
+        valid_from: row.link.valid_from ?? null,
+        valid_to: row.link.valid_to ?? null,
+        link_status: row.link.status
+      });
+    } catch (error) {
+      if (error?.code === 'endpoint_not_found') continue;
+      throw error;
+    }
+  }
+  items.sort((a, b) => {
+    const aFrom = a.valid_from || '9999-12-31';
+    const bFrom = b.valid_from || '9999-12-31';
+    return aFrom.localeCompare(bFrom) || String(a.role ?? '').localeCompare(String(b.role ?? ''));
+  });
+  return items;
+}
+
+/**
  * Assembles Career Hub overview sections. Items are lightweight summaries /
  * endpoint projections — never copies of authoritative Application, Event,
  * Person, or Organisation records.
@@ -124,57 +192,13 @@ export async function assembleCareerOverview(deps = {}) {
       employment = sectionOk([]);
     } else {
       selfRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id });
-      const linkRepo = createLinkRepo({
-        store: universalStore,
+      const items = await listSelfEmployment(self, {
+        universalStore,
         resolveEntity,
-        now
-      });
-      const { outgoing } = await linkRepo.listForEntity(selfRef, accessContext);
-      const items = [];
-      // Career river needs the full employee_at period history (BUILD-PLAN §3.3
-      // Roles). Filtering to status=current left only Tallowwood and collapsed
-      // multi-role employers (e.g. Wattle Grove) to one band because seen keyed
-      // on org ref. Dedupe by link id so concurrent/stacked roles survive.
-      const seen = new Set();
-      for (const entry of outgoing) {
-        if (entry.link.relationship_type !== 'employee_at') continue;
-        if (entry.link.status !== 'current' && entry.link.status !== 'ended') continue;
-        const key = entry.link.id || `${entry.endpoint.ref}|${entry.link.role ?? ''}|${entry.link.valid_from ?? ''}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        items.push({
-          ...endpointSummary(entry.endpoint),
-          role: entry.link.role ?? null,
-          valid_from: entry.link.valid_from ?? null,
-          valid_to: entry.link.valid_to ?? null,
-          link_status: entry.link.status
-        });
-      }
-      const githubRows = await listGithubRelationshipEntries('person', self.id, github);
-      for (const row of githubRows) {
-        if (row.link.relationship_type !== 'employee_at') continue;
-        if (row.link.status !== 'current' && row.link.status !== 'ended') continue;
-        const key = row.link.id || `${row.otherRef}|${row.link.role ?? ''}|${row.link.valid_from ?? ''}`;
-        if (seen.has(key)) continue;
-        try {
-          const endpoint = await resolveEntity(row.otherRef, accessContext, github);
-          seen.add(key);
-          items.push({
-            ...endpointSummary(endpoint),
-            role: row.link.role ?? null,
-            valid_from: row.link.valid_from ?? null,
-            valid_to: row.link.valid_to ?? null,
-            link_status: row.link.status
-          });
-        } catch (error) {
-          if (error?.code === 'endpoint_not_found') continue;
-          throw error;
-        }
-      }
-      items.sort((a, b) => {
-        const aFrom = a.valid_from || '9999-12-31';
-        const bFrom = b.valid_from || '9999-12-31';
-        return aFrom.localeCompare(bFrom) || String(a.role ?? '').localeCompare(String(b.role ?? ''));
+        createUniversalLinkRepository: createLinkRepo,
+        now,
+        env: deps.env,
+        fetchImpl: deps.fetchImpl
       });
       employment = sectionOk(items);
     }

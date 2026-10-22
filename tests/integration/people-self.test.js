@@ -130,3 +130,22 @@ test('ignores an archived self-flagged Person', async () => {
   const body = await response.json();
   assert.deepEqual(body.data, { self: null });
 });
+
+test('include=workplaces lists the organisations self works at now', async () => {
+  const store = memoryStore();
+  await makePerson(store, { display_name: 'Adam Russell', is_self: true });
+  const handler = createPeopleSelfHandler(baseDeps(store, {
+    listSelfEmployment: async () => [
+      { ref: 'shared:organisation:school', display_label: 'Northgate College', link_status: 'current', valid_to: null },
+      { ref: 'shared:organisation:school', display_label: 'Northgate College', link_status: 'current', valid_to: null },
+      { ref: 'shared:organisation:old', display_label: 'Old School', link_status: 'ended', valid_to: '2020-01-01' },
+      { ref: 'shared:organisation:lapsed', display_label: 'Lapsed', link_status: 'current', valid_to: '2026-01-01' }
+    ]
+  }));
+  const response = await handler(request({ url: `${URL_BASE}?include=workplaces` }));
+  const body = await response.json();
+  assert.deepEqual(body.data.workplaces, [{ ref: 'shared:organisation:school', display_name: 'Northgate College' }]);
+
+  const plain = await (await handler(request({ url: URL_BASE }))).json();
+  assert.equal(plain.data.workplaces, undefined);
+});
