@@ -10,8 +10,6 @@ export type RoomPerson = {
   /** False when neither the People directory nor its Students list knows this person. */
   known: boolean;
   student: boolean;
-  /** The operator themself. */
-  self: boolean;
   /** The organisation this person is grouped under for this meeting. */
   organisationRef: string | null;
   /** Their current organisations when there is more than one to choose from. */
@@ -49,6 +47,19 @@ export function directoryRowFor<T extends Pick<RoomDirectoryRow, 'ref' | 'displa
   if (exact) return exact;
   const matches = attendee.name ? byName.get(nameKey(attendee.name)) ?? [] : [];
   return matches.length === 1 ? matches[0]! : null;
+}
+
+/**
+ * You, linked as an attendee (by ref, or a copy carrying your name). You're in
+ * every meeting, so the room never lists you.
+ */
+export function isSelfAttendee(
+  attendee: { ref: string; name?: string | null },
+  self: Pick<RoomDirectoryRow, 'ref' | 'display_name'> | null
+): boolean {
+  if (!self) return false;
+  if (attendee.ref === self.ref) return true;
+  return Boolean(attendee.name) && nameKey(attendee.name!) === nameKey(self.display_name);
 }
 
 export function indexDirectory<T extends Pick<RoomDirectoryRow, 'ref' | 'display_name'>>(directory: T[]): {
@@ -106,18 +117,21 @@ function organisationFor(
 /**
  * Attendees grouped by the organisation they're here for (biggest group first, chairs first
  * inside a group). Someone with several jobs sits under the one picked for this
- * meeting, else the one most others in the room share. Warmth comes from the People directory, the same number People shows.
- * An attendee the directory doesn't know keeps the name on its link.
+ * meeting, else the one most others in the room share (you count: you're always there).
+ * Warmth comes from the People directory, the same number People shows.
+ * An attendee the directory doesn't know keeps the name on its link. You are never listed.
  */
 export function groupRoom(
-  attendees: Array<{ ref: string; role: string | null; name?: string | null; organisationRef?: string | null }>,
+  allAttendees: Array<{ ref: string; role: string | null; name?: string | null; organisationRef?: string | null }>,
   directory: RoomDirectoryRow[],
-  now: Date
+  now: Date,
+  self: RoomDirectoryRow | null = null
 ): RoomCluster[] {
+  const attendees = allAttendees.filter((attendee) => !isSelfAttendee(attendee, self));
   const { byRef, byName } = indexDirectory(directory);
   const rows = attendees.map((attendee) => directoryRowFor(attendee, byRef, byName));
   const shared = new Map<string, number>();
-  for (const row of rows) {
+  for (const row of self ? [...rows, self] : rows) {
     if (!row) continue;
     for (const org of currentOrganisations(row)) shared.set(org.ref, (shared.get(org.ref) ?? 0) + 1);
   }
@@ -138,7 +152,6 @@ export function groupRoom(
       isNew: row ? now.getTime() - Date.parse(row.created_at) <= NEW_MS : false,
       known: Boolean(row),
       student: row?.person_type === 'student',
-      self: row?.is_self === true,
       organisationRef: org?.ref ?? null,
       organisationChoices: row ? currentOrganisations(row) : []
     });
