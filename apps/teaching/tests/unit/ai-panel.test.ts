@@ -394,6 +394,43 @@ describe('mountAiPanel', () => {
     expect(toggle().getAttribute('aria-expanded')).toBe('true');
   });
 
+  it('folds the chips the moment a message is sent, not when the reply lands', async () => {
+    pollAiJobMock.mockReturnValue(new Promise(() => {}));
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+    const tray = () => mounted.host.querySelector<HTMLElement>('.agent-protocol-pills')!;
+    const actions = () => mounted.host.querySelector<HTMLElement>('.ai-panel__actions')!;
+    const suggestions = () =>
+      mounted.host.querySelector<HTMLButtonElement>('.ai-panel__suggestions-toggle')!;
+    suggestions().click();
+    expect(actions().hidden).toBe(false);
+
+    submitMessage(mounted.host, 'Hello');
+    await vi.waitFor(() => expect(tray().hidden).toBe(true));
+    expect(actions().hidden).toBe(true);
+    expect(suggestions().getAttribute('aria-expanded')).toBe('false');
+    expect(handle.isWorking()).toBe(true);
+  });
+
+  it('starts a lesson with an existing chat folded, whatever the saved preference', () => {
+    const first = mountPanel();
+    first.handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+    first.host.querySelector<HTMLButtonElement>('.ai-panel__suggestions-toggle')!.click();
+    first.handle.dispose();
+    localStorage.setItem(
+      'teaching_hub_ai_transcript_lesson_1',
+      JSON.stringify([{ id: 'm1', role: 'user', text: 'Earlier' }])
+    );
+
+    const second = mountPanel();
+    handle = second.handle;
+    handle.setSelection({ blockId: 'block_1', blockType: 'rich_text', scope: 'block' });
+
+    expect(second.host.querySelector<HTMLElement>('.agent-protocol-pills')!.hidden).toBe(true);
+    expect(second.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(true);
+  });
+
   it('keeps suggestion buttons out of the way until asked for', () => {
     const mounted = mountPanel();
     handle = mounted.handle;
