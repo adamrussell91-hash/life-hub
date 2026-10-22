@@ -99,6 +99,7 @@ import { createQuizHandler } from '../../../netlify/functions/quiz.mjs';
 import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.mjs';
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
+import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
 import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
@@ -3568,6 +3569,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createLessonDiscernHandler(deps)
       : path.startsWith('/api/published/discern/')
         ? createPublishedDiscernHandler(deps)
+        : /^\/api\/classes\/[^/]+\/claims$/.test(path)
+      ? createClassClaimsHandler(deps)
         : path.startsWith('/api/lessons/')
       ? createQuizHandler(deps)
       : path.startsWith('/api/published/quiz/')
@@ -3646,6 +3649,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handleClassExamples(method, pathWithQuery, cookie, body);
     }
     if (
+      /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
