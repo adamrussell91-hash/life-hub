@@ -7,11 +7,69 @@ import {
 } from "./_shared/travel-http.mjs";
 import { createFoodJournalRepository } from "./_shared/food-journal-repository.mjs";
 import { isDeletedRecord } from "./_shared/record-liveness.mjs";
+import { parseTravelSourceId } from "./_shared/travel-meal-link.mjs";
+import { createMealLinkStore } from "./_shared/meal-link-store.mjs";
 import {
   readableJournal,
   validateFoodJournal,
 } from "./_shared/food-journal-schema.mjs";
 export const config = { path: "/api/food-journal" };
+
+// Deleting a travel-linked visit also strips the meal from its moment, in the
+// same commit. A trip file that is gone is skipped so it never blocks a delete.
+const defaultUnlinkTravelMeals = (ctx, deps) => async (journal, version, links) => {
+  const store = (deps.createMealLinkStore ?? createMealLinkStore)({
+    env: ctx.env,
+    fetchImpl: deps.fetchImpl,
+    github: deps.github,
+  });
+  const snaps = [];
+  for (const tripId of new Set(links.map((l) => l.tripId))) {
+    try {
+      snaps.push(await store.read(tripId));
+    } catch (error) {
+      if (error?.status !== 404) throw error;
+    }
+  }
+  if (!snaps.length) return ctx.repo.saveJournal(journal, version);
+  if (snaps[0].food.version !== version)
+    throw Object.assign(
+      new Error("Your journal changed on another device. Reload before saving."),
+      { status: 409, code: "conflict" },
+    );
+  // A moment keeps its meal unless it points at the visit deleted for it.
+  const deletedFor = (tripId, momentId) =>
+    journal.visits
+      .filter((v) => isDeletedRecord(v))
+      .filter((v) => {
+        const l = parseTravelSourceId(v.source_id);
+        return l?.tripId === tripId && l.momentId === momentId;
+      })
+      .map((v) => v.id);
+  const travels = snaps.map((s) => ({
+    tripId: s.tripId,
+    journal: {
+      ...s.travel.journal,
+      moments: s.travel.journal.moments.map((m) => {
+        const hit = links.some(
+          (l) =>
+            l.tripId === s.tripId &&
+            l.momentId === m.id &&
+            deletedFor(l.tripId, l.momentId).includes(m.meal?.food_visit_id),
+        );
+        if (!hit) return m;
+        const { meal, ...rest } = m;
+        return rest;
+      }),
+    },
+  }));
+  const out = await store.write(snaps[0], {
+    food: journal,
+    travels,
+    message: "food-journal: delete travel meal",
+  });
+  return { journal, version: out.foodVersion };
+};
 export function createFoodJournalHandler(deps = {}) {
   return createTravelOperatorHandler(
     async (request, ctx) => {
@@ -82,7 +140,20 @@ export function createFoodJournalHandler(deps = {}) {
         ],
       };
       const { reserved_source_ids, reserved_visit_ids, ...clean } = merged;
-      const saved = await ctx.repo.saveJournal(clean, body.if_version);
+      const wasLive = new Set(
+        current.journal.visits.filter((v) => !isDeletedRecord(v)).map((v) => v.id),
+      );
+      const links = clean.visits
+        .filter((v) => isDeletedRecord(v) && wasLive.has(v.id))
+        .map((v) => parseTravelSourceId(v.source_id))
+        .filter(Boolean);
+      const saved = links.length
+        ? await (deps.unlinkTravelMeals ?? defaultUnlinkTravelMeals(ctx, deps))(
+            clean,
+            body.if_version,
+            links,
+          )
+        : await ctx.repo.saveJournal(clean, body.if_version);
       return okResponse(
         200,
         { ...saved, journal: readableJournal(saved.journal) },

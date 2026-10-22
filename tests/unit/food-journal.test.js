@@ -1509,3 +1509,86 @@ test("a dish that goes blank loses its English title and original ingredients", 
   const next = mergeCapture(blank, draft("Paella", "Rice dish"));
   assert.equal(next.dishes[0].title_en, "Rice dish");
 });
+
+test("deleting a travel-linked visit clears the moment's meal link in the same commit", async () => {
+  const j = fixture();
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234";
+  const r = repo(j);
+  const unlinks = [];
+  const h = createFoodJournalHandler(deps(r, {
+    unlinkTravelMeals: async (journal, version, links) => {
+      unlinks.push(links);
+      return r.saveJournal(journal, version);
+    },
+  }));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 200);
+  assert.deepEqual(unlinks, [[{ tripId: "trp_test1", momentId: "mom_abcd1234" }]]);
+});
+
+test("the default unlink strips only the matching moment's meal and skips missing trips", async () => {
+  const j = fixture();
+  const visitId = j.visits[0].id;
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234:2";
+  const moment = (id, meal) => ({ id, leg_id: "leg_test01", local_date: "2026-11-03", media_ids: [], display_order: 1, lifecycle: "live", place: { name: "Mercado Test" }, ...(meal ? { meal } : {}) });
+  const tripJournal = {
+    id: "jrn_abcd", schema_version: 1, trip_id: "trp_test1", title: "", revision: 0, lifecycle: "live",
+    leg_ids: ["leg_test01"], preferences: {},
+    legs: [{ id: "leg_test01", trip_id: "trp_test1", destination: "Test", timezone: "UTC", pattern_id: "generic", order: 0, lifecycle: "live" }],
+    days: [], media: [], transitions: [], operations: [],
+    moments: [
+      moment("mom_abcd1234", { food_visit_id: visitId, mood: "happy" }),
+      moment("mom_other567", { food_visit_id: "visit_elsewhere" }),
+    ],
+  };
+  const writes = [];
+  const store = {
+    async read(tripId) {
+      if (tripId !== "trp_test1") throw Object.assign(new Error("Journal not found."), { status: 404, code: "not_found" });
+      return { tripId, base: {}, travel: { journal: structuredClone(tripJournal), version: "t".repeat(40) }, food: { journal: j, version: "a".repeat(40) } };
+    },
+    async write(_snap, out) {
+      writes.push(out);
+      return { commitSha: "d".repeat(40), foodVersion: "e".repeat(40), travelVersions: {} };
+    },
+  };
+  const r = repo(j);
+  const h = createFoodJournalHandler(deps(r, { createMealLinkStore: () => store }));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].status = "deleted";
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.version, "e".repeat(40));
+  assert.equal(writes.length, 1);
+  const moments = writes[0].travels[0].journal.moments;
+  assert.equal(moments[0].meal, undefined);
+  assert.deepEqual(moments[1].meal, { food_visit_id: "visit_elsewhere" });
+  assert.equal(writes[0].food.visits[0].status, "deleted");
+
+  // A visit whose trip file is gone still deletes, through the ordinary save.
+  const j2 = fixture();
+  j2.visits[0].source_id = "travel:trp_gone1:mom_abcd1234";
+  const r2 = repo(j2);
+  const h2 = createFoodJournalHandler(deps(r2, { createMealLinkStore: () => store }));
+  const g = (await (await h2(req("GET"))).json()).data;
+  g.journal.visits[0].status = "deleted";
+  const res2 = await h2(req("PUT", { journal: g.journal, if_version: g.version }));
+  assert.equal(res2.status, 200);
+  assert.equal(writes.length, 1);
+  assert.equal((await r2.getJournal()).journal.visits[0].status, "deleted");
+});
+
+test("deleting an already-deleted travel visit does not touch the trip", async () => {
+  const j = fixture();
+  j.visits[0].source_id = "travel:trp_test1:mom_abcd1234";
+  j.visits[0].status = "deleted";
+  const r = repo(j);
+  let called = false;
+  const h = createFoodJournalHandler(deps(r, { unlinkTravelMeals: async () => { called = true; } }));
+  const first = (await (await h(req("GET"))).json()).data;
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal(res.status, 200);
+  assert.equal(called, false);
+});
