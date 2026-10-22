@@ -116,7 +116,7 @@ button, textarea, input { font: inherit; color: inherit; }
 .route li { display: grid; justify-items: center; gap: 6px; text-align: center; min-width: 0; }
 .route__em { width: 48px; height: 48px; border-radius: 50%; background: var(--card); display: grid; place-items: center; position: relative; }
 .route__em svg { width: 46px; height: 46px; display: block; }
-.route li[data-lit="false"] .route__em svg { opacity: 0.28; filter: grayscale(1); }
+.route li[data-lit="false"] .route__em svg { opacity: 0.4; filter: grayscale(1); }
 .route li[data-lit="true"] .route__em::after { content: ""; position: absolute; inset: -5px; border: 3px solid var(--gt-ink); border-radius: 50%; }
 .route li span:last-child { font-size: 11.5px; line-height: 1.25; color: var(--muted); padding: 0 2px; background: var(--card); }
 .route li[data-lit="true"] span:last-child { color: var(--gt-ink); font-weight: 650; }
@@ -125,7 +125,7 @@ button, textarea, input { font: inherit; color: inherit; }
 
 /* The Pomodoro Technique as stages: round markers on a dotted path, with a repeat loop */
 .stages { list-style: none; margin: 0; padding: 0 0 0 34px; display: grid; gap: 10px; position: relative; }
-.stages::before { content: ""; position: absolute; left: 61px; top: 20px; bottom: 20px; border-left: 3px dotted var(--gt-ink); opacity: 0.5; }
+.stages::before { content: ""; position: absolute; left: 61px; top: 20px; bottom: var(--line-end, 20px); border-left: 3px dotted var(--gt-ink); opacity: 0.5; }
 .stage { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 14px; align-items: start; position: relative; animation: place 600ms var(--gt-spring) both; animation-delay: calc(var(--i) * 120ms + 200ms); }
 @keyframes place { from { transform: translateY(-10px) scale(0.96); opacity: 0; } }
 .stage__mk { width: 54px; height: 54px; display: grid; place-items: center; background: var(--card); border-radius: 50%; position: relative; z-index: 1; }
@@ -192,7 +192,9 @@ button, textarea, input { font: inherit; color: inherit; }
 .slotlist dd.todo { color: var(--muted); font-style: italic; }
 .confirm { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px; padding: 12px 14px; border-radius: 18px; background: var(--gt-blue-tint); }
 .confirm--date { background: var(--gt-amber-tint); }
-.confirm svg { width: 40px; height: 40px; grid-row: span 3; overflow: visible; }
+.confirm > span:first-child { grid-row: 1 / span 4; width: 40px; height: 40px; }
+.confirm > span:first-child svg { width: 40px; height: 40px; overflow: visible; display: block; }
+.confirm > :not(:first-child) { grid-column: 2; }
 .confirm small { font: 500 11px var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--gt-blue-label); }
 .confirm--date small { color: var(--gt-amber-label); }
 .confirm b { font-size: 14px; line-height: 1.35; }
@@ -410,7 +412,7 @@ function medal(p) {
   const ghost = 'var(--gt-ghost)';
   const ring = `<circle class="piece p-ring" cx="50" cy="50" r="31" fill="var(--card)" stroke="${p.frame ? 'var(--gt-red)' : ghost}" stroke-width="6"/>`;
   const arrows = `<g class="piece p-loop">${returns(50, 50, 44, 6, p.route ? 'var(--gt-blue)' : ghost)}</g>`;
-  const core = p.entry ? `<g class="piece p-tool">${nested(emblem(p.entry), 28, 28, 44)}</g>`
+  const core = p.entry ? `<g class="piece p-tool">${nested(emblem(p.entry), 21, 21, 58)}</g>`
     : `<circle cx="50" cy="50" r="10" fill="none" stroke="${ghost}" stroke-width="3" stroke-dasharray="0.1 6" stroke-linecap="round"/>`;
   const badge = p.route && p.section ? `<g class="piece p-badge"><circle cx="14" cy="84" r="14" fill="var(--gt-paper)" stroke="var(--gt-line)" stroke-width="1"/>${nested(SECTIONS[p.section], 2, 72, 24)}</g>` : '';
   const arrow = p.commit ? `<g class="piece p-dart">${dart(97, 3, 72, 28, 5)}</g>` : '';
@@ -469,6 +471,8 @@ function placeRepeat() {
   loop.style.top = `${a.top - box.top + a.height / 2 - 3}px`;
   loop.style.height = `${b.top - a.top + 6}px`;
   loop.style.width = `${a.left - box.left - 4}px`;
+  const z = rows[rows.length - 1].getBoundingClientRect();
+  stages.style.setProperty('--line-end', `${box.bottom - z.top - z.height / 2}px`);
 }
 placeRepeat();
 addEventListener('resize', placeRepeat);
