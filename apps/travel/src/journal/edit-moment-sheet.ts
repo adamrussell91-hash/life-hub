@@ -372,7 +372,14 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
 
     // Read the meal once: it may still be loading, and then nothing changed.
     const mealNow = meal as MealSectionHandle | null;
-    const mealOn = Boolean(mealNow?.available && mealNow.enabled());
+    // The visit takes its venue, date and place from the moment, so those count too.
+    const momentFedVisit =
+      placeName.trim() !== (moment.place?.name ?? '') ||
+      localDate !== moment.local_date ||
+      JSON.stringify(coordinates ?? null) !== JSON.stringify(moment.coordinates ?? null);
+    const mealOn = Boolean(
+      mealNow?.available && mealNow.enabled() && (mealNow.changed() || momentFedVisit),
+    );
     const mealOff = Boolean(mealNow?.available && mealNow.wasLinked && !mealNow.enabled());
     const mealState = mealOn ? mealNow!.state() : null;
     if (mealState && !mealState.dishes.some((d) => d.title.trim())) {

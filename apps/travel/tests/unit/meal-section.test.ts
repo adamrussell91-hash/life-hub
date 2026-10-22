@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mealPayload, canBeMeal, RATING_OPTIONS } from '@/journal/meal-section';
+import { mealPayload, canBeMeal, mealChanged, RATING_OPTIONS, type MealState } from '@/journal/meal-section';
 
 describe('meal section', () => {
   it('only your own moments can be meals', () => {
@@ -49,5 +49,42 @@ describe('meal section', () => {
 
   it('offers no rating, then 1 to 5 in half steps', () => {
     expect(RATING_OPTIONS).toEqual([null, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]);
+  });
+
+  describe('mealChanged', () => {
+    const loaded = (): MealState => ({
+      title: 'Market lunch',
+      dishes: [{ id: 'dish_1', title: 'Tortilla', title_en: 'Omelette', meal_type: 'Lunch', rating: 4, ingredients: 'egg' }],
+      extras: { mood: 'buzzing', vibe: '', with: '' },
+    });
+
+    it('a newly enabled switch counts as changed', () => {
+      expect(mealChanged(null, loaded())).toBe(true);
+    });
+
+    it('is unchanged when only whitespace, blank dishes or read-only fields differ', () => {
+      const now = loaded();
+      now.title = ' Market lunch ';
+      now.extras.vibe = '  ';
+      now.dishes[0]!.ingredients = 'egg, potato';
+      now.dishes.push({ title: ' ', meal_type: 'Dinner', rating: null });
+      expect(mealChanged(loaded(), now)).toBe(false);
+    });
+
+    it('sees edits to the title, a dish, the dishes or the extras', () => {
+      const edits: ((s: MealState) => void)[] = [
+        (s) => { s.title = 'Market supper'; },
+        (s) => { s.dishes[0]!.rating = 4.5; },
+        (s) => { s.dishes[0]!.meal_type = 'Dinner'; },
+        (s) => { s.dishes.push({ title: 'Churros', meal_type: 'Dessert', rating: null }); },
+        (s) => { s.dishes = []; },
+        (s) => { s.extras.with = 'Sam'; },
+      ];
+      for (const edit of edits) {
+        const now = loaded();
+        edit(now);
+        expect(mealChanged(loaded(), now)).toBe(true);
+      }
+    });
   });
 });
