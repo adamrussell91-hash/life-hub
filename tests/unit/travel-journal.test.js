@@ -99,3 +99,58 @@ test('travel-journal PUT rejects stale if_version', async () => {
   );
   assert.equal(response.status, 409);
 });
+
+function journalWithTwoMoments() {
+  const journal = emptyJournal(TRIP);
+  journal.legs = [
+    {
+      id: 'leg_test01',
+      trip_id: TRIP,
+      destination: 'Test',
+      timezone: 'UTC',
+      pattern_id: 'generic',
+      order: 0,
+      lifecycle: 'live'
+    }
+  ];
+  journal.leg_ids = ['leg_test01'];
+  journal.moments = ['mom_one01', 'mom_two01'].map((id, i) => ({
+    id,
+    leg_id: 'leg_test01',
+    local_date: '2026-03-01',
+    media_ids: [],
+    display_order: i + 1,
+    lifecycle: 'live'
+  }));
+  return journal;
+}
+
+test("travel-journal ordinary save keeps the server's meal links and ignores forged ones", async () => {
+  const repo = fakeJournalRepo();
+  const handler = handlerFor(repo);
+  const doc = journalWithTwoMoments();
+  doc.moments[0].meal = { food_visit_id: 'visit_keep' };
+  const created = await (await handler(request('PUT', TRIP, { create: true, journal: doc }))).json();
+
+  const stale = structuredClone(doc);
+  delete stale.moments[0].meal;
+  stale.moments[1].meal = { food_visit_id: 'visit_forged' };
+  const res = await handler(
+    request('PUT', TRIP, { if_version: created.data.version, journal: stale })
+  );
+  assert.equal(res.status, 200);
+  const saved = (await res.json()).data.journal;
+  assert.deepEqual(saved.moments[0].meal, { food_visit_id: 'visit_keep' });
+  assert.equal(saved.moments[1].meal, undefined);
+});
+
+test('travel-journal ordinary save still conflicts on a stale if_version', async () => {
+  const repo = fakeJournalRepo();
+  const handler = handlerFor(repo);
+  const doc = journalWithTwoMoments();
+  await handler(request('PUT', TRIP, { create: true, journal: doc }));
+  const res = await handler(
+    request('PUT', TRIP, { if_version: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', journal: doc })
+  );
+  assert.equal(res.status, 409);
+});

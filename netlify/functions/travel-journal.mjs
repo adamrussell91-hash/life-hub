@@ -60,8 +60,20 @@ export function createTravelJournalHandler(deps = {}) {
       }
 
       validateJournal(body.journal);
+      // Meal links are owned by /api/travel-meal. Carry the server's links over
+      // and drop any the client sent, so a stale copy cannot unlink or forge one.
+      const current = await ctx.repo.getJournal(tripId);
+      const links = new Map(
+        current.journal.moments.filter((m) => m.meal).map((m) => [m.id, m.meal])
+      );
+      const journal = {
+        ...body.journal,
+        moments: body.journal.moments.map(({ meal, ...m }) =>
+          links.has(m.id) ? { ...m, meal: links.get(m.id) } : m
+        )
+      };
       const saved = await ctx.repo.saveJournal(
-        body.journal,
+        journal,
         body.if_version,
         `travel-journal: edit trip ${tripId}`
       );
