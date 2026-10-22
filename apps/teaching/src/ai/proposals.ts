@@ -57,6 +57,11 @@ export const ProposeInsertBlocksSchema = z.object({
   set_mode: ProposalSetModeSchema.optional()
 });
 
+/** Several existing blocks swapped in one Accept, each matched by its own id. */
+export const ProposeReplaceBlocksSchema = z.object({
+  blocks: z.array(BlockSchema).min(1).max(30)
+});
+
 export const ProposeDeleteBlocksSchema = z.object({
   ids: z.array(z.string().min(1)).min(1)
 });
@@ -87,6 +92,7 @@ export const ReviewOnlySchema = z.object({
 
 export type AiProposal =
   | { kind: 'replace_block'; block_id: string; block: z.infer<typeof BlockSchema> }
+  | { kind: 'replace_blocks'; blocks: z.infer<typeof BlockSchema>[] }
   | { kind: 'replace_section'; section_id: string; section: z.infer<typeof BlockSchema> }
   | {
       kind: 'replace_lesson';
@@ -133,6 +139,19 @@ export const AI_TOOLS = [
         block: { type: 'object', description: 'Full block object matching Teaching Hub schema' }
       },
       required: ['block_id', 'block']
+    }
+  },
+  {
+    name: 'propose_replace_blocks',
+    description:
+      'Propose replacing several existing blocks at once, such as rewriting or converting a few quiz questions. Each block keeps the id of the block it replaces; blocks you leave out stay as they are.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message: MESSAGE_PROPERTY,
+        blocks: { type: 'array', items: { type: 'object' }, description: 'Full replacement blocks, each with the id of an existing block.' }
+      },
+      required: ['blocks']
     }
   },
   {
@@ -241,6 +260,13 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
     if (!parsed.success) return { error: parsed.error.message };
     const block = { ...parsed.data.block, id: parsed.data.block_id };
     return { kind: 'replace_block', block_id: parsed.data.block_id, block };
+  }
+  if (name === 'propose_replace_blocks') {
+    const parsed = ProposeReplaceBlocksSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    const ids = parsed.data.blocks.map((block) => block.id);
+    if (new Set(ids).size !== ids.length) return { error: 'Each replacement needs a different block id.' };
+    return { kind: 'replace_blocks', blocks: parsed.data.blocks };
   }
   if (name === 'propose_replace_section') {
     const parsed = ProposeReplaceSectionSchema.safeParse(input);

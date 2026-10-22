@@ -69,6 +69,8 @@ test('brief: at most 3 points with sources, and an optional owed line', async ()
   assert.equal(brief.points[0].source, 'Canvas, 13/10');
   assert.equal(brief.owed_line, 'Send Morgan the summary after this one.');
   assert.match(calls[0].system, /Australian English/);
+  assert.match(calls[0].system, /always in the room/);
+  assert.match(calls[0].system, /I, me, my/);
   assert.match(calls[0].content[0].text, /Alex J\./);
 });
 

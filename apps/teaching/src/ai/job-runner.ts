@@ -196,7 +196,7 @@ export function planConfirmed(job: Pick<AiJob, 'history' | 'message'>): boolean 
 
 function countBuild(proposal: AiProposal): { blocks: number; quizQuestions: number } {
   const blocks =
-    proposal.kind === 'insert_blocks' || proposal.kind === 'replace_lesson'
+    proposal.kind === 'insert_blocks' || proposal.kind === 'replace_lesson' || proposal.kind === 'replace_blocks'
       ? proposal.blocks
       : proposal.kind === 'replace_section'
         ? [proposal.section]

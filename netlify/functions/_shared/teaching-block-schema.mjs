@@ -219,7 +219,13 @@ var QuizQuestionSchema = z5.discriminatedUnion("kind", [
     ...base,
     kind: z5.literal("spot_technique"),
     passage: Text(QUIZ_LIMITS.passage),
-    options: z5.array(QuizChoiceSchema.extend({ technique_id: z5.string().max(64).optional() })).min(2).max(10),
+    options: z5.array(
+      QuizChoiceSchema.extend({
+        technique_id: z5.string().max(64).optional(),
+        /** How many times students may name it: 2 for a passage with two similes. */
+        uses: z5.number().int().min(1).max(12).optional()
+      })
+    ).min(2).max(10),
     targets: z5.array(QuizSpotTargetSchema).min(1).max(12),
     /** How many students must find. Fewer than the targets means any of them will do. */
     find: z5.number().int().min(1).max(12).optional()
@@ -283,6 +289,12 @@ function questionProblems(q) {
         if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push("Name the technique for every answer.");
       }
       if ((q.find ?? q.targets.length) > q.targets.length) out.push("Students can\u2019t be asked to find more than there are answers.");
+      if ((q.find ?? q.targets.length) > 1) {
+        for (const option of q.options) {
+          const needed = q.targets.filter((t) => t.correct.length === 1 && t.correct[0] === option.id).length;
+          if (needed > (option.uses ?? 1)) out.push(`${option.text.trim() || "A technique"} is the answer ${needed} times. Set it to \xD7${needed}.`);
+        }
+      }
       break;
     }
     case "fill_gap":

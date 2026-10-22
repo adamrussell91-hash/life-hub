@@ -3,7 +3,6 @@ import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
 import {
-  createTask,
   createUniversalLink,
   endUniversalLink,
   listUniversalLinksForEntity
@@ -14,10 +13,11 @@ import { ApiClientError } from '@/api/client';
 import { mountBlockPage, type BlockPageHandle } from '@/components/block-page';
 import { mountComposeWhen } from '@/components/compose-when';
 import { buildMeetingTaskLinks, roleLabel } from '@/views/meetings';
+import { makeActionTask } from '@/lib/action-task';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
 import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
-import { groupRoom, initialsFor, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
+import { groupRoom, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
 import { searchPickerPeople } from '@/lib/person-picker';
@@ -152,10 +152,11 @@ export async function renderMeetingPage(
       loadSelfRow()
     ]);
     record = meetingResult.meeting;
-    attendees = loadedAttendees;
+    selfRow = loadedSelf;
+    // You're in every meeting: never listed, never named to Clare.
+    attendees = loadedAttendees.filter((attendee) => !isSelfAttendee(attendee, selfRow));
     directory = loadedDirectory;
     ledger = ledgerResult.items;
-    selfRow = loadedSelf;
   } catch (err) {
     if (!options.isCurrent()) return;
     renderLoadError(canvas, err, () => void renderMeetingPage(canvas, id, options));
@@ -279,7 +280,7 @@ export async function renderMeetingPage(
   let prepPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-preparation"]');
   let followPanel = taskLinks.querySelector<HTMLElement>('[data-part="task-link-follow_up"]');
   const tagCard = el('section', 'card meeting-page__tags');
-  mountTagAnythingSection(tagCard, meetingRef);
+  const tags = mountTagAnythingSection(tagCard, meetingRef);
   side.append(roomHost, taskLinks, tagCard);
   const grid = el('div', 'meeting-page__grid');
   grid.append(main, side);
@@ -367,8 +368,7 @@ export async function renderMeetingPage(
 
   // ── The room: attendees by organisation, add / remove ──
   function paintRoom(): void {
-    const roomDirectory: RoomDirectoryRow[] = selfRow ? [...directory, selfRow] : directory;
-    const room = groupRoom(attendees, roomDirectory, new Date());
+    const room = groupRoom(attendees, directory, new Date(), selfRow);
     roomHost.replaceChildren(roomCard(room, attendees, {
       onRemove: async (attendee) => {
         await endUniversalLink(attendee.linkId);
@@ -415,7 +415,7 @@ export async function renderMeetingPage(
       mode: 'field',
       search: (query, signal) => searchPickerPeople(query, signal),
       onSelect: async (item) => {
-        if (attendees.some((attendee) => attendee.ref === item.ref)) {
+        if (isSelfAttendee({ ref: item.ref, name: item.display_label }, selfRow) || attendees.some((attendee) => attendee.ref === item.ref)) {
           input.value = '';
           return;
         }
@@ -889,10 +889,15 @@ export async function renderMeetingPage(
         toggle.disabled = Boolean(item.task_ref);
         toggle.addEventListener('click', async () => {
           toggle.disabled = true;
-          const task = await createTask({ title: item.text });
-          Object.assign(item, (await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` })).item);
-          toggle.setAttribute('aria-checked', 'true');
-          toggle.title = 'Task made';
+          try {
+            Object.assign(item, await makeActionTask(item, meetingRef));
+            toggle.setAttribute('aria-checked', 'true');
+            toggle.title = 'Task made';
+            void tags.refresh();
+          } catch (err) {
+            toggle.disabled = false;
+            toggle.title = err instanceof ApiClientError ? `Couldn't make the task: ${err.message}` : "Couldn't make the task. Try again.";
+          }
         });
         row.append(toggle);
         mine.append(row);
@@ -1010,7 +1015,6 @@ function roomCard(
       row.dataset.warmth = String(person.warmthDots);
       row.append(el('span', `room__initials${person.student ? ' room__initials--student' : ''}`, person.initials), el('span', 'room__name', person.name));
       const role = roleLabel(person.role);
-      if (person.self) row.append(el('span', 'muted', 'You'));
       if (role) row.append(el('span', 'muted', role));
       if (person.isNew) row.append(el('span', 'chip chip--warn', 'New to you'));
       if (!person.known) {
@@ -1023,8 +1027,7 @@ function roomCard(
       for (let i = 1; i <= 3; i += 1) dots.append(el('i', i <= person.warmthDots ? 'is-on' : ''));
       const jobs = attendee && person.organisationChoices.length > 1 ? organisationPicker(person, attendee, actions.onPickOrganisation) : null;
       if (jobs) row.append(jobs.toggle);
-      // You get no warmth; the empty slot still pushes × to the edge.
-      row.append(person.self ? el('span', 'room__warmth') : dots);
+      row.append(dots);
       if (attendee) {
         const remove = el('button', 'hub-icon-btn room__remove', '×') as HTMLButtonElement;
         remove.type = 'button';
