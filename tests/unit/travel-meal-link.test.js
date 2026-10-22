@@ -83,3 +83,28 @@ test("a tombstoned visit is never revived; the new one takes a free source id th
   assert.deepEqual(parseTravelSourceId(c.source_id), { tripId: "trp_test1", momentId: "mom_abcd1234" });
   assert.doesNotThrow(() => validateFoodJournal(out.journal));
 });
+
+test("an incoming dish id taken elsewhere, or repeated, gets a new dish rather than the old one", () => {
+  const journal = { schema_version: 1, visits: [{ id: "visit_other", date: "2026-11-01", title: "", notes: "", menu_text: "", venue: { name: "", address: "" }, dishes: [{ ...food.dishes[0], id: "dish_taken", title: "Other" }] }], recipes: [] };
+  let { journal: next } = upsertLinkedVisit(journal, { tripId: "trp_test1", moment, food, photos: [], newId: () => "visit_mine" });
+  let n = 0;
+  const twice = { title: "x", dishes: [{ id: "dish_1", title: "Kept", rating: 5 }, { id: "dish_1", title: "Repeat" }, { id: "dish_taken", title: "Stolen" }] };
+  ({ journal: next } = upsertLinkedVisit(next, { tripId: "trp_test1", moment, food: twice, photos: [], visitId: "visit_mine", newId: (p) => `${p}_n${++n}` }));
+  const dishes = next.visits[1].dishes;
+  assert.deepEqual(dishes.map((d) => d.id), ["dish_1", "dish_n1", "dish_n2"]);
+  assert.equal(dishes[0].title_en, "Spanish omelette");
+  assert.equal(dishes[1].title_en, undefined);
+  assert.equal(dishes[2].title, "Stolen");
+  assert.equal(next.visits[0].dishes[0].title, "Other");
+  assert.doesNotThrow(() => validateFoodJournal(next));
+});
+
+test("the visit with the linked id wins over another live visit for the moment", () => {
+  const blank = { title: "", notes: "", menu_text: "", venue: { name: "", address: "" }, dishes: [] };
+  const journal = { schema_version: 1, recipes: [], visits: [
+    { ...blank, id: "visit_a", source_id: "travel:trp_test1:mom_abcd1234" },
+    { ...blank, id: "visit_b", source_id: "travel:trp_test1:mom_abcd1234:2" },
+  ] };
+  assert.equal(upsertLinkedVisit(journal, { tripId: "trp_test1", moment, food, photos: [], visitId: "visit_b", newId: () => "never" }).visitId, "visit_b");
+  assert.equal(upsertLinkedVisit(journal, { tripId: "trp_test1", moment, food, photos: [], newId: () => "never" }).visitId, "visit_a");
+});

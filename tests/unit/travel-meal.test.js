@@ -39,7 +39,7 @@ function store(travel, food = { schema_version: 1, visits: [], recipes: [] }) {
       state.food = food;
       state.travel = travels[0].journal;
       state.writes += 1;
-      return { commitSha: "d".repeat(40), foodVersion: "e".repeat(40) };
+      return { commitSha: "d".repeat(40), foodVersion: "e".repeat(40), travelVersions: { trp_test1: "7".repeat(40) } };
     },
   };
 }
@@ -58,7 +58,9 @@ test("PUT links a moment to a new visit in one write", async () => {
   const visit = s.state.food.visits[0];
   assert.equal(visit.source_id, "travel:trp_test1:mom_abcd1234");
   assert.deepEqual(s.state.travel.moments[0].meal, { food_visit_id: visit.id, mood: "buzzing" });
-  assert.equal((await res.json()).data.food_version, "e".repeat(40));
+  const data = (await res.json()).data;
+  assert.equal(data.food_version, "e".repeat(40));
+  assert.equal(data.travel_version, "7".repeat(40));
 });
 
 test("a second PUT updates the same visit", async () => {
@@ -116,6 +118,7 @@ test("GET returns the linked visit; DELETE tombstones it and clears the link", a
   assert.equal(got.food_version, FOOD_V);
   res = await h(req("DELETE", Q, versions));
   assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.travel_version, "7".repeat(40));
   assert.equal(s.state.travel.moments[0].meal, undefined);
   assert.equal(s.state.food.visits[0].status, "deleted");
   res = await h(req("GET", Q));
@@ -213,4 +216,45 @@ test("photos copy once, under Food Journal names; deleted and audio media are sk
   await h(req("PUT", Q, { ...versions, food }));
   assert.equal(gets.length, 1);
   assert.equal(s.state.food.visits[0].dishes[0].photos.length, 1);
+});
+
+const photoTrip = (count) => {
+  const t = trip();
+  t.media = Array.from({ length: count }, (_, i) => ({ id: `med_p${String(i).padStart(6, "0")}`, lifecycle: "live", content_type: "image/jpeg", original_key: `travel/journal/trp_test1/${i}.jpg` }));
+  t.moments[0].media_ids = t.media.map((m) => m.id);
+  return t;
+};
+let copies = 0;
+const fakeCopy = async () => { copies += 1; const id = `photo_c${copies}`; return { id, key: `food/photos/${id}.jpg` }; };
+
+test("an invalid save is refused before any photo is copied", async () => {
+  const s = store(photoTrip(2));
+  let called = 0;
+  const h = createTravelMealHandler(deps(s, { copyPhoto: async () => { called += 1; return null; } }));
+  const res = await h(req("PUT", Q, { ...versions, food, extras: { vibe: "x".repeat(601) } }));
+  assert.equal(res.status, 400);
+  assert.equal(called, 0);
+  assert.equal(s.state.writes, 0);
+});
+
+test("copies stop at the Food Journal's 20 photos per dish", async () => {
+  const s = store(photoTrip(25));
+  const h = createTravelMealHandler(deps(s, { copyPhoto: fakeCopy }));
+  copies = 0;
+  const res = await h(req("PUT", Q, { ...versions, food }));
+  assert.equal(res.status, 200);
+  assert.equal(copies, 20);
+  assert.equal(s.state.food.visits[0].dishes[0].photos.length, 20);
+  const again = await h(req("PUT", Q, { ...versions, food }));
+  assert.equal(again.status, 200);
+  assert.equal(copies, 20);
+});
+
+test("GET leaves out deleted dishes", async () => {
+  const s = store(trip());
+  const h = createTravelMealHandler(deps(s));
+  await h(req("PUT", Q, { ...versions, food: { ...food, dishes: [...food.dishes, { id: "dish_2", title: "Flan" }] } }));
+  s.state.food.visits[0].dishes[1].status = "deleted";
+  const got = (await (await h(req("GET", Q))).json()).data;
+  assert.deepEqual(got.visit.dishes.map((d) => d.title), ["Tortilla"]);
 });

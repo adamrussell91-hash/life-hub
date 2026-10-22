@@ -42,6 +42,7 @@ test("reads both journals at one snapshot and writes them in one commit", async 
   assert.equal(gh.commits[0].baseTreeSha, sha("t"));
   assert.equal(out.commitSha, sha("d"));
   assert.equal(out.foodVersion, blobSha(gh.commits[0].files.find((f) => f.path.startsWith("data/food")).content));
+  assert.deepEqual(out.travelVersions, { trp_test1: blobSha(gh.commits[0].files.find((f) => f.path.startsWith("data/travel")).content) });
 });
 
 test("blobSha matches git hash-object", () => {

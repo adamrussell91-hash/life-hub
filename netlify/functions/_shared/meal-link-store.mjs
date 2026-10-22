@@ -63,17 +63,22 @@ export function createMealLinkStore({
       validateFood(food);
       for (const t of travels) validateTravel(t.journal);
       const foodContent = encode(food);
+      const trips = travels.map((t) => ({ tripId: t.tripId, content: encode(t.journal) }));
       try {
         const out = await client.commitFiles({
           files: [
             { path: FOOD_PATH, content: foodContent },
-            ...travels.map((t) => ({ path: travelPath(t.tripId), content: encode(t.journal) })),
+            ...trips.map((t) => ({ path: travelPath(t.tripId), content: t.content })),
           ],
           message,
           parentSha: snap.base.commitSha,
           baseTreeSha: snap.base.treeSha,
         });
-        return { commitSha: out.commitSha, foodVersion: blobSha(foodContent) };
+        return {
+          commitSha: out.commitSha,
+          foodVersion: blobSha(foodContent),
+          travelVersions: Object.fromEntries(trips.map((t) => [t.tripId, blobSha(t.content)])),
+        };
       } catch (e) {
         if (e instanceof GitHubClientError && e.code === 'write_conflict') throw conflict();
         throw e;

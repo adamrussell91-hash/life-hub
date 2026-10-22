@@ -17,9 +17,11 @@ export function parseTravelSourceId(sourceId) {
 const DISH_FIELDS = ["title", "title_en", "meal_type", "rating", "cuisine", "tags", "notes", "notes_en", "ingredients", "ingredients_original"];
 
 // Dish ids are unique across the whole journal, tombstones included.
+// An id already taken, even by an earlier dish in the same save, starts a new dish.
 function dishFrom(input, old, newId, taken) {
-  const id = input.id && !taken.has(input.id) ? input.id : newId("dish");
-  const dish = old ? structuredClone(old) : { id, cuisine: "", tags: [], notes: "", ingredients: "", rating: null, meal_type: "Dinner", photos: [] };
+  const fresh = !input.id || taken.has(input.id);
+  const id = fresh ? newId("dish") : input.id;
+  const dish = old && !fresh ? structuredClone(old) : { id, cuisine: "", tags: [], notes: "", ingredients: "", rating: null, meal_type: "Dinner", photos: [] };
   for (const key of DISH_FIELDS) if (input[key] !== undefined) dish[key] = input[key];
   return dish;
 }
@@ -31,7 +33,8 @@ export function upsertLinkedVisit(journal, { tripId, moment, food, photos, visit
     const s = parseTravelSourceId(v.source_id);
     return s?.tripId === tripId && s.momentId === moment.id;
   };
-  let visit = next.visits.find((v) => !isDeletedRecord(v) && (v.id === visitId || forMoment(v)));
+  const live = next.visits.filter((v) => !isDeletedRecord(v));
+  let visit = (visitId && live.find((v) => v.id === visitId)) || live.find(forMoment);
   if (!visit) {
     const taken = new Set(next.visits.map((v) => v.source_id));
     let sourceId = base;

@@ -9,12 +9,17 @@ import {
 import { createMealLinkStore } from "./_shared/meal-link-store.mjs";
 import { upsertLinkedVisit, pickFoodPhotoKey } from "./_shared/travel-meal-link.mjs";
 import { knowledgeGetObject, knowledgePutObject } from "./_shared/knowledge-r2.mjs";
-import { isDeletedRecord } from "./_shared/record-liveness.mjs";
+import { isDeletedRecord, withoutDeleted } from "./_shared/record-liveness.mjs";
+import { validateFoodJournal } from "./_shared/food-journal-schema.mjs";
+import { validateJournal } from "./_shared/travel-journal-schema.mjs";
 
 export const config = { path: "/api/travel-meal" };
 
 const newId = (prefix) => `${prefix}_${randomUUID()}`;
 const EXTRAS = ["mood", "vibe", "with"];
+// The Food Journal's photo limit per dish.
+const MAX_PHOTOS = 20;
+const readable = (visit) => (visit ? { ...visit, dishes: withoutDeleted(visit.dishes) } : null);
 
 // Same naming as a Food Journal upload, so its photo read serves the copy.
 async function defaultCopyPhoto(env, sourceKey, deps) {
@@ -46,7 +51,7 @@ export function createTravelMealHandler(deps = {}) {
     const linked = snap.food.journal.visits.find((v) => v.id === moment.meal?.food_visit_id && !isDeletedRecord(v));
 
     if (request.method === "GET")
-      return okResponse(200, { visit: linked ?? null, travel_version: snap.travel.version, food_version: snap.food.version }, PRIVATE_CACHE);
+      return okResponse(200, { visit: readable(linked), travel_version: snap.travel.version, food_version: snap.food.version }, PRIVATE_CACHE);
 
     // Older moments have no author; they are Adam's (parseMomentAuthor).
     if (moment.author === "Redacted")
@@ -59,15 +64,44 @@ export function createTravelMealHandler(deps = {}) {
     if (request.method === "PUT") {
       if (!body.food || !Array.isArray(body.food.dishes) || !body.food.dishes.length)
         return errorResponse(400, "validation_error", "Add at least one dish.", false, PRIVATE_CACHE);
+      const extras = Object.fromEntries(
+        EXTRAS.filter((k) => typeof body.extras?.[k] === "string" && body.extras[k].trim()).map((k) => [k, body.extras[k].trim()]),
+      );
+      const build = (photos) => {
+        const { journal: food, visitId } = upsertLinkedVisit(snap.food.journal, {
+          tripId,
+          moment,
+          food: body.food,
+          photos,
+          visitId: linked?.id,
+          newId,
+        });
+        const travel = {
+          ...snap.travel.journal,
+          revision,
+          moments: snap.travel.journal.moments.map((m) => (m.id === momentId ? { ...m, meal: { food_visit_id: visitId, ...extras } } : m)),
+        };
+        return { food, travel, visitId };
+      };
+      // Check the save is valid before touching R2.
+      const draft = build([]);
+      validateFoodJournal(draft.food);
+      validateJournal(draft.travel);
+
+      const draftVisit = draft.food.visits.find((v) => v.id === draft.visitId);
+      const already = new Set(draftVisit.dishes.flatMap((d) => d.photos.map((p) => p.from)).filter(Boolean));
+      const room = Math.max(0, MAX_PHOTOS - (draftVisit.dishes[0]?.photos.length ?? 0));
       const media = new Map(snap.travel.journal.media.map((m) => [m.id, m]));
-      const already = new Set((linked?.dishes ?? []).flatMap((d) => d.photos.map((p) => p.from)).filter(Boolean));
+      const wanted = moment.media_ids
+        .filter((id) => !already.has(id))
+        .map((id) => ({ id, key: isPhoto(media.get(id)) ? pickFoodPhotoKey(media.get(id)) : null }))
+        .filter((m) => m.key)
+        .slice(0, room);
+      // If the commit below loses a race, these copies are left orphaned in R2. That is accepted.
       const copy = deps.copyPhoto ?? ((key) => defaultCopyPhoto(ctx.env, key, deps));
       const copied = [];
       let photoFailed = false;
-      for (const id of moment.media_ids) {
-        const item = media.get(id);
-        const key = isPhoto(item) ? pickFoodPhotoKey(item) : null;
-        if (!key || already.has(id)) continue;
+      for (const { id, key } of wanted) {
         try {
           const photo = await copy(key);
           if (photo) copied.push({ ...photo, from: id });
@@ -75,32 +109,23 @@ export function createTravelMealHandler(deps = {}) {
           photoFailed = true;
         }
       }
-      const { journal: food, visitId } = upsertLinkedVisit(snap.food.journal, {
-        tripId,
-        moment,
-        food: body.food,
-        photos: copied,
-        visitId: linked?.id,
-        newId,
-      });
-      const extras = Object.fromEntries(
-        EXTRAS.filter((k) => typeof body.extras?.[k] === "string" && body.extras[k].trim()).map((k) => [k, body.extras[k].trim()]),
-      );
-      const travel = {
-        ...snap.travel.journal,
-        revision,
-        moments: snap.travel.journal.moments.map((m) => (m.id === momentId ? { ...m, meal: { food_visit_id: visitId, ...extras } } : m)),
-      };
+      const { food, travel, visitId } = copied.length ? build(copied) : draft;
       const saved = await store.write(snap, { food, travels: [{ tripId, journal: travel }], message: `travel-meal: link ${momentId}` });
       return okResponse(
         200,
-        { visit: food.visits.find((v) => v.id === visitId), travel, food_version: saved.foodVersion, photo_failed: photoFailed },
+        {
+          visit: readable(food.visits.find((v) => v.id === visitId)),
+          travel,
+          travel_version: saved.travelVersions?.[tripId] ?? null,
+          food_version: saved.foodVersion,
+          photo_failed: photoFailed,
+        },
         PRIVATE_CACHE,
       );
     }
 
     // DELETE: the visit is tombstoned for good and the moment stops pointing at it.
-    if (!moment.meal) return okResponse(200, { visit: null, travel: snap.travel.journal, food_version: snap.food.version }, PRIVATE_CACHE);
+    if (!moment.meal) return okResponse(200, { visit: null, travel: snap.travel.journal, travel_version: snap.travel.version, food_version: snap.food.version }, PRIVATE_CACHE);
     const food = {
       ...snap.food.journal,
       visits: snap.food.journal.visits.map((v) => (v.id === moment.meal.food_visit_id && !isDeletedRecord(v) ? { ...v, status: "deleted" } : v)),
@@ -111,7 +136,11 @@ export function createTravelMealHandler(deps = {}) {
       moments: snap.travel.journal.moments.map(({ meal, ...m }) => (m.id === momentId || !meal ? m : { ...m, meal })),
     };
     const saved = await store.write(snap, { food, travels: [{ tripId, journal: travel }], message: `travel-meal: unlink ${momentId}` });
-    return okResponse(200, { visit: null, travel, food_version: saved.foodVersion }, PRIVATE_CACHE);
+    return okResponse(
+      200,
+      { visit: null, travel, travel_version: saved.travelVersions?.[tripId] ?? null, food_version: saved.foodVersion },
+      PRIVATE_CACHE,
+    );
   }, { ...deps, createTravelRepository: deps.createTravelRepository ?? (() => null) });
 }
 
