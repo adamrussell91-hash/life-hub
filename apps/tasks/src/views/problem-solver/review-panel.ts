@@ -10,6 +10,10 @@ import type { PsSession } from '../../../../../packages/problem-solver/types';
 export type ReviewEntry = { kind: NonNullable<ReturnType<typeof reviewStart>>; step: string };
 export type ReviewPanel = { el: HTMLElement; update(session: PsSession): void };
 
+const NOTE = 'Or move on; the review brings you back here.';
+/** While the learning question waits, Review now waits too: a review started now would have its opening read as the answer. */
+const LEARNING_FIRST = 'Answer the coach’s question first, then start the review.';
+
 function dueLabel(due: string | null | undefined): string {
   if (!due) return '';
   return new Date(`${due}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -23,7 +27,7 @@ export function mountReviewPanel({ start }: { start: () => void }): ReviewPanel 
   line.setAttribute('role', 'status');
   const go = el('button', 'btn btn--primary ps-review__go', 'Review now') as HTMLButtonElement;
   go.type = 'button';
-  const note = el('p', 'ps-review__note', 'Or move on; the review brings you back here.');
+  const note = el('p', 'ps-review__note', NOTE);
   const row = el('div', 'ps-review__row');
   row.append(go, note);
   panel.append(line, row);
@@ -37,7 +41,10 @@ export function mountReviewPanel({ start }: { start: () => void }): ReviewPanel 
     update(session) {
       const on = waitingForReview(session);
       panel.hidden = !on;
-      go.disabled = false;
+      const asking = Boolean(session.pendingLearning);
+      go.disabled = asking;
+      const said = asking ? LEARNING_FIRST : NOTE;
+      if (note.textContent !== said) note.textContent = said;
       if (!on) return;
       const name = stepName(session.model!.id, session.phase);
       const date = dueLabel(session.reviewState?.due);

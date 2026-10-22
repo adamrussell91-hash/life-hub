@@ -46,6 +46,8 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
   properties: ['M5 7h14v3H5z', 'M7 11h10v8H7z', 'M9 14h2', 'M13 14h2'],
   'problem-solver': ['M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18', 'M8 10l4 4l4-4'],
   'decision-maker': ['M8 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10', 'M16 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10', 'M5 12h13', 'M15 9l3 3l-3 3'],
+  // The gear inside the two return arrows, in outline.
+  'gear-shifter': ['M4 9a8.5 8.5 0 0 1 14.6-3.6', 'M19 2.8v3.6h-3.6', 'M20 15a8.5 8.5 0 0 1-14.6 3.6', 'M5 21.2v-3.6h3.6', 'M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6', 'M12 7v1.3', 'M12 15.7V17', 'M7 12h1.3', 'M15.7 12H17'],
   'term-dates': ['M4 6h16', 'M4 10h12', 'M4 14h16', 'M4 18h8'],
   line: ['M8 3v18', 'M8 7h0', 'M8 7a1.5 1.5 0 1 0 0.01 0', 'M8 15a1.5 1.5 0 1 0 0.01 0', 'M12 7h7', 'M12 15h5']
 };

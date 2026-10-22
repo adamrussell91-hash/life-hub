@@ -23,7 +23,7 @@ import { SECTIONS, modelsInSection } from '../../../../../packages/decision-book
 import { composeRecord, recordOffer } from '../../../../../packages/decision-book/record.mjs';
 import { currentEntry as quickEntry, decisionOf } from '../../../../../packages/decision-book/quick.mjs';
 import { modelEmblem, sectionEmblem } from '../../../../../packages/decision-book/glyphs';
-import { decisionBookApi, isBusy, pollUntilSettled, problemSolverApi } from '../problem-solver/api';
+import { decisionBookApi, gearShifterApi, isBusy, pollUntilSettled, problemSolverApi } from '../problem-solver/api';
 import { mountCoachPanel } from '../problem-solver/coach-panel';
 import { createTaskBridge, taskBody, type TaskOrigin } from '../problem-solver/task-bridge';
 import { mountReviewPanel, reviewBanner, type ReviewEntry } from '../problem-solver/review-panel';
@@ -298,10 +298,11 @@ async function renderList(canvas: HTMLElement): Promise<void> {
   hero.append(copy, board.el);
   page.append(hero);
 
-  const [sessions, problems] = await Promise.all([
+  const [sessions, problems, shifts] = await Promise.all([
     decisionBookApi.list().then((rows) => rows.filter((item) => item.status !== 'archived')),
-    // The shared tally only: a Problem Solver that cannot be reached leaves its share out.
-    problemSolverApi.list().catch(() => [] as PsSummary[])
+    // The shared tally only: a tool that cannot be reached leaves its share out.
+    problemSolverApi.list().catch(() => [] as PsSummary[]),
+    gearShifterApi.list().catch(() => [] as PsSummary[])
   ]);
   const list = el('ul', 'ps-probs');
   list.append(...sessions.map(decisionCard));
@@ -323,7 +324,7 @@ async function renderList(canvas: HTMLElement): Promise<void> {
       start.startFrom(model);
       toStart();
     })),
-    section('Thinking skills you have used', 'Across Decision Maker and Problem Solver. Faint marks have not come up yet.', skillsRibbon({ name: 'Decision Maker', sessions }, { name: 'Problem Solver', sessions: problems }, () => 'var(--dm-ink)'))
+    section('Thinking skills you have used', 'One tally across all three tools. Faint marks have not come up yet.', skillsRibbon({ name: 'Decision Maker', sessions }, [{ name: 'Problem Solver', sessions: problems }, { name: 'Gear Shifter', sessions: shifts, colour: '#2b7de9' }], () => 'var(--dm-ink)'))
   );
   canvas.replaceChildren(page);
 }

@@ -6,10 +6,12 @@ import { CATALOGUE_IDS } from '../../../../packages/decision-book/catalogue.mjs'
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightning.mjs';
 import { QUICK_NODE_IDS } from '../../../../packages/decision-book/quick.mjs';
+import { START_NODE_IDS, isWay } from '../../../../packages/get-things-done/quick.mjs';
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
+import { BOOK_FRAME_KEYS } from '../../../../packages/problem-solver/books.mjs';
 
 const VERDICTS = ['accept', 'challenge', 'clarify'];
-const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone', 'decision', 'compass', 'known'];
+const FRAME_KEYS = ['goal', 'whatIsTrue', 'whatCanBeDone', ...BOOK_FRAME_KEYS];
 const TEXT_MAX = 600;
 
 /** First balanced JSON object in text, or null. */
@@ -50,6 +52,11 @@ function suggestionOf(raw) {
   // next_model is Decision Maker's name for next_tool, limited to the book's models.
   if (raw.kind === 'next_model') {
     if (!CATALOGUE_IDS.includes(raw.tool) || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown model in suggestion: ${raw.tool}` };
+    return { value: { kind: 'next_tool', tool: raw.tool, reason } };
+  }
+  // next_technique is Gear Shifter's name for next_tool, limited to its own (gt_) tools.
+  if (raw.kind === 'next_technique') {
+    if (!String(raw.tool).startsWith('gt_') || !TOOL_IDS.includes(raw.tool)) return { error: `Unknown technique in suggestion: ${raw.tool}` };
     return { value: { kind: 'next_tool', tool: raw.tool, reason } };
   }
   if (raw.kind === 'next_tool' || raw.kind === 'switch_tool') {
@@ -110,11 +117,12 @@ export function validateCoachTurn(raw) {
     lightning = { node: raw.lightning.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}) };
   }
 
-  // A quick decision's step: Lightning's shape, plus the three tests at the tests box.
+  // A quick decision's step: Lightning's shape, plus the three tests at the tests box. Gear
+  // Shifter's Quick start uses the same field: its boxes, and a way to start at `how`.
   let quick = null;
   if (raw.quick != null) {
-    if (!QUICK_NODE_IDS.includes(raw.quick?.node)) return fail(`Unknown quick decision box: ${raw.quick?.node}`);
-    const answer = ['yes', 'no'].includes(raw.quick.answer) ? raw.quick.answer : null;
+    if (!QUICK_NODE_IDS.includes(raw.quick?.node) && !START_NODE_IDS.includes(raw.quick?.node)) return fail(`Unknown quick decision box: ${raw.quick?.node}`);
+    const answer = ['yes', 'no'].includes(raw.quick.answer) || (raw.quick.node === 'how' && isWay(raw.quick.answer)) ? raw.quick.answer : null;
     const note = text(raw.quick.note);
     const tests = Array.isArray(raw.quick.tests) ? raw.quick.tests.map((item) => text(item, 120)).filter(Boolean).slice(0, 3) : [];
     quick = { node: raw.quick.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}), ...(tests.length ? { tests } : {}) };

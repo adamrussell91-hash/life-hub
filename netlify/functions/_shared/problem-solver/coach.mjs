@@ -5,12 +5,14 @@ import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { extractJson, validateCoachTurn } from './coach-schema.mjs';
 import { buildCoachPrompt, repairPrompt, rewritePrompt } from './prompts.mjs';
 import { buildDecisionPrompt } from './decision-prompts.mjs';
+import { buildGearPrompt } from './get-things-done-prompts.mjs';
 import { buildLightningPrompt, checkLightningTurn } from './lightning-prompts.mjs';
 import { buildQuickPrompt, checkQuickTurn } from './quick-prompts.mjs';
+import { buildStartPrompt, checkStartTurn } from './start-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
-import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { bookOf } from '../../../../packages/problem-solver/books.mjs';
 import { basisCandidates, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 
 const WORD_LIMIT = 60;
@@ -101,14 +103,15 @@ function withAcceptedNode(session, turn) {
   return { ...session, steps: { ...session.steps, [session.phase]: { ...step, runs } } };
 }
 
-/** Tools a frame-phase suggestion may name: Explore's models for a decision, else Define tools. */
+/** Tools a frame-phase suggestion may name: a book's Explore tools, else Define tools. */
 function frameTools(session) {
-  return session.kind === 'decision' ? toolsForPlanStep('decision_book', 'explore') : toolsForBookStep('define');
+  const book = bookOf(session.kind);
+  return book ? toolsForPlanStep(book.model.id, 'explore') : toolsForBookStep('define');
 }
 
-/** True when this reply ends framing: a decision's last frame answer, or a chosen model. */
+/** True when this reply ends framing: a book session's last frame answer, or a chosen model. */
 function endsFrame(session, value) {
-  if (session.kind === 'decision') return frameKeysOf(session).every((key) => Boolean(session.frame[key] || value.frame?.[key]));
+  if (bookOf(session.kind)) return frameKeysOf(session).every((key) => Boolean(session.frame[key] || value.frame?.[key]));
   return Boolean(value.model);
 }
 
@@ -140,18 +143,20 @@ function parse(session, text) {
 }
 
 /**
- * A basis belongs only to a decision record reason. An accepted reason must rest on at least one
- * placed Explore node when any exist (the repair names them); a reason with nothing behind it is
- * challenged instead.
+ * A basis belongs only to a book record's basis slot (a decision record reason, the technique an
+ * experiment rests on; books.mjs). An accepted answer there must rest on at least one placed
+ * Explore node when any exist (the repair names them); one with nothing behind it is challenged
+ * instead.
  */
 function withBasis(session, value) {
   const run = activeRun(session);
-  const reason = run?.tool === RECORD_ID && value.node && parseSlot(value.node.slot)?.name === 'reason';
+  const record = bookOf(session.kind)?.record;
+  const reason = Boolean(record) && run?.tool === record.tool && value.node && parseSlot(value.node.slot)?.name === record.basisSlot;
   if (!reason) return value.basis?.length ? { ...value, basis: [] } : value;
   if (value.verdict !== 'accept' || resolveBasis(session, value.basis).length) return value;
   const candidates = basisCandidates(session);
   if (!candidates.length) return value;
-  return { error: `A reason rests on what a model showed: put at least one of these in "basis" as {"tool","slot"}, or challenge the reason. ${candidates.slice(0, 20).map((c) => `${c.tool} ${c.slot}`).join('; ')}.` };
+  return { error: `${record.basisRule}: put at least one of these in "basis" as {"tool","slot"}, or challenge ${record.basisSlot === 'reason' ? 'the reason' : 'it'}. ${candidates.slice(0, 20).map((c) => `${c.tool} ${c.slot}`).join('; ')}.` };
 }
 
 function parseLightning(session, text) {
@@ -164,11 +169,18 @@ function parseQuick(session, text) {
   return result.ok ? checkQuickTurn(session, result.value) : result;
 }
 
-/** Each session kind's prompt and reply check; full and decision sessions share the step parser. */
+function parseStart(session, text) {
+  const result = validateCoachTurn(extractJson(text));
+  return result.ok ? checkStartTurn(session, result.value) : result;
+}
+
+/** Each session kind's prompt and reply check; full and book sessions share the step parser. */
 const PROMPTS = {
   lightning: { build: buildLightningPrompt, read: parseLightning },
   quick: { build: buildQuickPrompt, read: parseQuick },
+  start: { build: buildStartPrompt, read: parseStart },
   decision: { build: buildDecisionPrompt, read: parse },
+  shift: { build: buildGearPrompt, read: parse },
   full: { build: buildCoachPrompt, read: parse }
 };
 

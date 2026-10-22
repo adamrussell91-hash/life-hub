@@ -130,9 +130,13 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await noOverflow(page);
     await shot(page, 'written', viewport);
 
-    // Review waits for its date; Review now opens the feedback analysis.
+    // Review waits for its date; Review now opens the feedback analysis. It also waits for the
+    // learning question (Adam, 22 Oct), so that is answered first.
     await page.getByRole('button', { name: 'Move on to Review' }).click();
-    await expect(page.getByRole('button', { name: 'Review now' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.ps-coach__messages')).toContainText(/what did you learn/i, { timeout: 20_000 });
+    await expect(page.getByRole('button', { name: 'Review now' })).toBeDisabled();
+    await answer(page, 'Naming the trigger early made the call easier.');
+    await expect(page.getByRole('button', { name: 'Review now' })).toBeEnabled({ timeout: 20_000 });
     await page.getByRole('button', { name: 'Review now' }).click();
     await expect.poll(async () => (await now()).reviewState?.status).toBe('reviewing');
     await noOverflow(page);

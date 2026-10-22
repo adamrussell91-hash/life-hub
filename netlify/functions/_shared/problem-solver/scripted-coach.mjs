@@ -5,7 +5,6 @@ import { petalsOf } from '../../../../packages/problem-solver/tools/lotus-blosso
 import { CHOICE_SLOT } from '../../../../packages/problem-solver/tools/choice.mjs';
 import { matrixTotals, options } from '../../../../packages/problem-solver/tools/decision-matrix.mjs';
 import { attributesOf, contradictionPairs, subjectsOf } from '../../../../packages/problem-solver/tools/morphological.mjs';
-import { KANBAN_COLUMNS } from '../../../../packages/problem-solver/tools/kanban.mjs';
 import { QUADRANTS } from '../../../../packages/problem-solver/tools/swot.mjs';
 import { longestEarlier } from '../../../../packages/problem-solver/tools/after-action-review.mjs';
 import { TOOLS } from '../../../../packages/problem-solver/tools/index.mjs';
@@ -14,10 +13,15 @@ import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { applyStep, currentEntry, isQuestion, LIGHTNING_NODES } from '../../../../packages/problem-solver/lightning.mjs';
 import * as quickFlow from '../../../../packages/decision-book/quick.mjs';
+import * as startFlow from '../../../../packages/get-things-done/quick.mjs';
 import { FEEDBACK_ID, RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { basisCandidates } from '../../../../packages/decision-book/record.mjs';
 import { isRecordDate } from '../../../../packages/decision-book/tools/record.mjs';
 import { anotherAngle } from './knowledge/decision-book.mjs';
+import { OBSTACLES, anotherAngle as gearAngle } from './knowledge/get-things-done.mjs';
+import { CATALOGUE as GEAR_CATALOGUE, SECTIONS as GEAR_SECTIONS } from '../../../../packages/get-things-done/catalogue.mjs';
+import { COMMIT_ID, EXPERIMENT_REVIEW_ID } from '../../../../packages/get-things-done/commit-slots.mjs';
+import { REVIEW_TOOL as GEAR_REVIEW_TOOL } from '../../../../packages/get-things-done/model.mjs';
 import { validateCoachTurn } from './coach-schema.mjs';
 import { activeRun, currentStep, followOn, reopenProblem, skippedUntouched, waitingForReview } from './session.mjs';
 
@@ -51,6 +55,12 @@ const DECISION_FRAME = [
   ['decision', 'What are you deciding, or trying to see clearly? Put it in one sentence.'],
   ['compass', 'Clear. Who is this about, you or other people, and do you want to understand it or to improve it?'],
   ['known', 'Good. What do you already know: the options, the facts, the deadline and what is at stake?']
+];
+
+const SHIFT_FRAME = [
+  ['need', 'What needs to move? Put it in one sentence.'],
+  ['route', 'Clear. Where is it stuck: before you start, while doing it, with other people, in changing course, or after it is done?'],
+  ['known', 'Good. What do you already know: the deadline, the people, what you have tried and what is at stake?']
 ];
 
 /**
@@ -156,8 +166,9 @@ function placement(run, answer) {
     const text = hint[2].trim();
     const slot = open.find((s) => parseSlot(s)?.name === name);
     if (slot) return { slot, text, tag: null };
+    // A Kanban column names the next card's tag: the tool's own columns (a variant may drop Review).
     const card = open.find((s) => parseSlot(s)?.name === 'card');
-    if (run.tool === 'kanban' && card && KANBAN_COLUMNS.includes(name)) return { slot: card, text, tag: name };
+    if (card && TOOLS[run.tool].nodeTags?.card?.includes(name)) return { slot: card, text, tag: name };
   }
   if (open.includes(CHOICE_SLOT)) return { slot: CHOICE_SLOT, text: answer, tag: null };
   // The decision record moves on in order: a further reason needs its hint.
@@ -222,6 +233,45 @@ function heardCompass(text) {
   const who = /\b(team|others?|they|them|staff|people|partner|colleagues?|my (son|daughter|kids|class))\b/i.test(text) ? 'others' : 'self';
   const aim = /\b(improve|better|change|fix|grow|lead|develop)\b/i.test(text) ? 'improve' : 'understand';
   return `${who}_${aim}`;
+}
+
+/** The route station the scripted coach hears in an answer; doing it, when nothing else is named. */
+function heardRoute(text) {
+  if (/\b(finished|done with|afterwards|look back|review|wrapped up)\b/i.test(text)) return 'after';
+  if (/\b(team|others?|they|them|people|colleagues?|partner|staff)\b/i.test(text)) return 'others';
+  if (/\b(change|differently|direction|pivot|new way)\b/i.test(text)) return 'differently';
+  if (/\b(before|plan|planning|prepare|haven.t started|start)\b/i.test(text)) return 'before';
+  return 'doing';
+}
+
+/** Gear Shifter framing: the opening message is the need; then the route, then what is known. */
+function shiftFrameTurn(session, last) {
+  const missing = SHIFT_FRAME.filter(([key]) => !session.frame[key]);
+  const [key] = missing[0];
+  const frame = { [key]: key === 'route' ? heardRoute(last) : last };
+  if (missing.length > 1) return { ...base, verdict: 'accept', frame, message: missing[1][1], skillsSeen: ['critical_thinking'] };
+  const pick = discern({ ...session.frame, ...frame });
+  if (!pick) return { ...base, verdict: 'accept', frame, message: 'That frames it. Pick a technique from the shelf when you are ready.', skillsSeen: ['decision_making'] };
+  return asCoachReply({
+    verdict: 'accept',
+    frame,
+    message: `That frames it. The obstacle looks like ${pick.obstacle.name}. I suggest ${TOOLS[pick.tool].name} as a first technique for it. Shall we begin?`,
+    suggestion: { kind: 'next_technique', tool: pick.tool, reason: `A first technique for ${pick.obstacle.name}.` },
+    skillsSeen: ['decision_making']
+  });
+}
+
+/**
+ * The scripted coach's discernment: the obstacle the route's first station leads with (else
+ * the first that visits it), and that obstacle's first technique in the station's section.
+ */
+function discern(frame) {
+  const station = String(frame.route ?? 'doing').split('+')[0];
+  const obstacle = OBSTACLES.find((o) => o.stations[0] === station) ?? OBSTACLES.find((o) => o.stations.includes(station));
+  const section = GEAR_SECTIONS.find((s) => s.route === station)?.key;
+  const tool = GEAR_CATALOGUE.find((e) => e.section === section && obstacle?.look.includes(e.id) && TOOLS[e.id])?.id
+    ?? toolsForPlanStep('gear_shifter', 'explore')[0];
+  return obstacle && tool ? { obstacle, tool } : null;
 }
 
 /** Decision framing: the opening message is the decision; then the compass, then what is known. */
@@ -291,6 +341,49 @@ function decisionTurn(session, last, run) {
   if (wordCount(text) < 6) return null;
   if (name === 'reason') {
     return { ...base, verdict: 'accept', node: { slot, text }, basis: restsOn(session), skillsSeen: ['decision_making'], message: 'That reason rests on what the model showed. Now, what would make you rethink: what would you notice?' };
+  }
+  return null;
+}
+
+/**
+ * A shift session's own turns, or null to fall through to the shared ones: discerning a
+ * technique, another angle, Commit, the experiment's basis and check-back, and Review.
+ */
+function shiftTurn(session, last, run) {
+  if (!run && waitingForReview(session)) return { ...base, verdict: 'clarify', message: `Review picks up on ${dueText(session)}. Press Review now if the results are already in.` };
+  if (!run && session.reviewState?.status === 'reviewing' && session.phase === 'review') {
+    const finished = /\b(finished|shipped|wrapped up|completed?)\b/i.test(last) || String(session.frame.route ?? '').split('+').includes('after');
+    return finished
+      ? asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_technique', tool: GEAR_REVIEW_TOOL, reason: 'The project is finished: evaluate it as a whole.' }, message: 'The project is finished, so let us evaluate it as a whole: fun, money and impact. Start Project Evaluation when you are ready.' })
+      : asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_technique', tool: EXPERIMENT_REVIEW_ID, reason: 'See what the experiment changed.' }, message: 'The results are in. The experiment review asks what changed, what it cost and what to keep; start it when you are ready. If the project is finished, say so.' });
+  }
+  if (!run && session.phase === 'explore') {
+    const pick = discern(session.frame);
+    if (!pick) return null;
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_technique', tool: pick.tool, reason: `A first technique for ${pick.obstacle.name}.` }, message: `Pick a technique from the shelf, or start with ${TOOLS[pick.tool].name}: it fits ${pick.obstacle.name}.` });
+  }
+  if (!run) return null;
+  if (/^another angle\b/i.test(last.trim()) && session.phase === 'explore') {
+    if (!followOn(session)) return { ...base, verdict: 'clarify', message: 'Finish this technique first: it is not at its minimum yet. What goes next on the chart?' };
+    const used = (currentStep(session)?.runs ?? []).map((item) => item.tool);
+    const { book, ours } = gearAngle(run.tool, used);
+    const tool = book[0] ?? ours[0];
+    if (!tool) return { ...base, verdict: 'clarify', suggestion: { kind: 'next_step', reason: 'No other angle is listed; set the experiment.' }, message: 'There is no other angle listed for this one. Shall we turn it into an experiment?' };
+    return asCoachReply({ verdict: 'clarify', suggestion: { kind: 'next_technique', tool, reason: `Another angle on the same work: ${TOOLS[tool].name}.` }, message: `Another angle would help: ${TOOLS[tool].name} looks at it from a different side. Start it when you are ready.` });
+  }
+  if (/^commit\b/i.test(last.trim()) && session.phase === 'explore') {
+    return { ...base, verdict: 'clarify', suggestion: { kind: 'next_step', reason: 'The technique has done its work.' }, message: 'Then let us turn it into one small experiment. Move on to Commit when you are ready.' };
+  }
+  if (run.tool !== COMMIT_ID) return null;
+  const { slot, text } = placement(run, last);
+  const name = parseSlot(slot)?.name;
+  if (name === 'check_back') {
+    const date = /\d{4}-\d{2}-\d{2}/.exec(text)?.[0];
+    if (!isRecordDate(date)) return { ...base, verdict: 'clarify', message: 'Give the check-back a date, written like 2026-11-05. When will you look at how it went?' };
+    return { ...base, verdict: 'accept', node: { slot, text: date }, skillsSeen: ['metacognition'], message: 'Check-back set for that date; confirm it on the card. Last: what would tell you to change course?' };
+  }
+  if (name === 'rests_on' && wordCount(text) >= 6) {
+    return { ...base, verdict: 'accept', node: { slot, text }, basis: restsOn(session), skillsSeen: ['decision_making'], message: 'That rests on what the technique showed. What is the next action, small enough to start today?' };
   }
   return null;
 }
@@ -399,6 +492,57 @@ function quickTurn(session, last) {
   return accept({ node: entry.node, note: last.trim() }, entry.node === 'learn' ? ['metacognition'] : ['decision_making']);
 }
 
+/**
+ * A Quick start walked by rule. The first action, the cue and the closing boxes take a few words;
+ * how it starts takes "countdown" or "interval"; the check-back takes a date (YYYY-MM-DD) or a
+ * few words. `go deeper` (or `escalate`) suggests a full session.
+ */
+const START_ASKS = {
+  action: 'What is the first small, safe action: something you could start today that does no harm if it goes nowhere?',
+  how: 'How will it start: a countdown cue, or one protected interval? Say countdown or interval, or pick one on the chart.',
+  countdown: 'What is the cue: the moment you count down from five and move?',
+  interval: 'When is the interval, and how long: one block with a start and an end?',
+  check: 'When will you check back? Give a date like 2026-11-05, or say when.',
+  happened: 'Go and try it. When you are back: what happened?',
+  next: 'What next?'
+};
+
+function startMessage(state, before = '') {
+  const entry = startFlow.currentEntry(state);
+  if (!entry) return `${before}That one is moving. Press It came back if it stalls again.`;
+  const ask = entry.node === 'cue' ? START_ASKS[startFlow.wayOf(state) ?? 'countdown'] : START_ASKS[entry.node];
+  return `${before}${ask}`;
+}
+
+function startTurn(session, last) {
+  const state = session.start;
+  const entry = startFlow.currentEntry(state);
+  const turn = (verdict, message, quick = null, extra = {}) => ({ ...base, verdict, message, quick, ...extra });
+  if (!entry) return turn('clarify', 'That one is moving. Say "it came back" if it stalls again.');
+  if (session.turns.length === 1 || last === 'It came back.') return turn('clarify', startMessage(state));
+  if (/^(escalate|go deeper)$/i.test(last.trim())) {
+    return turn('clarify', 'This sounds bigger than one stalled task. A full session may suit it better.', null, { suggestion: { kind: 'escalate', reason: 'Named as needing a full session.' } });
+  }
+  const accept = (step, skills = ['decision_making']) => turn('accept', startMessage(startFlow.applyStep(state, step, session.updatedAt)), step, { skillsSeen: skills });
+  const kind = startFlow.START_NODES[entry.node].kind;
+  if (kind === 'choice') {
+    const way = /\b(count ?down|countdown cue|five|5)\b/i.test(last) ? 'countdown' : /\b(interval|block|minutes?|hours?|pomodoro)\b/i.test(last) ? 'interval' : null;
+    if (!way) return turn('clarify', START_ASKS.how);
+    return accept({ node: 'how', answer: way });
+  }
+  // A way picked on the chart has already moved the run on.
+  const picked = Object.values(startFlow.START_WAYS).some((w) => last === `${w.label}.`);
+  if (picked && state.path.at(-2)?.node === 'how') return turn('clarify', startMessage(state, 'Noted. '));
+  if (kind === 'check') {
+    const date = /\b(\d{4}-\d{2}-\d{2})\b/.exec(last)?.[1];
+    if (date && startFlow.isCheckDate(date)) return accept({ node: 'check', note: date }, ['metacognition']);
+    if (wordCount(last) < 2) return turn('clarify', START_ASKS.check);
+    return accept({ node: 'check', note: last.trim() }, ['metacognition']);
+  }
+  if (wordCount(last) < 2) return turn('clarify', 'Say a little more about that.');
+  return accept({ node: entry.node, note: last.trim() }, entry.node === 'happened' ? ['reflective_thinking'] : ['decision_making']);
+}
+
 export async function scriptedCoach(session) {
   if (session.kind === 'lightning') {
     const turn = session.turns.at(-1);
@@ -408,6 +552,10 @@ export async function scriptedCoach(session) {
     const turn = session.turns.at(-1);
     return quickTurn(session, turn?.role === 'user' ? turn.text : '');
   }
+  if (session.kind === 'start') {
+    const turn = session.turns.at(-1);
+    return startTurn(session, turn?.role === 'user' ? turn.text : '');
+  }
   const latest = session.turns.at(-1);
   const last = latest?.role === 'user' ? latest.text : '';
   if (session.runner?.mode === 'boundary') {
@@ -416,12 +564,12 @@ export async function scriptedCoach(session) {
       const then = session.phase === 'finished' ? 'The whole problem is on the record now.' : 'Tell me what you notice here; the first tool for this step is ready below.';
       return { ...base, verdict: 'clarify', message: `Fair enough, nothing was done in that step, so there is nothing to look back on. ${then}` };
     }
-    const how = session.kind === 'decision' ? 'decide' : 'tend to work through problems';
+    const how = session.kind === 'decision' ? 'decide' : session.kind === 'shift' ? 'get things done' : 'tend to work through problems';
     return { ...base, verdict: 'clarify', message: `Fair enough, that step is behind us now. Before we go on: what did you learn about how you ${how} in that step?` };
   }
   if (session.pendingLearning) {
     if (waitingForReview(session)) {
-      const step = session.kind === 'decision' ? 'Review' : 'Improve';
+      const step = session.kind === 'decision' || session.kind === 'shift' ? 'Review' : 'Improve';
       return { ...base, verdict: 'clarify', learning: last || null, message: `Thank you, that is worth keeping. ${step} picks up at your review on ${dueText(session)}.` };
     }
     const hasTool = session.phase !== 'finished' && session.model && defaultToolFor(session.model.id, session.phase);
@@ -437,6 +585,7 @@ export async function scriptedCoach(session) {
   }
   if (session.phase === 'frame') {
     if (session.kind === 'decision') return decisionFrameTurn(session, last || session.turns[0].text);
+    if (session.kind === 'shift') return shiftFrameTurn(session, last || session.turns[0].text);
     if (session.turns.length === 1) {
       // Escalated from Lightning: the carried seeds come first, for the person to confirm or change.
       const seeds = session.frameSeeds;
@@ -460,6 +609,10 @@ export async function scriptedCoach(session) {
     const own = decisionTurn(session, last, run);
     if (own) return own;
   }
+  if (session.kind === 'shift') {
+    const own = shiftTurn(session, last, run);
+    if (own) return own;
+  }
   if (!run && waitingForReview(session)) {
     return { ...base, verdict: 'clarify', message: `Improve picks up at your review on ${dueText(session)}. Until then, tell me anything you notice.` };
   }
@@ -474,7 +627,8 @@ export async function scriptedCoach(session) {
   if (!last) {
     const first = TOOLS[run.tool].steps[0];
     const chosen = TOOLS[run.tool].step === 'implement' ? chosenOption(session) : null;
-    const carry = chosen ? `We are carrying forward: ${chosen.title}. ` : run.tool === 'after_action_review' || (run.tool === FEEDBACK_ID && session.reviewState?.status === 'reviewing') ? reviewOpening(session) : '';
+    const reviewing = session.reviewState?.status === 'reviewing';
+    const carry = chosen ? `We are carrying forward: ${chosen.title}. ` : run.tool === 'after_action_review' || (reviewing && [FEEDBACK_ID, EXPERIMENT_REVIEW_ID, GEAR_REVIEW_TOOL].includes(run.tool)) ? reviewOpening(session) : '';
     return { ...base, verdict: 'clarify', message: `${carry}Let's start the ${TOOLS[run.tool].name}. ${first.title}: ${first.prompt}` };
   }
   if (/^link:/i.test(last)) {
@@ -517,7 +671,7 @@ export async function scriptedCoach(session) {
     return { ...base, verdict: 'challenge', ...fillNode(run, slot, text, tag), proposeTasks: [], skillsMissing: ['reflective_thinking'], message: `Learning is the heart of the review, yet this is shorter than what you said about what happened. Tell me more: what will you keep, change or try next time, and why?` };
   }
   const message = slot === CHOICE_SLOT ? choiceMessage(run)
-    : session.kind === 'decision' ? 'That holds up, and it is on the chart. What goes next: what else belongs here?'
+    : session.kind === 'decision' || session.kind === 'shift' ? 'That holds up, and it is on the chart. What goes next: what else belongs here?'
       : 'That holds up: it names a process, not a person. Now, why does that happen? Base your answer on what you just said.';
   return { ...base, verdict: 'accept', ...fillNode(run, slot, text, tag), skillsSeen: ['analysis'], message };
 }
