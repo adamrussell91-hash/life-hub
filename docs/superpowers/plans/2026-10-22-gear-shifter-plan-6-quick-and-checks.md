@@ -1,6 +1,6 @@
 # Gear Shifter Plan 6: Quick Start and Checks
 
-> Tasks 1 to 8 run in order. Each is test-first, leaves every suite green and ends with one commit. Task 8 runs the gate, marks PR #1047 ready and turns on auto-merge.
+> Tasks 1 to 8 ran in order, then Tasks 9 and 10 (Adam's two decisions, see As run). Each is test-first, leaves every suite green and ends with one commit. Task 8 runs the gate, marks PR #1047 ready and turns on auto-merge.
 
 **Goal:** Gear Shifter gets its quick route, its checks and its PR. After this plan:
 
@@ -142,9 +142,7 @@ Selectors from Plan 5's walk: `Describe what needs to move`, `Your answer`, `.ps
 - As run here; the plan set's table reads Plan 6 Done.
 - Push; PR #1047's description covers the whole build; mark it ready; enable auto-merge (merge commit).
 
-**Questions for Adam** (not decided here):
-1. The shared engine takes Review now while the learning question is pending: the reply is read as the learning answer and Review opens with no tool. Decision Maker does the same. Should Review now wait for the answer (or ask it after)?
-2. Should Problem Solver's and Decision Maker's skills ribbons take Gear Shifter's share too (one line each)?
+**Adam's two decisions** (22 Oct, after the plan was written; see As run) became Tasks 9 and 10: Review now waits for the learning question, and all three skills ribbons show all three tools.
 
 ---
 
@@ -177,7 +175,9 @@ Selectors from Plan 5's walk: `Describe what needs to move`, `Your answer`, `.ps
 
 12/12 after the fix. The stand-in tended to open with a skill compliment ("which shows analysis") on discernment; that is the shared voice's skill-naming rule, not flattery, and the judge does not count it.
 
-### Questions for Adam
+### Adam's two decisions (22 Oct), built as Tasks 9 and 10
 
-1. **Review now while the learning question is pending.** The shared engine takes Review now and reads the next reply as the learning answer, so Review opens with no tool. Decision Maker does the same. The walks answer the question first. Should Review now wait for the answer, or ask it after?
-2. **The other ribbons.** Gear Shifter's landing splits the skills ribbon three ways; Problem Solver's and Decision Maker's still split two ways. Should they take Gear Shifter's share (one line each)?
+Plan 5 left two questions for Adam. He left the call to the Plan 5 session ("whatever you think is best"), which decided both and sent them here; each was built test-first with its own commit.
+
+- **Task 9: Review now waits for the learning question.** While `pendingLearning` is set, `start_review` refuses with a 409 ("Answer the coach’s question first, then start the review.") and the review panel holds Review now with that note. It is in the shared engine and panel, so it also fixes Decision Maker's identical bug. Tests: `tests/unit/review-waits-for-learning.test.js` (2) and a panel test in `problem-solver-review-panel.test.ts`; Problem Solver's and Decision Maker's tests pass unedited. Gear Shifter's walk now checks the held button and its note before answering.
+- **Task 10: all three skills ribbons show all three tools.** Problem Solver's and Decision Maker's landings give Gear Shifter its share with the ribbon's list form, each extra list failing soft, and say "One tally across all three tools." Each page keeps its own colour; Gear Shifter's share is drawn in its ink on Problem Solver's page and its cobalt on Decision Maker's. Tests: `apps/tasks/tests/unit/skills-ribbon-three-ways.test.ts` (3). No existing ribbon test changed: the one asserting a two-tool legend calls the component directly, which is unchanged.
