@@ -1,7 +1,8 @@
 // scripts/import-gear-shifter-glyphs.mjs
 // Copies the Get Things Done book pack's graphics into packages/get-things-done/glyphs/: one
-// emblem per catalogue entry that has its own (the Kanban and 5 Whys variants use Problem
-// Solver's), the five section emblems and the book identity. The artwork was drawn for this
+// emblem per catalogue entry that has its own, the five section emblems and the book identity.
+// The Kanban and 5 Whys variants have none in the pack; theirs (gt_kanban.svg, gt_five_whys.svg)
+// were drawn for Gear Shifter in the same style, and this script leaves them alone. The artwork was drawn for this
 // project, so it may be committed; the pack's page text and figures never are.
 // Usage: node scripts/import-gear-shifter-glyphs.mjs ~/Projects/life-hub-data/book-packs/get-things-done
 import { mkdir, readFile, writeFile } from 'node:fs/promises';

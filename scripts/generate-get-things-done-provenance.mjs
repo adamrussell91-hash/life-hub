@@ -2,8 +2,7 @@
 // scripts/generate-get-things-done-provenance.mjs
 // The provenance graphics a Gear Shifter action record's image block shows: for every catalogue
 // technique, its emblem on a paper disc inside a cobalt ring, with its section's emblem as a
-// badge at the lower right. The Kanban and 5 Whys variants have no emblem of their own, so they
-// show the book's. Written to the Tasks build's static files
+// badge at the lower right. An entry without an emblem would show the book's. Written to the Tasks build's static files
 // (apps/tasks/public/get-things-done/provenance/<id>.svg), so a page keeps a stable address for
 // them. Run after changing an emblem; a unit test fails if they drift.
 //   node scripts/generate-get-things-done-provenance.mjs          write the files

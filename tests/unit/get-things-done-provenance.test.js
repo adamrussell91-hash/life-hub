@@ -1,7 +1,7 @@
 // tests/unit/get-things-done-provenance.test.js
 // The provenance graphics an action record shows: one per catalogue technique (its emblem inside
-// a cobalt ring with its section's emblem as a badge; the Kanban and 5 Whys variants, which have
-// no emblem of their own, show the book's), in Gear Shifter's palette, kept in step with the generator.
+// a cobalt ring with its section's emblem as a badge), in Gear Shifter's palette, kept in step
+// with the generator.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
