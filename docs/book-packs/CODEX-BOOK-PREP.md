@@ -17,6 +17,7 @@ and `scripts/book-pack/check.mjs` proves the result before Claude starts.
 > project. Read `docs/book-packs/CODEX-BOOK-PREP.md` in the life-hub repo and follow it exactly.
 >
 > - Book PDF: `<path to PDF>`
+> - Cover image: `<path to the largest cover image you have>`
 > - Pack slug: `<short-kebab-name>` (for example `get-things-done`)
 > - Id prefix: `<two letters>` (for example `gt`; never `dm` or `ps`)
 > - Life Hub repo, read only: `~/Projects/life-hub`
@@ -224,6 +225,124 @@ One page that answers:
 Questions for Adam, each with your recommended answer. Ask only what changes the build, such
 as scope, overlaps, cuts and placement.
 
+### 8. Graphics library: `graphics/`
+
+You will be given the book's cover. Every graphic in the library is built from the cover's
+visual language. This is the step most likely to be rushed, so it has the most rules. **A
+library of generic icons in the right colours fails.** Each mark must be a deliberate piece
+of design that says something true about its entry.
+
+**Do not draw charts.** Claude's renderers draw every chart from `structure`. The library is
+only the identity, the section emblems and one emblem per entry.
+
+#### 8a. Write the language first: `graphics/LANGUAGE.md`
+
+Before drawing anything, study the cover and write down its rules, with numbers:
+
+- **Motifs.** List every motif on the cover and what each stands for. On *The Get Things Done
+  Book*, these are:
+  - a red gear inside two blue circular arrows (the process, the cycle);
+  - a blue and red target with a dark dart (the goal, the finish);
+  - a dotted vertical line between them.
+
+  The emblems are built from these, the way Decision Maker's are built from its cover's red
+  disc, green disc, arrows and dotted line.
+- **Geometry.** Stroke widths (a fixed set of two or three, in viewBox units), line caps and
+  joins, the arrowhead shape (copy the cover's chunky triangular heads, with angle and size),
+  gear tooth count and shape, ring proportions, dot spacing on dotted lines, and corner radii.
+- **Grid.** Model emblems use `viewBox="0 0 140 140"` with a 20-unit safe margin. Section
+  emblems use `0 0 240 240`. Say how marks sit on the grid.
+- **Colour use.** Use at most three palette colours per emblem, plus paper as negative space.
+  Say which colour means what (for example, blue for process and red for the target or action).
+- **Distinctness.** Say how 40 emblems will stay distinguishable: each one shows its entry's
+  structure (Pomodoro is four blocks with breaks; Kanban is columns; the 5 Whys is a chain
+  drilling down), drawn in the cover's motifs.
+
+#### 8b. Palette: `graphics/palette.json`
+
+Sample the colours from the cover image you are given. In a small screenshot they read
+roughly as: paper `#fefef7`, ink near-black, blue around `#4572a3`, red around `#d24c3a`,
+and a dark slate dart. Sample from the best image you have and record the exact values.
+
+Then propose a **screen** version. Decision Maker brightened its print colours at Adam's
+request. Give both versions, and say which you recommend and why.
+
+```json
+{
+  "print":  { "paper": "#…", "ink": "#…", "blue": "#…", "red": "#…", "slate": "#…" },
+  "screen": { "paper": "#…", "ink": "#…", "blue": "#…", "red": "#…", "slate": "#…" },
+  "tints":  { "blue_tint": "#…", "red_tint": "#…", "soft": "#…", "line": "#…" },
+  "labels": { "red_label": "#… (a red that holds 4.5:1 for small text, if the main red does not)" },
+  "strokes": [6, 9],
+  "recommend": "screen",
+  "why": "…"
+}
+```
+
+Colour names are lower snake case and may differ by book. The checker computes contrast in
+both `print` and `screen`:
+
+- ink on paper must reach at least 7:1;
+- each other main colour must reach at least 3:1 against paper (big shapes);
+- each `labels` colour must reach at least 4.5:1 against paper or ink.
+
+#### 8c. The files
+
+```text
+graphics/
+  LANGUAGE.md
+  palette.json
+  graphics.json              manifest: one record per SVG
+  identity/book-emblem.svg   the cover pair as one mark (viewBox 0 0 140 140)
+  identity/book-emblem-mono.svg
+  identity/wordmark.svg
+  sections/<section_key>.svg one per section in book.json (viewBox 0 0 240 240)
+  models/<entry_id>.svg      one per kept entry that does not reuse a tool (viewBox 0 0 140 140)
+  contact-sheet.html         every SVG at 140, 48 and 24 px, on paper and on ink
+  contact-sheet.png          a screenshot of that page
+  critique.md                your review rounds
+```
+
+`graphics.json` entry:
+
+```json
+{ "file": "models/gt_pomodoro.svg", "for": "gt_pomodoro", "title": "The Pomodoro Technique",
+  "concept": "Four blocks inside the cover's cycle arrows: work, pause, repeat.",
+  "motifs": ["cycle_arrows", "blocks"] }
+```
+
+#### 8d. SVG rules (the checker enforces these)
+
+- Write the SVG by hand, so the coordinates mean something. Use integers or one decimal
+  place, and no editor metadata, `matrix()` transforms or converter output.
+- Start every file with `<title>` matching its `graphics.json` title. `role="img"` goes on
+  the root.
+- Use only `svg`, `title`, `g`, `path`, `circle`, `ellipse`, `rect`, `line`, `polyline` and
+  `polygon`. Do not use `text`, `image`, `style`, `script`, `foreignObject`, gradients,
+  filters, masks or `use`.
+- Every `fill` and `stroke` is a palette hex (any of its sets), `none` or `currentColor`.
+- Every `stroke-width` comes from `palette.json`'s `strokes`.
+- Size limits: models at most 3 KB, sections and identity at most 6 KB.
+- No two emblems may be identical, and none may be a copy of a common icon set (Material,
+  Lucide, Font Awesome, emoji).
+
+#### 8e. Look at your own work: `critique.md`
+
+1. Build `contact-sheet.html` and screenshot it to `contact-sheet.png`. Use headless Chrome,
+   or `npx playwright screenshot`.
+2. **Open the PNG and look at it.** For every emblem, write a line in `critique.md` that
+   answers these questions:
+   - Does it read at 24 px?
+   - Can it be told apart from its neighbours?
+   - Is it clearly from this cover?
+   - Does it show its entry's structure?
+   - Does any stroke clip at the edge?
+3. Fix what fails and repeat. Do at least **two** rounds, each headed `## Round N` with
+   what you changed.
+
+The checker fails the pack if `contact-sheet.png` is older than any SVG, so the sheet must
+be rebuilt after the last change.
+
 ---
 
 ## Pack layout
@@ -238,6 +357,7 @@ book-packs/<slug>/
   overlap.md
   process.md
   questions.md
+  graphics/         palette, language, emblems, contact sheet, critique (step 8)
 ```
 
 ## The checker
@@ -266,6 +386,12 @@ The checker covers:
   - `seeAlso` and `pairsWell` resolve and do not repeat each other
 - **Figures:** they point at real entries.
 - **Copying:** no coaching field shares 8 or more words in a row with the page text.
+- **Graphics:**
+  - one emblem for every section and every kept entry, plus the three identity files
+  - viewBox, title, allowed elements, palette colours, stroke widths and file size
+  - no duplicate emblems
+  - palette contrast
+  - two critique rounds, and a contact sheet newer than every SVG
 
 It prints errors, which must be fixed, and warnings, which must be read. It ends with a count
 of `unsure` facts. The pack is done when the checker exits 0.
