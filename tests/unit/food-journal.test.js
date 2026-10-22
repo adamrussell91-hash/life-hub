@@ -1364,3 +1364,39 @@ test("schema accepts dish ingredients, English text and a Brisket link, and reje
     assert.throws(() => validateFoodJournal(copy), message);
   }
 });
+
+test("a dish from the photo read takes the ingredients of the menu item with its name", () => {
+  const v = newVisit();
+  const draft = {
+    title: "",
+    venue: { name: "", address: "" },
+    menu_text: "",
+    menu_items: [
+      {
+        name: "Fish tacos",
+        description: "Battered snapper, slaw, lime",
+        price: "$19",
+        kind: "dish",
+      },
+    ],
+    dishes: [
+      {
+        title: "Fish tacos",
+        cuisine: "Mexican",
+        meal_type: "Lunch",
+        tags: [],
+        notes: "Two tacos on a tray",
+        photo_ids: [],
+      },
+    ],
+  };
+  const next = mergeCapture(v, draft);
+  assert.equal(next.dishes[0].ingredients, "Battered snapper, slaw, lime");
+  assert.equal(next.dishes[0].notes, "Two tacos on a tray");
+  // Ingredients Adam already has are kept.
+  next.dishes[0].ingredients = "Snapper, cabbage";
+  assert.equal(
+    mergeCapture(next, draft).dishes[0].ingredients,
+    "Snapper, cabbage",
+  );
+});
