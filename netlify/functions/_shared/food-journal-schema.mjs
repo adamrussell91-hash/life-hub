@@ -23,6 +23,28 @@ function unique(rows) {
     seen.add(r.id);
   }
 }
+const MEAL_PATH = /^data\/nutrition\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/;
+function optionalText(value, label, max) {
+  if (value != null) text(value, label, max);
+}
+function brisketLink(b) {
+  if (b == null) return;
+  if (typeof b !== "object" || Array.isArray(b)) bad("Brisket link is invalid.");
+  if (typeof b.meal_path !== "string" || !MEAL_PATH.test(b.meal_path))
+    bad("Brisket link is invalid.");
+  text(b.portion, "Brisket portion", 40);
+  if (
+    typeof b.portion_fraction !== "number" ||
+    !(b.portion_fraction > 0 && b.portion_fraction <= 1)
+  )
+    bad("Brisket portion is invalid.");
+  if (typeof b.counted_at !== "string" || Number.isNaN(Date.parse(b.counted_at)))
+    bad("Brisket link is invalid.");
+  if (typeof b.needs_recount !== "boolean") bad("Brisket link is invalid.");
+  // The numbers Brisket confirmed, so a re-count can show old → new.
+  for (const k of ["calories", "protein_g", "fat_g"])
+    if (b[k] != null && (!Number.isFinite(b[k]) || b[k] < 0)) bad("Brisket numbers are invalid.");
+}
 export function validateFoodJournal(j) {
   if (
     !j ||
@@ -43,6 +65,7 @@ export function validateFoodJournal(j) {
     if (v.source_id != null) text(v.source_id, "Source identifier", 200);
     text(v.notes, "Notes");
     text(v.menu_text, "Menu", 100000);
+    optionalText(v.menu_text_en, "Menu", 100000);
     if (v.menu_items != null) {
       if (!Array.isArray(v.menu_items) || v.menu_items.length > 200)
         bad("Menu items are invalid.");
@@ -51,6 +74,8 @@ export function validateFoodJournal(j) {
         text(item.name, "Menu item", 200);
         text(item.description, "Menu item description", 1000);
         text(item.price, "Menu item price", 40);
+        optionalText(item.name_en, "Menu item", 200);
+        optionalText(item.description_en, "Menu item description", 1000);
         if (item.kind != null && !["dish", "extra"].includes(item.kind))
           bad("Menu items are invalid.");
       }
@@ -110,6 +135,11 @@ export function validateFoodJournal(j) {
       text(d.cuisine, "Cuisine", 100);
       text(d.meal_type, "Meal type", 30);
       text(d.notes, "Dish notes");
+      optionalText(d.title_en, "Dish title", 200);
+      optionalText(d.notes_en, "Dish notes", 20000);
+      optionalText(d.ingredients, "Ingredients", 2000);
+      optionalText(d.ingredients_original, "Ingredients", 2000);
+      brisketLink(d.brisket);
       if (
         ![
           "Breakfast",
