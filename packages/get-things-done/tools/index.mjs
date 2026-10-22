@@ -3,7 +3,9 @@
 // (problem-solver/tools/index.mjs) spreads these in; their step, explore, is not a toolkit
 // step, and Decision Maker's Explore lists only its own catalogue, so neither ever shows them.
 import { DOING_THINGS } from './doing-things.mjs';
+import { BEFORE_DOING } from './before-doing.mjs';
 
 export const GEAR_TOOLS = Object.freeze({
-  ...DOING_THINGS
+  ...DOING_THINGS,
+  ...BEFORE_DOING
 });

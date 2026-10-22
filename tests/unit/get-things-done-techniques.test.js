@@ -10,13 +10,14 @@ import { MODEL_IDS } from '../../packages/problem-solver/models.mjs';
 import { isComplete, newRun, nextSlots, placeNode } from '../../packages/problem-solver/machine.mjs';
 import { workThrough } from '../../packages/decision-book/work-through.mjs';
 import { flowRoute } from '../../packages/decision-book/families/path.mjs';
+import { curveAt } from '../../packages/decision-book/curves.mjs';
 import { sampleNode } from '../../packages/decision-book/fixtures.mjs';
 import { GT_SAMPLE_TOOLS } from '../../packages/get-things-done/fixtures.mjs';
 import { GEAR_TOOLS } from '../../packages/get-things-done/tools/index.mjs';
 import { CATALOGUE, entry } from '../../packages/get-things-done/catalogue.mjs';
 
 /** The sections built so far; each section's task adds its key. */
-const SECTIONS_DONE = ['doing_things'];
+const SECTIONS_DONE = ['doing_things', 'before_doing'];
 const DONE = CATALOGUE.filter((e) => SECTIONS_DONE.includes(e.section));
 const T = GEAR_TOOLS;
 const ids = (list) => list.map((item) => item.id);
@@ -185,4 +186,72 @@ test('Paralysis by Analysis: a lens; change your rhythm and trust your abilities
 
 test('The Book of Books: mark, review each chapter, summarise, store, record', () => {
   assert.deepEqual(labels(T.gt_book_of_books.chart.stages), ['Mark', 'Review chapter', 'Summarise book', 'Store searchable notes', 'Record reading']);
+});
+
+// ---------------------------------------------------------------- What to do before you do anything
+
+test('Getting a Project Done: seven stages, each linked to the techniques the book points to there', () => {
+  const { stages } = T.gt_getting_a_project_done.chart;
+  assert.deepEqual(labels(stages), ['What do you want to do', 'What exactly and why', 'How will you achieve it', 'Start working', 'Restore momentum', 'Prepare the final sprint', 'Look back and ahead']);
+  assert.deepEqual(stages.map((s) => s.tools), [
+    ['gt_bursty_communication', 'gt_brainstorming', 'gt_structured_evaluation'],
+    ['gt_rapid_prototyping', 'gt_five_whys', 'gt_reversed_effort'],
+    ['gt_budgeting', 'gt_small_gifts', 'gt_circle_of_competence'],
+    ['gt_compartmentalisation', 'gt_deep_work'],
+    ['gt_pomodoro', 'gt_five_second_rule', 'gt_transactional_model'],
+    ['gt_kanban', 'gt_circle_of_influence'],
+    ['gt_project_evaluation']
+  ]);
+  assert.deepEqual(stages.flatMap((s) => s.tools).sort(), [...entry('gt_getting_a_project_done').seeAlso].sort());
+});
+
+test('Budgeting: five ways to estimate, two compared before the reflection', () => {
+  const { chart } = T.gt_budgeting;
+  assert.deepEqual(labels(chart.groups), ['A rough guess', 'Top-down estimate', 'Estimate based on experience', 'Approximation', 'Bottom-up estimate']);
+  assert.deepEqual([chart.minEntries, chart.minGroups], [2, 2]);
+});
+
+test('Batching: three routes by how the cost of waiting behaves', () => {
+  const { chart } = T.gt_batching;
+  assert.equal(chart.layout, 'routes');
+  assert.deepEqual(labels(chart.groups), ['Sock: batch', 'Roof tile: act now', 'Dummy: wait']);
+});
+
+test('Delphi: ask separately, anonymise, share, revise, then decide', () => {
+  assert.deepEqual(labels(T.gt_delphi_method.chart.stages), ['Ask separately', 'Anonymise', 'Share assessments', 'Revise judgements', 'Decide']);
+});
+
+test('To-Do List: Ivy Lee priorities or time blocks, up to nine each', () => {
+  const { chart } = T.gt_to_do_list;
+  assert.deepEqual(labels(chart.groups), ['Ivy Lee priorities', 'Time blocks']);
+  assert.equal(chart.perGroup, 9);
+});
+
+test('Motivation: a bell over task difficulty in even thirds; The Matthew Effect folded in', () => {
+  const def = T.gt_motivation;
+  assert.equal(def.tier, 'lens');
+  assert.deepEqual([def.chart.axes.x.label, def.chart.axes.y.label], ['Task difficulty', 'Motivation']);
+  assert.equal(def.chart.lines[0].shape, 'bell');
+  assert.ok(curveAt('bell', 0.5) > curveAt('bell', 0.1) && curveAt('bell', 0.5) > curveAt('bell', 0.9));
+  assert.deepEqual(def.chart.regions.map((r) => [r.label, Number(r.from.toFixed(2)), Number(r.to.toFixed(2))]), [['Too easy', 0, 0.33], ['Challenging and achievable', 0.33, 0.67], ['Overwhelming', 0.67, 1]]);
+  assert.doesNotMatch([...def.chart.regions.map((r) => r.label), def.chart.axes.x.label, def.chart.axes.y.label].join(' '), /\d/);
+  assert.ok(def.steps.some((s) => s.id === 'bank_a_small_win'), 'The Matthew Effect’s step');
+  assert.ok(def.failureModes.some((f) => /win/i.test(f)), 'The Matthew Effect’s watch-for');
+});
+
+test('Deep Work: four habits, checked off', () => {
+  assert.deepEqual(labels(T.gt_deep_work.chart.groups), ['Take your time', 'Learn to be bored', 'Review social media', 'Devise rituals']);
+});
+
+test('Tactics Versus Strategies: tactics across, strategy up; walking the walk has both', () => {
+  const { axes } = T.gt_tactics_versus_strategies.chart;
+  assert.deepEqual([axes.x.label, axes.y.label], ['Tactics', 'Strategy']);
+  assert.deepEqual(cellLabels('gt_tactics_versus_strategies'), { '00': 'Hot air', '10': 'Walking the walk', '01': 'Labyrinth', '11': 'Mindless activity' });
+});
+
+test('Routines: helpful, unhelpful and desired habits, as an experiment with a date to look back', () => {
+  const def = T.gt_routines;
+  assert.deepEqual(labels(def.chart.groups), ['Helpful habits', 'Unhelpful habits', 'Desired habits']);
+  assert.match(def.exercise, /date/);
+  assert.doesNotMatch(coaching(def).join(' '), /\btrack/i);
 });
