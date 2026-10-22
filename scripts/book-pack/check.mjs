@@ -7,7 +7,7 @@
 //
 //   node scripts/book-pack/check.mjs <pack-dir>   check a pack; exit 1 on any error
 //   node scripts/book-pack/check.mjs --tools      list existing tools for reuse matching
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { TOOLS } from '../../packages/problem-solver/tools/index.mjs';
 import { CATALOGUE, FAMILIES } from '../../packages/decision-book/catalogue.mjs';
@@ -233,6 +233,127 @@ for (const figure of figures) {
 }
 
 for (const file of ['overlap.md', 'process.md', 'questions.md']) if (!existsSync(join(dir, file))) err(file, 'missing');
+
+// graphics: the identity, one emblem per section and per kept entry, all from the cover's palette
+const gfx = join(dir, 'graphics');
+const SVG_ELEMENTS = ['svg', 'title', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon'];
+const SVG_RULES = {
+  identity: { box: '0 0 140 140', bytes: 6144 },
+  sections: { box: '0 0 240 240', bytes: 6144 },
+  models: { box: '0 0 140 140', bytes: 3072 }
+};
+
+function luminance(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+const isHex = (value) => /^#[0-9a-f]{6}$/.test(value);
+
+if (!existsSync(gfx)) err('graphics', 'missing graphics/ folder (step 8)');
+else {
+  const palette = readJson(join(gfx, 'palette.json'), 'graphics/palette.json') ?? {};
+  const colours = new Set();
+  for (const set of ['print', 'screen', 'tints', 'labels']) {
+    for (const [name, hex] of Object.entries(palette[set] ?? {})) {
+      if (!isKey(name)) err('graphics/palette.json', `${set}.${name}: colour names are lower snake case`);
+      if (!isHex(hex)) err('graphics/palette.json', `${set}.${name} is a lower-case #rrggbb hex`);
+      else colours.add(hex);
+    }
+  }
+  for (const set of ['print', 'screen']) {
+    const main = palette[set] ?? {};
+    if (!isHex(main.paper) || !isHex(main.ink)) {
+      err('graphics/palette.json', `${set} needs paper and ink`);
+      continue;
+    }
+    const inkRatio = contrast(main.ink, main.paper);
+    if (inkRatio < 7) err('graphics/palette.json', `${set}: ink on paper is ${inkRatio.toFixed(1)}:1, needs 7:1`);
+    for (const [name, hex] of Object.entries(main)) {
+      if (name === 'paper' || name === 'ink' || !isHex(hex)) continue;
+      const ratio = contrast(hex, main.paper);
+      if (ratio < 3) err('graphics/palette.json', `${set}.${name} on paper is ${ratio.toFixed(1)}:1, needs 3:1`);
+    }
+    for (const [name, hex] of Object.entries(palette.labels ?? {})) {
+      if (isHex(hex) && Math.max(contrast(hex, main.paper), contrast(hex, main.ink)) < 4.5) {
+        err('graphics/palette.json', `labels.${name} reaches 4.5:1 against neither ${set} paper nor ink`);
+      }
+    }
+  }
+  if (!['print', 'screen'].includes(palette.recommend) || !sentence(palette.why)) err('graphics/palette.json', 'needs recommend (print or screen) and why');
+  const strokes = palette.strokes;
+  if (!Array.isArray(strokes) || strokes.length < 1 || strokes.length > 4 || !strokes.every((n) => typeof n === 'number' && n > 0)) {
+    err('graphics/palette.json', 'strokes lists one to four stroke widths');
+  }
+
+  if (!existsSync(join(gfx, 'LANGUAGE.md')) || readFileSync(join(gfx, 'LANGUAGE.md'), 'utf8').trim().length < 400) {
+    err('graphics/LANGUAGE.md', 'missing or too thin: write the cover’s rules, with numbers, before drawing');
+  }
+
+  const manifest = readJson(join(gfx, 'graphics.json'), 'graphics/graphics.json') ?? [];
+  const records = new Map(manifest.map((record) => [record.file, record]));
+  const expected = [
+    'identity/book-emblem.svg',
+    'identity/book-emblem-mono.svg',
+    'identity/wordmark.svg',
+    ...[...sections.keys()].map((key) => `sections/${key}.svg`),
+    ...[...entries.values()].filter((entry) => entry.verdict === 'keep' && !entry.reuse).map((entry) => `models/${entry.id}.svg`)
+  ];
+  for (const file of expected) if (!existsSync(join(gfx, file))) err(`graphics/${file}`, 'missing');
+
+  const seen = new Map();
+  let newestSvg = 0;
+  for (const folder of Object.keys(SVG_RULES)) {
+    const folderPath = join(gfx, folder);
+    if (!existsSync(folderPath)) continue;
+    for (const name of readdirSync(folderPath).filter((file) => file.endsWith('.svg'))) {
+      const file = `${folder}/${name}`;
+      const where = `graphics/${file}`;
+      const path = join(gfx, file);
+      const svg = readFileSync(path, 'utf8');
+      newestSvg = Math.max(newestSvg, statSync(path).mtimeMs);
+      const rule = SVG_RULES[folder];
+      if (Buffer.byteLength(svg) > rule.bytes) err(where, `${Buffer.byteLength(svg)} bytes, limit ${rule.bytes}`);
+      if (!new RegExp(`<svg[^>]*viewBox="${rule.box}"`).test(svg)) err(where, `viewBox must be "${rule.box}"`);
+      if (!/<svg[^>]*role="img"/.test(svg)) err(where, 'root needs role="img"');
+      const record = records.get(file);
+      if (!record) err(where, 'not in graphics.json');
+      else {
+        if (!sentence(record.concept)) err(where, 'graphics.json needs a concept: what the mark says about its entry');
+        const title = /<title>([^<]*)<\/title>/.exec(svg)?.[1];
+        if (title !== record.title) err(where, `<title> must be "${record.title}"`);
+      }
+      if (folder === 'models' && !entries.has(name.slice(0, -4))) err(where, 'no entry with this id');
+      for (const [, tag] of svg.matchAll(/<([a-zA-Z][\w:-]*)/g)) if (!SVG_ELEMENTS.includes(tag)) err(where, `<${tag}> is not allowed`);
+      if (/matrix\(/.test(svg)) err(where, 'no matrix() transforms: hand-author the coordinates');
+      if (/\d\.\d{2,}/.test(svg)) warn(where, 'coordinates with 2+ decimals: converter output?');
+      for (const [, attr, value] of svg.matchAll(/\b(fill|stroke)="([^"]*)"/g)) {
+        if (value !== 'none' && value !== 'currentColor' && !colours.has(value.toLowerCase())) err(where, `${attr} ${value} is not in the palette`);
+      }
+      if (/\b(fill|stroke)\s*:/.test(svg)) err(where, 'colours go in attributes, not style');
+      for (const [, width] of svg.matchAll(/stroke-width="([^"]*)"/g)) {
+        if (Array.isArray(strokes) && !strokes.includes(Number(width))) err(where, `stroke-width ${width} is not in palette strokes`);
+      }
+      const body = svg.replace(/<title>[^<]*<\/title>/, '').replace(/\s+/g, ' ');
+      if (seen.has(body)) err(where, `identical to graphics/${seen.get(body)}`);
+      seen.set(body, file);
+    }
+  }
+
+  const sheet = join(gfx, 'contact-sheet.png');
+  if (!existsSync(join(gfx, 'contact-sheet.html'))) err('graphics/contact-sheet.html', 'missing');
+  if (!existsSync(sheet)) err('graphics/contact-sheet.png', 'missing: screenshot the contact sheet and look at it');
+  else if (statSync(sheet).mtimeMs < newestSvg) err('graphics/contact-sheet.png', 'older than an SVG: rebuild the sheet and look again');
+  const critique = existsSync(join(gfx, 'critique.md')) ? readFileSync(join(gfx, 'critique.md'), 'utf8') : '';
+  const rounds = (critique.match(/^## Round \d+/gm) ?? []).length;
+  if (rounds < 2) err('graphics/critique.md', `${rounds} review rounds, needs at least two`);
+  for (const file of expected.filter((f) => f.startsWith('models/'))) {
+    if (critique && !critique.includes(file.slice(7, -4))) warn('graphics/critique.md', `no line about ${file.slice(7, -4)}`);
+  }
+}
 
 // report
 for (const line of warnings) console.log(`warn  ${line}`);
