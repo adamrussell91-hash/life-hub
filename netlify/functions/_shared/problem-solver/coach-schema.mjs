@@ -6,6 +6,7 @@ import { CATALOGUE_IDS } from '../../../../packages/decision-book/catalogue.mjs'
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { LIGHTNING_NODE_IDS } from '../../../../packages/problem-solver/lightning.mjs';
 import { QUICK_NODE_IDS } from '../../../../packages/decision-book/quick.mjs';
+import { START_NODE_IDS, isWay } from '../../../../packages/get-things-done/quick.mjs';
 import { tidyTitle, titleFromText } from '../../../../packages/problem-solver/titles.mjs';
 import { BOOK_FRAME_KEYS } from '../../../../packages/problem-solver/books.mjs';
 
@@ -116,11 +117,12 @@ export function validateCoachTurn(raw) {
     lightning = { node: raw.lightning.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}) };
   }
 
-  // A quick decision's step: Lightning's shape, plus the three tests at the tests box.
+  // A quick decision's step: Lightning's shape, plus the three tests at the tests box. Gear
+  // Shifter's Quick start uses the same field: its boxes, and a way to start at `how`.
   let quick = null;
   if (raw.quick != null) {
-    if (!QUICK_NODE_IDS.includes(raw.quick?.node)) return fail(`Unknown quick decision box: ${raw.quick?.node}`);
-    const answer = ['yes', 'no'].includes(raw.quick.answer) ? raw.quick.answer : null;
+    if (!QUICK_NODE_IDS.includes(raw.quick?.node) && !START_NODE_IDS.includes(raw.quick?.node)) return fail(`Unknown quick decision box: ${raw.quick?.node}`);
+    const answer = ['yes', 'no'].includes(raw.quick.answer) || (raw.quick.node === 'how' && isWay(raw.quick.answer)) ? raw.quick.answer : null;
     const note = text(raw.quick.note);
     const tests = Array.isArray(raw.quick.tests) ? raw.quick.tests.map((item) => text(item, 120)).filter(Boolean).slice(0, 3) : [];
     quick = { node: raw.quick.node, ...(answer ? { answer } : {}), ...(note ? { note } : {}), ...(tests.length ? { tests } : {}) };

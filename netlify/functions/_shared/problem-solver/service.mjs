@@ -6,6 +6,7 @@ import {
 } from './session.mjs';
 import { applyLightningTurn, createLightningSession, escalateLightning, lightningAgain, lightningAnswer } from './lightning-session.mjs';
 import { applyQuickTurn, createQuickSession, escalateQuick, quickAgain, quickAnswer, quickCheck } from './quick-session.mjs';
+import { applyStartTurn, createStartSession, escalateStart, startAgain, startAnswer, startCheck } from './start-session.mjs';
 import { migrateRow, migrateSession } from './migrate.mjs';
 
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -23,7 +24,8 @@ const httpError = (status, code, message) => Object.assign(new Error(message), {
  */
 const FLOWS = {
   lightning: { create: createLightningSession, turn: applyLightningTurn, escalate: (s, id, deps) => { const { full, lightning } = escalateLightning(s, id, deps); return { full, run: lightning }; } },
-  quick: { create: createQuickSession, turn: applyQuickTurn, escalate: (s, id, deps) => { const { full, quick } = escalateQuick(s, id, deps); return { full, run: quick }; } }
+  quick: { create: createQuickSession, turn: applyQuickTurn, escalate: (s, id, deps) => { const { full, quick } = escalateQuick(s, id, deps); return { full, run: quick }; } },
+  start: { create: createStartSession, turn: applyStartTurn, escalate: escalateStart }
 };
 const flowOf = (session) => FLOWS[session.kind] ?? null;
 
@@ -70,6 +72,9 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
     quick_answer: (s, body) => quickAnswer(s, body.payload ?? {}, deps),
     quick_again: (s) => quickAgain(s, deps),
     quick_check: (s, body) => quickCheck(s, body.payload ?? {}, deps),
+    start_answer: (s, body) => startAnswer(s, body.payload ?? {}, deps),
+    start_again: (s) => startAgain(s, deps),
+    start_check: (s, body) => startCheck(s, body.payload ?? {}, deps),
     archive: (s) => archive(s, deps),
     retry: (s) => {
       if (s.runner.status !== 'failed') throw httpError(409, 'action_not_allowed', 'Nothing to retry.');
@@ -83,7 +88,7 @@ export function createProblemSolverService({ store, coach, kinds = ['full', 'lig
   }
 
   /**
-   * A flow (Lightning, or a quick decision) to a full session: write the seeded full session first
+   * A flow (Lightning, a quick decision or a Quick start) to a full session: write the seeded full session first
    * (its id is the request id, so a retry finds it instead of making another), then mark the run.
    * Returns the run.
    */
