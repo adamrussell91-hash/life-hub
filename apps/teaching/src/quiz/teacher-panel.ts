@@ -16,6 +16,7 @@ import {
 import { answerLines } from '@/blocks/quiz-question';
 import { mountQuestionBuilder } from '@/quiz/builder';
 import { mountQuestionPlayer } from '@/quiz/player';
+import { spanText } from '@/quiz/word-picker';
 import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
 import './quiz.css';
 
@@ -746,7 +747,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     stage.append(el('p', 'qz-player__meta', `Question ${l.index + 1} of ${l.total} · ${QUIZ_KIND_INFO[q.kind].label}`));
     if (q.prompt) stage.append(el('h3', `qz-player__prompt${big ? ' qz-player__prompt--board' : ''}`, q.prompt));
     if (q.kind === 'quote_technique' && q.quote) stage.append(el('blockquote', 'qz-quote', q.quote));
-    if (q.kind === 'explain_effect') stage.append(el('blockquote', 'qz-quote', q.quote));
+    if (q.kind === 'explain_effect' || q.kind === 'spot_technique') stage.append(el('blockquote', 'qz-quote', q.kind === 'spot_technique' ? q.passage : q.quote));
     if (q.image && q.kind !== 'label_image') {
       const img = el('img', 'qz-live__img');
       img.src = q.image.url;
@@ -900,6 +901,10 @@ export function keySummary(q: PublicQuestion, key: QuestionKey): string {
       return `Answer: ${a.accepted.join(' / ')}`;
     case 'gaps':
       return `Answer: ${Object.values(a.gaps).map((g) => g[0]).join(', ')}`;
+    case 'spots': {
+      const names = 'options' in q ? new Map(q.options.map((o) => [o.id, o.text])) : new Map<string, string>();
+      return `Answer: ${a.targets.map((t) => `“${spanText(a.passage, t)}” ${t.ids.map((id) => names.get(id)).join(' or ')}`).join(' · ')}`;
+    }
     case 'order':
       return q.kind === 'ordering' ? `Order: ${a.ids.map((id, i) => `${i + 1}. ${q.items.find((x) => x.id === id)?.text ?? ''}`).join('  ')}` : '';
     case 'map': {

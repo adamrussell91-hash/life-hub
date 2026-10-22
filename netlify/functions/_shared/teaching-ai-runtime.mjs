@@ -134,6 +134,7 @@ var QUIZ_QUESTION_KINDS = [
   "categorise",
   "quote_technique",
   "find_it",
+  "spot_technique",
   "label_image",
   "extended_response",
   "explain_effect"
@@ -161,6 +162,13 @@ var QuizChoiceSchema = z5.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
 var QuizPairSchema = z5.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
 var QuizGroupSchema = z5.object({ id: Id, name: Text(120) });
 var QuizSortItemSchema = z5.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
+var QuizSpotTargetSchema = z5.object({
+  id: Id,
+  /** The words, copied exactly from the passage. */
+  quote: Text(QUIZ_LIMITS.option),
+  /** Every technique a fair marker would accept for these words. */
+  correct: z5.array(Id).min(1).max(10)
+});
 var QuizPinSchema = z5.object({
   id: Id,
   x: z5.number().min(0).max(1),
@@ -209,6 +217,15 @@ var QuizQuestionSchema = z5.discriminatedUnion("kind", [
     kind: z5.literal("find_it"),
     segments: z5.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
     correct: z5.array(Id).min(1).max(40)
+  }),
+  z5.object({
+    ...base,
+    kind: z5.literal("spot_technique"),
+    passage: Text(QUIZ_LIMITS.passage),
+    options: z5.array(QuizChoiceSchema.extend({ technique_id: z5.string().max(64).optional() })).min(2).max(10),
+    targets: z5.array(QuizSpotTargetSchema).min(1).max(12),
+    /** How many students must find. Fewer than the targets means any of them will do. */
+    find: z5.number().int().min(1).max(12).optional()
   }),
   z5.object({ ...base, kind: z5.literal("label_image"), image: QuizImageSchema, pins: z5.array(QuizPinSchema).min(2).max(8) }),
   z5.object({
@@ -259,6 +276,18 @@ function questionProblems(q) {
       if (q.correct.length >= q.segments.length) out.push("Leave at least one line that isn\u2019t an answer.");
       break;
     }
+    case "spot_technique": {
+      unique(q.options.map((o) => o.id), "techniques");
+      unique(q.targets.map((t) => t.id), "answers");
+      if (new Set(q.options.map((o) => norm(o.text))).size !== q.options.length) out.push("Two techniques say the same thing.");
+      const ids = new Set(q.options.map((o) => o.id));
+      for (const target of q.targets) {
+        if (!locateQuote(q.passage, target.quote)) out.push(`\u201C${target.quote}\u201D isn\u2019t in the passage. Copy the words exactly.`);
+        if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push("Name the technique for every answer.");
+      }
+      if ((q.find ?? q.targets.length) > q.targets.length) out.push("Students can\u2019t be asked to find more than there are answers.");
+      break;
+    }
     case "fill_gap":
       if (!parseGapPassage(q.passage).some((part) => part.type === "gap")) out.push("Blank out at least one word.");
       break;
@@ -299,6 +328,34 @@ function parseGapPassage(passage) {
   if (last < passage.length) parts.push({ type: "text", text: passage.slice(last) });
   return parts;
 }
+function passageWords(passage) {
+  const words = [];
+  const re = /\S+/g;
+  let line = 0;
+  let seen = 0;
+  for (let m = re.exec(passage); m; m = re.exec(passage)) {
+    line += (passage.slice(seen, m.index).match(/\n/g) ?? []).length;
+    seen = m.index;
+    words.push({ text: m[0], start: m.index, end: m.index + m[0].length, line });
+  }
+  return words;
+}
+function wordKey(word) {
+  return norm(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+function locateQuote(passage, quote) {
+  const words = passageWords(passage);
+  const keyed = words.map((w, i) => ({ i, key: wordKey(w.text) })).filter((w) => w.key);
+  const wanted = passageWords(quote).map((w) => wordKey(w.text)).filter(Boolean);
+  if (!wanted.length) return null;
+  for (let s2 = 0; s2 + wanted.length <= keyed.length; s2++) {
+    if (wanted.every((key, j) => keyed[s2 + j].key === key)) return { from: keyed[s2].i, to: keyed[s2 + wanted.length - 1].i };
+  }
+  return null;
+}
+var FILLER = new Set(
+  "a an the and or but of to in on at by for with from as is are was were be been it its this that these those i you he she we they his her their our my your so then than".split(" ")
+);
 var QuizFeedbackSchema = z5.enum(["instant", "end", "released"]);
 var QuizSettingsSchema = z5.object({
   /** Whole-quiz countdown in minutes. */
@@ -355,6 +412,8 @@ function blankQuestion(kind, id, marks = 1, newId = () => Math.random().toString
     }
     case "find_it":
       return { ...shared, kind, segments: [], correct: [] };
+    case "spot_technique":
+      return { ...shared, kind, passage: "", options: opts(4), targets: [] };
     case "label_image":
       return { ...shared, kind, image: { url: "", alt: "" }, pins: [] };
     case "extended_response":
@@ -385,10 +444,13 @@ function checkQuestion(input) {
     groups: "Name every group.",
     quote: "Paste the quote.",
     segments: "Paste a passage of at least two lines.",
+    targets: "Select the words for at least one answer and name its technique.",
     pins: "Add at least two pins, each with a label.",
     image: "Choose an image.",
     marks: `Marks must be between 1 and ${QUIZ_LIMITS.marksMax}.`
   };
+  if (raw.kind === "spot_technique" && field === "passage") return { ok: false, message: "Paste the passage." };
+  if (raw.kind === "spot_technique" && field === "options") return { ok: false, message: "Fill in every technique." };
   return { ok: false, message: messages[field] ?? "Check the question: something is missing or too long." };
 }
 
@@ -5001,6 +5063,7 @@ A quiz is one quiz_question block per question: content { question }. Set questi
 - categorise: groups [{ id, name }] 2-4, items [{ id, text, group: group id }] 2-16.
 - quote_technique: quote, options [{ id, text }] 2-6 naming techniques, correct [one id].
 - find_it: segments [{ id, text }] 2-40 (the lines of a passage), correct [the ids that answer]; leave at least one line that is not an answer.
+- spot_technique: passage (the poem or prose, line breaks kept), options [{ id, text }] 3-10 naming techniques (every right one plus a few plausible wrong ones), targets [{ id, quote, correct: [option ids] }] 1-12. Each quote is the few words that carry the technique, copied exactly from the passage; correct lists every technique a fair marker would accept for those words. find optional: how many students must find (leave it out to need them all; find 1 with several targets means any one counts). Say "Find two\u2026" or "Find one\u2026" in the prompt to match. Students select words and pick a name; a selection a few words bigger or smaller still counts, and right words with the wrong name earn half.
 - label_image: image { url, alt } from an image already in the lesson, pins [{ id, x, y, label }] 2-8 with x and y from 0 to 1. Skip this kind when the lesson has no image.
 - extended_response: model_answer and guide optional. Teacher-marked.
 - explain_effect: quote, technique optional, model_answer and guide optional. Teacher-marked.

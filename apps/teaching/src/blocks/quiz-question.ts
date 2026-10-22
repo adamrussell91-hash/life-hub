@@ -92,6 +92,16 @@ export function answerLines(q: QuizQuestion, hideAnswer = false): string[] {
       );
     case 'find_it':
       return (q.segments ?? []).map((s) => `${tick(q.correct?.includes(s.id))} ${s.text}`);
+    case 'spot_technique': {
+      const names = new Map((q.options ?? []).map((o) => [o.id, o.text]));
+      const find = q.find && q.find < (q.targets ?? []).length ? [`Students find any ${q.find}.`] : [];
+      if (hideAnswer) return [q.passage ?? '', `Techniques: ${(q.options ?? []).map((o) => o.text).join(', ')}`];
+      return [
+        q.passage ?? '',
+        ...(q.targets ?? []).map((t) => `✓ “${t.quote}”: ${t.correct.map((id) => names.get(id)).filter(Boolean).join(' or ')}`),
+        ...find
+      ];
+    }
     case 'label_image':
       return (q.pins ?? []).map((p, i) => (hideAnswer ? `${i + 1}. ______` : `${i + 1}. ${p.label}`));
     case 'extended_response':
