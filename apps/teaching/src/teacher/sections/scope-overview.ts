@@ -2,16 +2,13 @@ import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
 import type { ScopeSequence, Subject, TimelineItem, Unit } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
-
-export function barPositionStyle(
-  startWeek: number,
-  endWeek: number,
-  weekCount: number
-): string {
-  const left = ((startWeek - 1) / weekCount) * 100;
-  const width = ((endWeek - startWeek + 1) / weekCount) * 100;
-  return `left:${left}%;width:${width}%`;
-}
+import {
+  academicYearBounds,
+  diffDays,
+  resolveItemSpan,
+  resolveTermSpan,
+  type DateSpan
+} from '@/scope/timeline-dates';
 
 export function subjectsWithScope(
   curriculum: CurriculumResponse
@@ -31,6 +28,17 @@ export function subjectsWithScope(
   return rows;
 }
 
+/** Place a dated span on the academic year (1 Jan to 31 Dec), in percent. */
+export function spanPositionStyle(span: DateSpan, academicYear: number): string {
+  const year = academicYearBounds(academicYear);
+  const clamp = (days: number): number => Math.min(Math.max(days, 0), year.days);
+  const startDay = clamp(diffDays(year.start, span.start));
+  const endDay = clamp(diffDays(year.start, span.end) + 1);
+  const left = (startDay / year.days) * 100;
+  const width = (Math.max(endDay - startDay, 1) / year.days) * 100;
+  return `left:${left}%;width:${width}%`;
+}
+
 function itemLabel(item: TimelineItem, unitsById: Map<string, Unit>): string {
   if (item.kind === 'note') return item.title;
   return unitsById.get(item.unit_id)?.title ?? 'Unknown unit';
@@ -44,7 +52,7 @@ function bindNavigate(anchor: HTMLAnchorElement, path: string): void {
 }
 
 /**
- * Overall year Gantt: term bands + one spacious row per subject that has a scope.
+ * Overall year Gantt on the calendar year: term bands + one row per subject that has a scope.
  */
 export function renderScopeOverview(
   host: HTMLElement,
@@ -61,7 +69,7 @@ export function renderScopeOverview(
     return;
   }
 
-  const weekCount = Math.max(...rows.map(({ scope }) => scope.week_count));
+  const academicYear = rows[0]!.scope.academic_year;
   const terms = rows[0]!.scope.terms;
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
 
@@ -70,14 +78,27 @@ export function renderScopeOverview(
 
   const termsRow = document.createElement('div');
   termsRow.className = 'scope-overview__terms';
-  termsRow.style.setProperty('--week-count', String(weekCount));
 
   for (const term of terms) {
     const band = document.createElement('div');
     band.className = 'scope-overview__term';
-    band.style.cssText = barPositionStyle(term.start_week, term.end_week, weekCount);
+    band.style.cssText = spanPositionStyle(resolveTermSpan(term, academicYear), academicYear);
     band.textContent = term.title;
     termsRow.append(band);
+  }
+
+  const monthsRow = document.createElement('div');
+  monthsRow.className = 'scope-overview__months';
+  for (let month = 0; month < 12; month += 1) {
+    const first = `${academicYear}-${String(month + 1).padStart(2, '0')}-01`;
+    const cell = document.createElement('span');
+    cell.className = 'scope-overview__month';
+    cell.style.cssText = spanPositionStyle({ start: first, end: first }, academicYear);
+    cell.textContent = new Date(`${first}T00:00:00Z`).toLocaleDateString('en-AU', {
+      month: 'short',
+      timeZone: 'UTC'
+    });
+    monthsRow.append(cell);
   }
 
   const rowsHost = document.createElement('div');
@@ -97,7 +118,6 @@ export function renderScopeOverview(
 
     const track = document.createElement('div');
     track.className = 'scope-overview__track';
-    track.style.setProperty('--week-count', String(weekCount));
 
     const sortedItems = [...scope.timeline_items].sort(
       (a, b) => a.order - b.order || a.start_week - b.start_week
@@ -107,7 +127,11 @@ export function renderScopeOverview(
       const bar = document.createElement('a');
       bar.className = `scope-overview__bar scope-overview__bar--${item.kind}`;
       bar.dataset.scopeBarKind = item.kind;
-      bar.style.cssText = barPositionStyle(item.start_week, item.end_week, weekCount);
+      const unit = item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined;
+      bar.style.cssText = spanPositionStyle(
+        resolveItemSpan(item, scope.terms, scope.academic_year, unit),
+        scope.academic_year
+      );
       bar.textContent = itemLabel(item, unitsById);
       bar.title = itemLabel(item, unitsById);
 
@@ -131,6 +155,6 @@ export function renderScopeOverview(
     rowsHost.append(row);
   }
 
-  overview.append(termsRow, rowsHost);
+  overview.append(termsRow, monthsRow, rowsHost);
   host.append(overview);
 }

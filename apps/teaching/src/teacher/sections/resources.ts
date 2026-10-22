@@ -60,6 +60,31 @@ function readStoredView(): LibraryView {
 /** Survives the remount after each upload or move, so the teacher stays where they were. */
 let currentView: LibraryView = readStoredView();
 
+const NAV_COLLAPSED_KEY = 'teaching-hub.resources-nav-collapsed';
+
+function readNavCollapsed(): boolean {
+  try {
+    return localStorage.getItem(NAV_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeNavCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(NAV_COLLAPSED_KEY, collapsed ? '1' : '0');
+  } catch {
+    // Private mode: the panel still toggles for this visit.
+  }
+}
+
+const PANEL_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <path d="M9.5 4.5v15" />
+  </svg>
+`.trim();
+
 function setView(view: LibraryView): void {
   currentView = view;
   try {
@@ -386,6 +411,25 @@ export function renderResourcesIndex(
   layout.append(nav, main);
   canvas.append(layout);
 
+  let navCollapsed = readNavCollapsed();
+  const navToggle = document.createElement('button');
+  navToggle.type = 'button';
+  navToggle.className = 'hub-icon-btn resources-nav__toggle';
+  navToggle.innerHTML = PANEL_ICON;
+  const syncNavCollapsed = (): void => {
+    layout.classList.toggle('resources-layout--collapsed', navCollapsed);
+    const label = navCollapsed ? 'Show library panel' : 'Hide library panel';
+    navToggle.setAttribute('aria-label', label);
+    navToggle.setAttribute('aria-expanded', navCollapsed ? 'false' : 'true');
+    navToggle.title = label;
+  };
+  navToggle.addEventListener('click', () => {
+    navCollapsed = !navCollapsed;
+    writeNavCollapsed(navCollapsed);
+    syncNavCollapsed();
+  });
+  syncNavCollapsed();
+
   const go = (view: LibraryView): void => {
     setView(view);
     renderNav();
@@ -413,7 +457,7 @@ export function renderResourcesIndex(
   };
 
   function renderNav(): void {
-    nav.replaceChildren();
+    nav.replaceChildren(navToggle);
     const views = document.createElement('div');
     views.className = 'resources-nav__views';
     views.append(
