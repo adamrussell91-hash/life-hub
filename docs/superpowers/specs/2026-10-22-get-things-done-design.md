@@ -38,6 +38,8 @@ The pack's `questions.md` asked ten questions. Adam accepted the recommendations
 | 8 | Placement and palette | The Tasks hub's Tools group, beside Problem Solver and Decision Maker (where both actually live; the pack said "Mind"). A brighter palette than the pack's (see Design language) |
 | 9 | Page citations | Printed chapter ranges only, labelled as chapters |
 | 10 | Edition | *The Get Things Done Book*, Profile Books 2023, translated by Gesche Ipsen |
+| 11 | Review now and the learning question (22 Oct, Plan 6) | Review now waits until the learning question is answered: the server refuses `start_review` while it is pending, and the panel holds the button with a note. Shared by all three tools |
+| 12 | Skills ribbons (22 Oct, Plan 6) | All three tools' landings show all three shares of the one tally |
 
 ## Experience
 
@@ -48,7 +50,7 @@ The landing page mirrors Decision Maker's, in the Gear Shifter palette:
 - **Hero:** the book emblem, one line, a **New** box ("What do you need to get moving?") and a **Quick start** card.
 - **Your work:** one card per session. The medal is the section emblem with the main technique's emblem at its centre. The meta line shows the stage, the technique and the date.
 - **The five sections:** the section emblems, each opening its shelf of technique emblems with a one-line "use it when". Starting from a technique here opens a session already on it.
-- **Thinking skills you have used:** the shared ribbon, now split three ways.
+- **Thinking skills you have used:** the shared ribbon, now split three ways, as Problem Solver's and Decision Maker's ribbons are too (decision 12).
 
 ### Full session
 
@@ -71,7 +73,7 @@ The landing page mirrors Decision Maker's, in the Gear Shifter palette:
 6. **Record:** the action record composes from the session, never from coach free text, as Decision Maker's does. A confirm card writes it to the linked task or project page. It has a provenance graphic (the technique's and the section's emblems, captioned "Worked with The Get Things Done Book · <technique> · <date>"), a heading, rich-text sections and a link back. Later changes offer a dated update.
 7. **Review:** on the check-back date, or with Review now, the session reopens on a short review of the experiment: what changed, what it cost and what to keep. For a finished project it opens **Project Evaluation** instead (fun, money and impact, for both the result and the way the work felt), including the luck-and-support question merged in from The Myth of Achievement. Live task statuses are the evidence. This reuses `reviewState` and `review.mjs`.
 
-At each boundary the coach asks the one-shot learning question in its action form: "what did you learn about how you get things done?"
+At each boundary the coach asks the one-shot learning question in its action form: "what did you learn about how you get things done?" Review now waits until it is answered (decision 11).
 
 ### Quick start
 
