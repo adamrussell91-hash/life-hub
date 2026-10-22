@@ -1084,6 +1084,25 @@ test("capture action returns the items on a menu photo, cleaned", async () => {
     { name: "Fries", description: "", price: "", kind: "dish" },
   ]);
 });
+test("translate action returns English for non-English notes and nothing for English", async () => {
+  resetRateLimits();
+  const calls = [];
+  const complete = async (opts) => {
+    calls.push(opts.model);
+    return opts.messages[0].content.includes("riquísimo")
+      ? JSON.stringify({ english: false, text: "delicious, very garlicky" })
+      : JSON.stringify({ english: true, text: "" });
+  };
+  const h = createFoodJournalProcessHandler(deps(repo(fixture()), { complete }));
+  let res = await h(req("POST", { action: "translate", text: "riquísimo, mucho ajo" }));
+  assert.deepEqual((await res.json()).data, { text_en: "delicious, very garlicky" });
+  res = await h(req("POST", { action: "translate", text: "Great chips" }));
+  assert.deepEqual((await res.json()).data, { text_en: "" });
+  assert.equal(calls.length, 1, "plain ASCII English skips the model");
+  assert.equal(calls[0], "claude-haiku-5-5");
+  res = await h(req("POST", { action: "translate", text: "x".repeat(20001) }));
+  assert.equal(res.status, 400);
+});
 test("menu items merge across photos without repeats and are kept on the visit", () => {
   const v = newVisit();
   let next = mergeCapture(v, {

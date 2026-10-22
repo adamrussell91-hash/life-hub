@@ -187,6 +187,9 @@ export function createFoodJournalView({
     dialog = null;
   let editorialRunning = false;
   const editorialFailed = new Set();
+  let translating = false;
+  // dish id -> the notes last handled, so each wording is translated once.
+  const notesHandled = new Map();
   let filterControls = [],
     journalQuery = "",
     filters = {},
@@ -308,6 +311,7 @@ export function createFoodJournalView({
       if (!quiet) {
         showHubToast("Saved.");
         void refreshEditorial();
+        void refreshTranslations();
       }
       return value;
     } finally {
@@ -359,6 +363,63 @@ export function createFoodJournalView({
       editorialRunning = false;
     }
   }
+  // Typed dish notes get an English copy after the save. Best effort: a
+  // failed translation never touches the save, and a second save only
+  // happens when notes_en actually changed.
+  async function refreshTranslations() {
+    if (translating || !loaded) return;
+    translating = true;
+    const token = epoch;
+    try {
+      const found = [];
+      for (const v of liveVisits(journal))
+        for (const d of v.dishes) {
+          const notes = (d.notes || "").trim();
+          if (notesHandled.get(d.id) === notes) continue;
+          // First sight of a dish that already has an English copy: trust it.
+          if (!notesHandled.has(d.id) && d.notes_en) {
+            notesHandled.set(d.id, notes);
+            continue;
+          }
+          found.push({ id: d.id, notes });
+        }
+      const changes = new Map();
+      for (const { id, notes } of found) {
+        let text_en = "";
+        if (notes) {
+          try {
+            ({ text_en } = await api.translate(notes));
+          } catch {
+            // Leave it for the next save; the notes are already safe.
+            continue;
+          }
+        }
+        notesHandled.set(id, notes);
+        changes.set(id, { notes, text_en: text_en || "" });
+      }
+      if (token !== epoch || !changes.size) return;
+      for (let wait = 0; (busy || dialog) && wait < 600; wait++)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (token !== epoch || busy || dialog) return;
+      const next = structuredClone(journal);
+      let changed = false;
+      for (const v of next.visits)
+        for (const d of v.dishes) {
+          const c = changes.get(d.id);
+          // Skip a dish whose notes were edited while we were translating.
+          if (!c || (d.notes || "").trim() !== c.notes) continue;
+          if ((d.notes_en || "") === c.text_en) continue;
+          if (c.text_en) d.notes_en = c.text_en;
+          else delete d.notes_en;
+          changed = true;
+        }
+      if (changed) await persist(next, { quiet: true });
+    } catch {
+      // Best effort only.
+    } finally {
+      translating = false;
+    }
+  }
   async function load() {
     const token = epoch;
     status("Loading Food Journal.");
@@ -374,6 +435,7 @@ export function createFoodJournalView({
         await persist(tidy.journal, { quiet: true }).catch(() => {});
       if (token !== epoch) return;
       void refreshEditorial();
+      void refreshTranslations();
     } catch (e) {
       if (token !== epoch) return;
       status(e.message, true);
