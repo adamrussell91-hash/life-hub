@@ -39,6 +39,10 @@ export function parseOutcomeCodes(text: string, labels: OutcomeLabel[]): { ids: 
 export const formatOutcomeCodes = (ids: string[], labels: OutcomeLabel[]): string =>
   ids.map((id) => labels.find((l) => l.id === id)?.code ?? id).join(', ');
 
+/** A placeholder built from the class's own catalogue, so the example codes are ones that work. */
+export const outcomeCodeExample = (labels: OutcomeLabel[]): string =>
+  labels.slice(0, 2).map((l) => l.code).join(', ') || 'Outcome codes, comma separated';
+
 export function outcomeLabels(rows: ReadonlyArray<{ id: string; code: string; title: string; group: string; status?: string }>): OutcomeLabel[] {
   return rows.filter((r) => r.status !== 'trashed').map(({ id, code, title, group }) => ({ id, code, title, group }));
 }

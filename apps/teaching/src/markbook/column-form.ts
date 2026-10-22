@@ -2,7 +2,7 @@ import { el } from '@/quiz/dom';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { CriterionSchema, checkColumn, newMarkbookId, type Column, type Criterion } from './schema';
 import type { OutcomeLabel } from './types';
-import { formatBands, formatOutcomeCodes, parseBands, parseOutcomeCodes } from './parse';
+import { formatBands, formatOutcomeCodes, outcomeCodeExample, parseBands, parseOutcomeCodes } from './parse';
 import { openOverlay } from './overlay';
 
 /** A small overlay form for adding or editing one teacher column. */
@@ -88,7 +88,7 @@ export function openColumnForm(o: ColumnFormOptions): HTMLElement {
         outcomes: input('criterion-outcomes', d.outcomes),
         bands: input('criterion-bands', d.bands)
       };
-      fields.outcomes.placeholder = 'EN12-1, EN12-3';
+      fields.outcomes.placeholder = outcomeCodeExample(o.outcomes);
       fields.bands.placeholder = 'A 13, B 10, C 7, D 4, E 0';
       for (const key of Object.keys(fields) as CriterionField[]) {
         fields[key].addEventListener('input', () => {

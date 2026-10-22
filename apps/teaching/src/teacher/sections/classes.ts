@@ -364,7 +364,6 @@ export function renderClassPage(
 
   const markbookHost = document.createElement('div');
   markbookHost.className = 'class-page__markbook-host';
-  main.append(markbookHost);
   disposers.push(mountMarkbook(markbookHost, pageClass, { outcomes: outcomeLabels(curriculum.outcomes ?? []) }));
 
   const sequence = renderUnitSequence(sequenceHost, {
@@ -482,7 +481,8 @@ export function renderClassPage(
   });
 
   body.append(main, side);
-  root.append(bannerHost, body);
+  // The markbook is a wide grid, so it spans the page under both columns.
+  root.append(bannerHost, body, markbookHost);
   canvas.append(root);
 
   return {
