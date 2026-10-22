@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/alignment/api', () => ({ fetchAlignment: vi.fn(), saveAlignmentPoint: vi.fn() }));
+vi.mock('@/skills/api', () => ({ loadSkills: vi.fn(() => Promise.reject(new Error('no skills in this test'))), refreshSkills: vi.fn() }));
 
 import { fetchAlignment, saveAlignmentPoint } from '@/alignment/api';
+import { loadSkills } from '@/skills/api';
 import { alignmentDots, heatHits, heatScore, heatStep, pointsFor, sharedRuns, skillHits, subjectUsesAlignment, wordStems } from '@/alignment/model';
 import { applyAlignmentPatch, mergeMissingSkills, needsSkills, type Alignment } from '@/alignment/schema';
 import { mountAlignmentView, resetAlignmentViewForTests } from '@/alignment/view';
@@ -147,6 +149,22 @@ describe('alignment view', () => {
     await settle();
     expect(saveAlignmentPoint).toHaveBeenCalledWith(expect.objectContaining({ focus_area: 'area-one', point: 'U1' }));
     expect(host.querySelector('.align__edited')?.textContent).toBe('Edited');
+  });
+
+  it('shows an HSC skills layer when the continuum loads', async () => {
+    const r = (x: string) => ({ i_can: x, build: { formula: ['P'], parts: [{ id: 'p', name: 'P', job: 'j', language: [] }], example: [['e', 'p']] as [string, string | null][], why_here: 'w', checks: [], next_move: 'n' } });
+    vi.mocked(loadSkills).mockResolvedValueOnce({ strands: [{ schema: 'skills_strand_v1', strand: 'arguing', name: 'Arguing', summary: 's',
+      rungs: (['capable', 'skilled', 'accomplished', 'excellent'] as const).map((id) => ({ id, name: id, marks: '13', marker_words: 'x', meaning: 'y' })),
+      sub_strands: [{ id: 'thesis', name: 'Thesis', in_hsc: 'h', draws_on: 'd', outcomes: [1], focus_areas: ['area-one'], rungs: { capable: r('a'), skilled: r('b'), accomplished: r('c'), excellent: r('d') } }] }] });
+    mountAlignmentView(host);
+    await settle();
+    await settle();
+    expect(host.querySelector('.align__panel')?.textContent).toContain('HSC skills for this focus area');
+    click(host.querySelector('[data-align-mode="heat"]'));
+    click(host.querySelector('[data-align-rows="hsc"]'));
+    expect([...host.querySelectorAll('.align__hc')].map((c) => c.textContent)).toEqual(['2', '']);
+    click(host.querySelector('.align__rl-btn'));
+    expect(host.querySelector('.align__panel .align__title')?.textContent).toBe('Arguing · Thesis');
   });
 
   it('explains when the private file can’t be reached', async () => {
