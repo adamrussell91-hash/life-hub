@@ -25,7 +25,7 @@ export const shortDate = (at: string): string => {
   return Number.isNaN(date.getTime()) ? at : `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
 };
 /** The words a scale's form field shows, from its current name. */
-const fieldWords = (mode: ScalesChart['mode'], scale: Scale, name: string): string => (mode === 'pairs' ? `${scale.low} (0–10; ${scale.high} gets the rest)` : mode === 'shares' ? `${name} (% of 100)` : `${name} (1–10)`);
+const fieldWords = (chart: ScalesChart, scale: Scale, name: string): string => (chart.mode === 'pairs' ? `${scale.low} (0–10; ${scale.high} gets the rest)` : chart.mode === 'shares' ? `${name} (% of 100)` : `${name} (${chart.min ?? 1}–10)`);
 
 /** The radar polygon's points for values on 1–10 axes, in a 100×100 box. */
 export function radarPoints(values: number[]): string {
@@ -61,7 +61,7 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
       const map = new Map<string, HTMLInputElement>();
       for (const scale of chart.scales) {
         const label = el(doc, 'label', 'dm-scales__field');
-        const words = el(doc, 'span', 'dm-scales__field-label', fieldWords(chart.mode, scale, scale.label ?? ''));
+        const words = el(doc, 'span', 'dm-scales__field-label', fieldWords(chart, scale, scale.label ?? ''));
         words.setAttribute('data-field-for', scale.id);
         label.append(words);
         const input = el(doc, 'input', 'dm-scales__input');
@@ -179,7 +179,7 @@ export function createScalesView(tool: ChartTool & { chart: ScalesChart }, doc: 
       const name = (scale: Scale): string => scaleLabel(run, scale);
       for (const scale of chart.scales) {
         for (const span of ctx.frame.querySelectorAll(`[data-label-for="${scale.id}"]`)) setText(span, name(scale));
-        for (const span of ctx.frame.querySelectorAll(`[data-field-for="${scale.id}"]`)) setText(span, fieldWords(chart.mode, scale, name(scale)));
+        for (const span of ctx.frame.querySelectorAll(`[data-field-for="${scale.id}"]`)) setText(span, fieldWords(chart, scale, name(scale)));
         setAttr(ctx.frame.querySelector(`.dm-scales__row[data-scale="${scale.id}"]`)!, 'aria-label', name(scale));
       }
       const values = valuesOf(run) as Record<string, Record<string, number>>;

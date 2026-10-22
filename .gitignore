@@ -35,3 +35,6 @@ apps/*/.ua/
 # Decision Maker contact sheet build output: rebuild with the build-decision-book-contact-sheet script.
 /docs/mockups/decision-maker/contact-sheet.js
 /docs/mockups/decision-maker/contact-sheet.css
+# Gear Shifter contact sheet build output: rebuild with the build-gear-shifter-contact-sheet script.
+/docs/mockups/gear-shifter/contact-sheet.js
+/docs/mockups/gear-shifter/contact-sheet.css
