@@ -1,3 +1,5 @@
+import type { SkillsContinuum } from '@/skills/schema';
+import { findSkill, nextMoveFor, rungForMark, rungName } from '@/skills/model';
 import { el } from '@/quiz/dom';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { MARKBOOK_LIMITS, type AssessmentColumn, type AssessmentMark } from './schema';
@@ -21,6 +23,8 @@ export type AssessmentPanelOptions = {
   returnFocus?: (studentId: string) => HTMLElement | null;
   /** Lets the owner report a save that failed later. Returns an unsubscribe, called on close. */
   subscribeErrors?: (show: (message: string) => void) => () => void;
+  /** The skills continuum, so a criterion linked to a skill shows its rung and next move. */
+  skills?: SkillsContinuum | null;
 };
 
 type Problem = { problem: string; index: number };
@@ -62,6 +66,45 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
     for (const b of boxes) b.removeAttribute('aria-invalid');
   }
 
+  /** Under a skill-linked criterion: the rung the mark reaches and the next move, which can go into the feedback. */
+  function skillPanel(c: AssessmentColumn['criteria'][number], box: HTMLInputElement, feedbackBox: () => HTMLTextAreaElement | undefined): { node: HTMLElement; update: () => void } | null {
+    const entry = o.skills ? findSkill(o.skills, c.skill) : null;
+    if (!entry || !o.skills) return null;
+    const continuum = o.skills;
+    const node = el('div', 'mb-panel__skill');
+    node.setAttribute('aria-live', 'polite');
+    const update = (): void => {
+      const n = Number(box.value);
+      const fits = box.value.trim() !== '' && Number.isFinite(n) && n >= 0 && n <= c.max;
+      node.replaceChildren(el('span', 'mb-panel__skill-name', `${entry.strand.name} · ${entry.sub.name}`));
+      if (!fits) {
+        node.append(el('span', 'mb-panel__skill-hint', 'Enter a mark to see the rung and next move.'));
+        return;
+      }
+      const rung = rungForMark(n, c.max);
+      const next = nextMoveFor(entry.sub, rung);
+      const add = el('button', 'btn btn--secondary mb-panel__skill-add', 'Add next move to feedback');
+      add.type = 'button';
+      add.addEventListener('click', () => {
+        const fb = feedbackBox();
+        if (!fb) return;
+        const line = `${entry.sub.name}: ${next.move}`;
+        if (fb.value.includes(line)) return;
+        fb.value = fb.value.trim() ? `${fb.value.trim()}\n${line}` : line;
+        fb.dispatchEvent(new Event('input'));
+        add.textContent = 'Added';
+        add.disabled = true;
+      });
+      node.append(
+        el('span', `mb-panel__rung mb-panel__rung--${rung}`, rungName(continuum, rung)),
+        el('p', 'mb-panel__skill-next', `Next move: ${next.move}`),
+        add
+      );
+    };
+    update();
+    return { node, update };
+  }
+
   function paint(): void {
     const student = studentOf(current);
     const mark = o.markFor(current);
@@ -92,9 +135,11 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
         const label = fits ? bandFor(c, n) : null;
         band.textContent = label ? `Band ${label}` : '';
       };
+      const skillBox = skillPanel(c, box, () => feedback);
       box.addEventListener('input', () => {
         clearError();
         showBand();
+        skillBox?.update();
       });
       showBand();
       box.addEventListener('keydown', (event) => {
@@ -104,6 +149,7 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
       });
       row.append(el('span', 'mb-form__label', `${c.label} (out of ${c.max})`), box, band);
       body.append(row);
+      if (skillBox) body.append(skillBox.node);
       return box;
     });
     feedback = el('textarea', 'mb-form__input mb-panel__feedback');

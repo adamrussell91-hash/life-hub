@@ -1,3 +1,4 @@
+import type { SkillsContinuum } from '@/skills/schema';
 import { el } from '@/quiz/dom';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { CriterionSchema, checkColumn, newMarkbookId, type Column, type Criterion } from './schema';
@@ -17,13 +18,15 @@ export type ColumnFormOptions = {
   random?: () => number;
   /** Where focus goes on close if the control that opened the form is gone. */
   returnFocus?: () => HTMLElement | null;
+  /** The skills continuum, for linking a criterion to a skill. Null while it loads or if it can't. */
+  skills?: SkillsContinuum | null;
 };
 
 const KIND_TITLE = { assessment: 'Assessment task', handin: 'Hand-in', check: 'Check' } as const;
 
 /** A criterion exactly as typed. Text is parsed only when the teacher saves. */
-type CriterionDraft = { id: string; label: string; max: string; outcomes: string; bands: string };
-type CriterionField = Exclude<keyof CriterionDraft, 'id'>;
+type CriterionDraft = { id: string; label: string; max: string; outcomes: string; bands: string; skill: string };
+type CriterionField = Exclude<keyof CriterionDraft, 'id' | 'skill'>;
 
 let formCount = 0;
 
@@ -39,6 +42,27 @@ function labelled(text: string, control: HTMLElement): HTMLLabelElement {
   const l = el('label', 'mb-form__field');
   l.append(el('span', 'mb-form__label', text), control);
   return l;
+}
+
+/** A criterion's skill picker: none, or one sub-strand grouped by strand. Keeps a saved skill even before the list loads. */
+function skillSelect(value: string, skills: SkillsContinuum | null): HTMLSelectElement {
+  const select = el('select', 'mb-form__input mb-form__skill');
+  select.name = 'criterion-skill';
+  const none = el('option', undefined, skills ? 'No skill' : value ? value : 'Skills are loading…');
+  none.value = skills ? '' : value;
+  select.append(none);
+  for (const strand of skills?.strands ?? []) {
+    const group = el('optgroup');
+    group.label = strand.name;
+    for (const sub of strand.sub_strands) {
+      const opt = el('option', undefined, sub.name);
+      opt.value = `${strand.strand}.${sub.id}`;
+      group.append(opt);
+    }
+    select.append(group);
+  }
+  select.value = value;
+  return select;
 }
 
 export function openColumnForm(o: ColumnFormOptions): HTMLElement {
@@ -67,13 +91,14 @@ export function openColumnForm(o: ColumnFormOptions): HTMLElement {
   scale.value = existing?.kind === 'check' ? existing.scale : 'tick';
 
   const criteriaHost = el('div', 'mb-form__criteria');
-  const blankDraft = (): CriterionDraft => ({ id: newMarkbookId(random), label: '', max: '10', outcomes: '', bands: '' });
+  const blankDraft = (): CriterionDraft => ({ id: newMarkbookId(random), label: '', max: '10', outcomes: '', bands: '', skill: '' });
   const toDraft = (c: Criterion): CriterionDraft => ({
     id: c.id,
     label: c.label,
     max: String(c.max),
     outcomes: formatOutcomeCodes(c.outcomes, o.outcomes),
-    bands: formatBands(c.bands)
+    bands: formatBands(c.bands),
+    skill: c.skill ?? ''
   });
   let drafts: CriterionDraft[] = existing?.kind === 'assessment' ? existing.criteria.map(toDraft) : [blankDraft()];
 
@@ -95,6 +120,10 @@ export function openColumnForm(o: ColumnFormOptions): HTMLElement {
           d[key] = fields[key].value;
         });
       }
+      const skill = skillSelect(d.skill, o.skills ?? null);
+      skill.addEventListener('change', () => {
+        d.skill = skill.value;
+      });
       const remove = el('button', 'mb-form__remove-criterion', 'Remove');
       remove.type = 'button';
       remove.disabled = drafts.length === 1;
@@ -102,7 +131,7 @@ export function openColumnForm(o: ColumnFormOptions): HTMLElement {
         drafts = drafts.filter((x) => x !== d);
         paintCriteria();
       });
-      row.append(labelled('Name', fields.label), labelled('Marks', fields.max), labelled('Outcome codes', fields.outcomes), labelled('Bands (optional)', fields.bands), remove);
+      row.append(labelled('Name', fields.label), labelled('Marks', fields.max), labelled('Outcome codes', fields.outcomes), labelled('Bands (optional)', fields.bands), labelled('Skill (optional)', skill), remove);
       criteriaHost.append(row);
     }
   }
@@ -130,7 +159,7 @@ export function openColumnForm(o: ColumnFormOptions): HTMLElement {
     if ('problem' in bands) return where + bands.problem;
     const max = d.max.trim() === '' ? Number.NaN : Number(d.max);
     if (Number.isNaN(max)) return `${where}Give the marks it is worth.`;
-    const built = { id: d.id, label: d.label, max, outcomes: codes.ids, ...(bands.bands.length ? { bands: bands.bands } : {}) };
+    const built = { id: d.id, label: d.label, max, outcomes: codes.ids, ...(bands.bands.length ? { bands: bands.bands } : {}), ...(d.skill ? { skill: d.skill } : {}) };
     const checked = CriterionSchema.safeParse(built);
     if (!checked.success) return where + (checked.error.issues[0]?.message ?? 'Check this criterion.');
     return built;

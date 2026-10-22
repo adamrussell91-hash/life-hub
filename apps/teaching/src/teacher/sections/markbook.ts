@@ -18,6 +18,8 @@ import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
 import { withAppBase } from '@/app/base-path';
 import { ApiClientError } from '@/api/client';
+import { loadSkills } from '@/skills/api';
+import type { SkillsContinuum } from '@/skills/schema';
 import '@/markbook/markbook.css';
 
 type Options = {
@@ -76,6 +78,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   /** Where that student was, for when they leave the list. */
   let phoneIndex = 0;
   let disposed = false;
+  /** The skills continuum for skill-linked criteria; the markbook works without it. */
+  let skills: SkillsContinuum | null = null;
+  void loadSkills().then((c) => { skills = c; }, () => {});
   const queued: Change[] = [];
   /** Told about each queued save that fails, e.g. by an open marking panel. */
   const saveErrorListeners = new Set<(change: Change, message: string) => void>();
@@ -195,6 +200,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       kind: column?.kind ?? kind,
       column,
       outcomes: options.outcomes ?? [],
+      skills,
       today: today(),
       returnFocus: () => (columnId ? findInBody('.mb-col__title', columnId) : null) ?? title,
       // A throw stays in the form, which shows the message and keeps the teacher's typing.
@@ -233,6 +239,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       // Removed students are read-only, so Save and next never lands on one.
       students: rowStudents(view, showRemoved).filter((s) => !s.removed),
       studentId,
+      skills,
       // Reads the live view, so a mark saved or queued in this panel shows when the teacher comes back to it.
       markFor: (id) => (view ? markOf<AssessmentMark>(view.markbook, columnId, id) : undefined),
       onSave: (id, mark) => {
