@@ -18,21 +18,31 @@ function button(className: string, text: string, label: string): HTMLButtonEleme
   return b;
 }
 
-/** A right-click (or a long press on a phone) clears the cell. */
+/** A right-click (or a long press on a phone), Delete or Backspace clears the cell. */
 function clearOn(b: HTMLElement, clear: () => void): void {
+  b.setAttribute('aria-label', `${b.getAttribute('aria-label') ?? ''}, Delete to clear`);
   b.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    clear();
+  });
+  b.addEventListener('keydown', (event) => {
+    if (event.key !== 'Delete' && event.key !== 'Backspace') return;
     event.preventDefault();
     clear();
   });
 }
 
 export function cellFor(view: MarkbookView, column: AnyColumn, student: RosterStudent, actions: MarkbookActions, today: string): HTMLElement {
-  const cell = cellButton(view, column, student, actions, today);
-  if (!student.removed || !(cell instanceof HTMLButtonElement)) return cell;
-  // The server refuses writes for students no longer on the class list, so their rows are read-only.
-  const span = el('span', cell.className);
-  span.append(...cell.childNodes);
-  return span;
+  let cell = cellButton(view, column, student, actions, today);
+  if (student.removed && cell instanceof HTMLButtonElement) {
+    // The server refuses writes for students no longer on the class list, so their rows are read-only.
+    const span = el('span', cell.className);
+    span.append(...cell.childNodes);
+    cell = span;
+  }
+  cell.dataset.col = column.id;
+  cell.dataset.student = student.id;
+  return cell;
 }
 
 function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStudent, actions: MarkbookActions, today: string): HTMLElement {
@@ -40,7 +50,8 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
   if (column.kind === 'quiz') {
     const score = column.scores[sid];
     if (!score) return el('span', 'mb-cell mb-cell--quiz mb-cell--blank', '');
-    const b = button('mb-cell mb-cell--quiz', formatPercent(quizPercent(score)), `${column.title}, ${student.name}: ${formatPercent(quizPercent(score))}`);
+    const toMark = score.pending > 0 ? `, ${score.pending} to mark` : '';
+    const b = button('mb-cell mb-cell--quiz', formatPercent(quizPercent(score)), `${column.title}, ${student.name}: ${formatPercent(quizPercent(score))}${toMark}`);
     if (score.pending > 0) {
       const dot = el('span', 'mb-cell__pending');
       dot.title = `${score.pending} to mark`;
@@ -77,6 +88,8 @@ export function headerFor(column: AnyColumn, actions: MarkbookActions): HTMLTabl
   th.scope = 'col';
   const title = el('button', 'mb-col__title', column.title);
   title.type = 'button';
+  title.title = column.title;
+  title.dataset.col = column.id;
   title.addEventListener('click', () => (column.kind === 'quiz' ? actions.openHeatmap(column.lesson_id) : actions.editColumn(column.id)));
   th.append(el('span', 'mb-col__kind', KIND_LABEL[column.kind]), title, el('span', 'mb-col__date', formatDay(dateOf(column))));
   if (column.kind === 'assessment') th.append(el('span', 'mb-col__weight', `${column.weight}%`));
