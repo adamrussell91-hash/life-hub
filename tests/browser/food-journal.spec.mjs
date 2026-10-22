@@ -16,6 +16,8 @@ import { createFoodJournalRunHandler } from "../../netlify/functions/food-journa
 import { createFoodJournalMediaHandler } from "../../netlify/functions/food-journal-media.mjs";
 import { createMemoryChatJobStore } from "../../netlify/functions/_shared/chat-job-store.mjs";
 let browser, server, base, pages = 0;
+const JPEG =
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/4QBIRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAZADAAIAAAAUAAAALAAAAAAyMDI2OjEyOjAyIDE4OjMwOjAwAP/bAEMACAYGBwYFCAcHBwkJCAoMFA0MCwsMGRITDxQdGh8eHRocHCAkLicgIiwjHBwoNyksMDE0NDQfJzk9ODI8LjM0Mv/bAEMBCQkJDAsMGA0NGDIhHCEyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMv/AABEIABAAEAMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AO0ooooA/9k=";
 before(async () => {
   server = createStaticServer({
     root: new URL("../../dist/", import.meta.url),
@@ -70,7 +72,7 @@ function fixture() {
     ],
   };
 }
-async function pageFor(width = 1440, { editorial = false, seed } = {}) {
+async function pageFor(width = 1440, { editorial = false, seed, media = {} } = {}) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     reducedMotion: "reduce",
@@ -93,6 +95,7 @@ async function pageFor(width = 1440, { editorial = false, seed } = {}) {
       return { journal: structuredClone(journal), version };
     },
   };
+  const removedMeals = [];
   const handler = createFoodJournalHandler({
     env: {
       LIFE_HUB_PASSPHRASE_HASH: "configured",
@@ -101,6 +104,9 @@ async function pageFor(width = 1440, { editorial = false, seed } = {}) {
     },
     verifySessionToken: () => ({ valid: true }),
     createFoodJournalRepository: () => repo,
+    removeMeal: async (path) => {
+      removedMeals.push(path);
+    },
   });
   await page.route("**/api/food-journal", async (route) => {
     const r = route.request(),
@@ -120,7 +126,7 @@ async function pageFor(width = 1440, { editorial = false, seed } = {}) {
     });
   });
   const jobs = createMemoryChatJobStore(),
-    assets = new Map();
+    assets = new Map(Object.entries(media));
   const deps = {
     env: {
       LIFE_HUB_PASSPHRASE_HASH: "configured",
@@ -303,6 +309,12 @@ async function pageFor(width = 1440, { editorial = false, seed } = {}) {
     page,
     errors,
     read: () => journal,
+    removedMeals,
+    // A change made elsewhere, such as Brisket confirming a meal.
+    write(fn) {
+      fn(journal);
+      version = "e".repeat(40);
+    },
     otherDevice() {
       journal.visits[0].title = "Other device revision";
       version = "d".repeat(40);
@@ -528,8 +540,7 @@ test("capture, private upload, menu text, backup and restore work through the re
   await page.evaluate(() => scrollTo(0, 0));
   // Dish photos are added inside each dish; the top only reads a menu.
   assert.equal(await page.getByLabel("Dish photos", { exact: true }).count(), 0);
-  const jpeg =
-    "/9j/4AAQSkZJRgABAQAAAQABAAD/4QBIRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAZADAAIAAAAUAAAALAAAAAAyMDI2OjEyOjAyIDE4OjMwOjAwAP/bAEMACAYGBwYFCAcHBwkJCAoMFA0MCwsMGRITDxQdGh8eHRocHCAkLicgIiwjHBwoNyksMDE0NDQfJzk9ODI8LjM0Mv/bAEMBCQkJDAsMGA0NGDIhHCEyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMv/AABEIABAAEAMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AO0ooooA/9k=";
+  const jpeg = JPEG;
   const photo = {
     name: "dish.jpg",
     mimeType: "image/jpeg",
@@ -1124,6 +1135,222 @@ for (const width of [1440, 390])
       await page.getByRole("button", { name: "A to Z", exact: true }).getAttribute("aria-pressed"),
       "true",
     );
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+async function goTo(page, width, section) {
+  if (width <= 720) {
+    await page.locator("#more-nav-button").click();
+    await page.locator(`#more-sheet [data-section="${section}"]`).click();
+  } else {
+    await page.locator(`.hub-rail [data-section="${section}"]`).click();
+  }
+}
+// Brisket's reply is not under test; a short stream keeps the chat calm.
+async function mockChat(page) {
+  const sent = [];
+  await page.route("**/api/chat", async (route) => {
+    sent.push(JSON.parse(route.request().postData()));
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+      body: [
+        { type: "agent", slug: "brisket" },
+        { type: "text", delta: "Counting it now." },
+        { type: "done" },
+      ]
+        .map((e) => `data: ${JSON.stringify(e)}\n\n`)
+        .join(""),
+    });
+  });
+  return sent;
+}
+const countedDish = (j, extra = {}) =>
+  Object.assign(j.visits[0].dishes[0], {
+    ingredients: "Pasta, beef, bechamel",
+    photos: [{ id: "photo_lasagne", key: "food/photos/photo_lasagne.jpg" }],
+    ...extra,
+  });
+const brisketLink = (extra = {}) => ({
+  meal_path: "data/nutrition/2026/10/2026-10-12-lasagne.md",
+  portion: "½",
+  portion_fraction: 0.5,
+  counted_at: "2026-10-12T09:00:00.000Z",
+  needs_recount: false,
+  calories: 640,
+  protein_g: 32,
+  fat_g: 28,
+  ...extra,
+});
+const lasagneCard = (page) =>
+  page.locator("[data-food-grid]>.food-dish", { hasText: "Lasagne" });
+
+for (const width of [1440, 390]) {
+  test(`brisket ${width}: send a dish with a portion, then it shows as counted`, async () => {
+    const { page, read, write, errors } = await pageFor(width, {
+      seed: (j) => countedDish(j),
+      media: { "food/photos/photo_lasagne.jpg": Buffer.from(JPEG, "base64") },
+    });
+    const sent = await mockChat(page);
+    const dishId = read().visits[0].dishes[0].id;
+    await page.getByRole("tab", { name: "Custom Menu" }).click();
+    await lasagneCard(page)
+      .getByRole("button", { name: "Send to Brisket", exact: true })
+      .click();
+    const sheet = page.getByRole("dialog", { name: "Send to Brisket" });
+    await sheet.waitFor();
+    assert.deepEqual(
+      await sheet.getByRole("radio").allInnerTexts(),
+      ["All", "¾", "½", "⅓", "¼", "Pieces"],
+    );
+    assert.equal(
+      await sheet.getByRole("radio", { name: "All" }).getAttribute("aria-checked"),
+      "true",
+    );
+    const send = sheet.getByRole("button", { name: "Send", exact: true });
+    assert.equal(await send.isDisabled(), false);
+    await sheet.getByRole("radio", { name: "Pieces" }).click();
+    assert.equal(await send.isDisabled(), true);
+    await sheet.getByLabel("Pieces eaten").fill("9");
+    await sheet.getByLabel("Pieces in total").fill("8");
+    assert.equal(await send.isDisabled(), true);
+    await sheet.getByLabel("Pieces eaten").fill("2");
+    assert.equal(await send.isDisabled(), false);
+    await sheet.getByLabel("Anything else").fill("no crusts");
+    if (width <= 720)
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+        width,
+      );
+    const request = page.waitForRequest(
+      (r) => r.url().endsWith("/api/chat") && r.method() === "POST",
+    );
+    await send.click();
+    await request;
+    await sheet.waitFor({ state: "detached" });
+    await page.locator("#nutrition-dashboard #chat-view").waitFor();
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].message, new RegExp(`food_dish_id: ${dishId}`));
+    assert.match(sent[0].message, /I had: 2 of 8 \(no crusts\)/);
+    assert.match(sent[0].message, /portion_fraction: 0.25/);
+    assert.match(sent[0].message, /^Count this Food Journal dish/);
+    assert.equal(sent[0].priorAgentSlug, "brisket");
+    assert.equal(sent[0].attachments.length, 1);
+    assert.equal(sent[0].attachments[0].kind, "image");
+    assert.match(sent[0].attachments[0].dataUrl, /^data:image\//);
+    // Brisket confirms the meal; back in the Food Journal the dish is counted.
+    write((j) => {
+      j.visits[0].dishes[0].brisket = brisketLink();
+    });
+    await page.locator("#chat-close").click();
+    await goTo(page, width, "food-journal");
+    await page.getByRole("tab", { name: "Custom Menu" }).click();
+    const card = lasagneCard(page);
+    await card.getByText("Counted in Brisket · ½", { exact: true }).waitFor();
+    assert.ok(
+      await card.evaluate((n) => n.scrollWidth <= n.clientWidth + 1),
+      "counted dish card overflows",
+    );
+    assert.equal(
+      await card.getByRole("button", { name: "Send to Brisket" }).count(),
+      0,
+    );
+    await card.getByRole("button", { name: "Change portion", exact: true }).click();
+    const change = page.getByRole("dialog", { name: "Send to Brisket" });
+    await change.waitFor();
+    assert.equal(
+      await change.getByRole("radio", { name: "½" }).getAttribute("aria-checked"),
+      "true",
+    );
+    assert.equal(
+      await change.getByRole("radio", { name: "All" }).getAttribute("aria-checked"),
+      "false",
+    );
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
+  test(`brisket ${width}: a dish that needs a re-count, and edits that cause one`, async () => {
+    const { page, read, errors } = await pageFor(width, {
+      seed: (j) => countedDish(j, { brisket: brisketLink({ needs_recount: true }) }),
+    });
+    const sent = await mockChat(page);
+    await page.getByRole("tab", { name: "Custom Menu" }).click();
+    const card = lasagneCard(page);
+    await card
+      .getByText("Counted in Brisket · needs a re-count", { exact: true })
+      .waitFor();
+    assert.equal(
+      await card.getByRole("button", { name: "Send to Brisket" }).count(),
+      0,
+    );
+    await card.getByRole("button", { name: "Re-count", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Send to Brisket" });
+    await sheet.getByRole("radio", { name: "½" }).waitFor();
+    assert.equal(
+      await sheet.getByRole("radio", { name: "½" }).getAttribute("aria-checked"),
+      "true",
+    );
+    // A photo that cannot be fetched is skipped; the hand-off still goes.
+    await sheet.getByRole("button", { name: "Send", exact: true }).click();
+    await page.locator("#nutrition-dashboard #chat-view").waitFor();
+    await expectSent(sent, 1);
+    assert.match(sent[0].message, /^Re-count this Food Journal dish\. Last time: 640 kcal/);
+    assert.equal(sent[0].attachments, undefined);
+    errors.length = 0;
+    // Changing a counted dish's ingredients marks it for a re-count.
+    await page.locator("#chat-close").click();
+    await goTo(page, width, "food-journal");
+    await page.getByRole("tab", { name: "Timeline" }).click();
+    await openFirstEntry(page);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator(".food-sheet").waitFor();
+    await page
+      .getByLabel("Ingredients", { exact: true })
+      .first()
+      .fill("Pasta, beef, bechamel, spinach");
+    await page.getByRole("button", { name: "Save visit", exact: true }).click();
+    await page.locator(".food-sheet").waitFor({ state: "detached" });
+    const saved = read().visits[0].dishes;
+    assert.equal(saved[0].brisket.needs_recount, true);
+    assert.equal(saved[1].brisket, undefined);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+}
+async function expectSent(sent, n) {
+  for (let i = 0; i < 50 && sent.length < n; i++)
+    await new Promise((r) => setTimeout(r, 100));
+  assert.equal(sent.length, n);
+}
+
+for (const answer of ["Yes", "No"])
+  test(`deleting a counted visit, ${answer} to the nutrition log question`, async () => {
+    const { page, read, removedMeals, errors } = await pageFor(390, {
+      seed: (j) => countedDish(j, { brisket: brisketLink() }),
+    });
+    const puts = [];
+    page.on("request", (r) => {
+      if (r.url().endsWith("/api/food-journal") && r.method() === "PUT")
+        puts.push(JSON.parse(r.postData()));
+    });
+    await openFirstEntry(page);
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    const sheet = page.locator(".food-sheet");
+    await sheet.getByRole("button", { name: "Delete", exact: true }).click();
+    await sheet.getByText("Also remove it from your nutrition log?").waitFor();
+    await sheet.getByRole("button", { name: answer, exact: true }).click();
+    await sheet.waitFor({ state: "detached" });
+    assert.equal(read().visits[0].status, "deleted");
+    const put = puts.at(-1);
+    if (answer === "Yes") {
+      assert.deepEqual(put.remove_meals, [brisketLink().meal_path]);
+      assert.deepEqual(removedMeals, [brisketLink().meal_path]);
+    } else {
+      assert.equal(put.remove_meals, undefined);
+      assert.deepEqual(removedMeals, []);
+    }
     assert.deepEqual(errors, []);
     await page.close();
   });

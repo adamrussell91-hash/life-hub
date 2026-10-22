@@ -55,6 +55,12 @@ import {
   toggleMenuDish,
   menuDishIndex,
 } from "./capture.js";
+import { PORTION_CHIPS, portionOf } from "./portion.js";
+import { handoffMessage, needsRecount } from "./brisket-handoff.js";
+import {
+  fileToChatAttachment,
+  MAX_CHAT_IMAGE_BYTES,
+} from "../../../../packages/design-kit/js/hub-chat-attachments.js";
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -183,6 +189,7 @@ export function createFoodJournalView({
   root = document,
   api,
   storage = globalThis.localStorage,
+  sendToBrisket,
 } = {}) {
   const host = root.querySelector("#food-journal-dashboard");
   let journal = emptyJournal(),
@@ -194,7 +201,9 @@ export function createFoodJournalView({
     entryId = null,
     fixIndex = 0,
     venueIndex = 0,
-    dialog = null;
+    dialog = null,
+    // Brisket writes the counted link on confirm, so look again on return.
+    sentToBrisket = false;
   let editorialRunning = false;
   const editorialFailed = new Set();
   let translating = false;
@@ -638,6 +647,7 @@ export function createFoodJournalView({
     content.append(...dishNotes(dish, visit, "food-notes fj-serif fj-italic"));
     const actions = el("div", "food-actions");
     actions.append(
+      ...brisketActions(visit, dish),
       button("Recipe", (e) => openRecipe(dish, e.currentTarget)),
       button(
         "Eat it again",
@@ -649,6 +659,131 @@ export function createFoodJournalView({
     content.append(actions);
     card.append(content);
     return card;
+  }
+  function brisketActions(visit, dish) {
+    const open = (e) => openPortion(visit, dish, e.currentTarget);
+    if (!sendToBrisket) return [];
+    if (!dish.brisket) return [button("Send to Brisket", open, "primary")];
+    if (dish.brisket.needs_recount)
+      return [
+        el("span", "hub-chip food-counted", "Counted in Brisket · needs a re-count"),
+        button("Re-count", open, "primary"),
+      ];
+    return [
+      el("span", "hub-chip food-counted", `Counted in Brisket · ${dish.brisket.portion}`),
+      button("Change portion", open),
+    ];
+  }
+  // How much of the dish was eaten, then the hand-off goes to Brisket's chat.
+  function openPortion(visit, dish, trigger) {
+    const s = modal("Send to Brisket", trigger);
+    const current = dish.brisket?.portion;
+    const fixed = PORTION_CHIPS.some((c) => c.label === current);
+    const piecesNow = !fixed && /^(\d+) of (\d+)$/.exec(current || "");
+    let chip = piecesNow ? null : fixed ? current : "All",
+      note = "";
+    const row = el("div", "hub-chips food-portion");
+    row.setAttribute("role", "radiogroup");
+    row.setAttribute("aria-label", "How much you had");
+    const pieces = el("div", "food-portion__pieces");
+    const count = (label, value) => {
+      const n = el("input", "hub-input food-portion__count");
+      n.type = "number";
+      n.inputMode = "numeric";
+      n.min = "1";
+      n.max = "99";
+      n.step = "1";
+      n.value = value ?? "";
+      n.setAttribute("aria-label", label);
+      n.addEventListener("input", paint);
+      return n;
+    };
+    const eaten = count("Pieces eaten", piecesNow?.[1]),
+      total = count("Pieces in total", piecesNow?.[2]);
+    pieces.append(eaten, el("span", "", "of"), total);
+    const choice = () =>
+      portionOf(
+        chip
+          ? { chip }
+          : { pieces: Number(eaten.value || NaN), of: Number(total.value || NaN) },
+      );
+    const chips = [...PORTION_CHIPS.map((c) => c.label), "Pieces"].map((label) => {
+      const b = button(label, () => {
+        chip = label === "Pieces" ? null : label;
+        paint();
+        if (!chip) eaten.focus();
+      });
+      b.className = "hub-chip food-portion__chip";
+      b.setAttribute("role", "radio");
+      b.dataset.portion = label;
+      return b;
+    });
+    row.append(...chips);
+    const send = button(
+      "Send",
+      async (e) => {
+        const picked = choice();
+        if (!picked) return;
+        e.currentTarget.disabled = true;
+        s.error.textContent = "";
+        const message = handoffMessage({
+          visit,
+          dish,
+          portion: { ...picked, note: note.trim() },
+          previous: dish.brisket || undefined,
+        });
+        const attachments = [];
+        const photo = await dishAttachment(dish);
+        if (photo) attachments.push(photo);
+        if (!s.isOpen()) return;
+        sentToBrisket = true;
+        s.close();
+        sendToBrisket(message, attachments);
+      },
+      "primary",
+    );
+    function paint() {
+      for (const b of chips) {
+        const on = chip ? b.dataset.portion === chip : b.dataset.portion === "Pieces";
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-checked", String(on));
+      }
+      pieces.hidden = chip != null;
+      send.disabled = !choice();
+    }
+    s.fields.append(
+      row,
+      pieces,
+      field("Anything else", note, (v) => (note = v), { max: 200 }),
+    );
+    s.actions.append(button("Cancel", s.close, "ghost"), send);
+    paint();
+  }
+  // The dish's first photo as a chat image, or null when it can't be had.
+  async function dishAttachment(dish) {
+    const key = dish.photos?.[0]?.key;
+    if (!key) return null;
+    try {
+      const cached = photoCache.get(key);
+      const url =
+        cached &&
+        (cached.startsWith("blob:") || (photoExpires.get(key) || 0) > Date.now())
+          ? cached
+          : await signPhoto(key);
+      if (!url) return null;
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const blob = await compressPhoto(
+        new File([await response.blob()], "dish.jpg", { type: "image/jpeg" }),
+        1200,
+      );
+      if (blob.size > MAX_CHAT_IMAGE_BYTES) return null;
+      return await fileToChatAttachment(
+        new File([blob], "dish.jpg", { type: "image/jpeg" }),
+      );
+    } catch {
+      return null;
+    }
   }
   function openEntry(id) {
     entryId = id;
@@ -1600,6 +1735,10 @@ export function createFoodJournalView({
           next.recipes = next.recipes.filter((r) => ids.has(r.dish_id));
           const kept = new Set(visit.dishes.map((d) => d.id));
           const saved = journal.visits.find((v) => v.id === visit.id);
+          for (const d of visit.dishes) {
+            const before = saved?.dishes.find((b) => b.id === d.id);
+            if (d.brisket && needsRecount(before, d)) d.brisket.needs_recount = true;
+          }
           const paths = countedPaths(
             (saved?.dishes ?? []).filter((d) => !kept.has(d.id)),
           );
@@ -2112,7 +2251,8 @@ export function createFoodJournalView({
   return {
     show() {
       if (!host) return;
-      if (!loaded) {
+      if (!loaded || sentToBrisket) {
+        sentToBrisket = false;
         render();
         void load();
       } else render();
