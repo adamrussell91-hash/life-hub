@@ -11,7 +11,7 @@ import { TOOLS, toolsForBookStep } from '../../../../../packages/problem-solver/
 import { BOOK_STEPS, planStepForBook, stepName } from '../../../../../packages/problem-solver/steps.mjs';
 import { reviewStart, waitingForReview } from '../../../../../packages/problem-solver/review.mjs';
 import type { PsAction, PsCaseFileOffer, PsSession, PsSummary, PsToolId } from '../../../../../packages/problem-solver/types';
-import { decisionBookApi, isBusy, pollUntilSettled, problemSolverApi } from './api';
+import { decisionBookApi, gearShifterApi, isBusy, pollUntilSettled, problemSolverApi } from './api';
 import { skillsRibbon } from './skills-ribbon';
 import { mountCanvas, type RunScores } from './canvas';
 import { mountCoachPanel } from './coach-panel';
@@ -222,10 +222,11 @@ async function renderList(canvas: HTMLElement): Promise<void> {
   hero.append(copy, board.el);
   page.append(hero);
 
-  const [sessions, decisions] = await Promise.all([
+  const [sessions, decisions, shifts] = await Promise.all([
     problemSolverApi.list().then((rows) => rows.filter((item) => item.status !== 'archived')),
-    // The shared tally only: a Decision Maker that cannot be reached leaves its share out.
-    decisionBookApi.list().catch(() => [] as PsSummary[])
+    // The shared tally only: a tool that cannot be reached leaves its share out.
+    decisionBookApi.list().catch(() => [] as PsSummary[]),
+    gearShifterApi.list().catch(() => [] as PsSummary[])
   ]);
   const problems = el('ul', 'ps-probs');
   problems.append(...sessions.map(problemCard));
@@ -243,7 +244,7 @@ async function renderList(canvas: HTMLElement): Promise<void> {
     section('Problems', sessions.length ? 'Each badge fills in as you go. Blue, yellow and red are the three framing questions; the centre is the tool in use.' : 'Nothing yet. Start with the problem that is bugging you most.', problems),
     section('How a session builds', 'The order follows the toolkit’s problem solving process.', buildSteps()),
     section('The toolkit', 'The coach picks from these for each step. Here is what each one is for.', toolShelf()),
-    section('Thinking skills you have used', 'Across Problem Solver and Decision Maker. Faint marks have not come up yet.', skillsRibbon({ name: 'Problem Solver', sessions }, { name: 'Decision Maker', sessions: decisions }, (i) => COLOURS[i % 3]))
+    section('Thinking skills you have used', 'One tally across all three tools. Faint marks have not come up yet.', skillsRibbon({ name: 'Problem Solver', sessions }, [{ name: 'Decision Maker', sessions: decisions }, { name: 'Gear Shifter', sessions: shifts, colour: '#2a3340' }], (i) => COLOURS[i % 3]))
   );
   canvas.replaceChildren(page);
 }

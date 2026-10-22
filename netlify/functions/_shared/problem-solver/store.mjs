@@ -4,6 +4,7 @@ import { summaryRow } from './session.mjs';
 
 export const PROBLEM_SOLVER_PREFIX = 'problem-solver/v1';
 export const DECISION_BOOK_PREFIX = 'decision-book/v1';
+export const GEAR_SHIFTER_PREFIX = 'get-things-done/v1';
 
 /** In-memory store with the same read/write/list contract as the R2 cognitive store. */
 export function createMemoryProblemStore() {

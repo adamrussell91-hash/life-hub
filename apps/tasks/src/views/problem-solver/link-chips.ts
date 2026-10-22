@@ -1,6 +1,6 @@
 import './link-chips.css';
 import { el } from '@/views/hub-kit';
-import { decisionBookApi, problemSolverApi, type PsLinkedSession } from './api';
+import { decisionBookApi, gearShifterApi, problemSolverApi, type PsLinkedSession } from './api';
 
 type LinkedApi = { linked: (ref: string) => Promise<PsLinkedSession[]> };
 /** A tool's chips: where they open, the review step a review chip opens at, and the tool's name. */
@@ -38,4 +38,9 @@ export function problemSolverChips(ref: { kind: 'task' | 'project'; id: string }
 /** Chips for the Decision Maker decisions that link to a task or project (a record page, a first step, a review). */
 export function decisionMakerChips(ref: { kind: 'task' | 'project'; id: string }, api: LinkedApi = decisionBookApi): HTMLSpanElement {
   return sessionChips(ref, api, { hash: '#/decision-maker', reviewStep: 'review', name: 'Decision Maker', tone: 'dm' });
+}
+
+/** Chips for the Gear Shifter sessions that link to a task or project (an action record page, a next action, a check-back). */
+export function gearShifterChips(ref: { kind: 'task' | 'project'; id: string }, api: LinkedApi = gearShifterApi): HTMLSpanElement {
+  return sessionChips(ref, api, { hash: '#/gear-shifter', reviewStep: 'review', name: 'Gear Shifter', tone: 'gt' });
 }

@@ -11,6 +11,7 @@ import { createCurveView } from './curve';
 import { createTensionView } from './tension';
 import { createPathView } from './path';
 import { createListView } from './list';
+import { createRatingsView } from './ratings';
 import { createOutsideBoxView } from './outside-box';
 import { createBlackBoxView } from './black-box';
 import { createRecordView } from './record';
@@ -31,7 +32,8 @@ const BY_FAMILY: Record<string, (tool: never) => RunChart> = {
   curve: createCurveView,
   tension: createTensionView,
   path: createPathView,
-  list: createListView
+  list: createListView,
+  ratings: createRatingsView
 };
 
 const BY_ID: Record<string, (tool: never) => RunChart> = {

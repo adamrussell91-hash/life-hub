@@ -5,6 +5,8 @@
 // shape opens a details card beneath it with the full answer, the skills it
 // showed and any coach objection. One card is open at a time.
 // Rows appear only once an answer is accepted (or kept), and only new rows animate.
+// A variant that checks each why (Gear Shifter's) has `evidence:k` nodes: each is drawn right
+// after why k as a plain note, with no shape, so the chain itself still reads as the book's.
 import type { PsNode, PsToolRun } from '../types';
 import { parseSlot } from '../slots.mjs';
 import { nodeTitle } from '../titles.mjs';
@@ -15,11 +17,11 @@ const SVG = 'http://www.w3.org/2000/svg';
 
 export type FiveWhysView = { el: HTMLDivElement; update(run: PsToolRun): void };
 
-type Kind = 'problem' | 'why' | 'root';
+type Kind = 'problem' | 'why' | 'root' | 'evidence';
 
-const ACCENT: Record<Kind, Accent> = { problem: 'red', why: 'yellow', root: 'blue' };
+const ACCENT: Record<Kind, Accent> = { problem: 'red', why: 'yellow', root: 'blue', evidence: 'blue' };
 
-const PATHS: Record<Kind, string> = {
+const PATHS: Record<Exclude<Kind, 'evidence'>, string> = {
   problem: 'M0 100A100 100 0 0 1 200 100Z', // half-disc, flat edge down
   why: 'M0 0H200L100 100Z', // downward triangle, 2:1 like the book
   root: 'M0 0A100 100 0 0 0 200 0Z' // half-disc, flat edge up
@@ -27,21 +29,23 @@ const PATHS: Record<Kind, string> = {
 
 function kindOf(node: PsNode): Kind {
   const name = parseSlot(node.slot)?.name;
-  return name === 'problem' || name === 'root' ? name : 'why';
+  return name === 'problem' || name === 'root' || name === 'evidence' ? name : 'why';
 }
 
 function order(node: PsNode): number {
   const slot = parseSlot(node.slot);
   if (slot?.name === 'problem') return 0;
   if (slot?.name === 'root') return 1000;
+  if (slot?.name === 'evidence') return (slot.index ?? 999) + 0.5;
   return slot?.index ?? 999;
 }
 
 function metaLabel(node: PsNode, kind: Kind): string {
+  if (kind === 'evidence') return `Evidence for why ${parseSlot(node.slot)?.index ?? ''}`.trim();
   return kind === 'why' ? slotLabel(node.slot) : kind === 'root' ? 'The root cause' : 'The problem';
 }
 
-function shapeSvg(doc: Document, kind: Kind): SVGSVGElement {
+function shapeSvg(doc: Document, kind: Exclude<Kind, 'evidence'>): SVGSVGElement {
   const svg = doc.createElementNS(SVG, 'svg') as SVGSVGElement;
   svg.setAttribute('class', 'ps-whys__svg');
   svg.setAttribute('viewBox', '0 0 200 100');
@@ -71,7 +75,8 @@ function shapeButton(doc: Document, node: PsNode, kind: Kind, detailsId: string)
   if (node.state === 'contested') {
     label.append(contestedTag(doc, node));
   }
-  button.append(shapeSvg(doc, kind), label);
+  if (kind === 'evidence') button.append(label);
+  else button.append(shapeSvg(doc, kind), label);
   button.setAttribute('aria-label', `${metaLabel(node, kind)}: ${nodeTitle(node)}${node.state === 'contested' ? ', contested' : ''}. Show details`);
   return button;
 }

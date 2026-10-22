@@ -7,16 +7,30 @@ import { TOOLS } from '../problem-solver/tools/index.mjs';
 import { addEdge, applyScores, canEdge, checkNode, isComplete, newRun, nextSlots, placeNode } from '../problem-solver/machine.mjs';
 import { parseSlot } from '../problem-solver/slots.mjs';
 
+// Scores are stamped with a fixed date, so a dated chart's legend reads as a date.
+const AT = '2026-10-01T09:00:00.000Z';
+
 /** Scores the tool is waiting for: every point in the middle, every series at a valid value. */
 function scoreWaiting(run, def) {
   if (def.family === 'plot') {
     const points = Object.fromEntries(run.nodes.filter((n) => parseSlot(n.slot).name === 'point').map((n, i) => [n.id, { x: 2 + ((i * 3) % 8), y: 3 + ((i * 5) % 7), ...(def.chart.size ? { size: 3 + (i % 5) } : {}) }]));
-    return applyScores(run, { points }, 'work-through');
+    return applyScores(run, { points }, AT);
+  }
+  if (def.family === 'ratings') {
+    // Every rater still to score rates every idea mid-range, and ranks the ideas in slot order.
+    const of = (name) => run.nodes.filter((n) => parseSlot(n.slot).name === name).map((n) => n.id);
+    const scored = new Set((run.scores?.snapshots ?? []).map((snap) => snap.rater));
+    for (const [r, rater] of of('rater').entries()) {
+      if (scored.has(rater)) continue;
+      const scores = Object.fromEntries(of('idea').map((idea, i) => [idea, Object.fromEntries(of('criterion').map((c, k) => [c, 1 + ((i * 3 + k * 2 + r) % 10)]))]));
+      run = applyScores(run, { rater, scores, ranking: of('idea') }, AT);
+    }
+    return run;
   }
   for (const [k, s] of (def.chart.series ?? [{ id: 'now' }]).entries()) {
     const ids = def.chart.scales.map((scale) => scale.id);
     const values = Object.fromEntries(ids.map((id, i) => [id, def.chart.mode === 'shares' ? (i === 0 ? 100 - 15 * (ids.length - 1) : 15) : 2 + ((i * 3 + k * 2) % 8)]));
-    run = applyScores(run, { series: s.id, values }, 'work-through');
+    run = applyScores(run, { series: s.id, values }, AT);
   }
   return run;
 }

@@ -4,9 +4,7 @@ import { defaultToolFor, firstStep, nextPhase, planStepForBook, stepName, stepSe
 import { parseSlot } from '../../../../packages/problem-solver/slots.mjs';
 import { isDate } from './coach-schema.mjs';
 import { cleanOverdue, reviewLive, reviewStart, SNAPSHOT_STATUSES, waitingForReview } from '../../../../packages/problem-solver/review.mjs';
-import { parseCompass } from '../../../../packages/decision-book/compass.mjs';
-import { DECISION_MODEL } from '../../../../packages/decision-book/model.mjs';
-import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
+import { BOOK_KINDS, bookOf } from '../../../../packages/problem-solver/books.mjs';
 import { mainModel, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 import { outcomeOf } from '../../../../packages/decision-book/quick.mjs';
 
@@ -23,22 +21,23 @@ const fail = (status, code, message) => Object.assign(new Error(message), { stat
 
 /**
  * Frame questions per session kind, and the model a kind starts in once framed (null: the
- * coach chooses one). Lightning sessions never frame.
+ * coach chooses one). Lightning sessions never frame. Each coached book (books.mjs) adds its own.
  */
 export const KIND_FRAMES = Object.freeze({
   full: Object.freeze({ keys: Object.freeze(['goal', 'whatIsTrue', 'whatCanBeDone']), model: null }),
-  decision: Object.freeze({ keys: Object.freeze(['decision', 'compass', 'known']), model: Object.freeze({ id: DECISION_MODEL.id, reason: 'Decision Maker works from The Decision Book.' }) })
+  ...Object.fromEntries(Object.entries(BOOK_KINDS).map(([kind, book]) => [kind, Object.freeze({ keys: book.frameKeys, model: Object.freeze({ id: book.model.id, reason: book.reason }) })]))
 });
 
 export const frameKeysOf = (session) => (KIND_FRAMES[session.kind] ?? KIND_FRAMES.full).keys;
 
-/** The answers of this turn that belong to the session's frame; a compass keeps only known quadrants. */
+/** The answers of this turn that belong to the session's frame; a placement (a compass, a route) keeps only known ids. */
 function pickFrame(session, frame) {
+  const book = bookOf(session.kind);
   const out = {};
   for (const key of frameKeysOf(session)) {
     if (!frame?.[key]) continue;
-    if (key !== 'compass') out[key] = frame[key];
-    else if (parseCompass(frame[key]).length) out.compass = parseCompass(frame[key]).join('+');
+    if (key !== book?.placeKey) out[key] = frame[key];
+    else if (book.parsePlace(frame[key]).length) out[key] = book.parsePlace(frame[key]).join('+');
   }
   return out;
 }
@@ -118,8 +117,8 @@ function replaceRun(session, run) {
   return { ...session, steps };
 }
 
-/** A model a decision starts from (picked on the shelf), when it is one Explore offers. */
-const shelfModel = (kind, model) => (kind === 'decision' && typeof model === 'string' && toolsForPlanStep(DECISION_MODEL.id, 'explore').includes(model) ? model : null);
+/** A model a book session starts from (picked on the shelf), when it is one Explore offers. */
+const shelfModel = (kind, model) => (bookOf(kind) && typeof model === 'string' && toolsForPlanStep(bookOf(kind).model.id, 'explore').includes(model) ? model : null);
 
 export function createSession({ title = '', text, links = [], kind = 'full', startModel = null }, deps) {
   if (!KIND_FRAMES[kind]) throw fail(400, 'validation_error', `Unknown session kind: ${kind}`);
@@ -221,21 +220,23 @@ function placeAccepted(next, turn, coachTurnId, deps) {
 }
 
 /**
- * After a node lands in the decision record: a reason keeps the Explore nodes it rests on
- * (`basis`, on the session, since they sit in other runs), and the review date becomes the
- * session's review proposal, the page's confirm card (unless one is created or set aside).
+ * After a node lands in a book's record tool (Decision Maker's decision record, Gear Shifter's
+ * experiment; books.mjs): its basis slot keeps the Explore nodes it rests on (`basis`, on the
+ * session, since they sit in other runs), and its date becomes the session's review proposal,
+ * the page's confirm card (unless one is created or set aside).
  */
 function recordPlaced(session, run, nodeId, refs, deps) {
-  if (run.tool !== RECORD_ID) return session;
+  const record = bookOf(session.kind)?.record;
+  if (!record || run.tool !== record.tool) return session;
   const node = run.nodes.find((item) => item.id === nodeId);
   const name = parseSlot(node.slot)?.name;
-  if (name === 'reason') {
+  if (name === record.basisSlot) {
     const basis = resolveBasis(session, refs);
     return basis.length ? { ...session, basis: { ...(session.basis ?? {}), [nodeId]: basis } } : session;
   }
   const open = !session.reviewTaskId && session.reviewProposal?.status !== 'dismissed';
-  if (name === 'review' && open && afterToday(node.text, deps)) {
-    return { ...session, reviewProposal: { title: reviewTitle(session), due: node.text, reason: 'The review date set in the decision record.', status: 'proposed' } };
+  if (name === record.dateSlot && open && afterToday(node.text, deps)) {
+    return { ...session, reviewProposal: { title: reviewTitle(session), due: node.text, reason: record.dateReason, status: 'proposed' } };
   }
   return session;
 }
@@ -305,8 +306,8 @@ export function applyCoachTurn(session, turn, deps) {
   // Leaving a step untouched asks no learning question, so the next step's opening tool comes at once.
   const untouched = mode === 'boundary' && skippedUntouched(next.steps?.[session.runner?.leaving]);
   const quiet = next.phase === 'finished' || (mode === 'boundary' && !untouched) || waitingForReview(next);
-  // A decision started from a model on the shelf opens on that model once it is framed.
-  const shelf = session.phase === 'frame' && next.phase !== 'frame' && next.startModel ? { kind: 'next_tool', tool: next.startModel, reason: 'You started from this model on the shelf.' } : null;
+  // A session started from a model (or technique) on the shelf opens on it once it is framed.
+  const shelf = session.phase === 'frame' && next.phase !== 'frame' && next.startModel ? { kind: 'next_tool', tool: next.startModel, reason: `You started from this ${next.kind === 'shift' ? 'technique' : 'model'} on the shelf.` } : null;
   const suggestion = quiet ? null : (shelf ?? turn.suggestion ?? followOn(next) ?? (next.pendingLearning ? null : openingSuggestion(next)));
   return touch({ ...next, turns: [...next.turns, coachTurn], suggestion, summary: turn.summary ?? next.summary }, deps);
 }
@@ -373,6 +374,8 @@ export function startReview(session, payload, deps) {
   if (!improve) throw fail(409, 'action_not_allowed', 'This problem has no Improve step.');
   if (session.reviewState?.status === 'reviewing' && session.phase === improve) return session;
   if (session.reviewState?.status === 'done') throw fail(409, 'action_not_allowed', 'This review is already done.');
+  // The learning question comes first: a review started now would have its opening read as the answer.
+  if (session.pendingLearning) throw fail(409, 'action_not_allowed', 'Answer the coach’s question first, then start the review.');
   if (!reviewLive(session)) throw fail(409, 'action_not_allowed', 'There is no review to start.');
   if (session.detour) throw fail(409, 'action_not_allowed', 'Finish the reopened step first.');
   const snap = cleanSnapshot(payload?.snapshot, deps);
@@ -550,21 +553,21 @@ function cleanDigests(raw) {
 
 const sameTarget = (a, b) => Boolean(a && b) && a.kind === b.kind && a.id === b.id;
 
-/** A session that writes a page record: Problem Solver's case file (a Document step) or a decision record. */
-const keepsRecord = (session) => Boolean(session.model && (planStepForBook(session.model.id, 'document') || session.kind === 'decision'));
+/** A session that writes a page record: Problem Solver's case file (a Document step) or a book's record (books.mjs). */
+const keepsRecord = (session) => Boolean(session.model && (planStepForBook(session.model.id, 'document') || bookOf(session.kind)?.record));
 
 /**
  * The page wrote the case file (or an update) to a task or project page; record it. No coach call.
  * A first write or a move (`moved`: the old page is gone) replaces the section digests; an update
  * merges them and must be the next version on the same page. The same version on the same page
  * again is a no-op, so a retry after a lost response is safe. The page joins the problem's links.
- * A decision record also says whether its provenance graphic wrote (`graphic`); the same version
+ * A book's record also says whether its provenance graphic wrote (`graphic`); the same version
  * on the same page with `graphic: true` records a retried graphic.
  */
 export function linkCaseFile(session, payload, deps) {
   if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
   if (!keepsRecord(session)) throw fail(409, 'action_not_allowed', 'This problem has no Document step.');
-  const graphic = session.kind === 'decision' && typeof payload?.graphic === 'boolean' ? { graphic: payload.graphic } : {};
+  const graphic = bookOf(session.kind)?.record && typeof payload?.graphic === 'boolean' ? { graphic: payload.graphic } : {};
   const target = cleanTarget(payload?.target);
   const version = payload?.version;
   if (!Number.isInteger(version) || version < 1 || version > 999) throw fail(400, 'validation_error', 'A case file version is required.');
@@ -634,11 +637,11 @@ export function summaryRow(session) {
     taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
     reviewTaskId: session.reviewTaskId ?? null,
     reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
-    escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? null,
+    escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? session.start?.escalatedTo ?? null,
     // A quick decision's row says how its latest round came out.
     ...(session.kind === 'quick' ? { outcome: outcomeOf(session.quick) } : {}),
-    // A decision's medal shows the model its reasons lean on most.
-    ...(session.kind === 'decision' ? { main: mainModel(session) } : {}),
+    // A book session's medal shows the model or technique its record leans on most.
+    ...(bookOf(session.kind) ? { main: mainModel(session) } : {}),
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   };

@@ -24,7 +24,8 @@ export function entriesByGroup(run, chart) {
  * @param {object} config
  * @param {object} config.chart
  * @param {string} config.chart.layout
- * @param {{id: string, label: string, prompt?: string, column?: string}[]} config.chart.groups
+ * @param {{id: string, label: string, prompt?: string, column?: string, max?: number}[]} config.chart.groups
+ *   `max` caps one group below perGroup (the 5/25 Rule's five)
  * @param {string} config.chart.entry what one entry is
  * @param {number} [config.chart.perGroup] (6)
  * @param {number} [config.chart.minGroups] groups with an entry before the reflection opens (2)
@@ -47,6 +48,8 @@ export function listTool(config) {
   const minGroups = chart.minGroups ?? 2;
   const minEntries = chart.minEntries ?? 3;
   const groupIds = chart.groups.map((group) => group.id);
+  for (const group of chart.groups) check(group.max === undefined || (Number.isInteger(group.max) && group.max >= 1 && group.max <= perGroup), id, `group ${group.id}: max is a whole number from 1 to perGroup`);
+  const capOf = Object.fromEntries(chart.groups.map((group) => [group.id, group.max ?? perGroup]));
   const { subject, reflection } = framing(config);
 
   const ready = (run) => {
@@ -57,7 +60,7 @@ export function listTool(config) {
   return baseTool(config, 'list', { entry: chart.entry }, {
     nodeTags: { entry: groupIds },
     validateNode(run, node) {
-      if (node.slot.startsWith('entry') && entriesByGroup(run, chart)[node.tag]?.length >= perGroup) return `That group already has ${perGroup} entries; merge or replace one.`;
+      if (node.slot.startsWith('entry') && entriesByGroup(run, chart)[node.tag]?.length >= capOf[node.tag]) return `That group already has ${capOf[node.tag]} entries; merge or replace one.`;
       return null;
     },
     nextSlots(run) {

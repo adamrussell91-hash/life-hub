@@ -1,0 +1,174 @@
+/* packages/get-things-done/get-things-done.css
+   Gear Shifter's tokens, scoped to .gt-scope the way Decision Maker scopes .dm-scope. Adam's
+   palette (22 Oct): cobalt and vermilion for shapes, rings and gears, with amber as a sparing
+   accent (the centre gear, a done state). The bright colours fall under 4.5:1 on paper, so
+   small text takes the darker label shades. Motion matches the other two tools. */
+.gt-scope {
+  --gt-paper: #fefdf6;
+  --gt-ink: #2a3340;
+  --gt-blue: #2b7de9;
+  --gt-red: #ea4f2a;
+  --gt-amber: #f5a623;
+  --gt-blue-label: #2670d1;
+  --gt-red-label: #cd4524;
+  --gt-amber-label: #976615;
+  /* Deeper shades for small text on the tints (4.5:1 there; the label shades are not). */
+  --gt-blue-deep: #1f5fb4;
+  --gt-red-deep: #a8361b;
+  --gt-blue-tint: #e4eefb;
+  --gt-red-tint: #fbe9e4;
+  --gt-amber-tint: #fcf3e3;
+  --gt-soft: #f2f0e8;
+  --gt-line: #c9cbc4;
+  --gt-muted: #5b6372;
+  --gt-ghost: rgba(42, 51, 64, 0.12);
+  --gt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --gt-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* The re-skin: Decision Maker's family charts (decision-book.css) draw from --dm-* tokens,
+     so remapping them here draws every shared chart in Gear Shifter's palette. Red stays red
+     (vermilion for shapes, the label shade under text); green, which carries Decision Maker's
+     "go" and its process marks, becomes blue, at the label shade so paper text reads on it. */
+  --dm-paper: var(--gt-paper);
+  --dm-ink: var(--gt-ink);
+  --dm-red: var(--gt-red);
+  --dm-green: var(--gt-blue-label);
+  --dm-red-label: var(--gt-red-label);
+  --dm-soft: var(--gt-soft);
+  --dm-line: var(--gt-line);
+  --dm-green-tint: var(--gt-blue-tint);
+  --dm-red-tint: var(--gt-red-tint);
+  --dm-ghost: var(--gt-ghost);
+  --dm-ease: var(--gt-ease);
+  --dm-spring: var(--gt-spring);
+  --dm-muted: var(--gt-muted);
+  --dm-contested: var(--gt-red-deep);
+  --dm-band: var(--gt-blue-deep);
+}
+
+.gt-emblem { display: inline-flex; line-height: 0; }
+.gt-emblem svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------------ the shared charts
+   Twins of Decision Maker's .dm-scope-only rules, so the details cards look the same here. */
+.gt-scope .dm-details__card { box-shadow: none; border-top: 3px solid var(--gt-ink); background: var(--gt-paper); }
+.gt-scope .dm-details__card--red { border-top-color: var(--gt-red); }
+.gt-scope .dm-details__card--green { border-top-color: var(--gt-blue); }
+.gt-scope .dm-details__card--tint { border-top-color: var(--gt-line); }
+/* Decision Maker sets ink on its brighter label red; on Gear Shifter's darker one, paper reads. */
+.gt-scope .dm-qk__row[data-answer='no'] .dm-qk__chip,
+.gt-scope .dm-qk__answer[data-answer='no'] { color: var(--gt-paper); }
+
+/* ------------------------------------------------------------------ Kanban and 5 Whys
+   Problem Solver's renderers, remapped inside .gt-scope only. Kanban: To do in the red label
+   shade and Doing in the blue (white text reads on both), Done in amber, the done state, with
+   ink. 5 Whys: the problem red, the chain in blue tint with ink and a cobalt edge, the root blue. */
+.gt-scope .ps-kanban {
+  --ps-red: var(--gt-red-label);
+  --ps-blue: var(--gt-blue-label);
+  --ps-yellow: var(--gt-amber);
+  --ps-on-yellow: var(--gt-ink);
+  --ps-paper: var(--gt-paper);
+  --ps-ink: var(--gt-ink);
+}
+.gt-scope .ps-kanban__board { --ps-kanban-on-red: var(--gt-paper); }
+.gt-scope .ps-whys {
+  --ps-red: var(--gt-red-label);
+  --ps-yellow: var(--gt-blue-tint);
+  --ps-on-yellow: var(--gt-ink);
+  --ps-blue: var(--gt-blue-label);
+  --ps-paper: var(--gt-paper);
+  --ps-ink: var(--gt-ink);
+}
+.gt-scope .ps-whys__why { stroke: var(--gt-blue); stroke-width: 4; stroke-linejoin: round; }
+.gt-scope :is(.ps-kanban, .ps-whys) .ps-details__card { box-shadow: none; border-top: 3px solid var(--gt-ink); }
+/* Gear Shifter keeps the family rule of no text under 11px, where Problem Solver's own small
+   tags run at 9 and 10px. */
+.gt-scope :is(.ps-kanban, .ps-whys) :is(.ps-kanban__tag, .ps-kanban__meta-text, .ps-whys__meta, .ps-objection) { font-size: 11px; }
+/* Amber stays sparing on the board: Done and the limit badge. Doing's pills and arrow are paper. */
+.gt-scope .ps-kanban__lane--doing .ps-kanban__pill,
+.gt-scope .ps-kanban__arrow--doing { background: var(--gt-paper); }
+
+/* Scales: the newest (or first) overlay draws in cobalt, the older ones stay ink outlines. */
+.gt-scope .dm-scales__poly[data-style='solid'] { stroke: var(--gt-blue); stroke-width: 2; }
+.gt-scope .dm-scales__legend-item[data-style='solid']::before,
+.gt-scope .dm-scales__bar[data-style='solid'] { background: var(--gt-blue-label); }
+
+/* ------------------------------------------------------------------ the experiment (render/commit.ts)
+   After the cover: the result inside the target, the next action on the dart, the check-back on
+   the return arrows and a vermilion band for changing course. Phone: one column. */
+.gt-commit__part { position: relative; display: grid; align-content: start; gap: 6px; padding: 12px 14px 12px 52px; border-radius: 18px; background: var(--gt-paper); border: 1.5px solid var(--gt-line); min-width: 0; }
+.gt-commit__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--gt-muted); }
+.gt-commit__mark { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; }
+.gt-commit__result { border: 2px solid var(--gt-ink); }
+.gt-commit__result .dm-entry__pill { font-size: 18px; font-weight: 700; padding: 10px 18px; }
+.gt-commit__rests { display: flex; flex-wrap: wrap; gap: 6px; }
+.gt-commit__rests .gt-commit__title { flex-basis: 100%; }
+.gt-commit__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.gt-commit__action { background: var(--gt-blue-tint); border-color: var(--gt-blue); }
+.gt-commit__action .gt-commit__title { color: var(--gt-blue-deep); }
+.gt-commit__back { background: var(--gt-amber-tint); border-color: var(--gt-amber); }
+.gt-commit__back .gt-commit__title { color: var(--gt-amber-label); }
+.gt-commit__turn { background: var(--gt-red-tint); border: 2px solid var(--gt-red); }
+.gt-commit__turn .gt-commit__title { color: var(--gt-red-deep); }
+.dm-chart--commit .dm-chart__frame { display: grid; gap: 10px; }
+
+/* ------------------------------------------------------------------ the experiment review (render/review.ts) */
+.gt-review__loop { list-style: none; margin: 0; padding: 18px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; position: relative; }
+/* The return loop the stations sit on: a dotted cobalt arc over all three. */
+.gt-review__loop::before { content: ''; position: absolute; left: 16%; right: 16%; top: 4px; height: 30px; border: 3px dotted var(--gt-blue); border-bottom: 0; border-radius: 30px 30px 0 0; }
+.gt-review__station { position: relative; display: grid; align-content: start; gap: 8px; padding: 30px 12px 12px; border-radius: 18px; border: 1.5px solid var(--gt-line); background: var(--gt-paper); min-width: 0; }
+.gt-review__n { position: absolute; left: 50%; top: -14px; width: 32px; height: 32px; margin-left: -16px; display: grid; place-items: center; border-radius: 50%; font: 800 14px / 1 var(--font-ui, sans-serif); color: var(--gt-paper); background: var(--gt-blue-label); }
+.gt-review__station--cost .gt-review__n { background: var(--gt-red-label); }
+.gt-review__station--keep .gt-review__n { background: var(--gt-amber); color: var(--gt-ink); }
+.gt-review__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--gt-muted); text-align: center; }
+
+@media (max-width: 480px) {
+  .gt-commit__row, .gt-review__loop { grid-template-columns: 1fr; }
+  .gt-review__loop { gap: 22px; }
+  .gt-review__loop::before { left: 50%; right: auto; top: 0; bottom: 0; height: auto; width: 0; border: 0; border-left: 3px dotted var(--gt-blue); border-radius: 0; }
+}
+
+/* ------------------------------------------------------------------ Quick start's route (render/quick.ts)
+   The first action is the target; the dart flies in once a way to start is picked. The stations
+   sit on a dotted cobalt line; the one waiting for an answer is dashed and says "Now". */
+.gt-qs { display: grid; gap: 16px; min-width: 0; color: var(--gt-ink); }
+.gt-qs [hidden] { display: none !important; }
+.gt-qs__rounds { margin: 0; font: 600 12px / 1.4 var(--font-ui, sans-serif); color: var(--gt-muted); }
+.gt-qs__hit { display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr); gap: 16px; align-items: center; padding: 14px 16px; border-radius: 18px; border: 1.5px solid var(--gt-line); background: var(--gt-paper); }
+.gt-qs__art { width: 100%; height: auto; display: block; overflow: visible; }
+.gt-qs__mark, .gt-qs__dart { opacity: 0; transition: opacity 0.3s var(--gt-ease), transform 0.5s var(--gt-spring); }
+.gt-qs__dart { transform: translate(-40px, 20px); }
+.gt-qs[data-way] .gt-qs__dart { opacity: 1; transform: none; }
+.gt-qs[data-way='countdown'] .gt-qs__mark--countdown, .gt-qs[data-way='interval'] .gt-qs__mark--interval { opacity: 1; }
+.gt-qs__hit-text { display: grid; gap: 6px; min-width: 0; }
+.gt-qs__kicker { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--gt-red-label); }
+.gt-qs__action { margin: 0; font: 700 18px / 1.35 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
+.gt-qs__action[data-empty] { font-weight: 600; font-size: 15px; color: var(--gt-muted); }
+.gt-qs__way { margin: 0; font: 400 14px / 1.45 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
+.gt-qs__route { list-style: none; margin: 0; padding: 0; display: grid; }
+.gt-qs__stn { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; padding-bottom: 18px; }
+.gt-qs__stn:not(:last-child)::before { content: ''; position: absolute; left: 11px; top: 28px; bottom: 2px; border-left: 3px dotted var(--gt-blue); }
+.gt-qs__disc { width: 26px; height: 26px; box-sizing: border-box; border-radius: 50%; border: 3px solid var(--gt-blue); background: var(--gt-paper); }
+.gt-qs__stn[data-done] .gt-qs__disc { background: var(--gt-blue); }
+.gt-qs__stn[data-box='action'][data-done] .gt-qs__disc { border-color: var(--gt-red); background: var(--gt-red); }
+.gt-qs__stn[data-box='check'][data-done] .gt-qs__disc { border-color: var(--gt-amber); background: var(--gt-amber); }
+.gt-qs__stn[data-now] .gt-qs__disc { border-style: dashed; border-color: var(--gt-ink); }
+.gt-qs__stn:not([data-done]):not([data-now]) .gt-qs__label { color: var(--gt-muted); }
+.gt-qs__label { font: 600 14px / 1.4 var(--font-ui, sans-serif); min-width: 0; overflow-wrap: anywhere; }
+.gt-qs__now { padding: 0 10px; border-radius: 999px; background: var(--gt-ink); color: var(--gt-paper); font: 700 11px / 1.8 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; }
+.gt-qs__text { grid-column: 2 / -1; margin: 0; font: 400 13px / 1.45 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
+.gt-qs__ask { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.gt-qs__pick { min-height: 44px; padding: 0 16px; border: 2px solid var(--gt-blue-label); border-radius: 999px; background: var(--gt-paper); color: var(--gt-blue-deep); font: 600 14px / 1 var(--font-ui, sans-serif); cursor: pointer; }
+.gt-qs__pick[data-way='interval'] { border-color: var(--gt-ink); color: var(--gt-ink); }
+.gt-qs__pick:hover { background: var(--gt-blue-tint); }
+.gt-qs__pick:focus-visible { outline: 2px solid var(--gt-ink); outline-offset: 2px; }
+.gt-qs__pick[aria-disabled='true'] { opacity: 0.5; cursor: default; }
+.gt-qs__credit { margin: 0; font: 400 12px / 1.45 var(--font-ui, sans-serif); color: var(--gt-muted); }
+@media (max-width: 480px) {
+  .gt-qs__hit { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+  .gt-qs__art { max-width: 180px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gt-qs__mark, .gt-qs__dart { transition: none; }
+}

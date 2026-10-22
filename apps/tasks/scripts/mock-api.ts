@@ -145,10 +145,11 @@ export function createMockApi({ seed }: MockApiOptions) {
 
   const personalLines = new Map<string, Record<string, unknown> & { slug: string }>();
   const whiteboards = new Map<string, Record<string, unknown>>();
-  // Problem Solver and Decision Maker: one service each over its own memory store, both on the scripted coach.
+  // Problem Solver, Decision Maker and Gear Shifter: one service each over its own memory store, all on the scripted coach.
   const coachServices: Record<string, ReturnType<typeof createProblemSolverService>> = {
     '/api/problem-solver': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach }),
-    '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision', 'quick'] })
+    '/api/decision-book': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['decision', 'quick'] }),
+    '/api/get-things-done': createProblemSolverService({ store: createMemoryProblemStore(), coach: scriptedCoach, kinds: ['shift', 'start'] })
   };
 
   async function handle(method: string, urlPath: string, body?: unknown) {
@@ -467,7 +468,8 @@ export function createMockApi({ seed }: MockApiOptions) {
             ? await problemSolver.create('operator', payload.create as Record<string, unknown>)
             : await problemSolver.action('operator', payload);
           if (session.runner.status === 'queued') session = await problemSolver.run('operator', session.id);
-          if (payload.action === 'escalate' && session.lightning?.escalatedTo) await problemSolver.run('operator', session.lightning.escalatedTo);
+          const escalatedTo = session.lightning?.escalatedTo ?? session.start?.escalatedTo;
+          if (payload.action === 'escalate' && escalatedTo) await problemSolver.run('operator', escalatedTo);
           return json(200, { ok: true, data: { session } });
         }
       } catch (error) {
