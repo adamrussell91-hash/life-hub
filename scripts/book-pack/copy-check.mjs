@@ -54,13 +54,19 @@ export function readPackTexts(dir) {
   return texts;
 }
 
-/** Gear Shifter's shipped strings, each with where it came from. */
+/** Gear Shifter's shipped strings, each with where it came from: techniques, the Commit and Review tools, the coach's knowledge and rubric, the catalogue and the glyph titles. */
 export async function gearShifterStrings() {
   const { GEAR_TOOLS } = await import('../../packages/get-things-done/tools/index.mjs');
+  const { gtCommit } = await import('../../packages/get-things-done/tools/commit.mjs');
+  const { gtReview } = await import('../../packages/get-things-done/tools/review.mjs');
+  const knowledge = await import('../../netlify/functions/_shared/problem-solver/knowledge/get-things-done.mjs');
+  const { GEAR_RUBRIC } = await import('../../netlify/functions/_shared/problem-solver/get-things-done-prompts.mjs');
   const { CATALOGUE, SECTIONS } = await import('../../packages/get-things-done/catalogue.mjs');
   const glyphs = fileURLToPath(new URL('../../packages/get-things-done/glyphs/', import.meta.url));
   const out = [];
-  for (const [id, tool] of Object.entries(GEAR_TOOLS)) for (const text of shippedStrings(tool)) out.push([id, text]);
+  for (const [id, tool] of Object.entries({ ...GEAR_TOOLS, gt_commit: gtCommit, gt_review: gtReview })) for (const text of shippedStrings(tool)) out.push([id, text]);
+  for (const key of ['STANCE', 'ROUTE_GUIDE', 'OBSTACLE_GUIDE', 'GEAR_TRAPS']) out.push([`knowledge ${key}`, knowledge[key]]);
+  out.push(['rubric GEAR_RUBRIC', GEAR_RUBRIC]);
   for (const entry of [...CATALOGUE, ...SECTIONS]) for (const text of shippedStrings(entry)) out.push([`catalogue ${entry.id ?? entry.key}`, text]);
   for (const folder of readdirSync(glyphs, { withFileTypes: true }).filter((d) => d.isDirectory())) {
     for (const file of readdirSync(join(glyphs, folder.name)).filter((name) => name.endsWith('.svg'))) {
