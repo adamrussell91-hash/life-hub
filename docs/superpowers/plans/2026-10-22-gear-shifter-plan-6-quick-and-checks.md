@@ -145,3 +145,39 @@ Selectors from Plan 5's walk: `Describe what needs to move`, `Your answer`, `.ps
 **Questions for Adam** (not decided here):
 1. The shared engine takes Review now while the learning question is pending: the reply is read as the learning answer and Review opens with no tool. Decision Maker does the same. Should Review now wait for the answer (or ask it after)?
 2. Should Problem Solver's and Decision Maker's skills ribbons take Gear Shifter's share too (one line each)?
+
+---
+
+## As run (22 Oct)
+
+- Every task ran test-first and ended with a commit, plus one prompt fix from the evaluation. Tests added: 7 flow tests (`get-things-done-quick.test.js`), 6 server tests (`get-things-done-start-session.test.js`), 7 prompt, seed and record tests (`get-things-done-start-prompts.test.js`), 2 evaluation-case tests (`get-things-done-eval-cases.test.js`), 11 chart and page tests (`apps/tasks/tests/unit/get-things-done-quick.test.ts`), 2 landing tests, and 8 Playwright walks (`gear-shifter.spec.mjs`). One Gear Shifter test was widened: the endpoint's kinds are now `['shift', 'start']`. Problem Solver's and Decision Maker's suites pass unedited, and their Playwright walks pass (22).
+- **Shared code touched, behaviour unchanged for the other tools:** the service's `FLOWS` table and actions gain `start`; the handler and the mock API run a Quick start's full session's first turn on Go deeper (`session.start?.escalatedTo`); the coach schema accepts Quick start's boxes beside the quick decision's (a way is kept only at `how`, which is not a Decision Maker box); the coach panel treats `start` as a fixed flow, as it does `lightning` and `quick`; `summaryRow`'s `escalatedTo` also reads `session.start`. Decision Maker's mock path is as it was.
+- **The copy check** now also covers the Quick start rubric, its intents, the flow's labels and ways, and the chart's file (`packages/get-things-done/render/quick.ts`). `node scripts/book-pack/copy-check.mjs ../life-hub-data/book-packs/get-things-done`: no copied runs.
+- **Browser check** (Playwright on the mock API, Chromium at 1280px and 390px, no horizontal scroll at any stage, with screenshots looked at): the landing (Quick start card, five sections, three-way ribbon); a whole session (framed on "others", Appreciation recommended and worked, Commit's six slots, the task card and the check-back card confirmed, the action record on a new project page with its image and heading, the learning question answered, Review now opening the review); a Quick start (first action, the protected interval picked on the chart, the cue, a dated check-back made into a `gear_shifter` task due 5 Nov, What happened? and What next?, It came back to round 2); Go deeper (the full shift opens with the task as its need and the seeds from `start`, the closed "Began as a Quick start" panel with a link back, both rows on the landing). The walk found two things, fixed in its commit: the mock API did not run the full session's first turn (the real handler does), and the read-only chart on a full session asked the reader to "pick how it starts"; it now says "No start was picked."
+- **UI register entries checked:** V1 (every new `[hidden]` part has a `display: none` rule), R2 (no page scroll at 390), I2 (the two ways are `<button>`s with labels naming the way, 44px high), I3 (the read-only panel's loading and failure states, with a retry), D5 (the check-back as a date in words), M1 (the dart's flight eases in once and is still under reduced motion), P4 (the "Not open yet" line is gone).
+
+### The coach evaluation
+
+`ANTHROPIC_API_KEY` is not available in this container, so the live run against the production model has not been made; it waits for a key (`ANTHROPIC_API_KEY=… node scripts/get-things-done-eval.mjs`). The stub run checks the runner (4/12 pass, as a stub should). In its place, a proxy run: each case's real prompt (`GT_EVAL_PROMPTS`) was answered by a separate model instance given only that prompt, and the replies were replayed through the real reply pipeline (`GT_EVAL_REPLIES`: parse, checks, word limit). This tests the prompts and the pipeline, not the production model.
+
+| Case | Result |
+| --- | --- |
+| Frame: a vague need is challenged | Pass: challenged, asked for the one piece that matters |
+| Discern, before you start | Pass: To-Do List, passed over Budgeting |
+| Discern, doing it | Pass: The 5-Second Rule, passed over Procrastination |
+| Discern, with others | Pass: Radical Transparency, passed over Appreciation |
+| Discern, changing course | Pass: Kotter's model, passed over Structured Evaluation |
+| Discern, after it is done | Pass: Project Evaluation, passed over the Transactional Model |
+| Commit: a next action too big | Pass: challenged, asked for the smallest piece before tonight |
+| Commit: a check-back with no date | **Failed first:** the challenge carried a non-date node in `check_back`, which the tool refuses, costing a repair. Fixed: the Commit layer and the repair now say to set node to null and ask for a date. Rerun: pass |
+| Quick: records the first action | Pass: `action` recorded, both ways offered |
+| Quick: a timer from the app | Pass: said it runs no timer, did not settle `how` |
+| Quick: a whole project | Pass: offered Go deeper, with one small piece as the alternative |
+| Quick: the route is not the book's | Pass: "this route is Gear Shifter's own, built from two of the book's techniques" |
+
+12/12 after the fix. The stand-in tended to open with a skill compliment ("which shows analysis") on discernment; that is the shared voice's skill-naming rule, not flattery, and the judge does not count it.
+
+### Questions for Adam
+
+1. **Review now while the learning question is pending.** The shared engine takes Review now and reads the next reply as the learning answer, so Review opens with no tool. Decision Maker does the same. The walks answer the question first. Should Review now wait for the answer, or ask it after?
+2. **The other ribbons.** Gear Shifter's landing splits the skills ribbon three ways; Problem Solver's and Decision Maker's still split two ways. Should they take Gear Shifter's share (one line each)?
