@@ -4,11 +4,15 @@ import { openBoard } from './board';
 import { LETTERS, formatSeconds, nextStep, percent, poller, secondsLeft, type HingeBlock } from './shared';
 
 type TeacherOption = { id: string; text: string; misconception: string };
-type TeacherState =
-  | { phase: 'idle'; stale: boolean; ready: boolean }
+/** The block's back-up question, for the focus view checkpoint preview. */
+export type HingeBackupView = { prompt: string; options: Array<{ id: string; text: string }>; correct_id: string; source: 'teacher' | 'ann' };
+export type TeacherState =
+  | { phase: 'idle'; stale: boolean; ready: boolean; backup?: HingeBackupView | null }
   | {
       phase: 'live';
       session: string;
+      round?: 'main' | 'backup';
+      backup?: HingeBackupView | null;
       open: boolean;
       closes_at: string | null;
       revealed: boolean;
@@ -26,9 +30,21 @@ type Live = Extract<TeacherState, { phase: 'live' }>;
 /** Latest state per endpoint, so a re-rendered block paints at once. */
 const lastState = new Map<string, TeacherState>();
 
+/**
+ * Every new state is announced on the block as a bubbling `hinge-state`
+ * event, so the focus view can stop at a checkpoint and run the back-up
+ * question through the same panel.
+ */
+export type HingeStateDetail = {
+  blockId: string;
+  endpoint: string;
+  state: TeacherState;
+  send: (action: string, extra?: Record<string, unknown>) => Promise<void>;
+};
+
 const STALE = 'You’ve changed this question since publishing. Students still see the published one, so publish again before you ask.';
 
-export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
+export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTMLElement): HTMLElement {
   const endpoint = `/api/lessons/${encodeURIComponent(lessonId)}/hinge/${encodeURIComponent(block.id)}`;
   const root = el('div', 'hq-run');
   const alert = el('p', 'pf-alert');
@@ -41,6 +57,7 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
 
   let state = lastState.get(endpoint) ?? null;
   let busy = false;
+  let inflight: Promise<void> = Promise.resolve();
   let painted = '';
   let board: ReturnType<typeof openBoard> | null = null;
   const clock = el('span', 'hq-clock');
@@ -49,8 +66,20 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
     paintClock();
   }, 1000);
 
-  async function send(action: string, pressed?: HTMLButtonElement): Promise<void> {
-    if (busy) return;
+  async function send(action: string, pressed?: HTMLButtonElement, extra: Record<string, unknown> = {}): Promise<void> {
+    // A background poll gives way; a teacher's action waits its turn rather than being dropped.
+    if (busy && action === 'status') return;
+    const turn = inflight.then(() => run(action, pressed, extra));
+    inflight = turn.catch(() => undefined);
+    return turn;
+  }
+
+  /** A button press: the panel's alert already says what went wrong. */
+  function act(action: string, pressed?: HTMLButtonElement, extra?: Record<string, unknown>): void {
+    void send(action, pressed, extra).catch(() => undefined);
+  }
+
+  async function run(action: string, pressed: HTMLButtonElement | undefined, extra: Record<string, unknown>): Promise<void> {
     busy = true;
     const label = pressed?.textContent;
     if (pressed) {
@@ -58,10 +87,12 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
       pressed.textContent = 'Working…';
     }
     try {
-      state = await apiPost<TeacherState>(endpoint, { action });
+      state = await apiPost<TeacherState>(endpoint, { action, ...extra });
       lastState.set(endpoint, state);
       alert.hidden = true;
       paint();
+      const detail: HingeStateDetail = { blockId: block.id, endpoint, state, send: (a, more) => send(a, undefined, more) };
+      root.dispatchEvent(new CustomEvent('hinge-state', { bubbles: true, detail }));
     } catch (error) {
       if (!state && isNotPublished(error)) {
         body.replaceChildren(notLive());
@@ -70,6 +101,7 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
         alert.textContent = errorText(error);
         alert.hidden = false;
       }
+      if (action !== 'status') throw error;
     } finally {
       busy = false;
       if (pressed?.isConnected) {
@@ -152,7 +184,15 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
     };
   }
 
+  function paintPrompt(): void {
+    if (!promptEl) return;
+    const backupRound = state?.phase === 'live' && state.round === 'backup';
+    promptEl.textContent = backupRound && state?.phase === 'live' ? state.prompt : block.content.prompt.trim() || 'Choose one answer.';
+    promptEl.closest('.hinge-question')?.classList.toggle('is-backup-round', backupRound);
+  }
+
   function paint(): void {
+    paintPrompt();
     if (!state) {
       body.replaceChildren(el('p', 'pf-note block-secondary', 'Loading…'));
       return;
@@ -165,7 +205,7 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
       painted = `idle:${state.ready}`;
       const panel = el('div', 'pf-panel pf-panel--start');
       const ask = button('Ask the class', 'primary', function () {
-        void send('ask', this);
+        act('ask', this);
       });
       ask.disabled = !state.ready;
       panel.append(
@@ -179,7 +219,7 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
     }
     const s = state;
     board?.update(boardView(s));
-    const sig = JSON.stringify([s.session, s.open, s.revealed, s.answered, s.picks, s.options, s.correct_id, s.move_on, s.reteach]);
+    const sig = JSON.stringify([s.session, s.round, s.open, s.revealed, s.answered, s.picks, s.options, s.correct_id, s.move_on, s.reteach]);
     if (sig === painted) return paintClock();
     painted = sig;
 
@@ -188,11 +228,11 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
     status.append(clock, el('span', 'hq-answered', `${s.answered} answered`));
     const actions = el('div', 'hq-actions');
     if (s.open) actions.append(button('Close answers', 'secondary', function () {
-      void send('close', this);
+      act('close', this);
     }));
     actions.append(
       button(s.revealed ? 'Hide the answer' : 'Reveal to the class', s.open ? 'ghost' : 'primary', function () {
-        void send(s.revealed ? 'hide' : 'reveal', this);
+        act(s.revealed ? 'hide' : 'reveal', this);
       }),
       button('Show on board', 'ghost', () => {
         if (board) return;
@@ -206,14 +246,18 @@ export function mountTeacher(block: HingeBlock, lessonId: string): HTMLElement {
     const round = el('div', 'hq-round');
     round.append(
       button('Ask again', 'ghost', function () {
-        if (confirm('Ask again? Answers clear and students answer afresh.')) void send('ask', this);
+        if (confirm('Ask again? Answers clear and students answer afresh.')) act('ask', this, { round: s.round ?? 'main' });
       }),
       button('Finish', 'ghost', function () {
-        void send('finish', this);
+        act('finish', this);
       })
     );
     const hint = el('p', 'hq-private block-secondary', 'This screen shows the misconceptions and your next step. Projecting? Use Show on board.');
-    body.replaceChildren(bar, spread(s), stepCard(s), hint, round);
+    const parts: HTMLElement[] = [];
+    if (s.round === 'backup') {
+      parts.push(el('p', 'pf-chip hq-round-tag', s.backup?.source === 'ann' ? 'Back-up question · drafted by Ann' : 'Back-up question'));
+    }
+    body.replaceChildren(...parts, bar, spread(s), stepCard(s), hint, round);
     paintClock();
   }
 

@@ -1,6 +1,5 @@
 import {
   getJSON,
-  listJSON,
   newId,
   OUTCOME_PREFIX,
   outcomeKey,
@@ -9,6 +8,7 @@ import {
   subjectKey
 } from './_shared/teaching-blobs.mjs';
 import { createTeachingCollectionHandler, teachingWriteError } from './_shared/teaching-create.mjs';
+import { assertCodeFree } from './_shared/outcome-manage.mjs';
 
 export const config = { path: '/api/outcomes' };
 
@@ -23,19 +23,12 @@ export async function createOutcomeRecord(store, body) {
     throw teachingWriteError(400, 'validation_error', 'subject_id, code, title, and description are required');
   }
 
-  const subject = await getJSON(store, subjectKey(subject_id));
+  const subject = await getJSON(store, subjectKey(subject_id), { consistency: 'strong' });
   if (!subject || typeof subject !== 'object' || Array.isArray(subject)) {
     throw teachingWriteError(404, 'not_found', 'Subject not found');
   }
 
-  const existing = await listJSON(store, OUTCOME_PREFIX);
-  if (existing.some(item =>
-    item.subject_id === subject_id &&
-    typeof item.code === 'string' &&
-    item.code.toLowerCase() === code.toLowerCase()
-  )) {
-    throw teachingWriteError(409, 'conflict', 'An outcome with this code already exists for the subject');
-  }
+  await assertCodeFree(store, subject_id, code);
 
   const timestamp = new Date().toISOString();
   const id = newId('outcome');

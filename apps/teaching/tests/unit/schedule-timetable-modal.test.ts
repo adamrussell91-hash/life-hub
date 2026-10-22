@@ -34,6 +34,13 @@ describe('timetable composer',()=>{
     expect(body.omitted_slots).toEqual(['2026-10-12_1150']);expect(body.timetable.slots[1]!.end_time).toBe('15:10');
     await vi.waitFor(()=>expect(onSuccess).toHaveBeenCalled());
   });
+  it('does not offer programs in the unit picker',()=>{
+    const c=curriculum();
+    c.units.push({...c.units[0]!,id:'prog-unit',title:'Made-up Program',kind:'program'});
+    module.openScheduleTimetableModal!({curriculum:c,classId:c.classes[0]!.id});
+    expect(document.querySelector('[data-timetable-action="unit-'+c.units[0]!.id+'"]')).not.toBeNull();
+    expect(document.querySelector('[data-timetable-action="unit-prog-unit"]')).toBeNull();
+  });
   it('fixes the unit and imports editable times from text',()=>{
     const c=curriculum();delete c.classes[0]!.timetable;
     c.units.push({...c.units[0]!,id:'other-unit',title:'Another unit'});

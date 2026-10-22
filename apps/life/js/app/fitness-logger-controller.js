@@ -27,7 +27,13 @@ import {
   suggestTarget
 } from './fitness-progression.js';
 import { resolveTrackingType } from '../core/exercise-tracking.js';
-import { DEFAULT_REST_SEC, buildLoggerSteps } from '../core/workout-plan-groups.js';
+import {
+  DEFAULT_REST_SEC,
+  INTERVAL_LEAD_IN_SEC,
+  buildLoggerSteps,
+  intervalPosition,
+  isTimedFormat
+} from '../core/workout-plan-groups.js';
 
 const NUMERIC_SET_FIELDS = ['reps', 'weight_kg', 'duration_sec', 'time_cap_sec'];
 
@@ -124,6 +130,7 @@ export function createFitnessLoggerController({
     if (block?.kind !== 'circuit') return null;
     const elapsed = circuitElapsed(step.blockIndex);
     if (block.format === 'amrap' && block.timeCapSec) return Math.max(0, block.timeCapSec * 1000 - elapsed);
+    if (isTimedFormat(block.format)) return intervalPosition(block, elapsed).remainingMs;
     return elapsed;
   }
 
@@ -237,8 +244,27 @@ export function createFitnessLoggerController({
     return win;
   }
 
+  // Per-device switch: Adam can turn the rest countdown off entirely.
+  const REST_TIMER_KEY = 'life-hub:gym-rest-timer';
+  function restTimerOn() {
+    try {
+      return storage?.getItem?.(REST_TIMER_KEY) !== 'off';
+    } catch {
+      return true;
+    }
+  }
+  function setRestTimer(on) {
+    try {
+      storage?.setItem?.(REST_TIMER_KEY, on ? 'on' : 'off');
+    } catch {
+      // Per-device convenience only.
+    }
+    if (!on) clearRest();
+    rerender();
+  }
+
   function startRest(seconds, { cue = null, label = 'Rest', exercise = null } = {}) {
-    if (!(seconds > 0)) return;
+    if (!(seconds > 0) || !restTimerOn()) return;
     rest = { endsAt: now() + seconds * 1000, cue, label, win: pickRestWin(exercise) };
     stopRestInterval();
     restTimerId = setIntervalImpl(restTick, 1000);
@@ -278,7 +304,8 @@ export function createFitnessLoggerController({
     const roundsDone = layout.steps
       .filter(step => step.blockIndex === blockIndex && stepDone(step))
       .length;
-    const timeSec = Math.round(circuitElapsed(blockIndex) / 1000);
+    const leadInMs = isTimedFormat(block?.format) ? INTERVAL_LEAD_IN_SEC * 1000 : 0;
+    const timeSec = Math.round(Math.max(0, circuitElapsed(blockIndex) - leadInMs) / 1000);
     owner.block = { kind: 'circuit', ...(owner.block ?? {}) };
     owner.block.result = {
       ...(owner.block.result ?? {}),
@@ -327,12 +354,35 @@ export function createFitnessLoggerController({
           touchDraft({ rerenderAfter: true });
           return;
         }
+        if (block && isTimedFormat(block.format) && tickInterval(step.blockIndex, block)) return;
         refreshChrome();
       }, 1000);
     } else if (!running && circuitTickerId != null) {
       clearIntervalImpl(circuitTickerId);
       circuitTickerId = null;
     }
+  }
+
+  // Interval clock (emom / intervals): buzz and redraw when a new interval or
+  // station starts, and stop the clock when the last one ends.
+  const intervalSeen = new Map();
+  function tickInterval(blockIndex, block) {
+    const position = intervalPosition(block, circuitElapsed(blockIndex));
+    const key = `${position.phase}:${position.index}`;
+    if (intervalSeen.get(blockIndex) === key) return false;
+    intervalSeen.set(blockIndex, key);
+    if (position.phase === 'done') {
+      stopCircuitClock(blockIndex);
+      writeCircuitResult(blockIndex);
+      vibrate([300, 120, 300]);
+      ensureCircuitTicker();
+      touchDraft({ rerenderAfter: true });
+      return true;
+    }
+    if (position.phase === 'work') vibrate([220]);
+    else if (position.phase === 'rest') vibrate([90, 60, 90]);
+    rerender();
+    return true;
   }
 
   function addRound(block) {
@@ -935,6 +985,7 @@ export function createFitnessLoggerController({
     minimise,
     openGym,
     adjustRest,
+    setRestTimer,
     skipRest: () => {
       clearRest();
       rerender();
@@ -987,6 +1038,7 @@ export function createFitnessLoggerController({
       lastPainFlags: motivation.lastPainFlags,
       twingeOffer,
       treat: readTreat(),
+      restTimerOn: restTimerOn(),
       libraryByName: motivation.libraryByName,
       boardRows: motivation.buildBoard ? projectBuildBoard(motivation.buildBoard, draft, motivation.libraryByName) : null,
       actions
@@ -1019,10 +1071,10 @@ export function createFitnessLoggerController({
     }
   }
 
-  /** An AMRAP plans more rounds than you'll play; unplayed rounds don't get logged. */
+  /** AMRAP, EMOM and interval blocks plan more rounds than you may play; unplayed rounds don't get logged. */
   function trimUnplayedAmrapRounds() {
     for (const block of layout.blocks) {
-      if (block.kind !== 'circuit' || block.format !== 'amrap') continue;
+      if (block.kind !== 'circuit' || !(block.format === 'amrap' || isTimedFormat(block.format))) continue;
       const played = layout.steps.filter(step => step.blockIndex === layout.blocks.indexOf(block) && stepDone(step)).length;
       if (!played) continue;
       for (const index of block.indexes) {
@@ -1178,8 +1230,12 @@ export function createFitnessLoggerController({
     getExerciseIndex: () => currentMember()?.exerciseIndex ?? 0,
     getStepIndex: () => stepIndex,
     getSteps: () => layout.steps,
+    getBlocks: () => layout.blocks,
+    getCircuitClock: currentCircuitClock,
+    toggleCircuitClock,
     getView: () => view,
     getRest: restSnapshot,
+    setRestTimer,
     getCelebration: () => celebration,
     getLastReport: () => lastReport,
     applyTarget,

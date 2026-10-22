@@ -31,7 +31,9 @@ import {
   formatBlockResult,
   formatBlockScheme,
   formatSupersetBlockLabel,
-  isGroupedBlock
+  intervalPosition,
+  isGroupedBlock,
+  isTimedFormat
 } from '../core/workout-plan-groups.js';
 import {
   CABLE_TYPES,
@@ -288,7 +290,8 @@ function renderRest(root, rest, actions) {
   row.append(
     button(root, { className: 'gym-chip', text: '−15s', marker: 'rest-less', onClick: () => actions.adjustRest?.(-15) }),
     button(root, { className: 'gym-chip', text: '+15s', marker: 'rest-more', onClick: () => actions.adjustRest?.(15) }),
-    button(root, { className: 'gym-chip gym-chip--strong', text: 'Skip rest', marker: 'rest-skip', onClick: () => actions.skipRest?.() })
+    button(root, { className: 'gym-chip gym-chip--strong', text: 'Skip rest', marker: 'rest-skip', onClick: () => actions.skipRest?.() }),
+    button(root, { className: 'gym-chip', text: 'Turn off', marker: 'rest-off', label: 'Turn the rest timer off', onClick: () => actions.setRestTimer?.(false) })
   );
   panel.append(row);
   return panel;
@@ -372,13 +375,40 @@ function pumpCircuitGhostBit(ghost) {
   return '';
 }
 
+/** "Get ready", "Round 3 of 10", "WORK · C1 Push-ups", "REST · next C2 Cable Row". */
+function intervalPhaseText(block, position) {
+  const member = index => {
+    const exercise = block.exercises?.[index];
+    const code = block.exercises?.length > 1 ? `${blockMemberCode(block, index)} ` : '';
+    return `${code}${exercise?.name ?? 'Exercise'}`;
+  };
+  const segment = position.segment;
+  if (position.phase === 'lead_in') {
+    return segment?.memberIndex != null ? `Get ready · first up ${member(segment.memberIndex)}` : 'Get ready';
+  }
+  if (position.phase === 'done') return 'Clock done';
+  if (position.phase === 'rest') return `REST · next ${member(segment.memberIndex)}`;
+  const rounds = `Round ${segment.round} of ${block.rounds || 1}`;
+  return segment.memberIndex != null ? `${block.format === 'intervals' ? 'WORK' : rounds} · ${member(segment.memberIndex)}` : `${rounds} · go`;
+}
+
 function renderCircuitClock(root, draft, { block, circuit, actions }) {
   const wrap = el(root, 'div', { className: 'gym-circuit', data: { fitnessLogger: 'circuit' } });
   const amrap = block.format === 'amrap';
+  const timed = isTimedFormat(block.format);
   const running = Boolean(circuit?.running);
   const elapsed = circuit?.elapsedMs ?? 0;
   const capMs = (block.timeCapSec ?? 0) * 1000;
-  const shown = amrap && capMs ? Math.max(0, capMs - elapsed) : elapsed;
+  const position = timed ? intervalPosition(block, elapsed) : null;
+  const shown = timed ? position.remainingMs : (amrap && capMs ? Math.max(0, capMs - elapsed) : elapsed);
+  if (timed && (running || elapsed > 0)) {
+    wrap.className += ` gym-circuit--${position.phase}`;
+    wrap.append(el(root, 'p', {
+      className: 'gym-circuit__phase',
+      text: intervalPhaseText(block, position),
+      data: { fitnessLogger: 'interval-phase', phase: position.phase }
+    }));
+  }
   wrap.append(el(root, 'p', {
     className: 'gym-circuit__clock',
     text: formatElapsed(shown),
@@ -387,11 +417,11 @@ function renderCircuitClock(root, draft, { block, circuit, actions }) {
   const row = el(root, 'div', { className: 'gym-circuit__actions' });
   row.append(button(root, {
     className: 'gym-chip gym-chip--strong',
-    text: running ? 'Pause clock' : (elapsed > 0 ? 'Resume clock' : (amrap ? 'Start AMRAP' : 'Start clock')),
+    text: running ? 'Pause clock' : (elapsed > 0 ? 'Resume clock' : (amrap ? 'Start AMRAP' : (block.format === 'emom' ? 'Start EMOM' : (block.format === 'intervals' ? 'Start intervals' : 'Start clock')))),
     marker: 'circuit-clock-toggle',
     onClick: () => actions.toggleCircuitClock?.(block)
   }));
-  if (amrap) {
+  if (amrap || block.format === 'emom') {
     row.append(button(root, {
       className: 'gym-chip',
       text: '+ Round',
@@ -913,7 +943,7 @@ function renderDock(root, draft, { steps, stepIndex, allDone, actions }) {
   return dock;
 }
 
-function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat = '', actions }) {
+function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat = '', restTimerOn = true, actions }) {
   const sheet = el(root, 'section', {
     className: 'gym-sheet',
     data: { fitnessLogger: 'plan-sheet' },
@@ -1031,7 +1061,7 @@ function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat =
   addExercise.append(addName, addButton);
   body.append(addExercise);
 
-  body.append(renderSessionDetails(root, draft, { timer, actions }));
+  body.append(renderSessionDetails(root, draft, { timer, restTimerOn, actions }));
   const treatWrap = el(root, 'label', { className: 'fitness-logger__field gym-plan__treat' });
   treatWrap.append(el(root, 'span', { text: 'Gym-only treat (a podcast or playlist you only allow yourself while training)' }));
   const treatInput = el(root, 'input', { data: { fitnessLogger: 'treat-input' } });
@@ -1065,9 +1095,18 @@ function labeledNumber(root, { label, value, step = '1', onInput }) {
   return wrap;
 }
 
-function renderSessionDetails(root, draft, { timer, actions }) {
+function renderSessionDetails(root, draft, { timer, restTimerOn = true, actions }) {
   const details = el(root, 'div', { className: 'fitness-logger__details' });
   details.append(el(root, 'h4', { text: 'Session details' }));
+  const restRow = el(root, 'div', { className: 'gym-sheet__clock' });
+  restRow.append(button(root, {
+    className: `gym-chip${restTimerOn ? ' is-active' : ''}`,
+    text: restTimerOn ? 'Rest timer: on' : 'Rest timer: off',
+    marker: 'rest-toggle',
+    pressed: restTimerOn,
+    onClick: () => actions.setRestTimer?.(!restTimerOn)
+  }));
+  details.append(restRow);
 
   const clock = el(root, 'div', { className: 'gym-sheet__clock', data: { fitnessLogger: 'controls' } });
   if (timer.state === 'completed') {
@@ -1255,6 +1294,7 @@ export function renderFitnessLogger(root, draft, {
   lastPainFlags = null,
   twingeOffer = null,
   treat = '',
+  restTimerOn = true,
   actions = {}
 } = {}) {
   const host = root.querySelector('#fitness-logger');
@@ -1392,7 +1432,7 @@ export function renderFitnessLogger(root, draft, {
   const allDone = steps.length > 0 && steps.every(item => stepDone(draft, item));
   shell.append(renderDock(root, draft, { steps, stepIndex, allDone, actions }));
 
-  if (panel === 'plan') shell.append(renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat, actions }));
+  if (panel === 'plan') shell.append(renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat, restTimerOn, actions }));
 
   layer.append(shell);
 }

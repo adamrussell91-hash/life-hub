@@ -107,7 +107,7 @@ export function openScheduleTimetableModal(options: {
       classes.forEach(c=>{const b=button((c.title||c.code)+' · '+c.code,'class-'+c.id,()=>{pastedText='';classId=c.id;unitId=options.unitId ?? '';timetable=structuredClone(c.timetable ?? {anchor_date:startDate,anchor_day:1,cycle_length:10,slots:[],non_school_dates:[],cycle_overrides:{}});omitted.clear();render();});b.setAttribute('aria-pressed',String(c.id===classId));choices.append(b);});body.append(choices);
       if(options.unitId) note('Unit: '+(curriculum.units.find(u=>u.id===options.unitId)?.title ?? ''));
       else note('Unit');
-      const units=curriculum.units.filter(u=>u.status==='active'&&u.subject_id===cls()?.subject_id);
+      const units=curriculum.units.filter(u=>u.status==='active'&&u.kind!=='program'&&u.subject_id===cls()?.subject_id);
       if(!unitId && units.length===1)unitId=units[0]!.id;
       const unitChoices=document.createElement('div');unitChoices.className='timetable-choices';
       if(!options.unitId) units.forEach(u=>{const b=button(u.title,'unit-'+u.id,()=>{unitId=u.id;omitted.clear();render();});b.setAttribute('aria-pressed',String(u.id===unitId));unitChoices.append(b);});if(!options.unitId) body.append(unitChoices);

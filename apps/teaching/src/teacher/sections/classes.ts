@@ -23,6 +23,8 @@ import {
 } from '@/teacher/sections/homepage-editor';
 import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 import { mountClassStudents } from '@/teacher/sections/class-students';
+import { mountMarkbook } from '@/teacher/sections/markbook';
+import { outcomeLabels } from '@/markbook/parse';
 import { openScheduleOverflow } from '@/teacher/schedule-overflow';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
@@ -269,7 +271,7 @@ export function renderClassPage(
 
   const activeUnits = cls.active_unit_ids
     .map((id) => unitsById.get(id))
-    .filter((unit): unit is Unit => unit?.status === 'active');
+    .filter((unit): unit is Unit => unit?.status === 'active' && unit.kind !== 'program');
   const currentActiveUnitId = activeUnits.some((unit) => unit.id === cls.current_unit_id)
     ? (cls.current_unit_id ?? '')
     : (activeUnits[0]?.id ?? '');
@@ -359,6 +361,10 @@ export function renderClassPage(
   studentsHost.className = 'class-page__students-host';
   main.append(studentsHost);
   mountClassStudents(studentsHost, pageClass);
+
+  const markbookHost = document.createElement('div');
+  markbookHost.className = 'class-page__markbook-host';
+  disposers.push(mountMarkbook(markbookHost, pageClass, { outcomes: outcomeLabels(curriculum.outcomes ?? []) }));
 
   const sequence = renderUnitSequence(sequenceHost, {
     units: activeUnits,
@@ -475,7 +481,8 @@ export function renderClassPage(
   });
 
   body.append(main, side);
-  root.append(bannerHost, body);
+  // The markbook is a wide grid, so it spans the page under both columns.
+  root.append(bannerHost, body, markbookHost);
   canvas.append(root);
 
   return {

@@ -1,4 +1,7 @@
 import type { NetworkLineMode } from '@/schemas/block';
+import { connect, route, type Way } from './route';
+import { bundleMinWidth, layoutBundle } from './bundle';
+import type { FlowProblem, FlowSeq } from './flow';
 
 /**
  * Curriculum network layout. One engine draws both zoom levels: a unit map
@@ -30,7 +33,7 @@ export type NetRow = {
   band?: string;
 };
 export type NetStopKind = 'stop' | 'extension' | 'support';
-export type NetRailStop = { id: string; lineId: string; afterRow: number; kind: NetStopKind; target: NetTarget };
+export type NetRailStop = { id: string; lineId: string; afterRow: number; kind: NetStopKind; target: NetTarget; skip?: string };
 export type NetGate = { id: string; afterRow: number; target: NetTarget; lineIds: string[] };
 export type NetNudge = { dx: number; dy: number };
 export type NetInput = {
@@ -45,13 +48,16 @@ export type NetInput = {
   rowKind?: 'lesson' | 'unit';
   /** Year network: where the class is now, between row `row` and the next. */
   now?: { row: number; frac: number; label: string };
+  /** Unit map: how the lessons branch and rejoin. Rows are listed in this walk's order. */
+  flow?: FlowSeq;
+  flowProblems?: FlowProblem[];
 };
 
 export type Orientation = 'vertical' | 'horizontal';
 export type Pt = { x: number; y: number };
 export type Anchor = 'start' | 'middle' | 'end';
 /** `down`: a wrapped label's second line goes below the first (inside a station) rather than above. */
-export type LabelView = { x: number; y: number; anchor: Anchor; text: string; maxW: number; wrap: boolean; down?: boolean };
+export type LabelView = { x: number; y: number; anchor: Anchor; text: string; maxW: number; wrap: boolean; down?: boolean; bold?: boolean; note?: string };
 export type PathView = { lineId: string; mode: NetworkLineMode; colour: string; points: Pt[]; style: 'main' | 'spur' | 'loop' };
 export type MarkerView = { lineId: string; colour: string; x: number; y: number; level: NetLevel; mode: NetworkLineMode };
 export type PillView = { rowId: string; x: number; y: number; w: number; h: number; target: NetTarget; label: LabelView; markers: MarkerView[] };
@@ -62,6 +68,8 @@ export type BandView = { x: number; y: number; w: number; h: number; label: stri
 export type TerminusView = { x: number; y: number; w: number; h: number; target: NetTarget; detail?: string; when?: string };
 export type NetLayout = {
   orientation: Orientation;
+  /** 'bundle': the unit map's tight bundle, names beside the stations. */
+  style?: 'bundle';
   width: number;
   height: number;
   rowKind: 'lesson' | 'unit';
@@ -124,39 +132,7 @@ const ENTRY_SIZE: Record<Orientation, Record<NetStopKind | 'gate', number>> = {
   horizontal: { stop: 64, extension: 64, support: 84, gate: 96 }
 };
 
-/* ── Octilinear connection ─────────────────────────────────────────── */
-
-/** A waypoint in along/across space. `near` points want the 45° bend next to them. */
-type Way = { a: number; c: number; near?: boolean };
-
-/**
- * Joins two waypoints with straight runs and one 45° diagonal. The diagonal
- * sits next to a `near` point (a station edge or a detour), otherwise in the
- * middle of the run. Returns the points after `p`, ending with `q`.
- */
-export function connect(p: Way, q: Way): Way[] {
-  const da = q.a - p.a;
-  const dc = q.c - p.c;
-  if (dc === 0 || da <= 0) return [q];
-  const d = Math.abs(dc);
-  const sign = Math.sign(dc);
-  if (da >= d) {
-    if (q.near && !p.near) return [{ a: q.a - d, c: p.c }, q];
-    if (p.near && !q.near) return [{ a: p.a + d, c: q.c }, q];
-    const m = (da - d) / 2;
-    return m > 0 ? [{ a: p.a + m, c: p.c }, { a: p.a + m + d, c: q.c }, q] : [q];
-  }
-  // Not enough room along: the diagonal takes what there is, the rest runs across.
-  if (q.near) return [{ a: p.a, c: q.c - sign * da }, q];
-  return [{ a: q.a, c: p.c + sign * da }, q];
-}
-
-function route(ways: Way[]): Way[] {
-  if (!ways.length) return [];
-  const out: Way[] = [ways[0]!];
-  for (let i = 1; i < ways.length; i++) out.push(...connect(out[out.length - 1]!, ways[i]!));
-  return out;
-}
+export { connect } from './route';
 
 /* ── Layout ────────────────────────────────────────────────────────── */
 
@@ -173,10 +149,14 @@ export type LayoutOptions = {
 
 /** The width a vertical map needs; narrower containers get the horizontal map. */
 export function verticalWidth(input: NetInput, options: LayoutOptions = {}): number {
+  // The unit map's bundle wraps its names, so it only needs its narrowest width.
+  if (input.rowKind !== 'unit') return bundleMinWidth(input, options);
   return layoutNetwork(input, 'vertical', { measure: options.measure }).width;
 }
 
 export function chooseNetworkOrientation(width: number, input: NetInput, options: LayoutOptions = {}): Orientation {
+  // The unit map is always upright: its bundle fits a phone, and a wide split scrolls instead.
+  if (input.rowKind !== 'unit') return 'vertical';
   return width >= verticalWidth(input, options) ? 'vertical' : 'horizontal';
 }
 
@@ -184,6 +164,7 @@ export function chooseNetworkOrientation(width: number, input: NetInput, options
 const ZIG = [0, 1, 1, 0, -1, -1];
 
 export function layoutNetwork(input: NetInput, orientation: Orientation, options: LayoutOptions = {}): NetLayout {
+  if (orientation === 'vertical' && input.rowKind !== 'unit') return layoutBundle(input, options);
   const vertical = orientation === 'vertical';
   const unit = input.rowKind === 'unit';
   const G = NET_G;

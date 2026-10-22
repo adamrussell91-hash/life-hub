@@ -120,7 +120,9 @@ const base = {
   marks: z.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
-  image: QuizImageSchema.optional()
+  image: QuizImageSchema.optional(),
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
+  outcomes: z.array(z.string().min(1).max(64)).max(8).optional()
 };
 
 export const QuizQuestionSchema = z
@@ -429,7 +431,9 @@ export const QuizSettingsSchema = z.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z.number().min(0).max(1).optional(),
   confidence: z.boolean().optional(),
-  closes_at: z.string().datetime().optional()
+  closes_at: z.string().datetime().optional(),
+  /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
+  move_on: z.number().int().min(1).max(100).optional()
 });
 export type QuizSettings = z.infer<typeof QuizSettingsSchema>;
 
@@ -481,6 +485,7 @@ export type QuestionKey = {
   marks: number;
   hint?: string;
   explanation?: string;
+  outcomes?: string[];
   answer:
     | { type: 'choice'; ids: string[] }
     | { type: 'boolean'; value: boolean }
@@ -547,7 +552,8 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
     kind: q.kind,
     marks: q.marks,
     ...(q.hint?.trim() ? { hint: q.hint.trim() } : {}),
-    ...(q.explanation?.trim() ? { explanation: q.explanation.trim() } : {})
+    ...(q.explanation?.trim() ? { explanation: q.explanation.trim() } : {}),
+    ...(q.outcomes?.length ? { outcomes: [...q.outcomes] } : {})
   };
 
   switch (q.kind) {

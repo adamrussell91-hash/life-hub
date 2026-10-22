@@ -5,6 +5,7 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
+import { DOCUMENT_PREFIX } from './_shared/notion-import-store.mjs';
 import {
   CLASS_PREFIX,
   DEFAULT_SCHEDULE_ANCHOR_DATE,
@@ -24,6 +25,8 @@ import {
 } from './_shared/teaching-blobs.mjs';
 import { isDeletedRecord, withoutDeleted } from './_shared/record-liveness.mjs';
 import { buildMediaUsage } from './_shared/media-usage.mjs';
+
+const LESSON_KINDS = new Set(['lesson', 'workshop', 'lecture']);
 
 export const config = { path: '/api/curriculum' };
 
@@ -55,7 +58,9 @@ function lessonSummary(lesson, publishedIds) {
       ? { outcome_ids: lesson.outcome_ids }
       : {}),
     ...(typeof lesson.pedagogical_mode === 'string' ? { pedagogical_mode: lesson.pedagogical_mode } : {}),
-    ...(Array.isArray(lesson.line_stops) && lesson.line_stops.length ? { line_stops: lesson.line_stops } : {})
+    ...(Array.isArray(lesson.line_stops) && lesson.line_stops.length ? { line_stops: lesson.line_stops } : {}),
+    ...(Array.isArray(lesson.after_lesson_ids) ? { after_lesson_ids: lesson.after_lesson_ids } : {}),
+    ...(LESSON_KINDS.has(lesson.lesson_kind) && lesson.lesson_kind !== 'lesson' ? { lesson_kind: lesson.lesson_kind } : {})
   };
 }
 
@@ -73,6 +78,7 @@ export async function buildCurriculum(store) {
     scope_sequences,
     mediaRaw,
     outcomes,
+    documents,
     anchor,
     mediaFolders
   ] = await Promise.all([
@@ -86,6 +92,7 @@ export async function buildCurriculum(store) {
     listJSON(store, SCOPE_SEQUENCE_PREFIX),
     listJSON(store, MEDIA_PREFIX),
     listJSON(store, OUTCOME_PREFIX),
+    listJSON(store, DOCUMENT_PREFIX),
     getJSON(store, scheduleAnchorKey()),
     getJSON(store, mediaFoldersKey())
   ]);
@@ -110,6 +117,7 @@ export async function buildCurriculum(store) {
     years,
     subjects,
     units,
+    documents: documents.filter(doc => doc.status === 'active'),
     lessons: lessons.filter(lesson => lesson.id).map(lesson => lessonSummary(lesson, publishedIds)),
     classes,
     scheduled_lessons: liveScheduled,
