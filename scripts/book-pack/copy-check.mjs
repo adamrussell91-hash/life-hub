@@ -54,7 +54,20 @@ export function readPackTexts(dir) {
   return texts;
 }
 
-/** Gear Shifter's shipped strings, each with where it came from: techniques, the Commit and Review tools, the coach's knowledge and rubric, the catalogue and the glyph titles. */
+/** The app's own copy: every quoted string in Gear Shifter's Tasks views (section and route lines, step text, cards). */
+const APP_DIR = new URL('../../apps/tasks/src/views/get-things-done/', import.meta.url);
+function appStrings() {
+  const dir = fileURLToPath(APP_DIR);
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.ts'))) {
+    const source = readFileSync(join(dir, file), 'utf8');
+    for (const match of source.matchAll(/'((?:[^'\\\n]|\\.){20,})'|`([^`]{20,})`/g)) out.push([`app ${file}`, match[1] ?? match[2]]);
+  }
+  return out;
+}
+
+/** Gear Shifter's shipped strings, each with where it came from: techniques, the Commit and Review tools, the coach's knowledge and rubric, the catalogue, the glyph titles and the app's own copy. */
 export async function gearShifterStrings() {
   const { GEAR_TOOLS } = await import('../../packages/get-things-done/tools/index.mjs');
   const { gtCommit } = await import('../../packages/get-things-done/tools/commit.mjs');
@@ -74,6 +87,7 @@ export async function gearShifterStrings() {
       if (title) out.push([`glyph ${folder.name}/${file}`, title]);
     }
   }
+  out.push(...appStrings());
   return out;
 }
 
