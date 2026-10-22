@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/alignment/api', () => ({ fetchAlignment: vi.fn(), saveAlignmentPoint: vi.fn() }));
 
 import { fetchAlignment, saveAlignmentPoint } from '@/alignment/api';
-import { alignmentDots, heatHits, heatScore, heatStep, pointsFor, sharedRuns, subjectUsesAlignment, wordStems } from '@/alignment/model';
-import { applyAlignmentPatch, type Alignment } from '@/alignment/schema';
+import { alignmentDots, heatHits, heatScore, heatStep, pointsFor, sharedRuns, skillHits, subjectUsesAlignment, wordStems } from '@/alignment/model';
+import { applyAlignmentPatch, mergeMissingSkills, needsSkills, type Alignment } from '@/alignment/schema';
 import { mountAlignmentView, resetAlignmentViewForTests } from '@/alignment/view';
 
 // Invented wording. The real syllabus text lives in the private data repo.
@@ -24,8 +24,8 @@ const doc: Alignment = {
   ],
   focus_areas: [
     { id: 'area-one', name: 'Area one', points: [
-      { id: 'U1', kind: 'U', short: 'Close reading', text: 'Reading closely for meaning', outcomes: [{ n: 1, link: 'shared' }], concepts: [{ ref: 'ARG1', link: 'shared' }, { ref: 'STY1', link: 'related' }], processes: ['UN'] },
-      { id: 'R1', kind: 'R', short: 'New forms', text: 'Compose in new forms', outcomes: [{ n: 1, link: 'related' }, { n: 4, link: 'shared' }], concepts: [{ ref: 'ARG2', link: 'shared' }], processes: ['EX'] }
+      { id: 'U1', kind: 'U', short: 'Close reading', text: 'Reading closely for meaning', outcomes: [{ n: 1, link: 'shared' }], concepts: [{ ref: 'ARG1', link: 'shared' }, { ref: 'STY1', link: 'related' }], processes: ['UN'], skills: ['analysis', 'inference'] },
+      { id: 'R1', kind: 'R', short: 'New forms', text: 'Compose in new forms', outcomes: [{ n: 1, link: 'related' }, { n: 4, link: 'shared' }], concepts: [{ ref: 'ARG2', link: 'shared' }], processes: ['EX'], skills: ['creative_thinking'] }
     ] },
     { id: 'area-two', name: 'Area two', points: [
       { id: 'U1', kind: 'U', short: 'Style study', text: 'Style and meaning', outcomes: [{ n: 4, link: 'shared' }], concepts: [{ ref: 'STY1', link: 'shared' }], processes: [] }
@@ -58,17 +58,32 @@ describe('alignment model', () => {
     expect(heatStep(3, 3)).toBe(7);
   });
 
+  it('counts thinking skills against outcomes, and fills in skills a saved copy predates', () => {
+    const one = pointsFor(doc, 'area-one');
+    expect(skillHits(one, 1, 'analysis').map((h) => h.point.id)).toEqual(['U1']);
+    expect(skillHits(one, 4, 'creative_thinking').map((h) => `${h.point.id}:${h.link}`)).toEqual(['R1:shared']);
+    const old = structuredClone(doc);
+    delete old.focus_areas[0]!.points[0]!.skills;
+    old.focus_areas[0]!.points[1]!.skills = ['learning'];
+    expect(needsSkills(old)).toBe(true);
+    const { doc: merged, changed } = mergeMissingSkills(old, doc);
+    expect(changed).toBe(true);
+    expect(merged.focus_areas[0]!.points.map((p) => p.skills)).toEqual([['analysis', 'inference'], ['learning']]);
+    expect(merged.focus_areas[1]!.points[0]!.skills).toEqual([]);
+  });
+
   it('highlights only the content words both sides share', () => {
     const runs = sharedRuns('evaluates the meaning of texts', wordStems('meanings in a text'));
     expect(runs.filter((r) => r.shared).map((r) => r.text)).toEqual(['meaning']);
   });
 
   it('keeps wording when links change, and refuses links outside the syllabus', () => {
-    const next = applyAlignmentPatch(doc, { focus_area: 'area-one', point: 'U1', outcomes: [{ n: 4, link: 'related' }], concepts: [], processes: ['EX'] });
+    const next = applyAlignmentPatch(doc, { focus_area: 'area-one', point: 'U1', outcomes: [{ n: 4, link: 'related' }], concepts: [], processes: ['EX'], skills: ['metacognition'] });
     const u1 = next.focus_areas[0]!.points[0]!;
     expect(u1).toMatchObject({ text: 'Reading closely for meaning', outcomes: [{ n: 4, link: 'related' }], processes: ['EX'], edited: true });
     expect(doc.focus_areas[0]!.points[0]!.edited).toBeUndefined();
-    expect(() => applyAlignmentPatch(doc, { focus_area: 'area-one', point: 'U1', outcomes: [{ n: 2, link: 'shared' }], concepts: [], processes: [] })).toThrow();
+    expect(() => applyAlignmentPatch(doc, { focus_area: 'area-one', point: 'U1', outcomes: [{ n: 2, link: 'shared' }], concepts: [], processes: [], skills: [] })).toThrow();
+    expect(() => applyAlignmentPatch(doc, { focus_area: 'area-one', point: 'U1', outcomes: [], concepts: [], processes: [], skills: ['mind_reading'] })).toThrow();
   });
 });
 
@@ -108,8 +123,20 @@ describe('alignment view', () => {
     expect(cells).toEqual(['2', '1', '1', '1']);
   });
 
+  it('shows skill glyphs and a thinking skills heatmap', async () => {
+    mountAlignmentView(host);
+    await settle();
+    expect(host.querySelectorAll('.align__ylab .align__glyph').length).toBe(3);
+    expect(host.querySelector<HTMLElement>('[data-align-rows="skills"]')?.closest('.align__modes')?.hidden).toBe(true);
+    click(host.querySelector('[data-align-mode="heat"]'));
+    click(host.querySelector('[data-align-rows="skills"]'));
+    expect(host.querySelectorAll('.align__rl-btn--skill').length).toBe(12);
+    click(host.querySelector('.align__rl-btn--skill'));
+    expect(host.querySelector('.align__panel .align__title')?.textContent).toContain('Abstract thinking');
+  });
+
   it('saves edited links and shows the result', async () => {
-    const saved = applyAlignmentPatch(doc, { focus_area: 'area-one', point: 'U1', outcomes: [{ n: 4, link: 'shared' }], concepts: [{ ref: 'ARG1', link: 'shared' }], processes: ['UN'] });
+    const saved = applyAlignmentPatch(doc, { focus_area: 'area-one', point: 'U1', outcomes: [{ n: 4, link: 'shared' }], concepts: [{ ref: 'ARG1', link: 'shared' }], processes: ['UN'], skills: ['analysis'] });
     vi.mocked(saveAlignmentPoint).mockResolvedValue({ alignment: saved });
     mountAlignmentView(host);
     await settle();

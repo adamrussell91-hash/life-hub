@@ -7,7 +7,7 @@
  * (data/teaching/syllabus/{id}.json in life-hub-data). After that the teacher's
  * link edits live here. The syllabus and booklet wording never enters public code.
  */
-import { ALIGNMENT_ID, AlignmentPatchError, AlignmentPatchSchema, AlignmentSchema, applyAlignmentPatch } from './syllabus-alignment-schema.mjs';
+import { ALIGNMENT_ID, AlignmentPatchError, AlignmentPatchSchema, AlignmentSchema, applyAlignmentPatch, mergeMissingSkills, needsSkills } from './syllabus-alignment-schema.mjs';
 import { PROFESSIONAL_DATA_TOKEN_ENV, professionalDataRepo } from './github-professional-data.mjs';
 import { reject } from './question-drop.mjs';
 
@@ -47,8 +47,19 @@ async function readStored(store, id) {
 
 /** The alignment, copied from the private file on first use. */
 export async function loadAlignment(store, id = ALIGNMENT_ID, deps = {}) {
-  const { doc } = await readStored(store, id);
-  if (doc) return doc;
+  const { doc, etag } = await readStored(store, id);
+  if (doc && !needsSkills(doc)) return doc;
+  if (doc) {
+    // A copy saved before thinking skills existed: fill them in, keep every other edit.
+    // If the private file can't be read just now, show the saved copy without them.
+    const source = await readPrivateAlignment(id, deps).catch(() => null);
+    if (!source) return doc;
+    const merged = mergeMissingSkills(doc, source);
+    if (!merged.changed) return doc;
+    const next = { ...merged.doc, updated_at: new Date().toISOString() };
+    const written = await store.setJSON(alignmentKey(id), next, { onlyIfMatch: etag });
+    return written?.modified === false ? (await readStored(store, id)).doc : next;
+  }
   const fresh = { ...(await readPrivateAlignment(id, deps)), updated_at: new Date().toISOString() };
   const written = await store.setJSON(alignmentKey(id), fresh, { onlyIfNew: true });
   if (written?.modified === false) return (await readStored(store, id)).doc;

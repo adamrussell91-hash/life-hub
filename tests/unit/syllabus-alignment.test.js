@@ -13,7 +13,7 @@ const sample = {
   processes: [{ code: 'UN', name: 'Understanding', text: 'knows things' }, { code: 'RE', name: 'Reflecting', text: 'looks back' }],
   concepts: [{ key: 'ARG', name: 'Argument', head: 'argues well', bullets: [{ n: 1, text: 'claims need reasons', adv: false }, { n: 2, text: 'counter-claims help', adv: true }] }],
   focus_areas: [{ id: 'sample-area', name: 'Sample area', points: [
-    { id: 'U1', kind: 'U', short: 'Close reading', text: 'Close reading of a text', outcomes: [{ n: 1, link: 'shared' }], concepts: [{ ref: 'ARG1', link: 'related' }], processes: ['UN'] }
+    { id: 'U1', kind: 'U', short: 'Close reading', text: 'Close reading of a text', outcomes: [{ n: 1, link: 'shared' }], concepts: [{ ref: 'ARG1', link: 'related' }], processes: ['UN'], skills: ['analysis'] }
   ] }]
 };
 
@@ -49,6 +49,30 @@ test('first load copies the private file, later loads use the saved copy', async
   assert.equal(calls[0].init.headers.authorization, 'Bearer test-token');
   await loadAlignment(store, 'sample', { env, fetchImpl: impl });
   assert.equal(calls.length, 1);
+});
+
+test('a copy saved before thinking skills gets them from the private file, keeping its edits', async () => {
+  const store = storeFixture();
+  const old = structuredClone(sample);
+  delete old.focus_areas[0].points[0].skills;
+  old.focus_areas[0].points[0].processes = ['RE'];
+  store.data.set('syllabus_alignment/sample', old);
+  const { calls, impl } = fakeFetch();
+  const doc = await loadAlignment(store, 'sample', { env, fetchImpl: impl });
+  assert.deepEqual(doc.focus_areas[0].points[0].skills, ['analysis']);
+  assert.deepEqual(doc.focus_areas[0].points[0].processes, ['RE']);
+  assert.equal(calls.length, 1);
+  await loadAlignment(store, 'sample', { env, fetchImpl: impl });
+  assert.equal(calls.length, 1);
+});
+
+test('if the private file is down, an older saved copy still loads', async () => {
+  const store = storeFixture();
+  const old = structuredClone(sample);
+  delete old.focus_areas[0].points[0].skills;
+  store.data.set('syllabus_alignment/sample', old);
+  const doc = await loadAlignment(store, 'sample', { env: {}, fetchImpl: fakeFetch().impl });
+  assert.equal(doc.focus_areas[0].points[0].skills, undefined);
 });
 
 test('without a token the private file is reported unreachable, not invented', async () => {
