@@ -701,6 +701,14 @@ for (const width of [1440, 390])
     );
     await page.getByRole("tab", { name: "Timeline" }).click();
     await openFirstEntry(page);
+    const entryDish = page.locator(".fj-dish").first();
+    assert.equal(
+      await entryDish.locator(".fj-dish__title").innerText(),
+      "Spanish omelette",
+    );
+    assert.equal(await entryDish.locator(".food-original").first().innerText(), "Tortilla");
+    assert.equal(await entryDish.locator(".food-ingredients").innerText(), "Egg, potato");
+    assert.match(await entryDish.locator(".fj-dish__note").innerText(), /Very good/);
     await page.getByRole("button", { name: "Edit", exact: true }).click();
     await page.locator(".food-sheet").waitFor();
     const ingredients = page.getByLabel("Ingredients", { exact: true }).first();
