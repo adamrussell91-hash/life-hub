@@ -695,3 +695,22 @@ test('completeMessage throws AnthropicClientError on HTTP failure', async () => 
     (err) => err instanceof AnthropicClientError && err.retryable === true
   );
 });
+
+test('usage carries input and cache counts from message_start and output from message_delta', async () => {
+  const frames = [
+    frame('message_start', { message: { usage: { input_tokens: 1200, cache_read_input_tokens: 800, cache_creation_input_tokens: 50, output_tokens: 1 } } }),
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Done.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 42, server_tool_use: { web_search_requests: 2 } } }),
+    frame('message_stop', {})
+  ];
+  const client = createAnthropicClient({ apiKey: 'k', fetchImpl: async () => sseResponse(frames) });
+  const usage = [];
+  for await (const event of client.streamMessage({ system: 's', messages: [], tools: [] })) {
+    if (event.type === 'usage') usage.push(event);
+  }
+  assert.deepEqual(usage, [
+    { type: 'usage', inputTokens: 1200, outputTokens: 42, cacheReadTokens: 800, cacheWriteTokens: 50, webSearches: 2 }
+  ]);
+});

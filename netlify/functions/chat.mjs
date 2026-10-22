@@ -404,7 +404,8 @@ import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolver
 import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
-import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
+import { createAnthropicClient, AnthropicClientError, DEFAULT_MODEL } from './_shared/anthropic-client.mjs';
+import { createTurnUsage, addUsage, usageLogLine } from './_shared/chat-usage-log.mjs';
 import { FORCED_PLAN_TEXT, resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
 import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
 import {
@@ -2154,6 +2155,7 @@ export function createChatHandler({
           });
         };
 
+        const turnUsage = createTurnUsage();
         try {
           const emit = event => {
             if (event.type === 'record_proposal' || event.type === 'record_saved') {
@@ -3550,6 +3552,7 @@ export function createChatHandler({
             keepFullDomainTools: visualCtx.keepFullDomainTools,
             hasVisualEvidence: visualCtx.hasVisualEvidence
           })) {
+            addUsage(turnUsage, event);
             if (event.type === 'tool_call' && event.name === 'add_workout_notes') {
               try {
                 await proposeWorkoutNotesAmend({
@@ -3670,6 +3673,7 @@ export function createChatHandler({
           turnErrored = true;
           send({ type: 'error', code: error instanceof AnthropicClientError ? error.code : 'anthropic_unavailable' });
         } finally {
+          if (turnUsage.rounds) console.log(usageLogLine({ agent: slug, model: DEFAULT_MODEL, turn: turnUsage }));
           if (pendingLogRejection) {
             send({ type: 'record_rejected', errors: pendingLogRejection.errors });
           }
