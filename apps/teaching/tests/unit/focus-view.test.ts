@@ -5,6 +5,8 @@ import type { HingeStateDetail, TeacherState } from '@/blocks/hinge-question/tea
 import { talkingPoint, topWrongAnswer, underTheMark } from '@/teacher/focus/checkpoint';
 import { mountFocusController, stepTimerStack, type FocusStepView } from '@/teacher/focus/focus-view';
 import { focusSteps } from '@/teacher/focus/steps';
+import { quizSubject } from '@/teacher/focus/quiz-live';
+import type { LiveQuiz } from '@/quiz/live-stage';
 
 type Live = Extract<TeacherState, { phase: 'live' }>;
 
@@ -149,5 +151,34 @@ describe('focus controller', () => {
     expect(shown()).toEqual(['Exit']);
     vi.unstubAllGlobals();
     focus.dispose();
+  });
+});
+
+describe('live quiz checkpoint', () => {
+  const base: LiveQuiz = {
+    session: 'q', code: '123456', phase: 'reveal', index: 0, total: 3, joined: 10, move_on: 65,
+    question: { id: 'q1', kind: 'multiple_choice', prompt: 'Main effect?', marks: 1, has_hint: false, options: [{ id: 'x', text: 'Expert' }, { id: 'y', text: 'Urgency' }, { id: 'z', text: 'Appeal to fear' }] },
+    key: { id: 'q1', kind: 'multiple_choice', marks: 1, answer: { type: 'choice', ids: ['y'] }, explanation: 'Fear is the tool.' } as LiveQuiz['key'],
+    answered: 10, right: 5, marked: 10, picks: { x: 1, y: 5, z: 4 }
+  };
+
+  it('stops a revealed, auto-marked question under the teacher’s mark and names the top wrong answer', () => {
+    const next = vi.fn();
+    const subject = quizSubject(base, next)!;
+    expect(subject.pct).toBe(50);
+    expect(subject.key).toBe('q:0');
+    expect(subject.sub).toContain('5 of 10 got full marks, under your 65% mark');
+    expect(subject.sub).toContain('C, “Appeal to fear” (4)');
+    expect(subject.talk).toContain('why B fits better');
+    expect(subject.talk).toContain('Fear is the tool.');
+    subject.next();
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('lets the class through at the mark, before reveal, and for written answers; blank mark means 80', () => {
+    expect(quizSubject({ ...base, right: 7 }, () => undefined)).toBeNull();
+    expect(quizSubject({ ...base, phase: 'question' }, () => undefined)).toBeNull();
+    expect(quizSubject({ ...base, marked: 0 }, () => undefined)).toBeNull();
+    expect(quizSubject({ ...base, right: 7, move_on: undefined }, () => undefined)?.moveOnMark).toBe(80);
   });
 });
