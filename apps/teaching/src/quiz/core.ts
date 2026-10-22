@@ -32,6 +32,7 @@ export const QUIZ_QUESTION_KINDS = [
   'categorise',
   'quote_technique',
   'find_it',
+  'spot_technique',
   'label_image',
   'extended_response',
   'explain_effect'
@@ -56,6 +57,7 @@ export const QUIZ_KIND_INFO: Record<
   categorise: { label: 'Sort into groups', blurb: 'Sort each item into its group.', tier: 2, manual: false },
   quote_technique: { label: 'Quote → technique', blurb: 'Name the technique in a quote.', tier: 2, manual: false },
   find_it: { label: 'Find it in the text', blurb: 'Tap the line that answers the question.', tier: 2, manual: false },
+  spot_technique: { label: 'Spot the technique', blurb: 'Select the words in a passage, then name the technique.', tier: 2, manual: false },
   label_image: { label: 'Label the image', blurb: 'Match each label to its pin on the image.', tier: 2, manual: false },
   extended_response: { label: 'Extended response', blurb: 'Write a paragraph. Your teacher marks it.', tier: 3, manual: true },
   explain_effect: { label: 'Explain the effect', blurb: 'Explain the effect of a technique. Your teacher marks it.', tier: 3, manual: true }
@@ -96,6 +98,13 @@ const QuizChoiceSchema = z.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
 const QuizPairSchema = z.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
 const QuizGroupSchema = z.object({ id: Id, name: Text(120) });
 const QuizSortItemSchema = z.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
+const QuizSpotTargetSchema = z.object({
+  id: Id,
+  /** The words, copied exactly from the passage. */
+  quote: Text(QUIZ_LIMITS.option),
+  /** Every technique a fair marker would accept for these words. */
+  correct: z.array(Id).min(1).max(10)
+});
 const QuizPinSchema = z.object({
   id: Id,
   x: z.number().min(0).max(1),
@@ -147,6 +156,15 @@ export const QuizQuestionSchema = z
       kind: z.literal('find_it'),
       segments: z.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
       correct: z.array(Id).min(1).max(40)
+    }),
+    z.object({
+      ...base,
+      kind: z.literal('spot_technique'),
+      passage: Text(QUIZ_LIMITS.passage),
+      options: z.array(QuizChoiceSchema.extend({ technique_id: z.string().max(64).optional() })).min(2).max(10),
+      targets: z.array(QuizSpotTargetSchema).min(1).max(12),
+      /** How many students must find. Fewer than the targets means any of them will do. */
+      find: z.number().int().min(1).max(12).optional()
     }),
     z.object({ ...base, kind: z.literal('label_image'), image: QuizImageSchema, pins: z.array(QuizPinSchema).min(2).max(8) }),
     z.object({
@@ -216,6 +234,18 @@ export function questionProblems(q: QuizQuestion): string[] {
       if (q.correct.length >= q.segments.length) out.push('Leave at least one line that isn’t an answer.');
       break;
     }
+    case 'spot_technique': {
+      unique(q.options.map((o) => o.id), 'techniques');
+      unique(q.targets.map((t) => t.id), 'answers');
+      if (new Set(q.options.map((o) => norm(o.text))).size !== q.options.length) out.push('Two techniques say the same thing.');
+      const ids = new Set(q.options.map((o) => o.id));
+      for (const target of q.targets) {
+        if (!locateQuote(q.passage, target.quote)) out.push(`“${target.quote}” isn’t in the passage. Copy the words exactly.`);
+        if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push('Name the technique for every answer.');
+      }
+      if ((q.find ?? q.targets.length) > q.targets.length) out.push('Students can’t be asked to find more than there are answers.');
+      break;
+    }
     case 'fill_gap':
       if (!parseGapPassage(q.passage).some((part) => part.type === 'gap')) out.push('Blank out at least one word.');
       break;
@@ -271,6 +301,97 @@ export function writeGapPassage(parts: GapPart[]): string {
   return parts
     .map((part) => (part.type === 'text' ? part.text : `[[${part.answers.map((a) => a.replace(/[[\]|]/g, '')).join('|')}]]`))
     .join('');
+}
+
+/* ── Spot the technique: words and spans ───────────────────────────── */
+
+/**
+ * A passage as words, so a selection is a run of words rather than raw
+ * characters. Students, the builder and the marker all split it the same way.
+ */
+export type PassageWord = { text: string; start: number; end: number; line: number };
+
+export function passageWords(passage: string): PassageWord[] {
+  const words: PassageWord[] = [];
+  const re = /\S+/g;
+  let line = 0;
+  let seen = 0;
+  for (let m = re.exec(passage); m; m = re.exec(passage)) {
+    line += (passage.slice(seen, m.index).match(/\n/g) ?? []).length;
+    seen = m.index;
+    words.push({ text: m[0], start: m.index, end: m.index + m[0].length, line });
+  }
+  return words;
+}
+
+/** A word with its punctuation and case stripped, for comparing. */
+function wordKey(word: string): string {
+  return norm(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+}
+
+export type WordSpan = { from: number; to: number };
+
+/** Where a quote sits in the passage, as word positions, ignoring case and punctuation. */
+export function locateQuote(passage: string, quote: string): WordSpan | null {
+  const words = passageWords(passage);
+  const keyed = words.map((w, i) => ({ i, key: wordKey(w.text) })).filter((w) => w.key);
+  const wanted = passageWords(quote).map((w) => wordKey(w.text)).filter(Boolean);
+  if (!wanted.length) return null;
+  for (let s = 0; s + wanted.length <= keyed.length; s++) {
+    if (wanted.every((key, j) => keyed[s + j]!.key === key)) return { from: keyed[s]!.i, to: keyed[s + wanted.length - 1]!.i };
+  }
+  return null;
+}
+
+/** Little words that say nothing on their own: finding only “the” is not finding the technique. */
+const FILLER = new Set(
+  'a an the and or but of to in on at by for with from as is are was were be been it its this that these those i you he she we they his her their our my your so then than'.split(' ')
+);
+
+/**
+ * Whether a student's selection finds a target. It must take in enough of the
+ * target's meaningful words (one for a short phrase, a third of a long line)
+ * and not wander far past it: a whole stanza does not find a two-word simile.
+ */
+export function spanFinds(words: PassageWord[], spot: WordSpan, target: WordSpan): boolean {
+  const content = (i: number) => {
+    const key = wordKey(words[i]?.text ?? '');
+    return !!key && !FILLER.has(key);
+  };
+  const targetWords: number[] = [];
+  for (let i = target.from; i <= target.to; i++) targetWords.push(i);
+  const meaningful = targetWords.filter(content);
+  const pool = meaningful.length ? meaningful : targetWords;
+  const caught = pool.filter((i) => i >= spot.from && i <= spot.to).length;
+  if (caught < Math.max(1, Math.ceil(pool.length / 3))) return false;
+  const overlap = Math.max(0, Math.min(spot.to, target.to) - Math.max(spot.from, target.from) + 1);
+  const spill = spot.to - spot.from + 1 - overlap;
+  return spill <= Math.max(4, targetWords.length);
+}
+
+/**
+ * Pairs each selection with the target it finds best, each target once, so
+ * two selections on the same simile only count once.
+ */
+export function matchSpots(words: PassageWord[], spots: WordSpan[], targets: WordSpan[]): Array<number | null> {
+  const pairs: Array<{ s: number; t: number; fit: number }> = [];
+  spots.forEach((spot, s) =>
+    targets.forEach((target, t) => {
+      if (!spanFinds(words, spot, target)) return;
+      const overlap = Math.min(spot.to, target.to) - Math.max(spot.from, target.from) + 1;
+      const union = Math.max(spot.to, target.to) - Math.min(spot.from, target.from) + 1;
+      pairs.push({ s, t, fit: overlap / union });
+    })
+  );
+  pairs.sort((a, b) => b.fit - a.fit || a.s - b.s);
+  const out: Array<number | null> = spots.map(() => null);
+  const taken = new Set<number>();
+  for (const pair of pairs) {
+    if (out[pair.s] !== null || taken.has(pair.t)) continue;
+    out[pair.s] = pair.t;
+    taken.add(pair.t);
+  }
+  return out;
 }
 
 /* ── Quiz settings ─────────────────────────────────────────────────── */
@@ -332,6 +453,7 @@ export type PublicQuestion =
   | (PublicBase & { kind: 'ordering'; items: Choice[] })
   | (PublicBase & { kind: 'categorise'; groups: Choice[]; items: Choice[] })
   | (PublicBase & { kind: 'find_it'; segments: Choice[]; pick: number })
+  | (PublicBase & { kind: 'spot_technique'; passage: string; options: Choice[]; pick: number })
   | (PublicBase & { kind: 'label_image'; image: QuizImage; pins: Array<{ id: string; x: number; y: number; n: number }>; labels: Choice[] })
   | (PublicBase & { kind: 'extended_response' })
   | (PublicBase & { kind: 'explain_effect'; quote: string; technique?: string });
@@ -350,6 +472,7 @@ export type QuestionKey = {
     | { type: 'gaps'; gaps: Record<string, string[]> }
     | { type: 'map'; map: Record<string, string> }
     | { type: 'order'; ids: string[] }
+    | { type: 'spots'; passage: string; targets: Array<WordSpan & { ids: string[] }>; pick: number }
     | { type: 'manual'; model_answer?: string; guide?: string };
 };
 
@@ -495,6 +618,19 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
         key: { ...keyHead, answer: { type: 'choice', ids: q.correct.map((id) => ids.get(id) as string) } }
       };
     }
+    case 'spot_technique': {
+      const ids = new Map(q.options.map((o) => [o.id, fresh()]));
+      const options = shuffled(q.options, random).map((o) => ({ id: ids.get(o.id) as string, text: o.text }));
+      const targets = q.targets.flatMap((t) => {
+        const span = locateQuote(q.passage, t.quote);
+        return span ? [{ ...span, ids: t.correct.map((id) => ids.get(id)).filter((id): id is string => !!id) }] : [];
+      });
+      const pick = Math.min(q.find ?? targets.length, targets.length);
+      return {
+        question: { ...head, kind: 'spot_technique', passage: q.passage, options, pick },
+        key: { ...keyHead, answer: { type: 'spots', passage: q.passage, targets, pick } }
+      };
+    }
     case 'label_image': {
       const map: Record<string, string> = {};
       const labels: Choice[] = [];
@@ -531,7 +667,11 @@ export type QuizResponse =
   | { text: string }
   | { gaps: Record<string, string> }
   | { map: Record<string, string> }
-  | { order: string[] };
+  | { order: string[] }
+  | { spots: Spot[] };
+
+/** One thing a student found: a run of words and the technique they named. */
+export type Spot = WordSpan & { option: string };
 
 export type MarkResult = {
   /** Marks earned before any hint cost. Null while a person still has to mark it. */
@@ -601,6 +741,7 @@ export function hasAnswer(response: unknown): boolean {
   if (typeof response.text === 'string') return response.text.trim().length > 0;
   if (Array.isArray(response.selected)) return response.selected.length > 0;
   if (Array.isArray(response.order)) return response.order.length > 0;
+  if (Array.isArray(response.spots)) return response.spots.length > 0;
   for (const field of ['gaps', 'map'] as const) {
     if (isRecord(response[field])) return Object.values(response[field] as object).some((v) => typeof v === 'string' && v.trim());
   }
@@ -664,6 +805,22 @@ export function markResponse(key: QuestionKey, response: unknown): MarkResult {
       }
       return share(right, Object.keys(a.map).length, parts);
     }
+    case 'spots': {
+      // Right words and right name: full credit. Right words, wrong name: half.
+      const words = passageWords(a.passage);
+      const spots = spotList(r.spots).slice(0, a.pick);
+      const found = matchSpots(words, spots, a.targets);
+      const parts: Record<string, boolean> = {};
+      let credit = 0;
+      spots.forEach((spot, i) => {
+        const t = found[i];
+        const named = t !== null && t !== undefined && !!a.targets[t]?.ids.includes(spot.option);
+        parts[`s${i}`] = named;
+        parts[`s${i}.found`] = t !== null && t !== undefined;
+        credit += named ? 1 : parts[`s${i}.found`] ? 0.5 : 0;
+      });
+      return share(credit, a.pick, parts);
+    }
     case 'order': {
       const given = strings(r.order);
       const parts: Record<string, boolean> = {};
@@ -675,6 +832,18 @@ export function markResponse(key: QuestionKey, response: unknown): MarkResult {
       return share(right, a.ids.length, parts);
     }
   }
+}
+
+function spotList(v: unknown): Spot[] {
+  if (!Array.isArray(v)) return [];
+  const at = (n: unknown) => (typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 5000 ? n : null);
+  return v.flatMap((x) => {
+    if (!isRecord(x) || typeof x.option !== 'string') return [];
+    const a = at(x.from);
+    const b = at(x.to);
+    if (a === null || b === null) return [];
+    return [{ from: Math.min(a, b), to: Math.max(a, b), option: x.option.slice(0, 64) }];
+  });
 }
 
 /** Hint cost applied to a mark. */
@@ -708,6 +877,8 @@ export function cleanResponse(kind: QuizQuestionKind, response: unknown): QuizRe
       return { map: Object.fromEntries(Object.entries(stringMap(response.map)).slice(0, 60)) };
     case 'ordering':
       return { order: strings(response.order).slice(0, 40) };
+    case 'spot_technique':
+      return { spots: spotList(response.spots).slice(0, 12) };
   }
 }
 
@@ -747,6 +918,8 @@ export function blankQuestion(kind: QuizQuestionKind, id: string, marks = 1, new
     }
     case 'find_it':
       return { ...shared, kind, segments: [], correct: [] } as unknown as QuizQuestion;
+    case 'spot_technique':
+      return { ...shared, kind, passage: '', options: opts(4), targets: [] } as unknown as QuizQuestion;
     case 'label_image':
       return { ...shared, kind, image: { url: '', alt: '' }, pins: [] } as unknown as QuizQuestion;
     case 'extended_response':
@@ -787,9 +960,12 @@ export function checkQuestion(input: unknown): { ok: true; question: QuizQuestio
     groups: 'Name every group.',
     quote: 'Paste the quote.',
     segments: 'Paste a passage of at least two lines.',
+    targets: 'Select the words for at least one answer and name its technique.',
     pins: 'Add at least two pins, each with a label.',
     image: 'Choose an image.',
     marks: `Marks must be between 1 and ${QUIZ_LIMITS.marksMax}.`
   };
+  if (raw.kind === 'spot_technique' && field === 'passage') return { ok: false, message: 'Paste the passage.' };
+  if (raw.kind === 'spot_technique' && field === 'options') return { ok: false, message: 'Fill in every technique.' };
   return { ok: false, message: messages[field] ?? 'Check the question: something is missing or too long.' };
 }
