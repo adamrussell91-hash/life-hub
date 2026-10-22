@@ -1,6 +1,6 @@
 import type { Block } from '@/schemas/block';
 import { button, el, errorText, readJSON, writeJSON } from '@/blocks/peer-feedback-ui';
-import { clock, durationLabel, livePoint, paceSlots, type PacedPoint } from '@/blocks/voice-pacing';
+import { clock, durationLabel, livePoint, paceSlots, pointProgress, type PacedPoint } from '@/blocks/voice-pacing';
 import { keepTake, takeStore, type VoiceTake } from '@/blocks/voice-takes';
 import { audioUrl, cleanInitials, fetchMine, rememberInitials, submitTake, voiceDevice, type MineState } from '@/blocks/voice-client';
 import { DEFAULT_VIVA_SECONDS, STUDENT_TIME_CHOICES } from '@/blocks/voice-block-editor';
@@ -411,6 +411,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
     box.append(actions);
 
     let lastCurrent = -2;
+    let begunAt = 0;
     return {
       el: box,
       next: onNext,
@@ -420,9 +421,11 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string): HTMLElem
         box.classList.toggle('voice-rec--warn', Boolean(seconds && left <= WARN_BEFORE_S));
         if (seconds) totalFill.style.width = `${Math.min(100, (t / seconds) * 100)}%`;
         if (!labels.length) return;
+        const changed = current !== lastCurrent;
+        if (changed) begunAt = current <= 0 ? 0 : Math.min(t, slots[current]?.start ?? t);
         const slot = slots[current];
-        if (slot) nowFill.style.width = `${Math.min(100, Math.max(0, ((t - slot.start) / (slot.end - slot.start)) * 100))}%`;
-        if (current === lastCurrent) return;
+        if (slot) nowFill.style.width = `${pointProgress(slot, begunAt, t) * 100}%`;
+        if (!changed) return;
         lastCurrent = current;
         nowLabel.textContent = `Point ${current + 1} of ${labels.length}`;
         nowText.textContent = labels[current] ?? '';
