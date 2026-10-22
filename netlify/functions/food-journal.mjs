@@ -28,10 +28,11 @@ const defaultUnlinkTravelMeals = (ctx, deps) => async (journal, version, links) 
     try {
       snaps.push(await store.read(tripId));
     } catch (error) {
-      if (error?.status !== 404) throw error;
+      if (error?.code !== "not_found") throw error;
     }
   }
   if (!snaps.length) return ctx.repo.saveJournal(journal, version);
+  // snaps[0] is the commit parent, so its Food Journal version is the one to check.
   if (snaps[0].food.version !== version)
     throw Object.assign(
       new Error("Your journal changed on another device. Reload before saving."),
