@@ -3,7 +3,7 @@ import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
 import { withAppBase } from '@/app/base-path';
-import { apiGet, apiPost, ApiClientError } from '@/api/client';
+import { apiGet, apiPatch, apiPost, ApiClientError } from '@/api/client';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { agentColour, readLastAgentSlug, type AgentSlug } from '@/ai/agents';
 import type { AiProposal, AiScope } from '@/ai/proposals';
@@ -252,6 +252,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
       // Saves merge into the stored lesson, so clearing sends an empty list.
       if (next.line_stops) lesson.line_stops = next.line_stops;
+      // null (follow unit order) is saved as null so the merge clears the old list.
+      if (next.after_lesson_ids !== undefined) lesson.after_lesson_ids = next.after_lesson_ids;
+      if (next.lesson_kind) lesson.lesson_kind = next.lesson_kind;
       if (typeof next.feedback_off === 'boolean') lesson.feedback_off = next.feedback_off;
       if (next.quiz) {
         lesson.quiz = next.quiz;
@@ -596,6 +599,19 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
           : undefined;
       })(),
+      flowPeers: (() => {
+        const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
+        const byId = new Map(curriculum.lessons.map((l) => [l.id, l]));
+        return (unit?.lesson_ids ?? [])
+          .map((id) => byId.get(id))
+          .filter((l): l is NonNullable<typeof l> => Boolean(l))
+          .map((l) => ({ id: l.id, title: l.title, ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}) }));
+      })(),
+      onFlowPeer: async (lessonId, after) => {
+        await apiPatch(`/api/lessons/${lessonId}`, { after_lesson_ids: after });
+        const row = curriculum.lessons.find((l) => l.id === lessonId);
+        if (row) row.after_lesson_ids = after;
+      },
       onChange: (next) => {
         assignLesson(next);
         markDirty();

@@ -24,7 +24,7 @@ export type UnitNetworkEditorContext = UnitNetworkContext & {
 };
 
 type Kind = CurriculumRailStop['kind'];
-const KIND_LABEL: Record<Kind, string> = { stop: 'Stop', extension: 'Extension (optional spur)', support: 'Support (loop)' };
+const KIND_LABEL: Record<Kind, string> = { stop: 'Stop', extension: 'Extension (optional spur)', support: 'Optional detour (fork)' };
 const LEVEL_LETTER = { introduced: 'I', reinforced: 'R', mastered: 'M' } as const;
 const BEFORE_FIRST = '';
 
@@ -85,7 +85,8 @@ export function createCurriculumLinesEditor(
     const measure = measureStations(input);
     const orientation = chooseNetworkOrientation(width, input, { measure });
     const editable = isCurriculumLinesV2(current.content);
-    const svg = drawNetwork(layoutNetwork(input, orientation, { width, measure }), {
+    const layout = layoutNetwork(input, orientation, { width, measure });
+    const svg = drawNetwork(layout, {
       label: 'Unit curriculum map preview',
       ...(editable ? {
         nudgeRows: true,
@@ -96,7 +97,7 @@ export function createCurriculumLinesEditor(
         }
       } : {})
     });
-    const frame = el('div', orientation === 'vertical' ? 'cl-editor__map' : 'cl-editor__map net-scroll');
+    const frame = el('div', orientation === 'vertical' && layout.width <= width ? 'cl-editor__map' : 'cl-editor__map net-scroll');
     frame.append(svg);
     const tools = el('div', 'cl-editor__row');
     if (editable) {
@@ -105,7 +106,13 @@ export function createCurriculumLinesEditor(
       reset.disabled = !Object.keys(v2().nudges).length;
       tools.append(reset);
     }
-    preview.replaceChildren(el('h4', 'cl-editor__heading', 'Map'), tools, frame, networkLegend('unit'));
+    // Splits come from each lesson's Before and after; anything the map had to set aside is listed here.
+    const issues = el('ul', 'cl-editor__issues');
+    for (const problem of input.flowProblems ?? []) issues.append(el('li', undefined, problem.message));
+    const flowNote = (input.flowProblems ?? []).length
+      ? [el('p', 'cl-editor__hint', 'Fix these in Before and after at the foot of each lesson:'), issues]
+      : [el('p', 'cl-editor__hint', 'Splits come from Before and after at the foot of each lesson: a lesson with more than one lesson after it is a choice.')];
+    preview.replaceChildren(el('h4', 'cl-editor__heading', 'Map'), tools, frame, ...flowNote, networkLegend('unit'));
   }
 
   /* Version 1: one step converts and saves. */
@@ -334,7 +341,14 @@ export function createCurriculumLinesEditor(
           update(stop.id, { block_id: blockId, ...(blockId && !stop.label ? { label: blockLabel } : {}) });
         }), true));
       }
-      row.append(field('Label', label, true), remove);
+      row.append(field('Label', label, true));
+      if (stop.kind !== 'stop') {
+        // Who may take the straight track past it: shown under the stop's name on the map.
+        const skip = textInput(stop.skip_rule ?? '', 80, 'e.g. 90%+ on the techniques quiz', 'Who can skip it');
+        skip.addEventListener('input', () => update(stop.id, { skip_rule: skip.value.trim() ? skip.value : undefined }, false));
+        row.append(field('Who can skip it', skip, true));
+      }
+      row.append(remove);
       s.append(row);
     }
     const add = ghostButton('Add light-rail stop', () => {
