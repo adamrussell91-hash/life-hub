@@ -18,7 +18,7 @@ import { GEAR_TOOLS } from '../../packages/get-things-done/tools/index.mjs';
 import { CATALOGUE, entry } from '../../packages/get-things-done/catalogue.mjs';
 
 /** The sections built so far; each section's task adds its key. */
-const SECTIONS_DONE = ['doing_things', 'before_doing', 'working_with_others', 'doing_differently'];
+const SECTIONS_DONE = ['doing_things', 'before_doing', 'working_with_others', 'doing_differently', 'reviewing'];
 const DONE = CATALOGUE.filter((e) => SECTIONS_DONE.includes(e.section));
 const T = GEAR_TOOLS;
 const ids = (list) => list.map((item) => item.id);
@@ -344,4 +344,40 @@ test('Disruptive Innovation: a lens; sustaining against disruptive', () => {
 
 test('Kotter: the eight stages in order', () => {
   assert.deepEqual(labels(T.gt_kotter_change.chart.stages), ['Create urgency', 'Build a guiding coalition', 'Formulate a vision', 'Communicate the vision', 'Remove obstacles', 'Generate short-term wins', 'Stick with it', 'Embed the change']);
+});
+
+// ---------------------------------------------------------------- What to do with the things you have done
+
+test('Project Evaluation: fun, money and impact, all three; luck and support folded in; it is Review’s tool', () => {
+  const def = T.gt_project_evaluation;
+  assert.deepEqual(labels(def.chart.groups), ['Fun', 'Money', 'Impact']);
+  assert.equal(def.chart.minGroups, 3);
+  assert.ok(def.steps.some((s) => s.id === 'name_the_luck_and_help'), 'The Myth of Achievement’s step');
+  assert.ok(def.failureModes.some((f) => /luck|help/i.test(f)), 'The Myth of Achievement’s watch-for');
+  assert.deepEqual(toolsForPlanStep('gear_shifter', 'review'), ['gt_project_evaluation']);
+});
+
+test('Transactional Model: three needs scored 0 to 10, never a sum; recognition at the top; dated', () => {
+  const def = T.gt_transactional_model;
+  assert.equal(def.family, 'scales');
+  assert.deepEqual([def.chart.mode, def.chart.min, def.chart.layout, def.chart.dated], ['axes', 0, 'radar', true]);
+  // The radar draws the first scale at the top, then clockwise: structure lower right, stimuli lower left.
+  assert.deepEqual(def.chart.scales.map((sc) => sc.label), ['Recognition', 'Structure', 'Stimuli']);
+  const run = newRun(def.id, 'r');
+  assert.equal(def.validateScores(run, { series: 'now', values: { recognition: 0, structure: 10, stimuli: 0 } }), null);
+  assert.match(def.validateScores(run, { series: 'now', values: { recognition: 11, structure: 5, stimuli: 5 } }), /from 0 to 10/);
+});
+
+test('Journalling: review the day, three good things, every evening', () => {
+  assert.deepEqual(labels(T.gt_journalling.chart.stages), ['Review the day', 'Record three good things', 'Repeat each evening']);
+});
+
+test('The Law of Reversed Effort: a lens; notice, step away, reassess later', () => {
+  const def = T.gt_reversed_effort;
+  assert.equal(def.tier, 'lens');
+  assert.deepEqual(labels(def.chart.stages), ['Notice counterproductive effort', 'Step away', 'Reassess later']);
+});
+
+test('all 37 entries are built', () => {
+  assert.equal(Object.keys(T).length, 37);
 });
