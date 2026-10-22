@@ -26,6 +26,8 @@ export interface MealSectionHandle {
   foodVersion: string | null;
   enabled(): boolean;
   state(): MealState;
+  /** True when the meal differs from what was loaded, or is newly switched on. */
+  changed(): boolean;
 }
 
 // Older moments have no author; they are Adam's.
@@ -57,6 +59,17 @@ export function mealPayload(
     food: { title: state.title.trim(), dishes },
     extras,
   };
+}
+
+// Compares what would be sent, so blank rows, spaces and read-only fields
+// don't count. No loaded state means the meal is new.
+export function mealChanged(loaded: MealState | null, current: MealState): boolean {
+  if (!loaded) return true;
+  const body = (s: MealState) => {
+    const { food, extras } = mealPayload(s, { travel_version: '', food_version: null });
+    return JSON.stringify({ food, extras });
+  };
+  return body(loaded) !== body(current);
 }
 
 function field(labelText: string, control: HTMLElement): HTMLLabelElement {
@@ -107,6 +120,7 @@ export function mountMealSection(
       with: moment.meal?.with ?? '',
     },
   };
+  const loaded: MealState | null = visit ? structuredClone(state) : null;
 
   const section = document.createElement('section');
   section.className = 'journal-edit-moment__meal';
@@ -132,6 +146,7 @@ export function mountMealSection(
       foodVersion: null,
       enabled: () => false,
       state: () => state,
+      changed: () => false,
     };
   }
 
@@ -247,5 +262,6 @@ export function mountMealSection(
     foodVersion: read.food_version,
     enabled: () => toggle.checked,
     state: () => state,
+    changed: () => mealChanged(loaded, state),
   };
 }
