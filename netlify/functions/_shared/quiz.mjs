@@ -622,12 +622,16 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
   const scores = {};
   let firstAt = null;
   await mapBounded([...handedIn], 8, async ([owner, ns]) => {
-    const from = (await read(store, `quiz/${lessonId}/cleared/${owner}`))?.from ?? 0;
-    for (const n of ns.filter((x) => x >= from).sort((a, b) => a - b)) {
-      const [start, result] = await Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n))]);
+    const sorted = [...ns].sort((a, b) => a - b);
+    const readAttempt = (n) => Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n)), read(store, k.marks(owner, n))]);
+    // Most students were never cleared, so their first go is read alongside the cleared record.
+    const [cleared, firstRead] = await Promise.all([read(store, `quiz/${lessonId}/cleared/${owner}`), readAttempt(sorted[0])]);
+    const from = cleared?.from ?? 0;
+    for (const n of sorted.filter((x) => x >= from)) {
+      const [start, result, marks] = n === sorted[0] ? firstRead : await readAttempt(n);
       if (!start || !result) continue;
       const rec = await recordFor(store, lessonId, start.version, record);
-      const scored = scoreAttempt(rec, result, await read(store, k.marks(owner, n)));
+      const scored = scoreAttempt(rec, result, marks);
       scores[owners.get(owner)] = {
         attempt_id: attemptId(owner, n),
         submitted_at: result.submitted_at,

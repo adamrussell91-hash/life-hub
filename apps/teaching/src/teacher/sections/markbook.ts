@@ -17,6 +17,7 @@ import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
 import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
 import { withAppBase } from '@/app/base-path';
+import { ApiClientError } from '@/api/client';
 import '@/markbook/markbook.css';
 
 type Options = {
@@ -380,8 +381,10 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       view = queued.reduce(applyChange, confirmed);
       if (repaint) paint();
       return true;
-    } catch {
-      if (repaint) status.textContent = 'Couldn’t load the markbook.';
+    } catch (error) {
+      // A server's own message says what went wrong; a dropped connection or garbled reply gets the plain one.
+      const fromServer = error instanceof ApiClientError && error.code !== 'network_error' && error.code !== 'invalid_response';
+      if (repaint) status.textContent = fromServer ? error.message : 'Couldn’t load the markbook.';
       return false;
     }
   }

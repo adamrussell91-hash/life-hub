@@ -14,7 +14,9 @@ describe('quiz question outcomes', () => {
     const { key } = splitQuestion(QuizQuestionSchema.parse({ ...q, outcomes: undefined }), () => 0.5);
     expect('outcomes' in key).toBe(false);
   });
-  it('refuses more than six', () => {
-    expect(QuizQuestionSchema.safeParse({ ...q, outcomes: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }).success).toBe(false);
+  it('takes eight, like a criterion, and refuses more', () => {
+    const eight = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    expect(QuizQuestionSchema.safeParse({ ...q, outcomes: eight }).success).toBe(true);
+    expect(QuizQuestionSchema.safeParse({ ...q, outcomes: [...eight, 'i'] }).success).toBe(false);
   });
 });

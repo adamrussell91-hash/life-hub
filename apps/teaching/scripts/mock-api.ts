@@ -3576,7 +3576,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createLessonDiscernHandler(deps)
       : path.startsWith('/api/published/discern/')
         ? createPublishedDiscernHandler(deps)
-        : /^\/api\/classes\/[^/]+\/markbook$/.test(path)
+      : /^\/api\/classes\/[^/]+\/markbook$/.test(path)
       ? createMarkbookHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
       ? createClassClaimsHandler(deps)

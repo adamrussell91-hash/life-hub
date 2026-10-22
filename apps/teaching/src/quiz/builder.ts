@@ -14,6 +14,7 @@ import {
 } from '@/quiz/core';
 import { loadLiteraryElements, type LiteraryTechnique } from '@/blocks/literary-elements';
 import { formatOutcomeCodes, parseOutcomeCodes } from '@/markbook/parse';
+import { MARKBOOK_LIMITS } from '@/markbook/schema';
 import type { OutcomeLabel } from '@/markbook/types';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
@@ -1062,7 +1063,8 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
 
     const more = el('details', 'qz-more');
     more.open = !!(q.hint || q.explanation || q.outcomes?.length || (q.image && q.kind !== 'label_image'));
-    more.append(el('summary', 'qz-more__summary', 'Hint, explanation and picture (optional)'));
+    const offersOutcomes = !student && !!options.outcomes?.length;
+    more.append(el('summary', 'qz-more__summary', offersOutcomes ? 'Hint, explanation, outcomes and picture (optional)' : 'Hint, explanation and picture (optional)'));
     const hint = textInput(q.hint ?? '', QUIZ_LIMITS.hint, 'A nudge, not the answer.');
     hint.addEventListener('input', () => {
       q.hint = hint.value || undefined;
@@ -1074,7 +1076,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       emit();
     });
     more.append(labelled('Hint', hint, 'Students can open it during the quiz. It costs some of the marks.'), labelled('Why this is the answer', why));
-    if (!student && options.outcomes?.length) {
+    if (offersOutcomes && options.outcomes) {
       const labels = options.outcomes;
       const codes = textInput(formatOutcomeCodes(q.outcomes ?? [], labels), 200, 'EN12-1, EN12-3');
       codes.classList.add('qz-outcomes');
@@ -1087,11 +1089,11 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       codes.setAttribute('aria-describedby', [hintEl?.id, note.id].filter(Boolean).join(' '));
       codes.addEventListener('input', () => {
         const parsed = parseOutcomeCodes(codes.value, labels);
-        if (parsed.ids.length) q.outcomes = parsed.ids.slice(0, 6);
+        if (parsed.ids.length) q.outcomes = parsed.ids.slice(0, MARKBOOK_LIMITS.outcomes);
         else delete q.outcomes;
         const lines: string[] = [];
         if (parsed.unknown.length) lines.push(`Not an outcome code: ${parsed.unknown.join(', ')}`);
-        if (parsed.ids.length > 6) lines.push('Only the first 6 outcomes are kept.');
+        if (parsed.ids.length > MARKBOOK_LIMITS.outcomes) lines.push(`Only the first ${MARKBOOK_LIMITS.outcomes} outcomes are kept.`);
         note.textContent = lines.join('. ');
         emit();
       });

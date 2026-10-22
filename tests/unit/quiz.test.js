@@ -531,3 +531,30 @@ test('markbook: each student’s first handed-in attempt, scored like Results', 
 
   assert.equal(await classQuizScores(store, 'lesson1', 'class1', [bob.id]), null, 'an ordinary lesson is not a quiz');
 });
+
+test('markbook: a student’s cleared record and first attempt are read in one round trip', async () => {
+  const { classQuizScores } = await import('../../netlify/functions/_shared/quiz.mjs');
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = withClass(baseStore({ quizSettings: { attempts: 3 } }));
+  await publishQuiz(store);
+  const [bob] = (await loadRoster(store, 'class1')).students;
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Romeo' } } });
+  const owner = (await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id].attempt_id.split('~')[0];
+
+  // Each read notes how many reads had finished when it started; reads sent together share a number.
+  const started = new Map();
+  let finished = 0;
+  const get = store.get.bind(store);
+  store.get = async (key) => {
+    started.set(key, finished);
+    await new Promise((r) => setTimeout(r, 1));
+    finished += 1;
+    return get(key);
+  };
+  await classQuizScores(store, 'quiz1', 'class1', [bob.id]);
+  const waves = [`quiz/quiz1/cleared/${owner}`, `quiz/quiz1/attempts/${owner}/0`, `quiz/quiz1/results/${owner}/0`, `quiz/quiz1/marks/${owner}~0`].map((key) => started.get(key));
+  assert.ok(waves.every((w) => w !== undefined), 'all four are read');
+  assert.equal(new Set(waves).size, 1, 'cleared, start, result and marks go out together');
+});

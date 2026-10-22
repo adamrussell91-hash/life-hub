@@ -16,12 +16,19 @@ export function parseBands(text: string): { bands: Band[] } | { problem: string 
 
 export const formatBands = (bands: Band[] | undefined): string => (bands ?? []).map((b) => `${b.label} ${b.min}`).join(', ');
 
+/** The catalogue outcome a code or id names: a code match first, ignoring case, then an id match. */
+export const findOutcome = (token: string, labels: readonly OutcomeLabel[]): OutcomeLabel | undefined =>
+  labels.find((l) => l.code.toLowerCase() === token.toLowerCase()) ?? labels.find((l) => l.id === token);
+
+/** A code or id as its catalogue id, or the token itself when the catalogue doesn't know it. */
+export const outcomeIdOf = (token: string, labels: readonly OutcomeLabel[]): string => findOutcome(token, labels)?.id ?? token;
+
 /** Codes or ids, separated by commas or spaces. Unknown codes come back so the form can name them. */
 export function parseOutcomeCodes(text: string, labels: OutcomeLabel[]): { ids: string[]; unknown: string[] } {
   const ids: string[] = [];
   const unknown: string[] = [];
   for (const token of text.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)) {
-    const found = labels.find((l) => l.code.toLowerCase() === token.toLowerCase()) ?? labels.find((l) => l.id === token);
+    const found = findOutcome(token, labels);
     if (found) {
       if (!ids.includes(found.id)) ids.push(found.id);
     } else if (!unknown.includes(token.toUpperCase())) unknown.push(token.toUpperCase());

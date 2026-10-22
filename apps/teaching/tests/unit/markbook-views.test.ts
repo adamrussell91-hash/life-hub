@@ -35,6 +35,18 @@ describe('outcomes view', () => {
     const tom = root.querySelectorAll('tbody tr')[1]!;
     expect(tom.querySelector('.mb-outcome-cell--none')?.textContent).toBe('No evidence');
   });
+  it('puts a quiz’s old outcome code in the same column as the criterion’s catalogue id', () => {
+    const old: MarkbookView = {
+      ...view,
+      quizzes: [{ ...quiz, questions: [{ id: 'q1', prompt: 'Name the device', marks: 2, outcomes: ['EN12-1'] }], scores: { s1: { attempt_id: 'x~0', submitted_at: '', score: 2, max: 2, pending: 0, rows: [{ id: 'q1', awarded: 2, max: 2, confidence: null, outcomes: ['EN12-1'] }] } } }]
+    };
+    const root = renderOutcomes(old, view.students, labels);
+    expect([...root.querySelectorAll('thead .mb-outcome__code')].map((n) => n.textContent)).toEqual(['EN12-1']);
+    const cell = root.querySelector<HTMLButtonElement>('tbody tr .mb-outcome-cell')!;
+    expect(cell.textContent).toBe('80%·2');
+    cell.click();
+    expect([...root.querySelectorAll('.mb-evidence li')].map((n) => n.textContent)).toEqual(['Essay · Analysis · 60%', 'Quiz 1 · Name the device · 100%']);
+  });
   it('sorts Other outcomes last, codes numerically, and names unknown ids', () => {
     const many: MarkbookView = {
       ...view,

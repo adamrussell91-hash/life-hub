@@ -9,6 +9,7 @@ import type { MarkbookApi } from '@/markbook/api';
 import type { MarkbookView } from '@/markbook/types';
 import { mountMarkbook } from '@/teacher/sections/markbook';
 import { withAppBase } from '@/app/base-path';
+import { ApiClientError } from '@/api/client';
 
 const cls: Class = ClassSchema.parse({
   id: 'class1', type: 'class', title: '12ENG', slug: '12eng', schema_version: 1, code: '12ENG', academic_year: 2026, year_id: 'year_12',
@@ -225,6 +226,24 @@ describe('markbook section', () => {
     expect(cell().textContent).toBe('Missing');
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Couldn’t save that, and couldn’t reach the server. Check your connection.'));
     expect(cell().textContent).toBe('Late');
+  });
+
+  it('shows the server’s message when the markbook can’t be read', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const api = fakeApi(view());
+    (api.load as Mock).mockRejectedValueOnce(new ApiClientError({ code: 'markbook_unreadable', message: 'This markbook couldn’t be read. Nothing was changed.' }));
+    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03' });
+    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('This markbook couldn’t be read. Nothing was changed.'));
+  });
+
+  it('keeps the plain load message when the server can’t be reached', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const api = fakeApi(view());
+    (api.load as Mock).mockRejectedValueOnce(new ApiClientError({ code: 'network_error', message: 'Failed to fetch' }));
+    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03' });
+    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Couldn’t load the markbook.'));
   });
 
   it('moves focus to the heading when the focused control goes away', async () => {
