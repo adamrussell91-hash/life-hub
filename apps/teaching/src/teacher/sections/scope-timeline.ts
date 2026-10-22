@@ -9,6 +9,8 @@ import {
   academicYearBounds,
   diffDays,
   formatDateRange,
+  formatYmd,
+  parseYmd,
   pxPerDay,
   resolveItemSpan,
   resolveTermSpan,
@@ -289,6 +291,7 @@ export function renderScopeTimelineEditor(
     actions: [optionsMenu.el]
   });
   const stripHost = document.createElement('div');
+  stripHost.className = 'scope-timeline__outcomes';
   pageHeader.insertAdjacentElement('afterend', stripHost);
   mountOutcomeStrip(stripHost, {
     catalog: curriculum.outcomes ?? [],
@@ -713,8 +716,42 @@ export function renderScopeTimelineEditor(
     renderInspectorContent(item);
   };
 
+  /** Months on the axis: Jan of the academic year through the month the last item ends. */
+  const axisMonths = (): string[] => {
+    const yearEnd = academicYearBounds(scope.academic_year).end;
+    let lastEnd = yearEnd;
+    for (const item of scope.timeline_items) {
+      const unit = item.kind === 'unit' ? unitsById.get(item.unit_id) : undefined;
+      const span = resolveItemSpan(item, scope.terms, scope.academic_year, unit);
+      if (span.end > lastEnd) lastEnd = span.end;
+    }
+    const months: string[] = [];
+    for (let month = 0; ; month += 1) {
+      const first = formatYmd(new Date(Date.UTC(scope.academic_year, month, 1)));
+      if (first > lastEnd) break;
+      months.push(first);
+    }
+    return months;
+  };
+
+  const monthEnd = (first: string): string => {
+    const date = parseYmd(first);
+    return formatYmd(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)));
+  };
+
+  const monthLabel = (first: string, style: 'short' | 'long'): string => {
+    const label = parseYmd(first).toLocaleDateString('en-AU', { month: style, timeZone: 'UTC' });
+    // Months that spill into the next year carry the year so January isn't ambiguous.
+    return first.startsWith(String(scope.academic_year)) ? label : `${label} ${first.slice(2, 4)}`;
+  };
+
   const yearBounds = (): { start: string; days: number; ppd: number; totalW: number } => {
-    const bounds = academicYearBounds(scope.academic_year);
+    const months = axisMonths();
+    const yearStart = academicYearBounds(scope.academic_year).start;
+    const bounds = {
+      start: yearStart,
+      days: diffDays(yearStart, monthEnd(months[months.length - 1]!))
+    };
     // Year zoom fills the space beside the inspector; Month keeps its fixed scale.
     const fitWidth = Math.floor(main.clientWidth) - 2;
     const ppd =
@@ -847,23 +884,15 @@ export function renderScopeTimelineEditor(
 
     const months = document.createElement('div');
     months.className = 'scope-gantt__months';
-    for (let month = 0; month < 12; month += 1) {
-      const mStart = `${scope.academic_year}-${String(month + 1).padStart(2, '0')}-01`;
-      const mEnd =
-        month === 11
-          ? `${scope.academic_year + 1}-01-01`
-          : `${scope.academic_year}-${String(month + 2).padStart(2, '0')}-01`;
+    for (const mStart of axisMonths()) {
       const left = offsetPx(mStart, start, ppd);
-      const width = diffDays(mStart, mEnd) * ppd;
+      const width = diffDays(mStart, monthEnd(mStart)) * ppd;
       const cell = document.createElement('div');
       cell.className = 'scope-gantt__month';
       cell.style.left = `${left}px`;
       cell.style.width = `${width}px`;
       const useShort = zoom === 'year' || width < 70;
-      cell.textContent = new Date(`${mStart}T00:00:00Z`).toLocaleDateString('en-AU', {
-        month: useShort ? 'short' : 'long',
-        timeZone: 'UTC'
-      });
+      cell.textContent = monthLabel(mStart, useShort ? 'short' : 'long');
       months.append(cell);
     }
 
@@ -880,15 +909,11 @@ export function renderScopeTimelineEditor(
         ticks.append(tick);
       }
     } else {
-      for (let month = 0; month < 12; month += 1) {
-        const mStart = `${scope.academic_year}-${String(month + 1).padStart(2, '0')}-01`;
+      for (const mStart of axisMonths()) {
         const tick = document.createElement('div');
         tick.className = 'scope-gantt__tick';
         tick.style.left = `${offsetPx(mStart, start, ppd)}px`;
-        tick.textContent = new Date(`${mStart}T00:00:00Z`).toLocaleDateString('en-AU', {
-          month: 'short',
-          timeZone: 'UTC'
-        });
+        tick.textContent = monthLabel(mStart, 'short');
         ticks.append(tick);
       }
     }
