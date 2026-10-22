@@ -5,12 +5,13 @@
  */
 import type { Class } from '@/schemas';
 import { el } from '@/quiz/dom';
-import type { Column, Markbook } from '@/markbook/schema';
+import type { AssessmentColumn, AssessmentMark, Column, Markbook } from '@/markbook/schema';
 import { httpMarkbookApi, type MarkbookApi } from '@/markbook/api';
 import type { MarkbookActions, MarkbookView, OutcomeLabel } from '@/markbook/types';
-import { assessments, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
+import { assessments, markOf, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
 import { openColumnForm } from '@/markbook/column-form';
+import { openAssessmentPanel } from '@/markbook/assessment-panel';
 import '@/markbook/markbook.css';
 
 type Options = {
@@ -161,7 +162,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       column,
       outcomes: options.outcomes ?? [],
       today: today(),
-      returnFocus: () => title,
+      returnFocus: () => (columnId ? findInBody('.mb-col__title', columnId) : null) ?? title,
       // A throw stays in the form, which shows the message and keeps the teacher's typing.
       onSave: async (saved) => {
         const markbook = await enqueue(() => api.saveColumn(cls.id, saved));
@@ -181,12 +182,40 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     });
   }
 
+  /** The grid's column title, or with `studentId` its cell, as drawn now. */
+  function findInBody(selector: string, columnId: string, studentId?: string): HTMLElement | null {
+    return (
+      [...body.querySelectorAll<HTMLElement>(selector)].find(
+        (n) => n.dataset.col === columnId && (studentId === undefined || n.dataset.student === studentId)
+      ) ?? null
+    );
+  }
+
+  function openAssessment(columnId: string, studentId: string): void {
+    const column = view?.markbook.columns.find((c): c is AssessmentColumn => c.id === columnId && c.kind === 'assessment');
+    if (!column || !view) return;
+    openAssessmentPanel({
+      column,
+      // Removed students are read-only, so Save and next never lands on one.
+      students: rowStudents(view, showRemoved).filter((s) => !s.removed),
+      studentId,
+      // Reads the live view, so a mark saved or queued in this panel shows when the teacher comes back to it.
+      markFor: (id) => (view ? markOf<AssessmentMark>(view.markbook, columnId, id) : undefined),
+      onSave: (id, mark) => {
+        // Passing over an unmarked student has nothing to clear.
+        if (mark === null && view && markOf(view.markbook, columnId, id) === undefined) return;
+        actions.setMark(columnId, id, mark);
+      },
+      returnFocus: (id) => findInBody('.mb-cell', columnId, id) ?? title
+    });
+  }
+
   const actions: MarkbookActions = {
     setMark: (columnId, studentId, mark) =>
       change({ kind: 'mark', columnId, studentId, mark }, () => api.setMark(cls.id, columnId, studentId, mark)),
     hideQuiz: (lessonId, hidden) => change({ kind: 'hide', lessonId, hidden }, () => api.hideQuiz(cls.id, lessonId, hidden)),
     editColumn: (columnId) => openForm('assessment', columnId),
-    openAssessment: () => { status.textContent = 'Assessment marking arrives in the next step.'; },
+    openAssessment,
     openQuiz: () => { status.textContent = 'Attempt summaries arrive in the next step.'; },
     openHeatmap: () => { status.textContent = 'Heatmaps arrive in the next step.'; }
   };
@@ -201,11 +230,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
 
   function restoreFocus(key: { col: string; student?: string } | null): void {
     if (!key) return;
-    const selector = key.student === undefined ? '.mb-col__title' : '.mb-cell';
-    const target = [...body.querySelectorAll<HTMLElement>(selector)].find(
-      (n) => n.dataset.col === key.col && (key.student === undefined || n.dataset.student === key.student)
-    );
-    target?.focus();
+    findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell', key.col, key.student)?.focus();
   }
 
   function paintHidden(current: MarkbookView): void {

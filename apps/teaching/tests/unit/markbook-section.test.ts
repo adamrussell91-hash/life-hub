@@ -351,4 +351,65 @@ describe('markbook section', () => {
     expect(host.querySelectorAll('tbody tr')[0]!.querySelector('.mb-cell--handin')?.textContent).toBe('Submitted');
     expect(document.querySelector('.mb-form')).toBeNull();
   });
+
+  it('marks an assessment in the panel, saving through the queue and moving on', async () => {
+    const { host, api } = await mount(view());
+    const cell = (i: number) => host.querySelectorAll('tbody tr')[i]!.querySelector<HTMLButtonElement>('.mb-cell--assessment')!;
+    cell(0).focus();
+    cell(0).click();
+    const panel = document.querySelector<HTMLElement>('.mb-panel')!;
+    const box = () => panel.querySelector<HTMLInputElement>('.mb-panel__mark')!;
+    expect(panel.querySelector('.mb-panel__student')?.textContent).toBe('BB · Bob Brown');
+    expect(box().value).toBe('15');
+    expect(document.activeElement).toBe(box());
+    box().value = '18';
+    box().dispatchEvent(new Event('input'));
+    box().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect(api.calls).toEqual([['essay0001', 's1', { criteria: { crit0001: 18 } }]]));
+    expect(panel.querySelector('.mb-panel__student')?.textContent).toBe('TT · Tom Tills');
+    expect(box().value).toBe('');
+    expect(document.activeElement).toBe(box());
+    await vi.waitFor(() => expect(cell(0).textContent).toBe('18/20 · 90%'));
+    box().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(document.querySelector('.mb-panel')).toBeNull();
+    expect(document.activeElement).toBe(cell(1));
+  });
+
+  it('shows a mark saved earlier in the same panel when the teacher comes back to it', async () => {
+    const { host, api } = await mount(view());
+    const cell = (i: number) => host.querySelectorAll('tbody tr')[i]!.querySelector<HTMLButtonElement>('.mb-cell--assessment')!;
+    cell(1).click();
+    const box = () => document.querySelector<HTMLInputElement>('.mb-panel__mark')!;
+    box().value = '11';
+    document.querySelector<HTMLButtonElement>('.mb-panel__save')!.click();
+    expect(document.querySelector('.mb-panel')).toBeNull();
+    cell(1).click();
+    expect(box().value).toBe('11');
+    document.querySelector<HTMLButtonElement>('.mb-panel__close')!.click();
+    await vi.waitFor(() => expect(api.setMark).toHaveBeenCalledTimes(1));
+  });
+
+  it('skips the server when an unmarked student is passed over', async () => {
+    const { host, api } = await mount(view());
+    host.querySelectorAll('tbody tr')[1]!.querySelector<HTMLButtonElement>('.mb-cell--assessment')!.click();
+    document.querySelector<HTMLButtonElement>('.mb-panel__next')!.click();
+    expect(document.querySelector('.mb-panel')).toBeNull();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(api.setMark).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to the redrawn column title after the form saves', async () => {
+    const { host, api } = await mount(view());
+    const title = () => [...host.querySelectorAll<HTMLButtonElement>('.mb-col__title')].find((b) => b.dataset.col === 'hand00001')!;
+    title().focus();
+    title().click();
+    const form = document.querySelector<HTMLElement>('.mb-form')!;
+    const name = form.querySelector<HTMLInputElement>('[name="title"]')!;
+    name.value = 'Final draft';
+    form.querySelector<HTMLButtonElement>('.mb-form__save')!.click();
+    await vi.waitFor(() => expect(api.saveColumn).toHaveBeenCalled());
+    await vi.waitFor(() => expect(document.querySelector('.mb-form')).toBeNull());
+    expect(document.activeElement).toBe(title());
+    expect(title().textContent).toBe('Final draft');
+  });
 });
