@@ -194,6 +194,10 @@ export function buildGearPrompt(session) {
   const missing = frameKeysOf(session).filter((key) => !session.frame[key]);
   parts.push(`Frame: ${JSON.stringify(session.frame)}${missing.length ? `\nMissing frame answers: ${missing.join(', ')}` : ''}`);
   if (session.frame.route) parts.push(`ROUTE: ${routeLabels(session.frame.route)}`);
+  // The turn that completes the frame is the turn that discerns: say so here, not only in the rubric.
+  if (session.phase === 'frame' && missing.length === 1 && session.runner?.mode !== 'boundary') {
+    parts.push(`LAST FRAME ANSWER (${missing[0]}): if the latest reply settles it, accept it in "frame" and, in the same message, name the obstacle (one of OBSTACLES) and recommend one technique with next_technique. The message itself must name both techniques by their names, never their ids: the one you recommend, with one sentence on why it fits, and one sibling you passed over ("I passed over <name> because …"). The card shows only the first, so the sibling lives only in your words. If the reply does not settle it, challenge or clarify instead.`);
+  }
   if (session.phase === 'frame' && session.startModel) parts.push(`SHELF PICK: the person started from ${TOOLS[session.startModel].name} (${session.startModel}). When framing ends it opens on that technique: suggest it with next_technique and say in one sentence how it fits the frame.`);
   parts.push(...startLines(session));
   const earlier = earlierSteps(session);

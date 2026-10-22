@@ -48,6 +48,9 @@ test('judge: word limits, flattery, a technique with a sibling, the quick step a
   assert.equal(judge(discern, { verdict: 'accept', message: named, suggestion: { kind: 'next_tool', tool: 'gt_pomodoro' } }), null);
   assert.match(judge(discern, { verdict: 'accept', message: named.replace('the 5-Second Rule', 'another one'), suggestion: { kind: 'next_tool', tool: 'gt_pomodoro' } }), /no sibling/);
   assert.match(judge(discern, { verdict: 'accept', message: named, suggestion: { kind: 'next_tool', tool: 'five_whys' } }), /Gear Shifter technique/);
+  const short = 'The obstacle is an avoided start. The 5-Second Rule fits better than Pomodoro here, because the hard part is beginning each session.';
+  assert.equal(judge(discern, { verdict: 'accept', message: short, suggestion: { kind: 'next_tool', tool: 'gt_five_second_rule' } }), null, 'a name without its trailing "technique" still counts');
+  assert.equal(judge(find('changing course'), { verdict: 'accept', message: `${long} I passed over Kotter's model here.`, suggestion: { kind: 'next_tool', tool: 'gt_five_twenty_five_rule' } }), null, 'Kotter by its short name');
   const action = find('records the first action');
   assert.equal(judge(action, { verdict: 'accept', message: long, quick: { node: 'action', note: 'Open the folder' } }), null);
   assert.match(judge(action, { verdict: 'accept', message: long, quick: null }), /want action/);

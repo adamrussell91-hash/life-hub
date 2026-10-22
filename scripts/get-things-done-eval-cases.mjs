@@ -20,11 +20,20 @@ function reply(session, raw, text = null) {
   return idle(applyCoachTurn(next, turn.value, deps));
 }
 
+/** How a person might place their work on the route, in their own words. */
+const ROUTE_WORDS = {
+  before: 'I have not really started it yet.',
+  doing: 'I am in the middle of it and it has stalled.',
+  others: 'It depends on other people doing their part.',
+  differently: 'The way we do it needs to change.',
+  after: 'It is finished and I want to look back on it.'
+};
+
 /** A shift with its frame answered up to `answers` (need, then route, then known). */
 export function framed(text, answers = []) {
   let s = idle(createSession({ text, kind: 'shift' }, deps));
   ['need', 'route', 'known'].slice(0, answers.length).forEach((key, i) => {
-    s = reply(s, { frame: { [key]: answers[i] } }, i ? answers[i] : null);
+    s = reply(s, { frame: { [key]: answers[i] } }, i === 0 ? null : key === 'route' ? ROUTE_WORDS[answers[i]] ?? answers[i] : answers[i]);
   });
   return s;
 }
@@ -144,8 +153,11 @@ export function prepare(testCase) {
 }
 
 const FLATTERY = /\b(great|excellent|fantastic|brilliant|amazing|wonderful|perfect|love (that|this|it))\b/i;
-/** A technique's name as a coach might say it: lower case, without a leading "the". */
+/** A technique's name as a coach might say it: lower case, without a leading "the" (and, in the check, a trailing "technique" or "model"). */
 const plain = (name) => name.toLowerCase().replace(/^the /, '').replace(/[’']/g, "'");
+
+/** Long titles a coach shortens in speech. */
+const SHORT_NAMES = { gt_kotter_change: 'kotter' };
 
 /** Why a coach reply fails the case's checks, or null. */
 export function judge(testCase, reply) {
@@ -160,7 +172,8 @@ export function judge(testCase, reply) {
   if (e.suggestionNot && reply.suggestion?.kind === e.suggestionNot) return `should not suggest ${e.suggestionNot}`;
   if (e.technique && !(reply.suggestion?.kind === 'next_tool' && String(reply.suggestion.tool).startsWith('gt_'))) return `suggestion ${JSON.stringify(reply.suggestion)}, want a Gear Shifter technique`;
   if (e.sibling) {
-    const others = CATALOGUE.filter((entry) => entry.id !== reply.suggestion?.tool).map((entry) => plain(entry.title));
+    // A coach may drop a trailing "technique", "rule" or "model" ("Pomodoro" for The Pomodoro Technique).
+    const others = CATALOGUE.filter((entry) => entry.id !== reply.suggestion?.tool).map((entry) => SHORT_NAMES[entry.id] ?? plain(entry.title).replace(/ (technique|model)$/, ''));
     const text = plain(reply.message);
     if (!others.some((name) => text.includes(name))) return 'message names no sibling technique';
   }
