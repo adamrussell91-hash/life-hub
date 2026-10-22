@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { questionDropAction, listSubmissions, reviewSubmission } from '../../netlify/functions/_shared/question-drop.mjs';
-import { prepareQuizPublish, storeQuizKey, quizAction, quizTeacherAction } from '../../netlify/functions/_shared/quiz.mjs';
+import { prepareQuizPublish, storeQuizKey, quizAction as rawQuizAction, quizTeacherAction } from '../../netlify/functions/_shared/quiz.mjs';
 import { BlockSchema } from '../../netlify/functions/_shared/teaching-block-schema.mjs';
 import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
 import { createPublishedQuizHandler } from '../../netlify/functions/published-quiz.mjs';
+
+// Students take quizzes from a class page. `class0` has no list, so it stays anonymous.
+const quizAction = (store, lessonId, body) => rawQuizAction(store, lessonId, { class_id: 'class0', ...body });
 
 const stamp = { created_at: '2026-10-17T00:00:00.000Z', updated_at: '2026-10-17T00:00:00.000Z', schema_version: 1 };
 const drop = (content = {}) => ({
@@ -21,6 +24,7 @@ const essay = { kind: 'extended_response', prompt: 'Explain the ending.', marks:
 
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
+  if (!data.has('classes/class0')) data.set('classes/class0', { id: 'class0', type: 'class', title: 'Open class', students: [] });
   return {
     data,
     async get(key) { return structuredClone(data.get(key) ?? null); },
@@ -28,6 +32,7 @@ function storeFixture(entries = []) {
       if (options?.onlyIfNew && data.has(key)) return { modified: false };
       data.set(key, structuredClone(value)); return { modified: true };
     },
+    async delete(key) { data.delete(key); },
     async list({ prefix }) { return { blobs: [...data.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })) }; }
   };
 }
@@ -282,7 +287,7 @@ test('the public quiz endpoint answers JSON errors without leaking stack traces'
   const store = baseStore();
   await publishQuiz(store);
   const handler = createPublishedQuizHandler({ env: {}, getContentStore: async () => store });
-  const res = await handler(new Request('https://example.com/api/published/quiz/quiz1', { method: 'POST', body: '{"action":"submit"}', headers: { 'content-type': 'application/json' } }));
+  const res = await handler(new Request('https://example.com/api/published/quiz/quiz1', { method: 'POST', body: '{"action":"submit","class_id":"class0"}', headers: { 'content-type': 'application/json' } }));
   assert.equal(res.status, 400);
   assert.equal((await res.json()).error?.code ?? 'no_device', 'no_device');
   const unpublished = await handler(new Request('https://example.com/api/published/quiz/nope', { method: 'POST', body: '{}' }));
@@ -347,4 +352,93 @@ test('a just-started attempt opens even while the blob listing lags behind', asy
   assert.equal(started.current?.n, 0, 'the start reply carries the open attempt');
   assert.equal((await quizAction(store, 'quiz1', { ...me, action: 'hint', question_id: 'qa' })).hint, 'Think comparison.');
   assert.equal((await quizAction(store, 'quiz1', { ...me, action: 'start' })).current.n, 0, 'a second tap resumes rather than starting another go');
+});
+
+const withClass = (store) => {
+  store.data.set('classes/class1', { id: 'class1', type: 'class', title: '9 English', students: [{ name: 'Bob Brown' }, { name: 'Tom Tills' }] });
+  return store;
+};
+const bobDevice = { token: token(1), class_id: 'class1', class_token: token(3) };
+const tomDevice = { token: token(2), class_id: 'class1', class_token: token(4) };
+
+test('a quiz only takes answers from a class page', async () => {
+  const store = baseStore();
+  await publishQuiz(store);
+  const plain = await rawQuizAction(store, 'quiz1', { token: token(1) });
+  assert.deepEqual(plain.identity, { need: 'class', initials: null });
+  await assert.rejects(rawQuizAction(store, 'quiz1', { token: token(1), action: 'start' }), /Open this quiz from your class page/);
+  await assert.rejects(rawQuizAction(store, 'quiz1', { token: token(1), class_id: 'gone', action: 'status' }), /Open this quiz from your class page/);
+});
+
+test('initials: claim once, then start; someone else’s initials are refused', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  const before = await rawQuizAction(store, 'quiz1', bobDevice);
+  assert.deepEqual(before.identity, { need: 'initials', initials: null });
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' }), /Type your initials first/);
+
+  const claimed = await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'bb' });
+  assert.deepEqual(claimed.identity, { need: null, initials: 'BB' });
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'BB' }), /BB is already taken/);
+
+  const started = await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  assert.ok(started.current);
+  const startKey = [...store.data.keys()].find(k => k.startsWith('quiz/quiz1/attempts/'));
+  const start = store.data.get(startKey);
+  assert.equal(start.class_id, 'class1');
+  assert.match(start.student_id, /^st_/);
+});
+
+test('attempts follow the student to a new device after a release', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: {} });
+
+  const { releaseClaim, loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const roster = await loadRoster(store, 'class1');
+  await releaseClaim(store, 'class1', roster.students[0].id);
+
+  const newDevice = { token: token(5), class_id: 'class1', class_token: token(6) };
+  const moved = await rawQuizAction(store, 'quiz1', { ...newDevice, action: 'claim', initials: 'BB' });
+  assert.equal(moved.attempts_used, 1, 'the earlier go still counts');
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...newDevice, action: 'start' }), /already done this quiz/);
+});
+
+test('teacher results label attempts with initials and name', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: {} });
+  await quizAction(store, 'quiz1', { token: token(7), action: 'start' });
+  await quizAction(store, 'quiz1', { token: token(7), action: 'submit', responses: {} });
+
+  const results = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  const labels = results.attempts.map(a => a.student);
+  assert.deepEqual(labels.filter(Boolean), [{ initials: 'BB', name: 'Bob Brown' }]);
+  assert.equal(labels.filter(l => l === null).length, 1, 'the anonymous attempt has no label');
+
+  const bobs = results.attempts.find(a => a.student);
+  const detail = await quizTeacherAction(store, 'quiz1', { action: 'attempt', attempt_id: bobs.id });
+  assert.deepEqual(detail.attempt.student, { initials: 'BB', name: 'Bob Brown' });
+
+  const cls = store.data.get('classes/class1');
+  store.data.set('classes/class1', { ...cls, students: [{ name: 'Tom Tills' }] });
+  const removed = await quizTeacherAction(store, 'quiz1', { action: 'results' });
+  assert.deepEqual(removed.attempts.find(a => a.student).student, { initials: null, name: null });
+});
+
+test('live mode needs claimed initials to join', async () => {
+  const store = withClass(baseStore());
+  await publishQuiz(store);
+  const live = await quizTeacherAction(store, 'quiz1', { action: 'live_start' });
+  const code = live.live.code;
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'live_join', code }), /Type your initials first/);
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'TT' });
+  const joined = await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'live_join', code });
+  assert.equal(joined.live.joined, true);
+  const player = [...store.data.entries()].find(([k]) => k.includes('/players/'))[1];
+  assert.match(player.student_id, /^st_/);
 });
