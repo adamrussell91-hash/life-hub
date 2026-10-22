@@ -87,8 +87,10 @@
 
 /* ── Session: track ── */
 .gt-track__line { min-width: 24rem; max-width: 40rem; }
-.gt-track__line::before { height: 0; border-top: 3px dotted var(--gt-line); background: none; }
-.gt-track__line::after { height: 0; border-top: 3px dotted var(--gt-ink); background: none; }
+/* Four equal columns: the line runs centre to centre (12.5% in from each side). */
+.gt-track__line { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gt-track__line::before { left: 12.5%; right: 12.5%; height: 0; border-top: 3px dotted var(--gt-line); background: none; }
+.gt-track__line::after { left: 12.5%; width: calc(75% * var(--ps-track-p, 0)); height: 0; border-top: 3px dotted var(--gt-ink); background: none; }
 .gt-track__mark { border-radius: 50%; background: var(--gt-paper); box-shadow: 0 0 0 5px var(--gt-paper); }
 .gt-track__stn[data-state='future'] .gt-track__mark { opacity: 0.3; }
 .gt-track__note { min-height: 1em; color: var(--gt-muted); font-size: 11px; }

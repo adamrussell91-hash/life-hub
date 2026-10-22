@@ -11,7 +11,7 @@ import { el } from '@/views/hub-kit';
 import { TOOLS } from '../../../../../packages/problem-solver/tools/index.mjs';
 import { ROUTE, parseRoute } from '../../../../../packages/get-things-done/route.mjs';
 import { entry as catalogueEntry } from '../../../../../packages/get-things-done/catalogue.mjs';
-import { COMMIT_ID } from '../../../../../packages/get-things-done/commit-slots.mjs';
+import { COMMIT_ID, EXPERIMENT_REVIEW_ID } from '../../../../../packages/get-things-done/commit-slots.mjs';
 import { mainModel } from '../../../../../packages/decision-book/record.mjs';
 import { BOOK_SVG, ENTRY_SVG, SECTION_SVG, entryEmblem, sectionEmblem } from '../../../../../packages/get-things-done/glyphs';
 import type { PsSession, PsSummary } from '../../../../../packages/problem-solver/types';
@@ -157,7 +157,8 @@ const SHAPES: Array<(a: string) => string> = [
     return `<circle cx="${x}" cy="${y}" r="9" fill="${k === 1 ? R : PAPER}" stroke="${k === 1 ? R : B}" stroke-width="5"/>`;
   }).join(''),
   () => `<path d="M8 74C30 74 30 26 50 26S70 74 92 74" fill="none" stroke="${B}" stroke-width="6" stroke-linecap="round"/><circle cx="8" cy="74" r="5" fill="${B}"/><circle cx="92" cy="74" r="5" fill="${B}"/><circle cx="50" cy="26" r="12" fill="${PAPER}" stroke="${R}" stroke-width="6"/><circle cx="50" cy="26" r="4" fill="${R}"/>`,
-  () => nested(BOOK_SVG, 4, 4, 92)
+  // A group, not a nested svg: Problem Solver's `.ps-loom svg` sizing would stretch an inner svg.
+  () => `<g transform="translate(4 4) scale(${92 / 140})">${BOOK_SVG.replace(/^\s*<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').replace(/<title>.*?<\/title>/, '')}</g>`
 ];
 
 const pick = (n: number) => Math.floor(Math.random() * n);
@@ -419,10 +420,18 @@ function commitMark(): HTMLSpanElement {
   return span;
 }
 
+/** The experiment review's mark: the return arrows round an amber centre. */
+function reviewMark(): HTMLSpanElement {
+  const span = el('span', 'gt-emblem');
+  span.setAttribute('aria-hidden', 'true');
+  span.append(svg('0 0 100 100', `${returns(50, 50, 36, 9)}<circle cx="50" cy="50" r="11" fill="var(--gt-amber)"/>`));
+  return span;
+}
+
 /** How the shared coach panel looks in Gear Shifter. */
 export const GT_LOOK: CoachLook = {
   avatar: gtAvatar,
-  emblem: (tool) => (tool === COMMIT_ID ? commitMark() : entryEmblem(tool)),
+  emblem: (tool) => (tool === COMMIT_ID ? commitMark() : tool === EXPERIMENT_REVIEW_ID ? reviewMark() : entryEmblem(tool)),
   frames: {
     shift: {
       keys: ['need', 'route', 'known'],
