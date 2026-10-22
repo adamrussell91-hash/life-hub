@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AssessmentColumn, Markbook } from '@/markbook/schema';
 import type { MarkbookView, QuizColumn } from '@/markbook/types';
-import { assessmentResult, bandFor, formatPercent, orderedColumns, overallFor, rowStudents, sortStudents, weightTotal } from '@/markbook/calc';
+import { assessmentResult, bandFor, formatDay, formatPercent, orderedColumns, overallFor, quizPercent, rowStudents, sortStudents, sydneyDay, todayInSydney, weightTotal } from '@/markbook/calc';
 import { nextCheck, nextHandin } from '@/markbook/cells';
 
 const task = (id: string, weight: number, max = 20, date = '2026-11-01'): AssessmentColumn => ({
@@ -62,11 +62,46 @@ describe('ordering and rows', () => {
   it('sorts by surname and adds removed students on request', () => {
     expect(sortStudents(view.students).map((s) => s.initials)).toEqual(['BB', 'TT']);
     expect(rowStudents(view, false).map((s) => s.id)).toEqual(['s2', 's1']);
-    expect(rowStudents(view, true).map((s) => s.name)).toEqual(['Bob Brown', 'Tom Tills', 'Removed student']);
+    expect(rowStudents(view, true).map((s) => s.name)).toEqual(['Bob Brown', 'Tom Tills', 'Removed student 1']);
+    expect(rowStudents(view, true).map((s) => s.removed === true)).toEqual([false, false, true]);
   });
   it('formats percents', () => {
     expect(formatPercent(null)).toBe('–');
     expect(formatPercent(79.6)).toBe('80%');
+  });
+});
+
+describe('extra calc cases', () => {
+  it('uses Sydney days', () => {
+    expect(todayInSydney(new Date('2026-10-22T14:30:00Z'))).toBe('2026-10-23');
+    expect(todayInSydney(new Date('2026-06-30T13:59:00Z'))).toBe('2026-06-30');
+    expect(sydneyDay('2026-10-22T14:30:00Z')).toBe('2026-10-23');
+  });
+  it('formats days without throwing', () => {
+    expect(formatDay('2026-01-01')).toBe('1 Jan');
+    expect(formatDay('nope')).toBe('nope');
+  });
+  it('gives quiz percents', () => {
+    const s = { attempt_id: 'a', submitted_at: '', pending: 0, rows: [] };
+    expect(quizPercent({ ...s, score: 3, max: 4 })).toBe(75);
+    expect(quizPercent({ ...s, score: 0, max: 0 })).toBeNull();
+  });
+  it('lists a removed student once and orders hand-ins by due date', () => {
+    const v: MarkbookView = {
+      markbook: {
+        columns: [
+          { id: 'hand0001', kind: 'handin', title: 'H', due: '2026-10-05' },
+          { id: 'task0001', kind: 'assessment', title: 'T', date: '2026-10-10', weight: 0, criteria: [] }
+        ],
+        hidden_quizzes: [],
+        marks: { hand0001: { gone: { status: 'late' } }, task0001: { gone: { criteria: {} } } },
+        updated_at: ''
+      },
+      students: [],
+      quizzes: []
+    };
+    expect(rowStudents(v, true)).toHaveLength(1);
+    expect(orderedColumns(v).map((c) => c.id)).toEqual(['hand0001', 'task0001']);
   });
 });
 
@@ -85,5 +120,6 @@ describe('tap to cycle', () => {
     expect(nextCheck('four', undefined)).toBe(1);
     expect(nextCheck('four', 3)).toBe(4);
     expect(nextCheck('four', 4)).toBeNull();
+    expect(nextCheck('four', true)).toBe(1);
   });
 });

@@ -2,7 +2,7 @@ import type { AssessmentMark, Column, Markbook } from './schema';
 
 /** What the markbook endpoint's `load` returns, and the shapes the views draw. */
 
-export type RosterStudent = { id: string; name: string; initials: string };
+export type RosterStudent = { id: string; name: string; initials: string; removed?: true };
 
 export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[] };
 export type QuizScore = { attempt_id: string; submitted_at: string; score: number; max: number; pending: number; rows: QuizRow[] };
