@@ -132,6 +132,23 @@
 
 ---
 
+## As run (22 Oct)
+
+- Every task ran test-first and ended with a commit, then one commit of fixes from the browser walk and one widening the copy check. Tests added: 5 server tests (`tests/unit/get-things-done-app.test.js`), 2 provenance tests (`get-things-done-provenance.test.js`), 4 chart tests (`get-things-done-charts.test.ts`), 15 client tests (`get-things-done-app.test.ts`: shared components, decor, canvas, record blocks, view helpers) and 5 landing tests against a stubbed API (`get-things-done-landing.test.ts`). Problem Solver's and Decision Maker's suites pass unedited.
+- `npm run pre-pr-check` passed: 6,783 root tests (6,772 pass, 11 skipped as before), Tasks 2,723, Teaching 2,275 and the Professional type-check. `node scripts/book-pack/copy-check.mjs ../life-hub-data/book-packs/get-things-done`: no copied runs.
+- **The copy check now covers the app's own copy:** every quoted string of 20 characters or more in `apps/tasks/src/views/get-things-done/` (154 strings).
+- **Browser walk** (mock API, Chromium, 1280px and 390px; no horizontal scroll at either): the landing against `landing.html`; a whole session (framed on "others", Appreciation worked, Commit with the task, check-back and record cards, the record written to a new project page with its provenance image, caption, link back and the Gear Shifter chip, then Review now opening the experiment review on its three stations); a session started from Getting a Project Done on the shelf, its seventeen station links and the session shelf, a pick arriving as "Let's try Brainstorming."; Problem Solver's and Decision Maker's landings unchanged. It found three things, fixed in one commit:
+  - the track's dotted line started left of Frame: Problem Solver's fixed offset does not fit four wide columns, so Gear Shifter's runs centre to centre;
+  - the experiment review showed the book's emblem in the canvas title and strip; it now has its own mark (the return arrows round an amber centre);
+  - the board's book tile drew nothing: Problem Solver's `.ps-loom svg { width: 100% }` stretched the nested emblem off the board, so it is drawn as a scaled group.
+- **Variants:** Kanban and 5 Whys have no emblem of their own, so their shelf, station links and provenance image show the book's emblem (Problem Solver's glyphs are in its palette).
+- **UI register entries checked:** V1 (every `[hidden]` part has a `display: none` rule), R2 (no page scroll at 390), R3, I2 (every pick is a `<button>`), I3 (empty states say what to do), D5 (dates by `formatDisplayDate` or in words), M1 (the avatar's gear turns only while the coach thinks; hovers settle), P4 (see below).
+- **Quick start** is a card with its line and "Not open yet. Use the box above for now.", with no dead control. P4 forbids roadmap talk in the product; the PR goes ready only after Plan 6 replaces the card, so it never ships.
+
 ## Notes for Plan 6
 
-(Filled in when Plan 5 is done.)
+- **Quick start** replaces `quickCard()` in `view.ts`, with `quick-view.ts` beside it as Decision Maker's; the endpoint and the mock API gain `start` (`kinds: ['shift', 'start']`).
+- **The engine takes Review now while the learning question is pending:** the reply is read as the learning answer and Review opens with no tool ("There is no tool for this step yet"). This is shared with Decision Maker. The walk avoided it by answering the question first; Plan 6's Playwright walk should do the same, and the fix (hold Review now until the learning question is answered, or ask it after) is a question for Adam.
+- **Ribbons:** Gear Shifter's landing splits the shared ribbon three ways. Problem Solver's and Decision Maker's still split two ways (their behaviour stays unchanged in this plan); giving them Gear Shifter's share is one line each (`skillsRibbon(here, [other, { name: 'Gear Shifter', … }])`) once Adam agrees.
+- **Playwright** (`apps/tasks/tests/browser/gear-shifter.spec.mjs`) can follow the walk above; the selectors used were `Describe what needs to move`, `Your answer`, `.ps-suggestion`, `.ps-taskcard`, `.ps-reviewcard`, `.ps-casefilecard` ("Write action record"), `.gt-stage-links button` and `.gt-session-shelf__pick`.
+- The scripted coach is literal: a pick from the shelf arrives as "Let's try …" and it answers as it would any message. The live coach's reading of it belongs to the live evaluation.
