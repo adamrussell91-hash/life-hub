@@ -555,6 +555,12 @@ export function createChatController({
   }
 
   async function send(message, { hiddenUser = false, attachments } = {}) {
+    // Callers such as the Food Journal hand-off need to know the turn failed.
+    let failed = false;
+    const fail = text => {
+      failed = true;
+      showChatError(root, text);
+    };
     sending = true;
     setChatBusy(root, true);
     showChatError(root, '');
@@ -849,9 +855,9 @@ export function createChatController({
               });
             }
           } else if (event.code === 'request_too_large') {
-            showChatError(root, 'That photo is too large to send. Try a smaller image.');
+            fail('That photo is too large to send. Try a smaller image.');
           } else {
-            showChatError(root, 'Chat is unavailable right now. Please try again.');
+            fail('Chat is unavailable right now. Please try again.');
           }
         } else if (event.type === 'status') {
           if (typeof event.text === 'string' && event.text.trim()) {
@@ -939,12 +945,12 @@ export function createChatController({
       const abortedForNewChat = abort.signal.reason === 'new-chat';
       if (error?.name === 'AbortError') {
         if (!abortedForNewChat && abort.signal.reason !== 'stop') {
-          showChatError(root, 'That search took too long. Try again in a moment.');
+          fail('That search took too long. Try again in a moment.');
         }
       } else if (error?.code === 'request_too_large' || error?.status === 413) {
-        showChatError(root, 'That photo is too large to send. Try a smaller image.');
+        fail('That photo is too large to send. Try a smaller image.');
       } else {
-        showChatError(root, 'Chat is unavailable right now. Please try again.');
+        fail('Chat is unavailable right now. Please try again.');
       }
     } finally {
       if (activeAbort === abort) activeAbort = null;
@@ -956,6 +962,7 @@ export function createChatController({
       setChatBusy(root, false);
       if (turnSignaled && !hiddenUser) maybeMarkUnread();
     }
+    return { ok: !failed };
   }
 
   function bindProposal(proposal, event) {
@@ -1233,6 +1240,7 @@ export function createChatController({
 
   return {
     send,
+    waitUntilIdle,
     selectAgent,
     selectProtocol,
     startNewChat,

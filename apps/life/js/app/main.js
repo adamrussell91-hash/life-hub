@@ -258,6 +258,7 @@ controller = createAppController({
   renderMind,
   chatSelectAgent: slug => chatController?.selectAgent?.(slug),
   chatSend: (message, opts) => chatController?.send?.(message, opts),
+  chatWaitUntilIdle: () => chatController?.waitUntilIdle?.(),
   chatSyncAccent: () => chatController?.syncAccent?.(),
   chatStartCentralNodeAudit: () => chatController?.startCentralNodeAudit?.(),
   chatFlushVeraSession: () => chatController?.flushVeraSession?.(),
