@@ -1,5 +1,6 @@
 import { el } from '@/quiz/dom';
-import type { AssessmentColumn, AssessmentMark } from './schema';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
+import { MARKBOOK_LIMITS, type AssessmentColumn, type AssessmentMark } from './schema';
 import type { RosterStudent } from './types';
 import { bandFor } from './calc';
 import { openOverlay } from './overlay';
@@ -18,32 +19,59 @@ export type AssessmentPanelOptions = {
   onSave: (studentId: string, mark: AssessmentMark | null) => void;
   /** Where focus goes on close when the opener is gone; gets the student shown last. */
   returnFocus?: (studentId: string) => HTMLElement | null;
+  /** Lets the owner report a save that failed later. Returns an unsubscribe, called on close. */
+  subscribeErrors?: (show: (message: string) => void) => () => void;
 };
 
+type Problem = { problem: string; index: number };
+
 let panelCount = 0;
+
+/** A typed mark as the box would show it, so 7.50 and 7.5 count as the same. */
+function tidy(text: string): string {
+  const t = text.trim();
+  if (!t) return '';
+  const n = Number(t);
+  return Number.isFinite(n) ? String(n) : t;
+}
 
 export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
   const panel = el('div', 'mb-panel');
   panelCount += 1;
-  const taskId = `mb-panel-task-${panelCount}`;
-  const studentId = `mb-panel-student-${panelCount}`;
+  const prefix = `mb-panel-${panelCount}`;
+  const taskId = `${prefix}-task`;
+  const studentId = `${prefix}-student`;
+  // Lives outside the repainted part, so screen readers hear each move.
+  const announce = el('p', 'mb-sr mb-panel__announce');
+  announce.setAttribute('aria-live', 'polite');
+  const body = el('div', 'mb-panel__body');
+  panel.append(announce, body);
   let current = o.studentId;
   let boxes: HTMLInputElement[] = [];
   let feedback: HTMLTextAreaElement;
   let exempt: HTMLInputElement;
   let note: HTMLInputElement;
   let error: HTMLElement;
+  let asking = false;
+  let unsubscribe: (() => void) | undefined;
+
+  const studentOf = (id: string): RosterStudent => o.students.find((s) => s.id === id) ?? { id, name: 'Removed student', initials: '–' };
+
+  function clearError(): void {
+    error.textContent = '';
+    for (const b of boxes) b.removeAttribute('aria-invalid');
+  }
 
   function paint(): void {
-    const student = o.students.find((s) => s.id === current) ?? { id: current, name: 'Removed student', initials: '–' };
+    const student = studentOf(current);
     const mark = o.markFor(current);
-    panel.replaceChildren();
+    body.replaceChildren();
     const task = el('p', 'mb-panel__task', o.column.title);
     task.id = taskId;
     const heading = el('h3', 'mb-panel__student', `${student.initials} · ${student.name}`);
     heading.id = studentId;
-    panel.append(task, heading);
-    boxes = o.column.criteria.map((c) => {
+    body.append(task, heading);
+    boxes = o.column.criteria.map((c, i) => {
       const row = el('label', 'mb-panel__row');
       const box = el('input', 'mb-form__input mb-panel__mark');
       box.type = 'number';
@@ -55,34 +83,54 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
       const given = mark?.criteria?.[c.id];
       box.value = typeof given === 'number' ? String(given) : '';
       const band = el('span', 'mb-panel__band');
+      band.id = `${prefix}-band-${i}`;
+      band.setAttribute('aria-live', 'polite');
+      box.setAttribute('aria-describedby', band.id);
       const showBand = () => {
         const n = Number(box.value);
-        const label = box.value.trim() && Number.isFinite(n) ? bandFor(c, n) : null;
+        const fits = box.value.trim() !== '' && Number.isFinite(n) && n >= 0 && n <= c.max;
+        const label = fits ? bandFor(c, n) : null;
         band.textContent = label ? `Band ${label}` : '';
       };
-      box.addEventListener('input', showBand);
+      box.addEventListener('input', () => {
+        clearError();
+        showBand();
+      });
       showBand();
       box.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          saveAndNext();
-        }
+        if (event.key !== 'Enter' || event.repeat || event.isComposing) return;
+        event.preventDefault();
+        saveAndNext();
       });
       row.append(el('span', 'mb-form__label', `${c.label} (out of ${c.max})`), box, band);
-      panel.append(row);
+      body.append(row);
       return box;
     });
     feedback = el('textarea', 'mb-form__input mb-panel__feedback');
     feedback.rows = 3;
+    feedback.maxLength = MARKBOOK_LIMITS.feedback;
     feedback.value = mark?.feedback ?? '';
+    feedback.addEventListener('input', clearError);
     const exemptRow = el('label', 'mb-panel__exempt-row');
     exempt = el('input', 'mb-panel__exempt');
     exempt.type = 'checkbox';
     exempt.checked = !!mark?.exempt;
     exemptRow.append(exempt, el('span', undefined, 'Exempt from this task'));
+    const hint = el('p', 'mb-panel__exempt-hint', 'Marks and feedback aren’t kept while the student is exempt.');
+    const applyExempt = () => {
+      for (const b of boxes) b.disabled = exempt.checked;
+      feedback.disabled = exempt.checked;
+      hint.hidden = !exempt.checked;
+    };
+    exempt.addEventListener('change', () => {
+      clearError();
+      applyExempt();
+    });
     note = el('input', 'mb-form__input mb-panel__note');
+    note.maxLength = MARKBOOK_LIMITS.note;
     note.placeholder = 'Reason or provision, e.g. misadventure, extra time';
     note.value = mark?.note ?? '';
+    note.addEventListener('input', clearError);
     error = el('p', 'mb-form__error mb-panel__error');
     error.setAttribute('role', 'alert');
     const fb = el('label', 'mb-form__field');
@@ -100,12 +148,15 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
     });
     const closeBtn = el('button', 'btn btn--secondary mb-panel__close', 'Close');
     closeBtn.type = 'button';
-    closeBtn.addEventListener('click', () => close());
+    closeBtn.addEventListener('click', () => {
+      if (canClose()) close();
+    });
     actions.append(next, saveBtn, closeBtn);
-    panel.append(fb, exemptRow, nt, error, actions);
+    body.append(fb, exemptRow, hint, nt, error, actions);
+    applyExempt();
   }
 
-  function collect(): AssessmentMark | null | string {
+  function collect(): AssessmentMark | null | Problem {
     const noteText = note.value.trim();
     if (exempt.checked) return { criteria: {}, exempt: true, ...(noteText ? { note: noteText } : {}) };
     const criteria: Record<string, number> = {};
@@ -115,7 +166,7 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
       // A browser blanks a number box it can't read, so ask rather than treat it as empty.
       if (!text && !box.validity?.badInput) continue;
       const n = Number(text);
-      if (!text || !Number.isFinite(n) || n < 0 || n > c.max) return `Give between 0 and ${c.max} for ${c.label}.`;
+      if (!text || !Number.isFinite(n) || n < 0 || n > c.max) return { problem: `Give between 0 and ${c.max} for ${c.label}.`, index: i };
       criteria[c.id] = n;
     }
     const fbText = feedback.value.trim();
@@ -123,14 +174,66 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
     return { criteria, ...(fbText ? { feedback: fbText } : {}), ...(noteText ? { note: noteText } : {}) };
   }
 
+  /** The fields as typed, and a saved mark as the fields would show it, in one comparable shape. */
+  function typedState(): string {
+    const ex = exempt.checked;
+    return JSON.stringify({
+      ex,
+      marks: ex ? [] : boxes.map((b) => (b.validity?.badInput ? '\u0000' : tidy(b.value))),
+      feedback: ex ? '' : feedback.value.trim(),
+      note: note.value.trim()
+    });
+  }
+  function savedState(mark: AssessmentMark | undefined): string {
+    const ex = !!mark?.exempt;
+    return JSON.stringify({
+      ex,
+      marks: ex ? [] : o.column.criteria.map((c) => {
+        const v = mark?.criteria?.[c.id];
+        return typeof v === 'number' ? String(v) : '';
+      }),
+      feedback: ex ? '' : (mark?.feedback ?? '').trim(),
+      note: (mark?.note ?? '').trim()
+    });
+  }
+
+  /** Closes straight away unless there is unsaved typing; then asks, and closes only on a yes. */
+  function canClose(): boolean {
+    if (typedState() === savedState(o.markFor(current))) return true;
+    void askThenClose();
+    return false;
+  }
+
+  async function askThenClose(): Promise<void> {
+    if (asking) return;
+    asking = true;
+    const back = document.activeElement;
+    let yes = false;
+    try {
+      yes = await askConfirmCard({ title: 'Close without saving?', supporting: 'What you typed for this student will be lost.', confirmLabel: 'Close' });
+    } finally {
+      asking = false;
+    }
+    if (!panel.isConnected) return;
+    if (yes) close();
+    else if (back instanceof HTMLElement && back.isConnected) back.focus();
+  }
+
   function save(): boolean {
     const mark = collect();
-    if (typeof mark === 'string') {
-      error.textContent = mark;
+    if (mark && 'problem' in mark) {
+      error.textContent = mark.problem;
+      const box = boxes[mark.index];
+      box?.setAttribute('aria-invalid', 'true');
+      box?.focus();
       return false;
     }
     o.onSave(current, mark);
     return true;
+  }
+
+  function focusFirst(): void {
+    (boxes.find((b) => !b.disabled) ?? exempt).focus();
   }
 
   function saveAndNext(): void {
@@ -143,14 +246,20 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
     }
     current = next.id;
     paint();
-    boxes[0]?.focus();
+    announce.textContent = `Now marking ${next.initials} · ${next.name}`;
+    focusFirst();
   }
 
   paint();
   const { overlay, close } = openOverlay(panel, {
     labelledBy: `${taskId} ${studentId}`,
-    returnFocus: () => o.returnFocus?.(current) ?? null
+    returnFocus: () => o.returnFocus?.(current) ?? null,
+    canClose,
+    onClose: () => unsubscribe?.()
   });
-  boxes[0]?.focus();
+  unsubscribe = o.subscribeErrors?.((message) => {
+    error.textContent = message;
+  });
+  focusFirst();
   return overlay;
 }

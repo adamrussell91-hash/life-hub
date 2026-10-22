@@ -412,4 +412,28 @@ describe('markbook section', () => {
     expect(document.activeElement).toBe(title());
     expect(title().textContent).toBe('Final draft');
   });
+
+  it('shows a failed mark save inside the open panel, naming the student', async () => {
+    const { host, api } = await mount(view());
+    (api.setMark as Mock).mockRejectedValueOnce(new Error('Server said no'));
+    host.querySelectorAll('tbody tr')[0]!.querySelector<HTMLButtonElement>('.mb-cell--assessment')!.click();
+    const panel = document.querySelector<HTMLElement>('.mb-panel')!;
+    const box = () => panel.querySelector<HTMLInputElement>('.mb-panel__mark')!;
+    box().value = '19';
+    box().dispatchEvent(new Event('input'));
+    panel.querySelector<HTMLButtonElement>('.mb-panel__next')!.click();
+    await vi.waitFor(() => expect(panel.querySelector('.mb-panel__error')?.textContent).toBe('Bob Brown’s mark wasn’t saved: Server said no'));
+    expect(host.querySelectorAll('tbody tr')[0]!.querySelector('.mb-cell--assessment')?.textContent).toBe('15/20 · 75%');
+    panel.querySelector<HTMLButtonElement>('.mb-panel__close')!.click();
+    expect(document.querySelector('.mb-panel')).toBeNull();
+  });
+
+  it('skips the server when a mark is saved unchanged', async () => {
+    const { host, api } = await mount(view());
+    host.querySelectorAll('tbody tr')[0]!.querySelector<HTMLButtonElement>('.mb-cell--assessment')!.click();
+    document.querySelector<HTMLButtonElement>('.mb-panel__save')!.click();
+    expect(document.querySelector('.mb-panel')).toBeNull();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(api.setMark).not.toHaveBeenCalled();
+  });
 });

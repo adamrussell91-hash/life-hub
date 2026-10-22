@@ -66,6 +66,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let phoneIndex = 0;
   let disposed = false;
   const queued: Change[] = [];
+  /** Told about each queued save that fails, e.g. by an open marking panel. */
+  const saveErrorListeners = new Set<(change: Change, message: string) => void>();
   let queue: Promise<void> = Promise.resolve();
 
   const section = el('section', 'mb');
@@ -129,6 +131,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
           status.textContent = reached
             ? error instanceof Error ? error.message : 'Couldn’t save that.'
             : 'Couldn’t save that, and couldn’t reach the server. Check your connection.';
+          for (const listener of saveErrorListeners) listener(item, status.textContent);
         } finally {
           paint();
         }
@@ -202,11 +205,21 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       // Reads the live view, so a mark saved or queued in this panel shows when the teacher comes back to it.
       markFor: (id) => (view ? markOf<AssessmentMark>(view.markbook, columnId, id) : undefined),
       onSave: (id, mark) => {
-        // Passing over an unmarked student has nothing to clear.
-        if (mark === null && view && markOf(view.markbook, columnId, id) === undefined) return;
+        // Unchanged, including passing over an unmarked student: nothing to send.
+        const now = view ? markOf(view.markbook, columnId, id) : undefined;
+        if (JSON.stringify(mark) === JSON.stringify(now ?? null)) return;
         actions.setMark(columnId, id, mark);
       },
-      returnFocus: (id) => findInBody('.mb-cell', columnId, id) ?? title
+      returnFocus: (id) => findInBody('.mb-cell', columnId, id) ?? title,
+      subscribeErrors: (show) => {
+        const listener = (failed: Change, message: string): void => {
+          if (failed.kind !== 'mark' || failed.columnId !== columnId) return;
+          const name = view?.students.find((s) => s.id === failed.studentId)?.name ?? 'A removed student';
+          show(`${name}’s mark wasn’t saved: ${message}`);
+        };
+        saveErrorListeners.add(listener);
+        return () => saveErrorListeners.delete(listener);
+      }
     });
   }
 
