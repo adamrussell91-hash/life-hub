@@ -1,7 +1,7 @@
 import type { Media, MediaFolder } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { isHttpUrl } from '@/blocks/url-safety';
-import { applyCreatedMedia, applyMediaFolders, applyPatchedMedia } from '@/app/curriculum-state';
+import { applyCreatedMedia, applyMediaFolders, applyPatchedMedia, reconcileCurriculum } from '@/app/curriculum-state';
 import { navigate } from '@/app/router';
 import { askConfirmCard, askSelectCard, askTextCard } from '@/teacher/confirm-dialog';
 import { createMedia, patchMedia, saveMediaFolders } from '@/teacher/media-api';
@@ -26,6 +26,7 @@ import { ApiClientError } from '@/api/client';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderPageHeader } from '@/teacher/page-header';
+import { libraryOutcomeCount, renderOutcomesLibrary } from '@/teacher/sections/outcomes-library';
 
 export function openUrlForMedia(media: Media): string | undefined {
   const url = media.preview_url ?? media.download_url;
@@ -47,7 +48,7 @@ function readStoredView(): LibraryView {
   try {
     const raw = localStorage.getItem(VIEW_STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as LibraryView) : null;
-    if (parsed && ['all', 'unfiled', 'unused', 'by-unit'].includes(parsed.kind)) return { kind: parsed.kind } as LibraryView;
+    if (parsed && ['all', 'unfiled', 'unused', 'by-unit', 'outcomes'].includes(parsed.kind)) return { kind: parsed.kind } as LibraryView;
     if (parsed?.kind === 'folder' && typeof parsed.id === 'string') return { kind: 'folder', id: parsed.id };
   } catch {
     // Storage blocked: start on All resources.
@@ -65,6 +66,12 @@ function setView(view: LibraryView): void {
   } catch {
     // Storage blocked: the view still holds for this session.
   }
+}
+
+/** Opens the Resource Library on its Outcomes view (from the outcome picker). */
+export function showOutcomesInLibrary(): void {
+  setView({ kind: 'outcomes' });
+  navigate('/resources');
 }
 
 /** Test hook: start each render from a known view. */
@@ -353,7 +360,7 @@ export function renderResourcesIndex(
   toolbar.insertBefore(newFolderBtn, fileInput);
   actionButtons.push(newFolderBtn);
 
-  if (media.length === 0 && folders.length === 0) {
+  if (media.length === 0 && folders.length === 0 && curriculum.subjects.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'teacher-layout__canvas-status';
     empty.textContent = 'No resources yet.';
@@ -437,7 +444,13 @@ export function renderResourcesIndex(
       none.textContent = 'No folders yet. Use New folder to make one.';
       tree.append(none);
     }
-    nav.append(views, heading, tree);
+    const curriculumHeading = document.createElement('p');
+    curriculumHeading.className = 'resources-nav__heading';
+    curriculumHeading.textContent = 'Curriculum';
+    const curriculumViews = document.createElement('div');
+    curriculumViews.className = 'resources-nav__views';
+    curriculumViews.append(navButton('Outcomes', { kind: 'outcomes' }, libraryOutcomeCount(curriculum)));
+    nav.append(views, heading, tree, curriculumHeading, curriculumViews);
   }
 
   /** Folder list changes in place; views read through this so counts stay current. */
@@ -446,6 +459,20 @@ export function renderResourcesIndex(
   function renderMain(): void {
     main.replaceChildren();
     const data = curriculumView();
+    // Upload, link and folder tools act on files, not outcomes.
+    toolbar.hidden = currentView.kind === 'outcomes';
+    if (toolbar.hidden) urlForm.hidden = true;
+    if (currentView.kind === 'outcomes') {
+      // Outcome writes touch subjects, lessons and units, so refetch before the remount.
+      renderOutcomesLibrary(main, curriculum, {
+        run: (task) =>
+          run(async () => {
+            await task();
+            await reconcileCurriculum();
+          })
+      });
+      return;
+    }
     if (currentView.kind === 'folder') {
       renderFolderHeader(currentView.id);
     } else {
@@ -730,7 +757,8 @@ const VIEW_TITLES: Record<Exclude<LibraryView['kind'], 'folder'>, string> = {
   all: 'All resources',
   unfiled: 'Unfiled',
   unused: 'Not used anywhere',
-  'by-unit': 'By class and unit'
+  'by-unit': 'By class and unit',
+  outcomes: 'Outcomes'
 };
 
 const VIEW_EMPTY: Record<'all' | 'unfiled' | 'unused', string> = {

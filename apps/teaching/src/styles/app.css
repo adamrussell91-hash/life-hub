@@ -2513,6 +2513,281 @@ a:hover {
   color: var(--muted);
 }
 
+/* Resource Library → Outcomes: the subject's outcome catalog, editable. */
+.resources-toolbar[hidden] {
+  display: none;
+}
+
+.outcomes-lib__subjects {
+  margin-bottom: var(--space-3);
+}
+
+.outcomes-lib__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.outcomes-lib__search {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--warm-white);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.outcomes-lib__group + .outcomes-lib__group {
+  margin-top: var(--space-5);
+}
+
+.outcomes-lib__group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+
+.outcomes-lib__group-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.outcomes-lib__count {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.outcomes-lib__tools,
+.outcomes-lib__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.outcomes-lib__step {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.outcomes-lib__step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.outcomes-lib__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outcomes-lib__row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.outcomes-lib__view {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.outcomes-lib__view[hidden] {
+  display: none;
+}
+
+.outcomes-lib__copy {
+  min-width: 0;
+}
+
+.outcomes-lib__head {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--navy);
+}
+
+.outcomes-lib__code {
+  font-weight: 700;
+}
+
+.outcomes-lib__tag {
+  padding: 0 0.4rem;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--pastel-blue) 55%, #fff);
+  color: var(--pastel-blue-ink);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+.outcomes-lib__wording {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.outcomes-lib__meta,
+.outcomes-lib__usage summary {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.outcomes-lib__usage summary {
+  cursor: pointer;
+}
+
+.outcomes-lib__usage ul {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-xs);
+}
+
+.outcomes-lib__form {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 12px);
+  background: var(--warm-white);
+}
+
+.outcomes-lib__form-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.outcomes-lib__form-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.outcomes-lib__field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.outcomes-lib__field input,
+.outcomes-lib__field textarea {
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.outcomes-lib__field textarea {
+  resize: vertical;
+}
+
+.outcomes-lib__form-error {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--danger, #b42318);
+}
+
+.outcomes-lib__form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.outcomes-lib__dupes {
+  margin-bottom: var(--space-5);
+  padding: var(--space-3);
+  border: 1px solid var(--warning, #b7791f);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--warning, #b7791f) 8%, transparent);
+}
+
+.outcomes-lib__dupes-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+}
+
+.outcomes-lib__dupes-lead {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.outcomes-lib__dupe + .outcomes-lib__dupe {
+  margin-top: var(--space-3);
+}
+
+.outcomes-lib__dupe-code {
+  margin: 0 0 var(--space-1);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--navy);
+}
+
+.outcomes-lib__dupe-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.outcomes-lib__dupe-row > .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.outcomes-lib__dupe-copy {
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.outcomes-lib__dupe-copy p {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .outcomes-lib__view,
+  .outcomes-lib__dupe-row {
+    flex-direction: column;
+  }
+
+  .outcomes-lib__actions {
+    align-self: flex-end;
+  }
+
+  .outcomes-lib__form-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .resources-crumbs {
   display: flex;
   flex-wrap: wrap;
@@ -9989,7 +10264,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 }
 
 .outcome-picker__list {
-  max-height: 16rem;
+  max-height: min(26rem, 50vh);
   overflow: auto;
   margin-bottom: var(--space-3);
 }
@@ -10010,6 +10285,29 @@ body.is-lesson-builder-full-page .hub-utilities {
   padding: 0.35rem 0;
   font-size: var(--text-sm);
   color: var(--navy);
+}
+
+.outcome-picker__copy {
+  min-width: 0;
+}
+
+.outcome-picker__wording {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.outcome-picker__error {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--danger, #b42318);
+}
+
+.outcome-picker__manage {
+  margin-right: auto;
 }
 
 .outcome-picker__custom {
