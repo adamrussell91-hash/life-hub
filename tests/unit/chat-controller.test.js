@@ -420,6 +420,28 @@ test('a confirm that reports foodJournalUpdated:false says the Food Journal badg
   );
 });
 
+test('Central Node, Food Journal and old-count warnings show together in one message', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: false, foodJournalUpdated: false, oldCountRemoved: false })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  findProposalButton(proposal, 'record-proposal__confirm').dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged, but Central Node didn\u2019t update — try Refresh. '
+      + 'Logged. The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again. '
+      + 'Logged. The old count for this dish couldn\u2019t be removed; delete it from Nutrition.'
+  );
+});
+
 test('a confirm that reports centralNodeUpdated:true does not show the Central Node warning', async () => {
   const root = new FakeDocument();
   const chatApi = fakeChatApi({

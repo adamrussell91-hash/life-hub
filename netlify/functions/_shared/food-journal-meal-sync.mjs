@@ -1,3 +1,4 @@
+import { load } from "js-yaml";
 import { decodeBlob } from "./decode-blob.mjs";
 import { parseNutritionMealPath } from "./delete-meal.mjs";
 import { validateFoodJournal } from "./food-journal-schema.mjs";
@@ -50,10 +51,8 @@ export async function syncFoodJournalAfterMeal(client, record, mealPath, nowIso)
   return { updated: true };
 }
 
-// The meal file a dish was last counted into, when a re-count can safely
-// replace it: still in the tree, and the same date and meal slot, since
-// both are part of the path that delete-meal reads.
-export async function findCountedMealPath(client, tree, dishId, { date, meal } = {}) {
+// The meal file a dish was last counted into, while it is still in the tree.
+export async function findCountedMeal(client, tree, dishId) {
   const blob = tree.find((b) => b.path === PATH && b.type === "blob");
   if (!blob) return null;
   let journal;
@@ -65,10 +64,24 @@ export async function findCountedMealPath(client, tree, dishId, { date, meal } =
   const dish = (journal?.visits ?? [])
     .flatMap((v) => v?.dishes ?? [])
     .find((d) => d?.id === dishId);
-  const mealPath = dish?.brisket?.meal_path;
-  const parsed = parseNutritionMealPath(mealPath);
-  if (!parsed || parsed.date !== date || parsed.meal !== meal) return null;
-  return tree.some((b) => b.path === mealPath && b.type === "blob")
-    ? mealPath
-    : null;
+  const parsed = parseNutritionMealPath(dish?.brisket?.meal_path);
+  if (!parsed) return null;
+  const entry = tree.find((b) => b.path === parsed.path && b.type === "blob");
+  return entry ? { ...parsed, sha: entry.sha } : null;
+}
+
+// After a re-count lands in a new file, remove the old one, but only when it
+// still names this dish, so an unrelated meal is never deleted.
+// Returns null when there was nothing of ours to remove.
+export async function removeOldCountedMeal(client, prior, dishId) {
+  const text = decodeBlob(await client.readBlob(prior.sha));
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text?.trim() ?? "");
+  const front = match ? load(match[1]) : null;
+  if (front?.type !== "meal" || front.food_dish_id !== dishId) return null;
+  await client.deleteFile({
+    path: prior.path,
+    sha: prior.sha,
+    message: `chore(nutrition): replace re-counted meal ${prior.path.split("/").pop()}`,
+  });
+  return { date: prior.date, meal: prior.meal };
 }

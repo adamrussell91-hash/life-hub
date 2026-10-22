@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  findCountedMealPath,
+  findCountedMeal,
+  removeOldCountedMeal,
   markDishCounted,
   syncFoodJournalAfterMeal,
 } from "../../netlify/functions/_shared/food-journal-meal-sync.mjs";
@@ -195,28 +196,55 @@ function countedJournal(mealPath) {
   return j;
 }
 
-test("findCountedMealPath returns the counted meal path while it is still in the tree", async () => {
+test("findCountedMeal returns the counted meal while it is still in the tree", async () => {
   const client = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: "---\n---\n" });
   const { tree } = await client.resolveTree();
-  assert.equal(await findCountedMealPath(client, tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), path);
+  assert.deepEqual(await findCountedMeal(client, tree, "dish_1"), {
+    path,
+    date: "2026-10-22",
+    meal: "dinner",
+    slug: "dinner-1930",
+    sha: "2".repeat(40),
+  });
 });
 
-test("findCountedMealPath returns null when the file is gone, the dish is uncounted or unknown", async () => {
+test("findCountedMeal returns null when the file is gone, the dish is uncounted or unknown", async () => {
   const gone = fakeClient({ [JOURNAL_PATH]: countedJournal(path) });
-  assert.equal(await findCountedMealPath(gone, (await gone.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+  assert.equal(await findCountedMeal(gone, (await gone.resolveTree()).tree, "dish_1"), null);
   const fresh = fakeClient({ [JOURNAL_PATH]: journal(), [path]: "x" });
-  assert.equal(await findCountedMealPath(fresh, (await fresh.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+  assert.equal(await findCountedMeal(fresh, (await fresh.resolveTree()).tree, "dish_1"), null);
   const counted = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: "x" });
-  assert.equal(await findCountedMealPath(counted, (await counted.resolveTree()).tree, "dish_x", { date: "2026-10-22", meal: "dinner" }), null);
+  assert.equal(await findCountedMeal(counted, (await counted.resolveTree()).tree, "dish_x"), null);
   const noJournal = fakeClient({ [path]: "x" });
-  assert.equal(await findCountedMealPath(noJournal, (await noJournal.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+  assert.equal(await findCountedMeal(noJournal, (await noJournal.resolveTree()).tree, "dish_1"), null);
   const broken = fakeClient({ [JOURNAL_PATH]: "{not json", [path]: "x" });
-  assert.equal(await findCountedMealPath(broken, (await broken.resolveTree()).tree, "dish_1", { date: "2026-10-22", meal: "dinner" }), null);
+  assert.equal(await findCountedMeal(broken, (await broken.resolveTree()).tree, "dish_1"), null);
 });
 
-test("findCountedMealPath won't reuse a file for another date or meal slot", async () => {
-  const client = fakeClient({ [JOURNAL_PATH]: countedJournal(path), [path]: "x" });
-  const { tree } = await client.resolveTree();
-  assert.equal(await findCountedMealPath(client, tree, "dish_1", { date: "2026-10-23", meal: "dinner" }), null);
-  assert.equal(await findCountedMealPath(client, tree, "dish_1", { date: "2026-10-22", meal: "lunch" }), null);
+function deletingClient(files) {
+  const client = fakeClient(files);
+  client.deletes = [];
+  client.deleteFile = async (args) => {
+    client.deletes.push(args);
+    return { commitSha: "e".repeat(40) };
+  };
+  return client;
+}
+
+test("removeOldCountedMeal deletes the old file with its sha when it names this dish", async () => {
+  const client = deletingClient({ [path]: '---\ntype: "meal"\nmeal: "dinner"\nfood_dish_id: "dish_1"\n---\n' });
+  const prior = { path, date: "2026-10-22", meal: "dinner", sha: "1".repeat(40) };
+  assert.deepEqual(await removeOldCountedMeal(client, prior, "dish_1"), { date: "2026-10-22", meal: "dinner" });
+  assert.equal(client.deletes.length, 1);
+  assert.equal(client.deletes[0].path, path);
+  assert.equal(client.deletes[0].sha, "1".repeat(40));
+});
+
+test("removeOldCountedMeal leaves a meal for another dish, or no dish, alone", async () => {
+  for (const front of ['food_dish_id: "dish_2"\n', ""]) {
+    const client = deletingClient({ [path]: `---\ntype: "meal"\nmeal: "dinner"\n${front}---\n` });
+    const prior = { path, date: "2026-10-22", meal: "dinner", sha: "1".repeat(40) };
+    assert.equal(await removeOldCountedMeal(client, prior, "dish_1"), null);
+    assert.equal(client.deletes.length, 0);
+  }
 });
