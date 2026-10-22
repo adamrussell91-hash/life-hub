@@ -1,7 +1,10 @@
+import { ApiClientError } from '@/api/client';
 import type { FoodDish, MealPutBody, MealRead } from '@/api/travel-meal';
 import type { JournalMoment } from '@/journal/types';
 
 export const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Drinks'] as const;
+// Same limits as the journal schema.
+export const EXTRA_MAX = { mood: 40, vibe: 600, with: 200 } as const;
 export const RATING_OPTIONS: (number | null)[] = [null, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
 export interface MealDishState {
@@ -72,6 +75,26 @@ export function mealChanged(loaded: MealState | null, current: MealState): boole
   return body(loaded) !== body(current);
 }
 
+export const MEAL_MESSAGES = {
+  conflict: 'Your journal changed on another device. Reload before saving.',
+  invalid: "Couldn't save the meal. Check the dish names and try again.",
+  failed: 'Could not save. Try again.',
+  photoFailed: "Saved. The photo didn't copy; open again to retry.",
+  queued: 'Saved offline. The meal needs a connection; open the moment again to save it.',
+} as const;
+
+// A 400 only means the meal when it came from the meal call.
+export function saveErrorMessage(err: unknown, step: 'moment' | 'meal'): string {
+  const status = err instanceof ApiClientError ? err.status : undefined;
+  if (status === 409 || (err instanceof ApiClientError && err.code === 'conflict')) return MEAL_MESSAGES.conflict;
+  if (step === 'meal' && status === 400) return MEAL_MESSAGES.invalid;
+  return MEAL_MESSAGES.failed;
+}
+
+export function removeDishLabel(dish: Pick<MealDishState, 'title'>, index: number): string {
+  return `Remove dish ${dish.title.trim() || index + 1}`;
+}
+
 function field(labelText: string, control: HTMLElement): HTMLLabelElement {
   const wrap = document.createElement('label');
   wrap.className = 'journal-edit-moment__field';
@@ -81,10 +104,11 @@ function field(labelText: string, control: HTMLElement): HTMLLabelElement {
   return wrap;
 }
 
-function textInput(value: string, onInput: (value: string) => void): HTMLInputElement {
+function textInput(value: string, onInput: (value: string) => void, maxLength?: number): HTMLInputElement {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = value;
+  if (maxLength) input.maxLength = maxLength;
   input.addEventListener('input', () => onInput(input.value));
   return input;
 }
@@ -156,9 +180,9 @@ export function mountMealSection(
   const extrasRow = document.createElement('div');
   extrasRow.className = 'journal-edit-moment__meal-extras';
   extrasRow.append(
-    field('Mood', textInput(state.extras.mood, (v) => { state.extras.mood = v; changed(); })),
-    field('Vibe', textInput(state.extras.vibe, (v) => { state.extras.vibe = v; changed(); })),
-    field('Who with', textInput(state.extras.with, (v) => { state.extras.with = v; changed(); })),
+    field('Mood', textInput(state.extras.mood, (v) => { state.extras.mood = v; changed(); }, EXTRA_MAX.mood)),
+    field('Vibe', textInput(state.extras.vibe, (v) => { state.extras.vibe = v; changed(); }, EXTRA_MAX.vibe)),
+    field('Who with', textInput(state.extras.with, (v) => { state.extras.with = v; changed(); }, EXTRA_MAX.with)),
   );
 
   const titleField = field('Title', textInput(state.title, (v) => { state.title = v; changed(); }));
@@ -177,11 +201,16 @@ export function mountMealSection(
     dishList.querySelector<HTMLInputElement>('.journal-edit-moment__dish:last-child input')?.focus();
   });
 
-  function dishRow(dish: MealDishState): HTMLElement {
+  function dishRow(dish: MealDishState, index: number): HTMLElement {
     const row = document.createElement('div');
     row.className = 'journal-edit-moment__dish';
 
-    const titleWrap = field('Dish', textInput(dish.title, (v) => { dish.title = v; changed(); }));
+    const remove = document.createElement('button');
+    const titleWrap = field('Dish', textInput(dish.title, (v) => {
+      dish.title = v;
+      remove.setAttribute('aria-label', removeDishLabel(dish, index));
+      changed();
+    }));
     if (dish.title_en) {
       const en = document.createElement('span');
       en.className = 'journal-edit-moment__dish-en';
@@ -220,8 +249,8 @@ export function mountMealSection(
       row.append(ingredients);
     }
 
-    const remove = document.createElement('button');
     remove.type = 'button';
+    remove.setAttribute('aria-label', removeDishLabel(dish, index));
     remove.className = 'btn btn--ghost journal-edit-moment__dish-remove';
     remove.textContent = 'Remove';
     remove.addEventListener('click', () => {
@@ -234,7 +263,7 @@ export function mountMealSection(
   }
 
   function renderDishes(): void {
-    dishList.replaceChildren(...state.dishes.map(dishRow));
+    dishList.replaceChildren(...state.dishes.map((d, i) => dishRow(d, i)));
   }
 
   function refresh(): void {

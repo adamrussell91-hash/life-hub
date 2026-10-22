@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { mealPayload, canBeMeal, mealChanged, RATING_OPTIONS, type MealState } from '@/journal/meal-section';
+import { ApiClientError } from '@/api/client';
+import { samePatch } from '@/journal/edit-moment-sheet';
+import {
+  canBeMeal,
+  EXTRA_MAX,
+  mealChanged,
+  mealPayload,
+  MEAL_MESSAGES,
+  RATING_OPTIONS,
+  removeDishLabel,
+  saveErrorMessage,
+  type MealState,
+} from '@/journal/meal-section';
 
 describe('meal section', () => {
   it('only your own moments can be meals', () => {
@@ -86,5 +98,33 @@ describe('meal section', () => {
         expect(mealChanged(loaded(), now)).toBe(true);
       }
     });
+  });
+
+  it('caps the extras at the journal schema limits', () => {
+    expect(EXTRA_MAX).toEqual({ mood: 40, vibe: 600, with: 200 });
+  });
+
+  it('names the error by what failed', () => {
+    const err = (status: number, code = 'x') => new ApiClientError({ code, message: 'm' }, status);
+    expect(saveErrorMessage(err(409), 'meal')).toBe(MEAL_MESSAGES.conflict);
+    expect(saveErrorMessage(err(409), 'moment')).toBe(MEAL_MESSAGES.conflict);
+    expect(saveErrorMessage(err(400), 'meal')).toBe(
+      "Couldn't save the meal. Check the dish names and try again.",
+    );
+    expect(saveErrorMessage(err(400), 'moment')).toBe('Could not save. Try again.');
+    expect(saveErrorMessage(err(500), 'meal')).toBe('Could not save. Try again.');
+    expect(saveErrorMessage(new Error('offline'), 'meal')).toBe('Could not save. Try again.');
+  });
+
+  it('labels Remove by the dish title, or its number when untitled', () => {
+    expect(removeDishLabel({ title: ' Tortilla ' }, 0)).toBe('Remove dish Tortilla');
+    expect(removeDishLabel({ title: '  ' }, 1)).toBe('Remove dish 2');
+  });
+
+  it('sees an identical moment patch so a retry skips the moment save', () => {
+    const patch = { text: 'Hi', local_date: '2026-03-01', coordinates: { lat: 1, lon: 2 } };
+    expect(samePatch(null, patch)).toBe(false);
+    expect(samePatch({ ...patch, place: undefined }, patch)).toBe(true);
+    expect(samePatch(patch, { ...patch, text: 'Hello' })).toBe(false);
   });
 });

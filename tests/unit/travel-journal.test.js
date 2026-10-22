@@ -274,3 +274,24 @@ test('travel-journal deleting a meal moment on a stale version is a conflict and
   assert.equal(res.status, 409);
   assert.equal(store.writes.length, 0);
 });
+
+test('travel-journal cascade returns 409 when the one-commit write loses a race', async () => {
+  const { repo, doc, created, store } = await seededMealTrip();
+  const base = store.create;
+  store.create = (...args) => ({
+    ...base(...args),
+    async write() {
+      throw Object.assign(new Error('Your journal changed on another device. Reload before saving.'), {
+        code: 'conflict',
+        status: 409
+      });
+    }
+  });
+  const next = structuredClone(doc);
+  next.moments[0] = { ...next.moments[0], lifecycle: 'deleted', deleted_at: '2026-03-02T00:00:00.000Z' };
+
+  const res = await mealHandler(repo, store)(request('PUT', TRIP, { if_version: created.version, journal: next }));
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error.code, 'conflict');
+  assert.equal((await repo.getJournal(TRIP)).journal.moments[0].lifecycle, 'live');
+});
