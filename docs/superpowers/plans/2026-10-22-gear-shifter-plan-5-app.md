@@ -38,7 +38,7 @@
 
 **Design notes:**
 - **One structure, three looks.** The session page wires the same parts in the same order as Decision Maker's `renderSession`; only the canvas, route, track, medal card, shelf and options differ.
-- **The provenance image is a static file** in the Tasks build (`apps/tasks/public/get-things-done/provenance/<id>.svg`), made by a generator with a drift test, for Decision Maker's reason: an image block keeps the http(s) address it was written with. The Kanban and 5 Whys variants have no emblem of their own; their image is Problem Solver's tool glyph inside the section.
+- **The provenance image is a static file** in the Tasks build (`apps/tasks/public/get-things-done/provenance/<id>.svg`), made by a generator with a drift test, for Decision Maker's reason: an image block keeps the http(s) address it was written with. The Kanban and 5 Whys variants have no emblem of their own; their image is the book's emblem inside the section (Problem Solver's glyphs are in its own palette).
 - **Picking a technique is a message to the coach**, not a new action. The shelf and a station's links send "Let's try <technique>." through `say`, so the coach's discernment and its gatekeeping still apply; the engine gains nothing. Starting from a technique on the landing uses the server's existing `startModel`.
 - **Station links are added by Gear Shifter's canvas**, after the path renderer draws Getting a Project Done, so Decision Maker's renderer is untouched.
 
@@ -78,7 +78,7 @@
 ### Task 3: The provenance images
 
 **Files:**
-- Create: `scripts/generate-get-things-done-provenance.mjs`: for every catalogue entry, its emblem (or, for the two variants, Problem Solver's tool glyph) on a paper disc with a cobalt ring, and its section's emblem as a badge at the lower right; `--check` exits 1 on drift. Written to `apps/tasks/public/get-things-done/provenance/<id>.svg` (37 files).
+- Create: `scripts/generate-get-things-done-provenance.mjs`: for every catalogue entry, its emblem (or, for the two variants, the book's emblem) on a paper disc with a cobalt ring, and its section's emblem as a badge at the lower right; `--check` exits 1 on drift. Written to `apps/tasks/public/get-things-done/provenance/<id>.svg` (37 files).
 - Create: `tests/unit/get-things-done-provenance.test.js`: one file per catalogue entry, each labelled "<technique>, from <section>", only palette colours, and `--check` passes.
 
 **Commit:** "Gear Shifter: the provenance images a record shows".
