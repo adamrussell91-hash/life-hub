@@ -227,6 +227,11 @@ async function pageFor(width = 1440, { editorial = false, seed, media = {} } = {
       assets.set(key, Buffer.from(body));
     },
     signGet: async ({ key }) => "https://food-media.test/" + key,
+    headObject: async ({ key }) => {
+      if (!assets.has(key))
+        throw Object.assign(new Error("missing"), { name: "NotFound" });
+      return { size: assets.get(key).length };
+    },
     getObject: async ({ key }) => {
       if (!assets.has(key))
         throw Object.assign(new Error("missing"), { name: "NoSuchKey" });

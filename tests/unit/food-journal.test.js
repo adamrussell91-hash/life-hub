@@ -366,6 +366,7 @@ test("media bytes serve a live photo's JPEG and 404 for an unreferenced key", as
   const asked = [];
   const h = createFoodJournalMediaHandler(
     deps(repo(j), {
+      headObject: async () => ({ size: jpeg.length }),
       getObject: async ({ key }) => {
         asked.push(key);
         if (key !== "food/photos/photo_1.jpg")
@@ -1828,4 +1829,42 @@ test("a save keeps each dish's Brisket link, whatever the client sends", async (
     jj.visits[0].dishes[0].brisket = { ...forged, needs_recount: true };
   });
   assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640, needs_recount: true });
+});
+
+test("media bytes refuse a photo over 4 MB, by its size or after reading", async () => {
+  resetRateLimits();
+  const j = fixture();
+  j.visits[0].dishes[0].photos = [
+    { id: "photo_1", key: "food/photos/photo_1.jpg" },
+  ];
+  const big = 4 * 1024 * 1024 + 1;
+  const r2 = {
+    ...env,
+    R2_ACCOUNT_ID: "a",
+    R2_BUCKET: "b",
+    R2_ACCESS_KEY_ID: "k",
+    R2_SECRET_ACCESS_KEY: "s",
+  };
+  let reads = 0;
+  const byHead = createFoodJournalMediaHandler(
+    deps(repo(j), {
+      env: r2,
+      headObject: async () => ({ size: big }),
+      getObject: async () => {
+        reads += 1;
+        return Buffer.alloc(10);
+      },
+    }),
+  );
+  const ask = (h) => h(req("POST", { action: "bytes", key: "food/photos/photo_1.jpg" }));
+  assert.equal((await ask(byHead)).status, 413);
+  assert.equal(reads, 0, "a photo too large by its size is never read");
+  const byLength = createFoodJournalMediaHandler(
+    deps(repo(j), {
+      env: r2,
+      headObject: async () => ({}),
+      getObject: async () => Buffer.alloc(big),
+    }),
+  );
+  assert.equal((await ask(byLength)).status, 413);
 });

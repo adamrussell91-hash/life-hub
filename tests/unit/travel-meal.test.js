@@ -203,6 +203,7 @@ test("photos copy once, under Food Journal names; deleted and audio media are sk
     env: { ...env, ...r2 },
     verifySessionToken: () => ({ valid: true }),
     createMealLinkStore: () => s,
+    headObject: async () => ({ size: 3 }),
     getObject: async ({ key }) => { gets.push(key); return Buffer.from([0xff, 0xd8, 0xff]); },
     putObject: async ({ key, contentType }) => { puts.push({ key, contentType }); },
   });
@@ -257,4 +258,28 @@ test("GET leaves out deleted dishes", async () => {
   s.state.food.visits[0].dishes[1].status = "deleted";
   const got = (await (await h(req("GET", Q))).json()).data;
   assert.deepEqual(got.visit.dishes.map((d) => d.title), ["Tortilla"]);
+});
+
+test("a travel photo over 4 MB is not copied and counts as a failed photo", async () => {
+  const t = trip();
+  t.media = [
+    { id: "med_big00001", trip_id: "trp_test1", lifecycle: "live", content_type: "image/jpeg", original_key: "travel/journal/trp_test1/big.jpg" },
+    { id: "med_small001", trip_id: "trp_test1", lifecycle: "live", content_type: "image/jpeg", original_key: "travel/journal/trp_test1/small.jpg" },
+  ];
+  t.moments[0].media_ids = ["med_big00001", "med_small001"];
+  const s = store(t);
+  const gets = [];
+  const h = createTravelMealHandler({
+    env: { ...env, R2_ACCOUNT_ID: "acct", R2_BUCKET: "bucket", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret" },
+    verifySessionToken: () => ({ valid: true }),
+    createMealLinkStore: () => s,
+    headObject: async ({ key }) => ({ size: key.endsWith("big.jpg") ? 4 * 1024 * 1024 + 1 : 3 }),
+    getObject: async ({ key }) => { gets.push(key); return Buffer.from([0xff, 0xd8, 0xff]); },
+    putObject: async () => {},
+  });
+  const res = await h(req("PUT", Q, { ...versions, food }));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.photo_failed, true);
+  assert.deepEqual(gets, ["travel/journal/trp_test1/small.jpg"]);
+  assert.equal(s.state.food.visits[0].dishes[0].photos.length, 1);
 });
