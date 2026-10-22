@@ -1,5 +1,6 @@
 import { apiGet, apiPatch } from '@/api/client';
 import { withAppBase } from '@/app/base-path';
+import { subjectUsesAlignment } from '@/alignment/model';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { NEW_BLOCK_LABEL, type NewBlockType } from '@/blocks/create-block';
 import { blocksToSearchText } from '@/blocks/search-text';
@@ -82,8 +83,11 @@ export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): 
       href: withAppBase(`/lessons/${l.id}`),
       ...(l.line_stops ? { line_stops: l.line_stops } : {}),
       ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}),
-      ...(l.lesson_kind ? { kind: l.lesson_kind } : {})
+      ...(l.lesson_kind ? { kind: l.lesson_kind } : {}),
+      ...(l.dot_points ? { dot_points: l.dot_points } : {})
     })),
+    unitTitle: unit.title,
+    usesAlignment: subject ? subjectUsesAlignment(subject.title) : false,
     ...(bands ? { bands } : {}),
     ...(subject ? { saveLines: (lines: NetworkLine[]) => saveSubjectLines(curriculum, subject.id, lines) } : {}),
     saveLessonStops: (lessonId, stops) => saveLessonStops(curriculum, lessonId, stops),

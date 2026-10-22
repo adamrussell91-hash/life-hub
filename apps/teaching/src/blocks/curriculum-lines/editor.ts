@@ -14,6 +14,8 @@ import { chooseNetworkOrientation, layoutNetwork, liveNudges } from '@/network/l
 import { el, ghostButton, mountLinesEditor, networkId, selectOf, textInput } from '@/network/lines-editor';
 import { LEVEL_ORDER, MODE_LABEL, convertV1, orderLines, orderStations, type NetLesson } from '@/network/model';
 import { unitNetworkInput } from './render';
+import { loadAlignment } from '@/alignment/coverage-panel';
+import { focusAreaFor } from '@/alignment/coverage';
 
 /** What the unit page gives the editor: the network, plus how to save the parts that live elsewhere. */
 export type UnitNetworkEditorContext = UnitNetworkContext & {
@@ -186,6 +188,7 @@ export function createCurriculumLinesEditor(
       toggle.setAttribute('aria-expanded', 'false');
       mountLinesEditor(host, {
         lines,
+        syllabus: context.usesAlignment === true,
         onSave: async (next) => {
           await context.saveLines!(next);
           lines = orderLines(next);
@@ -432,6 +435,23 @@ export function createCurriculumLinesEditor(
 
   const stopsHost = el('div', 'cl-editor__stack');
   const paintStops = () => stopsHost.replaceChildren(stopsSection(), railSection(), gatesSection());
+  /* Syllabus focus area: the guess from the unit's title, or the teacher's pick. */
+  function syllabusSection(): HTMLElement | null {
+    if (!context?.usesAlignment) return null;
+    const s = section('Syllabus', 'The focus area this unit covers. The coverage under the map counts its dot points.');
+    const select = selectOf([{ value: '', label: 'From the unit’s title' }], v2().focus_area ?? '', 'Syllabus focus area');
+    select.addEventListener('change', () => commit({ focus_area: select.value || undefined }, false));
+    s.append(field('Focus area', select, true));
+    void loadAlignment()
+      .then((doc) => {
+        const guess = focusAreaFor(doc, context.unitTitle);
+        select.options[0]!.text = guess ? `From the unit’s title (${guess.name})` : 'From the unit’s title (no match)';
+        for (const area of doc.focus_areas) select.append(new Option(area.name, area.id, false, area.id === v2().focus_area));
+      })
+      .catch(() => { s.hidden = true; });
+    return s;
+  }
+
   function paint(): void {
     if (!isCurriculumLinesV2(current.content)) {
       root.replaceChildren(upgradeBar(), titleRow(), preview);
@@ -439,7 +459,7 @@ export function createCurriculumLinesEditor(
       return;
     }
     paintStops();
-    root.replaceChildren(titleRow(), linesSection(), stopsHost, terminusSection(), preview);
+    root.replaceChildren(...[titleRow(), linesSection(), stopsHost, syllabusSection(), terminusSection(), preview].filter((n): n is HTMLElement => Boolean(n)));
     paintPreview();
   }
   paint();

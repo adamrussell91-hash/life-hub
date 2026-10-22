@@ -1,4 +1,6 @@
-import type { NetworkLine, NetworkLineMode } from '@/schemas/block';
+import type { LineAlignment, NetworkLine, NetworkLineMode } from '@/schemas/block';
+import { loadAlignment } from '@/alignment/coverage-panel';
+import { SKILL_STRANDS } from '@/skills/schema';
 import { COLOUR_LABEL, COLOUR_ORDER, lineColour, nextColour } from './colour';
 import { MODE_HINT, MODE_LABEL, MODE_ORDER, orderLines, shortName } from './model';
 
@@ -53,7 +55,32 @@ export type LinesEditorOptions = {
   onSave: (lines: NetworkLine[]) => Promise<void> | void;
   /** Where a line is used, for the confirmation before removing it. */
   usage?: (lineId: string) => string[];
+  /** The subject is in the syllabus alignment: each line can say what it stands for there. */
+  syllabus?: boolean;
 };
+
+const STRAND_LABEL = (s: string) => s[0]!.toUpperCase() + s.slice(1);
+
+/** What a line can stand for in the syllabus, by mode: trains a dot-point group, metro a concept, light rail a skills strand. */
+function syllabusChoices(mode: NetworkLineMode, concepts: ReadonlyArray<{ key: string; name: string }>): Array<{ value: string; label: string }> {
+  const none = { value: '', label: 'Not linked' };
+  if (mode === 'train') return [none, { value: 'points:U', label: 'Understanding dot points' }, { value: 'points:R', label: 'Responding dot points' }];
+  if (mode === 'metro') return [none, ...concepts.map((c) => ({ value: `concept:${c.key}`, label: c.name }))];
+  return [none, ...SKILL_STRANDS.map((s) => ({ value: `strand:${s}`, label: STRAND_LABEL(s) }))];
+}
+
+function linkValue(link: LineAlignment | undefined): string {
+  if (!link) return '';
+  return link.kind === 'points' ? `points:${link.group}` : link.kind === 'concept' ? `concept:${link.key}` : `strand:${link.strand}`;
+}
+
+function parseLink(value: string): LineAlignment | undefined {
+  const [kind, v] = value.split(':');
+  if (kind === 'points' && (v === 'U' || v === 'R')) return { kind, group: v };
+  if (kind === 'concept' && v) return { kind, key: v };
+  if (kind === 'strand' && (SKILL_STRANDS as readonly string[]).includes(v ?? '')) return { kind, strand: v as (typeof SKILL_STRANDS)[number] };
+  return undefined;
+}
 
 /**
  * The subject's line list: add, rename, reorder, change mode and colour,
@@ -62,6 +89,7 @@ export type LinesEditorOptions = {
  */
 export function mountLinesEditor(host: HTMLElement, options: LinesEditorOptions): { update(lines: readonly NetworkLine[]): void } {
   let lines = orderLines(options.lines);
+  let concepts: Array<{ key: string; name: string }> = [];
   const root = el('div', 'net-lines');
   const status = el('p', 'net-lines__status');
   status.setAttribute('role', 'status');
@@ -91,7 +119,11 @@ export function mountLinesEditor(host: HTMLElement, options: LinesEditorOptions)
     short.className = 'net-lines__short';
     short.addEventListener('change', () => void patch(line.id, { short: short.value.trim().toUpperCase() || undefined }));
     const mode = selectOf(MODE_ORDER.map((m) => ({ value: m, label: MODE_LABEL[m] })), line.mode, `Mode of ${line.name || 'line'}`);
-    mode.addEventListener('change', () => void patch(line.id, { mode: mode.value as NetworkLineMode }));
+    mode.addEventListener('change', () => {
+      // A link only fits its own mode (a train's dot points, a metro's concept, light rail's strand).
+      const { alignment: _link, ...rest } = line;
+      void save(lines.map((l) => (l.id === line.id ? { ...rest, mode: mode.value as NetworkLineMode } : l)));
+    });
     const colour = selectOf(COLOUR_ORDER.map((c) => ({ value: c, label: COLOUR_LABEL[c] })), line.colour, `Colour of ${line.name || 'line'}`);
     colour.addEventListener('change', () => void patch(line.id, { colour: colour.value as NetworkLine['colour'] }));
     const same = lines.filter((l) => l.mode === line.mode);
@@ -117,7 +149,26 @@ export function mountLinesEditor(host: HTMLElement, options: LinesEditorOptions)
       }
       void save(lines.filter((l) => l.id !== line.id));
     }, `Remove ${line.name || 'line'}`);
-    r.append(swatch, name, short, mode, colour, up, down, remove);
+    r.append(swatch, name, short, mode, colour);
+    if (options.syllabus) {
+      const choices = syllabusChoices(line.mode, concepts);
+      const current = linkValue(line.alignment);
+      // A concept saved before the list loads still shows.
+      if (current && !choices.some((c) => c.value === current)) choices.push({ value: current, label: current.split(':')[1]! });
+      const link = selectOf(choices, current, `What ${line.name || 'this line'} stands for in the syllabus`);
+      link.className = 'net-lines__syllabus';
+      link.title = 'What this line stands for in the syllabus';
+      link.addEventListener('change', () => {
+        const next = parseLink(link.value);
+        void save(lines.map((l) => {
+          if (l.id !== line.id) return l;
+          const { alignment: _old, ...rest } = l;
+          return next ? { ...rest, alignment: next } : rest;
+        }));
+      });
+      r.append(link);
+    }
+    r.append(up, down, remove);
     return r;
   }
 
@@ -142,6 +193,14 @@ export function mountLinesEditor(host: HTMLElement, options: LinesEditorOptions)
     root.append(status);
   }
   paint();
+  if (options.syllabus) {
+    void loadAlignment()
+      .then((doc) => {
+        concepts = doc.concepts.map((c) => ({ key: c.key, name: c.name }));
+        paint();
+      })
+      .catch(() => { /* Concepts stay unlisted; trains and light rail still link. */ });
+  }
   return {
     update(next) {
       lines = orderLines(next);
