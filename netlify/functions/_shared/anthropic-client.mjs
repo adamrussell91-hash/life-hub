@@ -1,6 +1,7 @@
 const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';
+export const DEFAULT_MODEL = MODEL;
 const MAX_TOKENS = 8192;
 // High enough that iterative web_search / pause_turn research can finish,
 // and that a session build can call search_exercise_library /
@@ -408,15 +409,26 @@ function* interpretEvent(event, toolBuffers, roundState) {
     }
     return;
   }
+  if (event.name === 'message_start') {
+    // Input and cache counts arrive here; message_delta may omit them.
+    const usage = event.payload.message?.usage;
+    if (usage && roundState) roundState.startUsage = usage;
+    return;
+  }
   if (event.name === 'message_delta') {
     const reason = event.payload.delta?.stop_reason;
     if (reason != null && roundState) roundState.stopReason = reason;
     const usage = event.payload.usage;
     if (usage && (usage.input_tokens != null || usage.output_tokens != null)) {
+      const start = roundState?.startUsage ?? {};
+      const count = (key) => Number(usage[key] ?? start[key]) || 0;
       yield {
         type: 'usage',
-        inputTokens: Number(usage.input_tokens) || 0,
-        outputTokens: Number(usage.output_tokens) || 0
+        inputTokens: count('input_tokens'),
+        outputTokens: Number(usage.output_tokens) || 0,
+        cacheReadTokens: count('cache_read_input_tokens'),
+        cacheWriteTokens: count('cache_creation_input_tokens'),
+        webSearches: Number((usage.server_tool_use ?? start.server_tool_use)?.web_search_requests) || 0
       };
     }
     return;
