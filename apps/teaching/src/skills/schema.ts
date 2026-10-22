@@ -41,6 +41,11 @@ export const SkillSubStrandSchema = z.object({
   example_note: Long.optional(),
   outcomes: z.array(z.number().int().min(1).max(12)).max(6).default([]),
   focus_areas: z.array(z.string().regex(/^[a-z0-9-]{2,40}$/)).max(8).default([]),
+  /** The syllabus dot points it builds. Outcomes and focus areas follow from these; without any, they stand alone. */
+  points: z
+    .array(z.object({ area: z.string().regex(/^[a-z0-9-]{2,40}$/), point: z.string().regex(/^[UR]\d{1,2}$/), link: z.enum(['shared', 'related']) }))
+    .max(40)
+    .default([]),
   rungs: z.object({ capable: SkillRungSchema, skilled: SkillRungSchema, accomplished: SkillRungSchema, excellent: SkillRungSchema })
 });
 export const SkillRungInfoSchema = z.object({ id: z.enum(RUNG_IDS), name: Short, marks: Short, marker_words: Short, meaning: Long });

@@ -20,7 +20,7 @@ import type { Alignment, AlignmentPatch, LinkStrength } from './schema';
 import { skillGlyph } from '../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
 import { loadSkills } from '@/skills/api';
-import { skillEntries, skillsForArea, skillsForOutcome, type SkillEntry } from '@/skills/model';
+import { servesPoint, skillEntries, skillsForArea, skillsForOutcome, type SkillEntry } from '@/skills/model';
 import type { SkillsContinuum } from '@/skills/schema';
 import { showSkillInLibrary } from '@/teacher/sections/resources';
 import './alignment.css';
@@ -369,8 +369,9 @@ function render(root: HTMLElement): void {
     }
     const ns = doc.outcomes.map((o) => o.n);
     const entries = skillsForArea(skillsData, state.area);
-    const reach = new Map(ns.map((n) => [n, points.filter((p) => p.outcomes.some((o) => o.n === n)).length]));
-    const max = Math.max(1, ...reach.values());
+    const served = new Map(entries.map((e) => [e.ref, points.filter((p) => servesPoint(e.sub, p))]));
+    const reach = (e: SkillEntry, n: number): number => (e.sub.outcomes.includes(n) ? served.get(e.ref)!.filter((p) => p.outcomes.some((o) => o.n === n)).length : 0);
+    const max = Math.max(1, ...entries.flatMap((e) => ns.map((n) => reach(e, n))));
     const sel = state.sel;
     const grid = h('div', 'align__heat');
     grid.style.setProperty('--nx', String(ns.length));
@@ -385,22 +386,22 @@ function render(root: HTMLElement): void {
       grid.append(h('div', 'align__rl', button('align__rl-btn', e.sub.name, () => select({ kind: 'hsc', ref: e.ref }), e.sub.rungs.excellent.i_can)));
       let total = 0;
       for (const n of ns) {
-        const builds = e.sub.outcomes.includes(n);
-        const count = builds ? reach.get(n)! : 0;
+        const count = reach(e, n);
+        const builds = count > 0;
         total = Math.max(total, count);
         const step = count ? Math.max(1, Math.min(7, Math.round((count / max) * 7))) : 0;
-        const cell = button(`align__hc align__hc--${step}`, count ? String(count) : '', () => select({ kind: 'hsc', ref: e.ref }), builds ? `${e.sub.name} builds ${outcomeCode(n)}: ${count} dot point${count === 1 ? '' : 's'} here reach it` : `${e.sub.name} doesn’t build ${outcomeCode(n)}`);
+        const cell = button(`align__hc align__hc--${step}`, count ? String(count) : '', () => select({ kind: 'hsc', ref: e.ref }), builds ? `${e.sub.name} builds ${outcomeCode(n)} through ${count} dot point${count === 1 ? '' : 's'} here` : `${e.sub.name} doesn’t build ${outcomeCode(n)}`);
         cell.setAttribute('aria-label', cell.title);
         cell.classList.toggle('is-lit', !!sel && ((sel.kind === 'outcome' && sel.n === n && builds) || (sel.kind === 'hsc' && sel.ref === e.ref)));
         grid.append(cell);
       }
-      grid.append(h('div', `align__tot${total ? '' : ' is-zero'}`, String(points.filter((p) => p.outcomes.some((o) => e.sub.outcomes.includes(o.n))).length)));
+      grid.append(h('div', `align__tot${total ? '' : ' is-zero'}`, String(served.get(e.ref)!.length)));
     }
     chart.replaceChildren(grid);
     legend.replaceChildren(
       h('span', 'align__label', 'Dot points a skill serves'),
       h('span', 'align__ramp-wrap', h('span', '', 'None'), h('span', 'align__ramp'), h('span', '', 'Most')),
-      h('span', 'align__hint', 'A skill is linked to a dot point when both build the same outcome in this focus area. The number is how many dot points here reach that outcome.')
+      h('span', 'align__hint', 'A skill is linked to the dot points it names; one not yet linked to any falls back to sharing an outcome. The number is how many of its dot points here reach that outcome.')
     );
   }
 
@@ -420,7 +421,7 @@ function render(root: HTMLElement): void {
   function hscView(ref: string): HTMLElement[] {
     const e = skillsData ? skillEntries(skillsData).find((x) => x.ref === ref) : undefined;
     if (!e) return [h('p', 'align__hint', 'That skill isn’t in the continuum.')];
-    const served = points.filter((p) => p.outcomes.some((o) => e.sub.outcomes.includes(o.n)));
+    const served = points.filter((p) => servesPoint(e.sub, p));
     const rungs = skillsData!.strands[0]!.rungs;
     return [
       h('h3', 'align__title', `${e.strand.name} · ${e.sub.name}`),
@@ -522,7 +523,7 @@ function render(root: HTMLElement): void {
       section('Stage 6 concept bullets', ...cons),
       section('Learning processes', ...procs),
       section('Thinking skills', ...(p.skills ?? []).map((id) => item([glyph(id), button('align__tag', skillName(id), () => select({ kind: 'skill', id }))], skillText(id)))),
-      skillsData ? section('HSC skills that build it', hscTags(skillEntries(skillsData).filter((e) => e.sub.focus_areas.includes(p.area) && p.outcomes.some((o) => e.sub.outcomes.includes(o.n))))) : h('span'),
+      skillsData ? section('HSC skills that build it', hscTags(skillEntries(skillsData).filter((e) => servesPoint(e.sub, p)))) : h('span'),
       h('p', 'align__hint', 'Highlighted words appear on both sides of a link.')
     ];
   }

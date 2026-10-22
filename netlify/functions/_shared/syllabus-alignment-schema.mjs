@@ -22,6 +22,7 @@ var SKILL_IDS = Object.freeze(SKILLS.map((skill) => skill.id));
 
 // apps/teaching/src/alignment/schema.ts
 var ALIGNMENT_ID = "english-advanced-12-2024";
+var ALIGNMENT_REVISION = 2;
 var LinkStrengthSchema = z.enum(["shared", "related"]);
 var Text = z.string().trim().min(1).max(2e3);
 var Code = z.string().regex(/^[A-Z]{2,5}$/);
@@ -62,6 +63,8 @@ var AlignmentSchema = z.object({
   processes: z.array(AlignmentProcessSchema).max(8),
   concepts: z.array(AlignmentConceptSchema).max(20),
   focus_areas: z.array(AlignmentFocusAreaSchema).min(1).max(8),
+  /** The private file's revision this copy was last brought up to. Missing means 1. */
+  revision: z.number().int().min(1).optional(),
   updated_at: z.string().optional()
 });
 var AlignmentPatchSchema = z.object({
@@ -95,22 +98,42 @@ function applyAlignmentPatch(doc, patch) {
   target.edited = true;
   return next;
 }
-function mergeMissingSkills(saved, source) {
+function mergeFromSource(saved, source) {
   const next = structuredClone(saved);
+  const newer = (source.revision ?? 1) > (saved.revision ?? 1);
+  const linked = new Set(saved.focus_areas.flatMap((f) => f.points.flatMap((p) => p.concepts.map((c) => c.ref))));
   let changed = false;
   for (const area of next.focus_areas) {
     const from = source.focus_areas.find((f) => f.id === area.id);
     for (const point of area.points) {
-      if (point.skills) continue;
-      point.skills = [...from?.points.find((p) => p.id === point.id)?.skills ?? []];
-      changed = true;
+      const src = from?.points.find((p) => p.id === point.id);
+      if (!point.skills) {
+        point.skills = [...src?.skills ?? []];
+        changed = true;
+      }
+      if (!newer || !src) continue;
+      if (!point.edited) {
+        point.outcomes = structuredClone(src.outcomes);
+        point.concepts = structuredClone(src.concepts);
+        point.processes = [...src.processes];
+        point.skills = [...src.skills ?? point.skills];
+      } else {
+        const own = new Set(point.concepts.map((c) => c.ref));
+        point.concepts.push(...src.concepts.filter((c) => !linked.has(c.ref) && !own.has(c.ref)));
+      }
     }
+  }
+  if (newer) {
+    next.revision = source.revision;
+    changed = true;
   }
   return { doc: next, changed };
 }
 var needsSkills = (doc) => doc.focus_areas.some((f) => f.points.some((p) => !p.skills));
+var needsSource = (doc) => needsSkills(doc) || (doc.revision ?? 1) < ALIGNMENT_REVISION;
 export {
   ALIGNMENT_ID,
+  ALIGNMENT_REVISION,
   AlignmentConceptSchema,
   AlignmentFocusAreaSchema,
   AlignmentOutcomeSchema,
@@ -121,6 +144,7 @@ export {
   AlignmentSchema,
   LinkStrengthSchema,
   applyAlignmentPatch,
-  mergeMissingSkills,
-  needsSkills
+  mergeFromSource,
+  needsSkills,
+  needsSource
 };

@@ -22,6 +22,15 @@ export function skillsForArea(c: SkillsContinuum, area: string): SkillEntry[] {
 }
 
 /**
+ * Whether a sub-strand builds this dot point: the points it names, or, for one that
+ * names none yet, any point in its focus areas reaching an outcome it builds.
+ */
+export function servesPoint(sub: SkillSubStrand, p: { area: string; id: string; outcomes: { n: number }[] }): boolean {
+  if (sub.points.length) return sub.points.some((x) => x.area === p.area && x.point === p.id);
+  return sub.focus_areas.includes(p.area) && p.outcomes.some((o) => sub.outcomes.includes(o.n));
+}
+
+/**
  * The rung a mark reaches, on the HSC-style scale out of 20: 13 Capable,
  * 15 Skilled, 17 Accomplished, 19 Excellent, scaled to the criterion's marks.
  * Below 13 out of 20 is under the starting line.

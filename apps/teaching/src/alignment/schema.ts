@@ -9,6 +9,8 @@ import { SKILL_IDS } from '../../../../packages/problem-solver/skills.mjs';
  */
 
 export const ALIGNMENT_ID = 'english-advanced-12-2024';
+/** Bump with each change to the private file that saved copies should pick up. */
+export const ALIGNMENT_REVISION = 2;
 
 export const LinkStrengthSchema = z.enum(['shared', 'related']);
 export type LinkStrength = z.infer<typeof LinkStrengthSchema>;
@@ -54,6 +56,8 @@ export const AlignmentSchema = z.object({
   processes: z.array(AlignmentProcessSchema).max(8),
   concepts: z.array(AlignmentConceptSchema).max(20),
   focus_areas: z.array(AlignmentFocusAreaSchema).min(1).max(8),
+  /** The private file's revision this copy was last brought up to. Missing means 1. */
+  revision: z.number().int().min(1).optional(),
   updated_at: z.string().optional()
 });
 export type Alignment = z.infer<typeof AlignmentSchema>;
@@ -97,21 +101,42 @@ export function applyAlignmentPatch(doc: Alignment, patch: AlignmentPatch): Alig
 }
 
 /**
- * Fill in thinking skills a saved copy predates, from the private file. Points that
- * already have skills (including ones the teacher edited) keep them.
+ * Bring a saved copy up to the private file. Thinking skills a copy predates are filled in.
+ * From a newer revision, points the teacher never edited take the file's links; edited
+ * points keep theirs and gain only concept bullets the saved copy had nowhere.
  */
-export function mergeMissingSkills(saved: Alignment, source: Alignment): { doc: Alignment; changed: boolean } {
+export function mergeFromSource(saved: Alignment, source: Alignment): { doc: Alignment; changed: boolean } {
   const next: Alignment = structuredClone(saved);
+  const newer = (source.revision ?? 1) > (saved.revision ?? 1);
+  const linked = new Set(saved.focus_areas.flatMap((f) => f.points.flatMap((p) => p.concepts.map((c) => c.ref))));
   let changed = false;
   for (const area of next.focus_areas) {
     const from = source.focus_areas.find((f) => f.id === area.id);
     for (const point of area.points) {
-      if (point.skills) continue;
-      point.skills = [...(from?.points.find((p) => p.id === point.id)?.skills ?? [])];
-      changed = true;
+      const src = from?.points.find((p) => p.id === point.id);
+      if (!point.skills) {
+        point.skills = [...(src?.skills ?? [])];
+        changed = true;
+      }
+      if (!newer || !src) continue;
+      if (!point.edited) {
+        point.outcomes = structuredClone(src.outcomes);
+        point.concepts = structuredClone(src.concepts);
+        point.processes = [...src.processes];
+        point.skills = [...(src.skills ?? point.skills)];
+      } else {
+        const own = new Set(point.concepts.map((c) => c.ref));
+        point.concepts.push(...src.concepts.filter((c) => !linked.has(c.ref) && !own.has(c.ref)));
+      }
     }
+  }
+  if (newer) {
+    next.revision = source.revision;
+    changed = true;
   }
   return { doc: next, changed };
 }
 
 export const needsSkills = (doc: Alignment): boolean => doc.focus_areas.some((f) => f.points.some((p) => !p.skills));
+/** A saved copy missing skills, or older than the revision this code expects. */
+export const needsSource = (doc: Alignment): boolean => needsSkills(doc) || (doc.revision ?? 1) < ALIGNMENT_REVISION;
