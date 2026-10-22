@@ -137,3 +137,62 @@ test('the endpoint is teacher only', async () => {
   const bad = await signedIn(new Request('https://example.test/api/classes/class1/markbook', { method: 'POST', body: '{' }));
   assert.equal(bad.status, 400);
 });
+
+async function handIn(store) {
+  const device = { token: 'a'.repeat(48), class_id: 'class1', class_token: 'b'.repeat(48) };
+  await quizAction(store, 'quiz1', { ...device, action: 'claim', initials: 'BB' });
+  await quizAction(store, 'quiz1', { ...device, action: 'start' });
+  await quizAction(store, 'quiz1', { ...device, action: 'submit', responses: { qs: { text: 'Romeo' } } });
+}
+
+test('hide_quiz takes any safe id, and a full list is refused without breaking load', async () => {
+  const { store } = await setup();
+  const long = 'q'.repeat(100);
+  await call(store, { action: 'hide_quiz', lesson_id: long, hidden: true });
+  await call(store, { action: 'hide_quiz', lesson_id: long, hidden: true });
+  assert.deepEqual((await call(store, { action: 'load' })).markbook.hidden_quizzes, [long], 'hiding twice keeps one entry');
+
+  const full = Array.from({ length: 200 }, (_, i) => `quiz${i}`);
+  await store.setJSON('markbook/class1', { columns: [], hidden_quizzes: full, marks: {}, updated_at: '' });
+  await assert.rejects(call(store, { action: 'hide_quiz', lesson_id: 'one_more', hidden: true }), (e) => e.status === 400 && /can’t be saved/.test(e.message));
+  assert.equal((await call(store, { action: 'load' })).markbook.hidden_quizzes.length, 200);
+});
+
+test('a corrupt record gives a clear error', async () => {
+  const { store } = await setup();
+  await store.setJSON('markbook/class1', { columns: 'junk', marks: [] });
+  await assert.rejects(call(store, { action: 'load' }), (e) => e.status === 500 && e.message === 'This markbook couldn’t be read. Nothing was changed.');
+  await assert.rejects(call(store, { action: 'save_column', column: essay }), /couldn’t be read/);
+});
+
+test('a refused change writes nothing', async () => {
+  const { store, bob } = await setup();
+  await call(store, { action: 'save_column', column: essay });
+  let writes = 0;
+  const realSet = store.setJSON.bind(store);
+  store.setJSON = async (key, value, options) => { if (key.startsWith('markbook/')) writes += 1; return realSet(key, value, options); };
+  await assert.rejects(call(store, { action: 'set_mark', column_id: essay.id, student_id: bob.id, mark: { criteria: { crit000001: 99 } } }), /between 0 and 15/);
+  assert.equal(writes, 0);
+});
+
+test('__proto__ is just a missing column', async () => {
+  const { store, bob } = await setup();
+  await call(store, { action: 'save_column', column: essay });
+  const before = Object.getOwnPropertyNames(Object.prototype).sort();
+  await assert.rejects(call(store, { action: 'delete_column', column_id: '__proto__' }), /That column is gone/);
+  await assert.rejects(call(store, { action: 'set_mark', column_id: '__proto__', student_id: bob.id, mark: true }), /That column is gone/);
+  assert.deepEqual(Object.getOwnPropertyNames(Object.prototype).sort(), before);
+  assert.equal(({}).criteria, undefined);
+  assert.equal((await call(store, { action: 'load' })).markbook.columns.length, 1);
+});
+
+test('a deleted unit is skipped and a lesson in two units gives one column', async () => {
+  const { store } = await setup();
+  await handIn(store);
+  await store.setJSON('units/unit2', { id: 'unit2', lesson_ids: ['quiz1'], status: 'trashed', trashed_at: '2026-10-18T00:00:00.000Z' });
+  await store.setJSON('units/unit3', { id: 'unit3', lesson_ids: ['quiz1', 'lesson2'] });
+  const cls = await store.get('classes/class1');
+  await store.setJSON('classes/class1', { ...cls, active_unit_ids: ['unit1', 'unit2', 'unit3', 'gone_unit'] });
+  const { quizzes } = await call(store, { action: 'load' });
+  assert.deepEqual(quizzes.map((q) => q.id), ['quiz:quiz1']);
+});
