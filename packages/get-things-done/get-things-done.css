@@ -12,15 +12,73 @@
   --gt-blue-label: #2670d1;
   --gt-red-label: #cd4524;
   --gt-amber-label: #976615;
+  /* Deeper shades for small text on the tints (4.5:1 there; the label shades are not). */
+  --gt-blue-deep: #1f5fb4;
+  --gt-red-deep: #a8361b;
   --gt-blue-tint: #e4eefb;
   --gt-red-tint: #fbe9e4;
   --gt-amber-tint: #fcf3e3;
   --gt-soft: #f2f0e8;
   --gt-line: #c9cbc4;
+  --gt-muted: #5b6372;
   --gt-ghost: rgba(42, 51, 64, 0.12);
   --gt-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --gt-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* The re-skin: Decision Maker's family charts (decision-book.css) draw from --dm-* tokens,
+     so remapping them here draws every shared chart in Gear Shifter's palette. Red stays red
+     (vermilion for shapes, the label shade under text); green, which carries Decision Maker's
+     "go" and its process marks, becomes blue, at the label shade so paper text reads on it. */
+  --dm-paper: var(--gt-paper);
+  --dm-ink: var(--gt-ink);
+  --dm-red: var(--gt-red);
+  --dm-green: var(--gt-blue-label);
+  --dm-red-label: var(--gt-red-label);
+  --dm-soft: var(--gt-soft);
+  --dm-line: var(--gt-line);
+  --dm-green-tint: var(--gt-blue-tint);
+  --dm-red-tint: var(--gt-red-tint);
+  --dm-ghost: var(--gt-ghost);
+  --dm-ease: var(--gt-ease);
+  --dm-spring: var(--gt-spring);
+  --dm-muted: var(--gt-muted);
+  --dm-contested: var(--gt-red-deep);
+  --dm-band: var(--gt-blue-deep);
 }
 
 .gt-emblem { display: inline-flex; line-height: 0; }
 .gt-emblem svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------------ the shared charts
+   Twins of Decision Maker's .dm-scope-only rules, so the details cards look the same here. */
+.gt-scope .dm-details__card { box-shadow: none; border-top: 3px solid var(--gt-ink); background: var(--gt-paper); }
+.gt-scope .dm-details__card--red { border-top-color: var(--gt-red); }
+.gt-scope .dm-details__card--green { border-top-color: var(--gt-blue); }
+.gt-scope .dm-details__card--tint { border-top-color: var(--gt-line); }
+/* Decision Maker sets ink on its brighter label red; on Gear Shifter's darker one, paper reads. */
+.gt-scope .dm-qk__row[data-answer='no'] .dm-qk__chip,
+.gt-scope .dm-qk__answer[data-answer='no'] { color: var(--gt-paper); }
+
+/* ------------------------------------------------------------------ Kanban and 5 Whys
+   Problem Solver's renderers, remapped inside .gt-scope only. Kanban: To do in the red label
+   shade and Doing in the blue (white text reads on both), Done in amber, the done state, with
+   ink. 5 Whys: the problem red, the chain in blue tint with ink and a cobalt edge, the root blue. */
+.gt-scope .ps-kanban {
+  --ps-red: var(--gt-red-label);
+  --ps-blue: var(--gt-blue-label);
+  --ps-yellow: var(--gt-amber);
+  --ps-on-yellow: var(--gt-ink);
+  --ps-paper: var(--gt-paper);
+  --ps-ink: var(--gt-ink);
+}
+.gt-scope .ps-kanban__board { --ps-kanban-on-red: var(--gt-paper); }
+.gt-scope .ps-whys {
+  --ps-red: var(--gt-red-label);
+  --ps-yellow: var(--gt-blue-tint);
+  --ps-on-yellow: var(--gt-ink);
+  --ps-blue: var(--gt-blue-label);
+  --ps-paper: var(--gt-paper);
+  --ps-ink: var(--gt-ink);
+}
+.gt-scope .ps-whys__why { stroke: var(--gt-blue); stroke-width: 4; stroke-linejoin: round; }
+.gt-scope :is(.ps-kanban, .ps-whys) .ps-details__card { box-shadow: none; border-top: 3px solid var(--gt-ink); }
