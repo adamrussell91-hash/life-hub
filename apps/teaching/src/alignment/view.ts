@@ -19,6 +19,10 @@ import {
 import type { Alignment, AlignmentPatch, LinkStrength } from './schema';
 import { skillGlyph } from '../../../../packages/problem-solver/glyphs';
 import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
+import { loadSkills } from '@/skills/api';
+import { skillEntries, skillsForArea, skillsForOutcome, type SkillEntry } from '@/skills/model';
+import type { SkillsContinuum } from '@/skills/schema';
+import { showSkillInLibrary } from '@/teacher/sections/resources';
 import './alignment.css';
 
 type Mode = 'dots' | 'heat';
@@ -30,8 +34,12 @@ type Selection =
   | { kind: 'process'; code: string }
   | { kind: 'cell'; n: number; key: string }
   | { kind: 'skill'; id: string }
-  | { kind: 'skillcell'; n: number; skill: string };
-type HeatRows = 'concepts' | 'skills';
+  | { kind: 'skillcell'; n: number; skill: string }
+  | { kind: 'hsc'; ref: string };
+type HeatRows = 'concepts' | 'skills' | 'hsc';
+
+/** The HSC skills continuum, loaded alongside the alignment when available. */
+let skillsData: SkillsContinuum | null = null;
 
 /** Kept across tab switches and re-renders of the scope page. */
 const state: { doc: Alignment | null; area: string; mode: Mode; heatRows: HeatRows; sel: Selection | null; editing: boolean } = {
@@ -89,6 +97,13 @@ function option(label: string, value: string): HTMLOptionElement {
 export function mountAlignmentView(host: HTMLElement): void {
   const root = h('div', 'align');
   host.replaceChildren(root);
+  // The skills layer arrives when it can; the chart works without it.
+  if (!skillsData) {
+    loadSkills().then((c) => {
+      skillsData = c;
+      if (root.isConnected && state.doc) render(root);
+    }, () => {});
+  }
   if (state.doc) {
     render(root);
     return;
@@ -168,7 +183,7 @@ function render(root: HTMLElement): void {
   rows.setAttribute('role', 'group');
   rows.setAttribute('aria-label', 'Heatmap rows');
   rows.hidden = state.mode !== 'heat';
-  for (const [value, label] of [['concepts', 'Concepts'], ['skills', 'Thinking skills']] as const) {
+  for (const [value, label] of [['concepts', 'Concepts'], ['skills', 'Thinking skills'], ['hsc', 'HSC skills']] as const) {
     const b = button('align__mode', label, () => {
       if (state.heatRows === value) return;
       state.heatRows = value;
@@ -256,6 +271,10 @@ function render(root: HTMLElement): void {
 
   // ---------- heatmap ----------
   function paintHeat(): void {
+    if (state.heatRows === 'hsc') {
+      paintHscHeat();
+      return;
+    }
     if (state.heatRows === 'skills') {
       paintSkillHeat();
       return;
@@ -341,6 +360,78 @@ function render(root: HTMLElement): void {
     );
   }
 
+  /** HSC skills against outcomes: dot points here that reach each outcome a skill builds. */
+  function paintHscHeat(): void {
+    if (!skillsData) {
+      chart.replaceChildren(h('p', 'align__hint', 'The skills continuum is loading, or isn’t available here yet.'));
+      legend.replaceChildren();
+      return;
+    }
+    const ns = doc.outcomes.map((o) => o.n);
+    const entries = skillsForArea(skillsData, state.area);
+    const reach = new Map(ns.map((n) => [n, points.filter((p) => p.outcomes.some((o) => o.n === n)).length]));
+    const max = Math.max(1, ...reach.values());
+    const sel = state.sel;
+    const grid = h('div', 'align__heat');
+    grid.style.setProperty('--nx', String(ns.length));
+    grid.classList.toggle('is-dimmed', !!sel && ['outcome', 'hsc'].includes(sel.kind));
+    grid.append(h('div'), ...ns.map((n) => h('div', 'align__hh', button('align__hh-btn', h('span', '', outcomeCode(n).replace(/-\d+$/, ''), h('small', '', pad2(n))), () => select({ kind: 'outcome', n }), outcomeText(n)))), h('div', 'align__hh', h('small', '', 'Points')));
+    let strandName = '';
+    for (const e of entries) {
+      if (e.strand.name !== strandName) {
+        strandName = e.strand.name;
+        grid.append(h('div', 'align__rl align__label align__strand-row', strandName), ...ns.map(() => h('div')), h('div'));
+      }
+      grid.append(h('div', 'align__rl', button('align__rl-btn', e.sub.name, () => select({ kind: 'hsc', ref: e.ref }), e.sub.rungs.excellent.i_can)));
+      let total = 0;
+      for (const n of ns) {
+        const builds = e.sub.outcomes.includes(n);
+        const count = builds ? reach.get(n)! : 0;
+        total = Math.max(total, count);
+        const step = count ? Math.max(1, Math.min(7, Math.round((count / max) * 7))) : 0;
+        const cell = button(`align__hc align__hc--${step}`, count ? String(count) : '', () => select({ kind: 'hsc', ref: e.ref }), builds ? `${e.sub.name} builds ${outcomeCode(n)}: ${count} dot point${count === 1 ? '' : 's'} here reach it` : `${e.sub.name} doesn’t build ${outcomeCode(n)}`);
+        cell.setAttribute('aria-label', cell.title);
+        cell.classList.toggle('is-lit', !!sel && ((sel.kind === 'outcome' && sel.n === n && builds) || (sel.kind === 'hsc' && sel.ref === e.ref)));
+        grid.append(cell);
+      }
+      grid.append(h('div', `align__tot${total ? '' : ' is-zero'}`, String(points.filter((p) => p.outcomes.some((o) => e.sub.outcomes.includes(o.n))).length)));
+    }
+    chart.replaceChildren(grid);
+    legend.replaceChildren(
+      h('span', 'align__label', 'Dot points a skill serves'),
+      h('span', 'align__ramp-wrap', h('span', '', 'None'), h('span', 'align__ramp'), h('span', '', 'Most')),
+      h('span', 'align__hint', 'A skill is linked to a dot point when both build the same outcome in this focus area. The number is how many dot points here reach that outcome.')
+    );
+  }
+
+  function hscTags(entries: SkillEntry[]): HTMLElement {
+    let strandName = '';
+    const wrap = h('div', 'align__tags');
+    for (const e of entries) {
+      if (e.strand.name !== strandName) {
+        strandName = e.strand.name;
+        wrap.append(h('span', 'align__why align__tag-group', strandName));
+      }
+      wrap.append(button('align__tag', e.sub.name, () => select({ kind: 'hsc', ref: e.ref })));
+    }
+    return wrap;
+  }
+
+  function hscView(ref: string): HTMLElement[] {
+    const e = skillsData ? skillEntries(skillsData).find((x) => x.ref === ref) : undefined;
+    if (!e) return [h('p', 'align__hint', 'That skill isn’t in the continuum.')];
+    const served = points.filter((p) => p.outcomes.some((o) => e.sub.outcomes.includes(o.n)));
+    const rungs = skillsData!.strands[0]!.rungs;
+    return [
+      h('h3', 'align__title', `${e.strand.name} · ${e.sub.name}`),
+      h('p', 'align__quote', e.sub.in_hsc),
+      section('Builds', h('div', 'align__tags', ...e.sub.outcomes.map((n) => button('align__tag', outcomeCode(n), () => select({ kind: 'outcome', n }))))),
+      section('The climb', ...rungs.map((r) => item([r.name, why(`${r.marks} marks`)], e.sub.rungs[r.id].i_can))),
+      section(`${served.length} dot point${served.length === 1 ? '' : 's'} it serves in ${areaName}`, ...(served.length ? [h('div', 'align__tags', ...served.map(pointTag))] : [h('p', 'align__hint', 'None here. This skill belongs to another focus area.')])),
+      button('btn btn--secondary', 'Open in the Skills continuum', () => showSkillInLibrary(ref))
+    ];
+  }
+
   // ---------- panel ----------
   function pointTag(p: AreaPoint): HTMLElement {
     const label = state.area === 'all' ? `${p.areaName} ${p.id}` : p.id;
@@ -364,6 +455,7 @@ function render(root: HTMLElement): void {
     else if (sel.kind === 'process') body = processView(sel.code);
     else if (sel.kind === 'skill') body = skillView(sel.id);
     else if (sel.kind === 'skillcell') body = skillCellView(sel.n, sel.skill);
+    else if (sel.kind === 'hsc') body = hscView(sel.ref);
     else body = cellView(sel.n, sel.key);
     panel.replaceChildren(...(back ? [back] : []), ...body);
   }
@@ -402,7 +494,8 @@ function render(root: HTMLElement): void {
         const b = button(`align__tag${n ? '' : ' is-zero'}`, '', () => select({ kind: 'skill', id: k.id }), k.description);
         b.append(glyph(k.id), ` ${k.name} ${n}`);
         return b;
-      })))
+      }))),
+      skillsData ? section('HSC skills for this focus area', hscTags(skillsForArea(skillsData, state.area))) : h('span')
     ];
   }
 
@@ -429,6 +522,7 @@ function render(root: HTMLElement): void {
       section('Stage 6 concept bullets', ...cons),
       section('Learning processes', ...procs),
       section('Thinking skills', ...(p.skills ?? []).map((id) => item([glyph(id), button('align__tag', skillName(id), () => select({ kind: 'skill', id }))], skillText(id)))),
+      skillsData ? section('HSC skills that build it', hscTags(skillEntries(skillsData).filter((e) => e.sub.focus_areas.includes(p.area) && p.outcomes.some((o) => e.sub.outcomes.includes(o.n))))) : h('span'),
       h('p', 'align__hint', 'Highlighted words appear on both sides of a link.')
     ];
   }
@@ -442,7 +536,8 @@ function render(root: HTMLElement): void {
       h('h3', 'align__title', outcomeCode(n)),
       h('p', 'align__quote', outcomeText(n)),
       section(`Reached by ${hits.length} dot point${hits.length === 1 ? '' : 's'} in ${areaName}`, ...(list.length ? list : [h('p', 'align__hint', 'No dot point here reaches it. Cover it through another unit, or tag lessons with it by hand.')])),
-      refs.length ? section('Concept bullets behind those points', h('div', 'align__tags', ...refs.map((r) => button('align__tag', `${concepts.get(conceptKeyOf(r))?.name ?? r} ${bulletNumberOf(r)}`, () => select({ kind: 'bullet', ref: r }))))) : h('span')
+      refs.length ? section('Concept bullets behind those points', h('div', 'align__tags', ...refs.map((r) => button('align__tag', `${concepts.get(conceptKeyOf(r))?.name ?? r} ${bulletNumberOf(r)}`, () => select({ kind: 'bullet', ref: r }))))) : h('span'),
+      skillsData ? section('HSC skills that build it', hscTags(skillsForOutcome(skillsData, n, state.area))) : h('span')
     ];
   }
 
@@ -658,5 +753,6 @@ export function resetAlignmentViewForTests(): void {
   state.mode = 'dots';
   state.heatRows = 'concepts';
   state.sel = null;
+  skillsData = null;
   state.editing = false;
 }

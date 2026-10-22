@@ -158,3 +158,8 @@ span.align__tag { cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .align__dot, .align__hc { transition: none; }
 }
+
+/* HSC skills layer */
+.align__strand-row { font-size: var(--text-2xs); padding-top: var(--space-2); }
+.align__tag-group { width: 100%; margin-top: var(--space-1); }
+.align__panel > .btn { justify-self: start; }

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { MockStore, type SeedData } from './mock-store';
 import { applyAlignmentPatch, AlignmentPatchError, AlignmentPatchSchema, AlignmentSchema, ALIGNMENT_ID } from '../src/alignment/schema';
+import { SKILL_STRANDS, SkillStrandSchema } from '../src/skills/schema';
 import {
   draftLessonKey,
   publishedLessonKey,
@@ -680,6 +681,20 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     store.setJSON(MEDIA_FOLDERS_KEY, { folders, updated_at: nowIso() });
     return okResponse(200, { folders });
+  }
+
+  // Mirrors netlify/functions/skills-continuum.mjs, reading a local life-hub-data checkout.
+  function handleSkillsContinuum(cookie: string | null | undefined, method: string): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    if (method !== 'GET' && method !== 'POST') return errorResponse(405, 'method_not_allowed', 'Method not allowed.');
+    const dataDir = process.env.LIFE_HUB_DATA_DIR ?? new URL('../../../../life-hub-data/', import.meta.url).pathname;
+    try {
+      const strands = SKILL_STRANDS.map((id) => SkillStrandSchema.parse(JSON.parse(readFileSync(`${dataDir}/data/teaching/skills/${id}.json`, 'utf8'))));
+      return okResponse(200, { continuum: { strands, fetched_at: nowIso() } });
+    } catch {
+      return errorResponse(503, 'private_data_unbound', 'The private skills file can’t be reached from here.');
+    }
   }
 
   // Mirrors netlify/functions/syllabus-alignment.mjs. Reads the private file from a local
@@ -4128,6 +4143,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handleMediaFolders(cookie, method, body);
     }
     if (path === '/api/syllabus-alignment') return handleSyllabusAlignment(cookie, method, body);
+    if (path === '/api/skills-continuum') return handleSkillsContinuum(cookie, method);
     const whiteboardMatch = /^\/api\/whiteboards\/([A-Za-z0-9_-]{1,160})$/.exec(path);
     if (whiteboardMatch && (method === 'GET' || method === 'PUT')) {
       return handleWhiteboard(cookie, method, whiteboardMatch[1]!, body);
