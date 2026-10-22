@@ -214,7 +214,7 @@ export function renderFutureDetail(
       void (async () => {
         addTask.disabled = true;
         try {
-          const task = await createTask({ title: stone.label, status: 'todo', domain: 'work' });
+          const task = await createTask({ title: stone.label, status: 'todo' });
           await createUniversalLink({
             source_ref: `tasks:task:${task.id}`,
             target_ref: `professional:stepping_stone:${stone.id}`,
