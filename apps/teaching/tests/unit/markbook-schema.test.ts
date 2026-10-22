@@ -50,4 +50,31 @@ describe('markbook schema', () => {
   it('makes ids that pass the id rule', () => {
     expect(newMarkbookId(() => 0.5)).toMatch(/^[a-z0-9]{12}$/);
   });
+
+  it('prunes strictly', () => {
+    const shrunk = { ...essay, criteria: [{ ...essay.criteria[0]!, max: 5 }, essay.criteria[1]!] };
+    expect(pruneMarks(shrunk, { st_a: { criteria: { crit000001: 9, crit000002: 8 } } })).toEqual({ st_a: { criteria: { crit000002: 8 } } });
+    expect(pruneMarks(essay, { st_a: { criteria: { crit000001: 3 }, evil: 'x' }, st_d: { criteria: {}, feedback: 5 }, st_b: [1, 2], st_c: 'x' })).toEqual({ st_a: { criteria: { crit000001: 3 } } });
+    const handin = { id: 'col0000003', kind: 'handin' as const, title: 'Draft', due: '2026-11-05' };
+    expect(pruneMarks(handin, { st_a: { status: 'late' }, st_b: { status: 'nope' }, st_c: true })).toEqual({ st_a: { status: 'late' } });
+  });
+
+  it('rejects impossible dates, duplicate outcomes and duplicate band names', () => {
+    expect(checkColumn({ ...essay, date: '2026-99-99' })).toEqual({ problem: 'Pick a date.' });
+    expect(checkColumn({ ...essay, criteria: [{ ...essay.criteria[0], outcomes: ['o1', 'o1'] }] })).toEqual({ problem: 'Each outcome once per criterion.' });
+    expect(checkColumn({ ...essay, criteria: [{ ...essay.criteria[0], bands: [{ label: 'A', min: 5 }, { label: 'A', min: 1 }] }] })).toEqual({ problem: 'Band names must differ in Analysis.' });
+    expect(checkColumn({ ...essay, id: 'X' })).toEqual({ problem: 'Something went wrong with this column. Reload and try again.' });
+    expect(checkColumn({ ...essay, kind: 'zzz' })).toEqual({ problem: 'Pick a column type.' });
+  });
+
+  it('gives friendly mark messages and drops empty text', () => {
+    expect(checkMark(essay, { criteria: { crit000001: -1 } })).toEqual({ problem: 'Marks must be 0 or more.' });
+    expect(checkMark(essay, { criteria: { crit000001: 2 }, feedback: '  ', note: '' })).toEqual({ mark: { criteria: { crit000001: 2 } } });
+    expect(checkMark({ id: 'col0000003', kind: 'handin', title: 'Draft', due: '2026-11-05' }, { status: 'late', at: 'bad' })).toEqual({ problem: 'Pick a date.' });
+    expect(checkMark({ id: 'col0000003', kind: 'handin', title: 'Draft', due: '2026-11-05' }, { status: 'x' })).toEqual({ problem: 'Pick submitted, late, missing or exempt.' });
+  });
+
+  it('keeps the id index in range', () => {
+    expect(newMarkbookId(() => 1)).toMatch(/^[a-z0-9]{12}$/);
+  });
 });
