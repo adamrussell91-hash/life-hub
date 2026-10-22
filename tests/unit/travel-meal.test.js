@@ -217,6 +217,9 @@ test("photos copy once, under Food Journal names; deleted and audio media are sk
   await h(req("PUT", Q, { ...versions, food }));
   assert.equal(gets.length, 1);
   assert.equal(s.state.food.visits[0].dishes[0].photos.length, 1);
+  // The sheet reads which moment photo each copy came from, to retry the rest.
+  const got = (await (await h(req("GET", Q))).json()).data;
+  assert.equal(got.visit.dishes[0].photos[0].from, "med_live0001");
 });
 
 const photoTrip = (count) => {

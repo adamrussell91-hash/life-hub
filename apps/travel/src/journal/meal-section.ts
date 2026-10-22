@@ -1,6 +1,6 @@
 import { ApiClientError } from '@/api/client';
-import type { FoodDish, MealPutBody, MealRead } from '@/api/travel-meal';
-import type { JournalMoment } from '@/journal/types';
+import type { FoodDish, FoodVisit, MealPutBody, MealRead } from '@/api/travel-meal';
+import type { JournalMedia, JournalMoment } from '@/journal/types';
 
 export const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Drinks'] as const;
 // Same limits as the journal schema.
@@ -31,6 +31,8 @@ export interface MealSectionHandle {
   state(): MealState;
   /** True when the meal differs from what was loaded, or is newly switched on. */
   changed(): boolean;
+  /** Moment photos the linked visit has not copied yet; a save retries them. */
+  photosPending: string[];
 }
 
 // Older moments have no author; they are Adam's.
@@ -73,6 +75,37 @@ export function mealChanged(loaded: MealState | null, current: MealState): boole
     return JSON.stringify({ food, extras });
   };
   return body(loaded) !== body(current);
+}
+
+// The Food Journal's photo limit per dish; copies go on the first dish.
+const MAX_PHOTOS = 20;
+
+// Same rule as the server's pickFoodPhotoKey: a JPEG up to 1600 wide.
+function copyable(media: JournalMedia | undefined): boolean {
+  if (!media || media.lifecycle === 'deleted' || media.deleted_at) return false;
+  if (media.content_type != null && !/^image\//i.test(media.content_type)) return false;
+  const sized = Object.keys(media.derivative_keys ?? {}).some((w) => {
+    const n = Number(w.replace(/\D/g, ''));
+    return Number.isFinite(n) && n <= 1600;
+  });
+  return sized || (media.content_type === 'image/jpeg' && Boolean(media.original_key));
+}
+
+// Only a linked visit has photos to retry; a new meal copies them all on its first save.
+export function pendingPhotoIds(
+  moment: Pick<JournalMoment, 'media_ids'>,
+  media: JournalMedia[],
+  visit: FoodVisit | null,
+): string[] {
+  if (!visit) return [];
+  if ((visit.dishes[0]?.photos?.length ?? 0) >= MAX_PHOTOS) return [];
+  const byId = new Map(media.map((m) => [m.id, m]));
+  const copied = new Set(visit.dishes.flatMap((d) => (d.photos ?? []).map((p) => p.from)));
+  return moment.media_ids.filter((id) => !copied.has(id) && copyable(byId.get(id)));
+}
+
+export function pendingPhotoHint(count: number): string {
+  return `${count} ${count === 1 ? 'photo' : 'photos'} not yet in the Food Journal. Save to copy them.`;
 }
 
 export const MEAL_MESSAGES = {
@@ -129,7 +162,7 @@ function hint(text: string): HTMLParagraphElement {
 
 export function mountMealSection(
   container: HTMLElement,
-  options: { moment: JournalMoment; read: MealRead | null; onChange?: () => void },
+  options: { moment: JournalMoment; read: MealRead | null; media?: JournalMedia[]; onChange?: () => void },
 ): MealSectionHandle {
   const { moment, read } = options;
   const changed = () => options.onChange?.();
@@ -171,6 +204,7 @@ export function mountMealSection(
       enabled: () => false,
       state: () => state,
       changed: () => false,
+      photosPending: [],
     };
   }
 
@@ -279,9 +313,12 @@ export function mountMealSection(
     refresh();
   });
 
+  const photosPending = pendingPhotoIds(moment, options.media ?? [], visit);
+
   renderDishes();
   refresh();
   body.append(extrasRow, titleField, dishList, addBtn);
+  if (photosPending.length) body.append(hint(pendingPhotoHint(photosPending.length)));
   section.append(body);
   container.replaceChildren(section);
 
@@ -292,5 +329,6 @@ export function mountMealSection(
     enabled: () => toggle.checked,
     state: () => state,
     changed: () => mealChanged(loaded, state),
+    photosPending,
   };
 }

@@ -8,6 +8,8 @@ export interface FoodDish {
   meal_type: string;
   rating: number | null;
   ingredients?: string;
+  /** Read only: `from` is the moment media id a copied photo came from. */
+  photos?: { from?: string }[];
 }
 
 export interface FoodVisit {

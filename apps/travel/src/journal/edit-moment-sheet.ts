@@ -162,7 +162,7 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     }));
     const host = mealHost;
     getTravelMeal(options.tripId, moment.id)
-      .then((read) => mountMealSection(host, { moment, read, onChange: markDirty }))
+      .then((read) => mountMealSection(host, { moment, read, media: journal.media, onChange: markDirty }))
       .catch(() => mountMealSection(host, { moment, read: null }))
       .then((handle) => {
         meal = handle;
@@ -391,8 +391,11 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       placeName.trim() !== (moment.place?.name ?? '') ||
       localDate !== moment.local_date ||
       JSON.stringify(coordinates ?? null) !== JSON.stringify(moment.coordinates ?? null);
+    // Photos that didn't copy last time count as a change, so Save retries them.
     const mealOn = Boolean(
-      mealNow?.available && mealNow.enabled() && (mealNow.changed() || momentFedVisit),
+      mealNow?.available &&
+        mealNow.enabled() &&
+        (mealNow.changed() || mealNow.photosPending.length > 0 || momentFedVisit),
     );
     const mealOff = Boolean(mealNow?.available && mealNow.wasLinked && !mealNow.enabled());
     const mealState = mealOn ? mealNow!.state() : null;

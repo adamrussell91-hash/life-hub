@@ -7,6 +7,8 @@ import {
   mealChanged,
   mealPayload,
   MEAL_MESSAGES,
+  pendingPhotoIds,
+  pendingPhotoHint,
   RATING_OPTIONS,
   removeDishLabel,
   saveErrorMessage,
@@ -126,5 +128,26 @@ describe('meal section', () => {
     expect(samePatch(null, patch)).toBe(false);
     expect(samePatch({ ...patch, place: undefined }, patch)).toBe(true);
     expect(samePatch(patch, { ...patch, text: 'Hello' })).toBe(false);
+  });
+
+  it('lists the moment photos the linked visit has not copied yet', () => {
+    const photo = (id: string, extra = {}) => ({ id, lifecycle: 'live', content_type: 'image/jpeg', original_key: `travel/journal/trp_x/${id}.jpg`, ...extra });
+    const media = [
+      photo('med_a'),
+      photo('med_b'),
+      photo('med_c', { lifecycle: 'deleted' }),
+      { id: 'med_d', lifecycle: 'live', content_type: 'audio/mp4', original_key: 'travel/journal/trp_x/d.m4a' },
+      photo('med_e', { content_type: 'image/heic', original_key: 'travel/journal/trp_x/e.heic', derivative_keys: { w1600: 'travel/journal/trp_x/e-1600.jpg' } }),
+      photo('med_f', { content_type: 'image/heic', original_key: 'travel/journal/trp_x/f.heic' }),
+    ] as never[];
+    const moment = { media_ids: ['med_a', 'med_b', 'med_c', 'med_d', 'med_e', 'med_f', 'med_gone'] } as never;
+    const visit = { id: 'visit_1', title: '', dishes: [{ title: 'Tortilla', meal_type: 'Lunch', rating: null, photos: [{ from: 'med_a' }] }] };
+    expect(pendingPhotoIds(moment, media, visit)).toEqual(['med_b', 'med_e']);
+    // A new meal copies them all on its first save, and a full dish takes no more.
+    expect(pendingPhotoIds(moment, media, null)).toEqual([]);
+    const full = { ...visit, dishes: [{ ...visit.dishes[0], photos: Array.from({ length: 20 }, () => ({})) }] };
+    expect(pendingPhotoIds(moment, media, full)).toEqual([]);
+    expect(pendingPhotoHint(2)).toBe('2 photos not yet in the Food Journal. Save to copy them.');
+    expect(pendingPhotoHint(1)).toBe('1 photo not yet in the Food Journal. Save to copy them.');
   });
 });
