@@ -1128,26 +1128,32 @@ test("ticking a menu item adds it as a dish; unticking removes it only if untouc
   assert.equal(plain.dishes.length, 1);
   assert.equal(plain.dishes[0].title, "");
 });
-test("ticking a menu dish copies its ingredients into the dish notes", () => {
+test("ticking a menu dish puts its ingredients in ingredients and leaves notes alone", () => {
   const v = newVisit();
   v.menu_items = [
     { name: "Morning steak", description: "150g sirloin, hash, chimichurri", price: "32", kind: "dish" },
     { name: "Smashed avo", description: "Poached eggs, feta", price: "22", kind: "dish" },
   ];
   let next = toggleMenuDish(v, v.menu_items[0]);
-  assert.equal(next.dishes[0].notes, "150g sirloin, hash, chimichurri");
+  assert.equal(next.dishes[0].ingredients, "150g sirloin, hash, chimichurri");
+  assert.equal(next.dishes[0].notes, "");
   next = toggleMenuDish(next, v.menu_items[1]);
-  assert.equal(next.dishes[1].notes, "Poached eggs, feta");
-  // Still the menu's words, so unticking removes it.
+  assert.equal(next.dishes[1].ingredients, "Poached eggs, feta");
   next = toggleMenuDish(next, v.menu_items[1]);
   assert.deepEqual(next.dishes.map((d) => d.title), ["Morning steak"]);
-  // Once Adam writes his own notes, it stays.
-  next.dishes[0].notes += ". Cooked perfectly";
+  // Adam's own words make it stay.
+  next.dishes[0].notes = "Cooked perfectly";
   assert.equal(toggleMenuDish(next, v.menu_items[0]).dishes.length, 1);
-  assert.equal(menuDishIndex(next, v.menu_items[0]), 0);
-  // The last dish goes blank, notes and all.
+  // A dish that already has notes still gets the ingredients.
+  const noted = newVisit();
+  noted.menu_items = v.menu_items;
+  noted.dishes[0].title = "Morning steak";
+  noted.dishes[0].notes = "From the photo";
+  const filled = toggleMenuDish(noted, v.menu_items[0]);
+  assert.equal(filled.dishes[0].ingredients, "150g sirloin, hash, chimichurri");
+  assert.equal(filled.dishes[0].notes, "From the photo");
   const plain = toggleMenuDish(toggleMenuDish(v, v.menu_items[1]), v.menu_items[1]);
-  assert.deepEqual([plain.dishes[0].title, plain.dishes[0].notes], ["", ""]);
+  assert.deepEqual([plain.dishes[0].title, plain.dishes[0].ingredients], ["", ""]);
 });
 test("an extra ticks onto the last dish, and is its own dish when nothing else is ticked", () => {
   const v = newVisit();
@@ -1165,15 +1171,24 @@ test("an extra ticks onto the last dish, and is its own dish when nothing else i
   next = toggleMenuDish(next, hash);
   next = toggleMenuDish(next, avo);
   assert.equal(next.dishes.length, 1);
-  assert.equal(next.dishes[0].notes, "Bacon, eggs\n+ Hash brown\n+ Add avocado");
+  assert.equal(next.dishes[0].ingredients, "Bacon, eggs\n+ Hash brown\n+ Add avocado");
   assert.equal(menuDishIndex(next, avo), 0);
   // Unticking an extra takes only its line.
   next = toggleMenuDish(next, hash);
-  assert.equal(next.dishes[0].notes, "Bacon, eggs\n+ Add avocado");
+  assert.equal(next.dishes[0].ingredients, "Bacon, eggs\n+ Add avocado");
   assert.equal(menuDishIndex(next, hash), -1);
   // Extras do not count as Adam's own notes.
   next = toggleMenuDish(next, breakfast);
-  assert.deepEqual([next.dishes[0].title, next.dishes[0].notes], ["", ""]);
+  assert.deepEqual([next.dishes[0].title, next.dishes[0].ingredients], ["", ""]);
+});
+test("older dishes with extras in notes are still found and unticked", () => {
+  const v = newVisit();
+  v.menu_items = [{ name: "Hash brown", description: "", price: "6", kind: "extra" }];
+  v.dishes[0].title = "Big breakfast";
+  v.dishes[0].notes = "Bacon, eggs\n+ Hash brown";
+  assert.equal(menuDishIndex(v, v.menu_items[0]), 0);
+  const next = toggleMenuDish(v, v.menu_items[0]);
+  assert.equal(next.dishes[0].notes, "Bacon, eggs");
 });
 test("every page of a menu is read when no dish photos are chosen", () => {
   const menus = Array.from({ length: 3 }, (_, i) => ({ role: "menu", id: `m${i}`, data: "x".repeat(10) }));

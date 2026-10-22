@@ -62,6 +62,7 @@ export function newDish() {
     tags: [],
     rating: null,
     notes: "",
+    ingredients: "",
     photos: [],
   };
 }
