@@ -635,7 +635,7 @@ export function summaryRow(session) {
     taskIds: (session.proposedTasks ?? []).filter((p) => p.status === 'confirmed').map((p) => p.taskId),
     reviewTaskId: session.reviewTaskId ?? null,
     reviewDue: session.reviewState?.status === 'waiting' ? session.reviewState.due : null,
-    escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? null,
+    escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? session.start?.escalatedTo ?? null,
     // A quick decision's row says how its latest round came out.
     ...(session.kind === 'quick' ? { outcome: outcomeOf(session.quick) } : {}),
     // A book session's medal shows the model or technique its record leans on most.

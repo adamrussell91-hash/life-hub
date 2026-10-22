@@ -32,7 +32,7 @@ function harness(make, path) {
 
 test('the API uses its own store prefix and run path', () => {
   assert.equal(GEAR_SHIFTER_PREFIX, 'get-things-done/v1');
-  assert.deepEqual(GEAR_SHIFTER_DEPS, { prefix: 'get-things-done/v1', runPath: '/api/get-things-done/run', kinds: ['shift'] });
+  assert.deepEqual(GEAR_SHIFTER_DEPS, { prefix: 'get-things-done/v1', runPath: '/api/get-things-done/run', kinds: ['shift', 'start'] });
 });
 
 test('a shift is created, framed in three answers and opens Explore on gear_shifter', async () => {

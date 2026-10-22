@@ -13,6 +13,7 @@ import { namingProblem } from '../../../../packages/problem-solver/naming.mjs';
 import { chosenOption, defaultToolFor, toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { applyStep, currentEntry, isQuestion, LIGHTNING_NODES } from '../../../../packages/problem-solver/lightning.mjs';
 import * as quickFlow from '../../../../packages/decision-book/quick.mjs';
+import * as startFlow from '../../../../packages/get-things-done/quick.mjs';
 import { FEEDBACK_ID, RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { basisCandidates } from '../../../../packages/decision-book/record.mjs';
 import { isRecordDate } from '../../../../packages/decision-book/tools/record.mjs';
@@ -491,6 +492,57 @@ function quickTurn(session, last) {
   return accept({ node: entry.node, note: last.trim() }, entry.node === 'learn' ? ['metacognition'] : ['decision_making']);
 }
 
+/**
+ * A Quick start walked by rule. The first action, the cue and the closing boxes take a few words;
+ * how it starts takes "countdown" or "interval"; the check-back takes a date (YYYY-MM-DD) or a
+ * few words. `go deeper` (or `escalate`) suggests a full session.
+ */
+const START_ASKS = {
+  action: 'What is the first small, safe action: something you could start today that does no harm if it goes nowhere?',
+  how: 'How will it start: a countdown cue, or one protected interval? Say countdown or interval, or pick one on the chart.',
+  countdown: 'What is the cue: the moment you count down from five and move?',
+  interval: 'When is the interval, and how long: one block with a start and an end?',
+  check: 'When will you check back? Give a date like 2026-11-05, or say when.',
+  happened: 'Go and try it. When you are back: what happened?',
+  next: 'What next?'
+};
+
+function startMessage(state, before = '') {
+  const entry = startFlow.currentEntry(state);
+  if (!entry) return `${before}That one is moving. Press It came back if it stalls again.`;
+  const ask = entry.node === 'cue' ? START_ASKS[startFlow.wayOf(state) ?? 'countdown'] : START_ASKS[entry.node];
+  return `${before}${ask}`;
+}
+
+function startTurn(session, last) {
+  const state = session.start;
+  const entry = startFlow.currentEntry(state);
+  const turn = (verdict, message, quick = null, extra = {}) => ({ ...base, verdict, message, quick, ...extra });
+  if (!entry) return turn('clarify', 'That one is moving. Say "it came back" if it stalls again.');
+  if (session.turns.length === 1 || last === 'It came back.') return turn('clarify', startMessage(state));
+  if (/^(escalate|go deeper)$/i.test(last.trim())) {
+    return turn('clarify', 'This sounds bigger than one stalled task. A full session may suit it better.', null, { suggestion: { kind: 'escalate', reason: 'Named as needing a full session.' } });
+  }
+  const accept = (step, skills = ['decision_making']) => turn('accept', startMessage(startFlow.applyStep(state, step, session.updatedAt)), step, { skillsSeen: skills });
+  const kind = startFlow.START_NODES[entry.node].kind;
+  if (kind === 'choice') {
+    const way = /\b(count ?down|countdown cue|five|5)\b/i.test(last) ? 'countdown' : /\b(interval|block|minutes?|hours?|pomodoro)\b/i.test(last) ? 'interval' : null;
+    if (!way) return turn('clarify', START_ASKS.how);
+    return accept({ node: 'how', answer: way });
+  }
+  // A way picked on the chart has already moved the run on.
+  const picked = Object.values(startFlow.START_WAYS).some((w) => last === `${w.label}.`);
+  if (picked && state.path.at(-2)?.node === 'how') return turn('clarify', startMessage(state, 'Noted. '));
+  if (kind === 'check') {
+    const date = /\b(\d{4}-\d{2}-\d{2})\b/.exec(last)?.[1];
+    if (date && startFlow.isCheckDate(date)) return accept({ node: 'check', note: date }, ['metacognition']);
+    if (wordCount(last) < 2) return turn('clarify', START_ASKS.check);
+    return accept({ node: 'check', note: last.trim() }, ['metacognition']);
+  }
+  if (wordCount(last) < 2) return turn('clarify', 'Say a little more about that.');
+  return accept({ node: entry.node, note: last.trim() }, entry.node === 'happened' ? ['reflective_thinking'] : ['decision_making']);
+}
+
 export async function scriptedCoach(session) {
   if (session.kind === 'lightning') {
     const turn = session.turns.at(-1);
@@ -499,6 +551,10 @@ export async function scriptedCoach(session) {
   if (session.kind === 'quick') {
     const turn = session.turns.at(-1);
     return quickTurn(session, turn?.role === 'user' ? turn.text : '');
+  }
+  if (session.kind === 'start') {
+    const turn = session.turns.at(-1);
+    return startTurn(session, turn?.role === 'user' ? turn.text : '');
   }
   const latest = session.turns.at(-1);
   const last = latest?.role === 'user' ? latest.text : '';
