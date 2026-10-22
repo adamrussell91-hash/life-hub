@@ -1158,10 +1158,18 @@ async function goTo(page, width, section) {
   }
 }
 // Brisket's reply is not under test; a short stream keeps the chat calm.
-async function mockChat(page) {
+async function mockChat(page, { failFirst = false } = {}) {
   const sent = [];
   await page.route("**/api/chat", async (route) => {
     sent.push(JSON.parse(route.request().postData()));
+    if (failFirst && sent.length === 1) {
+      await route.fulfill({
+        status: 502,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ok: false, error: { code: "upstream" } }),
+      });
+      return;
+    }
     await route.fulfill({
       status: 200,
       headers: { "content-type": "text/event-stream" },
@@ -1405,3 +1413,44 @@ for (const width of [1440, 390])
     assert.deepEqual(errors, []);
     await page.close();
   });
+
+test("a hand-off Brisket can't take keeps the sheet, the choice and the photo for another go", async () => {
+  const { page, errors } = await pageFor(390, {
+    seed: (j) => countedDish(j),
+    media: { "food/photos/photo_lasagne.jpg": Buffer.from(JPEG, "base64") },
+  });
+  const sent = await mockChat(page, { failFirst: true });
+  let photoReads = 0;
+  page.on("request", (r) => {
+    if (r.url().endsWith("/api/food-journal-media") && r.postData()?.includes('"bytes"'))
+      photoReads += 1;
+  });
+  await page.getByRole("tab", { name: "Custom Menu" }).click();
+  await lasagneCard(page)
+    .getByRole("button", { name: "Send to Brisket", exact: true })
+    .click();
+  const sheet = page.getByRole("dialog", { name: "Send to Brisket" });
+  await sheet.getByRole("button", { name: "Pieces", exact: true }).click();
+  await sheet.getByLabel("Pieces eaten").fill("3");
+  await sheet.getByLabel("Pieces in total").fill("4");
+  const send = sheet.getByRole("button", { name: "Send", exact: true });
+  await send.click();
+  await sheet.getByText("Couldn't reach Brisket. Try again.").waitFor();
+  // Back on the Food Journal, with the chat closed, so the sheet can retry.
+  assert.equal(await page.locator("#food-journal-dashboard").isVisible(), true);
+  assert.equal(await page.locator("#nutrition-dashboard #chat-view").count(), 0);
+  assert.equal(await send.isDisabled(), false);
+  assert.equal(await sheet.getByLabel("Pieces eaten").inputValue(), "3");
+  assert.equal(
+    await sheet.getByRole("button", { name: "Pieces", exact: true }).getAttribute("aria-pressed"),
+    "true",
+  );
+  await send.click();
+  await sheet.waitFor({ state: "detached" });
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].attachments.length, 1);
+  assert.match(sent[1].message, /I had: 3 of 4/);
+  assert.equal(photoReads, 1, "the photo is fetched once and kept");
+  assert.deepEqual(errors, []);
+  await page.close();
+});

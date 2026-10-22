@@ -681,7 +681,9 @@ export function createFoodJournalView({
     const fixed = PORTION_CHIPS.some((c) => c.label === current);
     const piecesNow = !fixed && /^(\d+) of (\d+)$/.exec(current || "");
     let chip = piecesNow ? null : fixed ? current : "All",
-      note = "";
+      note = "",
+      // Fetched once, so a retry sends the same photo without asking again.
+      photo;
     const row = el("div", "hub-chips food-portion");
     row.setAttribute("role", "group");
     row.setAttribute("aria-label", "Portion");
@@ -724,20 +726,26 @@ export function createFoodJournalView({
         const picked = choice();
         if (!picked) return;
         e.currentTarget.disabled = true;
-        s.error.textContent = "";
+        s.error.textContent = "Sending to Brisket.";
         const message = handoffMessage({
           visit,
           dish,
           portion: { ...picked, note: note.trim() },
           previous: dish.brisket || undefined,
         });
-        const attachments = [];
-        const photo = await dishAttachment(dish);
-        if (photo) attachments.push(photo);
+        if (photo === undefined) photo = await dishAttachment(dish);
         if (!s.isOpen()) return;
+        const result = await Promise.resolve(
+          sendToBrisket(message, photo ? [photo] : []),
+        ).catch(() => ({ ok: false }));
+        if (!s.isOpen()) return;
+        if (result?.ok === false) {
+          s.error.textContent = "Couldn't reach Brisket. Try again.";
+          paint();
+          return;
+        }
         sentToBrisket = true;
         s.close();
-        sendToBrisket(message, attachments);
       },
       "primary",
     );
