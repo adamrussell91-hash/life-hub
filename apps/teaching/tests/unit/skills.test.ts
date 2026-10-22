@@ -14,6 +14,7 @@ import type { AssessmentColumn, Column } from '@/markbook/schema';
 // Invented content. The real continuum lives in the private data repo.
 const rung = (label: string, next: string) => ({
   i_can: `I can ${label}.`,
+  indicators: [] as { group: string; text: string; eg?: string }[],
   build: { formula: ['Claim', 'Reason'], parts: [{ id: 'c', name: 'Claim', job: 'Says it', language: ['so'] }, { id: 'r', name: 'Reason', job: 'Backs it', language: ['because'] }],
     example: [['A claim', 'c'], [' because a reason', 'r'], ['.', null]] as [string, string | null][], why_here: `Why ${label}`, checks: [`Check ${label}`], next_move: next }
 });
@@ -68,6 +69,25 @@ describe('skills continuum in the Resource Library', () => {
     expect(host.querySelector('[data-skill-sub="evidence"]')?.getAttribute('aria-pressed')).toBe('true');
     expect([...host.querySelectorAll('.skl__rung')].map((r) => (r as HTMLElement).dataset.rung)).toEqual(['capable', 'skilled', 'accomplished', 'excellent']);
     expect(host.querySelectorAll('.skl__rung')[0]!.querySelectorAll('.skl__seg sup').length).toBe(2);
+  });
+
+  it('groups each rung\'s indicators under Look for, and leaves rungs without them unchanged', async () => {
+    const withIndicators = structuredClone(continuum);
+    withIndicators.strands[0]!.sub_strands[0]!.rungs.capable.indicators = [
+      { group: 'Claim', text: 'names the writer as the subject', eg: '“The poet shows…”' },
+      { group: 'Claim', text: 'uses one key term' },
+      { group: 'Language', text: 'writes in the present tense' }
+    ];
+    vi.mocked(loadSkills).mockResolvedValue(withIndicators);
+    selectSkill('arguing.thesis');
+    const host = document.createElement('div');
+    document.body.append(host);
+    renderSkillsLibrary(host);
+    await settle();
+    const [capable, skilled] = host.querySelectorAll('.skl__rung');
+    expect([...capable!.querySelectorAll('.skl__group-name')].map((g) => g.textContent)).toEqual(['Claim', 'Language']);
+    expect(capable!.querySelector('.skl__inds li')?.textContent).toBe('names the writer as the subject (e.g. “The poet shows…”)');
+    expect(skilled!.querySelector('.skl__look')).toBeNull();
   });
 
   it('switches strands, shows the whole-strand grid and refreshes', async () => {

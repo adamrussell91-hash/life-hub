@@ -59,3 +59,15 @@ test('the endpoint is teacher only and refreshes on request', async () => {
   const bad = await make(true)(new Request('https://example.test/api/skills-continuum', { method: 'POST', body: JSON.stringify({ action: 'nope' }) }));
   assert.equal(bad.status, 400);
 });
+
+test('indicators survive the copy, and older copies without them load with none', async () => {
+  const store = storeFixture();
+  const withIndicators = (id) => {
+    const s = strand(id);
+    s.sub_strands[0].rungs.capable.indicators = [{ group: 'Claim', text: 'names the writer', eg: '“The poet shows…”' }];
+    return s;
+  };
+  const c = await loadSkills(store, { env, fetchImpl: fakeFetch(withIndicators).impl });
+  assert.deepEqual(c.strands[0].sub_strands[0].rungs.capable.indicators, [{ group: 'Claim', text: 'names the writer', eg: '“The poet shows…”' }]);
+  assert.deepEqual(c.strands[0].sub_strands[0].rungs.skilled.indicators, []);
+});

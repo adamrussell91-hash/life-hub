@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * The HSC skills continuum: strands of sub-strands, each climbing four rungs
- * from Capable to Excellent. Every rung is a build: named parts, the language
+ * from Capable to Excellent. Every rung has indicators to look for and a build: named parts, the language
  * for each part, a labelled example, checks and the next move. The content
  * lives in the private data repo (data/teaching/skills/{strand}.json).
  */
@@ -28,7 +28,9 @@ export const SkillBuildSchema = z.object({
   steps: z.array(Long).max(8).optional(),
   technique: z.object({ name: Short, how: Long, pairs: z.array(z.tuple([Long, Long])).max(8) }).optional()
 });
-export const SkillRungSchema = z.object({ i_can: Long, build: SkillBuildSchema });
+/** One observable behaviour, verb first, grouped by organiser, with a concrete example. */
+export const SkillIndicatorSchema = z.object({ group: Short, text: Long, eg: Long.optional() });
+export const SkillRungSchema = z.object({ i_can: Long, indicators: z.array(SkillIndicatorSchema).max(12).default([]), build: SkillBuildSchema });
 export const SkillSubStrandSchema = z.object({
   id: z.string().regex(/^[a-z-]{2,40}$/),
   name: Short,
