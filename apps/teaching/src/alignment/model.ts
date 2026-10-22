@@ -108,3 +108,14 @@ export function sharedRuns(text: string, stems: Set<string>): Array<{ text: stri
     .filter(Boolean)
     .map((part) => ({ text: part, shared: /^[A-Za-z’']+$/.test(part) && isContentWord(part) && stems.has(stem(part)) }));
 }
+
+/** Dot points that call on a thinking skill and reach outcome n. */
+export function skillHits(points: AreaPoint[], n: number, skill: string): HeatHit[] {
+  const hits: HeatHit[] = [];
+  for (const point of points) {
+    const o = point.outcomes.find((x) => x.n === n);
+    if (!o || !(point.skills ?? []).includes(skill)) continue;
+    hits.push({ point, refs: [], link: o.link });
+  }
+  return hits;
+}

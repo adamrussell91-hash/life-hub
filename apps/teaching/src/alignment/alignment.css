@@ -28,6 +28,7 @@
 .align__controls { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; }
 .align__count { margin-left: var(--space-1); opacity: 0.7; font-variant-numeric: tabular-nums; }
 .align__modes { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--warm-white); }
+.align__modes[hidden] { display: none; }
 .align__mode { font: inherit; font-size: var(--text-sm); border: 0; background: none; color: var(--muted); padding: var(--space-1) var(--space-3); border-radius: 999px; cursor: pointer; }
 .align__mode[aria-pressed='true'] { background: var(--cotton); color: var(--ink); font-weight: var(--weight-semibold); }
 
@@ -60,6 +61,16 @@
 .align__xlab { padding-top: var(--space-2); display: flex; justify-content: center; }
 .align__xlab-btn { font: inherit; font-size: var(--text-xs); background: none; border: 0; color: var(--ink); cursor: pointer; writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; padding: 2px; }
 .align__xtitle { grid-column: 2 / -1; text-align: center; padding-top: var(--space-2); font-size: var(--text-2xs); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); font-weight: var(--weight-semibold); }
+
+/* thinking-skill glyphs (Problem Solver) */
+.align__glyph { display: inline-flex; flex: none; width: 15px; height: 15px; color: var(--orca); }
+.align__glyph svg { width: 100%; height: 100%; display: block; }
+.align__glyph--title { width: 22px; height: 22px; color: var(--ink); align-self: center; }
+.align__glyphs { display: inline-flex; gap: 2px; }
+.align__tag .align__glyph { vertical-align: -3px; }
+.align__tag.is-zero { color: var(--muted); border-style: dashed; }
+.align__rl-btn--skill { display: inline-flex; gap: var(--space-2); align-items: center; }
+.align__item-head .align__glyph { width: 18px; height: 18px; color: var(--ink); }
 
 /* legend */
 .align__legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); align-items: center; padding-top: var(--space-3); border-top: 1px solid var(--line); }
