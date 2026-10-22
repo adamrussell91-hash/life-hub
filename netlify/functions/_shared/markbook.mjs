@@ -26,15 +26,21 @@ export function sydneyDay(iso) {
 
 async function readBook(store, classId) {
   const row = await store.getWithMetadata(bookKey(classId), { type: 'json', consistency: 'strong' });
-  return { book: MarkbookSchema.parse(row?.data ?? {}), etag: row?.etag ?? null };
+  const parsed = MarkbookSchema.safeParse(row?.data ?? {});
+  if (!parsed.success) reject(500, 'corrupt', 'This markbook couldn’t be read. Nothing was changed.');
+  return { book: parsed.data, etag: row?.etag ?? null };
 }
 
 /** Read, change, write only if nobody wrote in between. One retry, then a 409. */
 async function changeBook(store, classId, fn) {
   for (let i = 0; i < 2; i += 1) {
     const { book, etag } = await readBook(store, classId);
-    const next = fn(book);
-    next.updated_at = new Date().toISOString();
+    const changed = fn(book);
+    changed.updated_at = new Date().toISOString();
+    // Never write a record the next read would refuse.
+    const parsed = MarkbookSchema.safeParse(changed);
+    if (!parsed.success) reject(400, 'bad_request', 'That change can’t be saved.');
+    const next = parsed.data;
     const written = await store.setJSON(bookKey(classId), next, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
     if (written?.modified !== false) return next;
   }
@@ -134,8 +140,13 @@ export async function markbookAction(store, classId, body) {
   if (action === 'hide_quiz') {
     if (!isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown quiz.');
     const markbook = await changeBook(store, classId, (book) => {
-      const rest = book.hidden_quizzes.filter((id) => id !== body.lesson_id);
-      book.hidden_quizzes = body.hidden === true ? [...rest, body.lesson_id] : rest;
+      const already = book.hidden_quizzes.includes(body.lesson_id);
+      if (body.hidden === true) {
+        // Only a quiz not yet hidden is added; the schema caps the list.
+        if (!already) book.hidden_quizzes = [...book.hidden_quizzes, body.lesson_id];
+      } else {
+        book.hidden_quizzes = book.hidden_quizzes.filter((id) => id !== body.lesson_id);
+      }
       return book;
     });
     return { markbook };

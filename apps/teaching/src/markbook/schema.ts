@@ -54,7 +54,7 @@ export const CheckMarkSchema = z.union([z.boolean(), z.number().int().min(1).max
 
 export const MarkbookSchema = z.object({
   columns: z.array(ColumnSchema).max(MARKBOOK_LIMITS.columns).default([]),
-  hidden_quizzes: z.array(z.string().min(1).max(64)).default([]),
+  hidden_quizzes: z.array(z.string().min(1).max(120)).max(MARKBOOK_LIMITS.columns).default([]),
   marks: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
   updated_at: z.string().default('')
 });
