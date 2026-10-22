@@ -889,10 +889,15 @@ export async function renderMeetingPage(
         toggle.disabled = Boolean(item.task_ref);
         toggle.addEventListener('click', async () => {
           toggle.disabled = true;
-          const task = await createTask({ title: item.text });
-          Object.assign(item, (await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` })).item);
-          toggle.setAttribute('aria-checked', 'true');
-          toggle.title = 'Task made';
+          try {
+            const task = await createTask({ title: item.text });
+            Object.assign(item, (await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` })).item);
+            toggle.setAttribute('aria-checked', 'true');
+            toggle.title = 'Task made';
+          } catch (err) {
+            toggle.disabled = false;
+            toggle.title = err instanceof ApiClientError ? `Couldn't make the task: ${err.message}` : "Couldn't make the task. Try again.";
+          }
         });
         row.append(toggle);
         mine.append(row);

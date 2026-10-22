@@ -485,10 +485,14 @@ export async function renderCommPage(
         toggle.disabled = Boolean(item.task_ref);
         toggle.addEventListener('click', async () => {
           toggle.disabled = true;
-          const task = await createTask({ title: item.text });
-          const { item: next } = await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` });
-          Object.assign(item, next);
-          toggle.setAttribute('aria-checked', 'true');
+          try {
+            const task = await createTask({ title: item.text });
+            const { item: next } = await patchLedger(item.id, { task_ref: `tasks:task:${task.id}` });
+            Object.assign(item, next);
+            toggle.setAttribute('aria-checked', 'true');
+          } catch {
+            toggle.disabled = false;
+          }
         });
         row.append(toggle);
         mine.append(row);
