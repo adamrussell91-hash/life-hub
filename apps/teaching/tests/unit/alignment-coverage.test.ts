@@ -31,9 +31,11 @@ const SKILLS = {
   strands: [{
     schema: 'skills_strand_v1', strand: 'arguing', name: 'Arguing', summary: '', rungs: [],
     sub_strands: [
-      { id: 'claim', name: 'Claim', in_hsc: 'Make a claim', draws_on: '', outcomes: [3], focus_areas: ['harbours'], rungs: {} },
-      { id: 'evidence', name: 'Evidence', in_hsc: 'Use evidence', draws_on: '', outcomes: [4], focus_areas: ['harbours'], rungs: {} },
-      { id: 'elsewhere', name: 'Elsewhere', in_hsc: 'Other area', draws_on: '', outcomes: [3], focus_areas: ['storms'], rungs: {} }
+      { id: 'claim', name: 'Claim', in_hsc: 'Make a claim', draws_on: '', outcomes: [3], focus_areas: ['harbours'], points: [], rungs: {} },
+      { id: 'evidence', name: 'Evidence', in_hsc: 'Use evidence', draws_on: '', outcomes: [4], focus_areas: ['harbours'], points: [], rungs: {} },
+      { id: 'elsewhere', name: 'Elsewhere', in_hsc: 'Other area', draws_on: '', outcomes: [3], focus_areas: ['storms'], points: [], rungs: {} },
+      // Names its dot point: only U2 counts, even though R1 shares its outcome.
+      { id: 'voice', name: 'Voice', in_hsc: 'Find a voice', draws_on: '', outcomes: [3], focus_areas: ['harbours'], points: [{ area: 'harbours', point: 'U2', link: 'shared' }], rungs: {} }
     ]
   }]
 } as unknown as SkillsContinuum;
@@ -80,7 +82,7 @@ describe('Unit map: syllabus coverage', () => {
   it('covers a skills strand’s sub-strands in this focus area through shared outcomes', () => {
     const arg = unitCoverage(DOC, SKILLS, AREA, LINES, LESSONS).rows.find((r) => r.line.id === 'arg')!;
     expect(arg.heading).toBe('Arguing');
-    expect(arg.items.map((i) => [i.label, i.covered])).toEqual([['Claim', true], ['Evidence', false]]);
+    expect(arg.items.map((i) => [i.label, i.covered])).toEqual([['Claim', true], ['Evidence', false], ['Voice', false]]);
     expect(arg.outcomes).toEqual([3]);
   });
 

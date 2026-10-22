@@ -1,5 +1,6 @@
 import type { LineAlignment, NetworkLine } from '@/schemas/block';
 import type { SkillsContinuum } from '@/skills/schema';
+import { servesPoint } from '@/skills/model';
 import { conceptKeyOf, bulletNumberOf, wordStems } from './model';
 import type { Alignment, AlignmentPoint } from './schema';
 
@@ -103,9 +104,13 @@ export function unitCoverage(
       }
     } else if (link?.kind === 'strand') {
       const strand = skills?.strands.find((s) => s.strand === link.strand);
-      for (const sub of strand?.sub_strands.filter((s) => s.focus_areas.includes(area.id)) ?? []) {
-        // A sub-strand and a dot point meet where they share an outcome in this focus area.
-        const by = coverBy((x) => x.outcomes.some((o) => sub.outcomes.includes(o.n)), (x) => x.outcomes.map((o) => o.n).filter((n) => sub.outcomes.includes(n)));
+      const inArea = (s: NonNullable<typeof strand>['sub_strands'][number]) =>
+        s.points.length ? s.points.some((x) => x.area === area.id) : s.focus_areas.includes(area.id);
+      for (const sub of strand?.sub_strands.filter(inArea) ?? []) {
+        // The dot points a sub-strand names, or (naming none) those sharing an outcome in its focus areas.
+        const serves = (x: AlignmentPoint) => servesPoint(sub, { area: area.id, id: x.id, outcomes: x.outcomes });
+        const reach = (x: AlignmentPoint) => x.outcomes.map((o) => o.n).filter((n) => !sub.outcomes.length || sub.outcomes.includes(n));
+        const by = coverBy(serves, reach);
         items.push({ id: `${link.strand}.${sub.id}`, label: sub.name, title: sub.in_hsc, covered: by.length > 0, lessons: by });
       }
     }
