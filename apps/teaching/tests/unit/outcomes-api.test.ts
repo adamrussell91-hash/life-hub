@@ -76,4 +76,47 @@ describe('outcomes library', () => {
     );
     expect(subject.outcome_ids).toContain(created.data.id);
   });
+
+  it('edits, reorders, merges and deletes outcomes through the item routes', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const add = (code: string) =>
+      api.request('POST', '/api/outcomes', {
+        cookie,
+        body: { subject_id: 'subject_y12_engadv', code, title: code, description: `${code} wording`, group: 'Custom' }
+      });
+    const keep = (await (await add('EAV-12-04')).json()).data;
+    expect((await add(' eav-12-04 ')).status).toBe(409);
+    const extra = (await (await add('EAV-12-09')).json()).data;
+
+    const unit = await api.request('PATCH', '/api/units/unit_aotfw', { cookie, body: { outcome_ids: ['EA12-6', extra.id] } });
+    expect(unit.status).toBe(200);
+
+    const patched = await api.request('PATCH', `/api/outcomes/${keep.id}`, {
+      cookie,
+      body: { title: 'New and different contexts', group: 'Module A' }
+    });
+    expect(patched.status).toBe(200);
+    expect((await patched.json()).data.group).toBe('Module A');
+
+    const blocked = await api.request('DELETE', `/api/outcomes/${extra.id}`, { cookie });
+    expect(blocked.status).toBe(409);
+
+    const merged = await api.request('POST', `/api/outcomes/${extra.id}/merge`, { cookie, body: { into: keep.id } });
+    expect(merged.status).toBe(200);
+
+    const curriculum = (await (await api.request('GET', '/api/curriculum', { cookie })).json()).data;
+    const unitRow = curriculum.units.find((row: { id: string }) => row.id === 'unit_aotfw');
+    expect(unitRow.outcome_ids).toEqual(['EA12-6', keep.id]);
+    expect(curriculum.outcomes.some((row: { id: string }) => row.id === extra.id)).toBe(false);
+
+    const subject = curriculum.subjects.find((row: { id: string }) => row.id === 'subject_y12_engadv');
+    const reordered = [keep.id, ...subject.outcome_ids.filter((id: string) => id !== keep.id)];
+    const saved = await api.request('PATCH', '/api/subjects/subject_y12_engadv', { cookie, body: { outcome_ids: reordered } });
+    expect(saved.status).toBe(200);
+    expect((await saved.json()).data.outcome_ids[0]).toBe(keep.id);
+
+    const unused = (await (await add('EAV-12-10')).json()).data;
+    expect((await api.request('DELETE', `/api/outcomes/${unused.id}`, { cookie })).status).toBe(200);
+  });
 });
