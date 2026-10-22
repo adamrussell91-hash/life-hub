@@ -3,6 +3,7 @@ import { visitBlocks } from '@/blocks/walk-blocks';
 import type { Block, TimerSegment } from '@/schemas/block';
 import { mountCheckpoint, type CheckpointHandle } from './checkpoint';
 import { openLessonMap } from './lesson-map';
+import type { QuizLiveHandle } from './quiz-live';
 import type { FocusStep } from './steps';
 import './focus-view.css';
 
@@ -16,7 +17,8 @@ import './focus-view.css';
  * Home and End jump; M opens the lesson map. A presenter clicker sends these.
  */
 
-export type FocusStepView = FocusStep & { el: HTMLElement };
+/** A rendered step. A quiz lesson's live round rides on its quiz step. */
+export type FocusStepView = FocusStep & { el: HTMLElement; live?: QuizLiveHandle };
 
 export type FocusMode = 'page' | 'focus';
 
@@ -31,6 +33,8 @@ export interface FocusControllerOptions {
 export interface FocusController {
   /** Hand over freshly rendered steps (first load and every Refresh), with the lesson's blocks for the tools. */
   setSteps(steps: FocusStepView[], pageBlocks: Block[]): void;
+  /** A live quiz round changed: re-check the checkpoint cue. */
+  refreshCheckpoint(): void;
   dispose(): void;
 }
 
@@ -118,7 +122,7 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
   const strip = el('nav', 'fv-strip');
   strip.setAttribute('aria-label', 'Lesson steps');
   const dock = el('div', 'fv-dock');
-  const prev = button('‹', 'fv-strip__nav', () => go(index - 1));
+  const prev = button('‹', 'fv-strip__nav', () => goBack());
   prev.setAttribute('aria-label', 'Previous step');
   const next = button('›', 'fv-strip__nav', () => goNext());
   next.setAttribute('aria-label', 'Next step');
@@ -188,10 +192,12 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
       step.el.hidden = !current;
       step.el.setAttribute('aria-hidden', String(!current));
     });
+    steps.forEach((step, k) => step.live?.activate(mode === 'focus' && k === index));
     if (mode === 'focus') {
       paintStrip();
       mountDock();
-      checkpoint.watch(steps[index]?.el ?? null);
+      const live = steps[index]?.live;
+      checkpoint.watch(steps[index]?.el ?? null, live ? () => live.subject() : undefined);
       stage.scrollTop = 0;
       scheduleFit();
     }
@@ -206,14 +212,21 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
     show();
   }
 
-  /** Forward, unless a hinge question on this step came in under the bar. */
+  /** Forward, unless a question on this step came in under the mark, or a live quiz round has more to show. */
   function goNext(): void {
     if (checkpoint.isOpen()) return;
     if (checkpoint.shouldStop()) {
       checkpoint.open();
       return;
     }
+    if (steps[index]?.live?.forward()) return;
     go(index + 1);
+  }
+
+  function goBack(): void {
+    checkpoint.close();
+    if (steps[index]?.live?.back()) return;
+    go(index - 1);
   }
 
   /** Scale the current step to fill the stage, never below its page size. */
@@ -307,7 +320,7 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
       goNext();
     } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(key)) {
       event.preventDefault();
-      go(index - 1);
+      goBack();
     } else if (key === 'Home') {
       event.preventDefault();
       go(0);
@@ -322,6 +335,7 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
 
   return {
     setSteps(fresh, blocks) {
+      for (const step of steps) if (!fresh.includes(step)) step.live?.dispose();
       steps = fresh;
       pageBlocks = blocks;
       // A Refresh keeps the teacher on the step they were showing.
@@ -329,7 +343,9 @@ export function mountFocusController(options: FocusControllerOptions): FocusCont
       dockStack = '';
       show();
     },
+    refreshCheckpoint: () => checkpoint.refresh(),
     dispose() {
+      for (const step of steps) step.live?.dispose();
       document.removeEventListener('keydown', onKey);
       resize.disconnect();
       cancelAnimationFrame(fitFrame);

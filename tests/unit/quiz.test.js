@@ -249,6 +249,8 @@ test('live mode: join with the code, answer once, the teacher sees the spread, t
   const student = body => quizAction(store, 'quiz1', body);
   const started = (await teacher({ action: 'live_start' })).live;
   assert.equal(started.phase, 'lobby');
+  // Focus view's checkpoint mark: the teacher's, defaulting to 80, and never sent to students.
+  assert.equal(started.move_on, 80);
   assert.equal((await student({ action: 'status' })).live, true);
   const a = { token: token(9) };
   const b = { token: token(10) };
@@ -260,6 +262,7 @@ test('live mode: join with the code, answer once, the teacher sees the spread, t
   const q1 = (await teacher({ action: 'live_next' })).live;
   assert.equal(q1.index, 0);
   const view = (await student({ ...a, action: 'live_status' })).live;
+  assert.ok(!('move_on' in view));
   assert.equal(view.question.id, 'qa');
   assert.equal(view.key, undefined, 'no answer before the reveal');
   const right = prepared.quiz.record.questions.qa.question.options.find(o => o.text === 'Metaphor').id;

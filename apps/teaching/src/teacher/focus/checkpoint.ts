@@ -17,12 +17,29 @@ import { pollTextToolJob } from '@/blocks/text-tools-client';
  *   is done. The teacher previews it before it goes on the board, and Ann's
  *   question is saved onto the block for next time;
  * - Move on, the teacher's deliberate call.
+ *
+ * A live quiz question in focus view stops here too (see quiz-live.ts), with
+ * the score, the most picked wrong answer and Move on. Quiz questions have no
+ * back-up question.
  */
 
 type Live = Extract<TeacherState, { phase: 'live' }>;
 type Entry = HingeStateDetail & { root: HTMLElement };
 export type BackupDraft = { prompt: string; options: Array<{ text: string; misconception: string; right: boolean }> };
 type Drafting = { status: 'working' } | { status: 'ready'; draft: BackupDraft } | { status: 'error'; error: string };
+
+/** A live quiz question under its mark, as the quiz step reports it. */
+export type QuizSubject = {
+  /** One per question per round: moving on clears it. */
+  key: string;
+  pct: number;
+  moveOnMark: number;
+  sub: string;
+  talk: string;
+  wrongLetter: string | null;
+  /** Go on to the next question. */
+  next: () => void;
+};
 
 export interface CheckpointOptions {
   surface: HTMLElement;
@@ -31,13 +48,15 @@ export interface CheckpointOptions {
 }
 
 export interface CheckpointHandle {
-  /** The step now on the board. */
-  watch(step: HTMLElement | null): void;
+  /** The step now on the board, and its live quiz if it runs one. */
+  watch(step: HTMLElement | null, quiz?: () => QuizSubject | null): void;
   /** A hinge question on this step came in under the mark and the teacher hasn't moved on from it. */
   shouldStop(): boolean;
   open(): void;
   close(): void;
   isOpen(): boolean;
+  /** Re-check the next-arrow cue after a live quiz update. */
+  refresh(): void;
   dispose(): void;
 }
 
@@ -94,6 +113,7 @@ export function mountCheckpoint(options: CheckpointOptions): CheckpointHandle {
   const drafts = new Map<string, Drafting>();
   const cleared = new Set<string>();
   let step: HTMLElement | null = null;
+  let quizSource: (() => QuizSubject | null) | null = null;
   let openFor: string | null = null;
   let view: 'actions' | 'preview' = 'actions';
   let talkShown = false;
@@ -120,8 +140,13 @@ export function mountCheckpoint(options: CheckpointOptions): CheckpointHandle {
     return null;
   }
 
+  function quizTarget(): QuizSubject | null {
+    const subject = quizSource?.() ?? null;
+    return subject && !cleared.has(subject.key) ? subject : null;
+  }
+
   function cue(): void {
-    surface.classList.toggle('fv-has-checkpoint', focusOn() && !!target());
+    surface.classList.toggle('fv-has-checkpoint', focusOn() && !!(target() || quizTarget()));
   }
 
   function startDraft(entry: Entry & { state: Live }): void {
@@ -161,11 +186,45 @@ export function mountCheckpoint(options: CheckpointOptions): CheckpointHandle {
   }
 
   function moveOn(): void {
+    const quiz = openFor?.startsWith('quiz:') ? quizSource?.() : null;
+    if (quiz) {
+      cleared.add(quiz.key);
+      close();
+      cue();
+      quiz.next();
+      return;
+    }
     const entry = openFor ? hinges.get(openFor) : null;
     if (entry && live(entry)) cleared.add(entry.state.session);
     close();
     cue();
     onMoveOn();
+  }
+
+  function paintQuiz(subject: QuizSubject): void {
+    const sig = JSON.stringify([subject.key, subject.sub, talkShown]);
+    if (sig === painted && panel.childElementCount) return;
+    painted = sig;
+    const head = el('div', 'fv-checkpoint__head');
+    const text = el('div', 'fv-checkpoint__text');
+    text.append(el('p', 'fv-checkpoint__title', 'Checkpoint: not everyone’s there yet.'), el('p', 'fv-checkpoint__sub', subject.sub));
+    head.append(el('p', 'fv-checkpoint__score', `${subject.pct}%`), text);
+    const parts: HTMLElement[] = [head];
+    if (talkShown) {
+      const talk = el('div', 'fv-checkpoint__talk');
+      talk.append(el('p', 'fv-checkpoint__label', 'Talking point · no names'), el('p', '', subject.talk));
+      parts.push(talk);
+    }
+    const actions = el('div', 'fv-checkpoint__actions');
+    actions.append(
+      button(subject.wrongLetter ? `Explain why ${subject.wrongLetter} is tempting` : 'Talking point', 'btn btn--ghost', () => {
+        talkShown = !talkShown;
+        paint();
+      }),
+      button('Move on', 'btn btn--primary', moveOn)
+    );
+    parts.push(actions);
+    panel.replaceChildren(...parts);
   }
 
   async function showBackup(entry: Entry & { state: Live }): Promise<void> {
@@ -224,6 +283,11 @@ export function mountCheckpoint(options: CheckpointOptions): CheckpointHandle {
 
   function paint(): void {
     if (panel.hidden || !openFor) return;
+    if (openFor.startsWith('quiz:')) {
+      const subject = quizSource?.();
+      if (!subject || `quiz:${subject.key}` !== openFor) return close();
+      return paintQuiz(subject);
+    }
     const entry = hinges.get(openFor);
     if (!entry || !live(entry)) return close();
     const s = entry.state;
@@ -308,16 +372,18 @@ export function mountCheckpoint(options: CheckpointOptions): CheckpointHandle {
   }
 
   return {
-    watch(next) {
+    watch(next, quiz) {
       step = next;
+      quizSource = quiz ?? null;
       close();
       cue();
     },
-    shouldStop: () => focusOn() && !!target(),
+    shouldStop: () => focusOn() && !!(target() || quizTarget()),
     open() {
       const entry = target();
-      if (!entry) return;
-      openFor = entry.blockId;
+      const quiz = entry ? null : quizTarget();
+      if (!entry && !quiz) return;
+      openFor = entry ? entry.blockId : `quiz:${quiz!.key}`;
       view = 'actions';
       talkShown = false;
       error = '';
@@ -328,6 +394,7 @@ export function mountCheckpoint(options: CheckpointOptions): CheckpointHandle {
     },
     close,
     isOpen: () => !panel.hidden,
+    refresh: cue,
     dispose() {
       stage.removeEventListener('hinge-state', onState);
       panel.remove();

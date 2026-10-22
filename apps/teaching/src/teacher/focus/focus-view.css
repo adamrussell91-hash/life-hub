@@ -520,3 +520,58 @@
     display: block;
   }
 }
+
+/* ── Quiz lessons: self-paced on the page, live in focus ─────────── */
+.lesson-display.is-focus .fv-quiz-page,
+.lesson-display:not(.is-focus) .fv-quiz-live {
+  display: none;
+}
+
+.fv-quiz-live {
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  background: #fff;
+  text-align: center;
+}
+
+.fv-quiz-live__body {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+}
+
+.fv-quiz-live__body .qz-live__stage {
+  justify-self: stretch;
+  text-align: left;
+}
+
+.fv-quiz-live__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.fv-quiz-live__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* Sized for the step: focus view's zoom scales it up to the board. */
+.fv-quiz-live__label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-md);
+}
+
+.fv-quiz-live__code {
+  margin: 0;
+  color: var(--ink);
+  font-size: 4.5rem;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}

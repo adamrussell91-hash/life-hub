@@ -11,6 +11,7 @@ import type { PublishedLesson } from '@/schemas/published-lesson';
 import { renderPublishedLessonHero } from '@/student/lesson-view';
 import { createStudentShell, renderStudentStatus } from '@/student/shell';
 import { mountFocusController, type FocusStepView } from '@/teacher/focus/focus-view';
+import { mountQuizLive } from '@/teacher/focus/quiz-live';
 import { focusSteps } from '@/teacher/focus/steps';
 
 /**
@@ -120,11 +121,15 @@ export function mountLessonDisplayView(
       views.push({ ...step, el: wrap });
     }
     if (isQuiz) {
+      // Page keeps the self-paced quiz; Focus runs it live from the board.
       const quiz = document.createElement('section');
       quiz.className = 'lesson-display__step';
-      quiz.append(mountStudentQuiz(lesson));
+      const selfPaced = mountStudentQuiz(lesson);
+      selfPaced.classList.add('fv-quiz-page');
+      const live = mountQuizLive(lesson.lesson_id, () => focus.refreshCheckpoint());
+      quiz.append(selfPaced, live.root);
       content.append(quiz);
-      views.push({ label: 'Quiz', blocks: [], el: quiz });
+      views.push({ label: 'Live quiz', blocks: [], el: quiz, live });
     }
     focus.setSteps(views, lesson.blocks);
   }

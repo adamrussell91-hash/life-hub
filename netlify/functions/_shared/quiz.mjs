@@ -672,7 +672,9 @@ async function liveTeacher(store, lessonId, body, action) {
 
   const rec = await recordFor(store, lessonId, live.version, record);
   const joined = (await listBlobKeys(store, k.players(live.session))).length;
-  const out = { session: live.session, code: live.code, phase: live.phase, index: live.index, total: live.order.length, joined };
+  // The teacher's own move-on mark for focus view's checkpoint; never sent to students.
+  const moveOn = Number.isInteger(record.settings?.move_on) ? record.settings.move_on : 80;
+  const out = { session: live.session, code: live.code, phase: live.phase, index: live.index, total: live.order.length, joined, move_on: moveOn };
   if (live.index < 0 || live.phase === 'lobby') return { live: out };
   const id = live.order[live.index];
   const entry = rec.questions[id];

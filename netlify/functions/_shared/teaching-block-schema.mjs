@@ -380,7 +380,9 @@ var QuizSettingsSchema = z5.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z5.number().min(0).max(1).optional(),
   confidence: z5.boolean().optional(),
-  closes_at: z5.string().datetime().optional()
+  closes_at: z5.string().datetime().optional(),
+  /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
+  move_on: z5.number().int().min(1).max(100).optional()
 });
 function norm(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();
