@@ -51,6 +51,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   const media = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 600px)') : null;
   const narrow = options.narrow ?? (() => !!media?.matches);
   let view: MarkbookView | null = null;
+  /** The last view the server confirmed, with no local changes on it. */
+  let confirmed: MarkbookView | null = null;
   let mode: 'grid' | 'outcomes' = 'grid';
   let showRemoved = false;
   let showHiddenList = false;
@@ -64,6 +66,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   const head = el('div', 'mb__head');
   const title = el('h2', 'mb__title', 'Markbook');
   title.id = `mb-${cls.id}`;
+  title.tabIndex = -1;
   const tools = el('div', 'mb__tools');
   const toggle = el('button', 'btn btn--secondary mb__toggle', 'Outcomes');
   toggle.type = 'button';
@@ -98,11 +101,18 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
         try {
           const markbook = await run();
           queued.splice(queued.indexOf(item), 1);
-          if (view) view = withServerCopy(view, markbook, queued);
+          if (confirmed) {
+            confirmed = withServerCopy(confirmed, markbook, []);
+            view = queued.reduce(applyChange, confirmed);
+          }
         } catch (error) {
           queued.splice(queued.indexOf(item), 1);
-          status.textContent = error instanceof Error ? error.message : 'Couldn’t save that.';
-          await load(false);
+          // Roll the failed change back at once, so it never looks saved.
+          if (confirmed) view = queued.reduce(applyChange, confirmed);
+          const reached = await load(false);
+          status.textContent = reached
+            ? error instanceof Error ? error.message : 'Couldn’t save that.'
+            : 'Couldn’t save that, and couldn’t reach the server. Check your connection.';
         } finally {
           paint();
         }
@@ -166,32 +176,44 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
 
   function paint(): void {
     if (disposed || !view) return;
-    const total = weightTotal(view.markbook);
-    warning.hidden = total === 100 || assessments(view.markbook).length === 0;
+    const active = document.activeElement;
+    const hadFocus = active instanceof HTMLElement && section.contains(active) && active !== title;
+    const key = focusKey();
+    draw(view, key);
+    if (!hadFocus) return;
+    // The focused control went away (Hide, Unhide, an emptied list): fall back to the heading.
+    const now = document.activeElement;
+    if (!(now instanceof HTMLElement) || !section.contains(now) || now.closest('[hidden]')) title.focus();
+  }
+
+  function draw(current: MarkbookView, key: ReturnType<typeof focusKey>): void {
+    const total = weightTotal(current.markbook);
+    warning.hidden = total === 100 || assessments(current.markbook).length === 0;
     warning.textContent = `Assessment weights add to ${total}%, not 100%.`;
     toggle.setAttribute('aria-pressed', String(mode === 'outcomes'));
-    removedToggle.hidden = removedStudentIds(view).length === 0;
+    removedToggle.hidden = removedStudentIds(current).length === 0;
     removedToggle.textContent = showRemoved ? 'Hide removed students' : 'Show removed students';
-    paintHidden(view);
-    if (!view.students.length) {
+    paintHidden(current);
+    if (!current.students.length) {
       body.replaceChildren(el('p', 'mb__empty', 'Add students to this class to start a markbook.'));
       return;
     }
-    const key = focusKey();
-    const students = rowStudents(view, showRemoved);
-    body.replaceChildren(renderGrid(view, students, actions, today()));
+    const students = rowStudents(current, showRemoved);
+    body.replaceChildren(renderGrid(current, students, actions, today()));
     restoreFocus(key);
   }
 
-  /** Fetches a fresh view; changes still queued are laid over it. */
-  async function load(draw = true): Promise<void> {
-    if (disposed) return;
+  /** Fetches a fresh view; changes still queued are laid over it. Says whether the server answered. */
+  async function load(repaint = true): Promise<boolean> {
+    if (disposed) return false;
     try {
-      const fresh = await api.load(cls.id);
-      view = queued.reduce(applyChange, fresh);
-      if (draw) paint();
+      confirmed = await api.load(cls.id);
+      view = queued.reduce(applyChange, confirmed);
+      if (repaint) paint();
+      return true;
     } catch {
-      status.textContent = 'Couldn’t load the markbook.';
+      if (repaint) status.textContent = 'Couldn’t load the markbook.';
+      return false;
     }
   }
 
