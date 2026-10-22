@@ -1884,3 +1884,34 @@ test("the server flags a re-count when a counted dish's nutrition fields change"
   assert.equal((await saveWith((d) => void (d.rating = 2))).needs_recount, false);
   assert.equal((await saveWith((d) => void (d.ingredients = "Pasta, beef"))).needs_recount, true);
 });
+
+test("clear_recount keeps the old numbers only while the dish is unchanged", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket, calories: 640, needs_recount: true };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const saveWith = async (edit) => {
+    const first = (await (await h(req("GET"))).json()).data;
+    const dish = first.journal.visits[0].dishes[0];
+    edit(dish);
+    const res = await h(
+      req("PUT", { journal: first.journal, if_version: first.version, clear_recount: [dish.id] }),
+    );
+    assert.equal(res.status, 200);
+    return (await res.json()).data.journal.visits[0].dishes[0].brisket;
+  };
+  // A changed dish still needs counting again, whatever the client asks.
+  assert.equal((await saveWith((d) => void (d.title = "Lasagne al forno"))).needs_recount, true);
+  // An unchanged dish keeps its old numbers and drops the flag.
+  const kept = await saveWith((d) => void (d.brisket = { ...d.brisket, needs_recount: false }));
+  assert.deepEqual(kept, { ...countedBrisket, calories: 640, needs_recount: false });
+});
+
+test("without clear_recount a re-count flag stays put", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket, needs_recount: true };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const first = (await (await h(req("GET"))).json()).data;
+  first.journal.visits[0].dishes[0].brisket.needs_recount = false;
+  const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+  assert.equal((await res.json()).data.journal.visits[0].dishes[0].brisket.needs_recount, true);
+});

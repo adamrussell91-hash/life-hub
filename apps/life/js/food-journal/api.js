@@ -35,7 +35,7 @@ export function createFoodJournalApi(fetchImpl) {
           new URLSearchParams({ lat: String(gps.lat), lon: String(gps.lon), q }),
       ),
     load: () => request("/api/food-journal"),
-    save: (journal, version, removeMeals = []) =>
+    save: (journal, version, removeMeals = [], clearRecount = []) =>
       request("/api/food-journal", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -43,6 +43,7 @@ export function createFoodJournalApi(fetchImpl) {
           journal,
           if_version: version,
           ...(removeMeals.length ? { remove_meals: removeMeals } : {}),
+          ...(clearRecount.length ? { clear_recount: clearRecount } : {}),
         }),
       }),
     async assist(body) {
