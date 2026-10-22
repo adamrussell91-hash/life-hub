@@ -29,6 +29,7 @@ const PACK = {
     zz_board: kept('zz_board', 'first', 30, 'list', {}, { reuse: { tool: 'kanban', fit: 'variant', differences: ['Book printed pp.28-31 (PDF pp.22-24) differs.'] } }),
     zz_rate: kept('zz_rate', 'first', 40, 'proposed', {}, { proposedFamily: { name: 'group_ratings', why: 'w', shape: 's' } }),
     zz_folded: { ...kept('zz_folded', 'first', 50, 'list', {}), verdict: 'merge', mergeInto: 'zz_alpha' },
+    zz_away: { ...kept('zz_away', 'second', 80, 'list', {}), verdict: 'merge', mergeInto: 'zz_beta' },
     zz_gone: { ...kept('zz_gone', 'first', 60, 'list', {}), verdict: 'cut' },
     zz_elsewhere: kept('zz_elsewhere', 'second', 70, 'path', { variant: 'stages', stages: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] })
   }
@@ -67,7 +68,8 @@ test('importer: variants and proposed families become notes to finish by hand; m
   assert.match(source, /\/\/ Variant of Problem Solver's `kanban`: finish by hand\.\nexport const zzBoardNotes = \{/);
   assert.match(source, /\/\/ Proposed family `group_ratings`: finish by hand\.\nexport const zzRateNotes = \{/);
   assert.match(source, /\/\/ Merged into zz_alpha: zz_folded \(fold in by hand\)\./);
-  assert.deepEqual(report, { built: ['zz_alpha', 'zz_beta'], byHand: ['zz_board', 'zz_rate'], merged: [['zz_folded', 'zz_alpha']], cut: ['zz_gone'] });
+  assert.match(source, /\/\/ Merged into zz_beta: zz_away/, 'named beside its home, from another section');
+  assert.deepEqual(report, { built: ['zz_alpha', 'zz_beta'], byHand: ['zz_board', 'zz_rate'], merged: [['zz_folded', 'zz_alpha'], ['zz_away', 'zz_beta']], cut: ['zz_gone'] });
 });
 
 test('importer: the generated module builds through the real factories', async () => {

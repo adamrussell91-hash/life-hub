@@ -114,7 +114,9 @@ export function importSection(pack, sectionKey, { familiesPath }) {
       blocks.push(`// ${why}: finish by hand.\nexport const ${camel(entry.id)}Notes = ${configSource(config)};`);
     }
   }
-  const merges = all.filter((e) => e.verdict === 'merge').sort(byChapter);
+  // Merged entries are named beside their home, whichever section they came from.
+  const homes = new Set(keptEntries.map((e) => e.id));
+  const merges = Object.values(pack.entries).filter((e) => e.verdict === 'merge' && homes.has(e.mergeInto)).sort(byChapter);
   for (const e of merges) report.merged.push([e.id, e.mergeInto]);
   for (const e of all.filter((x) => x.verdict === 'cut').sort(byChapter)) report.cut.push(e.id);
 
