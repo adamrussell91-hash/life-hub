@@ -53,6 +53,7 @@ export function toCurriculumLessonSummary(
     ...(lesson.pedagogical_mode ? { pedagogical_mode: lesson.pedagogical_mode } : {}),
     ...(lesson.line_stops && lesson.line_stops.length > 0 ? { line_stops: lesson.line_stops } : {}),
     ...(lesson.after_lesson_ids ? { after_lesson_ids: lesson.after_lesson_ids } : {}),
-    ...(lesson.lesson_kind && lesson.lesson_kind !== 'lesson' ? { lesson_kind: lesson.lesson_kind } : {})
+    ...(lesson.lesson_kind && lesson.lesson_kind !== 'lesson' ? { lesson_kind: lesson.lesson_kind } : {}),
+    ...(lesson.dot_points && lesson.dot_points.length > 0 ? { dot_points: lesson.dot_points } : {})
   };
 }

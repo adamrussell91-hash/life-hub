@@ -26,6 +26,7 @@ export interface CurriculumLessonSummary {
   line_stops?: LineStop[];
   after_lesson_ids?: string[];
   lesson_kind?: LessonKind;
+  dot_points?: string[];
   excerpt?: string;
   attachment_count?: number;
   pedagogical_mode?: PedagogicalMode;

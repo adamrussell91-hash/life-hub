@@ -31,6 +31,7 @@ import type { CurriculumOutcome } from '@/schemas/outcome';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountLineChips } from '@/network/line-chips';
 import { mountLessonFlow, type FlowPeer } from '@/network/lesson-flow';
+import { mountLessonDotPoints } from '@/alignment/lesson-dot-points';
 import { revealBlockFromHash } from '@/app/block-hash';
 import type { NetworkLine } from '@/schemas/block';
 import {
@@ -115,6 +116,8 @@ export type MountLessonPageOptions = {
   /** The unit's lessons in order, for "Before and after" at the foot of the page. */
   flowPeers?: FlowPeer[];
   onFlowPeer?: (lessonId: string, after: string[]) => Promise<void>;
+  /** Set when the subject is in the syllabus alignment: tag the dot points this lesson teaches. */
+  dotPoints?: { unitTitle?: string; focusArea?: string };
   onToggleFullPage?: () => void;
   /**
    * Render the in-canvas page menu (Export, Print, Trash…). The lesson
@@ -1125,9 +1128,18 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       })
     : null;
 
+  const dotPoints = options.dotPoints
+    ? mountLessonDotPoints(stripHost, {
+        dotPoints: lesson.dot_points,
+        ...options.dotPoints,
+        onChange: (refs) => emitLesson({ ...lesson, dot_points: refs })
+      })
+    : null;
+
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
+      dotPoints?.update(lesson.dot_points);
       lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.lesson_kind);
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);
@@ -1160,6 +1172,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       strip?.dispose();
       lineChips?.dispose();
       lessonFlow?.dispose();
+      dotPoints?.dispose();
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();

@@ -19,6 +19,8 @@ export type NetLesson = {
   /** Lessons after this one; unset follows the map's order. */
   after?: readonly string[];
   kind?: LessonKind;
+  /** Syllabus dot points the lesson teaches (teacher views only). */
+  dot_points?: readonly string[];
 };
 
 export const MODE_ORDER: readonly NetworkLineMode[] = ['train', 'metro', 'light_rail'];

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SKILL_STRANDS } from '../skills/schema';
 import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
@@ -667,12 +668,26 @@ export const CurriculumLinesV1ContentSchema = z.object({
  * stops, gates, drag nudges and the terminus.
  */
 export const NetworkLineModeSchema = z.enum(['train', 'metro', 'light_rail']);
+/**
+ * What a line stands for in the syllabus alignment: a train carries the
+ * Understanding or Responding dot points, a metro a textual concept, light
+ * rail a strand of the HSC skills continuum. The unit map's coverage panel reads it.
+ */
+export const LineAlignmentSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('points'), group: z.enum(['U', 'R']) }),
+  z.object({ kind: z.literal('concept'), key: z.string().regex(/^[A-Z]{2,5}$/) }),
+  z.object({ kind: z.literal('strand'), strand: z.enum(SKILL_STRANDS) })
+]);
+export type LineAlignment = z.infer<typeof LineAlignmentSchema>;
+/** A syllabus dot point a lesson teaches: focus area id and point id, e.g. "human:U2". */
+export const DotPointRefSchema = z.string().regex(/^[a-z0-9-]{2,40}:[UR]\d{1,2}$/);
 export const NetworkLineSchema = z.object({
   id: z.string().min(1).max(64),
   mode: NetworkLineModeSchema,
   name: z.string().max(60).default(''),
   short: z.string().max(4).optional(),
-  colour: CurriculumLinesColourSchema.default('wave')
+  colour: CurriculumLinesColourSchema.default('wave'),
+  alignment: LineAlignmentSchema.optional()
 });
 /** What kind of session a lesson is, for the student's next-step choices. */
 export const LessonKindSchema = z.enum(['lesson', 'workshop', 'lecture']);
@@ -715,6 +730,8 @@ export const CurriculumLinesV2ContentSchema = z.object({
   station_order: z.array(z.string().min(1).max(64)).max(200).optional(),
   /** Lessons left off this map (they stay in the unit). */
   hidden_lessons: z.array(z.string().min(1).max(64)).max(200).optional(),
+  /** The syllabus focus area this unit covers; unset is worked out from the unit's title. */
+  focus_area: z.string().regex(/^[a-z0-9-]{2,40}$/).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: 'Assessment task' })
 });
 export const CurriculumLinesBlockSchema = z.object({
