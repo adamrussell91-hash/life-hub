@@ -11,6 +11,8 @@ export type OverlayOptions = {
   returnFocus?: () => HTMLElement | null;
   /** Return false to keep the overlay open, for example while saving. */
   canClose?: () => boolean;
+  /** Runs once when the overlay closes, however it closes. */
+  onClose?: () => void;
 };
 
 const FOCUSABLE = [
@@ -80,6 +82,8 @@ export function openOverlay(content: HTMLElement, opts: OverlayOptions = {}): { 
     const lost = target === document.body || target === document.documentElement || target === document;
     if (!lost && !(target instanceof Node && overlay.contains(target))) return;
     if (event.key === 'Escape') {
+      // Escape while an input method is composing cancels the composition, not the overlay.
+      if (event.isComposing) return;
       event.preventDefault();
       if (!opts.canClose || opts.canClose()) close();
       return;
@@ -112,6 +116,7 @@ export function openOverlay(content: HTMLElement, opts: OverlayOptions = {}): { 
     if (at >= 0) stack.splice(at, 1);
     overlay.remove();
     syncInert();
+    opts.onClose?.();
     // Under another overlay, focus belongs to that one.
     if (!wasTop) return;
     const target = opener?.isConnected ? opener : opts.returnFocus?.() ?? null;

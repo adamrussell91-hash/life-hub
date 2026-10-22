@@ -66,6 +66,15 @@ span.mb-cell { display: inline-block; cursor: default; }
 
 .mb-panel__task { margin: 0; color: var(--muted); font-weight: var(--weight-semibold); }
 .mb-panel__student { margin: 0; font: 700 var(--text-lg) / 1.2 var(--font-ui); }
-.mb-panel__row { display: grid; grid-template-columns: 1fr 7ch 8ch; align-items: center; gap: var(--space-2); }
+.mb-panel__row { display: grid; grid-template-columns: 1fr minmax(7ch, 9ch) minmax(6ch, auto); align-items: center; gap: var(--space-2); }
 .mb-panel__band { font-weight: var(--weight-semibold); color: var(--marine); }
 .mb-panel__exempt-row { display: flex; align-items: center; gap: var(--space-2); }
+.mb-panel__body { display: grid; gap: var(--space-3); }
+.mb-panel__mark { width: 100%; min-width: 0; }
+.mb-panel__exempt-hint { margin: 0; color: var(--muted); }
+.mb-panel__exempt-hint[hidden] { display: none; }
+.mb-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 600px) {
+  .mb-panel__band { grid-column: 2 / -1; }
+}
