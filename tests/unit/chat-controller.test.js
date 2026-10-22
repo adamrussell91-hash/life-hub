@@ -442,6 +442,34 @@ test('Central Node, Food Journal and old-count warnings show together in one mes
   );
 });
 
+async function confirmWith(confirmImpl) {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({ record: skincareRecord(), path: '2026/2026-08-02-hyaluronica-skincare.md', confirmImpl });
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  const button = findProposalButton(proposal, 'record-proposal__confirm');
+  button.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+  return { root, button };
+}
+
+test('a recount_not_saved confirm shows its message and lets Confirm be pressed again', async () => {
+  const { root, button } = await confirmWith(async () => {
+    throw Object.assign(new Error('The re-count didn\u2019t save; try again.'), { code: 'recount_not_saved', status: 409 });
+  });
+  assert.equal(root.querySelector('#chat-error').textContent, 'The re-count didn\u2019t save; try again.');
+  assert.equal(button.disabled, false);
+});
+
+test('a failed re-count rollback says it was logged twice', async () => {
+  const { root } = await confirmWith(async () => ({ ok: true, centralNodeUpdated: true, foodJournalUpdated: false, recountRollbackFailed: true }));
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged twice: the re-count couldn\u2019t be linked to the dish. Delete the newer one from Nutrition.'
+  );
+});
+
 test('a confirm that reports centralNodeUpdated:true does not show the Central Node warning', async () => {
   const root = new FakeDocument();
   const chatApi = fakeChatApi({

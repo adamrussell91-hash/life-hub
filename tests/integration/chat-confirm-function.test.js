@@ -450,11 +450,33 @@ test('a cross-date re-count keeps the old file when the Food Journal write fails
 
   const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
   const payload = await response.json();
+  assert.equal(response.status, 409);
+  assert.equal(payload.error.code, 'recount_not_saved');
+  assert.equal(payload.error.message, 'The re-count didn\u2019t save; try again.');
+  assert.equal(payload.data, undefined, 'no oldCountRemoved or other flags on a rollback');
+
+  const newPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('2026-08-01-dinner-1945.md'));
+  assert.ok(newPut, 'the new meal was written first');
+  const deletes = calls.filter(call => call.options?.method === 'DELETE');
+  assert.equal(deletes.length, 1, 'only the new file is deleted');
+  assert.match(deletes[0].url, /2026-08-01-dinner-1945\.md/);
+  assert.equal(JSON.parse(deletes[0].options.body).sha, 'a'.repeat(40), 'deleted with the sha the write returned');
+  assert.ok(!calls.some(call => call.url.includes('2026-07-31-dinner-1930') && ['PUT', 'DELETE'].includes(call.options?.method)));
+});
+
+test('a failed rollback of an unlinked re-count reports recountRollbackFailed', async () => {
+  const mealPath = 'data/nutrition/2026/07/2026-07-31-dinner-1930.md';
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha: '7'.repeat(40), journalPutStatus: 500, deleteStatus: 500 });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: recountDinner, slug: 'brisket' }));
+  const payload = await response.json();
   assert.equal(response.status, 200);
   assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1945.md');
   assert.equal(payload.data.foodJournalUpdated, false);
-  assert.equal(payload.data.oldCountRemoved, false);
-  assert.equal(calls.some(call => call.options?.method === 'DELETE'), false);
+  assert.equal(payload.data.recountRollbackFailed, true);
+  assert.equal('oldCountRemoved' in payload.data, false);
+  assert.ok(!calls.some(call => call.url.includes('2026-07-31-dinner-1930') && call.options?.method === 'DELETE'));
 });
 
 test('enriches Exercise status and Recent Actions on completed workout confirm (no Day Type directive)', async () => {
