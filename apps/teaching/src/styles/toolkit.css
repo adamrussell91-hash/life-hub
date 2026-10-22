@@ -1644,7 +1644,9 @@ button.tk-chip:focus-visible {
 
 /* Close Reading: a plain form. "In the text" and "Outside the text" side by
    side, "Because both…", the limit and the insight full width under them.
-   Each field is its label (subtitle) over a kit input surface. */
+   Each field is its label (subtitle) over its prompt. On screen the prompt is
+   guidance under a rule, never a white field: students read a white box as
+   somewhere to type. Print keeps the box as room to write. */
 
 .an-bridge {
   gap: var(--space-4);
@@ -1673,12 +1675,16 @@ button.tk-chip:focus-visible {
 
 .an-bridge .an-box__frame,
 .an-bridge .an-box__example {
-  box-sizing: border-box;
-  min-height: 2.75rem;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.88);
+  padding: 2px 0 2px var(--space-3);
+  border-left: 3px solid var(--line);
+}
+
+.an-bridge .an-box__frame {
+  font-style: italic;
+}
+
+.an-bridge .an-box__example {
+  border-left-color: var(--navy);
 }
 
 .an-bridge .an-box__label {
@@ -2156,6 +2162,14 @@ button.tk-chip:focus-visible {
   /* Room to write in each empty box. */
   .an-box {
     padding-bottom: 2.4em;
+  }
+
+  /* Close Reading has no box on screen; on paper the prompt sits in one. */
+  .an-bridge .an-box__frame {
+    min-height: 4.5em;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
   }
 }
 
