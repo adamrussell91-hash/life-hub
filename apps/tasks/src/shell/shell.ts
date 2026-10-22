@@ -64,6 +64,7 @@ export type HubViewId =
   | 'term-dates'
   | 'problem-solver'
   | 'decision-maker'
+  | 'gear-shifter'
   | 'city'
   | 'grove';
 
@@ -122,6 +123,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'maps', label: 'Maps', href: '#/maps' },
       { id: 'problem-solver', label: 'Problem Solver', href: '#/problem-solver' },
       { id: 'decision-maker', label: 'Decision Maker', href: '#/decision-maker' },
+      { id: 'gear-shifter', label: 'Gear Shifter', href: '#/gear-shifter' },
       { id: 'line', label: 'Personal line', href: '#/line' },
       { id: 'search', label: 'Search', href: '#/search' },
       { id: 'properties', label: 'Properties', href: '#/properties' },

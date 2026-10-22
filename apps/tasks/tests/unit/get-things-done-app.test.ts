@@ -13,6 +13,7 @@ import { provenanceUrl, recordBlockId, recordBlocks, recordGraphic } from '../..
 import { actionOffer } from '../../../../packages/get-things-done/record.mjs';
 import { acceptSuggestion, linkCaseFile } from '../../../../netlify/functions/_shared/problem-solver/session.mjs';
 import type { PsRecordOffer } from '../../../../packages/problem-solver/types';
+import { latestRecordWriter, reviewEntry } from '../../src/views/get-things-done/view';
 import { createSession, moveOn, setReviewTask } from '../../../../netlify/functions/_shared/problem-solver/session.mjs';
 
 const deps = { now: () => '2026-10-22T10:00:00.000Z', newId: () => 'x1' };
@@ -193,5 +194,25 @@ describe('record blocks', () => {
     expect(image).toMatchObject({ block_type: 'image', id: recordBlockId(s.id, 1, 0), content: { url: 'https://x/gt_appreciation.svg', alt_text: 'Appreciation emblem, inside its section’s emblem' } });
     const bare = { ...offer, provenance: { ...offer.provenance, technique: null } } as unknown as PsRecordOffer;
     expect(recordGraphic(bare, { sessionId: s.id, date })).toBeNull();
+  });
+});
+
+describe('view helpers', () => {
+  it('a review link enters only with step=review, by the server’s own rule', () => {
+    const done = committed() as PsSession;
+    expect(reviewEntry(done, null)).toBeNull();
+    expect(reviewEntry(done, 'review')).toEqual({ kind: 'move', step: 'review' });
+    expect(reviewEntry(fresh(), 'review')).toBeNull();
+  });
+
+  it('the record writer refuses a card whose offer has moved on', async () => {
+    const s = committed() as PsSession;
+    const offer = actionOffer(s) as PsRecordOffer;
+    const write = vi.fn().mockResolvedValue(undefined);
+    await latestRecordWriter(() => s, write)(offer, { place: 'new', title: 'x' });
+    expect(write).toHaveBeenCalledTimes(1);
+    const moved = { ...s, frame: { ...s.frame, known: 'Something else entirely.' } } as PsSession;
+    await expect(latestRecordWriter(() => moved, write)(offer, { place: 'new', title: 'x' })).rejects.toThrow('The action record changed; check the card again.');
+    expect(write).toHaveBeenCalledTimes(1);
   });
 });
