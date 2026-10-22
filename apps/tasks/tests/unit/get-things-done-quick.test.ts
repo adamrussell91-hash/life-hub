@@ -43,7 +43,7 @@ describe('the Quick start chart', () => {
   });
 
   it('flies the dart in only once a way is picked, and says which', () => {
-    const view = createStartView(document);
+    const view = createStartView(document, { onPick: () => {} });
     view.update(walk(1));
     expect(view.el.hasAttribute('data-way')).toBe(false);
     expect(view.el.querySelector('.gt-qs__way')!.textContent).toMatch(/Pick how it starts/);
@@ -176,6 +176,10 @@ describe('the Began as a Quick start panel', () => {
     await vi.waitFor(() => expect(panel.el.querySelector('.gt-qs')).not.toBeNull());
     expect(get).toHaveBeenCalledTimes(1);
     expect(panel.el.querySelector('.gt-qs__pick')).toBeNull();
+    expect(panel.el.querySelector('.gt-qs__way')!.textContent).toBe('Starts with a protected interval: Ten to ten thirty, notifications off');
+    const unpicked = createStartView(document);
+    unpicked.update(walk(1));
+    expect(unpicked.el.querySelector('.gt-qs__way')!.textContent).toBe('No start was picked.');
     expect(panel.el.querySelector('.ps-ltn-from__link')!.getAttribute('href')).toBe('#/gear-shifter?id=q1');
     expect(panel.el.querySelector('summary')!.textContent).toBe('Began as a Quick start: the first action tried');
   });

@@ -106,7 +106,7 @@ export function createStartView(doc: Document = document, opts: { onPick?(node: 
       setText(action, first ?? 'Not named yet');
       setAttr(action, 'data-empty', first ? null : 'true');
       const cue = latestNote(state, 'cue');
-      setText(way, picked ? `Starts with a ${START_WAYS[picked].label.toLowerCase()}${cue ? `: ${cue}` : ''}` : 'Pick how it starts, and the dart flies in.');
+      setText(way, picked ? `Starts with a ${START_WAYS[picked].label.toLowerCase()}${cue ? `: ${cue}` : ''}` : opts.onPick ? 'Pick how it starts, and the dart flies in.' : 'No start was picked.');
 
       const answers: Record<string, string | null> = {
         task: taskOf(state) || null,
