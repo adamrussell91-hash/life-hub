@@ -558,3 +558,52 @@ test('markbook: a student’s cleared record and first attempt are read in one r
   assert.ok(waves.every((w) => w !== undefined), 'all four are read');
   assert.equal(new Set(waves).size, 1, 'cleared, start, result and marks go out together');
 });
+
+test('give another go clears one student’s attempts; numbering carries on', async () => {
+  const store = withClass(baseStore({ quizSettings: { attempts: 1 } }));
+  await publishQuiz(store);
+  for (const device of [bobDevice, tomDevice]) {
+    await rawQuizAction(store, 'quiz1', { ...device, action: 'claim', initials: device === bobDevice ? 'BB' : 'TT' });
+    await rawQuizAction(store, 'quiz1', { ...device, action: 'start' });
+    await rawQuizAction(store, 'quiz1', { ...device, action: 'hint', question_id: 'qa' });
+    await rawQuizAction(store, 'quiz1', { ...device, action: 'submit', responses: {} });
+  }
+  const teacher = body => quizTeacherAction(store, 'quiz1', body);
+  const before = await teacher({ action: 'results' });
+  const bobs = before.attempts.find(a => a.student.initials === 'BB');
+  await teacher({ action: 'mark', attempt_id: bobs.id, question_id: 'qc', score: 2 });
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' }), /already done this quiz/);
+
+  const after = await teacher({ action: 'reset', attempt_id: bobs.id });
+  assert.deepEqual(after.attempts.map(a => a.student.initials), ['TT'], 'only Bob’s go is cleared');
+  const owner = bobs.id.split('~')[0];
+  assert.ok(![...store.data.keys()].some(key => key.includes(owner) && !key.includes('/cleared/')), 'Bob’s goes, hints and marks are deleted');
+
+  const fresh = await rawQuizAction(store, 'quiz1', bobDevice);
+  assert.equal(fresh.attempts_used, 0);
+  assert.deepEqual(fresh.results, []);
+  const again = await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  assert.equal(again.current.n, 1, 'a new go never reuses an old number');
+  assert.deepEqual(again.current.hints, {}, 'no hint carries over');
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: {} });
+  const relisted = await teacher({ action: 'results' });
+  assert.equal(relisted.attempts.find(a => a.student.initials === 'BB').go, 0, 'the teacher sees it as a first go');
+  await assert.rejects(teacher({ action: 'reset', attempt_id: 'nope' }), /Unknown attempt/);
+});
+
+test('clear all attempts empties the results and lets everyone start again', async () => {
+  const store = withClass(baseStore({ quizSettings: { attempts: 1 } }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: {} });
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'TT' });
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'start' });
+
+  const cleared = await quizTeacherAction(store, 'quiz1', { action: 'clear_all' });
+  assert.deepEqual(cleared.attempts, []);
+  assert.ok(![...store.data.keys()].some(key => /^quiz\/quiz1\/(attempts|results|hints|checked|marks)\//.test(key)));
+  assert.equal((await rawQuizAction(store, 'quiz1', tomDevice)).current, null, 'an unfinished go is cleared too');
+  assert.ok((await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' })).current);
+  assert.equal((await rawQuizAction(store, 'quiz1', bobDevice)).identity.initials, 'BB', 'claimed initials stay');
+});

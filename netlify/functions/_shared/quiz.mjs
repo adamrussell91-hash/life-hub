@@ -8,6 +8,7 @@
  *   quiz/{lesson}/checked/{device}/{n}/{question}    an answer checked in instant mode (create-only)
  *   quiz/{lesson}/results/{device}/{n}               the hand-in (create-only)
  *   quiz/{lesson}/marks/{device}~{n}                 { question id: marks } teacher marking
+ *   quiz/{lesson}/cleared/{device}                   { from } goes before `from` were cleared by the teacher
  *   quiz/{lesson}/release                            { released } when feedback waits for the teacher
  *   quiz/{lesson}/live/active                        live round (teacher writes only)
  *   quiz/{lesson}/live/{session}/players/{device}    { joined_at }
@@ -62,6 +63,7 @@ const keys = (lesson) => ({
   check: (device, n, id) => `quiz/${lesson}/checked/${device}/${n}/${id}`,
   result: (device, n) => `quiz/${lesson}/results/${device}/${n}`,
   marks: (device, n) => `quiz/${lesson}/marks/${device}~${n}`,
+  cleared: (device) => `quiz/${lesson}/cleared/${device}`,
   release: `quiz/${lesson}/release`,
   live: `quiz/${lesson}/live/active`,
   player: (session, device) => `quiz/${lesson}/live/${session}/players/${device}`,
@@ -207,7 +209,7 @@ function scoreAttempt(record, result, teacherMarks) {
 }
 
 const attemptId = (device, n) => `${device}~${n}`;
-const ATTEMPT_ID = /^([a-f0-9]{24})~(\d{1,2})$/;
+const ATTEMPT_ID = /^([a-f0-9]{24})~(\d{1,4})$/;
 
 /* ── Students ──────────────────────────────────────────────────────── */
 
@@ -233,12 +235,17 @@ async function loadAttempt(store, k, device, start) {
   return { ...start, hints, answers, result };
 }
 
-async function deviceAttempts(store, k, device) {
+/** The first go that still counts. Goes before it were cleared by the teacher. */
+async function clearedFrom(store, k, device) {
+  return (await read(store, k.cleared(device)))?.from ?? 0;
+}
+
+async function deviceAttempts(store, k, device, from) {
   const list = await listBlobKeys(store, k.attempts(device));
-  const starts = (await Promise.all(list.map((key) => read(store, key)))).filter(Boolean).sort((a, b) => a.n - b.n);
+  const starts = (await Promise.all(list.map((key) => read(store, key)))).filter((s) => s && s.n >= from).sort((a, b) => a.n - b.n);
   // Listings lag behind writes, so a go started moments ago can be missing.
   // Reads by key are current: check the slots after the last listed go.
-  for (let n = starts.reduce((top, s) => Math.max(top, s.n + 1), 0); n < 100; n += 1) {
+  for (let n = starts.reduce((top, s) => Math.max(top, s.n + 1), from); n < from + 100; n += 1) {
     const next = await read(store, k.attempt(device, n));
     if (!next) break;
     starts.push(next);
@@ -304,7 +311,8 @@ export async function quizAction(store, lessonId, body) {
     if (!validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to take the quiz.');
   }
   const device = ownerOf(who, body.token);
-  let attempts = await deviceAttempts(store, k, device);
+  const from = await clearedFrom(store, k, device);
+  let attempts = await deviceAttempts(store, k, device, from);
   let current = attempts.find((a) => !a.result) ?? null;
   let reply = null;
 
@@ -321,20 +329,20 @@ export async function quizAction(store, lessonId, body) {
     if (closed) reject(409, 'closed', 'This quiz has closed. Hand in what you have.');
     if (pastDeadline && attemptSettings.timer_hard) reject(409, 'time_up', 'Time’s up. Hand in what you have.');
   };
-  const lastAttempt = (a) => a.n + 1 >= attemptSettings.attempts;
+  const lastAttempt = (a) => a.n - from + 1 >= attemptSettings.attempts;
 
   if (action === 'start' && !current) {
     if (closed) reject(409, 'closed', 'This quiz has closed.');
     if (attempts.length >= settings.attempts) reject(409, 'no_attempts', settings.attempts === 1 ? 'You’ve already done this quiz.' : 'You’ve used all your attempts.');
     const start = {
-      n: attempts.reduce((top, a) => Math.max(top, a.n + 1), 0),
+      n: attempts.reduce((top, a) => Math.max(top, a.n + 1), from),
       version: record.version,
       started_at: new Date(now).toISOString(),
       deadline: settings.timer_minutes ? new Date(now + settings.timer_minutes * 60_000).toISOString() : null,
       ...studentFields(who)
     };
     await store.setJSON(k.attempt(device, start.n), start, { onlyIfNew: true });
-    attempts = await deviceAttempts(store, k, device);
+    attempts = await deviceAttempts(store, k, device, from);
     current = attempts.find((a) => !a.result) ?? null;
   }
 
@@ -394,7 +402,7 @@ export async function quizAction(store, lessonId, body) {
       overtime: pastDeadline || closed
     };
     await store.setJSON(k.result(device, current.n), result, { onlyIfNew: true });
-    attempts = await deviceAttempts(store, k, device);
+    attempts = await deviceAttempts(store, k, device, from);
     current = null;
   }
 
@@ -469,6 +477,21 @@ async function studentLabel(store, start, rosters) {
   return found ? { initials: found.initials, name: found.name } : { initials: null, name: null };
 }
 
+/**
+ * Clears every go one student (or anonymous device) has made, so they can
+ * start again. Numbering carries on past the cleared goes, so a new go never
+ * lands on an old key or an old draft saved on the device.
+ */
+async function clearOwner(store, k, lessonId, device) {
+  const from = await clearedFrom(store, k, device);
+  const goes = await deviceAttempts(store, k, device, from);
+  const next = goes.reduce((top, a) => Math.max(top, a.n + 1), from);
+  await store.setJSON(k.cleared(device), { from: next, at: new Date().toISOString() });
+  const prefixes = ['attempts', 'hints', 'checked', 'results'].map((part) => `quiz/${lessonId}/${part}/${device}/`).concat(`quiz/${lessonId}/marks/${device}~`);
+  const doomed = (await Promise.all(prefixes.map((prefix) => listBlobKeys(store, prefix)))).flat();
+  await mapBounded(doomed, 8, (key) => store.delete(key));
+}
+
 export async function quizTeacherAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   if (!isSafeId(lessonId)) reject(404, 'not_found', 'Quiz not found.');
@@ -479,7 +502,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     return { submissions: await listSubmissions(store, lessonId) };
   }
   if (action.startsWith('live_')) return liveTeacher(store, lessonId, body, action);
-  if (!['results', 'attempt', 'mark', 'release'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['results', 'attempt', 'mark', 'release', 'reset', 'clear_all'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
 
   let loaded;
   try {
@@ -493,6 +516,17 @@ export async function quizTeacherAction(store, lessonId, body) {
 
   if (action === 'release') {
     await store.setJSON(k.release, { released: body.released === true, at: new Date().toISOString() });
+  }
+
+  if (action === 'reset') {
+    const match = ATTEMPT_ID.exec(String(body.attempt_id ?? ''));
+    if (!match) reject(400, 'bad_request', 'Unknown attempt.');
+    await clearOwner(store, k, lessonId, match[1]);
+  }
+
+  if (action === 'clear_all') {
+    const owners = new Set((await listBlobKeys(store, `quiz/${lessonId}/attempts/`)).map((key) => key.split('/')[3]).filter(Boolean));
+    await mapBounded([...owners], 4, (device) => clearOwner(store, k, lessonId, device));
   }
 
   const handedIn = async () => {
@@ -544,9 +578,12 @@ export async function quizTeacherAction(store, lessonId, body) {
   const resultKeys = await listBlobKeys(store, `quiz/${lessonId}/results/`);
   const stats = new Map(record.order.map((id) => [id, { answered: 0, total: 0, full: 0, pending: 0, hinted: 0, confidence: { 1: [0, 0], 2: [0, 0], 3: [0, 0] }, picks: {} }]));
   const rows = [];
+  const froms = new Map();
   for (const key of resultKeys) {
     const [, , , device, nText] = key.split('/');
     const n = Number(nText);
+    if (!froms.has(device)) froms.set(device, await clearedFrom(store, k, device));
+    if (n < froms.get(device)) continue;
     const [start, result] = await Promise.all([read(store, k.attempt(device, n)), read(store, key)]);
     if (!start || !result) continue;
     const rec = await recordFor(store, lessonId, start.version, record);
@@ -556,6 +593,7 @@ export async function quizTeacherAction(store, lessonId, body) {
       device: device.slice(0, 6),
       student: await studentLabel(store, start, rosters),
       n,
+      go: n - froms.get(device),
       started_at: start.started_at,
       submitted_at: result.submitted_at,
       overtime: !!result.overtime,

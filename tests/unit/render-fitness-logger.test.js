@@ -185,6 +185,22 @@ test('a circuit round is one card with every move and a round clock', () => {
   assert.equal(byMarker(root.logger, 'done-step')[0].textContent, 'Round done ✓');
 });
 
+test('an EDT zone (two weighted moves, AMRAP) runs as one round card with an AMRAP clock', () => {
+  const sets = (kg, n = 8) => Array.from({ length: n }, () => ({ reps: 5, weight_kg: kg, cable_type: 'constant_force' }));
+  const draft = draftWithCues();
+  draft.exercises = [
+    { name: 'Cable Curl', superset_group: 1, superset_label: 'EDT Zone', block: { kind: 'circuit', format: 'amrap', time_cap_sec: 480 }, sets: sets(12) },
+    { name: 'Rope Pushdown', superset_group: 1, sets: sets(14) }
+  ];
+  const root = render(draft);
+  const card = byMarker(root.logger, 'round-card')[0];
+  assert.ok(card, 'two-move circuit still gets the round card');
+  assert.equal(byMarker(card, 'value-weight_kg').length, 2);
+  const text = walk(root.logger).map(node => node.textContent).join(' ');
+  assert.match(text, /EDT Zone/);
+  assert.match(text, /Start AMRAP/);
+});
+
 test('the plan sheet keeps add-exercise, reorder, session details and a docked Finish', () => {
   const root = render(draftWithCues(), { panel: 'plan' });
   const sheet = byMarker(root.logger, 'plan-sheet')[0];
