@@ -60,6 +60,8 @@ export function createFoodJournalApi(fetchImpl) {
       }
       throw new Error("Research took too long. Try again.");
     },
+    translate: (text) =>
+      post("/api/food-journal-process", { action: "translate", text }),
     media: (body) => post("/api/food-journal-media", body),
     // The function stores the photo, so no browser PUT to R2 is needed.
     upload: (blob) =>
