@@ -669,7 +669,9 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       if (!root.isConnected) return;
       if (!document.hidden) {
         if (liveState || status?.live) await pollLive();
-        else if (view === 'landing') {
+        // While the student is typing initials, a refresh would repaint the box
+        // and wipe what they typed; nothing (not even live) opens before a claim.
+        else if (view === 'landing' && status?.identity?.need !== 'initials') {
           await call('status');
           if (view === 'landing') paint();
           if (status?.live) await pollLive();
