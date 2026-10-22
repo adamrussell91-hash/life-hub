@@ -741,10 +741,79 @@ function render(root: HTMLElement): void {
   else paintHeat();
   paintPanel();
 
+  const scene = `${state.area}|${state.mode}|${state.heatRows}`;
+  const sameScene = scene === lastScene && root.querySelector('.align__stage') !== null;
+  const before = {
+    controls: snapshot(root, CONTROL_MOTION),
+    chart: sameScene ? snapshot(root, CHART_MOTION) : null,
+    scrollLeft: root.querySelector('.align__scroll')?.scrollLeft ?? 0
+  };
+  lastScene = scene;
+
   root.replaceChildren(
     h('div', 'align__controls', areas, modes, rows),
     h('div', 'align__stage', h('div', 'align__card', h('div', 'align__scroll', chart), legend), panel)
   );
+
+  const scroll = root.querySelector('.align__scroll');
+  if (scroll && sameScene) scroll.scrollLeft = before.scrollLeft;
+  // Rebuilt elements start from their old state, then move to the new one, so
+  // dimming, highlights and pill changes ease instead of jumping.
+  const settle = [...replay(root, CONTROL_MOTION, before.controls), ...replay(root, CHART_MOTION, before.chart)];
+  if (settle.length) {
+    // Paint one frame in the old state first. `.align` is a size container, so
+    // forcing layout on it would skip its children's styles.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      for (const restore of settle) restore();
+    }));
+  }
+  if (!sameScene) enter(root);
+}
+
+const CONTROL_MOTION = '.align__controls button';
+const CHART_MOTION = '.align__plot, .align__heat, .align__dot, .align__ylab, .align__hc, .align__legend-item';
+let lastScene = '';
+let enterTimer: ReturnType<typeof setTimeout> | undefined;
+
+type Snap = Array<[string, string | null]>;
+
+function snapshot(root: HTMLElement, selector: string): Snap {
+  return [...root.querySelectorAll<HTMLElement>(selector)].map((el) => [el.className, el.getAttribute('aria-pressed')]);
+}
+
+/** Put each element back in its snapshotted state; returns the calls that restore the new one. */
+function replay(root: HTMLElement, selector: string, snap: Snap | null): Array<() => void> {
+  if (!snap) return [];
+  const els = [...root.querySelectorAll<HTMLElement>(selector)];
+  if (els.length !== snap.length) return [];
+  return els.map((el, i) => {
+    const [className, pressed] = snap[i]!;
+    const nextClass = el.className;
+    const nextPressed = el.getAttribute('aria-pressed');
+    if (className === nextClass && pressed === nextPressed) return () => {};
+    el.className = className;
+    if (pressed === null) el.removeAttribute('aria-pressed');
+    else el.setAttribute('aria-pressed', pressed);
+    return () => {
+      el.className = nextClass;
+      if (nextPressed === null) el.removeAttribute('aria-pressed');
+      else el.setAttribute('aria-pressed', nextPressed);
+    };
+  });
+}
+
+/** Stagger the chart in: columns sweep left to right, rows cascade down. */
+function enter(root: HTMLElement): void {
+  const delay = (el: HTMLElement, ms: number): void => el.style.setProperty('--align-d', `${Math.min(ms, 640)}ms`);
+  const grid = root.querySelector<HTMLElement>('.align__plot, .align__heat');
+  const nx = Number(grid?.style.getPropertyValue('--nx')) || 1;
+  root.querySelectorAll<HTMLElement>('.align__cell').forEach((el, i) => delay(el, (i % nx) * 26 + Math.floor(i / nx) * 18));
+  root.querySelectorAll<HTMLElement>('.align__hc').forEach((el, i) => delay(el, (i % nx) * 22 + Math.floor(i / nx) * 30));
+  root.querySelectorAll<HTMLElement>('.align__ylab, .align__rl').forEach((el, i) => delay(el, i * 30));
+  root.querySelectorAll<HTMLElement>('.align__xlab').forEach((el, i) => delay(el, 160 + i * 26));
+  root.classList.add('align--enter');
+  clearTimeout(enterTimer);
+  enterTimer = setTimeout(() => root.classList.remove('align--enter'), 1400);
 }
 
 /** For tests: forget the loaded alignment and view state. */
@@ -756,4 +825,5 @@ export function resetAlignmentViewForTests(): void {
   state.sel = null;
   skillsData = null;
   state.editing = false;
+  lastScene = '';
 }
