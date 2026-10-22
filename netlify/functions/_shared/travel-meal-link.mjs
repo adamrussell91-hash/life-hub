@@ -53,11 +53,20 @@ export function upsertLinkedVisit(journal, { tripId, moment, food, photos, visit
   };
   const before = new Map(visit.dishes.map((d) => [d.id, d]));
   const taken = new Set(next.visits.filter((v) => v !== visit).flatMap((v) => v.dishes.map((d) => d.id)));
-  visit.dishes = food.dishes.map((d) => {
-    const dish = dishFrom(d, before.get(d.id), newId, taken);
-    taken.add(dish.id);
-    return dish;
-  });
+  // A counted dish is removed in the Food Journal, which can also remove its meal.
+  const sent = new Set(food.dishes.map((d) => d.id).filter(Boolean));
+  const keptCounted = visit.dishes.filter((d) => d.brisket && !isDeletedRecord(d) && !sent.has(d.id));
+  for (const d of keptCounted) taken.add(d.id);
+  visit.dishes = [
+    ...food.dishes.map((d) => {
+      const dish = dishFrom(d, before.get(d.id), newId, taken);
+      taken.add(dish.id);
+      return dish;
+    }),
+    ...keptCounted,
+  ];
+  const dishIds = new Set(next.visits.flatMap((v) => v.dishes.map((d) => d.id)));
+  next.recipes = next.recipes.filter((r) => dishIds.has(r.dish_id));
   // New copies of the moment's photos go on the first dish, once each.
   const first = visit.dishes[0];
   if (first) for (const p of photos) if (!visit.dishes.some((d) => d.photos.some((q) => q.key === p.key))) first.photos.push(p);

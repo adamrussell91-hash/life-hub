@@ -286,3 +286,45 @@ test("a travel photo over 4 MB is not copied and counts as a failed photo", asyn
   assert.deepEqual(gets, ["travel/journal/trp_test1/small.jpg"]);
   assert.equal(s.state.food.visits[0].dishes[0].photos.length, 1);
 });
+
+const linkedFood = (dishes) => ({
+  schema_version: 1,
+  visits: [{
+    id: "visit_t1", source_id: "travel:trp_test1:mom_abcd1234", date: "2026-11-03", title: "Market lunch", notes: "", menu_text: "",
+    venue: { name: "Mercado Test", address: "" },
+    dishes: dishes.map((d) => ({ cuisine: "", tags: [], notes: "", ingredients: "", rating: null, meal_type: "Lunch", photos: [], ...d })),
+  }],
+  recipes: [],
+});
+const linkedTrip = () => {
+  const t = trip();
+  t.moments[0].meal = { food_visit_id: "visit_t1" };
+  return t;
+};
+const counted = { meal_path: "data/nutrition/2026/11/2026-11-03-lunch-1300.md", portion: "All", portion_fraction: 1, counted_at: "2026-11-03T13:01:00Z", needs_recount: false };
+
+test("removing a dish from Travel drops its recipe too", async () => {
+  const f = linkedFood([{ id: "dish_1", title: "Tortilla" }, { id: "dish_2", title: "Flan" }]);
+  f.recipes = [{ id: "recipe_1", dish_id: "dish_2", title: "Flan", servings: 2, ingredients: ["2 eggs"], steps: ["Bake."], sources: [] }];
+  const s = store(linkedTrip(), f);
+  const res = await createTravelMealHandler(deps(s))(req("PUT", Q, { ...versions, food }));
+  assert.equal(res.status, 200);
+  assert.deepEqual(s.state.food.visits[0].dishes.map((d) => d.id), ["dish_1"]);
+  assert.deepEqual(s.state.food.recipes, []);
+});
+
+test("a counted dish stays when Travel leaves it out, and reads as counted", async () => {
+  const s = store(linkedTrip(), linkedFood([{ id: "dish_1", title: "Tortilla" }, { id: "dish_2", title: "Flan", brisket: counted }]));
+  const h = createTravelMealHandler(deps(s));
+  const res = await h(req("PUT", Q, { ...versions, food }));
+  assert.equal(res.status, 200);
+  const dishes = s.state.food.visits[0].dishes;
+  assert.deepEqual(dishes.map((d) => d.id), ["dish_1", "dish_2"]);
+  assert.deepEqual(dishes[1].brisket, counted);
+  const got = (await (await h(req("GET", Q))).json()).data;
+  assert.equal(got.visit.dishes[1].counted, true);
+  assert.equal(got.visit.dishes[1].brisket, undefined);
+  assert.equal(got.visit.dishes[0].counted, undefined);
+  const put = (await res.json()).data;
+  assert.equal(put.visit.dishes[1].brisket, undefined);
+});

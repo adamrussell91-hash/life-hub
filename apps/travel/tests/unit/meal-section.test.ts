@@ -7,6 +7,7 @@ import {
   mealChanged,
   mealPayload,
   MEAL_MESSAGES,
+  mountMealSection,
   pendingPhotoIds,
   pendingPhotoHint,
   RATING_OPTIONS,
@@ -149,5 +150,23 @@ describe('meal section', () => {
     expect(pendingPhotoIds(moment, media, full)).toEqual([]);
     expect(pendingPhotoHint(2)).toBe('2 photos not yet in the Food Journal. Save to copy them.');
     expect(pendingPhotoHint(1)).toBe('1 photo not yet in the Food Journal. Save to copy them.');
+  });
+
+  it('offers no Remove for a dish counted in Brisket', () => {
+    const host = document.createElement('div');
+    mountMealSection(host, {
+      moment: { media_ids: [] } as never,
+      read: {
+        visit: { id: 'visit_1', title: 'Lunch', dishes: [
+          { id: 'dish_1', title: 'Tortilla', meal_type: 'Lunch', rating: null },
+          { id: 'dish_2', title: 'Flan', meal_type: 'Lunch', rating: null, counted: true },
+        ] },
+        food_version: 'b',
+        travel_version: 'a',
+      },
+    });
+    const labels = [...host.querySelectorAll('button')].map((b) => b.getAttribute('aria-label')).filter(Boolean);
+    expect(labels).toEqual(['Remove dish Tortilla']);
+    expect(host.textContent).toContain('Counted in Brisket. Remove it in the Food Journal.');
   });
 });
