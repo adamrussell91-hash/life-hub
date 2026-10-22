@@ -201,6 +201,18 @@ test('an EDT zone (two weighted moves, AMRAP) runs as one round card with an AMR
   assert.match(text, /Start AMRAP/);
 });
 
+test('rest panel offers Turn off, and the plan sheet shows the rest timer switch', () => {
+  const calls = [];
+  const actions = { setRestTimer: on => calls.push(on) };
+  const resting = render(draftWithCues(), { rest: { remainingMs: 60_000, label: 'Rest' }, actions });
+  byMarker(resting.logger, 'rest-off')[0].click();
+  const plan = render(draftWithCues(), { panel: 'plan', restTimerOn: false, actions });
+  const toggle = byMarker(plan.logger, 'rest-toggle')[0];
+  assert.equal(toggle.textContent, 'Rest timer: off');
+  toggle.click();
+  assert.deepEqual(calls, [false, true]);
+});
+
 test('the plan sheet keeps add-exercise, reorder, session details and a docked Finish', () => {
   const root = render(draftWithCues(), { panel: 'plan' });
   const sheet = byMarker(root.logger, 'plan-sheet')[0];
