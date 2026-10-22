@@ -147,6 +147,18 @@ export function createFoodJournalHandler(deps = {}) {
           false,
           PRIVATE_CACHE,
         );
+      // Only Brisket writes a dish's link, so a stale draft cannot drop it
+      // and a client cannot forge one. A client may only ask for a re-count.
+      const counted = new Map(
+        current.journal.visits.flatMap((v) => v.dishes.map((d) => [d.id, d.brisket])),
+      );
+      for (const v of body.journal.visits)
+        for (const d of v.dishes) {
+          const link = counted.get(d.id);
+          const recount = d.brisket?.needs_recount === true;
+          if (link) d.brisket = { ...link, ...(recount ? { needs_recount: true } : {}) };
+          else delete d.brisket;
+        }
       const deleted = current.journal.visits.filter(isDeletedRecord);
       if (
         body.journal.visits.some((v) =>

@@ -1796,3 +1796,36 @@ test("remove_meals ignores a tombstoned visit's path and a stale version", async
   assert.equal(stale.status, 409);
   assert.deepEqual(removed, []);
 });
+
+test("a save keeps each dish's Brisket link, whatever the client sends", async () => {
+  const j = fixture();
+  j.visits[0].dishes[0].brisket = { ...countedBrisket, calories: 640 };
+  const h = createFoodJournalHandler(deps(repo(j)));
+  const saveWith = async (edit) => {
+    const first = (await (await h(req("GET"))).json()).data;
+    edit(first.journal);
+    const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
+    assert.equal(res.status, 200);
+    return (await res.json()).data.journal.visits[0].dishes;
+  };
+  // A stale draft that never saw the link does not drop it.
+  let dishes = await saveWith((jj) => {
+    delete jj.visits[0].dishes[0].brisket;
+  });
+  assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640 });
+  // A link the server never wrote is stripped, on an old dish or a new one.
+  const forged = { ...countedBrisket, meal_path: "data/nutrition/2026/10/2026-10-22-lunch-1200.md" };
+  dishes = await saveWith((jj) => {
+    jj.visits[0].dishes[1].brisket = { ...forged };
+    jj.visits[0].dishes.push({ ...newDish(), title: "Flan", brisket: { ...forged } });
+    jj.visits[0].dishes[0].brisket = { ...forged, portion: "¼", portion_fraction: 0.25 };
+  });
+  assert.equal(dishes[1].brisket, undefined);
+  assert.equal(dishes[2].brisket, undefined);
+  assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640 });
+  // The one change a client may make: mark a counted dish for a re-count.
+  dishes = await saveWith((jj) => {
+    jj.visits[0].dishes[0].brisket = { ...forged, needs_recount: true };
+  });
+  assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640, needs_recount: true });
+});
