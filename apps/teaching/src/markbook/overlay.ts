@@ -84,7 +84,9 @@ export function openOverlay(content: HTMLElement, opts: OverlayOptions = {}): { 
     if (event.key === 'Escape') {
       // Escape while an input method is composing cancels the composition, not the overlay.
       if (event.isComposing) return;
+      // Handled here: a window listener added during this dispatch (a confirm card) must not see it.
       event.preventDefault();
+      event.stopPropagation();
       if (!opts.canClose || opts.canClose()) close();
       return;
     }

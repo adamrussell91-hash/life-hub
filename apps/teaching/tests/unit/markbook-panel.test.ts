@@ -127,7 +127,7 @@ describe('assessment panel', () => {
     const root = open();
     type(boxes(root)[0]!, '12');
     esc(boxes(root)[0]!);
-    expect(askConfirmCard).toHaveBeenCalledWith(expect.objectContaining({ title: 'Close without saving?', confirmLabel: 'Close' }));
+    await vi.waitFor(() => expect(askConfirmCard).toHaveBeenCalledWith(expect.objectContaining({ title: 'Close without saving?', confirmLabel: 'Close' })));
     await new Promise((r) => setTimeout(r, 0));
     expect(document.body.contains(root)).toBe(true);
     vi.mocked(askConfirmCard).mockResolvedValueOnce(true);
@@ -199,5 +199,20 @@ describe('assessment panel', () => {
     boxes(root)[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true }));
     boxes(root)[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('puts focus on Save and next for an exempt student, so Enter moves on', () => {
+    const root = open({ markFor: () => ({ criteria: {}, exempt: true }) });
+    expect(document.activeElement).toBe(root.querySelector('.mb-panel__next'));
+  });
+
+  it('drops a failed-save message that arrives after the panel was taken away', () => {
+    let show: ((message: string) => void) | null = null;
+    const unsubscribe = vi.fn();
+    const root = open({ subscribeErrors: (fn) => { show = fn; return unsubscribe; } });
+    root.remove();
+    show!('Bob Brown’s mark wasn’t saved: Server said no');
+    expect(unsubscribe).toHaveBeenCalled();
+    expect(root.querySelector('.mb-panel__error')?.textContent).toBe('');
   });
 });
