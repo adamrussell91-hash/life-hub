@@ -1,5 +1,6 @@
 import { createTeachingRecordHandler } from './_shared/teaching-record-get.mjs';
 import { classKey } from './_shared/teaching-blobs.mjs';
+import { assignInitials } from './_shared/student-initials.mjs';
 
 export const config = { path: '/api/classes/:id' };
 
@@ -7,7 +8,8 @@ export const MAX_CLASS_STUDENTS = 60;
 
 /**
  * Tidy a class list before it is stored: names trimmed and capped, blanks and
- * repeats dropped. The list is teacher-only; published class pages never copy it.
+ * repeats dropped, and every student given a lasting id and unique initials.
+ * The list is teacher-only; published class pages never copy it.
  */
 export function cleanClassStudents(value) {
   if (!Array.isArray(value)) throw new Error('students must be a list');
@@ -18,10 +20,15 @@ export function cleanClassStudents(value) {
     const key = name.toLowerCase();
     if (!name || seen.has(key)) continue;
     seen.add(key);
-    out.push({ name, skip_picker: row.skip_picker === true });
+    out.push({
+      name,
+      skip_picker: row.skip_picker === true,
+      ...(typeof row.id === 'string' ? { id: row.id } : {}),
+      ...(typeof row.initials === 'string' ? { initials: row.initials } : {})
+    });
     if (out.length >= MAX_CLASS_STUDENTS) break;
   }
-  return out;
+  return assignInitials(out);
 }
 
 function prepareClassPatch(_record, patch) {

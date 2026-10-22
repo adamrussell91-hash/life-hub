@@ -46,7 +46,7 @@ test('class lists are tidied before they are stored', () => {
       { name: 'Eli', skip_picker: true },
       { name: 'Mia', skip_picker: 'yes' },
       null
-    ]),
+    ]).map(({ name, skip_picker }) => ({ name, skip_picker })),
     [
       { name: 'Ava', skip_picker: false },
       { name: 'Eli', skip_picker: true },
@@ -70,7 +70,7 @@ test('PATCH /api/classes/:id saves the class list', async () => {
   );
   assert.equal(response.status, 200);
   const saved = (await response.json()).data;
-  assert.deepEqual(saved.students, [
+  assert.deepEqual(saved.students.map(({ name, skip_picker }) => ({ name, skip_picker })), [
     { name: 'Ava', skip_picker: false },
     { name: 'Eli', skip_picker: true }
   ]);
@@ -96,4 +96,18 @@ test('server schema knows the new blocks, and old dividers get the gear', () => 
   assert.equal(BlockSchema.parse({ ...stamp, id: 'c', block_type: 'countdown', content: { due_date: '2026-10-30' } }).content.due_date, '2026-10-30');
   assert.ok(PULSE_EXCLUDED_TYPES.has('classroom_tools'));
   assert.ok(PULSE_EXCLUDED_TYPES.has('countdown'));
+});
+
+test('class lists keep and fill in student ids and initials', () => {
+  const out = cleanClassStudents([
+    { name: 'Bob Brown' },
+    { name: 'Ben Bates', initials: 'bb' },
+    { name: 'Tom Tills', id: 'st_tom', initials: 'TT' },
+    { name: 'Ava Moss', id: '../bad', initials: 'not valid!' }
+  ]);
+  assert.deepEqual(out.map(s => s.initials), ['BB2', 'BB', 'TT', 'AM']);
+  assert.equal(out[2].id, 'st_tom');
+  assert.match(out[0].id, /^st_[a-z0-9]+$/);
+  assert.match(out[3].id, /^st_[a-z0-9]+$/, 'an unsafe id is replaced');
+  assert.deepEqual(cleanClassStudents(out), out, 'saving again changes nothing');
 });
