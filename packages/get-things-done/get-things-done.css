@@ -82,3 +82,14 @@
 }
 .gt-scope .ps-whys__why { stroke: var(--gt-blue); stroke-width: 4; stroke-linejoin: round; }
 .gt-scope :is(.ps-kanban, .ps-whys) .ps-details__card { box-shadow: none; border-top: 3px solid var(--gt-ink); }
+/* Gear Shifter keeps the family rule of no text under 11px, where Problem Solver's own small
+   tags run at 9 and 10px. */
+.gt-scope :is(.ps-kanban, .ps-whys) :is(.ps-kanban__tag, .ps-kanban__meta-text, .ps-whys__meta, .ps-objection) { font-size: 11px; }
+/* Amber stays sparing on the board: Done and the limit badge. Doing's pills and arrow are paper. */
+.gt-scope .ps-kanban__lane--doing .ps-kanban__pill,
+.gt-scope .ps-kanban__arrow--doing { background: var(--gt-paper); }
+
+/* Scales: the newest (or first) overlay draws in cobalt, the older ones stay ink outlines. */
+.gt-scope .dm-scales__poly[data-style='solid'] { stroke: var(--gt-blue); stroke-width: 2; }
+.gt-scope .dm-scales__legend-item[data-style='solid']::before,
+.gt-scope .dm-scales__bar[data-style='solid'] { background: var(--gt-blue-label); }

@@ -28,6 +28,8 @@ export function fill(run, slots, extra = {}) {
 test('factories take gt_ ids; other prefixes still fail', () => {
   assert.equal(GT_SAMPLE_TOOLS.needs.id, 'gt_sample_needs');
   assert.equal(GT_SAMPLE_TOOLS.needs.step, 'explore');
+  assert.equal(GT_SAMPLE_TOOLS.needs.slots.reflection, 'What this shows about getting it moving', 'Gear Shifter\'s own default');
+  assert.equal(scalesTool({ ...base, id: 'dm_ok', chart: axes3 }).slots.reflection, 'What this shows about the decision');
   assert.throws(() => scalesTool({ ...base, id: 'xx_bad', chart: axes3 }), /ids start with dm_ or gt_/);
 });
 

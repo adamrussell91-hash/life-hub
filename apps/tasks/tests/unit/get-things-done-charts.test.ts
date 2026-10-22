@@ -22,6 +22,7 @@ describe('scales with min 0 and dated snapshots', () => {
     const view = createScalesView(tool('needs'));
     view.update(run('needs', 'empty'));
     for (const input of view.el.querySelectorAll<HTMLInputElement>('.dm-scales__input')) expect(input.min).toBe('0');
+    expect(texts(view.el, '.dm-scales__field-label')).toEqual(['Order (0–10)', 'Novelty (0–10)', 'Thanks (0–10)']);
   });
 
   it('overlays the latest three saves, newest solid, each labelled by its date', () => {

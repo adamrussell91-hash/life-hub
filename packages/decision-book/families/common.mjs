@@ -53,7 +53,9 @@ export function checkCommon(config) {
  */
 export function framing(config) {
   const subject = config.chart.subject ?? null;
-  const reflection = config.chart.reflection === false ? null : (config.chart.reflection ?? 'What this shows about the decision');
+  // Gear Shifter's techniques are about moving work, not deciding: their default says so.
+  const fallback = config.id.startsWith('gt_') ? 'What this shows about getting it moving' : 'What this shows about the decision';
+  const reflection = config.chart.reflection === false ? null : (config.chart.reflection ?? fallback);
   return { subject, reflection };
 }
 

@@ -5846,7 +5846,7 @@ a.ps-record__casefile:focus-visible { outline: 2px solid var(--ink); outline-off
 .ps-kanban__select { min-height: 32px; max-width: 100%; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--ps-paper); color: var(--ps-ink); font: 400 13px / 1 var(--font-ui); }
 .ps-kanban__fields-save { min-height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ps-ink); color: var(--ps-paper); font: 600 13px / 1 var(--font-ui); cursor: pointer; }
 .ps-kanban__suggested.is-over::before { content: '!'; margin-right: 5px; color: var(--ps-red); font-weight: 900; }
-.ps-kanban__suggested { margin-left: calc(var(--ps-kanban-arrow-w) * 0.38 + 6px); font: var(--weight-bold) 10px / 1.4 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.ps-kanban__suggested { margin-left: calc(var(--ps-kanban-arrow-w) * 0.38 + 6px); font: var(--weight-bold) 11px / 1.4 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
 
 /* WIP: a badge on the Doing heading, clear of the triangle's tip; the button keeps a 44px target. */
 .ps-kanban__wip {
