@@ -313,6 +313,35 @@ const supersetSession = () => ({
   ]
 });
 
+test('the rest timer can be switched off, and the choice is remembered on the device', () => {
+  const saved = new Map();
+  const storage = { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value), removeItem: key => saved.delete(key) };
+  const { controller } = makeController({ storage });
+  controller.mount(supersetSession());
+  controller.doneStep();
+  controller.doneStep();
+  assert.ok(controller.getRest(), 'rest runs by default');
+  controller.setRestTimer(false);
+  assert.equal(controller.getRest(), null, 'turning it off clears the running rest');
+  controller.doneStep();
+  controller.doneStep();
+  assert.equal(controller.getRest(), null, 'no rest after the next round');
+  controller.destroy();
+
+  // Carry only the switch over; the resumed draft would already have rounds done.
+  const kept = new Map([['life-hub:gym-rest-timer', saved.get('life-hub:gym-rest-timer')]]);
+  const again = makeController({ storage: { getItem: key => kept.get(key) ?? null, setItem: (key, value) => kept.set(key, value), removeItem: key => kept.delete(key) } });
+  again.controller.mount(supersetSession());
+  again.controller.doneStep();
+  again.controller.doneStep();
+  assert.equal(again.controller.getRest(), null, 'still off next session');
+  again.controller.setRestTimer(true);
+  again.controller.doneStep();
+  again.controller.doneStep();
+  assert.ok(again.controller.getRest(), 'back on when switched on');
+  again.controller.destroy();
+});
+
 test('supersets run set-for-set: B1 B2, B1 B2 — not AAA BBB', () => {
   const { controller } = makeController();
   controller.mount(supersetSession());
