@@ -39,7 +39,9 @@ if (mount) {
   fixture.content.annotations = [
     tagged('ann_beggars', 'line_1', 13, 'like old beggars', 'simile', 'Soldiers reduced to beggars.'),
     tagged('ann_hags', 'line_2', 22, 'like hags', 'simile', 'A second simile, harsher still.'),
-    tagged('ann_blood', 'line_6', 15, 'blood-shod', 'metaphor', 'Blood where boots should be.')
+    tagged('ann_blood', 'line_6', 15, 'blood-shod', 'metaphor', 'Blood where boots should be.'),
+    tagged('ann_knock', 'line_2', 0, 'Knock-kneed', 'alliteration', 'Hard k sounds, like stumbling.'),
+    tagged('ann_hoots', 'line_7', 36, 'hoots', 'auditory-imagery', 'The shells heard, not seen.')
   ];
   mount.append(renderAnnotationBlock(fixture, 'student'));
 }

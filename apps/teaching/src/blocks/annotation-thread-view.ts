@@ -201,26 +201,64 @@ export function drawThreadLink(
   host.prepend(svg);
 }
 
-export function fillStepCaption(
-  host: HTMLElement,
-  annotation: AnnotationItem,
-  stops: ThreadStop[],
-  stepIndex: number
-): void {
-  host.replaceChildren();
-  const stop = stops[stepIndex];
-  if (!stop) return;
-  const meta = document.createElement('p');
-  meta.className = 'block-annotation__step-meta';
-  meta.textContent = `Place ${stepIndex + 1} of ${stops.length}`;
-  host.append(meta);
-  // The thread's main note is already on the card; only add what this place says.
-  const html = stop.note_html?.trim();
-  if (!html) return;
-  const body = document.createElement('div');
-  body.className = 'block-annotation__body';
-  body.innerHTML = sanitizeRichTextHtml(html);
-  host.append(body);
+/**
+ * A place's own note, shown under its line while the thread is followed, so
+ * every place can be read without stepping and the note never sits far above
+ * the line it explains. The current place carries the step controls.
+ */
+export function buildStopNote(options: {
+  stopIndex: number;
+  stopCount: number;
+  html?: string;
+  colour: AnnotationLayer['colour'] | undefined;
+  current: boolean;
+  onStep: (delta: -1 | 1) => void;
+}): HTMLElement | null {
+  const { stopIndex, stopCount, current } = options;
+  const html = options.html?.trim();
+  if (!html && !current) return null;
+  const note = document.createElement('div');
+  note.className = `block-annotation__stop-note block-annotation__stop-note--${options.colour ?? 'wave'}`;
+  note.dataset.stop = String(stopIndex + 1);
+  if (current) note.classList.add('is-current');
+
+  // The numbered pip just above already says which place this is.
+  note.setAttribute('aria-label', `Note for place ${stopIndex + 1} of ${stopCount}`);
+  note.setAttribute('role', 'group');
+
+  const main = document.createElement('div');
+  main.className = 'block-annotation__stop-main';
+  if (html) {
+    const body = document.createElement('div');
+    body.className = 'block-annotation__body';
+    body.innerHTML = sanitizeRichTextHtml(html);
+    main.append(body);
+  }
+  if (current) {
+    const nav = document.createElement('div');
+    nav.className = 'block-annotation__stop-nav';
+    const meta = document.createElement('span');
+    meta.className = 'block-annotation__step-meta';
+    meta.textContent = `Place ${stopIndex + 1} of ${stopCount}`;
+    const prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'block-annotation__stop-step';
+    prev.dataset.step = 'previous';
+    prev.textContent = '‹ Previous';
+    prev.disabled = stopIndex <= 0;
+    prev.addEventListener('click', () => options.onStep(-1));
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'block-annotation__stop-step';
+    next.dataset.step = 'next';
+    next.textContent = 'Next ›';
+    next.disabled = stopIndex >= stopCount - 1;
+    next.addEventListener('click', () => options.onStep(1));
+    nav.append(meta, prev, next);
+    main.append(nav);
+  }
+  note.append(main);
+  return note;
 }
 
 export function printThreadFootnoteLabel(

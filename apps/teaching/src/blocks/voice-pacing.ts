@@ -33,6 +33,17 @@ export function livePoint(slots: readonly PacedPoint[], t: number, manual: numbe
   return Math.min(Math.max(slotAt(slots, t), manual), Math.max(0, slots.length - 1));
 }
 
+/**
+ * How full a point's bar is (0–1) at `t`: from when the student actually
+ * reached it (`begunAt`, earlier than `slot.start` after an early Next) to
+ * when the schedule moves on.
+ */
+export function pointProgress(slot: PacedPoint, begunAt: number, t: number): number {
+  const span = slot.end - begunAt;
+  if (span <= 0) return 1;
+  return Math.min(1, Math.max(0, (t - begunAt) / span));
+}
+
 /** Seconds as m:ss. */
 export function clock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));

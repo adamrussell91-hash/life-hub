@@ -17,7 +17,7 @@ import { buildMeetingTaskLinks, roleLabel } from '@/views/meetings';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
 import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
-import { groupRoom, initialsFor, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
+import { groupRoom, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
 import { searchPickerPeople } from '@/lib/person-picker';
@@ -152,10 +152,11 @@ export async function renderMeetingPage(
       loadSelfRow()
     ]);
     record = meetingResult.meeting;
-    attendees = loadedAttendees;
+    selfRow = loadedSelf;
+    // You're in every meeting: never listed, never named to Clare.
+    attendees = loadedAttendees.filter((attendee) => !isSelfAttendee(attendee, selfRow));
     directory = loadedDirectory;
     ledger = ledgerResult.items;
-    selfRow = loadedSelf;
   } catch (err) {
     if (!options.isCurrent()) return;
     renderLoadError(canvas, err, () => void renderMeetingPage(canvas, id, options));
@@ -367,8 +368,7 @@ export async function renderMeetingPage(
 
   // ── The room: attendees by organisation, add / remove ──
   function paintRoom(): void {
-    const roomDirectory: RoomDirectoryRow[] = selfRow ? [...directory, selfRow] : directory;
-    const room = groupRoom(attendees, roomDirectory, new Date());
+    const room = groupRoom(attendees, directory, new Date(), selfRow);
     roomHost.replaceChildren(roomCard(room, attendees, {
       onRemove: async (attendee) => {
         await endUniversalLink(attendee.linkId);
@@ -415,7 +415,7 @@ export async function renderMeetingPage(
       mode: 'field',
       search: (query, signal) => searchPickerPeople(query, signal),
       onSelect: async (item) => {
-        if (attendees.some((attendee) => attendee.ref === item.ref)) {
+        if (isSelfAttendee({ ref: item.ref, name: item.display_label }, selfRow) || attendees.some((attendee) => attendee.ref === item.ref)) {
           input.value = '';
           return;
         }
@@ -1015,7 +1015,6 @@ function roomCard(
       row.dataset.warmth = String(person.warmthDots);
       row.append(el('span', `room__initials${person.student ? ' room__initials--student' : ''}`, person.initials), el('span', 'room__name', person.name));
       const role = roleLabel(person.role);
-      if (person.self) row.append(el('span', 'muted', 'You'));
       if (role) row.append(el('span', 'muted', role));
       if (person.isNew) row.append(el('span', 'chip chip--warn', 'New to you'));
       if (!person.known) {
@@ -1028,8 +1027,7 @@ function roomCard(
       for (let i = 1; i <= 3; i += 1) dots.append(el('i', i <= person.warmthDots ? 'is-on' : ''));
       const jobs = attendee && person.organisationChoices.length > 1 ? organisationPicker(person, attendee, actions.onPickOrganisation) : null;
       if (jobs) row.append(jobs.toggle);
-      // You get no warmth; the empty slot still pushes × to the edge.
-      row.append(person.self ? el('span', 'room__warmth') : dots);
+      row.append(dots);
       if (attendee) {
         const remove = el('button', 'hub-icon-btn room__remove', '×') as HTMLButtonElement;
         remove.type = 'button';
