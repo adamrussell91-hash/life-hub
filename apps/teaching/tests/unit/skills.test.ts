@@ -4,7 +4,7 @@ vi.mock('@/skills/api', () => ({ loadSkills: vi.fn(), refreshSkills: vi.fn() }))
 vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: vi.fn() }));
 
 import { loadSkills, refreshSkills } from '@/skills/api';
-import { findSkill, nextMoveFor, rungForMark, skillsForArea, skillsForOutcome } from '@/skills/model';
+import { findSkill, nextMoveFor, rungForMark, servesPoint, skillsForArea, skillsForOutcome } from '@/skills/model';
 import type { SkillsContinuum, SkillStrand } from '@/skills/schema';
 import { renderSkillsLibrary, resetSkillsViewForTests, selectSkill } from '@/skills/view';
 import { openColumnForm } from '@/markbook/column-form';
@@ -18,8 +18,8 @@ const rung = (label: string, next: string) => ({
   build: { formula: ['Claim', 'Reason'], parts: [{ id: 'c', name: 'Claim', job: 'Says it', language: ['so'] }, { id: 'r', name: 'Reason', job: 'Backs it', language: ['because'] }],
     example: [['A claim', 'c'], [' because a reason', 'r'], ['.', null]] as [string, string | null][], why_here: `Why ${label}`, checks: [`Check ${label}`], next_move: next }
 });
-const sub = (id: string, name: string, outcomes: number[], areas: string[]) => ({
-  id, name, in_hsc: `${name} in the HSC`, draws_on: 'Sources', outcomes, focus_areas: areas,
+const sub = (id: string, name: string, outcomes: number[], areas: string[], points: { area: string; point: string; link: 'shared' | 'related' }[] = []) => ({
+  id, name, in_hsc: `${name} in the HSC`, draws_on: 'Sources', outcomes, focus_areas: areas, points,
   rungs: { capable: rung('claim', 'Add a reason.'), skilled: rung('reason', 'Add a concept.'), accomplished: rung('concept', 'Qualify it.'), excellent: rung('qualify', 'Keep refining: cut words.') }
 });
 const rungs = (['capable', 'skilled', 'accomplished', 'excellent'] as const).map((id, i) => ({ id, name: id[0]!.toUpperCase() + id.slice(1), marks: `${13 + i * 2}`, marker_words: 'x', meaning: 'y' }));
@@ -49,6 +49,15 @@ describe('skills model', () => {
     expect(skillsForOutcome(continuum, 1).map((e) => e.ref)).toEqual(['arguing.thesis', 'arguing.evidence']);
     expect(skillsForOutcome(continuum, 1, 'area-two').map((e) => e.ref)).toEqual(['arguing.evidence']);
     expect(skillsForArea(continuum, 'area-two').map((e) => e.ref)).toEqual(['arguing.evidence', 'composing.reflection']);
+  });
+
+  it('serves the dot points a skill names, falling back to shared outcomes when it names none', () => {
+    const linked = sub('thesis', 'Thesis', [5], ['area-one'], [{ area: 'area-one', point: 'R1', link: 'shared' }]);
+    const r1 = { area: 'area-one', id: 'R1', outcomes: [{ n: 5 }] };
+    const u1 = { area: 'area-one', id: 'U1', outcomes: [{ n: 5 }] };
+    expect([servesPoint(linked, r1), servesPoint(linked, u1)]).toEqual([true, false]);
+    const loose = sub('evidence', 'Evidence', [5], ['area-one']);
+    expect([servesPoint(loose, u1), servesPoint(loose, { ...u1, area: 'area-two' })]).toEqual([true, false]);
   });
 });
 
