@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadAlignment, patchAlignment, privateAlignmentPath } from '../../netlify/functions/_shared/syllabus-alignment.mjs';
 import { createSyllabusAlignmentHandler } from '../../netlify/functions/syllabus-alignment.mjs';
+import { ALIGNMENT_REVISION } from '../../netlify/functions/_shared/syllabus-alignment-schema.mjs';
 
 // Invented wording only. The real syllabus text lives in the private data repo.
 const sample = {
@@ -14,7 +15,8 @@ const sample = {
   concepts: [{ key: 'ARG', name: 'Argument', head: 'argues well', bullets: [{ n: 1, text: 'claims need reasons', adv: false }, { n: 2, text: 'counter-claims help', adv: true }] }],
   focus_areas: [{ id: 'sample-area', name: 'Sample area', points: [
     { id: 'U1', kind: 'U', short: 'Close reading', text: 'Close reading of a text', outcomes: [{ n: 1, link: 'shared' }], concepts: [{ ref: 'ARG1', link: 'related' }], processes: ['UN'], skills: ['analysis'] }
-  ] }]
+  ] }],
+  revision: ALIGNMENT_REVISION
 };
 
 function storeFixture() {
@@ -62,6 +64,20 @@ test('a copy saved before thinking skills gets them from the private file, keepi
   assert.deepEqual(doc.focus_areas[0].points[0].skills, ['analysis']);
   assert.deepEqual(doc.focus_areas[0].points[0].processes, ['RE']);
   assert.equal(calls.length, 1);
+  await loadAlignment(store, 'sample', { env, fetchImpl: impl });
+  assert.equal(calls.length, 1);
+});
+
+test('a copy from an older revision takes the new links on unedited points, once', async () => {
+  const store = storeFixture();
+  const old = structuredClone(sample);
+  delete old.revision;
+  old.focus_areas[0].points[0].concepts = [];
+  store.data.set('syllabus_alignment/sample', old);
+  const { calls, impl } = fakeFetch();
+  const doc = await loadAlignment(store, 'sample', { env, fetchImpl: impl });
+  assert.deepEqual(doc.focus_areas[0].points[0].concepts, [{ ref: 'ARG1', link: 'related' }]);
+  assert.equal(doc.revision, ALIGNMENT_REVISION);
   await loadAlignment(store, 'sample', { env, fetchImpl: impl });
   assert.equal(calls.length, 1);
 });
