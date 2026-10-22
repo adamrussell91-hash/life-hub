@@ -89,3 +89,62 @@ test("a moved branch on commit becomes a 409 conflict", async () => {
     (e) => e.status === 409 && e.code === "conflict",
   );
 });
+
+// The branch moves once between read and write; `changed` names the files the other commit touched.
+function movedGithub(changed = []) {
+  const files = {
+    "data/food-journal/journal.json": JSON.stringify({ schema_version: 1, visits: [], recipes: [] }),
+    "data/travel/journals/trp_test1.json": "{}",
+    "data/notes/other.md": "x",
+  };
+  const paths = Object.keys(files);
+  let moved = false;
+  const gh = {
+    commits: [],
+    attempts: 0,
+    async resolveTree() {
+      return {
+        commitSha: sha(moved ? "e" : "c"),
+        treeSha: sha(moved ? "u" : "t"),
+        tree: paths.map((path, i) => ({ path, type: "blob", sha: (moved && (changed.includes(path) || path === "data/notes/other.md") ? "9" : String(i)).repeat(40) })),
+      };
+    },
+    async readBlob(s) {
+      return { content: Buffer.from(files[paths[Number(s[0])]]).toString("base64"), encoding: "base64" };
+    },
+    async commitFiles(args) {
+      gh.attempts += 1;
+      if (!moved) {
+        moved = true;
+        throw new GitHubClientError("write_conflict", true);
+      }
+      gh.commits.push(args);
+      return { commitSha: sha("d") };
+    },
+  };
+  return gh;
+}
+
+test("a branch moved only by unrelated files retries once on the new commit", async () => {
+  const gh = movedGithub();
+  const store = createMealLinkStore({ github: gh, ...passthrough });
+  const snap = await store.read("trp_test1");
+  const out = await store.write(snap, { food: snap.food.journal, travels: [{ tripId: "trp_test1", journal: snap.travel.journal }], message: "m" });
+  assert.equal(gh.attempts, 2);
+  assert.equal(gh.commits[0].parentSha, sha("e"));
+  assert.equal(gh.commits[0].baseTreeSha, sha("u"));
+  assert.equal(out.commitSha, sha("d"));
+});
+
+test("a branch that moved either journal stays a 409", async () => {
+  for (const path of ["data/food-journal/journal.json", "data/travel/journals/trp_test1.json"]) {
+    const gh = movedGithub([path]);
+    const store = createMealLinkStore({ github: gh, ...passthrough });
+    const snap = await store.read("trp_test1");
+    await assert.rejects(
+      () => store.write(snap, { food: snap.food.journal, travels: [{ tripId: "trp_test1", journal: snap.travel.journal }], message: "m" }),
+      (e) => e.status === 409 && e.code === "conflict",
+    );
+    assert.equal(gh.attempts, 1, path);
+  }
+});

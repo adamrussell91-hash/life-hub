@@ -56,6 +56,7 @@ const defaultUnlinkTravelMeals = (ctx, deps) => async (journal, version, links) 
       .map((v) => v.id);
   const travels = snaps.map((s) => ({
     tripId: s.tripId,
+    version: s.travel.version,
     journal: {
       ...s.travel.journal,
       moments: s.travel.journal.moments.map((m) => {
