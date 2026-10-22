@@ -22,8 +22,8 @@ const T = SAMPLE_TOOLS;
 const place = (run, id, slot, text, extra = {}) => placeNode(run, sampleNode(id, slot, text, extra));
 const AT = '2026-10-21T10:00:00.000Z';
 
-test('seven factories, keyed by catalogue family', () => {
-  assert.deepEqual(Object.keys(FAMILY_FACTORIES), ['quadrant', 'plot', 'scales', 'curve', 'tension', 'path', 'list']);
+test('the factories, keyed by catalogue family (ratings is Gear Shifter\'s)', () => {
+  assert.deepEqual(Object.keys(FAMILY_FACTORIES), ['quadrant', 'plot', 'scales', 'curve', 'tension', 'path', 'list', 'ratings']);
 });
 
 test('every sample tool meets the shared contract', () => {

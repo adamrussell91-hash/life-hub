@@ -3,7 +3,7 @@
 // text), shared by the factory tests, the renderer tests and the contact sheet. Each sample
 // has an empty, a partial and a full run; the full run's last entry is contested where the
 // chart has entries.
-import { scalesTool } from '../decision-book/families/index.mjs';
+import { ratingsTool, scalesTool } from '../decision-book/families/index.mjs';
 import { sampleNode, sampleRun } from '../decision-book/fixtures.mjs';
 
 const steps = [{ id: 'work', title: 'Work it', prompt: 'Fill the chart.' }];
@@ -19,8 +19,24 @@ export const GT_SAMPLE_TOOLS = Object.freeze({
       dated: true,
       scales: [{ id: 'order', label: 'Order' }, { id: 'novelty', label: 'Novelty' }, { id: 'thanks', label: 'Thanks' }]
     }
+  }),
+  ratings: ratingsTool({
+    ...base('gt_sample_ratings', 'Sample ratings'),
+    chart: { idea: 'One idea on the shortlist', criterion: 'One criterion to rate by', rater: 'One person rating', reflection: false }
   })
 });
+
+const ratingNodes = [
+  sampleNode('idea1', 'idea:1', 'Swap shelf in the hall'),
+  sampleNode('idea2', 'idea:2', 'Saturday stall'),
+  sampleNode('idea3', 'idea:3', 'Lunch club'),
+  sampleNode('criterion1', 'criterion:1', 'Cost to run'),
+  sampleNode('criterion2', 'criterion:2', 'People reached'),
+  sampleNode('rater1', 'rater:1', 'Ines'),
+  sampleNode('rater2', 'rater:2', 'Tomas'),
+  sampleNode('rater3', 'rater:3', 'Wren')
+];
+const rate = (rater, at, rows, ranking) => ({ at, rater, scores: Object.fromEntries(rows.map(([a, b], i) => [`idea${i + 1}`, { criterion1: a, criterion2: b }])), ranking });
 
 const contested = { state: 'contested', objection: 'Is that really where it belongs?' };
 
@@ -36,6 +52,19 @@ export const GT_SAMPLE_RUNS = Object.freeze({
       ]
     },
     partialScores: { snapshots: [{ at: '2026-10-08T09:00:00.000Z', series: 'now', values: { order: 6, novelty: 4, thanks: 0 } }] }
+  },
+  // idea1 on criterion1 is rated 4, 6 and 8: mean 6, sample SD 2, n 3.
+  ratings: {
+    partial: ratingNodes,
+    full: [...ratingNodes, sampleNode('rec', 'recommendation', 'Try the stall first; Wren rates it far lower, so ask why before committing.'), sampleNode('own', 'owner', 'Ines', contested)],
+    scores: {
+      snapshots: [
+        rate('rater1', '2026-10-22T10:00:00.000Z', [[4, 6], [8, 9], [3, 5]], ['idea2', 'idea1', 'idea3']),
+        rate('rater2', '2026-10-22T10:01:00.000Z', [[6, 5], [7, 8], [5, 4]], ['idea2', 'idea1', 'idea3']),
+        rate('rater3', '2026-10-22T10:02:00.000Z', [[8, 7], [2, 3], [6, 6]], ['idea1', 'idea3', 'idea2'])
+      ]
+    },
+    partialScores: { snapshots: [rate('rater1', '2026-10-22T10:00:00.000Z', [[4, 6], [8, 9], [3, 5]], ['idea2', 'idea1', 'idea3'])] }
   }
 });
 
