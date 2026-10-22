@@ -400,6 +400,26 @@ test('a confirm that reports centralNodeUpdated:false shows an ephemeral warning
   );
 });
 
+test('a confirm that reports foodJournalUpdated:false says the Food Journal badge did not save', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: true, foodJournalUpdated: false })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  findProposalButton(proposal, 'record-proposal__confirm').dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged. The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.'
+  );
+});
+
 test('a confirm that reports centralNodeUpdated:true does not show the Central Node warning', async () => {
   const root = new FakeDocument();
   const chatApi = fakeChatApi({
