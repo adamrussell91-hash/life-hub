@@ -10,12 +10,15 @@ import {
   knowledgePutObject,
   readStoredPhoto,
   knowledgePresignGet,
+  MAX_PHOTO_BYTES,
 } from "./_shared/knowledge-r2.mjs";
 import { createFoodJournalRepository } from "./_shared/food-journal-repository.mjs";
 import { readableJournal } from "./_shared/food-journal-schema.mjs";
 import { checkRateLimit } from "./_shared/travel-rate-limit.mjs";
 export const config = { path: "/api/food-journal-media" };
 const missing = (e) => e?.name === "NoSuchKey" || e?.name === "NotFound";
+// Base64 grows a photo by a third, so 3 MB keeps the reply under Netlify's 6 MB limit.
+const BYTES_MAX = 3 * 1024 * 1024;
 export function createFoodJournalMediaHandler(deps = {}) {
   return createTravelOperatorHandler(
     async (request, ctx) => {
@@ -34,7 +37,7 @@ export function createFoodJournalMediaHandler(deps = {}) {
         const bytes = new Uint8Array(await request.arrayBuffer());
         if (
           bytes.length < 3 ||
-          bytes.length > 4 * 1024 * 1024 ||
+          bytes.length > MAX_PHOTO_BYTES ||
           bytes[0] !== 0xff ||
           bytes[1] !== 0xd8 ||
           bytes[2] !== 0xff
@@ -97,7 +100,10 @@ export function createFoodJournalMediaHandler(deps = {}) {
         let bytes = null;
         if (found)
           try {
-            bytes = await readStoredPhoto(ctx.env, body.key, deps);
+            bytes = await readStoredPhoto(ctx.env, body.key, {
+              ...deps,
+              maxBytes: BYTES_MAX,
+            });
           } catch (e) {
             if (e?.tooLarge)
               return errorResponse(

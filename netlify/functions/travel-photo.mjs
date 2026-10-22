@@ -15,6 +15,7 @@ import {
   photoMetaKey
 } from './_shared/travel-blobs.mjs';
 import { createTravelRepository } from './_shared/travel-repository.mjs';
+import { MAX_PHOTO_BYTES } from './_shared/knowledge-r2.mjs';
 import {
   errorResponse as httpError,
   guardRequestOrigin,
@@ -28,7 +29,7 @@ import {
 
 export const config = { path: '/api/travel-photo' };
 
-export const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+export { MAX_PHOTO_BYTES };
 export const ALLOWED_PHOTO_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 /** Operator upload: POST multipart `file` + query `trip`. Returns `{ photo_id }`. */

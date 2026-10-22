@@ -140,10 +140,12 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
   }
   // null when the meal names no dish, so the chat only warns about a real miss.
   let foodJournalUpdated = null;
+  let foodJournalReason;
   if (record.type === 'meal' && record.food_dish_id) {
     try {
       const out = await retryWriteConflict(() => syncFoodJournalAfterMeal(client, record, path, getSydneyTimestamp(now)));
       foodJournalUpdated = out?.updated === true;
+      if (out?.reason) foodJournalReason = out.reason;
     } catch {
       foodJournalUpdated = false;
     }
@@ -157,7 +159,14 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
       governanceUpdated = false;
     }
   }
-  return { sha: result.sha, commitSha: result.commitSha, centralNodeUpdated, governanceUpdated, foodJournalUpdated };
+  return {
+    sha: result.sha,
+    commitSha: result.commitSha,
+    centralNodeUpdated,
+    governanceUpdated,
+    foodJournalUpdated,
+    ...(foodJournalReason ? { foodJournalReason } : {})
+  };
 }
 
 function agentNameForType(type) {

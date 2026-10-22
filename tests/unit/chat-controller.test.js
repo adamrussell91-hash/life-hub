@@ -420,6 +420,26 @@ test('a confirm that reports foodJournalUpdated:false says the Food Journal badg
   );
 });
 
+test('a confirm for a deleted Food Journal dish says there is no badge to update', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: true, foodJournalUpdated: false, foodJournalReason: 'dish_missing' })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  findProposalButton(proposal, 'record-proposal__confirm').dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged. The Food Journal dish was deleted, so there\u2019s no badge to update.'
+  );
+});
+
 test('Central Node, Food Journal and old-count warnings show together in one message', async () => {
   const root = new FakeDocument();
   const chatApi = fakeChatApi({

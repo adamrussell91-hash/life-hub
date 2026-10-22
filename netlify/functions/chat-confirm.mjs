@@ -591,6 +591,7 @@ export function createChatConfirmHandler({
           commitSha,
           centralNodeUpdated,
           ...(foodJournalUpdated != null ? { foodJournalUpdated } : {}),
+          ...(persisted.foodJournalReason ? { foodJournalReason: persisted.foodJournalReason } : {}),
           ...(oldCountRemoved != null ? { oldCountRemoved } : {}),
           ...(recountRollbackFailed ? { recountRollbackFailed } : {}),
           record: validation.record,

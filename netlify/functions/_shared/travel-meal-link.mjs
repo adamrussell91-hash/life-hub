@@ -47,7 +47,7 @@ export function upsertLinkedVisit(journal, { tripId, moment, food, photos, visit
   visit.title = String(food.title ?? visit.title ?? "").slice(0, 200);
   visit.venue = {
     ...visit.venue,
-    name: food.venue_name ?? moment.place?.name ?? visit.venue.name ?? "",
+    name: moment.place?.name ?? visit.venue.name ?? "",
     address: visit.venue.address ?? "",
     ...(moment.coordinates ? { lat: moment.coordinates.lat, lon: moment.coordinates.lon } : {}),
   };

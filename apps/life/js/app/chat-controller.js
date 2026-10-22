@@ -1162,7 +1162,11 @@ export function createChatController({
       // One message that says "Logged" once, so a second warning never hides the first.
       const twice = result?.recountRollbackFailed === true;
       const saveWarnings = [
-        result?.foodJournalUpdated === false && !twice ? 'The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.' : null,
+        result?.foodJournalUpdated === false && !twice
+          ? result.foodJournalReason === 'dish_missing'
+            ? 'The Food Journal dish was deleted, so there\u2019s no badge to update.'
+            : 'The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.'
+          : null,
         result?.oldCountRemoved === false ? 'The old count for this dish couldn\u2019t be removed; delete it from Nutrition.' : null
       ].filter(Boolean);
       const lead = twice

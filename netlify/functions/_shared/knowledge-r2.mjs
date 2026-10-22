@@ -74,15 +74,15 @@ export async function knowledgeHeadObject(env, { key, headObject } = {}) {
   return { size: out.ContentLength };
 }
 
-// A Food Journal photo's upload limit; a bigger object is never read in.
+// The photo upload limit for the Food Journal and Travel; a bigger object is never read in.
 export const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
 const tooLarge = () => Object.assign(new Error('That photo is too large.'), { tooLarge: true });
 // Reads a stored photo, refusing one over the limit before and after reading.
-export async function readStoredPhoto(env, key, { getObject, headObject } = {}) {
+export async function readStoredPhoto(env, key, { getObject, headObject, maxBytes = MAX_PHOTO_BYTES } = {}) {
   const head = await knowledgeHeadObject(env, { key, headObject });
-  if (Number(head?.size) > MAX_PHOTO_BYTES) throw tooLarge();
+  if (Number(head?.size) > maxBytes) throw tooLarge();
   const bytes = await knowledgeGetObject(env, { key, getObject });
-  if (bytes.length > MAX_PHOTO_BYTES) throw tooLarge();
+  if (bytes.length > maxBytes) throw tooLarge();
   return bytes;
 }
 

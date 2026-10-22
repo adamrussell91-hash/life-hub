@@ -1831,13 +1831,13 @@ test("a save keeps each dish's Brisket link, whatever the client sends", async (
   assert.deepEqual(dishes[0].brisket, { ...countedBrisket, calories: 640, needs_recount: true });
 });
 
-test("media bytes refuse a photo over 4 MB, by its size or after reading", async () => {
+test("media bytes refuse a photo over 3 MB, by its size or after reading", async () => {
   resetRateLimits();
   const j = fixture();
   j.visits[0].dishes[0].photos = [
     { id: "photo_1", key: "food/photos/photo_1.jpg" },
   ];
-  const big = 4 * 1024 * 1024 + 1;
+  const big = 3 * 1024 * 1024 + 1;
   const r2 = {
     ...env,
     R2_ACCOUNT_ID: "a",
