@@ -873,6 +873,7 @@ export function createFoodJournalView({
     editVisit,
     deleteVisit,
     openRecipe,
+    brisketActions,
     openBookRecipe: (recipe, trigger) => recipeEditor(recipe, trigger),
     get book() {
       return book;
