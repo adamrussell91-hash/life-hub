@@ -15,10 +15,14 @@
 // Only Doing's own cards count: Review cards wait at the review stop and are not in progress.
 // Details open in one panel under the board, so an open card never stretches a column.
 // Phone (the root up to 560px wide): the columns stack, each a heading over a wrapping row of pills.
+// Options (another book's variant; the defaults draw Problem Solver's board): `columns` without
+// 'review' drops the Review stop; `suggestedWip` puts a "Suggested limit" badge on Doing until a
+// limit is set; `cardFields` shows each card's effort, help and urgency and adds a small form
+// under the board that sets them (sent through onScore).
 import type { PsNode, PsTaskLink, PsToolRun } from '../types';
 import { nodeTitle } from '../titles.mjs';
 import { parseSlot } from '../slots.mjs';
-import { columnForStatus, wipLimit } from '../tools/kanban.mjs';
+import { CARD_FIELDS, cardFieldsOf, columnForStatus, wipLimit } from '../tools/kanban.mjs';
 import { taskStatusLabel } from './task-status';
 import { EASE, canAnimate, cancelAnimations, createDisclosureGroup, detailsCard, nextId, syncContested } from './details';
 
@@ -28,8 +32,17 @@ export type KanbanView = {
   setTasks(links: PsTaskLink[]): void;
   /** Node ids with a task proposal waiting for the person's answer. */
   setProposed(nodeIds: string[]): void;
+  /** Card fields set with the board's form (only with `cardFields`). */
+  onScore(cb: (payload: Record<string, unknown>) => void): void;
   destroy(): void;
 };
+
+export type KanbanOptions = { columns?: readonly Column[]; suggestedWip?: number; cardFields?: boolean };
+type Fields = { effort?: string; help?: string; urgency?: string };
+const FIELD_WORDS: Record<string, string> = { small: 'Small', medium: 'Medium', large: 'Large', alone: 'Alone', needs_help: 'Needs help', now: 'Now', soon: 'Soon', later: 'Later' };
+const FIELD_NAMES: Record<string, string> = { effort: 'Effort', help: 'Help', urgency: 'Urgency' };
+/** A card's fields in words, in field order: "Large · Needs help · Soon". */
+const fieldWords = (fields: Fields | undefined): string[] => (fields ? (Object.keys(CARD_FIELDS) as (keyof Fields)[]).map((name) => FIELD_WORDS[fields[name] ?? ''] ?? '').filter(Boolean) : []);
 
 type Column = 'todo' | 'doing' | 'review' | 'done';
 type Main = 'todo' | 'doing' | 'done';
@@ -47,6 +60,7 @@ type Card = {
   title: HTMLSpanElement;
   meta: HTMLSpanElement;
   metaText: HTMLSpanElement;
+  fields: HTMLSpanElement;
   link: SVGSVGElement | null;
   card: HTMLDivElement;
   cardKey: string;
@@ -77,7 +91,6 @@ const indexOf = (node: PsNode): number => parseSlot(node.slot)?.index ?? 0;
 const bySlot = (a: PsNode, b: PsNode): number => indexOf(a) - indexOf(b);
 const contested = (node: PsNode): string => (node.state === 'contested' ? ', contested' : '');
 const keyOf = (node: PsNode): string => `${node.id}\u0000${node.text}\u0000${node.state}\u0000${(node.skills ?? []).join(',')}`;
-const tagOf = (node: PsNode): Column => ((COLUMNS as readonly string[]).includes(node.tag ?? '') ? (node.tag as Column) : 'todo');
 
 /** A small chain link, the mark of a card that is a real task (decorative: the label says it). */
 function linkMark(doc: Document): SVGSVGElement {
@@ -96,7 +109,10 @@ function linkMark(doc: Document): SVGSVGElement {
   return svg;
 }
 
-export function createKanbanView(doc: Document = document): KanbanView {
+export function createKanbanView(doc: Document = document, options: KanbanOptions = {}): KanbanView {
+  const columns: readonly Column[] = options.columns ?? COLUMNS;
+  const withReview = columns.includes('review');
+  const tagOf = (node: PsNode): Column => (columns.includes(node.tag as Column) ? (node.tag as Column) : 'todo');
   const root = doc.createElement('div');
   root.className = 'ps-kanban';
   root.setAttribute('role', 'group');
@@ -109,6 +125,12 @@ export function createKanbanView(doc: Document = document): KanbanView {
   let doingHead: HTMLDivElement | null = null;
   const cards = new Map<string, Card>();
   let wip: Wip | null = null;
+  let suggested: HTMLSpanElement | null = null;
+  let fieldsOf: Record<string, Fields> = {};
+  let fieldsForm: HTMLFormElement | null = null;
+  let cardSelect: HTMLSelectElement | null = null;
+  const fieldSelects = new Map<string, HTMLSelectElement>();
+  let scoreCb: ((payload: Record<string, unknown>) => void) | null = null;
   let links = new Map<string, string>();
   let proposed = new Set<string>();
   let lastRun: PsToolRun | null = null;
@@ -143,7 +165,7 @@ export function createKanbanView(doc: Document = document): KanbanView {
       head.append(triangle(main), el(doc, 'span', 'ps-kanban__name', NAME[main]));
       if (main === 'doing') doingHead = head;
       col.append(head, lane(main));
-      if (main === 'doing') {
+      if (main === 'doing' && withReview) {
         const review = el(doc, 'div', 'ps-kanban__review');
         review.setAttribute('role', 'group');
         review.setAttribute('aria-label', NAME.review);
@@ -153,7 +175,64 @@ export function createKanbanView(doc: Document = document): KanbanView {
       }
       board.append(col);
     }
-    root.append(board, panel);
+    root.append(board);
+    if (options.cardFields) root.append(buildFieldsForm());
+    root.append(panel);
+  }
+
+  /** The form under the board that sets one card's effort, help and urgency. */
+  function buildFieldsForm(): HTMLFormElement {
+    fieldsForm = el(doc, 'form', 'ps-kanban__fields-form');
+    fieldsForm.setAttribute('aria-label', 'Card details');
+    const pick = el(doc, 'label', 'ps-kanban__field');
+    pick.append(el(doc, 'span', 'ps-kanban__field-label', 'Card'));
+    cardSelect = el(doc, 'select', 'ps-kanban__select');
+    cardSelect.addEventListener('change', prefillFields);
+    pick.append(cardSelect);
+    fieldsForm.append(pick);
+    for (const [name, values] of Object.entries(CARD_FIELDS) as [string, readonly string[]][]) {
+      const label = el(doc, 'label', 'ps-kanban__field');
+      label.append(el(doc, 'span', 'ps-kanban__field-label', FIELD_NAMES[name]));
+      const select = el(doc, 'select', 'ps-kanban__select');
+      for (const value of values) {
+        const option = el(doc, 'option', '', FIELD_WORDS[value]);
+        option.value = value;
+        select.append(option);
+      }
+      label.append(select);
+      fieldsForm.append(label);
+      fieldSelects.set(name, select);
+    }
+    const save = el(doc, 'button', 'ps-kanban__fields-save', 'Save card details');
+    save.type = 'button';
+    save.addEventListener('click', () => {
+      if (!cardSelect?.value || destroyed) return;
+      scoreCb?.({ card: cardSelect.value, ...Object.fromEntries([...fieldSelects].map(([name, select]) => [name, select.value])) });
+    });
+    fieldsForm.append(save);
+    return fieldsForm;
+  }
+
+  function prefillFields(): void {
+    const fields = cardSelect ? fieldsOf[cardSelect.value] : undefined;
+    for (const [name, select] of fieldSelects) select.value = fields?.[name as keyof Fields] ?? (CARD_FIELDS as Record<string, readonly string[]>)[name][0];
+  }
+
+  /** The form's card list in step with the cards on the board. */
+  function syncFieldsForm(nodes: PsNode[]): void {
+    if (!cardSelect) return;
+    const key = nodes.map((node) => `${node.id}=${nodeTitle(node)}`).join('|');
+    if (cardSelect.getAttribute('data-key') !== key) {
+      const keep = cardSelect.value;
+      cardSelect.replaceChildren(...nodes.map((node) => {
+        const option = el(doc, 'option', '', nodeTitle(node));
+        option.value = node.id;
+        return option;
+      }));
+      if (nodes.some((node) => node.id === keep)) cardSelect.value = keep;
+      cardSelect.setAttribute('data-key', key);
+    }
+    if (!fieldsForm?.contains(doc.activeElement)) prefillFields();
   }
 
   // ---------------------------------------------------------------- cards
@@ -173,12 +252,14 @@ export function createKanbanView(doc: Document = document): KanbanView {
     const metaText = el(doc, 'span', 'ps-kanban__meta-text');
     meta.append(metaText);
     meta.hidden = true;
-    button.append(head, meta);
+    const fields = el(doc, 'span', 'ps-kanban__fields');
+    fields.hidden = true;
+    button.append(head, fields, meta);
     item.append(button);
     const card = el(doc, 'div', 'ps-details');
     card.id = detailsId;
     group.register(card, button);
-    return { node, item, button, head, title, meta, metaText, link: null, card, cardKey: '', live: null };
+    return { node, item, button, head, title, meta, metaText, fields, link: null, card, cardKey: '', live: null };
   }
 
   function dropCard(id: string): void {
@@ -237,8 +318,11 @@ export function createKanbanView(doc: Document = document): KanbanView {
       card.link = null;
     }
 
+    const words = fieldWords(fieldsOf[node.id]);
+    setText(card.fields, words.join(' · '));
+    card.fields.hidden = !words.length;
     const taskWords = removed ? ', task removed' : linked ? (label ? `, task: ${label}` : ', task') : waiting ? ', proposed task' : '';
-    setAttr(card.button, 'aria-label', `Card ${indexOf(node)}: ${nodeTitle(node)}${taskWords}${contested(node)}. Show details`);
+    setAttr(card.button, 'aria-label', `Card ${indexOf(node)}: ${nodeTitle(node)}${words.length ? `, ${words.join(', ')}` : ''}${taskWords}${contested(node)}. Show details`);
     const key = `${keyOf(node)}\u0001${column}`;
     if (card.cardKey !== key) {
       card.card.replaceChildren(...detailsCard(doc, node, PILL_FILL[column], card.card.id).childNodes);
@@ -248,6 +332,26 @@ export function createKanbanView(doc: Document = document): KanbanView {
   }
 
   // ---------------------------------------------------------------- WIP
+
+  /** Before a limit is set, the suggested one; it says so when Doing goes over it. */
+  function syncSuggested(show: boolean, doing: number): void {
+    const limit = options.suggestedWip;
+    if (!show || !limit || !doingHead) {
+      suggested?.remove();
+      suggested = null;
+      return;
+    }
+    if (!suggested) {
+      suggested = el(doc, 'span', 'ps-kanban__badge ps-kanban__suggested');
+      suggested.setAttribute('data-shape', '');
+      doingHead.append(suggested);
+    }
+    const over = doing > limit;
+    suggested.classList.toggle('is-over', over);
+    setAttr(suggested, 'data-fill', over ? 'card' : 'yellow');
+    // Never colour alone: the words change when Doing is over the suggestion.
+    setText(suggested, over ? `Over suggested limit (${doing} of ${limit})` : `Suggested limit ${limit}`);
+  }
 
   function syncWip(node: PsNode | undefined, doing: number): void {
     if (!node || !doingHead) {
@@ -350,9 +454,11 @@ export function createKanbanView(doc: Document = document): KanbanView {
     }
 
     syncWip(wipNode, lanes.get('doing')!.children.length);
+    syncSuggested(!wipNode, lanes.get('doing')!.children.length);
+    syncFieldsForm(nodes);
 
     // Details cards sit in one panel under the board, in reading order.
-    const order = [...(wip ? [wip.card] : []), ...COLUMNS.flatMap((column) => [...lanes.get(column)!.children].map((child) => [...cards.values()].find((c) => c.item === child)!.card))];
+    const order = [...(wip ? [wip.card] : []), ...columns.flatMap((column) => [...lanes.get(column)!.children].map((child) => [...cards.values()].find((c) => c.item === child)!.card))];
     order.forEach((card, i) => {
       if (panel.children[i] !== card) panel.insertBefore(card, panel.children[i] ?? null);
     });
@@ -385,6 +491,10 @@ export function createKanbanView(doc: Document = document): KanbanView {
   function teardown(): void {
     for (const id of [...cards.keys()]) dropCard(id);
     syncWip(undefined, 0);
+    syncSuggested(false, 0);
+    fieldsForm = null;
+    cardSelect = null;
+    fieldSelects.clear();
     cancelAnimations(root);
     for (const target of lanes.values()) target.replaceChildren();
     lanes.clear();
@@ -396,6 +506,7 @@ export function createKanbanView(doc: Document = document): KanbanView {
   function update(run: PsToolRun): void {
     if (destroyed) return;
     lastRun = run;
+    fieldsOf = options.cardFields ? (cardFieldsOf(run) as Record<string, Fields>) : {};
     layout(run);
   }
 
@@ -420,6 +531,9 @@ export function createKanbanView(doc: Document = document): KanbanView {
     update,
     setTasks,
     setProposed,
+    onScore(cb) {
+      scoreCb = cb;
+    },
     /** Stop any motion and ignore later calls once the canvas drops this view. */
     destroy() {
       destroyed = true;

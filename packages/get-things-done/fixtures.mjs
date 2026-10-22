@@ -5,6 +5,8 @@
 // chart has entries.
 import { ratingsTool, scalesTool } from '../decision-book/families/index.mjs';
 import { sampleNode, sampleRun } from '../decision-book/fixtures.mjs';
+import { kanbanTool } from '../problem-solver/tools/kanban.mjs';
+import { fiveWhysTool } from '../problem-solver/tools/five-whys.mjs';
 
 const steps = [{ id: 'work', title: 'Work it', prompt: 'Fill the chart.' }];
 const base = (id, name) => ({ id, name, when: `Sample ${name.toLowerCase()} for tests.`, steps });
@@ -23,7 +25,9 @@ export const GT_SAMPLE_TOOLS = Object.freeze({
   ratings: ratingsTool({
     ...base('gt_sample_ratings', 'Sample ratings'),
     chart: { idea: 'One idea on the shortlist', criterion: 'One criterion to rate by', rater: 'One person rating', reflection: false }
-  })
+  }),
+  kanban: kanbanTool({ ...base('gt_sample_kanban', 'Sample board'), kind: 'plan', step: 'explore', columns: ['todo', 'doing', 'done'], suggestedWip: 3, cardFields: true }),
+  fiveWhys: fiveWhysTool({ ...base('gt_sample_five_whys', 'Sample whys'), kind: 'diagnostic', step: 'explore', minWhys: 1, evidence: true })
 });
 
 const ratingNodes = [
@@ -65,6 +69,28 @@ export const GT_SAMPLE_RUNS = Object.freeze({
       ]
     },
     partialScores: { snapshots: [rate('rater1', '2026-10-22T10:00:00.000Z', [[4, 6], [8, 9], [3, 5]], ['idea2', 'idea1', 'idea3'])] }
+  },
+  kanban: {
+    partial: [sampleNode('k1', 'card:1', 'Book the hall', { tag: 'todo' }), sampleNode('k2', 'card:2', 'Draft the flyer', { tag: 'doing' })],
+    full: [
+      sampleNode('k1', 'card:1', 'Book the hall', { tag: 'todo' }),
+      sampleNode('k2', 'card:2', 'Draft the flyer', { tag: 'doing' }),
+      sampleNode('k3', 'card:3', 'Ask the school', { tag: 'doing' }),
+      sampleNode('k4', 'card:4', 'Order chairs', { tag: 'done' }),
+      sampleNode('k5', 'card:5', 'Find a float', { tag: 'doing', ...contested })
+    ],
+    scores: { snapshots: [{ at: '2026-10-22T10:00:00.000Z', card: 'k2', effort: 'small', help: 'alone', urgency: 'now' }, { at: '2026-10-22T10:01:00.000Z', card: 'k3', effort: 'large', help: 'needs_help', urgency: 'soon' }] }
+  },
+  fiveWhys: {
+    partial: [sampleNode('w1', 'problem', 'The bins go out late every week'), sampleNode('w2', 'why:1', 'Nobody knows whose turn it is')],
+    full: [
+      sampleNode('w1', 'problem', 'The bins go out late every week'),
+      sampleNode('w2', 'why:1', 'Nobody knows whose turn it is'),
+      sampleNode('w3', 'evidence:1', 'Three of us said a different name'),
+      sampleNode('w4', 'why:2', 'The rota on the fridge fell off in May'),
+      sampleNode('w5', 'evidence:2', 'Found it behind the fridge'),
+      sampleNode('w6', 'root', 'No rota where everyone sees it', contested)
+    ]
   }
 });
 
