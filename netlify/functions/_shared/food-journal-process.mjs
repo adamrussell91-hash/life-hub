@@ -97,10 +97,16 @@ export function createFoodJournalProcessHandler(deps = {}) {
           PRIVATE_CACHE,
         );
       const body = await readJson(request);
-      checkRateLimit(
-        body?.action === "editorial" ? "food-editorial" : "food-assist",
-        { limit: body?.action === "editorial" ? 20 : 8, now: ctx.now() },
-      );
+      const bucket =
+        body?.action === "editorial"
+          ? "food-editorial"
+          : body?.action === "translate"
+            ? "food-translate"
+            : "food-assist";
+      checkRateLimit(bucket, {
+        limit: bucket === "food-assist" ? 8 : 20,
+        now: ctx.now(),
+      });
       if (!ctx.env.ANTHROPIC_API_KEY && !deps.complete && !deps.client)
         return errorResponse(
           503,

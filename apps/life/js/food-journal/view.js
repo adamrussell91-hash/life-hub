@@ -188,6 +188,7 @@ export function createFoodJournalView({
   let editorialRunning = false;
   const editorialFailed = new Set();
   let translating = false;
+  let translateRerun = false;
   // dish id -> notes as loaded or last handled, so only edits are translated.
   const notesHandled = new Map();
   let filterControls = [],
@@ -367,7 +368,11 @@ export function createFoodJournalView({
   // failed translation never touches the save, and a second save only
   // happens when notes_en actually changed.
   async function refreshTranslations() {
-    if (translating || !loaded) return;
+    if (!loaded) return;
+    if (translating) {
+      translateRerun = true;
+      return;
+    }
     translating = true;
     const token = epoch;
     try {
@@ -391,7 +396,6 @@ export function createFoodJournalView({
             continue;
           }
         }
-        notesHandled.set(id, notes);
         changes.set(id, { notes, text_en: text_en || "" });
       }
       if (token !== epoch || !changes.size) return;
@@ -411,10 +415,16 @@ export function createFoodJournalView({
           changed = true;
         }
       if (changed) await persist(next, { quiet: true });
+      // Handled only once saved, so a failed save is retried next time.
+      for (const [id, c] of changes) notesHandled.set(id, c.notes);
     } catch {
       // Best effort only.
     } finally {
       translating = false;
+      if (translateRerun) {
+        translateRerun = false;
+        void refreshTranslations();
+      }
     }
   }
   async function load() {
@@ -1284,6 +1294,8 @@ export function createFoodJournalView({
           const block = el("div", "food-dish-editor");
           const set = (key, v) => {
             d[key] = v;
+            // An old translation never shows against new text.
+            if (key === "notes") delete d.notes_en;
             ctx.update({ ...d });
             persistDraft();
             if (key === "title") repaintMenu();

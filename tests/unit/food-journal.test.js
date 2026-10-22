@@ -1105,6 +1105,10 @@ test("translate action returns English for non-English notes and nothing for Eng
   assert.equal(calls.length, 2, "an accented letter calls the model");
   res = await h(req("POST", { action: "translate", text: "x".repeat(20001) }));
   assert.equal(res.status, 400);
+  for (let i = 0; i < 9; i++) {
+    res = await h(req("POST", { action: "translate", text: "riquísimo " + i }));
+    assert.equal(res.status, 200, "translate has its own limit bucket");
+  }
 });
 test("menu items merge across photos without repeats and are kept on the visit", () => {
   const v = newVisit();
