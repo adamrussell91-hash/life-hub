@@ -133,7 +133,7 @@ function renderPublishedLesson(
     feedbackOff: lesson.feedback_off === true
   });
   content.append(blocks);
-  if (isQuiz) content.append(mountStudentQuiz(lesson));
+  if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: extras?.cls?.id }));
   revealBlockFromHash(content);
 
   if (openNoteId && typeof history !== 'undefined' && history.replaceState) {
