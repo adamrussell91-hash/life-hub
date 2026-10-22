@@ -67,3 +67,19 @@ test("a linked visit passes the Food Journal validator, with missing dish ids fi
   assert.ok(next.visits[0].dishes[0].id.startsWith("dish_"));
   assert.doesNotThrow(() => validateFoodJournal(next));
 });
+
+test("a tombstoned visit is never revived; the new one takes a free source id that still parses", () => {
+  const journal = { schema_version: 1, visits: [], recipes: [] };
+  let { journal: next } = upsertLinkedVisit(journal, { tripId: "trp_test1", moment, food, photos: [], newId: () => "visit_old" });
+  next.visits[0].status = "deleted";
+  ({ journal: next } = upsertLinkedVisit(next, { tripId: "trp_test1", moment, food, photos: [], newId: () => "visit_two" }));
+  next.visits[1].status = "deleted";
+  const out = upsertLinkedVisit(next, { tripId: "trp_test1", moment, food, photos: [], visitId: "visit_old", newId: () => "visit_three" });
+  const [a, b, c] = out.journal.visits;
+  assert.equal(out.visitId, "visit_three");
+  assert.equal(a.status, "deleted");
+  assert.equal(b.status, "deleted");
+  assert.deepEqual([a.source_id, b.source_id, c.source_id], ["travel:trp_test1:mom_abcd1234", "travel:trp_test1:mom_abcd1234:2", "travel:trp_test1:mom_abcd1234:3"]);
+  assert.deepEqual(parseTravelSourceId(c.source_id), { tripId: "trp_test1", momentId: "mom_abcd1234" });
+  assert.doesNotThrow(() => validateFoodJournal(out.journal));
+});
