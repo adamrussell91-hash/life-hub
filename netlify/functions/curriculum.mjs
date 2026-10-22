@@ -26,6 +26,8 @@ import {
 import { isDeletedRecord, withoutDeleted } from './_shared/record-liveness.mjs';
 import { buildMediaUsage } from './_shared/media-usage.mjs';
 
+const LESSON_KINDS = new Set(['lesson', 'workshop', 'lecture']);
+
 export const config = { path: '/api/curriculum' };
 
 function lessonStatus(lesson) {
@@ -56,7 +58,9 @@ function lessonSummary(lesson, publishedIds) {
       ? { outcome_ids: lesson.outcome_ids }
       : {}),
     ...(typeof lesson.pedagogical_mode === 'string' ? { pedagogical_mode: lesson.pedagogical_mode } : {}),
-    ...(Array.isArray(lesson.line_stops) && lesson.line_stops.length ? { line_stops: lesson.line_stops } : {})
+    ...(Array.isArray(lesson.line_stops) && lesson.line_stops.length ? { line_stops: lesson.line_stops } : {}),
+    ...(Array.isArray(lesson.after_lesson_ids) ? { after_lesson_ids: lesson.after_lesson_ids } : {}),
+    ...(LESSON_KINDS.has(lesson.lesson_kind) && lesson.lesson_kind !== 'lesson' ? { lesson_kind: lesson.lesson_kind } : {})
   };
 }
 

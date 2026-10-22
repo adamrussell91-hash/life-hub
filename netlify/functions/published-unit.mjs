@@ -15,7 +15,7 @@ import {
   subjectKey,
   unitKey
 } from './_shared/teaching-blobs.mjs';
-import { publicLineStops, publicNetworkLines } from './_shared/teaching-network.mjs';
+import { publicLineStops, publicAfterLinks, publicLessonKind, publicNetworkLines } from './_shared/teaching-network.mjs';
 import { collectAnthology } from './_shared/teaching-anthology.mjs';
 import {
   attachedOutcomeIds,
@@ -72,7 +72,21 @@ export function createPublishedUnitHandler(deps = {}) {
       });
     }
 
-    const lessons = orderLessonsByUnitIds(unit.lesson_ids ?? [], matching);
+    const unitLessonIds = Array.isArray(unit.lesson_ids) ? unit.lesson_ids : [];
+    const drafts = new Map();
+    for (const lessonId of unitLessonIds) {
+      const draft = await getJSON(store, draftLessonKey(lessonId));
+      if (draft && !isDeletedRecord(draft)) drafts.set(lessonId, draft);
+    }
+    const afterLinks = publicAfterLinks(unitLessonIds, drafts, new Set(matching.map(lesson => lesson.lesson_id)));
+    const lessons = orderLessonsByUnitIds(unit.lesson_ids ?? [], matching).map(lesson => {
+      const kind = publicLessonKind(drafts.get(lesson.lesson_id)?.lesson_kind);
+      return {
+        ...lesson,
+        ...(afterLinks.has(lesson.lesson_id) ? { after_lesson_ids: afterLinks.get(lesson.lesson_id) } : {}),
+        ...(kind ? { lesson_kind: kind } : {})
+      };
+    });
     const filteredBlocks = filterBlocksForStudent(unit.blocks ?? []);
     let resolvedBlocks = filteredBlocks;
     if (containsWhiteboardBlocks(filteredBlocks)) {

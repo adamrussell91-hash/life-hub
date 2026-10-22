@@ -1246,6 +1246,8 @@ var NetworkLineSchema = z7.object({
   short: z7.string().max(4).optional(),
   colour: CurriculumLinesColourSchema.default("wave")
 });
+var LessonKindSchema = z7.enum(["lesson", "workshop", "lecture"]);
+var AfterLessonIdsSchema = z7.array(z7.string().min(1).max(64)).max(6);
 var LineStopSchema = z7.object({
   line_id: z7.string().min(1).max(64),
   level: CurriculumLinesLevelSchema.optional()
@@ -1261,7 +1263,9 @@ var CurriculumRailStopSchema = z7.object({
   kind: z7.enum(["stop", "extension", "support"]).default("stop"),
   lesson_id: z7.string().min(1).max(64).optional(),
   block_id: z7.string().min(1).max(120).optional(),
-  label: z7.string().max(120).default("")
+  label: z7.string().max(120).default(""),
+  /** Who may take the straight track past a support stop, e.g. "90%+ on the techniques quiz". */
+  skip_rule: z7.string().max(80).optional()
 });
 var CurriculumGateSchema = z7.object({
   id: z7.string().min(1).max(64),
@@ -2183,6 +2187,7 @@ var BlockSchema = z7.lazy(
 export {
   AccordionBlockSchema,
   AccordionItemSchema,
+  AfterLessonIdsSchema,
   AnalogyChainsBlockSchema,
   AnalogyCloseReadingBlockSchema,
   AnalogyMetaphorBlockSchema,
@@ -2288,6 +2293,7 @@ export {
   HtmlAppBlockSchema,
   HtmlBlockSchema,
   ImageBlockSchema,
+  LessonKindSchema,
   LineStopSchema,
   MediaSizeVariantSchema,
   MindMapBlockSchema,
