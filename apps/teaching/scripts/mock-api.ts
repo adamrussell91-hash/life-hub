@@ -100,6 +100,7 @@ import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
+import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
@@ -1328,6 +1329,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const next = { ...existing, updated_at: nowIso() };
     if (record.network_lines !== undefined) next.network_lines = record.network_lines;
     if (record.network_nudges !== undefined) next.network_nudges = record.network_nudges;
+    if (record.outcome_ids !== undefined) next.outcome_ids = record.outcome_ids;
     const parsed = SubjectSchema.safeParse(next);
     if (!parsed.success) return errorResponse(400, 'validation_error', 'Subject network is invalid');
     store.setJSON(subjectKey(id), parsed.data);
@@ -2230,7 +2232,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return (
         parsed.success &&
         parsed.data.subject_id === subjectId &&
-        parsed.data.code.toLowerCase() === code.toLowerCase()
+        parsed.data.code.trim().replace(/\s+/g, ' ').toLowerCase() === code.replace(/\s+/g, ' ').toLowerCase()
       );
     });
     if (duplicate) {
@@ -3606,6 +3608,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createLessonDiscernHandler(deps)
       : path.startsWith('/api/published/discern/')
         ? createPublishedDiscernHandler(deps)
+      : path.startsWith('/api/outcomes/')
+      ? createOutcomeHandler(deps)
       : /^\/api\/classes\/[^/]+\/markbook$/.test(path)
       ? createMarkbookHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
@@ -3690,6 +3694,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if (
       /^\/api\/classes\/[^/]+\/markbook$/.test(path) ||
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
+      /^\/api\/outcomes\/[^/]+(\/(usage|merge))?$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
