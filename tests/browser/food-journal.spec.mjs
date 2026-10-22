@@ -1218,16 +1218,19 @@ for (const width of [1440, 390]) {
     const sheet = page.getByRole("dialog", { name: "Send to Brisket" });
     await sheet.waitFor();
     assert.deepEqual(
-      await sheet.getByRole("radio").allInnerTexts(),
+      await sheet
+        .getByRole("group", { name: "Portion" })
+        .getByRole("button")
+        .allInnerTexts(),
       ["All", "¾", "½", "⅓", "¼", "Pieces"],
     );
     assert.equal(
-      await sheet.getByRole("radio", { name: "All" }).getAttribute("aria-checked"),
+      await sheet.getByRole("button", { name: "All", exact: true }).getAttribute("aria-pressed"),
       "true",
     );
     const send = sheet.getByRole("button", { name: "Send", exact: true });
     assert.equal(await send.isDisabled(), false);
-    await sheet.getByRole("radio", { name: "Pieces" }).click();
+    await sheet.getByRole("button", { name: "Pieces", exact: true }).click();
     assert.equal(await send.isDisabled(), true);
     await sheet.getByLabel("Pieces eaten").fill("9");
     await sheet.getByLabel("Pieces in total").fill("8");
@@ -1279,11 +1282,11 @@ for (const width of [1440, 390]) {
     const change = page.getByRole("dialog", { name: "Send to Brisket" });
     await change.waitFor();
     assert.equal(
-      await change.getByRole("radio", { name: "½" }).getAttribute("aria-checked"),
+      await change.getByRole("button", { name: "½", exact: true }).getAttribute("aria-pressed"),
       "true",
     );
     assert.equal(
-      await change.getByRole("radio", { name: "All" }).getAttribute("aria-checked"),
+      await change.getByRole("button", { name: "All", exact: true }).getAttribute("aria-pressed"),
       "false",
     );
     assert.deepEqual(errors, []);
@@ -1306,9 +1309,9 @@ for (const width of [1440, 390]) {
     );
     await card.getByRole("button", { name: "Re-count", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "Send to Brisket" });
-    await sheet.getByRole("radio", { name: "½" }).waitFor();
+    await sheet.getByRole("button", { name: "½", exact: true }).waitFor();
     assert.equal(
-      await sheet.getByRole("radio", { name: "½" }).getAttribute("aria-checked"),
+      await sheet.getByRole("button", { name: "½", exact: true }).getAttribute("aria-pressed"),
       "true",
     );
     // A photo that cannot be fetched is skipped; the hand-off still goes.
@@ -1393,7 +1396,7 @@ for (const width of [1440, 390])
     );
     await fresh.getByRole("button", { name: "Send to Brisket", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "Send to Brisket" });
-    await sheet.getByRole("radio", { name: "¾" }).click();
+    await sheet.getByRole("button", { name: "¾", exact: true }).click();
     await sheet.getByRole("button", { name: "Send", exact: true }).click();
     await page.locator("#nutrition-dashboard #chat-view").waitFor();
     await expectSent(sent, 1);
