@@ -135,6 +135,16 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       .catch(() => {});
   }
 
+  /** Runs a job after every write already queued. Its failure goes to the caller and never stops the queue. */
+  function enqueue<T>(job: () => Promise<T>): Promise<T> {
+    const run = queue.then(job);
+    queue = run.then(
+      () => {},
+      () => {}
+    );
+    return run;
+  }
+
   function change(next: Change, run: () => Promise<Markbook>): void {
     status.textContent = '';
     if (view) view = applyChange(view, next);
@@ -151,10 +161,15 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       column,
       outcomes: options.outcomes ?? [],
       today: today(),
+      returnFocus: () => title,
       // A throw stays in the form, which shows the message and keeps the teacher's typing.
       onSave: async (saved) => {
-        const markbook = await api.saveColumn(cls.id, saved);
-        if (disposed || !confirmed) return;
+        const markbook = await enqueue(() => api.saveColumn(cls.id, saved));
+        if (disposed) return;
+        if (!confirmed) {
+          void load();
+          return;
+        }
         confirmed = withServerCopy(confirmed, markbook, []);
         view = queued.reduce(applyChange, confirmed);
         status.textContent = '';

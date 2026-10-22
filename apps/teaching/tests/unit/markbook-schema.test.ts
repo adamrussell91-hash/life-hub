@@ -26,6 +26,9 @@ describe('markbook schema', () => {
     expect(checkColumn({ ...essay, criteria: [{ ...essay.criteria[0], bands: [{ label: 'A', min: 16 }] }] })).toEqual({ problem: 'Band A starts above 15 in Analysis.' });
     expect(checkColumn({ ...essay, criteria: [essay.criteria[0], { ...essay.criteria[1], id: 'crit000001' }] })).toEqual({ problem: 'Two criteria share an id.' });
     expect('problem' in checkColumn({ ...essay, weight: 120 })).toBe(true);
+    expect(checkColumn({ ...essay, weight: 120 })).toEqual({ problem: 'Weight is at most 100.' });
+    expect(checkColumn({ ...essay, weight: -1 })).toEqual({ problem: 'Weight can’t be below 0.' });
+    expect(checkColumn({ ...essay, criteria: [{ ...essay.criteria[1], max: 1001 }] })).toEqual({ problem: 'A criterion is worth at most 1000 marks.' });
   });
 
   it('checks a mark against its column', () => {
