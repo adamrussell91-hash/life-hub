@@ -59,7 +59,7 @@ The landing page mirrors Decision Maker's, in the Gear Shifter palette:
 2. **Discern:** the coach names the obstacle in a few words (no clear priority, an avoided start, broken attention, too little capacity, other people, worn-out energy). It recommends one technique with one sentence on why, and names a sibling it passed over. If the whole project needs attention rather than one obstacle, it recommends **Getting a Project Done**, the book's seven-stage overview, whose stations link to the techniques the book points to at each stage. The person can accept or pick from the shelf.
 3. **Work the technique:** slot by slot, exactly as in Decision Maker. Lenses are short: two sentences, one marker or one answer.
 4. **Another angle:** at the technique's minimum, the coach offers one follow-up from `seeAlso` or `pairsWell`, or goes straight to Commit. One technique per session is the default; the book's advice is to try one thing, not to stack exercises.
-5. **Commit:** the experiment tool (`gt_commit`, `step: 'settle'`). Its slots are:
+5. **Commit:** the experiment tool (`gt_commit`, `step: 'commit'`, so no other book's settle tool joins Commit). Its slots are:
    - the result that matters;
    - the technique it rests on, with the chart nodes it uses;
    - the next action, small and visible;

@@ -170,3 +170,15 @@
 - The record card reads `actionOffer(session)` and writes through `link_case_file` with `graphic`; the provenance graphic draws `actionProvenance(session)` (the technique's emblem inside its section's) with its caption.
 - The next action's task card is the proposal flow; the check-back is the review card (`set_review_task`, `dismiss_review`); Review now is `start_review`.
 - The medal reads the row's `main`.
+
+## As run (22 Oct)
+
+- Every task ran test-first and ended with a commit. **Order changed:** the schema (Task 3), then Commit and Review's tools (Task 4) and the action record (Task 5) ran before the prompt (Tasks 2 and 6, one commit), so the prompt's Commit and Review layers and record lines could name real tools and offers.
+- Tests added: 13 prompt and knowledge tests (`get-things-done-prompts.test.js`, with `next_technique`), 8 Commit and Review tests (`get-things-done-commit.test.js`), 7 record tests (`get-things-done-record.test.js`) and 7 scripted tests (`get-things-done-scripted.test.js`); the shared steps live in `tests/unit/gear-shifter-test-helpers.mjs`. Two existing tests were widened, not loosened: the registry order now ends with `gt_commit` and `gt_review`, and Project Evaluation is one of Review's two tools.
+- `npm run pre-pr-check` passed: 6,776 root tests (6,765 pass, 11 skipped as before), the Tasks, Teaching and Professional suites and type-checks. Problem Solver's rubric hash is unchanged; its and Decision Maker's suites pass unedited.
+- `node scripts/book-pack/copy-check.mjs ../life-hub-data/book-packs/get-things-done`: no copied runs, now over the coach's knowledge, the rubric and the two new tools too.
+- **The rubric** is about 18,400 characters (Decision Maker's is about 22,800), cached like the others.
+- **The register's `record` entry** also carries `basisRule`, the opening of the coach's repair when an answer rests on nothing (Decision Maker's wording is unchanged).
+- **The scripted coach discerns** from the route's first station: the obstacle that leads with that station (else the first that visits it), and its first technique in that section (others gives Appreciation; doing, Procrastination). It reads a finished project from the person's words ("finished", "shipped") or an `after` route.
+- **The record's "rests on" line** shows the basis nodes' titles, which are the short titles the coach gives, not the full text.
+- The spec's Commit line now reads `step: 'commit'`.

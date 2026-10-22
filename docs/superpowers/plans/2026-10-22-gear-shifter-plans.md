@@ -10,9 +10,9 @@ There are six plans and one PR, as with Decision Maker. Each plan is written onc
 | --- | --- | --- | --- |
 | 1 | Foundations | **Done**; design approved by Adam on 22 Oct, including the mockups' medal (progressive cover with a section badge), the lighter rail icon, route-order sections and the How a session builds strip | Catalogue, route, glyphs recoloured to Adam's palette, tokens, the `gear_shifter` model, a book register replacing the `'decision'` checks in the engine, the `shift` and `start` session kinds, `/api/get-things-done`, and mockups. **Adam approves the design before Plan 2** |
 | 2 | Charts | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-2-charts.md`; approved by Adam on 22 Oct | The scales `min` and dated saves, the ratings family, the Kanban and 5 Whys variants, the `.gt-scope` re-skin, and a contact sheet |
-| 3 | The techniques | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-3-techniques.md`. Awaiting Adam before Plan 4; the techniques are on the contact sheet | The importer, then configs and notes for all 37 entries, one section per commit |
-| 4 | Coach, Commit, Record and Review | **Next**, after Adam's go-ahead | Rubric, catalogue lines, discernment, `gt_commit`, the action record and Review |
-| 5 | The app | Not started | Landing, session, route, medal, track and shelf; the record on a page; the mock API route |
+| 3 | The techniques | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-3-techniques.md`; Adam gave the go-ahead for Plan 4 | The importer, then configs and notes for all 37 entries, one section per commit |
+| 4 | Coach, Commit, Record and Review | **Done** (22 Oct); plan in `2026-10-22-gear-shifter-plan-4-coach.md`. Awaiting Adam before Plan 5 | Rubric, catalogue lines, discernment, `gt_commit`, the action record and Review |
+| 5 | The app | **Next**, after Adam's go-ahead | Landing, session, route, medal, track and shelf; the record on a page; the mock API route |
 | 6 | Quick start and checks | Not started | Quick start, live coach evaluation, Playwright at both widths, `pre-pr-check` and the PR marked ready |
 
 ## Plan 1: Foundations
