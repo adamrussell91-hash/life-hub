@@ -160,6 +160,21 @@ function validateMedia(media, path, tripId) {
   }
 }
 
+const FOOD_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/;
+
+function validateMeal(meal, path) {
+  if (!isObject(meal)) throw fail(path, `${path} must be an object`);
+  if (typeof meal.food_visit_id !== 'string' || !FOOD_ID_RE.test(meal.food_visit_id)) {
+    throw fail(`${path}.food_visit_id`, 'food_visit_id must be a Food Journal visit id');
+  }
+  for (const [key, max] of [['mood', 40], ['vibe', 600], ['with', 200]]) {
+    if (meal[key] === undefined) continue;
+    if (typeof meal[key] !== 'string' || meal[key].length > max) {
+      throw fail(`${path}.${key}`, `${key} must be text up to ${max} characters`);
+    }
+  }
+}
+
 function validateMoment(moment, path, legIds) {
   if (!isObject(moment)) throw fail(path, `${path} must be an object`);
   requireId(moment.id, 'mom', `${path}.id`);
@@ -185,6 +200,7 @@ function validateMoment(moment, path, legIds) {
   }
   if (moment.place) validatePlace(moment.place, `${path}.place`);
   if (moment.coordinates) validateCoordinates(moment.coordinates, `${path}.coordinates`);
+  if (moment.meal !== undefined && moment.meal !== null) validateMeal(moment.meal, `${path}.meal`);
 }
 
 function validateDay(day, path, legIds) {

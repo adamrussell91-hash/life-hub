@@ -52,6 +52,40 @@ export async function knowledgePutObject(env, { key, body, contentType, putObjec
   );
 }
 
+// Reads from the function, for server-side copies between namespaces.
+export async function knowledgeGetObject(env, { key, getObject } = {}) {
+  const config = knowledgeR2Config(env);
+  if (!config) throw knowledgeR2Unbound();
+  if (typeof getObject === 'function') return getObject({ ...config, key });
+  const { GetObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const client = new S3Client(knowledgeR2ClientOptions(config));
+  const out = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+  return Buffer.from(await out.Body.transformToByteArray());
+}
+
+// An object's size without reading it, so a copy can refuse one too large.
+export async function knowledgeHeadObject(env, { key, headObject } = {}) {
+  const config = knowledgeR2Config(env);
+  if (!config) throw knowledgeR2Unbound();
+  if (typeof headObject === 'function') return headObject({ ...config, key });
+  const { HeadObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const client = new S3Client(knowledgeR2ClientOptions(config));
+  const out = await client.send(new HeadObjectCommand({ Bucket: config.bucket, Key: key }));
+  return { size: out.ContentLength };
+}
+
+// The photo upload limit for the Food Journal and Travel; a bigger object is never read in.
+export const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+const tooLarge = () => Object.assign(new Error('That photo is too large.'), { tooLarge: true });
+// Reads a stored photo, refusing one over the limit before and after reading.
+export async function readStoredPhoto(env, key, { getObject, headObject, maxBytes = MAX_PHOTO_BYTES } = {}) {
+  const head = await knowledgeHeadObject(env, { key, headObject });
+  if (Number(head?.size) > maxBytes) throw tooLarge();
+  const bytes = await knowledgeGetObject(env, { key, getObject });
+  if (bytes.length > maxBytes) throw tooLarge();
+  return bytes;
+}
+
 export async function knowledgePresignGet(env, { key, signGet, expiresIn = 300 } = {}) {
   const config = knowledgeR2Config(env);
   if (!config) throw knowledgeR2Unbound();

@@ -53,6 +53,17 @@ html[data-hub="life"] .hub-card.food-dish {
   color: var(--muted);
   margin: 0;
 }
+.food-original {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.food-ingredients {
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
 .food-notes,
 .food-preview {
   margin: 0;
@@ -327,6 +338,32 @@ html[data-hub="life"] .hub-card.food-dish {
   display: flex;
   align-items: center;
   color: var(--navy);
+}
+.food-counted {
+  align-self: center;
+  background: var(--success-surface);
+  color: var(--success);
+  white-space: normal;
+  text-align: left;
+}
+.food-portion__chip {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.food-portion__pieces {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.food-portion__pieces[hidden] {
+  display: none;
+}
+.food-sheet .food-portion__count {
+  flex: 0 0 5rem;
+  width: 5rem;
+  min-height: 44px;
 }
 @media (max-width: 1100px) {
   .food-grid {

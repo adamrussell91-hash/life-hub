@@ -4,6 +4,8 @@ import {
   applyRestore,
   applySoftDelete,
   deleteImpactSummary,
+  momentDeletedMessage,
+  momentRestoredMessage,
 } from '@/journal/delete-flow';
 import type { JournalDocument } from '@/api/journal';
 
@@ -62,5 +64,19 @@ describe('delete-flow', () => {
     const impact = deleteImpactSummary(journal, { kind: 'leg', id: leg!.id });
     expect(impact.legs).toBe(1);
     expect(impact.moments).toBeGreaterThan(0);
+  });
+});
+
+describe('moment delete messages', () => {
+  it('only claims the Food Journal visit went when the delete reached the server', () => {
+    expect(momentDeletedMessage('Market', { meal: false, queued: false })).toBe('Deleted “Market”');
+    expect(momentDeletedMessage('Market', { meal: false, queued: true })).toBe('Deleted “Market”');
+    expect(momentDeletedMessage('Market', { meal: true, queued: false })).toBe(
+      'Deleted “Market” and its Food Journal visit',
+    );
+    expect(momentDeletedMessage('Market', { meal: true, queued: true })).toBe(
+      'Deleted “Market”. The Food Journal visit goes when you’re back online.',
+    );
+    expect(momentRestoredMessage('Market')).toBe('Restored “Market” without its meal.');
   });
 });

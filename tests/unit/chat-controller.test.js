@@ -400,6 +400,96 @@ test('a confirm that reports centralNodeUpdated:false shows an ephemeral warning
   );
 });
 
+test('a confirm that reports foodJournalUpdated:false says the Food Journal badge did not save', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: true, foodJournalUpdated: false })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  findProposalButton(proposal, 'record-proposal__confirm').dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged. The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.'
+  );
+});
+
+test('a confirm for a deleted Food Journal dish says there is no badge to update', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: true, foodJournalUpdated: false, foodJournalReason: 'dish_missing' })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  findProposalButton(proposal, 'record-proposal__confirm').dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged. The Food Journal dish was deleted, so there\u2019s no badge to update.'
+  );
+});
+
+test('Central Node, Food Journal and old-count warnings show together in one message', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: false, foodJournalUpdated: false, oldCountRemoved: false })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  findProposalButton(proposal, 'record-proposal__confirm').dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged, but Central Node didn\u2019t update — try Refresh. '
+      + 'The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again. '
+      + 'The old count for this dish couldn\u2019t be removed; delete it from Nutrition.'
+  );
+});
+
+async function confirmWith(confirmImpl) {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({ record: skincareRecord(), path: '2026/2026-08-02-hyaluronica-skincare.md', confirmImpl });
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hyaluronica, log tonight\'s routine');
+  const proposal = findProposalCardInRoot(root);
+  const button = findProposalButton(proposal, 'record-proposal__confirm');
+  button.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+  return { root, button };
+}
+
+test('a recount_not_saved confirm shows its message and lets Confirm be pressed again', async () => {
+  const { root, button } = await confirmWith(async () => {
+    throw Object.assign(new Error('The re-count didn\u2019t save; try again.'), { code: 'recount_not_saved', status: 409 });
+  });
+  assert.equal(root.querySelector('#chat-error').textContent, 'The re-count didn\u2019t save; try again.');
+  assert.equal(button.disabled, false);
+});
+
+test('a failed re-count rollback says it was logged twice', async () => {
+  const { root } = await confirmWith(async () => ({ ok: true, centralNodeUpdated: true, foodJournalUpdated: false, recountRollbackFailed: true }));
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged twice: the re-count couldn\u2019t be linked to the dish. Delete the newer one from Nutrition.'
+  );
+});
+
 test('a confirm that reports centralNodeUpdated:true does not show the Central Node warning', async () => {
   const root = new FakeDocument();
   const chatApi = fakeChatApi({
@@ -2418,4 +2508,91 @@ test('switching from Vera to Penelope flushes then pins Penelope', async () => {
   assert.equal(sendCalls.length, 2);
   assert.equal(sendCalls[1].message, VERA_FLUSH);
   assert.equal(controller.getSelectedAgentSlug(), 'penelope');
+});
+
+test('a hand-off after a Vera thread goes to the new agent only once the Vera flush has finished', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let releaseFlush;
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      if (sendCalls.length === 2) await new Promise(resolve => { releaseFlush = resolve; });
+      yield { type: 'agent', slug: sendCalls.length === 3 ? 'brisket' : 'vera' };
+      yield { type: 'text', delta: 'Noted.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('vera');
+  await controller.send('Today felt long');
+  // Leaving the chat surface starts the flush without waiting for it.
+  void controller.flushVeraSession();
+  await flushMicrotasks();
+  await controller.selectAgent('brisket');
+  const idle = controller.waitUntilIdle();
+  let sent = false;
+  const handoff = idle.then(() => controller.send('Count this Food Journal dish.')).then(r => { sent = true; return r; });
+  await flushMicrotasks();
+  assert.equal(sendCalls.length, 2, 'the hand-off waits behind the flush');
+  assert.equal(sent, false);
+  releaseFlush();
+  const result = await handoff;
+  assert.equal(sendCalls.length, 3);
+  assert.equal(sendCalls[1].priorAgentSlug, 'vera');
+  assert.equal(sendCalls[2].message, 'Count this Food Journal dish.');
+  assert.equal(sendCalls[2].priorAgentSlug, 'brisket');
+  assert.deepEqual(result, { ok: true });
+});
+
+test('send reports a failed turn so a caller can say so', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    // eslint-disable-next-line require-yield
+    async *send() {
+      throw Object.assign(new Error('down'), { status: 502 });
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  assert.deepEqual(await controller.send('Count this'), { ok: false });
+});
+
+test('send tells the caller once the agent has taken the turn, before the reply ends', async () => {
+  const root = new FakeDocument();
+  let release;
+  const order = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      await new Promise(resolve => { release = resolve; });
+      yield { type: 'text', delta: 'Counting.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  const done = controller.send('Count this', { onAccepted: () => order.push('accepted') }).then(r => {
+    order.push('done');
+    return r;
+  });
+  await flushMicrotasks();
+  assert.deepEqual(order, ['accepted']);
+  release();
+  assert.deepEqual(await done, { ok: true });
+  assert.deepEqual(order, ['accepted', 'done']);
+});
+
+test('an error before the agent takes the turn is not reported as accepted', async () => {
+  const root = new FakeDocument();
+  let accepted = 0;
+  const chatApi = {
+    async *send() {
+      yield { type: 'error', code: 'upstream' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  assert.deepEqual(await controller.send('Count this', { onAccepted: () => { accepted += 1; } }), { ok: false });
+  assert.equal(accepted, 0);
 });

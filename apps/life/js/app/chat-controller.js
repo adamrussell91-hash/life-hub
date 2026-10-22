@@ -554,7 +554,13 @@ export function createChatController({
       });
   }
 
-  async function send(message, { hiddenUser = false, attachments } = {}) {
+  async function send(message, { hiddenUser = false, attachments, onAccepted } = {}) {
+    // Callers such as the Food Journal hand-off need to know the turn failed.
+    let failed = false;
+    const fail = text => {
+      failed = true;
+      showChatError(root, text);
+    };
     sending = true;
     setChatBusy(root, true);
     showChatError(root, '');
@@ -694,6 +700,11 @@ export function createChatController({
         ...(sessionForSend ? { auditSession: sessionForSend } : {}),
         ...(protocolId ? { protocolId } : {})
       })) {
+        // The agent has the turn once anything but an error arrives.
+        if (onAccepted && event.type !== 'error') {
+          onAccepted();
+          onAccepted = null;
+        }
         if (event.type === 'agent') {
           const slug = lockedSlug && event.slug !== lockedSlug ? lockedSlug : event.slug;
           if (slug !== 'hammond') clearAuditSession();
@@ -849,9 +860,9 @@ export function createChatController({
               });
             }
           } else if (event.code === 'request_too_large') {
-            showChatError(root, 'That photo is too large to send. Try a smaller image.');
+            fail('That photo is too large to send. Try a smaller image.');
           } else {
-            showChatError(root, 'Chat is unavailable right now. Please try again.');
+            fail('Chat is unavailable right now. Please try again.');
           }
         } else if (event.type === 'status') {
           if (typeof event.text === 'string' && event.text.trim()) {
@@ -939,12 +950,12 @@ export function createChatController({
       const abortedForNewChat = abort.signal.reason === 'new-chat';
       if (error?.name === 'AbortError') {
         if (!abortedForNewChat && abort.signal.reason !== 'stop') {
-          showChatError(root, 'That search took too long. Try again in a moment.');
+          fail('That search took too long. Try again in a moment.');
         }
       } else if (error?.code === 'request_too_large' || error?.status === 413) {
-        showChatError(root, 'That photo is too large to send. Try a smaller image.');
+        fail('That photo is too large to send. Try a smaller image.');
       } else {
-        showChatError(root, 'Chat is unavailable right now. Please try again.');
+        fail('Chat is unavailable right now. Please try again.');
       }
     } finally {
       if (activeAbort === abort) activeAbort = null;
@@ -956,6 +967,7 @@ export function createChatController({
       setChatBusy(root, false);
       if (turnSignaled && !hiddenUser) maybeMarkUnread();
     }
+    return { ok: !failed };
   }
 
   function bindProposal(proposal, event) {
@@ -1147,9 +1159,23 @@ export function createChatController({
         label: 'Confirmed'
       });
       moveConfirmReceiptToTranscript(root, proposal.card);
-      if (result?.centralNodeUpdated === false) {
-        showChatError(root, 'Logged, but Central Node didn\u2019t update — try Refresh.');
-      }
+      // One message that says "Logged" once, so a second warning never hides the first.
+      const twice = result?.recountRollbackFailed === true;
+      const saveWarnings = [
+        result?.foodJournalUpdated === false && !twice
+          ? result.foodJournalReason === 'dish_missing'
+            ? 'The Food Journal dish was deleted, so there\u2019s no badge to update.'
+            : 'The Food Journal badge didn\u2019t save; open the dish and choose Send to Brisket to try again.'
+          : null,
+        result?.oldCountRemoved === false ? 'The old count for this dish couldn\u2019t be removed; delete it from Nutrition.' : null
+      ].filter(Boolean);
+      const lead = twice
+        ? 'Logged twice: the re-count couldn\u2019t be linked to the dish. Delete the newer one from Nutrition.'
+          + (result?.centralNodeUpdated === false ? ' Central Node didn\u2019t update — try Refresh.' : '')
+        : result?.centralNodeUpdated === false
+          ? 'Logged, but Central Node didn\u2019t update — try Refresh.'
+          : saveWarnings.length ? 'Logged.' : null;
+      if (lead) showChatError(root, [lead, ...saveWarnings].join(' '));
       // Earned hype: a genuine PB (Phase 1's library upsert) gets a specific, loud reaction
       // right in the transcript -- confirm is a plain POST, not an LLM turn, so this is a
       // templated in-voice line rather than a model-generated one. Workout-only: personalBests
@@ -1192,6 +1218,8 @@ export function createChatController({
             ? error.message
             : 'That session is already finished — I won\'t replace it with a plan'
         );
+      } else if (error.code === 'recount_not_saved') {
+        showChatError(root, 'The re-count didn\u2019t save; try again.');
       } else if (error.code === 'github_unavailable' || error.code === 'repository_not_found') {
         showChatError(root, `The record was not saved because the data store was unavailable (${error.code}). Confirm again.`);
       } else {
@@ -1221,6 +1249,7 @@ export function createChatController({
 
   return {
     send,
+    waitUntilIdle,
     selectAgent,
     selectProtocol,
     startNewChat,

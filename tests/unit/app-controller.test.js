@@ -348,6 +348,9 @@ function harness(options = {}) {
     chatFlushVeraSession: () => {
       calls.chatFlushes = (calls.chatFlushes ?? 0) + 1;
     },
+    chatSelectAgent: options.chatSelectAgent,
+    chatWaitUntilIdle: options.chatWaitUntilIdle,
+    chatSend: options.chatSend,
     chatPanel: {
       opens: [],
       closes: 0,
@@ -1508,3 +1511,46 @@ test('a completed refresh while viewing Central Node re-renders the dashboard an
   assert.equal(state.calls.centralNodeRenders, 2);
 });
 
+
+test('a Food Journal hand-off waits for the switch to Brisket and an idle chat before sending', async () => {
+  const order = [];
+  let finishSwitch, finishIdle;
+  const state = harness({
+    chatSelectAgent: slug => new Promise(resolve => {
+      order.push(`select ${slug}`);
+      finishSwitch = () => { order.push('switched'); resolve(); };
+    }),
+    chatWaitUntilIdle: () => new Promise(resolve => {
+      order.push('wait');
+      finishIdle = () => { order.push('idle'); resolve(); };
+    }),
+    chatSend: async (message, opts) => {
+      order.push(`send ${message} ${opts.attachments.length}`);
+      return { ok: true };
+    }
+  });
+  await state.controller.start();
+  const done = state.controller.openBrisketWith('Count this', [{ id: 'a' }]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(state.controller.getCurrentSection(), 'nutrition');
+  assert.deepEqual(order, ['select brisket']);
+  finishSwitch();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(order, ['select brisket', 'switched', 'wait']);
+  finishIdle();
+  assert.deepEqual(await done, { ok: true });
+  assert.deepEqual(order, ['select brisket', 'switched', 'wait', 'idle', 'send Count this 1']);
+  assert.equal(state.chatPanelCalls.opens.at(-1).slot, state.root.querySelector('#nutrition-dashboard'));
+});
+
+test('a failed Food Journal hand-off returns to the section it came from', async () => {
+  const state = harness({
+    chatSelectAgent: async () => {},
+    chatWaitUntilIdle: async () => {},
+    chatSend: async () => ({ ok: false })
+  });
+  await state.controller.start();
+  assert.deepEqual(await state.controller.openBrisketWith('Count this', []), { ok: false });
+  assert.equal(state.controller.getCurrentSection(), 'home');
+  assert.equal(state.chatPanelCalls.isOpen(), false);
+});

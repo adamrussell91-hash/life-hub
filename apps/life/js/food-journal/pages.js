@@ -627,12 +627,28 @@ export function paintEntry(ctx, host, visit) {
   host.append(page);
 }
 
+// English first, the original beneath, shared by the dish card and the entry.
+export const dishName = (dish) => dish.title_en || dish.title;
+export const dishOriginal = (dish) =>
+  dish.title_en ? el("p", "food-original", dish.title) : null;
+export const dishIngredients = (dish) =>
+  dish.ingredients
+    ? el("p", "food-ingredients", dish.ingredients.split("\n").join(" · "))
+    : null;
+export function dishNotes(dish, visit, className) {
+  if (!dish.notes || dish.notes === visit.notes || !plainNotes(dish.notes))
+    return [];
+  const out = [el("p", className, plainNotes(dish.notes_en || dish.notes))];
+  if (dish.notes_en) out.push(el("p", "food-original", plainNotes(dish.notes)));
+  return out;
+}
+
 function menuDish(ctx, visit, dish) {
   const li = el("li", "fj-dish");
   if (dish.photos[0]) li.append(media(ctx, dish.photos[0], "fj-dish__thumb"));
   const body = el("div", "fj-dish__body");
   const line = el("div", "fj-dish__line");
-  line.append(el("h3", "fj-dish__title fj-serif", dish.title), el("span", "fj-leader"));
+  line.append(el("h3", "fj-dish__title fj-serif", dishName(dish)), el("span", "fj-leader"));
   const rate = el("div", "fj-rate");
   rate.setAttribute("role", "group");
   rate.setAttribute("aria-label", `Rate ${dish.title}`);
@@ -647,8 +663,10 @@ function menuDish(ctx, visit, dish) {
   }
   line.append(rate);
   body.append(line);
-  if (dish.notes && dish.notes !== visit.notes && plainNotes(dish.notes))
-    body.append(el("p", "fj-dish__note fj-serif fj-italic", plainNotes(dish.notes)));
+  body.append(
+    ...[dishOriginal(dish), dishIngredients(dish)].filter(Boolean),
+    ...dishNotes(dish, visit, "fj-dish__note fj-serif fj-italic"),
+  );
   const dishTags = unique(dish.tags.map(tagKey));
   if (dish.cuisine || dishTags.length) {
     const meta = el("p", "fj-meta fj-tags");
@@ -658,6 +676,7 @@ function menuDish(ctx, visit, dish) {
   }
   const actions = el("div", "fj-dish__actions");
   actions.append(
+    ...ctx.brisketActions(visit, dish),
     ctx.button(ctx.hasRecipe(dish.id) ? "Open recipe" : "Find a recipe", (e) => ctx.openRecipe(dish, e.currentTarget), ctx.hasRecipe(dish.id) ? "primary" : "secondary"),
     ctx.button("Eat it again", (e) => ctx.openRestaurant(visit, e.currentTarget, dish), "ghost"),
   );
