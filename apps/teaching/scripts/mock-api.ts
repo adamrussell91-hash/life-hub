@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { MockStore, type SeedData } from './mock-store';
+import { applyAlignmentPatch, AlignmentPatchError, AlignmentPatchSchema, AlignmentSchema, ALIGNMENT_ID } from '../src/alignment/schema';
 import {
   draftLessonKey,
   publishedLessonKey,
@@ -679,6 +680,37 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
     store.setJSON(MEDIA_FOLDERS_KEY, { folders, updated_at: nowIso() });
     return okResponse(200, { folders });
+  }
+
+  // Mirrors netlify/functions/syllabus-alignment.mjs. Reads the private file from a local
+  // life-hub-data checkout beside this repo; the wording never ships in this code.
+  function handleSyllabusAlignment(cookie: string | null | undefined, method: string, body: unknown): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    const key = `syllabus_alignment/${ALIGNMENT_ID}`;
+    if (!store.getJSON(key)) {
+      const dataDir = process.env.LIFE_HUB_DATA_DIR ?? new URL('../../../../life-hub-data/', import.meta.url).pathname;
+      try {
+        const parsed = AlignmentSchema.safeParse(JSON.parse(readFileSync(`${dataDir}/data/teaching/syllabus/${ALIGNMENT_ID}.json`, 'utf8')));
+        if (!parsed.success) return errorResponse(500, 'corrupt', 'The private syllabus file couldn’t be read.');
+        store.setJSON(key, parsed.data);
+      } catch {
+        return errorResponse(503, 'private_data_unbound', 'The private syllabus file can’t be reached from here.');
+      }
+    }
+    const doc = AlignmentSchema.parse(store.getJSON(key));
+    if (method === 'GET') return okResponse(200, { alignment: doc });
+    if (method !== 'PATCH') return errorResponse(405, 'method_not_allowed', 'Method not allowed.');
+    const patch = AlignmentPatchSchema.safeParse(body);
+    if (!patch.success) return errorResponse(400, 'bad_request', 'That change can’t be saved.');
+    try {
+      const next = { ...applyAlignmentPatch(doc, patch.data), updated_at: nowIso() };
+      store.setJSON(key, next);
+      return okResponse(200, { alignment: next });
+    } catch (error) {
+      if (error instanceof AlignmentPatchError) return errorResponse(400, 'bad_request', error.message);
+      throw error;
+    }
   }
 
   // Mirrors netlify/functions/whiteboards.mjs so boards save in local dev.
@@ -4095,6 +4127,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     if ((method === 'GET' || method === 'PUT') && path === '/api/media-folders') {
       return handleMediaFolders(cookie, method, body);
     }
+    if (path === '/api/syllabus-alignment') return handleSyllabusAlignment(cookie, method, body);
     const whiteboardMatch = /^\/api\/whiteboards\/([A-Za-z0-9_-]{1,160})$/.exec(path);
     if (whiteboardMatch && (method === 'GET' || method === 'PUT')) {
       return handleWhiteboard(cookie, method, whiteboardMatch[1]!, body);
