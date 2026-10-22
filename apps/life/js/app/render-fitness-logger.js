@@ -288,7 +288,8 @@ function renderRest(root, rest, actions) {
   row.append(
     button(root, { className: 'gym-chip', text: '−15s', marker: 'rest-less', onClick: () => actions.adjustRest?.(-15) }),
     button(root, { className: 'gym-chip', text: '+15s', marker: 'rest-more', onClick: () => actions.adjustRest?.(15) }),
-    button(root, { className: 'gym-chip gym-chip--strong', text: 'Skip rest', marker: 'rest-skip', onClick: () => actions.skipRest?.() })
+    button(root, { className: 'gym-chip gym-chip--strong', text: 'Skip rest', marker: 'rest-skip', onClick: () => actions.skipRest?.() }),
+    button(root, { className: 'gym-chip', text: 'Turn off', marker: 'rest-off', label: 'Turn the rest timer off', onClick: () => actions.setRestTimer?.(false) })
   );
   panel.append(row);
   return panel;
@@ -913,7 +914,7 @@ function renderDock(root, draft, { steps, stepIndex, allDone, actions }) {
   return dock;
 }
 
-function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat = '', actions }) {
+function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat = '', restTimerOn = true, actions }) {
   const sheet = el(root, 'section', {
     className: 'gym-sheet',
     data: { fitnessLogger: 'plan-sheet' },
@@ -1031,7 +1032,7 @@ function renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat =
   addExercise.append(addName, addButton);
   body.append(addExercise);
 
-  body.append(renderSessionDetails(root, draft, { timer, actions }));
+  body.append(renderSessionDetails(root, draft, { timer, restTimerOn, actions }));
   const treatWrap = el(root, 'label', { className: 'fitness-logger__field gym-plan__treat' });
   treatWrap.append(el(root, 'span', { text: 'Gym-only treat (a podcast or playlist you only allow yourself while training)' }));
   const treatInput = el(root, 'input', { data: { fitnessLogger: 'treat-input' } });
@@ -1065,9 +1066,18 @@ function labeledNumber(root, { label, value, step = '1', onInput }) {
   return wrap;
 }
 
-function renderSessionDetails(root, draft, { timer, actions }) {
+function renderSessionDetails(root, draft, { timer, restTimerOn = true, actions }) {
   const details = el(root, 'div', { className: 'fitness-logger__details' });
   details.append(el(root, 'h4', { text: 'Session details' }));
+  const restRow = el(root, 'div', { className: 'gym-sheet__clock' });
+  restRow.append(button(root, {
+    className: `gym-chip${restTimerOn ? ' is-active' : ''}`,
+    text: restTimerOn ? 'Rest timer: on' : 'Rest timer: off',
+    marker: 'rest-toggle',
+    pressed: restTimerOn,
+    onClick: () => actions.setRestTimer?.(!restTimerOn)
+  }));
+  details.append(restRow);
 
   const clock = el(root, 'div', { className: 'gym-sheet__clock', data: { fitnessLogger: 'controls' } });
   if (timer.state === 'completed') {
@@ -1255,6 +1265,7 @@ export function renderFitnessLogger(root, draft, {
   lastPainFlags = null,
   twingeOffer = null,
   treat = '',
+  restTimerOn = true,
   actions = {}
 } = {}) {
   const host = root.querySelector('#fitness-logger');
@@ -1392,7 +1403,7 @@ export function renderFitnessLogger(root, draft, {
   const allDone = steps.length > 0 && steps.every(item => stepDone(draft, item));
   shell.append(renderDock(root, draft, { steps, stepIndex, allDone, actions }));
 
-  if (panel === 'plan') shell.append(renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat, actions }));
+  if (panel === 'plan') shell.append(renderPlanSheet(root, draft, { blocks, steps, stepIndex, timer, treat, restTimerOn, actions }));
 
   layer.append(shell);
 }
