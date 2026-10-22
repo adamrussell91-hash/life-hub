@@ -2,7 +2,8 @@
 // The contact sheet: Gear Shifter's charts under .gt-scope, empty, partial and full at desktop
 // width and full at 390px. First the new and changed charts (the zero-min dated scales, ratings,
 // and the Kanban and 5 Whys variants), then the shared Decision Book families Gear Shifter uses
-// (path, list, quadrant, curve) re-skinned. Built by scripts/build-gear-shifter-contact-sheet.mjs
+// (path, list, quadrant, curve) re-skinned. Then every technique (Plan 3), worked to completion
+// with placeholder answers, section by section, at desktop width and at 390px. Built by scripts/build-gear-shifter-contact-sheet.mjs
 // into docs/mockups/gear-shifter/; for one look by Adam, not shipped in the app.
 import '../design-kit/tokens.css';
 import '../problem-solver/problem-solver.css';
@@ -11,6 +12,9 @@ import './get-things-done.css';
 import { GT_SAMPLE_TOOLS, gtRunFor } from './fixtures.mjs';
 import { SAMPLE_TOOLS, runFor } from '../decision-book/fixtures.mjs';
 import { createGearChartForTool } from './render/charts';
+import { GEAR_TOOLS } from './tools/index.mjs';
+import { CATALOGUE, SECTIONS } from './catalogue.mjs';
+import { workThrough } from '../decision-book/work-through.mjs';
 
 type View = { el: HTMLElement; update(run: never): void };
 type Stage = 'empty' | 'partial' | 'full';
@@ -55,6 +59,27 @@ for (const row of ROWS) {
   const phone = row.make();
   phone.update(row.run('full') as never);
   cells.append(cell('full at 390px', '358px', phone));
+  section.append(heading, cells);
+  sheet.append(section);
+}
+
+// Every technique, worked through by the patient driver, a row per section in book order.
+for (const { key, title } of SECTIONS) {
+  const section = document.createElement('section');
+  section.className = 'sheet__row';
+  const heading = document.createElement('h2');
+  heading.textContent = `Techniques: ${title} (placeholder answers)`;
+  const cells = document.createElement('div');
+  cells.className = 'sheet__cells sheet__cells--wrap';
+  for (const entry of CATALOGUE.filter((e) => e.section === key)) {
+    const tool = (GEAR_TOOLS as Record<string, { name: string }>)[entry.id];
+    const run = workThrough(entry.id, (slot: string, i: number) => `Answer ${i + 1}`);
+    for (const [width, label] of [['560px', tool.name], ['358px', `${tool.name} at 390px`]]) {
+      const view = createGearChartForTool(tool as never) as unknown as View;
+      view.update(run as never);
+      cells.append(cell(label, width, view));
+    }
+  }
   section.append(heading, cells);
   sheet.append(section);
 }
