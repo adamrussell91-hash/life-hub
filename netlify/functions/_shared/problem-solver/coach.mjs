@@ -10,6 +10,7 @@ import { buildQuickPrompt, checkQuickTurn } from './quick-prompts.mjs';
 import { toolsForPlanStep } from '../../../../packages/problem-solver/steps.mjs';
 import { TOOLS, toolsForBookStep } from '../../../../packages/problem-solver/tools/index.mjs';
 import { activeRun, frameKeysOf, reopenProblem, waitingForReview } from './session.mjs';
+import { bookOf } from '../../../../packages/problem-solver/books.mjs';
 import { RECORD_ID } from '../../../../packages/decision-book/record-slots.mjs';
 import { basisCandidates, resolveBasis } from '../../../../packages/decision-book/record.mjs';
 
@@ -101,14 +102,15 @@ function withAcceptedNode(session, turn) {
   return { ...session, steps: { ...session.steps, [session.phase]: { ...step, runs } } };
 }
 
-/** Tools a frame-phase suggestion may name: Explore's models for a decision, else Define tools. */
+/** Tools a frame-phase suggestion may name: a book's Explore tools, else Define tools. */
 function frameTools(session) {
-  return session.kind === 'decision' ? toolsForPlanStep('decision_book', 'explore') : toolsForBookStep('define');
+  const book = bookOf(session.kind);
+  return book ? toolsForPlanStep(book.model.id, 'explore') : toolsForBookStep('define');
 }
 
-/** True when this reply ends framing: a decision's last frame answer, or a chosen model. */
+/** True when this reply ends framing: a book session's last frame answer, or a chosen model. */
 function endsFrame(session, value) {
-  if (session.kind === 'decision') return frameKeysOf(session).every((key) => Boolean(session.frame[key] || value.frame?.[key]));
+  if (bookOf(session.kind)) return frameKeysOf(session).every((key) => Boolean(session.frame[key] || value.frame?.[key]));
   return Boolean(value.model);
 }
 
