@@ -36,7 +36,8 @@ export function freeze(value) {
 /** The fields every model config carries, checked once. */
 export function checkCommon(config) {
   const { id } = config;
-  check(typeof id === 'string' && id.startsWith('dm_'), id, 'ids start with dm_');
+  // Decision Maker's models start dm_, Gear Shifter's techniques gt_; both use these factories.
+  check(typeof id === 'string' && /^(dm|gt)_/.test(id), id, 'ids start with dm_ or gt_');
   check(typeof config.name === 'string' && config.name, id, 'needs a name');
   check(typeof config.when === 'string' && config.when, id, 'needs a "use it when" line');
   check(Array.isArray(config.steps) && config.steps.length > 0, id, 'needs coaching steps');

@@ -2,7 +2,7 @@
 // The scales family: profiles the person scores with the chart's controls, one snapshot per
 // series ({ series, values: { scaleId: n } }), the latest snapshot of a series winning.
 //   pairs   opposed poles (body/mind); n is the low pole's share of 10, the high pole has 10 − n.
-//   axes    independent 1–10 scales, drawn as bars or as a radar.
+//   axes    independent 1–10 scales (0–10 with `min: 0`), drawn as bars or as a radar.
 //   shares  parts of a whole; the values sum to 100.
 // Series are the overlays a model compares (now and wanted, two dates, four perspectives).
 // Notes (`note` slots) are optional, each tagged with the scale it is about. With `named`, the
@@ -20,6 +20,11 @@ export function valuesOf(run) {
   return out;
 }
 
+/** The saved snapshots of one series, newest first: `{ at, values }`. */
+export function historyOf(run, series, count = 3) {
+  return (run.scores?.snapshots ?? []).filter((snap) => snap.series === series).reverse().slice(0, count).map((snap) => ({ at: snap.at, values: { ...snap.values } }));
+}
+
 /** A scale's words for this run: the name the person gave it, or its configured label. */
 export function scaleLabel(run, scale) {
   const named = run.nodes.find((node) => parseSlot(node.slot)?.name === 'scale_name' && node.tag === scale.id);
@@ -34,6 +39,8 @@ export function scaleLabel(run, scale) {
  * @param {{id: string, label: string}[]} [config.chart.series] defaults to one series, now
  * @param {'bars'|'radar'} [config.chart.layout] axes mode only (bars)
  * @param {{label: string}} [config.chart.named] the person names every scale before scoring
+ * @param {0|1} [config.chart.min] axes mode only: the lowest score (default 1)
+ * @param {boolean} [config.chart.dated] axes mode with one series: keep and overlay dated saves
  */
 export function scalesTool(config) {
   checkCommon(config);
@@ -46,7 +53,11 @@ export function scalesTool(config) {
     else check(scale.label, id, `scale ${scale.id} needs a label`);
   }
   if (chart.layout === 'radar') check(chart.mode === 'axes' && chart.scales.length >= 3, id, 'a radar needs axes mode and three scales');
+  check(chart.min === undefined || chart.mode === 'axes', id, 'min belongs to axes mode');
+  const min = chart.min ?? 1;
+  check([0, 1].includes(min), id, 'min is 0 or 1');
   const series = chart.series ?? [{ id: 'now', label: 'Now' }];
+  if (chart.dated) check(chart.mode === 'axes' && series.length === 1, id, 'dated scales take one series in axes mode');
   for (const s of series) check(isKey(s.id) && s.label, id, `series ${s.id} needs a key and a label`);
   const scaleIds = chart.scales.map((scale) => scale.id);
   const seriesIds = series.map((s) => s.id);
@@ -78,7 +89,7 @@ export function scalesTool(config) {
       if (!values || scaleIds.some((scale) => !Number.isInteger(values[scale])) || Object.keys(values).length !== scaleIds.length) return 'Give a whole number for every scale.';
       const list = scaleIds.map((scale) => values[scale]);
       if (chart.mode === 'pairs' && !list.every((n) => n >= 0 && n <= 10)) return 'Each pair shares 10 points: give the first pole 0 to 10.';
-      if (chart.mode === 'axes' && !list.every((n) => n >= 1 && n <= 10)) return 'Scores run from 1 to 10.';
+      if (chart.mode === 'axes' && !list.every((n) => n >= min && n <= 10)) return `Scores run from ${min} to 10.`;
       if (chart.mode === 'shares' && (!list.every((n) => n >= 0) || list.reduce((a, b) => a + b, 0) !== 100)) return 'The shares must add up to 100.';
       return null;
     },
