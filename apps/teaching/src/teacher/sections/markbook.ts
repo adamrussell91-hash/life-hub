@@ -12,6 +12,9 @@ import { assessments, markOf, removedStudentIds, rowStudents, todayInSydney, wei
 import { renderGrid } from '@/markbook/grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
+import { renderOutcomes } from '@/markbook/outcomes-view';
+import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
+import { withAppBase } from '@/app/base-path';
 import '@/markbook/markbook.css';
 
 type Options = {
@@ -185,7 +188,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     });
   }
 
-  /** The grid's column title, or with `studentId` its cell, as drawn now. */
+  /** A column title, or with `studentId` a cell (grid or outcomes view), as drawn now. */
   function findInBody(selector: string, columnId: string, studentId?: string): HTMLElement | null {
     return (
       [...body.querySelectorAll<HTMLElement>(selector)].find(
@@ -229,8 +232,19 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     hideQuiz: (lessonId, hidden) => change({ kind: 'hide', lessonId, hidden }, () => api.hideQuiz(cls.id, lessonId, hidden)),
     editColumn: (columnId) => openForm('assessment', columnId),
     openAssessment,
-    openQuiz: () => { status.textContent = 'Attempt summaries arrive in the next step.'; },
-    openHeatmap: () => { status.textContent = 'Heatmaps arrive in the next step.'; }
+    openQuiz: (lessonId, studentId) => {
+      const quiz = view?.quizzes.find((q) => q.lesson_id === lessonId);
+      const student = view?.students.find((s) => s.id === studentId);
+      if (!quiz || !student) return;
+      openQuizAttempt(quiz, student, withAppBase(`/lessons/${encodeURIComponent(lessonId)}`), {
+        returnFocus: () => findInBody('.mb-cell', quiz.id, studentId) ?? title
+      });
+    },
+    openHeatmap: (lessonId) => {
+      const quiz = view?.quizzes.find((q) => q.lesson_id === lessonId);
+      if (!quiz || !view) return;
+      openHeatmap(quiz, rowStudents(view, false), { returnFocus: () => findInBody('.mb-col__title', quiz.id) ?? title });
+    }
   };
 
   /** Which cell or column title had focus, so a redraw can put it back. */
@@ -243,7 +257,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
 
   function restoreFocus(key: { col: string; student?: string } | null): void {
     if (!key) return;
-    findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell', key.col, key.student)?.focus();
+    findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell, .mb-outcome-cell', key.col, key.student)?.focus();
   }
 
   function paintHidden(current: MarkbookView): void {
@@ -291,7 +305,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
-    body.replaceChildren(renderGrid(current, students, actions, today()));
+    if (mode === 'outcomes') body.replaceChildren(renderOutcomes(current, students, options.outcomes ?? []));
+    else body.replaceChildren(renderGrid(current, students, actions, today()));
     restoreFocus(key);
   }
 
