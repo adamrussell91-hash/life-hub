@@ -8,8 +8,8 @@ There are six plans and one PR, as with Decision Maker. Each plan is written onc
 
 | Plan | Phase | Status | Ends with |
 | --- | --- | --- | --- |
-| 1 | Foundations | **Built; awaiting Adam's design approval** | Catalogue, route, glyphs recoloured to Adam's palette, tokens, the `gear_shifter` model, a book register replacing the `'decision'` checks in the engine, the `shift` and `start` session kinds, `/api/get-things-done`, and mockups. **Adam approves the design before Plan 2** |
-| 2 | Charts | Not started | The scales `min`, the ratings family, the Kanban and 5 Whys variants, the `.gt-scope` re-skin, and a contact sheet |
+| 1 | Foundations | **Done**; design approved by Adam on 22 Oct, including the mockups' medal (progressive cover with a section badge), the lighter rail icon, route-order sections and the How a session builds strip | Catalogue, route, glyphs recoloured to Adam's palette, tokens, the `gear_shifter` model, a book register replacing the `'decision'` checks in the engine, the `shift` and `start` session kinds, `/api/get-things-done`, and mockups. **Adam approves the design before Plan 2** |
+| 2 | Charts | **Next**, in a new session | The scales `min`, the ratings family, the Kanban and 5 Whys variants, the `.gt-scope` re-skin, and a contact sheet |
 | 3 | The techniques | Not started | The importer, then configs and notes for all 37 entries, one section per commit |
 | 4 | Coach, Commit, Record and Review | Not started | Rubric, catalogue lines, discernment, `gt_commit`, the action record and Review |
 | 5 | The app | Not started | Landing, session, route, medal, track and shelf; the record on a page; the mock API route |
