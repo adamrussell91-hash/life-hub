@@ -182,7 +182,7 @@ describe('meeting page', () => {
     expect(headings()).toContain('Greyhounds');
   });
 
-  it('knows you: your workplaces pull a two-job colleague into your shared organisation', async () => {
+  it('you are always in the room but never listed: your workplaces still pull a two-job colleague into your shared organisation', async () => {
     vi.mocked(listUniversalLinksForEntity).mockResolvedValueOnce({ outgoing: [
       { link: { id: 'a2', source_ref: MEETING_REF, target_ref: 'shared:person:ben', relationship_type: 'attendee', role: null, status: 'current' },
         endpoint: { ref: 'shared:person:ben', kind: 'person', display_label: 'Ben C.', href: null }, direction: 'outgoing' },
@@ -193,7 +193,9 @@ describe('meeting page', () => {
     const groups = [...canvas.querySelectorAll('.room__org')];
     expect(groups.map((group) => group.querySelector('.room__org-name')!.textContent)).toEqual(['HALT NSW']);
     const room = canvas.querySelector('[data-part="room"]')!;
-    expect(room.textContent).toContain('You');
+    expect(room.textContent).not.toContain('Sam Writer');
+    expect(room.textContent).toContain('The room · 1');
+    expect(canvas.querySelector('[data-part="facts"]')!.textContent).not.toContain('Sam Writer');
     expect(room.textContent).not.toContain('Add to People');
     expect(room.textContent).not.toContain('No organisation yet');
   });
