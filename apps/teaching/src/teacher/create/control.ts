@@ -1,5 +1,8 @@
 import type { CurriculumResponse } from '@/teacher/nav';
 import { openCreateModal } from '@/teacher/create/modal';
+import { navigate } from '@/app/router';
+import { reconcileCurriculum } from '@/app/curriculum-state';
+import { openNotionImportModal } from '@/teacher/notion-import/modal';
 import type { CreateContext, CreateKind, EntityCreatedHandler } from '@/teacher/create/types';
 
 export type { CreateContext, CreateKind } from '@/teacher/create/types';
@@ -78,6 +81,32 @@ export function mountCreateControl(
       });
       menu.append(button);
     }
+
+    const importItem = document.createElement('button');
+    importItem.type = 'button';
+    importItem.className = 'create-control__menu-item hub-create__item';
+    importItem.dataset.createImport = 'notion';
+    importItem.setAttribute('role', 'menuitem');
+    importItem.textContent = 'Import from Notion';
+    importItem.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeMenu();
+      openNotionImportModal({
+        curriculum: options.curriculum,
+        onDone: (report) => {
+          const classId = report.written.find((id) => id.startsWith('class_'));
+          if (classId) { void options.onCreated('class', classId); return; }
+          const first = report.written.find((id) => id.startsWith('unit_') || id.startsWith('lesson_'));
+          if (first) { void options.onCreated(first.startsWith('lesson_') ? 'lesson' : 'unit', first); return; }
+          // Nothing else to open: refresh what the app holds, then open a syllabus if that's all there is.
+          const documentId = report.written.find((id) => id.startsWith('document_'));
+          void reconcileCurriculum()
+            .catch(() => {})
+            .then(() => { if (documentId) navigate(`/documents/${documentId}`); });
+        }
+      });
+    });
+    menu.append(importItem);
 
     host.append(menu);
 

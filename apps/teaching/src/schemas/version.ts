@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { IsoDateSchema } from './common';
 
-export const VersionKindSchema = z.enum(['lesson', 'unit', 'class_homepage']);
+export const VersionKindSchema = z.enum(['lesson', 'unit', 'document', 'class_homepage']);
 export const VersionReasonSchema = z.enum([
   'save',
   'publish',
@@ -27,7 +27,7 @@ export const VersionIndexSchema = z.object({
 
 export const VersionRecordSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(['lesson_version', 'unit_version', 'class_homepage_version']),
+  type: z.enum(['lesson_version', 'unit_version', 'document_version', 'class_homepage_version']),
   kind: VersionKindSchema,
   parent_id: z.string().min(1),
   revision: z.number().int().positive(),

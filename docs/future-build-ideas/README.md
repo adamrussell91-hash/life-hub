@@ -92,7 +92,7 @@ This split is an **Open question** for the next round, not a decision.
 | Peer-built weekly review: quiz lessons fed by student questions | Built | [peer-built-quiz.md](peer-built-quiz.md) |
 | Classroom tools: timers, name picker and more on a divider or block | Concept and mockup | [classroom-tools.md](classroom-tools.md) |
 | Lesson builder on a phone: one thing at a time | Concept | [lesson-builder-mobile.md](lesson-builder-mobile.md) |
-| Focus view: one step of the lesson at a time on the board | Concept and mockup | [focus-view.md](focus-view.md) |
+| Focus view: one step of the lesson at a time on the board | Built | [focus-view.md](focus-view.md) |
 
 ## History
 

@@ -19,6 +19,41 @@ function isStrengthLike(sessionKind) {
   return sessionKind === 'strength' || sessionKind == null;
 }
 
+const MAX_INTERVAL_CABLE_REPS = 20;
+
+// The AEKE needs ~30 s to register a finished set and reset, so in a work:rest
+// interval block cable stations must alternate with bodyweight ones (the last
+// station wraps to the first), and a cable station is a fixed count, not max reps.
+// Death By climbs a rep every minute, which only works as bodyweight.
+function lintTimedBlocks(exercises) {
+  const warnings = [];
+  const groups = new Map();
+  exercises.forEach(exercise => {
+    const key = exercise?.superset_group ?? exercise;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(exercise);
+  });
+  for (const members of groups.values()) {
+    const block = members.find(member => member?.block?.format)?.block;
+    if (!block || (block.format !== 'intervals' && block.format !== 'emom')) continue;
+    const cable = members.map(member => resolveTrackingType(member) === 'weighted');
+    const label = members[0]?.superset_label || members[0]?.name || 'Timed block';
+    if (block.format === 'intervals') {
+      const backToBack = members.length > 1 && cable.some((isCable, index) => isCable && cable[(index + 1) % members.length]);
+      if (backToBack) warnings.push(`${label}: two cable stations run back to back — alternate cable and bodyweight so the AEKE has time to reset.`);
+      const heavy = members.some((member, index) => cable[index] && (member.sets ?? []).some(set => !(Number(set?.reps) > 0) || Number(set.reps) > MAX_INTERVAL_CABLE_REPS));
+      if (heavy) warnings.push(`${label}: cable stations need a fixed rep count of ${MAX_INTERVAL_CABLE_REPS} or fewer.`);
+    }
+    if (block.format === 'emom' && members.length === 1 && cable[0]) {
+      const reps = (members[0].sets ?? []).map(set => Number(set?.reps) || 0);
+      if (reps.length > 2 && reps.every((count, index) => index === 0 || count > reps[index - 1])) {
+        warnings.push(`${label}: Death By climbs a rep every minute — make it a bodyweight move, not a cable one.`);
+      }
+    }
+  }
+  return warnings;
+}
+
 export function lintWorkoutProposal(record) {
   const warnings = [];
   if (!record || record.type !== 'workout') return warnings;
@@ -53,6 +88,8 @@ export function lintWorkoutProposal(record) {
   if (setSplitCount > 0) {
     warnings.push(`${setSplitCount} exercises look like set rows (e.g. "Bar Press set 1") — log one row per exercise with multiple sets, not one exercise per set.`);
   }
+
+  warnings.push(...lintTimedBlocks(exercises));
 
   if (record.status === 'completed' && /^(?:planned session|strength session)$/i.test(String(record.title ?? '').trim())) {
     warnings.push('Completed session still has a generic title — give it a real unique title before it becomes history.');

@@ -100,12 +100,16 @@ import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
+import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
+import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
 import { createPublishedQuestionDropHandler } from '../../../netlify/functions/published-question-drop.mjs';
 import { createPublishedDiscernHandler } from '../../../netlify/functions/published-discern.mjs';
 import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-discern.mjs';
 import { createPublishedQuadrantHandler } from '../../../netlify/functions/published-quadrant.mjs';
 import { createLessonQuadrantHandler } from '../../../netlify/functions/lesson-quadrant.mjs';
 import { createHingeHandler } from '../../../netlify/functions/hinge.mjs';
+import { createTextToolsHandler } from '../../../netlify/functions/teaching-text-tools.mjs';
+import { runTextToolJob } from '../../../netlify/functions/_shared/text-tools.mjs';
 import { createPublishedHingeHandler } from '../../../netlify/functions/published-hinge.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
@@ -531,6 +535,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
   const sessionSecret = options.sessionSecret ?? DEFAULT_SESSION_SECRET;
 
   const store = new MockStore();
+  // Notion import jobs live in memory. A plan job is 'planned' straight away; an apply job is 'done'.
+  const notionJobs = new Map<string, Record<string, unknown>>();
   store.loadSeed(options.seed);
 
   const seedIds = {
@@ -641,6 +647,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       years,
       subjects,
       units,
+      documents: [],
       lessons,
       classes,
       scheduled_lessons,
@@ -1322,6 +1329,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const next = { ...existing, updated_at: nowIso() };
     if (record.network_lines !== undefined) next.network_lines = record.network_lines;
     if (record.network_nudges !== undefined) next.network_nudges = record.network_nudges;
+    if (record.outcome_ids !== undefined) next.outcome_ids = record.outcome_ids;
     const parsed = SubjectSchema.safeParse(next);
     if (!parsed.success) return errorResponse(400, 'validation_error', 'Subject network is invalid');
     store.setJSON(subjectKey(id), parsed.data);
@@ -2224,7 +2232,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return (
         parsed.success &&
         parsed.data.subject_id === subjectId &&
-        parsed.data.code.toLowerCase() === code.toLowerCase()
+        parsed.data.code.trim().replace(/\s+/g, ' ').toLowerCase() === code.replace(/\s+/g, ' ').toLowerCase()
       );
     });
     if (duplicate) {
@@ -3522,8 +3530,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       async get(key: string) {
         return store.getJSON(key) ?? null;
       },
-      async setJSON(key: string, value: unknown, options?: { onlyIfNew?: boolean }) {
+      // The stored text doubles as the etag, as in the schedule-timetable store below.
+      async getWithMetadata(key: string) {
+        const raw = store.get(key);
+        return raw === undefined ? null : { data: store.getJSON(key), etag: raw };
+      },
+      async setJSON(key: string, value: unknown, options?: { onlyIfNew?: boolean; onlyIfMatch?: string }) {
         if (options?.onlyIfNew && store.getJSON(key) != null) return { modified: false };
+        if (options?.onlyIfMatch !== undefined && store.get(key) !== options.onlyIfMatch) return { modified: false };
         store.setJSON(key, value);
         return { modified: true };
       },
@@ -3544,6 +3558,29 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return { x: open, y: intellectual };
   }
 
+  /**
+   * Offline stand-in for Ann's hinge back-up: a fixed parallel question, after
+   * a short pause so the checkpoint shows "drafting" before "ready".
+   */
+  async function mockHingeBackup(): Promise<string> {
+    return JSON.stringify({
+      prompt: 'Every one of you will one day have to tell your children why you did nothing. What is the main effect of this line on the audience?',
+      options: [
+        { text: 'It gives the audience facts to weigh up', right: false, misconception: 'any persuasive line is giving evidence' },
+        { text: 'It uses emotive language and direct address', right: false, misconception: 'naming the technique is the same as explaining its effect' },
+        { text: 'It makes each listener feel personally responsible, so they are more likely to act', right: true, misconception: '' },
+        { text: 'It shows the speaker has done their research', right: false, misconception: 'confident speakers must be experts' }
+      ]
+    });
+  }
+
+  function mockKickTextTool(_request: Request, _path: string, key: string): Promise<boolean> {
+    setTimeout(() => {
+      void runTextToolJob({ store: functionBlobStore(), env: { ANTHROPIC_API_KEY: 'mock' }, key, completeMessage: mockHingeBackup });
+    }, 3500);
+    return Promise.resolve(true);
+  }
+
   /** Quiz lessons, Question drop and Hinge question run the real Functions against the mock store. */
   async function handleQuiz(
     method: string,
@@ -3558,7 +3595,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     };
     const path = pathWithQuery.split('?')[0]!;
     const handler = /^\/api\/lessons\/[^/]+\/hinge\//.test(path)
-      ? createHingeHandler(deps)
+      ? createHingeHandler({ ...deps, kickTextToolRun: mockKickTextTool })
+      : path.startsWith('/api/text-tools/')
+        ? createTextToolsHandler(deps)
       : path.startsWith('/api/published/hinge/')
         ? createPublishedHingeHandler(deps)
       : /\/quadrant$/.test(path)
@@ -3569,6 +3608,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createLessonDiscernHandler(deps)
       : path.startsWith('/api/published/discern/')
         ? createPublishedDiscernHandler(deps)
+      : path.startsWith('/api/outcomes/')
+      ? createOutcomeHandler(deps)
+      : /^\/api\/classes\/[^/]+\/markbook$/.test(path)
+      ? createMarkbookHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
       ? createClassClaimsHandler(deps)
         : path.startsWith('/api/lessons/')
@@ -3649,7 +3692,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handleClassExamples(method, pathWithQuery, cookie, body);
     }
     if (
+      /^\/api\/classes\/[^/]+\/markbook$/.test(path) ||
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
+      /^\/api\/outcomes\/[^/]+(\/(usage|merge))?$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
@@ -3658,9 +3703,53 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/lessons\/[^/]+\/quadrant$/.test(path) ||
       /^\/api\/published\/quadrant\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/hinge\/[^/]+$/.test(path) ||
+      (method === 'GET' && /^\/api\/text-tools\/[a-f0-9]{64}$/.test(path)) ||
       /^\/api\/published\/hinge\/[^/]+\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
+    }
+
+    if (method === 'GET' && path === '/api/notion-import/search') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      return okResponse(200, { items: [] });
+    }
+    if (method === 'POST' && path === '/api/notion-import/jobs') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const req = (body ?? {}) as { kind?: string; page_id?: unknown };
+      if ((req.kind !== 'plan' && req.kind !== 'apply') || typeof req.page_id !== 'string' || !req.page_id) {
+        return errorResponse(400, 'validation_error', 'Choose a Notion page to import.');
+      }
+      const id = `nij_mock${String(notionJobs.size + 1).padStart(4, '0')}`;
+      const now = new Date().toISOString();
+      const base = { id, kind: req.kind, page_id: req.page_id, updated_at: now };
+      notionJobs.set(
+        id,
+        req.kind === 'plan'
+          ? {
+              ...base,
+              status: 'planned',
+              plan: {
+                root_page_id: req.page_id,
+                entities: [
+                  { page_id: req.page_id, parent_page_id: null, kind: 'unit', label: 'Unit', id: 'unit_n_mock1', title: 'Sample imported unit', existing: false, needs: [], suggested: {} },
+                  { page_id: 'mock-lesson-1', parent_page_id: req.page_id, kind: 'lesson', label: 'Lesson', id: 'lesson_n_mock1', title: 'Sample imported lesson', existing: false, needs: [], suggested: {} }
+                ],
+                skipped: [],
+                warnings: [{ page_id: 'mock-lesson-1', notion_block_id: 'mock-block-1', rule: 'flattened', message: 'A two column layout was stacked.' }],
+                html_apps: [],
+                new_subjects: [],
+                media_count: 0
+              }
+            }
+          : { ...base, status: 'done', report: { written: ['unit_n_mock1', 'lesson_n_mock1'], skipped: [], warnings: [] } }
+      );
+      return okResponse(202, { job_id: id });
+    }
+    const notionJobMatch = path.match(/^\/api\/notion-import\/jobs\/([^/]+)$/);
+    if (method === 'GET' && notionJobMatch) {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const job = notionJobs.get(notionJobMatch[1]!);
+      return job ? okResponse(200, job) : errorResponse(404, 'not_found', 'Import job not found.');
     }
 
     if (method === 'GET' && path === '/api/session') return handleSession(cookie);

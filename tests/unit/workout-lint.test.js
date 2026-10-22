@@ -176,3 +176,26 @@ test('lintWorkoutProposal flags too many focuses on a workout_30 day', () => {
   const warnings = lintWorkoutProposal(session);
   assert.ok(warnings.some(w => /focus/i.test(w)), JSON.stringify(warnings));
 });
+
+test('interval blocks warn on back-to-back cable stations and uncapped cable reps', () => {
+  const cable = (name, reps = 12) => exercise(name, { superset_group: 7, sets: [{ reps, weight_kg: 15, cable_type: 'constant_force' }] });
+  const bodyweight = name => exercise(name, { superset_group: 7, tracking: 'bodyweight_reps', sets: [{ reps: 20, weight_kg: 0, cable_type: 'none' }] });
+  const tabata = members => {
+    members[0].superset_label = 'Tabata';
+    members[0].block = { kind: 'circuit', format: 'intervals', work_sec: 20, rest_sec: 10 };
+    return lintWorkoutProposal(warmupSession(members));
+  };
+  assert.equal(tabata([cable('Cable Row'), bodyweight('Push-ups')]).some(line => line.startsWith('Tabata')), false, 'alternating is fine');
+  assert.ok(tabata([cable('Cable Row'), cable('Cable Press')]).some(line => /back to back/.test(line)));
+  assert.ok(tabata([cable('Cable Row'), bodyweight('Push-ups'), cable('Cable Curl')]).some(line => /back to back/.test(line)), 'last station wraps to the first');
+  assert.ok(tabata([cable('Cable Row', 25), bodyweight('Push-ups')]).some(line => /20 or fewer/.test(line)));
+});
+
+test('a cable Death By warns that it must be bodyweight', () => {
+  const death = exercise('Cable Row', {
+    superset_label: 'Death By',
+    block: { format: 'emom' },
+    sets: [1, 2, 3, 4].map(reps => ({ reps, weight_kg: 15, cable_type: 'constant_force' }))
+  });
+  assert.ok(lintWorkoutProposal(warmupSession([death])).some(line => /bodyweight move/.test(line)));
+});

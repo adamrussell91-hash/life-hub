@@ -83,7 +83,9 @@ var base = {
   marks: z.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
-  image: QuizImageSchema.optional()
+  image: QuizImageSchema.optional(),
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
+  outcomes: z.array(z.string().min(1).max(64)).max(8).optional()
 };
 var QuizQuestionSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("multiple_choice"), options: z.array(QuizChoiceSchema).min(2).max(6), correct: z.array(Id).length(1) }),
@@ -321,7 +323,9 @@ var QuizSettingsSchema = z.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z.number().min(0).max(1).optional(),
   confidence: z.boolean().optional(),
-  closes_at: z.string().datetime().optional()
+  closes_at: z.string().datetime().optional(),
+  /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
+  move_on: z.number().int().min(1).max(100).optional()
 });
 var DEFAULT_QUIZ_SETTINGS = {
   attempts: 1,
@@ -378,7 +382,8 @@ function splitQuestion(q, random = Math.random) {
     kind: q.kind,
     marks: q.marks,
     ...q.hint?.trim() ? { hint: q.hint.trim() } : {},
-    ...q.explanation?.trim() ? { explanation: q.explanation.trim() } : {}
+    ...q.explanation?.trim() ? { explanation: q.explanation.trim() } : {},
+    ...q.outcomes?.length ? { outcomes: [...q.outcomes] } : {}
   };
   switch (q.kind) {
     case "multiple_choice":

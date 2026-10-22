@@ -12,7 +12,25 @@
  */
 
 export const BLOCK_KINDS = ['superset', 'circuit'];
-export const BLOCK_FORMATS = ['rounds', 'for_time', 'amrap'];
+export const BLOCK_FORMATS = ['rounds', 'for_time', 'amrap', 'emom', 'intervals'];
+
+/**
+ * Clock-driven formats: gym mode runs an interval clock that tells Adam when
+ * each round (or station) starts. emom = a new round every `interval_sec`
+ * (`alternate: true` gives each member its own interval); intervals =
+ * `work_sec` on, `rest_sec` off, station by station (Tabata is 20 / 10).
+ * A single exercise with one of these formats still runs as a one-move circuit.
+ */
+export const TIMED_FORMATS = ['emom', 'intervals'];
+export const DEFAULT_EMOM_INTERVAL_SEC = 60;
+export const DEFAULT_WORK_SEC = 20;
+export const DEFAULT_INTERVAL_REST_SEC = 10;
+/** Seconds between tapping Start and the first interval, to get to the machine. */
+export const INTERVAL_LEAD_IN_SEC = 10;
+
+export function isTimedFormat(format) {
+  return TIMED_FORMATS.includes(format);
+}
 
 /** Seconds of rest after a straight set / a finished round when nothing says otherwise. */
 export const DEFAULT_REST_SEC = 90;
@@ -91,6 +109,8 @@ function blockSettings(members) {
 }
 
 function resolveBlockKind(members, settings) {
+  // The interval clock lives on circuits, so a timed block is always one.
+  if (isTimedFormat(settings?.format)) return 'circuit';
   if (members.length < 2) return 'single';
   if (BLOCK_KINDS.includes(settings?.kind)) return settings.kind;
   return members.length >= 3 ? 'circuit' : 'superset';
@@ -144,6 +164,9 @@ export function groupWorkoutPlanExercises(exercises = []) {
       format: BLOCK_FORMATS.includes(settings?.format) ? settings.format : 'rounds',
       restSec: positiveNumber(settings?.rest_sec) ?? positiveNumber(memberExercises[0]?.rest_sec),
       timeCapSec: positiveNumber(settings?.time_cap_sec),
+      intervalSec: positiveNumber(settings?.interval_sec),
+      workSec: positiveNumber(settings?.work_sec),
+      alternate: settings?.alternate === true,
       result: settings?.result && typeof settings.result === 'object' ? settings.result : null,
       rounds: Math.max(0, ...memberExercises.map(item => exerciseSets(item).length)),
       exercises: memberExercises,
@@ -190,14 +213,22 @@ export function formatBlockScheme(block) {
   if (!isGroupedBlock(block)) return '';
   const order = block.exercises.map((_, index) => blockMemberCode(block, index)).join(' → ');
   const parts = [];
+  const rounds = block.rounds || 1;
+  const roundsText = `${rounds} round${rounds === 1 ? '' : 's'}`;
   if (block.format === 'amrap') {
     parts.push(block.timeCapSec ? `AMRAP ${formatSeconds(block.timeCapSec)}` : 'As many rounds as possible');
+  } else if (block.format === 'emom') {
+    const every = formatSeconds(block.intervalSec ?? DEFAULT_EMOM_INTERVAL_SEC);
+    parts.push(`Every ${every}${block.alternate && block.exercises.length > 1 ? ', alternating' : ''} · ${roundsText}`);
+  } else if (block.format === 'intervals') {
+    const work = formatSeconds(block.workSec ?? DEFAULT_WORK_SEC);
+    const rest = formatSeconds(block.restSec ?? DEFAULT_INTERVAL_REST_SEC);
+    parts.push(`${roundsText} · ${work} on / ${rest} off`);
   } else {
-    const rounds = block.rounds || 1;
-    parts.push(`${rounds} round${rounds === 1 ? '' : 's'}${block.format === 'for_time' ? ' for time' : ''}`);
+    parts.push(`${roundsText}${block.format === 'for_time' ? ' for time' : ''}`);
   }
-  parts.push(order);
-  if (block.restSec) parts.push(`rest ${formatSeconds(block.restSec)} after each round`);
+  if (block.exercises.length > 1) parts.push(order);
+  if (block.restSec && !isTimedFormat(block.format)) parts.push(`rest ${formatSeconds(block.restSec)} after each round`);
   return parts.join(' · ');
 }
 
@@ -277,6 +308,9 @@ function cleanBlock(block, { withResults }) {
   if (BLOCK_FORMATS.includes(block.format)) out.format = block.format;
   if (positiveNumber(block.rest_sec)) out.rest_sec = Number(block.rest_sec);
   if (positiveNumber(block.time_cap_sec)) out.time_cap_sec = Number(block.time_cap_sec);
+  if (positiveNumber(block.interval_sec)) out.interval_sec = Number(block.interval_sec);
+  if (positiveNumber(block.work_sec)) out.work_sec = Number(block.work_sec);
+  if (block.alternate === true) out.alternate = true;
   if (withResults && block.result && typeof block.result === 'object') {
     const result = {};
     for (const key of ['rounds', 'extra_reps', 'time_sec']) {
@@ -353,4 +387,59 @@ export function buildLoggerSteps(exercises = []) {
     out.push({ ...step, kind: block?.kind === 'superset' ? 'superset' : 'set', members: [member] });
   }
   return { blocks, steps: out };
+}
+
+/**
+ * The interval clock's timeline for an emom / intervals block (after the
+ * lead-in): one `work` segment per round (EMOM), per member per round
+ * (alternating EMOM, intervals), with `rest` segments between intervals work.
+ * `memberIndex` is who works in that segment (null = the whole round).
+ */
+export function intervalSchedule(block) {
+  if (!isTimedFormat(block?.format)) return [];
+  const rounds = Math.max(1, block.rounds || 1);
+  const members = Math.max(1, block.exercises?.length ?? 1);
+  const segments = [];
+  if (block.format === 'emom') {
+    const sec = block.intervalSec ?? DEFAULT_EMOM_INTERVAL_SEC;
+    for (let round = 1; round <= rounds; round += 1) {
+      if (block.alternate && members > 1) {
+        for (let memberIndex = 0; memberIndex < members; memberIndex += 1) {
+          segments.push({ phase: 'work', round, memberIndex, sec });
+        }
+      } else {
+        segments.push({ phase: 'work', round, memberIndex: null, sec });
+      }
+    }
+    return segments;
+  }
+  const work = block.workSec ?? DEFAULT_WORK_SEC;
+  const rest = block.restSec ?? DEFAULT_INTERVAL_REST_SEC;
+  for (let round = 1; round <= rounds; round += 1) {
+    for (let memberIndex = 0; memberIndex < members; memberIndex += 1) {
+      segments.push({ phase: 'work', round, memberIndex, sec: work });
+      const last = round === rounds && memberIndex === members - 1;
+      if (!last && rest > 0) {
+        const next = memberIndex + 1 < members ? memberIndex + 1 : 0;
+        segments.push({ phase: 'rest', round: memberIndex + 1 < members ? round : round + 1, memberIndex: next, sec: rest });
+      }
+    }
+  }
+  return segments;
+}
+
+/** Where the interval clock is: lead_in, work, rest, or done, with ms left in that phase. */
+export function intervalPosition(block, elapsedMs) {
+  const segments = intervalSchedule(block);
+  const total = segments.length;
+  const lead = INTERVAL_LEAD_IN_SEC * 1000;
+  const elapsed = Math.max(0, Number(elapsedMs) || 0);
+  if (elapsed < lead) return { phase: 'lead_in', index: -1, total, segment: segments[0] ?? null, remainingMs: lead - elapsed };
+  let t = elapsed - lead;
+  for (let index = 0; index < total; index += 1) {
+    const ms = segments[index].sec * 1000;
+    if (t < ms) return { phase: segments[index].phase, index, total, segment: segments[index], remainingMs: ms - t };
+    t -= ms;
+  }
+  return { phase: 'done', index: total, total, segment: null, remainingMs: 0 };
 }

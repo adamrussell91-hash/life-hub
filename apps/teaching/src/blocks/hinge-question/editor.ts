@@ -33,29 +33,26 @@ function numberField(label: string, value: number, min: number, max: number, onI
   return wrap;
 }
 
-export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: HingeBlock) => void): HTMLElement {
-  const root = el('div', 'peer-feedback peer-feedback--editor hq-editor');
-  let current = block;
-  const set = (patch: Partial<HingeContent>) => {
-    current = { ...current, content: { ...current.content, ...patch } };
-    onChange(current);
-  };
-  const setOption = (id: string, patch: Partial<HingeOption>) =>
-    set({ options: current.content.options.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
+type Answers = { options: HingeOption[]; correct_id: string };
 
-  const q = field('Question', 'Ask at the point the lesson turns on. Every student should answer in under a minute.');
-  q.input.rows = 2;
-  q.input.maxLength = 500;
-  q.input.value = current.content.prompt;
-  q.input.addEventListener('input', () => set({ prompt: q.input.value }));
-
-  const optionsWrap = el('fieldset', 'hq-editor__options');
+/** The answers list with a right-answer pick and a misconception note per wrong answer. */
+function answersEditor(opts: {
+  legend: string;
+  hint: string;
+  newId: () => string;
+  get: () => Answers;
+  set: (patch: Partial<Answers>) => void;
+}): HTMLFieldSetElement {
+  const wrap = el('fieldset', 'hq-editor__options');
   const groupName = nextId('hq-right');
-  function paintOptions(): void {
-    const legend = el('legend', 'pf-field__label', 'Answers');
-    const hint = el('p', 'pf-field__hint block-secondary', 'Mark the right one. For each wrong one, note the misconception a student who picks it probably holds. Only you see the notes.');
-    const rows = current.content.options.map((o, i) => {
-      const right = o.id === current.content.correct_id;
+  const setOption = (id: string, patch: Partial<HingeOption>) =>
+    opts.set({ options: opts.get().options.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
+  function paint(): void {
+    const { options, correct_id: correctId } = opts.get();
+    const legend = el('legend', 'pf-field__label', opts.legend);
+    const hint = el('p', 'pf-field__hint block-secondary', opts.hint);
+    const rows = options.map((o, i) => {
+      const right = o.id === correctId;
       const row = el('div', 'hq-editor__option');
       row.dataset.right = String(right);
       const letter = el('span', 'hq-letter', LETTERS[i] ?? '?');
@@ -64,7 +61,7 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
       text.type = 'text';
       text.maxLength = 300;
       text.placeholder = `Answer ${LETTERS[i]}`;
-      text.setAttribute('aria-label', `Answer ${LETTERS[i]}`);
+      text.setAttribute('aria-label', `${opts.legend}: answer ${LETTERS[i]}`);
       text.value = o.text;
       text.addEventListener('input', () => setOption(o.id, { text: text.value }));
 
@@ -74,18 +71,18 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
       radio.name = groupName;
       radio.checked = right;
       radio.addEventListener('change', () => {
-        set({ correct_id: o.id });
-        paintOptions();
+        opts.set({ correct_id: o.id });
+        paint();
       });
       pick.append(radio, el('span', '', 'Right answer'));
 
       const head = el('div', 'hq-editor__head');
       head.append(letter, text, pick);
-      if (current.content.options.length > MIN_OPTIONS) {
+      if (options.length > MIN_OPTIONS) {
         const remove = button('Remove', 'ghost', () => {
-          const options = current.content.options.filter((x) => x.id !== o.id);
-          set({ options, correct_id: current.content.correct_id === o.id ? '' : current.content.correct_id });
-          paintOptions();
+          const now = opts.get();
+          opts.set({ options: now.options.filter((x) => x.id !== o.id), correct_id: now.correct_id === o.id ? '' : now.correct_id });
+          paint();
         });
         remove.setAttribute('aria-label', `Remove answer ${LETTERS[i]}`);
         head.append(remove);
@@ -103,17 +100,40 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
       }
       return row;
     });
-    optionsWrap.replaceChildren(legend, hint, ...rows);
-    if (current.content.options.length < MAX_OPTIONS) {
-      optionsWrap.append(
+    wrap.replaceChildren(legend, hint, ...rows);
+    if (options.length < MAX_OPTIONS) {
+      wrap.append(
         button('Add an answer', 'secondary', () => {
-          set({ options: [...current.content.options, { id: `${current.id}_${Date.now().toString(36)}`, text: '', misconception: '' }] });
-          paintOptions();
+          opts.set({ options: [...opts.get().options, { id: opts.newId(), text: '', misconception: '' }] });
+          paint();
         })
       );
     }
   }
-  paintOptions();
+  paint();
+  return wrap;
+}
+
+export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: HingeBlock) => void): HTMLElement {
+  const root = el('div', 'peer-feedback peer-feedback--editor hq-editor');
+  let current = block;
+  const set = (patch: Partial<HingeContent>) => {
+    current = { ...current, content: { ...current.content, ...patch } };
+    onChange(current);
+  };
+  const q = field('Question', 'Ask at the point the lesson turns on. Every student should answer in under a minute.');
+  q.input.rows = 2;
+  q.input.maxLength = 500;
+  q.input.value = current.content.prompt;
+  q.input.addEventListener('input', () => set({ prompt: q.input.value }));
+
+  const optionsWrap = answersEditor({
+    legend: 'Answers',
+    hint: 'Mark the right one. For each wrong one, note the misconception a student who picks it probably holds. Only you see the notes.',
+    newId: () => `${current.id}_${Date.now().toString(36)}`,
+    get: () => ({ options: current.content.options, correct_id: current.content.correct_id }),
+    set: (patch) => set(patch)
+  });
 
   const timeId = nextId('hq-time');
   const time = el('div', 'pf-field');
@@ -142,14 +162,49 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
       );
       return row;
     })(),
-    el('p', 'pf-field__hint block-secondary', 'In between, it suggests splitting the class.')
+    el('p', 'pf-field__hint block-secondary', 'In between, it suggests splitting the class. In focus view, the next arrow stops at a checkpoint when the class comes in under your move-on mark.')
   );
+
+  // The back-up: a parallel question for the re-check after re-teaching.
+  const backup = el('details', 'hq-editor__backup');
+  // An empty back-up starts with four blank answers, like a new hinge question.
+  const getBackup = (): NonNullable<HingeContent['backup']> => {
+    const b = current.content.backup;
+    if (b?.options.length) return b;
+    const options = ['a', 'b', 'c', 'd'].map((k) => ({ id: `${current.id}_bk${k}`.slice(0, 40), text: '', misconception: '' }));
+    return { prompt: b?.prompt ?? '', options, correct_id: b?.correct_id ?? '', source: 'teacher' };
+  };
+  const setBackup = (patch: Partial<NonNullable<HingeContent['backup']>>) =>
+    set({ backup: { ...getBackup(), ...patch, source: 'teacher' } });
+  backup.open = !!current.content.backup?.prompt;
+  const summary = el('summary', 'pf-field__label', 'Back-up question (optional)');
+  const backupHint = el(
+    'p',
+    'pf-field__hint block-secondary',
+    current.content.backup?.source === 'ann'
+      ? 'Ann drafted this in focus view after a class came in under your mark. Edit it as you like.'
+      : 'Same idea, new wording, same traps. Asked from the focus view checkpoint after you re-teach. Leave it empty and Ann drafts one when it’s needed.'
+  );
+  const bq = field('Back-up question', '');
+  bq.input.rows = 2;
+  bq.input.maxLength = 500;
+  bq.input.value = getBackup().prompt;
+  bq.input.addEventListener('input', () => setBackup({ prompt: bq.input.value }));
+  const backupAnswers = answersEditor({
+    legend: 'Back-up answers',
+    hint: 'Mark the right one, and keep the wrong ones as tempting as the originals.',
+    newId: () => `${current.id}_bk${Date.now().toString(36)}`.slice(0, 40),
+    get: () => ({ options: getBackup().options, correct_id: getBackup().correct_id }),
+    set: (patch) => setBackup(patch)
+  });
+  backup.append(summary, backupHint, bq.wrap, backupAnswers);
 
   root.append(
     q.wrap,
     optionsWrap,
     time,
     thresholds,
+    backup,
     el('p', 'pf-note block-secondary', 'To run it, publish the lesson, close this editor and press Ask the class on the block.')
   );
   return root;

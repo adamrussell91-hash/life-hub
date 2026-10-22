@@ -79,3 +79,52 @@ test('the protocol only marks formats runnable that gym mode supports', () => {
   }
   assert.match(section, /area: "session formats"/);
 });
+
+test('EMOM, E2MOM and alternating EMOM parse into timed circuits', async () => {
+  const { intervalSchedule } = await import('../../apps/life/js/core/workout-plan-groups.js');
+  const emom = plan('C  Press EMOM (EMOM 8 min)\nC1 Bar Press — 30 kg × 6\nC2 Push-ups — 8 reps');
+  assert.deepEqual(emom.exercises[2].block, { kind: 'circuit', format: 'emom' });
+  assert.equal(emom.exercises[2].sets.length, 8, 'EMOM 8 min = 8 rounds');
+  assert.equal(formatBlockScheme(emom.grouped), 'Every 1 min · 8 rounds · C1 → C2');
+  assert.equal(intervalSchedule(emom.grouped).length, 8);
+
+  const e2 = plan('C  Heavy E2MOM (E2MOM, 5 rounds)\nC1 Cable RDL — 40 kg × 10\nC2 Air squats — 15 reps');
+  assert.equal(e2.exercises[2].block.interval_sec, 120);
+  assert.equal(formatBlockScheme(e2.grouped), 'Every 2 min · 5 rounds · C1 → C2');
+
+  const alt = plan('C  Alt EMOM (every 60 s, alternating, 5 rounds)\nC1 Bar Row — 30 kg × 8\nC2 Push-ups — 10 reps');
+  assert.equal(alt.exercises[2].block.alternate, true);
+  const schedule = intervalSchedule(alt.grouped);
+  assert.equal(schedule.length, 10, 'each move gets its own minute');
+  assert.deepEqual(schedule.slice(0, 2).map(segment => segment.memberIndex), [0, 1]);
+});
+
+test('Death By is a one-move EMOM with rising reps', () => {
+  const { exercises, grouped, steps } = plan('C  Death By Push-ups (Death By, EMOM)\nC1 Push-ups — 1 rep, 2 reps, 3 reps, 4 reps, 5 reps, 6 reps');
+  const push = exercises.at(-1);
+  assert.equal(push.superset_label, 'Death By Push-ups');
+  assert.equal(push.block.format, 'emom');
+  assert.deepEqual(push.sets.map(set => set.reps), [1, 2, 3, 4, 5, 6]);
+  assert.equal(grouped.kind, 'circuit');
+  assert.equal(formatBlockScheme(grouped), 'Every 1 min · 6 rounds');
+  assert.equal(steps.filter(step => step.kind === 'round').length, 6);
+});
+
+test('Tabata and work:rest intervals parse with work and rest seconds', async () => {
+  const { intervalPosition, intervalSchedule } = await import('../../apps/life/js/core/workout-plan-groups.js');
+  const tabata = plan('D  Tabata (Tabata, 4 rounds)\nD1 Cable Row — 15 kg × 12\nD2 Mountain climbers — 20 reps');
+  assert.deepEqual(tabata.exercises[2].block, { kind: 'circuit', format: 'intervals', rest_sec: 10, work_sec: 20 });
+  assert.equal(formatBlockScheme(tabata.grouped), '4 rounds · 20s on / 10s off · C1 → C2');
+  const segments = intervalSchedule(tabata.grouped);
+  assert.equal(segments.filter(segment => segment.phase === 'work').length, 8, 'Tabata is 8 work intervals');
+  assert.equal(segments.at(-1).phase, 'work', 'no trailing rest');
+  assert.equal(intervalPosition(tabata.grouped, 5_000).phase, 'lead_in');
+  assert.equal(intervalPosition(tabata.grouped, 35_000).phase, 'rest');
+  assert.equal(intervalPosition(tabata.grouped, 35_000).segment.memberIndex, 1, 'rest shows who is next');
+  assert.equal(intervalPosition(tabata.grouped, 10_000 + 240_000 - 10_000).phase, 'done');
+
+  const custom = plan('D  Intervals (30 s on / 15 s off, 3 rounds)\nD1 Cable Press — 15 kg × 12\nD2 Squat jumps — 10 reps');
+  assert.equal(custom.exercises[2].block.work_sec, 30);
+  assert.equal(custom.exercises[2].block.rest_sec, 15);
+  assert.equal(custom.exercises[2].sets.length, 3);
+});

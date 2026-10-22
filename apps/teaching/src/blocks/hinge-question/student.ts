@@ -12,6 +12,8 @@ type StudentState =
       revealed: boolean;
       mine: string | null;
       correct_id?: string;
+      /** Set during a back-up round: that question is not in the published block. */
+      question?: { prompt: string; options: Array<{ id: string; text: string }> };
     };
 type Live = Extract<StudentState, { phase: 'live' }>;
 
@@ -25,7 +27,7 @@ function deviceToken(key: string): string | null {
   return writeJSON(key, fresh) ? fresh : null;
 }
 
-export function mountStudent(block: HingeBlock, lessonId: string): HTMLElement {
+export function mountStudent(block: HingeBlock, lessonId: string, promptEl?: HTMLElement): HTMLElement {
   const endpoint = `/api/published/hinge/${encodeURIComponent(lessonId)}/${encodeURIComponent(block.id)}`;
   const token = deviceToken(`hinge:${lessonId}:${block.id}:device`);
   const root = el('div', 'hq-run');
@@ -85,7 +87,7 @@ export function mountStudent(block: HingeBlock, lessonId: string): HTMLElement {
     const list = el('div', 'hq-choices');
     list.setAttribute('role', 'radiogroup');
     list.setAttribute('aria-label', 'Your answer');
-    block.content.options.forEach((o, i) => {
+    (s.question?.options ?? block.content.options).forEach((o, i) => {
       const chosen = s.mine === o.id;
       const shown = s.revealed && !!s.correct_id;
       const choice = el('button', 'hq-choice');
@@ -128,14 +130,16 @@ export function mountStudent(block: HingeBlock, lessonId: string): HTMLElement {
       return;
     }
     if (state.phase === 'idle') {
+      if (promptEl) promptEl.textContent = block.content.prompt.trim() || 'Choose one answer.';
       if (painted !== 'idle') body.replaceChildren(waitPanel('Your teacher hasn’t asked this yet.', 'This page updates by itself.'));
       painted = 'idle';
       return;
     }
     const s = state;
-    const sig = JSON.stringify([s.session, s.open, s.revealed, s.mine, s.correct_id]);
+    const sig = JSON.stringify([s.session, s.open, s.revealed, s.mine, s.correct_id, s.question]);
     if (sig === painted) return paintClock();
     painted = sig;
+    if (promptEl) promptEl.textContent = s.question?.prompt ?? (block.content.prompt.trim() || 'Choose one answer.');
     const parts: HTMLElement[] = [choices(s)];
     if (s.open) parts.push(clock);
     if (!token) parts.push(el('p', 'pf-alert', 'This browser won’t save anything, so you can’t answer here. Try a normal (not private) window.'));

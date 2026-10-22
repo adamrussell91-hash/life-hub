@@ -183,7 +183,9 @@ var base = {
   marks: z5.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
-  image: QuizImageSchema.optional()
+  image: QuizImageSchema.optional(),
+  /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
+  outcomes: z5.array(z5.string().min(1).max(64)).max(8).optional()
 };
 var QuizQuestionSchema = z5.discriminatedUnion("kind", [
   z5.object({ ...base, kind: z5.literal("multiple_choice"), options: z5.array(QuizChoiceSchema).min(2).max(6), correct: z5.array(Id).length(1) }),
@@ -383,7 +385,9 @@ var QuizSettingsSchema = z5.object({
   /** Share of a question's marks a hint costs, 0 to 1. */
   hint_cost: z5.number().min(0).max(1).optional(),
   confidence: z5.boolean().optional(),
-  closes_at: z5.string().datetime().optional()
+  closes_at: z5.string().datetime().optional(),
+  /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
+  move_on: z5.number().int().min(1).max(100).optional()
 });
 function norm(value2, caseSensitive = false) {
   const cleaned = String(value2 ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();
@@ -1241,6 +1245,12 @@ var HingeOptionSchema = z7.object({
   text: z7.string().max(300).default(""),
   misconception: z7.string().max(300).default("")
 });
+var HingeBackupSchema = z7.object({
+  prompt: z7.string().max(500).default(""),
+  options: z7.array(HingeOptionSchema).max(5).default([]),
+  correct_id: z7.string().max(40).default(""),
+  source: z7.enum(["teacher", "ann"]).default("teacher")
+});
 var HingeQuestionBlockSchema = z7.object({
   id: z7.string().min(1),
   type: z7.literal("block"),
@@ -1253,7 +1263,9 @@ var HingeQuestionBlockSchema = z7.object({
     correct_id: z7.string().max(40).default(""),
     seconds: z7.union([z7.literal(0), z7.literal(30), z7.literal(60), z7.literal(90), z7.literal(120)]).default(60),
     move_on: z7.number().int().min(1).max(100).default(80),
-    reteach: z7.number().int().min(0).max(99).default(50)
+    reteach: z7.number().int().min(0).max(99).default(50),
+    /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
+    backup: HingeBackupSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -5456,7 +5468,7 @@ function validateProposalAgainstSearchPack(proposal, pack) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z11 } from "zod";
+import { z as z12 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z as z10 } from "zod";
@@ -5476,6 +5488,15 @@ var PEDAGOGICAL_MODES = [
   "quiz"
 ];
 var PedagogicalModeSchema = z10.enum(PEDAGOGICAL_MODES);
+
+// apps/teaching/src/schemas/source.ts
+import { z as z11 } from "zod";
+var SourceSchema = z11.object({
+  system: z11.literal("notion"),
+  page_id: z11.string().min(1).max(64),
+  imported_at: IsoDateSchema,
+  last_edited_at: IsoDateSchema
+});
 
 // apps/teaching/src/blocks/learning-activity.ts
 var CLOZE_MARKER = /\[\[([^\]]+)\]\]/g;
@@ -6123,33 +6144,34 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z11.object({
+var LessonSchema = z12.object({
   ...CommonFields,
   ...TrashFields,
-  type: z11.literal("lesson"),
-  unit_id: z11.string().min(1),
-  sequence: z11.number().int(),
-  blocks: z11.array(BlockSchema),
+  type: z12.literal("lesson"),
+  unit_id: z12.string().min(1),
+  sequence: z12.number().int(),
+  blocks: z12.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z11.array(z11.string().min(1).max(40)).max(24).optional(),
-  author_id: z11.string().min(1).optional(),
-  review_status: z11.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z11.array(z11.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z11.array(z11.string().min(1).max(64)).max(24).optional(),
+  tags: z12.array(z12.string().min(1).max(40)).max(24).optional(),
+  author_id: z12.string().min(1).optional(),
+  review_status: z12.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z12.array(z12.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z12.array(z12.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z11.array(LineStopSchema).max(16).optional(),
+  line_stops: z12.array(LineStopSchema).max(16).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z11.boolean().optional(),
+  feedback_off: z12.boolean().optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
-  quiz: QuizSettingsSchema.optional()
+  quiz: QuizSettingsSchema.optional(),
+  source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z11.ZodIssueCode.custom,
+      code: z12.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
@@ -6161,7 +6183,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
     });
     if (stray) {
       ctx.addIssue({
-        code: z11.ZodIssueCode.custom,
+        code: z12.ZodIssueCode.custom,
         message: "Quiz questions only work in a lesson set to Quiz. Change the lesson type or remove them.",
         path: ["blocks"]
       });
@@ -6169,7 +6191,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   }
   for (const issue of listPublishBlockIssues(lesson.blocks)) {
     ctx.addIssue({
-      code: z11.ZodIssueCode.custom,
+      code: z12.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
