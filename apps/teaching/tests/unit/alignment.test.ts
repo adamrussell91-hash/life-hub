@@ -6,7 +6,7 @@ vi.mock('@/skills/api', () => ({ loadSkills: vi.fn(() => Promise.reject(new Erro
 import { fetchAlignment, saveAlignmentPoint } from '@/alignment/api';
 import { loadSkills } from '@/skills/api';
 import { alignmentDots, heatHits, heatScore, heatStep, pointsFor, sharedRuns, skillHits, subjectUsesAlignment, wordStems } from '@/alignment/model';
-import { applyAlignmentPatch, mergeMissingSkills, needsSkills, type Alignment } from '@/alignment/schema';
+import { ALIGNMENT_REVISION, applyAlignmentPatch, mergeFromSource, needsSkills, needsSource, type Alignment } from '@/alignment/schema';
 import { mountAlignmentView, resetAlignmentViewForTests } from '@/alignment/view';
 
 // Invented wording. The real syllabus text lives in the private data repo.
@@ -68,10 +68,28 @@ describe('alignment model', () => {
     delete old.focus_areas[0]!.points[0]!.skills;
     old.focus_areas[0]!.points[1]!.skills = ['learning'];
     expect(needsSkills(old)).toBe(true);
-    const { doc: merged, changed } = mergeMissingSkills(old, doc);
+    const { doc: merged, changed } = mergeFromSource(old, doc);
     expect(changed).toBe(true);
     expect(merged.focus_areas[0]!.points.map((p) => p.skills)).toEqual([['analysis', 'inference'], ['learning']]);
     expect(merged.focus_areas[1]!.points[0]!.skills).toEqual([]);
+  });
+
+  it('brings a saved copy up to a newer revision, keeping edited points and adding only new bullets to them', () => {
+    const saved = structuredClone(doc);
+    const u1 = saved.focus_areas[0]!.points[0]!;
+    u1.concepts = [{ ref: 'STY1', link: 'shared' }];
+    u1.edited = true;
+    saved.focus_areas[0]!.points[1]!.concepts = [];
+    expect(needsSource(saved)).toBe(ALIGNMENT_REVISION > 1);
+    const source = { ...structuredClone(doc), revision: 2 };
+    const { doc: merged, changed } = mergeFromSource(saved, source);
+    expect(changed).toBe(true);
+    expect(merged.revision).toBe(2);
+    // Edited: keeps its own links, gains ARG1 (linked nowhere in the saved copy).
+    expect(merged.focus_areas[0]!.points[0]!.concepts).toEqual([{ ref: 'STY1', link: 'shared' }, { ref: 'ARG1', link: 'shared' }]);
+    // Unedited: takes the file's links.
+    expect(merged.focus_areas[0]!.points[1]!.concepts).toEqual([{ ref: 'ARG2', link: 'shared' }]);
+    expect(mergeFromSource(merged, source).changed).toBe(false);
   });
 
   it('highlights only the content words both sides share', () => {
@@ -155,7 +173,7 @@ describe('alignment view', () => {
     const r = (x: string) => ({ i_can: x, build: { formula: ['P'], parts: [{ id: 'p', name: 'P', job: 'j', language: [] }], example: [['e', 'p']] as [string, string | null][], why_here: 'w', checks: [], next_move: 'n' } });
     vi.mocked(loadSkills).mockResolvedValueOnce({ strands: [{ schema: 'skills_strand_v1', strand: 'arguing', name: 'Arguing', summary: 's',
       rungs: (['capable', 'skilled', 'accomplished', 'excellent'] as const).map((id) => ({ id, name: id, marks: '13', marker_words: 'x', meaning: 'y' })),
-      sub_strands: [{ id: 'thesis', name: 'Thesis', in_hsc: 'h', draws_on: 'd', outcomes: [1], focus_areas: ['area-one'], rungs: { capable: r('a'), skilled: r('b'), accomplished: r('c'), excellent: r('d') } }] }] });
+      sub_strands: [{ id: 'thesis', name: 'Thesis', in_hsc: 'h', draws_on: 'd', outcomes: [1], focus_areas: ['area-one'], points: [], rungs: { capable: r('a'), skilled: r('b'), accomplished: r('c'), excellent: r('d') } }] }] });
     mountAlignmentView(host);
     await settle();
     await settle();
