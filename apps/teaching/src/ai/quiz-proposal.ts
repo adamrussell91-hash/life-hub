@@ -16,6 +16,7 @@ function proposalBlocks(proposal: AiProposal): Block[] {
       return [proposal.section];
     case 'replace_lesson':
     case 'insert_blocks':
+    case 'replace_blocks':
       return proposal.blocks;
     default:
       return [];

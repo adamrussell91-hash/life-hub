@@ -17,6 +17,10 @@ export type WordPicker = {
   /** Repaints the per-word marks, e.g. after a spot is added or removed. */
   paint(marks: (index: number) => WordMark | undefined): void;
   clear(): void;
+  /** True between the first tap and the second. */
+  waiting(): boolean;
+  /** Puts a node straight after the line a span ends on, or takes it out with null. */
+  placeAfter(node: HTMLElement, span: WordSpan | null): void;
 };
 
 export function mountWordPicker(options: {
@@ -30,6 +34,8 @@ export function mountWordPicker(options: {
   root.setAttribute('role', 'group');
   root.setAttribute('aria-label', options.label);
   const buttons: HTMLButtonElement[] = [];
+  /** The line element each word sits in, by word position. */
+  const lineOf: HTMLElement[] = [];
   let anchor: number | null = null;
   let selection: WordSpan | null = null;
   let focusAt = 0;
@@ -57,6 +63,7 @@ export function mountWordPicker(options: {
       focus(Math.max(0, Math.min(words.length - 1, next)));
     });
     buttons.push(b);
+    lineOf.push(para);
     para.append(b);
   });
 
@@ -86,6 +93,7 @@ export function mountWordPicker(options: {
     buttons.forEach((b, n) => {
       const on = !!selection && n >= selection.from && n <= selection.to;
       b.setAttribute('aria-pressed', String(on));
+      b.classList.toggle('qz-word--start', anchor === n);
     });
   }
 
@@ -104,6 +112,14 @@ export function mountWordPicker(options: {
       anchor = null;
       selection = null;
       showSelection();
+    },
+    waiting: () => anchor !== null,
+    placeAfter(node, span) {
+      if (!span) {
+        node.remove();
+        return;
+      }
+      (lineOf[span.to] ?? root.lastElementChild ?? root).after(node);
     }
   };
 }

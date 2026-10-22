@@ -171,4 +171,46 @@ describe('spot the technique', () => {
     expect(builder.problem()).toBeNull();
     expect(answerLines(latest!)).toContain('✓ “wind whispered”: Personification');
   });
+
+  it('asks the technique right under the line the selection is on, and drops a technique once used', () => {
+    const { pub } = setUp();
+    const root = mountQuestionPlayer({ question: pub });
+    const step = () => root.querySelector('.qz-spot-step')?.textContent ?? '';
+    expect(step()).toBe('1 of 2: tap the first word of a technique.');
+    const words = () => [...root.querySelectorAll<HTMLButtonElement>('.qz-word')];
+    const at = (phrase: string) => locateQuote(PASSAGE, phrase)!;
+    words()[at('Her').from]!.click();
+    expect(step()).toContain('now tap the last word');
+    words()[at('stone').from]!.click();
+    // Inside the passage, straight after line two.
+    const pick = root.querySelector('.qz-spot-pick')!;
+    expect(pick.previousElementSibling?.textContent).toContain('Her heart was a stone');
+    const chips = () => [...root.querySelectorAll<HTMLButtonElement>('.qz-spot-pick .qz-chip')].map((b) => b.textContent);
+    expect(chips()).toHaveLength(4);
+    [...root.querySelectorAll<HTMLButtonElement>('.qz-spot-pick .qz-chip')].find((b) => b.textContent === 'Metaphor')!.click();
+    expect(root.querySelector('.qz-spot-pick')).toBeNull();
+    expect(step()).toBe('2 of 2: tap the first word of a technique.');
+    words()[at('wind').from]!.click();
+    expect(chips()).not.toContain('Metaphor');
+    expect(chips()).toHaveLength(3);
+  });
+
+  it('keeps a technique on offer when the teacher allows it twice, and asks for that when two answers need it', () => {
+    const twice = {
+      targets: [
+        { id: 't1', quote: 'The wind whispered', correct: ['per'] },
+        { id: 't2', quote: 'the city slept', correct: ['per'] }
+      ]
+    } as Partial<QuizQuestion>;
+    expect(checkQuestion(question(twice))).toEqual({
+      ok: false,
+      message: 'Two answers need the same technique. Turn on “A technique can be used more than once”.'
+    });
+    expect(checkQuestion(question({ ...twice, find: 1 } as Partial<QuizQuestion>)).ok).toBe(true);
+    const { pub, id } = setUp({ ...twice, reuse: true } as Partial<QuizQuestion>);
+    const response = { spots: [{ ...locateQuote(PASSAGE, 'wind whispered')!, option: id('Personification') }] };
+    const root = mountQuestionPlayer({ question: pub, response });
+    root.querySelectorAll<HTMLButtonElement>('.qz-word')[locateQuote(PASSAGE, 'city')!.from]!.click();
+    expect([...root.querySelectorAll('.qz-spot-pick .qz-chip')].map((b) => b.textContent)).toContain('Personification');
+  });
 });

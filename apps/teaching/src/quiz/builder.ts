@@ -780,8 +780,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     );
     const picker = mountWordPicker({ passage: question.passage, label: 'Passage: select an answer', onSelect: (span) => paintPick(span) });
     const pickHost = el('div', 'qz-spot-pick');
-    pickHost.hidden = true;
-    wrap.append(picker.root, pickHost);
+    wrap.append(picker.root);
     const spans = question.targets.map((t) => locateQuote(question.passage, t.quote));
     picker.paint((n) => {
       const i = spans.findIndex((s) => !!s && n >= s.from && n <= s.to);
@@ -790,7 +789,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
 
     function paintPick(span: { from: number; to: number } | null): void {
       pickHost.replaceChildren();
-      pickHost.hidden = !span;
+      picker.placeAfter(pickHost, span);
       if (!span) return;
       const named = question.options.filter((o) => o.text.trim());
       if (!named.length) {
@@ -801,6 +800,8 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       pickHost.append(el('p', 'qz-spot-pick__ask', `“${spanText(question.passage, span)}”: which technique is it?`));
       const chips = el('div', 'qz-spot-pick__chips');
       const add = button('Add this answer', 'primary', () => {
+        // Two answers that need the same name keep that name on offer for students.
+        if (question.targets.some((t) => t.correct.some((id) => ticked.has(id)))) question.reuse = true;
         question.targets.push({ id: newId(), quote: spanText(question.passage, span), correct: [...ticked] });
         paintBody();
         emit();
@@ -871,6 +872,14 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
       });
       wrap.append(labelled('Students must find', find, 'Choose “Any 1” to accept whichever answer they spot.'));
     }
+    wrap.append(
+      checkbox('A technique can be used more than once', !!question.reuse, (on) => {
+        if (on) question.reuse = true;
+        else delete question.reuse;
+        emit();
+      })
+    );
+    wrap.append(el('p', 'qz-field__hint', 'Off: each technique leaves the students’ list once they use it.'));
     return wrap;
   }
 

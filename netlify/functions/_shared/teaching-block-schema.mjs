@@ -222,7 +222,9 @@ var QuizQuestionSchema = z5.discriminatedUnion("kind", [
     options: z5.array(QuizChoiceSchema.extend({ technique_id: z5.string().max(64).optional() })).min(2).max(10),
     targets: z5.array(QuizSpotTargetSchema).min(1).max(12),
     /** How many students must find. Fewer than the targets means any of them will do. */
-    find: z5.number().int().min(1).max(12).optional()
+    find: z5.number().int().min(1).max(12).optional(),
+    /** A technique stays on offer after it is used, for passages with two of the same. */
+    reuse: z5.boolean().optional()
   }),
   z5.object({ ...base, kind: z5.literal("label_image"), image: QuizImageSchema, pins: z5.array(QuizPinSchema).min(2).max(8) }),
   z5.object({
@@ -283,6 +285,10 @@ function questionProblems(q) {
         if (!target.correct.length || target.correct.some((id) => !ids.has(id))) out.push("Name the technique for every answer.");
       }
       if ((q.find ?? q.targets.length) > q.targets.length) out.push("Students can\u2019t be asked to find more than there are answers.");
+      const only = q.targets.filter((t) => t.correct.length === 1).map((t) => t.correct[0]);
+      if (!q.reuse && (q.find ?? q.targets.length) > 1 && new Set(only).size !== only.length) {
+        out.push("Two answers need the same technique. Turn on \u201CA technique can be used more than once\u201D.");
+      }
       break;
     }
     case "fill_gap":

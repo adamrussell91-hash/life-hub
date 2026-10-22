@@ -102,6 +102,7 @@ export function listPartialAcceptUnits(proposal: AiProposal): PartialAcceptUnit[
     case 'replace_block':
       return collectionItems(proposal.block, '');
     case 'insert_blocks':
+    case 'replace_blocks':
       return listRootBlocks(proposal.blocks, 'block');
     case 'replace_lesson': {
       const units: PartialAcceptUnit[] = [];
@@ -234,7 +235,7 @@ export function filterProposal(proposal: AiProposal, selectedKeys: Set<string>):
     return { ok: true, proposal: { ...proposal, block: filtered.block } };
   }
 
-  if (proposal.kind === 'insert_blocks') {
+  if (proposal.kind === 'insert_blocks' || proposal.kind === 'replace_blocks') {
     const filtered = filterBlockList(proposal.blocks, selectedKeys, 'block');
     if (!filtered.ok) return filtered;
     if (filtered.blocks.length === 0) {
