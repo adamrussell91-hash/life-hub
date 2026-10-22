@@ -10,6 +10,8 @@ import { mountStudentQuiz } from '@/quiz/student-quiz';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { renderPublishedLessonHero } from '@/student/lesson-view';
 import { createStudentShell, renderStudentStatus } from '@/student/shell';
+import { mountFocusController, type FocusStepView } from '@/teacher/focus/focus-view';
+import { focusSteps } from '@/teacher/focus/steps';
 
 /**
  * Display view: the page the teacher projects. It shows the published lesson,
@@ -17,6 +19,10 @@ import { createStudentShell, renderStudentStatus } from '@/student/shell';
  * join codes, open and close, reveal, brainstorm boards and groups, class
  * example answers. No editing chrome and nothing marked teacher only, because
  * the published snapshot never carries it.
+ *
+ * Page shows the lesson as one long page. Focus shows it a step at a time,
+ * scaled to fill the board (see teacher/focus). Both use the same rendered
+ * blocks, so switching never restarts a live activity.
  */
 
 export interface MountLessonDisplayViewOptions {
@@ -76,35 +82,55 @@ export function mountLessonDisplayView(
   );
   header.append(brand, actions);
 
+  const focus = mountFocusController({ surface, actions, stage: content, lessonId });
+
   function render(lesson: PublishedLesson): void {
     examples?.dispose();
     content.replaceChildren();
     document.title = `${lesson.title || 'Lesson'} · Display`;
-    const outcomes = renderPublishedLessonHero(content, lesson);
+    const hero = document.createElement('section');
+    hero.className = 'lesson-display__step lesson-display__step--hero';
+    content.append(hero);
+    const outcomes = renderPublishedLessonHero(hero, lesson);
 
     examples = createTeacherClassExamples({ lessonId: lesson.lesson_id });
-    const blocks = document.createElement('div');
-    blocks.className = 'lesson-blocks';
     const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
-    for (const block of lesson.blocks) {
-      if (isQuiz && block.block_type === 'quiz_question') continue;
-      const row = document.createElement('div');
-      row.className = 'lesson-display__block';
-      row.append(
-        renderBlock(block, 'teacher', {
-          lessonId: lesson.lesson_id,
-          pageBlocks: lesson.blocks,
-          attachedOutcomes: outcomes
-        })
-      );
-      examples.decorate(row, block);
-      blocks.append(row);
+    const shown = isQuiz ? lesson.blocks.filter((block) => block.block_type !== 'quiz_question') : lesson.blocks;
+    const views: FocusStepView[] = [{ label: 'Start', blocks: [], el: hero }];
+    for (const step of focusSteps(shown)) {
+      const wrap = document.createElement('section');
+      wrap.className = 'lesson-display__step';
+      const blocks = document.createElement('div');
+      blocks.className = 'lesson-blocks';
+      for (const block of step.blocks) {
+        const row = document.createElement('div');
+        row.className = 'lesson-display__block';
+        row.append(
+          renderBlock(block, 'teacher', {
+            lessonId: lesson.lesson_id,
+            pageBlocks: lesson.blocks,
+            attachedOutcomes: outcomes
+          })
+        );
+        examples.decorate(row, block);
+        blocks.append(row);
+      }
+      wrap.append(blocks);
+      content.append(wrap);
+      views.push({ ...step, el: wrap });
     }
-    content.append(blocks);
-    if (isQuiz) content.append(mountStudentQuiz(lesson));
+    if (isQuiz) {
+      const quiz = document.createElement('section');
+      quiz.className = 'lesson-display__step';
+      quiz.append(mountStudentQuiz(lesson));
+      content.append(quiz);
+      views.push({ label: 'Quiz', blocks: [], el: quiz });
+    }
+    focus.setSteps(views, lesson.blocks);
   }
 
   function load(): void {
+    focus.setSteps([], []);
     renderStudentStatus(content, 'Loading lesson…');
     void apiGet<PublishedLesson>(`/api/published/lessons/${encodeURIComponent(lessonId)}`)
       .then((lesson) => {
@@ -127,6 +153,7 @@ export function mountLessonDisplayView(
     dispose() {
       disposed = true;
       document.removeEventListener('fullscreenchange', syncFullScreen);
+      focus.dispose();
       examples?.dispose();
       examples = null;
     }

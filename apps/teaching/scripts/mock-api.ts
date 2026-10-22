@@ -106,6 +106,8 @@ import { createLessonDiscernHandler } from '../../../netlify/functions/lesson-di
 import { createPublishedQuadrantHandler } from '../../../netlify/functions/published-quadrant.mjs';
 import { createLessonQuadrantHandler } from '../../../netlify/functions/lesson-quadrant.mjs';
 import { createHingeHandler } from '../../../netlify/functions/hinge.mjs';
+import { createTextToolsHandler } from '../../../netlify/functions/teaching-text-tools.mjs';
+import { runTextToolJob } from '../../../netlify/functions/_shared/text-tools.mjs';
 import { createPublishedHingeHandler } from '../../../netlify/functions/published-hinge.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
@@ -3544,6 +3546,29 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return { x: open, y: intellectual };
   }
 
+  /**
+   * Offline stand-in for Ann's hinge back-up: a fixed parallel question, after
+   * a short pause so the checkpoint shows "drafting" before "ready".
+   */
+  async function mockHingeBackup(): Promise<string> {
+    return JSON.stringify({
+      prompt: 'Every one of you will one day have to tell your children why you did nothing. What is the main effect of this line on the audience?',
+      options: [
+        { text: 'It gives the audience facts to weigh up', right: false, misconception: 'any persuasive line is giving evidence' },
+        { text: 'It uses emotive language and direct address', right: false, misconception: 'naming the technique is the same as explaining its effect' },
+        { text: 'It makes each listener feel personally responsible, so they are more likely to act', right: true, misconception: '' },
+        { text: 'It shows the speaker has done their research', right: false, misconception: 'confident speakers must be experts' }
+      ]
+    });
+  }
+
+  function mockKickTextTool(_request: Request, _path: string, key: string): Promise<boolean> {
+    setTimeout(() => {
+      void runTextToolJob({ store: functionBlobStore(), env: { ANTHROPIC_API_KEY: 'mock' }, key, completeMessage: mockHingeBackup });
+    }, 3500);
+    return Promise.resolve(true);
+  }
+
   /** Quiz lessons, Question drop and Hinge question run the real Functions against the mock store. */
   async function handleQuiz(
     method: string,
@@ -3558,7 +3583,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     };
     const path = pathWithQuery.split('?')[0]!;
     const handler = /^\/api\/lessons\/[^/]+\/hinge\//.test(path)
-      ? createHingeHandler(deps)
+      ? createHingeHandler({ ...deps, kickTextToolRun: mockKickTextTool })
+      : path.startsWith('/api/text-tools/')
+        ? createTextToolsHandler(deps)
       : path.startsWith('/api/published/hinge/')
         ? createPublishedHingeHandler(deps)
       : /\/quadrant$/.test(path)
@@ -3658,6 +3685,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/lessons\/[^/]+\/quadrant$/.test(path) ||
       /^\/api\/published\/quadrant\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/hinge\/[^/]+$/.test(path) ||
+      (method === 'GET' && /^\/api\/text-tools\/[a-f0-9]{64}$/.test(path)) ||
       /^\/api\/published\/hinge\/[^/]+\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
