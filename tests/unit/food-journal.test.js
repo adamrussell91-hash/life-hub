@@ -1455,3 +1455,20 @@ test("a translated menu item gives English ingredients and keeps the original", 
   assert.equal(merged.dishes[0].ingredients, "Egg, potato");
   assert.equal(merged.dishes[0].ingredients_original, "Huevo, patata");
 });
+test("a dish that goes blank loses its English title and original ingredients", () => {
+  const item = { name: "Tortilla", name_en: "Spanish omelette", description: "Huevo, patata", description_en: "Egg, potato", price: "6€", kind: "dish" };
+  const draft = (title, title_en) => ({
+    title: "", venue: { name: "", address: "" }, menu_text: "",
+    menu_items: [item],
+    dishes: [{ title, title_en, cuisine: "", meal_type: "Lunch", tags: [], notes: "", photo_ids: [] }],
+  });
+  const v = mergeCapture(newVisit(), draft("Tortilla", "Spanish omelette"));
+  assert.equal(v.dishes.length, 1);
+  assert.equal(v.dishes[0].title_en, "Spanish omelette");
+  const blank = toggleMenuDish(v, item);
+  assert.equal(blank.dishes[0].title, "");
+  assert.equal("title_en" in blank.dishes[0], false);
+  assert.equal("ingredients_original" in blank.dishes[0], false);
+  const next = mergeCapture(blank, draft("Paella", "Rice dish"));
+  assert.equal(next.dishes[0].title_en, "Rice dish");
+});

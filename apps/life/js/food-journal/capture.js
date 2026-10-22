@@ -96,7 +96,7 @@ export function mergeCapture(visit, draft, photos = []) {
     );
     if (item?.description_en) {
       dish.ingredients = item.description_en;
-      dish.ingredients_original = item.description;
+      if (item.description) dish.ingredients_original = item.description;
     } else if (item?.description) dish.ingredients = item.description;
   }
   for (const photo of photos) {
@@ -204,19 +204,17 @@ export function toggleMenuDish(visit, item) {
   if (!untouched(dish, item)) {
     if (!String(dish.ingredients || "").trim()) {
       dish.ingredients = String(item.description_en || item.description || "");
-      if (item.description_en)
-        dish.ingredients_original = String(item.description || "");
+      if (item.description_en && item.description)
+        dish.ingredients_original = String(item.description);
     }
     return next;
   }
   if (next.dishes.length > 1) next.dishes.splice(index, 1);
-  else
-    Object.assign(dish, {
-      title: "",
-      notes: "",
-      ingredients: "",
-      ingredients_original: "",
-    });
+  else {
+    Object.assign(dish, { title: "", notes: "", ingredients: "" });
+    delete dish.title_en;
+    delete dish.ingredients_original;
+  }
   return next;
 }
 
