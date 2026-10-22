@@ -551,21 +551,21 @@ function cleanDigests(raw) {
 
 const sameTarget = (a, b) => Boolean(a && b) && a.kind === b.kind && a.id === b.id;
 
-/** A session that writes a page record: Problem Solver's case file (a Document step) or a decision record. */
-const keepsRecord = (session) => Boolean(session.model && (planStepForBook(session.model.id, 'document') || session.kind === 'decision'));
+/** A session that writes a page record: Problem Solver's case file (a Document step) or a book's record (books.mjs). */
+const keepsRecord = (session) => Boolean(session.model && (planStepForBook(session.model.id, 'document') || bookOf(session.kind)?.record));
 
 /**
  * The page wrote the case file (or an update) to a task or project page; record it. No coach call.
  * A first write or a move (`moved`: the old page is gone) replaces the section digests; an update
  * merges them and must be the next version on the same page. The same version on the same page
  * again is a no-op, so a retry after a lost response is safe. The page joins the problem's links.
- * A decision record also says whether its provenance graphic wrote (`graphic`); the same version
+ * A book's record also says whether its provenance graphic wrote (`graphic`); the same version
  * on the same page with `graphic: true` records a retried graphic.
  */
 export function linkCaseFile(session, payload, deps) {
   if (session.status === 'archived') throw fail(409, 'action_not_allowed', 'This problem is archived.');
   if (!keepsRecord(session)) throw fail(409, 'action_not_allowed', 'This problem has no Document step.');
-  const graphic = session.kind === 'decision' && typeof payload?.graphic === 'boolean' ? { graphic: payload.graphic } : {};
+  const graphic = bookOf(session.kind)?.record && typeof payload?.graphic === 'boolean' ? { graphic: payload.graphic } : {};
   const target = cleanTarget(payload?.target);
   const version = payload?.version;
   if (!Number.isInteger(version) || version < 1 || version > 999) throw fail(400, 'validation_error', 'A case file version is required.');
@@ -638,8 +638,8 @@ export function summaryRow(session) {
     escalatedTo: session.lightning?.escalatedTo ?? session.quick?.escalatedTo ?? null,
     // A quick decision's row says how its latest round came out.
     ...(session.kind === 'quick' ? { outcome: outcomeOf(session.quick) } : {}),
-    // A decision's medal shows the model its reasons lean on most.
-    ...(session.kind === 'decision' ? { main: mainModel(session) } : {}),
+    // A book session's medal shows the model or technique its record leans on most.
+    ...(bookOf(session.kind) ? { main: mainModel(session) } : {}),
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   };

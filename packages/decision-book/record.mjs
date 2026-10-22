@@ -168,11 +168,20 @@ export function composeRecord(session) {
  * exactly this content. Only decision sessions have a record.
  */
 export function recordOffer(session) {
-  if (session.kind !== 'decision' || !session.model || session.status === 'archived') return null;
+  if (session.kind !== 'decision') return null;
+  return offerFor(session, composeRecord, recordProvenance);
+}
+
+/**
+ * A book record's offer (write, update or graphic retry; see recordOffer), shared with Gear
+ * Shifter's action record. `compose` and `provenance` build the record from the session.
+ */
+export function offerFor(session, compose, provenanceOf) {
+  if (!session.model || session.status === 'archived') return null;
   if (session.reviewState?.status === 'reviewing') return null;
-  const file = composeRecord(session);
+  const file = compose(session);
   if (!file) return null;
-  const provenance = recordProvenance(session);
+  const provenance = provenanceOf(session);
   const digests = sectionDigests(file);
   const key = hashText(JSON.stringify(digests));
   const written = session.caseFile;

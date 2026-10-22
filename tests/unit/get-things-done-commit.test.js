@@ -12,41 +12,10 @@ import { BOOK_KINDS } from '../../packages/problem-solver/books.mjs';
 import { GEAR_TOOLS } from '../../packages/get-things-done/tools/index.mjs';
 import { COMMIT_ID, COMMIT_SLOT_NAMES, EXPERIMENT_REVIEW_ID, EXPERIMENT_REVIEW_SLOT_NAMES } from '../../packages/get-things-done/commit-slots.mjs';
 import { REVIEW_TOOL } from '../../packages/get-things-done/model.mjs';
-import { validateCoachTurn } from '../../netlify/functions/_shared/problem-solver/coach-schema.mjs';
 import { createModelCoach } from '../../netlify/functions/_shared/problem-solver/coach.mjs';
-import { acceptSuggestion, applyCoachTurn, createSession, moveOn, say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
+import { say } from '../../netlify/functions/_shared/problem-solver/session.mjs';
 
-let n = 0;
-const deps = { now: () => '2026-10-22T10:00:00.000Z', newId: () => `id${(n += 1)}` };
-
-/** The person says `text` (if any), then the coach replies with `raw`, read through the schema. */
-export function reply(session, raw, text = null) {
-  const next = text ? say(session, text, deps) : session;
-  const turn = validateCoachTurn({ verdict: 'accept', message: 'Noted.', ...raw });
-  assert.ok(turn.ok, turn.error);
-  return applyCoachTurn(next, turn.value, deps);
-}
-
-/** A framed shift with Appreciation worked to its minimum. */
-export function explored() {
-  let s = createSession({ text: 'The team report keeps stalling.', kind: 'shift' }, deps);
-  s = reply(s, { frame: { need: 'Get the team report out' } });
-  s = reply(s, { frame: { route: 'others' } }, 'It turns on two colleagues.');
-  s = reply(s, { frame: { known: 'Due Friday; Priya has the data.' }, suggestion: { kind: 'next_technique', tool: 'gt_appreciation', reason: 'Fits.' } }, 'Due Friday; Priya has the data.');
-  s = acceptSuggestion(s, deps);
-  s = reply(s, { node: { slot: 'entry:1', text: 'Thank Priya for pulling the sales data together', tag: 'acknowledge_contribution' } }, 'Priya pulled the data.');
-  s = reply(s, { node: { slot: 'reflection', text: 'Saying thanks first makes the next ask easier' } }, 'Thanks first.');
-  return s;
-}
-
-/** Explored, then Commit opened on gt_commit. */
-export function committing() {
-  let s = moveOn(explored(), deps);
-  s = applyCoachTurn(s, validateCoachTurn({ verdict: 'clarify', message: 'What did you learn about how you get things done?' }).value, deps);
-  s = reply(s, { verdict: 'clarify', learning: 'I move faster when I thank people first.' }, 'I move faster when I thank people first.');
-  assert.equal(s.suggestion?.tool, COMMIT_ID);
-  return acceptSuggestion(s, deps);
-}
+import { committing, deps, reply } from './gear-shifter-test-helpers.mjs';
 
 const commitRun = (s) => s.steps.commit.runs.find((run) => run.tool === COMMIT_ID);
 
