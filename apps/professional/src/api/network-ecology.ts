@@ -38,6 +38,9 @@ export function fetchNetworkEcologyHistory(
  * dedicated route rather than reusing `/api/career` (which computes the
  * same lookup internally but does not expose it, and does several
  * unrelated queries this caller does not need). */
-export function fetchSelfPerson(options: { signal?: AbortSignal } = {}): Promise<SelfPersonResponse> {
-  return apiGet<SelfPersonResponse>('/api/people/self', { signal: options.signal });
+export function fetchSelfPerson(
+  options: { signal?: AbortSignal; workplaces?: boolean } = {}
+): Promise<SelfPersonResponse> {
+  const path = options.workplaces ? '/api/people/self?include=workplaces' : '/api/people/self';
+  return apiGet<SelfPersonResponse>(path, { signal: options.signal });
 }
