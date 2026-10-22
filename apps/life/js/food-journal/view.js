@@ -308,12 +308,32 @@ export function createFoodJournalView({
     };
     return handle;
   }
-  async function persist(next, { quiet = false } = {}) {
+  // Counted dishes that a save drops, so the person can say whether their
+  // nutrition log should lose the meal too.
+  const countedPaths = (dishes) =>
+    dishes.filter((d) => d.brisket?.meal_path).map((d) => d.brisket.meal_path);
+  function askRemoveMeals(s) {
+    return new Promise((resolve) => {
+      const old = [...s.actions.childNodes];
+      const answer = (yes) => {
+        question.remove();
+        s.actions.replaceChildren(...old);
+        resolve(yes);
+      };
+      const question = el("p", "", "Also remove it from your nutrition log?");
+      s.fields.append(question);
+      s.actions.replaceChildren(
+        button("No", () => answer(false), "ghost"),
+        button("Yes", () => answer(true), "primary"),
+      );
+    });
+  }
+  async function persist(next, { quiet = false, removeMeals = [] } = {}) {
     if (busy) throw new Error("A save is already running.");
     busy = true;
     const token = epoch;
     try {
-      const value = await api.save(next, version);
+      const value = await api.save(next, version, removeMeals);
       if (token !== epoch)
         throw new Error("Your session changed. Sign in again.");
       journal = value.journal;
@@ -324,6 +344,10 @@ export function createFoodJournalView({
         void refreshEditorial();
         void refreshTranslations();
       }
+      if (value.meals_removed === false)
+        showHubToast(
+          "The Food Journal saved, but a nutrition entry couldn't be removed. Delete it from Nutrition.",
+        );
       return value;
     } finally {
       busy = false;
@@ -923,9 +947,11 @@ export function createFoodJournalView({
         async (e) => {
           e.currentTarget.disabled = true;
           try {
+            const paths = countedPaths(visit.dishes);
+            const removeMeals = paths.length && (await askRemoveMeals(s)) ? paths : [];
             const next = structuredClone(journal);
             next.visits.find((v) => v.id === visit.id).status = "deleted";
-            await persist(next);
+            await persist(next, { removeMeals });
             s.close();
           } catch (err) {
             s.error.textContent = err.message;
@@ -1566,7 +1592,10 @@ export function createFoodJournalView({
             next.visits.flatMap((v) => v.dishes.map((d) => d.id)),
           );
           next.recipes = next.recipes.filter((r) => ids.has(r.dish_id));
-          await persist(next);
+          const kept = new Set(visit.dishes.map((d) => d.id));
+          const paths = countedPaths(original.dishes.filter((d) => !kept.has(d.id)));
+          const removeMeals = paths.length && (await askRemoveMeals(s)) ? paths : [];
+          await persist(next, { removeMeals });
           clearDraft();
           s.close();
           render();
