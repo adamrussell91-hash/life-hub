@@ -79,7 +79,7 @@ const defaultUnlinkTravelMeals = (ctx, deps) => async (journal, version, links) 
 };
 // Removes one counted meal file, but only while it still names this dish.
 // A file that is already gone counts as removed; anything else throws.
-const defaultRemoveMeal = (ctx, deps) => async (path, dishId) => {
+const defaultRemoveMeal = (ctx, deps) => async (path, dishIds) => {
   const parsed = parseNutritionMealPath(path);
   if (!parsed) throw new Error("Not a meal path.");
   const client = (deps.createGitHubClient ?? createGitHubClient)({ env: ctx.env });
@@ -87,7 +87,7 @@ const defaultRemoveMeal = (ctx, deps) => async (path, dishId) => {
   const entry = tree.find((b) => b.path === path && b.type === "blob");
   if (!entry) return;
   const text = decodeBlob(await client.readBlob(entry.sha));
-  if (!mealNamesDish(text, dishId)) throw new Error("Meal is not this dish's.");
+  if (!dishIds.some((id) => mealNamesDish(text, id))) throw new Error("Meal is not this dish's.");
   await client.deleteFile({
     path,
     sha: entry.sha,
@@ -191,21 +191,34 @@ export function createFoodJournalHandler(deps = {}) {
       // Only meal files linked to dishes that are now gone may be removed.
       let mealsRemoved;
       if (Array.isArray(body.remove_meals) && body.remove_meals.length) {
-        const liveDishes = new Set(
-          clean.visits
-            .filter((v) => !isDeletedRecord(v))
-            .flatMap((v) => v.dishes.map((d) => d.id)),
+        const liveDishes = clean.visits
+          .filter((v) => !isDeletedRecord(v))
+          .flatMap((v) => v.dishes.filter((d) => !isDeletedRecord(d)));
+        const liveIds = new Set(liveDishes.map((d) => d.id));
+        const livePaths = new Set(
+          liveDishes.map((d) => d.brisket?.meal_path).filter(Boolean),
         );
+        // Gone means gone in this save: live before, not live now.
         const goneLinks = new Map();
-        for (const d of current.journal.visits.flatMap((v) => v.dishes))
-          if (d.brisket?.meal_path && !liveDishes.has(d.id))
-            goneLinks.set(d.brisket.meal_path, d.id);
+        for (const d of current.journal.visits
+          .filter((v) => !isDeletedRecord(v))
+          .flatMap((v) => v.dishes))
+          if (
+            d.brisket?.meal_path &&
+            !isDeletedRecord(d) &&
+            !liveIds.has(d.id) &&
+            !livePaths.has(d.brisket.meal_path)
+          ) {
+            if (!goneLinks.has(d.brisket.meal_path))
+              goneLinks.set(d.brisket.meal_path, new Set());
+            goneLinks.get(d.brisket.meal_path).add(d.id);
+          }
         const remove = deps.removeMeal ?? defaultRemoveMeal(ctx, deps);
         for (const p of new Set(body.remove_meals)) {
           if (!goneLinks.has(p)) continue;
           mealsRemoved ??= true;
           try {
-            await remove(p, goneLinks.get(p));
+            await remove(p, [...goneLinks.get(p)]);
           } catch {
             mealsRemoved = false;
           }

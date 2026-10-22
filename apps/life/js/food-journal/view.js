@@ -315,7 +315,11 @@ export function createFoodJournalView({
   function askRemoveMeals(s) {
     return new Promise((resolve) => {
       const old = [...s.actions.childNodes];
+      const watch = setInterval(() => {
+        if (!s.isOpen()) answer(null);
+      }, 200);
       const answer = (yes) => {
+        clearInterval(watch);
         question.remove();
         s.actions.replaceChildren(...old);
         resolve(yes);
@@ -948,7 +952,9 @@ export function createFoodJournalView({
           e.currentTarget.disabled = true;
           try {
             const paths = countedPaths(visit.dishes);
-            const removeMeals = paths.length && (await askRemoveMeals(s)) ? paths : [];
+            const yes = paths.length ? await askRemoveMeals(s) : false;
+            if (yes === null) return;
+            const removeMeals = yes ? paths : [];
             const next = structuredClone(journal);
             next.visits.find((v) => v.id === visit.id).status = "deleted";
             await persist(next, { removeMeals });
@@ -1593,8 +1599,16 @@ export function createFoodJournalView({
           );
           next.recipes = next.recipes.filter((r) => ids.has(r.dish_id));
           const kept = new Set(visit.dishes.map((d) => d.id));
-          const paths = countedPaths(original.dishes.filter((d) => !kept.has(d.id)));
-          const removeMeals = paths.length && (await askRemoveMeals(s)) ? paths : [];
+          const saved = journal.visits.find((v) => v.id === visit.id);
+          const paths = countedPaths(
+            (saved?.dishes ?? []).filter((d) => !kept.has(d.id)),
+          );
+          const yes = paths.length ? await askRemoveMeals(s) : false;
+          if (yes === null) {
+            persistDraft();
+            return;
+          }
+          const removeMeals = yes ? paths : [];
           await persist(next, { removeMeals });
           clearDraft();
           s.close();
