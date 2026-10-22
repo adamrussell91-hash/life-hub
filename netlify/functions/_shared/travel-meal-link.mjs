@@ -2,6 +2,7 @@
 // meal; the moment only points at it. These helpers are pure so the
 // endpoint can read both files, change them and commit once.
 import { isDeletedRecord } from "./record-liveness.mjs";
+import { needsRecount } from "../../../apps/life/js/food-journal/brisket-handoff.js";
 
 // A deleted visit keeps its source id reserved, so a re-link after an unlink
 // takes the next free one: travel:<trip>:<moment>:2, :3 and so on.
@@ -60,6 +61,8 @@ export function upsertLinkedVisit(journal, { tripId, moment, food, photos, visit
   // New copies of the moment's photos go on the first dish, once each.
   const first = visit.dishes[0];
   if (first) for (const p of photos) if (!visit.dishes.some((d) => d.photos.some((q) => q.key === p.key))) first.photos.push(p);
+  // A counted dish whose name, ingredients or photos changed needs Brisket again.
+  for (const d of visit.dishes) if (d.brisket && needsRecount(before.get(d.id), d)) d.brisket.needs_recount = true;
   return { journal: next, visitId: visit.id };
 }
 

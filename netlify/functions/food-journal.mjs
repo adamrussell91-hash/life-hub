@@ -19,6 +19,7 @@ import { parseNutritionMealPath } from "./_shared/delete-meal.mjs";
 import { mealNamesDish } from "./_shared/food-journal-meal-sync.mjs";
 import { syncCentralNodeAfterMealDeletes } from "./_shared/persist-log.mjs";
 import { getSydneyDateKey } from "../../apps/life/js/core/time.js";
+import { needsRecount } from "../../apps/life/js/food-journal/brisket-handoff.js";
 export const config = { path: "/api/food-journal" };
 
 // Deleting a travel-linked visit also strips the meal from its moment, in the
@@ -149,13 +150,16 @@ export function createFoodJournalHandler(deps = {}) {
         );
       // Only Brisket writes a dish's link, so a stale draft cannot drop it
       // and a client cannot forge one. A client may only ask for a re-count.
-      const counted = new Map(
-        current.journal.visits.flatMap((v) => v.dishes.map((d) => [d.id, d.brisket])),
+      // A changed name, ingredients or photos flags it here too, whatever the page did.
+      const stored = new Map(
+        current.journal.visits.flatMap((v) => v.dishes.map((d) => [d.id, d])),
       );
       for (const v of body.journal.visits)
         for (const d of v.dishes) {
-          const link = counted.get(d.id);
-          const recount = d.brisket?.needs_recount === true;
+          const before = stored.get(d.id);
+          const link = before?.brisket;
+          const recount =
+            d.brisket?.needs_recount === true || needsRecount(before, d);
           if (link) d.brisket = { ...link, ...(recount ? { needs_recount: true } : {}) };
           else delete d.brisket;
         }

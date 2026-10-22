@@ -108,3 +108,23 @@ test("the visit with the linked id wins over another live visit for the moment",
   assert.equal(upsertLinkedVisit(journal, { tripId: "trp_test1", moment, food, photos: [], visitId: "visit_b", newId: () => "never" }).visitId, "visit_b");
   assert.equal(upsertLinkedVisit(journal, { tripId: "trp_test1", moment, food, photos: [], newId: () => "never" }).visitId, "visit_a");
 });
+
+test("re-saving a meal flags a counted dish whose name or ingredients changed", () => {
+  const journal = { schema_version: 1, visits: [], recipes: [] };
+  let { journal: next } = upsertLinkedVisit(journal, { tripId: "trp_test1", moment, food, photos: [], newId: () => "visit_new" });
+  next.visits[0].dishes[0].brisket = {
+    meal_path: "data/nutrition/2026/11/2026-11-03-lunch.md", portion: "All", portion_fraction: 1,
+    counted_at: "2026-11-03T13:30:00.000Z", needs_recount: false,
+  };
+  const same = upsertLinkedVisit(next, { tripId: "trp_test1", moment, food, photos: [], visitId: "visit_new", newId: () => "x" });
+  assert.equal(same.journal.visits[0].dishes[0].brisket.needs_recount, false);
+  for (const change of [{ title: "Tortilla de patatas" }, { title_en: "Potato omelette" }, { ingredients: "Egg, potato" }]) {
+    const edited = { ...food, dishes: [{ ...food.dishes[0], ...change }] };
+    const out = upsertLinkedVisit(next, { tripId: "trp_test1", moment, food: edited, photos: [], visitId: "visit_new", newId: () => "x" });
+    assert.equal(out.journal.visits[0].dishes[0].brisket.needs_recount, true, JSON.stringify(change));
+  }
+  // The rating is not nutrition.
+  const rated = { ...food, dishes: [{ ...food.dishes[0], rating: 2 }] };
+  const out = upsertLinkedVisit(next, { tripId: "trp_test1", moment, food: rated, photos: [], visitId: "visit_new", newId: () => "x" });
+  assert.equal(out.journal.visits[0].dishes[0].brisket.needs_recount, false);
+});
