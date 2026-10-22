@@ -162,6 +162,24 @@ describe('scope & sequences', () => {
     expect(navigate).toHaveBeenCalledWith('/units/unit_aotfw');
   });
 
+  it('runs the timeline axis on past December when a unit spills into next year', () => {
+    const spilling: CurriculumResponse = {
+      ...curriculum,
+      scope_sequences: [
+        {
+          ...scope,
+          timeline_items: [
+            { ...scope.timeline_items[0]!, start_date: '2026-10-23', end_date: '2027-02-12' }
+          ]
+        } as ScopeSequence
+      ]
+    };
+    renderScopeTimelineEditor(canvas, spilling, 'subject_y12_engadv');
+    const months = [...canvas.querySelectorAll('.scope-gantt__month')].map((el) => el.textContent);
+    expect(months).toHaveLength(14);
+    expect(months.at(-1)).toMatch(/^Feb(ruary)? 27$/);
+  });
+
   it('renders the timeline editor for a known subject with a scope', () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv');
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('English Advanced');

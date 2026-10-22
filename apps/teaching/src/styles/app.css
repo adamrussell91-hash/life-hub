@@ -7148,6 +7148,11 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
   min-height: 14rem;
 }
 
+/* Outcome chips read as part of the title block, not a separate band. */
+.page-header + .scope-timeline__outcomes {
+  margin: calc(var(--space-4) * -1) 0 var(--space-4);
+}
+
 .scope-timeline__body:has(> .scope-timeline__inspector[hidden]) {
   grid-template-columns: minmax(0, 1fr);
 }
