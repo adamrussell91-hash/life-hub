@@ -296,6 +296,7 @@ test('meeting v2 reads v1 with empty purpose, blocks and decisions', () => {
   assert.equal(parsed.purpose, null);
   assert.deepEqual(parsed.blocks, []);
   assert.deepEqual(parsed.decisions, []);
+  assert.deepEqual(parsed.guide_runs, []);
   assert.equal(projectMeeting(parsed).agenda, MEETING_V1.agenda);
 });
 
@@ -325,4 +326,11 @@ test('meeting guide_runs: validated, bounded and kept on the record', () => {
   assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [{ ...run, values: { external: 11 } }] }), { code: 'invalid_guide_runs' });
   assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [{ ...run, taps: { external: 4 } }] }), { code: 'invalid_guide_runs' });
   assert.throws(() => validateMeetingFieldUpdate({ guide_runs: Array.from({ length: 21 }, (_, i) => ({ ...run, id: `g${i}` })) }), { code: 'invalid_guide_runs' });
+  const bad = (over) => assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [{ ...run, ...over }] }), { code: 'invalid_guide_runs' });
+  assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [run, { ...run }] }), { code: 'invalid_guide_runs' });
+  bad({ values: { '  ': 3 } });
+  bad({ values: JSON.parse('{"__proto__": 3}') });
+  bad({ checks: ['yes'] });
+  bad({ created_at: 'not a date' });
+  bad({ updated_at: '' });
 });

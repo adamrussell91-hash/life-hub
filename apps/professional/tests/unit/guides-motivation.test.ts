@@ -32,6 +32,7 @@ describe('motivation guide', () => {
     expect(g.profileFor({ external: 3, introjected: 7, identified: 5, integrated: 2, intrinsic: 2 }).id).toBe('control');
     expect(g.profileFor({ external: 1, introjected: 2, identified: 7, integrated: 6, intrinsic: 8 }).id).toBe('own');
     expect(g.profileFor({ external: 6, introjected: 7, identified: 7, integrated: 6, intrinsic: 6 }).id).toBe('both');
+    expect(g.profileFor({ external: 5, introjected: 5, identified: 4, integrated: 4, intrinsic: 4 }).id).toBe('control');
     expect(g.profileFor({ amotivation: 8, external: 1, introjected: 1, identified: 1, integrated: 0, intrinsic: 1 }).id).toBe('low');
   });
 

@@ -106,12 +106,19 @@ export function validateDecisions(value) {
 
 const shortText = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
+/** Trimmed object key, or null when empty, prototype-polluting or already used. */
+function safeKey(key, out) {
+  const k = shortText(key, 40);
+  return !k || k === '__proto__' || k in out ? null : k;
+}
+
 function numberMap(value, min, max) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 12) return null;
   const out = {};
   for (const [key, n] of Object.entries(value)) {
-    if (!Number.isInteger(n) || n < min || n > max) return null;
-    out[shortText(key, 40)] = n;
+    const k = safeKey(key, out);
+    if (!k || !Number.isInteger(n) || n < min || n > max) return null;
+    out[k] = n;
   }
   return out;
 }
@@ -120,16 +127,24 @@ function numberMap(value, min, max) {
 export function validateGuideRuns(value) {
   const fail = (why) => validationError('invalid_guide_runs', `guide_runs: ${why}`);
   if (!Array.isArray(value) || value.length > GUIDE_RUNS_MAX) throw fail(`an array of at most ${GUIDE_RUNS_MAX}.`);
+  const seen = new Set();
   return value.map((run) => {
     if (!run || typeof run !== 'object') throw fail('each run is an object.');
     const id = shortText(run.id, 80);
+    if (seen.has(id)) throw fail('run ids must be unique.');
+    seen.add(id);
     const context = shortText(run.context, 120);
     const values = numberMap(run.values, 0, 10);
     const taps = numberMap(run.taps ?? {}, 0, 3);
-    if (!id || !context || !values || !taps) throw fail('id, context, values (0–10) and taps (0–3) are required.');
+    if (!id || !context || !values || !taps) throw fail('id, context and values (0–10) are required; taps are 0–3.');
+    if (!isIsoTimestamp(run.created_at) || !isIsoTimestamp(run.updated_at)) throw fail('created_at and updated_at must be timestamps.');
+    const rawChecks = run.checks ?? {};
+    if (typeof rawChecks !== 'object' || Array.isArray(rawChecks) || Object.keys(rawChecks).length > 12) throw fail('checks is an object of at most 12 answers.');
     const checks = {};
-    for (const [key, answer] of Object.entries(run.checks && typeof run.checks === 'object' ? run.checks : {})) {
-      if (typeof answer === 'string') checks[shortText(key, 40)] = shortText(answer, 40);
+    for (const [key, answer] of Object.entries(rawChecks)) {
+      const k = safeKey(key, checks);
+      if (!k) throw fail('check keys must be unique, non-empty names.');
+      if (typeof answer === 'string') checks[k] = shortText(answer, 40);
     }
     return {
       id,
