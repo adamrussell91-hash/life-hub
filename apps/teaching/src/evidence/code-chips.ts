@@ -21,10 +21,13 @@ export function codeChips(o: CodeChipsOptions): HTMLElement {
       b.type = 'button';
       b.title = c.descriptor;
       b.setAttribute('aria-pressed', String(picked.includes(c.id)));
+      b.dataset.code = c.id;
       b.addEventListener('click', () => {
         picked = picked.includes(c.id) ? picked.filter((id) => id !== c.id) : [...picked, c.id];
         o.onChange(picked);
         paint();
+        // The repaint swaps the buttons, so keep keyboard focus on this chip.
+        [...root.querySelectorAll<HTMLButtonElement>('.ev-chip')].find((x) => x.dataset.code === c.id)?.focus();
       });
       return b;
     });

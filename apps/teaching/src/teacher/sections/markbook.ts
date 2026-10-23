@@ -252,6 +252,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       students: rowStudents(view, showRemoved).filter((s) => !s.removed),
       studentId,
       skills,
+      codes: ctx?.codes,
       // Reads the live view, so a mark saved or queued in this panel shows when the teacher comes back to it.
       markFor: (id) => (view ? markOf<AssessmentMark>(view.markbook, columnId, id) : undefined),
       onSave: (id, mark) => {
