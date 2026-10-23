@@ -64,8 +64,7 @@ function renderPublishedUnit(content: HTMLElement, unit: PublishedUnit): void {
               title: lesson.title,
               href: `${CLASS_SITE_ORIGIN}/s/lessons/${lesson.lesson_id}`,
               ...(lesson.line_stops ? { line_stops: lesson.line_stops } : {}),
-              ...(lesson.after_lesson_ids ? { after: lesson.after_lesson_ids } : {}),
-              ...(lesson.lesson_kind ? { kind: lesson.lesson_kind } : {})
+              ...(lesson.after_lesson_ids ? { after: lesson.after_lesson_ids } : {})
             }))
           },
           attachedOutcomes: publishedOutcomes,
