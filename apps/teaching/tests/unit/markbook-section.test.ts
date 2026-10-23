@@ -70,6 +70,13 @@ function fakeApi(view: MarkbookView): MarkbookApi & { calls: unknown[][] } {
       else focus[studentId] = { pinned, dismissed };
       current = { ...current, markbook: { ...current.markbook, focus } };
       return current.markbook;
+    }),
+    setTook: vi.fn(async (_c, studentId, lessonIds) => {
+      const took = { ...(current.markbook.took ?? {}) };
+      if (!lessonIds.length) delete took[studentId];
+      else took[studentId] = lessonIds;
+      current = { ...current, markbook: { ...current.markbook, took } };
+      return current.markbook;
     })
   };
 }
