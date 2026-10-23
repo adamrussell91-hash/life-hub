@@ -10,6 +10,13 @@ type Saved = { pick: string; correct_id: string; right: boolean };
  * sees right or wrong with the right answer marked. In the teacher's preview
  * the draft still holds the answer, so it checks locally and sends nothing.
  */
+const previewAnswers = new Map<string, Saved>();
+
+/** Preview answers last until the teacher closes the preview (Start again clears them too). */
+export function clearPreviewAnswers(): void {
+  previewAnswers.clear();
+}
+
 export function mountSolo(block: HingeBlock, lessonId: string, preview: boolean): HTMLElement {
   const saveKey = `hinge:${lessonId}:${block.id}:solo`;
   const deviceKey = `hinge:${lessonId}:${block.id}:device`;
@@ -17,7 +24,8 @@ export function mountSolo(block: HingeBlock, lessonId: string, preview: boolean)
   const alert = el('p', 'pf-alert');
   alert.setAttribute('role', 'alert');
   alert.hidden = true;
-  let saved = preview ? null : readJSON<Saved>(saveKey);
+  // The teacher's preview keeps answers in memory only, so a re-render after a detour still shows them.
+  let saved = preview ? previewAnswers.get(saveKey) ?? null : readJSON<Saved>(saveKey);
   let busy = false;
 
   function token(): string | null {
@@ -34,6 +42,7 @@ export function mountSolo(block: HingeBlock, lessonId: string, preview: boolean)
       if (preview) {
         const correct = (block.content as { correct_id?: string }).correct_id ?? '';
         saved = { pick: id, correct_id: correct, right: id === correct };
+        previewAnswers.set(saveKey, saved);
       } else {
         const res = await apiPost<{ mine: string; correct_id: string; right: boolean }>(
           `/api/published/hinge/${encodeURIComponent(lessonId)}/${encodeURIComponent(block.id)}`,
