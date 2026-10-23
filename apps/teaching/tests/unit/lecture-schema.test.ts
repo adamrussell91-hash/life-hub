@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import { PublishedLessonSchema } from '@/schemas/published-lesson';
-import { createHeadingEditor } from '@/blocks/editors';
+import { createHeadingEditor, createClozeEditor, createSelfCheckEditor } from '@/blocks/editors';
 
 const base = { type: 'block', visibility: 'student_teacher', variant: 'medium', created_at: '2026-10-23T00:00:00.000Z', updated_at: '2026-10-23T00:00:00.000Z', schema_version: 1 } as const;
 const narration = { url: '/api/media/m1/file', duration_s: 42, transcript: 'Today we look at tone.' };
@@ -49,5 +49,24 @@ describe('lecture schema fields', () => {
     input.value = 'Tone and mood';
     input.dispatchEvent(new Event('input'));
     expect(latest.content).toEqual({ text: 'Tone and mood', narration });
+  });
+  it('the cloze editor keeps the gate switch when text changes', () => {
+    const block = BlockSchema.parse({ ...base, id: 'c1', block_type: 'cloze', content: { text: 'A [[b]] c', gate: false } }) as any;
+    let latest = block;
+    const editor = createClozeEditor(block, (next: any) => { latest = next; }, () => latest);
+    const input = editor.querySelector<HTMLTextAreaElement>('.block-editor__cloze-text')!;
+    input.value = 'A [[b]] d';
+    input.dispatchEvent(new Event('input'));
+    expect(latest.content.gate).toBe(false);
+  });
+
+  it('the self-check editor keeps the gate switch when the prompt changes', () => {
+    const block = BlockSchema.parse({ ...base, id: 'k1', block_type: 'self_check', content: { mode: 'reveal', prompt: 'Why?', gate: false } }) as any;
+    let latest = block;
+    const editor = createSelfCheckEditor(block, (next: any) => { latest = next; }, () => latest);
+    const input = editor.querySelector<HTMLTextAreaElement>('.block-editor__self-check-prompt')!;
+    input.value = 'Why so?';
+    input.dispatchEvent(new Event('input'));
+    expect(latest.content.gate).toBe(false);
   });
 });

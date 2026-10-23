@@ -2290,9 +2290,11 @@ export function createClozeEditor(
 
   const emitChange = () => {
     const titleValue = title.value.trim();
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         title: titleValue.length > 0 ? titleValue : undefined,
         text: text.value,
         case_sensitive: caseSensitive.checked || undefined
@@ -2332,9 +2334,11 @@ export function createSelfCheckEditor(
   itemsHost.className = 'block-editor__self-check-items';
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         title: title.value.trim() || undefined,
         mode,
         prompt: prompt.value,
