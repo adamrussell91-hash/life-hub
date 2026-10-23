@@ -14,7 +14,7 @@ export type LectureEditorToolsOptions = {
   idFactory: () => string;
 };
 
-const GATES = new Set<Block['block_type']>(['hinge_question', 'cloze', 'self_check']);
+const GATES = new Set<Block['block_type']>(['hinge_question', 'cloze', 'self_check', 'faded_example']);
 
 type Content = Record<string, unknown>;
 
