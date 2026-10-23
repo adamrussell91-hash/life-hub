@@ -11,7 +11,8 @@ export const BANDS = {
   groupMin: 2
 } as const;
 
-export const FOCUS = { below: 0.6, minItems: 3, max: 3, secureMinItems: 3 } as const;
+/** Pre-tests usually ask two questions per technique, so two items are enough for a focus area or a secure tag. */
+export const FOCUS = { below: 0.6, minItems: 2, max: 3, secureMinItems: 2 } as const;
 
 export const FLAGS = {
   /** Students sure (3) but below full marks on one tag. */

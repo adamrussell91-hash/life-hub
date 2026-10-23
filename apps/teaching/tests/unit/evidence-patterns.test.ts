@@ -105,11 +105,20 @@ describe('focusFor', () => {
       ...[0, 0.2, 0.4].map((s, i) => e('s1', `a${i}`, ['tech:a'], s)),
       ...[0.5, 0.5, 0.5].map((s, i) => e('s1', `b${i}`, ['tech:b'], s)),
       ...[1, 1, 0.9].map((s, i) => e('s1', `c${i}`, ['tech:c'], s)),
-      ...[0, 0].map((s, i) => e('s1', `d${i}`, ['tech:d'], s))
+      ...[0].map((s, i) => e('s1', `d${i}`, ['tech:d'], s))
     ];
     const f = focusFor(ev, 's1', 'tech', { pinned: ['tech:c'], dismissed: ['tech:b'] });
     expect(f.focus.map((x) => x.tag)).toEqual(['tech:c', 'tech:a']);
     expect(f.focus[0]!.pinned).toBe(true);
+    expect(f.secure.map((x) => x.tag)).toEqual(['tech:c']);
+  });
+  it('two items on a tag are enough for a focus area or a secure tag', () => {
+    const ev = [
+      ...[0, 0.5].map((s, i) => e('s1', `a${i}`, ['tech:a'], s)),
+      ...[1, 1].map((s, i) => e('s1', `c${i}`, ['tech:c'], s))
+    ];
+    const f = focusFor(ev, 's1', 'tech');
+    expect(f.focus.map((x) => x.tag)).toEqual(['tech:a']);
     expect(f.secure.map((x) => x.tag)).toEqual(['tech:c']);
   });
   it('lists a duplicated pin once', () => {
