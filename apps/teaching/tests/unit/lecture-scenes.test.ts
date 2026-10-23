@@ -81,4 +81,23 @@ describe('lectureScenes', () => {
     const [scene] = lectureScenes([heading('h1', { narration: { url: 'u', duration_s: 5 }, reveal: 'all' })]);
     expect(scene).toMatchObject({ narration: { url: 'u', duration_s: 5 }, reveal: 'all' });
   });
+
+  it('attaches a side path that sits inside a chapter after its gate', () => {
+    const hinge = b('q1', 'hinge_question', { prompt: 'p', options: [] });
+    const path = section('p1', [text('again')], { side_path: true });
+    const scenes = lectureScenes([section('s1', [heading('h1'), hinge, path, text('after')], { takeaway: { enabled: false } })]);
+    expect(scenes.map((s) => s.id)).toEqual(['h1']);
+    expect(ids(scenes[0]!)).toEqual(['q1', 'after']);
+    expect(scenes[0]!.beats[0]).toMatchObject({ gate: true, sidePath: { id: 'p1' } });
+  });
+
+  it('makes no intro scene when only skipped blocks come before the first heading', () => {
+    const scenes = lectureScenes([section('s1', [b('tn', 'teacher_note', { html: '' }), heading('h1'), text('t1')])]);
+    expect(scenes.map((s) => s.id)).toEqual(['h1']);
+  });
+
+  it('numbers untitled chapters by chapter, not by scene', () => {
+    const scenes = lectureScenes([heading('h1'), heading('h2'), section('s1', [heading('h3')], { title: '' })]);
+    expect(scenes.at(-1)!.chapter?.label).toBe('Chapter 1');
+  });
 });
