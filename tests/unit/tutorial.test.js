@@ -59,3 +59,46 @@ test('a class with no list can’t run a tutorial', async () => {
   assert.equal(s.anonymous, true);
   assert.equal(s.group, null);
 });
+
+test('hand-ups are saved, capped and listed for their owner only', async () => {
+  const store = storeFor();
+  await claim(store, 1, 'AB');
+  await claim(store, 2, 'CD');
+  const sent = await tutorialAction(store, 'tut1', { action: 'handup', ...who(1), scene_id: 'f1', scene_label: 'Example', text: 'Stuck here' });
+  assert.equal(sent.handups.length, 1);
+  assert.equal(sent.handups[0].text, 'Stuck here');
+  assert.equal(sent.handups[0].status, 'open');
+  const cy = await tutorialAction(store, 'tut1', { action: 'status', ...who(2) });
+  assert.deepEqual(cy.handups, []);
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'handup', ...who(1), scene_id: 'w2', text: 'x' }), { code: 'bad_scene' });
+  for (let i = 1; i < 30; i += 1) await tutorialAction(store, 'tut1', { action: 'handup', ...who(1), scene_id: 'f1', text: `n${i}` });
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'handup', ...who(1), scene_id: 'f1', text: 'one more' }), { code: 'too_many' });
+});
+
+test('progress and answer responses leave hand-ups out', async () => {
+  const store = storeFor();
+  await claim(store, 1, 'AB');
+  await tutorialAction(store, 'tut1', { action: 'handup', ...who(1), scene_id: 'f1', text: 'hi' });
+  const p = await tutorialAction(store, 'tut1', { action: 'progress', ...who(1), stage: 'before' });
+  assert.deepEqual(p.handups, []);
+});
+
+test('a missing, malformed or other-class tabs record means not_for_you', async () => {
+  const store = storeFor();
+  await claim(store, 1, 'AB');
+  store.data.delete(tutorialKeys('tut1').tabs);
+  assert.equal((await tutorialAction(store, 'tut1', { action: 'status', ...who(1) })).not_for_you, true);
+  store.data.set(tutorialKeys('tut1').tabs, { class_id: 'class1', groups: [{ id: 'ga', students: 'st_ann', blocks: [] }, null] });
+  assert.equal((await tutorialAction(store, 'tut1', { action: 'status', ...who(1) })).not_for_you, true);
+  store.data.set(tutorialKeys('tut1').tabs, { class_id: 'class9', groups: [{ id: 'ga', goal: 'g', students: ['st_ann'], blocks: [] }] });
+  const s = await tutorialAction(store, 'tut1', { action: 'status', ...who(1) });
+  assert.equal(s.not_for_you, true);
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'progress', ...who(1), stage: 'before' }), { code: 'not_for_you' });
+});
+
+test('writes need initials, and a bad device token is treated as unclaimed', async () => {
+  const store = storeFor();
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'progress', ...who(1), stage: 'before' }), { code: 'need_initials' });
+  await claim(store, 1, 'AB');
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'progress', class_id: 'class1', class_token: 'short', stage: 'before' }), { code: 'need_initials' });
+});

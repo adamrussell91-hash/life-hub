@@ -137,7 +137,9 @@ export async function tutorialAction(store, lessonId, body) {
     if (action === 'status' || action === 'claim') return { ...empty, anonymous: true };
     reject(403, 'no_list', 'Your teacher hasn’t added a class list yet.');
   }
-  const group = tabs.groups.find((g) => g.students.includes(who.student.id));
+  const groups = Array.isArray(tabs.groups) ? tabs.groups : [];
+  const otherClass = !!tabs.class_id && tabs.class_id !== who.classId;
+  const group = otherClass ? null : groups.find((g) => Array.isArray(g?.students) && g.students.includes(who.student.id));
   if (!group) {
     if (action === 'status' || action === 'claim') return { ...empty, not_for_you: true };
     reject(403, 'not_for_you', 'This one isn’t for you today.');
@@ -161,6 +163,7 @@ export async function tutorialAction(store, lessonId, body) {
     await store.setJSON(k.answers(owner), all);
   }
   if (action === 'handup') {
+    if (typeof body.scene_id !== 'string' || !blockIds(group.blocks).has(body.scene_id)) reject(400, 'bad_scene', 'That part of the tutorial has changed. Reload the page.');
     const mine = await listBlobKeys(store, k.ownHandups(owner));
     if (mine.length >= MAX_HANDUPS) reject(429, 'too_many', 'You’ve sent a lot of hand-ups. Ask your teacher.');
     const id = `${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
@@ -168,10 +171,14 @@ export async function tutorialAction(store, lessonId, body) {
   }
 
   const state = (await read(store, k.group(group.id))) ?? emptyGroupState();
+  if (action === 'progress' || action === 'answer') {
+    return { identity, group: { id: group.id, goal: group.goal, blocks: group.blocks }, sitting: !!state.sitting, unlocked: Array.isArray(state.done_students) && state.done_students.includes(who.student.id), shown: state.shown ?? null, handups: [] };
+  }
   const handupKeys = await listBlobKeys(store, k.ownHandups(owner));
   const handups = (await Promise.all(handupKeys.map(async (key) => [key.slice(key.lastIndexOf('/') + 1), await read(store, key)])))
     .filter(([, h]) => h)
-    .map(([id, h]) => ({ id, scene_id: h.block_id, scene_label: h.label, text: h.text, status: h.status, reply: h.reply ?? '', at: h.at }));
+    .map(([id, h]) => ({ id, scene_id: h.block_id, scene_label: h.label, text: h.text, status: h.status, reply: h.reply ?? '', at: h.at }))
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)));
   return {
     identity,
     group: { id: group.id, goal: group.goal, blocks: group.blocks },
