@@ -72,6 +72,7 @@ export function createContinuumChart(doc: Document, options: ContinuumOptions): 
     if (options.editable) {
       bar.append(div('guide-chart__handle'));
       col.setAttribute('role', 'slider');
+      col.setAttribute('aria-orientation', 'vertical');
       col.tabIndex = 0;
       col.setAttribute('aria-label', scale.label);
       col.setAttribute('aria-valuemin', '0');
@@ -136,7 +137,11 @@ export function createContinuumChart(doc: Document, options: ContinuumOptions): 
   function paint(): void {
     for (const scale of options.scales) {
       barEls.get(scale.id)!.style.height = `${values[scale.id]! * 10}%`;
-      if (options.editable) cols.get(scale.id)!.setAttribute('aria-valuenow', String(values[scale.id]));
+      if (options.editable) {
+        const col = cols.get(scale.id)!;
+        col.setAttribute('aria-valuenow', String(values[scale.id]));
+        col.setAttribute('aria-valuetext', `${values[scale.id]} of 10`);
+      }
     }
     pin.style.left = `${Math.round(options.lean(values) * 100)}%`;
   }

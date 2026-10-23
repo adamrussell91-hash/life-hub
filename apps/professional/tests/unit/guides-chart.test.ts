@@ -33,9 +33,11 @@ describe('continuum chart', () => {
     const chart = createContinuumChart(document, { scales: g.scales, values, suggested: values, lean: g.lean, editable: true, onChange });
     const col = chart.el.querySelector<HTMLElement>('[data-scale="identified"]')!;
     expect(col.getAttribute('role')).toBe('slider');
+    expect(col.getAttribute('aria-orientation')).toBe('vertical');
     col.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     expect(chart.values().identified).toBe(6);
     expect(col.getAttribute('aria-valuenow')).toBe('6');
+    expect(col.getAttribute('aria-valuetext')).toBe('6 of 10');
     col.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
     expect(chart.values().identified).toBe(10);
     col.getBoundingClientRect = () => ({ top: 0, bottom: 100, height: 100, left: 0, right: 40, width: 40, x: 0, y: 0, toJSON: () => ({}) });
