@@ -14,11 +14,15 @@
  *   tutorial/{lesson}/answers/{owner}       { [block id]: { parts: { [index]: text }, rating, at } }
  *   tutorial/{lesson}/handups/{owner}/{id}  { block_id, label, text, status, reply, at, class_id, student_id, group_id }
  *
+ * Teacher actions (tutorialTeacherAction) read the draft for group names and
+ * whys, and write group state, the draft's groups, the tabs and the quiz key.
+ *
  * No model is called here.
  */
 import { randomBytes } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
-import { publishedLessonKey } from './teaching-blobs.mjs';
+import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
+import { loadRoster } from './class-claims.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { QuizError, deviceHash, read, reject, validToken } from './question-drop.mjs';
 import { identify, mapTree, prepareQuizPublish } from './quiz.mjs';
@@ -189,4 +193,180 @@ export async function tutorialAction(store, lessonId, body) {
     shown: state.shown ?? null,
     handups
   };
+}
+
+// ---------------------------------------------------------------------------
+// Teacher side: the board, sitting with a group, Done, unlock, moving students.
+// ---------------------------------------------------------------------------
+
+const TEACHER_ACTIONS = ['summary', 'board', 'sit', 'show', 'hide', 'done', 'unlock', 'move', 'reply'];
+const list = (value) => (Array.isArray(value) ? value : []);
+const draftGroups = (draft) => list(draft?.tutorial?.groups).map((g) => ({ ...g, students: list(g?.students) }));
+const groupState = async (store, key) => {
+  const state = (await read(store, key)) ?? emptyGroupState();
+  return { ...emptyGroupState(), ...state, done_students: list(state.done_students) };
+};
+
+/** Every hand-up in the tutorial as [id "owner~handup", record]. */
+async function allHandups(store, lessonId) {
+  const k = tutorialKeys(lessonId);
+  const keys = await listBlobKeys(store, k.handups);
+  return (await Promise.all(keys.map(async (key) => {
+    const [owner, id] = key.slice(k.handups.length).split('/');
+    const h = await read(store, key);
+    return h && owner && id ? [`${owner}~${id}`, h] : null;
+  }))).filter(Boolean);
+}
+
+/** The exit question ids a draft's exit section for this group holds, in the published key's order. */
+function exitQuestionsFromDraft(draft, groupId, record) {
+  const ids = new Set();
+  for (const b of list(draft?.blocks)) {
+    if (groupOfSection(b) !== groupId || b.content.tutorial_exit !== true) continue;
+    mapTree(list(b.content.blocks), (q) => {
+      if (q?.block_type === 'quiz_question') ids.add(q.id);
+      return q;
+    });
+  }
+  return list(record?.order).filter((id) => ids.has(id));
+}
+
+/**
+ * Moving a student touches the draft (groups), the published tabs and the
+ * current quiz key (which exit questions they get), so all three stay in step.
+ */
+async function moveStudent(store, lessonId, studentId, groupId) {
+  const draft = await read(store, draftLessonKey(lessonId));
+  const groups = draftGroups(draft);
+  if (typeof groupId !== 'string' || !groups.some((g) => g.id === groupId)) reject(404, 'not_found', 'That group is gone.');
+  const roster = await loadRoster(store, draft.tutorial?.class_id);
+  if (typeof studentId !== 'string' || !list(roster?.students).some((s) => s.id === studentId)) reject(400, 'bad_student', 'That student isn’t on this class list.');
+  const shift = (gs) => gs.map((g) => {
+    const others = list(g?.students).filter((s) => s !== studentId);
+    return { ...g, students: g.id === groupId ? [...others, studentId] : others };
+  });
+  await store.setJSON(draftLessonKey(lessonId), { ...draft, tutorial: { ...draft.tutorial, groups: shift(groups) }, updated_at: new Date().toISOString() });
+  const k = tutorialKeys(lessonId);
+  const tabs = await read(store, k.tabs);
+  if (tabs && Array.isArray(tabs.groups)) await store.setJSON(k.tabs, { ...tabs, groups: shift(tabs.groups) });
+
+  // The exit check follows the student: copy a current member's questions, else read the group's exit section.
+  const current = await read(store, `quiz/${lessonId}/current`);
+  if (!current?.version) return;
+  const recordKey = `quiz/${lessonId}/keys/${current.version}`;
+  const record = await read(store, recordKey);
+  if (!record || !record.groups || typeof record.groups !== 'object') return;
+  const mate = groups.find((g) => g.id === groupId).students.find((s) => s !== studentId && Array.isArray(record.groups[s]));
+  const questions = mate ? [...record.groups[mate]] : exitQuestionsFromDraft(draft, groupId, record);
+  const forStudents = list(record.settings?.for_students);
+  await store.setJSON(recordKey, {
+    ...record,
+    groups: { ...record.groups, [studentId]: questions },
+    settings: { ...record.settings, for_students: forStudents.includes(studentId) ? forStudents : [...forStudents, studentId] }
+  });
+}
+
+function groupStatus(state, students) {
+  if (students.length && students.every((s) => s.stage === 'done')) return 'done';
+  if (state.seen_at) return 'seen';
+  if (students.some((s) => s.stage === 'waiting')) return 'waiting';
+  if (students.some((s) => s.stage !== 'not_started')) return 'working';
+  return 'not_started';
+}
+
+async function summary(store, lessonId, draft) {
+  const k = tutorialKeys(lessonId);
+  const classId = draft.tutorial?.class_id;
+  const roster = classId ? await loadRoster(store, classId) : null;
+  const byId = new Map(list(roster?.students).map((s) => [s.id, s]));
+  const handups = await allHandups(store, lessonId);
+  const groups = await Promise.all(draftGroups(draft).map(async (g) => {
+    const state = await groupState(store, k.group(g.id));
+    const students = await Promise.all(g.students.map(async (id) => {
+      const progress = await read(store, k.progress(deviceHash(`student:${classId}:${id}`)));
+      const s = byId.get(id);
+      return { id, initials: s?.initials ?? '–', name: s?.name ?? 'Removed student', stage: progress?.stage ?? 'not_started', unlocked: state.done_students.includes(id) };
+    }));
+    const own = handups.filter(([, h]) => h.group_id === g.id);
+    return {
+      id: g.id, name: g.name, why: g.why, gap_type: g.gap_type, students,
+      sitting: !!state.sitting, seen_at: state.seen_at ?? null, status: groupStatus(state, students),
+      handups: own.length, open: own.filter(([, h]) => h.status !== 'answered').length
+    };
+  }));
+  return { groups, seen: groups.filter((g) => g.seen_at).length, total: groups.length };
+}
+
+export async function tutorialTeacherAction(store, lessonId, body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
+  if (!isSafeId(lessonId)) reject(404, 'not_found', 'Tutorial not found.');
+  const action = body.action ?? 'summary';
+  if (!TEACHER_ACTIONS.includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  const draft = await read(store, draftLessonKey(lessonId));
+  if (!draft || draft.pedagogical_mode !== 'tutorial') reject(404, 'not_found', 'Tutorial not found.');
+  const k = tutorialKeys(lessonId);
+  const again = async () => summary(store, lessonId, (await read(store, draftLessonKey(lessonId))) ?? draft);
+  if (action === 'summary') return summary(store, lessonId, draft);
+  if (action === 'move') {
+    await moveStudent(store, lessonId, body.student_id, body.group_id);
+    return again();
+  }
+  if (action === 'reply') {
+    const [owner, id] = typeof body.id === 'string' ? body.id.split('~') : [];
+    if (!/^[a-f0-9]{24}$/.test(owner ?? '') || !/^[a-z0-9]{6,24}$/.test(id ?? '')) reject(400, 'bad_id', 'That hand-up wasn’t found.');
+    const key = k.handup(owner, id);
+    const h = await read(store, key);
+    if (!h) reject(404, 'not_found', 'That hand-up wasn’t found.');
+    await store.setJSON(key, { ...h, status: 'answered', reply: clean(body.reply, MAX_TEXT), replied_at: new Date().toISOString() });
+    return again();
+  }
+  const group = draftGroups(draft).find((g) => g.id === body.group_id);
+  if (!group) reject(404, 'not_found', 'That group is gone.');
+  const classId = draft.tutorial.class_id;
+  const ownerOf = (id) => deviceHash(`student:${classId}:${id}`);
+  const inGroup = (id) => {
+    if (typeof id !== 'string' || !group.students.includes(id)) reject(400, 'bad_student', 'That student isn’t in this group.');
+  };
+  // One teacher writes group state, so each write reads it fresh just before.
+  const write = async (change) => {
+    const state = await groupState(store, k.group(group.id));
+    await store.setJSON(k.group(group.id), { ...state, ...change(state) });
+  };
+
+  if (action === 'sit') await write(() => ({ sitting: true }));
+  if (action === 'hide') await write(() => ({ shown: null }));
+  if (action === 'show') {
+    inGroup(body.student_id);
+    const answers = (await read(store, k.answers(ownerOf(body.student_id)))) ?? {};
+    const text = typeof body.block_id === 'string' && Object.hasOwn(answers, body.block_id) ? answers[body.block_id]?.parts?.[String(body.part)] : null;
+    if (typeof text !== 'string' || !text) reject(404, 'not_found', 'That answer is gone.');
+    // Shown to the group with no name, so nobody is called out.
+    await write(() => ({ shown: { text, label: 'One answer from your group' } }));
+  }
+  if (action === 'done') {
+    const picked = list(body.students).filter((id) => group.students.includes(id));
+    await write((state) => ({ sitting: false, shown: null, seen_at: new Date().toISOString(), done_students: [...new Set([...state.done_students, ...picked])] }));
+  }
+  if (action === 'unlock') {
+    inGroup(body.student_id);
+    await write((state) => ({ done_students: [...new Set([...state.done_students, body.student_id])] }));
+  }
+  if (action === 'board') {
+    const roster = await loadRoster(store, classId);
+    const byId = new Map(list(roster?.students).map((s) => [s.id, s]));
+    const students = await Promise.all(group.students.map(async (id) => ({
+      id,
+      initials: byId.get(id)?.initials ?? '–',
+      name: byId.get(id)?.name ?? 'Removed student',
+      stage: (await read(store, k.progress(ownerOf(id))))?.stage ?? 'not_started',
+      answers: (await read(store, k.answers(ownerOf(id)))) ?? {}
+    })));
+    const handups = (await allHandups(store, lessonId))
+      .filter(([, h]) => h.group_id === group.id)
+      .map(([id, h]) => ({ id, label: h.label ?? '', text: h.text ?? '', status: h.status ?? 'open', reply: h.reply ?? '', at: h.at ?? null, student_id: h.student_id ?? null }))
+      .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    const fresh = await groupState(store, k.group(group.id));
+    return { group: { id: group.id, name: group.name, why: group.why }, sitting: !!fresh.sitting, shown: fresh.shown ?? null, done_students: fresh.done_students, students, handups };
+  }
+  return again();
 }
