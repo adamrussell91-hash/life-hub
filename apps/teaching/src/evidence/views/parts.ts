@@ -49,8 +49,11 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
   return node;
 }
 
-/** One dot per student on a 0–100% line, equal scores stacked; the middle half shaded and the median marked. */
-export function dotPlot(shares: number[], s: Summary | null): SVGSVGElement {
+/**
+ * One dot per student on a 0–100% line, equal scores stacked; the middle half shaded and the median marked.
+ * The 0/50/100% labels are HTML under the drawing, so they stay readable when the drawing shrinks on a phone.
+ */
+export function dotPlot(shares: number[], s: Summary | null): HTMLElement {
   const x = (share: number): number => 20 + share * 600;
   const stacks = new Map<number, number>();
   const bins = shares.map((share) => Math.round(share * 50));
@@ -65,7 +68,7 @@ export function dotPlot(shares: number[], s: Summary | null): SVGSVGElement {
     stacks.set(bin, k + 1);
     dots.push([x(bin / 50), 36 - r - k * step]);
   }
-  const root = svg('svg', { viewBox: '0 0 640 60', class: 'ev-dots', role: 'img' });
+  const root = svg('svg', { viewBox: '0 0 640 46', class: 'ev-dots', role: 'img' });
   const title = svg('title');
   title.textContent = `Scores of ${shares.length} ${shares.length === 1 ? 'student' : 'students'}${s ? `, median ${pct(s.median)}` : ''}`;
   root.append(title, svg('line', { x1: 20, y1: 40, x2: 620, y2: 40, class: 'ev-dots__axis' }));
@@ -74,12 +77,16 @@ export function dotPlot(shares: number[], s: Summary | null): SVGSVGElement {
     root.append(svg('line', { x1: x(s.median), y1: 16, x2: x(s.median), y2: 44, class: 'ev-dots__median' }));
   }
   for (const [cx, cy] of dots) root.append(svg('circle', { cx, cy, r, class: 'ev-dots__dot' }));
+  const ticks = el('div', 'ev-dots__ticks');
+  ticks.setAttribute('aria-hidden', 'true');
   for (const [t, text] of [[0, '0%'], [0.5, '50%'], [1, '100%']] as const) {
-    const tick = svg('text', { x: x(t), y: 56, 'text-anchor': 'middle', class: 'ev-dots__tick' });
-    tick.textContent = text;
-    root.append(tick);
+    const tick = el('span', 'ev-dots__tick', text);
+    tick.style.left = `${(x(t) / 640) * 100}%`;
+    ticks.append(tick);
   }
-  return root;
+  const wrap = el('figure', 'ev-dotplot');
+  wrap.append(root, ticks);
+  return wrap;
 }
 
 export function tagSwitch(kinds: TagKind[], current: TagKind, onPick: (kind: TagKind) => void): HTMLElement {
@@ -122,7 +129,9 @@ export function tagRows(rows: TagRow[], label: (tag: string) => string): HTMLEle
     bar.append(full, part);
     const meta = el('span', 'ev-tag__meta');
     meta.append(el('span', `ev-badge ev-badge--${r.band}`, BAND_TEXT[r.band]), ` ${pct(r.mean)}${r.confidence === null ? '' : ` · sure ${r.confidence.toFixed(1)}`}`);
-    li.append(el('span', 'ev-tag__name', label(r.tag)), bar, meta);
+    const name = el('span', 'ev-tag__name', label(r.tag));
+    name.title = label(r.tag);
+    li.append(name, bar, meta);
     list.append(li);
   }
   return list;
