@@ -1322,7 +1322,6 @@ var NetworkLineSchema = z8.object({
   colour: CurriculumLinesColourSchema.default("wave"),
   alignment: LineAlignmentSchema.optional()
 });
-var LessonKindSchema = z8.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z8.array(z8.string().min(1).max(64)).max(6);
 var LessonRouteRoleSchema = z8.enum(["core", "support", "extension", "optional"]);
 var LessonSkipRuleSchema = z8.string().trim().max(80);
@@ -2430,7 +2429,6 @@ export {
   HtmlAppBlockSchema,
   HtmlBlockSchema,
   ImageBlockSchema,
-  LessonKindSchema,
   LessonRouteRoleSchema,
   LessonSkipRuleSchema,
   LineAlignmentSchema,

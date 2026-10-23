@@ -710,10 +710,8 @@ export const NetworkLineSchema = z.object({
   alignment: LineAlignmentSchema.optional()
 });
 /** What kind of session a lesson is, for the student's next-step choices. */
-export const LessonKindSchema = z.enum(['lesson', 'workshop', 'lecture']);
 /** The lessons that can come after this one; more than one is a choice, and the map splits. */
 export const AfterLessonIdsSchema = z.array(z.string().min(1).max(64)).max(6);
-export type LessonKind = z.infer<typeof LessonKindSchema>;
 /**
  * Where a lesson sits on the unit's route: on the core line, or off it as support,
  * extension or optional. Unset is core unless an old unit-map stop says otherwise;

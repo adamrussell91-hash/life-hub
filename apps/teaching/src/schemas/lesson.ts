@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
-import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonKindSchema, LessonRouteRoleSchema, LessonSkipRuleSchema, LineOffSchema, LineStopSchema } from './block';
+import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonRouteRoleSchema, LessonSkipRuleSchema, LineOffSchema, LineStopSchema } from './block';
 import { QuizSettingsSchema } from '../quiz/core';
 import { visitBlocks } from '../blocks/walk-blocks';
 import { CoverSchema } from './cover';
@@ -41,7 +41,6 @@ export const LessonSchema = z.object({
    * how a lesson goes back) follows unit order; an empty list ends the unit here.
    */
   after_lesson_ids: AfterLessonIdsSchema.nullable().optional(),
-  lesson_kind: LessonKindSchema.optional(),
   /** On the unit map: a support or extension lesson beside the core route. Null (saves merge) goes back to core. */
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),

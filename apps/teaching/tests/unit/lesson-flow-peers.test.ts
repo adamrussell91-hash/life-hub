@@ -101,7 +101,6 @@ describe('Before and after panel', () => {
       lessonId: 'b',
       peers: [{ id: 'a', title: 'Harbour poems' }, { id: 'b', title: 'Tide quiz' }, { id: 'c', title: 'Salt and stone' }],
       after: undefined,
-      kind: undefined,
       onSelf: (patch) => selfPatches.push(patch),
       onPeer: async () => {},
       classes: [{ id: 'k1', name: '12ABC' }],
