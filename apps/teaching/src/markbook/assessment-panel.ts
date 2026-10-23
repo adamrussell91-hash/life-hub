@@ -1,6 +1,8 @@
 import type { SkillsContinuum } from '@/skills/schema';
 import { findSkill, nextMoveFor, rungForMark, rungName } from '@/skills/model';
 import { el } from '@/quiz/dom';
+import type { FeedbackCode } from '@/blocks/feedback-codes';
+import { codeChips } from '@/evidence/code-chips';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { MARKBOOK_LIMITS, type AssessmentColumn, type AssessmentMark } from './schema';
 import type { RosterStudent } from './types';
@@ -25,6 +27,8 @@ export type AssessmentPanelOptions = {
   subscribeErrors?: (show: (message: string) => void) => () => void;
   /** The skills continuum, so a criterion linked to a skill shows its rung and next move. */
   skills?: SkillsContinuum | null;
+  /** The teacher's feedback codes, offered under each criterion below full marks. */
+  codes?: FeedbackCode[];
 };
 
 type Problem = { problem: string; index: number };
@@ -52,6 +56,8 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
   panel.append(announce, body);
   let current = o.studentId;
   let boxes: HTMLInputElement[] = [];
+  /** Feedback codes picked per criterion for the student shown. */
+  let picked: Record<string, string[]> = {};
   let feedback: HTMLTextAreaElement;
   let exempt: HTMLInputElement;
   let note: HTMLInputElement;
@@ -114,6 +120,7 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
     const heading = el('h3', 'mb-panel__student', `${student.initials} · ${student.name}`);
     heading.id = studentId;
     body.append(task, heading);
+    picked = Object.fromEntries(Object.entries(mark?.codes ?? {}).map(([id, list]) => [id, [...list]]));
     boxes = o.column.criteria.map((c, i) => {
       const row = el('label', 'mb-panel__row');
       const box = el('input', 'mb-form__input mb-panel__mark');
@@ -150,6 +157,27 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
       row.append(el('span', 'mb-form__label', `${c.label} (out of ${c.max})`), box, band);
       body.append(row);
       if (skillBox) body.append(skillBox.node);
+      if (o.codes?.length) {
+        const chipHost = el('div', 'mb-panel__codes');
+        const showChips = (): void => {
+          const n = Number(box.value);
+          chipHost.hidden = !(box.value.trim() !== '' && Number.isFinite(n) && n < c.max);
+        };
+        chipHost.append(
+          codeChips({
+            codes: o.codes,
+            selected: picked[c.id] ?? [],
+            label: `Why marks were lost: ${c.label}`,
+            onChange: (ids) => {
+              picked[c.id] = ids;
+              clearError();
+            }
+          })
+        );
+        box.addEventListener('input', showChips);
+        showChips();
+        body.append(chipHost);
+      }
       return box;
     });
     feedback = el('textarea', 'mb-form__input mb-panel__feedback');
@@ -215,9 +243,20 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
       if (!text || !Number.isFinite(n) || n < 0 || n > c.max) return { problem: `Give between 0 and ${c.max} for ${c.label}.`, index: i };
       criteria[c.id] = n;
     }
+    // Codes count only where marks were lost, so raising a mark to full drops them.
+    const codes = Object.fromEntries(
+      o.column.criteria
+        .filter((c) => typeof criteria[c.id] === 'number' && (criteria[c.id] as number) < c.max && picked[c.id]?.length)
+        .map((c) => [c.id, picked[c.id] as string[]])
+    );
     const fbText = feedback.value.trim();
     if (!Object.keys(criteria).length && !fbText && !noteText) return null;
-    return { criteria, ...(fbText ? { feedback: fbText } : {}), ...(noteText ? { note: noteText } : {}) };
+    return { criteria, ...(Object.keys(codes).length ? { codes } : {}), ...(fbText ? { feedback: fbText } : {}), ...(noteText ? { note: noteText } : {}) };
+  }
+
+  /** Codes in a comparable shape: empty lists dropped, criteria in column order, ids sorted. */
+  function liveCodes(codes: Record<string, string[]>): Array<[string, string[]]> {
+    return o.column.criteria.filter((c) => codes[c.id]?.length).map((c) => [c.id, [...codes[c.id]!].sort()]);
   }
 
   /** The fields as typed, and a saved mark as the fields would show it, in one comparable shape. */
@@ -227,6 +266,11 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
       ex,
       marks: ex ? [] : boxes.map((b) => (b.validity?.badInput ? '\u0000' : tidy(b.value))),
       feedback: ex ? '' : feedback.value.trim(),
+      // Only codes collect() would keep: those under a typed mark below full.
+      codes: ex ? {} : liveCodes(Object.fromEntries(o.column.criteria.filter((c, i) => {
+        const t = boxes[i]?.value.trim() ?? '';
+        return t !== '' && Number(t) < c.max;
+      }).map((c) => [c.id, picked[c.id] ?? []]))),
       note: note.value.trim()
     });
   }
@@ -239,6 +283,7 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
         return typeof v === 'number' ? String(v) : '';
       }),
       feedback: ex ? '' : (mark?.feedback ?? '').trim(),
+      codes: ex ? {} : liveCodes(mark?.codes ?? {}),
       note: (mark?.note ?? '').trim()
     });
   }

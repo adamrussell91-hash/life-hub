@@ -538,10 +538,14 @@ test('markbook: each student’s first handed-in attempt, scored like Results', 
   assert.equal(first.max, 7);
   assert.equal(first.pending, 1);
   const qb = first.rows.find(r => r.id === 'qb');
-  assert.deepEqual(qb, { id: 'qb', awarded: 1, max: 1, confidence: 3, outcomes: ['oShort'] });
+  const { items, codes, ...plain } = qb;
+  assert.deepEqual(plain, { id: 'qb', awarded: 1, max: 1, confidence: 3, outcomes: ['oShort'] });
+  assert.deepEqual(codes, []);
+  assert.deepEqual(items.map((i) => i.share), [1]);
   assert.deepEqual(first.rows.find(r => r.id === 'qa').outcomes, ['oLesson'], 'no outcomes of its own: the lesson’s');
   assert.deepEqual(found.questions.map(q => q.id), ['qa', 'qb', 'qc']);
   assert.ok(found.first_at);
+  assert.equal(found.unit_id, 'unit1');
 
   await quizTeacherAction(store, 'quiz1', { action: 'mark', attempt_id: first.attempt_id, question_id: 'qc', score: 3 });
   const marked = (await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id];
@@ -629,4 +633,147 @@ test('clear all attempts empties the results and lets everyone start again', asy
   assert.equal((await rawQuizAction(store, 'quiz1', tomDevice)).current, null, 'an unfinished go is cleared too');
   assert.ok((await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' })).current);
   assert.equal((await rawQuizAction(store, 'quiz1', bobDevice)).identity.initials, 'BB', 'claimed initials stay');
+});
+
+/** Moves the last-change stamp two minutes back, so a closed quiz may save its copy. */
+const ageStamp = (store) => store.data.set('quiz/quiz1/evidence-stamp', { at: new Date(Date.now() - 120_000).toISOString() });
+
+test('insight: evidence per answer; a closed, fully marked quiz is saved until something changes', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Juliet' } } });
+
+  const open = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(open.closed, false);
+  assert.equal(open.saved, false);
+  assert.equal(open.attempts.length, 1);
+  assert.ok(open.students.length >= 2, 'the whole class list comes back');
+  assert.equal(open.attempts[0].rows.find((r) => r.id === 'qb').items[0].share, 0);
+  assert.equal(store.data.has('quiz/quiz1/evidence/class1'), false, 'open quizzes are not saved');
+
+  ageStamp(store);
+  const closed = await quizTeacherAction(store, 'quiz1', { action: 'close', class_id: 'class1' });
+  assert.equal(closed.closed, true);
+  assert.equal(closed.closed_by, 'button');
+  assert.ok(store.data.has('quiz/quiz1/evidence/class1'));
+  assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).saved, true);
+  await rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'TT' });
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'start' }), /closed/);
+
+  await quizTeacherAction(store, 'quiz1', { action: 'mark', attempt_id: open.attempts[0].attempt_id, question_id: 'qb', score: 0, codes: ['code-e', 'code-e'] });
+  assert.ok(store.data.has('quiz/quiz1/evidence/class1'), 'the old copy is still there');
+  const after = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(after.saved, false, 'marking changes the stamp, so the old copy no longer matches');
+  const qb = after.attempts[0].rows.find((r) => r.id === 'qb');
+  assert.deepEqual(qb.codes, ['code-e']);
+  assert.deepEqual(qb.items[0].why, [{ type: 'code', id: 'code-e' }]);
+
+  await quizTeacherAction(store, 'quiz1', { action: 'reopen', class_id: 'class1' });
+  assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).closed, false);
+});
+
+test('old numeric teacher marks still read', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc), qBlock('qb', sa)] }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: {} });
+  const [attempt] = (await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).attempts;
+  const [owner, n] = attempt.attempt_id.split('~');
+  store.data.set(`quiz/quiz1/marks/${owner}~${n}`, { qb: 1 });
+  const row = (await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).attempts[0].rows.find((r) => r.id === 'qb');
+  assert.equal(row.awarded, 1);
+  assert.deepEqual(row.codes, []);
+});
+
+test('a follow-up quiz only lets its listed students in', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const [bob] = (await loadRoster(store, 'class1')).students;
+  const draft = store.data.get('lessons/quiz1');
+  store.data.set('lessons/quiz1', { ...draft, quiz: { ...(draft.quiz ?? {}), for_students: [bob.id] } });
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  assert.ok((await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' })).current);
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'TT' }), /small group/);
+});
+
+test('dismissed flags are kept and come back with the insight', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  await publishQuiz(store);
+  assert.deepEqual((await quizTeacherAction(store, 'quiz1', { action: 'dismiss_flag', flag_id: 'thin:tech:motif' })).dismissed, ['thin:tech:motif']);
+  assert.deepEqual((await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' })).dismissed, ['thin:tech:motif']);
+  assert.deepEqual((await quizTeacherAction(store, 'quiz1', { action: 'dismiss_flag', flag_id: 'thin:tech:motif', undo: true })).dismissed, []);
+});
+
+test('insight lists the unit’s other quizzes and this quiz’s follow-ups', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  store.data.set('units/unit1', { id: 'unit1', type: 'unit', lesson_ids: ['lesson1', 'quiz1', 'quiz2'] });
+  store.data.set('lessons/quiz2', { id: 'quiz2', title: 'Follow-up: Simile', unit_id: 'unit1', pedagogical_mode: 'quiz', quiz: { follow_up_of: 'quiz1', follow_up_flag: 'sure_wrong:tech:simile' }, blocks: [] });
+  await publishQuiz(store);
+  const insight = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.deepEqual(insight.siblings, [{ lesson_id: 'quiz2', title: 'Follow-up: Simile' }]);
+  assert.deepEqual(insight.follow_ups, [{ lesson_id: 'quiz2', title: 'Follow-up: Simile', flag: 'sure_wrong:tech:simile' }]);
+});
+
+test('insight names come from the live class list, even from a saved copy', async () => {
+  const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  const pinned = (await loadRoster(store, 'class1')).students.map(({ id, name, initials }) => ({ id, name, initials }));
+  store.data.set('classes/class1', { ...store.data.get('classes/class1'), students: pinned });
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qa: { selected: ['b'] } } });
+  ageStamp(store);
+  await quizTeacherAction(store, 'quiz1', { action: 'close', class_id: 'class1' });
+  assert.ok(store.data.has('quiz/quiz1/evidence/class1'));
+
+  store.data.set('classes/class1', { ...store.data.get('classes/class1'), students: pinned.map((p) => (p.initials === 'BB' ? { ...p, name: 'Bob Browning' } : p)) });
+  const renamed = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.equal(renamed.saved, true);
+  assert.ok(renamed.students.some((st) => st.name === 'Bob Browning'));
+  assert.equal(renamed.attempts.length, 1);
+
+  store.data.set('classes/class1', { ...store.data.get('classes/class1'), students: pinned.filter((p) => p.initials !== 'BB') });
+  const without = await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.deepEqual(without.attempts, [], 'someone taken off the list drops out of the saved copy too');
+});
+
+test('no copy is saved while the last change is under a minute old, or for an unknown class', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  await publishQuiz(store);
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qa: { selected: ['b'] } } });
+  const closed = await quizTeacherAction(store, 'quiz1', { action: 'close', class_id: 'class1' });
+  assert.equal(closed.closed, true);
+  assert.equal(store.data.has('quiz/quiz1/evidence/class1'), false, 'the hand-in was moments ago');
+  ageStamp(store);
+  await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'nosuchclass' });
+  assert.equal([...store.data.keys()].some((key) => key.startsWith('quiz/quiz1/evidence/')), false, 'no copy for a class that does not exist');
+  await quizTeacherAction(store, 'quiz1', { action: 'insight', class_id: 'class1' });
+  assert.ok(store.data.has('quiz/quiz1/evidence/class1'), 'once settled, it saves');
+});
+
+test('markbook: asking for no students reads nothing', async () => {
+  const { classQuizScores } = await import('../../netlify/functions/_shared/quiz.mjs');
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  await publishQuiz(store);
+  assert.equal(await classQuizScores(store, 'quiz1', 'class1', []), null);
+});
+
+test('teacher-only quiz settings never reach students', async () => {
+  const store = withClass(baseStore({ quizBlocks: [qBlock('qa', mc)] }));
+  const draft = store.data.get('lessons/quiz1');
+  store.data.set('lessons/quiz1', { ...draft, quiz: { for_students: ['bob_brown'], follow_up_of: 'quiz0', follow_up_flag: 'sure_wrong:tech:simile', compare_with: 'quiz0' } });
+  await publishQuiz(store);
+  const secret = ['for_students', 'follow_up_of', 'follow_up_flag', 'compare_with'];
+  const snapshot = store.data.get('published/lessons/quiz1').quiz;
+  for (const key of secret) assert.equal(Object.hasOwn(snapshot, key), false, `${key} is not in the published snapshot`);
+  const status = await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'status' });
+  for (const key of secret) assert.equal(Object.hasOwn(status.settings, key), false, `${key} is not in the student status`);
+  assert.equal(JSON.stringify(status).includes('bob_brown'), false);
 });

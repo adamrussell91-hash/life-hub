@@ -98,6 +98,8 @@ import { createLessonExamplesHandler } from '../../../netlify/functions/lesson-e
 import { createPublishedExamplesHandler } from '../../../netlify/functions/published-examples.mjs';
 import { createPublishedExamplesWriteHandler } from '../../../netlify/functions/published-examples-write.mjs';
 import { createQuizHandler } from '../../../netlify/functions/quiz.mjs';
+import { createLessonRecord } from '../../../netlify/functions/lessons.mjs';
+import { createFeedbackCodesHandler } from '../../../netlify/functions/feedback-codes.mjs';
 import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.mjs';
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
@@ -2481,79 +2483,30 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return okResponse(201, validated.data);
   }
 
-  function handlePostLesson(cookie: string | null | undefined, body: unknown): MockResponse {
+  /** Runs the real Function's create, so follow-ups (`after_lesson_id`) and quiz settings behave as deployed. */
+  async function handlePostLesson(cookie: string | null | undefined, body: unknown): Promise<MockResponse> {
     const session = getSession(cookie);
     if (!session.authenticated) return unauthorizedResponse();
 
-    if (typeof body !== 'object' || body === null) {
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
       return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
     }
-
     const record = body as Record<string, unknown>;
-    const title = typeof record.title === 'string' ? record.title.trim() : '';
-    const unit_id = typeof record.unit_id === 'string' ? record.unit_id : '';
-    let pedagogical_mode: PedagogicalMode = DEFAULT_PEDAGOGICAL_MODE;
-    if (record.pedagogical_mode !== undefined) {
-      if (!isPedagogicalMode(record.pedagogical_mode)) {
-        return errorResponse(400, 'validation_error', 'pedagogical_mode is invalid');
+    if (record.pedagogical_mode !== undefined && !isPedagogicalMode(record.pedagogical_mode)) {
+      return errorResponse(400, 'validation_error', 'pedagogical_mode is invalid');
+    }
+    const input = { ...record, pedagogical_mode: record.pedagogical_mode ?? DEFAULT_PEDAGOGICAL_MODE };
+    try {
+      const created = (await createLessonRecord(functionBlobStore(), input)) as Lesson;
+      seedIds.lessons.push(created.id);
+      return okResponse(201, created);
+    } catch (error) {
+      const e = error as { status?: number; code?: string; message?: string };
+      if (typeof e.status === 'number') {
+        return e.status === 404 ? notFoundResponse(e.message ?? 'Not found') : errorResponse(e.status, e.code ?? 'validation_error', e.message ?? 'Invalid lesson');
       }
-      pedagogical_mode = record.pedagogical_mode;
+      throw error;
     }
-
-    if (!title || !unit_id) {
-      return errorResponse(400, 'validation_error', 'title and unit_id are required');
-    }
-
-    const rawUnit = store.getJSON(unitKey(unit_id));
-    if (!rawUnit) return notFoundResponse('Unit not found');
-    const unitParsed = UnitSchema.safeParse(rawUnit);
-    if (!unitParsed.success) {
-      return errorResponse(400, 'validation_error', 'Unit data is invalid');
-    }
-
-    let maxSequence = 0;
-    for (const lessonId of unitParsed.data.lesson_ids) {
-      const lesson = store.getJSON<Lesson>(draftLessonKey(lessonId));
-      if (lesson && typeof lesson.sequence === 'number' && lesson.sequence > maxSequence) {
-        maxSequence = lesson.sequence;
-      }
-    }
-
-    const timestamp = nowIso();
-    const id = newId('lesson');
-    const candidate: Lesson = {
-      id,
-      type: 'lesson',
-      title,
-      slug: slugify(title),
-      unit_id,
-      sequence: maxSequence + 1,
-      blocks: [],
-      pedagogical_mode,
-      status: 'active',
-      created_at: timestamp,
-      updated_at: timestamp,
-      schema_version: 1
-    };
-
-    const validated = LessonSchema.safeParse(candidate);
-    if (!validated.success) {
-      return errorResponse(400, 'validation_error', 'Lesson data is invalid', validated.error.flatten());
-    }
-
-    const updatedUnit = UnitSchema.safeParse({
-      ...unitParsed.data,
-      lesson_ids: [...unitParsed.data.lesson_ids, id],
-      updated_at: timestamp
-    });
-    if (!updatedUnit.success) {
-      return errorResponse(400, 'validation_error', 'Unit data is invalid');
-    }
-
-    store.setJSON(draftLessonKey(id), validated.data);
-    store.setJSON(unitKey(unit_id), updatedUnit.data);
-    seedIds.lessons.push(id);
-    return okResponse(201, validated.data);
   }
 
   function handlePostSubject(cookie: string | null | undefined, body: unknown): MockResponse {
@@ -3665,6 +3618,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createPublishedDiscernHandler(deps)
       : path.startsWith('/api/outcomes/')
       ? createOutcomeHandler(deps)
+      : path === '/api/feedback-codes'
+      ? createFeedbackCodesHandler(deps)
       : /^\/api\/classes\/[^/]+\/markbook$/.test(path)
       ? createMarkbookHandler(deps)
         : /^\/api\/classes\/[^/]+\/claims$/.test(path)
@@ -3747,6 +3702,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return handleClassExamples(method, pathWithQuery, cookie, body);
     }
     if (
+      path === '/api/feedback-codes' ||
       /^\/api\/classes\/[^/]+\/markbook$/.test(path) ||
       /^\/api\/classes\/[^/]+\/claims$/.test(path) ||
       /^\/api\/outcomes\/[^/]+(\/(usage|merge))?$/.test(path) ||

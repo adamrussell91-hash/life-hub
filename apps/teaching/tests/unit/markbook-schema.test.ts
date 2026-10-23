@@ -16,7 +16,7 @@ const tick: CheckColumn = { id: 'col0000002', kind: 'check', title: 'Bookwork', 
 
 describe('markbook schema', () => {
   it('fills an empty record', () => {
-    expect(MarkbookSchema.parse({})).toEqual({ columns: [], hidden_quizzes: [], marks: {}, updated_at: '' });
+    expect(MarkbookSchema.parse({})).toEqual({ columns: [], hidden_quizzes: [], marks: {}, focus: {}, updated_at: '' });
   });
 
   it('accepts a good column and names the problem in a bad one', () => {
@@ -79,5 +79,23 @@ describe('markbook schema', () => {
 
   it('keeps the id index in range', () => {
     expect(newMarkbookId(() => 1)).toMatch(/^[a-z0-9]{12}$/);
+  });
+});
+
+describe('criterion codes', () => {
+  it('keeps codes on known criteria and drops empty lists', () => {
+    const checked = checkMark(essay, { criteria: { crit000001: 3 }, codes: { crit000001: ['code-e'], crit000002: [] } });
+    expect('mark' in checked && checked.mark).toEqual({ criteria: { crit000001: 3 }, codes: { crit000001: ['code-e'] } });
+  });
+  it('refuses codes on an unknown criterion', () => {
+    expect(checkMark(essay, { criteria: {}, codes: { nope: ['x'] } })).toEqual({ problem: 'Unknown criterion.' });
+  });
+  it('pruneMarks keeps codes only for criteria still there', () => {
+    const edited = { ...essay, criteria: essay.criteria.slice(0, 1) };
+    const kept = pruneMarks(edited, { s1: { criteria: { crit000001: 1 }, codes: { crit000001: ['a'], crit000002: ['b'] } } });
+    expect(kept.s1).toEqual({ criteria: { crit000001: 1 }, codes: { crit000001: ['a'] } });
+  });
+  it('a markbook defaults focus to empty', () => {
+    expect(MarkbookSchema.parse({}).focus).toEqual({});
   });
 });
