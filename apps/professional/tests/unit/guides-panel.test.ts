@@ -92,4 +92,94 @@ describe('guide panel', () => {
     expect(onSave).not.toHaveBeenCalled();
     expect(document.body.contains(panel.el)).toBe(false);
   });
+
+  const back = (root: HTMLElement) =>
+    [...root.querySelectorAll('button')].find((b) => b.textContent === '‹ Back')!.click();
+  const typeQuote = (root: HTMLElement, text: string) => {
+    const quote = root.querySelector('input[name="quote"]') as HTMLInputElement;
+    quote.value = text;
+    quote.dispatchEvent(new Event('input'));
+  };
+
+  it('Back to context then Start keeps taps and quotes', async () => {
+    const { root, onSave } = open();
+    await toPrompts(root);
+    click(root, '[data-tap="0"]');
+    typeQuote(root, 'Mum makes me.');
+    click(root, '[data-part="guide-next"]');
+    back(root);
+    back(root);
+    const input = root.querySelector('input[name="context"]') as HTMLInputElement;
+    expect(input.value).toBe('English · essays');
+    click(root, '[data-part="guide-start"]');
+    expect(root.querySelector('[data-tap="0"]')?.classList.contains('is-on')).toBe(true);
+    for (let i = 0; i < 6; i++) {
+      if (i > 0) click(root, '[data-tap="0"]');
+      click(root, '[data-part="guide-next"]');
+    }
+    click(root, '[data-part="guide-save"]');
+    await flush();
+    expect(onSave.mock.calls[0]![0].quotes).toEqual(['Mum makes me.']);
+  });
+
+  it('clears stale check answers when the check is no longer needed', async () => {
+    const { root, onSave } = open();
+    await toPrompts(root);
+    for (const tap of [0, 1, 3, 2, 0, 1]) {
+      click(root, `[data-tap="${tap}"]`);
+      click(root, '[data-part="guide-next"]');
+    }
+    click(root, '[data-probe="alone"][data-option="yes"]');
+    back(root);
+    for (let i = 0; i < 6; i++) {
+      if (i > 0) back(root);
+    }
+    // now at prompt 1: set all taps to 0 by walking forward
+    for (let i = 0; i < 6; i++) {
+      click(root, '[data-tap="0"]');
+      click(root, '[data-part="guide-next"]');
+    }
+    expect(root.querySelector('.guide-check')).toBeNull();
+    click(root, '[data-part="guide-save"]');
+    await flush();
+    expect(onSave.mock.calls[0]![0].checks).toEqual({});
+  });
+
+  it('saves quotes de-duplicated and in prompt order', async () => {
+    const { root, onSave } = open();
+    await toPrompts(root);
+    const words = ['one', 'two', 'one', '', '  three  ', 'two'];
+    for (let i = 0; i < 6; i++) {
+      click(root, '[data-tap="0"]');
+      typeQuote(root, words[i]!);
+      click(root, '[data-part="guide-next"]');
+    }
+    click(root, '[data-part="guide-save"]');
+    await flush();
+    expect(onSave.mock.calls[0]![0].quotes).toEqual(['one', 'two', 'three']);
+  });
+
+  it('a failed save shows one alert and re-enables Save', async () => {
+    const { root, onSave } = open();
+    onSave.mockRejectedValue(new Error('nope'));
+    await toPrompts(root);
+    for (let i = 0; i < 6; i++) {
+      click(root, '[data-tap="0"]');
+      click(root, '[data-part="guide-next"]');
+    }
+    const save = root.querySelector('[data-part="guide-save"]') as HTMLButtonElement;
+    save.click();
+    await flush();
+    save.click();
+    await flush();
+    expect(root.querySelectorAll('[role="alert"]').length).toBe(1);
+    expect(save.disabled).toBe(false);
+    expect(document.body.contains(root)).toBe(true);
+  });
+
+  it('Escape closes the panel', () => {
+    const { root } = open();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.body.contains(root)).toBe(false);
+  });
 });
