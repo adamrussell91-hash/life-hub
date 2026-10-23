@@ -50,6 +50,7 @@ import {
   insertAt,
   insertTargetForSelection,
   moveBlockTo,
+  moveByTarget,
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
 import {
@@ -60,6 +61,7 @@ import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
 import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 import { createTeacherClassExamples } from '@/class-examples/teacher';
 import { mountQuizPanel, type QuizPanelHandle } from '@/quiz/teacher-panel';
+import { createLectureEditorTools } from '@/lecture/editor-tools';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -528,18 +530,11 @@ export function mountBlockCanvas(
     return grip;
   }
 
-  function moveBy(blockId: string, delta: number): void {
-    const from = blocks.findIndex((row) => row.id === blockId);
-    if (from < 0) return;
-    const to = from + delta;
-    if (to < 0 || to >= blocks.length) return;
-    const result = moveBlockTo(
-      blocks,
-      blockId,
-      { kind: 'root' },
-      delta > 0 ? to + 1 : to,
-      { rootMode }
-    );
+  function moveBy(blockId: string, delta: 1 | -1): void {
+    // A lecture gate and its If wrong path move, and are passed, as one.
+    const at = moveByTarget(blocks, blockId, delta);
+    if (at === null) return;
+    const result = moveBlockTo(blocks, blockId, { kind: 'root' }, at, { rootMode });
     if (!result.ok) {
       setHint(result.message);
       return;
@@ -585,6 +580,7 @@ export function mountBlockCanvas(
       () => {
         const editing = selectedId === block.id;
         const index = blocks.findIndex((row) => row.id === block.id);
+        const canMoveDown = moveByTarget(blocks, block.id, 1) !== null;
         return [
           {
             label: editing ? 'Done' : 'Edit',
@@ -602,7 +598,7 @@ export function mountBlockCanvas(
           {
             label: 'Move down',
             icon: HUB_LIST_ICONS.down,
-            disabled: index < 0 || index >= blocks.length - 1,
+            disabled: !canMoveDown,
             dataset: { blockAction: 'down' },
             onSelect: () => moveBy(block.id, 1)
           },
@@ -991,6 +987,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     emitLesson({ ...lesson, pedagogical_mode });
     banner.update({ eyebrow: PEDAGOGICAL_MODE_LABELS[pedagogical_mode] });
     syncQuizPanel();
+    // Lecture controls on the canvas come and go with the lesson type.
+    canvas.update(lesson.blocks, media);
   });
   metaRow.append(modeSelect);
 
@@ -1040,10 +1038,20 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.update(blocks, media);
     }
   });
+  const lectureTools = createLectureEditorTools({
+    isLecture: () => resolvePedagogicalMode(lesson.pedagogical_mode) === 'lecture',
+    getBlocks: () => lesson.blocks,
+    onBlocks: (blocks) => {
+      emitLesson({ ...lesson, blocks });
+      canvas.update(blocks, media);
+    },
+    idFactory: options.idFactory
+  });
   const canvas = mountBlockCanvas(canvasHost, {
     decorateRow: (row, block) => {
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
+      lectureTools.decorate(row, block);
     },
     blocks: lesson.blocks,
     media,
