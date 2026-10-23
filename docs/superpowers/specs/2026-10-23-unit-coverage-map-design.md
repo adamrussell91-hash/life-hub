@@ -34,7 +34,7 @@ Three columns, top to bottom in lesson order.
 
 **Coverage header** above each item:
 - a solid bar for core lessons (everyone gets these) and a pale bar stacked on it for support, extension and option lessons (only some students get these);
-- an orange "!" when an item has four or fewer core lessons, or none at all;
+- an orange "!" when an item is taught in few core lessons: under 15% of the unit's core lessons, at least one (36 lessons: 5 or fewer; 14 lessons: 2 or fewer);
 - this is the neglect signal. Items taught everywhere (U1, R1) are simply tall bars.
 
 **Interaction**
@@ -45,7 +45,7 @@ Three columns, top to bottom in lesson order.
 ## Student view (teacher picks a student)
 
 Same layout with these changes:
-- **Nodes take the student's evidence state** for that item at that lesson: struggling (red), working on it (amber), secure (green). The first lesson where the item becomes secure at mastered depth gets a star.
+- **Nodes take the student's evidence state** for that item at that lesson: struggling (red), working on it (amber), secure (green). When an item is secure at a second separate checkpoint, its next node gets a star (mastered here).
 - No evidence at a taught lesson shows a small hollow node.
 - **Route**: support, extension and option lessons the student took are drawn thick in their lane colour. Ones they skipped fade. At a fork, the option they took is highlighted. Lessons after their latest activity fade.
 - **Quiz scores** sit beside checkpoint diamonds, red under 70%.

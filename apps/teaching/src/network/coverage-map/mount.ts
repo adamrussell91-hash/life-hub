@@ -1,6 +1,6 @@
 import type { Evidence } from '@/evidence/types';
 import type { CoverageMap } from './model';
-import { drawCoverageMap, isSideRow, rowTag } from './draw';
+import { drawCoverageMap, fitNameWidth, isSideRow, rowTag } from './draw';
 import { studentRoute, type NodeState, type StudentRoute } from './student';
 
 /** One class's evidence for the student view. */
@@ -48,7 +48,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
  */
 export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions): { update(map: CoverageMap): void } {
   let map = options.map;
-  const narrowNow = () => (host.clientWidth || window.innerWidth) < 600;
+  // Phones: a smaller name column, and groups start collapsed so the map fits.
+  const narrowNow = () => window.matchMedia?.('(max-width: 599px)').matches ?? window.innerWidth < 600;
   const collapsed = new Set<string>(narrowNow() && !options.print ? map.groups.map((g) => g.id) : []);
   const known = new Set(map.groups.map((g) => g.id));
   let selected: string | null = null;
@@ -157,8 +158,8 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
   }
 
   function paint(): void {
-    const narrow = narrowNow();
-    const drawn = drawCoverageMap(map, { collapsed, selected, focus, student: route, narrow });
+    const nameW = fitNameWidth(map, collapsed, options.print ? 900 : scroller.clientWidth || host.clientWidth || 700);
+    const drawn = drawCoverageMap(map, { collapsed, selected, focus, student: route, nameW });
     stage.innerHTML = `<svg class="cm__svg" width="${drawn.width}" height="${drawn.height}" viewBox="0 0 ${drawn.width} ${drawn.height}" aria-hidden="false">${drawn.svg}</svg>`;
     toggleAll.textContent = collapsed.size === map.groups.length ? 'Expand all' : 'Collapse all';
     const row = selected ? map.rows.find((r) => r.id === selected) : undefined;
@@ -248,6 +249,17 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
   });
 
   paint();
+  // Once on the page the real width is known; paint again when it changes.
+  if (typeof ResizeObserver !== 'undefined' && !options.print) {
+    let last = 0;
+    new ResizeObserver(() => {
+      const w = scroller.clientWidth;
+      if (w && Math.abs(w - last) > 8) {
+        last = w;
+        paint();
+      }
+    }).observe(scroller);
+  }
   return {
     update(next) {
       map = next;
