@@ -142,3 +142,7 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-patterns__group, .mb-patterns__cell { min-width: 32px; min-height: 32px; border: 0; border-radius: var(--radius-sm); font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; }
 .mb-patterns__name { min-height: 32px; border: 0; background: none; padding: 0; font: inherit; color: var(--marine); cursor: pointer; text-align: left; }
 .mb-patterns__list { display: grid; gap: var(--space-2); text-align: left; white-space: normal; }
+
+.mb-focus { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.mb-focus__item { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font: var(--text-sm) / 1.4 var(--font-ui); }
+@media (max-width: 600px) { .mb-sheet--student { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; } }
