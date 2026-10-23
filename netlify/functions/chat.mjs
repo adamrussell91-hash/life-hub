@@ -1985,6 +1985,35 @@ export function createChatHandler({
           return bases;
         };
 
+        // The queue sha is read once per turn. A confirm, ghost or second tab can commit the
+        // queue mid-turn, so a stale sha 409s; reload the latest queue and rebuild on top.
+        const writePendingActionsQueue = async (buildQueue, message) => {
+          for (let attempt = 0; ; attempt += 1) {
+            const nextQueue = buildQueue(pendingActions);
+            try {
+              const result = await client.writeFile({
+                path: PENDING_ACTIONS_PATH,
+                content: serializePendingActions(nextQueue),
+                ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
+                message
+              });
+              pendingActions = nextQueue;
+              pendingActionsSha = result.sha;
+              return;
+            } catch (error) {
+              if (error?.code !== 'write_conflict' || attempt >= 2) throw error;
+              const latest = await client.resolveTree();
+              const entry = latest.tree.find(
+                item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob'
+              );
+              pendingActionsSha = entry?.sha;
+              pendingActions = parsePendingActions(
+                entry ? decodeBlob(await client.readBlob(entry.sha)) : null
+              );
+            }
+          }
+        };
+
         // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
         const proposeOsAction = async (proposal, extras = {}) => {
           let persistedId = null;
@@ -2019,25 +2048,36 @@ export function createChatHandler({
                 patched.calendarGhostId = merged.calendarGhostId;
                 patched.calendarGhostIds = merged.calendarGhostIds;
               }
-              const nextQueue = patchPendingAction(pendingActions, turnScheduleBatchId, patched);
-              const result = await client.writeFile({
-                path: PENDING_ACTIONS_PATH,
-                content: serializePendingActions(nextQueue),
-                ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
-                message: `chore(propose-action): batch ${merged.proposal.intent}`.slice(0, 200)
-              });
-              pendingActions = nextQueue;
-              pendingActionsSha = result.sha;
-              persistedId = turnScheduleBatchId;
-              emitProposal = merged.proposal;
-              send({
-                type: 'action_proposal',
-                proposal: emitProposal,
-                id: persistedId,
-                batched: true,
-                turnBound: Boolean(openBatch.turnId)
-              });
-              return persistedId;
+              let batchClosed = false;
+              try {
+                await writePendingActionsQueue(
+                  (queue) => {
+                    // A reload can show the batch already confirmed or discarded.
+                    if (!isPendingActionExecutable(findPendingActionById(queue, turnScheduleBatchId))) {
+                      throw Object.assign(new Error('Schedule batch closed.'), { code: 'batch_closed' });
+                    }
+                    return patchPendingAction(queue, turnScheduleBatchId, patched);
+                  },
+                  `chore(propose-action): batch ${merged.proposal.intent}`.slice(0, 200)
+                );
+              } catch (error) {
+                if (error?.code !== 'batch_closed') throw error;
+                batchClosed = true;
+                turnScheduleBatchId = null;
+              }
+              if (!batchClosed) {
+                persistedId = turnScheduleBatchId;
+                emitProposal = merged.proposal;
+                send({
+                  type: 'action_proposal',
+                  proposal: emitProposal,
+                  id: persistedId,
+                  batched: true,
+                  turnBound: Boolean(openBatch.turnId)
+                });
+                return persistedId;
+              }
+              // Batch closed under us: queue this move as a fresh proposal below.
             }
 
             const bases = await snapshotProposalBases(proposal.writes);
@@ -2079,15 +2119,10 @@ export function createChatHandler({
                 ? { calendarGhostIds: seedMerged.calendarGhostIds }
                 : {})
             };
-            const nextQueue = addPendingAction(pendingActions, entry);
-            const result = await client.writeFile({
-              path: PENDING_ACTIONS_PATH,
-              content: serializePendingActions(nextQueue),
-              ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
-              message: `chore(propose-action): queue ${entry.proposal.intent}`.slice(0, 200)
-            });
-            pendingActions = nextQueue;
-            pendingActionsSha = result.sha;
+            await writePendingActionsQueue(
+              queue => addPendingAction(queue, entry),
+              `chore(propose-action): queue ${entry.proposal.intent}`.slice(0, 200)
+            );
             persistedId = entry.id;
             if (batchable) turnScheduleBatchId = persistedId;
             else turnScheduleBatchId = null;
