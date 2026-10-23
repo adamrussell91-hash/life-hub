@@ -12,6 +12,7 @@ import type { ArchiveCitation } from '@/ai/client';
 import { aiFailureCopy } from '@/app/failure';
 import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import { AI_JOB_STALE_MS } from '@/ai/jobs';
+import { CLARE_HANDOFF_LINE, isTasksClareRequest, tasksClareHref } from '@/ai/clare-handoff';
 import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
 import type { AiProposal, AiScope } from '@/ai/proposals';
 import type { Block } from '@/schemas/block';
@@ -45,6 +46,8 @@ export interface MountAiPanelOptions {
   onStaleAccept?: (apply: () => void) => void;
   onAgentChange?: (slug: AgentSlug) => void;
   onRequestShelve?: () => void;
+  /** Leaves Teaching for Clare's chat in Tasks. Defaults to a full page load. */
+  openTasksClare?: (href: string) => void;
   random?: () => number;
 }
 
@@ -854,6 +857,17 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     const trimmed = text.trim();
     if (!trimmed) return;
     const turnAgent = agentSlug;
+
+    // Clare's lesson moves stay here; meetings and the calendar are her Tasks job.
+    if (turnAgent === 'clare' && !protocolId && !action && isTasksClareRequest(trimmed)) {
+      messages.push({ id: nextMsgId(), role: 'user', text: trimmed });
+      messages.push({ id: nextMsgId(), role: 'assistant', agent: 'clare', text: CLARE_HANDOFF_LINE });
+      saveTranscript(options.lessonId, messages);
+      renderShell();
+      const href = tasksClareHref(trimmed);
+      (options.openTasksClare ?? ((url) => window.location.assign(url)))(href);
+      return;
+    }
 
     setWorkingState(true);
 
