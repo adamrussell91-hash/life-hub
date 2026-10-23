@@ -575,7 +575,9 @@ export async function renderMeetingPage(
     });
   }
 
+  let guidesPaint = 0;
   async function paintGuides(): Promise<void> {
+    const seq = ++guidesPaint;
     const runs = record.guide_runs ?? [];
     const head = el('div', 'meeting-guides__head');
     const run = el('button', 'btn btn--secondary', '◐ Run a guide') as HTMLButtonElement;
@@ -589,6 +591,8 @@ export async function renderMeetingPage(
       return;
     }
     const all = await placed();
+    // A newer paint started while this one waited: let it draw, or the cards double up.
+    if (seq !== guidesPaint) return;
     for (const saved of runs) {
       const guide = guideById(saved.guide);
       if (!guide) continue;
