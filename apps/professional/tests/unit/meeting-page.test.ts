@@ -13,7 +13,8 @@ vi.mock('@/api/meetings', () => ({
   getMeeting: vi.fn(async () => ({ meeting })),
   updateMeeting: vi.fn(async (_id: string, patch: object) => ({ meeting: { ...meeting, ...patch } })),
   rescheduleMeeting: vi.fn(async (_id: string, body: object) => ({ meeting: { ...meeting, ...body, state: 'rescheduled' } })),
-  meetingStateAction: vi.fn(async () => ({ meeting: { ...meeting, state: 'completed' } }))
+  meetingStateAction: vi.fn(async () => ({ meeting: { ...meeting, state: 'completed' } })),
+  listMeetings: vi.fn(async () => ({ meetings: [] }))
 }));
 vi.mock('@/views/meetings', () => ({
   buildMeetingTaskLinks: () => {
@@ -230,11 +231,11 @@ describe('meeting page', () => {
     expect(canvas.querySelector('[data-part="clare-brief"]')!.textContent).toContain('Rachel wants the date locked');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="during"]')!.click();
-    expect(parts()).toEqual(['live-strip', 'notes', 'actions', 'mentions']);
+    expect(parts()).toEqual(['live-strip', 'notes', 'guides', 'actions', 'mentions']);
     expect(canvas.querySelector('[data-part="live-strip"]')!.textContent).toContain('30 min in · 45 min left');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
-    expect(parts()).toEqual(['purpose-check-card', 'wrap-up', 'actions', 'notes', 'mentions']);
+    expect(parts()).toEqual(['purpose-check-card', 'wrap-up', 'actions', 'notes', 'guides', 'mentions']);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(true);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(false);
   });
@@ -295,5 +296,27 @@ describe('meeting page', () => {
     expect(canvas.querySelector('[data-part="notes"]')).toBe(notes);
     expect(notesDisposeCount).toBe(0);
     expect((mountBlockPage as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+  });
+
+  it('Guides: the live strip opens the shelf about the people in the room, and the Guides section is on the page', async () => {
+    const canvas = await render();
+    expect(canvas.querySelector('[data-part="guides"]')).not.toBeNull();
+    expect(canvas.querySelector('[data-part="run-guide"]')).not.toBeNull();
+    (canvas.querySelector('[data-part="open-guides"]') as HTMLButtonElement).click();
+    const panel = document.querySelector('.guide-panel') as HTMLElement;
+    expect(panel).not.toBeNull();
+    // Nobody in this fixture is a student, so everyone in the room (you excluded) can be chosen.
+    expect(panel.querySelector('[data-guide="motivation_sdt"]')?.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('saveGuideRun stores the run and returns the note line only the first time', async () => {
+    const { saveGuideRun } = await import('@/views/meeting-page');
+    const run = { id: 'g1', guide: 'motivation_sdt', person_ref: 'shared:person:ben', person_name: 'Ben C.', context: 'Treasury', taps: {}, quotes: [], checks: {}, values: {}, profile: 'low', moves: [], created_at: '', updated_at: '' };
+    const first = saveGuideRun([], run);
+    expect(first.runs).toEqual([run]);
+    expect(first.note).toBe('Motivation guide · Treasury · see card');
+    const again = saveGuideRun(first.runs, { ...run, context: 'Treasury' });
+    expect(again.runs.length).toBe(1);
+    expect(again.note).toBeNull();
   });
 });
