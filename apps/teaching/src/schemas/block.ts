@@ -171,6 +171,8 @@ export const HeadingBlockSchema = z.object({
   content: z.object({
     text: z.string(),
     narration: NarrationSchema.optional(),
+    /** Lecture: what the teacher plans to say, e.g. imported speaker notes. Teacher-only. */
+    script: z.string().max(8000).optional(),
     reveal: RevealSchema.optional()
   }),
   ...blockLayout,

@@ -66,16 +66,19 @@ export function createLectureEditorTools(options: LectureEditorToolsOptions) {
     return p;
   }
 
-  function narration(block: Block, label: string): HTMLElement {
+  function narration(block: Block, label: string, withScript = false): HTMLElement {
     return createNarrationField({
       label,
       value: (block.content as { narration?: Parameters<typeof createNarrationField>[0]['value'] }).narration,
-      onChange: (next) => setField(block.id, 'narration', next)
+      onChange: (next) => setField(block.id, 'narration', next),
+      script: withScript
+        ? { value: (block.content as { script?: string }).script ?? '', onChange: (next) => setField(block.id, 'script', next || undefined) }
+        : undefined
     });
   }
 
   function headingTools(block: Extract<Block, { block_type: 'heading' }>, tools: HTMLElement): void {
-    tools.append(narration(block, '🎙 Scene narration'));
+    tools.append(narration(block, '🎙 Scene narration', true));
     const reveal = document.createElement('div');
     reveal.className = 'lecture-tools__reveal';
     reveal.setAttribute('role', 'radiogroup');
