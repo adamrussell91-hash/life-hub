@@ -748,6 +748,17 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
 
   type AttemptDetail = { student: StudentLabel | null; id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; rows: Row[] };
 
+  /**
+   * Mark saves go out one at a time: the server rewrites an attempt's whole
+   * marks record on each, so two at once could lose one.
+   */
+  let markQueue: Promise<unknown> = Promise.resolve();
+  function inOrder<T>(fn: () => Promise<T>): Promise<T> {
+    const next = markQueue.then(fn, fn);
+    markQueue = next.catch(() => undefined);
+    return next;
+  }
+
   function attemptView(a: AttemptDetail): HTMLElement {
     const wrap = el('div', 'qz-attempt-detail');
     const bar = el('div', 'qz-tray__bar');
@@ -790,7 +801,10 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         const score = input.value.trim() === '' ? null : Number(input.value);
         this.disabled = true;
         try {
-          const res = await post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score, codes: r.codes ?? [] });
+          // Codes are read when the post goes out, so a chip changed just before still counts.
+          const res = await inOrder(() =>
+            post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score, codes: score === null || score >= r.mark.max ? [] : (r.codes ?? []) })
+          );
           wrap.replaceWith(attemptView(res.attempt));
         } catch (error) {
           showError(error);
@@ -801,24 +815,39 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       item.append(markRow);
       // Saving the current mark with codes turns an automatic mark into a teacher mark of the same value.
       const awarded = r.awarded;
-      if (ctx?.codes.length && awarded !== null && awarded < r.mark.max) {
-        item.append(
-          labelled(
-            'Why marks were lost (optional)',
+      const codes = ctx?.codes ?? [];
+      if (codes.length && awarded !== null && awarded < r.mark.max) {
+        const chipHost = el('div', 'qz-attempt-codes');
+        let confirmed = [...(r.codes ?? [])];
+        let waiting = 0;
+        const paintChips = (): void => {
+          chipHost.replaceChildren(
             codeChips({
-              codes: ctx.codes,
+              codes,
               selected: r.codes ?? [],
-              onChange: async (ids) => {
-                try {
-                  const res = await post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score: awarded, codes: ids });
-                  r.codes = res.attempt.rows.find((x) => x.id === r.id)?.codes ?? ids;
-                } catch (error) {
-                  showError(error);
-                }
+              label: `Why marks were lost: question ${i + 1}`,
+              onChange: (ids) => {
+                r.codes = ids;
+                waiting += 1;
+                inOrder(() => post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score: awarded, codes: ids })).then(
+                  (res) => {
+                    waiting -= 1;
+                    confirmed = res.attempt.rows.find((x) => x.id === r.id)?.codes ?? ids;
+                    if (!waiting) r.codes = confirmed;
+                  },
+                  (error: unknown) => {
+                    waiting -= 1;
+                    showError(error);
+                    r.codes = [...confirmed];
+                    paintChips();
+                  }
+                );
               }
             })
-          )
-        );
+          );
+        };
+        paintChips();
+        item.append(el('p', 'qz-field__label', 'Why marks were lost (optional)'), chipHost);
       }
       wrap.append(item);
     });

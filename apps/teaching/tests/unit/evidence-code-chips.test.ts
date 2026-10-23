@@ -43,4 +43,14 @@ describe('codeChips', () => {
     expect(document.activeElement).toBe(now);
     node.remove();
   });
+  it('moves focus to the first chip More codes reveals', () => {
+    const node = codeChips({ codes, selected: [], onChange: vi.fn(), label: 'Why marks were lost: Analysis' });
+    document.body.append(node);
+    expect(node.getAttribute('aria-label')).toBe('Why marks were lost: Analysis');
+    const more = node.querySelector<HTMLButtonElement>('.ev-chips__more')!;
+    more.focus();
+    more.click();
+    expect((document.activeElement as HTMLElement).textContent).toBe('VP');
+    node.remove();
+  });
 });
