@@ -179,6 +179,25 @@ describe('Next steps view', () => {
     expect(node.querySelector('.mb-syl')?.textContent).toContain('Language forms');
   });
 
+  it('puts Plan a tutorial on a small group card only', () => {
+    const planTutorial = vi.fn();
+    const five: RosterStudent[] = [...students, { id: 'e', name: 'Ed Fox', initials: 'E' }];
+    const node = renderNextSteps({ ...view({ a: 0, b: 0.1, c: 0.95, d: 1, e: 0.9 }), students: five }, five, ctx, newNextState(), {
+      openStudent: () => {},
+      planTutorial,
+      pins: () => ({ pinned: [], dismissed: [] }),
+      repaint: () => {}
+    });
+    const card = node.querySelector('.mb-move--group')!;
+    expect(node.querySelectorAll('.mb-move__tutorial')).toHaveLength(1);
+    const btn = card.querySelector<HTMLButtonElement>('.mb-move__tutorial')!;
+    expect(btn.textContent).toBe('Plan a tutorial');
+    btn.click();
+    expect(planTutorial).toHaveBeenCalledWith('fam:structural', ['a', 'b'], expect.any(Array));
+    const reteach = renderNextSteps(view({ a: 0, b: 0.2, c: 0.9, d: 1 }), students, ctx, newNextState(), { openStudent: () => {}, planTutorial, pins: () => ({ pinned: [], dismissed: [] }), repaint: () => {} });
+    expect(reteach.querySelector('.mb-move__tutorial')).toBeNull();
+  });
+
   it('lists students most need first and re-sorts by name', () => {
     const state = newNextState();
     let node = document.createElement('div');

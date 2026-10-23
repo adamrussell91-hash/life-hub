@@ -21,6 +21,8 @@ export const newNextState = (): NextState => ({ syllabusSort: 'weakest', student
 export type NextActions = {
   openStudent: (studentId: string) => void;
   followUp?: (tag: string, students: string[], evidence: Evidence[]) => void;
+  /** Small group cards: plan a tutorial for the students behind on one tag. */
+  planTutorial?: (tag: string, students: string[], evidence: Evidence[]) => void;
   pins: (studentId: string) => FocusPins;
   repaint: () => void;
 };
@@ -127,6 +129,14 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
         ann.type = 'button';
         ann.addEventListener('click', () => actions.followUp?.(part.tag, part.students, evidence));
         tools.append(ann);
+      }
+    }
+    if (move.kind === 'group' && actions.planTutorial) {
+      for (const part of move.parts) {
+        const plan = el('button', 'btn btn--secondary mb-move__tutorial', move.parts.length > 1 ? `Plan a tutorial: ${label(part.tag)}` : 'Plan a tutorial');
+        plan.type = 'button';
+        plan.addEventListener('click', () => actions.planTutorial?.(part.tag, part.students, evidence));
+        tools.append(plan);
       }
     }
     card.append(list, tools);

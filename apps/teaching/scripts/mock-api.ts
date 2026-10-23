@@ -105,6 +105,8 @@ import { validateMediaFolders } from '../../../netlify/functions/media-folders.m
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
 import { createLectureHandler } from '../../../netlify/functions/lecture.mjs';
 import { createPublishedLectureHandler } from '../../../netlify/functions/published-lecture.mjs';
+import { createPublishedTutorialHandler } from '../../../netlify/functions/published-tutorial.mjs';
+import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
 import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
@@ -3605,6 +3607,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createLectureHandler(deps)
       : path.startsWith('/api/published/lecture/')
         ? createPublishedLectureHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/tutorial$/.test(path)
+        ? createTutorialHandler(deps)
+      : path.startsWith('/api/published/tutorial/')
+        ? createPublishedTutorialHandler(deps)
       : path.startsWith('/api/published/hinge/')
         ? createPublishedHingeHandler(deps)
       : /\/quadrant$/.test(path)
@@ -3693,6 +3699,17 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const query = new URLSearchParams(search);
 
     if (method === 'POST' && path === '/api/auth') return handleAuth(body);
+    // Ann's grouping call: a stub so local walks work with no API key.
+    if (method === 'POST' && path === '/api/tutorial-groups') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const brief = String((body as { brief?: unknown } | null)?.brief ?? '');
+      const found = [...new Set(brief.match(/\bS\d+\b/g) ?? [])];
+      const odd = found.filter((_, i) => i % 2 === 0);
+      const even = found.filter((_, i) => i % 2 === 1);
+      const group = (name: string, members: string[]) => ({ name, why: `${name}: mock grouping`, goal: 'Today: practising this together', gap_type: 'knowledge', members, quotes: {}, notes: `Target: ${name.toLowerCase()}.\nModel one worked example.\nExit check: one question on it.` });
+      const groups = [group('Names it wrong', odd), ...(even.length ? [group('Re-tells the plot', even)] : [])];
+      return okResponse(200, { text: JSON.stringify({ groups }) });
+    }
     // Class examples run the real Functions against the mock store.
     if (
       /^\/api\/lessons\/[^/]+\/examples$/.test(path) ||
@@ -3709,6 +3726,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/lecture$/.test(path) ||
       /^\/api\/published\/lecture\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/tutorial$/.test(path) ||
+      /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
       /^\/api\/published\/discern\/[^/]+$/.test(path) ||

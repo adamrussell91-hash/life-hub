@@ -3,7 +3,9 @@ import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonRouteRoleSchema, LessonSkipRuleSchema, LineOffSchema, LineStopSchema } from './block';
 import { QuizSettingsSchema } from '../quiz/core';
+import { TutorialSettingsSchema } from '../tutorial/schema';
 import { visitBlocks } from '../blocks/walk-blocks';
+import { tutorialIssues } from '../tutorial/model';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
 import {
@@ -54,6 +56,8 @@ export const LessonSchema = z.object({
   feedback_off: z.boolean().optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
+  /** Tutorial lessons only: the class and its groups. */
+  tutorial: TutorialSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 
@@ -65,7 +69,7 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
       path: ['title']
     });
   }
-  if (lesson.pedagogical_mode !== 'quiz') {
+  if (lesson.pedagogical_mode !== 'quiz' && lesson.pedagogical_mode !== 'tutorial') {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === 'quiz_question') stray = true;
@@ -78,7 +82,13 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
       });
     }
   }
-  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' })) {
+  if (lesson.pedagogical_mode === 'tutorial') {
+    for (const message of tutorialIssues(lesson)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['blocks'] });
+    }
+  }
+  // Tutorials use the lecture publish rules: gates and side paths.
+  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' || lesson.pedagogical_mode === 'tutorial' })) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
