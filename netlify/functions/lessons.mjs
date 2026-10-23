@@ -8,6 +8,29 @@ import {
 } from './_shared/teaching-blobs.mjs';
 import { QuizSettingsSchema } from './_shared/quiz-core.mjs';
 import { createTeachingCollectionHandler, teachingWriteError } from './_shared/teaching-create.mjs';
+import { BlockSchema } from './_shared/teaching-block-schema.mjs';
+import { TutorialSettingsSchema } from './_shared/tutorial-schema.mjs';
+
+/** A new lesson can start with a skeleton (a tutorial's tabs and exit checks). */
+const MAX_START_BLOCKS = 40;
+
+function startBlocks(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_START_BLOCKS) {
+    throw teachingWriteError(400, 'validation_error', `blocks must be a list of at most ${MAX_START_BLOCKS} blocks`);
+  }
+  const parsed = BlockSchema.array().safeParse(value);
+  if (!parsed.success) throw teachingWriteError(400, 'validation_error', 'blocks are not valid lesson blocks');
+  return parsed.data;
+}
+
+/** A tutorial needs its class and groups, so a bad one is refused rather than dropped. */
+function tutorialSettings(mode, value) {
+  if (mode !== 'tutorial' || value === undefined) return null;
+  const parsed = TutorialSettingsSchema.safeParse(value);
+  if (!parsed.success) throw teachingWriteError(400, 'validation_error', 'tutorial settings are not valid');
+  return parsed.data;
+}
 
 export const config = { path: '/api/lessons' };
 
@@ -21,6 +44,8 @@ export async function createLessonRecord(store, body) {
   if (!title || !unit_id) {
     throw teachingWriteError(400, 'validation_error', 'title and unit_id are required');
   }
+  const blocks = startBlocks(body.blocks);
+  const tutorial = tutorialSettings(pedagogical_mode, body.tutorial);
 
   const unit = await getJSON(store, unitKey(unit_id));
   if (!unit) throw teachingWriteError(404, 'not_found', 'Unit not found');
@@ -51,9 +76,10 @@ export async function createLessonRecord(store, body) {
     slug: slugify(title),
     unit_id,
     sequence,
-    blocks: [],
+    blocks,
     pedagogical_mode,
     ...(quiz?.success ? { quiz: quiz.data } : {}),
+    ...(tutorial ? { tutorial } : {}),
     status: 'active',
     created_at: timestamp,
     updated_at: timestamp,
