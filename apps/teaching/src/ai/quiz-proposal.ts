@@ -121,13 +121,9 @@ export function questionGiveaways(question: Record<string, unknown>): string[] {
 /**
  * Problems with the quiz questions in a proposal, in words the agent can fix:
  * each question must pass the quiz engine's own check, images must already be
-<<<<<<< HEAD
- * in the lesson, and quiz questions need a Quiz lesson (or set_mode: quiz), or
- * in a tutorial, a group's exit-check section.
-=======
- * in the lesson, quiz questions need a Quiz lesson (or set_mode: quiz), and
- * none may give its answer away (questionGiveaways).
->>>>>>> origin/main
+ * in the lesson, quiz questions need a Quiz lesson (or set_mode: quiz) or, in
+ * a tutorial, a group's exit-check section, and none may give its answer away
+ * (questionGiveaways).
  * The block schema only checks a question's id and kind, so this is the real gate.
  */
 export function quizProposalIssues(
