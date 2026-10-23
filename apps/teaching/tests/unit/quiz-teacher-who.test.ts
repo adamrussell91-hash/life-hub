@@ -40,7 +40,14 @@ describe('teacher results attempt labels', () => {
       onSettings: () => {},
       onAddBlocks: () => {},
       onRemoveBlock: () => {},
-      idFactory: () => 'x'
+      idFactory: () => 'x',
+      insightApi: {
+        classes: async () => ({ classes: [] }),
+        load: async () => ({ published: false }),
+        close: async () => ({ published: false }),
+        reopen: async () => ({ published: false }),
+        dismiss: async () => ({ dismissed: [] })
+      }
     });
     document.body.append(handle.root);
     await vi.waitFor(() => expect(handle.root.querySelectorAll('.qz-attempt__who').length).toBe(4));

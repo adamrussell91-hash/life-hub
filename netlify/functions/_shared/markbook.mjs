@@ -68,9 +68,11 @@ export async function quizColumns(store, roster, book) {
       id: `quiz:${q.lesson_id}`,
       lesson_id: q.lesson_id,
       title: q.title,
+      unit_id: q.unit_id,
       date: sydneyDay(q.first_at),
       hidden: book.hidden_quizzes.includes(q.lesson_id),
       confidence: q.confidence,
+      closed: q.closed,
       questions: q.questions,
       scores: q.scores
     }));
@@ -148,6 +150,21 @@ export async function markbookAction(store, classId, body) {
       } else {
         book.hidden_quizzes = book.hidden_quizzes.filter((id) => id !== body.lesson_id);
       }
+      return book;
+    });
+    return { markbook };
+  }
+
+  if (action === 'set_focus') {
+    if (!roster.students.some((s) => s.id === body.student_id)) reject(404, 'not_found', 'That student isn’t on the class list.');
+    const list = (v, max) => (Array.isArray(v) ? [...new Set(v.filter((t) => typeof t === 'string' && t.length > 0 && t.length <= 120))].slice(0, max) : []);
+    const pinned = list(body.pinned, 12);
+    const dismissed = list(body.dismissed, 40);
+    const markbook = await changeBook(store, classId, (book) => {
+      const focus = { ...(book.focus ?? {}) };
+      if (!pinned.length && !dismissed.length) delete focus[body.student_id];
+      else focus[body.student_id] = { pinned, dismissed };
+      book.focus = focus;
       return book;
     });
     return { markbook };
