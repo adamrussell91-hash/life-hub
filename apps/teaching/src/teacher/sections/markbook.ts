@@ -302,6 +302,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   const actions: MarkbookActions = {
     openStudent: (studentId) => {
       const student = view?.students.find((s) => s.id === studentId);
+      // One panel at a time; a panel whose overlay has gone without closing counts as closed.
+      if (studentPanel && !studentPanel.isOpen()) studentPanel = null;
       if (!view || !student || studentPanel) return;
       if (!ctx) {
         // The tag names are still loading: open once they arrive.
@@ -399,7 +401,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     const hadFocus = active instanceof HTMLElement && section.contains(active) && active !== title;
     const key = focusKey();
     draw(view, key);
-    studentPanel?.refresh();
+    if (studentPanel?.isOpen()) studentPanel.refresh();
     if (!hadFocus) return;
     // The focused control went away (Hide, Unhide, an emptied list): fall back to the heading.
     const now = document.activeElement;
@@ -534,6 +536,9 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   );
   return () => {
     disposed = true;
+    // Closing releases the overlay's hold on the rest of the page.
+    studentPanel?.close();
+    studentPanel = null;
     if (typeof media?.removeEventListener === 'function') media.removeEventListener('change', onMedia);
     else media?.removeListener?.(onMedia);
   };

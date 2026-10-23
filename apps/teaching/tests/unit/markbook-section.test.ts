@@ -523,6 +523,21 @@ describe('markbook section', () => {
     host.remove();
   });
 
+  it('opens a new panel when the old overlay was removed without closing', async () => {
+    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+    const name = () => [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
+    await vi.waitFor(() => {
+      name().click();
+      expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
+    });
+    document.querySelector('.mb-sheet--student')!.closest('.mb-overlay')!.remove();
+    expect(document.querySelector('.mb-sheet--student')).toBeNull();
+    name().click();
+    expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
+    document.querySelector<HTMLButtonElement>('.mb-sheet--student .mb-sheet__close')!.click();
+    host.remove();
+  });
+
   it('opens a student pressed before the tag names load, once they arrive', async () => {
     let arrive!: (v: unknown) => void;
     const original = insightContext.load;
