@@ -1363,7 +1363,14 @@ var QuizSettingsSchema = z7.object({
   confidence: z7.boolean().optional(),
   closes_at: z7.string().datetime().optional(),
   /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
-  move_on: z7.number().int().min(1).max(100).optional()
+  move_on: z7.number().int().min(1).max(100).optional(),
+  /** A follow-up quiz: only these students (class-list ids) may sit it. */
+  for_students: z7.array(z7.string().min(1).max(64)).max(60).optional(),
+  /** The quiz this one follows up, and the flag that prompted it. */
+  follow_up_of: z7.string().max(64).optional(),
+  follow_up_flag: z7.string().max(160).optional(),
+  /** Teacher only: an earlier quiz to show before-and-after against. */
+  compare_with: z7.string().max(64).optional()
 });
 function norm(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();

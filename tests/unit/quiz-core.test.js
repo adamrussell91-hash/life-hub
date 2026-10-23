@@ -215,3 +215,10 @@ test('a question with no technique ids or skills keeps a bare key', () => {
 test('a skill must be strand.sub', () => {
   assert.equal(checkQuestion({ ...samples.true_false, skills: ['Reading'] }).ok, false);
 });
+
+test('quiz settings accept follow-up fields and keep them out of student settings', async () => {
+  const { QuizSettingsSchema } = await import('../../netlify/functions/_shared/quiz-core.mjs');
+  const parsed = QuizSettingsSchema.parse({ for_students: ['stu1'], follow_up_of: 'lesson_a', follow_up_flag: 'sure_wrong:tech:simile', compare_with: 'lesson_b' });
+  assert.deepEqual(parsed.for_students, ['stu1']);
+  assert.equal(parsed.compare_with, 'lesson_b');
+});
