@@ -1,3 +1,4 @@
+import { createNoteCueEditor } from '@/blocks/note-cue';
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
@@ -385,10 +386,11 @@ export function createHeadingEditor(
   });
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       variant: variantSelect.getValue() as typeof block.variant,
-      content: { text: textInput.value }
+      content: { ...latest.content, text: textInput.value }
     });
   };
 
@@ -2289,9 +2291,11 @@ export function createClozeEditor(
 
   const emitChange = () => {
     const titleValue = title.value.trim();
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         title: titleValue.length > 0 ? titleValue : undefined,
         text: text.value,
         case_sensitive: caseSensitive.checked || undefined
@@ -2331,9 +2335,11 @@ export function createSelfCheckEditor(
   itemsHost.className = 'block-editor__self-check-items';
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       content: {
+        ...latest.content,
         title: title.value.trim() || undefined,
         mode,
         prompt: prompt.value,
@@ -3108,6 +3114,8 @@ function createBlockEditorFields(
       );
     case 'cloze':
       return createClozeEditor(block, onChange, latest as () => Extract<Block, { block_type: 'cloze' }>);
+    case 'note_cue':
+      return createNoteCueEditor(block, onChange, latest as () => Extract<Block, { block_type: 'note_cue' }>);
     case 'self_check':
       return createSelfCheckEditor(block, onChange, latest as () => Extract<Block, { block_type: 'self_check' }>);
     case 'chart':

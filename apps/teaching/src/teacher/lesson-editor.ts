@@ -816,7 +816,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     }
 
     function showPublishIssues(apiIssues: string[]): void {
-      const local = listPublishBlockIssues(lesson.blocks);
+      const local = listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' });
       const errorIds = local.map((issue) => issue.blockId);
 
       publishPanel.replaceChildren();

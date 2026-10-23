@@ -294,7 +294,7 @@ async function deviceAttempts(store, k, device, from) {
  * answered. A class with no list stays anonymous. Otherwise the device must
  * hold claimed initials, and `claim` is how it gets them.
  */
-async function identify(store, body, action) {
+export async function identify(store, body, action) {
   if (!body.class_id) return { classId: null, student: null, need: 'class' };
   const roster = await loadRoster(store, body.class_id);
   if (!roster) reject(404, 'need_class', 'Open this quiz from your class page.');

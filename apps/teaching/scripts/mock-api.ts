@@ -103,6 +103,8 @@ import { createFeedbackCodesHandler } from '../../../netlify/functions/feedback-
 import { buildMediaUsage } from '../../../netlify/functions/_shared/media-usage.mjs';
 import { validateMediaFolders } from '../../../netlify/functions/media-folders.mjs';
 import { createPublishedQuizHandler } from '../../../netlify/functions/published-quiz.mjs';
+import { createLectureHandler } from '../../../netlify/functions/lecture.mjs';
+import { createPublishedLectureHandler } from '../../../netlify/functions/published-lecture.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
 import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
@@ -3600,6 +3602,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ? createHingeHandler({ ...deps, kickTextToolRun: mockKickTextTool })
       : path.startsWith('/api/text-tools/')
         ? createTextToolsHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/lecture$/.test(path)
+        ? createLectureHandler(deps)
+      : path.startsWith('/api/published/lecture/')
+        ? createPublishedLectureHandler(deps)
       : path.startsWith('/api/published/hinge/')
         ? createPublishedHingeHandler(deps)
       : /\/quadrant$/.test(path)
@@ -3702,6 +3708,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/outcomes\/[^/]+(\/(usage|merge))?$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/quiz$/.test(path) ||
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/lecture$/.test(path) ||
+      /^\/api\/published\/lecture\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
       /^\/api\/published\/discern\/[^/]+$/.test(path) ||

@@ -53,6 +53,7 @@ export const BlockTypeSchema = z.enum([
   'flashcards',
   'cloze',
   'self_check',
+  'note_cue',
   'chart',
   'equation',
   'diagram',
@@ -150,13 +151,28 @@ export const RichTextBlockSchema = z.object({
   ...blockTimestamps
 });
 
+/** A scene's voiceover in a lecture: one short clip the teacher records. */
+export const NarrationSchema = z.object({
+  url: z.string().min(1),
+  duration_s: z.number().min(0).max(900),
+  transcript: z.string().max(8000).optional()
+});
+export type Narration = z.infer<typeof NarrationSchema>;
+
+/** Lecture: a heading starts a scene. `one` reveals its blocks one tap at a time. */
+export const RevealSchema = z.enum(['all', 'one']);
+
 export const HeadingBlockSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
   block_type: z.literal('heading'),
   variant: HeadingVariantSchema,
   visibility: VisibilitySchema,
-  content: z.object({ text: z.string() }),
+  content: z.object({
+    text: z.string(),
+    narration: NarrationSchema.optional(),
+    reveal: RevealSchema.optional()
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -610,7 +626,9 @@ export const HingeQuestionBlockSchema = z.object({
     move_on: z.number().int().min(1).max(100).default(80),
     reteach: z.number().int().min(0).max(99).default(50),
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
-    backup: HingeBackupSchema.optional()
+    backup: HingeBackupSchema.optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z.boolean().optional()
   }), ...blockLayout, ...blockTimestamps
 });
 
@@ -867,7 +885,9 @@ export const ClozeBlockSchema = z.object({
   content: z.object({
     title: z.string().optional(),
     text: z.string(),
-    case_sensitive: z.boolean().optional()
+    case_sensitive: z.boolean().optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -891,7 +911,27 @@ export const SelfCheckBlockSchema = z.object({
     mode: SelfCheckModeSchema,
     prompt: z.string(),
     answer: z.string().optional(),
-    items: z.array(SelfCheckItemSchema).max(12).optional()
+    items: z.array(SelfCheckItemSchema).max(12).optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z.boolean().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const NOTE_CUE_KINDS = ['copy', 'own_words', 'draw', 'question'] as const;
+export const NoteCueKindSchema = z.enum(NOTE_CUE_KINDS);
+
+/** A prompt to write in their book. In a lecture it pauses until they tick Done. */
+export const NoteCueBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('note_cue'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    kind: NoteCueKindSchema,
+    prompt: z.string().max(500)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1598,6 +1638,7 @@ const leafBlockSchemas = [
   FlashcardsBlockSchema,
   ClozeBlockSchema,
   SelfCheckBlockSchema,
+  NoteCueBlockSchema,
   ChartBlockSchema,
   EquationBlockSchema,
   DiagramBlockSchema,
@@ -1709,7 +1750,7 @@ export const TabsBlockSchema = z.object({
   ...blockTimestamps
 });
 
-export const SectionChildBlockSchema = z.lazy(() =>
+const SectionInnerChildBlockSchema = z.lazy(() =>
   z.discriminatedUnion('block_type', [
     ...leafBlockSchemas,
     SpacerBlockSchema,
@@ -1717,6 +1758,36 @@ export const SectionChildBlockSchema = z.lazy(() =>
     TabsBlockSchema,
     TimelineBlockSchema,
     CardStackBlockSchema
+  ])
+);
+
+/** Lecture: a gate's second look. One level only: it holds ordinary blocks, never another section. */
+export const SidePathSectionSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('section'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string(),
+    collapsed_in_editor: z.boolean().optional(),
+    blocks: z.array(SectionInnerChildBlockSchema),
+    side_path: z.literal(true),
+    narration: NarrationSchema.optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const SectionChildBlockSchema = z.lazy(() =>
+  z.discriminatedUnion('block_type', [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    TabsBlockSchema,
+    TimelineBlockSchema,
+    CardStackBlockSchema,
+    SidePathSectionSchema
   ])
 );
 
@@ -1735,7 +1806,13 @@ const SectionBlockObjectSchema = z.object({
     title: z.string(),
     collapsed_in_editor: z.boolean().optional(),
     blocks: z.array(SectionChildBlockSchema),
-    link: SectionLinkSchema.optional()
+    link: SectionLinkSchema.optional(),
+    /** Lecture: the chapter intro clip. */
+    narration: NarrationSchema.optional(),
+    /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
+    takeaway: z.object({ enabled: z.boolean(), prompt: z.string().max(300).optional() }).optional(),
+    /** Lecture: plays only after a wrong answer on the gate just above it. */
+    side_path: z.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps

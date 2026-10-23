@@ -18,7 +18,7 @@ export const PublishedLessonSchema = z.object({
   outcome_ids: z.array(z.string().min(1)).max(24).optional(),
   feedback_off: z.boolean().optional(),
   /** Quiz lessons: the settings students may see, with the published version. */
-  pedagogical_mode: z.literal('quiz').optional(),
+  pedagogical_mode: z.enum(['quiz', 'lecture']).optional(),
   quiz: QuizSettingsSchema.extend({
     version: z.string(),
     question_count: z.number().int(),
@@ -44,7 +44,8 @@ export function toPublishedLesson(
     ...(attachedOutcomeIds(lesson).length > 0
       ? { outcome_ids: attachedOutcomeIds(lesson) }
       : {}),
-    ...(lesson.feedback_off === true ? { feedback_off: true } : {})
+    ...(lesson.feedback_off === true ? { feedback_off: true } : {}),
+    ...(lesson.pedagogical_mode === 'lecture' ? { pedagogical_mode: 'lecture' as const } : {})
   });
 }
 

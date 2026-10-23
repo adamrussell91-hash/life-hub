@@ -241,6 +241,7 @@ describe('createBlock learning activities', () => {
       'flashcards',
       'cloze',
       'self_check',
+      'note_cue',
       'annotation'
     ]);
   });
