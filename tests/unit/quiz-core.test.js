@@ -179,6 +179,20 @@ test('keys carry skills and the technique of each public option', () => {
   assert.deepEqual(key.techniques, { [byText.Personification]: 'personification', [byText.Simile]: 'simile' });
 });
 
+test('the public question never carries technique ids or skills', () => {
+  const checked = checkQuestion({
+    id: 'qp', kind: 'quote_technique', prompt: 'Which technique?', marks: 1, quote: 'The wind sang.',
+    skills: ['reading.inference'],
+    options: [{ id: 'a', text: 'Personification', technique_id: 'personification' }, { id: 'b', text: 'Simile', technique_id: 'simile' }],
+    correct: ['a']
+  });
+  assert.equal(checked.ok, true);
+  const { question } = splitQuestion(checked.question, seeded());
+  assert.equal('techniques' in question, false);
+  assert.equal('skills' in question, false);
+  assert.equal(question.options.some((o) => 'technique_id' in o), false);
+});
+
 test('spot_technique keys map option ids to techniques', () => {
   const q = {
     id: 'sp', kind: 'spot_technique', prompt: 'Find them.', marks: 2, passage: 'The sea roared like a lion. The moon was a coin.',
