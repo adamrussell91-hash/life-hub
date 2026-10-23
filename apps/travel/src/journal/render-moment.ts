@@ -31,6 +31,7 @@ export interface RenderMomentContext {
   tripId: string;
   version: string;
   anchor: HTMLElement;
+  trip?: import('@/types').Trip;
   onJournalSaved?: (envelope: { journal: JournalDocument; version: string }) => void;
 }
 
@@ -112,7 +113,7 @@ function handleMenuAction(
   const base = sheetBase(ctx, moment);
   switch (action) {
     case 'edit':
-      setSheetOverlay(openEditMomentSheet(base));
+      setSheetOverlay(openEditMomentSheet({ ...base, trip: ctx.trip }));
       break;
     case 'annotate': {
       const firstId = moment.media_ids[0];

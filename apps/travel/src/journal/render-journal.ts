@@ -188,6 +188,7 @@ export function renderJournal(
       tripId: liveFixture.trip_id,
       version: liveVersion,
       anchor: root,
+      trip: liveTrip,
       onJournalSaved,
     };
   }
