@@ -136,7 +136,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
   const shown = withAutoDepths(order.map((id) => byId.get(id)!).filter(Boolean));
   const roleOf = (id: string): MapLane | undefined => {
     const role = byId.get(id)?.role ?? railRole.get(id);
-    return role === 'optional' ? 'option' : role;
+    return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
   };
   const lanes = lanesFrom(flow.seq, roleOf);
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
