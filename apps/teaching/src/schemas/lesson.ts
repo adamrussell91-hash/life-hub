@@ -5,6 +5,7 @@ import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonKindSchema,
 import { QuizSettingsSchema } from '../quiz/core';
 import { TutorialSettingsSchema } from '../tutorial/schema';
 import { visitBlocks } from '../blocks/walk-blocks';
+import { tutorialIssues } from '../tutorial/model';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
 import {
@@ -69,7 +70,7 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
       path: ['title']
     });
   }
-  if (lesson.pedagogical_mode !== 'quiz') {
+  if (lesson.pedagogical_mode !== 'quiz' && lesson.pedagogical_mode !== 'tutorial') {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === 'quiz_question') stray = true;
@@ -82,7 +83,12 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
       });
     }
   }
-  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' })) {
+  if (lesson.pedagogical_mode === 'tutorial') {
+    for (const message of tutorialIssues(lesson)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['blocks'] });
+    }
+  }
+  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' || lesson.pedagogical_mode === 'tutorial' })) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
