@@ -61,7 +61,24 @@ describe('lecture state', () => {
     const s = goTo(startState(scenes), scenes, 2);
     expect(s.shown).toBe(1);
     expect(mainAction(s, scenes)).toEqual({ kind: 'finish', label: 'See your recap →' });
-    expect(act(s, scenes, mainAction(s, scenes)).finished).toBe(true);
+    // Reaching the recap is not finishing; only the recap's Finish button sets it.
+    expect(act(s, scenes, mainAction(s, scenes)).finished).toBe(false);
+  });
+
+  it('goes straight on to the next scene after a side path when the gate was the last beat', () => {
+    const last = lectureScenes([
+      heading('g1'), text('a'), b('q2', 'cloze', { text: 'x' }), b('p2', 'section', { title: 'again', blocks: [text('y')], side_path: true }),
+      heading('g2'), text('c')
+    ]);
+    let s = startState(last);
+    s = act(s, last, mainAction(s, last));
+    s = answer(s, 'q2', 'wrong');
+    s = act(s, last, mainAction(s, last));
+    expect(s.detour).toBe('q2');
+    s = act(s, last, mainAction(s, last));
+    expect(s.detour).toBeNull();
+    expect(s.scene).toBe(1);
+    expect(s.reached).toEqual(['g1', 'g2']);
   });
 
   it('counts a replay when going back to a scene already reached', () => {

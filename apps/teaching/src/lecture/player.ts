@@ -1,12 +1,13 @@
 // apps/teaching/src/lecture/player.ts
 import type { Block } from '@/schemas/block';
 import { renderBlock, type RenderContext } from '@/blocks/render';
+import { storageKey } from '@/blocks/learning-activity';
 import { el, readJSON, writeJSON } from '@/quiz/dom';
-import { lectureScenes, noteCues, type LectureScene } from './scenes';
+import { isGate, lectureScenes, noteCues } from './scenes';
 import { act, answer, goTo, mainAction, restoreState, startState, type LectureState } from './state';
 import { LECTURE_ANSWERED, type AnsweredDetail } from './answered';
 import { createNarration } from './narration';
-import type { LectureClient, LectureStatus, MyHandup } from './api';
+import type { LectureClient, LectureStatus } from './api';
 import './lecture.css';
 
 export type LecturePlayerOptions = {
@@ -26,6 +27,13 @@ export type LecturePlayerHandle = { dispose(): void };
 const NOTE_LOCK_MS = 3000;
 const HINT_MS = 4000;
 const SEND_EVERY = 3;
+/** How long Start waits for the server to say who the student is. */
+const STATUS_WAIT_MS = 3000;
+
+/** The keys a gate block keeps its own answer under, so Start again can clear them. */
+export function gateStateKeys(lessonId: string, blockId: string): string[] {
+  return [storageKey('local', blockId), `hinge:${lessonId}:${blockId}:solo`];
+}
 
 /**
  * The lecture player: a title card, then one scene at a time with its
@@ -38,9 +46,14 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   const saveKey = `lecture:${lessonId}:state`;
   let state: LectureState = restoreState(preview ? null : readJSON(saveKey), scenes);
   let status: LectureStatus | null = null;
-  const localHandups: MyHandup[] = [];
+  /** Start waits on the server's answer, or the timeout, whichever comes first. */
+  let statusReady = !client || preview;
+  let statusTimer = 0;
+  /** Nothing is sent until the student has opened the lecture. */
+  let started = false;
   let hinted = false;
   let hintTimer = 0;
+  let narrationIdle = false;
   let lockTimer = 0;
   let unsent = 0;
   let disposed = false;
@@ -57,8 +70,9 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     reached: state.reached, replays: state.replays, last_scene: scenes[state.scene]?.id ?? '',
     missed: state.missed, ticked: state.ticked.length, finished: state.finished
   });
+  const needsInitials = () => !!client && !preview && status?.identity.need === 'initials';
   const send = (leaving = false) => {
-    if (!client || preview || status?.identity.need) return;
+    if (!client || preview || !started || status?.identity.need) return;
     unsent = 0;
     client.progress(progressBody(), leaving);
   };
@@ -77,45 +91,92 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     const start = el('button', 'btn btn--primary lecture-title__start');
     start.type = 'button';
     const resumeAt = state.scene > 0 && !state.finished ? scenes[state.scene] : undefined;
-    start.textContent = resumeAt ? `Pick up at ${resumeAt.label}` : 'Start';
-    start.addEventListener('click', () => play());
+    const label = state.finished ? 'See your recap' : resumeAt ? `Pick up at ${resumeAt.label}` : 'Start';
+    start.addEventListener('click', () => {
+      started = true;
+      if (state.finished) recap();
+      else play();
+    });
     card.append(who, start);
-    if (resumeAt) {
+    if (resumeAt || state.finished) {
       const again = el('button', 'btn btn--ghost lecture-title__again', 'Start again');
       again.type = 'button';
-      again.addEventListener('click', () => { state = startState(scenes); save(); play(); });
+      again.addEventListener('click', () => {
+        started = true;
+        startAgain();
+      });
       card.append(again);
     }
     root.replaceChildren(card);
-    paintWho(who, start);
+    const paint = () => {
+      who.replaceChildren();
+      if (needsInitials()) who.append(claimForm(paint));
+      else if (status?.identity.initials) who.append(el('p', 'lecture-title__as', `Watching as ${status.identity.initials}`));
+      start.disabled = !statusReady || needsInitials();
+      start.textContent = statusReady ? label : 'Loading…';
+    };
+    paint();
   }
 
-  function paintWho(who: HTMLElement, start: HTMLButtonElement): void {
-    const need = !!client && status?.identity.need === 'initials';
-    start.disabled = need;
-    who.replaceChildren();
-    if (!need) {
-      if (status?.identity.initials) who.append(el('p', 'lecture-title__as', `Watching as ${status.identity.initials}`));
-      return;
+  /** Back to scene one with nothing answered, including each gate block's own saved answer. */
+  function startAgain(): void {
+    for (const scene of scenes) {
+      for (const beat of scene.beats) {
+        const inner = beat.sidePath ? (beat.sidePath.content.blocks as Block[]) : [];
+        for (const block of [beat.block, ...inner]) {
+          if (!isGate(block)) continue;
+          for (const key of gateStateKeys(lessonId, block.id)) {
+            try { localStorage.removeItem(key); } catch { /* storage blocked: nothing saved to clear */ }
+          }
+        }
+      }
     }
+    noteReady.clear();
+    state = startState(scenes);
+    save();
+    play();
+  }
+
+  /** The class-initials claim, shared by the title card and the bar above the stage. */
+  function claimForm(onDone: () => void): HTMLElement {
+    const form = el('form', 'lecture-claim');
     const input = el('input', 'qz-input lecture-title__initials');
     input.autocomplete = 'off';
     input.maxLength = 5;
     input.setAttribute('aria-label', 'Your initials');
     const go = el('button', 'btn btn--secondary', 'That’s me');
-    go.type = 'button';
+    go.type = 'submit';
     const err = el('p', 'lecture-title__err');
     err.hidden = true;
-    go.addEventListener('click', async () => {
+    err.setAttribute('role', 'alert');
+    let busy = false;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (busy || !client) return;
+      busy = true;
+      go.disabled = true;
+      err.hidden = true;
       try {
-        status = await client!.claim(input.value);
-        paintWho(who, start);
-      } catch (e) {
-        err.textContent = e instanceof Error ? e.message : 'That didn’t work. Try again.';
+        const next = await client.claim(input.value.trim());
+        if (disposed) return;
+        status = next;
+        if (next.identity.need === 'initials') {
+          err.textContent = 'Those initials aren’t on your class list. Check them and try again.';
+          err.hidden = false;
+        } else {
+          onDone();
+          paintWhoBar();
+        }
+      } catch (error) {
+        err.textContent = error instanceof Error ? error.message : 'That didn’t work. Try again.';
         err.hidden = false;
+      } finally {
+        busy = false;
+        go.disabled = false;
       }
     });
-    who.append(el('p', 'lecture-title__ask', 'Type your initials so your teacher can see your hand-ups.'), input, go, err);
+    form.append(el('p', 'lecture-title__ask', 'Type your initials so your teacher can see your hand-ups.'), input, go, err);
+    return form;
   }
 
   // ---------- playing ----------
@@ -124,7 +185,17 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   const dots = el('ol', 'lecture-strip__dots');
   const hand = el('button', 'lecture-strip__hand', '✋ Lost me');
   hand.type = 'button';
-  strip.append(chapterName, dots, hand);
+  // Asks for initials when the server answers after Start; progress and hand-ups wait for it.
+  const whoBar = el('div', 'lecture-who');
+  whoBar.hidden = true;
+  strip.append(chapterName, dots, hand, whoBar);
+
+  function paintWhoBar(): void {
+    const need = needsInitials();
+    if (need && !whoBar.childElementCount) whoBar.append(claimForm(() => {}));
+    if (!need) whoBar.replaceChildren();
+    whoBar.hidden = !need;
+  }
 
   const stage = el('main', 'lecture-stage');
   const captions = el('p', 'lecture-captions');
@@ -145,7 +216,8 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   bar.append(back, narration.el, cc, main);
 
   back.addEventListener('click', () => {
-    if (state.detour) state = act(state, scenes, { kind: 'return', label: '' });
+    // Back from a side path returns to its gate's scene, never on past it.
+    if (state.detour) state = { ...state, detour: null };
     else state = goTo(state, scenes, state.scene - 1);
     save();
     paintScene();
@@ -160,6 +232,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     const before = state.scene;
     state = act(state, scenes, action);
     save();
+    armHint();
     if (action.kind === 'finish') { send(); return recap(); }
     if (action.kind === 'detour' || action.kind === 'return' || state.scene !== before) {
       if (state.scene !== before && ++unsent >= SEND_EVERY) send();
@@ -168,7 +241,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     revealUpTo();
     paintBar();
   });
-  hand.addEventListener('click', () => openHandup());
+  hand.addEventListener('click', () => raiseHand());
   stage.addEventListener(LECTURE_ANSWERED, (e) => {
     const { blockId, result } = (e as CustomEvent<AnsweredDetail>).detail;
     state = answer(state, blockId, result);
@@ -178,22 +251,32 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   // A video or clip inside the scene pauses the narration.
   stage.addEventListener('play', () => narration.pause(), true);
   // Narration never holds the main button; idle only drives the one-time hint.
-  narration.onIdle((idle) => {
+  // The hint means "nothing tapped for a few seconds after the narration".
+  function armHint(): void {
     window.clearTimeout(hintTimer);
-    if (!idle || hinted) return;
+    if (!narrationIdle || hinted) return;
     hintTimer = window.setTimeout(() => {
       const kind = mainAction(state, scenes).kind;
       if (kind !== 'reveal' && kind !== 'next') return;
       hinted = true;
       hint.hidden = false;
     }, HINT_MS);
+  }
+  narration.onIdle((idle) => {
+    narrationIdle = idle;
+    armHint();
   });
 
   const onKey = (e: KeyboardEvent) => {
-    if (!root.contains(stage)) return;
+    if (!root.contains(stage) || e.altKey || e.metaKey || e.ctrlKey || e.repeat) return;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('input, textarea, select, button, [contenteditable="true"]')) return;
-    if (e.key === ' ') { e.preventDefault(); narration.toggle(); }
+    if (t?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+    if (e.key === ' ') {
+      // A focused button or link takes Space itself.
+      if (t?.closest?.('button, a[href], summary, [role="button"]')) return;
+      e.preventDefault();
+      narration.toggle();
+    }
     if (e.key === 'ArrowRight' && !main.disabled) { e.preventDefault(); main.click(); }
   };
   document.addEventListener('keydown', onKey);
@@ -201,6 +284,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   function play(): void {
     root.replaceChildren(strip, stage, captions, hint, bar);
     hand.hidden = !canRaise;
+    paintWhoBar();
     paintScene();
   }
 
@@ -263,7 +347,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     dots.replaceChildren();
     scenes.forEach((scene, i) => {
       const dot = el('li', 'lecture-strip__dot');
-      if (scene.chapter && scene.chapter.id === scene.id) dot.classList.add('lecture-strip__dot--chapter');
+      if (scene.chapter && scenes[i - 1]?.chapter?.id !== scene.chapter.id) dot.classList.add('lecture-strip__dot--chapter');
       if (scene.beats.some((b) => b.gate)) dot.classList.add('lecture-strip__dot--gate');
       if (scene.beats.some((b) => b.block.block_type === 'note_cue')) dot.classList.add('lecture-strip__dot--note');
       if (state.reached.includes(scene.id)) dot.classList.add('lecture-strip__dot--seen');
@@ -312,7 +396,18 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   }
 
   // ---------- hand-up ----------
-  function openHandup(prefill = ''): void {
+  /** Until the student is known, ✋ points them at the initials bar instead. */
+  function raiseHand(prefill = ''): void {
+    if (!canRaise) return;
+    if (needsInitials()) {
+      paintWhoBar();
+      whoBar.querySelector<HTMLInputElement>('input')?.focus();
+      return;
+    }
+    openHandup(prefill);
+  }
+
+  function openHandup(prefill: string): void {
     if (!client || !canRaise) return;
     const scene = scenes[state.scene];
     if (!scene) return;
@@ -338,7 +433,6 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
       sendBtn.disabled = true;
       try {
         status = await client.handup({ scene_id: scene.id, scene_label: scene.label, clip_s: narration.time(), text: box.value.trim() });
-        localHandups.length = 0;
         note.textContent = 'Sent. Your teacher will see it.';
         window.setTimeout(close, 1200);
       } catch (e) {
@@ -351,12 +445,15 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     sheet.addEventListener('close', () => sheet.remove());
     root.append(sheet);
     if (typeof sheet.showModal === 'function') sheet.showModal();
-    else sheet.setAttribute('open', '');
+    else {
+      sheet.classList.add('lecture-sheet--fallback');
+      sheet.setAttribute('open', '');
+    }
   }
   // A Question note cue offers the hand-up straight from its card.
   stage.addEventListener('click', (e) => {
-    const link = (e.target as HTMLElement).closest?.('.lecture-raise');
-    if (link) openHandup((link as HTMLElement).dataset.prompt ?? '');
+    const link = (e.target as HTMLElement).closest?.('.block-note-cue__raise');
+    if (link) raiseHand((link as HTMLElement).dataset.prompt ?? '');
   });
 
   // ---------- recap ----------
@@ -373,20 +470,20 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
       notes.append(item);
     }
     if (notes.childElementCount) page.append(el('h3', 'lecture-recap__head', 'In your book'), notes);
-    const missed = scenes.flatMap((scene, i) => scene.beats.filter((b) => state.missed.includes(b.block.id)).map(() => ({ scene, i })));
+    const missed = scenes.map((scene, i) => ({ scene, i })).filter(({ scene }) => scene.beats.some((b) => state.missed.includes(b.block.id)));
     if (missed.length) {
       const list = el('ul', 'lecture-recap__list');
       for (const { scene, i } of missed) {
         const item = el('li');
         const go = el('button', 'btn btn--ghost', `Look again: ${scene.label}`);
         go.type = 'button';
-        go.addEventListener('click', () => { state = goTo({ ...state, finished: false }, scenes, i); save(); play(); });
+        go.addEventListener('click', () => { state = goTo(state, scenes, i); save(); play(); });
         item.append(go);
         list.append(item);
       }
       page.append(el('h3', 'lecture-recap__head', 'Look again'), list);
     }
-    const mine = [...(status?.handups ?? []), ...localHandups];
+    const mine = status?.handups ?? [];
     if (mine.length) {
       const list = el('ul', 'lecture-recap__list');
       for (const h of mine) {
@@ -411,15 +508,24 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
 
   titleCard();
   if (client && !preview) {
+    const settle = () => {
+      if (disposed || statusReady) return;
+      statusReady = true;
+      window.clearTimeout(statusTimer);
+      if (root.querySelector('.lecture-title')) titleCard();
+    };
+    statusTimer = window.setTimeout(settle, STATUS_WAIT_MS);
     // The server may be missing or down; the lecture still plays, it just sends nothing.
     void Promise.resolve()
       .then(() => client.status())
       .then((next) => {
         if (disposed) return;
         status = next;
-        if (root.querySelector('.lecture-title')) titleCard();
+        if (statusReady && root.querySelector('.lecture-title')) titleCard();
+        settle();
+        if (root.contains(stage)) paintWhoBar();
       })
-      .catch(() => {});
+      .catch(() => settle());
   }
 
   return {
@@ -429,6 +535,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
       narration.dispose();
       window.clearTimeout(hintTimer);
       window.clearTimeout(lockTimer);
+      window.clearTimeout(statusTimer);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onLeave);
     }

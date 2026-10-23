@@ -10,16 +10,16 @@
 .lecture-strip__dot { flex: 1; height: 4px; border-radius: var(--radius-full); background: var(--line); position: relative; }
 .lecture-strip__dot--seen { background: color-mix(in srgb, var(--marine) 45%, var(--line)); }
 .lecture-strip__dot--here { background: var(--marine); }
-.lecture-strip__dot--detour { background: var(--amber, #c98a1b); }
+.lecture-strip__dot--detour { background: var(--warning); }
 .lecture-strip__dot--chapter { margin-left: 6px; }
 .lecture-strip__dot--gate::after, .lecture-strip__dot--note::after { content: ''; position: absolute; right: 2px; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--paper); border: 2px solid var(--marine); }
 .lecture-strip__dot--note::after { border-color: var(--muted); }
-.lecture-strip__hand { grid-column: 2; grid-row: 1; border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-full); padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
+.lecture-strip__hand { grid-column: 2; grid-row: 1; min-height: 44px; border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-full); padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
 .lecture-stage { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-4) 0 var(--space-6, 3rem); max-width: 46rem; width: 100%; margin: 0 auto; }
 .lecture-stage--single-image { max-width: none; }
 .lecture-stage--single-image .lecture-beat img { width: 100%; max-height: 70dvh; object-fit: contain; }
-.lecture-stage--detour { border-left: 4px solid var(--amber, #c98a1b); padding-left: var(--space-3); }
-.lecture-stage__detour { margin: 0; color: var(--amber, #c98a1b); font-weight: var(--weight-semibold); font-size: var(--text-sm); }
+.lecture-stage--detour { border-left: 4px solid var(--warning); padding-left: var(--space-3); }
+.lecture-stage__detour { margin: 0; color: var(--warning); font-weight: var(--weight-semibold); font-size: var(--text-sm); }
 .lecture-stage__title { margin: 0; font-size: var(--text-xl); }
 .lecture-beat--hidden { min-height: 3.5rem; border: 2px dashed var(--line); border-radius: var(--radius-md); }
 .lecture-beat--hidden > * { visibility: hidden; max-height: 3rem; overflow: hidden; }
@@ -42,6 +42,11 @@
 .lecture-narration__fill { height: 100%; width: 0; background: var(--marine); }
 .lecture-narration__speed { border: 0; background: none; font-size: var(--text-sm); color: var(--muted); }
 .lecture-sheet { border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-4); max-width: 28rem; width: calc(100% - 2rem); }
+.lecture-sheet--fallback { position: fixed; inset: auto 0 1rem; margin: 0 auto; z-index: 10; background: var(--paper); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent); }
+.lecture-who { grid-column: 1 / -1; grid-row: 3; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: color-mix(in srgb, var(--marine) 7%, var(--paper)); }
+.lecture-who[hidden] { display: none; }
+.lecture-claim { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.lecture-claim .lecture-title__ask, .lecture-claim .lecture-title__err { flex-basis: 100%; margin: 0; }
 .lecture-sheet__form { display: grid; gap: var(--space-2); }
 .lecture-sheet__title { margin: 0; font-weight: var(--weight-semibold); }
 .lecture-sheet__text { width: 100%; }
@@ -51,8 +56,8 @@
 .lecture-recap__note--done .lecture-recap__mark { color: var(--success); }
 .lecture-recap__reply { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 /* The note cue's hand-up link only works inside the player, and only with a class. */
-.lecture .lecture-raise { display: inline-flex; margin-top: var(--space-2); border: 0; background: none; color: var(--marine); padding: 0; text-decoration: underline; }
-.lecture--no-hand .lecture-raise { display: none; }
+.lecture .block-note-cue__raise { display: inline-flex; margin-top: var(--space-2); border: 0; background: none; color: var(--marine); padding: 0; text-decoration: underline; }
+.lecture--no-hand .block-note-cue__raise { display: none; }
 @media (max-width: 600px) {
   .lecture-bar { flex-wrap: wrap; }
   .lecture-narration { order: -1; flex-basis: 100%; }
