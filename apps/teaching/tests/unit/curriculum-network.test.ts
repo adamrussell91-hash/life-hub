@@ -8,6 +8,8 @@ import { lineColour, nextColour } from '@/network/colour';
 import { connect, layoutNetwork, liveNudges, type NetInput, type NetLevel, type Pt } from '@/network/layout';
 import { buildUnitNetwork, convertV1, placeByDate, type NetLesson } from '@/network/model';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines/editor';
+import { unitNetworkInput } from '@/blocks/curriculum-lines/render';
+import { mountNetworkStage } from '@/network/draw';
 import type { CurriculumLinesBlock } from '@/schemas/block';
 import { buildYearNetwork, classNow, outcomeCoverage, unitStops } from '@/network/year';
 
@@ -213,16 +215,25 @@ describe('Year network', () => {
 });
 
 describe('Curriculum lines block: render', () => {
-  it('draws a version 1 block through the network, with links only to lessons the viewer can open', () => {
+  it('draws a version 1 block through the network for students, with links only to lessons they can open', () => {
     const block = createBlock('curriculum_lines', 'cl1');
     if (block.block_type !== 'curriculum_lines') throw new Error('x');
     const v1Block = { ...block, content: { weeks: 1, strands: [{ id: 'a', name: 'Understanding', colour: 'wave' as const }], stations: [{ id: 's', strand_id: 'a', week: 1, level: 'introduced' as const, label: '', lesson_id: 'l1' }], checkpoints: [], terminus: { label: 'Essay' } } };
-    const el = renderBlock(v1Block, 'print', { network: { lines: LINES, lessons: [LESSONS[0]!, { id: 'l4', title: 'Tide tables' }] } });
+    // Students keep the network map; printed here so it draws at once.
+    const el = mountNetworkStage(unitNetworkInput(v1Block, { network: { lines: LINES, lessons: [LESSONS[0]!, { id: 'l4', title: 'Tide tables' }] } }), { print: true, label: 'Map' });
     expect(el.querySelector('svg')).not.toBeNull();
     const hrefs = [...el.querySelectorAll('a')].map((a) => a.getAttribute('href'));
     expect(hrefs).toContain('/lessons/l1');
     expect(el.textContent).toContain('Tide tables');
     expect(hrefs.some((h) => h?.includes('l4'))).toBe(false);
+  });
+
+  it('draws the coverage map for teachers, one branch per line and a row per lesson', () => {
+    const el = renderBlock({ ...createBlock('curriculum_lines', 'cl3'), content: v2() } as CurriculumLinesBlock, 'teacher', { network: { lines: LINES, lessons: LESSONS } });
+    expect(el.querySelector('.cm__svg')).not.toBeNull();
+    expect(el.querySelectorAll('.cm-row')).toHaveLength(LESSONS.length + 1);
+    expect(el.querySelectorAll('[data-item]')).toHaveLength(LINES.length);
+    expect(el.querySelector('.net-stage')).toBeNull();
   });
 
   it('asks for lines and lessons when it has neither', () => {
