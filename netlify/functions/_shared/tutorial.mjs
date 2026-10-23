@@ -338,7 +338,16 @@ export async function tutorialTeacherAction(store, lessonId, body) {
     await store.setJSON(k.group(group.id), { ...state, ...change(state) });
   };
 
-  if (action === 'sit') await write(() => ({ sitting: true }));
+  if (action === 'sit') {
+    // The teacher sits with one group at a time: leaving another group takes down what was up there.
+    for (const other of draftGroups(draft)) {
+      if (other.id === group.id) continue;
+      const key = k.group(other.id);
+      const state = await read(store, key);
+      if (state?.sitting || state?.shown) await store.setJSON(key, { ...emptyGroupState(), ...state, sitting: false, shown: null });
+    }
+    await write(() => ({ sitting: true }));
+  }
   if (action === 'hide') await write(() => ({ shown: null }));
   if (action === 'show') {
     inGroup(body.student_id);

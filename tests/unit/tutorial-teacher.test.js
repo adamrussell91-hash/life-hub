@@ -191,3 +191,16 @@ test('summary with no class lists students as not started without reading progre
   const s = await tutorialTeacherAction(store, 'tut1', { action: 'summary' });
   assert.deepEqual(s.groups[0].students, [{ id: 'st_ann', initials: '–', name: 'Removed student', stage: 'not_started', unlocked: false }]);
 });
+
+test('sitting with one group leaves any other group, taking down what was shown there', async () => {
+  const store = withDraft();
+  await tutorialAction(store, 'tut1', { action: 'claim', ...who(1), initials: 'AB' });
+  await tutorialAction(store, 'tut1', { action: 'answer', ...who(1), block_id: 'f1', parts: { 0: 'It repeats' }, rating: 'wrong' });
+  await tutorialTeacherAction(store, 'tut1', { action: 'sit', group_id: 'ga' });
+  await tutorialTeacherAction(store, 'tut1', { action: 'show', group_id: 'ga', student_id: 'st_ann', block_id: 'f1', part: '0' });
+  const s = await tutorialTeacherAction(store, 'tut1', { action: 'sit', group_id: 'gb' });
+  assert.deepEqual(s.groups.map((g) => [g.id, g.sitting]), [['ga', false], ['gb', true]]);
+  const a = store.data.get(tutorialKeys('tut1').group('ga'));
+  assert.deepEqual({ sitting: a.sitting, shown: a.shown }, { sitting: false, shown: null });
+  assert.equal((await tutorialAction(store, 'tut1', { action: 'status', ...who(1) })).sitting, false);
+});

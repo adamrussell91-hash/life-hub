@@ -18,7 +18,8 @@
 .tut-board__title { margin: 0; font-size: var(--text-lg); }
 .tut-board__count { margin: 0; color: var(--muted); }
 .tut-board__error { margin: 0; color: var(--danger); }
-.tut-board__error:empty { display: none; }
+.tut-board__error:empty, .tut-board__note:empty { display: none; }
+.tut-board__note { margin: 0; color: var(--muted); }
 .tut-board__strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: var(--space-3); }
 .tut-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-3); display: grid; gap: var(--space-1); align-content: start; background: var(--paper); min-width: 0; }
 .tut-card--waiting { border-color: var(--marine); box-shadow: 0 0 0 2px color-mix(in srgb, var(--marine) 25%, transparent); }
@@ -46,13 +47,14 @@
 .tut-live__who { display: grid; gap: .1rem; min-width: 0; }
 .tut-live__name, .tut-live__stage { font-size: var(--text-sm); color: var(--muted); overflow-wrap: anywhere; }
 .tut-live__cell { display: grid; gap: var(--space-1); min-width: 0; }
-.tut-live__cell--wrong { border-left: 3px solid var(--warn, #c9893b); padding-left: var(--space-2); }
-.tut-live__label { display: none; font-size: var(--text-xs); color: var(--muted); }
+.tut-live__cell--wrong { border-left: 3px solid var(--warning); padding-left: var(--space-2); }
+.tut-live__label { font-size: var(--text-xs); color: var(--muted); }
 .tut-live__answer, .tut-live__none { margin: 0; overflow-wrap: anywhere; }
 .tut-live__show { justify-self: start; }
 .tut-live__tools { display: grid; gap: var(--space-1); justify-items: start; min-width: 0; }
 .tut-live__move { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
 .tut-live__move-label { font-size: var(--text-xs); color: var(--muted); }
+.tut-live__move .hub-pills { flex-wrap: wrap; gap: var(--space-1); }
 .tut-live__hands { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .tut-live__hand { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .tut-live__hand--answered { opacity: .75; }
@@ -69,7 +71,8 @@
   .tut-live__cols { display: none; }
   .tut-live__row { grid-auto-flow: row; grid-template-columns: auto 1fr; grid-auto-columns: auto; }
   .tut-live__row > .tut-live__cell, .tut-live__row > .tut-live__tools { grid-column: 1 / -1; }
-  .tut-live__label { display: block; }
+  /* The column heads are hidden here, so each answer shows its label. */
+  .tut-live__label.tk-visually-hidden { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
   .tut-live__actions { justify-content: stretch; }
   .tut-live__actions .btn { flex: 1 1 100%; min-height: 44px; }
 }

@@ -16,7 +16,7 @@ const summary = (): TutorialSummary => ({
       ]
     },
     {
-      id: 'gb', name: 'Mix-up', why: 'y', gap_type: 'mix_up', sitting: false, seen_at: '2026-10-21T12:00:00.000Z', status: 'seen', handups: 0, open: 0,
+      id: 'gb', name: 'Mix-up', why: 'y', gap_type: 'mix_up', sitting: false, seen_at: '2026-10-21T03:00:00.000Z', status: 'seen', handups: 0, open: 0,
       students: [
         { id: 'st_cy', initials: 'CD', name: 'Cy Dale', stage: 'after', unlocked: true },
         { id: 'st_gus', initials: 'GH', name: 'Gus Hale', stage: 'waiting', unlocked: false }
@@ -70,7 +70,26 @@ async function openLive(a: TutorialTeacherApi, extra: Partial<Parameters<typeof 
   return handle;
 }
 
-afterEach(() => vi.useRealTimers());
+let visibility: DocumentVisibilityState = 'visible';
+Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+const setVisibility = (v: DocumentVisibilityState) => {
+  visibility = v;
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  visibility = 'visible';
+});
 
 describe('tutorial board', () => {
   it('draws a card per group and the seen count', async () => {
@@ -148,12 +167,17 @@ describe('tutorial board', () => {
     const handle = await openLive(a, { onMoved });
     const row = handle.root.querySelector('.tut-live__row')!;
     expect(row.querySelector('select')).toBeNull();
-    const pill = row.querySelector<HTMLButtonElement>('.tut-live__move .hub-pills__btn')!;
-    expect(pill.textContent).toBe('Mix-up');
+    const move = row.querySelector('.tut-live__move')!;
+    const group = move.querySelector('.hub-pills.hub-pills--loose')!;
+    expect(move.firstElementChild?.className).toBe('tut-live__move-label');
+    expect(move.firstElementChild?.textContent).toBe('Move to');
+    expect(group.textContent).toBe('Mix-up');
+    const pill = group.querySelector<HTMLButtonElement>('.hub-pills__btn')!;
     pill.click();
     await flush();
     expect(a.move).toHaveBeenCalledWith('st_ann', 'gb');
     expect(onMoved).toHaveBeenCalledWith(expect.objectContaining({ total: 2 }));
+    expect(handle.root.querySelector('.tut-board__note')!.textContent).toBe('Moved AB to Mix-up.');
     handle.dispose();
   });
 
@@ -200,5 +224,126 @@ describe('tutorial board', () => {
     await vi.advanceTimersByTimeAsync(12000);
     expect(a.board).toHaveBeenCalledTimes(2);
     expect(handle.root.innerHTML).toBe(before);
+  });
+
+  it('keeps a typed reply when Answered fails, and drops it once the reply is sent', async () => {
+    const a = api();
+    a.reply = vi.fn(async () => {
+      throw new ApiClientError({ code: 'network_error', message: '' });
+    });
+    const handle = await openLive(a);
+    const input = handle.root.querySelector<HTMLInputElement>('.tut-live__reply')!;
+    input.value = 'Look at the last line';
+    handle.root.querySelector<HTMLButtonElement>('.tut-live__answered')!.click();
+    await flush();
+    handle.root.querySelector<HTMLButtonElement>('.tut-live__show')!.click();
+    await flush();
+    expect(handle.root.querySelector<HTMLInputElement>('.tut-live__reply')!.value).toBe('Look at the last line');
+    a.reply = vi.fn(async () => summary());
+    handle.root.querySelector<HTMLButtonElement>('.tut-live__answered')!.click();
+    await flush();
+    expect(a.reply).toHaveBeenCalledWith('aaaaaaaaaaaaaaaaaaaaaaaa~abc123', 'Look at the last line');
+    expect(handle.root.querySelector<HTMLInputElement>('.tut-live__reply')!.value).toBe('');
+    handle.dispose();
+  });
+
+  it('locks Done while it is being sent', async () => {
+    const a = api();
+    const wait = deferred<TutorialSummary>();
+    a.done = vi.fn(() => wait.promise);
+    const handle = await openLive(a);
+    const done = handle.root.querySelector<HTMLButtonElement>('.tut-live__done')!;
+    done.click();
+    expect(done.disabled).toBe(true);
+    done.click();
+    expect(a.done).toHaveBeenCalledTimes(1);
+    wait.reject(new Error('x'));
+    await flush();
+    expect(done.disabled).toBe(false);
+    handle.dispose();
+  });
+
+  it('locks the move pills of a row while a move is out', async () => {
+    const a = api();
+    const wait = deferred<TutorialSummary>();
+    a.move = vi.fn(() => wait.promise);
+    const handle = await openLive(a);
+    const pill = handle.root.querySelector<HTMLButtonElement>('.tut-live__move .hub-pills__btn')!;
+    pill.click();
+    expect(pill.disabled).toBe(true);
+    wait.resolve(summary());
+    await flush();
+    handle.dispose();
+  });
+
+  it('a poll error clears on the next good fetch, and leaves an action’s error alone', async () => {
+    vi.useFakeTimers();
+    const a = api();
+    const handle = mountTutorialBoard({ getLesson: lesson, api: a });
+    await handle.refresh();
+    (handle.root.querySelector('.tut-card__sit') as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(0);
+    const error = handle.root.querySelector('.tut-board__error')!;
+    a.board = vi.fn(async () => {
+      throw new ApiClientError({ code: 'server_error', message: 'Board down' });
+    });
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(error.textContent).toBe('Board down');
+    a.board = vi.fn(async () => board());
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(error.textContent).toBe('');
+    a.show = vi.fn(async () => {
+      throw new ApiClientError({ code: 'not_found', message: 'That answer is gone.' });
+    });
+    handle.root.querySelector<HTMLButtonElement>('.tut-live__show')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(error.textContent).toBe('That answer is gone.');
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(a.board).toHaveBeenCalledTimes(2);
+    expect(error.textContent).toBe('That answer is gone.');
+    handle.dispose();
+  });
+
+  it('refreshes the cards every 15 seconds with no live board, and pauses while hidden', async () => {
+    vi.useFakeTimers();
+    const a = api();
+    const handle = mountTutorialBoard({ getLesson: lesson, api: a });
+    await handle.refresh();
+    expect(a.summary).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(a.summary).toHaveBeenCalledTimes(2);
+    setVisibility('hidden');
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(a.summary).toHaveBeenCalledTimes(2);
+    setVisibility('visible');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(a.summary).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(a.summary).toHaveBeenCalledTimes(4);
+    handle.dispose();
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(a.summary).toHaveBeenCalledTimes(4);
+  });
+
+  it('with the live board open, polls it every 4 seconds and the cards every third poll, on one timer', async () => {
+    vi.useFakeTimers();
+    const a = api();
+    const handle = mountTutorialBoard({ getLesson: lesson, api: a });
+    await handle.refresh();
+    (handle.root.querySelector('.tut-card__sit') as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect([vi.mocked(a.board).mock.calls.length, vi.mocked(a.summary).mock.calls.length]).toEqual([1, 1]);
+    await vi.advanceTimersByTimeAsync(8000);
+    expect([vi.mocked(a.board).mock.calls.length, vi.mocked(a.summary).mock.calls.length]).toEqual([3, 1]);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect([vi.mocked(a.board).mock.calls.length, vi.mocked(a.summary).mock.calls.length]).toEqual([4, 2]);
+    expect(vi.getTimerCount()).toBe(1);
+    setVisibility('hidden');
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(vi.mocked(a.board).mock.calls.length).toBe(4);
+    setVisibility('visible');
+    await vi.advanceTimersByTimeAsync(0);
+    expect([vi.mocked(a.board).mock.calls.length, vi.mocked(a.summary).mock.calls.length]).toEqual([5, 3]);
+    handle.dispose();
   });
 });
