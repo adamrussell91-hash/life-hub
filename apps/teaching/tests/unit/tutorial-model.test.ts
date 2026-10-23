@@ -1,4 +1,5 @@
 // apps/teaching/tests/unit/tutorial-model.test.ts
+import { BlockSchema } from '@/schemas/block';
 import { describe, it, expect } from 'vitest';
 import type { Block } from '@/schemas/block';
 import { groupOf, splitAtTeacher, tutorialCommon, tutorialIssues, tutorialParts, tutorialSkeleton } from '@/tutorial/model';
@@ -69,5 +70,38 @@ describe('tutorial model', () => {
     expect(tutorialIssues({ blocks: [] })).toEqual(['Plan the groups first: open the markbook and press Plan a tutorial.']);
     const stray = tutorialIssues({ tutorial: settings, blocks: [b('q9', 'quiz_question', {})] });
     expect(stray).toContain('Quiz questions in a tutorial go in a group’s exit check.');
+  });
+
+  it('skeleton blocks all parse, children included', () => {
+    let n = 0;
+    const check = (list: Block[]) => {
+      for (const x of list) {
+        const parsed = BlockSchema.parse(x);
+        if (parsed.block_type === 'section') check(parsed.content.blocks as Block[]);
+      }
+    };
+    check(tutorialSkeleton(settings.groups, () => `id${++n}`));
+  });
+
+  it('keeps the first of two tabs and flags duplicates', () => {
+    const dup = [section('t1', { tutorial_group: 'ga' }), section('t2', { tutorial_group: 'ga' }), section('e1', { tutorial_group: 'ga', tutorial_exit: true }), section('e2', { tutorial_group: 'ga', tutorial_exit: true })];
+    const parts = tutorialParts(dup);
+    expect(parts.tabs.get('ga')?.id).toBe('t1');
+    expect(parts.duplicates).toEqual({ tabs: ['ga'], exits: ['ga'] });
+    const issues = tutorialIssues({ tutorial: settings, blocks: dup });
+    expect(issues).toContain('Group “A” has two tabs.');
+    expect(issues).toContain('Group “A” has two exit checks.');
+  });
+
+  it('flags a tab whose group is gone, once', () => {
+    const blocks = [section('o1', { tutorial_group: 'zz' }), section('o2', { tutorial_group: 'zz', tutorial_exit: true })];
+    const issues = tutorialIssues({ tutorial: settings, blocks });
+    expect(issues.filter((m) => m === 'A tab is for a group that’s gone. Delete it or plan the groups again.')).toHaveLength(1);
+  });
+
+  it('flags a quiz question nested in columns inside a tab', () => {
+    const cols = b('c1', 'columns', { columns: [{ blocks: [b('qx', 'quiz_question', {})] }, { blocks: [] }] });
+    const issues = tutorialIssues({ tutorial: settings, blocks: [section('tabA', { tutorial_group: 'ga' }, [cols])] });
+    expect(issues).toContain('Quiz questions in a tutorial go in a group’s exit check.');
   });
 });
