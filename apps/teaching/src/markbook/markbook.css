@@ -129,3 +129,16 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-panel__rung { font-size: var(--text-xs); font-weight: var(--weight-bold); border-radius: 999px; padding: 1px 8px; background: var(--warm-white); border: 1px solid var(--line); }
 .mb-panel__rung--excellent, .mb-panel__rung--accomplished { background: #424860; color: #fff; border-color: #424860; }
 .mb-form__skill { max-width: 100%; }
+
+.mb-patterns { display: grid; gap: var(--space-3); min-width: 0; }
+.mb-trend { width: 100%; height: auto; max-height: 180px; }
+.mb-trend__grid { stroke: var(--line); stroke-width: 1; }
+.mb-trend__band { fill: var(--marine); opacity: 0.15; }
+.mb-trend__line { fill: none; stroke: var(--marine); stroke-width: 2; }
+.mb-trend__dot { fill: var(--marine); }
+.mb-trend__tick { fill: var(--muted); font: 11px var(--font-ui); }
+.mb-patterns__table th:first-child, .mb-patterns__table td:first-child { text-align: left; }
+.mb-patterns__groups { display: flex; gap: var(--space-1); justify-content: center; }
+.mb-patterns__group, .mb-patterns__cell { min-width: 32px; min-height: 32px; border: 0; border-radius: var(--radius-sm); font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; }
+.mb-patterns__name { min-height: 32px; border: 0; background: none; padding: 0; font: inherit; color: var(--marine); cursor: pointer; text-align: left; }
+.mb-patterns__list { display: grid; gap: var(--space-2); text-align: left; white-space: normal; }
