@@ -17,6 +17,9 @@ export type TutorialBoardHandle = { root: HTMLElement; refresh(): Promise<void>;
 type FadedStep = Extract<Block, { block_type: 'faded_example' }>;
 
 const POLL_MS = 4000;
+const SUMMARY_MS = 15000;
+/** With the live board open, every third board poll also refreshes the cards. */
+const SUMMARY_EVERY = 3;
 const STATUS_TEXT: Record<GroupSummary['status'], string> = {
   not_started: 'Not started',
   working: 'Working on their own',
@@ -50,9 +53,11 @@ function fadedColumns(blocks: Block[], groupId: string): { steps: FadedStep[]; t
 
 /**
  * The teacher's tutorial board above the canvas: a card per group, and the
- * live board for the group being sat with. The live board checks for new
- * answers every few seconds, and only while it is open. Student names show
- * here only; anything put up to students goes through the server, nameless.
+ * live board for the group being sat with. One timer keeps it fresh while the
+ * board is mounted and the page is visible: the cards every 15 seconds, or,
+ * with the live board open, the board every 4 seconds and the cards on every
+ * third of those. Student names show here only; anything put up to students
+ * goes through the server, nameless.
  */
 export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoardHandle {
   const root = el('section', 'tut-board');
@@ -63,13 +68,19 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
   const live = el('div', 'tut-board__live');
   const error = el('p', 'tut-board__error');
   error.setAttribute('role', 'alert');
-  root.append(head, strip, error, live);
+  const note = el('p', 'tut-board__note');
+  note.setAttribute('role', 'status');
+  root.append(head, strip, error, note, live);
 
   let summary: TutorialSummary | null = null;
   let open: string | null = null;
-  let poll = 0;
+  let timer = 0;
+  let ticks = 0;
   let seq = 0;
   let disposed = false;
+  /** An action's error stays until an action succeeds; a poll's error until a poll succeeds. */
+  let actionError = '';
+  let pollError = '';
   /**
    * Who is here, per group, kept across polls. A student is ticked once, the
    * first time they're seen waiting (or already unlocked); after that only the
@@ -78,30 +89,94 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
   const here = new Map<string, { ticked: Set<string>; decided: Set<string> }>();
   const replies = new Map<string, string>();
 
-  const fail = (e: unknown) => {
-    if (!disposed) error.textContent = errorText(e, 'That didn’t work. Try again.');
+  const showError = () => {
+    if (!disposed) error.textContent = actionError || pollError;
   };
-  const ok = () => {
-    error.textContent = '';
+  const failAction = (e: unknown) => {
+    actionError = errorText(e, 'That didn’t work. Try again.');
+    showError();
+  };
+  const failPoll = (e: unknown) => {
+    pollError = errorText(e, 'Couldn’t check for new answers. Trying again.');
+    showError();
+  };
+  const actionOk = () => {
+    actionError = '';
+    note.textContent = '';
+    showError();
+  };
+  const pollOk = () => {
+    pollError = '';
+    showError();
   };
   const useSummary = (next: TutorialSummary) => {
     if (disposed) return;
     summary = next;
     paintStrip();
   };
-  /** Runs a teacher action that answers with the summary, then repaints. */
-  const act = async (run: () => Promise<TutorialSummary>, after?: (s: TutorialSummary) => void) => {
-    try {
-      const next = await run();
-      if (disposed) return;
-      ok();
-      useSummary(next);
-      after?.(next);
+  const visible = () => document.visibilityState === 'visible';
+
+  /** The one timer. Nothing runs after dispose or while the page is hidden. */
+  function schedule(): void {
+    window.clearTimeout(timer);
+    if (disposed || !visible()) return;
+    timer = window.setTimeout(() => void tick(), open ? POLL_MS : SUMMARY_MS);
+  }
+  async function tick(): Promise<void> {
+    if (disposed || !visible()) return;
+    if (open) {
+      ticks += 1;
+      if (ticks % SUMMARY_EVERY === 0) await pollSummary();
       await paintLive();
+    } else await pollSummary();
+    schedule();
+  }
+  async function pollSummary(): Promise<void> {
+    try {
+      const next = await options.api.summary();
+      if (disposed) return;
+      pollOk();
+      useSummary(next);
     } catch (e) {
-      fail(e);
+      if (!disposed) failPoll(e);
     }
+  }
+  const onVisibility = () => {
+    if (disposed) return;
+    if (!visible()) return void window.clearTimeout(timer);
+    void (async () => {
+      window.clearTimeout(timer);
+      await pollSummary();
+      if (open) await paintLive();
+      schedule();
+    })();
   };
+  document.addEventListener('visibilitychange', onVisibility);
+
+  /** Disables the controls while their request is out, so a second press can't send it twice. */
+  async function locked(controls: HTMLButtonElement[], run: () => Promise<void>): Promise<void> {
+    for (const c of controls) c.disabled = true;
+    try {
+      await run();
+    } finally {
+      for (const c of controls) c.disabled = false;
+    }
+  }
+  /** Runs a teacher action that answers with the summary, then repaints. */
+  const act = (controls: HTMLButtonElement[], run: () => Promise<TutorialSummary>, after?: (s: TutorialSummary) => void) =>
+    locked(controls, async () => {
+      try {
+        const next = await run();
+        if (disposed) return;
+        actionOk();
+        after?.(next);
+        useSummary(next);
+        await paintLive();
+        schedule();
+      } catch (e) {
+        if (!disposed) failAction(e);
+      }
+    });
 
   function paintStrip(): void {
     if (!summary || disposed) return;
@@ -125,7 +200,7 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
           if (away.length) {
             const list = el('div', 'tut-card__away');
             for (const s of away) {
-              const b = button(`Unlock ${s.initials}`, 'ghost', () => void act(() => options.api.unlock(g.id, s.id)));
+              const b = button(`Unlock ${s.initials}`, 'ghost', () => void act([b], () => options.api.unlock(g.id, s.id)));
               b.classList.add('tut-card__unlock');
               b.setAttribute('aria-label', `Unlock the exit check for ${s.name}`);
               list.append(b);
@@ -133,21 +208,24 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
             card.append(list);
           }
         }
-        const sit = button(open === g.id ? 'Open below' : g.sitting ? 'Back to group' : 'Sit with group', 'secondary', async () => {
-          try {
-            if (!g.sitting) {
-              const next = await options.api.sit(g.id);
-              if (disposed) return;
-              summary = next;
+        const sit = button(open === g.id ? 'Open below' : g.sitting ? 'Back to group' : 'Sit with group', 'secondary', () =>
+          void locked([sit], async () => {
+            try {
+              if (!g.sitting) {
+                const next = await options.api.sit(g.id);
+                if (disposed) return;
+                summary = next;
+              }
+              actionOk();
+              open = g.id;
+              paintStrip();
+              await paintLive();
+              schedule();
+            } catch (e) {
+              if (!disposed) failAction(e);
             }
-            ok();
-            open = g.id;
-            paintStrip();
-            await paintLive();
-          } catch (e) {
-            fail(e);
-          }
-        });
+          })
+        );
         sit.classList.add('tut-card__sit');
         card.append(sit);
         return card;
@@ -171,27 +249,23 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
     return entry.ticked;
   }
 
+  /** Fetches and draws the live board. Timing is schedule()'s job. */
   async function paintLive(): Promise<void> {
-    window.clearTimeout(poll);
     const mine = ++seq;
     if (disposed) return;
     if (!open) return void live.replaceChildren();
-    // Don't repaint under the teacher's typing; look again shortly.
+    // Don't repaint under the teacher's typing; the next tick looks again.
     const focused = document.activeElement;
-    if (focused instanceof HTMLInputElement && focused.type === 'text' && live.contains(focused)) {
-      poll = window.setTimeout(() => void paintLive(), POLL_MS);
-      return;
-    }
+    if (focused instanceof HTMLInputElement && focused.type === 'text' && live.contains(focused)) return;
     let board: LiveBoard;
     try {
       board = await options.api.board(open);
     } catch (e) {
-      if (mine !== seq || disposed) return;
-      fail(e);
-      poll = window.setTimeout(() => void paintLive(), POLL_MS);
+      if (mine === seq && !disposed) failPoll(e);
       return;
     }
     if (disposed || mine !== seq || open !== board.group.id) return;
+    pollOk();
     const group = board.group;
     const seenAt = summary?.groups.find((g) => g.id === group.id)?.seen_at ?? null;
     const others = (summary?.groups ?? []).filter((g) => g.id !== group.id);
@@ -238,11 +312,12 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
         const answer = s.answers[st.id];
         for (const index of st.content.blanks) {
           const cell = el('div', `tut-live__cell${answer?.rating === 'wrong' ? ' tut-live__cell--wrong' : ''}`);
-          cell.append(el('span', 'tut-live__label', st.content.parts[index]?.label ?? ''));
+          // Read out on a desktop (the column heads are hidden from screen readers), shown on a phone.
+          cell.append(el('span', 'tut-live__label tk-visually-hidden', st.content.parts[index]?.label ?? ''));
           const text = answer?.parts[String(index)];
           if (text) {
             cell.append(el('p', 'tut-live__answer', text));
-            const show = button('Show to group', 'ghost', () => void act(() => options.api.show(group.id, s.id, st.id, String(index))));
+            const show = button('Show to group', 'ghost', () => void act([show], () => options.api.show(group.id, s.id, st.id, String(index))));
             show.classList.add('tut-live__show');
             cell.append(show);
           } else cell.append(el('p', 'tut-live__none', '…'));
@@ -251,22 +326,30 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
       }
       const tools = el('div', 'tut-live__tools');
       if (seenAt && !board.done_students.includes(s.id)) {
-        const unlock = button('Unlock', 'ghost', () => void act(() => options.api.unlock(group.id, s.id)));
+        const unlock = button('Unlock', 'ghost', () => void act([unlock], () => options.api.unlock(group.id, s.id)));
         unlock.classList.add('tut-live__unlock');
         unlock.setAttribute('aria-label', `Unlock the exit check for ${s.name}`);
         tools.append(unlock);
       }
       if (others.length) {
-        const move = el('div', 'hub-pills tut-live__move');
-        move.setAttribute('role', 'group');
-        move.setAttribute('aria-label', `Move ${s.name} to`);
-        move.append(el('span', 'tut-live__move-label', 'Move to'));
+        const move = el('div', 'tut-live__move');
+        const pills = el('div', 'hub-pills hub-pills--loose');
+        pills.setAttribute('role', 'group');
+        pills.setAttribute('aria-label', `Move ${s.name} to`);
+        const all: HTMLButtonElement[] = [];
         for (const g of others) {
           const pill = el('button', 'hub-pills__btn', g.name);
           pill.type = 'button';
-          pill.addEventListener('click', () => void act(() => options.api.move(s.id, g.id), (next) => options.onMoved?.(next)));
-          move.append(pill);
+          pill.addEventListener('click', () =>
+            void act(all, () => options.api.move(s.id, g.id), (next) => {
+              note.textContent = `Moved ${s.initials} to ${g.name}.`;
+              options.onMoved?.(next);
+            })
+          );
+          all.push(pill);
+          pills.append(pill);
         }
+        move.append(el('span', 'tut-live__move-label', 'Move to'), pills);
         tools.append(move);
       }
       row.append(tools);
@@ -292,8 +375,9 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
           reply.value = replies.get(h.id) ?? '';
           reply.addEventListener('input', () => replies.set(h.id, reply.value));
           const answered = button('Answered', 'secondary', () => {
-            replies.delete(h.id);
-            void act(() => options.api.reply(h.id, reply.value.trim()));
+            replies.set(h.id, reply.value);
+            // The typed reply is kept until the server has it.
+            void act([answered], () => options.api.reply(h.id, reply.value.trim()), () => replies.delete(h.id));
           });
           answered.classList.add('tut-live__answered');
           item.append(reply, answered);
@@ -304,46 +388,43 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
     }
 
     const actions = el('div', 'tut-live__actions');
-    if (board.shown) actions.append(button('Take it down', 'secondary', () => void act(() => options.api.hide(group.id))));
+    if (board.shown) {
+      const down = button('Take it down', 'secondary', () => void act([down], () => options.api.hide(group.id)));
+      actions.append(down);
+    }
     const done = button('Done with this group', 'primary', () => {
       const students = board.students.filter((s) => ticked.has(s.id)).map((s) => s.id);
-      void (async () => {
-        try {
-          const next = await options.api.done(group.id, students);
-          if (disposed) return;
-          ok();
-          here.delete(group.id);
-          open = null;
-          useSummary(next);
-          await paintLive();
-        } catch (e) {
-          fail(e);
-        }
-      })();
+      void act([done], () => options.api.done(group.id, students), () => {
+        here.delete(group.id);
+        open = null;
+      });
     });
     done.classList.add('tut-live__done');
     actions.append(done);
     box.append(actions);
     live.replaceChildren(box);
-    poll = window.setTimeout(() => void paintLive(), POLL_MS);
   }
 
   return {
     root,
     async refresh() {
+      window.clearTimeout(timer);
       try {
         const next = await options.api.summary();
         if (disposed) return;
-        ok();
+        actionError = '';
+        pollOk();
         useSummary(next);
       } catch (e) {
-        fail(e);
+        if (!disposed) failAction(e);
       }
+      schedule();
     },
     dispose() {
       disposed = true;
       seq += 1;
-      window.clearTimeout(poll);
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
     }
   };
 }
