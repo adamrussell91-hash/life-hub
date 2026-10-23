@@ -18,15 +18,24 @@ export function storeFor() {
       { id: 'gb', goal: 'Today: telling them apart', students: ['st_cy'], blocks: [block('w2', 'with_teacher', { talking_points: [] })] }
     ] }]
   ]);
-  return {
+  // Each write bumps a key's etag, so onlyIfMatch can be tested. `beforeWrite` lets a test slip in another tab's write.
+  const etags = new Map();
+  let n = 0;
+  const store = {
     data,
+    beforeWrite: null,
     async get(key) { return structuredClone(data.get(key) ?? null); },
+    async getWithMetadata(key) { return data.has(key) ? { data: structuredClone(data.get(key)), etag: etags.get(key) ?? 'e0' } : null; },
     async setJSON(key, value, opts = {}) {
+      if (store.beforeWrite) await store.beforeWrite(key, opts);
       if (opts.onlyIfNew && data.has(key)) return { modified: false };
+      if (opts.onlyIfMatch !== undefined && (etags.get(key) ?? (data.has(key) ? 'e0' : undefined)) !== opts.onlyIfMatch) return { modified: false };
       data.set(key, structuredClone(value));
+      etags.set(key, `e${++n}`);
       return { modified: true };
     },
     async delete(key) { data.delete(key); },
     async list({ prefix }) { return { blobs: [...data.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })) }; }
   };
+  return store;
 }
