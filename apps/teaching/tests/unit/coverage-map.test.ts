@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { CurriculumLinesV2Content, NetworkLine } from '@/schemas/block';
 import { buildCoverageMap, thinLimit, type MapLesson } from '@/network/coverage-map/model';
 import { studentRoute } from '@/network/coverage-map/student';
+import { rowTag } from '@/network/coverage-map/draw';
 import type { Evidence } from '@/evidence/types';
 
 /* Invented names only: this repository is public. */
@@ -28,25 +29,17 @@ const LESSONS: MapLesson[] = [
 const build = (lessons = LESSONS, content = v2()) => buildCoverageMap({ content, lines: LINES, lessons, points: POINTS });
 
 describe('Coverage map: model', () => {
-  it('puts lessons on lanes from their role and marks quizzes and the task', () => {
+  it('puts every lesson on the core line, whatever its role, and marks quizzes and the task', () => {
     const map = build();
     expect(map.rows.map((r) => [r.id, r.lane, r.kind])).toEqual([
-      ['a', 'core', 'lesson'], ['b', 'core', 'check'], ['c', 'support', 'lesson'], ['d', 'core', 'lesson'],
-      ['e', 'extension', 'lesson'], ['f', 'core', 'lesson'], ['__terminus', 'core', 'goal']
+      ['a', 'core', 'lesson'], ['b', 'core', 'check'], ['c', 'core', 'lesson'], ['d', 'core', 'lesson'],
+      ['e', 'core', 'lesson'], ['f', 'core', 'lesson'], ['__terminus', 'core', 'goal']
     ]);
-    expect(map.rows.find((r) => r.id === 'c')?.skip).toBe('90%+ on the quiz');
+    expect(map.rows.map(rowTag).every((t) => t === undefined)).toBe(true);
+    expect(map.rows.find((r) => r.id === 'c')?.skip).toBeUndefined();
   });
 
-  it('takes support and extension from a light-rail stop when the lesson has no role', () => {
-    const lessons = LESSONS.map((l) => ({ ...l, role: undefined, skip: undefined }));
-    const map = build(lessons, v2({ rail_stops: [{ id: 's', line_id: 'read', kind: 'support', lesson_id: 'c', label: '', skip_rule: 'Under 50%' }] }));
-    const c = map.rows.find((r) => r.id === 'c')!;
-    expect(c.lane).toBe('support');
-    expect(c.skip).toBe('Under 50%');
-    expect(map.rows.find((r) => r.id === 'e')?.lane).toBe('core');
-  });
-
-  it('draws a choice as options: A on the core line, B beside it', () => {
+  it('puts every lesson on a fork on the core line: forks never make options', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Start', after: ['b1', 'b2'] },
       { id: 'b1', title: 'Talk', after: ['c'] },
@@ -54,13 +47,11 @@ describe('Coverage map: model', () => {
       { id: 'c', title: 'Draft' }
     ];
     const rows = build(lessons).rows;
-    expect(rows.find((r) => r.id === 'b1')).toMatchObject({ lane: 'core', option: 'A' });
-    expect(rows.find((r) => r.id === 'b2')).toMatchObject({ lane: 'option', option: 'B' });
-    expect(rows.find((r) => r.id === 'c')).toMatchObject({ lane: 'core' });
-    expect(rows.find((r) => r.id === 'c')?.option).toBeUndefined();
+    expect(rows.map((r) => [r.id, r.lane])).toEqual([['a', 'core'], ['b1', 'core'], ['b2', 'core'], ['c', 'core'], ['__terminus', 'core']]);
+    expect(rows.map(rowTag)).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 
-  it('keeps lessons the teacher set to Core on the core line, with no option letters, even across a split', () => {
+  it('keeps lessons the teacher set to Core on the core line, even across a split', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Start', after: ['b1', 'w'] },
       { id: 'b1', title: 'Poet', role: 'core', after: ['b2'] },
@@ -72,18 +63,19 @@ describe('Coverage map: model', () => {
     const rows = build(lessons, v2({ station_order: ['a', 'b1', 'b2', 'b3', 'w', 'c'] })).rows;
     for (const row of rows) {
       expect(row.lane).toBe('core');
-      expect(row.option).toBeUndefined();
     }
   });
 
-  it('puts a detour that rejoins (the other way goes straight on) beside the core line as optional', () => {
+  it('keeps a detour that rejoins on the core line, even when the lesson is set to Optional', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Start', after: ['c', 'b'] },
       { id: 'b', title: 'Pre-quiz', quiz: true, after: ['c'] },
       { id: 'c', title: 'Next' }
     ];
     const rows = build(lessons, v2({ station_order: ['a', 'b', 'c'] })).rows;
-    expect(rows.map((r) => [r.id, r.lane, r.option])).toEqual([['a', 'core', undefined], ['b', 'option', undefined], ['c', 'core', undefined], ['__terminus', 'core', undefined]]);
+    expect(rows.map((r) => [r.id, r.lane])).toEqual([['a', 'core'], ['b', 'core'], ['c', 'core'], ['__terminus', 'core']]);
+    const optional = build(lessons.map((l) => (l.id === 'b' ? { ...l, role: 'optional' as const } : l)), v2({ station_order: ['a', 'b', 'c'] })).rows;
+    expect(optional.find((r) => r.id === 'b')?.lane).toBe('core');
   });
 
   it('shows an extension stop’s lesson the old map left off, after the lesson it follows, teaching the stop’s line', () => {
@@ -94,7 +86,7 @@ describe('Coverage map: model', () => {
     }));
     expect(map.rows.map((r) => r.id).slice(0, 3)).toEqual(['a', 'talk', 'b']);
     const talk = map.rows.find((r) => r.id === 'talk')!;
-    expect(talk.lane).toBe('extension');
+    expect(talk.lane).toBe('core');
     expect(talk.teaches.has('read')).toBe(true);
   });
 
@@ -116,9 +108,9 @@ describe('Coverage map: model', () => {
     expect(at('c', 'read')).toBe(2);
   });
 
-  it('counts core lessons apart from support and extension and flags thin items for the unit’s size', () => {
+  it('counts every lesson as core and flags thin items for the unit’s size', () => {
     const map = build();
-    expect(map.coverage.get('read')).toEqual({ core: 1, optional: 2, thin: true, first: 1 });
+    expect(map.coverage.get('read')).toEqual({ core: 3, optional: 0, thin: false, first: 1 });
     expect(map.coverage.get('human:R1')).toEqual({ core: 0, optional: 0, thin: true, first: -1 });
     expect(map.coverage.get('human:U1')?.thin).toBe(false);
     expect([thinLimit(4), thinLimit(14), thinLimit(36)]).toEqual([1, 2, 5]);
@@ -148,17 +140,6 @@ describe('Coverage map: one student', () => {
     expect(route.nodes.get('a|human:U1')).toBe('none');
     expect(route.nodes.get('c|read')).toBe('ahead');
     expect(route.current.get('read')).toBe('struggling');
-  });
-
-  it('counts a ticked support lesson as taken and a skipped one as skipped', () => {
-    const map = build();
-    const base = { scores: new Map([['b', { score: 3, max: 10 }]]), today: '2026-12-01' };
-    const ticked = studentRoute(map, { ...base, evidence: [ev('quiz:b', 0.3)], took: ['c'] });
-    expect(ticked.took.has('c')).toBe(true);
-    expect(ticked.nodes.get('c|read')).toBe('struggling');
-    const not = studentRoute(map, { ...base, evidence: [ev('quiz:b', 0.3)], took: ['d'] });
-    expect(not.nodes.get('c|read')).toBe('skipped');
-    expect(not.nodes.get('e|read')).toBe('ahead');
   });
 
   it('matches skill tags to the strand’s line and stars the second secure checkpoint', () => {

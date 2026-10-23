@@ -41,10 +41,10 @@ const STATE_CLASS: Record<NodeState, string> = {
 const STATE_RANK: NodeState[] = ['struggling', 'working', 'secure', 'none', 'skipped', 'ahead'];
 const worst = (states: NodeState[]): NodeState => STATE_RANK.find((s) => states.includes(s)) ?? 'none';
 
-export const isSideRow = (row: MapRow) => row.lane !== 'core' || (row.option !== undefined && row.option !== 'A');
+export const isSideRow = (row: MapRow) => row.lane !== 'core';
 const laneX = (row: MapRow) => (row.lane === 'support' ? X_SUPPORT : row.lane === 'core' ? X_CORE : X_SIDE);
 export const rowTag = (row: MapRow): string | undefined =>
-  row.lane === 'support' ? 'Support' : row.lane === 'extension' ? 'Extension' : row.option ? `Option ${row.option}` : row.lane === 'option' ? 'Optional' : undefined;
+  row.lane === 'support' ? 'Support' : row.lane === 'extension' ? 'Extension' : row.lane === 'option' ? 'Optional' : undefined;
 const tagClass = (row: MapRow) => (row.lane === 'support' ? 'support' : row.lane === 'core' ? 'option' : 'side');
 
 /** The widest name column (and so map) that fits `available` pixels, between 120 and 340: wide pages fill with lesson names. */
@@ -138,7 +138,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       if (lane.collapsed) {
         for (const row of rows) {
           if (!lane.items.some((it) => row.teaches.has(it.id))) continue;
-          if (isSideRow(row) || row.option) optional++;
+          if (isSideRow(row)) optional++;
           else core++;
         }
         thin = lane.items.some((it) => map.coverage.get(it.id)?.thin);
