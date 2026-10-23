@@ -152,7 +152,7 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
       add('cm__swatch--took', 'Support or extension taken');
     } else {
       add('cm__swatch--bar', 'Bar: core lessons; pale: support, extension or option only');
-      add('cm__swatch--thin', `Taught in few core lessons`);
+      add('cm__swatch--thin', 'Few or no core lessons teach this yet');
       add('cm__swatch--depth', 'Bigger node: deeper (introduced, reinforced, mastered)');
       add('cm__swatch--support', 'Support');
       add('cm__swatch--side', 'Extension or option');
