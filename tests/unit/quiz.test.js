@@ -64,6 +64,7 @@ test('new blocks parse, and the public routes are open to students', () => {
   assert.equal(BlockSchema.parse({ ...qBlock('qz', { kind: 'matching', prompt: '' }) }).block_type, 'quiz_question', 'half-written drafts still save');
   assert.ok(isPublicStudentApi('POST', '/api/published/question-drop/lesson1/drop1'));
   assert.ok(isPublicStudentApi('POST', '/api/published/quiz/quiz1'));
+  assert.ok(isPublicStudentApi('POST', '/api/published/lecture/lesson1'));
   assert.ok(!isPublicStudentApi('POST', '/api/lessons/quiz1/quiz'));
 });
 
