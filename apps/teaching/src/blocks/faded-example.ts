@@ -1,5 +1,6 @@
 import type { Block } from '@/schemas/block';
 import type { RenderMode } from '@/blocks/render';
+import { emitAnswered } from '@/lecture/answered';
 import { editorShell, type BlockChangeHandler } from '@/blocks/editors';
 
 export type FadedExampleBlock = Extract<Block, { block_type: 'faded_example' }>;
@@ -11,7 +12,7 @@ export type FadedDetail = { blockId: string; parts: Record<number, string>; rati
 /**
  * One step of a faded worked example: the extract, then each part of the
  * model answer. Blank parts are for the student to write; the rest show.
- * Checking and rating are added in a later task.
+ * Students press Check to see the model beside their answer, then rate themselves.
  */
 export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode): HTMLElement {
   const root = document.createElement('div');
@@ -48,7 +49,51 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode): 
     list.append(term, value);
   });
   root.append(list);
+  if (mode !== 'teacher' && blanks.length > 0) attachFadedCheck(root, block);
   return root;
+}
+
+function attachFadedCheck(root: HTMLElement, block: FadedExampleBlock): void {
+  const actions = document.createElement('div');
+  actions.className = 'block-faded__actions';
+  const nudge = document.createElement('p');
+  nudge.className = 'block-faded__nudge';
+  nudge.setAttribute('aria-live', 'polite');
+  const check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'btn btn--primary block-faded__check';
+  check.textContent = 'Check';
+  actions.append(check, nudge);
+  root.append(actions);
+  check.addEventListener('click', () => {
+    const inputs = [...root.querySelectorAll<HTMLTextAreaElement>('.block-faded__input')];
+    if (inputs.some((input) => !input.value.trim())) {
+      nudge.textContent = 'Write your part first.';
+      return;
+    }
+    const parts: Record<number, string> = Object.fromEntries(inputs.map((input) => [Number(input.dataset.part), input.value.trim()]));
+    for (const input of inputs) {
+      input.readOnly = true;
+      const model = document.createElement('p');
+      model.className = 'block-faded__model';
+      model.textContent = `Model: ${block.content.parts[Number(input.dataset.part)]!.answer}`;
+      input.after(model);
+    }
+    nudge.textContent = 'Compare yours with the model.';
+    const rate = (rating: 'right' | 'wrong', label: string) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `btn btn--secondary block-faded__rate block-faded__rate--${rating}`;
+      button.textContent = label;
+      button.addEventListener('click', () => {
+        actions.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = true));
+        root.dispatchEvent(new CustomEvent<FadedDetail>(FADED_EVENT, { bubbles: true, detail: { blockId: block.id, parts, rating } }));
+        emitAnswered(root, block.id, rating);
+      });
+      return button;
+    };
+    check.replaceWith(rate('right', 'Got it'), rate('wrong', 'Not quite'));
+  });
 }
 
 export function createFadedExampleEditor(
@@ -92,7 +137,7 @@ export function createFadedExampleEditor(
     box.checked = block.content.blanks.includes(index);
     box.addEventListener('change', () => {
       const current = getLatest().content.blanks.filter((i) => i !== index);
-      emit({ blanks: box.checked ? [...current, index].sort() : current });
+      emit({ blanks: box.checked ? [...current, index].sort((a, b) => a - b) : current });
     });
     blank.append(box, ' Students write this part');
     row.append(blank);
