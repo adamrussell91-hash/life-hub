@@ -74,7 +74,8 @@ export async function quizColumns(store, roster, book) {
       confidence: q.confidence,
       closed: q.closed,
       questions: q.questions,
-      scores: q.scores
+      scores: q.scores,
+      ...(q.groups ? { groups: q.groups } : {})
     }));
 }
 

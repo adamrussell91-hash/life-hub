@@ -144,3 +144,23 @@ test('live status and end on a tutorial just say there’s no round', async () =
   await quizAction(store, 'tut1', { action: 'claim', ...who(1), initials: 'AB' });
   assert.deepEqual(await quizAction(store, 'tut1', { action: 'live_status', ...who(1) }), { live: null });
 });
+
+test('the markbook column knows each student’s group', async () => {
+  const { store, record } = await setup();
+  store.data.get(draftLessonKey('tut1')).tutorial.groups = [{ id: 'ga', name: 'Re-tells the plot', students: ['st_ann'] }, { id: 'gb', name: 'Names it wrong', students: ['st_cy'] }];
+  store.data.set(tutorialKeys('tut1').group('ga'), { done_students: ['st_ann'] });
+  await quizAction(store, 'tut1', { action: 'claim', ...who(1), initials: 'AB' });
+  await quizAction(store, 'tut1', { action: 'start', ...who(1) });
+  await quizAction(store, 'tut1', { action: 'submit', ...who(1), responses: { qa1: { selected: [rightOption(record, 'qa1')] }, qa2: { selected: ['b'] } } });
+  const scores = await classQuizScores(store, 'tut1', 'class1', ['st_ann']);
+  assert.deepEqual(scores.groups, { st_ann: 'Re-tells the plot' });
+});
+
+test('a plain quiz column carries no groups', async () => {
+  const { store } = await setup();
+  const draft = store.data.get(draftLessonKey('tut1'));
+  draft.pedagogical_mode = 'quiz';
+  draft.tutorial.groups = [{ id: 'ga', name: 'Re-tells the plot', students: ['st_ann'] }];
+  const scores = await classQuizScores(store, 'tut1', 'class1', ['st_ann']);
+  assert.equal(scores?.groups, undefined);
+});
