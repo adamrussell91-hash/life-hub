@@ -115,10 +115,49 @@ describe('Before and after panel', () => {
     [...host.querySelectorAll('button')].find((b) => b.textContent === 'Core')!.click();
     expect(selfPatches).toContainEqual({ route_role: 'core' });
     const input = host.querySelector<HTMLInputElement>('input[type="date"]')!;
+    // Typing the year fires change at each digit; a half-typed year is not saved.
+    input.value = '0002-10-28';
+    input.dispatchEvent(new Event('change'));
+    expect(input.disabled).toBe(false);
     input.value = '2026-10-28';
     input.dispatchEvent(new Event('change'));
     await new Promise((r) => setTimeout(r, 0));
     expect(dated).toEqual(['k1 2026-10-28']);
     expect(host.textContent).toContain('Nothing: the unit can start here');
+  });
+
+  it('puts the lesson straight after the one picked as Before, with no choice made', async () => {
+    const { mountLessonFlow } = await import('@/network/lesson-flow');
+    const host = document.createElement('div');
+    const selfPatches: unknown[] = [];
+    const peerPatches: Array<[string, string[]]> = [];
+    mountLessonFlow(host, {
+      lessonId: 'c',
+      peers: [{ id: 'a', title: 'Harbour poems' }, { id: 'b', title: 'Tide quiz' }, { id: 'c', title: 'Salt and stone' }, { id: 'd', title: 'Wrap up' }],
+      after: undefined,
+      onSelf: (patch) => selfPatches.push(patch),
+      onPeer: async (id, next) => { peerPatches.push([id, next]); }
+    });
+    const before = host.querySelector<HTMLSelectElement>('select[aria-label="Add a lesson before…"]')!;
+    expect([...before.options].filter((o) => o.disabled).map((o) => o.value)).toEqual(['d']);
+    before.value = 'a';
+    before.dispatchEvent(new Event('change'));
+    expect(peerPatches).toEqual([['b', ['d']], ['a', ['c']]]);
+    expect(selfPatches).toContainEqual({ after_lesson_ids: ['b'] });
+    const afterPick = host.querySelector<HTMLSelectElement>('select[aria-label="Change the next lesson…"]')!;
+    afterPick.value = 'd';
+    afterPick.dispatchEvent(new Event('change'));
+    expect(selfPatches.at(-1)).toEqual({ after_lesson_ids: ['d'] });
+  });
+});
+
+describe('A lesson nothing leads into', () => {
+  it('slots in on the line, so the unit never splits in two', () => {
+    const f = buildFlow([
+      { id: 'a' }, { id: 'b' }, { id: 'poet', after: ['poem'] }, { id: 'pretest', after: ['poem'] }, { id: 'poem' }, { id: 'review' }, { id: 'next' }
+    ]);
+    expect(f.seq.every((item) => 'row' in item)).toBe(true);
+    expect(f.order).toEqual(['a', 'b', 'poet', 'pretest', 'poem', 'review', 'next']);
+    expect(linkProblem([{ id: 'a' }, { id: 'b' }, { id: 'poet', after: ['poem'] }, { id: 'pretest', after: ['poem'] }, { id: 'poem' }], 'a', ['pretest'])).toBeUndefined();
   });
 });

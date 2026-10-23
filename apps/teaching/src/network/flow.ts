@@ -92,7 +92,53 @@ function edges(lessons: readonly FlowLesson[], problems: FlowProblem[], titles?:
     state.set(n, 2);
   };
   ids.forEach((id) => { if (!state.has(id)) visit(id); });
+  stitchStrays(ids, out, new Set(lessons.filter((l) => l.after?.length === 0).map((l) => l.id)));
   return { ids, out, inn: inbound(ids, out) };
+}
+
+/**
+ * A lesson nothing leads into, past the first, is not a second start to the unit:
+ * it slots in after the nearest earlier lesson in the order, ahead of whatever that
+ * lesson led to. Without this one stray link splits the whole unit in two. A lesson
+ * the teacher ended the unit on stays an end.
+ */
+function stitchStrays(ids: readonly string[], out: Map<string, string[]>, ends: ReadonlySet<string>): void {
+  const reaches = (from: string, to: string): boolean => {
+    const seen = new Set<string>();
+    const stack = [from];
+    while (stack.length) {
+      const n = stack.pop()!;
+      if (n === to) return true;
+      if (seen.has(n)) continue;
+      seen.add(n);
+      stack.push(...(out.get(n) ?? []));
+    }
+    return false;
+  };
+  // Where the stray rejoins what came after `prev`, it takes that link's place; otherwise it goes
+  // in between, and what `prev` led to is stitched in on the next pass. A choice is never undone.
+  const place = (stray: string): boolean => {
+    const at = ids.indexOf(stray);
+    for (const prev of ids.slice(0, at).reverse()) {
+      if (ends.has(prev) || reaches(stray, prev)) continue;
+      const was = out.get(prev) ?? [];
+      const rejoin = was.find((x) => reaches(stray, x));
+      if (rejoin) out.set(prev, was.map((x) => (x === rejoin ? stray : x)));
+      else if (was.length <= 1) {
+        out.set(prev, [stray]);
+        if (!(out.get(stray) ?? []).length) out.set(stray, was);
+      } else continue;
+      return true;
+    }
+    return false;
+  };
+  const left = new Set<string>();
+  for (let guard = 0; guard < ids.length * 2; guard++) {
+    const inn = inbound(ids, out);
+    const stray = ids.slice(1).find((id) => !inn.get(id)!.length && !left.has(id));
+    if (!stray) return;
+    if (!place(stray)) left.add(stray);
+  }
 }
 
 function inbound(ids: readonly string[], out: ReadonlyMap<string, string[]>): Map<string, string[]> {
