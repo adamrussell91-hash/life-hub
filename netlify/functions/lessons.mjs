@@ -6,6 +6,7 @@ import {
   slugify,
   unitKey
 } from './_shared/teaching-blobs.mjs';
+import { QuizSettingsSchema } from './_shared/quiz-core.mjs';
 import { createTeachingCollectionHandler, teachingWriteError } from './_shared/teaching-create.mjs';
 
 export const config = { path: '/api/lessons' };
@@ -25,13 +26,21 @@ export async function createLessonRecord(store, body) {
   if (!unit) throw teachingWriteError(404, 'not_found', 'Unit not found');
 
   const lessonIds = Array.isArray(unit.lesson_ids) ? unit.lesson_ids : [];
-  let maxSequence = 0;
+  const sequences = new Map();
   for (const lessonId of lessonIds) {
     const lesson = await getJSON(store, draftLessonKey(lessonId));
-    if (typeof lesson?.sequence === 'number' && lesson.sequence > maxSequence) {
-      maxSequence = lesson.sequence;
-    }
+    if (typeof lesson?.sequence === 'number') sequences.set(lessonId, lesson.sequence);
   }
+  const maxSequence = Math.max(0, ...sequences.values());
+  // A follow-up sits straight after the lesson it follows: halfway to the next one.
+  const after = typeof body.after_lesson_id === 'string' && sequences.has(body.after_lesson_id) ? body.after_lesson_id : null;
+  let sequence = maxSequence + 1;
+  if (after) {
+    const from = sequences.get(after);
+    const later = [...sequences.values()].filter((s) => s > from);
+    sequence = later.length ? (from + Math.min(...later)) / 2 : from + 1;
+  }
+  const quiz = pedagogical_mode === 'quiz' && body.quiz ? QuizSettingsSchema.safeParse(body.quiz) : null;
 
   const timestamp = new Date().toISOString();
   const id = newId('lesson');
@@ -41,9 +50,10 @@ export async function createLessonRecord(store, body) {
     title,
     slug: slugify(title),
     unit_id,
-    sequence: maxSequence + 1,
+    sequence,
     blocks: [],
     pedagogical_mode,
+    ...(quiz?.success ? { quiz: quiz.data } : {}),
     status: 'active',
     created_at: timestamp,
     updated_at: timestamp,
@@ -51,9 +61,10 @@ export async function createLessonRecord(store, body) {
   };
 
   await setJSON(store, draftLessonKey(id), record);
+  const at = after ? lessonIds.indexOf(after) + 1 : lessonIds.length;
   await setJSON(store, unitKey(unit_id), {
     ...unit,
-    lesson_ids: [...lessonIds, id],
+    lesson_ids: [...lessonIds.slice(0, at), id, ...lessonIds.slice(at)],
     updated_at: timestamp
   });
   return record;

@@ -5,6 +5,9 @@ vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: vi.fn() }));
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
 import { MARKBOOK_LIMITS, type AssessmentColumn, type AssessmentMark } from '@/markbook/schema';
+import type { FeedbackCode } from '@/blocks/feedback-codes';
+
+const evidenceCode: FeedbackCode = { id: 'e', code: 'E', label: 'Evidence', group: 'composition', criterion: 2, colour: 'sage', descriptor: 'Link evidence.', hidden: false };
 
 const column: AssessmentColumn = {
   id: 'essay0001', kind: 'assessment', title: 'Essay', date: '2026-11-03', weight: 40,
@@ -214,5 +217,36 @@ describe('assessment panel', () => {
     show!('Bob Brown’s mark wasn’t saved: Server said no');
     expect(unsubscribe).toHaveBeenCalled();
     expect(root.querySelector('.mb-panel__error')?.textContent).toBe('');
+  });
+
+  it('saves feedback codes for a criterion below full marks', () => {
+    const onSave = vi.fn();
+    const root = open({ onSave, codes: [evidenceCode] });
+    const hosts = () => [...root.querySelectorAll<HTMLElement>('.mb-panel__codes')];
+    expect(hosts().map((h) => h.hidden)).toEqual([true, true]);
+    type(boxes(root)[0]!, '5');
+    type(boxes(root)[1]!, '10');
+    expect(hosts().map((h) => h.hidden)).toEqual([false, true]);
+    hosts()[0]!.querySelector<HTMLButtonElement>('.ev-chip')!.click();
+    hosts()[1]!.querySelector<HTMLButtonElement>('.ev-chip')!.click();
+    root.querySelector<HTMLButtonElement>('.mb-panel__save')!.click();
+    expect(onSave.mock.calls.at(-1)).toEqual(['s1', { criteria: { c1: 5, c2: 10 }, codes: { c1: ['e'] } }]);
+  });
+
+  it('shows saved codes, and asks before closing when only a chip changed', async () => {
+    vi.mocked(askConfirmCard).mockResolvedValueOnce(false);
+    const root = open({ codes: [evidenceCode], markFor: () => ({ criteria: { c1: 5 }, codes: { c1: ['e'] } }) });
+    const chip = root.querySelector<HTMLButtonElement>('.mb-panel__codes .ev-chip')!;
+    expect(chip.getAttribute('aria-pressed')).toBe('true');
+    chip.click();
+    esc(boxes(root)[0]!);
+    await vi.waitFor(() => expect(askConfirmCard).toHaveBeenCalled());
+  });
+
+  it('closes at once when the saved codes are untouched', () => {
+    const root = open({ codes: [evidenceCode], markFor: () => ({ criteria: { c1: 5 }, codes: { c1: ['e'] } }) });
+    esc(boxes(root)[0]!);
+    expect(askConfirmCard).not.toHaveBeenCalled();
+    expect(document.body.contains(root)).toBe(false);
   });
 });
