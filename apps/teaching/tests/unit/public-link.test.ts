@@ -59,6 +59,10 @@ describe('mountPublicLinkControl', () => {
     expect(load).toHaveBeenCalledOnce();
     const row = host.querySelector('.public-link__class');
     expect(row?.textContent).toContain('12 English');
+    expect(row?.textContent).toContain('Copy class link');
+    const headings = [...host.querySelectorAll('.public-link__heading')].map((h) => h.textContent);
+    expect(headings).toEqual(['Class link', 'General link']);
+    expect(host.textContent).toContain('Copy general link');
     expect(row?.getAttribute('title')).toBe('https://class.adam-russell.com/s/lessons/lesson_1?class=class_1');
   });
 
