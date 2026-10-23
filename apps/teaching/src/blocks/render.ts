@@ -56,6 +56,7 @@ import 'photoswipe/dist/photoswipe.css';
 import type { NetworkLine } from '@/schemas/block';
 import type { NetLesson } from '@/network/model';
 // Last: the shared block anatomy roles win ties with block stylesheets above.
+import { renderNoteCue } from '@/blocks/note-cue';
 import '@/styles/block-anatomy.css';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
@@ -2336,6 +2337,8 @@ function renderBlockContent(
       return renderClozeBlock(block, mode);
     case 'self_check':
       return renderSelfCheckBlock(block, mode);
+    case 'note_cue':
+      return wrapBlock(renderNoteCue(block, mode), block, mode);
     case 'timeline':
       return renderTimelineBlock(block, mode);
     case 'card_stack':

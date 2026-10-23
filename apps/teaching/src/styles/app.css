@@ -6199,6 +6199,13 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
   gap: var(--space-3);
 }
 
+.block-note-cue { border-radius: var(--radius-md); background: color-mix(in srgb, var(--marine) 7%, var(--paper)); border: 1px solid color-mix(in srgb, var(--marine) 22%, transparent); padding: var(--space-3) var(--space-4); }
+.block-note-cue__head { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-1); font-size: var(--text-sm); }
+.block-note-cue__label { font-weight: var(--weight-semibold); color: var(--ink); }
+.block-note-cue__kind { color: var(--muted); }
+.block-note-cue__kind::before { content: '·'; margin-right: var(--space-2); }
+.block-note-cue__prompt { margin: 0; font-size: var(--text-lg, 1.125rem); }
+
 .block-flashcards__teacher-list {
   margin: 0;
   padding: 0;

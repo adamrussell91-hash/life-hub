@@ -121,6 +121,9 @@ function extractBlock(block: Block, parts: string[]): void {
       push(parts, q.passage);
       break;
     }
+    case 'note_cue':
+      push(parts, c.prompt);
+      break;
     case 'question_set':
     case 'flashcards':
     case 'self_check':

@@ -28,6 +28,7 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   discern_confirm: 'Discern Confirm',
   quiz_question: 'Quiz question',
   self_check: 'Self check',
+  note_cue: 'Note cue',
   mind_map: 'Mind map',
   concept_map: 'Concept map'
 };
@@ -376,6 +377,9 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
     if (validBlanks.length < 1) {
       return 'Cloze blocks need at least one blank to publish';
     }
+  }
+  if (block.block_type === 'note_cue' && !block.content.prompt.trim()) {
+    return 'Write the prompt for this note cue';
   }
   if (block.block_type === 'self_check') {
     if (block.content.prompt.trim().length === 0) {

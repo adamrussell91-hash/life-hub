@@ -731,6 +731,7 @@ var BlockTypeSchema = z8.enum([
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "chart",
   "equation",
   "diagram",
@@ -820,13 +821,23 @@ var RichTextBlockSchema = z8.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var NarrationSchema = z8.object({
+  url: z8.string().min(1),
+  duration_s: z8.number().min(0).max(900),
+  transcript: z8.string().max(8e3).optional()
+});
+var RevealSchema = z8.enum(["all", "one"]);
 var HeadingBlockSchema = z8.object({
   id: z8.string().min(1),
   type: z8.literal("block"),
   block_type: z8.literal("heading"),
   variant: HeadingVariantSchema,
   visibility: VisibilitySchema,
-  content: z8.object({ text: z8.string() }),
+  content: z8.object({
+    text: z8.string(),
+    narration: NarrationSchema.optional(),
+    reveal: RevealSchema.optional()
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -1231,7 +1242,9 @@ var HingeQuestionBlockSchema = z8.object({
     move_on: z8.number().int().min(1).max(100).default(80),
     reteach: z8.number().int().min(0).max(99).default(50),
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
-    backup: HingeBackupSchema.optional()
+    backup: HingeBackupSchema.optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1460,7 +1473,9 @@ var ClozeBlockSchema = z8.object({
   content: z8.object({
     title: z8.string().optional(),
     text: z8.string(),
-    case_sensitive: z8.boolean().optional()
+    case_sensitive: z8.boolean().optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1481,7 +1496,24 @@ var SelfCheckBlockSchema = z8.object({
     mode: SelfCheckModeSchema,
     prompt: z8.string(),
     answer: z8.string().optional(),
-    items: z8.array(SelfCheckItemSchema).max(12).optional()
+    items: z8.array(SelfCheckItemSchema).max(12).optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var NOTE_CUE_KINDS = ["copy", "own_words", "draw", "question"];
+var NoteCueKindSchema = z8.enum(NOTE_CUE_KINDS);
+var NoteCueBlockSchema = z8.object({
+  id: z8.string().min(1),
+  type: z8.literal("block"),
+  block_type: z8.literal("note_cue"),
+  variant: z8.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z8.object({
+    kind: NoteCueKindSchema,
+    prompt: z8.string().max(500)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2082,6 +2114,7 @@ var leafBlockSchemas = [
   FlashcardsBlockSchema,
   ClozeBlockSchema,
   SelfCheckBlockSchema,
+  NoteCueBlockSchema,
   ChartBlockSchema,
   EquationBlockSchema,
   DiagramBlockSchema,
@@ -2204,7 +2237,13 @@ var SectionBlockObjectSchema = z8.object({
     title: z8.string(),
     collapsed_in_editor: z8.boolean().optional(),
     blocks: z8.array(SectionChildBlockSchema),
-    link: SectionLinkSchema.optional()
+    link: SectionLinkSchema.optional(),
+    /** Lecture: the chapter intro clip. */
+    narration: NarrationSchema.optional(),
+    /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
+    takeaway: z8.object({ enabled: z8.boolean(), prompt: z8.string().max(300).optional() }).optional(),
+    /** Lecture: plays only after a wrong answer on the gate just above it. */
+    side_path: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2353,9 +2392,13 @@ export {
   LineStopSchema,
   MediaSizeVariantSchema,
   MindMapBlockSchema,
+  NOTE_CUE_KINDS,
+  NarrationSchema,
   NetworkLineModeSchema,
   NetworkLineSchema,
   NetworkNudgesSchema,
+  NoteCueBlockSchema,
+  NoteCueKindSchema,
   OutcomesBlockSchema,
   PeerFeedbackBlockSchema,
   QuestionDropBlockSchema,
@@ -2366,6 +2409,7 @@ export {
   QuizQuestionBlockSchema,
   QuoteBlockSchema,
   ResponseSpaceSchema,
+  RevealSchema,
   RichTextBlockSchema,
   SectionBlockSchema,
   SectionChildBlockSchema,
