@@ -1,13 +1,12 @@
 import type { CurriculumLinesV2Content, LessonRouteRole, NetworkLine } from '@/schemas/block';
 import { lineColour } from '../colour';
-import { buildFlow, type FlowSeq } from '../flow';
+import { buildFlow } from '../flow';
 import { orderStations, placeByDate, withAutoDepths, type NetLesson } from '../model';
 
 /**
  * The unit coverage map: lessons down the page in the order the unit runs,
- * each on a lane of the route (core, support, extension or an option of a
- * choice), and one branch per syllabus item showing where it is taught and
- * how deep. Pure: no DOM, unit tested directly.
+ * each on a lane of the route (core, support, extension or optional), and
+ * one branch per syllabus item showing where it is taught and how deep. Pure: no DOM, unit tested directly.
  */
 
 export type MapLane = 'core' | 'support' | 'extension' | 'option';
@@ -27,8 +26,6 @@ export type MapRow = {
   title: string;
   href?: string;
   lane: MapLane;
-  /** "A", "B", … for the options of a choice. */
-  option?: string;
   kind: RowKind;
   skip?: string;
   band?: string;
@@ -65,48 +62,6 @@ export const thinLimit = (coreLessons: number): number => Math.max(1, Math.floor
 
 const LEVEL_DEPTH = { introduced: 1, reinforced: 2, mastered: 3 } as const;
 const isSide = (lane: MapLane) => lane !== 'core';
-
-/**
- * Each row's lane and option letter, from the flow's splits and the lessons' own roles.
- * A lesson the teacher set to Core is core: it never gets an option letter, and a split
- * with a Core lesson in it is not a choice, so its other plain lessons are core too.
- */
-function lanesFrom(seq: FlowSeq, roleOf: (id: string) => MapLane | undefined, isCore: (id: string) => boolean): Map<string, { lane: MapLane; option?: string }> {
-  const out = new Map<string, { lane: MapLane; option?: string }>();
-  const rowsOf = (s: FlowSeq): string[] => s.flatMap((item) => ('row' in item ? [item.row] : item.split.flatMap(rowsOf)));
-  const walk = (s: FlowSeq, inOption: string | undefined) => {
-    for (const item of s) {
-      if ('row' in item) {
-        const role = roleOf(item.row);
-        out.set(item.row, role ? { lane: role } : inOption && !isCore(item.row) ? { lane: 'option', option: inOption } : { lane: 'core' });
-        continue;
-      }
-      if (item.split.flatMap(rowsOf).some(isCore)) {
-        for (const branch of item.split) walk(branch, undefined);
-        continue;
-      }
-      // A branch made only of support or extension lessons is a detour, not an option.
-      const plain = item.split.filter((branch) => rowsOf(branch).some((id) => !roleOf(id)));
-      // Beside a branch that goes straight on (no lessons), the others are optional detours.
-      const detour = item.split.some((branch) => rowsOf(branch).length === 0);
-      item.split.forEach((branch) => {
-        const at = plain.indexOf(branch);
-        if (detour) {
-          for (const id of rowsOf(branch)) {
-            const role = roleOf(id);
-            out.set(id, role ? { lane: role } : { lane: 'option' });
-          }
-        } else if (plain.length < 2 || at < 0) walk(branch, inOption);
-        else if (at === 0 && !inOption) walk(branch, undefined);
-        else walk(branch, inOption ?? String.fromCharCode(65 + at));
-      });
-      // The first option stays on the core line and is labelled A.
-      if (plain.length >= 2 && !inOption && !detour) for (const id of rowsOf(plain[0]!)) if (!roleOf(id)) out.set(id, { lane: 'core', option: 'A' });
-    }
-  };
-  walk(seq, undefined);
-  return out;
-}
 
 export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
   const { content, lines, lessons, bands, dates, points } = input;
@@ -146,7 +101,6 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     const role = byId.get(id)?.role ?? railRole.get(id);
     return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
   };
-  const lanes = lanesFrom(flow.seq, roleOf, (id) => byId.get(id)?.role === 'core');
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
 
   /* Items, in four groups. */
@@ -205,18 +159,17 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       const level = line ? stopLevel.get(line.id) : undefined;
       teaches.set(ref, level ?? n);
     }
-    const role = roleOf(lesson.id);
-    const lane = lanes.get(lesson.id) ?? { lane: role ?? ('core' as MapLane) };
+    // Every lesson is core unless it has its own support, extension or optional role: forks never make options.
+    const lane = roleOf(lesson.id) ?? 'core';
     const skip = lesson.skip?.trim() || railSkip.get(lesson.id);
     const isGoal = content.terminus.lesson_id === lesson.id;
     return {
       id: lesson.id,
       title: lesson.title || 'Untitled lesson',
       ...(lesson.href ? { href: lesson.href } : {}),
-      lane: lane.lane,
-      ...(lane.option ? { option: lane.option } : {}),
+      lane,
       kind: isGoal ? 'goal' : lesson.quiz || gateLessons.has(lesson.id) ? 'check' : 'lesson',
-      ...(skip && isSide(lane.lane) ? { skip } : {}),
+      ...(skip && isSide(lane) ? { skip } : {}),
       ...(bands?.get(lesson.id) ? { band: bands.get(lesson.id) } : {}),
       ...(dates?.get(lesson.id) ? { date: dates.get(lesson.id) } : {}),
       teaches
@@ -229,7 +182,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
 
   /* Coverage: core lessons everyone gets, and the rest. */
   const coverage = new Map<string, ItemCoverage>();
-  const limit = thinLimit(rows.filter((r) => r.lane === 'core' && !r.option && r.kind !== 'goal').length);
+  const limit = thinLimit(rows.filter((r) => r.lane === 'core' && r.kind !== 'goal').length);
   for (const id of itemIds) {
     let core = 0;
     let optional = 0;
@@ -237,7 +190,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     rows.forEach((row, i) => {
       if (!row.teaches.has(id)) return;
       if (first < 0) first = i;
-      if (row.lane === 'core' && !row.option) core++;
+      if (row.lane === 'core') core++;
       else optional++;
     });
     coverage.set(id, { core, optional, thin: core <= limit, first });
