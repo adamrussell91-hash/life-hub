@@ -9,7 +9,7 @@ export type AnonRow = { key: string; mistakes: Why[]; share: number | null };
 
 /**
  * What leaves the app for grouping: S1, S2… and their recorded mistakes on
- * the one tag. No names, initials or ids. `keys` stays in the browser.
+ * the one tag. No names, initials or ids of the students. `keys` stays in the browser.
  */
 export function anonymise(students: readonly string[], evidence: readonly Evidence[], tag: string): { keys: Record<string, string>; rows: AnonRow[] } {
   const keys: Record<string, string> = {};
@@ -24,7 +24,7 @@ export function anonymise(students: readonly string[], evidence: readonly Eviden
 }
 
 export function groupingBrief(input: { tagLabel: string; rows: AnonRow[]; mistakeText: (why: Why) => string }): string {
-  const lines = input.rows.map((r) => `${r.key} (${r.share === null ? 'not marked' : `${Math.round(r.share * 100)}%`}): ${r.mistakes.map(input.mistakeText).join('; ') || 'low marks, no mistake recorded'}`);
+  const lines = input.rows.map((r) => `${r.key} (${r.share === null ? 'not marked' : `${Math.round(r.share * 100)}%`}): ${r.mistakes.map((w) => input.mistakeText(w).slice(0, 160)).join('; ') || 'low marks, no mistake recorded'}`);
   return [
     `These students are behind on ${input.tagLabel}. Group them by WHY they get it wrong, so each group can be taught to its reason.`,
     `Make 2 to ${MAX_GROUPS} groups. Every student goes in exactly one group.`,
@@ -46,36 +46,60 @@ function extractJson(raw: string): string {
 }
 
 /** Ann's reply → groups with real student ids. Anyone left out goes in an Unsure group. */
+const UNREADABLE = 'Ann’s grouping came back unreadable. Try again.';
+const DEFAULT_GOAL = 'Today: practising this together';
+const DEFICIT = /\b(can'?t|can’t|cannot|without|not|never|rather than)\b/i;
+const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+function cleanGoal(v: unknown): string {
+  let goal = str(v).trim();
+  if (!goal || DEFICIT.test(goal)) return DEFAULT_GOAL;
+  if (!/^today:/i.test(goal)) goal = `Today: ${goal}`;
+  return goal.slice(0, 140);
+}
+
+/** Ann's reply → groups with real student ids. Anyone left out goes in an Unsure group. */
 export function parseGroups(raw: string, keys: Record<string, string>): TutorialGroup[] {
   let parsed: { groups?: unknown };
   try {
     parsed = JSON.parse(extractJson(raw));
   } catch {
-    throw new Error('Ann’s grouping came back unreadable. Try again.');
+    throw new Error(UNREADABLE);
   }
-  if (!Array.isArray(parsed.groups)) throw new Error('Ann’s grouping came back unreadable. Try again.');
-  const placed = new Set<string>();
-  const groups: TutorialGroup[] = [];
-  parsed.groups.slice(0, MAX_GROUPS).forEach((g, i) => {
-    const raw = g as { name?: string; why?: string; goal?: string; gap_type?: string; members?: unknown; quotes?: Record<string, string> };
-    const students = (Array.isArray(raw.members) ? raw.members : []).map((m) => keys[String(m)]).filter((id): id is string => !!id && !placed.has(id));
-    students.forEach((id) => placed.add(id));
-    if (!students.length) return;
+  if (!parsed || !Array.isArray(parsed.groups)) throw new Error(UNREADABLE);
+  try {
     const back = Object.fromEntries(Object.entries(keys).map(([k, v]) => [v, k]));
-    const candidate = {
-      id: slug(raw.name ?? 'group', i),
-      name: (raw.name ?? `Group ${i + 1}`).slice(0, 80),
-      why: (raw.why ?? '').slice(0, 300),
-      goal: (raw.goal ?? 'Today: practising this together').slice(0, 140),
-      gap_type: raw.gap_type === 'mix_up' ? 'mix_up' : 'knowledge',
-      students,
-      evidence: students.map((id) => ({ student: id, quote: (raw.quotes?.[back[id]!] ?? '').slice(0, 300) })).filter((e) => e.quote)
-    };
-    let id = candidate.id;
-    for (let n = 2; groups.some((x) => x.id === id); n++) id = `${candidate.id.slice(0, 36)}-${n}`;
-    groups.push(TutorialGroupSchema.parse({ ...candidate, id }));
-  });
-  const left = Object.values(keys).filter((id) => !placed.has(id));
-  if (left.length) groups.push(TutorialGroupSchema.parse({ id: groups.some((x) => x.id === 'unsure') ? 'unsure-left' : 'unsure', name: 'Unsure', why: 'Ann couldn’t place these students. Move each one to a group.', goal: 'Today: practising this together', gap_type: 'knowledge', students: left, evidence: [], unsure: left }));
-  return groups;
+    const placed = new Set<string>();
+    const groups: TutorialGroup[] = [];
+    parsed.groups.slice(0, MAX_GROUPS).forEach((g, i) => {
+      const r = (g && typeof g === 'object' ? g : {}) as Record<string, unknown>;
+      const members = Array.isArray(r.members) ? r.members : [];
+      const students = members.map((m) => (typeof m === 'string' && Object.hasOwn(keys, m) ? keys[m]! : '')).filter((id) => !!id && !placed.has(id));
+      students.forEach((id) => placed.add(id));
+      if (!students.length) return;
+      const quotes = (r.quotes && typeof r.quotes === 'object' ? r.quotes : {}) as Record<string, unknown>;
+      const name = str(r.name).trim() || `Group ${i + 1}`;
+      const base = slug(name, i);
+      let id = base;
+      for (let n = 2; groups.some((x) => x.id === id); n++) id = `${base.slice(0, 36)}-${n}`;
+      groups.push(
+        TutorialGroupSchema.parse({
+          id,
+          name: name.slice(0, 80),
+          why: str(r.why).slice(0, 300),
+          goal: cleanGoal(r.goal),
+          gap_type: r.gap_type === 'mix_up' ? 'mix_up' : 'knowledge',
+          students,
+          evidence: students.map((s) => ({ student: s, quote: str(quotes[back[s]!]).slice(0, 300) })).filter((e) => e.quote)
+        })
+      );
+    });
+    const left = Object.values(keys).filter((id) => !placed.has(id));
+    if (left.length) {
+      groups.push(TutorialGroupSchema.parse({ id: groups.some((x) => x.id === 'unsure') ? 'unsure-left' : 'unsure', name: 'Unsure', why: 'Ann couldn’t place these students. Move each one to a group.', goal: DEFAULT_GOAL, gap_type: 'knowledge', students: left, evidence: [], unsure: left }));
+    }
+    return groups;
+  } catch {
+    throw new Error(UNREADABLE);
+  }
 }
