@@ -35,6 +35,7 @@ import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountLineChips } from '@/network/line-chips';
 import { mountLessonFlow, type FlowPeer } from '@/network/lesson-flow';
 import { mountLessonDotPoints } from '@/alignment/lesson-dot-points';
+import { mountLessonSyllabus } from '@/alignment/lesson-syllabus';
 import { autoLineIds, syncAutoStops } from '@/alignment/auto-lines';
 import { revealBlockFromHash } from '@/app/block-hash';
 import type { NetworkLine } from '@/schemas/block';
@@ -973,7 +974,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     }
   });
 
-  // Lesson type sits as a quiet chip at the head of the outcomes row
+  // Lesson type sits as a quiet chip at the head of the meta row
   // rather than a labelled form field above the canvas.
   const metaRow = document.createElement('div');
   metaRow.className = 'lesson-page__meta';
@@ -1124,9 +1125,10 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   syncQuizPanel();
   syncLecturePanel();
 
-  const stripHost = document.createElement('div');
-  stripHost.className = 'lesson-page__meta-outcomes';
-  metaRow.append(stripHost);
+  // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
+  const syllabus = mountLessonSyllabus(document.createElement('div'));
+  metaRow.after(syllabus.element);
+  const stripHost = syllabus.outcomes;
 
   // Every dot's counts in one panel above the canvas, opened from the meta row.
   const pulseSummary = mountPulseSummary({
@@ -1162,8 +1164,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
 
   const networkLines = options.subject?.network_lines ?? [];
   const lineChips = networkLines.length
-    ? mountLineChips(stripHost, {
+    ? mountLineChips(syllabus.lines, {
         lines: networkLines,
+        onPaint: (served) => syllabus.setSummary({ lines: served }),
         stops: lesson.line_stops,
         off: lesson.line_off,
         ...(options.linesBefore ? { linesBefore: options.linesBefore } : {}),
@@ -1189,9 +1192,13 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     : null;
 
   const dotPoints = options.dotPoints
-    ? mountLessonDotPoints(stripHost, {
+    ? mountLessonDotPoints(syllabus.points, {
         dotPoints: lesson.dot_points,
         ...options.dotPoints,
+        planHost: syllabus.plan,
+        covered: lesson.plan_covered,
+        onCovered: (covered) => emitLesson({ ...lesson, plan_covered: covered }),
+        onPaint: ({ points, outcomes, plan }) => syllabus.setSummary({ points, outcomes, plan }),
         // The dot points carry the lesson's lines; hand-set stops and lines taken off stay as they are.
         onChange: (refs, ctx) => {
           const stops = syncAutoStops(lesson.line_stops, lesson.line_off, autoLineIds(networkLines, ctx, refs));
@@ -1200,11 +1207,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         }
       })
     : null;
+  if (!strip && !lineChips && !dotPoints) syllabus.element.hidden = true;
 
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
-      dotPoints?.update(lesson.dot_points);
+      dotPoints?.update(lesson.dot_points, lesson.plan_covered ?? []);
       lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.lesson_kind, lesson.route_role ?? undefined, lesson.skip_rule ?? undefined);
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);
@@ -1241,6 +1249,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       lineChips?.dispose();
       lessonFlow?.dispose();
       dotPoints?.dispose();
+      syllabus.dispose();
       titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();

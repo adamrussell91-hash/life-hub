@@ -209,6 +209,12 @@
 /* Lesson settings: line chips */
 
 .net-chips {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.net-chips__group {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -216,11 +222,16 @@
   min-width: 0;
 }
 
-.net-chips__label {
+.net-chips__mode {
+  width: 72px;
   font-size: var(--text-xs, 0.75rem);
-  font-weight: 650;
   color: var(--muted);
-  margin-right: 2px;
+}
+
+@media (max-width: 600px) {
+  .net-chips__mode {
+    width: 100%;
+  }
 }
 
 .net-chip {

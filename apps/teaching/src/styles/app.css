@@ -9749,34 +9749,11 @@ body.is-lesson-builder-full-page .hub-utilities {
   margin: var(--space-4) 0 var(--space-2);
 }
 
-.lesson-page__meta-outcomes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* On a phone the tags take a full row instead of a sliver beside the lesson type. */
+/* On a phone the lesson type and feedback chip wrap rather than squeeze. */
 @media (max-width: 600px) {
   .lesson-page__meta {
     flex-wrap: wrap;
   }
-
-  .lesson-page__meta-outcomes {
-    flex-basis: 100%;
-  }
-}
-
-/* Outcomes, + Add and the line chips share one row; an opened outcome drops below it. */
-.lesson-page__meta .outcome-strip {
-  display: contents;
-}
-
-.lesson-page__meta .outcome-strip__expand {
-  flex: 1 0 100%;
-  order: 1;
 }
 
 /* Matches .outcome-chip so lesson type reads as one more tag, not a form field. */
