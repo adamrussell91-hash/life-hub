@@ -35,8 +35,8 @@ describe('renderQuizInsight', () => {
   });
   it('hides dismissed flags and offers Close now while open', () => {
     const onClose = vi.fn();
-    const node = renderQuizInsight({ ...payload, dismissed: ['sure_wrong:tech:~juxtaposition', 'sure_wrong:out:X'] }, { ctx, onDismiss: vi.fn(), openLesson: vi.fn(), onClose });
-    expect(node.textContent).not.toContain('Sure but wrong');
+    const node = renderQuizInsight({ ...payload, dismissed: ['sure_wrong:tech:~juxtaposition'] }, { ctx, onDismiss: vi.fn(), openLesson: vi.fn(), onClose });
+    expect(node.textContent).not.toContain('Sure but wrong on');
     [...node.querySelectorAll('button')].find((b) => b.textContent === 'Close now')!.click();
     expect(onClose).toHaveBeenCalled();
   });

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { renderPatterns } from '@/markbook/patterns-view';
 import { markbookEvidence } from '@/evidence/markbook-evidence';
 import type { MarkbookView } from '@/markbook/types';
 
@@ -36,5 +37,21 @@ describe('markbookEvidence', () => {
     expect(essay).toEqual([
       { item: 'essay0001:c1', tags: ['out:o1', 'skill:reading.inference'], share: 0.5, why: [{ type: 'code', id: 'code-e' }], student: 's1', source: 'assess:essay0001', date: '2026-11-01', confidence: null }
     ]);
+  });
+});
+
+describe('renderPatterns', () => {
+  const ctx = { table: null, outcomes: [], skills: null, codes: [] };
+  it('draws the class trend, tag table and heatmap; groups open a student list', () => {
+    const openStudent = vi.fn();
+    const node = renderPatterns(view, view.students, ctx, { openStudent });
+    expect(node.querySelector('.mb-trend')).not.toBeNull();
+    expect(node.querySelector('.mb-patterns__tags')?.textContent).toContain('simile');
+    const weak = node.querySelector<HTMLButtonElement>('[data-group="weak"]');
+    expect(weak).toBeNull(); // one question per student: below the group minimum
+    const cell = node.querySelector<HTMLButtonElement>('.mb-patterns__cell[data-student="s1"]');
+    expect(cell?.textContent).toBe('0');
+    node.querySelector<HTMLButtonElement>('.mb-patterns__name[data-student="s2"]')!.click();
+    expect(openStudent).toHaveBeenCalledWith('s2');
   });
 });
