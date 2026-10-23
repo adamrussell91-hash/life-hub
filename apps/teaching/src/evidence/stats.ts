@@ -66,7 +66,8 @@ export function cronbachAlpha(matrix: number[][]): number | null {
   return (k / (k - 1)) * (1 - itemVar / totalVar);
 }
 
-export type ItemStat = { facility: number; discrimination: number | null };
+/** `facility` is null when no answer to the question has been marked yet. */
+export type ItemStat = { facility: number | null; discrimination: number | null };
 
 /** Facility (mean share of marks) and discrimination (each question against the total of the others). */
 export function itemStats(matrix: number[][], maxes: number[]): ItemStat[] {
@@ -74,5 +75,16 @@ export function itemStats(matrix: number[][], maxes: number[]): ItemStat[] {
     const item = matrix.map((row) => row[j] as number);
     const rest = matrix.map((row) => row.reduce((s, v, i) => (i === j ? s : s + v), 0));
     return { facility: max > 0 && item.length ? mean(item) / max : 0, discrimination: pearson(item, rest) };
+  });
+}
+
+/**
+ * Facility per question from every marked answer to it (rows = attempts, null = not marked yet),
+ * so each question has its own denominator. Null where a question has no marked answers.
+ */
+export function questionFacility(answers: Array<Array<number | null>>, maxes: number[]): Array<number | null> {
+  return maxes.map((max, j) => {
+    const marked = answers.map((row) => row[j]).filter((v): v is number => v !== null && v !== undefined);
+    return max > 0 && marked.length ? mean(marked) / max : null;
   });
 }

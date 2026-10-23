@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cronbachAlpha, itemStats, quantile, summary } from '@/evidence/stats';
+import { cronbachAlpha, itemStats, quantile, questionFacility, summary } from '@/evidence/stats';
 
 describe('summary', () => {
   it('mean, median, sample sd, quartiles (linear interpolation)', () => {
@@ -47,5 +47,9 @@ describe('reliability and items', () => {
   });
   it('discrimination is null when an item has no spread', () => {
     expect(itemStats([[1, 0], [1, 1]], [1, 1])[0]!.discrimination).toBeNull();
+  });
+  it('question facility uses each question\'s own marked answers, null when none', () => {
+    expect(questionFacility([[1, null], [0, null], [2, 1]], [2, 1])).toEqual([0.5, 1]);
+    expect(questionFacility([[null], [null]], [1])).toEqual([null]);
   });
 });

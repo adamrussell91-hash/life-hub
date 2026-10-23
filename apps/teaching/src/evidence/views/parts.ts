@@ -228,7 +228,15 @@ export function questionTable(questions: InsightQuestion[], stats: ItemStat[], s
     const s = stats[i];
     const tr = el('tr');
     const note =
-      !s ? '' : s.facility >= ITEM.tooEasy ? 'Too easy' : s.facility <= ITEM.tooHard ? 'Too hard' : showDiscrimination && s.discrimination !== null && s.discrimination < 0 ? 'Check question' : '';
+      !s || s.facility === null
+        ? ''
+        : s.facility >= ITEM.tooEasy
+          ? 'Too easy'
+          : s.facility <= ITEM.tooHard
+            ? 'Too hard'
+            : showDiscrimination && s.discrimination !== null && s.discrimination < 0
+              ? 'Check question'
+              : '';
     const prompt = el('td', 'ev-questions__prompt', q.prompt || 'Question');
     prompt.title = q.prompt;
     const noteCell = el('td');

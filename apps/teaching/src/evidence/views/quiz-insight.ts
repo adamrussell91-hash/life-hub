@@ -2,7 +2,7 @@ import { button, el } from '@/quiz/dom';
 import { BANDS, ITEM } from '../constants';
 import { codeLabel, type InsightContext } from '../context';
 import { byTag, compare, confidenceQuadrants, defaultKind, findFlags, kindsPresent, mixUps } from '../patterns';
-import { cronbachAlpha, itemStats, summary } from '../stats';
+import { cronbachAlpha, itemStats, questionFacility, summary } from '../stats';
 import { expandTags, payloadEvidence, tagLabel } from '../tags';
 import type { Evidence, Flag, InsightPayload, TagKind } from '../types';
 import { comparePanel, dotPlot, flagCards, mixUpList, quadrantGrid, questionTable, sectionHead, summaryCards, tagRows, tagSwitch } from './parts';
@@ -100,7 +100,18 @@ export function renderQuizInsight(p: InsightPayload, o: QuizInsightOptions): HTM
   paint();
 
   root.append(sectionHead('Confidence'), quadrantGrid(confidenceQuadrants(evidence), who));
-  root.append(sectionHead('Questions'), questionTable(p.questions, itemStats(matrix, p.questions.map((q) => q.marks)), marked.length >= ITEM.discriminationMinAttempts));
+  // Facility counts every marked answer, so a question is not held back by others still waiting in the same attempt.
+  // Discrimination needs whole totals, so it stays on fully marked attempts.
+  const maxes = p.questions.map((q) => q.marks);
+  const answers = p.attempts.map((a) =>
+    p.questions.map((q) => {
+      const row = a.rows.find((r) => r.id === q.id);
+      return row ? row.awarded : a.pending === 0 ? 0 : null;
+    })
+  );
+  const facility = questionFacility(answers, maxes);
+  const items = itemStats(matrix, maxes).map((st, j) => ({ facility: facility[j] ?? null, discrimination: st.discrimination }));
+  root.append(sectionHead('Questions'), questionTable(p.questions, items, marked.length >= ITEM.discriminationMinAttempts));
   if (o.compare) root.append(compareHost);
   return root;
 }
