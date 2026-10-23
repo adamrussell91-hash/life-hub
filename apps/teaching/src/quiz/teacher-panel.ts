@@ -121,31 +121,57 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   };
 
   /**
+   * Bumped by every insight load and every insight action. A load commits only
+   * if nothing bumped it during its awaits, so a slow poll never undoes Close
+   * now, a dismiss or a class switch, and two loads never interleave writes.
+   */
+  let insightGen = 0;
+
+  /**
    * Insights for the chosen class. The context and class list load once; the
    * insight reloads with each results poll. The Compare with quiz and follow-ups
    * reload only when the class or their ids change, so polls stay one call.
+   * Returns false when a newer load or an action superseded this one.
    */
-  async function loadInsight(force = false): Promise<void> {
+  async function loadInsight(): Promise<boolean> {
+    const gen = ++insightGen;
     if (!classes) {
-      classes = (await insightApi.classes(lessonId)).classes;
-      insightClass = classes[0]?.id ?? null;
+      try {
+        classes = (await insightApi.classes(lessonId)).classes;
+        insightClass = classes[0]?.id ?? null;
+      } catch (error) {
+        // Not retried each poll: insights fall back to every class.
+        classes = [];
+        insightClass = null;
+        showError(error);
+      }
     }
-    const reply: InsightReply = await insightApi.load(lessonId, insightClass);
-    insight = isInsight(reply) ? reply : null;
-    if (insight) ctx ??= await loadInsightContext();
-    const key = JSON.stringify([insightClass, insight?.compare_with ?? null, (insight?.follow_ups ?? []).map((f) => f.lesson_id)]);
-    if (!force && key === sideKey) return;
-    sideKey = key;
-    compareInsight = null;
-    followInsights.clear();
-    if (insight?.compare_with) {
-      const other = await insightApi.load(insight.compare_with, insightClass).catch(() => null);
-      compareInsight = isInsight(other) ? other : null;
+    const classId = insightClass;
+    const reply: InsightReply = await insightApi.load(lessonId, classId);
+    const next = isInsight(reply) ? reply : null;
+    if (next) ctx ??= await loadInsightContext();
+    const key = JSON.stringify([classId, next?.compare_with ?? null, (next?.follow_ups ?? []).map((f) => f.lesson_id)]);
+    let side: { compare: InsightPayload | null; follow: Map<string, InsightPayload> } | null = null;
+    if (key !== sideKey) {
+      side = { compare: null, follow: new Map() };
+      if (next?.compare_with) {
+        const other = await insightApi.load(next.compare_with, classId).catch(() => null);
+        side.compare = isInsight(other) ? other : null;
+      }
+      for (const f of next?.follow_ups ?? []) {
+        const reply2 = await insightApi.load(f.lesson_id, classId).catch(() => null);
+        if (isInsight(reply2)) side.follow.set(f.lesson_id, reply2);
+      }
     }
-    for (const f of insight?.follow_ups ?? []) {
-      const reply2 = await insightApi.load(f.lesson_id, insightClass).catch(() => null);
-      if (isInsight(reply2)) followInsights.set(f.lesson_id, reply2);
+    if (gen !== insightGen) return false;
+    insight = next;
+    if (side) {
+      sideKey = key;
+      compareInsight = side.compare;
+      followInsights.clear();
+      for (const [id, p] of side.follow) followInsights.set(id, p);
     }
+    return true;
   }
 
   const TAB_LABELS: Record<Tab, string> = { tray: 'From students', settings: 'Settings', results: 'Results', live: 'Live' };
@@ -515,7 +541,13 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     const compareOptions = [{ value: '', label: 'None' }, ...siblings.map((x) => ({ value: x.lesson_id, label: x.title }))];
     if (current && !siblings.some((x) => x.lesson_id === current)) compareOptions.push({ value: current, label: 'An earlier quiz' });
     const compareWith = select(compareOptions, current);
-    compareWith.addEventListener('change', () => save({ compare_with: compareWith.value || undefined }));
+    compareWith.addEventListener('change', () => {
+      save({ compare_with: compareWith.value || undefined });
+      // Drop in-flight loads and the cached compare panel; Results reloads it when shown.
+      insightGen++;
+      sideKey = '';
+      if (tab === 'results') void refresh();
+    });
     grid.append(
       labelled(
         'Compare with',
@@ -637,10 +669,12 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     if ((classes?.length ?? 0) > 1) {
       const pick = select((classes ?? []).map((c) => ({ value: c.id, label: c.title })), insightClass ?? '');
       pick.addEventListener('change', async () => {
+        const previous = insightClass;
         insightClass = pick.value || null;
         try {
           await loadInsight();
         } catch (error) {
+          insightClass = previous;
           showError(error);
         }
         paint();
@@ -648,8 +682,10 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       out.push(labelled('Class', pick, 'Insights use each student’s first attempt.'));
     }
     const act = (run: () => Promise<InsightReply>) => async () => {
+      insightGen++;
       try {
         const reply = await run();
+        insightGen++; // a poll sent before this reply is now stale
         insight = isInsight(reply) ? reply : insight;
       } catch (error) {
         showError(error);
@@ -664,8 +700,10 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         onClose: act(() => insightApi.close(lessonId, insightClass)),
         onReopen: act(() => insightApi.reopen(lessonId, insightClass)),
         onDismiss: async (flag) => {
+          insightGen++;
           try {
             const { dismissed } = await insightApi.dismiss(lessonId, flag.id);
+            insightGen++;
             if (insight) insight = { ...insight, dismissed };
           } catch (error) {
             showError(error);
