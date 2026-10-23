@@ -165,6 +165,11 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
       if (block.block_type === 'annotation') {
         return stripAnnotationTeacherContent(block, teacherOnlyIds);
       }
+      if (block.block_type === 'heading' && block.content?.script !== undefined) {
+        // A lecture scene's script is the teacher's notes; students get the transcript once it is recorded.
+        const { script: _script, ...content } = block.content ?? {};
+        return { ...block, content };
+      }
       if (block.block_type === 'hinge_question') {
         // The right answer, misconception notes, move-on marks and back-up question are the teacher's alone.
         const { correct_id: _right, move_on: _move, reteach: _reteach, backup: _backup, ...content } = block.content ?? {};

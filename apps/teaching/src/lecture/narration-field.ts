@@ -52,6 +52,8 @@ export function createNarrationField(options: {
   label: string;
   value: Narration | undefined;
   onChange: (next: Narration | undefined) => void;
+  /** Scene headings only: what to say, shown while recording and copied into a new take's transcript. */
+  script?: { value: string; onChange: (next: string) => void };
 }): HTMLElement {
   const root = document.createElement('div');
   root.className = 'narration-field';
@@ -64,6 +66,7 @@ export function createNarrationField(options: {
     options.onChange(next);
   };
   let disposeRecorder: (() => void) | null = null;
+  let script = options.script?.value.trim() ?? '';
 
   const paint = () => {
     disposeRecorder?.();
@@ -128,9 +131,9 @@ export function createNarrationField(options: {
         uploaded = url;
         controls.disabled = true;
         status.textContent = 'Saving…';
-        // A new clip starts with no transcript: the old words were for the old take.
+        // A new clip starts from the script, or with no transcript: the old words were for the old take.
         void measureDuration(url).then((duration_s) => {
-          save({ url, duration_s });
+          save(script ? { url, duration_s, transcript: script } : { url, duration_s });
           paint();
         });
       }
@@ -146,6 +149,21 @@ export function createNarrationField(options: {
     disposeRecorder = record.dispose;
     controls.append(record.el, upload.el);
     root.append(controls, status);
+    if (options.script) {
+      const onScript = options.script.onChange;
+      const area = document.createElement('textarea');
+      area.className = 'narration-field__script';
+      area.rows = Math.min(8, Math.max(3, script.split('\n').length + 1));
+      area.maxLength = 8000;
+      area.value = script;
+      area.placeholder = 'Script: what you plan to say. It becomes the captions when you record.';
+      area.setAttribute('aria-label', `${options.label} script`);
+      area.addEventListener('change', () => {
+        script = area.value.trim();
+        onScript(script);
+      });
+      root.append(area);
+    }
     if (saved) {
       const keep = saved;
       controls.append(
