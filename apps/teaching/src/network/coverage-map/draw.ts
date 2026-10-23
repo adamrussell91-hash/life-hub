@@ -13,8 +13,8 @@ export type DrawState = {
   selected: string | null;
   focus: string | null;
   student: StudentRoute | null;
-  /** Narrow screens: a smaller name column. */
-  narrow: boolean;
+  /** Width of the lesson-name column; it gives way so the branches fit. */
+  nameW: number;
 };
 
 type Lane = { x: number; group: MapGroup; items: MapItem[]; collapsed: boolean; id: string };
@@ -47,8 +47,14 @@ export const rowTag = (row: MapRow): string | undefined =>
   row.lane === 'support' ? 'Support' : row.lane === 'extension' ? 'Extension' : row.option ? `Option ${row.option}` : undefined;
 const tagClass = (row: MapRow) => (row.lane === 'support' ? 'support' : row.lane === 'core' ? 'option' : 'side');
 
-export function layoutLanes(map: CoverageMap, state: DrawState): { lanes: Lane[]; start: number; width: number } {
-  const start = NAME_X + (state.narrow ? 150 : 196) + 14;
+/** The widest name column (and so map) that fits `available` pixels, between 120 and 200. */
+export function fitNameWidth(map: CoverageMap, collapsed: ReadonlySet<string>, available: number): number {
+  const branches = layoutLanes(map, { collapsed, nameW: 0 }).width - NAME_X - 14;
+  return Math.max(120, Math.min(200, available - NAME_X - 14 - branches));
+}
+
+export function layoutLanes(map: CoverageMap, state: Pick<DrawState, 'collapsed' | 'nameW'>): { lanes: Lane[]; start: number; width: number } {
+  const start = NAME_X + state.nameW + 14;
   const lanes: Lane[] = [];
   let slot = 0;
   map.groups.forEach((group, gi) => {
@@ -72,7 +78,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
   const height = HEAD_H + rows.length * ROW_H + 8;
   const Y = (i: number) => HEAD_H + i * ROW_H + ROW_H / 2;
   const st = state.student;
-  const nameChars = state.narrow ? 22 : 30;
+  const nameChars = Math.floor(state.nameW / 6.6);
   const out: string[] = [];
   const push = (s: string) => out.push(s);
 
@@ -104,15 +110,20 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
     const x0 = mine[0]!.x;
     const x1 = mine[mine.length - 1]!.x;
     const collapsed = state.collapsed.has(group.id);
-    const name = collapsed ? fit(group.name, 6) : group.name;
     push(`<g class="cm-hit" data-group="${esc(group.id)}" role="button" tabindex="0" aria-label="${collapsed ? 'Expand' : 'Collapse'} ${esc(group.name)}">`);
-    push(`<rect x="${x0 - 14}" y="0" width="${x1 - x0 + 28}" height="30" fill="transparent"/>`);
-    push(`<text class="cm-group" x="${(x0 + x1) / 2}" y="16" text-anchor="middle">${esc(name)}</text></g>`);
+    if (collapsed) {
+      // One lane: the name sits at an angle like an item label, so neighbours don't collide.
+      push(`<rect x="${x0 - 10}" y="0" width="20" height="104" fill="transparent"/>`);
+      push(`<text class="cm-group" transform="translate(${x0 + 3},92) rotate(-60)">${esc(fit(group.name, 13))}</text></g>`);
+    } else {
+      push(`<rect x="${x0 - 14}" y="0" width="${x1 - x0 + 28}" height="30" fill="transparent"/>`);
+      push(`<text class="cm-group" x="${(x0 + x1) / 2}" y="16" text-anchor="middle">${esc(group.name)}</text></g>`);
+    }
     push(`<line class="cm-bus" x1="${x0}" y1="26" x2="${x1}" y2="26" style="stroke:${group.items[0]?.colour ?? 'currentColor'}"/>`);
   }
   for (const lane of lanes) {
     const colour = lane.items[0]!.colour;
-    if (lane.collapsed) push(`<text class="cm-count" x="${lane.x}" y="48" text-anchor="middle" style="fill:${colour}">${lane.items.length}</text>`);
+    if (lane.collapsed) push(`<text class="cm-count" x="${lane.x}" y="104" text-anchor="middle" style="fill:${colour}">${lane.items.length}</text>`);
     else {
       const item = lane.items[0]!;
       push(`<g class="cm-hit" data-item="${esc(item.id)}" role="button" tabindex="0" aria-label="Follow ${esc(item.label)}: ${esc(item.title)}">`);
@@ -195,7 +206,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
         const star = p.hits.some((it) => st.stars.has(`${p.row.id}|${it.id}`));
         if (state.selected === p.row.id) push(`<circle class="cm-pick cm-pick--ink" cx="${x}" cy="${y}" r="10"/>`);
         if (star) push(`<circle class="cm-node cm-st--mastered" cx="${x}" cy="${y}" r="8"/><text class="cm-star" x="${x}" y="${y + 4}" text-anchor="middle">★</text>`);
-        else push(`<circle class="cm-node ${STATE_CLASS[s]}${p.row.lane === 'support' && s !== 'skipped' && s !== 'ahead' ? ' cm-node--support' : ''}" cx="${x}" cy="${y}" r="${s === 'struggling' ? 6.5 : s === 'none' || s === 'skipped' || s === 'ahead' ? 3.5 : 5}"/>`);
+        else push(`<circle class="cm-node ${STATE_CLASS[s]}" cx="${x}" cy="${y}" r="${s === 'struggling' ? 6.5 : s === 'none' || s === 'skipped' || s === 'ahead' ? 3.5 : 5}"/>`);
       }
       push('</g>');
     }

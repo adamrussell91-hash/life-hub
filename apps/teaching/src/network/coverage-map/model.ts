@@ -59,8 +59,9 @@ export type CoverageMapInput = {
   points?: MapPoints;
 };
 
-/** An item taught in this few core lessons, or fewer, is flagged as thin. */
-export const THIN_CORE = 4;
+/** An item taught in fewer than this share of the core lessons (at least one) is flagged as thin. */
+export const THIN_SHARE = 0.15;
+export const thinLimit = (coreLessons: number): number => Math.max(1, Math.floor(coreLessons * THIN_SHARE));
 
 const LEVEL_DEPTH = { introduced: 1, reinforced: 2, mastered: 3 } as const;
 const isSide = (lane: MapLane) => lane !== 'core';
@@ -194,6 +195,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
 
   /* Coverage: core lessons everyone gets, and the rest. */
   const coverage = new Map<string, ItemCoverage>();
+  const limit = thinLimit(rows.filter((r) => r.lane === 'core' && !r.option && r.kind !== 'goal').length);
   for (const id of itemIds) {
     let core = 0;
     let optional = 0;
@@ -204,7 +206,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       if (row.lane === 'core' && !row.option) core++;
       else optional++;
     });
-    coverage.set(id, { core, optional, thin: core <= THIN_CORE, first });
+    coverage.set(id, { core, optional, thin: core <= limit, first });
   }
   return { rows, groups, coverage };
 }

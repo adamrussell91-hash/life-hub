@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { CurriculumLinesV2Content, NetworkLine } from '@/schemas/block';
-import { buildCoverageMap, THIN_CORE, type MapLesson } from '@/network/coverage-map/model';
+import { buildCoverageMap, thinLimit, type MapLesson } from '@/network/coverage-map/model';
 import { studentRoute } from '@/network/coverage-map/student';
 import type { Evidence } from '@/evidence/types';
 
@@ -78,11 +78,12 @@ describe('Coverage map: model', () => {
     expect(at('c', 'read')).toBe(2);
   });
 
-  it('counts core lessons apart from support and extension and flags thin items', () => {
+  it('counts core lessons apart from support and extension and flags thin items for the unit’s size', () => {
     const map = build();
     expect(map.coverage.get('read')).toEqual({ core: 1, optional: 2, thin: true, first: 1 });
     expect(map.coverage.get('human:R1')).toEqual({ core: 0, optional: 0, thin: true, first: -1 });
-    expect(THIN_CORE).toBe(4);
+    expect(map.coverage.get('human:U1')?.thin).toBe(false);
+    expect([thinLimit(4), thinLimit(14), thinLimit(36)]).toEqual([1, 2, 5]);
   });
 
   it('uses the terminus lesson as the goal when it is in the unit', () => {

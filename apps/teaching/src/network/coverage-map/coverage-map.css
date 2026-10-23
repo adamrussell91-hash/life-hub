@@ -32,6 +32,10 @@
   color: var(--muted, #6b7788);
 }
 
+.cm > * {
+  min-width: 0;
+}
+
 .cm__scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
