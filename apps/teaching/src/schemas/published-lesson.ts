@@ -44,7 +44,8 @@ export function toPublishedLesson(
     ...(attachedOutcomeIds(lesson).length > 0
       ? { outcome_ids: attachedOutcomeIds(lesson) }
       : {}),
-    ...(lesson.feedback_off === true ? { feedback_off: true } : {})
+    ...(lesson.feedback_off === true ? { feedback_off: true } : {}),
+    ...(lesson.pedagogical_mode === 'lecture' ? { pedagogical_mode: 'lecture' as const } : {})
   });
 }
 

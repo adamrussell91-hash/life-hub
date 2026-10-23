@@ -1,7 +1,7 @@
 // apps/teaching/tests/unit/lecture-schema.test.ts
 import { describe, it, expect } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
-import { PublishedLessonSchema } from '@/schemas/published-lesson';
+import { PublishedLessonSchema, toPublishedLesson } from '@/schemas/published-lesson';
 import { createHeadingEditor, createClozeEditor, createSelfCheckEditor } from '@/blocks/editors';
 
 const base = { type: 'block', visibility: 'student_teacher', variant: 'medium', created_at: '2026-10-23T00:00:00.000Z', updated_at: '2026-10-23T00:00:00.000Z', schema_version: 1 } as const;
@@ -68,5 +68,11 @@ describe('lecture schema fields', () => {
     input.value = 'Why so?';
     input.dispatchEvent(new Event('input'));
     expect(latest.content.gate).toBe(false);
+  });
+
+  it('toPublishedLesson keeps the lecture type and leaves ordinary lessons untyped', () => {
+    const lesson = { id: 'l1', type: 'lesson' as const, title: 'T', slug: 't', unit_id: 'u1', sequence: 1, blocks: [], status: 'active' as const, created_at: base.created_at, updated_at: base.updated_at, schema_version: 1 as const };
+    expect(toPublishedLesson({ ...lesson, pedagogical_mode: 'lecture' } as any, base.created_at).pedagogical_mode).toBe('lecture');
+    expect(toPublishedLesson({ ...lesson, pedagogical_mode: 'lesson' } as any, base.created_at).pedagogical_mode).toBeUndefined();
   });
 });
