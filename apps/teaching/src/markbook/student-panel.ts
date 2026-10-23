@@ -72,6 +72,8 @@ export type StudentPanelHandle = {
   /** Redraws with the pins `pinsNow` gives, e.g. after a failed save was rolled back. */
   refresh: () => void;
   close: () => void;
+  /** False once the overlay has left the page, however it went. */
+  isOpen: () => boolean;
 };
 
 export function openStudentPanel(
@@ -122,6 +124,7 @@ export function openStudentPanel(
       pins = now;
       repaint(false);
     },
-    close: () => opened.close()
+    close: () => opened.close(),
+    isOpen: () => opened.overlay.isConnected
   };
 }
