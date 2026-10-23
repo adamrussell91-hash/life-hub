@@ -23,13 +23,36 @@ export function anonymise(students: readonly string[], evidence: readonly Eviden
   return { keys, rows };
 }
 
-export function groupingBrief(input: { tagLabel: string; rows: AnonRow[]; mistakeText: (why: Why) => string }): string {
-  const lines = input.rows.map((r) => `${r.key} (${r.share === null ? 'not marked' : `${Math.round(r.share * 100)}%`}): ${r.mistakes.map((w) => input.mistakeText(w).slice(0, 160)).join('; ') || 'low marks, no mistake recorded'}`);
+export type RosterName = { name: string; initials: string };
+
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const wholeWord = (alts: string[], flags: string) => new RegExp(`(?<![\\p{L}\\p{N}])(?:${alts.join('|')})(?![\\p{L}\\p{N}])`, flags);
+
+/**
+ * Replaces any roster student's full name, first name or initials in `text`
+ * with "[name]", whole words only. Names match in any case; initials only as
+ * written (upper case), so "AN" doesn't eat the word "an".
+ */
+export function scrubNames(text: string, roster: readonly RosterName[]): string {
+  const names = [...new Set(roster.flatMap((s) => { const full = s.name.trim().replace(/\s+/g, ' '); return full ? [full, full.split(' ')[0]!] : []; }))]
+    .filter((n) => n.length > 1)
+    .sort((a, b) => b.length - a.length)
+    .map((n) => escapeRe(n).replace(/ /g, '\\s+'));
+  const initials = [...new Set(roster.map((s) => s.initials.trim()).filter((i) => i.length > 1))].sort((a, b) => b.length - a.length).map(escapeRe);
+  let out = text;
+  if (names.length) out = out.replace(wholeWord(names, 'giu'), '[name]');
+  if (initials.length) out = out.replace(wholeWord(initials, 'gu'), '[name]');
+  return out;
+}
+
+export function groupingBrief(input: { tagLabel: string; rows: AnonRow[]; mistakeText: (why: Why) => string; roster?: readonly RosterName[] }): string {
+  const text = (w: Why) => scrubNames(input.mistakeText(w), input.roster ?? []).slice(0, 160);
+  const lines = input.rows.map((r) => `${r.key} (${r.share === null ? 'not marked' : `${Math.round(r.share * 100)}%`}): ${r.mistakes.map(text).join('; ') || 'low marks, no mistake recorded'}`);
   return [
     `These students are behind on ${input.tagLabel}. Group them by WHY they get it wrong, so each group can be taught to its reason.`,
     `Make 2 to ${MAX_GROUPS} groups. Every student goes in exactly one group.`,
-    'For each group give: name (teacher-facing, under 8 words), why (one sentence), goal (student-facing, starts "Today:", says what they will do, never what they can’t), gap_type ("knowledge" when something is missing, "mix_up" when they confuse two things), members (the S keys), quotes (per member, one short line from their mistakes above that shows the reason).',
-    'Reply with JSON only: {"groups":[{"name":"","why":"","goal":"","gap_type":"knowledge","members":["S1"],"quotes":{"S1":""}}]}',
+    'For each group give: name (teacher-facing, under 8 words), why (one sentence), goal (student-facing, starts "Today:", says what they will do, never what they can’t), gap_type ("knowledge" when something is missing, "mix_up" when they confuse two things), members (the S keys), quotes (per member, one short line from their mistakes above that shows the reason), notes (for the teacher, 3 to 5 short lines: the misunderstanding to target, what to model, and what the exit check should test; no S keys or names).',
+    'Reply with JSON only: {"groups":[{"name":"","why":"","goal":"","gap_type":"knowledge","members":["S1"],"quotes":{"S1":""},"notes":""}]}',
     'Students:',
     ...lines
   ].join('\n\n');
@@ -50,6 +73,12 @@ const UNREADABLE = 'Ann’s grouping came back unreadable. Try again.';
 const DEFAULT_GOAL = 'Today: practising this together';
 const DEFICIT = /\b(can'?t|can’t|cannot|without|not|never|rather than)\b/i;
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/** Teacher notes with any S keys taken out, capped to fit the schema. */
+function cleanNotes(v: unknown): string | undefined {
+  const notes = str(v).replace(/\bS\d+\b/g, '').replace(/[ \t]{2,}/g, ' ').replace(/ +([.,;:])/g, '$1').trim().slice(0, 1200);
+  return notes || undefined;
+}
 
 function cleanGoal(v: unknown): string {
   let goal = str(v).trim();
@@ -79,6 +108,7 @@ export function parseGroups(raw: string, keys: Record<string, string>): Tutorial
       if (!students.length) return;
       const quotes = (r.quotes && typeof r.quotes === 'object' ? r.quotes : {}) as Record<string, unknown>;
       const name = str(r.name).trim() || `Group ${i + 1}`;
+      const notes = cleanNotes(r.notes);
       const base = slug(name, i);
       let id = base;
       for (let n = 2; groups.some((x) => x.id === id); n++) id = `${base.slice(0, 36)}-${n}`;
@@ -90,7 +120,8 @@ export function parseGroups(raw: string, keys: Record<string, string>): Tutorial
           goal: cleanGoal(r.goal),
           gap_type: r.gap_type === 'mix_up' ? 'mix_up' : 'knowledge',
           students,
-          evidence: students.map((s) => ({ student: s, quote: str(quotes[back[s]!]).slice(0, 300) })).filter((e) => e.quote)
+          evidence: students.map((s) => ({ student: s, quote: str(quotes[back[s]!]).slice(0, 300) })).filter((e) => e.quote),
+          ...(notes ? { notes } : {})
         })
       );
     });

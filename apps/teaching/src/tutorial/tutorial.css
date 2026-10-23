@@ -83,3 +83,18 @@
 .tut-tabs { flex-wrap: wrap; justify-self: start; max-width: 100%; }
 .lesson-page__blocks > .lesson-page__block[hidden] { display: none; }
 .lesson-page__blocks > .lesson-page__gap:has(+ .lesson-page__block[hidden]) { display: none; }
+
+/* Plan a tutorial sheet: one card per group, each student with move pills. */
+.tut-plan__groups { display: grid; gap: var(--space-3); }
+.tut-plan__group { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.tut-plan__why, .tut-plan__goal { margin: 0; overflow-wrap: anywhere; }
+.tut-plan__why { color: var(--muted); }
+.tut-plan__notes { min-height: 5rem; resize: vertical; }
+.tut-plan__students { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.tut-plan__student { display: grid; gap: var(--space-1); }
+.tut-plan__quote { font-size: var(--text-xs); color: var(--muted); overflow-wrap: anywhere; }
+.tut-plan__move { flex-wrap: wrap; gap: var(--space-1); justify-self: start; max-width: 100%; }
+.tut-plan__group-btn { justify-self: start; }
+@media (max-width: 560px) {
+  .tut-plan__group-btn { justify-self: stretch; min-height: 44px; }
+}

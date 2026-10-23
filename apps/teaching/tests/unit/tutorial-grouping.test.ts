@@ -1,6 +1,6 @@
 // apps/teaching/tests/unit/tutorial-grouping.test.ts
 import { describe, it, expect } from 'vitest';
-import { anonymise, groupingBrief, parseGroups } from '@/tutorial/grouping';
+import { anonymise, groupingBrief, parseGroups, scrubNames } from '@/tutorial/grouping';
 import { TutorialGroupIdSchema } from '@/tutorial/schema';
 import type { Evidence } from '@/evidence/types';
 
@@ -80,5 +80,23 @@ describe('tutorial grouping', () => {
   it('caps long mistake lines in the brief', () => {
     const rows = [{ key: 'S1', mistakes: [{ type: 'code', id: 'x' } as never], share: 0.5 }];
     expect(groupingBrief({ tagLabel: 'T', rows, mistakeText: () => 'y'.repeat(500) })).not.toContain('y'.repeat(161));
+  });
+
+  it('asks for teacher notes and reads them back without S keys', () => {
+    const anon = anonymise(['st_ann'], evidence, 'tech:cyclical');
+    expect(groupingBrief({ tagLabel: 'T', rows: anon.rows, mistakeText: () => 'x' })).toContain('notes');
+    expect(one({ notes: 'Model the return. S1 and S12 mix it up. Exit: find the start.' }).notes).toBe('Model the return. and mix it up. Exit: find the start.');
+    expect(one({ notes: 'z'.repeat(2000) }).notes).toHaveLength(1200);
+    expect(one({ notes: 7 }).notes).toBeUndefined();
+    expect(one({}).notes).toBeUndefined();
+  });
+
+  it('scrubs roster names and initials from mistake text', () => {
+    const roster = [{ name: 'Ann Bell', initials: 'AB' }, { name: 'Cy Dale', initials: 'CD' }];
+    expect(scrubNames('ann bell picked Ann’s line; AB and cy wrote it; Annex stays; ABC stays', roster)).toBe('[name] picked [name]’s line; [name] and [name] wrote it; Annex stays; ABC stays');
+    const anon = anonymise(['st_ann'], evidence, 'tech:cyclical');
+    const brief = groupingBrief({ tagLabel: 'T', rows: anon.rows, mistakeText: () => 'Picked “Cy Dale is right”', roster });
+    expect(brief).toContain('Picked “[name] is right”');
+    expect(brief).not.toMatch(/Cy|Dale/);
   });
 });

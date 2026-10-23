@@ -23,6 +23,8 @@ import { loadInsightContext, codeLabel, type InsightContext } from '@/evidence/c
 import { classEvidence } from '@/evidence/class-evidence';
 import { defaultKind } from '@/evidence/patterns';
 import { tagLabel } from '@/evidence/tags';
+import { mixUpText } from '@/evidence/views/parts';
+import { openTutorialPlan } from '@/tutorial/plan-sheet';
 import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
 import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
@@ -450,6 +452,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
           renderNextSteps(current, students, context, nextState, {
             openStudent: actions.openStudent,
             followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence),
+            planTutorial: (tag, ids, evidence) => planTutorial(current, context, tag, ids, evidence),
             pins: (id) => current.markbook.focus?.[id] ?? { pinned: [], dismissed: [] },
             repaint: paint
           })
@@ -507,6 +510,39 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       evidence,
       label: (t) => tagLabel(t, context),
       codeLabel: (id) => codeLabel(id, context.codes),
+      onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+    });
+  }
+
+  /** Plan a tutorial for `ids` on `tag`, placed after the latest shown quiz with evidence on it. */
+  function planTutorial(current: MarkbookView, context: InsightContext, tag: string, ids: string[], evidence: Evidence[]): void {
+    const lessonId = latestQuizFor(current, tag, evidence);
+    const quiz = current.quizzes.find((q) => q.lesson_id === lessonId);
+    if (!quiz) {
+      status.textContent = hiddenQuizzesHave(current, tag, context)
+        ? 'This tag’s quizzes are hidden in the markbook.'
+        : 'Tutorials start from a quiz; this tag only has assessment marks.';
+      return;
+    }
+    if (!quiz.unit_id) {
+      status.textContent = 'Tutorials start from a quiz in a unit.';
+      return;
+    }
+    status.textContent = '';
+    // Only students still on the list; a tutorial's groups are this class's students.
+    const roster = current.students.filter((s) => !s.removed);
+    const listed = new Set(roster.map((s) => s.id));
+    const label = (t: string) => tagLabel(t, context);
+    openTutorialPlan({
+      classId: cls.id,
+      unitId: quiz.unit_id,
+      sourceLessonId: quiz.lesson_id,
+      tag,
+      tagLabel: label(tag),
+      students: roster,
+      chosen: ids.filter((id) => listed.has(id)),
+      evidence,
+      mistakeText: (why) => mixUpText({ tag, key: '', why, count: 1, students: [] }, label, (id) => codeLabel(id, context.codes)),
       onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
     });
   }
