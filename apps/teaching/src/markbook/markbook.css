@@ -125,7 +125,12 @@ span.mb-cell { display: inline-block; cursor: default; }
 .mb-form__skill { max-width: 100%; }
 
 .mb-patterns { display: grid; gap: var(--space-3); min-width: 0; }
-.mb-trend { width: 100%; height: auto; max-height: 180px; }
+/* Detail sizes to its content: the chart keeps its own width, and each table is as wide as its columns. */
+.mb-trend { width: 100%; max-width: 640px; height: auto; justify-self: start; }
+.mb-patterns__tags, .mb-patterns__heat { display: grid; grid-template-columns: minmax(0, max-content); gap: var(--space-2); max-width: 100%; }
+.mb-patterns .mb-grid__table { min-width: 0; }
+.mb-patterns .mb-grid__table th, .mb-patterns .mb-grid__table td { padding: var(--space-1) var(--space-3); }
+.mb-patterns .ev-section { gap: var(--space-4); }
 .mb-trend__grid { stroke: var(--line); stroke-width: 1; }
 .mb-trend__band { fill: var(--marine); opacity: 0.15; }
 .mb-trend__line { fill: none; stroke: var(--marine); stroke-width: 2; }
