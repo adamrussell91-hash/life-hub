@@ -112,3 +112,43 @@ export function prependToSection(blocks: Block[], id: string, added: Block): Blo
   });
   return touched ? out : blocks;
 }
+
+/** `added` right before block `id` in its own list; unchanged if absent. */
+export function insertBefore(blocks: Block[], id: string, added: Block): Block[] {
+  const at = blocks.findIndex((b) => b.id === id);
+  if (at >= 0) return [...blocks.slice(0, at), added, ...blocks.slice(at)];
+  let touched = false;
+  const out = blocks.map((block) => {
+    let next = block;
+    for (const list of childLists(block)) {
+      const changed = insertBefore(list.blocks, id, added);
+      if (changed !== list.blocks) { next = list.rebuild(changed); touched = true; }
+    }
+    return next;
+  });
+  return touched ? out : blocks;
+}
+
+function find(blocks: Block[], id: string): Block | null {
+  for (const block of blocks) {
+    if (block.id === id) return block;
+    for (const list of childLists(block)) {
+      const hit = find(list.blocks, id);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/**
+ * Where a callout for a scene goes: after a heading scene's heading, first
+ * inside a chapter-intro section, and before the first block of an opening
+ * scene so it never splits a gate from its side path.
+ */
+export function addToScene(blocks: Block[], sceneId: string, added: Block): Block[] {
+  const target = find(blocks, sceneId);
+  if (!target) return blocks;
+  if (target.block_type === 'heading') return insertAfter(blocks, sceneId, added);
+  if (target.block_type === 'section') return prependToSection(blocks, sceneId, added);
+  return insertBefore(blocks, sceneId, added);
+}

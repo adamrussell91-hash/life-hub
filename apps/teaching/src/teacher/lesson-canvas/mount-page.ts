@@ -23,7 +23,7 @@ import { createDiscernConfirmBlock, findDiscernConfirm, insertDiscernConfirm, re
 import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-editor';
 import { renderBlock } from '@/blocks/render';
 import { mountLecturePanel, type LecturePanelHandle } from '@/lecture/teacher-panel';
-import { insertAfter, prependToSection } from '@/lecture/tree';
+import { addToScene } from '@/lecture/tree';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
 import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import { mountPulseSummary } from '@/teacher/pulse-summary';
@@ -1041,9 +1041,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         onAddCallout: (sceneId, text) => {
           const base = createBlock('callout', options.idFactory());
           const callout = { ...base, content: { ...base.content, style: 'information', body: text } } as Block;
-          // A chapter-intro scene is the section itself, so the callout opens it.
-          const inSection = prependToSection(lesson.blocks, sceneId, callout);
-          const blocks = inSection !== lesson.blocks ? inSection : insertAfter(lesson.blocks, sceneId, callout);
+          const blocks = addToScene(lesson.blocks, sceneId, callout);
+          if (blocks === lesson.blocks) return;
           emitLesson({ ...lesson, blocks });
           canvas.update(blocks, media);
         }
