@@ -1465,7 +1465,12 @@ export function createClareChatController({
           stopWait();
           const pendingId =
             typeof event.id === 'string' && event.id.trim() ? event.id.trim() : null;
-          if (pendingId) lastPendingActionId = pendingId;
+          if (!pendingId) {
+            // The server could not save the proposal, so Confirm would have nothing to apply.
+            showChatError(root, 'Clare could not save that proposal. Nothing changed. Ask her again.');
+            continue;
+          }
+          lastPendingActionId = pendingId;
           appendActionProposalToPendingTray(
             chatRoot,
             {
