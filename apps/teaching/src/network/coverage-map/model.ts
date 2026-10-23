@@ -61,6 +61,7 @@ export const THIN_SHARE = 0.15;
 export const thinLimit = (coreLessons: number): number => Math.max(1, Math.floor(coreLessons * THIN_SHARE));
 
 const LEVEL_DEPTH = { introduced: 1, reinforced: 2, mastered: 3 } as const;
+const isSide = (lane: MapLane) => lane !== 'core';
 
 export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
   const { content, lines, lessons, bands, dates, points } = input;
@@ -72,13 +73,18 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     hidden,
     title: (id) => byId.get(id)?.title || 'Untitled lesson'
   });
+  // Support, extension or optional: the lesson's own role, else a light-rail stop that names it.
+  const railRole = new Map<string, LessonRouteRole>();
+  const railSkip = new Map<string, string>();
   const railAfter = new Map<string, string | undefined>();
   /** The line a support or extension stop sits on: the lesson teaches it, as on the old map. */
   const railLines = new Map<string, string[]>();
   for (const stop of content.rail_stops) {
     if (!stop.lesson_id || stop.kind === 'stop' || !byId.has(stop.lesson_id)) continue;
+    railRole.set(stop.lesson_id, stop.kind);
     railAfter.set(stop.lesson_id, stop.after_lesson_id);
     railLines.set(stop.lesson_id, [...(railLines.get(stop.lesson_id) ?? []), stop.line_id]);
+    if (stop.skip_rule?.trim()) railSkip.set(stop.lesson_id, stop.skip_rule.trim());
   }
   // A support or extension stop's lesson shows even when the old map left it off its stations,
   // straight after the lesson the stop follows.
@@ -91,6 +97,10 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     order.splice(i, 0, id);
   }
   const shown = withAutoDepths(order.map((id) => byId.get(id)!).filter(Boolean));
+  const roleOf = (id: string): MapLane | undefined => {
+    const role = byId.get(id)?.role ?? railRole.get(id);
+    return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
+  };
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
 
   /* Items, in four groups. */
@@ -149,8 +159,9 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       const level = line ? stopLevel.get(line.id) : undefined;
       teaches.set(ref, level ?? n);
     }
-    // Every lesson on the map is core: no support, extension or option lanes.
-    const lane: MapLane = 'core';
+    // Every lesson is core unless it has its own support, extension or optional role: forks never make options.
+    const lane = roleOf(lesson.id) ?? 'core';
+    const skip = lesson.skip?.trim() || railSkip.get(lesson.id);
     const isGoal = content.terminus.lesson_id === lesson.id;
     return {
       id: lesson.id,
@@ -158,6 +169,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       ...(lesson.href ? { href: lesson.href } : {}),
       lane,
       kind: isGoal ? 'goal' : lesson.quiz || gateLessons.has(lesson.id) ? 'check' : 'lesson',
+      ...(skip && isSide(lane) ? { skip } : {}),
       ...(bands?.get(lesson.id) ? { band: bands.get(lesson.id) } : {}),
       ...(dates?.get(lesson.id) ? { date: dates.get(lesson.id) } : {}),
       teaches
