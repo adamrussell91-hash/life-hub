@@ -1,4 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const loaders = vi.hoisted(() => ({ elements: vi.fn(), skills: vi.fn(), codes: vi.fn() }));
+vi.mock('@/blocks/literary-elements', () => ({ loadLiteraryElements: loaders.elements }));
+vi.mock('@/skills/api', () => ({ loadSkills: loaders.skills }));
+vi.mock('@/blocks/feedback-codes', () => ({ loadFeedbackCodes: loaders.codes }));
+
 import { dotPlot, flagCards, mixUpList, questionTable, summaryCards, tagRows, tagSwitch } from '@/evidence/views/parts';
 import { summary } from '@/evidence/stats';
 import type { Flag, TagRow } from '@/evidence/types';
@@ -61,5 +67,36 @@ describe('view parts', () => {
     );
     expect(node.textContent).toContain('Too easy');
     expect(node.textContent).toContain('Check question');
+  });
+  it('dot plot keeps tall stacks inside the viewBox', () => {
+    const shares = Array(20).fill(0.5);
+    const svg = dotPlot(shares, summary(shares));
+    const [, , , h] = svg.getAttribute('viewBox')!.split(' ').map(Number);
+    for (const c of svg.querySelectorAll('circle')) {
+      const cy = Number(c.getAttribute('cy'));
+      expect(cy).toBeGreaterThanOrEqual(0);
+      expect(cy).toBeLessThanOrEqual(h!);
+    }
+  });
+  it('dismiss and follow-up buttons name their flag', () => {
+    const flag: Flag = { id: 'sure_wrong:tech:jux', type: 'sure_wrong', tag: 'tech:jux', students: [] };
+    const node = flagCards([flag], { label, who: () => '', onDismiss: vi.fn(), onFollowUp: vi.fn() });
+    const dismiss = [...node.querySelectorAll('button')].find((b) => b.textContent === 'Dismiss')!;
+    expect(dismiss.getAttribute('aria-label')).toBe('Dismiss: Sure but wrong on jux');
+  });
+  it('explains an unavailable reliability on the page', () => {
+    expect(summaryCards(summary([0.5]), 1, 1, null, 'Needs 5 attempts.').querySelector('.ev-card__note')?.textContent).toBe('Needs 5 attempts.');
+  });
+  it('context retries after a failed load and then keeps the result', async () => {
+    loaders.elements.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ marker: 'table' });
+    loaders.skills.mockResolvedValue({ marker: 'skills' });
+    loaders.codes.mockResolvedValue([{ id: 'c1', code: 'A1', label: 'Thesis' }]);
+    const { loadInsightContext, codeLabel } = await import('@/evidence/context');
+    expect((await loadInsightContext()).table).toBeNull();
+    const ok = await loadInsightContext();
+    expect(ok.table).toEqual({ marker: 'table' });
+    expect(codeLabel('c1', ok.codes)).toBe('A1 Thesis');
+    await loadInsightContext();
+    expect(loaders.elements).toHaveBeenCalledTimes(2);
   });
 });
