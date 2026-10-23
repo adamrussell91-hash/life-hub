@@ -167,7 +167,7 @@ export function renderPatterns(view: MarkbookView, students: RosterStudent[], ct
         el('td', undefined, pct(r.mean)),
         el('td', undefined, change === null ? '–' : `${change >= 0 ? '+' : '−'}${Math.abs(Math.round(change * 100))}`),
         spark,
-        el('td', undefined, `${r.questions} Qs`),
+        el('td', undefined, `${r.questions} ${r.questions === 1 ? 'question' : 'questions'}`),
         groups
       );
       table.append(tr);
