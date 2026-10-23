@@ -16,8 +16,15 @@
  *
  * No model is called here.
  */
-import { mapTree, prepareQuizPublish } from './quiz.mjs';
-import { tutorialKeys } from './tutorial-status.mjs';
+import { randomBytes } from 'node:crypto';
+import { isSafeId } from './class-examples.mjs';
+import { publishedLessonKey } from './teaching-blobs.mjs';
+import { listBlobKeys } from './blobs-list.mjs';
+import { QuizError, deviceHash, read, reject, validToken } from './question-drop.mjs';
+import { identify, mapTree, prepareQuizPublish } from './quiz.mjs';
+import { emptyGroupState, tutorialKeys } from './tutorial-status.mjs';
+
+export { QuizError as TutorialError };
 
 const groupOfSection = (block) =>
   block?.block_type === 'section' && typeof block.content?.tutorial_group === 'string' ? block.content.tutorial_group : null;
@@ -84,4 +91,93 @@ export function prepareTutorialPublish(draft, studentBlocks) {
 
 export async function storeTutorialTabs(store, lessonId, tabs) {
   await store.setJSON(tutorialKeys(lessonId).tabs, tabs);
+}
+
+const STAGES = new Set(['common', 'before', 'waiting', 'after', 'exit', 'done']);
+const MAX_TEXT = 600;
+const MAX_HANDUPS = 30;
+const clean = (text, max) => (typeof text === 'string' ? text.trim().slice(0, max) : '');
+
+async function loadTutorial(store, lessonId) {
+  if (!isSafeId(lessonId)) reject(404, 'not_found', 'Tutorial not found.');
+  const lesson = await read(store, publishedLessonKey(lessonId));
+  if (!lesson) reject(404, 'not_found', 'Tutorial not found.');
+  if (lesson.pedagogical_mode !== 'tutorial') reject(409, 'not_tutorial', 'This lesson isn’t a tutorial.');
+  const tabs = (await read(store, tutorialKeys(lessonId).tabs)) ?? { groups: [] };
+  return { lesson, tabs };
+}
+
+const blockIds = (blocks) => {
+  const ids = new Set();
+  const walk = (list) => (Array.isArray(list) ? list : []).forEach((b) => { if (typeof b?.id === 'string') ids.add(b.id); walk(b?.content?.blocks); });
+  walk(blocks);
+  return ids;
+};
+
+export async function tutorialAction(store, lessonId, body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
+  const action = body.action ?? 'status';
+  if (!['status', 'claim', 'progress', 'answer', 'handup'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  const { tabs } = await loadTutorial(store, lessonId);
+  let who;
+  try {
+    who = await identify(store, body, action);
+  } catch (e) {
+    if (e instanceof QuizError && e.code === 'need_class') reject(e.status, 'need_class', 'Open this tutorial from your class page.');
+    throw e;
+  }
+  if (who.need === 'class') reject(403, 'need_class', 'Open this tutorial from your class page.');
+  const identity = { need: who.need, initials: who.student?.initials ?? null };
+  const empty = { identity, group: null, sitting: false, unlocked: false, shown: null, handups: [] };
+  if (who.need === 'initials') {
+    if (action !== 'status' && action !== 'claim') reject(403, 'need_initials', 'Type your initials first.');
+    return empty;
+  }
+  if (!who.student) {
+    if (action === 'status' || action === 'claim') return { ...empty, anonymous: true };
+    reject(403, 'no_list', 'Your teacher hasn’t added a class list yet.');
+  }
+  const group = tabs.groups.find((g) => g.students.includes(who.student.id));
+  if (!group) {
+    if (action === 'status' || action === 'claim') return { ...empty, not_for_you: true };
+    reject(403, 'not_for_you', 'This one isn’t for you today.');
+  }
+  if (!validToken(body.class_token)) reject(400, 'no_device', 'This browser can’t remember you. Use your usual browser.');
+  const k = tutorialKeys(lessonId);
+  const owner = deviceHash(`student:${who.classId}:${who.student.id}`);
+  const stamp = { class_id: who.classId, student_id: who.student.id, group_id: group.id };
+
+  if (action === 'progress') {
+    if (!STAGES.has(body.stage)) reject(400, 'bad_stage', 'Unknown step.');
+    await store.setJSON(k.progress(owner), { stage: body.stage, at: new Date().toISOString(), ...stamp });
+  }
+  if (action === 'answer') {
+    if (typeof body.block_id !== 'string' || !blockIds(group.blocks).has(body.block_id)) reject(400, 'bad_block', 'That part has changed. Reload the page.');
+    const parts = Object.fromEntries(Object.entries(body.parts && typeof body.parts === 'object' ? body.parts : {})
+      .filter(([i]) => /^[0-3]$/.test(i)).map(([i, text]) => [i, clean(text, MAX_TEXT)]));
+    const rating = body.rating === 'right' || body.rating === 'wrong' ? body.rating : null;
+    const all = (await read(store, k.answers(owner))) ?? {};
+    all[body.block_id] = { parts, rating, at: new Date().toISOString() };
+    await store.setJSON(k.answers(owner), all);
+  }
+  if (action === 'handup') {
+    const mine = await listBlobKeys(store, k.ownHandups(owner));
+    if (mine.length >= MAX_HANDUPS) reject(429, 'too_many', 'You’ve sent a lot of hand-ups. Ask your teacher.');
+    const id = `${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
+    await store.setJSON(k.handup(owner, id), { block_id: clean(body.scene_id, 64), label: clean(body.scene_label, 80), text: clean(body.text, 500), status: 'open', reply: '', at: new Date().toISOString(), ...stamp });
+  }
+
+  const state = (await read(store, k.group(group.id))) ?? emptyGroupState();
+  const handupKeys = await listBlobKeys(store, k.ownHandups(owner));
+  const handups = (await Promise.all(handupKeys.map(async (key) => [key.slice(key.lastIndexOf('/') + 1), await read(store, key)])))
+    .filter(([, h]) => h)
+    .map(([id, h]) => ({ id, scene_id: h.block_id, scene_label: h.label, text: h.text, status: h.status, reply: h.reply ?? '', at: h.at }));
+  return {
+    identity,
+    group: { id: group.id, goal: group.goal, blocks: group.blocks },
+    sitting: !!state.sitting,
+    unlocked: Array.isArray(state.done_students) && state.done_students.includes(who.student.id),
+    shown: state.shown ?? null,
+    handups
+  };
 }
