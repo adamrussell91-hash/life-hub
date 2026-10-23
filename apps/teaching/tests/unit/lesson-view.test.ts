@@ -389,4 +389,44 @@ describe('mountStudentLessonView', () => {
     }
     handle.dispose();
   });
+
+  it('plays a lecture lesson in the lecture player, with the hero on its title card', async () => {
+    const lesson = publishedLessonWithLead();
+    vi.mocked(apiGet).mockResolvedValue({ ...lesson, pedagogical_mode: 'lecture' });
+    const root = document.createElement('div');
+    document.body.append(root);
+    const handle = mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+
+    await vi.waitFor(() => {
+      expect(root.querySelector('.lecture .lecture-title .lesson-hero__title')?.textContent).toBe('Memory');
+    });
+    expect(root.querySelector('.lesson-blocks')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.lecture-title__start')!.click();
+    expect(root.querySelector('.lecture-stage')?.textContent).toContain('Lead copy here');
+    // No class link: nothing to send hand-ups to.
+    expect(root.querySelector<HTMLElement>('.lecture-strip__hand')?.hidden).toBe(true);
+    handle.dispose();
+  });
+
+  it('leaves a side path out of an ordinary lesson page', async () => {
+    const lesson = publishedLessonWithLead();
+    const lead = lesson.blocks[0]!;
+    const sidePath = {
+      ...lead,
+      id: 'side_1',
+      block_type: 'section',
+      content: { title: 'Second look', side_path: true, blocks: [{ ...lead, id: 'side_text', content: { html: '<p>Hidden detour</p>' } }] }
+    };
+    vi.mocked(apiGet).mockResolvedValue({ ...lesson, blocks: [lead, sidePath] });
+    const root = document.createElement('div');
+    document.body.append(root);
+    const handle = mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('Lead copy here');
+    });
+    expect(root.querySelector('[data-block-id="side_1"]')).toBeNull();
+    expect(root.textContent).not.toContain('Hidden detour');
+    handle.dispose();
+  });
 });

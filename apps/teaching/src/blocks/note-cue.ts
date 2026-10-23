@@ -46,6 +46,15 @@ export function renderNoteCue(block: NoteCueBlock, _mode: RenderMode): HTMLEleme
   prompt.className = 'block-note-cue__prompt block-body';
   prompt.textContent = block.content.prompt;
   root.append(head, prompt);
+  if (block.content.kind === 'question') {
+    // Shown only inside the lecture player, which opens the hand-up sheet from it.
+    const raise = document.createElement('button');
+    raise.type = 'button';
+    raise.className = 'lecture-raise';
+    raise.dataset.prompt = block.content.prompt;
+    raise.textContent = 'Raise it with ✋';
+    root.append(raise);
+  }
   return root;
 }
 
