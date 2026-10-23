@@ -119,6 +119,10 @@ import { createHingeHandler } from '../../../netlify/functions/hinge.mjs';
 import { createTextToolsHandler } from '../../../netlify/functions/teaching-text-tools.mjs';
 import { runTextToolJob } from '../../../netlify/functions/_shared/text-tools.mjs';
 import { createPublishedHingeHandler } from '../../../netlify/functions/published-hinge.mjs';
+import { createContinuumHandler } from '../../../netlify/functions/continuum-line.mjs';
+import { createPublishedContinuumHandler } from '../../../netlify/functions/published-continuum-line.mjs';
+import { createPeerFeedbackHandler } from '../../../netlify/functions/peer-feedback.mjs';
+import { createPublishedPeerFeedbackHandler } from '../../../netlify/functions/published-peer-feedback.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
@@ -3613,6 +3617,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createPublishedTutorialHandler(deps)
       : path.startsWith('/api/published/hinge/')
         ? createPublishedHingeHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/continuum\//.test(path)
+        ? createContinuumHandler(deps)
+      : path.startsWith('/api/published/continuum/')
+        ? createPublishedContinuumHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/peer-feedback\//.test(path)
+        ? createPeerFeedbackHandler(deps)
+      : path.startsWith('/api/published/peer-feedback/')
+        ? createPublishedPeerFeedbackHandler(deps)
       : /\/quadrant$/.test(path)
       ? createLessonQuadrantHandler(deps)
       : path.startsWith('/api/published/quadrant/')
@@ -3735,7 +3747,9 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/quadrant\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/hinge\/[^/]+$/.test(path) ||
       (method === 'GET' && /^\/api\/text-tools\/[a-f0-9]{64}$/.test(path)) ||
-      /^\/api\/published\/hinge\/[^/]+\/[^/]+$/.test(path)
+      /^\/api\/published\/hinge\/[^/]+\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/(continuum|peer-feedback)\/[^/]+$/.test(path) ||
+      /^\/api\/published\/(continuum|peer-feedback)\/[^/]+\/[^/]+$/.test(path)
     ) {
       return handleQuiz(method, pathWithQuery, cookie, body);
     }

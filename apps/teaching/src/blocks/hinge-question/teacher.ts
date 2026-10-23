@@ -2,6 +2,7 @@ import { apiPost } from '@/api/client';
 import { button, el, errorText, isNotPublished } from '@/blocks/peer-feedback-ui';
 import { openBoard } from './board';
 import { LETTERS, formatSeconds, nextStep, percent, poller, secondsLeft, type HingeBlock } from './shared';
+import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
 
 type TeacherOption = { id: string; text: string; misconception: string };
 /** The block's back-up question, for the focus view checkpoint preview. */
@@ -65,6 +66,14 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
     if (!root.isConnected) return window.clearInterval(ticker);
     paintClock();
   }, 1000);
+
+  const past = pastRounds(
+    endpoint,
+    (session, pressed) => {
+      if (confirmBringBack(state?.phase === 'live')) return send('resume', pressed, { session }).catch(() => undefined);
+    },
+    (n) => `${n} ${n === 1 ? 'answer' : 'answers'}`
+  );
 
   async function send(action: string, pressed?: HTMLButtonElement, extra: Record<string, unknown> = {}): Promise<void> {
     // A background poll gives way; a teacher's action waits its turn rather than being dropped.
@@ -212,7 +221,8 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
         el('p', 'pf-panel__text block-body', state.ready
           ? 'Students answer on the lesson link. No accounts and no code. You see the spread; the class sees it only if you reveal.'
           : 'Finish the question and mark the right answer, then publish again.'),
-        ask
+        ask,
+        past
       );
       body.replaceChildren(panel);
       return;
@@ -257,7 +267,7 @@ export function mountTeacher(block: HingeBlock, lessonId: string, promptEl?: HTM
     if (s.round === 'backup') {
       parts.push(el('p', 'pf-chip hq-round-tag', s.backup?.source === 'ann' ? 'Back-up question · drafted by Ann' : 'Back-up question'));
     }
-    body.replaceChildren(...parts, bar, spread(s), stepCard(s), hint, round);
+    body.replaceChildren(...parts, bar, spread(s), stepCard(s), hint, round, past);
     paintClock();
   }
 
