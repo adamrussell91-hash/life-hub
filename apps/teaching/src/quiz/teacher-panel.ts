@@ -836,32 +836,50 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       if (codes.length && awarded !== null && awarded < r.mark.max) {
         const chipHost = el('div', 'qz-attempt-codes');
         let confirmed = [...(r.codes ?? [])];
+        /** The set the chips show now, and the chip the teacher last used. */
+        let shown = [...confirmed];
+        let lastUsed: string | null = null;
         let waiting = 0;
+        chipHost.addEventListener('focusin', (event) => {
+          const code = (event.target as HTMLElement).dataset?.code;
+          if (code) lastUsed = code;
+        });
+        const same = (x: readonly string[], y: readonly string[]) => x.length === y.length && x.every((id) => y.includes(id));
         const paintChips = (): void => {
+          const hadFocus = chipHost.contains(document.activeElement);
+          shown = [...(r.codes ?? [])];
           chipHost.replaceChildren(
             codeChips({
               codes,
-              selected: r.codes ?? [],
+              selected: shown,
               label: `Why marks were lost: question ${i + 1}`,
               onChange: (ids) => {
                 r.codes = ids;
+                shown = [...ids];
                 waiting += 1;
                 inOrder(() => post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score: awarded, codes: ids })).then(
                   (res) => {
-                    waiting -= 1;
                     confirmed = res.attempt.rows.find((x) => x.id === r.id)?.codes ?? ids;
-                    if (!waiting) r.codes = confirmed;
+                    settle();
                   },
                   (error: unknown) => {
-                    waiting -= 1;
                     showError(error);
-                    r.codes = [...confirmed];
-                    paintChips();
+                    settle();
                   }
                 );
               }
             })
           );
+          if (!hadFocus) return;
+          const chips = [...chipHost.querySelectorAll<HTMLButtonElement>('.ev-chip')];
+          (chips.find((b) => b.dataset.code === lastUsed) ?? chips[0])?.focus();
+        };
+        /** Once no save is waiting, the chips show what the server last confirmed. */
+        const settle = (): void => {
+          waiting -= 1;
+          if (waiting) return;
+          r.codes = [...confirmed];
+          if (!same(shown, confirmed)) paintChips();
         };
         paintChips();
         item.append(el('p', 'qz-field__label', 'Why marks were lost (optional)'), chipHost);

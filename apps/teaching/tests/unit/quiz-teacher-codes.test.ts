@@ -35,7 +35,10 @@ vi.mock('@/api/client', () => ({
 vi.mock('@/evidence/context', () => ({
   loadInsightContext: async () => ({
     table: null, outcomes: [], skills: null,
-    codes: [{ id: 'e', code: 'E', label: 'Evidence', group: 'composition', criterion: 2, colour: 'sage', descriptor: 'Link evidence.' }]
+    codes: [
+      { id: 'e', code: 'E', label: 'Evidence', group: 'composition', criterion: 2, colour: 'sage', descriptor: 'Link evidence.' },
+      { id: 'ts', code: 'TS', label: 'Topic sentence', group: 'composition', criterion: 2, colour: 'sage', descriptor: 'Open with the point.' }
+    ]
   }),
   codeLabel: (id: string) => id
 }));
@@ -124,6 +127,47 @@ describe('teacher attempt view feedback codes', () => {
     expect(rows()[0]!.querySelector('.ev-chip')!.getAttribute('aria-pressed')).toBe('true');
     await vi.waitFor(() => expect(rows()[0]!.querySelector('.ev-chip')!.getAttribute('aria-pressed')).toBe('false'));
     expect(handle.root.textContent).toContain('Something went wrong');
+    onMark = normal;
+    handle.dispose();
+  });
+
+  it('shows the server’s codes after a failed save overlaps a later one that lands', async () => {
+    const { handle, rows } = await openAttempt();
+    const normal = onMark;
+    let rejectFirst: (e: Error) => void = () => {};
+    let resolveSecond: () => void = () => {};
+    onMark = (body) =>
+      marks().length === 1
+        ? new Promise((_, reject) => (rejectFirst = reject))
+        : new Promise((r) => (resolveSecond = () => r({ attempt: detail(body.codes as string[]) })));
+    const chip = (code: string) => [...rows()[0]!.querySelectorAll<HTMLButtonElement>('.ev-chip')].find((b) => b.textContent === code)!;
+    chip('E').focus();
+    chip('E').click();
+    chip('TS').click();
+    await vi.waitFor(() => expect(marks()).toHaveLength(1));
+    rejectFirst(new Error('Server said no'));
+    await vi.waitFor(() => expect(marks()).toHaveLength(2));
+    expect(marks()[1]!.codes).toEqual(['e', 'ts']);
+    // The later save is still waiting, so the failure leaves the chips alone.
+    expect(chip('E').getAttribute('aria-pressed')).toBe('true');
+    resolveSecond();
+    await vi.waitFor(() => expect(chip('TS').getAttribute('aria-pressed')).toBe('true'));
+    expect(chip('E').getAttribute('aria-pressed')).toBe('true');
+    onMark = normal;
+    handle.dispose();
+  });
+
+  it('settles on the server’s set and keeps focus on the chip last used', async () => {
+    const { handle, rows } = await openAttempt();
+    const normal = onMark;
+    // The server keeps only E, whatever it is sent.
+    onMark = async () => ({ attempt: detail(['e']) });
+    const chip = (code: string) => [...rows()[0]!.querySelectorAll<HTMLButtonElement>('.ev-chip')].find((b) => b.textContent === code)!;
+    chip('TS').focus();
+    chip('TS').click();
+    await vi.waitFor(() => expect(chip('E').getAttribute('aria-pressed')).toBe('true'));
+    expect(chip('TS').getAttribute('aria-pressed')).toBe('false');
+    expect(document.activeElement).toBe(chip('TS'));
     onMark = normal;
     handle.dispose();
   });
