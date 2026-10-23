@@ -4,7 +4,7 @@ import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
 import {
   createUniversalLink,
-  endUniversalLink,
+  suppressUniversalLink,
   listUniversalLinksForEntity
 } from '@/api/universal-links';
 import { fetchPeopleDirectory, fetchPersonLedger, type DirectoryPersonRow } from '@/api/people-directory';
@@ -371,15 +371,15 @@ export async function renderMeetingPage(
     const room = groupRoom(attendees, directory, new Date(), selfRow);
     roomHost.replaceChildren(roomCard(room, attendees, {
       onRemove: async (attendee) => {
-        await endUniversalLink(attendee.linkId);
+        await suppressUniversalLink(attendee.linkId);
         attendees = attendees.filter((entry) => entry.linkId !== attendee.linkId);
         people = attendees.map((entry) => ({ ref: entry.ref, name: entry.name }));
         paintRoom();
       },
-      // A link's metadata never changes in place: end it and add the same person
+      // A link's metadata never changes in place: drop it and add the same person
       // again with the organisation they're here for.
       onPickOrganisation: async (attendee, organisationRef) => {
-        await endUniversalLink(attendee.linkId);
+        await suppressUniversalLink(attendee.linkId);
         const { link } = await createUniversalLink({
           source_ref: meetingRef,
           target_ref: attendee.ref,
@@ -425,7 +425,9 @@ export async function renderMeetingPage(
             source_ref: meetingRef,
             target_ref: item.ref,
             relationship_type: 'attendee',
-            role: picked
+            role: picked,
+            // A fresh moment makes a fresh link, so someone removed earlier can come back.
+            occurred_at: new Date().toISOString()
           });
           attendees = [...attendees, { linkId: link.id, ref: item.ref, role: picked, name: item.display_label, organisationRef: null }];
           people = attendees.map((entry) => ({ ref: entry.ref, name: entry.name }));
@@ -1037,8 +1039,10 @@ function roomCard(
           remove.disabled = true;
           try {
             await actions.onRemove(attendee);
-          } catch {
+          } catch (err) {
             remove.disabled = false;
+            row.querySelector('.room__remove-error')?.remove();
+            row.append(el('span', 'meeting-form__status room__remove-error', err instanceof ApiClientError ? err.message : 'Could not remove them.'));
           }
         });
         row.append(remove);
