@@ -5,8 +5,8 @@ import { tutorialKeys } from '../../netlify/functions/_shared/tutorial-status.mj
 import { classKey, draftLessonKey, publishedLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 
 const block = (id, block_type, content = {}) => ({ id, type: 'block', block_type, variant: 'medium', visibility: 'student_teacher', content });
-const mc = (id) => block(id, 'quiz_question', { question: { id, kind: 'multiple_choice', prompt: `Q ${id}`, marks: 1, options: [{ id: 'a', text: 'Right' }, { id: 'b', text: 'Wrong' }], correct: ['a'] } });
-const ROSTER = [{ id: 'st_ann', name: 'Ann Bell', initials: 'AB' }, { id: 'st_cy', name: 'Cy Dale', initials: 'CD' }];
+const mc = (id) => block(id, 'quiz_question', { question: { id, kind: 'multiple_choice', prompt: `Q ${id}`, marks: 1, hint: `Hint ${id}`, options: [{ id: 'a', text: 'Right' }, { id: 'b', text: 'Wrong' }], correct: ['a'] } });
+const ROSTER = [{ id: 'st_ann', name: 'Ann Bell', initials: 'AB' }, { id: 'st_cy', name: 'Cy Dale', initials: 'CD' }, { id: 'st_ed', name: 'Ed Fox', initials: 'EF' }];
 
 function memoryStore() {
   const data = new Map();
@@ -97,4 +97,50 @@ test('scores count only the student’s own questions', async () => {
 test('a tutorial’s exit check can’t run live', async () => {
   const { store } = await setup();
   await assert.rejects(quizTeacherAction(store, 'tut1', { action: 'live_start' }), { code: 'not_live' });
+});
+
+async function cyStarted(opts) {
+  const set = await setup(opts);
+  set.store.data.set(tutorialKeys('tut1').group('gb'), { sitting: false, seen_at: 'x', done_students: ['st_cy'], shown: null });
+  await quizAction(set.store, 'tut1', { action: 'claim', ...who(2), initials: 'CD' });
+  await quizAction(set.store, 'tut1', { action: 'start', ...who(2) });
+  return set;
+}
+
+test('a foreign question in a hand-in is ignored', async () => {
+  const { store, record } = await cyStarted();
+  const done = await quizAction(store, 'tut1', { action: 'submit', ...who(2), responses: { qa1: { selected: [rightOption(record, 'qa1')] } } });
+  assert.equal(done.results[0].max, 1);
+  assert.equal(done.results[0].score, 0);
+  assert.deepEqual(done.results[0].rows.map((r) => r.id), ['qb1']);
+});
+
+test('a hint on another group’s question is refused', async () => {
+  const { store } = await cyStarted();
+  const own = await quizAction(store, 'tut1', { action: 'hint', ...who(2), question_id: 'qb1' });
+  assert.equal(own.hint, 'Hint qb1');
+  await assert.rejects(quizAction(store, 'tut1', { action: 'hint', ...who(2), question_id: 'qa1' }), { code: 'no_hint' });
+});
+
+test('Done for one group doesn’t unlock another', async () => {
+  const { store } = await setup();
+  store.data.set(tutorialKeys('tut1').group('ga'), { sitting: false, seen_at: 'x', done_students: ['st_ann'], shown: null });
+  await quizAction(store, 'tut1', { action: 'claim', ...who(2), initials: 'CD' });
+  await assert.rejects(quizAction(store, 'tut1', { action: 'start', ...who(2) }), { code: 'not_yet' });
+});
+
+test('a student in no group has nothing to answer', async () => {
+  const { store } = await setup();
+  await quizAction(store, 'tut1', { action: 'claim', ...who(3), initials: 'EF' });
+  const ed = await quizAction(store, 'tut1', { action: 'status', ...who(3) });
+  assert.deepEqual(ed.questions, []);
+  await assert.rejects(quizAction(store, 'tut1', { action: 'start', ...who(3) }), { code: 'empty' });
+});
+
+test('live status and end on a tutorial just say there’s no round', async () => {
+  const { store } = await setup();
+  assert.deepEqual(await quizTeacherAction(store, 'tut1', { action: 'live_status' }), { live: null });
+  assert.deepEqual(await quizTeacherAction(store, 'tut1', { action: 'live_end' }), { live: null });
+  await quizAction(store, 'tut1', { action: 'claim', ...who(1), initials: 'AB' });
+  assert.deepEqual(await quizAction(store, 'tut1', { action: 'live_status', ...who(1) }), { live: null });
 });

@@ -160,6 +160,9 @@ export async function storeQuizKey(store, lessonId, quiz) {
 
 /* ── Loading ───────────────────────────────────────────────────────── */
 
+/** Lesson modes whose quiz questions run on this engine: a quiz, and a tutorial's exit check. */
+const QUIZ_MODES = new Set(['quiz', 'tutorial']);
+
 async function loadQuiz(store, lessonId) {
   if (!isSafeId(lessonId)) reject(404, 'not_found', 'Quiz not found.');
   const k = keys(lessonId);
@@ -223,9 +226,6 @@ const cleanCodes = (v) => (Array.isArray(v) ? [...new Set(v.filter((c) => typeof
 /** Students' copy of a record's questions, in quiz order. */
 const publicQuestions = (record) => record.order.map((id) => record.questions[id].question);
 
-/** Lesson modes whose quiz questions run on this engine: a quiz, and a tutorial's exit check. */
-const QUIZ_MODES = new Set(['quiz', 'tutorial']);
-
 /**
  * A tutorial's exit check holds every group's questions; each student answers
  * only their group's. `groups` maps student id → question ids. A plain quiz has
@@ -234,7 +234,8 @@ const QUIZ_MODES = new Set(['quiz', 'tutorial']);
  */
 export function narrow(record, studentId) {
   if (!record?.groups) return record;
-  const mine = new Set(Object.hasOwn(record.groups, studentId ?? '') ? record.groups[studentId] ?? [] : []);
+  const own = Object.hasOwn(record.groups, studentId ?? '') ? record.groups[studentId] : null;
+  const mine = new Set(Array.isArray(own) ? own : []);
   const order = record.order.filter((id) => mine.has(id));
   return { ...record, order, questions: Object.fromEntries(order.map((id) => [id, record.questions[id]])) };
 }
@@ -346,10 +347,12 @@ export async function quizAction(store, lessonId, body) {
     reject(403, 'not_for_you', 'This quiz is for a small group.');
   }
   if (!['status', 'claim'].includes(action)) needIdentity(who);
-  // A tutorial's exit check: only the student's own group's questions, and only after the teacher's Done.
+  // Any key with `groups` is narrowed to the student's own questions. Only a
+  // tutorial's exit check also waits for the teacher's Done before it starts.
   if (record.groups) {
     if (!who.student && !['status', 'claim'].includes(action)) reject(403, 'no_list', 'Your teacher hasn’t added a class list yet.');
     record = narrow(record, who.student?.id);
+    if (action === 'start' && !record.order.length) reject(409, 'empty', 'There’s nothing for you to answer here yet.');
     if (action === 'start' && draft.pedagogical_mode === 'tutorial' && !(await exitUnlocked(store, lessonId, who.student.id))) {
       reject(403, 'not_yet', 'Your teacher opens this after you’ve worked together.');
     }
@@ -930,7 +933,7 @@ async function liveTeacher(store, lessonId, body, action) {
     throw error;
   }
   const { record, k } = loaded;
-  if (record.groups) reject(409, 'not_live', 'A tutorial’s exit check can’t run live.');
+  if (record.groups && action === 'live_start') reject(409, 'not_live', 'A tutorial’s exit check can’t run live.');
   let live = await liveState(store, k);
 
   if (action === 'live_start') {
@@ -994,6 +997,8 @@ async function liveTeacher(store, lessonId, body, action) {
 async function liveStudent(store, lessonId, body, action) {
   if (!['live_status', 'live_join', 'live_answer'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const { record, k } = await loadQuiz(store, lessonId);
+  // A grouped key never runs live: students see no live round.
+  if (record.groups) return { live: null };
   const live = await liveState(store, k);
   if (!live || live.phase === 'done') return { live: null };
   if (body.session && body.session !== live.session) reject(409, 'new_session', 'Your teacher started a new live quiz. Join again.');
