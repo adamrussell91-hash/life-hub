@@ -269,7 +269,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
 
   const onKey = (e: KeyboardEvent) => {
     // A block that handles its own arrows (tabs, gallery, card stack) has already prevented the default.
-    if (e.defaultPrevented || !root.contains(stage) || e.altKey || e.metaKey || e.ctrlKey || e.repeat) return;
+    if (e.defaultPrevented || !root.isConnected || !root.contains(stage) || e.altKey || e.metaKey || e.ctrlKey || e.repeat) return;
     const t = e.target as HTMLElement | null;
     if (t?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
     if (e.key === ' ') {
