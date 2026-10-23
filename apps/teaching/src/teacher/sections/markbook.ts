@@ -262,6 +262,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   }
 
   const actions: MarkbookActions = {
+    openStudent: () => {},
     setMark: (columnId, studentId, mark) =>
       change({ kind: 'mark', columnId, studentId, mark }, () => api.setMark(cls.id, columnId, studentId, mark)),
     hideQuiz: (lessonId, hidden) => change({ kind: 'hide', lessonId, hidden }, () => api.hideQuiz(cls.id, lessonId, hidden)),

@@ -1,10 +1,11 @@
+import type { EvidenceItem } from '@/quiz/evidence';
 import type { AssessmentMark, Column, Markbook } from './schema';
 
 /** What the markbook endpoint's `load` returns, and the shapes the views draw. */
 
 export type RosterStudent = { id: string; name: string; initials: string; removed?: true };
 
-export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[] };
+export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[]; codes?: string[]; items?: EvidenceItem[] };
 export type QuizScore = { attempt_id: string; submitted_at: string; score: number; max: number; pending: number; rows: QuizRow[] };
 export type QuizQuestionMeta = { id: string; prompt: string; marks: number; outcomes: string[] };
 export type QuizColumn = {
@@ -17,6 +18,7 @@ export type QuizColumn = {
   hidden: boolean;
   /** The quiz asked students how sure they were. */
   confidence: boolean;
+  closed?: boolean;
   questions: QuizQuestionMeta[];
   scores: Record<string, QuizScore>;
 };
@@ -32,6 +34,7 @@ export type MarkbookActions = {
   editColumn: (columnId: string) => void;
   hideQuiz: (lessonId: string, hidden: boolean) => void;
   openHeatmap: (lessonId: string) => void;
+  openStudent: (studentId: string) => void;
 };
 
 export type { AssessmentMark };
