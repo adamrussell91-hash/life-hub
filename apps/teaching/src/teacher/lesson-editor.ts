@@ -340,7 +340,24 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       return { text: blockQueryText(selected), hasSelection: Boolean(selected) };
     }
 
+    // Expanded, the chat floats over the lesson so the page keeps its full
+    // width and wide blocks are never squeezed.
+    function setChatExpanded(expanded: boolean): void {
+      builder.classList.toggle('lesson-builder--chat-expanded', expanded);
+      aiPanel?.setExpanded(expanded);
+    }
+
+    function isChatExpanded(): boolean {
+      return builder.classList.contains('lesson-builder--chat-expanded');
+    }
+
+    builder.addEventListener('click', (event) => {
+      // The scrim behind an expanded chat is the builder itself.
+      if (event.target === builder && isChatExpanded()) setChatExpanded(false);
+    });
+
     function setChatShelved(shelved: boolean): void {
+      if (shelved) setChatExpanded(false);
       builder.classList.toggle('lesson-builder--chat-shelved', shelved);
       aiPanel?.setShelved(shelved);
       chatFab.hidden = !shelved;
@@ -713,6 +730,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         paintChatFab(slug);
       },
       onRequestShelve: () => setChatShelved(true),
+      onToggleExpand: () => setChatExpanded(!isChatExpanded()),
       flushDraft: () => saveController?.flush() ?? Promise.resolve()
     });
 
@@ -729,7 +747,14 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     chatFab.addEventListener('click', () => showColumn('chat'));
 
     function onWindowKeydown(event: KeyboardEvent): void {
-      if (disposed || isTypingTarget(event.target)) return;
+      if (disposed) return;
+      // Escape puts an expanded chat back in its column, even mid-message.
+      if (event.key === 'Escape' && isChatExpanded()) {
+        event.preventDefault();
+        setChatExpanded(false);
+        return;
+      }
+      if (isTypingTarget(event.target)) return;
       if (shouldExitBuilderFullPage(event.key, fullPage)) {
         event.preventDefault();
         if (!builder.classList.contains('lesson-builder--chat-shelved')) {

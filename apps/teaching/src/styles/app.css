@@ -9192,6 +9192,55 @@ input.scope-timeline__note-title:focus-visible {
   display: none;
 }
 
+/* Expanded, the chat floats over the lesson instead of taking page width,
+ * so wide blocks keep their room. Phones already get a full-screen chat. */
+.ai-panel__expand[hidden] {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .lesson-builder.lesson-builder--chat-expanded:not(.lesson-builder--chat-shelved)::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: color-mix(in srgb, var(--depth, #0b1f3a) 22%, transparent);
+  }
+
+  .lesson-builder.lesson-builder--chat-expanded:not(.lesson-builder--chat-shelved) .lesson-builder__chat {
+    position: fixed;
+    top: var(--space-4);
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 40;
+    /* As a grid item it keeps its content height unless told otherwise. */
+    height: calc(100dvh - 2 * var(--space-4));
+    width: min(64rem, 66vw);
+    max-width: min(64rem, 66vw);
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .lesson-builder.lesson-builder--chat-expanded:not(.lesson-builder--chat-shelved) .lesson-builder__chat > .ai-panel {
+    flex: 1 1 auto;
+    height: auto;
+    max-height: none;
+    box-shadow: var(--elev-4);
+  }
+
+  /* With the whole screen height, the Confirm card can show its batch. */
+  .lesson-builder--chat-expanded .ai-panel__proposal-list {
+    max-height: 18rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .ai-panel__expand {
+    display: none;
+  }
+}
+
 /* The chat keeps its full height whatever the trays above the thread are
  * doing; folding them gives the room to the thread, not back to the page. */
 .lesson-builder__chat > .ai-panel {
