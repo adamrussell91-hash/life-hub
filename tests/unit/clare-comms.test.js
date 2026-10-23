@@ -119,3 +119,12 @@ test('purpose check, task title and next session are bounded', async () => {
   assert.deepEqual(next, { date: '2026-10-21', time: '11:50', duration_min: 15, reason: 'Weekly, same slot.' });
   await assert.rejects(() => suggestNextSession(ctx, fake({ date: 'soon', time: '9', duration_min: 900 })), { code: 'clare_failed' });
 });
+
+test('guides reach Clare as context and moves, with a house rule against labels', async () => {
+  const { complete, calls } = fake({ summary: 'Next, link the essay to a goal they named.', promises: [], numbers: [] });
+  const withGuides = { ...ctx, guides: [{ about: 'Alex J.', guide: 'Motivation', context: 'English · essays', moves: ['Link the task to a goal they named themselves.'] }] };
+  await generateSummary(withGuides, { complete });
+  assert.match(calls[0].system, /Never name a motivation type or profile/);
+  const sent = JSON.parse(calls[0].content[0].text);
+  assert.deepEqual(sent.guides, [{ about: 'Alex J.', guide: 'Motivation', context: 'English · essays', moves: ['Link the task to a goal they named themselves.'] }]);
+});

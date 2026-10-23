@@ -498,6 +498,30 @@
     "note_cue.prompt filler",
     "📓"
   ],
+  "every-block/every_with_teacher/student": [
+    "Your teacher will join you here."
+  ],
+  "every-block/every_with_teacher/teacher": [
+    "With teacher"
+  ],
+  "every-block/every_faded_example/student": [
+    "Effect",
+    "Technique",
+    "Where",
+    "faded_example.parts.0.answer filler",
+    "faded_example.parts.1.answer filler",
+    "faded_example.parts.2.answer filler",
+    "faded_example.prompt filler"
+  ],
+  "every-block/every_faded_example/teacher": [
+    "Effect",
+    "Technique",
+    "Where",
+    "faded_example.parts.0.answer filler",
+    "faded_example.parts.1.answer filler",
+    "faded_example.parts.2.answer filler",
+    "faded_example.prompt filler"
+  ],
   "every-block/every_chart/student": [
     "2",
     "3",

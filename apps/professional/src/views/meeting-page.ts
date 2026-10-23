@@ -1,7 +1,7 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
-import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
+import { getMeeting, listMeetings, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
 import {
   createUniversalLink,
   suppressUniversalLink,
@@ -17,7 +17,7 @@ import { makeActionTask } from '@/lib/action-task';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/lib/inline-promises';
 import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting-notes';
-import { groupRoom, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
+import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
 import { searchPickerPeople } from '@/lib/person-picker';
@@ -34,6 +34,11 @@ import {
   type ClareDraft
 } from '@/api/clare-comms';
 import { buildClareContext } from '@/lib/clare-context';
+import { GUIDES, guideById } from '@/guides/registry';
+import { openGuidePanel } from '@/guides/guide-panel';
+import { renderGuideCard } from '@/guides/guide-card';
+import { guideDigest, historyFor, noteLine, placeRuns, type PlacedRun } from '@/guides/runs';
+import type { GuideRun } from '@/guides/types';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -55,6 +60,12 @@ const STATE_LABEL: Record<string, string> = {
 
 function isOpenState(state: string): boolean {
   return state === 'scheduled' || state === 'rescheduled';
+}
+
+/** A run saved to the meeting: replace by id, else add. The note line is for the first save only. */
+export function saveGuideRun(runs: GuideRun[], run: GuideRun): { runs: GuideRun[]; note: string | null } {
+  const first = !runs.some((r) => r.id === run.id);
+  return { runs: first ? [...runs, run] : runs.map((r) => (r.id === run.id ? run : r)), note: first ? noteLine(run) : null };
 }
 
 /** `Wed 30/09/26 · 3:30 pm – 4:30 pm` in the meeting's own zone. */
@@ -186,7 +197,7 @@ export async function renderMeetingPage(
     blocks: blockPage?.current() ?? record.blocks ?? [],
     summary: record.notes,
     todayKey,
-    extra: { time_zone: record.time_zone }
+    extra: { time_zone: record.time_zone, guides: guideDigest(record.guide_runs ?? []) }
   });
 
   // ── Header: what, when, where, state, edit ──
@@ -530,6 +541,74 @@ export async function renderMeetingPage(
   const mentions = el('section', 'card');
   mentions.dataset.part = 'mentions';
 
+  const guidesHost = el('section', 'card meeting-guides');
+  guidesHost.dataset.part = 'guides';
+  let placedCache: Promise<PlacedRun[]> | null = null;
+  const placed = () => (placedCache ??= listMeetings().then((r) => placeRuns(r.meetings)).catch(() => placeRuns([record])));
+
+  function aboutCandidates(): Array<{ ref: string; name: string }> {
+    const { byRef, byName } = indexDirectory(directory);
+    const all = attendees.map((a) => ({ ref: a.ref, name: a.name, student: directoryRowFor(a, byRef, byName)?.person_type === 'student' }));
+    const students = all.filter((p) => p.student);
+    return (students.length ? students : all).map(({ ref, name }) => ({ ref, name }));
+  }
+
+  async function storeGuideRun(run: GuideRun): Promise<void> {
+    const { runs, note } = saveGuideRun(record.guide_runs ?? [], run);
+    record = (await updateMeeting(id, { guide_runs: runs })).meeting;
+    placedCache = null;
+    if (note && blockPage) {
+      const html = `<p><em>${note.replace(/[<&>]/g, (c) => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;' })[c]!)}</em></p>`;
+      blockPage.append([{ id: `guide_note_${run.id}`, block_type: 'rich_text', variant: 'medium', content: { html } }]);
+    }
+    await paintGuides();
+  }
+
+  function openGuides(edit?: GuideRun): void {
+    const guide = edit ? guideById(edit.guide) : null;
+    openGuidePanel(document, {
+      guides: GUIDES,
+      about: aboutCandidates(),
+      placedRuns: placed,
+      onSave: storeGuideRun,
+      edit: edit && guide ? { guide, run: edit } : undefined
+    });
+  }
+
+  let guidesPaint = 0;
+  async function paintGuides(): Promise<void> {
+    const seq = ++guidesPaint;
+    const runs = record.guide_runs ?? [];
+    const head = el('div', 'meeting-guides__head');
+    const run = el('button', 'btn btn--secondary', '◐ Run a guide') as HTMLButtonElement;
+    run.type = 'button';
+    run.dataset.part = 'run-guide';
+    run.addEventListener('click', () => openGuides());
+    head.append(el('h3', undefined, 'Guides'), run);
+    guidesHost.replaceChildren(head);
+    if (!runs.length) {
+      guidesHost.append(el('p', 'muted', 'Structured reads you run with someone in the room land here.'));
+      return;
+    }
+    const all = await placed();
+    // A newer paint started while this one waited: let it draw, or the cards double up.
+    if (seq !== guidesPaint) return;
+    for (const saved of runs) {
+      const guide = guideById(saved.guide);
+      if (!guide) continue;
+      guidesHost.append(renderGuideCard(document, {
+        guide,
+        run: saved,
+        history: historyFor(all, saved),
+        onEdit: () => openGuides(saved),
+        onProfile: (profileId) => {
+          const profile = guide.profiles.find((p) => p.id === profileId);
+          if (profile) void storeGuideRun({ ...saved, profile: profile.id, moves: profile.moves, updated_at: new Date().toISOString() });
+        }
+      }));
+    }
+  }
+
   function paintBefore(): void {
     main.append(briefCard(), openPromisesCard(), notesCard(
       'Agenda and notes',
@@ -541,14 +620,16 @@ export async function renderMeetingPage(
     main.append(liveStrip(), notesCard(
       'Notes',
       'Start a line with »me to log something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.'
-    ), actions, mentions);
+    ), guidesHost, actions, mentions);
+    void paintGuides();
     paintActions();
     paintMentions(blockPage?.current() ?? record.blocks ?? []);
   }
 
   function paintAfter(): void {
     if (record.purpose) main.append(purposeCheckCard());
-    main.append(wrapUpCard(), actions, notesCard('Notes', 'Your notes from the meeting. Still editable.'), mentions);
+    main.append(wrapUpCard(), actions, notesCard('Notes', 'Your notes from the meeting. Still editable.'), guidesHost, mentions);
+    void paintGuides();
     paintActions();
     paintMentions(blockPage?.current() ?? record.blocks ?? []);
   }
@@ -701,7 +782,11 @@ export async function renderMeetingPage(
         file.value = '';
       }
     });
-    strip.append(el('span', 'live-strip__rec', 'Live'), timer, photo, end);
+    const guidesBtn = el('button', 'btn btn--ghost', '◐ Guides') as HTMLButtonElement;
+    guidesBtn.type = 'button';
+    guidesBtn.dataset.part = 'open-guides';
+    guidesBtn.addEventListener('click', () => openGuides());
+    strip.append(el('span', 'live-strip__rec', 'Live'), timer, photo, guidesBtn, end);
     return strip;
   }
 

@@ -18,7 +18,7 @@ export const PublishedLessonSchema = z.object({
   outcome_ids: z.array(z.string().min(1)).max(24).optional(),
   feedback_off: z.boolean().optional(),
   /** Quiz lessons: the settings students may see, with the published version. */
-  pedagogical_mode: z.enum(['quiz', 'lecture']).optional(),
+  pedagogical_mode: z.enum(['quiz', 'lecture', 'tutorial']).optional(),
   quiz: QuizSettingsSchema.extend({
     version: z.string(),
     question_count: z.number().int(),

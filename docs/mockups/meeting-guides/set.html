@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meeting Guides</title>
+<style>
+  /* Guide palette: paper and ink like the Problem Solver / Decision Maker set; its own pair for the
+     continuum: clay for controlled, teal for autonomous, slate for amotivation. */
+  :root {
+    --paper: #f7f4ec; --card: #fffdf8; --ink: #1b2230; --muted: #6b7380; --line: rgba(27, 34, 48, 0.12);
+    --navy: #1f3a5f;
+    --slate: #9aa3ad; --slate-tint: #eceef0;
+    --clay-1: #b4532a; --clay-2: #e08a5c; --clay-tint: #f8e6da;
+    --teal-1: #7cc3b8; --teal-2: #3d9c8f; --teal-3: #1f6f66; --teal-tint: #dcefeb;
+    --font: Inter, ui-sans-serif, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9e6dd; font-family: var(--font); color: var(--ink); font-size: 15px; }
+  .sheet { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+  .sheet > h1 { font-size: 22px; margin: 0 0 4px; }
+  .sheet > p { color: var(--muted); margin: 0 0 24px; max-width: 70ch; }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 32px 0 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .row > div { max-width: 100%; min-width: 0; }
+  .frame { background: var(--paper); border-radius: 18px; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 24px rgba(27,34,48,.08); overflow: hidden; }
+  .frame--phone { width: 390px; max-width: 100%; min-height: 720px; }
+  .cap { font-size: 13px; color: var(--muted); margin: 8px 4px 0; max-width: 390px; }
+
+  /* ---- Emblem ---- */
+  .emblem { width: 44px; height: 44px; flex: none; }
+
+  /* ---- Meeting page (desktop) ---- */
+  .meeting { display: grid; grid-template-columns: 1fr 420px; min-height: 760px; width: 100%; }
+  .meeting__main { padding: 24px 28px; }
+  .crumbs { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .meeting h2 { font-size: 26px; margin: 6px 0 14px; }
+  .strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; }
+  .strip .live { font-size: 13px; font-weight: 600; color: var(--teal-3); margin-right: auto; display: flex; gap: 6px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal-2); }
+  .btn { font: inherit; font-size: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .btn--on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .btn--primary { background: var(--teal-3); color: #fff; border-color: var(--teal-3); font-weight: 600; }
+  .btn--quiet { border-color: transparent; background: transparent; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; margin-top: 16px; }
+  .card h3 { margin: 0 0 8px; font-size: 16px; }
+  .room { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { font-size: 13px; border-radius: 999px; padding: 4px 10px 4px 4px; background: var(--card); border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; }
+  .av { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; background: #7a5cc0; }
+  .notes p { margin: 6px 0; color: #333a45; line-height: 1.5; }
+  .notes .guide-line { color: var(--teal-3); font-weight: 600; font-size: 14px; }
+
+  /* ---- Side panel ---- */
+  .panel { background: var(--paper); border-left: 1px solid var(--line); padding: 18px 18px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .panel__head { display: flex; justify-content: space-between; align-items: center; }
+  .panel__head b { font-size: 15px; }
+  .about { font-size: 13px; color: var(--muted); }
+  .shelf-card { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+  .shelf-card b { display: block; font-size: 15px; }
+  .shelf-card span { font-size: 13px; color: var(--muted); }
+  .shelf-card--soon { opacity: .45; border-style: dashed; }
+
+  /* ---- Step screens ---- */
+  .step { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .step__top { display: flex; align-items: center; gap: 10px; }
+  .step__top .title { font-weight: 700; font-size: 15px; }
+  .step__top .who { font-size: 13px; color: var(--muted); }
+  .progress { display: flex; gap: 4px; }
+  .progress i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+  .progress i.done { background: var(--ink); }
+  .progress i.now { background: var(--clay-2); }
+  .ctx { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .ctx b { color: var(--ink); }
+  .prompt { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  .type-tag { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--clay-1); }
+  .type-tag .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--clay-2); }
+  .ask { font-size: 20px; font-weight: 650; line-height: 1.3; margin: 10px 0 4px; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .listen { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .listen li { font-size: 14px; background: var(--clay-tint); border-radius: 10px; padding: 7px 10px; font-style: italic; }
+  .listen-h { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 14px; }
+  .taps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .tap { font: inherit; font-size: 13px; padding: 12px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); text-align: center; line-height: 1.2; }
+  .tap i { display: block; margin: 0 auto 6px; height: 14px; display: flex; gap: 2px; justify-content: center; align-items: flex-end; }
+  .tap i s { width: 4px; background: var(--line); border-radius: 1px; text-decoration: none; }
+  .tap--on { border-color: var(--clay-1); background: var(--clay-tint); font-weight: 650; }
+  .tap--on i s.f { background: var(--clay-1); }
+  .quote { display: flex; gap: 8px; align-items: center; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14px; color: var(--muted); }
+  .quote--filled { border-style: solid; color: var(--ink); font-style: italic; }
+  .nav { display: flex; justify-content: space-between; margin-top: auto; }
+
+  /* Check card */
+  .check { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  .check h4 { margin: 8px 0 6px; font-size: 18px; }
+  .balance { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin: 14px 0 4px; font-size: 12px; font-weight: 600; }
+  .balance .l { text-align: right; color: var(--clay-1); }
+  .balance .r { color: var(--teal-3); }
+  .beam { width: 120px; height: 34px; }
+  .probe { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+  .probe p { margin: 0 0 8px; font-weight: 600; font-size: 15px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .two .tap { font-size: 13px; padding: 10px 6px; }
+  .tap--teal.tap--on { border-color: var(--teal-3); background: var(--teal-tint); }
+  .nudge { font-size: 13px; color: var(--teal-3); font-weight: 600; margin-top: 8px; }
+
+  /* ---- The continuum chart ---- */
+  .chart { position: relative; padding: 10px 4px 0; }
+  .zones { position: absolute; inset: 10px 4px 34px; display: grid; grid-template-columns: 1fr 2fr 3fr; gap: 6px; pointer-events: none; }
+  .zones div { border-radius: 10px; }
+  .z-a { background: var(--slate-tint); }
+  .z-c { background: var(--clay-tint); }
+  .z-t { background: var(--teal-tint); }
+  .zone-names { position: absolute; top: 14px; left: 4px; right: 4px; display: grid; grid-template-columns: 1fr 2fr 3fr; gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: center; }
+  .zone-names span:nth-child(2) { color: var(--clay-1); }
+  .zone-names span:nth-child(3) { color: var(--teal-3); }
+  .bars { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; height: 196px; padding-top: 28px; align-items: end; }
+  .col { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .bar { width: 58%; border-radius: 8px 8px 3px 3px; position: relative; }
+  .ghost { position: absolute; z-index: 1; bottom: 0; width: 58%; border: 2px dashed var(--ink); border-radius: 8px 8px 3px 3px; opacity: .35; }
+  .sugg { position: absolute; left: 12%; right: 12%; height: 0; border-top: 2px dotted var(--ink); opacity: .55; }
+  .legend .sug { border-top: 2px dotted var(--ink); height: 0; border-radius: 0; opacity: .55; }
+  .handle { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); width: 26px; height: 14px; border-radius: 7px; background: #fff; border: 2px solid var(--ink); }
+  .val { position: absolute; top: -22px; left: 0; right: 0; text-align: center; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .names { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 8px 0 0; }
+  .names span { font-size: 11px; font-weight: 600; text-align: center; line-height: 1.15; color: #3a4250; }
+  .c-a { background: var(--slate); } .c-e { background: var(--clay-1); } .c-j { background: var(--clay-2); }
+  .c-d { background: var(--teal-1); } .c-g { background: var(--teal-2); } .c-i { background: var(--teal-3); }
+  .lean { margin: 18px 4px 0; }
+  .lean__track { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--clay-1), var(--clay-tint) 50%, var(--teal-tint) 50%, var(--teal-3)); }
+  .lean__pin { position: absolute; top: -6px; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); transform: translateX(-50%); }
+  .lean__pin--then { border: 2px dashed var(--ink); opacity: .45; background: transparent; }
+  .lean__ends { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 6px; }
+  .lean__ends span:first-child { color: var(--clay-1); } .lean__ends span:last-child { color: var(--teal-3); }
+
+  /* ---- Result card ---- */
+  .result { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; }
+  .result__head { display: flex; gap: 12px; align-items: center; }
+  .result__head .k { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .result__head .t { font-size: 18px; font-weight: 700; }
+  .result__head .edit { margin-left: auto; }
+  .profile { display: flex; gap: 10px; align-items: center; margin: 14px 0 2px; padding: 10px 12px; border-radius: 14px; background: var(--paper); }
+  .profile .pname { font-weight: 700; }
+  .profile .pctx { font-size: 13px; color: var(--muted); }
+  .profile .pick { margin-left: auto; white-space: nowrap; font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin: 10px 4px 0; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 16px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+  .legend .now { background: var(--ink); }
+  .legend .then { border: 2px dashed var(--ink); opacity: .45; }
+  .moves h4, .words h4 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+  .moves ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: m; }
+  .moves li { counter-increment: m; display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.4; }
+  .moves li::before { content: counter(m); flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--teal-3); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+  .words blockquote { margin: 0 0 6px; padding: 6px 10px; border-left: 3px solid var(--clay-2); font-style: italic; font-size: 14px; color: #3a4250; }
+  .cite { font-size: 11px; color: var(--muted); margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+
+  /* ---- Profile strip ---- */
+  .person { padding: 20px; }
+  .person__head { display: flex; gap: 12px; align-items: center; }
+  .person__head .av { width: 44px; height: 44px; font-size: 15px; }
+  .person__head b { font-size: 20px; display: block; }
+  .badge { font-size: 11px; font-weight: 700; background: #efe7fb; color: #5a3fa6; border-radius: 6px; padding: 2px 6px; }
+  .mstrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+  .mini { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+  .mini b { font-size: 14px; }
+  .mini .d { font-size: 12px; color: var(--muted); }
+  .spark { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; height: 40px; align-items: end; margin: 8px 0 6px; }
+  .spark i { border-radius: 3px 3px 1px 1px; }
+  .mini .lean__track { height: 6px; }
+  .mini .lean__pin { width: 14px; height: 14px; top: -4px; border-width: 2px; }
+  .timeline { margin-top: 18px; border-left: 2px solid var(--line); padding-left: 14px; display: grid; gap: 12px; }
+  .tl { font-size: 14px; }
+  .tl .d { font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .meeting { grid-template-columns: 1fr; }
+    .panel { border-left: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>Meeting Guides · mockups</h1>
+  <p>Motivation (SDT) is the first guide on the shelf. Mock data with an invented student. Screens 2 to 5 are drawn at 390px: that is the phone, and the side panel on a desktop is about the same width.</p>
+
+  <!-- SVG emblem, reused below -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="emblem-motivation" viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r="21" fill="#1b2230"/>
+      <line x1="11" y1="22" x2="33" y2="22" stroke="#f7f4ec" stroke-width="1.6" stroke-dasharray="1.5 2.5" stroke-linecap="round"/>
+      <circle cx="11.5" cy="22" r="5" fill="none" stroke="#e08a5c" stroke-width="2.4"/>
+      <circle cx="32.5" cy="22" r="6" fill="#3d9c8f"/>
+      <path d="M26 17.5 L29.5 22 L26 26.5" fill="none" stroke="#f7f4ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </svg>
+
+  <!-- 1. Meeting page with the shelf open -->
+  <div class="label">1 · Meeting page, Guides open (desktop)</div>
+  <div class="frame">
+    <div class="meeting">
+      <div class="meeting__main">
+        <div class="crumbs">Professional · Meetings</div>
+        <h2>Check-in with Jonah</h2>
+        <div class="strip">
+          <span class="live"><span class="dot"></span>In meeting · 12 min</span>
+          <button class="btn">✎ Read a photo</button>
+          <button class="btn btn--on">◐ Guides</button>
+          <button class="btn btn--quiet">End ›</button>
+        </div>
+        <div class="card">
+          <h3>The room · 1</h3>
+          <div class="room"><span class="chip"><span class="av">JP</span>Jonah Pereira <span class="badge">Student</span></span></div>
+        </div>
+        <div class="card notes">
+          <h3>Notes</h3>
+          <p>Talked through the persuasive essay draft. Says he left it until Sunday night again.</p>
+          <p>Gets it done but "only because Mum checks".</p>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="panel__head"><b>Guides</b><button class="btn btn--quiet">✕</button></div>
+        <div class="about">About <span class="chip"><span class="av">JP</span>Jonah Pereira</span></div>
+        <div class="shelf-card">
+          <svg class="emblem"><use href="#emblem-motivation"/></svg>
+          <div><b>Motivation</b><span>Where his reasons sit, from controlled to his own. About 5 minutes.</span></div>
+        </div>
+        <div class="shelf-card shelf-card--soon">
+          <svg class="emblem" viewBox="0 0 44 44"><circle cx="22" cy="22" r="21" fill="none" stroke="#9aa3ad" stroke-dasharray="3 3"/></svg>
+          <div><b>Next guide</b><span>The shelf takes more as we write them.</span></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="label">2 – 5 · Running the guide (390px)</div>
+  <div class="row">
+
+    <!-- 2. Context -->
+    <div>
+      <div class="frame frame--phone">
+        <div class="step">
+          <div class="step__top"><svg class="emblem"><use href="#emblem-motivation"/></svg><div><div class="title">Motivation</div><div class="who">About Jonah Pereira</div></div></div>
+          <div class="progress"><i class="now"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="prompt">
+            <div class="ask">What's this about?</div>
+            <div class="hint">One area at a time. Run it again for another.</div>
+            <div class="quote quote--filled" style="margin-top:14px;font-style:normal;font-weight:600">English · essays</div>
+            <div class="listen-h">Used before with Jonah</div>
+            <div class="room" style="margin-top:6px"><span class="chip" style="padding:4px 10px">English · essays</span><span class="chip" style="padding:4px 10px">Maths</span><span class="chip" style="padding:4px 10px">Debating</span></div>
+          </div>
+          <div class="hint">You'll ask six "why do you…" questions in your own words, then set the mix yourself.</div>
+          <div class="nav"><button class="btn btn--quiet">Cancel</button><button class="btn btn--primary">Start ›</button></div>
+        </div>
+      </div>
+      <p class="cap">Context first. Earlier contexts for this student come back as chips so history lines up.</p>
+    </div>
+
+    <!-- 3. A prompt -->
+    <div>
+      <div class="frame frame--phone">
+        <div class="step">
+          <div class="step__top"><svg class="emblem"><use href="#emblem-motivation"/></svg><div><div class="title">Motivation</div><div class="who">Jonah · <b>English · essays</b></div></div></div>
+          <div class="progress"><i class="done"></i><i class="done"></i><i class="done"></i><i class="now"></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="prompt">
+            <span class="type-tag"><span class="sw"></span>3 of 6 · Introjected</span>
+            <div class="ask">"When you do get the essay done, what's going through your head?"</div>
+            <div class="hint">Put it your own way. Listen for pressure he carries inside: guilt, shame, wanting to look good.</div>
+            <div class="listen-h">Sounds like</div>
+            <ul class="listen">
+              <li>"I'd feel bad if I didn't."</li>
+              <li>"I don't want to look lazy."</li>
+              <li>"I'd be embarrassed in front of the class."</li>
+            </ul>
+          </div>
+          <div class="taps">
+            <button class="tap"><i><s style="height:3px"></s><s style="height:3px"></s><s style="height:3px"></s></i>Not at all</button>
+            <button class="tap"><i><s class="f" style="height:5px"></s><s style="height:3px"></s><s style="height:3px"></s></i>A bit</button>
+            <button class="tap"><i><s class="f" style="height:5px"></s><s class="f" style="height:9px"></s><s style="height:3px"></s></i>Quite a lot</button>
+            <button class="tap tap--on"><i><s class="f" style="height:5px"></s><s class="f" style="height:9px"></s><s class="f" style="height:14px"></s></i>Very much</button>
+          </div>
+          <div class="quote quote--filled">❝ I'd feel bad if Mum saw it wasn't done.</div>
+          <div class="nav"><button class="btn btn--quiet">‹ Back</button><button class="btn btn--primary">Next ›</button></div>
+        </div>
+      </div>
+      <p class="cap">One card per type, in continuum order. The colour tells you which side of the line you're on. His words are optional.</p>
+    </div>
+
+    <!-- 4. The check -->
+    <div>
+      <div class="frame frame--phone">
+        <div class="step">
+          <div class="step__top"><svg class="emblem"><use href="#emblem-motivation"/></svg><div><div class="title">Motivation</div><div class="who">Jonah · <b>English · essays</b></div></div></div>
+          <div class="progress"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="now"></i><i></i></div>
+          <div class="check">
+            <span class="type-tag" style="color:var(--ink)"><span class="sw" style="background:linear-gradient(90deg,var(--clay-2) 50%,var(--teal-1) 50%)"></span>Getting the call right</span>
+            <h4>Guilt or genuinely valued?</h4>
+            <div class="hint">You heard both. These two are the hardest to tell apart, so check before you set the mix.</div>
+            <div class="balance">
+              <span class="l">Introjected<br><span style="font-weight:400;color:var(--muted)">pressure inside</span></span>
+              <svg class="beam" viewBox="0 0 120 34" aria-hidden="true">
+                <path d="M60 30 L54 34 L66 34 Z" fill="#1b2230"/>
+                <line x1="12" y1="12" x2="108" y2="20" stroke="#1b2230" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="7" fill="#e08a5c"/><circle cx="108" cy="20" r="7" fill="#7cc3b8"/>
+                <line x1="60" y1="16" x2="60" y2="30" stroke="#1b2230" stroke-width="2"/>
+              </svg>
+              <span class="r">Identified<br><span style="font-weight:400;color:var(--muted)">he values it</span></span>
+            </div>
+            <div class="probe">
+              <p>"If nobody would ever know or check, would you still do it?"</p>
+              <div class="two"><button class="tap">No, probably not</button><button class="tap tap--teal tap--on">Yes, I would</button></div>
+            </div>
+            <div class="probe">
+              <p>"When you skip it, does it feel guilty or tense, or more like a missed chance?"</p>
+              <div class="two"><button class="tap tap--on">Guilty or tense</button><button class="tap tap--teal">A missed chance</button></div>
+            </div>
+            <div class="nudge">Mixed answers: the suggestion stays as it is. You decide on the next screen.</div>
+          </div>
+          <div class="nav"><button class="btn btn--quiet">Skip</button><button class="btn btn--primary">Set the mix ›</button></div>
+        </div>
+      </div>
+      <p class="cap">Shows only when introjected and identified both came up. Each answer nudges the suggestion one step either way.</p>
+    </div>
+
+    <!-- 5. Set the mix -->
+    <div>
+      <div class="frame frame--phone">
+        <div class="step">
+          <div class="step__top"><svg class="emblem"><use href="#emblem-motivation"/></svg><div><div class="title">Set the mix</div><div class="who">Jonah · <b>English · essays</b></div></div></div>
+          <div class="progress"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="now"></i></div>
+          <div class="hint">Dotted lines are suggested from your taps. Drag each bar to your call. Only what you save is kept.</div>
+          <div class="chart">
+            <div class="zones"><div class="z-a"></div><div class="z-c"></div><div class="z-t"></div></div>
+            <div class="zone-names"><span></span><span>Controlled</span><span>Autonomous</span></div>
+            <div class="bars">
+              <div class="col"><div class="sugg" style="bottom:12%"></div><div class="bar c-a" style="height:10%"><span class="handle"></span></div></div>
+              <div class="col"><div class="sugg" style="bottom:40%"></div><div class="bar c-e" style="height:30%"><span class="handle"></span></div></div>
+              <div class="col"><div class="sugg" style="bottom:80%"></div><div class="bar c-j" style="height:70%"><span class="handle"></span></div></div>
+              <div class="col"><div class="sugg" style="bottom:40%"></div><div class="bar c-d" style="height:50%"><span class="handle"></span></div></div>
+              <div class="col"><div class="sugg" style="bottom:20%"></div><div class="bar c-g" style="height:20%"><span class="handle"></span></div></div>
+              <div class="col"><div class="sugg" style="bottom:20%"></div><div class="bar c-i" style="height:20%"><span class="handle"></span></div></div>
+            </div>
+            <div class="names"><span>Amotiv&shy;ation</span><span>External</span><span>Introj&shy;ected</span><span>Ident&shy;ified</span><span>Integ&shy;rated</span><span>Intrinsic</span></div>
+          </div>
+          <div class="lean">
+            <div class="lean__track"><span class="lean__pin" style="left:42%"></span></div>
+            <div class="lean__ends"><span>Controlled</span><span>Autonomous</span></div>
+          </div>
+          <div class="legend"><span><i class="sug"></i>Suggested from your taps</span><span><i class="now"></i>Your call</span></div>
+          <div class="nav"><button class="btn btn--quiet">‹ Back</button><button class="btn btn--primary">Save to meeting</button></div>
+        </div>
+      </div>
+      <p class="cap">The decision is yours: the bars start at the suggestion and you move them. Here Adam lowered external and raised identified after the check.</p>
+    </div>
+  </div>
+
+  <!-- 6. Result card -->
+  <div class="label">6 · The result card on the meeting page</div>
+  <div class="row">
+    <div style="width:560px;max-width:100%">
+      <div class="result">
+        <div class="result__head">
+          <svg class="emblem"><use href="#emblem-motivation"/></svg>
+          <div><div class="k">Motivation guide · 27 Oct</div><div class="t">English · essays</div></div>
+          <button class="btn btn--quiet edit">Edit</button>
+        </div>
+        <div class="profile">
+          <div><div class="pname">Leaning on control</div><div class="pctx">In English essays: more pressure than ownership, with real signs he values it.</div></div>
+          <span class="pick">Change ▾</span>
+        </div>
+        <div class="chart">
+          <div class="zones"><div class="z-a"></div><div class="z-c"></div><div class="z-t"></div></div>
+          <div class="zone-names"><span></span><span>Controlled</span><span>Autonomous</span></div>
+          <div class="bars">
+            <div class="col"><div class="ghost" style="height:20%"></div><div class="bar c-a" style="height:10%"></div></div>
+            <div class="col"><div class="ghost" style="height:60%"></div><div class="bar c-e" style="height:30%"></div></div>
+            <div class="col"><div class="ghost" style="height:60%"></div><div class="bar c-j" style="height:70%"></div></div>
+            <div class="col"><div class="ghost" style="height:30%"></div><div class="bar c-d" style="height:50%"></div></div>
+            <div class="col"><div class="ghost" style="height:10%"></div><div class="bar c-g" style="height:20%"></div></div>
+            <div class="col"><div class="ghost" style="height:10%"></div><div class="bar c-i" style="height:20%"></div></div>
+          </div>
+          <div class="names"><span>Amotiv&shy;ation</span><span>External</span><span>Introj&shy;ected</span><span>Ident&shy;ified</span><span>Integ&shy;rated</span><span>Intrinsic</span></div>
+        </div>
+        <div class="lean">
+          <div class="lean__track"><span class="lean__pin lean__pin--then" style="left:28%"></span><span class="lean__pin" style="left:42%"></span></div>
+          <div class="lean__ends"><span>Controlled</span><span>Autonomous</span></div>
+        </div>
+        <div class="legend"><span><i class="now"></i>27 Oct</span><span><i class="then"></i>4 Aug</span><span>Moving towards his own reasons</span></div>
+        <div class="moves">
+          <h4>Suggested moves</h4>
+          <ol>
+            <li>Link the essay to a goal he named himself, like winning his next debate.</li>
+            <li>Say the drafting is the dull part before asking for the effort.</li>
+            <li>Let him choose which paragraph to start with.</li>
+          </ol>
+        </div>
+        <div class="words">
+          <h4>His words</h4>
+          <blockquote>I'd feel bad if Mum saw it wasn't done.</blockquote>
+          <blockquote>It does help me get better at arguing.</blockquote>
+        </div>
+        <div class="cite">SDT continuum after Ryan &amp; Deci · profiles after McGregor, Jung &amp; Evans (2025) · moves after Vansteenkiste et al. (2018). Adam's read, not a test score.</div>
+      </div>
+      <p class="cap">Sits in its own Guides section under Notes. Notes get one line: "Motivation guide · English · essays · see card". The dashed outline is the earlier run in the same context.</p>
+    </div>
+
+    <!-- 7. Profile strip -->
+    <div style="width:560px;max-width:100%">
+      <div class="frame">
+        <div class="person">
+          <div class="person__head"><span class="av">JP</span><div><b>Jonah Pereira</b><span class="badge">Student</span></div></div>
+          <div class="label" style="margin-top:20px">Motivation</div>
+          <div class="mstrip">
+            <div class="mini">
+              <b>English · essays</b><div class="d">27 Oct · 2 runs</div>
+              <div class="spark"><i class="c-a" style="height:10%"></i><i class="c-e" style="height:30%"></i><i class="c-j" style="height:70%"></i><i class="c-d" style="height:50%"></i><i class="c-g" style="height:20%"></i><i class="c-i" style="height:20%"></i></div>
+              <div class="lean__track" style="position:relative"><span class="lean__pin" style="left:42%"></span></div>
+            </div>
+            <div class="mini">
+              <b>Debating</b><div class="d">12 Aug · 1 run</div>
+              <div class="spark"><i class="c-a" style="height:4%"></i><i class="c-e" style="height:10%"></i><i class="c-j" style="height:30%"></i><i class="c-d" style="height:70%"></i><i class="c-g" style="height:60%"></i><i class="c-i" style="height:90%"></i></div>
+              <div class="lean__track" style="position:relative"><span class="lean__pin" style="left:84%"></span></div>
+            </div>
+            <div class="mini">
+              <b>Maths</b><div class="d">4 Aug · 1 run</div>
+              <div class="spark"><i class="c-a" style="height:30%"></i><i class="c-e" style="height:70%"></i><i class="c-j" style="height:40%"></i><i class="c-d" style="height:20%"></i><i class="c-g" style="height:5%"></i><i class="c-i" style="height:10%"></i></div>
+              <div class="lean__track" style="position:relative"><span class="lean__pin" style="left:20%"></span></div>
+            </div>
+          </div>
+          <div class="label">Timeline</div>
+          <div class="timeline">
+            <div class="tl"><b>◐ Motivation guide · English · essays</b><div class="d">27 Oct · from Check-in with Jonah</div></div>
+            <div class="tl"><b>Meeting · Check-in with Jonah</b><div class="d">27 Oct</div></div>
+            <div class="tl"><b>◐ Motivation guide · Debating</b><div class="d">12 Aug · from Debate squad catch-up</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">On his People profile: the latest card per context, tap to open it. Each run also lands on the timeline, linked to its meeting.</p>
+    </div>
+  </div>
+
+  <!-- 8. Clare -->
+  <div class="label">8 · How Clare's summary uses it</div>
+  <div style="width:560px;max-width:100%" class="card">
+    <h3>Summary</h3>
+    <p style="margin:0;line-height:1.55;color:#333a45">Went through the persuasive essay draft; the work got finished late again. For English, next steps to try: link the essay to the debate he wants to win, name the drafting as the dull part before asking for effort, and let him pick where to start. Check in again after the next essay.</p>
+    <p class="cap" style="margin-top:10px">Reads the card's moves and context. It never names a motivation type or profile as a trait, and never quotes the scores.</p>
+  </div>
+</div>
+</body>
+</html>

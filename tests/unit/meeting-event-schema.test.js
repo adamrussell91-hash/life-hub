@@ -296,6 +296,7 @@ test('meeting v2 reads v1 with empty purpose, blocks and decisions', () => {
   assert.equal(parsed.purpose, null);
   assert.deepEqual(parsed.blocks, []);
   assert.deepEqual(parsed.decisions, []);
+  assert.deepEqual(parsed.guide_runs, []);
   assert.equal(projectMeeting(parsed).agenda, MEETING_V1.agenda);
 });
 
@@ -308,4 +309,28 @@ test('meeting update accepts purpose, blocks and decisions', () => {
   assert.equal(patch.decisions[0].agenda_heading, 'Minutes');
   assert.throws(() => validateMeetingFieldUpdate({ decisions: [{ id: 'd1' }] }), { code: 'invalid_decisions' });
   assert.throws(() => validateMeetingFieldUpdate({ purpose: 'x'.repeat(501) }), { code: 'purpose_too_long' });
+});
+
+test('meeting guide_runs: validated, bounded and kept on the record', () => {
+  const run = {
+    id: 'guide_1', guide: 'motivation_sdt', person_ref: 'shared:person:p_jonah', person_name: 'Jonah Pereira',
+    context: '  English · essays ', taps: { introjected: 3, identified: 2 }, quotes: ['I’d feel bad if I didn’t.'],
+    checks: { alone: 'yes' }, values: { amotivation: 1, external: 3, introjected: 7, identified: 5, integrated: 2, intrinsic: 2 },
+    profile: 'control', moves: ['Link the task to a goal they named themselves.'],
+    created_at: '2026-10-27T01:00:00.000Z', updated_at: '2026-10-27T01:05:00.000Z'
+  };
+  const patch = validateMeetingFieldUpdate({ guide_runs: [run] });
+  assert.equal(patch.guide_runs[0].context, 'English · essays');
+  assert.equal(patch.guide_runs[0].values.introjected, 7);
+  assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [{ ...run, context: '' }] }), { code: 'invalid_guide_runs' });
+  assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [{ ...run, values: { external: 11 } }] }), { code: 'invalid_guide_runs' });
+  assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [{ ...run, taps: { external: 4 } }] }), { code: 'invalid_guide_runs' });
+  assert.throws(() => validateMeetingFieldUpdate({ guide_runs: Array.from({ length: 21 }, (_, i) => ({ ...run, id: `g${i}` })) }), { code: 'invalid_guide_runs' });
+  const bad = (over) => assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [{ ...run, ...over }] }), { code: 'invalid_guide_runs' });
+  assert.throws(() => validateMeetingFieldUpdate({ guide_runs: [run, { ...run }] }), { code: 'invalid_guide_runs' });
+  bad({ values: { '  ': 3 } });
+  bad({ values: JSON.parse('{"__proto__": 3}') });
+  bad({ checks: ['yes'] });
+  bad({ created_at: 'not a date' });
+  bad({ updated_at: '' });
 });

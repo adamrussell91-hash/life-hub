@@ -50,6 +50,7 @@ import {
   splitQuestion
 } from './quiz-core.mjs';
 import { answerEvidence } from './quiz-evidence.mjs';
+import { exitUnlocked } from './tutorial-status.mjs';
 
 export { QuizError };
 
@@ -100,7 +101,7 @@ function publicSettings(settings) {
   };
 }
 
-function mapTree(blocks, fn) {
+export function mapTree(blocks, fn) {
   return (Array.isArray(blocks) ? blocks : []).flatMap((block) => {
     const next = fn(block);
     if (!next) return [];
@@ -157,13 +158,43 @@ export async function storeQuizKey(store, lessonId, quiz) {
   await store.setJSON(k.current, { version: quiz.version });
 }
 
+/**
+ * A tutorial student moved group: point their exit questions at the new
+ * group's. `pick(record)` returns the question ids from the current key.
+ * Also adds them to `for_students`. Returns 'updated', 'started' (left alone)
+ * or 'none' (no published exit check).
+ */
+export async function setStudentExitQuestions(store, lessonId, classId, studentId, pick) {
+  const k = keys(lessonId);
+  const current = await read(store, k.current);
+  if (!current?.version) return 'none';
+  const record = await read(store, k.version(current.version));
+  if (!record?.groups || typeof record.groups !== 'object') return 'none';
+  // A go already started is marked against the questions it began with, so
+  // changing them now would mis-mark it. That student keeps their old set.
+  const device = deviceHash(`student:${classId}:${studentId}`);
+  if ((await deviceAttempts(store, k, device, await clearedFrom(store, k, device))).length) return 'started';
+  const picked = pick(record);
+  const questions = (Array.isArray(picked) ? picked : []).filter((id) => record.order.includes(id));
+  const forStudents = Array.isArray(record.settings?.for_students) ? record.settings.for_students : [];
+  await store.setJSON(k.version(current.version), {
+    ...record,
+    groups: { ...record.groups, [studentId]: questions },
+    settings: { ...record.settings, for_students: forStudents.includes(studentId) ? forStudents : [...forStudents, studentId] }
+  });
+  return 'updated';
+}
+
 /* ── Loading ───────────────────────────────────────────────────────── */
+
+/** Lesson modes whose quiz questions run on this engine: a quiz, and a tutorial's exit check. */
+const QUIZ_MODES = new Set(['quiz', 'tutorial']);
 
 async function loadQuiz(store, lessonId) {
   if (!isSafeId(lessonId)) reject(404, 'not_found', 'Quiz not found.');
   const k = keys(lessonId);
   const [draft, snapshot, current] = await Promise.all([read(store, draftLessonKey(lessonId)), read(store, publishedLessonKey(lessonId)), read(store, k.current)]);
-  if (!draft || isDeletedRecord(draft) || !snapshot || draft.pedagogical_mode !== 'quiz' || !current?.version) {
+  if (!draft || isDeletedRecord(draft) || !snapshot || !QUIZ_MODES.has(draft.pedagogical_mode) || !current?.version) {
     reject(404, 'not_published', 'Publish this quiz first.');
   }
   const record = await read(store, k.version(current.version));
@@ -221,6 +252,20 @@ const cleanCodes = (v) => (Array.isArray(v) ? [...new Set(v.filter((c) => typeof
 
 /** Students' copy of a record's questions, in quiz order. */
 const publicQuestions = (record) => record.order.map((id) => record.questions[id].question);
+
+/**
+ * A tutorial's exit check holds every group's questions; each student answers
+ * only their group's. `groups` maps student id → question ids. A plain quiz has
+ * no `groups` and is returned as it is. Other groups' questions are dropped
+ * from `questions` too, so a hint or check can't reach them by id.
+ */
+export function narrow(record, studentId) {
+  if (!record?.groups) return record;
+  const own = Object.hasOwn(record.groups, studentId ?? '') ? record.groups[studentId] : null;
+  const mine = new Set(Array.isArray(own) ? own : []);
+  const order = record.order.filter((id) => mine.has(id));
+  return { ...record, order, questions: Object.fromEntries(order.map((id) => [id, record.questions[id]])) };
+}
 
 /** Marks every question in a handed-in attempt, applying hint costs and any teacher marks. */
 function scoreAttempt(record, result, teacherMarks) {
@@ -320,13 +365,25 @@ export async function quizAction(store, lessonId, body) {
   const action = body.action ?? 'status';
   if (action.startsWith('live_')) return liveStudent(store, lessonId, body, action);
   if (!['status', 'claim', 'start', 'hint', 'check', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
-  const { record, settings, k } = await loadQuiz(store, lessonId);
+  const loaded = await loadQuiz(store, lessonId);
+  const { draft, settings, k } = loaded;
+  let { record } = loaded;
   const who = await identify(store, body, action);
   // A follow-up quiz is for the students it was made for.
   if (settings.for_students?.length && who.student && !settings.for_students.includes(who.student.id)) {
     reject(403, 'not_for_you', 'This quiz is for a small group.');
   }
   if (!['status', 'claim'].includes(action)) needIdentity(who);
+  // Any key with `groups` is narrowed to the student's own questions. Only a
+  // tutorial's exit check also waits for the teacher's Done before it starts.
+  if (record.groups) {
+    if (!who.student && !['status', 'claim'].includes(action)) reject(403, 'no_list', 'Your teacher hasn’t added a class list yet.');
+    record = narrow(record, who.student?.id);
+    if (action === 'start' && !record.order.length) reject(409, 'empty', 'There’s nothing for you to answer here yet.');
+    if (action === 'start' && draft.pedagogical_mode === 'tutorial' && !(await exitUnlocked(store, lessonId, who.student.id))) {
+      reject(403, 'not_yet', 'Your teacher opens this after you’ve worked together.');
+    }
+  }
   const now = Date.now();
   const { closed } = await closedState(store, k, settings, now);
   const live = await read(store, k.live);
@@ -360,7 +417,7 @@ export async function quizAction(store, lessonId, body) {
 
   // An open attempt is always marked against the version it started on, so a
   // republish mid-quiz never loses or mis-marks anyone's answers.
-  const attemptRecord = current ? await recordFor(store, lessonId, current.version, record) : record;
+  const attemptRecord = current ? narrow(await recordFor(store, lessonId, current.version, record), who.student?.id) : record;
   const attemptSettings = resolveQuizSettings(attemptRecord.settings);
   const deadline = Date.parse(current?.deadline ?? '');
   const pastDeadline = Number.isFinite(deadline) && now > deadline + GRACE_MS;
@@ -456,7 +513,7 @@ export async function quizAction(store, lessonId, body) {
   const revealKeys = closed || used >= settings.attempts;
   const results = await Promise.all(
     done.map(async (a) => {
-      const rec = await recordFor(store, lessonId, a.version, record);
+      const rec = narrow(await recordFor(store, lessonId, a.version, record), who.student?.id);
       const scored = scoreAttempt(rec, a.result, await read(store, k.marks(device, a.n)));
       const base = { n: a.n, submitted_at: a.result.submitted_at, released };
       if (!released) return base;
@@ -598,7 +655,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     const [device, n] = [match[1], Number(match[2])];
     const [start, result] = await Promise.all([read(store, k.attempt(device, n)), read(store, k.result(device, n))]);
     if (!start || !result) reject(404, 'not_found', 'That attempt is gone.');
-    return { device, n, start, result, rec: await recordFor(store, lessonId, start.version, record) };
+    return { device, n, start, result, rec: narrow(await recordFor(store, lessonId, start.version, record), start.student_id) };
   };
 
   if (action === 'mark') {
@@ -651,7 +708,7 @@ export async function quizTeacherAction(store, lessonId, body) {
     if (n < froms.get(device)) continue;
     const [start, result] = await Promise.all([read(store, k.attempt(device, n)), read(store, key)]);
     if (!start || !result) continue;
-    const rec = await recordFor(store, lessonId, start.version, record);
+    const rec = narrow(await recordFor(store, lessonId, start.version, record), start.student_id);
     const scored = scoreAttempt(rec, result, await read(store, k.marks(device, n)));
     rows.push({
       id: attemptId(device, n),
@@ -734,7 +791,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
   const students = roster ? roster.students.map(({ id, name, initials }) => ({ id, name, initials })) : [];
   const attempts = [];
   for (const a of firsts) {
-    const rec = await recordFor(store, lessonId, a.start.version, record);
+    const rec = narrow(await recordFor(store, lessonId, a.start.version, record), a.start.student_id);
     const scored = scoreAttempt(rec, a.result, a.marks);
     const student = owners ? owners.get(a.owner) : a.start.student_id ?? a.owner;
     if (!owners) {
@@ -768,7 +825,7 @@ async function unitFamily(store, draft, lessonId) {
   const siblings = [];
   const followUps = [];
   drafts.forEach((d, i) => {
-    if (!d || isDeletedRecord(d) || d.pedagogical_mode !== 'quiz') return;
+    if (!d || isDeletedRecord(d) || !QUIZ_MODES.has(d.pedagogical_mode)) return;
     siblings.push({ lesson_id: ids[i], title: d.title });
     if (d.quiz?.follow_up_of === lessonId) followUps.push({ lesson_id: ids[i], title: d.title, flag: d.quiz.follow_up_flag ?? null });
   });
@@ -853,8 +910,20 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
     for_students: settings.for_students ?? [],
     dismissed: flags?.dismissed ?? [],
     follow_ups: kin.followUps,
-    siblings: kin.siblings
+    siblings: kin.siblings,
+    // A tutorial's exit check: each student's group name, for the markbook cell.
+    tutorial_groups: tutorialGroupNames(draft)
   };
+}
+
+function tutorialGroupNames(draft) {
+  if (draft.pedagogical_mode !== 'tutorial' || !Array.isArray(draft.tutorial?.groups)) return null;
+  const names = {};
+  for (const g of draft.tutorial.groups) {
+    if (!g || typeof g.name !== 'string' || !Array.isArray(g.students)) continue;
+    for (const s of g.students) if (typeof s === 'string' && !Object.hasOwn(names, s)) names[s] = g.name;
+  }
+  return names;
 }
 
 /**
@@ -882,7 +951,8 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     closed: insight.closed,
     first_at: firstAt,
     questions: insight.questions.map(({ id, prompt, marks, outcomes }) => ({ id, prompt, marks, outcomes })),
-    scores
+    scores,
+    ...(insight.tutorial_groups ? { groups: Object.fromEntries(Object.entries(insight.tutorial_groups).filter(([id]) => wanted.has(id))) } : {})
   };
 }
 
@@ -903,6 +973,7 @@ async function liveTeacher(store, lessonId, body, action) {
     throw error;
   }
   const { record, k } = loaded;
+  if (record.groups && action === 'live_start') reject(409, 'not_live', 'A tutorial’s exit check can’t run live.');
   let live = await liveState(store, k);
 
   if (action === 'live_start') {
@@ -966,6 +1037,8 @@ async function liveTeacher(store, lessonId, body, action) {
 async function liveStudent(store, lessonId, body, action) {
   if (!['live_status', 'live_join', 'live_answer'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const { record, k } = await loadQuiz(store, lessonId);
+  // A grouped key never runs live: students see no live round.
+  if (record.groups) return { live: null };
   const live = await liveState(store, k);
   if (!live || live.phase === 'done') return { live: null };
   if (body.session && body.session !== live.session) reject(409, 'new_session', 'Your teacher started a new live quiz. Join again.');
