@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { annBrief, startFollowUp } from '@/evidence/follow-up';
+import { annBrief, startAnn, startFollowUp, FollowUpStartError } from '@/evidence/follow-up';
 import type { Evidence } from '@/evidence/types';
 
 const ev = (student: string, why: Evidence['why'], share = 0): Evidence => ({ item: 'q1', tags: ['tech:personification'], share, why, student, source: 'quiz:l1', date: '2026-10-20', confidence: 3 });
@@ -42,5 +42,33 @@ describe('startFollowUp', () => {
       quiz: { for_students: ['s1', 's2'], follow_up_of: 'l1', follow_up_flag: 'sure_wrong:tech:personification', confidence: true }
     });
     expect(startJob).toHaveBeenCalledWith({ lesson_id: 'lesson_new', agent: 'ann', scope: 'lesson', message: 'Go ahead.' });
+  });
+
+  it('carries the lesson id when Ann fails to start, and a retry only starts Ann', async () => {
+    const createLesson = vi.fn(async () => ({ id: 'lesson_new' }));
+    const startJob = vi.fn().mockRejectedValueOnce(new Error('busy')).mockResolvedValueOnce({ id: 'j', status: 'working' });
+    const req = { sourceLessonId: 'l1', unitId: 'u1', flagId: null, title: 't', students: ['s1'], brief: 'Go ahead.' };
+    const err = await startFollowUp(req, { createLesson, startJob }).catch((e) => e);
+    expect(err).toBeInstanceOf(FollowUpStartError);
+    expect(err.lessonId).toBe('lesson_new');
+    await startAnn(err.lessonId, 'Go ahead.', { createLesson, startJob });
+    expect(createLesson).toHaveBeenCalledTimes(1);
+    expect(startJob).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('annBrief privacy', () => {
+  it('never contains student ids, names or initials', () => {
+    const ids = ['stu_ada_ash', 'stu_ben_bay'];
+    const ev2 = ids.map((id) => ({ ...ev(id, [{ type: 'named', as: 'tech:metaphor', target: 'tech:personification' }]) }));
+    const brief = annBrief({ tag: 'tech:personification', students: ids, evidence: ev2, label, codeLabel: (i) => i, sourceTitle: 'Pre-test', count: 4 });
+    for (const bad of ['stu_ada_ash', 'stu_ben_bay', 'Ada Ash', 'Ben Bay', 'AA', 'BB']) expect(brief).not.toContain(bad);
+  });
+
+  it('drops mistake lines, not the closing instructions, when too long', () => {
+    const many = Array.from({ length: 6 }, (_, i) => ev('s' + i, [{ type: 'option', id: 'x' + i, text: 'y'.repeat(3000) + i }]));
+    const brief = annBrief({ tag: 'tech:personification', students: many.map((e) => e.student), evidence: many, label, codeLabel: (i) => i, sourceTitle: 'T', count: 5 });
+    expect(brief.length).toBeLessThanOrEqual(8000);
+    expect(brief).toContain('single technique or idea');
   });
 });
