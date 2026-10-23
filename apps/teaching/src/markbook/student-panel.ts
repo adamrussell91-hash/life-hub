@@ -68,22 +68,34 @@ export function studentPanelBody(o: StudentPanelOptions, headingId?: string): HT
   return body;
 }
 
-export function openStudentPanel(o: StudentPanelOptions & { returnFocus?: () => HTMLElement | null }): void {
+export type StudentPanelHandle = {
+  /** Redraws with the pins `pinsNow` gives, e.g. after a failed save was rolled back. */
+  refresh: () => void;
+  close: () => void;
+};
+
+export function openStudentPanel(
+  o: StudentPanelOptions & { returnFocus?: () => HTMLElement | null; pinsNow?: () => FocusPins; onClose?: () => void }
+): StudentPanelHandle {
   const sheet = el('div', 'mb-sheet mb-sheet--student');
   const close = el('button', 'btn btn--secondary mb-sheet__close', 'Close');
   close.type = 'button';
   const headingId = `mb-student-${o.student.id}`;
   let pins = o.pins;
-  const build = (): HTMLElement => studentPanelBody({ ...o, pins, onPins: redraw }, headingId);
+  const build = (): HTMLElement => studentPanelBody({ ...o, pins, onPins: pick }, headingId);
   let body = build();
-  function redraw(next: FocusPins): void {
-    o.onPins(next);
-    pins = next;
+  /**
+   * Draws the body again, keeping focus on the same control, or the heading when it has gone.
+   * After a press (`pressed`) focus always lands somewhere in the panel: Safari leaves it on the body.
+   */
+  function repaint(pressed: boolean): void {
     const active = document.activeElement;
-    const key = active instanceof HTMLElement && body.contains(active) ? (active.dataset.focus ?? null) : null;
+    const hadFocus = active instanceof HTMLElement && body.contains(active);
+    const key = hadFocus ? (active.dataset.focus ?? null) : null;
     const fresh = build();
     body.replaceWith(fresh);
     body = fresh;
+    if (!hadFocus && !pressed) return;
     const same = key ? ([...fresh.querySelectorAll<HTMLElement>('[data-focus]')].find((n) => n.dataset.focus === key) ?? null) : null;
     if (same) same.focus();
     else {
@@ -94,7 +106,22 @@ export function openStudentPanel(o: StudentPanelOptions & { returnFocus?: () => 
       }
     }
   }
+  function pick(next: FocusPins): void {
+    // Set first, so a refresh the save triggers sees nothing new.
+    pins = next;
+    o.onPins(next);
+    repaint(true);
+  }
   sheet.append(close, body);
-  const opened = openOverlay(sheet, { labelledBy: headingId, returnFocus: o.returnFocus });
+  const opened = openOverlay(sheet, { labelledBy: headingId, returnFocus: o.returnFocus, onClose: o.onClose });
   close.addEventListener('click', () => opened.close());
+  return {
+    refresh: () => {
+      const now = o.pinsNow?.();
+      if (!now || JSON.stringify(now) === JSON.stringify(pins)) return;
+      pins = now;
+      repaint(false);
+    },
+    close: () => opened.close()
+  };
 }

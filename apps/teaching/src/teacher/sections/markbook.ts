@@ -17,7 +17,7 @@ import { renderGrid } from '@/markbook/grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
 import { renderPatterns } from '@/markbook/patterns-view';
-import { openStudentPanel } from '@/markbook/student-panel';
+import { openStudentPanel, type StudentPanelHandle } from '@/markbook/student-panel';
 import { loadInsightContext, codeLabel, type InsightContext } from '@/evidence/context';
 import { markbookEvidence } from '@/evidence/markbook-evidence';
 import { defaultKind } from '@/evidence/patterns';
@@ -102,6 +102,12 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let mode: 'grid' | 'patterns' = 'grid';
   /** Names for tags and codes, for Patterns and the student panel; loaded once, after the markbook. */
   let ctx: InsightContext | null = null;
+  /** Set when the tag names could not be loaded, so Patterns and the student panel say so. */
+  let ctxError: string | null = null;
+  /** A student whose name was pressed before the tag names arrived; their panel opens once they do. */
+  let pendingStudent: string | null = null;
+  /** The open student panel, redrawn after each markbook repaint so a rolled-back save shows. */
+  let studentPanel: StudentPanelHandle | null = null;
   let showRemoved = false;
   let showHiddenList = false;
   /** The student on the phone card, by id, so a reload that adds or removes someone keeps the card on them. */
@@ -296,23 +302,32 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   const actions: MarkbookActions = {
     openStudent: (studentId) => {
       const student = view?.students.find((s) => s.id === studentId);
-      if (!view || !student || !ctx) return;
+      if (!view || !student || studentPanel) return;
+      if (!ctx) {
+        // The tag names are still loading: open once they arrive.
+        status.textContent = ctxError ?? 'Loading…';
+        if (!ctxError) pendingStudent = studentId;
+        return;
+      }
       const context = ctx;
       const evidence = expandTags(markbookEvidence(view, context.outcomes).evidence, context.table);
-      const pins = view.markbook.focus?.[studentId] ?? { pinned: [], dismissed: [] };
-      // Back to the name that opened it, or the heading once a redraw has replaced that name.
-      const opener = document.activeElement;
-      openStudentPanel({
+      const pinsNow = () => view?.markbook.focus?.[studentId] ?? { pinned: [], dismissed: [] };
+      studentPanel = openStudentPanel({
         student,
         evidence,
         kind: defaultKind(evidence),
         label: (tag) => tagLabel(tag, context),
         codeLabel: (id) => codeLabel(id, context.codes),
-        pins,
+        pins: pinsNow(),
+        pinsNow,
         overall: formatPercent(overallFor(view.markbook, studentId).percent),
         onPins: (next) =>
           change({ kind: 'focus', studentId, pinned: next.pinned, dismissed: next.dismissed }, () => api.setFocus(cls.id, studentId, next.pinned, next.dismissed)),
-        returnFocus: () => (opener instanceof HTMLElement && opener !== title && section.contains(opener) ? opener : title)
+        // Back to this student's name, which a redraw may have replaced, else the heading.
+        returnFocus: () => body.querySelector<HTMLElement>(`.mb-patterns__name[data-student="${CSS.escape(studentId)}"]`) ?? title,
+        onClose: () => {
+          studentPanel = null;
+        }
       });
     },
     setMark: (columnId, studentId, mark) =>
@@ -384,6 +399,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     const hadFocus = active instanceof HTMLElement && section.contains(active) && active !== title;
     const key = focusKey();
     draw(view, key);
+    studentPanel?.refresh();
     if (!hadFocus) return;
     // The focused control went away (Hide, Unhide, an emptied list): fall back to the heading.
     const now = document.activeElement;
@@ -440,7 +456,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
                 });
               }
             })
-          : el('p', 'mb__status', 'Loading patterns…')
+          : el('p', 'mb__status', ctxError ?? 'Loading patterns…')
       );
     }
     else if (narrow()) {
@@ -496,10 +512,26 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   if (typeof media?.addEventListener === 'function') media.addEventListener('change', onMedia);
   else media?.addListener?.(onMedia);
   void load();
-  void loadInsightContext().then((loaded) => {
-    ctx = { ...loaded, outcomes: options.outcomes ?? loaded.outcomes };
-    if (mode === 'patterns') paint();
-  });
+  void loadInsightContext().then(
+    (loaded) => {
+      if (disposed) return;
+      ctx = { ...loaded, outcomes: options.outcomes ?? loaded.outcomes };
+      if (mode === 'patterns') paint();
+      const waiting = pendingStudent;
+      pendingStudent = null;
+      if (waiting) {
+        if (status.textContent === 'Loading…') status.textContent = '';
+        actions.openStudent(waiting);
+      }
+    },
+    () => {
+      if (disposed) return;
+      ctxError = 'Couldn’t load the tag names, so Patterns and student panels can’t open. Reload to try again.';
+      pendingStudent = null;
+      status.textContent = ctxError;
+      if (mode === 'patterns') paint();
+    }
+  );
   return () => {
     disposed = true;
     if (typeof media?.removeEventListener === 'function') media.removeEventListener('change', onMedia);
