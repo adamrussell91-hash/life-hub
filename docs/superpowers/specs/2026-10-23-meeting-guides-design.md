@@ -131,3 +131,14 @@ The chart is drawn from data by the Decision Maker scales renderer (`packages/de
 - Student self-report mode.
 - Starting a guide from the profile without a meeting.
 - Any AI that scores or places.
+
+## Changes decided while planning (23 Oct)
+
+These override the sections above where they differ.
+
+1. **The chart is a slim Professional chart** (`apps/professional/src/guides/continuum-chart.ts`), not an import of Decision Maker's `scales` renderer. That renderer uses number boxes in horizontal rows and Problem Solver's run shape, and the approved mockup needs drag handles, zones and a lean marker. It keeps Decision Maker's ideas: drawn from data, dated history overlays, and colours as tokens.
+2. **Runs live on the meeting record** as `guide_runs` (validated like `decisions`), not in a separate store. History comes from `listMeetings()`.
+3. **When the check shows:** whenever introjected and identified were both tapped at least "a bit". The probe answers are netted, so mixed answers leave the suggestion unchanged.
+4. **A run can be edited at any time.**
+5. **Clare gets each run's context and moves only**, never the profile name or the values.
+6. **No pronouns in product copy**, because the tool can't know a student's pronouns.
