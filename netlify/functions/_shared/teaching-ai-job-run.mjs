@@ -7,6 +7,7 @@ import { aiJobKey, draftLessonKey, getJSON, setJSON } from './teaching-blobs.mjs
 import { TOOLS as ALCHEMY_TOOLS } from './alchemy-agent.mjs';
 import { refreshNoteIndex, searchNotes, noteFilters, readNoteText, readAttachmentText } from './alchemy-notes-index.mjs';
 import { writeJobInbox } from '../ai-jobs.mjs';
+import { LESSON_TOOLS, LESSON_TOOL_NAMES, createLessonToolRunner } from './teaching-lesson-tools.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -24,6 +25,9 @@ export const LESSON_JOB_DEADLINE_MS = 9 * 60 * 1000;
 
 /** Adam's Knowledge Hub notes, read the way Alchemy Lab's Ann reads them. */
 export const NOTE_TOOLS = ALCHEMY_TOOLS.filter(tool => ['search_notes', 'list_filters', 'read_note'].includes(tool.name));
+
+/** What the agent can read: Adam's lessons first, then his notes. */
+export const TEACHING_TOOLS = [...LESSON_TOOLS, ...NOTE_TOOLS];
 
 export function loadTeachingProtocol(slug, { readFileSyncImpl = readFileSync } = {}) {
   if (!Object.hasOwn(TEACHING_AGENT_NAMES, slug)) return '';
@@ -86,14 +90,16 @@ export function friendlyApiError(error) {
   return error instanceof Error ? error.message : 'The model request failed.';
 }
 
-/** Runs the notes tools for the runner, refreshing the notes index on first use only. */
-export function createNoteToolRunner({ store, env, fetchImpl = fetch, signal, deps = {} }) {
+/** Runs the lesson and notes tools for the runner, refreshing the notes index on first use only. */
+export function createNoteToolRunner({ store, env, fetchImpl = fetch, signal, lesson, deps = {} }) {
+  const runLessonTool = lesson ? createLessonToolRunner({ store, lesson }) : null;
   let docs = null;
   const index = async () => {
     docs ??= await (deps.noteIndex ?? refreshNoteIndex)({ store, env, fetchImpl, signal });
     return docs;
   };
   return async function runTool(name, input = {}) {
+    if (runLessonTool && LESSON_TOOL_NAMES.has(name)) return runLessonTool(name, input);
     switch (name) {
       case 'search_notes': {
         const hits = searchNotes(await index(), input);
@@ -179,8 +185,8 @@ export async function runStoredLessonJob({
       agentName: TEACHING_AGENT_NAMES[job.agent] ?? TEACHING_AGENT_NAMES.ann,
       protocol: loadTeachingProtocol(job.agent, readFileSyncImpl ? { readFileSyncImpl } : {}),
       complete: complete ?? createAnthropicComplete({ apiKey, signal: controller.signal }),
-      tools: NOTE_TOOLS,
-      runTool: createNoteToolRunner({ store, env, fetchImpl, signal: controller.signal, deps: { noteIndex } }),
+      tools: TEACHING_TOOLS,
+      runTool: createNoteToolRunner({ store, env, fetchImpl, signal: controller.signal, lesson, deps: { noteIndex } }),
       webSearch: true,
       models: teachingModels(env),
       onPhase,

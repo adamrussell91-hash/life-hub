@@ -10,7 +10,7 @@ import type { Lesson } from '@/schemas/lesson';
 
 /**
  * Server-side runner for a queued Teaching AI job. The agent works in a short
- * tool loop: it may research (web search, Adam's Knowledge Hub notes), then
+ * tool loop: it may research (his lessons, web search, his Knowledge Hub notes), then
  * proposes one change. A proposal that fails the block or quiz checks goes
  * back to the agent as a tool error so it can fix it in the same job; the
  * teacher only ever sees a proposal that passed. Pure apart from the injected
@@ -129,7 +129,7 @@ export interface RunLessonJobInput {
   agentName: string;
   protocol: string;
   complete: (request: ModelRequest) => Promise<ModelReply>;
-  /** Extra client tools the server runs (Knowledge Hub notes). */
+  /** Extra client tools the server runs (his lessons, Knowledge Hub notes). */
   tools?: ToolDefinition[];
   runTool?: (name: string, input: unknown) => Promise<unknown>;
   /** Adds the server web_search tool. */
