@@ -28,7 +28,7 @@ export function tutorialParts(blocks: readonly Block[]): TutorialParts {
     const id = groupId(block);
     if (id === null) parts.common.push(block);
     else if (isExitCheck(block)) parts.exits.set(id, block);
-    else parts.tabs.set(id, block as SectionBlock);
+    else parts.tabs.set(id, block as unknown as SectionBlock);
   }
   return parts;
 }
