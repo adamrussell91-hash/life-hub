@@ -7,6 +7,7 @@ import { createAiJobRunHandler } from '../../netlify/functions/ai-job-run.mjs';
 import {
   AI_USAGE_LOG_KEY,
   NOTE_TOOLS,
+  TEACHING_TOOLS,
   createAnthropicComplete,
   runStoredLessonJob
 } from '../../netlify/functions/_shared/teaching-ai-job-run.mjs';
@@ -204,7 +205,59 @@ test('the runner finishes a job with a checked quiz proposal, cost and a usage l
   assert.match(calls[0].system[0].text, /Ann protocol/);
   const names = calls[0].tools.map(tool => tool.name);
   for (const tool of NOTE_TOOLS) assert.ok(names.includes(tool.name));
+  for (const tool of TEACHING_TOOLS) assert.ok(names.includes(tool.name));
+  assert.ok(names.includes('list_lessons') && names.includes('read_lesson'));
   assert.ok(names.includes('web_search'));
+});
+
+test('Ann lists the unit\'s lessons with their dates and reads an earlier one in full', async () => {
+  const earlier = {
+    ...lesson, id: 'lesson_0', title: 'Samuel Wagan Watson', sequence: 0,
+    blocks: [{ ...heading, id: 'b_poet', content: { text: 'Who is Samuel Wagan Watson?' } },
+      { ...heading, id: 'b_def', block_type: 'rich_text', content: { html: '<p>Defamiliarisation makes the <strong>familiar</strong> strange.</p>' } }]
+  };
+  const store = memoryStore({
+    ...seed(),
+    'lessons/lesson_0': earlier,
+    'lessons/lesson_gone': { ...lesson, id: 'lesson_gone', status: 'trashed' },
+    'units/unit_1': { id: 'unit_1', type: 'unit', title: 'Poetry', status: 'active', year_id: 'y10', lesson_ids: ['lesson_0', 'lesson_gone', 'lesson_1'] },
+    'units/unit_2': { id: 'unit_2', type: 'unit', title: 'Novel study', status: 'active', year_id: 'y10', lesson_ids: [] },
+    'units/unit_9': { id: 'unit_9', type: 'unit', title: 'Year 7 unit', status: 'active', year_id: 'y7', lesson_ids: [] },
+    'scheduled_lessons/s1': { id: 's1', lesson_id: 'lesson_0', unit_id: 'unit_1', date: '2026-10-13', delivery_status: 'delivered' },
+    'scheduled_lessons/s2': { id: 's2', lesson_id: 'lesson_0', unit_id: 'unit_1', date: '2026-10-12', delivery_status: 'delivered' },
+    'scheduled_lessons/s3': { id: 's3', lesson_id: 'lesson_1', unit_id: 'unit_1', date: '2026-10-20', delivery_status: 'skipped' }
+  });
+  const results = [];
+  const replies = [
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'list_lessons', input: {} }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't2', name: 'read_lesson', input: { id: 'lesson_0' } }] },
+    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't3', name: 'read_lesson', input: { id: 'lesson_gone' } }] },
+    { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Plan to confirm' }] }
+  ];
+  const complete = async req => {
+    const last = req.messages[req.messages.length - 1];
+    if (Array.isArray(last.content)) results.push(...last.content.filter(block => block.type === 'tool_result'));
+    return replies.shift();
+  };
+  const job = await runStoredLessonJob({ store, jobId: 'ai_job_abc', env, complete, readFileSyncImpl: () => '', nowIso: () => NOW });
+  assert.equal(job.status, 'done');
+
+  const listing = JSON.parse(results[0].content);
+  assert.equal(listing.unit.title, 'Poetry');
+  assert.deepEqual(listing.lessons.map(row => row.id), ['lesson_0', 'lesson_1']);
+  assert.deepEqual(listing.lessons[0].dates, ['2026-10-12', '2026-10-13']);
+  assert.deepEqual(listing.lessons[1].dates, [], 'a skipped day is not a teaching date');
+  assert.equal(listing.lessons[1].this_lesson, true);
+  assert.deepEqual(listing.other_units.map(unit => unit.id), ['unit_2'], 'only units from the same year');
+
+  const reading = JSON.parse(results[1].content);
+  assert.equal(reading.title, 'Samuel Wagan Watson');
+  assert.equal(reading.unit, 'Poetry');
+  assert.match(reading.text, /\[heading\] Who is Samuel Wagan Watson\?/);
+  assert.match(reading.text, /\[rich_text\] Defamiliarisation makes the familiar strange\./);
+
+  assert.equal(results[2].is_error, true);
+  assert.match(results[2].content, /unavailable/);
 });
 
 test('the runner errors clearly without an API key', async () => {
