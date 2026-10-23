@@ -27,7 +27,7 @@ import { isDeletedRecord, withoutDeleted } from './_shared/record-liveness.mjs';
 import { buildMediaUsage } from './_shared/media-usage.mjs';
 
 const LESSON_KINDS = new Set(['lesson', 'workshop', 'lecture']);
-const ROUTE_ROLES = new Set(['support', 'extension']);
+const ROUTE_ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
 export const config = { path: '/api/curriculum' };
 

@@ -110,7 +110,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     hidden,
     title: (id) => byId.get(id)?.title || 'Untitled lesson'
   });
-  // Support and extension: the lesson's own role, else a light-rail stop that names it.
+  // Support, extension or optional: the lesson's own role, else a light-rail stop that names it.
   const railRole = new Map<string, LessonRouteRole>();
   const railSkip = new Map<string, string>();
   const railAfter = new Map<string, string | undefined>();
@@ -134,7 +134,10 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     order.splice(i, 0, id);
   }
   const shown = withAutoDepths(order.map((id) => byId.get(id)!).filter(Boolean));
-  const roleOf = (id: string): MapLane | undefined => byId.get(id)?.role ?? railRole.get(id);
+  const roleOf = (id: string): MapLane | undefined => {
+    const role = byId.get(id)?.role ?? railRole.get(id);
+    return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
+  };
   const lanes = lanesFrom(flow.seq, roleOf);
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
 

@@ -47,10 +47,10 @@ export const rowTag = (row: MapRow): string | undefined =>
   row.lane === 'support' ? 'Support' : row.lane === 'extension' ? 'Extension' : row.option ? `Option ${row.option}` : row.lane === 'option' ? 'Optional' : undefined;
 const tagClass = (row: MapRow) => (row.lane === 'support' ? 'support' : row.lane === 'core' ? 'option' : 'side');
 
-/** The widest name column (and so map) that fits `available` pixels, between 120 and 200. */
+/** The widest name column (and so map) that fits `available` pixels, between 120 and 340: wide pages fill with lesson names. */
 export function fitNameWidth(map: CoverageMap, collapsed: ReadonlySet<string>, available: number): number {
   const branches = layoutLanes(map, { collapsed, nameW: 0 }).width - NAME_X - 14;
-  return Math.max(120, Math.min(200, available - NAME_X - 14 - branches));
+  return Math.max(120, Math.min(340, available - NAME_X - 14 - branches));
 }
 
 export function layoutLanes(map: CoverageMap, state: Pick<DrawState, 'collapsed' | 'nameW'>): { lanes: Lane[]; start: number; width: number } {
@@ -266,7 +266,7 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
     const score = st?.scores.get(row.id);
     // A quiz score sits at the end of the name column; the name gives it room.
     const room = Math.max(6, nameChars - Math.round((tx - NAME_X) / 6.3) - (score && score.max > 0 ? 5 : 0));
-    push(`<text class="cm-name${side || row.kind === 'check' ? ' cm-name--quiet' : ''}" x="${tx}" y="${y + 4}">${esc(fit(row.title, room))}</text>`);
+    push(`<text class="cm-name" x="${tx}" y="${y + 4}">${esc(fit(row.title, room))}</text>`);
     if (score && score.max > 0) {
       const pct = Math.round((score.score / score.max) * 100);
       push(`<text class="cm-score${pct < 70 ? ' cm-score--low' : ''}" x="${start - 8}" y="${y + 4}" text-anchor="end">${pct}%</text>`);

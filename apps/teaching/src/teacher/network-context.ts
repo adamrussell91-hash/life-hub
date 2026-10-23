@@ -5,7 +5,9 @@ import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor'
 import { NEW_BLOCK_LABEL, type NewBlockType } from '@/blocks/create-block';
 import { blocksToSearchText } from '@/blocks/search-text';
 import { isCurriculumLinesV2, type Block, type CurriculumLinesV2Content, type LineStop, type NetworkLine } from '@/schemas/block';
-import type { Lesson, Subject, Unit } from '@/schemas';
+import type { Lesson, LessonRouteRole, Subject, Unit } from '@/schemas';
+import type { FlowPeer } from '@/network/lesson-flow';
+import { patchScheduledLesson, postScheduledLesson } from '@/teacher/schedule-api';
 import type { NetUnit } from '@/network/year';
 import { orderStations, placeByDate } from '@/network/model';
 import { linesBefore } from '@/alignment/auto-lines';
@@ -113,16 +115,65 @@ function unitLessons(curriculum: CurriculumResponse, unit: Unit) {
  * don't count). An auto stop on a line not yet seen is Introduced.
  */
 export function linesBeforeOnMap(curriculum: CurriculumResponse, unit: Unit, lessonId: string): Set<string> {
-  let content: CurriculumLinesV2Content | undefined;
-  for (const block of unit.blocks ?? []) {
-    if (block.block_type === 'curriculum_lines' && isCurriculumLinesV2(block.content)) {
-      content = block.content;
-      break;
-    }
-  }
+  const content = unitMapContent(unit);
   const hidden = new Set(content?.hidden_lessons ?? []);
   const ordered = placeByDate(orderStations(unitLessons(curriculum, unit), content?.station_order), unitSchedule(curriculum, unit)?.dates);
   return linesBefore(ordered.filter((l) => l.id === lessonId || !hidden.has(l.id)), lessonId);
+}
+
+function unitMapContent(unit: Unit): CurriculumLinesV2Content | undefined {
+  for (const block of unit.blocks ?? []) {
+    if (block.block_type === 'curriculum_lines' && isCurriculumLinesV2(block.content)) return block.content;
+  }
+  return undefined;
+}
+
+/**
+ * The unit's lessons for a lesson's Before and after, in the unit map's order
+ * (dates first, then the map's own order). Lessons left off the map are left
+ * out; this lesson stays, after the lesson its support or extension stop follows.
+ */
+export function unitFlowPeers(curriculum: CurriculumResponse, unit: Unit, lessonId: string): FlowPeer[] {
+  const content = unitMapContent(unit);
+  const hidden = new Set(content?.hidden_lessons ?? []);
+  const ordered = placeByDate(orderStations(unitLessons(curriculum, unit), content?.station_order), unitSchedule(curriculum, unit)?.dates);
+  const shown = ordered.filter((l) => !hidden.has(l.id));
+  const self = ordered.find((l) => l.id === lessonId);
+  if (self && hidden.has(lessonId)) {
+    const follows = content?.rail_stops.find((stop) => stop.lesson_id === lessonId)?.after_lesson_id;
+    const at = follows ? shown.findIndex((l) => l.id === follows) : -1;
+    shown.splice(at < 0 ? shown.length : at + 1, 0, self);
+  }
+  return shown.map((l) => ({ id: l.id, title: l.title, ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}) }));
+}
+
+/** A lesson's place on the route: its own role, else the support or extension stop on the unit map that names it. */
+export function lessonRouteRole(unit: Unit, lesson: Pick<Lesson, 'id' | 'route_role'>): LessonRouteRole | undefined {
+  if (lesson.route_role) return lesson.route_role;
+  const stop = unitMapContent(unit)?.rail_stops.find((s) => s.lesson_id === lesson.id && s.kind !== 'stop');
+  return stop && stop.kind !== 'stop' ? stop.kind : undefined;
+}
+
+/** The classes that teach a unit, with this lesson's first date in each. */
+export function lessonClassDates(curriculum: CurriculumResponse, unit: Unit, lessonId: string): Array<{ id: string; name: string; date?: string }> {
+  return unitClasses(curriculum, unit).map((c) => {
+    const dates = curriculum.scheduled_lessons
+      .filter((row) => row.class_id === c.id && row.lesson_id === lessonId && row.delivery_status !== 'skipped')
+      .map((row) => row.date)
+      .sort();
+    return dates[0] ? { ...c, date: dates[0] } : c;
+  });
+}
+
+/** Dates a lesson for a class: moves its first scheduled row there, or schedules it. */
+export async function setLessonDate(curriculum: CurriculumResponse, unit: Unit, lessonId: string, classId: string, date: string): Promise<void> {
+  const row = curriculum.scheduled_lessons
+    .filter((r) => r.class_id === classId && r.lesson_id === lessonId && r.delivery_status !== 'skipped')
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
+  const saved = row
+    ? await patchScheduledLesson(row.id, { date })
+    : await postScheduledLesson({ class_id: classId, lesson_id: lessonId, unit_id: unit.id, date });
+  curriculum.scheduled_lessons = [...curriculum.scheduled_lessons.filter((r) => r.id !== saved.id), saved];
 }
 
 /** Everything a unit map (and its editor) needs on a teacher page. */
