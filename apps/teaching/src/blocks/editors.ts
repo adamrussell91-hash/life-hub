@@ -385,10 +385,11 @@ export function createHeadingEditor(
   });
 
   const emitChange = () => {
+    const latest = getLatest();
     onChange({
-      ...getLatest(),
+      ...latest,
       variant: variantSelect.getValue() as typeof block.variant,
-      content: { text: textInput.value }
+      content: { ...latest.content, text: textInput.value }
     });
   };
 
