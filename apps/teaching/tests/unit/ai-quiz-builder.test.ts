@@ -3,7 +3,7 @@ import { createBlock } from '@/blocks/create-block';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
 import { AI_TOOLS, parseToolProposal, type AiProposal } from '@/ai/proposals';
-import { quizProposalIssues } from '@/ai/quiz-proposal';
+import { questionGiveaways, quizProposalIssues } from '@/ai/quiz-proposal';
 import { BLOCK_BUILD_RECIPES } from '@/ai/block-recipes';
 import { buildAiLessonContext } from '@/ai/context';
 import { emptySearchPack } from '@/ai/search-pack';
@@ -158,6 +158,52 @@ describe('quizProposalIssues', () => {
     });
     expect(quizProposalIssues(insertQuiz([pinned]), lesson('quiz', [createBlock('heading', 'b_head'), withImage]))).toEqual([]);
     expect(quizProposalIssues(insertQuiz([pinned]), lesson('quiz'))[0]).toMatch(/image must be one already in the lesson/);
+  });
+});
+
+describe('questions that give their answer away', () => {
+  it('sends back a right answer far longer than the wrong ones, with extreme wrong answers', () => {
+    const bad = quizBlock('q_ood', {
+      kind: 'multiple_choice',
+      prompt: "Oodgeroo Noonuccal's 1964 collection combined art with political resistance. What can you infer about how this tradition shapes Watson's poetry?",
+      options: [
+        { id: 'a', text: 'He writes within a lineage where Indigenous poetry can carry political meaning, which helps explain why his politics arrives through vivid imagery' },
+        { id: 'b', text: 'He rejects all earlier Indigenous poets and writes without context' },
+        { id: 'c', text: 'He writes only about nature and avoids politics' },
+        { id: 'd', text: 'He copies her poems line for line' }
+      ],
+      correct: ['a']
+    });
+    const issues = quizProposalIssues(insertQuiz([bad]), lesson('quiz'));
+    expect(issues).toHaveLength(2);
+    expect(issues[0]).toMatch(/^Question 1 \(q_ood\): the right answer is much longer/);
+    expect(issues[1]).toMatch(/wrong answers are the extreme ones/);
+  });
+
+  it('sends back matching with three pairs', () => {
+    const issues = questionGiveaways({
+      kind: 'matching',
+      pairs: [
+        { id: 'a', left: 'Stolen Generations', right: 'Children removed from their families' },
+        { id: 'b', left: 'Assimilation', right: 'Adopting a dominant culture' },
+        { id: 'c', left: 'Performative', right: 'Words not backed by action' }
+      ]
+    });
+    expect(issues).toEqual([expect.stringMatching(/at least 4 pairs \(it has 3\)/)]);
+  });
+
+  it('lets a fair question through, and an extreme right answer is not a giveaway', () => {
+    expect(questionGiveaways(goodMc.content.question as Record<string, unknown>)).toEqual([]);
+    expect(questionGiveaways({
+      kind: 'multiple_choice',
+      options: [{ id: 'a', text: 'Only the first stanza' }, { id: 'b', text: 'Every stanza' }, { id: 'c', text: 'The final two lines' }],
+      correct: ['a']
+    })).toEqual([]);
+  });
+
+  it('teaches Ann the item-writing rules', () => {
+    expect(BLOCK_BUILD_RECIPES).toMatch(/## Writing questions that test something/);
+    expect(BLOCK_BUILD_RECIPES).toMatch(/never teaches the answer/);
   });
 });
 
