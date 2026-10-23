@@ -15,6 +15,8 @@ import {
 import { loadLiteraryElements, type LiteraryTechnique } from '@/blocks/literary-elements';
 import { formatOutcomeCodes, outcomeCodeExample, parseOutcomeCodes } from '@/markbook/parse';
 import { MARKBOOK_LIMITS } from '@/markbook/schema';
+import { loadSkills } from '@/skills/api';
+import { skillSelect } from '@/skills/select';
 import type { OutcomeLabel } from '@/markbook/types';
 import { button, checkbox, el, iconButton, labelled, select, textArea, textInput, uid } from '@/quiz/dom';
 import { mountWordPicker, spanText } from '@/quiz/word-picker';
@@ -56,7 +58,10 @@ const newId = () => Math.random().toString(36).slice(2, 10);
 
 export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
   let q: QuizQuestion = structuredClone(options.question);
-  if (options.audience === 'student') delete q.outcomes;
+  if (options.audience === 'student') {
+    delete q.outcomes;
+    delete q.skills;
+  }
   const marks = options.marks ?? { min: 1, max: QUIZ_LIMITS.marksMax };
   const kinds = (options.kinds?.length ? options.kinds : (Object.keys(QUIZ_KIND_INFO) as QuizQuestionKind[])).filter(
     (k) => k !== 'label_image' || options.allowImageUrl || (options.images?.length ?? 0) > 0
@@ -1062,7 +1067,7 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
     extrasHost.append(row);
 
     const more = el('details', 'qz-more');
-    more.open = !!(q.hint || q.explanation || q.outcomes?.length || (q.image && q.kind !== 'label_image'));
+    more.open = !!(q.hint || q.explanation || q.outcomes?.length || q.skills?.length || (q.image && q.kind !== 'label_image'));
     const offersOutcomes = !student && !!options.outcomes?.length;
     more.append(el('summary', 'qz-more__summary', offersOutcomes ? 'Hint, explanation, outcomes and picture (optional)' : 'Hint, explanation and picture (optional)'));
     const hint = textInput(q.hint ?? '', QUIZ_LIMITS.hint, 'A nudge, not the answer.');
@@ -1098,6 +1103,28 @@ export function mountQuestionBuilder(options: BuilderOptions): QuestionBuilder {
         emit();
       });
       more.append(field, note);
+    }
+    if (!student) {
+      let pick = skillSelect(q.skills?.[0] ?? '', null, 'qz-input qz-skill');
+      const field = labelled('Skill (optional)', pick, 'For insights. Republish for changes to count.');
+      const onPick = (e: Event) => {
+        const value = (e.target as HTMLSelectElement).value;
+        if (value) q.skills = [value];
+        else delete q.skills;
+        emit();
+      };
+      pick.addEventListener('change', onPick);
+      void loadSkills().then(
+        (skills) => {
+          const next = skillSelect(q.skills?.[0] ?? '', skills, 'qz-input qz-skill');
+          next.id = pick.id;
+          next.addEventListener('change', onPick);
+          pick.replaceWith(next);
+          pick = next;
+        },
+        () => undefined
+      );
+      more.append(field);
     }
     if (q.kind !== 'label_image' && ((options.images?.length ?? 0) > 0 || options.allowImageUrl)) {
       const pictureHost = el('div', 'qz-field');

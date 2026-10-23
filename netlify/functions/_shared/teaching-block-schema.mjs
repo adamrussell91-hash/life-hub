@@ -227,7 +227,9 @@ var base = {
   explanation: OptionalText(QUIZ_LIMITS.explanation),
   image: QuizImageSchema.optional(),
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
-  outcomes: z6.array(z6.string().min(1).max(64)).max(8).optional()
+  outcomes: z6.array(z6.string().min(1).max(64)).max(8).optional(),
+  /** Skills-continuum sub-strands, `strand.sub`, for insights. */
+  skills: z6.array(z6.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
 };
 var QuizQuestionSchema = z6.discriminatedUnion("kind", [
   z6.object({ ...base, kind: z6.literal("multiple_choice"), options: z6.array(QuizChoiceSchema).min(2).max(6), correct: z6.array(Id).length(1) }),
@@ -429,7 +431,14 @@ var QuizSettingsSchema = z6.object({
   confidence: z6.boolean().optional(),
   closes_at: z6.string().datetime().optional(),
   /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
-  move_on: z6.number().int().min(1).max(100).optional()
+  move_on: z6.number().int().min(1).max(100).optional(),
+  /** A follow-up quiz: only these students (class-list ids) may sit it. */
+  for_students: z6.array(z6.string().min(1).max(64)).max(60).optional(),
+  /** The quiz this one follows up, and the flag that prompted it. */
+  follow_up_of: z6.string().max(64).optional(),
+  follow_up_flag: z6.string().max(160).optional(),
+  /** Teacher only: an earlier quiz to show before-and-after against. */
+  compare_with: z6.string().max(64).optional()
 });
 function norm(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();

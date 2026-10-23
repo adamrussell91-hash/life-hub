@@ -19,6 +19,15 @@ import { mountQuestionPlayer } from '@/quiz/player';
 import { spanText } from '@/quiz/word-picker';
 import { formatCode, keySummary, meter, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
 import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
+import { httpInsightApi, isInsight, type InsightApi, type InsightReply } from '@/evidence/api';
+import { codeLabel, loadInsightContext, type InsightContext } from '@/evidence/context';
+import { openFollowUpPlan } from '@/evidence/follow-up';
+import { FOLLOW_UP } from '@/evidence/constants';
+import { tagLabel } from '@/evidence/tags';
+import type { InsightPayload } from '@/evidence/types';
+import { renderQuizInsight } from '@/evidence/views/quiz-insight';
+import { codeChips } from '@/evidence/code-chips';
+import { navigate } from '@/app/router';
 import './quiz.css';
 
 /**
@@ -35,6 +44,8 @@ export type QuizPanelOptions = {
   onAddBlocks: (blocks: Block[]) => void;
   onRemoveBlock: (blockId: string) => void;
   idFactory: () => string;
+  /** Test seam for the insight calls; defaults to the quiz endpoint. */
+  insightApi?: InsightApi;
 };
 
 export type QuizPanelHandle = { root: HTMLElement; update(lesson: Lesson): void; dispose(): void };
@@ -52,7 +63,7 @@ type Submission = {
   quiz_block_id: string | null;
 };
 
-type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey };
+type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey; codes: string[] };
 /** Initials and name from the class list; both null when the student was removed. */
 type StudentLabel = { initials: string | null; name: string | null };
 
@@ -97,12 +108,75 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   let live: LiveQuiz | null = null;
   let disposed = false;
   let timer: number | undefined;
+  const insightApi = options.insightApi ?? httpInsightApi;
+  let insight: InsightPayload | null = null;
+  let compareInsight: InsightPayload | null = null;
+  const followInsights = new Map<string, InsightPayload>();
+  /** Which class and compare/follow-up ids the cached side insights were loaded for. */
+  let sideKey = '';
+  let classes: Array<{ id: string; title: string }> | null = null;
+  let insightClass: string | null = null;
+  let ctx: InsightContext | null = null;
 
   const post = <T>(body: Record<string, unknown>) => apiPost<T>(endpoint, body);
   const showError = (error: unknown) => {
     alert.textContent = errorText(error);
     alert.hidden = false;
   };
+
+  /**
+   * Bumped by every insight load and every insight action. A load commits only
+   * if nothing bumped it during its awaits, so a slow poll never undoes Close
+   * now, a dismiss or a class switch, and two loads never interleave writes.
+   */
+  let insightGen = 0;
+
+  /**
+   * Insights for the chosen class. The context and class list load once; the
+   * insight reloads with each results poll. The Compare with quiz and follow-ups
+   * reload only when the class or their ids change, so polls stay one call.
+   * Returns false when a newer load or an action superseded this one.
+   */
+  async function loadInsight(): Promise<boolean> {
+    const gen = ++insightGen;
+    if (!classes) {
+      try {
+        classes = (await insightApi.classes(lessonId)).classes;
+        insightClass = classes[0]?.id ?? null;
+      } catch (error) {
+        // Not retried each poll: insights fall back to every class.
+        classes = [];
+        insightClass = null;
+        showError(error);
+      }
+    }
+    const classId = insightClass;
+    const reply: InsightReply = await insightApi.load(lessonId, classId);
+    const next = isInsight(reply) ? reply : null;
+    if (next) ctx ??= await loadInsightContext();
+    const key = JSON.stringify([classId, next?.compare_with ?? null, (next?.follow_ups ?? []).map((f) => f.lesson_id)]);
+    let side: { compare: InsightPayload | null; follow: Map<string, InsightPayload> } | null = null;
+    if (key !== sideKey) {
+      side = { compare: null, follow: new Map() };
+      if (next?.compare_with) {
+        const other = await insightApi.load(next.compare_with, classId).catch(() => null);
+        side.compare = isInsight(other) ? other : null;
+      }
+      for (const f of next?.follow_ups ?? []) {
+        const reply2 = await insightApi.load(f.lesson_id, classId).catch(() => null);
+        if (isInsight(reply2)) side.follow.set(f.lesson_id, reply2);
+      }
+    }
+    if (gen !== insightGen) return false;
+    insight = next;
+    if (side) {
+      sideKey = key;
+      compareInsight = side.compare;
+      followInsights.clear();
+      for (const [id, p] of side.follow) followInsights.set(id, p);
+    }
+    return true;
+  }
 
   const TAB_LABELS: Record<Tab, string> = { tray: 'From students', settings: 'Settings', results: 'Results', live: 'Live' };
   function paintTabs(): void {
@@ -139,7 +213,16 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     try {
       let data: unknown;
       if (tab === 'tray') data = submissions = (await post<{ submissions: Submission[] }>({ action: 'submissions' })).submissions;
-      else if (tab === 'results' && !openAttempt) data = results = await post<Results>({ action: 'results' });
+      else if (tab === 'results' && !openAttempt) {
+        results = await post<Results>({ action: 'results' });
+        // A failed insight must not hide the results underneath it.
+        try {
+          await loadInsight();
+        } catch (error) {
+          showError(error);
+        }
+        data = [results, insight, compareInsight?.built_at ?? null, [...followInsights.values()].map((f) => f.built_at)];
+      }
       else if (tab === 'live') data = live = (await post<{ live: LiveQuiz | null }>({ action: 'live_status' })).live;
       else return;
       paintTabs();
@@ -457,6 +540,29 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     closes.value = raw.closes_at ? toLocalInput(raw.closes_at) : '';
     closes.addEventListener('change', () => save({ closes_at: closes.value ? new Date(closes.value).toISOString() : undefined }));
     grid.append(labelled('Closes', closes, 'Also stops new questions arriving from Question drop blocks.'));
+    const siblings = insight?.siblings ?? [];
+    const current = raw.compare_with ?? '';
+    const compareOptions = [{ value: '', label: 'None' }, ...siblings.map((x) => ({ value: x.lesson_id, label: x.title }))];
+    if (current && !siblings.some((x) => x.lesson_id === current)) compareOptions.push({ value: current, label: 'An earlier quiz' });
+    const compareWith = select(compareOptions, current);
+    compareWith.addEventListener('change', () => {
+      save({ compare_with: compareWith.value || undefined });
+      // Drop in-flight loads and the cached compare panel; Results reloads it when shown.
+      insightGen++;
+      sideKey = '';
+      if (tab === 'results') void refresh();
+    });
+    grid.append(
+      labelled(
+        'Compare with',
+        compareWith,
+        siblings.length ? 'Results shows before and after against this quiz. No republish needed.' : 'Open Results once to list this unit’s other quizzes.'
+      )
+    );
+    if (raw.for_students?.length) {
+      const n = raw.for_students.length;
+      grid.append(el('p', 'qz-note block-secondary', `For ${n} ${n === 1 ? 'student' : 'students'} only (a follow-up quiz).`));
+    }
     wrap.append(grid);
 
     const toggles = el('div', 'qz-settings__toggles');
@@ -513,12 +619,13 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       );
     }
     wrap.append(top);
+    if (insight && ctx) wrap.append(...insightSection(insight, ctx));
     if (!total) {
       wrap.append(el('p', 'qz-note block-secondary', 'No one has finished the quiz yet. This updates by itself.'));
       return wrap;
     }
 
-    wrap.append(el('h4', 'qz-h', 'By question'));
+    wrap.append(el('h4', 'qz-h', 'Answers by question'));
     const qs = el('ol', 'qz-qstats');
     for (const q of r.questions) qs.append(questionStat(q));
     wrap.append(qs);
@@ -561,6 +668,79 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     return wrap;
   }
 
+  function insightSection(p: InsightPayload, context: InsightContext): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    if ((classes?.length ?? 0) > 1) {
+      const pick = select((classes ?? []).map((c) => ({ value: c.id, label: c.title })), insightClass ?? '');
+      pick.addEventListener('change', async () => {
+        const previous = insightClass;
+        insightClass = pick.value || null;
+        try {
+          await loadInsight();
+        } catch (error) {
+          insightClass = previous;
+          showError(error);
+        }
+        paint();
+      });
+      out.push(labelled('Class', pick, 'Insights use each student’s first attempt.'));
+    }
+    const act = (run: () => Promise<InsightReply>) => async () => {
+      insightGen++;
+      try {
+        const reply = await run();
+        insightGen++; // a poll sent before this reply is now stale
+        insight = isInsight(reply) ? reply : insight;
+      } catch (error) {
+        showError(error);
+      }
+      paint();
+    };
+    out.push(
+      renderQuizInsight(p, {
+        ctx: context,
+        compare: compareInsight,
+        followUps: followInsights,
+        onClose: act(() => insightApi.close(lessonId, insightClass)),
+        onReopen: act(() => insightApi.reopen(lessonId, insightClass)),
+        onDismiss: async (flag) => {
+          insightGen++;
+          try {
+            const { dismissed } = await insightApi.dismiss(lessonId, flag.id);
+            insightGen++;
+            if (insight) insight = { ...insight, dismissed };
+          } catch (error) {
+            showError(error);
+          }
+          paint();
+        },
+        onFollowUp: (flag, _kind, evidence) => {
+          if (!p.unit_id) {
+            alert.textContent = FOLLOW_UP.noUnit;
+            alert.hidden = false;
+            return;
+          }
+          openFollowUpPlan({
+            sourceLessonId: p.lesson_id,
+            sourceTitle: p.title,
+            unitId: p.unit_id,
+            flagId: flag.id,
+            tag: flag.tag,
+            students: p.students,
+            // A flag on the whole class names no students: offer everyone.
+            chosen: flag.students.length ? flag.students : p.students.map((s) => s.id),
+            evidence,
+            label: (tag) => tagLabel(tag, context),
+            codeLabel: (id) => codeLabel(id, context.codes),
+            onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+          });
+        },
+        openLesson: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+      })
+    );
+    return out;
+  }
+
   function questionStat(q: QuestionStats): HTMLElement {
     const li = el('li', 'qz-qstat');
     const pct = q.total ? Math.round((q.full / q.total) * 100) : 0;
@@ -591,6 +771,17 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   }
 
   type AttemptDetail = { student: StudentLabel | null; id: string; device: string; n: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; rows: Row[] };
+
+  /**
+   * Mark saves go out one at a time: the server rewrites an attempt's whole
+   * marks record on each, so two at once could lose one.
+   */
+  let markQueue: Promise<unknown> = Promise.resolve();
+  function inOrder<T>(fn: () => Promise<T>): Promise<T> {
+    const next = markQueue.then(fn, fn);
+    markQueue = next.catch(() => undefined);
+    return next;
+  }
 
   function attemptView(a: AttemptDetail): HTMLElement {
     const wrap = el('div', 'qz-attempt-detail');
@@ -634,7 +825,10 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         const score = input.value.trim() === '' ? null : Number(input.value);
         this.disabled = true;
         try {
-          const res = await post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score });
+          // Codes are read when the post goes out, so a chip changed just before still counts.
+          const res = await inOrder(() =>
+            post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score, codes: score === null || score >= r.mark.max ? [] : (r.codes ?? []) })
+          );
           wrap.replaceWith(attemptView(res.attempt));
         } catch (error) {
           showError(error);
@@ -643,6 +837,60 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       });
       markRow.append(labelled(`Marks out of ${formatMarks(r.mark.max)}`, input), save);
       item.append(markRow);
+      // Saving the current mark with codes turns an automatic mark into a teacher mark of the same value.
+      const awarded = r.awarded;
+      const codes = ctx?.codes ?? [];
+      if (codes.length && awarded !== null && awarded < r.mark.max) {
+        const chipHost = el('div', 'qz-attempt-codes');
+        let confirmed = [...(r.codes ?? [])];
+        /** The set the chips show now, and the chip the teacher last used. */
+        let shown = [...confirmed];
+        let lastUsed: string | null = null;
+        let waiting = 0;
+        chipHost.addEventListener('focusin', (event) => {
+          const code = (event.target as HTMLElement).dataset?.code;
+          if (code) lastUsed = code;
+        });
+        const same = (x: readonly string[], y: readonly string[]) => x.length === y.length && x.every((id) => y.includes(id));
+        const paintChips = (): void => {
+          const hadFocus = chipHost.contains(document.activeElement);
+          shown = [...(r.codes ?? [])];
+          chipHost.replaceChildren(
+            codeChips({
+              codes,
+              selected: shown,
+              label: `Why marks were lost: question ${i + 1}`,
+              onChange: (ids) => {
+                r.codes = ids;
+                shown = [...ids];
+                waiting += 1;
+                inOrder(() => post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score: awarded, codes: ids })).then(
+                  (res) => {
+                    confirmed = res.attempt.rows.find((x) => x.id === r.id)?.codes ?? ids;
+                    settle();
+                  },
+                  (error: unknown) => {
+                    showError(error);
+                    settle();
+                  }
+                );
+              }
+            })
+          );
+          if (!hadFocus) return;
+          const chips = [...chipHost.querySelectorAll<HTMLButtonElement>('.ev-chip')];
+          (chips.find((b) => b.dataset.code === lastUsed) ?? chips[0])?.focus();
+        };
+        /** Once no save is waiting, the chips show what the server last confirmed. */
+        const settle = (): void => {
+          waiting -= 1;
+          if (waiting) return;
+          r.codes = [...confirmed];
+          if (!same(shown, confirmed)) paintChips();
+        };
+        paintChips();
+        item.append(el('p', 'qz-field__label', 'Why marks were lost (optional)'), chipHost);
+      }
       wrap.append(item);
     });
     return wrap;

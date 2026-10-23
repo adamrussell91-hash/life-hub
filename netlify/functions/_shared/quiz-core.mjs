@@ -85,7 +85,9 @@ var base = {
   explanation: OptionalText(QUIZ_LIMITS.explanation),
   image: QuizImageSchema.optional(),
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
-  outcomes: z.array(z.string().min(1).max(64)).max(8).optional()
+  outcomes: z.array(z.string().min(1).max(64)).max(8).optional(),
+  /** Skills-continuum sub-strands, `strand.sub`, for insights. */
+  skills: z.array(z.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
 };
 var QuizQuestionSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("multiple_choice"), options: z.array(QuizChoiceSchema).min(2).max(6), correct: z.array(Id).length(1) }),
@@ -325,7 +327,14 @@ var QuizSettingsSchema = z.object({
   confidence: z.boolean().optional(),
   closes_at: z.string().datetime().optional(),
   /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
-  move_on: z.number().int().min(1).max(100).optional()
+  move_on: z.number().int().min(1).max(100).optional(),
+  /** A follow-up quiz: only these students (class-list ids) may sit it. */
+  for_students: z.array(z.string().min(1).max(64)).max(60).optional(),
+  /** The quiz this one follows up, and the flag that prompted it. */
+  follow_up_of: z.string().max(64).optional(),
+  follow_up_flag: z.string().max(160).optional(),
+  /** Teacher only: an earlier quiz to show before-and-after against. */
+  compare_with: z.string().max(64).optional()
 });
 var DEFAULT_QUIZ_SETTINGS = {
   attempts: 1,
@@ -367,6 +376,11 @@ function idMaker(random) {
     }
   };
 }
+function techniquesOf(options, ids) {
+  const map = {};
+  for (const o of options) if (o.technique_id) map[ids.get(o.id)] = o.technique_id;
+  return Object.keys(map).length ? { techniques: map } : {};
+}
 function splitQuestion(q, random = Math.random) {
   const fresh = idMaker(random);
   const head = {
@@ -383,7 +397,8 @@ function splitQuestion(q, random = Math.random) {
     marks: q.marks,
     ...q.hint?.trim() ? { hint: q.hint.trim() } : {},
     ...q.explanation?.trim() ? { explanation: q.explanation.trim() } : {},
-    ...q.outcomes?.length ? { outcomes: [...q.outcomes] } : {}
+    ...q.outcomes?.length ? { outcomes: [...q.outcomes] } : {},
+    ...q.skills?.length ? { skills: [...q.skills] } : {}
   };
   switch (q.kind) {
     case "multiple_choice":
@@ -393,7 +408,10 @@ function splitQuestion(q, random = Math.random) {
       const ids = new Map(q.options.map((o) => [o.id, fresh()]));
       const options = shuffled(q.options, random).map((o) => ({ id: ids.get(o.id), text: o.text }));
       const question = { ...head, kind: q.kind, options, ...q.kind === "quote_technique" ? { quote: q.quote } : {} };
-      return { question, key: { ...keyHead, answer: { type: "choice", ids: q.correct.map((id) => ids.get(id)) } } };
+      return {
+        question,
+        key: { ...keyHead, ...q.kind === "quote_technique" ? techniquesOf(q.options, ids) : {}, answer: { type: "choice", ids: q.correct.map((id) => ids.get(id)) } }
+      };
     }
     case "true_false":
       return { question: { ...head, kind: "true_false" }, key: { ...keyHead, answer: { type: "boolean", value: q.answer } } };
@@ -479,7 +497,7 @@ function splitQuestion(q, random = Math.random) {
       const pick = Math.min(q.find ?? targets.length, targets.length);
       return {
         question: { ...head, kind: "spot_technique", passage: q.passage, options, pick },
-        key: { ...keyHead, answer: { type: "spots", passage: q.passage, targets, pick } }
+        key: { ...keyHead, ...techniquesOf(q.options, ids), answer: { type: "spots", passage: q.passage, targets, pick } }
       };
     }
     case "label_image": {
@@ -788,5 +806,6 @@ export {
   segmentPassage,
   spanFinds,
   splitQuestion,
+  spotList,
   writeGapPassage
 };

@@ -62,6 +62,7 @@ test('load: an empty markbook, the list, and quiz columns built from attempts', 
   const [quiz] = loaded.quizzes;
   assert.equal(quiz.id, 'quiz:quiz1');
   assert.equal(quiz.title, 'Week 4 review');
+  assert.equal(quiz.unit_id, 'unit1');
   assert.match(quiz.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(quiz.hidden, false);
   assert.equal(quiz.scores[bob.id].score, 1);
@@ -215,4 +216,13 @@ test('load reads the class’s units together', async () => {
   await call(store, { action: 'load' });
   const waves = ['units/unit1', 'units/unit2', 'units/unit3'].map((key) => started.get(key));
   assert.equal(new Set(waves).size, 1, 'the three units go out together');
+});
+
+test('set_focus pins and dismisses tags per student', async () => {
+  const { store, bob } = await setup();
+  const { markbook } = await call(store, { action: 'set_focus', student_id: bob.id, pinned: ['tech:simile', 'tech:simile'], dismissed: ['tech:motif'] });
+  assert.deepEqual(markbook.focus[bob.id], { pinned: ['tech:simile'], dismissed: ['tech:motif'] });
+  const cleared = await call(store, { action: 'set_focus', student_id: bob.id, pinned: [], dismissed: [] });
+  assert.equal(bob.id in cleared.markbook.focus, false);
+  await assert.rejects(call(store, { action: 'set_focus', student_id: 'nobody', pinned: [] }), /class list/);
 });

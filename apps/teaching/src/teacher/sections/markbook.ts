@@ -8,11 +8,20 @@ import { el } from '@/quiz/dom';
 import type { AssessmentColumn, AssessmentMark, Column, Markbook } from '@/markbook/schema';
 import { httpMarkbookApi, type MarkbookApi } from '@/markbook/api';
 import type { MarkbookActions, MarkbookView, OutcomeLabel } from '@/markbook/types';
-import { assessments, markOf, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
+import type { Evidence } from '@/evidence/types';
+import { openFollowUpPlan } from '@/evidence/follow-up';
+import { FOLLOW_UP } from '@/evidence/constants';
+import { navigate } from '@/app/router';
+import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
-import { renderOutcomes, type OutcomeSelection } from '@/markbook/outcomes-view';
+import { renderPatterns } from '@/markbook/patterns-view';
+import { openStudentPanel, type StudentPanelHandle } from '@/markbook/student-panel';
+import { loadInsightContext, codeLabel, type InsightContext } from '@/evidence/context';
+import { markbookEvidence } from '@/evidence/markbook-evidence';
+import { defaultKind } from '@/evidence/patterns';
+import { expandTags, tagLabel } from '@/evidence/tags';
 import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
 import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
@@ -37,9 +46,31 @@ type Options = {
 type Change =
   | { kind: 'mark'; columnId: string; studentId: string; mark: unknown | null }
   | { kind: 'hide'; lessonId: string; hidden: boolean }
-  | { kind: 'delete_column'; columnId: string };
+  | { kind: 'delete_column'; columnId: string }
+  | { kind: 'focus'; studentId: string; pinned: string[]; dismissed: string[] };
+
+/** The most recent shown quiz with evidence on this tag: the follow-up goes after it. */
+function latestQuizFor(view: MarkbookView, tag: string, evidence: Evidence[]): string | null {
+  const sources = new Set(evidence.filter((e) => e.tags.includes(tag) && e.source.startsWith('quiz:')).map((e) => e.source.slice(5)));
+  const quizzes = view.quizzes.filter((q) => !q.hidden && sources.has(q.lesson_id)).sort((a, b) => b.date.localeCompare(a.date));
+  return quizzes[0]?.lesson_id ?? null;
+}
+
+/** Whether a hidden quiz holds evidence on this tag: the Patterns view leaves hidden quizzes out. */
+function hiddenQuizzesHave(view: MarkbookView, tag: string, context: InsightContext): boolean {
+  const hidden = view.quizzes.filter((q) => q.hidden).map((q) => ({ ...q, hidden: false }));
+  if (!hidden.length) return false;
+  const only: MarkbookView = { ...view, quizzes: hidden, markbook: { ...view.markbook, columns: [] } };
+  return expandTags(markbookEvidence(only, context.outcomes).evidence, context.table).some((e) => e.tags.includes(tag));
+}
 
 function applyChange(view: MarkbookView, change: Change): MarkbookView {
+  if (change.kind === 'focus') {
+    const focus = { ...(view.markbook.focus ?? {}) };
+    if (!change.pinned.length && !change.dismissed.length) delete focus[change.studentId];
+    else focus[change.studentId] = { pinned: change.pinned, dismissed: change.dismissed };
+    return { ...view, markbook: { ...view.markbook, focus } };
+  }
   if (change.kind === 'hide') {
     return { ...view, quizzes: view.quizzes.map((q) => (q.lesson_id === change.lessonId ? { ...q, hidden: change.hidden } : q)) };
   }
@@ -68,9 +99,15 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let view: MarkbookView | null = null;
   /** The last view the server confirmed, with no local changes on it. */
   let confirmed: MarkbookView | null = null;
-  let mode: 'grid' | 'outcomes' = 'grid';
-  /** The outcome cell whose evidence is open, kept across redraws. */
-  let selectedOutcome: OutcomeSelection | null = null;
+  let mode: 'grid' | 'patterns' = 'grid';
+  /** Names for tags and codes, for Patterns and the student panel; loaded once, after the markbook. */
+  let ctx: InsightContext | null = null;
+  /** Set when the tag names could not be loaded, so Patterns and the student panel say so. */
+  let ctxError: string | null = null;
+  /** A student whose name was pressed before the tag names arrived; their panel opens once they do. */
+  let pendingStudent: string | null = null;
+  /** The open student panel, redrawn after each markbook repaint so a rolled-back save shows. */
+  let studentPanel: StudentPanelHandle | null = null;
   let showRemoved = false;
   let showHiddenList = false;
   /** The student on the phone card, by id, so a reload that adds or removes someone keeps the card on them. */
@@ -93,7 +130,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   title.id = `mb-${cls.id}`;
   title.tabIndex = -1;
   const tools = el('div', 'mb__tools');
-  const toggle = el('button', 'btn btn--secondary mb__toggle', 'Outcomes');
+  const toggle = el('button', 'btn btn--secondary mb__toggle', 'Patterns');
   toggle.type = 'button';
   const hiddenToggle = el('button', 'btn btn--secondary mb__hidden-toggle');
   hiddenToggle.type = 'button';
@@ -222,7 +259,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     });
   }
 
-  /** A column title, or with `studentId` a cell (grid or outcomes view), as drawn now. */
+  /** A column title, or with `studentId` a grid cell, as drawn now. */
   function findInBody(selector: string, columnId: string, studentId?: string): HTMLElement | null {
     return (
       [...body.querySelectorAll<HTMLElement>(selector)].find(
@@ -240,6 +277,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       students: rowStudents(view, showRemoved).filter((s) => !s.removed),
       studentId,
       skills,
+      codes: ctx?.codes,
       // Reads the live view, so a mark saved or queued in this panel shows when the teacher comes back to it.
       markFor: (id) => (view ? markOf<AssessmentMark>(view.markbook, columnId, id) : undefined),
       onSave: (id, mark) => {
@@ -262,6 +300,38 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   }
 
   const actions: MarkbookActions = {
+    openStudent: (studentId) => {
+      const student = view?.students.find((s) => s.id === studentId);
+      // One panel at a time; a panel whose overlay has gone without closing counts as closed.
+      if (studentPanel && !studentPanel.isOpen()) studentPanel = null;
+      if (!view || !student || studentPanel) return;
+      if (!ctx) {
+        // The tag names are still loading: open once they arrive.
+        status.textContent = ctxError ?? 'Loading…';
+        if (!ctxError) pendingStudent = studentId;
+        return;
+      }
+      const context = ctx;
+      const evidence = expandTags(markbookEvidence(view, context.outcomes).evidence, context.table);
+      const pinsNow = () => view?.markbook.focus?.[studentId] ?? { pinned: [], dismissed: [] };
+      studentPanel = openStudentPanel({
+        student,
+        evidence,
+        kind: defaultKind(evidence),
+        label: (tag) => tagLabel(tag, context),
+        codeLabel: (id) => codeLabel(id, context.codes),
+        pins: pinsNow(),
+        pinsNow,
+        overall: formatPercent(overallFor(view.markbook, studentId).percent),
+        onPins: (next) =>
+          change({ kind: 'focus', studentId, pinned: next.pinned, dismissed: next.dismissed }, () => api.setFocus(cls.id, studentId, next.pinned, next.dismissed)),
+        // Back to this student's name, which a redraw may have replaced, else the heading.
+        returnFocus: () => body.querySelector<HTMLElement>(`.mb-patterns__name[data-student="${CSS.escape(studentId)}"]`) ?? title,
+        onClose: () => {
+          studentPanel = null;
+        }
+      });
+    },
     setMark: (columnId, studentId, mark) =>
       change({ kind: 'mark', columnId, studentId, mark }, () => api.setMark(cls.id, columnId, studentId, mark)),
     hideQuiz: (lessonId, hidden) => change({ kind: 'hide', lessonId, hidden }, () => api.hideQuiz(cls.id, lessonId, hidden)),
@@ -302,7 +372,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       (control && !control.disabled ? control : body.querySelector<HTMLElement>('[data-phone="pick"]'))?.focus();
       return;
     }
-    findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell, .mb-outcome-cell', key.col, key.student)?.focus();
+    findInBody(key.student === undefined ? '.mb-col__title' : '.mb-cell', key.col, key.student)?.focus();
   }
 
   function paintHidden(current: MarkbookView): void {
@@ -331,6 +401,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     const hadFocus = active instanceof HTMLElement && section.contains(active) && active !== title;
     const key = focusKey();
     draw(view, key);
+    if (studentPanel?.isOpen()) studentPanel.refresh();
     if (!hadFocus) return;
     // The focused control went away (Hide, Unhide, an emptied list): fall back to the heading.
     const now = document.activeElement;
@@ -341,7 +412,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     const total = weightTotal(current.markbook);
     warning.hidden = total === 100 || assessments(current.markbook).length === 0;
     warning.textContent = `Assessment weights add to ${total}%, not 100%.`;
-    toggle.setAttribute('aria-pressed', String(mode === 'outcomes'));
+    toggle.setAttribute('aria-pressed', String(mode === 'patterns'));
     removedToggle.hidden = removedStudentIds(current).length === 0;
     removedToggle.textContent = showRemoved ? 'Hide removed students' : 'Show removed students';
     paintHidden(current);
@@ -350,14 +421,44 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
-    if (mode === 'outcomes') {
+    if (mode === 'patterns') {
+      const context = ctx;
       body.replaceChildren(
-        renderOutcomes(current, students, options.outcomes ?? [], {
-          selected: selectedOutcome,
-          onSelect: (next) => {
-            selectedOutcome = next;
-          }
-        })
+        context
+          ? renderPatterns(current, students, context, {
+              openStudent: actions.openStudent,
+              followUp: (tag, ids, evidence) => {
+                const lessonId = latestQuizFor(current, tag, evidence);
+                const quiz = current.quizzes.find((q) => q.lesson_id === lessonId);
+                if (!quiz) {
+                  status.textContent = hiddenQuizzesHave(current, tag, context)
+                    ? 'This tag’s quizzes are hidden in the markbook.'
+                    : 'Follow-ups start from a quiz; this tag only has assessment marks.';
+                  return;
+                }
+                if (!quiz.unit_id) {
+                  status.textContent = FOLLOW_UP.noUnit;
+                  return;
+                }
+                status.textContent = '';
+                // Only students still on the list; a removed student can sit in a group while they are shown.
+                const listed = new Set(current.students.map((s) => s.id));
+                openFollowUpPlan({
+                  sourceLessonId: quiz.lesson_id,
+                  sourceTitle: quiz.title,
+                  unitId: quiz.unit_id,
+                  flagId: null,
+                  tag,
+                  students: current.students,
+                  chosen: ids.filter((id) => listed.has(id)),
+                  evidence,
+                  label: (t) => tagLabel(t, context),
+                  codeLabel: (id) => codeLabel(id, context.codes),
+                  onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+                });
+              }
+            })
+          : el('p', 'mb__status', ctxError ?? 'Loading patterns…')
       );
     }
     else if (narrow()) {
@@ -397,7 +498,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   }
 
   toggle.addEventListener('click', () => {
-    mode = mode === 'grid' ? 'outcomes' : 'grid';
+    mode = mode === 'grid' ? 'patterns' : 'grid';
     paint();
   });
   hiddenToggle.addEventListener('click', () => {
@@ -413,8 +514,31 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   if (typeof media?.addEventListener === 'function') media.addEventListener('change', onMedia);
   else media?.addListener?.(onMedia);
   void load();
+  void loadInsightContext().then(
+    (loaded) => {
+      if (disposed) return;
+      ctx = { ...loaded, outcomes: options.outcomes ?? loaded.outcomes };
+      if (mode === 'patterns') paint();
+      const waiting = pendingStudent;
+      pendingStudent = null;
+      if (waiting) {
+        if (status.textContent === 'Loading…') status.textContent = '';
+        actions.openStudent(waiting);
+      }
+    },
+    () => {
+      if (disposed) return;
+      ctxError = 'Couldn’t load the tag names, so Patterns and student panels can’t open. Reload to try again.';
+      pendingStudent = null;
+      status.textContent = ctxError;
+      if (mode === 'patterns') paint();
+    }
+  );
   return () => {
     disposed = true;
+    // Closing releases the overlay's hold on the rest of the page.
+    studentPanel?.close();
+    studentPanel = null;
     if (typeof media?.removeEventListener === 'function') media.removeEventListener('change', onMedia);
     else media?.removeListener?.(onMedia);
   };
