@@ -1237,4 +1237,41 @@ describe('mountLessonEditor', () => {
 
     expect(document.querySelector('.lesson-editor__composition-modal')).toBeNull();
   });
+
+  it('a student moved on the tutorial board goes out with the next save, so autosave doesn’t move them back', async () => {
+    const group = (id: string, name: string, students: string[]) => ({ id, name, why: '', goal: '', gap_type: 'knowledge' as const, students, evidence: [] });
+    const lesson = makeLesson({
+      pedagogical_mode: 'tutorial',
+      tutorial: { class_id: 'class_1', groups: [group('ga', 'Re-tells', ['st_ann', 'st_ed']), group('gb', 'Mix-up', ['st_cy'])] }
+    });
+    mockLessonLoad(lesson);
+    apiPutMock.mockResolvedValue(lesson);
+    const student = (id: string, initials: string, name: string) => ({ id, initials, name, stage: 'before', unlocked: false });
+    const card = (id: string, name: string, students: ReturnType<typeof student>[]) => ({ id, name, why: '', gap_type: 'knowledge', students, sitting: false, seen_at: null, status: 'working', handups: 0, open: 0 });
+    const before = { seen: 0, total: 2, groups: [card('ga', 'Re-tells', [student('st_ann', 'AB', 'Ann Bell'), student('st_ed', 'EF', 'Ed Fox')]), card('gb', 'Mix-up', [student('st_cy', 'CD', 'Cy Dale')])] };
+    const after = { seen: 0, total: 2, groups: [card('ga', 'Re-tells', [student('st_ann', 'AB', 'Ann Bell')]), card('gb', 'Mix-up', [student('st_cy', 'CD', 'Cy Dale'), student('st_ed', 'EF', 'Ed Fox')])] };
+    apiPostMock.mockImplementation(async (path: string, body: { action: string }) => {
+      if (path !== '/api/lessons/lesson_001/tutorial') throw new Error(`Unexpected apiPost path: ${path}`);
+      if (body.action === 'move') return after;
+      if (body.action === 'board') {
+        return {
+          group: { id: 'ga', name: 'Re-tells', why: '' }, sitting: true, shown: null, done_students: [], handups: [],
+          students: [{ id: 'st_ann', initials: 'AB', name: 'Ann Bell', stage: 'before', answers: {} }, { id: 'st_ed', initials: 'EF', name: 'Ed Fox', stage: 'before', answers: {} }]
+        };
+      }
+      return before;
+    });
+    const handle = mount();
+    for (let i = 0; i < 4; i += 1) await tick();
+    refs.canvas.querySelector<HTMLButtonElement>('.tut-card__sit')!.click();
+    for (let i = 0; i < 4; i += 1) await tick();
+    const rows = refs.canvas.querySelectorAll('.tut-live__row');
+    rows[1]!.querySelector<HTMLButtonElement>('.tut-live__move .hub-pills__btn')!.click();
+    for (let i = 0; i < 4; i += 1) await tick();
+    expect(apiPostMock).toHaveBeenCalledWith('/api/lessons/lesson_001/tutorial', { action: 'move', student_id: 'st_ed', group_id: 'gb' });
+
+    await handle.flush();
+    const saved = apiPutMock.mock.calls.at(-1)![1] as Lesson;
+    expect(saved.tutorial?.groups.map((g) => g.students)).toEqual([['st_ann'], ['st_cy', 'st_ed']]);
+  });
 });

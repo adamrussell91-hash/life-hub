@@ -268,6 +268,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       } else {
         delete lesson.quiz;
       }
+      // A tutorial's groups change on the board (a student moved); the next save carries them.
+      if (next.tutorial) lesson.tutorial = next.tutorial;
     }
 
     function bumpDraftClock(): void {
