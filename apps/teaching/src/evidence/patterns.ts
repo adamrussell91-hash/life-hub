@@ -109,8 +109,7 @@ export function confidenceQuadrants(evidence: Evidence[]): Quadrants {
 /** Where the data can't support a decision yet. `rows` are byTag rows for the same kind. */
 export function findFlags(evidence: Evidence[], rows: TagRow[]): Flag[] {
   const flags: Flag[] = [];
-  const kind = rows[0]?.tag.slice(0, rows[0].tag.indexOf(':')) as TagKind | undefined;
-  if (!kind) return flags;
+  if (!rows.length) return flags;
   const list = scored(evidence);
   for (const row of rows) {
     const mine = list.filter((x) => x.tags.includes(row.tag));
@@ -177,7 +176,8 @@ export function focusFor(evidence: Evidence[], student: string, kind: TagKind, p
     const xs = byT.get(tag) ?? [];
     return { tag, mean: xs.length ? avg(xs.map((x) => x.share as number)) : null, items: xs.length, pinned, why: xs.flatMap((x) => x.why) };
   };
-  const pinned = pins.pinned.map((t) => area(t, true));
+  // Pins persist whatever grouping is shown, so pinned tags of other kinds stay.
+  const pinned = [...new Set(pins.pinned)].map((t) => area(t, true));
   const weak = [...byT.keys()]
     .filter((t) => t.startsWith(`${kind}:`) && !pins.dismissed.includes(t) && !pins.pinned.includes(t))
     .map((t) => area(t, false))
