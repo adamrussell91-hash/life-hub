@@ -13,6 +13,7 @@ import { createBlock } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
 import { mountLessonPage } from '@/teacher/lesson-canvas/mount-page';
+import { enterBlockEdit } from './helpers/block-edit';
 
 const ISO = '2026-01-01T00:00:00.000Z';
 const group = (id: string, name: string) => ({ id, name, why: '', goal: '', gap_type: 'knowledge' as const, students: [], evidence: [] });
@@ -69,9 +70,26 @@ afterEach(() => {
 
 function mount(lesson = tutorialLesson()) {
   const onChange = vi.fn();
-  const handle = mountLessonPage(host, { lesson, media: [], onChange, onPrint: vi.fn(), idFactory: () => 'new_1' });
-  return { handle, onChange };
+  const onSelect = vi.fn();
+  const handle = mountLessonPage(host, { lesson, media: [], onChange, onPrint: vi.fn(), onSelect, idFactory: () => 'new_1' });
+  return { handle, onChange, onSelect };
 }
+/** A palette drop on a page gap. */
+function dropOnGap(type: string): void {
+  const gap = [...host.querySelectorAll<HTMLElement>('.lesson-page__blocks > .lesson-page__gap')].at(-1)!;
+  const store = new Map<string, string>([['application/x-teaching-hub-block', JSON.stringify({ kind: 'block', type })]]);
+  const dt = { effectAllowed: 'copy', dropEffect: 'none', getData: (t: string) => store.get(t) ?? '', setData: () => {}, get types() { return [...store.keys()]; } };
+  for (const name of ['dragover', 'drop']) {
+    const event = new Event(name, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', { value: dt });
+    gap.dispatchEvent(event);
+  }
+}
+const lastLesson = (onChange: ReturnType<typeof vi.fn>) => onChange.mock.calls.at(-1)![0] as Lesson;
+const sectionIds = (lesson: Lesson, id: string) => {
+  const found = lesson.blocks.find((b) => b.id === id);
+  return found?.block_type === 'section' ? found.content.blocks.map((b) => b.id) : [];
+};
 
 describe('tutorial on the lesson page', () => {
   it('mounts the board and asks for the groups at once', async () => {
@@ -142,6 +160,76 @@ describe('tutorial on the lesson page', () => {
     expect(host.querySelector('.tut-board')).toBeNull();
     expect(host.querySelector<HTMLElement>('.lesson-page__tutorial')!.hidden).toBe(true);
     expect(fake.api.summary).not.toHaveBeenCalled();
+    handle.dispose();
+  });
+
+  it('a palette block dropped on a group tab goes into that group’s tab section and stays in view', async () => {
+    const { handle, onChange } = mount();
+    await flush();
+    tab(host, 'Re-tells').click();
+    dropOnGap('heading');
+    const saved = lastLesson(onChange);
+    expect(saved.blocks.map((b) => b.id)).toEqual(['common_1', 'tab_a', 'exit_a', 'tab_b']);
+    expect(sectionIds(saved, 'tab_a')).toEqual(['nested_a', 'new_1']);
+    expect(rowShown(host)).toEqual(['tab_a', 'exit_a']);
+    expect(tab(host, 'Re-tells').getAttribute('aria-pressed')).toBe('true');
+    handle.dispose();
+  });
+
+  it('Insert with nothing selected on a group tab adds to that group’s tab section', async () => {
+    const { handle, onChange } = mount();
+    await flush();
+    tab(host, 'Mix-up').click();
+    handle.insertType('heading');
+    expect(sectionIds(lastLesson(onChange), 'tab_b')).toEqual(['new_1']);
+    expect(rowShown(host)).toEqual(['tab_b']);
+    handle.dispose();
+  });
+
+  it('on Common and All, new blocks still go on the page', async () => {
+    const { handle, onChange } = mount();
+    await flush();
+    dropOnGap('heading');
+    expect(lastLesson(onChange).blocks.map((b) => b.id)).toEqual(['common_1', 'tab_a', 'exit_a', 'tab_b', 'new_1']);
+    expect(rowShown(host)).toContain('new_1');
+    handle.dispose();
+  });
+
+  it('a group with no tab section switches to All so the new block is seen', async () => {
+    const lesson = tutorialLesson({ blocks: [createBlock('heading', 'common_1'), section('exit_a', { tutorial_group: 'ga', tutorial_exit: true })] });
+    const { handle, onChange } = mount(lesson);
+    await flush();
+    tab(host, 'Re-tells').click();
+    handle.insertType('heading');
+    expect(lastLesson(onChange).blocks.map((b) => b.id)).toEqual(['common_1', 'exit_a', 'new_1']);
+    expect(tab(host, 'All').getAttribute('aria-pressed')).toBe('true');
+    expect(rowShown(host)).toContain('new_1');
+    handle.dispose();
+  });
+
+  it('a publish issue inside a group’s section opens that group’s tab', async () => {
+    const { handle } = mount();
+    await flush();
+    expect(rowShown(host)).toEqual(['common_1']);
+    handle.revealPublishBlock('nested_a');
+    expect(tab(host, 'Re-tells').getAttribute('aria-pressed')).toBe('true');
+    expect(rowShown(host)).toEqual(['tab_a', 'exit_a']);
+    expect(host.querySelector('[data-block-id="tab_a"]')!.classList.contains('lesson-page__block--selected')).toBe(true);
+    handle.revealPublishBlock('common_1');
+    expect(tab(host, 'Common').getAttribute('aria-pressed')).toBe('true');
+    handle.dispose();
+  });
+
+  it('closes the open block when a tab without it is chosen, and keeps it open on All', async () => {
+    const { handle, onSelect } = mount();
+    await flush();
+    enterBlockEdit(host, '.lesson-page__block[data-block-id="common_1"]');
+    expect(host.querySelector('[data-block-id="common_1"]')!.classList.contains('lesson-page__block--selected')).toBe(true);
+    tab(host, 'All').click();
+    expect(host.querySelector('[data-block-id="common_1"]')!.classList.contains('lesson-page__block--selected')).toBe(true);
+    tab(host, 'Re-tells').click();
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(host.querySelector('.lesson-page__block--selected')).toBeNull();
     handle.dispose();
   });
 });

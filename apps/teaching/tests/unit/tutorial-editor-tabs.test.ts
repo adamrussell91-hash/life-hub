@@ -49,25 +49,46 @@ describe('tutorial editor tabs', () => {
 });
 
 describe('movedGroups', () => {
-  it('takes each group’s students from the board summary and keeps the rest of the group', () => {
+  it('moves only the moved student, to the group the summary has them in, and keeps the rest of each group', () => {
     const settings: TutorialSettings = { class_id: 'c', groups: [{ ...group('ga', 'A', ['st_ann', 'st_ed']), evidence: [{ student: 'st_ann', quote: 'q' }] }, group('gb', 'B', ['st_cy'])] };
+    // The summary also differs on Ann; only Ed was moved here, so Ann stays where the editor has her.
     const summary = {
       seen: 0,
       total: 2,
       groups: [
-        { id: 'ga', students: [{ id: 'st_ann' }] },
-        { id: 'gb', students: [{ id: 'st_cy' }, { id: 'st_ed' }] }
+        { id: 'ga', students: [] },
+        { id: 'gb', students: [{ id: 'st_cy' }, { id: 'st_ed' }, { id: 'st_ann' }] }
       ]
     } as unknown as TutorialSummary;
-    const next = movedGroups(settings, summary);
+    const next = movedGroups(settings, summary, { studentId: 'st_ed', groupId: 'gb' });
     expect(next.groups.map((g) => g.students)).toEqual([['st_ann'], ['st_cy', 'st_ed']]);
     expect(next.groups[0]!.evidence).toEqual([{ student: 'st_ann', quote: 'q' }]);
     expect(next.class_id).toBe('c');
   });
 
-  it('leaves a group the summary doesn’t mention as it was', () => {
-    const settings: TutorialSettings = { class_id: 'c', groups: [group('ga', 'A', ['st_ann'])] };
-    const next = movedGroups(settings, { seen: 0, total: 0, groups: [] });
-    expect(next.groups[0]!.students).toEqual(['st_ann']);
+  it('uses the group moved to when the summary doesn’t list the student', () => {
+    const settings: TutorialSettings = { class_id: 'c', groups: [group('ga', 'A', ['st_ann']), group('gb', 'B', [])] };
+    const next = movedGroups(settings, { seen: 0, total: 0, groups: [] }, { studentId: 'st_ann', groupId: 'gb' });
+    expect(next.groups.map((g) => g.students)).toEqual([[], ['st_ann']]);
+  });
+
+  it('never leaves the student in two groups', () => {
+    const settings: TutorialSettings = { class_id: 'c', groups: [group('ga', 'A', ['st_ann']), group('gb', 'B', ['st_ann'])] };
+    const summary = { seen: 0, total: 2, groups: [{ id: 'gb', students: [{ id: 'st_ann' }] }] } as unknown as TutorialSummary;
+    const next = movedGroups(settings, summary, { studentId: 'st_ann', groupId: 'gb' });
+    expect(next.groups.map((g) => g.students)).toEqual([[], ['st_ann']]);
+  });
+});
+
+describe('set', () => {
+  it('opens a tab as a click would', () => {
+    const onTab = vi.fn();
+    const tabs = createTutorialTabs({ getLesson: () => lesson, onTab });
+    tabs.set('ga');
+    expect(tabs.current()).toBe('ga');
+    expect(onTab).toHaveBeenCalledWith('ga');
+    expect(tabs.root.querySelectorAll('button')[1]!.getAttribute('aria-pressed')).toBe('true');
+    tabs.set('ga');
+    expect(onTab).toHaveBeenCalledTimes(1);
   });
 });

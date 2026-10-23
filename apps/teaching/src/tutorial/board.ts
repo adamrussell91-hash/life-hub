@@ -9,8 +9,8 @@ import './tutorial.css';
 export type TutorialBoardOptions = {
   getLesson: () => { blocks: Block[] };
   api: TutorialTeacherApi;
-  /** After a student moves group, with the fresh summary, so the editor can patch its lesson's groups. */
-  onMoved?: (summary: TutorialSummary) => void;
+  /** After a student moves group, with the fresh summary and the move, so the editor can patch its lesson's groups. */
+  onMoved?: (summary: TutorialSummary, move: { studentId: string; groupId: string }) => void;
 };
 export type TutorialBoardHandle = { root: HTMLElement; refresh(): Promise<void>; dispose(): void };
 
@@ -352,7 +352,7 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
           pill.addEventListener('click', () =>
             void act(all, () => options.api.move(s.id, g.id), (next) => {
               note.textContent = `Moved ${s.initials} to ${g.name}.`;
-              options.onMoved?.(next);
+              options.onMoved?.(next, { studentId: s.id, groupId: g.id });
             })
           );
           all.push(pill);
