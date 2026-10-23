@@ -1,3 +1,5 @@
+import type { GuideRun } from '@/guides/types';
+
 /**
  * Shapes mirroring the server contracts this hub consumes.
  */
@@ -366,6 +368,7 @@ export interface MeetingRecord {
   purpose?: string | null;
   blocks?: unknown[];
   decisions?: MeetingDecision[];
+  guide_runs?: GuideRun[];
 }
 
 export interface MeetingDecision {

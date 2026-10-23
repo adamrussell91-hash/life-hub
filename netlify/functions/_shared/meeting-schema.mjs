@@ -13,6 +13,7 @@ export const MEETING_SCHEMA_VERSION = 2;
 const READABLE_MEETING_VERSIONS = new Set([1, 2]);
 export const PURPOSE_MAX_LENGTH = 500;
 export const DECISIONS_MAX = 50;
+export const GUIDE_RUNS_MAX = 20;
 
 export const MEETING_STATES = new Set([
   'scheduled',
@@ -103,6 +104,51 @@ export function validateDecisions(value) {
   });
 }
 
+const shortText = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+
+function numberMap(value, min, max) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 12) return null;
+  const out = {};
+  for (const [key, n] of Object.entries(value)) {
+    if (!Number.isInteger(n) || n < min || n > max) return null;
+    out[shortText(key, 40)] = n;
+  }
+  return out;
+}
+
+/** Guide runs (Meeting Guides): Adam's structured reads of someone in the room. Shape only; guides own meaning. */
+export function validateGuideRuns(value) {
+  const fail = (why) => validationError('invalid_guide_runs', `guide_runs: ${why}`);
+  if (!Array.isArray(value) || value.length > GUIDE_RUNS_MAX) throw fail(`an array of at most ${GUIDE_RUNS_MAX}.`);
+  return value.map((run) => {
+    if (!run || typeof run !== 'object') throw fail('each run is an object.');
+    const id = shortText(run.id, 80);
+    const context = shortText(run.context, 120);
+    const values = numberMap(run.values, 0, 10);
+    const taps = numberMap(run.taps ?? {}, 0, 3);
+    if (!id || !context || !values || !taps) throw fail('id, context, values (0–10) and taps (0–3) are required.');
+    const checks = {};
+    for (const [key, answer] of Object.entries(run.checks && typeof run.checks === 'object' ? run.checks : {})) {
+      if (typeof answer === 'string') checks[shortText(key, 40)] = shortText(answer, 40);
+    }
+    return {
+      id,
+      guide: shortText(run.guide, 40),
+      person_ref: shortText(run.person_ref, 200),
+      person_name: shortText(run.person_name, 200),
+      context,
+      taps,
+      quotes: (Array.isArray(run.quotes) ? run.quotes : []).filter((q) => typeof q === 'string' && q.trim()).slice(0, 5).map((q) => shortText(q, 300)),
+      checks,
+      values,
+      profile: shortText(run.profile, 60),
+      moves: (Array.isArray(run.moves) ? run.moves : []).filter((m) => typeof m === 'string' && m.trim()).slice(0, 5).map((m) => shortText(m, 300)),
+      created_at: shortText(run.created_at, 40),
+      updated_at: shortText(run.updated_at, 40)
+    };
+  });
+}
+
 function assertTimeOrder(start, end) {
   if (Date.parse(end) < Date.parse(start)) {
     throw validationError('invalid_time_range', 'scheduled_end cannot precede scheduled_start.');
@@ -125,7 +171,8 @@ const STORED_KEYS = new Set([
   'updated_at',
   'purpose',
   'blocks',
-  'decisions'
+  'decisions',
+  'guide_runs'
 ]);
 
 const HISTORY_KEYS = new Set([
@@ -192,7 +239,8 @@ export function parseMeetingRecord(raw) {
     updated_at: raw.updated_at,
     purpose: typeof raw.purpose === 'string' ? raw.purpose : null,
     blocks: Array.isArray(raw.blocks) ? raw.blocks : [],
-    decisions: Array.isArray(raw.decisions) ? raw.decisions : []
+    decisions: Array.isArray(raw.decisions) ? raw.decisions : [],
+    guide_runs: Array.isArray(raw.guide_runs) ? raw.guide_runs : []
   };
 }
 
@@ -243,7 +291,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -270,6 +318,7 @@ export function validateMeetingFieldUpdate(input) {
   if (input.purpose !== undefined) patch.purpose = trimBounded(input.purpose, 'purpose', PURPOSE_MAX_LENGTH);
   if (input.blocks !== undefined) patch.blocks = validateBlocks(input.blocks);
   if (input.decisions !== undefined) patch.decisions = validateDecisions(input.decisions);
+  if (input.guide_runs !== undefined) patch.guide_runs = validateGuideRuns(input.guide_runs);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -339,7 +388,8 @@ export function projectMeeting(record, incompleteLinks = null) {
     updated_at: record.updated_at,
     purpose: record.purpose ?? null,
     blocks: record.blocks ?? [],
-    decisions: record.decisions ?? []
+    decisions: record.decisions ?? [],
+    guide_runs: record.guide_runs ?? []
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;
