@@ -408,6 +408,22 @@ describe('mountStudentLessonView', () => {
     handle.dispose();
   });
 
+  it('routes a tutorial lesson to the tutorial player', async () => {
+    const lesson = publishedLessonWithLead();
+    vi.mocked(apiGet).mockResolvedValue({ ...lesson, pedagogical_mode: 'tutorial' });
+    const root = document.createElement('div');
+    document.body.append(root);
+    const handle = mountStudentLessonView({ root, lessonId: 'lesson_aotfw_008' });
+
+    // Opened without a class, so there is no one to fetch a group tab for.
+    await vi.waitFor(() => {
+      expect(root.querySelector('.tut')?.textContent).toContain('Open this tutorial from your class page.');
+    });
+    expect(root.querySelector('.lesson-blocks')).toBeNull();
+    expect(root.textContent).toContain('Tutorial');
+    handle.dispose();
+  });
+
   it('leaves a side path out of an ordinary lesson page', async () => {
     const lesson = publishedLessonWithLead();
     const lead = lesson.blocks[0]!;

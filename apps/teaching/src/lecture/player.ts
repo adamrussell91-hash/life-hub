@@ -513,8 +513,11 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
       state = { ...state, finished: true };
       save();
       send();
-      if (options.segment) options.segment.onDone();
-      else finish.textContent = 'Finished ✓';
+      if (options.segment) {
+        // A double-click moves the tutorial on once, not twice.
+        finish.disabled = true;
+        options.segment.onDone();
+      } else finish.textContent = 'Finished ✓';
     });
     page.append(finish);
     root.replaceChildren(page);

@@ -33,6 +33,7 @@ export function tutorialClient(lessonId: string, classId: string): TutorialClien
   return {
     status: () => call('status'),
     claim: (initials) => call('claim', { initials }),
+    // progress and answer reply with handups: [] always; read hand-ups from status.
     progress: (stage) => call('progress', { stage }),
     answer: (blockId, parts, rating) => call('answer', { block_id: blockId, parts, rating }),
     forPlayer: () => ({
