@@ -7,6 +7,7 @@ const HOUSE = [
   'Adam is always in the room, so he is never among the people listed. Write anything for Adam to read in his own voice: I, me, my. Never write his name (a draft email may still sign off with it).',
   'Use only the facts in the context. Never invent names, dates, scores or events. If something is missing, leave it out.',
   'Students are minors: never add health or family detail that is not already in the context.',
+  'Guides (context.guides) are Adam’s own structured read of someone in the room. Use their moves as suggested next steps for that context, in can-do wording. Never name a motivation type or profile, never describe a student as a type, and never mention scores.',
   'Reply with one JSON object only, no prose around it.'
 ].join('\n');
 
@@ -30,7 +31,11 @@ function contextText(ctx) {
     people: (ctx.people ?? []).map((person) => ({ name: person.name, role: person.role })),
     previous: ctx.previous ?? [], open_promises: ctx.open_promises ?? [],
     notes: typeof ctx.notes === 'string' ? ctx.notes.slice(0, 20000) : '',
-    summary: ctx.summary ?? null
+    summary: ctx.summary ?? null,
+    guides: (Array.isArray(ctx.guides) ? ctx.guides : []).slice(0, 5).map((g) => ({
+      about: line(g?.about, 120), guide: line(g?.guide, 60), context: line(g?.context, 120),
+      moves: (Array.isArray(g?.moves) ? g.moves : []).slice(0, 5).map((m) => line(m, 300)).filter(Boolean)
+    }))
   });
 }
 
