@@ -3707,7 +3707,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       const found = [...new Set(brief.match(/\bS\d+\b/g) ?? [])];
       const odd = found.filter((_, i) => i % 2 === 0);
       const even = found.filter((_, i) => i % 2 === 1);
-      const group = (name: string, members: string[]) => ({ name, why: `${name}: mock grouping`, goal: 'Today: practising this together', gap_type: 'knowledge', members, quotes: {} });
+      const group = (name: string, members: string[]) => ({ name, why: `${name}: mock grouping`, goal: 'Today: practising this together', gap_type: 'knowledge', members, quotes: {}, notes: `Target: ${name.toLowerCase()}.\nModel one worked example.\nExit check: one question on it.` });
       const groups = [group('Names it wrong', odd), ...(even.length ? [group('Re-tells the plot', even)] : [])];
       return okResponse(200, { text: JSON.stringify({ groups }) });
     }
