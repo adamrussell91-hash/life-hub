@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderPatterns } from '@/markbook/patterns-view';
 import { markbookEvidence } from '@/evidence/markbook-evidence';
 import type { MarkbookView } from '@/markbook/types';
+import { studentPanelBody } from '@/markbook/student-panel';
 
 export const view: MarkbookView = {
   markbook: {
@@ -53,5 +54,21 @@ describe('renderPatterns', () => {
     expect(cell?.textContent).toBe('0');
     node.querySelector<HTMLButtonElement>('.mb-patterns__name[data-student="s2"]')!.click();
     expect(openStudent).toHaveBeenCalledWith('s2');
+  });
+});
+
+describe('student panel', () => {
+  it('lists focus areas with pin and dismiss, secure tags and confidence', () => {
+    const ev = [0, 0.2, 0.4].map((share, i) => ({ item: `q${i}`, tags: ['tech:jux'], share, why: [], student: 's1', source: 'quiz:l1', date: '2026-10-20', confidence: 3 as const }));
+    const onPins = vi.fn();
+    const node = studentPanelBody({
+      student: { id: 's1', name: 'Ada Ash', initials: 'AA' }, evidence: ev, kind: 'tech', label: (t) => t.slice(5), codeLabel: (id) => id,
+      pins: { pinned: [], dismissed: [] }, onPins, overall: '64%'
+    });
+    expect(node.textContent).toContain('Focus areas');
+    expect(node.textContent).toContain('jux');
+    expect(node.textContent).toContain('Sure but wrong 3 times');
+    [...node.querySelectorAll('button')].find((b) => b.textContent === 'Pin')!.click();
+    expect(onPins).toHaveBeenCalledWith({ pinned: ['tech:jux'], dismissed: [] });
   });
 });
