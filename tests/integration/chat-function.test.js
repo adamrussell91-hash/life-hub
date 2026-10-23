@@ -1256,7 +1256,7 @@ Maintenance dose logged.
 
 // --- Sara record keeper, end to end through the real chat handler -------------------------------
 
-function saraVisitHarness({ calls }) {
+function saraVisitHarness({ calls, queueConflicts = 0 }) {
   const gpPath = 'data/body/2026/10/2026-10-15-medical-gp-review-ggt-results-1400.md';
   const gpYaml = `---
 schema_version: 1
@@ -1288,7 +1288,14 @@ Discuss GGT 233.
     }
     if (url.includes(`/git/blobs/${gpSha}`)) return Response.json({ content: Buffer.from(gpYaml).toString('base64'), encoding: 'base64' });
     if (url.includes('/git/blobs/')) return Response.json({ content: Buffer.from('# Purpose\n').toString('base64'), encoding: 'base64' });
-    if (options?.method === 'PUT') { puts.push({ url, body: options.body }); return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } }); }
+    if (options?.method === 'PUT') {
+      puts.push({ url, body: options.body });
+      if (url.includes('pending-actions.json') && queueConflicts > 0) {
+        queueConflicts -= 1;
+        return Response.json({ message: 'sha mismatch' }, { status: 409 });
+      }
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
     if (options?.method === 'DELETE') { deletes.push(url); return Response.json({ commit: { sha: 'b'.repeat(40) } }); }
     return Response.json({ message: 'not found' }, { status: 404 });
   };
@@ -1331,6 +1338,19 @@ test('Sara reschedule is one Confirm card (new file + old file removed); nothing
   assert.deepEqual(proposal.proposal.writes.map(w => w.mode), ['create', 'delete']);
   assert.match(proposal.proposal.writes[0].path, /2026-10-30-medical-/);
   assert.equal(h.puts.filter(p => /2026-10-30|2026-10-15-medical/.test(p.url)).length, 0, 'no visit file may change before Confirm');
+});
+
+test('Confirm card keeps its pending id when the queue sha went stale mid-turn', async () => {
+  const h = saraVisitHarness({
+    calls: [{ name: 'update_medical_visit', input: { visit_id: 'gp-visit', date: '30/10/2026' } }],
+    queueConflicts: 1
+  });
+  const events = contentEvents(await readSse(await h.handler(request({ message: 'GP moved to the 30th', priorAgentSlug: 'sara' }))));
+  const proposal = events.find(e => e.type === 'action_proposal');
+  assert.ok(proposal, JSON.stringify(events.map(e => e.type)));
+  assert.match(proposal.id, /\S/, 'card must carry a pending id so Confirm can apply it');
+  assert.equal(h.results[0].pendingId, proposal.id);
+  assert.equal(h.puts.filter(p => p.url.includes('pending-actions.json')).length, 2);
 });
 
 test('Sara delete is a Confirm card, and an unknown id is refused rather than guessed', async () => {
