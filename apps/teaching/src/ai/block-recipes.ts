@@ -1,4 +1,5 @@
 import { createBlock, NEW_BLOCK_TYPES } from '@/blocks/create-block';
+import { QUIZ_WRITING_GUIDE } from '@/ai/quiz-writing-guide';
 
 export const BLOCK_BUILD_RECIPES = `## Block build recipes
 Every proposed block must include all required metadata fields: id, type, block_type, variant, visibility, content, layout, print, settings, created_at, updated_at, schema_version:1.
@@ -29,7 +30,10 @@ A quiz is one quiz_question block per question: content { question }. Set questi
 - label_image: image { url, alt } from an image already in the lesson, pins [{ id, x, y, label }] 2-8 with x and y from 0 to 1. Skip this kind when the lesson has no image.
 - extended_response: model_answer and guide optional. Teacher-marked.
 - explain_effect: quote, technique optional, model_answer and guide optional. Teacher-marked.
-Mix kinds to suit the content: recall questions first, then structure (matching, ordering, categorise), then at most a few teacher-marked ones. Options must be plausible and distinct; no "all of the above".
+Mix kinds to suit the content: recall questions first, then structure (matching, ordering, categorise), then at most a few teacher-marked ones.
+
+${QUIZ_WRITING_GUIDE}
+
 quiz_question only works in a lesson whose type is quiz. In any other lesson, put set_mode: "quiz" on propose_insert_blocks (Accept switches the lesson to a Quiz) and say so in your message. When the teacher wants questions without a quiz ("just questions", "a few checks for understanding"), use question_set instead and leave the lesson type alone. Keep each proposal to 30 quiz questions or fewer. To rewrite or convert existing questions (e.g. turn find_it questions into spot_technique), use one propose_replace_blocks with every changed question, each keeping its block id; to convert a find_it, join its segments into the passage, keep line breaks, and quote the words that carry each technique.
 
 ## Limits: say so before you build
