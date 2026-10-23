@@ -163,3 +163,41 @@ test('text matching, gap markup, passages, hint cost and response cleaning', () 
   assert.equal(cleanResponse('true_false', { value: 'yes' }), null);
   assert.equal(cleanResponse('short_answer', { text: 'x'.repeat(9000) }).text.length, 6000);
 });
+
+test('keys carry skills and the technique of each public option', () => {
+  const q = {
+    id: 'qt', kind: 'quote_technique', prompt: 'Which technique?', marks: 1, quote: 'The wind sang.',
+    skills: ['reading.inference'],
+    options: [{ id: 'a', text: 'Personification', technique_id: 'personification' }, { id: 'b', text: 'Simile', technique_id: 'simile' }, { id: 'c', text: 'Rhyme' }],
+    correct: ['a']
+  };
+  const checked = checkQuestion(q);
+  assert.equal(checked.ok, true);
+  const { question, key } = splitQuestion(checked.question, seeded());
+  assert.deepEqual(key.skills, ['reading.inference']);
+  const byText = Object.fromEntries(question.options.map((o) => [o.text, o.id]));
+  assert.deepEqual(key.techniques, { [byText.Personification]: 'personification', [byText.Simile]: 'simile' });
+});
+
+test('spot_technique keys map option ids to techniques', () => {
+  const q = {
+    id: 'sp', kind: 'spot_technique', prompt: 'Find them.', marks: 2, passage: 'The sea roared like a lion. The moon was a coin.',
+    options: [{ id: 'o1', text: 'Simile', technique_id: 'simile' }, { id: 'o2', text: 'Metaphor', technique_id: 'metaphor' }],
+    targets: [{ id: 't1', quote: 'roared like a lion', correct: ['o1'] }, { id: 't2', quote: 'was a coin', correct: ['o2'] }]
+  };
+  const checked = checkQuestion(q);
+  assert.equal(checked.ok, true);
+  const { question, key } = splitQuestion(checked.question, seeded());
+  const byText = Object.fromEntries(question.options.map((o) => [o.text, o.id]));
+  assert.deepEqual(key.techniques, { [byText.Simile]: 'simile', [byText.Metaphor]: 'metaphor' });
+});
+
+test('a question with no technique ids or skills keeps a bare key', () => {
+  const { key } = splitQuestion(samples.multiple_choice, seeded());
+  assert.equal('techniques' in key, false);
+  assert.equal('skills' in key, false);
+});
+
+test('a skill must be strand.sub', () => {
+  assert.equal(checkQuestion({ ...samples.true_false, skills: ['Reading'] }).ok, false);
+});

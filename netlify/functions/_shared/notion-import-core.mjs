@@ -1159,7 +1159,9 @@ var base = {
   explanation: OptionalText(QUIZ_LIMITS.explanation),
   image: QuizImageSchema.optional(),
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
-  outcomes: z7.array(z7.string().min(1).max(64)).max(8).optional()
+  outcomes: z7.array(z7.string().min(1).max(64)).max(8).optional(),
+  /** Skills-continuum sub-strands, `strand.sub`, for insights. */
+  skills: z7.array(z7.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
 };
 var QuizQuestionSchema = z7.discriminatedUnion("kind", [
   z7.object({ ...base, kind: z7.literal("multiple_choice"), options: z7.array(QuizChoiceSchema).min(2).max(6), correct: z7.array(Id).length(1) }),
