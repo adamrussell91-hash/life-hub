@@ -70,6 +70,9 @@ describe('flags', () => {
     expect(ids).toEqual(['guessing:tech:jux', 'outlier:tech:simile', 'sure_wrong:tech:jux', 'thin:tech:motif'].sort());
     expect(flags.find((f) => f.id === 'outlier:tech:simile')!.students).toEqual(['s3']);
   });
+  it('returns nothing for no evidence', () => {
+    expect(findFlags([], [])).toEqual([]);
+  });
 });
 
 describe('trend and compare', () => {
@@ -90,6 +93,10 @@ describe('trend and compare', () => {
     expect(row!.change).toBeCloseTo(0.35, 6);
     expect(studentBand(0.49)).toBe('weak');
   });
+  it('counts a student who drops a band as down', () => {
+    const [row] = compare([e('s1', 'q', ['tech:x'], 0.9)], [e('s1', 'q', ['tech:x'], 0.2)], 'tech');
+    expect(row).toMatchObject({ up: 0, down: 1 });
+  });
 });
 
 describe('focusFor', () => {
@@ -104,5 +111,10 @@ describe('focusFor', () => {
     expect(f.focus.map((x) => x.tag)).toEqual(['tech:c', 'tech:a']);
     expect(f.focus[0]!.pinned).toBe(true);
     expect(f.secure.map((x) => x.tag)).toEqual(['tech:c']);
+  });
+  it('lists a duplicated pin once', () => {
+    const ev = [0, 0.2, 0.4].map((s, i) => e('s1', `a${i}`, ['tech:a'], s));
+    const f = focusFor(ev, 's1', 'tech', { pinned: ['tech:a', 'tech:a'], dismissed: [] });
+    expect(f.focus.map((x) => x.tag)).toEqual(['tech:a']);
   });
 });
