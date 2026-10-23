@@ -7,8 +7,11 @@ export type GapType = (typeof GAP_TYPES)[number];
 export const TUTORIAL_STAGES = ['common', 'before', 'waiting', 'after', 'exit', 'done'] as const;
 export type TutorialStage = (typeof TUTORIAL_STAGES)[number];
 
+/** One rule for a group id, shared by the settings and the section marker. */
+export const TutorialGroupIdSchema = z.string().regex(/^[a-z0-9_-]{1,40}$/);
+
 export const TutorialGroupSchema = z.object({
-  id: z.string().regex(/^[a-z0-9_-]{1,40}$/),
+  id: TutorialGroupIdSchema,
   /** Teacher-facing: "Re-tells the plot". Students never see it. */
   name: z.string().min(1).max(80),
   /** Teacher-facing: why this group gets it wrong. */
