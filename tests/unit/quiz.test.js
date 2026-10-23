@@ -544,6 +544,7 @@ test('markbook: each student’s first handed-in attempt, scored like Results', 
   assert.deepEqual(first.rows.find(r => r.id === 'qa').outcomes, ['oLesson'], 'no outcomes of its own: the lesson’s');
   assert.deepEqual(found.questions.map(q => q.id), ['qa', 'qb', 'qc']);
   assert.ok(found.first_at);
+  assert.equal(found.unit_id, 'unit1');
 
   await quizTeacherAction(store, 'quiz1', { action: 'mark', attempt_id: first.attempt_id, question_id: 'qc', score: 3 });
   const marked = (await classQuizScores(store, 'quiz1', 'class1', [bob.id])).scores[bob.id];

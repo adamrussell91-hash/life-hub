@@ -877,6 +877,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
   return {
     lesson_id: lessonId,
     title: insight.title,
+    unit_id: insight.unit_id,
     confidence: insight.confidence,
     closed: insight.closed,
     first_at: firstAt,

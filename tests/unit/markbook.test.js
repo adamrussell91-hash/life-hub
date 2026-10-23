@@ -62,6 +62,7 @@ test('load: an empty markbook, the list, and quiz columns built from attempts', 
   const [quiz] = loaded.quizzes;
   assert.equal(quiz.id, 'quiz:quiz1');
   assert.equal(quiz.title, 'Week 4 review');
+  assert.equal(quiz.unit_id, 'unit1');
   assert.match(quiz.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(quiz.hidden, false);
   assert.equal(quiz.scores[bob.id].score, 1);

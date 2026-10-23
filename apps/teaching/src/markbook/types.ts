@@ -14,6 +14,8 @@ export type QuizColumn = {
   id: string;
   lesson_id: string;
   title: string;
+  /** The quiz's unit, where a follow-up lesson goes. */
+  unit_id?: string;
   date: string;
   hidden: boolean;
   /** The quiz asked students how sure they were. */

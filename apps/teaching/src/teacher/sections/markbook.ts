@@ -8,6 +8,9 @@ import { el } from '@/quiz/dom';
 import type { AssessmentColumn, AssessmentMark, Column, Markbook } from '@/markbook/schema';
 import { httpMarkbookApi, type MarkbookApi } from '@/markbook/api';
 import type { MarkbookActions, MarkbookView, OutcomeLabel } from '@/markbook/types';
+import type { Evidence } from '@/evidence/types';
+import { openFollowUpPlan } from '@/evidence/follow-up';
+import { navigate } from '@/app/router';
 import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
 import { openColumnForm } from '@/markbook/column-form';
@@ -44,6 +47,13 @@ type Change =
   | { kind: 'hide'; lessonId: string; hidden: boolean }
   | { kind: 'delete_column'; columnId: string }
   | { kind: 'focus'; studentId: string; pinned: string[]; dismissed: string[] };
+
+/** The most recent shown quiz with evidence on this tag: the follow-up goes after it. */
+function latestQuizFor(view: MarkbookView, tag: string, evidence: Evidence[]): string | null {
+  const sources = new Set(evidence.filter((e) => e.tags.includes(tag) && e.source.startsWith('quiz:')).map((e) => e.source.slice(5)));
+  const quizzes = view.quizzes.filter((q) => !q.hidden && sources.has(q.lesson_id)).sort((a, b) => b.date.localeCompare(a.date));
+  return quizzes[0]?.lesson_id ?? null;
+}
 
 function applyChange(view: MarkbookView, change: Change): MarkbookView {
   if (change.kind === 'focus') {
@@ -385,7 +395,36 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     }
     const students = rowStudents(current, showRemoved);
     if (mode === 'patterns') {
-      body.replaceChildren(ctx ? renderPatterns(current, students, ctx, { openStudent: actions.openStudent }) : el('p', 'mb__status', 'Loading patterns…'));
+      const context = ctx;
+      body.replaceChildren(
+        context
+          ? renderPatterns(current, students, context, {
+              openStudent: actions.openStudent,
+              followUp: (tag, ids, evidence) => {
+                const lessonId = latestQuizFor(current, tag, evidence);
+                const quiz = current.quizzes.find((q) => q.lesson_id === lessonId);
+                if (!quiz) {
+                  status.textContent = 'Follow-ups start from a quiz; this tag only has assessment marks.';
+                  return;
+                }
+                status.textContent = '';
+                openFollowUpPlan({
+                  sourceLessonId: quiz.lesson_id,
+                  sourceTitle: quiz.title,
+                  unitId: quiz.unit_id ?? '',
+                  flagId: null,
+                  tag,
+                  students: current.students,
+                  chosen: ids,
+                  evidence,
+                  label: (t) => tagLabel(t, context),
+                  codeLabel: (id) => codeLabel(id, context.codes),
+                  onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+                });
+              }
+            })
+          : el('p', 'mb__status', 'Loading patterns…')
+      );
     }
     else if (narrow()) {
       const found = students.findIndex((s) => s.id === phoneStudentId);
