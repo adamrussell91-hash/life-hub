@@ -28,9 +28,9 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { deviceHash, validToken, walkBlocks } from './question-drop.mjs';
 import { backupForBlock, cleanBackupDraft, hingeBackupSource } from './hinge-backup.mjs';
+import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
-const ACTIVITY_HOURS = 12;
 const TIMES = [0, 30, 60, 90, 120];
 /** Answers sent a moment after the timer still count: phones lag. */
 const GRACE_MS = 3000;
@@ -125,6 +125,7 @@ function setup(draft, published, round = 'main') {
 function keys(lesson, block, session) {
   const base = `hinge/${lesson}/${block}`;
   return {
+    base,
     active: `${base}/active`,
     answer: (device) => `${base}/${session}/answers/${device}`,
     answers: `${base}/${session}/answers/`
@@ -162,7 +163,7 @@ async function teacherAction(store, k, activity, s, body) {
   if (action === 'hide') patch.revealed = false;
   if (Object.keys(patch).length) {
     activity = { ...activity, ...patch };
-    await store.setJSON(k.active, activity);
+    await saveRound(store, k.base, activity);
   }
   const { answered, picks } = await tally(store, k, s.options);
   return {
@@ -237,7 +238,7 @@ export async function hingeAction(store, lesson, block, body, opts = {}) {
   const teacher = opts.teacher === true;
   const { draft, published, draftLesson, publishedLesson } = await assertLive(store, lesson, block);
   if (!teacher && body.action === 'solo') return soloAnswer(store, lesson, block, body, { draft, published, publishedLesson });
-  const activeKey = keys(lesson, block, '').active;
+  const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 
   if (teacher && body.action === 'save_backup') {
@@ -254,7 +255,7 @@ export async function hingeAction(store, lesson, block, body, opts = {}) {
     reject(409, 'no_backup', 'This hinge question has no back-up question yet.');
   }
   const round = teacher && body.action === 'ask' ? askRound : activity?.round === 'backup' ? 'backup' : 'main';
-  const s = setup(draft, published, round);
+  let s = setup(draft, published, round);
 
   if (teacher && body.action === 'ask') {
     if (s.options.length < 2 || !s.correct_id) reject(409, 'unfinished', 'Finish the question and mark the right answer, then publish again.');
@@ -266,13 +267,21 @@ export async function hingeAction(store, lesson, block, body, opts = {}) {
       revealed: false,
       opened_at: new Date(now).toISOString(),
       closes_at: s.seconds ? new Date(now + s.seconds * 1000).toISOString() : null,
-      expires: now + ACTIVITY_HOURS * 3600_000
+      expires: roundExpiry(now)
     };
-    await store.setJSON(activeKey, activity);
+    await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'finish' && activity) {
     activity = { ...activity, expires: 0 };
-    await store.setJSON(activeKey, activity);
+    await saveRound(store, base, activity);
+  }
+  if (teacher && body.action === 'rounds') return { rounds: await listRounds(store, base, activity, 'answers') };
+  if (teacher && body.action === 'resume') {
+    // Back to look at the spread: answers stay closed. An older round that kept no state was a main-question round.
+    const fresh = (session) => ({ session, round: 'main', revealed: false, opened_at: null, closes_at: null });
+    activity = await bringBackRound(store, base, body.session, activity, fresh, { open: false });
+    if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
+    s = setup(draft, published, activity.round === 'backup' ? 'backup' : 'main');
   }
   if (!activity || activity.expires < Date.now()) {
     return teacher
@@ -281,7 +290,7 @@ export async function hingeAction(store, lesson, block, body, opts = {}) {
   }
 
   const k = keys(lesson, block, activity.session);
-  const rest = ['ask', 'finish', 'save_backup'].includes(body.action) ? { ...body, action: 'status' } : body;
+  const rest = ['ask', 'finish', 'save_backup', 'resume'].includes(body.action) ? { ...body, action: 'status' } : body;
   return teacher ? teacherAction(store, k, activity, s, rest) : studentAction(store, k, activity, s, body);
 }
 

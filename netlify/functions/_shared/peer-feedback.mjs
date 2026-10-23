@@ -35,9 +35,9 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { readBank } from './peer-feedback-bank.mjs';
+import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
-const ACTIVITY_HOURS = 12;
 export const MAX_WRITING = 8000;
 export const MAX_FEEDBACK = 2000;
 export const MAX_NOTES = 20;
@@ -93,6 +93,7 @@ async function assertLive(store, lesson, block) {
 function keys(lesson, block, session) {
   const base = `peer_feedback/${lesson}/${block}`;
   return {
+    base,
     active: `${base}/active`,
     claim: (id) => `${base}/${session}/claims/${id}`,
     token: (tokenHash) => `${base}/${session}/tokens/${tokenHash}`,
@@ -188,7 +189,7 @@ async function teacherAction(store, k, activity, body) {
 
   if (action === 'symbols') {
     activity = { ...activity, show_symbols: body.show === true };
-    await store.setJSON(k.active, activity);
+    await saveRound(store, k.base, activity);
   }
   if (action === 'release' || action === 'remove') {
     if (!IDENTITIES.includes(body.reviewer)) reject(400, 'bad_request', 'Unknown reviewer.');
@@ -212,11 +213,11 @@ async function teacherAction(store, k, activity, body) {
     const included = joined.filter((id) => writing[id] && !excluded.has(id));
     if (included.length < 2) reject(400, 'too_few', 'Include at least two answers to swap.');
     activity = { ...activity, phase: 'review', assignments: annotate ? pairRing(included) : ring(included) };
-    await store.setJSON(k.active, activity);
+    await saveRound(store, k.base, activity);
   } else if (action === 'results') {
     if (activity.phase !== 'review') reject(409, 'wrong_phase', 'Start the feedback round first.');
     activity = { ...activity, phase: 'results' };
-    await store.setJSON(k.active, activity);
+    await saveRound(store, k.base, activity);
   }
 
   if (annotate) return annotateTeacherState(store, k, activity, joined, writing);
@@ -427,30 +428,42 @@ async function annotateStudent(store, k, activity, id, action, body) {
   return state;
 }
 
+function freshRound(live) {
+  return {
+    session: randomBytes(16).toString('hex'),
+    code: String(randomInt(100000, 1000000)),
+    phase: 'write',
+    started_at: new Date().toISOString(),
+    expires: roundExpiry(),
+    assignments: {},
+    show_symbols: false,
+    mode: live.content?.mode === 'annotate' ? 'annotate' : 'comments'
+  };
+}
+
 export async function peerAction(store, lesson, block, body, teacher = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const live = await assertLive(store, lesson, block);
-  const activeKey = keys(lesson, block, '').active;
+  const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 
   if (teacher && body.action === 'start') {
-    activity = {
-      session: randomBytes(16).toString('hex'),
-      code: String(randomInt(100000, 1000000)),
-      phase: 'write',
-      expires: Date.now() + ACTIVITY_HOURS * 3600_000,
-      assignments: {},
-      show_symbols: false,
-      mode: live.content?.mode === 'annotate' ? 'annotate' : 'comments'
-    };
-    await store.setJSON(activeKey, activity);
+    activity = freshRound(live);
+    await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'end' && activity) {
     activity = { ...activity, expires: 0 };
-    await store.setJSON(activeKey, activity);
+    await saveRound(store, base, activity);
+  }
+  if (teacher && body.action === 'rounds') return { rounds: await listRounds(store, base, activity, 'claims') };
+  if (teacher && body.action === 'resume') {
+    // An older round that kept no state comes back in the writing phase: its answers are all there, the swap is not.
+    activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(live), session }));
+    if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
 
   const k = keys(lesson, block, activity.session);
-  return teacher ? teacherAction(store, k, activity, body) : studentAction(store, k, activity, body);
+  const rest = body.action === 'resume' ? { ...body, action: 'status' } : body;
+  return teacher ? teacherAction(store, k, activity, rest) : studentAction(store, k, activity, body);
 }
