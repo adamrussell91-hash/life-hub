@@ -93,3 +93,22 @@ function findPrevious(blocks: Block[], id: string): Block | null | undefined {
   }
   return undefined;
 }
+
+/** `added` as the first child of the section `id`, wherever it sits; unchanged if `id` is not a section. */
+export function prependToSection(blocks: Block[], id: string, added: Block): Block[] {
+  let touched = false;
+  const out = blocks.map((block) => {
+    if (block.id === id && block.block_type === 'section') {
+      touched = true;
+      const c = block.content as { blocks: Block[] };
+      return { ...block, content: { ...block.content, blocks: [added, ...c.blocks] } } as Block;
+    }
+    let next = block;
+    for (const list of childLists(block)) {
+      const changed = prependToSection(list.blocks, id, added);
+      if (changed !== list.blocks) { next = list.rebuild(changed); touched = true; }
+    }
+    return next;
+  });
+  return touched ? out : blocks;
+}

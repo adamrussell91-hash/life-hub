@@ -10,6 +10,7 @@ import { applyRememberedTabsPanel, rememberTabsPanel } from '@/blocks/layout-edi
 import {
   createFromInsertMenu,
   cloneBlockWithNewIds,
+  createBlock,
   type InsertMenuValue
 } from '@/blocks/create-block';
 import {
@@ -21,6 +22,8 @@ import { findBlockById } from '@/blocks/find-block';
 import { createDiscernConfirmBlock, findDiscernConfirm, insertDiscernConfirm, removeDiscernConfirms } from '@/blocks/discern';
 import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-editor';
 import { renderBlock } from '@/blocks/render';
+import { mountLecturePanel, type LecturePanelHandle } from '@/lecture/teacher-panel';
+import { insertAfter, prependToSection } from '@/lecture/tree';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
 import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import { mountPulseSummary } from '@/teacher/pulse-summary';
@@ -987,6 +990,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     emitLesson({ ...lesson, pedagogical_mode });
     banner.update({ eyebrow: PEDAGOGICAL_MODE_LABELS[pedagogical_mode] });
     syncQuizPanel();
+    syncLecturePanel();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
   });
@@ -1025,8 +1029,36 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     quizHost.hidden = !isQuiz;
   }
 
+  // A lesson set to Lecture gets its panel: Play as student, the replay strip and hand-ups.
+  const lectureHost = document.createElement('div');
+  lectureHost.className = 'lesson-page__lecture';
+  let lecturePanel: LecturePanelHandle | null = null;
+  function syncLecturePanel(): void {
+    const isLecture = resolvePedagogicalMode(lesson.pedagogical_mode) === 'lecture';
+    if (isLecture && !lecturePanel) {
+      lecturePanel = mountLecturePanel({
+        getLesson: () => lesson,
+        onAddCallout: (sceneId, text) => {
+          const base = createBlock('callout', options.idFactory());
+          const callout = { ...base, content: { ...base.content, style: 'information', body: text } } as Block;
+          // A chapter-intro scene is the section itself, so the callout opens it.
+          const inSection = prependToSection(lesson.blocks, sceneId, callout);
+          const blocks = inSection !== lesson.blocks ? inSection : insertAfter(lesson.blocks, sceneId, callout);
+          emitLesson({ ...lesson, blocks });
+          canvas.update(blocks, media);
+        }
+      });
+      lectureHost.append(lecturePanel.root);
+      void lecturePanel.refresh();
+    } else if (!isLecture && lecturePanel) {
+      lecturePanel.dispose();
+      lecturePanel = null;
+    }
+    lectureHost.hidden = !isLecture;
+  }
+
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, quizHost, canvasHost);
+  root.append(coverHost, metaRow, quizHost, lectureHost, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1075,6 +1107,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
 
   syncQuizPanel();
+  syncLecturePanel();
 
   const stripHost = document.createElement('div');
   stripHost.className = 'lesson-page__meta-outcomes';
@@ -1153,6 +1186,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       titleEditor.update(lesson.title);
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
       syncQuizPanel();
+      syncLecturePanel();
+      lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
         cover: lesson.cover ?? null,
@@ -1173,6 +1208,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     dispose() {
       quizPanel?.dispose();
+      lecturePanel?.dispose();
       classExamples.dispose();
       pulseSummary.dispose();
       pulse.dispose();
