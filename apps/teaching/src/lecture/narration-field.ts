@@ -56,6 +56,13 @@ export function createNarrationField(options: {
   const root = document.createElement('div');
   root.className = 'narration-field';
   let value = options.value;
+  /** The clip on the block, kept while a re-record is under way so Cancel can bring it back. */
+  let saved = options.value;
+  const save = (next: Narration | undefined) => {
+    value = next;
+    saved = next;
+    options.onChange(next);
+  };
   let disposeRecorder: (() => void) | null = null;
 
   const paint = () => {
@@ -82,8 +89,7 @@ export function createNarrationField(options: {
         paint();
       });
       const remove = ghostButton('Remove', () => {
-        value = undefined;
-        options.onChange(undefined);
+        save(undefined);
         paint();
       });
       const words = document.createElement('details');
@@ -99,8 +105,7 @@ export function createNarrationField(options: {
         if (!value) return;
         const transcript = area.value.trim();
         const { transcript: _old, ...rest } = value;
-        value = transcript ? { ...rest, transcript } : rest;
-        options.onChange(value);
+        save(transcript ? { ...rest, transcript } : rest);
       });
       words.append(summary, area);
       root.append(player, length, redo, remove, words);
@@ -108,6 +113,12 @@ export function createNarrationField(options: {
     }
 
     let uploaded = '';
+    // Record and Upload sit in one fieldset so both lock while a new clip is measured.
+    const controls = document.createElement('fieldset');
+    controls.className = 'narration-field__controls';
+    const status = document.createElement('span');
+    status.className = 'narration-field__status';
+    status.setAttribute('role', 'status');
     const upload = createUploadButton({
       accept: AUDIO_ACCEPT,
       noun: 'a recording',
@@ -115,10 +126,11 @@ export function createNarrationField(options: {
       compact: true,
       onUploaded: (url) => {
         uploaded = url;
+        controls.disabled = true;
+        status.textContent = 'Saving…';
+        // A new clip starts with no transcript: the old words were for the old take.
         void measureDuration(url).then((duration_s) => {
-          const transcript = options.value?.transcript;
-          value = { url, duration_s, ...(transcript ? { transcript } : {}) };
-          options.onChange(value);
+          save({ url, duration_s });
           paint();
         });
       }
@@ -132,7 +144,17 @@ export function createNarrationField(options: {
       fileTitle: () => options.label.replace(/^\W+/u, '')
     });
     disposeRecorder = record.dispose;
-    root.append(record.el, upload.el);
+    controls.append(record.el, upload.el);
+    root.append(controls, status);
+    if (saved) {
+      const keep = saved;
+      controls.append(
+        ghostButton('Cancel', () => {
+          value = keep;
+          paint();
+        })
+      );
+    }
   };
   paint();
   return root;

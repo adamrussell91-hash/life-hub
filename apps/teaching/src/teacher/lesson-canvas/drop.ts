@@ -7,6 +7,7 @@ import {
   type NewBlockType
 } from '@/blocks/create-block';
 import { findBlockById } from '@/blocks/find-block';
+import { isSidePath, takesSidePath } from '@/lecture/scenes';
 import type { Block } from '@/schemas/block';
 
 const LINKED_SECTION_MESSAGE = 'Linked sections cannot contain blocks.';
@@ -60,17 +61,7 @@ export function insertTypeForParent(
   return allowedTypesFor(parent, rootMode).includes(type) ? null : rejectReason(parent, type, rootMode);
 }
 
-/** Lecture: a section marked to play only after a wrong answer on the gate above it. */
-function isSidePathSection(block: Block | null | undefined): boolean {
-  return block?.block_type === 'section' && (block.content as { side_path?: boolean }).side_path === true;
-}
-
-/** Lecture gates whose wrong answer can open the side path right after them. */
-function takesSidePath(block: Block | null | undefined): boolean {
-  return block?.block_type === 'hinge_question' || block?.block_type === 'cloze';
-}
-
-const SIDE_PATH_IN_SIDE_PATH = 'An If wrong path cannot go inside another If wrong path.';
+const SIDE_PATH_PLACE = 'An If wrong path can sit on the page or inside a chapter.';
 
 /**
  * Why `block` cannot go in `parent`, or null. Like `insertTypeForParent`, but
@@ -82,21 +73,27 @@ function placeReason(
   block: Block,
   rootMode: DropRootMode = 'lesson'
 ): string | null {
-  if (isSidePathSection(block) && parent.kind === 'section') {
-    return isSidePathSection(findBlockById(blocks, parent.id)) ? SIDE_PATH_IN_SIDE_PATH : null;
+  if (isSidePath(block)) {
+    if (parent.kind === 'root') return insertTypeForParent(parent, 'section', rootMode);
+    if (parent.kind === 'section') {
+      const holder = findBlockById(blocks, parent.id);
+      return holder && !isSidePath(holder) ? null : SIDE_PATH_PLACE;
+    }
+    return SIDE_PATH_PLACE;
   }
   return insertTypeForParent(parent, block.block_type as NewBlockType, rootMode);
 }
 
 /**
  * Dropping a section where a section cannot go moves its blocks in instead.
- * A side path moves whole into a chapter section; into another side path it
- * is refused (by `moveBlockTo`), never quietly unpacked.
+ * A side path never unpacks: it moves whole onto the page or into a chapter,
+ * and `moveBlockTo` refuses it anywhere else.
  */
 export function sectionDropUnpacks(blocks: Block[], sectionId: string, parent: DropParent): boolean {
   const moving = findBlockById(blocks, sectionId);
   if (moving?.block_type !== 'section') return false;
-  if (isSidePathSection(moving) && parent.kind === 'section') return false;
+  // A side path moves whole or is refused, never quietly unpacked.
+  if (isSidePath(moving)) return false;
   return insertTypeForParent(parent, 'section') !== null;
 }
 
@@ -356,7 +353,7 @@ function attachedSidePath(
 ): Block | null {
   if (!takesSidePath(moving)) return null;
   const after = siblingsAt(blocks, location.parent)?.[location.index + 1];
-  return after && isSidePathSection(after) ? after : null;
+  return after && isSidePath(after) ? after : null;
 }
 
 /**
@@ -381,10 +378,7 @@ export function moveBlockTo(
   if (reason) return { ok: false, message: reason };
   const path = attachedSidePath(blocks, location, moving);
   if (path && placeReason(blocks, parent, path, rootMode)) {
-    return {
-      ok: false,
-      message: `This question’s If wrong path cannot go in a ${parent.kind}. Move the path off first.`
-    };
+    return { ok: false, message: 'A question and its If wrong path move together, onto the page or into a chapter.' };
   }
   const group = path ? [moving, path] : [moving];
 
@@ -411,11 +405,15 @@ export function moveBlockTo(
 export function moveByTarget(list: Block[], blockId: string, delta: 1 | -1): number | null {
   const from = list.findIndex((block) => block.id === blockId);
   if (from < 0) return null;
-  const span = (at: number) => (takesSidePath(list[at]) && isSidePathSection(list[at + 1]) ? 2 : 1);
+  const is = (at: number, test: (block: Block) => boolean) => {
+    const block = list[at];
+    return block !== undefined && test(block);
+  };
+  const span = (at: number) => (is(at, takesSidePath) && is(at + 1, isSidePath) ? 2 : 1);
   if (delta < 0) {
     if (from === 0) return null;
     const prev = from - 1;
-    return isSidePathSection(list[prev]) && prev > 0 && takesSidePath(list[prev - 1]) ? prev - 1 : prev;
+    return is(prev, isSidePath) && is(prev - 1, takesSidePath) ? prev - 1 : prev;
   }
   const next = from + span(from);
   if (next >= list.length) return null;
@@ -445,6 +443,7 @@ export function unpackSectionTo(
   const moving = [...(heading ? [heading] : []), ...(section.content.blocks as Block[])];
   for (const child of moving) {
     const reason = placeReason(blocks, parent, child);
+    if (reason === SIDE_PATH_PLACE) return { ok: false, message: reason };
     if (reason) {
       const label = child.block_type.replace(/_/g, ' ');
       return { ok: false, message: `This section holds a ${label} block, which cannot go in a ${parent.kind}.` };
