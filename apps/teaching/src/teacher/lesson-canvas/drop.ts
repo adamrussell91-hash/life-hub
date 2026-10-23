@@ -60,6 +60,46 @@ export function insertTypeForParent(
   return allowedTypesFor(parent, rootMode).includes(type) ? null : rejectReason(parent, type, rootMode);
 }
 
+/** Lecture: a section marked to play only after a wrong answer on the gate above it. */
+function isSidePathSection(block: Block | null | undefined): boolean {
+  return block?.block_type === 'section' && (block.content as { side_path?: boolean }).side_path === true;
+}
+
+/** Lecture gates whose wrong answer can open the side path right after them. */
+function takesSidePath(block: Block | null | undefined): boolean {
+  return block?.block_type === 'hinge_question' || block?.block_type === 'cloze';
+}
+
+const SIDE_PATH_IN_SIDE_PATH = 'An If wrong path cannot go inside another If wrong path.';
+
+/**
+ * Why `block` cannot go in `parent`, or null. Like `insertTypeForParent`, but
+ * a lecture side path may sit one level down, inside a chapter section.
+ */
+function placeReason(
+  blocks: Block[],
+  parent: DropParent,
+  block: Block,
+  rootMode: DropRootMode = 'lesson'
+): string | null {
+  if (isSidePathSection(block) && parent.kind === 'section') {
+    return isSidePathSection(findBlockById(blocks, parent.id)) ? SIDE_PATH_IN_SIDE_PATH : null;
+  }
+  return insertTypeForParent(parent, block.block_type as NewBlockType, rootMode);
+}
+
+/**
+ * Dropping a section where a section cannot go moves its blocks in instead.
+ * A side path moves whole into a chapter section; into another side path it
+ * is refused (by `moveBlockTo`), never quietly unpacked.
+ */
+export function sectionDropUnpacks(blocks: Block[], sectionId: string, parent: DropParent): boolean {
+  const moving = findBlockById(blocks, sectionId);
+  if (moving?.block_type !== 'section') return false;
+  if (isSidePathSection(moving) && parent.kind === 'section') return false;
+  return insertTypeForParent(parent, 'section') !== null;
+}
+
 function linkedSectionWriteError(blocks: Block[], parent: DropParent): string | null {
   if (parent.kind !== 'section') return null;
   const target = findBlockById(blocks, parent.id);
@@ -245,7 +285,7 @@ export function insertAt(
   const rootMode = options.rootMode ?? 'lesson';
   const linked = linkedSectionWriteError(blocks, parent);
   if (linked) return { ok: false, message: linked };
-  const reason = insertTypeForParent(parent, block.block_type as NewBlockType, rootMode);
+  const reason = placeReason(blocks, parent, block, rootMode);
   if (reason) return { ok: false, message: reason };
   const next = updateListAtParent(blocks, parent, (list) => {
     const at = Math.max(0, Math.min(index, list.length));
@@ -299,6 +339,31 @@ export function deleteBlocksById(blocks: Block[], ids: string[]): Block[] {
   return walk(blocks);
 }
 
+function siblingsAt(blocks: Block[], parent: DropParent): Block[] | null {
+  let found: Block[] | null = null;
+  updateListAtParent(blocks, parent, (list) => {
+    found = list;
+    return list;
+  });
+  return found;
+}
+
+/** The side path that travels with a hinge or cloze: the section right after it. */
+function attachedSidePath(
+  blocks: Block[],
+  location: { parent: DropParent; index: number },
+  moving: Block
+): Block | null {
+  if (!takesSidePath(moving)) return null;
+  const after = siblingsAt(blocks, location.parent)?.[location.index + 1];
+  return after && isSidePathSection(after) ? after : null;
+}
+
+/**
+ * Moves a block to `index` in `parent` (an index in the list as it is now).
+ * A hinge or cloze takes the side path right after it along, so the pair
+ * stays together.
+ */
 export function moveBlockTo(
   blocks: Block[],
   blockId: string,
@@ -311,19 +376,50 @@ export function moveBlockTo(
   if (!location || !moving) return { ok: false, message: 'Block not found.' };
   const linked = linkedSectionWriteError(blocks, parent);
   if (linked) return { ok: false, message: linked };
-  const reason = insertTypeForParent(
-    parent,
-    moving.block_type as NewBlockType,
-    options.rootMode ?? 'lesson'
-  );
+  const rootMode = options.rootMode ?? 'lesson';
+  const reason = placeReason(blocks, parent, moving, rootMode);
   if (reason) return { ok: false, message: reason };
-
-  const without = deleteBlocksById(blocks, [blockId]);
-  let destIndex = index;
-  if (sameParent(location.parent, parent) && location.index < index) {
-    destIndex = index - 1;
+  const path = attachedSidePath(blocks, location, moving);
+  if (path && placeReason(blocks, parent, path, rootMode)) {
+    return {
+      ok: false,
+      message: `This question’s If wrong path cannot go in a ${parent.kind}. Move the path off first.`
+    };
   }
-  return insertAt(without, parent, destIndex, moving, options);
+  const group = path ? [moving, path] : [moving];
+
+  const without = deleteBlocksById(blocks, group.map((block) => block.id));
+  // Slots the group leaves behind before `index` close up.
+  const destIndex = sameParent(location.parent, parent)
+    ? index - group.filter((_, i) => location.index + i < index).length
+    : index;
+  const next = updateListAtParent(without, parent, (list) => {
+    const at = Math.max(0, Math.min(destIndex, list.length));
+    const copy = [...list];
+    copy.splice(at, 0, ...group);
+    return copy;
+  });
+  if (!next) return { ok: false, message: 'Parent not found.' };
+  return { ok: true, blocks: next };
+}
+
+/**
+ * The `moveBlockTo` index for Move up / Move down in `list`, or null at an
+ * end. A hinge or cloze with its side path counts as one step, both as the
+ * block moving and as the neighbour it passes.
+ */
+export function moveByTarget(list: Block[], blockId: string, delta: 1 | -1): number | null {
+  const from = list.findIndex((block) => block.id === blockId);
+  if (from < 0) return null;
+  const span = (at: number) => (takesSidePath(list[at]) && isSidePathSection(list[at + 1]) ? 2 : 1);
+  if (delta < 0) {
+    if (from === 0) return null;
+    const prev = from - 1;
+    return isSidePathSection(list[prev]) && prev > 0 && takesSidePath(list[prev - 1]) ? prev - 1 : prev;
+  }
+  const next = from + span(from);
+  if (next >= list.length) return null;
+  return next + span(next);
 }
 
 /**
@@ -348,16 +444,16 @@ export function unpackSectionTo(
   if (linked) return { ok: false, message: linked };
   const moving = [...(heading ? [heading] : []), ...(section.content.blocks as Block[])];
   for (const child of moving) {
-    const reason = insertTypeForParent(parent, child.block_type as NewBlockType);
+    const reason = placeReason(blocks, parent, child);
     if (reason) {
       const label = child.block_type.replace(/_/g, ' ');
       return { ok: false, message: `This section holds a ${label} block, which cannot go in a ${parent.kind}.` };
     }
   }
 
-  const without = deleteBlocksById(blocks, [sectionId]);
   const destIndex =
     sameParent(location.parent, parent) && location.index < index ? index - 1 : index;
+  const without = deleteBlocksById(blocks, [sectionId]);
   const next = updateListAtParent(without, parent, (list) => {
     const at = Math.max(0, Math.min(destIndex, list.length));
     const copy = [...list];

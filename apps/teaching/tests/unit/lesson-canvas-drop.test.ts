@@ -9,8 +9,11 @@ import {
   insertTargetForSelection,
   insertTypeForParent,
   moveBlockTo,
+  moveByTarget,
   nextBlockIdFactory,
-  reorderSiblings
+  reorderSiblings,
+  sectionDropUnpacks,
+  unpackSectionTo
 } from '@/teacher/lesson-canvas/drop';
 
 function asSection(block: Block): Extract<Block, { block_type: 'section' }> {
@@ -351,5 +354,98 @@ describe('linked section writes', () => {
     if (result.ok) return;
     expect(result.message).toBe(linkedMessage);
     expect(tree).toEqual(snapshot);
+  });
+});
+
+describe('lecture side paths when moving', () => {
+  const sidePath = (id: string, children: Block[] = []): Block => {
+    const s = asSection(createBlock('section', id));
+    return { ...s, content: { ...s.content, title: 'Again', side_path: true, blocks: children as typeof s.content.blocks } } as Block;
+  };
+  const ids = (blocks: Block[]) => blocks.map((b) => b.id);
+  const kids = (block: Block) => ids(asSection(block).content.blocks as Block[]);
+
+  it('moves a side path into a chapter section whole', () => {
+    const chapter = createBlock('section', 'sec1');
+    const blocks = [chapter, sidePath('p1', [createBlock('rich_text', 'rt1')])];
+    expect(sectionDropUnpacks(blocks, 'p1', { kind: 'section', id: 'sec1' })).toBe(false);
+    const result = moveBlockTo(blocks, 'p1', { kind: 'section', id: 'sec1' }, 0);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(ids(result.blocks)).toEqual(['sec1']);
+    expect(kids(result.blocks[0]!)).toEqual(['p1']);
+    expect(kids(asSection(result.blocks[0]!).content.blocks[0] as Block)).toEqual(['rt1']);
+  });
+
+  it('refuses a side path inside another side path', () => {
+    const blocks = [sidePath('p0'), sidePath('p1')];
+    expect(sectionDropUnpacks(blocks, 'p1', { kind: 'section', id: 'p0' })).toBe(false);
+    const result = moveBlockTo(blocks, 'p1', { kind: 'section', id: 'p0' }, 0);
+    expect(result.ok).toBe(false);
+  });
+
+  it('still unpacks a section dropped into a column or a chapter', () => {
+    const cols = createBlock('columns', 'cols1');
+    const blocks = [cols, sidePath('p1'), createBlock('section', 'sec1'), createBlock('section', 'sec2')];
+    expect(sectionDropUnpacks(blocks, 'p1', { kind: 'column', id: 'cols1', columnIndex: 0 })).toBe(true);
+    expect(sectionDropUnpacks(blocks, 'sec2', { kind: 'section', id: 'sec1' })).toBe(true);
+    expect(sectionDropUnpacks(blocks, 'sec2', { kind: 'root' })).toBe(false);
+  });
+
+  it('unpacks a chapter that holds a side path into another chapter', () => {
+    const inner = [createBlock('cloze', 'q1'), sidePath('p1')];
+    const blocks = [createBlock('section', 'sec1'), withSectionChildren(createBlock('section', 'sec2'), inner)];
+    const result = unpackSectionTo(blocks, 'sec2', { kind: 'section', id: 'sec1' }, 0);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(kids(result.blocks[0]!)).toEqual(['q1', 'p1']);
+  });
+
+  it('carries a gate’s side path along when the gate moves', () => {
+    const blocks = [createBlock('rich_text', 'rt1'), createBlock('cloze', 'q1'), sidePath('p1'), createBlock('callout', 'c1')];
+    const result = moveBlockTo(blocks, 'q1', { kind: 'root' }, 0);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(ids(result.blocks)).toEqual(['q1', 'p1', 'rt1', 'c1']);
+
+    const down = moveBlockTo(blocks, 'q1', { kind: 'root' }, 4);
+    expect(down.ok && ids(down.blocks)).toEqual(['rt1', 'c1', 'q1', 'p1']);
+  });
+
+  it('carries the side path when a hinge moves into a chapter', () => {
+    const blocks = [createBlock('section', 'sec1'), createBlock('hinge_question', 'hq1'), sidePath('p1')];
+    const result = moveBlockTo(blocks, 'hq1', { kind: 'section', id: 'sec1' }, 0);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(ids(result.blocks)).toEqual(['sec1']);
+    expect(kids(result.blocks[0]!)).toEqual(['hq1', 'p1']);
+  });
+
+  it('refuses to split a gate from its side path into a column', () => {
+    const blocks = [createBlock('columns', 'cols1'), createBlock('cloze', 'q1'), sidePath('p1')];
+    const result = moveBlockTo(blocks, 'q1', { kind: 'column', id: 'cols1', columnIndex: 0 }, 0);
+    expect(result.ok).toBe(false);
+  });
+
+  it('a self-check does not carry the section after it', () => {
+    const blocks = [createBlock('rich_text', 'rt1'), createBlock('self_check', 'k1'), sidePath('p1')];
+    const result = moveBlockTo(blocks, 'k1', { kind: 'root' }, 0);
+    expect(result.ok && ids(result.blocks)).toEqual(['k1', 'rt1', 'p1']);
+  });
+
+  it('move up and down step over a gate and its side path as one', () => {
+    const list = [createBlock('rich_text', 'rt1'), createBlock('cloze', 'q1'), sidePath('p1'), createBlock('callout', 'c1')];
+    const step = (id: string, delta: 1 | -1) => {
+      const at = moveByTarget(list, id, delta);
+      if (at === null) return null;
+      const result = moveBlockTo(list, id, { kind: 'root' }, at);
+      return result.ok ? ids(result.blocks) : null;
+    };
+    expect(step('q1', 1)).toEqual(['rt1', 'c1', 'q1', 'p1']);
+    expect(step('q1', -1)).toEqual(['q1', 'p1', 'rt1', 'c1']);
+    expect(step('c1', -1)).toEqual(['rt1', 'c1', 'q1', 'p1']);
+    expect(step('rt1', 1)).toEqual(['q1', 'p1', 'rt1', 'c1']);
+    expect(step('rt1', -1)).toBeNull();
+    expect(step('c1', 1)).toBeNull();
   });
 });

@@ -13,8 +13,8 @@ import {
 import type { Block } from '@/schemas/block';
 import { findBlockById } from '@/blocks/find-block';
 import {
-  insertTypeForParent,
   moveBlockTo,
+  sectionDropUnpacks,
   unpackSectionTo,
   type DropParent
 } from '@/teacher/lesson-canvas/drop';
@@ -188,9 +188,8 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     if (!parent || !lesson) return;
     const moving = findBlockById(lesson, blockId);
     // A section cannot sit in a tab or column, so its blocks move in instead.
-    const unpack =
-      moving?.block_type === 'section' && insertTypeForParent(parent, 'section') !== null;
-    const result = unpack
+    // A lecture side path moves into a chapter whole.
+    const result = moving && sectionDropUnpacks(lesson, blockId, parent)
       ? unpackSectionTo(lesson, blockId, parent, index, sectionHeading(moving))
       : moveBlockTo(lesson, blockId, parent, index);
     if (!result.ok) {

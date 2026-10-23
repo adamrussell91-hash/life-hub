@@ -63,3 +63,17 @@
   .lecture-narration { order: -1; flex-basis: 100%; }
   .lecture-bar__main { flex: 1; min-width: 0; }
 }
+
+/* Editor: lecture controls on the lesson canvas */
+.lecture-tools { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-2); padding: var(--space-2); border: 1px dashed color-mix(in srgb, var(--marine) 35%, transparent); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.lecture-tools__note { margin: 0; color: var(--muted); }
+.lecture-tools__reveal { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-full); overflow: hidden; }
+.lecture-tools__reveal button { border: 0; background: var(--paper); color: var(--ink); padding: var(--space-1) var(--space-3); min-height: 32px; cursor: pointer; }
+.lecture-tools__reveal button[aria-checked="true"] { background: var(--ink); color: var(--paper); }
+.lecture-tools__takeaway, .lecture-tools__gate { display: inline-flex; gap: var(--space-1); align-items: center; }
+.lecture-tools__takeaway-prompt { flex: 1 1 16rem; min-width: 0; }
+.narration-field { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; min-width: 0; }
+.narration-field__label { font-weight: var(--weight-semibold); }
+.narration-field__audio { height: 32px; max-width: min(16rem, 100%); }
+.narration-field__transcript { flex-basis: 100%; }
+.narration-field__transcript textarea { width: 100%; box-sizing: border-box; }
