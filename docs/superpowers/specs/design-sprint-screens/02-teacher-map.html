@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint progress map</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .head__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .layout { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+  .map { padding: 8px 8px 12px; overflow: hidden; }
+  .grid { display: grid; grid-template-columns: 150px repeat(5, 1fr); }
+  .grid > div { padding: 10px 10px; border-bottom: 1px solid var(--line); }
+  .ph { font-size: 13px; }
+  .ph b { display: block; font-size: 14px; }
+  .ph .pill { margin-top: 4px; font-size: 11px; padding: 2px 8px; }
+  .ph .due { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .ph--now { background: rgba(23,55,94,.05); border-radius: 12px 12px 0 0; }
+  .gname { font-weight: 650; font-size: 14px; display: flex; flex-direction: column; justify-content: center; }
+  .gname span { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .cell { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; cursor: pointer; border-radius: 10px; }
+  .cell:hover { background: rgba(23,55,94,.05); }
+  .cell--now { background: rgba(23,55,94,.03); }
+  .cell .pill { font-size: 11px; padding: 2px 8px; }
+  .cell--sel { outline: 2px solid var(--navy); outline-offset: -2px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); padding: 10px 12px 0; }
+  .legend span { display: inline-flex; gap: 6px; align-items: center; }
+
+  .board { padding: 18px; }
+  .board h2 { margin-bottom: 2px; }
+  .ideas { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .ideaRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 12px; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .ideaRow--top { border-color: var(--navy); }
+  .ideaRow b { font-size: 14px; }
+  .ideaRow .by { font-size: 12px; color: var(--muted); }
+  .heat { display: flex; gap: 3px; }
+  .heat i { width: 18px; height: 18px; border-radius: 5px; background: var(--pastel-blue); }
+  .heat i.h1 { background: #c3d7ef; } .heat i.h2 { background: #7fa4d3; } .heat i.h3 { background: var(--navy); }
+  .heatKey { font-size: 11px; color: var(--muted); display: flex; justify-content: flex-end; gap: 3px; }
+  .heatKey span { width: 18px; text-align: center; }
+  .board__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Phone: one card per group. */
+  .cards { display: none; }
+  @media (max-width: 600px) {
+    .grid { display: none; }
+    .legend { padding-top: 4px; }
+    .cards { display: flex; flex-direction: column; gap: 10px; padding: 6px; }
+    .gcard { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+    .gcard__top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .mini { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+    .mini div { font-size: 10px; color: var(--muted); text-align: center; padding: 6px 2px; border-radius: 8px; background: var(--paper); }
+    .mini div b { display: block; font-size: 12px; color: var(--ink); }
+    .mini .now { outline: 1.5px solid var(--navy); }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="mock-label">Mockup 2 · Teacher · Progress map</p>
+  <p class="mock-note">Rows are groups and columns are phases, with one dot per student. Badges mark groups waiting on the teacher. Clicking a cell opens that group's board, which shows authors because the teacher needs them. On a phone each group becomes a card.</p>
+
+  <div class="head">
+    <div>
+      <div class="muted small">7B · Year 7 History · Teacher confirms the idea</div>
+      <h1>Pompeii: why it still matters</h1>
+    </div>
+    <div class="head__actions">
+      <button class="btn btn--sm">Groups</button>
+      <button class="btn btn--sm">Criteria</button>
+      <button class="btn btn--sm">Extend a deadline</button>
+      <button class="btn btn--primary btn--sm">Run pitches</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <section class="glass map">
+      <div class="grid">
+        <div></div>
+        <div class="ph"><b>Understand</b><span class="pill pill--class">Class</span><span class="due">Closed 21 Oct</span></div>
+        <div class="ph"><b>Sketch</b><span class="pill pill--home">Home</span><span class="due">Closed 24 Oct</span></div>
+        <div class="ph ph--now"><b>Decide</b><span class="pill pill--class">Class</span><span class="due">2 days · 28 Oct</span></div>
+        <div class="ph"><b>Prototype</b><span class="pill pill--home">Home</span><span class="due">3 Nov</span></div>
+        <div class="ph"><b>Test</b><span class="pill pill--class">Class</span><span class="due">Pitch 6 Nov</span></div>
+
+        <div class="gname">Kestrel<span>JT · MO · RS · AK</span></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--late"></i><i class="dot dot--in"></i></div>
+        <div class="cell cell--now"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--none"></i></div>
+        <div class="cell"></div><div class="cell"></div>
+
+        <div class="gname">Heron<span>BL · CW · DP · EN</span></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell cell--now"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><span class="pill pill--ok">Idea set</span></div>
+        <div class="cell"><i class="dot dot--started"></i><i class="dot dot--none"></i><i class="dot dot--none"></i><i class="dot dot--none"></i></div>
+        <div class="cell"></div>
+
+        <div class="gname">Wren<span>FG · HY · IV · KU</span></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell cell--now cell--sel"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><span class="pill pill--wait">Choose idea</span></div>
+        <div class="cell"></div><div class="cell"></div>
+
+        <div class="gname">Falcon<span>LM · NO · PQ</span></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--none"></i><i class="dot dot--in"></i></div>
+        <div class="cell cell--now"><i class="dot dot--started"></i><i class="dot dot--none"></i><i class="dot dot--none"></i></div>
+        <div class="cell"></div><div class="cell"></div>
+
+        <div class="gname">Osprey<span>RT · SV · UW · XZ</span></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--in"></i></div>
+        <div class="cell cell--now"><i class="dot dot--in"></i><i class="dot dot--in"></i><i class="dot dot--started"></i><i class="dot dot--in"></i></div>
+        <div class="cell"></div><div class="cell"></div>
+      </div>
+
+      <div class="cards">
+        <div class="gcard">
+          <div class="gcard__top"><b>Wren</b><span class="pill pill--wait">Choose idea</span></div>
+          <div class="mini"><div><b>✓</b>Und.</div><div><b>✓</b>Sketch</div><div class="now"><b>4/4</b>Decide</div><div><b>–</b>Proto</div><div><b>–</b>Test</div></div>
+        </div>
+        <div class="gcard">
+          <div class="gcard__top"><b>Kestrel</b><span class="muted small">1 late</span></div>
+          <div class="mini"><div><b>✓</b>Und.</div><div><b>✓</b>Sketch</div><div class="now"><b>3/4</b>Decide</div><div><b>–</b>Proto</div><div><b>–</b>Test</div></div>
+        </div>
+        <div class="gcard">
+          <div class="gcard__top"><b>Heron</b><span class="pill pill--ok">Idea set</span></div>
+          <div class="mini"><div><b>✓</b>Und.</div><div><b>✓</b>Sketch</div><div><b>✓</b>Decide</div><div class="now"><b>0/4</b>Proto</div><div><b>–</b>Test</div></div>
+        </div>
+        <div class="gcard">
+          <div class="gcard__top"><b>Falcon</b><span class="muted small">1 sketch not in</span></div>
+          <div class="mini"><div><b>✓</b>Und.</div><div><b>2/3</b>Sketch</div><div class="now"><b>0/3</b>Decide</div><div><b>–</b>Proto</div><div><b>–</b>Test</div></div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <span><i class="dot dot--in"></i>In</span>
+        <span><i class="dot dot--started"></i>Started</span>
+        <span><i class="dot dot--none"></i>Not in</span>
+        <span><i class="dot dot--late"></i>In late</span>
+      </div>
+    </section>
+
+    <aside class="glass board">
+      <div class="muted small">Group board · Decide</div>
+      <h2>Wren: choose the idea</h2>
+      <p class="small muted" style="margin:6px 0 0">Voting closed with all 4 in. Students see the heat map but never names or counts.</p>
+
+      <div class="heatKey" style="margin-top:12px"><span>S</span><span>W</span><span>V</span></div>
+      <div class="ideas" style="margin-top:4px">
+        <div class="ideaRow ideaRow--top"><div><b>A · Graffiti wall</b><div class="by">HY · top vote</div></div><div class="heat"><i class="h1"></i><i class="h1"></i><i class="h3"></i></div></div>
+        <div class="ideaRow"><div><b>B · What the ash kept</b><div class="by">FG</div></div><div class="heat"><i class="h3"></i><i class="h2"></i><i class=""></i></div></div>
+        <div class="ideaRow"><div><b>C · A family's last meal</b><div class="by">KU</div></div><div class="heat"><i class="h2"></i><i class="h2"></i><i class="h1"></i></div></div>
+        <div class="ideaRow"><div><b>D · Then and now</b><div class="by">IV</div></div><div class="heat"><i class=""></i><i class="h1"></i><i class=""></i></div></div>
+      </div>
+      <p class="small muted" style="margin:0 0 12px">S uses sources · W explains why it matters · V grabs a Year 7 visitor</p>
+      <div class="board__actions">
+        <button class="btn btn--primary btn--sm">Confirm A</button>
+        <button class="btn btn--sm">Pick another</button>
+      </div>
+    </aside>
+  </div>
+</div>
+</body>
+</html>

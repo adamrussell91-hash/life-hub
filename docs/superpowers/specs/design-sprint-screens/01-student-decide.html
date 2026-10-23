@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint student Decide</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .group-line { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .group-line .init { width: 24px; height: 24px; font-size: 10px; }
+  .brief { padding: 14px 18px; margin: 0 0 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+  .brief p { margin: 2px 0 0; font-size: 14px; }
+  .phase { padding: 20px 22px; }
+  .phase__head { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .instr { margin: 10px 0 4px; font-size: 15px; }
+  .q { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+  .q b { color: var(--ink); }
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 600px) { .gallery { grid-template-columns: 1fr; } }
+  .idea { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .idea__tag { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+  .idea__sketch { height: 96px; border-radius: 12px; background:
+      repeating-linear-gradient(135deg, rgba(23,55,94,.05) 0 8px, transparent 8px 16px), var(--paper);
+      border: 1px dashed var(--line-2); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+  .idea p { margin: 0; font-size: 14px; }
+  .votes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vote { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+          border: 1px solid var(--line-2); background: var(--paper); color: var(--ink); }
+  .vote[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .vote[aria-pressed="true"]::before { content: "✓ "; }
+  .tally { margin-top: 18px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--pastel-blue); color: var(--pastel-blue-ink);
+           display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+  .after { margin-top: 26px; }
+  .after h3 { margin-bottom: 8px; }
+  .locked { padding: 14px 16px; border-radius: var(--radius-md); border: 1px dashed var(--line-2); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="mock-label">Mockup 1 · Student · Phase 3 Decide (in class)</p>
+  <p class="mock-note">Ideas show as letters with no names. Each criterion gives one vote, which the student gives to the idea that does it best. Tapping a chip on another card moves that vote. Parts open once voting locks.</p>
+
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="muted small">Year 7 History · Design Sprint</div>
+        <h1>Pompeii: why it still matters</h1>
+      </div>
+      <div class="group-line">Group Kestrel <span class="init">JT</span><span class="init">MO</span><span class="init">RS</span><span class="init">AK</span> · 3 of 4 voted</div>
+    </div>
+
+    <div class="countdown">
+      <div>
+        <div class="countdown__title">Decide closes</div>
+        <div class="countdown__what">Voting and parts</div>
+        <div class="countdown__sub">Pitch day: Thursday 6 November</div>
+      </div>
+      <div class="countdown__fig"><div class="countdown__n">2</div><div class="countdown__unit">days left · Tue 28 Oct, 3:00 pm</div></div>
+    </div>
+
+    <div class="stepper">
+      <div class="step step--done"><b>Understand</b><span>Class · in</span></div>
+      <div class="step step--done"><b>Sketch</b><span>Home · in</span></div>
+      <div class="step step--now"><b>Decide</b><span>Class · now</span></div>
+      <div class="step step--later"><b>Prototype</b><span>Home</span></div>
+      <div class="step step--later"><b>Test</b><span>Class</span></div>
+    </div>
+
+    <div class="glass brief">
+      <div><b class="small">The challenge</b><p>Design a museum panel that shows a Year 7 visitor why Pompeii matters today.</p></div>
+      <button class="btn btn--sm">Show brief</button>
+    </div>
+
+    <section class="glass phase">
+      <div class="phase__head"><h2>Pick the idea that does each one best</h2><span class="pill pill--class">In class</span></div>
+      <p class="instr">Read every idea first. Then give each criterion to one idea. You can give more than one to the same idea.</p>
+      <p class="q">Your group's question: <b>How might we make a 2000-year-old town feel close to a Year 7 visitor?</b></p>
+
+      <div class="gallery">
+        <article class="idea">
+          <span class="idea__tag">IDEA A</span>
+          <div class="idea__sketch">sketch picture</div>
+          <p><b>A day in the life of a baker.</b> The panel follows one baker's day using the bakery ruins and the carbonised loaf.</p>
+          <div class="votes">
+            <button class="vote" aria-pressed="true">Uses sources</button>
+            <button class="vote" aria-pressed="false">Explains why it matters</button>
+            <button class="vote" aria-pressed="true">Grabs a Year 7 visitor</button>
+          </div>
+        </article>
+        <article class="idea">
+          <span class="idea__tag">IDEA B</span>
+          <div class="idea__sketch">sketch picture</div>
+          <p><b>Then and now.</b> Split panel: Pompeii's streets beside a modern street, with what has changed and what hasn't.</p>
+          <div class="votes">
+            <button class="vote" aria-pressed="false">Uses sources</button>
+            <button class="vote" aria-pressed="true">Explains why it matters</button>
+            <button class="vote" aria-pressed="false">Grabs a Year 7 visitor</button>
+          </div>
+        </article>
+        <article class="idea">
+          <span class="idea__tag">IDEA C</span>
+          <div class="idea__sketch">sketch picture</div>
+          <p><b>What the ash kept.</b> Five objects the ash preserved, each with one line on what it tells historians.</p>
+          <div class="votes">
+            <button class="vote" aria-pressed="false">Uses sources</button>
+            <button class="vote" aria-pressed="false">Explains why it matters</button>
+            <button class="vote" aria-pressed="false">Grabs a Year 7 visitor</button>
+          </div>
+        </article>
+        <article class="idea">
+          <span class="idea__tag">IDEA D</span>
+          <div class="idea__sketch">no picture</div>
+          <p><b>Pliny's letter.</b> The panel is built around the eyewitness letter, with quotes marked on a map.</p>
+          <div class="votes">
+            <button class="vote" aria-pressed="false">Uses sources</button>
+            <button class="vote" aria-pressed="false">Explains why it matters</button>
+            <button class="vote" aria-pressed="false">Grabs a Year 7 visitor</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="tally">
+        <span>3 of 3 votes placed. You can change them until voting closes.</span>
+        <button class="btn btn--primary btn--sm">Submit my votes</button>
+      </div>
+
+      <div class="after">
+        <h3>Next: claim a part</h3>
+        <div class="locked">Opens when your group's vote is in. Your group will list the parts of the prototype and each person claims one.</div>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+  // One vote per criterion: pressing a chip moves that criterion's vote here.
+  document.querySelectorAll('.vote').forEach((b) => b.addEventListener('click', () => {
+    const name = b.textContent.trim();
+    document.querySelectorAll('.vote').forEach((o) => { if (o.textContent.trim() === name) o.setAttribute('aria-pressed', 'false'); });
+    b.setAttribute('aria-pressed', 'true');
+    const n = document.querySelectorAll('.vote[aria-pressed="true"]').length;
+    document.querySelector('.tally span').textContent = `${n} of 3 votes placed. You can change them until voting closes.`;
+  }));
+</script>
+</body>
+</html>
