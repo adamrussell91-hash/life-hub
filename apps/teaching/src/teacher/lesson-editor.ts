@@ -258,6 +258,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       if (next.line_off) lesson.line_off = next.line_off;
       // null (follow unit order) is saved as null so the merge clears the old list.
       if (next.after_lesson_ids !== undefined) lesson.after_lesson_ids = next.after_lesson_ids;
+      // The Route pills: Core is saved too, so it beats an old support or extension stop on the unit map.
+      if (next.route_role !== undefined) lesson.route_role = next.route_role;
+      if (next.skip_rule !== undefined) lesson.skip_rule = next.skip_rule;
       // Saves merge into the stored lesson, so clearing sends an empty list.
       if (next.dot_points) lesson.dot_points = next.dot_points;
       if (next.plan_covered) lesson.plan_covered = next.plan_covered;
