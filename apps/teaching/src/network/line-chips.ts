@@ -7,7 +7,7 @@ import { removeLineStop, toggleLineStop } from '@/alignment/auto-lines';
 const LETTER = { introduced: 'I', reinforced: 'R', mastered: 'M' } as const;
 
 /**
- * The lines a lesson serves, as a row of chips grouped by mode. A tap on a
+ * The lines a lesson serves, as chips in one row per mode. A tap on a
  * train or metro chip steps its depth round (introduced, reinforced,
  * mastered) and its × takes it off; a light-rail chip is on or off. An auto
  * stop with no depth of its own shows the map's: Introduced on the first
@@ -22,6 +22,8 @@ export function mountLineChips(
     /** Lines a lesson before this one on the map stops on. */
     linesBefore?: ReadonlySet<string>;
     onChange: (stops: LineStop[], off: string[]) => void;
+    /** The lines this lesson stops on, after each paint, for a summary. */
+    onPaint?: (served: NetworkLine[]) => void;
   }
 ): { update(stops: readonly LineStop[] | undefined, off?: readonly string[] | undefined, lines?: readonly NetworkLine[]): void; dispose(): void } {
   let lines = [...options.lines];
@@ -48,9 +50,12 @@ export function mountLineChips(
   function paint(): void {
     root.replaceChildren();
     root.hidden = !lines.length;
-    root.append(el('span', 'net-chips__label', 'Lines'));
     for (const mode of MODE_ORDER) {
-      for (const line of lines.filter((l) => l.mode === mode)) {
+      const ofMode = lines.filter((l) => l.mode === mode);
+      if (!ofMode.length) continue;
+      const group = el('div', 'net-chips__group');
+      group.append(el('span', 'net-chips__mode', MODE_LABEL[mode]));
+      for (const line of ofMode) {
         const stop = stops.find((s) => s.line_id === line.id);
         const depth = stop && line.mode !== 'light_rail' ? depthOf(stop) : null;
         const chip = el('button', `net-chip net-chip--${line.mode}${stop ? ' net-chip--on' : ''}${depth ? ' net-chip--paired' : ''}`);
@@ -63,7 +68,7 @@ export function mountLineChips(
         if (depth) chip.append(el('span', 'net-chip__depth', LETTER[depth]));
         chip.addEventListener('click', () => step(line));
         if (!depth) {
-          root.append(chip);
+          group.append(chip);
           continue;
         }
         // A depth chip steps round its depths; its × takes the line off.
@@ -74,9 +79,11 @@ export function mountLineChips(
         x.setAttribute('aria-label', `Take ${line.name || 'this line'} off this lesson`);
         x.addEventListener('click', () => apply(removeLineStop(stops, off, line.id)));
         pair.append(chip, x);
-        root.append(pair);
+        group.append(pair);
       }
+      root.append(group);
     }
+    options.onPaint?.(lines.filter((l) => stops.some((s) => s.line_id === l.id)));
   }
   paint();
   return {
