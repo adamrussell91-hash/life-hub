@@ -263,9 +263,10 @@ export function drawCoverageMap(map: CoverageMap, state: DrawState): { svg: stri
       push(`<rect class="cm-tag cm-tag--${tagClass(row)}" x="${tx}" y="${y - 8}" width="${tw}" height="16" rx="4"/><text class="cm-tag-text" x="${tx + tw / 2}" y="${y + 4}" text-anchor="middle">${tag}</text>`);
       tx += tw + 5;
     }
-    const room = Math.max(6, nameChars - Math.round((tx - NAME_X) / 6.3));
-    push(`<text class="cm-name${side || row.kind === 'check' ? ' cm-name--quiet' : ''}" x="${tx}" y="${y + 4}">${esc(fit(row.title, room))}</text>`);
     const score = st?.scores.get(row.id);
+    // A quiz score sits at the end of the name column; the name gives it room.
+    const room = Math.max(6, nameChars - Math.round((tx - NAME_X) / 6.3) - (score && score.max > 0 ? 5 : 0));
+    push(`<text class="cm-name${side || row.kind === 'check' ? ' cm-name--quiet' : ''}" x="${tx}" y="${y + 4}">${esc(fit(row.title, room))}</text>`);
     if (score && score.max > 0) {
       const pct = Math.round((score.score / score.max) * 100);
       push(`<text class="cm-score${pct < 70 ? ' cm-score--low' : ''}" x="${start - 8}" y="${y + 4}" text-anchor="end">${pct}%</text>`);
