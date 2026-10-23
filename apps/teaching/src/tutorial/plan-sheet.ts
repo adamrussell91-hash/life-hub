@@ -154,7 +154,10 @@ export function openTutorialPlan(o: TutorialPlanOptions): HTMLElement {
   draft.classList.add('tut-plan__draft');
   draft.hidden = true;
   const actions = el('div', 'mb-form__actions');
-  actions.append(button('Cancel', 'secondary', () => handle.close()), draft);
+  actions.append(button('Cancel', 'secondary', () => {
+    // A tutorial being created can't be called off: the lesson would still appear.
+    if (!busy) handle.close();
+  }), draft);
   sheet.append(
     heading,
     el('p', 'mb__empty', `Ann groups ${picked.length} students by why they get ${o.tagLabel} wrong and notes what each group needs. You can rename groups and move anyone before you create the tutorial. Only these students will see it.`),
