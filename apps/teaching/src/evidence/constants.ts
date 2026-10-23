@@ -14,6 +14,21 @@ export const BANDS = {
 /** Pre-tests usually ask two questions per technique, so two items are enough for a focus area or a secure tag. */
 export const FOCUS = { below: 0.6, minItems: 2, max: 3, secureMinItems: 2 } as const;
 
+/** Next steps: when a tag calls for reteaching the class, a small group, or moving on. */
+export const NEXT = {
+  /** Fewer students assessed than this, and a tag makes no move. */
+  minStudents: 3,
+  /** This share of the students assessed weak: reteach to the class. */
+  reteachShare: 0.5,
+  /** A small group is this many weak students. */
+  groupMin: 2,
+  groupMax: 6,
+  /** Two small groups sharing this much of their students become one card. */
+  sameGroup: 0.6,
+  /** This share secure, with at most one weak: move on. */
+  moveOnShare: 2 / 3
+} as const;
+
 export const FLAGS = {
   /** Students sure (3) but below full marks on one tag. */
   sureWrongStudents: 2,

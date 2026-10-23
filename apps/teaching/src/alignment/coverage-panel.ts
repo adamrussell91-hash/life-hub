@@ -2,19 +2,12 @@ import type { NetworkLine } from '@/schemas/block';
 import { lineColour } from '@/network/colour';
 import { loadSkills } from '@/skills/api';
 import type { SkillsContinuum } from '@/skills/schema';
-import { fetchAlignment } from './api';
+import { loadAlignment } from './api';
 import { focusAreaFor, unitCoverage, type CoverageItem, type CoverageLesson, type LineCoverage } from './coverage';
 import type { Alignment } from './schema';
 import './coverage.css';
 
-let alignmentLoad: Promise<Alignment> | null = null;
-
-/** The alignment, fetched once per page and shared by the maps and lesson pages that need it. */
-export function loadAlignment(): Promise<Alignment> {
-  alignmentLoad ??= fetchAlignment().then((r) => r.alignment);
-  alignmentLoad.catch(() => { alignmentLoad = null; });
-  return alignmentLoad;
-}
+export { loadAlignment };
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
