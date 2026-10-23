@@ -7,6 +7,7 @@ import { renderHingeQuestion } from '@/blocks/hinge-question';
 import { renderContinuumLine } from '@/blocks/continuum-line';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
+import { renderNoteCue } from '@/blocks/note-cue';
 import { attachedSteppedLenses } from '@/blocks/lenses/registry';
 import { renderAnchorBridge, renderBecauseButSo, renderHumanExperienceTable, renderQuestionLevels } from '@/blocks/formats/question-set-formats';
 import { renderReasoningChartFormat } from '@/blocks/formats/reasoning-chart';
@@ -56,7 +57,6 @@ import 'photoswipe/dist/photoswipe.css';
 import type { NetworkLine } from '@/schemas/block';
 import type { NetLesson } from '@/network/model';
 // Last: the shared block anatomy roles win ties with block stylesheets above.
-import { renderNoteCue } from '@/blocks/note-cue';
 import '@/styles/block-anatomy.css';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
