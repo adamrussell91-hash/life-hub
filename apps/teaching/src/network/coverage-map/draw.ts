@@ -44,7 +44,7 @@ const worst = (states: NodeState[]): NodeState => STATE_RANK.find((s) => states.
 export const isSideRow = (row: MapRow) => row.lane !== 'core' || (row.option !== undefined && row.option !== 'A');
 const laneX = (row: MapRow) => (row.lane === 'support' ? X_SUPPORT : row.lane === 'core' ? X_CORE : X_SIDE);
 export const rowTag = (row: MapRow): string | undefined =>
-  row.lane === 'support' ? 'Support' : row.lane === 'extension' ? 'Extension' : row.option ? `Option ${row.option}` : undefined;
+  row.lane === 'support' ? 'Support' : row.lane === 'extension' ? 'Extension' : row.option ? `Option ${row.option}` : row.lane === 'option' ? 'Optional' : undefined;
 const tagClass = (row: MapRow) => (row.lane === 'support' ? 'support' : row.lane === 'core' ? 'option' : 'side');
 
 /** The widest name column (and so map) that fits `available` pixels, between 120 and 200. */
