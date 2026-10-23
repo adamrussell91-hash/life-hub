@@ -46,4 +46,19 @@ describe('renderQuizInsight', () => {
     [...node.querySelectorAll('button')].find((b) => b.textContent === 'Following up: Earlier quiz')!.click();
     expect(openLesson).toHaveBeenCalledWith('l0');
   });
+  it('question facility counts each marked answer while other answers wait to be marked', () => {
+    const waiting = (student: string, q1: number | null, q2: number | null) => {
+      const rows = [{ ...row('q1', 0, null, []), awarded: q1 }, { ...row('q2', 0, null, []), awarded: q2 }];
+      return { ...attempt(student, []), rows, score: (q1 ?? 0) + (q2 ?? 0), max: 2, pending: [q1, q2].filter((v) => v === null).length };
+    };
+    // q1 is marked for everyone; q2 for nobody. No attempt is fully marked.
+    const node = renderQuizInsight(
+      { ...payload, attempts: [waiting('s1', 1, null), waiting('s2', 1, null), waiting('s3', 0, null)] } as unknown as InsightPayload,
+      { ctx, onDismiss: vi.fn(), openLesson: vi.fn() }
+    );
+    const cells = [...node.querySelectorAll('.ev-questions tr')].slice(1).map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
+    expect(cells[0]!.slice(1)).toEqual(['67%', '']);
+    expect(cells[1]!.slice(1)).toEqual(['–', '']);
+    expect(node.querySelector('.ev-questions')?.textContent).not.toContain('Too hard');
+  });
 });
