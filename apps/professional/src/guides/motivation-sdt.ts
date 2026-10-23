@@ -2,7 +2,7 @@
 // CRAI asks ("why do you…?", a reason per type), read as a mix, named with the four gifted
 // profiles of McGregor, Jung & Evans (2025). Moves follow Vansteenkiste et al. (2018) on
 // internalisation and autonomy support. Our wording throughout; Adam sets the final values.
-import type { GuideDefinition, GuideProfile, Tap, Values } from './types';
+import type { GuideDefinition, GuideProbe, GuideScale, GuideProfile, Tap, Values } from './types';
 
 const TAP_POINTS = [0, 3, 6, 9] as const;
 const STEP = 3;
@@ -60,6 +60,34 @@ const PROFILES: GuideProfile[] = [
 
 const byId = (id: string) => PROFILES.find((p) => p.id === id)!;
 
+const SCALES: GuideScale[] = [
+  { id: 'amotivation', label: 'Amotivation', zone: 'apart', tone: 'slate' },
+  { id: 'external', label: 'External', zone: 'controlled', tone: 'clay-1' },
+  { id: 'introjected', label: 'Introjected', zone: 'controlled', tone: 'clay-2' },
+  { id: 'identified', label: 'Identified', zone: 'autonomous', tone: 'teal-1' },
+  { id: 'integrated', label: 'Integrated', zone: 'autonomous', tone: 'teal-2' },
+  { id: 'intrinsic', label: 'Intrinsic', zone: 'autonomous', tone: 'teal-3' }
+];
+
+const PROBES: GuideProbe[] = [
+  {
+    id: 'alone',
+    ask: 'If nobody would ever know or check, would you still do it?',
+    options: [
+      { id: 'no', label: 'No, probably not', leans: 'introjected' },
+      { id: 'yes', label: 'Yes, I would', leans: 'identified' }
+    ]
+  },
+  {
+    id: 'feel',
+    ask: 'When you skip it, does it feel guilty or tense, or more like a missed chance?',
+    options: [
+      { id: 'guilty', label: 'Guilty or tense', leans: 'introjected' },
+      { id: 'missed', label: 'A missed chance', leans: 'identified' }
+    ]
+  }
+];
+
 export const motivationSdt: GuideDefinition = {
   id: 'motivation_sdt',
   name: 'Motivation',
@@ -72,14 +100,7 @@ export const motivationSdt: GuideDefinition = {
     '<circle cx="32.5" cy="22" r="6" fill="#3d9c8f"/>' +
     '<path d="M26 17.5 L29.5 22 L26 26.5" fill="none" stroke="#f7f4ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   cite: 'SDT continuum after Ryan & Deci · profiles after McGregor, Jung & Evans (2025) · moves after Vansteenkiste et al. (2018). Your read, not a test score.',
-  scales: [
-    { id: 'amotivation', label: 'Amotivation', zone: 'apart', tone: 'slate' },
-    { id: 'external', label: 'External', zone: 'controlled', tone: 'clay-1' },
-    { id: 'introjected', label: 'Introjected', zone: 'controlled', tone: 'clay-2' },
-    { id: 'identified', label: 'Identified', zone: 'autonomous', tone: 'teal-1' },
-    { id: 'integrated', label: 'Integrated', zone: 'autonomous', tone: 'teal-2' },
-    { id: 'intrinsic', label: 'Intrinsic', zone: 'autonomous', tone: 'teal-3' }
-  ],
+  scales: SCALES,
   prompts: [
     {
       scale: 'amotivation',
@@ -120,31 +141,14 @@ export const motivationSdt: GuideDefinition = {
   ],
   probeTitle: 'Guilt, or genuinely valued?',
   probeHint: 'You heard both. These two are the hardest to tell apart, so check before you set the mix.',
-  probes: [
-    {
-      id: 'alone',
-      ask: 'If nobody would ever know or check, would you still do it?',
-      options: [
-        { id: 'no', label: 'No, probably not', leans: 'introjected' },
-        { id: 'yes', label: 'Yes, I would', leans: 'identified' }
-      ]
-    },
-    {
-      id: 'feel',
-      ask: 'When you skip it, does it feel guilty or tense, or more like a missed chance?',
-      options: [
-        { id: 'guilty', label: 'Guilty or tense', leans: 'introjected' },
-        { id: 'missed', label: 'A missed chance', leans: 'identified' }
-      ]
-    }
-  ],
+  probes: PROBES,
   profiles: PROFILES,
 
   suggest(taps, checks) {
     const values: Values = {};
-    for (const scale of this.scales) values[scale.id] = TAP_POINTS[(taps[scale.id] ?? 0) as Tap];
+    for (const scale of SCALES) values[scale.id] = TAP_POINTS[(taps[scale.id] ?? 0) as Tap];
     let net = 0;
-    for (const probe of this.probes) {
+    for (const probe of PROBES) {
       const pick = probe.options.find((option) => option.id === checks[probe.id]);
       if (pick) net += pick.leans === 'identified' ? 1 : -1;
     }
