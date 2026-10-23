@@ -51,15 +51,31 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
   let run: GuideRun | null = null;
   let placed: PlacedRun[] = [];
   let chart: ContinuumChart | null = null;
+  let closed = false;
+  let errorEl: HTMLElement | null = null;
+  /** Which taps and checks the stored run.values were set against. */
+  let suggestedFrom: string | null = null;
+  const opener = doc.activeElement as HTMLElement | null;
+  const answersKey = () => JSON.stringify([run!.taps, run!.checks]);
   /** Quotes typed on each prompt card, by prompt index; saved runs being edited seed from 100 up. */
   const quoteByPrompt = new Map<number, string>();
 
   const onKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') close();
+    if (event.key !== 'Escape') return;
+    const active = doc.activeElement;
+    if (active instanceof HTMLInputElement && active.value) return;
+    close();
   };
   function close(): void {
+    if (closed) return;
+    closed = true;
     panel.remove();
     doc.removeEventListener('keydown', onKey);
+    if (opener && doc.contains(opener)) opener.focus();
+  }
+  function focusScreen(): void {
+    const target = body.querySelector<HTMLElement>('[tabindex="-1"]') ?? body.querySelector<HTMLElement>('button:not([disabled])');
+    target?.focus();
   }
   doc.addEventListener('keydown', onKey);
   closeBtn.addEventListener('click', close);
@@ -67,7 +83,9 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
   function top(subtitle: string): HTMLElement {
     const row = el('div', 'guide-step__top');
     const text = el('div');
-    text.append(el('div', 'guide-step__title', guide!.name), el('div', 'guide-step__who', subtitle));
+    const title = el('div', 'guide-step__title', guide!.name);
+    title.tabIndex = -1;
+    text.append(title, el('div', 'guide-step__who', subtitle));
     row.append(emblemEl(doc, guide!), text);
     return row;
   }
@@ -95,7 +113,9 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
       card.append(emblemEl(doc, g), words);
       card.addEventListener('click', async () => {
         guide = g;
+        for (const c of body.querySelectorAll<HTMLButtonElement>('.guide-shelf-card')) c.disabled = true;
         placed = await options.placedRuns().catch(() => []);
+        if (closed) return;
         if (options.about.length === 1) {
           who = options.about[0]!;
           context();
@@ -105,6 +125,7 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
       });
       body.append(card);
     }
+    focusScreen();
   }
 
   function pickWho(): void {
@@ -118,6 +139,7 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
       });
       body.append(b);
     }
+    focusScreen();
   }
 
   function context(): void {
@@ -128,6 +150,7 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     input.name = 'context';
     input.placeholder = 'English · essays';
     input.setAttribute('aria-label', 'What this is about');
+    input.value = run?.context ?? '';
     card.append(input);
     const used = recentContexts(runsFor(placed, who!.ref, who!.name).filter((p) => p.run.guide === guide!.id));
     if (used.length) {
@@ -144,12 +167,13 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
       card.append(chips);
     }
     const start = button('Start ›', 'btn btn--primary', 'guide-start');
-    start.disabled = true;
+    start.disabled = !input.value.trim();
     input.addEventListener('input', () => {
       start.disabled = !input.value.trim();
     });
     start.addEventListener('click', () => {
-      run = newRun({ guide: guide!.id, personRef: who!.ref, personName: who!.name, context: input.value, now: now(), id: newId() });
+      if (run) run.context = input.value.trim();
+      else run = newRun({ guide: guide!.id, personRef: who!.ref, personName: who!.name, context: input.value, now: now(), id: newId() });
       prompt(0);
     });
     const nav = el('div', 'guide-nav');
@@ -157,6 +181,7 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     cancel.addEventListener('click', close);
     nav.append(cancel, start);
     body.append(card, el('p', 'guide-hint', 'Ask each question in your own words, then set the mix yourself.'), nav);
+    focusScreen();
     input.focus();
   }
 
@@ -201,7 +226,6 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     quote.value = quoteByPrompt.get(index) ?? '';
     quote.addEventListener('input', () => {
       quoteByPrompt.set(index, quote.value);
-      run!.quotes = [...quoteByPrompt.values()].map((q) => q.trim()).filter(Boolean);
     });
 
     const nav = el('div', 'guide-nav');
@@ -211,11 +235,15 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     next.addEventListener('click', () => {
       if (index + 1 < guide!.prompts.length) prompt(index + 1);
       else if (guide!.needsCheck(run!.taps)) check();
-      else mix();
+      else {
+        run!.checks = {};
+        mix();
+      }
     });
     nav.append(back, next);
     body.append(card, taps, quote, nav);
     paintTaps();
+    focusScreen();
   }
 
   function check(): void {
@@ -234,12 +262,15 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
           run!.checks[probe.id] = option.id;
           for (const sib of two.querySelectorAll<HTMLButtonElement>('button')) sib.classList.toggle('is-on', sib === b);
         });
+        b.classList.toggle('is-on', run!.checks[probe.id] === option.id);
         two.append(b);
       }
       block.append(two);
       card.append(block);
     }
     const nav = el('div', 'guide-nav');
+    const back = button('‹ Back', 'btn btn--ghost');
+    back.addEventListener('click', () => prompt(guide!.prompts.length - 1));
     const skip = button('Skip', 'btn btn--ghost');
     skip.addEventListener('click', () => {
       run!.checks = {};
@@ -247,13 +278,17 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     });
     const next = button('Set the mix ›', 'btn btn--primary', 'guide-next');
     next.addEventListener('click', mix);
-    nav.append(skip, next);
+    nav.append(back, skip, next);
     body.append(card, nav);
+    focusScreen();
   }
 
   function mix(): void {
     const suggested = guide!.suggest(run!.taps, run!.checks);
-    const start = options.edit ? run!.values : suggested;
+    const key = answersKey();
+    const keep = Object.keys(run!.values).length > 0 && suggestedFrom === key;
+    const start = keep ? run!.values : suggested;
+    errorEl = null;
     body.replaceChildren(top(`${who!.name} · ${run!.context}`), progress(guide!.prompts.length + 2));
     body.append(el('p', 'guide-hint', 'Dotted lines are suggested from your taps. Drag each bar to your call. Only what you save is kept.'));
     chart = createContinuumChart(doc, {
@@ -262,23 +297,38 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     });
     const nav = el('div', 'guide-nav');
     const back = button('‹ Back', 'btn btn--ghost');
-    back.addEventListener('click', () => (guide!.needsCheck(run!.taps) ? check() : prompt(guide!.prompts.length - 1)));
+    back.addEventListener('click', () => {
+      run!.values = chart!.values();
+      suggestedFrom = key;
+      if (guide!.needsCheck(run!.taps)) check();
+      else prompt(guide!.prompts.length - 1);
+    });
     const save = button(options.edit ? 'Save changes' : 'Save to meeting', 'btn btn--primary', 'guide-save');
     save.addEventListener('click', async () => {
       save.disabled = true;
       const values = chart!.values();
       const profile = guide!.profileFor(values);
-      const final: GuideRun = { ...run!, values, profile: profile.id, moves: profile.moves, updated_at: now() };
+      const quotes: string[] = [];
+      for (const key of [...quoteByPrompt.keys()].sort((a, b) => a - b)) {
+        const text = quoteByPrompt.get(key)!.trim();
+        if (text && !quotes.includes(text)) quotes.push(text);
+      }
+      const final: GuideRun = { ...run!, values, quotes, profile: profile.id, moves: profile.moves, updated_at: now() };
       try {
         await options.onSave(final);
         close();
       } catch {
         save.disabled = false;
-        body.append(el('p', 'guide-panel__error', 'Could not save. Try again.'));
+        if (!errorEl) {
+          errorEl = el('p', 'guide-panel__error', 'Could not save. Try again.');
+          errorEl.setAttribute('role', 'alert');
+        }
+        if (!errorEl.isConnected) body.append(errorEl);
       }
     });
     nav.append(back, save);
     body.append(chart.el, nav);
+    focusScreen();
   }
 
   if (options.edit) {
@@ -286,7 +336,9 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     run = { ...options.edit.run, taps: { ...options.edit.run.taps }, checks: { ...options.edit.run.checks } };
     who = { ref: run.person_ref, name: run.person_name };
     run.quotes.forEach((q, i) => quoteByPrompt.set(100 + i, q));
+    suggestedFrom = answersKey();
     void options.placedRuns().catch(() => []).then((list) => {
+      if (closed) return;
       placed = list;
       mix();
     });
