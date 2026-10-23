@@ -4785,6 +4785,10 @@ function visitBlocks(blocks, visitor, path = "blocks") {
 }
 
 // apps/teaching/src/lecture/scenes.ts
+var GATE_TYPES = /* @__PURE__ */ new Set(["hinge_question", "cloze", "self_check"]);
+function isGate(block) {
+  return GATE_TYPES.has(block.block_type) && block.content.gate !== false;
+}
 function takesSidePath(block) {
   return block.block_type === "hinge_question" || block.block_type === "cloze";
 }
@@ -5934,7 +5938,7 @@ function walk(blocks, ancestors, typeOrder, issues, discernHosts, lecture) {
   for (const [index, block] of blocks.entries()) {
     const label = locateBlock(block, ancestors, typeOrder);
     const before = blocks[index - 1];
-    const orphan = judgeOrder && isSidePath(block) && !(before && takesSidePath(before));
+    const orphan = judgeOrder && isSidePath(block) && !(before && isGate(before) && takesSidePath(before));
     const message = ownIssue(block, discernHosts) ?? (orphan ? ORPHAN_SIDE_PATH : null);
     if (message) {
       issues.push({

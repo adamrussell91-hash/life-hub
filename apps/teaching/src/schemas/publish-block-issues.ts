@@ -6,7 +6,7 @@ import { validateConceptMap, validateMindMap } from '@/blocks/graph-layout';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block } from '@/schemas/block';
 import { checkQuestion } from '@/quiz/core';
 import { hingeIssue } from '@/blocks/hinge-question/shared';
-import { isSidePath, takesSidePath } from '@/lecture/scenes';
+import { isGate, isSidePath, takesSidePath } from '@/lecture/scenes';
 
 export type PublishBlockIssue = {
   blockId: string;
@@ -84,7 +84,7 @@ function walk(
   for (const [index, block] of blocks.entries()) {
     const label = locateBlock(block, ancestors, typeOrder);
     const before = blocks[index - 1];
-    const orphan = judgeOrder && isSidePath(block) && !(before && takesSidePath(before));
+    const orphan = judgeOrder && isSidePath(block) && !(before && isGate(before) && takesSidePath(before));
     const message = ownIssue(block, discernHosts) ?? (orphan ? ORPHAN_SIDE_PATH : null);
     if (message) {
       issues.push({
