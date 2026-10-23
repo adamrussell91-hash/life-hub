@@ -1194,7 +1194,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         dotPoints: lesson.dot_points,
         ...options.dotPoints,
         planHost: syllabus.plan,
-        onPaint: ({ points, outcomes }) => syllabus.setSummary({ points, outcomes }),
+        covered: lesson.plan_covered,
+        onCovered: (covered) => emitLesson({ ...lesson, plan_covered: covered }),
+        onPaint: ({ points, outcomes, plan }) => syllabus.setSummary({ points, outcomes, plan }),
         // The dot points carry the lesson's lines; hand-set stops and lines taken off stay as they are.
         onChange: (refs, ctx) => {
           const stops = syncAutoStops(lesson.line_stops, lesson.line_off, autoLineIds(networkLines, ctx, refs));
@@ -1208,7 +1210,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   return {
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
-      dotPoints?.update(lesson.dot_points);
+      dotPoints?.update(lesson.dot_points, lesson.plan_covered ?? []);
       lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.lesson_kind);
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);
