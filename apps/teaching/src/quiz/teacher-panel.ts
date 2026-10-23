@@ -23,6 +23,7 @@ import { httpInsightApi, isInsight, type InsightApi, type InsightReply } from '@
 import { loadInsightContext, type InsightContext } from '@/evidence/context';
 import type { InsightPayload } from '@/evidence/types';
 import { renderQuizInsight } from '@/evidence/views/quiz-insight';
+import { codeChips } from '@/evidence/code-chips';
 import { navigate } from '@/app/router';
 import './quiz.css';
 
@@ -59,7 +60,7 @@ type Submission = {
   quiz_block_id: string | null;
 };
 
-type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey };
+type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey; codes: string[] };
 /** Initials and name from the class list; both null when the student was removed. */
 type StudentLabel = { initials: string | null; name: string | null };
 
@@ -789,7 +790,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         const score = input.value.trim() === '' ? null : Number(input.value);
         this.disabled = true;
         try {
-          const res = await post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score });
+          const res = await post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score, codes: r.codes ?? [] });
           wrap.replaceWith(attemptView(res.attempt));
         } catch (error) {
           showError(error);
@@ -798,6 +799,27 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       });
       markRow.append(labelled(`Marks out of ${formatMarks(r.mark.max)}`, input), save);
       item.append(markRow);
+      // Saving the current mark with codes turns an automatic mark into a teacher mark of the same value.
+      const awarded = r.awarded;
+      if (ctx?.codes.length && awarded !== null && awarded < r.mark.max) {
+        item.append(
+          labelled(
+            'Why marks were lost (optional)',
+            codeChips({
+              codes: ctx.codes,
+              selected: r.codes ?? [],
+              onChange: async (ids) => {
+                try {
+                  const res = await post<{ attempt: AttemptDetail }>({ action: 'mark', attempt_id: a.id, question_id: r.id, score: awarded, codes: ids });
+                  r.codes = res.attempt.rows.find((x) => x.id === r.id)?.codes ?? ids;
+                } catch (error) {
+                  showError(error);
+                }
+              }
+            })
+          )
+        );
+      }
       wrap.append(item);
     });
     return wrap;

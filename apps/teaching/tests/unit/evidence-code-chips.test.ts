@@ -31,4 +31,16 @@ describe('codeChips', () => {
     const node = codeChips({ codes, selected: ['v'], onChange: vi.fn() });
     expect([...node.querySelectorAll('.ev-chip')].map((b) => b.textContent)).toContain('VP');
   });
+  it('keeps focus on the chip that was clicked after it repaints', () => {
+    const node = codeChips({ codes, selected: [], onChange: vi.fn() });
+    document.body.append(node);
+    const first = node.querySelector<HTMLButtonElement>('.ev-chip')!;
+    first.focus();
+    first.click();
+    const now = node.querySelector<HTMLButtonElement>('.ev-chip')!;
+    expect(now).not.toBe(first);
+    expect(now.getAttribute('aria-pressed')).toBe('true');
+    expect(document.activeElement).toBe(now);
+    node.remove();
+  });
 });
