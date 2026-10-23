@@ -3700,6 +3700,17 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const query = new URLSearchParams(search);
 
     if (method === 'POST' && path === '/api/auth') return handleAuth(body);
+    // Ann's grouping call: a stub so local walks work with no API key.
+    if (method === 'POST' && path === '/api/tutorial-groups') {
+      if (!getSession(cookie).authenticated) return unauthorizedResponse();
+      const brief = String((body as { brief?: unknown } | null)?.brief ?? '');
+      const found = [...new Set(brief.match(/\bS\d+\b/g) ?? [])];
+      const odd = found.filter((_, i) => i % 2 === 0);
+      const even = found.filter((_, i) => i % 2 === 1);
+      const group = (name: string, members: string[]) => ({ name, why: `${name}: mock grouping`, goal: 'Today: practising this together', gap_type: 'knowledge', members, quotes: {} });
+      const groups = [group('Names it wrong', odd), ...(even.length ? [group('Re-tells the plot', even)] : [])];
+      return okResponse(200, { text: JSON.stringify({ groups }) });
+    }
     // Class examples run the real Functions against the mock store.
     if (
       /^\/api\/lessons\/[^/]+\/examples$/.test(path) ||
