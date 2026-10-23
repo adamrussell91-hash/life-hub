@@ -51,7 +51,7 @@ export function isSidePath(block: Block): boolean {
 }
 
 export const DEFAULT_TAKEAWAY = (chapter: string): string =>
-  `In your book: the one idea from ${chapter} you’d tell a friend.`;
+  `The one idea from ${chapter} you’d tell a friend.`;
 
 export function takeawayCue(section: SectionBlock): Block | null {
   const takeaway = section.content.takeaway;

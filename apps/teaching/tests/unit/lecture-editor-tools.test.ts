@@ -149,6 +149,12 @@ describe('lecture editor tools', () => {
     expect(pathTools.querySelector('.lecture-tools__takeaway-prompt')).toBeNull();
   });
 
+  it('puts a chapter’s controls under its title, before its blocks', () => {
+    const { row } = setup([b('s1', 'section', { title: 'Imagery', blocks: [b('t1', 'rich_text', { html: '<p>x</p>' })] })]);
+    const title = row.querySelector('.block-section__title')!;
+    expect(title.nextElementSibling?.classList.contains('lecture-tools')).toBe(true);
+  });
+
   it('gives a chapter a takeaway switch and wording', () => {
     const { row, current } = setup([b('s1', 'section', { title: 'Imagery', blocks: [] })]);
     const words = row.querySelector<HTMLInputElement>('.lecture-tools__takeaway-prompt')!;

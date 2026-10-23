@@ -70,5 +70,8 @@ describe('hinge in a lecture', () => {
     expect(got).toEqual([{ blockId: 'hq1', result: 'wrong' }]);
     expect(el.querySelector('.hq-verdict--wrong')).not.toBeNull();
     expect(el.querySelector<HTMLElement>('.hq-choice[data-right="true"]')?.textContent).toContain('Gravity');
+    // Drawn again (after a detour), the preview still shows the answer.
+    const again = renderBlock(hinge, 'student', { lessonId: 'l1', lecture: 'preview' });
+    expect(again.querySelector('.hq-verdict--wrong')).not.toBeNull();
   });
 });

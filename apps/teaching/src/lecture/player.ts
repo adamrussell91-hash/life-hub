@@ -8,6 +8,7 @@ import { act, answer, goTo, mainAction, restoreState, startState, type LectureSt
 import { LECTURE_ANSWERED, type AnsweredDetail } from './answered';
 import { createNarration } from './narration';
 import type { LectureClient, LectureStatus } from './api';
+import { clearPreviewAnswers } from '@/blocks/hinge-question/solo';
 import './lecture.css';
 
 export type LecturePlayerOptions = {
@@ -118,8 +119,9 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     paint();
   }
 
-  /** Back to scene one with nothing answered, including each gate block's own saved answer. */
-  function startAgain(): void {
+  /** Clears each gate block's own saved answer (and preview answers held in memory). */
+  function clearGateAnswers(): void {
+    clearPreviewAnswers();
     for (const scene of scenes) {
       for (const beat of scene.beats) {
         const inner = beat.sidePath ? (beat.sidePath.content.blocks as Block[]) : [];
@@ -131,6 +133,11 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
         }
       }
     }
+  }
+
+  /** Back to scene one with nothing answered, including each gate block's own saved answer. */
+  function startAgain(): void {
+    clearGateAnswers();
     noteReady.clear();
     state = startState(scenes);
     save();
@@ -507,6 +514,8 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     root.replaceChildren(page);
   }
 
+  // Each teacher preview starts with every question unanswered.
+  if (preview) clearGateAnswers();
   titleCard();
   if (client && !preview) {
     const settle = () => {

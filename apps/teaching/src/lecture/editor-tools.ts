@@ -180,9 +180,16 @@ export function createLectureEditorTools(options: LectureEditorToolsOptions) {
 
   function attach(target: HTMLElement, block: Block): void {
     if (!inReach(block)) return;
-    if (Array.from(target.children).some((child) => child.classList.contains('lecture-tools'))) return;
+    if (Array.from(target.querySelectorAll<HTMLElement>('.lecture-tools')).some((t) => t.dataset.for === block.id)) return;
     const tools = toolsFor(block);
-    if (tools) target.append(tools);
+    if (!tools) return;
+    tools.dataset.for = block.id;
+    // A chapter's controls sit under its title, not after all its blocks.
+    const title = block.block_type === 'section' && !isSidePath(block)
+      ? Array.from(target.querySelectorAll('.block-section__title')).find((t) => t.closest<HTMLElement>('.block[data-block-id]')?.dataset.blockId === block.id)
+      : undefined;
+    if (title) title.after(tools);
+    else target.append(tools);
   }
 
   return {

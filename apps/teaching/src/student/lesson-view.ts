@@ -77,7 +77,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
