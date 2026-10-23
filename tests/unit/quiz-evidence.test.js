@@ -81,6 +81,34 @@ test('ordering and matching: misplaced items are placement whys', () => {
   assert.deepEqual(item.why.map((w) => w.text).sort(), ['First', 'Second']);
 });
 
+test('matching: a wrong pairing is a placement why with the left-hand text', () => {
+  const s = split({
+    id: 'q7', kind: 'matching', prompt: 'Match.', marks: 2,
+    pairs: [{ id: 'p1', left: 'Simile', right: 'Uses like or as' }, { id: 'p2', left: 'Metaphor', right: 'Says one thing is another' }]
+  });
+  const lefts = s.question.left;
+  const rights = s.question.right;
+  const leftId = lefts.find((l) => l.text === 'Simile').id;
+  const otherLeft = lefts.find((l) => l.text === 'Metaphor').id;
+  const map = s.key.answer.map;
+  const wrong = rights.find((r) => r.id !== map[leftId]).id;
+  const [item] = run(s, { map: { [leftId]: wrong, [otherLeft]: map[leftId] } });
+  assert.deepEqual(item.why.map((w) => w.type), ['placement', 'placement']);
+  assert.ok(item.why.some((w) => w.text === 'Simile'));
+});
+
+test('spot_technique with find 1: one found target gives one item, the unfound one is not emitted', () => {
+  const s = split({
+    id: 'q8', kind: 'spot_technique', prompt: 'Find one.', marks: 1, find: 1, passage: 'The sea roared like a lion. The moon was a coin.',
+    options: [{ id: 'o1', text: 'Simile', technique_id: 'simile' }, { id: 'o2', text: 'Metaphor', technique_id: 'metaphor' }],
+    targets: [{ id: 't1', quote: 'roared like a lion', correct: ['o1'] }, { id: 't2', quote: 'was a coin', correct: ['o2'] }]
+  });
+  const items = run(s, { spots: [{ from: 2, to: 5, option: idOf(s.question, 'Simile') }] });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].share, 1);
+  assert.deepEqual(items[0].why, []);
+});
+
 test('hand-marked answers: codes are the why, only below full marks', () => {
   const s = split({ id: 'q6', kind: 'extended_response', prompt: 'Explain.', marks: 4 });
   const [low] = answerEvidence({ ...s, response: { text: 'Because.' }, awarded: 2, codes: ['code-e'] });
