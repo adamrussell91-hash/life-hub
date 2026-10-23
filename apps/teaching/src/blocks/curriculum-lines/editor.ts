@@ -12,7 +12,7 @@ import { lineColour } from '@/network/colour';
 import { drawNetwork, measureStations, networkLegend } from '@/network/draw';
 import { chooseNetworkOrientation, layoutNetwork, liveNudges } from '@/network/layout';
 import { el, ghostButton, mountLinesEditor, networkId, selectOf, textInput } from '@/network/lines-editor';
-import { MODE_LABEL, convertV1, orderLines, orderStations, placeByDate, type NetLesson } from '@/network/model';
+import { MODE_LABEL, convertV1, orderLines, orderStations, placeByDate, withAutoDepths, type NetLesson } from '@/network/model';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 import { unitNetworkInput } from './render';
 import { loadAlignment } from '@/alignment/coverage-panel';
@@ -243,6 +243,8 @@ export function createCurriculumLinesEditor(
     table.append(head);
     const ordered = mapLessons();
     const hidden = new Set(v2().hidden_lessons ?? []);
+    // Auto stops show the depth the map gives them.
+    const shownStops = new Map(withAutoDepths(ordered.filter((l) => !hidden.has(l.id))).map((l) => [l.id, l.line_stops]));
     ordered.forEach((lesson, index) => {
       const name = lesson.title || 'Untitled lesson';
       const tr = el('tr', hidden.has(lesson.id) ? 'cl-editor__station--off' : undefined);
@@ -265,7 +267,7 @@ export function createCurriculumLinesEditor(
       if (when) th.append(el('span', 'cl-editor__date', formatDisplayDate(when.slice(0, 10))));
       tr.append(place, th);
       for (const line of lines) {
-        const stop = lesson.line_stops?.find((x) => x.line_id === line.id);
+        const stop = (shownStops.get(lesson.id) ?? lesson.line_stops)?.find((x) => x.line_id === line.id);
         const td = el('td');
         const cell = el('button', `cl-editor__cell${stop ? '' : ' cl-editor__cell--empty'}`);
         cell.type = 'button';
@@ -273,7 +275,7 @@ export function createCurriculumLinesEditor(
         cell.textContent = stop ? (line.mode === 'light_rail' ? '●' : LEVEL_LETTER[stop.level ?? 'reinforced']) : '·';
         cell.setAttribute('aria-label', `${lesson.title || 'Lesson'} on ${line.name || 'line'}: ${stop ? (line.mode === 'light_rail' ? 'stops' : stop.level ?? 'reinforced') : 'passes'}`);
         cell.disabled = !context?.saveLessonStops;
-        cell.addEventListener('click', () => void cycle(lesson.id, line));
+        cell.addEventListener('click', () => void cycle(lesson.id, line, stop?.level));
         td.append(cell);
         tr.append(td);
       }
@@ -293,10 +295,11 @@ export function createCurriculumLinesEditor(
     commit({ station_order: same ? undefined : ids });
   }
 
-  async function cycle(lessonId: string, line: NetworkLine): Promise<void> {
+  /** A tap steps the depth from the one shown, then off; an auto stop tapped back on stays automatic. */
+  async function cycle(lessonId: string, line: NetworkLine, shown: LineStop['level']): Promise<void> {
     const lesson = lessons.find((l) => l.id === lessonId);
     if (!lesson || !context?.saveLessonStops) return;
-    const next = toggleLineStop(lesson.line_stops, lesson.line_off, line);
+    const next = toggleLineStop(lesson.line_stops, lesson.line_off, line, shown ? { shown } : {});
     const before = lessons;
     lessons = lessons.map((l) => (l.id === lessonId ? { ...l, line_stops: next.stops, line_off: next.off } : l));
     paintStops();
