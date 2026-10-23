@@ -8727,8 +8727,16 @@ input.scope-timeline__note-title:focus-visible {
 }
 
 .public-link__classes:not(:empty) {
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--line);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.public-link__heading {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .public-link__class {

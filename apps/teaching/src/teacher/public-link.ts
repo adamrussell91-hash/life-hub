@@ -155,11 +155,14 @@ export function mountPublicLinkControl(
     if (!options.published) return;
 
     const absolute = absolutePublicUrl(options.kind, options.id);
-    if (options.lead) {
-      const lead = document.createElement('p');
-      lead.className = 'public-link__lead';
-      lead.textContent = options.lead;
-      popover.append(lead);
+    // With class links, they come first and the plain link is the general one.
+    if (options.loadClassLinks) paintClassLinks(options.loadClassLinks);
+    const lead = options.loadClassLinks ? 'General link' : options.lead;
+    if (lead) {
+      const leadEl = document.createElement('p');
+      leadEl.className = options.loadClassLinks ? 'public-link__heading' : 'public-link__lead';
+      leadEl.textContent = lead;
+      popover.append(leadEl);
     }
     const urlEl = document.createElement('p');
     urlEl.className = 'public-link__url';
@@ -168,7 +171,7 @@ export function mountPublicLinkControl(
     const actions = document.createElement('div');
     actions.className = 'public-link__actions';
 
-    const copyBtn = copyButton(absolute, options.copyLabel ?? 'Copy');
+    const copyBtn = copyButton(absolute, options.loadClassLinks ? 'Copy general link' : (options.copyLabel ?? 'Copy'));
 
     const openBtn = document.createElement('a');
     openBtn.className = 'btn btn--secondary';
@@ -182,7 +185,6 @@ export function mountPublicLinkControl(
 
     actions.append(copyBtn, openBtn);
     popover.append(urlEl, actions);
-    if (options.loadClassLinks) paintClassLinks(options.loadClassLinks);
   }
 
   function paintClassLinks(load: () => Promise<Array<{ label: string; url: string }>>): void {
@@ -192,10 +194,10 @@ export function mountPublicLinkControl(
     void load()
       .then((links) => {
         if (!links.length) return;
-        const lead = document.createElement('p');
-        lead.className = 'public-link__lead';
-        lead.textContent = 'Give students their class’s link, so the quiz asks for their initials:';
-        section.append(lead);
+        const heading = document.createElement('p');
+        heading.className = 'public-link__heading';
+        heading.textContent = links.length === 1 ? 'Class link' : 'Class links';
+        section.append(heading);
         for (const link of links) {
           const row = document.createElement('div');
           row.className = 'public-link__class';
@@ -203,7 +205,7 @@ export function mountPublicLinkControl(
           name.className = 'public-link__class-name';
           name.textContent = link.label;
           row.title = link.url;
-          row.append(name, copyButton(link.url, 'Copy link'));
+          row.append(name, copyButton(link.url, 'Copy class link'));
           section.append(row);
         }
       })
