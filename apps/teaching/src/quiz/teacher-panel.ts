@@ -22,6 +22,7 @@ import { button, checkbox, el, errorText, formatMarks, labelled, plural, select 
 import { httpInsightApi, isInsight, type InsightApi, type InsightReply } from '@/evidence/api';
 import { codeLabel, loadInsightContext, type InsightContext } from '@/evidence/context';
 import { openFollowUpPlan } from '@/evidence/follow-up';
+import { FOLLOW_UP } from '@/evidence/constants';
 import { tagLabel } from '@/evidence/tags';
 import type { InsightPayload } from '@/evidence/types';
 import { renderQuizInsight } from '@/evidence/views/quiz-insight';
@@ -713,8 +714,13 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
           }
           paint();
         },
-        onFollowUp: (flag, _kind, evidence) =>
-          void openFollowUpPlan({
+        onFollowUp: (flag, _kind, evidence) => {
+          if (!p.unit_id) {
+            alert.textContent = FOLLOW_UP.noUnit;
+            alert.hidden = false;
+            return;
+          }
+          openFollowUpPlan({
             sourceLessonId: p.lesson_id,
             sourceTitle: p.title,
             unitId: p.unit_id,
@@ -727,7 +733,8 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
             label: (tag) => tagLabel(tag, context),
             codeLabel: (id) => codeLabel(id, context.codes),
             onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
-          }),
+          });
+        },
         openLesson: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
       })
     );

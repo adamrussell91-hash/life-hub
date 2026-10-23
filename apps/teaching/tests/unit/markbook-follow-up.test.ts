@@ -90,4 +90,53 @@ describe('markbook Patterns follow-up', () => {
     expect(host.querySelector('.mb__status')?.textContent).toBe('Follow-ups start from a quiz; this tag only has assessment marks.');
     host.remove();
   });
+
+  it('never ticks a removed student, even when removed students are shown', async () => {
+    openFollowUpPlan.mockClear();
+    // s9 has left the class but still has wrong answers and an assessment mark.
+    const withS9 = (q: QuizColumn): QuizColumn => ({ ...q, scores: { ...q.scores, s9: { ...q.scores.s1!, attempt_id: 'z~0' } } });
+    const host = await openPatterns({
+      markbook: emptyBook({
+        columns: [{ id: 'essay0001', kind: 'assessment', title: 'Essay', date: '2026-11-03', weight: 100, criteria: [{ id: 'crit0001', label: 'c', max: 20, outcomes: [] }] }],
+        marks: { essay0001: { s9: { criteria: { crit0001: 5 } } } }
+      }),
+      students,
+      quizzes: [withS9(quiz('l1', '2026-10-01', 'out:o2')), withS9(quiz('l2', '2026-10-10', 'out:o2')), withS9(quiz('l3', '2026-10-20', 'out:o2'))]
+    });
+    host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
+    await vi.waitFor(() => expect(host.querySelector('.mb__removed')?.textContent).toBe('Hide removed students'));
+    // The weak group holds s1 and s9.
+    expect(host.querySelector('.mb-patterns__group')?.textContent).toBe('2');
+    followUpFrom(host, 'o2');
+    const o = openFollowUpPlan.mock.calls[0][0];
+    expect(o.chosen).toEqual(['s1']);
+    host.remove();
+  });
+
+  it('says the quiz has no unit instead of opening the sheet', async () => {
+    openFollowUpPlan.mockClear();
+    const noUnit = (id: string, date: string) => quiz(id, date, 'out:o2', { unit_id: undefined });
+    const host = await openPatterns({ markbook: emptyBook(), students, quizzes: [noUnit('l1', '2026-10-01'), noUnit('l2', '2026-10-02'), noUnit('l3', '2026-10-03')] });
+    followUpFrom(host, 'o2');
+    expect(openFollowUpPlan).not.toHaveBeenCalled();
+    expect(host.querySelector('.mb__status')?.textContent).toBe('This quiz isn’t in a unit, so a follow-up can’t be placed after it.');
+    host.remove();
+  });
+
+  it('says when the tag’s quizzes are all hidden', async () => {
+    openFollowUpPlan.mockClear();
+    const host = await openPatterns({
+      markbook: emptyBook({
+        hidden_quizzes: ['l1'],
+        columns: [{ id: 'essay0001', kind: 'assessment', title: 'Essay', date: '2026-11-03', weight: 100, criteria: ['crit0001', 'crit0002', 'crit0003'].map((id) => ({ id, label: id, max: 20, outcomes: ['o2'] })) }],
+        marks: { essay0001: { s1: { criteria: { crit0001: 5, crit0002: 5, crit0003: 5 } }, s2: { criteria: { crit0001: 18, crit0002: 18, crit0003: 18 } } } }
+      }),
+      students,
+      quizzes: [quiz('l1', '2026-10-01', 'out:o2', { hidden: true })]
+    });
+    followUpFrom(host, 'o2');
+    expect(openFollowUpPlan).not.toHaveBeenCalled();
+    expect(host.querySelector('.mb__status')?.textContent).toBe('This tag’s quizzes are hidden in the markbook.');
+    host.remove();
+  });
 });

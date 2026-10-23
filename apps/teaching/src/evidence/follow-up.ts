@@ -117,7 +117,9 @@ export function openFollowUpPlan(o: PlanSheetOptions): HTMLElement {
   const sheet = el('div', 'mb-sheet ev-plan');
   const heading = el('h3', 'mb-form__title', `Follow-up quiz: ${o.label(o.tag)}`);
   heading.id = `ev-plan-${Math.random().toString(36).slice(2, 8)}`;
-  const picked = new Set(o.chosen);
+  // Only students on the list can be ticked, so no one else (a removed student, say) is ever sent.
+  const listed = new Set(o.students.map((s) => s.id));
+  const picked = new Set(o.chosen.filter((id) => listed.has(id)));
   const list = el('fieldset', 'ev-plan__students');
   list.append(el('legend', 'mb-form__label', 'Who sits it'));
   for (const s of o.students) {
