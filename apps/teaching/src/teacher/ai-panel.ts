@@ -29,6 +29,7 @@ export interface AiPanelHandle {
   }): void;
   setWorking(working: boolean): void;
   setShelved(shelved: boolean): void;
+  setExpanded(expanded: boolean): void;
   isWorking(): boolean;
   dispose(): void;
 }
@@ -46,6 +47,8 @@ export interface MountAiPanelOptions {
   onStaleAccept?: (apply: () => void) => void;
   onAgentChange?: (slug: AgentSlug) => void;
   onRequestShelve?: () => void;
+  /** Floats the chat over the page, or back into its column. Shows the Expand button. */
+  onToggleExpand?: () => void;
   /** Leaves Teaching for Clare's chat in Tasks. Defaults to a full page load. */
   openTasksClare?: (href: string) => void;
   random?: () => number;
@@ -190,9 +193,22 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     void startNewChat();
   });
 
+  const expandBtn = document.createElement('button');
+  expandBtn.type = 'button';
+  expandBtn.className = 'btn btn--ghost ai-panel__expand';
+  expandBtn.hidden = !options.onToggleExpand;
+  expandBtn.addEventListener('click', () => options.onToggleExpand?.());
+
+  function renderExpand(expanded: boolean): void {
+    expandBtn.textContent = expanded ? 'Collapse' : 'Expand';
+    expandBtn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+    expandBtn.setAttribute('aria-label', expanded ? 'Put the chat back in its column' : 'Expand the chat over the page');
+  }
+  renderExpand(false);
+
   const toolbarActions = document.createElement('div');
   toolbarActions.className = 'ai-panel__toolbar-actions';
-  toolbarActions.append(newChatBtn, hideBtn);
+  toolbarActions.append(newChatBtn, expandBtn, hideBtn);
   toolbar.append(picker, toolbarActions);
 
   const protocolTray = document.createElement('div');
@@ -969,6 +985,9 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     },
     setShelved(shelved) {
       host.classList.toggle('ai-panel--shelved', shelved);
+    },
+    setExpanded(expanded) {
+      renderExpand(expanded);
     },
     isWorking() {
       return busy;

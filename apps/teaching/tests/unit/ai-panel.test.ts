@@ -752,6 +752,26 @@ describe('mountAiPanel', () => {
     expect(onRequestShelve).toHaveBeenCalledTimes(1);
   });
 
+  it('shows Expand only when the host can float the chat, and relabels it', () => {
+    const plain = mountPanel();
+    expect(plain.host.querySelector<HTMLButtonElement>('.ai-panel__expand')!.hidden).toBe(true);
+    plain.handle.dispose();
+
+    const onToggleExpand = vi.fn();
+    const mounted = mountPanel({ onToggleExpand });
+    handle = mounted.handle;
+    const expand = mounted.host.querySelector<HTMLButtonElement>('.ai-panel__expand')!;
+    expect(expand.hidden).toBe(false);
+    expect(expand.textContent).toBe('Expand');
+
+    expand.click();
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
+
+    mounted.handle.setExpanded(true);
+    expect(expand.textContent).toBe('Collapse');
+    expect(expand.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('renders four to six one-sentence protocol pills for every personality', () => {
     const mounted = mountPanel();
     handle = mounted.handle;
