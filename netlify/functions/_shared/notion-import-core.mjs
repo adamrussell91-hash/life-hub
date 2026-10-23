@@ -3732,12 +3732,16 @@ function hingeIssue(content) {
 }
 
 // apps/teaching/src/lecture/scenes.ts
-var GATE_TYPES = /* @__PURE__ */ new Set(["hinge_question", "cloze", "self_check"]);
+var GATE_TYPES = /* @__PURE__ */ new Set(["hinge_question", "cloze", "self_check", "faded_example"]);
 function isGate(block) {
-  return GATE_TYPES.has(block.block_type) && block.content.gate !== false;
+  if (!GATE_TYPES.has(block.block_type)) return false;
+  if (block.block_type === "faded_example") {
+    return block.content.gate !== false && block.content.blanks.length > 0;
+  }
+  return block.content.gate !== false;
 }
 function takesSidePath(block) {
-  return block.block_type === "hinge_question" || block.block_type === "cloze";
+  return block.block_type === "hinge_question" || block.block_type === "cloze" || block.block_type === "faded_example";
 }
 function isSidePath(block) {
   return block.block_type === "section" && block.content.side_path === true;
