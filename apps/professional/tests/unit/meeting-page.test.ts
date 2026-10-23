@@ -38,7 +38,7 @@ vi.mock('@/api/universal-links', () => ({
   ], incoming: [] })),
   createTask: vi.fn(async () => ({ id: 'task_1', title: 'x' })),
   createUniversalLink: vi.fn(async () => ({ link: { id: 'a9' }, created: true })),
-  endUniversalLink: vi.fn(async () => ({ link: { id: 'a2' } }))
+  suppressUniversalLink: vi.fn(async () => ({ link: { id: 'a2' } }))
 }));
 vi.mock('@/api/people-directory', () => ({
   fetchPeopleDirectory: vi.fn(async () => ({ people: [
@@ -93,7 +93,7 @@ vi.mock('@/components/block-page', () => ({
 import { renderMeetingPage } from '@/views/meeting-page';
 import { mountBlockPage } from '@/components/block-page';
 import { meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
-import { createUniversalLink, endUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
+import { createUniversalLink, suppressUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
 
 describe('meeting page', () => {
   beforeEach(() => {
@@ -175,7 +175,7 @@ describe('meeting page', () => {
     room.querySelector<HTMLButtonElement>('[data-part="room-job-toggle"]')!.click();
     room.querySelector<HTMLButtonElement>('[data-part="room-job"] [data-value="club"]')!.click();
     await vi.advanceTimersByTimeAsync(0);
-    expect(endUniversalLink).toHaveBeenCalledWith('a2');
+    expect(suppressUniversalLink).toHaveBeenCalledWith('a2');
     expect(createUniversalLink).toHaveBeenCalledWith(expect.objectContaining({
       target_ref: 'shared:person:ben', role: null, metadata: { organisation_ref: 'club' }
     }));
@@ -269,7 +269,7 @@ describe('meeting page', () => {
     const canvas = await render();
     canvas.querySelector<HTMLButtonElement>('button[aria-label="Remove Ben C."]')!.click();
     await vi.advanceTimersByTimeAsync(0);
-    expect(endUniversalLink).toHaveBeenCalledWith('a2');
+    expect(suppressUniversalLink).toHaveBeenCalledWith('a2');
     expect(canvas.querySelector('[data-part="room"]')!.textContent).not.toContain('Ben C.');
     expect(createUniversalLink).not.toHaveBeenCalled();
   });
