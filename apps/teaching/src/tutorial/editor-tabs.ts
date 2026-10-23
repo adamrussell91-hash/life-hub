@@ -16,17 +16,19 @@ export function inTab(block: Block, tab: TutorialTab): boolean {
 }
 
 /**
- * The lesson's groups with each group's students as the server now has them,
- * after a move on the board. Everything else on a group (name, why, evidence)
- * stays as the editor has it.
+ * The lesson's groups after a move on the board: the moved student leaves
+ * every group and joins the one the server's summary has them in (the group
+ * they were moved to, if the summary doesn't list them). Every other student,
+ * and everything else on a group, stays as the editor has it.
  */
-export function movedGroups(settings: TutorialSettings, summary: TutorialSummary): TutorialSettings {
-  const fresh = new Map(summary.groups.map((g) => [g.id, g.students.map((s) => s.id)]));
+export function movedGroups(settings: TutorialSettings, summary: TutorialSummary, move: { studentId: string; groupId: string }): TutorialSettings {
+  const { studentId } = move;
+  const target = summary.groups.find((g) => g.students.some((s) => s.id === studentId))?.id ?? move.groupId;
   return {
     ...settings,
     groups: settings.groups.map((g) => {
-      const students = fresh.get(g.id);
-      return students ? { ...g, students } : g;
+      const others = g.students.filter((id) => id !== studentId);
+      return { ...g, students: g.id === target ? [...others, studentId] : others };
     })
   };
 }
@@ -56,17 +58,19 @@ export function createTutorialTabs(options: { getLesson: () => { tutorial?: Tuto
         const on = id === tab;
         pill.setAttribute('aria-pressed', String(on));
         pill.classList.toggle('is-active', on);
-        pill.addEventListener('click', () => {
-          if (tab === id) return;
-          tab = id;
-          paint();
-          options.onTab(id);
-        });
+        pill.addEventListener('click', () => set(id));
         return pill;
       })
     );
     requestAnimationFrame(() => applyHubPillsThumb(root));
   }
+  /** Opens a tab, as a click on it would. */
+  function set(id: TutorialTab): void {
+    if (tab === id) return;
+    tab = id;
+    paint();
+    options.onTab(id);
+  }
   paint();
-  return { root, current: () => tab, repaint: paint };
+  return { root, current: () => tab, repaint: paint, set };
 }

@@ -176,7 +176,7 @@ describe('tutorial board', () => {
     pill.click();
     await flush();
     expect(a.move).toHaveBeenCalledWith('st_ann', 'gb');
-    expect(onMoved).toHaveBeenCalledWith(expect.objectContaining({ total: 2 }));
+    expect(onMoved).toHaveBeenCalledWith(expect.objectContaining({ total: 2 }), { studentId: 'st_ann', groupId: 'gb' });
     expect(handle.root.querySelector('.tut-board__note')!.textContent).toBe('Moved AB to Mix-up.');
     handle.dispose();
   });
