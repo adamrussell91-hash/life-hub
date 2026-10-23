@@ -66,15 +66,23 @@ export const thinLimit = (coreLessons: number): number => Math.max(1, Math.floor
 const LEVEL_DEPTH = { introduced: 1, reinforced: 2, mastered: 3 } as const;
 const isSide = (lane: MapLane) => lane !== 'core';
 
-/** Each row's lane and option letter, from the flow's splits and the lessons' own roles. */
-function lanesFrom(seq: FlowSeq, roleOf: (id: string) => MapLane | undefined): Map<string, { lane: MapLane; option?: string }> {
+/**
+ * Each row's lane and option letter, from the flow's splits and the lessons' own roles.
+ * A lesson the teacher set to Core is core: it never gets an option letter, and a split
+ * with a Core lesson in it is not a choice, so its other plain lessons are core too.
+ */
+function lanesFrom(seq: FlowSeq, roleOf: (id: string) => MapLane | undefined, isCore: (id: string) => boolean): Map<string, { lane: MapLane; option?: string }> {
   const out = new Map<string, { lane: MapLane; option?: string }>();
   const rowsOf = (s: FlowSeq): string[] => s.flatMap((item) => ('row' in item ? [item.row] : item.split.flatMap(rowsOf)));
   const walk = (s: FlowSeq, inOption: string | undefined) => {
     for (const item of s) {
       if ('row' in item) {
         const role = roleOf(item.row);
-        out.set(item.row, role ? { lane: role } : inOption ? { lane: 'option', option: inOption } : { lane: 'core' });
+        out.set(item.row, role ? { lane: role } : inOption && !isCore(item.row) ? { lane: 'option', option: inOption } : { lane: 'core' });
+        continue;
+      }
+      if (item.split.flatMap(rowsOf).some(isCore)) {
+        for (const branch of item.split) walk(branch, undefined);
         continue;
       }
       // A branch made only of support or extension lessons is a detour, not an option.
@@ -138,7 +146,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     const role = byId.get(id)?.role ?? railRole.get(id);
     return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
   };
-  const lanes = lanesFrom(flow.seq, roleOf);
+  const lanes = lanesFrom(flow.seq, roleOf, (id) => byId.get(id)?.role === 'core');
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
 
   /* Items, in four groups. */

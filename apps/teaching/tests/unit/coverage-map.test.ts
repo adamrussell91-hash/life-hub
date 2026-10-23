@@ -60,6 +60,22 @@ describe('Coverage map: model', () => {
     expect(rows.find((r) => r.id === 'c')?.option).toBeUndefined();
   });
 
+  it('keeps lessons the teacher set to Core on the core line, with no option letters, even across a split', () => {
+    const lessons: MapLesson[] = [
+      { id: 'a', title: 'Start', after: ['b1', 'w'] },
+      { id: 'b1', title: 'Poet', role: 'core', after: ['b2'] },
+      { id: 'b2', title: 'Pre-test', quiz: true, role: 'core', after: ['b3'] },
+      { id: 'b3', title: 'Poem', role: 'core', after: ['c'] },
+      { id: 'w', title: 'Review', quiz: true, after: ['c'] },
+      { id: 'c', title: 'Next' }
+    ];
+    const rows = build(lessons, v2({ station_order: ['a', 'b1', 'b2', 'b3', 'w', 'c'] })).rows;
+    for (const row of rows) {
+      expect(row.lane).toBe('core');
+      expect(row.option).toBeUndefined();
+    }
+  });
+
   it('puts a detour that rejoins (the other way goes straight on) beside the core line as optional', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Start', after: ['c', 'b'] },
