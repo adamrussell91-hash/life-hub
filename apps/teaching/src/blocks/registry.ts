@@ -1,3 +1,4 @@
+import { renderNoteCue, createNoteCueEditor } from '@/blocks/note-cue';
 import {
   createAccordionEditor,
   createAnnotationEditor,
@@ -224,6 +225,7 @@ export const blockRegistry: {
     render: renderSelfCheckBlock,
     createEditor: createSelfCheckEditor
   },
+  note_cue: { render: renderNoteCue, createEditor: createNoteCueEditor },
   timeline: {
     render: renderTimelineBlock,
     createEditor: createTimelineEditor

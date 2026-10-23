@@ -50,6 +50,7 @@ export const NEW_BLOCK_TYPES = [
   'flashcards',
   'cloze',
   'self_check',
+  'note_cue',
   'chart',
   'equation',
   'diagram',
@@ -119,6 +120,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   flashcards: 'Flashcards',
   cloze: 'Cloze',
   self_check: 'Self check',
+  note_cue: 'Note cue',
   chart: 'Chart',
   equation: 'Equation',
   diagram: 'Diagram',
@@ -240,7 +242,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'note_cue', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -298,6 +300,7 @@ const HOMEPAGE_EXCLUDED = new Set([
   'flashcards',
   'cloze',
   'self_check',
+  'note_cue',
   'outcomes',
   'annotation',
   'anthology'
@@ -314,7 +317,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -678,6 +681,8 @@ export function createBlock(type: NewBlockType, id: string): Block {
           answer: ''
         }
       };
+    case 'note_cue':
+      return { ...shared, block_type: 'note_cue', variant: 'medium', content: { kind: 'own_words', prompt: '' } };
     case 'chart':
       return {
         ...shared,

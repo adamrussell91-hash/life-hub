@@ -1694,6 +1694,7 @@ var BlockTypeSchema = z9.enum([
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "chart",
   "equation",
   "diagram",
@@ -1783,13 +1784,23 @@ var RichTextBlockSchema = z9.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var NarrationSchema = z9.object({
+  url: z9.string().min(1),
+  duration_s: z9.number().min(0).max(900),
+  transcript: z9.string().max(8e3).optional()
+});
+var RevealSchema = z9.enum(["all", "one"]);
 var HeadingBlockSchema = z9.object({
   id: z9.string().min(1),
   type: z9.literal("block"),
   block_type: z9.literal("heading"),
   variant: HeadingVariantSchema,
   visibility: VisibilitySchema,
-  content: z9.object({ text: z9.string() }),
+  content: z9.object({
+    text: z9.string(),
+    narration: NarrationSchema.optional(),
+    reveal: RevealSchema.optional()
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -2194,7 +2205,9 @@ var HingeQuestionBlockSchema = z9.object({
     move_on: z9.number().int().min(1).max(100).default(80),
     reteach: z9.number().int().min(0).max(99).default(50),
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
-    backup: HingeBackupSchema.optional()
+    backup: HingeBackupSchema.optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z9.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2420,7 +2433,9 @@ var ClozeBlockSchema = z9.object({
   content: z9.object({
     title: z9.string().optional(),
     text: z9.string(),
-    case_sensitive: z9.boolean().optional()
+    case_sensitive: z9.boolean().optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z9.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2441,7 +2456,24 @@ var SelfCheckBlockSchema = z9.object({
     mode: SelfCheckModeSchema,
     prompt: z9.string(),
     answer: z9.string().optional(),
-    items: z9.array(SelfCheckItemSchema).max(12).optional()
+    items: z9.array(SelfCheckItemSchema).max(12).optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z9.boolean().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var NOTE_CUE_KINDS = ["copy", "own_words", "draw", "question"];
+var NoteCueKindSchema = z9.enum(NOTE_CUE_KINDS);
+var NoteCueBlockSchema = z9.object({
+  id: z9.string().min(1),
+  type: z9.literal("block"),
+  block_type: z9.literal("note_cue"),
+  variant: z9.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z9.object({
+    kind: NoteCueKindSchema,
+    prompt: z9.string().max(500)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -3041,6 +3073,7 @@ var leafBlockSchemas = [
   FlashcardsBlockSchema,
   ClozeBlockSchema,
   SelfCheckBlockSchema,
+  NoteCueBlockSchema,
   ChartBlockSchema,
   EquationBlockSchema,
   DiagramBlockSchema,
@@ -3163,7 +3196,13 @@ var SectionBlockObjectSchema = z9.object({
     title: z9.string(),
     collapsed_in_editor: z9.boolean().optional(),
     blocks: z9.array(SectionChildBlockSchema),
-    link: SectionLinkSchema.optional()
+    link: SectionLinkSchema.optional(),
+    /** Lecture: the chapter intro clip. */
+    narration: NarrationSchema.optional(),
+    /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
+    takeaway: z9.object({ enabled: z9.boolean(), prompt: z9.string().max(300).optional() }).optional(),
+    /** Lecture: plays only after a wrong answer on the gate just above it. */
+    side_path: z9.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -3530,6 +3569,7 @@ var KIND_LABEL = {
   discern_confirm: "Discern Confirm",
   quiz_question: "Quiz question",
   self_check: "Self check",
+  note_cue: "Note cue",
   mind_map: "Mind map",
   concept_map: "Concept map"
 };
@@ -3851,6 +3891,9 @@ function ownIssue(block, discernHosts) {
     if (validBlanks.length < 1) {
       return "Cloze blocks need at least one blank to publish";
     }
+  }
+  if (block.block_type === "note_cue" && !block.content.prompt.trim()) {
+    return "Write the prompt for this note cue";
   }
   if (block.block_type === "self_check") {
     if (block.content.prompt.trim().length === 0) {

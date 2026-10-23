@@ -486,6 +486,18 @@
     "Answer hidden",
     "self_check.prompt filler"
   ],
+  "every-block/every_note_cue/student": [
+    "In your book",
+    "Your own words",
+    "note_cue.prompt filler",
+    "📓"
+  ],
+  "every-block/every_note_cue/teacher": [
+    "In your book",
+    "Your own words",
+    "note_cue.prompt filler",
+    "📓"
+  ],
   "every-block/every_chart/student": [
     "2",
     "3",
