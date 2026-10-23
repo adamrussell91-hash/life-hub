@@ -1,5 +1,5 @@
 import { setToolkitClasses } from '@/toolkit/class-context';
-import { linesBeforeOnMap } from '@/teacher/network-context';
+import { lessonClassDates, lessonRouteRole, linesBeforeOnMap, setLessonDate, unitFlowPeers } from '@/teacher/network-context';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
@@ -606,13 +606,20 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
           : undefined;
       })(),
-      flowPeers: (() => {
+      ...(() => {
+        // Before and after follows the unit map: its order, its dates, the classes that teach it.
         const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
-        const byId = new Map(curriculum.lessons.map((l) => [l.id, l]));
-        return (unit?.lesson_ids ?? [])
-          .map((id) => byId.get(id))
-          .filter((l): l is NonNullable<typeof l> => Boolean(l))
-          .map((l) => ({ id: l.id, title: l.title, ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}) }));
+        if (!unit) return {};
+        const role = lessonRouteRole(unit, lesson);
+        return {
+          flowPeers: unitFlowPeers(curriculum, unit, lesson.id),
+          flowClasses: lessonClassDates(curriculum, unit, lesson.id),
+          ...(role ? { flowRole: role } : {}),
+          onFlowDate: async (classId: string, date: string) => {
+            await setLessonDate(curriculum, unit, lesson.id, classId, date);
+            return unitFlowPeers(curriculum, unit, lesson.id);
+          }
+        };
       })(),
       linesBefore: (() => {
         const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
