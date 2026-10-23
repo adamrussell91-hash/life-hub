@@ -57,7 +57,13 @@ export async function lectureAction(store, lessonId, body) {
   const action = body.action ?? 'status';
   if (!['status', 'claim', 'handup', 'progress'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const { ids } = await loadLecture(store, lessonId);
-  const who = await identify(store, body, action);
+  let who;
+  try {
+    who = await identify(store, body, action);
+  } catch (e) {
+    if (e instanceof QuizError && e.code === 'need_class') reject(e.status, 'need_class', 'Open this lecture from your class page.');
+    throw e;
+  }
   if (who.need === 'class') reject(403, 'need_class', 'Open this lecture from your class page.');
   const k = keys(lessonId);
   const identity = { need: who.need, initials: who.student?.initials ?? null };
@@ -65,9 +71,14 @@ export async function lectureAction(store, lessonId, body) {
     if (action !== 'status' && action !== 'claim') reject(403, 'need_initials', 'Type your initials first.');
     return { identity, handups: [] };
   }
-  if (!who.student && !validToken(body.class_token)) reject(400, 'no_device', 'This browser can’t remember you. Use your usual browser.');
-  const owner = who.student ? deviceHash(`student:${who.classId}:${who.student.id}`) : deviceHash(body.class_token);
-  const stamp = { class_id: who.classId, ...(who.student ? { student_id: who.student.id } : {}) };
+  if (!who.student) {
+    // A class with no list: nobody can be told apart, so nothing is recorded (it could be flooded).
+    if (action === 'status' || action === 'claim') return { identity, anonymous: true, handups: [] };
+    reject(403, 'no_list', 'Your teacher hasn’t added a class list yet, so hand-ups are off for now.');
+  }
+  if (!validToken(body.class_token)) reject(400, 'no_device', 'This browser can’t remember you. Use your usual browser.');
+  const owner = deviceHash(`student:${who.classId}:${who.student.id}`);
+  const stamp = { class_id: who.classId, student_id: who.student.id };
 
   if (action === 'handup') {
     if (typeof body.scene_id !== 'string' || !ids.has(body.scene_id)) reject(400, 'bad_scene', 'That part of the lecture has changed. Reload the page.');

@@ -59,10 +59,10 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   let disposed = false;
   const noteReady = new Map<string, number>();
   const narration = createNarration();
-  const canRaise = !!client && !preview;
+  const canRaise = () => !!client && !preview && !status?.anonymous;
 
   const root = el('div', 'lecture');
-  root.classList.toggle('lecture--no-hand', !canRaise);
+  root.classList.toggle('lecture--no-hand', !canRaise());
   host.replaceChildren(root);
 
   const save = () => { if (!preview) writeJSON(saveKey, state); };
@@ -72,7 +72,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   });
   const needsInitials = () => !!client && !preview && status?.identity.need === 'initials';
   const send = (leaving = false) => {
-    if (!client || preview || !started || status?.identity.need) return;
+    if (!client || preview || !started || status?.identity.need || status?.anonymous) return;
     unsent = 0;
     client.progress(progressBody(), leaving);
   };
@@ -284,7 +284,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
 
   function play(): void {
     root.replaceChildren(strip, stage, captions, hint, bar);
-    hand.hidden = !canRaise;
+    hand.hidden = !canRaise();
     paintWhoBar();
     paintScene();
   }
@@ -399,7 +399,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   // ---------- hand-up ----------
   /** Until the student is known, ✋ points them at the initials bar instead. */
   function raiseHand(prefill = ''): void {
-    if (!canRaise) return;
+    if (!canRaise()) return;
     if (needsInitials()) {
       paintWhoBar();
       whoBar.querySelector<HTMLInputElement>('input')?.focus();
@@ -409,7 +409,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   }
 
   function openHandup(prefill: string): void {
-    if (!client || !canRaise) return;
+    if (!client || !canRaise()) return;
     const scene = scenes[state.scene];
     if (!scene) return;
     const sheet = el('dialog', 'lecture-sheet');
@@ -454,7 +454,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
   // A Question note cue offers the hand-up straight from its card.
   stage.addEventListener('click', (e) => {
     const link = (e.target as HTMLElement).closest?.('.block-note-cue__raise');
-    if (link) raiseHand((link as HTMLElement).dataset.prompt ?? '');
+    if (link && canRaise()) raiseHand((link as HTMLElement).dataset.prompt ?? '');
   });
 
   // ---------- recap ----------
@@ -522,6 +522,8 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
       .then((next) => {
         if (disposed) return;
         status = next;
+        root.classList.toggle('lecture--no-hand', !canRaise());
+        hand.hidden = !canRaise();
         if (statusReady && root.querySelector('.lecture-title')) titleCard();
         settle();
         if (root.contains(stage)) paintWhoBar();
