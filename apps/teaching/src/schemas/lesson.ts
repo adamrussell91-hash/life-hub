@@ -88,6 +88,7 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
       ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['blocks'] });
     }
   }
+  // Tutorials use the lecture publish rules: gates and side paths.
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' || lesson.pedagogical_mode === 'tutorial' })) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
