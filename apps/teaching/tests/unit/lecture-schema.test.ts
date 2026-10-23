@@ -76,3 +76,23 @@ describe('lecture schema fields', () => {
     expect(toPublishedLesson({ ...lesson, pedagogical_mode: 'lesson' } as any, base.created_at).pedagogical_mode).toBeUndefined();
   });
 });
+
+describe('side path sections inside a chapter', () => {
+  const text = (id: string) => ({ ...base, id, block_type: 'rich_text', content: { html: `<p>${id}</p>` } });
+  const sec = (id: string, blocks: unknown[], extra: Record<string, unknown> = {}) => ({ ...base, id, block_type: 'section', content: { title: id, blocks, ...extra } });
+
+  it('allows a side-path section after a gate inside a chapter', () => {
+    const cloze = { ...base, id: 'c1', block_type: 'cloze', content: { text: 'A [[b]] c' } };
+    const r = BlockSchema.safeParse(sec('s1', [cloze, sec('p1', [text('again')], { side_path: true }), text('t')]));
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects a normal section inside a section', () => {
+    expect(BlockSchema.safeParse(sec('s1', [sec('p1', [text('x')])])).success).toBe(false);
+  });
+
+  it('rejects a side path inside a side path', () => {
+    const inner = sec('p2', [text('x')], { side_path: true });
+    expect(BlockSchema.safeParse(sec('s1', [sec('p1', [inner], { side_path: true })])).success).toBe(false);
+  });
+});

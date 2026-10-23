@@ -1750,7 +1750,7 @@ export const TabsBlockSchema = z.object({
   ...blockTimestamps
 });
 
-export const SectionChildBlockSchema = z.lazy(() =>
+const SectionInnerChildBlockSchema = z.lazy(() =>
   z.discriminatedUnion('block_type', [
     ...leafBlockSchemas,
     SpacerBlockSchema,
@@ -1758,6 +1758,36 @@ export const SectionChildBlockSchema = z.lazy(() =>
     TabsBlockSchema,
     TimelineBlockSchema,
     CardStackBlockSchema
+  ])
+);
+
+/** Lecture: a gate's second look. One level only: it holds ordinary blocks, never another section. */
+export const SidePathSectionSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('section'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string(),
+    collapsed_in_editor: z.boolean().optional(),
+    blocks: z.array(SectionInnerChildBlockSchema),
+    side_path: z.literal(true),
+    narration: NarrationSchema.optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+export const SectionChildBlockSchema = z.lazy(() =>
+  z.discriminatedUnion('block_type', [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    TabsBlockSchema,
+    TimelineBlockSchema,
+    CardStackBlockSchema,
+    SidePathSectionSchema
   ])
 );
 
