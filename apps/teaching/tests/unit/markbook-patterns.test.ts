@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderPatterns } from '@/markbook/patterns-view';
 import { markbookEvidence } from '@/evidence/markbook-evidence';
 import type { MarkbookView } from '@/markbook/types';
-import { studentPanelBody } from '@/markbook/student-panel';
+import { openStudentPanel, studentPanelBody } from '@/markbook/student-panel';
 
 export const view: MarkbookView = {
   markbook: {
@@ -70,5 +70,30 @@ describe('student panel', () => {
     expect(node.textContent).toContain('Sure but wrong 3 times');
     [...node.querySelectorAll('button')].find((b) => b.textContent === 'Pin')!.click();
     expect(onPins).toHaveBeenCalledWith({ pinned: ['tech:jux'], dismissed: [] });
+  });
+
+  const ev = [0, 0.2, 0.4].map((share, i) => ({ item: `q${i}`, tags: ['tech:jux'], share, why: [], student: 's1', source: 'quiz:l1', date: '2026-10-20', confidence: 3 as const }));
+  const base = { student: { id: 's1', name: 'Ada Ash', initials: 'AA' }, evidence: ev, kind: 'tech' as const, label: (t: string) => t.slice(5), codeLabel: (id: string) => id, overall: '64%' };
+  const click = (root: ParentNode, text: string) => [...root.querySelectorAll('button')].find((b) => b.textContent === text)!.click();
+
+  it('dismisses a tag and unpins a pinned one', () => {
+    const onPins = vi.fn();
+    click(studentPanelBody({ ...base, pins: { pinned: [], dismissed: [] }, onPins }), 'Dismiss');
+    expect(onPins).toHaveBeenCalledWith({ pinned: [], dismissed: ['tech:jux'] });
+    click(studentPanelBody({ ...base, pins: { pinned: ['tech:jux'], dismissed: [] }, onPins }), 'Unpin');
+    expect(onPins).toHaveBeenLastCalledWith({ pinned: [], dismissed: [] });
+  });
+
+  it('keeps focus on the row control after a redraw and the dialog labelled', () => {
+    openStudentPanel({ ...base, pins: { pinned: [], dismissed: [] }, onPins: vi.fn() });
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    const pin = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Pin')!;
+    pin.focus();
+    pin.click();
+    const unpin = [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Unpin')!;
+    expect(document.activeElement).toBe(unpin);
+    expect(dialog.getAttribute('aria-labelledby')).toBe('mb-student-s1');
+    expect(dialog.querySelector('#mb-student-s1')).not.toBeNull();
+    (dialog.querySelector('.mb-sheet__close') as HTMLElement).click();
   });
 });

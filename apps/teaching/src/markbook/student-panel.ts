@@ -17,9 +17,10 @@ export type StudentPanelOptions = {
 };
 
 /** One student's focus areas, secure tags and confidence, for the panel and for tests. */
-export function studentPanelBody(o: StudentPanelOptions): HTMLElement {
+export function studentPanelBody(o: StudentPanelOptions, headingId?: string): HTMLElement {
   const body = el('div', 'mb-student-panel');
   const heading = el('h3', 'mb-panel__student', `${o.student.initials} · ${o.student.name}`);
+  if (headingId) heading.id = headingId;
   body.append(heading, el('p', 'mb-panel__task', `Overall ${o.overall}`));
   const { focus, secure } = focusFor(o.evidence, o.student.id, o.kind, o.pins);
 
@@ -33,6 +34,7 @@ export function studentPanelBody(o: StudentPanelOptions): HTMLElement {
     li.append(el('span', undefined, `${pct(f.mean)} ${o.label(f.tag)} · ${f.items} ${f.items === 1 ? 'item' : 'items'}${top ? ` · ${top}` : ''}`));
     const pin = el('button', 'btn btn--ghost', f.pinned ? 'Unpin' : 'Pin');
     pin.type = 'button';
+    pin.dataset.focus = `${f.tag}:pin`;
     pin.addEventListener('click', () =>
       o.onPins(f.pinned ? { ...o.pins, pinned: o.pins.pinned.filter((t) => t !== f.tag) } : { ...o.pins, pinned: [...o.pins.pinned, f.tag] })
     );
@@ -40,6 +42,7 @@ export function studentPanelBody(o: StudentPanelOptions): HTMLElement {
     if (!f.pinned) {
       const dismiss = el('button', 'btn btn--ghost', 'Dismiss');
       dismiss.type = 'button';
+      dismiss.dataset.focus = `${f.tag}:dismiss`;
       dismiss.addEventListener('click', () => o.onPins({ ...o.pins, dismissed: [...o.pins.dismissed, f.tag] }));
       li.append(dismiss);
     }
@@ -58,6 +61,7 @@ export function studentPanelBody(o: StudentPanelOptions): HTMLElement {
   if (o.pins.dismissed.length) {
     const undo = el('button', 'btn btn--ghost', `Show ${o.pins.dismissed.length} dismissed`);
     undo.type = 'button';
+    undo.dataset.focus = 'show-dismissed';
     undo.addEventListener('click', () => o.onPins({ ...o.pins, dismissed: [] }));
     body.append(undo);
   }
@@ -69,18 +73,26 @@ export function openStudentPanel(o: StudentPanelOptions & { returnFocus?: () => 
   const close = el('button', 'btn btn--secondary mb-sheet__close', 'Close');
   close.type = 'button';
   const headingId = `mb-student-${o.student.id}`;
-  const build = (): HTMLElement => {
-    const next = studentPanelBody({ ...o, onPins: redraw });
-    (next.querySelector('h3') as HTMLElement).id = headingId;
-    return next;
-  };
+  let pins = o.pins;
+  const build = (): HTMLElement => studentPanelBody({ ...o, pins, onPins: redraw }, headingId);
   let body = build();
-  function redraw(pins: FocusPins): void {
-    o.onPins(pins);
-    o = { ...o, pins };
-    const next = build();
-    body.replaceWith(next);
-    body = next;
+  function redraw(next: FocusPins): void {
+    o.onPins(next);
+    pins = next;
+    const active = document.activeElement;
+    const key = active instanceof HTMLElement && body.contains(active) ? (active.dataset.focus ?? null) : null;
+    const fresh = build();
+    body.replaceWith(fresh);
+    body = fresh;
+    const same = key ? ([...fresh.querySelectorAll<HTMLElement>('[data-focus]')].find((n) => n.dataset.focus === key) ?? null) : null;
+    if (same) same.focus();
+    else {
+      const heading = fresh.querySelector<HTMLElement>(`#${CSS.escape(headingId)}`);
+      if (heading) {
+        heading.tabIndex = -1;
+        heading.focus();
+      }
+    }
   }
   sheet.append(close, body);
   const opened = openOverlay(sheet, { labelledBy: headingId, returnFocus: o.returnFocus });
