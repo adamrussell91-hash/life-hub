@@ -90,7 +90,16 @@ export function tagSwitch(kinds: TagKind[], current: TagKind, onPick: (kind: Tag
     const b = el('button', 'ev-switch__pill', TAG_KIND_LABEL[kind]);
     b.type = 'button';
     b.setAttribute('aria-pressed', String(kind === current));
-    b.addEventListener('click', () => onPick(kind));
+    b.addEventListener('click', () => {
+      // A pick usually redraws the switch. Keep keyboard focus on the pill just pressed in the new one.
+      const had = document.activeElement === b;
+      const above: HTMLElement[] = [];
+      for (let n = group.parentElement; n; n = n.parentElement) above.push(n);
+      onPick(kind);
+      if (!had || b.isConnected) return;
+      const host = above.find((n) => n.isConnected);
+      host?.querySelector<HTMLElement>('.ev-switch__pill[aria-pressed="true"]')?.focus();
+    });
     group.append(b);
   }
   return group;
@@ -206,10 +215,11 @@ export function quadrantGrid(q: Quadrants, who: (ids: string[]) => string): HTML
 export function questionTable(questions: InsightQuestion[], stats: ItemStat[], showDiscrimination: boolean): HTMLElement {
   const table = el('table', 'ev-questions');
   const head = el('tr');
-  for (const [h, hidden] of [['Question', false], ['Right', false], [showDiscrimination ? 'Discrimination' : '', false], ['Note', true]] as const) {
+  // Discrimination only gets a column when it is shown.
+  for (const [h, hidden] of [['Question', false], ['Right', false], ...(showDiscrimination ? [['Discrimination', false] as const] : []), ['Note', true]] as const) {
     const th = el('th');
     th.scope = 'col';
-    if (hidden || !h) th.append(el('span', 'ev-visually-hidden', h || 'Discrimination'));
+    if (hidden) th.append(el('span', 'ev-visually-hidden', h));
     else th.textContent = h;
     head.append(th);
   }
@@ -223,12 +233,9 @@ export function questionTable(questions: InsightQuestion[], stats: ItemStat[], s
     prompt.title = q.prompt;
     const noteCell = el('td');
     if (note) noteCell.append(el('span', `ev-badge ev-badge--${note === 'Check question' ? 'weak' : 'thin'}`, note));
-    tr.append(
-      prompt,
-      el('td', undefined, pct(s?.facility)),
-      el('td', undefined, showDiscrimination && s?.discrimination !== null && s?.discrimination !== undefined ? s.discrimination.toFixed(2) : ''),
-      noteCell
-    );
+    tr.append(prompt, el('td', undefined, pct(s?.facility)));
+    if (showDiscrimination) tr.append(el('td', undefined, s?.discrimination !== null && s?.discrimination !== undefined ? s.discrimination.toFixed(2) : ''));
+    tr.append(noteCell);
     table.append(tr);
   });
   return table;

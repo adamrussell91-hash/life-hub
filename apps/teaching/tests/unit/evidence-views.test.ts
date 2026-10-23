@@ -32,6 +32,35 @@ describe('view parts', () => {
     out!.click();
     expect(onPick).toHaveBeenCalledWith('out');
   });
+  it('tag switch keeps focus on the pressed pill when the pick redraws it', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const draw = (kind: 'tech' | 'out'): void => {
+      const head = document.createElement('div');
+      head.append(tagSwitch(['tech', 'out'], kind, draw));
+      host.replaceChildren(head);
+    };
+    draw('tech');
+    const out = host.querySelectorAll<HTMLButtonElement>('button')[1]!;
+    out.focus();
+    out.click();
+    expect(out.isConnected).toBe(false);
+    const now = document.activeElement as HTMLElement;
+    expect(host.contains(now)).toBe(true);
+    expect(now.textContent).toBe(out.textContent);
+    expect(now.getAttribute('aria-pressed')).toBe('true');
+    host.remove();
+  });
+  it('question table drops the discrimination column when it is not shown', () => {
+    const qs = [{ id: 'q1', prompt: 'Find it', marks: 1, kind: 'spot_technique', outcomes: [] }] as Parameters<typeof questionTable>[0];
+    const hidden = questionTable(qs, [{ facility: 0.5, discrimination: 0.3 }], false);
+    expect(hidden.querySelectorAll('th')).toHaveLength(3);
+    expect(hidden.textContent).not.toContain('Discrimination');
+    expect(hidden.querySelector('tr:last-child')!.querySelectorAll('td')).toHaveLength(3);
+    const shown = questionTable(qs, [{ facility: 0.5, discrimination: 0.3 }], true);
+    expect([...shown.querySelectorAll('th')].map((t) => t.textContent)).toEqual(['Question', 'Right', 'Discrimination', 'Note']);
+    expect(shown.textContent).toContain('0.30');
+  });
   it('tag rows name bands', () => {
     const row: TagRow = { tag: 'tech:jux', mean: 0.3, full: 0.2, half: 0.2, confidence: 2.4, questions: 3, band: 'weak', groups: { weak: [], developing: [], secure: [] } };
     const node = tagRows([row, { ...row, tag: 'tech:motif', band: 'thin', questions: 1 }], label);
