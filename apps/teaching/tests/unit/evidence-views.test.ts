@@ -19,10 +19,19 @@ describe('view parts', () => {
     expect(node.querySelector('[title="Needs 5 attempts."]')?.textContent).toContain('–');
   });
   it('dot plot draws one dot per score and stacks equal scores', () => {
-    const svg = dotPlot([0.5, 0.5, 0.9], summary([0.5, 0.5, 0.9]));
+    const svg = dotPlot([0.5, 0.5, 0.9], summary([0.5, 0.5, 0.9])).querySelector('svg')!;
     const dots = [...svg.querySelectorAll('circle')];
     expect(dots).toHaveLength(3);
     expect(new Set(dots.map((d) => d.getAttribute('cy'))).size).toBe(2);
+  });
+  it('dot plot labels its scale in HTML under the drawing', () => {
+    const plot = dotPlot([0.2], summary([0.2]));
+    expect(plot.querySelector('svg text')).toBeNull();
+    expect([...plot.querySelectorAll('.ev-dots__tick')].map((t) => t.textContent)).toEqual(['0%', '50%', '100%']);
+  });
+  it('tag rows give long names a tooltip so they can be cut short', () => {
+    const row: TagRow = { tag: 'tech:Personification', mean: 0.3, full: 0.2, half: 0.2, confidence: null, questions: 2, band: 'weak', groups: { weak: [], developing: [], secure: [] } };
+    expect(tagRows([row], label).querySelector<HTMLElement>('.ev-tag__name')!.title).toBe('Personification');
   });
   it('tag switch marks the current kind and reports picks', () => {
     const onPick = vi.fn();
@@ -99,7 +108,7 @@ describe('view parts', () => {
   });
   it('dot plot keeps tall stacks inside the viewBox', () => {
     const shares = Array(20).fill(0.5);
-    const svg = dotPlot(shares, summary(shares));
+    const svg = dotPlot(shares, summary(shares)).querySelector('svg')!;
     const [, , , h] = svg.getAttribute('viewBox')!.split(' ').map(Number);
     for (const c of svg.querySelectorAll('circle')) {
       const cy = Number(c.getAttribute('cy'));
