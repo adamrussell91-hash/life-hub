@@ -42,4 +42,21 @@ describe('lecture player as a segment', () => {
     finish.click();
     expect(onDone).toHaveBeenCalledTimes(1);
   });
+
+  it('a double-click on Done moves on once', () => {
+    const host = document.createElement('div');
+    const onDone = vi.fn();
+    mountLecturePlayer(host, {
+      lessonId: 'tut3', title: 'T', blocks: [b('h1', 'heading', { text: 'Demo' })],
+      client: null, renderHero: () => {},
+      segment: { saveKey: 'tutorial:tut3:after', doneLabel: 'On to the check', onDone }
+    });
+    const main = host.querySelector('.lecture-bar__main') as HTMLButtonElement;
+    for (let i = 0; i < 5 && !host.querySelector('.lecture-recap'); i += 1) main.click();
+    const finish = host.querySelector('.lecture-recap__finish') as HTMLButtonElement;
+    finish.click();
+    finish.click();
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(finish.disabled).toBe(true);
+  });
 });
