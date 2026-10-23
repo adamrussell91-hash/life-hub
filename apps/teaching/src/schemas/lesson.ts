@@ -3,6 +3,7 @@ import { PedagogicalModeSchema } from '../curriculum/pedagogical-mode';
 import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonKindSchema, LessonRouteRoleSchema, LessonSkipRuleSchema, LineOffSchema, LineStopSchema } from './block';
 import { QuizSettingsSchema } from '../quiz/core';
+import { TutorialSettingsSchema } from '../tutorial/schema';
 import { visitBlocks } from '../blocks/walk-blocks';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
@@ -55,6 +56,8 @@ export const LessonSchema = z.object({
   feedback_off: z.boolean().optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
+  /** Tutorial lessons only: the class and its groups. */
+  tutorial: TutorialSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 

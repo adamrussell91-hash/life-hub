@@ -1823,7 +1823,11 @@ const SectionBlockObjectSchema = z.object({
     /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
     takeaway: z.object({ enabled: z.boolean(), prompt: z.string().max(300).optional() }).optional(),
     /** Lecture: plays only after a wrong answer on the gate just above it. */
-    side_path: z.boolean().optional()
+    side_path: z.boolean().optional(),
+    /** Tutorial: this top-level section is the tab for the group with this id. */
+    tutorial_group: z.string().regex(/^[a-z0-9_-]{1,40}$/).optional(),
+    /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
+    tutorial_exit: z.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
