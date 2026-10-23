@@ -38,6 +38,10 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
   let paintId = 0;
   /** The last stage told to the server; progress is sent only when it changes. */
   let lastStage: TutorialStage | '' = '';
+  /** The first status check failed; the screen says so and keeps trying. */
+  let unreachable = false;
+  /** What the waiting screen is showing, so an unchanged check-in leaves it alone. Empty when it isn't up. */
+  let waitShowing = '';
   const shell = el('div', 'tut');
   // Segments skip the lecture title card, so the hero sits once above every stage.
   const hero = el('div', 'tut__hero');
@@ -50,6 +54,19 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
     done = { ...done, [part]: true };
     writeJSON(doneKey, done);
     paint();
+    // A teacher already sitting with the group, or already Done, shows at once.
+    if (lastStage === 'waiting') void refresh();
+  };
+
+  const stageOf = (s: TutorialStatus): TutorialStage | null => {
+    if (s.identity.need === 'initials' || s.anonymous || !s.group) return null;
+    const tab = splitAtTeacher(s.group.blocks);
+    return studentStage(done, { unlocked: s.unlocked, hasCommon: lesson.blocks.length > 0, hasAfter: tab.after.length > 0, hasExit: !!lesson.quiz });
+  };
+  const waitKey = (s: TutorialStatus) => JSON.stringify([stageOf(s), s.sitting, s.sitting ? s.shown : null]);
+  const schedule = () => {
+    window.clearTimeout(poll);
+    poll = window.setTimeout(() => void refresh(), POLL_MS);
   };
 
   // Faded answers go to the teacher's live board.
@@ -74,18 +91,23 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
   function paint(): void {
     if (disposed) return;
     paintId += 1;
+    waitShowing = '';
     window.clearTimeout(poll);
     player?.dispose();
     player = null;
     root.replaceChildren();
     if (!client) return void root.append(el('p', 'tut__note', 'Open this tutorial from your class page.'));
-    if (!status) return void root.append(el('p', 'tut__note', 'Loading…'));
+    if (!status) {
+      if (!unreachable) return void root.append(el('p', 'tut__note', 'Loading…'));
+      root.append(el('p', 'tut__note', 'Couldn’t reach your teacher’s board. Trying again…'));
+      return schedule();
+    }
     if (status.identity.need === 'initials') return void root.append(claimForm(client));
     // No lecture segment and no ✋ for anyone who isn't in a group today.
     if (status.anonymous) return void root.append(el('p', 'tut__note', 'Your teacher hasn’t added a class list yet.'));
     if (!status.group) return void root.append(el('p', 'tut__note', 'This one isn’t for you today.'));
     const tab = splitAtTeacher(status.group.blocks);
-    const stage = studentStage(done, { unlocked: status.unlocked, hasCommon: lesson.blocks.length > 0, hasAfter: tab.after.length > 0 });
+    const stage = stageOf(status) ?? 'done';
     if (stage !== lastStage) {
       lastStage = stage;
       void client.progress(stage).catch(() => {});
@@ -95,7 +117,7 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
     if (stage === 'before') return segment(tab.before, 'before', 'I’m ready for my teacher', 'before');
     if (stage === 'waiting') return waiting(status);
     if (stage === 'after') return segment(tab.after, 'after', 'On to the check', 'after');
-    // A tutorial with no exit questions publishes no quiz, so there's nothing to hand in.
+    // A tutorial with no exit questions publishes no quiz, so its stage goes straight to done.
     if (stage === 'exit' && lesson.quiz) {
       const quiz = el('div', 'tut__exit');
       quiz.append(mountStudentQuiz(lesson, { classId: options.classId, pickClass: false }));
@@ -119,7 +141,8 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
       box.append(shown);
     }
     root.append(box);
-    poll = window.setTimeout(() => void refresh(), POLL_MS);
+    waitShowing = waitKey(s);
+    schedule();
   }
 
   function claimForm(c: TutorialClient): HTMLElement {
@@ -160,7 +183,19 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
       // A dropped check-in tries again on the next tick.
     }
     if (disposed || asked !== paintId) return;
-    if (next) status = next;
+    if (!next) {
+      // The first check failed: say so and keep trying. A dropped check-in while waiting tries again.
+      if (!status) {
+        unreachable = true;
+        return paint();
+      }
+      if (waitShowing) schedule();
+      return;
+    }
+    status = next;
+    unreachable = false;
+    // Nothing new while waiting: leave the screen as it is and check again later.
+    if (waitShowing && waitShowing === waitKey(next)) return schedule();
     paint();
   }
 

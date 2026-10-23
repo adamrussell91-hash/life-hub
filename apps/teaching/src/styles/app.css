@@ -6266,6 +6266,21 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
 /* The lecture player shows this (lecture.css); plain lesson pages never do. */
 .block-note-cue__raise { display: none; }
 
+/* Tutorial blocks: a faded worked example and the With teacher marker. */
+.block-faded__extract { margin: 0 0 var(--space-3); padding: var(--space-3) var(--space-4); background: color-mix(in srgb, var(--line) 30%, var(--paper)); border-radius: var(--radius-md); white-space: pre-wrap; }
+.block-faded__parts { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
+.block-faded__parts dt { font-weight: var(--weight-semibold); }
+.block-faded__parts dd { margin: 0; min-width: 0; }
+.block-faded__input { width: 100%; }
+.block-faded__model { color: var(--success); }
+.block-faded__nudge { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+.block-faded__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-3); }
+.block-faded__rate--chosen { outline: 2px solid var(--marine); outline-offset: 2px; }
+.block-with-teacher { padding: var(--space-3) var(--space-4); border: 1px dashed var(--line); border-radius: var(--radius-md); }
+.block-with-teacher__head { margin: 0; font-weight: var(--weight-semibold); }
+.block-with-teacher__points { margin: var(--space-2) 0 0; padding-left: var(--space-4); }
+@media (max-width: 560px) { .block-faded__parts { grid-template-columns: 1fr; } }
+
 .block-flashcards__teacher-list {
   margin: 0;
   padding: 0;

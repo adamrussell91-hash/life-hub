@@ -2,7 +2,8 @@ import type { TutorialStage } from './schema';
 
 /** What this device has finished. Kept in localStorage per tutorial. */
 export type DeviceProgress = { common: boolean; before: boolean; after: boolean; exit: boolean };
-export type StageInputs = { unlocked: boolean; hasCommon: boolean; hasAfter: boolean };
+/** `hasExit` is false when the tutorial published no exit questions; left out, there is an exit check. */
+export type StageInputs = { unlocked: boolean; hasCommon: boolean; hasAfter: boolean; hasExit?: boolean };
 
 /**
  * Where a student is. Everything up to With teacher is theirs to work through;
@@ -13,6 +14,6 @@ export function studentStage(done: DeviceProgress, s: StageInputs): TutorialStag
   if (!done.before) return 'before';
   if (!s.unlocked) return 'waiting';
   if (s.hasAfter && !done.after) return 'after';
-  if (!done.exit) return 'exit';
+  if (s.hasExit !== false && !done.exit) return 'exit';
   return 'done';
 }
