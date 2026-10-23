@@ -5,7 +5,8 @@ import { deviceToken } from '@/quiz/dom';
 
 export type LectureIdentity = { need: 'class' | 'initials' | null; initials: string | null };
 export type MyHandup = { id: string; scene_id: string; scene_label: string; text: string; status: 'open' | 'answered'; reply: string; at: string };
-export type LectureStatus = { identity: LectureIdentity; handups: MyHandup[] };
+/** `anonymous`: the class has no list, so the server records nothing and hand-ups are off. */
+export type LectureStatus = { identity: LectureIdentity; handups: MyHandup[]; anonymous?: boolean };
 export type ProgressBody = { reached: string[]; replays: Record<string, number>; last_scene: string; missed: string[]; ticked: number; finished: boolean };
 
 /** What the player needs from the server. Preview passes null and sends nothing. */

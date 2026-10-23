@@ -10,11 +10,11 @@ export function createPublishedLectureHandler(deps = {}) {
     if (request.method !== 'POST') return withCors(methodNotAllowed('POST, OPTIONS'), request, env);
     const originError = guardRequestOrigin(request, env);
     if (originError) return withCors(originError, request, env);
-    if (Number(request.headers.get('content-length')) > MAX_BODY) return withCors(errorResponse(413, 'too_large', 'Invalid request.', false), request, env);
+    if (Number(request.headers.get('content-length')) > MAX_BODY) return withCors(errorResponse(413, 'too_large', 'That’s too long to send. Shorten it and try again.', false), request, env);
     const match = new URL(request.url).pathname.match(/\/published\/lecture\/([^/]+)$/);
     try {
       const text = await request.text();
-      if (text.length > MAX_BODY) throw new LectureError(413, 'too_large', 'Invalid request.');
+      if (text.length > MAX_BODY) throw new LectureError(413, 'too_large', 'That’s too long to send. Shorten it and try again.');
       const result = await lectureAction(store, match?.[1], JSON.parse(text));
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {

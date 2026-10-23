@@ -231,6 +231,21 @@ describe('lecture player', () => {
     }
   });
 
+  it('a class with no list hides ✋ and sends no progress', async () => {
+    const anonymous: Status = { identity: { need: null, initials: null }, anonymous: true, handups: [] };
+    const { client, sent } = fakeClient(() => Promise.resolve(anonymous));
+    const { host, handle } = mount(client, short);
+    await flush();
+    start(host);
+    expect(host.querySelector<HTMLElement>('.lecture-strip__hand')!.hidden).toBe(true);
+    expect(host.querySelector('.lecture')!.classList.contains('lecture--no-hand')).toBe(true);
+    host.querySelector<HTMLButtonElement>('.lecture-bar__main')!.click();
+    host.querySelector<HTMLButtonElement>('.lecture-bar__main')!.click();
+    host.querySelector<HTMLButtonElement>('.lecture-recap__finish')?.click();
+    expect(sent).toHaveLength(0);
+    handle.dispose();
+  });
+
   it('asks for initials above the stage when status arrives late, and ✋ opens that first', async () => {
     let resolve: (s: Status) => void = () => {};
     const { client, sent } = fakeClient(() => new Promise<Status>((r) => { resolve = r; }), () => Promise.resolve(needsInitials));
