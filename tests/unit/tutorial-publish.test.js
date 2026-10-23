@@ -43,6 +43,27 @@ test('a problem with an exit question is reported', () => {
   assert.equal(prepareTutorialPublish(draft, broken).problems.length, 1);
 });
 
+test('stray questions and talking points never ship, however deep', () => {
+  const stray = mc('stray');
+  const deep = block('c1', 'columns', { columns: [{ blocks: [block('w3', 'with_teacher', { talking_points: ['Deep secret'] }), mc('stray2')] }] });
+  const messy = [
+    block('h1', 'heading', { text: 'Demo' }), stray, block('w0', 'with_teacher', { talking_points: ['Common secret'] }),
+    block('tA', 'section', { title: 'T', tutorial_group: 'ga', blocks: [deep, mc('stray3')] }),
+    block('tA2', 'section', { title: 'Dup', tutorial_group: 'ga', blocks: [block('dup', 'heading', { text: 'dup' })] }),
+    block('eA', 'section', { title: 'Exit', tutorial_group: 'ga', tutorial_exit: true, blocks: [block('s', 'section', { blocks: [mc('qa1')] })] })
+  ];
+  const d = { ...draft, tutorial: { ...draft.tutorial, groups: [draft.tutorial.groups[0], { id: 'gx', goal: 'g' }] } };
+  const out = prepareTutorialPublish(d, messy);
+  const shipped = JSON.stringify([out.common, out.tabs]);
+  assert.ok(!shipped.includes('correct'));
+  assert.ok(!shipped.includes('secret'));
+  assert.ok(!shipped.includes('stray'));
+  assert.ok(!shipped.includes('"dup"'));
+  assert.ok(shipped.includes('w3') && shipped.includes('w0'));
+  assert.deepEqual(out.quiz.record.groups, { st_ann: ['qa1'] });
+  assert.deepEqual(out.tabs.groups[1].students, []);
+});
+
 /* ── Through the publish handler ─────────────────────────────────── */
 
 const SECRET = 's'.repeat(32);
@@ -86,4 +107,9 @@ test('publishing a tutorial draft stores Common publicly, tabs and the exit key 
   assert.ok(!JSON.stringify(data['tutorial/tut1/tabs']).includes('Secret point'));
   const keyNames = Object.keys(data).filter((k) => k.startsWith('quiz/tut1/'));
   assert.ok(keyNames.length >= 2, `quiz key stored: ${keyNames}`);
+  const current = data['quiz/tut1/current'];
+  assert.ok(current?.version);
+  const record = Object.entries(data).find(([k]) => k.startsWith('quiz/tut1/') && k !== 'quiz/tut1/current')[1];
+  assert.equal(record.version, current.version);
+  assert.deepEqual(record.groups, { st_ann: ['qa1'], st_cy: ['qb1', 'qb2'] });
 });
