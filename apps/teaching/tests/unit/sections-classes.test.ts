@@ -327,29 +327,35 @@ describe('classes section', () => {
     expect(typeof handle.dispose).toBe('function');
   });
 
-  it('calls schedule API and refresh when reordering via unit sequence', async () => {
-    const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
-    renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
+  it('lists lessons by date in a Lessons fold, with no move arrows', () => {
+    renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
 
-    const up = canvas.querySelector<HTMLButtonElement>('[aria-label="Move up"]');
-    expect(up).not.toBeNull();
-    up?.click();
-    await vi.waitFor(() => {
-      expect(patchScheduledLesson).toHaveBeenCalledWith('scheduled_aotfw_008', { direction: 'up' });
-      expect(onScheduleMutated).toHaveBeenCalled();
-    });
+    const fold = canvas.querySelector<HTMLDetailsElement>('details.class-page__lessons')!;
+    expect(fold.querySelector('summary')?.textContent).toMatch(/Lessons/);
+    expect(canvas.querySelector('[aria-label="Move up"]')).toBeNull();
+    const dates = [...fold.querySelectorAll('.seq__lesson-date')].map((n) => n.textContent ?? '');
+    const iso = dates.map((d) => d.split('/').reverse().join(''));
+    expect(iso).toEqual([...iso].sort());
   });
 
   it('shows an error banner and skips refresh when a schedule mutation fails', async () => {
-    vi.mocked(patchScheduledLesson).mockRejectedValueOnce(new Error('Reorder failed'));
+    vi.mocked(patchScheduledLesson).mockRejectedValueOnce(new Error('Date change failed'));
     const onScheduleMutated = vi.fn().mockResolvedValue(undefined);
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
 
-    canvas.querySelector<HTMLButtonElement>('[aria-label="Move up"]')?.click();
+    canvas
+      .querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')
+      ?.parentElement
+      ?.querySelector<HTMLButtonElement>('[aria-label="More actions"]')
+      ?.click();
+    document.querySelector<HTMLButtonElement>('[data-schedule-action="change-date"]')?.click();
+    const input = document.querySelector<HTMLInputElement>('.schedule-overflow input[type="date"]')!;
+    input.value = '2026-08-21';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
 
     await vi.waitFor(() => {
       const banner = canvas.querySelector('.class-page__error');
-      expect(banner?.textContent).toBe('Reorder failed');
+      expect(banner?.textContent).toBe('Date change failed');
       expect(banner?.getAttribute('role')).toBe('alert');
     });
     expect(onScheduleMutated).not.toHaveBeenCalled();

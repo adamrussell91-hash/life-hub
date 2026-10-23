@@ -25,6 +25,61 @@ export function createMockApi() {
   const shareTokens = new Map<string, { tripId: string; createdAt: string }>();
   const photoBytes = new Map<string, { tripId: string; mime: string }>();
   let authenticated = false;
+  // Journals and the Arches Atlas, in memory. Invented sample rows only.
+  const journals = new Map<string, { journal: Record<string, unknown>; version: number }>();
+  let atlasSettings: { home_big_mac_aud: number | null } = { home_big_mac_aud: null };
+  let atlasVersion: string | null = null;
+
+  function seedJournal(tripId: string) {
+    const trip = trips.get(tripId);
+    const city = trip?.cities[0];
+    const legId = 'leg_mocklisbon1';
+    return {
+      id: 'jrn_mockjournala',
+      schema_version: 1,
+      trip_id: tripId,
+      title: '',
+      revision: 1,
+      lifecycle: 'live',
+      leg_ids: [legId],
+      preferences: {},
+      legs: [{
+        id: legId, trip_id: tripId, pattern_id: 'generic', destination: city?.name ?? 'Lisbon',
+        timezone: city?.tz ?? 'Europe/Lisbon', city_id: city?.id, start_date: city?.start_date,
+        end_date: city?.end_date, order: 0, lifecycle: 'live'
+      }],
+      days: [{ id: 'day_mocklisbon1', leg_id: legId, local_date: city?.start_date ?? '2027-03-03', lifecycle: 'live' }],
+      moments: [{
+        id: 'mom_mocklunch01', leg_id: legId, local_date: city?.start_date ?? '2027-03-03', media_ids: [],
+        display_order: 0, lifecycle: 'live', text: 'Quick lunch by the river.', place: { name: 'Riverside' }
+      }],
+      media: [],
+      transitions: [],
+      operations: []
+    };
+  }
+
+  // A second invented trip so the sticker sheet and index have more than one country.
+  const SAMPLE_ATLAS_ITEMS = [
+    { id: 'maccas_sample01', trip_id: 'trp_mocksample1', moment_id: 'mom_sample0001', country: 'JP', city: 'Sample City', date: '2026-11-14', name: 'Ebi Filet-O', kind: 'exclusive', price: { amount: 450, currency: 'JPY' }, aud: { amount: 4.64, rate: 0.0103, as_of: '2026-11-14' }, big_mac: false, rating: 4.5, vs_home: null, note: 'Crumbed prawn patty', photo_ids: [] },
+    { id: 'maccas_sample02', trip_id: 'trp_mocksample1', moment_id: 'mom_sample0002', country: 'JP', city: 'Sample City', date: '2026-11-20', name: 'Big Mac', kind: 'classic', price: { amount: 480, currency: 'JPY' }, aud: { amount: 4.94, rate: 0.0103, as_of: '2026-11-20' }, big_mac: true, rating: 4, vs_home: 'better', note: '', photo_ids: [] },
+    { id: 'maccas_sample03', trip_id: 'trp_mocksample1', moment_id: 'mom_sample0003', country: 'IN', city: 'Sample Town', date: '2026-12-02', name: 'Maharaja Mac', kind: 'exclusive', price: { amount: 230, currency: 'INR' }, aud: { amount: 4.2, rate: 0.0183, as_of: '2026-12-02' }, big_mac: true, rating: 3.5, vs_home: null, note: '', photo_ids: [] }
+  ];
+
+  function liveAtlasFrom(tripId?: string) {
+    const out: Record<string, unknown>[] = [];
+    for (const [id, { journal }] of journals) {
+      if (tripId && id !== tripId) continue;
+      const moments = new Set(((journal.moments as { id: string; lifecycle: string }[]) ?? []).filter((m) => m.lifecycle === 'live').map((m) => m.id));
+      const map = ((journal.preferences as Record<string, unknown>)?.journal_maccas_v1 ?? {}) as Record<string, Record<string, unknown>>;
+      for (const item of Object.values(map)) {
+        if (item.lifecycle === 'deleted' || item.deleted_at || !moments.has(String(item.moment_id))) continue;
+        out.push({ ...item, trip_id: id });
+      }
+    }
+    if (!tripId || tripId === 'trp_mocksample1') out.push(...SAMPLE_ATLAS_ITEMS);
+    return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }
 
   function version(trip: Trip): string {
     return Buffer.from(JSON.stringify(trip)).toString('base64').slice(0, 24);
@@ -307,6 +362,46 @@ export function createMockApi() {
         ok: true,
         data: { places: [{ name: `${q} (mock result)`, lat: -33.87, lon: 151.21 }] }
       });
+    }
+
+    if (path === '/api/travel-journal') {
+      const tripId = url.searchParams.get('trip') ?? '';
+      if (method === 'GET') {
+        if (!trips.has(tripId)) return json(404, { ok: false, error: { code: 'not_found', message: 'Journal not found.' } });
+        if (!journals.has(tripId)) journals.set(tripId, { journal: seedJournal(tripId), version: 1 });
+        const entry = journals.get(tripId)!;
+        return json(200, { ok: true, data: { journal: entry.journal, version: `v${entry.version}` } });
+      }
+      if (method === 'PUT') {
+        const next = (body as { journal: Record<string, unknown> }).journal;
+        const entry = journals.get(tripId) ?? { journal: next, version: 0 };
+        entry.journal = next;
+        entry.version += 1;
+        journals.set(tripId, entry);
+        return json(200, { ok: true, data: { journal: next, version: `v${entry.version}` } });
+      }
+    }
+
+    if (path === '/api/travel-meal' && method === 'GET') {
+      const entry = journals.get(url.searchParams.get('trip') ?? '');
+      return json(200, { ok: true, data: { visit: null, food_version: null, travel_version: `v${entry?.version ?? 1}` } });
+    }
+
+    if (path === '/api/travel-atlas' && method === 'GET') {
+      const items = liveAtlasFrom(url.searchParams.get('trip') ?? undefined);
+      return json(200, { ok: true, data: { items, settings: atlasSettings, settings_version: atlasVersion } });
+    }
+    if (path === '/api/travel-atlas' && method === 'PUT') {
+      const next = body as { home_big_mac_aud: number | null; settings_version: string | null };
+      if ((next.settings_version ?? null) !== atlasVersion) {
+        return json(409, { ok: false, error: { code: 'conflict', message: 'The Atlas changed somewhere else.' } });
+      }
+      atlasSettings = { home_big_mac_aud: next.home_big_mac_aud };
+      atlasVersion = randomUUID();
+      return json(200, { ok: true, data: { settings: atlasSettings, settings_version: atlasVersion } });
+    }
+    if (path === '/api/travel-atlas-asset' && method === 'GET') {
+      return json(404, { ok: false, error: { code: 'not_found', message: 'No artwork for that slot.' } });
     }
 
     if (path === '/api/travel-rates' && method === 'GET') {

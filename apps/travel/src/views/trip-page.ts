@@ -26,7 +26,9 @@ import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
 import { formatCountdown, formatLongRange, formatShortRange, formatWeekdayDate } from '@/lib/date-label';
 import { I } from '@/lib/icons';
-import { journalRoute } from '@/app/router';
+import { atlasRoute, journalRoute } from '@/app/router';
+import { getAtlas } from '@/api/travel-atlas';
+import { tripBadgeLabel } from '@/atlas/atlas-model';
 import type { Marker } from 'maplibre-gl';
 
 export interface TripPageOptions {
@@ -127,6 +129,17 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   journalLink.href = journalRoute(tripId);
   journalLink.textContent = 'Journal';
   acts.append(addCityBtn, addBtn, journalLink, publicBtn);
+  // Arches Atlas: shown only once this trip has a Maccas item.
+  void getAtlas(tripId)
+    .then(({ items }) => {
+      if (!items.length || !options.isCurrent()) return;
+      const badge = document.createElement('a');
+      badge.className = 'btn ghost atlas-trip-badge';
+      badge.href = atlasRoute(tripId);
+      badge.textContent = tripBadgeLabel(items.length);
+      acts.append(badge);
+    })
+    .catch(() => {});
   top.append(titleBlock, acts);
   wrap.append(top);
 

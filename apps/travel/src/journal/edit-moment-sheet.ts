@@ -10,7 +10,17 @@ import {
   type MealSectionHandle,
 } from '@/journal/meal-section';
 import { showHubToast } from '../../design-kit/js/hub-feedback.js';
-import { searchPlaces } from '@/api/travel';
+import { getRate, getTrip, searchPlaces } from '@/api/travel';
+import {
+  applyMaccasDrafts,
+  draftFromItem,
+  keptDrafts,
+  liveMaccasForMoment,
+  maccasDraftsKey,
+  momentWhere,
+  needsRateRetry,
+} from '@/atlas/maccas';
+import type { Trip } from '@/types';
 import type { JournalCoordinates, JournalMoment, JournalPlace } from '@/journal/types';
 import { openPinEditor } from '@/journal/pin-editor';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
@@ -22,6 +32,8 @@ export interface OpenEditMomentSheetOptions {
   version: string;
   moment: JournalMoment;
   anchor: HTMLElement;
+  /** Gives a Maccas run its country and currency; loaded here when absent. */
+  trip?: Trip;
   onSaved?: (envelope: { journal: JournalDocument; version: string }) => void;
   onClose?: () => void;
 }
@@ -55,6 +67,9 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   let version = options.version;
   // A retry after a failed meal call skips the moment save it already made.
   let savedPatch: Partial<JournalMoment> | null = null;
+  // Same for the Maccas items: a retry doesn't write them twice.
+  let savedMaccas: string | null = null;
+  let trip: Trip | null = options.trip ?? null;
   let text = moment.text ?? '';
   let localDate = moment.local_date;
   let localTime = moment.local_time ?? '';
@@ -161,9 +176,16 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       textContent: 'Loading meal…',
     }));
     const host = mealHost;
+    if (!trip) {
+      getTrip(options.tripId).then((env) => { trip = env.trip; }).catch(() => {});
+    }
+    const maccas = {
+      drafts: liveMaccasForMoment(journal, moment.id).map(draftFromItem),
+      currency: () => momentWhere(journal, moment, trip).currency,
+    };
     getTravelMeal(options.tripId, moment.id)
-      .then((read) => mountMealSection(host, { moment, read, media: journal.media, onChange: markDirty }))
-      .catch(() => mountMealSection(host, { moment, read: null }))
+      .then((read) => mountMealSection(host, { moment, read, media: journal.media, onChange: markDirty, maccas }))
+      .catch(() => mountMealSection(host, { moment, read: null, onChange: markDirty, maccas }))
       .then((handle) => {
         meal = handle;
       });
@@ -376,7 +398,7 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       location_source: coordinates ? 'manual' : undefined,
     };
 
-    const nextJournal = patchMomentInJournal(journal, moment.id, patch);
+    let nextJournal = patchMomentInJournal(journal, moment.id, patch);
 
     if (isFixtureVersion(options.version)) {
       options.onSaved?.({ journal: nextJournal, version: options.version });
@@ -404,10 +426,33 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
       return;
     }
 
+    // A Maccas run is saved with the moment, into the trip journal.
+    const maccasOn = Boolean(mealNow?.maccasEnabled());
+    const maccasDrafts = maccasOn ? mealNow!.maccasDrafts() : [];
+    if (maccasOn && keptDrafts(maccasDrafts).length === 0) {
+      fail('Add at least one Maccas item.');
+      return;
+    }
+    const maccasKey = JSON.stringify([maccasOn, maccasDraftsKey(maccasDrafts), localDate]);
+    const maccasDirty =
+      Boolean(mealNow) &&
+      maccasKey !== savedMaccas &&
+      (mealNow!.maccasChanged() || (maccasOn && (momentFedVisit || needsRateRetry(journal, moment.id))));
+    if (maccasDirty) {
+      const where = momentWhere(journal, moment, trip);
+      nextJournal = await applyMaccasDrafts(
+        nextJournal,
+        { id: moment.id, local_date: localDate, media_ids: moment.media_ids },
+        where,
+        maccasDrafts,
+        (currency) => getRate(currency),
+      );
+    }
+
     let step: 'moment' | 'meal' = 'moment';
     try {
       // The ordinary save never touches the meal; the meal call follows on its version.
-      if (!samePatch(savedPatch, patch)) {
+      if (!samePatch(savedPatch, patch) || maccasDirty) {
         const envelope = await persistJournalPatch(options.tripId, version, nextJournal);
         journal = envelope.journal;
         version = envelope.version;
@@ -419,6 +464,8 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
           return;
         }
         savedPatch = patch;
+        // New rows got their ids in the save, so key them again.
+        if (maccasDirty) savedMaccas = JSON.stringify([maccasOn, maccasDraftsKey(maccasDrafts), localDate]);
       }
       if (!mealOn && !mealOff) {
         finishClose();

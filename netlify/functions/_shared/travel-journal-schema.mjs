@@ -1,6 +1,7 @@
 import { DATE_RE, TIME_RE } from './travel-schema.mjs';
 import { isJournalMediaKey } from './travel-journal-r2.mjs';
 import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
+import { ATLAS_PREF_KEY, validateAtlasPreference } from './travel-atlas.mjs';
 
 const LOCATION_SOURCES = new Set(['exif', 'inferred', 'manual']);
 const LIFECYCLES = new Set(['live', 'deleted', 'archived']);
@@ -267,6 +268,7 @@ export function validateJournal(doc) {
   requireLifecycle(doc.lifecycle, 'lifecycle');
   if (!Array.isArray(doc.leg_ids)) throw fail('leg_ids', 'leg_ids must be an array');
   if (!isObject(doc.preferences)) throw fail('preferences', 'preferences must be an object');
+  validateAtlasPreference(doc.preferences[ATLAS_PREF_KEY]);
   for (const arrayKey of ['legs', 'days', 'moments', 'media', 'transitions', 'operations']) {
     if (!Array.isArray(doc[arrayKey])) throw fail(arrayKey, `${arrayKey} must be an array`);
   }
