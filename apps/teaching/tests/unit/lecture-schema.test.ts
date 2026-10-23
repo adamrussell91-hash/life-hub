@@ -96,3 +96,24 @@ describe('side path sections inside a chapter', () => {
     expect(BlockSchema.safeParse(sec('s1', [sec('p1', [inner], { side_path: true })])).success).toBe(false);
   });
 });
+
+describe('lecture lesson publish check', () => {
+  it('asks for an orphaned If wrong path to sit under a hinge or cloze, in lectures only', async () => {
+    const { PublishableLessonSchema: LessonSchema } = await import('@/schemas/lesson');
+    const ISO = '2026-10-23T00:00:00.000Z';
+    const lesson = (pedagogical_mode: string) => ({
+      id: 'lesson_001', type: 'lesson', title: 'T', slug: 't', status: 'active', created_at: ISO, updated_at: ISO,
+      schema_version: 1, unit_id: 'unit_001', sequence: 1, pedagogical_mode,
+      blocks: [
+        { ...base, id: 'h1', block_type: 'heading', variant: 'section', content: { text: 'Tone' } },
+        { ...base, id: 'p1', block_type: 'section', content: { title: 'Again', blocks: [], side_path: true } }
+      ]
+    });
+    const messages = (mode: string) => {
+      const result = LessonSchema.safeParse(lesson(mode));
+      return result.success ? [] : result.error.issues.map((issue) => issue.message);
+    };
+    expect(messages('lecture').some((m) => m.includes('Place this If wrong path straight under a hinge question or cloze.'))).toBe(true);
+    expect(messages('workshop').some((m) => m.includes('If wrong path'))).toBe(false);
+  });
+});

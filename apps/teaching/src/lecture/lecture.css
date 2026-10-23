@@ -77,3 +77,6 @@
 .narration-field__audio { height: 32px; max-width: min(16rem, 100%); }
 .narration-field__transcript { flex-basis: 100%; }
 .narration-field__transcript textarea { width: 100%; box-sizing: border-box; }
+.narration-field__controls { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; border: 0; margin: 0; padding: 0; min-width: 0; }
+.narration-field__status { color: var(--muted); }
+.narration-field__status:empty { display: none; }

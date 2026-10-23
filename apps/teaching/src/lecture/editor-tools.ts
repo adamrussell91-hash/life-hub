@@ -3,8 +3,8 @@ import type { Block } from '@/schemas/block';
 import { mapBlockById } from '@/blocks/block-pulse';
 import { findBlockById } from '@/blocks/find-block';
 import { createNarrationField } from './narration-field';
-import { isSidePath, takesSidePath, DEFAULT_TAKEAWAY } from './scenes';
-import { containerOf, insertAfter, nextSibling } from './tree';
+import { isGate, isSidePath, takesSidePath, DEFAULT_TAKEAWAY } from './scenes';
+import { containerOf, insertAfter, nextSibling, previousSibling } from './tree';
 import './lecture.css';
 
 export type LectureEditorToolsOptions = {
@@ -42,6 +42,21 @@ export function createLectureEditorTools(options: LectureEditorToolsOptions) {
     const holder = containerOf(options.getBlocks(), gateId);
     if (holder === null) return true;
     return holder?.block_type === 'section' && !isSidePath(holder);
+  }
+
+  /** Where the lecture will play this side path, or why it will skip it. */
+  function sidePathNote(path: Block): string {
+    const before = previousSibling(options.getBlocks(), path.id);
+    if (!before || !takesSidePath(before)) return 'If wrong · Not under a hinge question or cloze yet, so students skip it.';
+    if (!isGate(before)) return 'If wrong · The question above isn’t a gate, so students skip this.';
+    return 'If wrong · plays only after a wrong answer on the question above';
+  }
+
+  /** Lecture tools act on a block on the page or in a chapter; not in a side path, column or tab. */
+  function inReach(block: Block): boolean {
+    const holder = containerOf(options.getBlocks(), block.id);
+    if (holder === undefined) return false;
+    return holder === null || (holder.block_type === 'section' && !isSidePath(holder));
   }
 
   function note(text: string): HTMLElement {
@@ -115,7 +130,7 @@ export function createLectureEditorTools(options: LectureEditorToolsOptions) {
     box.addEventListener('click', () => patch(block.id, (c) => ({ ...c, gate: box.checked })));
     gate.append(box, document.createTextNode(' Gate: students answer before moving on'));
     tools.append(gate);
-    if (!takesSidePath(block) || !canHoldSidePath(block.id)) return;
+    if (!isGate(block) || !takesSidePath(block) || !canHoldSidePath(block.id)) return;
     const after = nextSibling(options.getBlocks(), block.id);
     if (after && isSidePath(after)) {
       tools.append(note('If wrong path ✓ (just below)'));
@@ -151,7 +166,7 @@ export function createLectureEditorTools(options: LectureEditorToolsOptions) {
       headingTools(block, tools);
     } else if (block.block_type === 'section' && isSidePath(block)) {
       // No switch back to a chapter: a nested side path can't become one.
-      tools.append(note('If wrong · plays only after a wrong answer on the question above'));
+      tools.append(note(sidePathNote(block)));
       tools.append(narration(block, '🎙 Narration'));
     } else if (block.block_type === 'section') {
       chapterTools(block, tools);
@@ -164,6 +179,7 @@ export function createLectureEditorTools(options: LectureEditorToolsOptions) {
   }
 
   function attach(target: HTMLElement, block: Block): void {
+    if (!inReach(block)) return;
     if (Array.from(target.children).some((child) => child.classList.contains('lecture-tools'))) return;
     const tools = toolsFor(block);
     if (tools) target.append(tools);

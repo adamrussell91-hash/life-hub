@@ -77,17 +77,61 @@ describe('lecture editor tools', () => {
     expect(row.querySelector('.lecture-tools__side-path')).toBeNull();
   });
 
-  it('offers no If wrong path for a gate inside an If wrong path', () => {
-    const path = b('p1', 'section', { title: 'Again', side_path: true, blocks: [b('q2', 'cloze', { text: 'y' })] });
-    const blocks = [b('q1', 'cloze', { text: 'x' }), path];
+  function decorateWith(blocks: Block[], rowBlock: Block) {
     let current = blocks;
     const tools = createLectureEditorTools({ isLecture: () => true, getBlocks: () => current, onBlocks: (next) => { current = next; }, idFactory: () => 'new1' });
     const row = document.createElement('div');
-    row.append(renderBlock(path, 'teacher'));
-    tools.decorate(row, path);
-    const inner = row.querySelector<HTMLElement>('.block[data-block-id="q2"]');
-    expect(inner?.querySelector('.lecture-tools__gate')).not.toBeNull();
+    row.append(renderBlock(rowBlock, 'teacher'));
+    tools.decorate(row, rowBlock);
+    const own = (id: string) => {
+      const el = id === rowBlock.id ? row : row.querySelector<HTMLElement>(`.block[data-block-id="${id}"]`)!;
+      return Array.from(el.children).find((child) => child.classList.contains('lecture-tools')) ?? null;
+    };
+    return { row, own, current: () => current };
+  }
+
+  it('gives blocks inside an If wrong path no lecture tools of their own', () => {
+    const path = b('p1', 'section', { title: 'Again', side_path: true, blocks: [b('q2', 'cloze', { text: 'y' }), b('h2', 'heading', { text: 'B' })] });
+    const { row, own } = decorateWith([b('q1', 'cloze', { text: 'x' }), path], path);
+    expect(own('q2')).toBeNull();
+    expect(own('h2')).toBeNull();
     expect(row.querySelector('.lecture-tools__side-path')).toBeNull();
+    expect(Array.from(row.children).some((el) => el.classList.contains('lecture-tools'))).toBe(true);
+  });
+
+  it('gives headings and gates inside columns or tabs no lecture tools', () => {
+    const cols = b('c1', 'columns', { columns: [{ blocks: [b('h3', 'heading', { text: 'C' }), b('q3', 'cloze', { text: 'z' })] }] });
+    const { row, own } = decorateWith([cols], cols);
+    expect(own('h3')).toBeNull();
+    expect(own('q3')).toBeNull();
+    expect(row.querySelector('.lecture-tools')).toBeNull();
+  });
+
+  it('gives a heading and a gate inside a chapter their tools', () => {
+    const chapter = b('s1', 'section', { title: 'Imagery', blocks: [b('h4', 'heading', { text: 'D' }), b('q4', 'cloze', { text: 'w' })] });
+    const { own } = decorateWith([chapter], chapter);
+    expect(own('h4')?.querySelector('.lecture-tools__reveal')).not.toBeNull();
+    expect(own('q4')?.querySelector('.lecture-tools__side-path')).not.toBeNull();
+  });
+
+  it('hides the If wrong path controls while the gate is off', () => {
+    const { row } = setup([b('q1', 'cloze', { text: 'x', gate: false })]);
+    expect(row.querySelector('.lecture-tools__gate')).not.toBeNull();
+    expect(row.querySelector('.lecture-tools__side-path')).toBeNull();
+    const off = setup([b('q1', 'cloze', { text: 'x', gate: false }), b('p1', 'section', { title: 'Again', blocks: [], side_path: true })]);
+    expect(off.row.querySelector('.lecture-tools__note')).toBeNull();
+  });
+
+  it('tells the teacher when an If wrong path will be skipped', () => {
+    const path = () => b('p1', 'section', { title: 'Again', side_path: true, blocks: [] });
+    const lonely = decorateWith([b('t1', 'rich_text', { html: '' }), path()], path());
+    expect(lonely.own('p1')?.textContent).toContain('Not under a hinge question or cloze yet, so students skip it.');
+    const top = decorateWith([path()], path());
+    expect(top.own('p1')?.textContent).toContain('Not under a hinge question or cloze yet');
+    const gateOff = decorateWith([b('q1', 'cloze', { text: 'x', gate: false }), path()], path());
+    expect(gateOff.own('p1')?.textContent).toContain('The question above isn’t a gate, so students skip this.');
+    const ok = decorateWith([b('q1', 'cloze', { text: 'x' }), path()], path());
+    expect(ok.own('p1')?.textContent).toContain('plays only after a wrong answer');
   });
 
   it('gives a nested If wrong path narration but no switch to undo it', () => {
@@ -155,5 +199,64 @@ describe('measureDuration', () => {
     }
     globalThis.Audio = FakeAudio as unknown as typeof Audio;
     await expect(measureDuration('blob:rec')).resolves.toBe(42);
+  });
+});
+
+describe('narration field', () => {
+  const saved = { url: '/old.webm', duration_s: 30, transcript: 'Old words' };
+
+  it('re-record can be cancelled back to the saved clip', async () => {
+    const { createNarrationField } = await import('@/lecture/narration-field');
+    const onChange = vi.fn();
+    const field = createNarrationField({ label: 'Scene', value: saved, onChange });
+    const button = (text: string) => Array.from(field.querySelectorAll('button')).find((el) => el.textContent === text);
+    button('Re-record')!.click();
+    expect(field.querySelector('audio')).toBeNull();
+    button('Cancel')!.click();
+    expect(field.querySelector('audio')?.getAttribute('src')).toBe('/old.webm');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('saves a new clip without the old transcript and locks the buttons until it is measured', async () => {
+    vi.resetModules();
+    let onUploaded: ((url: string) => void) | null = null;
+    vi.doMock('@/blocks/upload-button', async (orig) => ({
+      ...(await orig<typeof import('@/blocks/upload-button')>()),
+      createUploadButton: (opts: { onUploaded: (url: string) => void }) => {
+        onUploaded = opts.onUploaded;
+        const el = document.createElement('div');
+        const button = document.createElement('button');
+        button.textContent = 'Upload';
+        el.append(button);
+        return { el, button, input: document.createElement('input'), uploadFiles: async () => {} };
+      }
+    }));
+    let finish: (n: number) => void = () => {};
+    const RealAudio = globalThis.Audio;
+    class PendingAudio extends EventTarget {
+      duration = NaN;
+      preload = '';
+      currentTime = 0;
+      set src(_url: string) { finish = (n) => { this.duration = n; this.dispatchEvent(new Event('loadedmetadata')); }; }
+      removeAttribute() {}
+    }
+    globalThis.Audio = PendingAudio as unknown as typeof Audio;
+    try {
+      const { createNarrationField } = await import('@/lecture/narration-field');
+      const onChange = vi.fn();
+      const field = createNarrationField({ label: 'Scene', value: saved, onChange });
+      Array.from(field.querySelectorAll('button')).find((el) => el.textContent === 'Re-record')!.click();
+      onUploaded!('/new.webm');
+      expect(field.textContent).toContain('Saving…');
+      expect(field.querySelector<HTMLFieldSetElement>('fieldset.narration-field__controls')?.disabled).toBe(true);
+      finish(12);
+      await Promise.resolve();
+      expect(onChange).toHaveBeenCalledWith({ url: '/new.webm', duration_s: 12 });
+      expect(field.querySelector('audio')?.getAttribute('src')).toBe('/new.webm');
+    } finally {
+      globalThis.Audio = RealAudio;
+      vi.doUnmock('@/blocks/upload-button');
+      vi.resetModules();
+    }
   });
 });

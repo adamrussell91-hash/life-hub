@@ -6,6 +6,7 @@ import { validateConceptMap, validateMindMap } from '@/blocks/graph-layout';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block } from '@/schemas/block';
 import { checkQuestion } from '@/quiz/core';
 import { hingeIssue } from '@/blocks/hinge-question/shared';
+import { isSidePath, takesSidePath } from '@/lecture/scenes';
 
 export type PublishBlockIssue = {
   blockId: string;
@@ -44,12 +45,19 @@ export function publishBlockIssues(blocks: Block[]): string | null {
   return first ? formatPublishBlockIssue(first) : null;
 }
 
-export function listPublishBlockIssues(blocks: Block[]): PublishBlockIssue[] {
+export type PublishBlockIssueOptions = {
+  /** The lesson is a Lecture, so its side paths must sit under a hinge or cloze. */
+  lecture?: boolean;
+};
+
+const ORPHAN_SIDE_PATH = 'Place this If wrong path straight under a hinge question or cloze.';
+
+export function listPublishBlockIssues(blocks: Block[], options: PublishBlockIssueOptions = {}): PublishBlockIssue[] {
   const typeOrder = collectTypeOrder(blocks);
   const issues: PublishBlockIssue[] = [];
   const discernHosts = new Set<string>();
   visitBlocks(blocks, (block) => { if (block.discern) discernHosts.add(block.id); });
-  walk(blocks, [], typeOrder, issues, discernHosts);
+  walk(blocks, [], typeOrder, issues, discernHosts, options.lecture === true);
   return issues;
 }
 
@@ -68,11 +76,16 @@ function walk(
   ancestors: string[],
   typeOrder: Map<string, string[]>,
   issues: PublishBlockIssue[],
-  discernHosts: Set<string>
+  discernHosts: Set<string>,
+  lecture: boolean
 ): void {
-  for (const block of blocks) {
+  // A lone block (an AI proposal checks one section by itself) has no neighbours to judge.
+  const judgeOrder = lecture && (ancestors.length > 0 || blocks.length > 1);
+  for (const [index, block] of blocks.entries()) {
     const label = locateBlock(block, ancestors, typeOrder);
-    const message = ownIssue(block, discernHosts);
+    const before = blocks[index - 1];
+    const orphan = judgeOrder && isSidePath(block) && !(before && takesSidePath(before));
+    const message = ownIssue(block, discernHosts) ?? (orphan ? ORPHAN_SIDE_PATH : null);
     if (message) {
       issues.push({
         blockId: block.id,
@@ -83,7 +96,7 @@ function walk(
     }
 
     if (block.block_type === 'section') {
-      walk(block.content.blocks as Block[], [...ancestors, shortLabel(block)], typeOrder, issues, discernHosts);
+      walk(block.content.blocks as Block[], [...ancestors, shortLabel(block)], typeOrder, issues, discernHosts, lecture);
     } else if (block.block_type === 'columns') {
       block.content.columns.forEach((column, index) => {
         walk(
@@ -91,13 +104,14 @@ function walk(
           [...ancestors, `Column ${index + 1}`],
           typeOrder,
           issues,
-          discernHosts
+          discernHosts,
+          lecture
         );
       });
     } else if (block.block_type === 'tabs') {
       block.content.tabs.forEach((tab, index) => {
         const tabLabel = tab.label.trim() ? `Tab “${truncate(tab.label.trim())}”` : `Tab ${index + 1}`;
-        walk(tab.blocks as Block[], [...ancestors, tabLabel], typeOrder, issues, discernHosts);
+        walk(tab.blocks as Block[], [...ancestors, tabLabel], typeOrder, issues, discernHosts, lecture);
       });
     }
   }

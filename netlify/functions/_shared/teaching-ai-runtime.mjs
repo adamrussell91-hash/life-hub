@@ -4757,6 +4757,41 @@ function findBlockById(blocks, id) {
   return null;
 }
 
+// apps/teaching/src/blocks/walk-blocks.ts
+function visitBlocks(blocks, visitor, path = "blocks") {
+  blocks.forEach((block, index) => {
+    const blockPath = `${path}[${index}]`;
+    visitor(block, blockPath);
+    if (block.block_type === "section") {
+      visitBlocks(block.content.blocks, visitor, `${blockPath}.content.blocks`);
+      return;
+    }
+    if (block.block_type === "columns") {
+      block.content.columns.forEach((column, columnIndex) => {
+        visitBlocks(
+          column.blocks,
+          visitor,
+          `${blockPath}.content.columns[${columnIndex}].blocks`
+        );
+      });
+      return;
+    }
+    if (block.block_type === "tabs") {
+      block.content.tabs.forEach((tab, tabIndex) => {
+        visitBlocks(tab.blocks, visitor, `${blockPath}.content.tabs[${tabIndex}].blocks`);
+      });
+    }
+  });
+}
+
+// apps/teaching/src/lecture/scenes.ts
+function takesSidePath(block) {
+  return block.block_type === "hinge_question" || block.block_type === "cloze";
+}
+function isSidePath(block) {
+  return block.block_type === "section" && block.content.side_path === true;
+}
+
 // apps/teaching/src/teacher/lesson-canvas/drop.ts
 var PAGE_ONLY = /* @__PURE__ */ new Set(["collection", "anthology"]);
 var LESSON_ROOT_CHILD_TYPES = NEW_BLOCK_TYPES.filter((t) => !PAGE_ONLY.has(t));
@@ -5396,33 +5431,6 @@ function emptySearchPack(query, searchedAt = (/* @__PURE__ */ new Date()).toISOS
   };
 }
 
-// apps/teaching/src/blocks/walk-blocks.ts
-function visitBlocks(blocks, visitor, path = "blocks") {
-  blocks.forEach((block, index) => {
-    const blockPath = `${path}[${index}]`;
-    visitor(block, blockPath);
-    if (block.block_type === "section") {
-      visitBlocks(block.content.blocks, visitor, `${blockPath}.content.blocks`);
-      return;
-    }
-    if (block.block_type === "columns") {
-      block.content.columns.forEach((column, columnIndex) => {
-        visitBlocks(
-          column.blocks,
-          visitor,
-          `${blockPath}.content.columns[${columnIndex}].blocks`
-        );
-      });
-      return;
-    }
-    if (block.block_type === "tabs") {
-      block.content.tabs.forEach((tab, tabIndex) => {
-        visitBlocks(tab.blocks, visitor, `${blockPath}.content.tabs[${tabIndex}].blocks`);
-      });
-    }
-  });
-}
-
 // apps/teaching/src/ai/search-pack-validation.ts
 var HTML_URL_ATTRIBUTE = /(?<![\w:-])(href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
 function addUrl(references, path, field, value2, blockType) {
@@ -5901,14 +5909,15 @@ function publishBlockIssues(blocks) {
   const first = listPublishBlockIssues(blocks)[0];
   return first ? formatPublishBlockIssue(first) : null;
 }
-function listPublishBlockIssues(blocks) {
+var ORPHAN_SIDE_PATH = "Place this If wrong path straight under a hinge question or cloze.";
+function listPublishBlockIssues(blocks, options = {}) {
   const typeOrder = collectTypeOrder(blocks);
   const issues = [];
   const discernHosts = /* @__PURE__ */ new Set();
   visitBlocks(blocks, (block) => {
     if (block.discern) discernHosts.add(block.id);
   });
-  walk(blocks, [], typeOrder, issues, discernHosts);
+  walk(blocks, [], typeOrder, issues, discernHosts, options.lecture === true);
   return issues;
 }
 function collectTypeOrder(blocks) {
@@ -5920,10 +5929,13 @@ function collectTypeOrder(blocks) {
   });
   return order;
 }
-function walk(blocks, ancestors, typeOrder, issues, discernHosts) {
-  for (const block of blocks) {
+function walk(blocks, ancestors, typeOrder, issues, discernHosts, lecture) {
+  const judgeOrder = lecture && (ancestors.length > 0 || blocks.length > 1);
+  for (const [index, block] of blocks.entries()) {
     const label = locateBlock(block, ancestors, typeOrder);
-    const message = ownIssue(block, discernHosts);
+    const before = blocks[index - 1];
+    const orphan = judgeOrder && isSidePath(block) && !(before && takesSidePath(before));
+    const message = ownIssue(block, discernHosts) ?? (orphan ? ORPHAN_SIDE_PATH : null);
     if (message) {
       issues.push({
         blockId: block.id,
@@ -5933,21 +5945,22 @@ function walk(blocks, ancestors, typeOrder, issues, discernHosts) {
       });
     }
     if (block.block_type === "section") {
-      walk(block.content.blocks, [...ancestors, shortLabel(block)], typeOrder, issues, discernHosts);
+      walk(block.content.blocks, [...ancestors, shortLabel2(block)], typeOrder, issues, discernHosts, lecture);
     } else if (block.block_type === "columns") {
-      block.content.columns.forEach((column, index) => {
+      block.content.columns.forEach((column, index2) => {
         walk(
           column.blocks,
-          [...ancestors, `Column ${index + 1}`],
+          [...ancestors, `Column ${index2 + 1}`],
           typeOrder,
           issues,
-          discernHosts
+          discernHosts,
+          lecture
         );
       });
     } else if (block.block_type === "tabs") {
-      block.content.tabs.forEach((tab, index) => {
-        const tabLabel = tab.label.trim() ? `Tab \u201C${truncate(tab.label.trim())}\u201D` : `Tab ${index + 1}`;
-        walk(tab.blocks, [...ancestors, tabLabel], typeOrder, issues, discernHosts);
+      block.content.tabs.forEach((tab, index2) => {
+        const tabLabel = tab.label.trim() ? `Tab \u201C${truncate(tab.label.trim())}\u201D` : `Tab ${index2 + 1}`;
+        walk(tab.blocks, [...ancestors, tabLabel], typeOrder, issues, discernHosts, lecture);
       });
     }
   }
@@ -5956,7 +5969,7 @@ function locateBlock(block, ancestors, typeOrder) {
   const ids = typeOrder.get(block.block_type) ?? [block.id];
   const index = ids.indexOf(block.id);
   const ordinal = { index: index >= 0 ? index + 1 : 1, total: ids.length };
-  const self = shortLabel(block, ordinal);
+  const self = shortLabel2(block, ordinal);
   return ancestors.length > 0 ? `${ancestors.join(" \u2192 ")} \u2192 ${self}` : self;
 }
 function kindLabel(type) {
@@ -5964,7 +5977,7 @@ function kindLabel(type) {
   if (mapped) return mapped;
   return type.replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
-function shortLabel(block, ordinal) {
+function shortLabel2(block, ordinal) {
   const kind = kindLabel(block.block_type);
   const numbered = ordinal && ordinal.total > 1 ? `${kind} ${ordinal.index}` : kind;
   const caption = blockCaption(block);
@@ -6330,7 +6343,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
       });
     }
   }
-  for (const issue of listPublishBlockIssues(lesson.blocks)) {
+  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" })) {
     ctx.addIssue({
       code: z13.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),

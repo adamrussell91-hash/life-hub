@@ -76,3 +76,20 @@ export function containerOf(blocks: Block[], id: string, parent: Block | null = 
   }
   return undefined;
 }
+
+/** The block right before `id` in the same list, or null (also when `id` is first or absent). */
+export function previousSibling(blocks: Block[], id: string): Block | null {
+  return findPrevious(blocks, id) ?? null;
+}
+
+function findPrevious(blocks: Block[], id: string): Block | null | undefined {
+  const at = blocks.findIndex((b) => b.id === id);
+  if (at >= 0) return blocks[at - 1] ?? null;
+  for (const block of blocks) {
+    for (const list of childLists(block)) {
+      const found = findPrevious(list.blocks, id);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}

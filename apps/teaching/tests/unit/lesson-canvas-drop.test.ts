@@ -381,13 +381,25 @@ describe('lecture side paths when moving', () => {
     const blocks = [sidePath('p0'), sidePath('p1')];
     expect(sectionDropUnpacks(blocks, 'p1', { kind: 'section', id: 'p0' })).toBe(false);
     const result = moveBlockTo(blocks, 'p1', { kind: 'section', id: 'p0' }, 0);
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: false, message: 'An If wrong path can sit on the page or inside a chapter.' });
   });
 
-  it('still unpacks a section dropped into a column or a chapter', () => {
+  it('refuses a side path in a column or tab rather than unpacking it', () => {
+    const blocks = [createBlock('columns', 'cols1'), createBlock('tabs', 'tabs1'), sidePath('p1', [createBlock('rich_text', 'rt1')])];
+    for (const parent of [
+      { kind: 'column', id: 'cols1', columnIndex: 0 },
+      { kind: 'tab', id: 'tabs1', tabIndex: 0 }
+    ] as const) {
+      expect(sectionDropUnpacks(blocks, 'p1', parent)).toBe(false);
+      const result = moveBlockTo(blocks, 'p1', parent, 0);
+      expect(result).toEqual({ ok: false, message: 'An If wrong path can sit on the page or inside a chapter.' });
+    }
+  });
+
+  it('still unpacks a chapter dropped into a column or a chapter', () => {
     const cols = createBlock('columns', 'cols1');
-    const blocks = [cols, sidePath('p1'), createBlock('section', 'sec1'), createBlock('section', 'sec2')];
-    expect(sectionDropUnpacks(blocks, 'p1', { kind: 'column', id: 'cols1', columnIndex: 0 })).toBe(true);
+    const blocks = [cols, createBlock('section', 'sec1'), createBlock('section', 'sec2')];
+    expect(sectionDropUnpacks(blocks, 'sec2', { kind: 'column', id: 'cols1', columnIndex: 0 })).toBe(true);
     expect(sectionDropUnpacks(blocks, 'sec2', { kind: 'section', id: 'sec1' })).toBe(true);
     expect(sectionDropUnpacks(blocks, 'sec2', { kind: 'root' })).toBe(false);
   });
@@ -399,6 +411,12 @@ describe('lecture side paths when moving', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(kids(result.blocks[0]!)).toEqual(['q1', 'p1']);
+  });
+
+  it('names the side path rule when a chapter holding one unpacks where it cannot go', () => {
+    const blocks = [createBlock('columns', 'cols1'), withSectionChildren(createBlock('section', 'sec2'), [createBlock('cloze', 'q1'), sidePath('p1')])];
+    const result = unpackSectionTo(blocks, 'sec2', { kind: 'column', id: 'cols1', columnIndex: 0 }, 0);
+    expect(result).toEqual({ ok: false, message: 'An If wrong path can sit on the page or inside a chapter.' });
   });
 
   it('carries a gate’s side path along when the gate moves', () => {
@@ -424,7 +442,7 @@ describe('lecture side paths when moving', () => {
   it('refuses to split a gate from its side path into a column', () => {
     const blocks = [createBlock('columns', 'cols1'), createBlock('cloze', 'q1'), sidePath('p1')];
     const result = moveBlockTo(blocks, 'q1', { kind: 'column', id: 'cols1', columnIndex: 0 }, 0);
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: false, message: 'A question and its If wrong path move together, onto the page or into a chapter.' });
   });
 
   it('a self-check does not carry the section after it', () => {

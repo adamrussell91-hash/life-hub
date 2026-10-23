@@ -58,3 +58,32 @@ describe('listPublishBlockIssues', () => {
     expect(issues[0]?.label).toBe('Section “Practice” → Diagram “Forgetting curve”');
   });
 });
+
+describe('lecture side paths at publish', () => {
+  const ORPHAN = 'Place this If wrong path straight under a hinge question or cloze.';
+  const sidePath = (id: string): Block => {
+    const s = createBlock('section', id);
+    if (s.block_type !== 'section') throw new Error('expected section');
+    return { ...s, content: { ...s.content, title: 'Again', side_path: true } } as Block;
+  };
+  const orphans = (blocks: Block[], lecture = true) =>
+    listPublishBlockIssues(blocks, { lecture }).filter((issue) => issue.message === ORPHAN).map((issue) => issue.blockId);
+
+  it('flags a side path with no hinge or cloze straight above it', () => {
+    expect(orphans([createBlock('rich_text', 't1'), sidePath('p1')])).toEqual(['p1']);
+    expect(orphans([sidePath('p0'), createBlock('rich_text', 't1')])).toEqual(['p0']);
+    expect(orphans([createBlock('cloze', 'q1'), sidePath('p1'), createBlock('hinge_question', 'h1'), sidePath('p2')])).toEqual([]);
+  });
+
+  it('checks inside a chapter too', () => {
+    const chapter = createBlock('section', 's1');
+    if (chapter.block_type !== 'section') throw new Error('expected section');
+    const inside = { ...chapter, content: { ...chapter.content, blocks: [createBlock('self_check', 'k1'), sidePath('p1')] } } as Block;
+    expect(orphans([inside])).toEqual(['p1']);
+  });
+
+  it('leaves other lesson types and a lone block alone', () => {
+    expect(orphans([createBlock('rich_text', 't1'), sidePath('p1')], false)).toEqual([]);
+    expect(orphans([sidePath('p1')])).toEqual([]);
+  });
+});
