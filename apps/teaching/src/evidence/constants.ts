@@ -34,5 +34,7 @@ export const FOLLOW_UP = {
   min: 3,
   max: 10,
   /** From recorded Ann quiz builds (US$0.26–0.36 for about 10 questions, 21 Oct 2026). */
-  cost: 'about A$0.30 to A$0.55'
+  cost: 'about A$0.30 to A$0.55',
+  /** Shown instead of the plan sheet: a follow-up lesson goes after its quiz, in the same unit. */
+  noUnit: 'This quiz isn’t in a unit, so a follow-up can’t be placed after it.'
 } as const;

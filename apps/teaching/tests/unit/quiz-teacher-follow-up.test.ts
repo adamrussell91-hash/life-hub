@@ -97,4 +97,20 @@ describe('follow-up from a quiz flag', () => {
     expect(o.chosen).toEqual(['s1', 's2', 's3']);
     handle.dispose();
   });
+
+  it('says the quiz has no unit instead of opening the sheet', async () => {
+    openFollowUpPlan.mockClear();
+    const handle = mount({ ...payload, unit_id: '' });
+    const sure = await vi.waitFor(() => {
+      const b = followButtons(handle.root).find((n) => n.getAttribute('aria-label')?.includes('Sure but wrong'));
+      expect(b).toBeTruthy();
+      return b!;
+    });
+    sure.click();
+    expect(openFollowUpPlan).not.toHaveBeenCalled();
+    const alert = handle.root.querySelector<HTMLElement>('.qz-alert')!;
+    expect(alert.hidden).toBe(false);
+    expect(alert.textContent).toBe('This quiz isn’t in a unit, so a follow-up can’t be placed after it.');
+    handle.dispose();
+  });
 });

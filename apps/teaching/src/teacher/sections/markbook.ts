@@ -10,6 +10,7 @@ import { httpMarkbookApi, type MarkbookApi } from '@/markbook/api';
 import type { MarkbookActions, MarkbookView, OutcomeLabel } from '@/markbook/types';
 import type { Evidence } from '@/evidence/types';
 import { openFollowUpPlan } from '@/evidence/follow-up';
+import { FOLLOW_UP } from '@/evidence/constants';
 import { navigate } from '@/app/router';
 import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowStudents, todayInSydney, weightTotal } from '@/markbook/calc';
 import { renderGrid } from '@/markbook/grid';
@@ -53,6 +54,14 @@ function latestQuizFor(view: MarkbookView, tag: string, evidence: Evidence[]): s
   const sources = new Set(evidence.filter((e) => e.tags.includes(tag) && e.source.startsWith('quiz:')).map((e) => e.source.slice(5)));
   const quizzes = view.quizzes.filter((q) => !q.hidden && sources.has(q.lesson_id)).sort((a, b) => b.date.localeCompare(a.date));
   return quizzes[0]?.lesson_id ?? null;
+}
+
+/** Whether a hidden quiz holds evidence on this tag: the Patterns view leaves hidden quizzes out. */
+function hiddenQuizzesHave(view: MarkbookView, tag: string, context: InsightContext): boolean {
+  const hidden = view.quizzes.filter((q) => q.hidden).map((q) => ({ ...q, hidden: false }));
+  if (!hidden.length) return false;
+  const only: MarkbookView = { ...view, quizzes: hidden, markbook: { ...view.markbook, columns: [] } };
+  return expandTags(markbookEvidence(only, context.outcomes).evidence, context.table).some((e) => e.tags.includes(tag));
 }
 
 function applyChange(view: MarkbookView, change: Change): MarkbookView {
@@ -404,18 +413,26 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
                 const lessonId = latestQuizFor(current, tag, evidence);
                 const quiz = current.quizzes.find((q) => q.lesson_id === lessonId);
                 if (!quiz) {
-                  status.textContent = 'Follow-ups start from a quiz; this tag only has assessment marks.';
+                  status.textContent = hiddenQuizzesHave(current, tag, context)
+                    ? 'This tag’s quizzes are hidden in the markbook.'
+                    : 'Follow-ups start from a quiz; this tag only has assessment marks.';
+                  return;
+                }
+                if (!quiz.unit_id) {
+                  status.textContent = FOLLOW_UP.noUnit;
                   return;
                 }
                 status.textContent = '';
+                // Only students still on the list; a removed student can sit in a group while they are shown.
+                const listed = new Set(current.students.map((s) => s.id));
                 openFollowUpPlan({
                   sourceLessonId: quiz.lesson_id,
                   sourceTitle: quiz.title,
-                  unitId: quiz.unit_id ?? '',
+                  unitId: quiz.unit_id,
                   flagId: null,
                   tag,
                   students: current.students,
-                  chosen: ids,
+                  chosen: ids.filter((id) => listed.has(id)),
                   evidence,
                   label: (t) => tagLabel(t, context),
                   codeLabel: (id) => codeLabel(id, context.codes),

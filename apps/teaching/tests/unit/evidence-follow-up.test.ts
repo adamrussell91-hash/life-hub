@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { annBrief, startAnn, startFollowUp, FollowUpStartError } from '@/evidence/follow-up';
+import { annBrief, openFollowUpPlan, startAnn, startFollowUp, FollowUpStartError } from '@/evidence/follow-up';
 import type { Evidence } from '@/evidence/types';
 
 const ev = (student: string, why: Evidence['why'], share = 0): Evidence => ({ item: 'q1', tags: ['tech:personification'], share, why, student, source: 'quiz:l1', date: '2026-10-20', confidence: 3 });
@@ -70,5 +70,23 @@ describe('annBrief privacy', () => {
     const brief = annBrief({ tag: 'tech:personification', students: many.map((e) => e.student), evidence: many, label, codeLabel: (i) => i, sourceTitle: 'T', count: 5 });
     expect(brief.length).toBeLessThanOrEqual(8000);
     expect(brief).toContain('single technique or idea');
+  });
+});
+
+describe('openFollowUpPlan', () => {
+  it('never sends a chosen id that is not on the student list', async () => {
+    const createLesson = vi.fn(async () => ({ id: 'lesson_new' }));
+    const startJob = vi.fn(async () => ({ id: 'job1', status: 'working' as const }));
+    const onDone = vi.fn();
+    const sheet = openFollowUpPlan({
+      sourceLessonId: 'l1', sourceTitle: 'Pre-test', unitId: 'u1', flagId: null, tag: 'tech:personification',
+      students: [{ id: 's1', name: 'Ada Ash', initials: 'AA' }],
+      chosen: ['s1', 'gone'],
+      evidence, label, codeLabel: (id) => id, onDone, deps: { createLesson, startJob }
+    });
+    [...sheet.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Draft')!.click();
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalledWith('lesson_new'));
+    const body = (createLesson.mock.calls[0] as unknown as [{ quiz: { for_students: string[] } }])[0];
+    expect(body.quiz.for_students).toEqual(['s1']);
   });
 });
