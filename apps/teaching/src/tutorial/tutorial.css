@@ -11,3 +11,65 @@
 .tut-claim { display: grid; gap: var(--space-2); max-width: 20rem; }
 .tut-claim__err { margin: 0; color: var(--danger); }
 .tut__finish { justify-self: start; min-height: 44px; }
+
+/* Teacher board: a card per group, then the live board for the group being sat with. */
+.tut-board { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); min-width: 0; }
+.tut-board__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-2) var(--space-4); }
+.tut-board__title { margin: 0; font-size: var(--text-lg); }
+.tut-board__count { margin: 0; color: var(--muted); }
+.tut-board__error { margin: 0; color: var(--danger); }
+.tut-board__error:empty { display: none; }
+.tut-board__strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: var(--space-3); }
+.tut-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-3); display: grid; gap: var(--space-1); align-content: start; background: var(--paper); min-width: 0; }
+.tut-card--waiting { border-color: var(--marine); box-shadow: 0 0 0 2px color-mix(in srgb, var(--marine) 25%, transparent); }
+.tut-card--open { border-color: var(--ink); }
+.tut-card__name { margin: 0; font-size: var(--text-base); }
+.tut-card__meta, .tut-card__status, .tut-card__hand { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.tut-card__dots, .tut-card__away { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; }
+.tut-card__sit { justify-self: start; margin-top: var(--space-1); }
+.tut-dot { font-size: var(--text-xs); padding: .1rem .4rem; border-radius: 999px; background: color-mix(in srgb, var(--line) 50%, var(--paper)); }
+.tut-dot--waiting { background: color-mix(in srgb, var(--marine) 30%, var(--paper)); font-weight: var(--weight-semibold); }
+.tut-dot--after, .tut-dot--exit, .tut-dot--done { background: color-mix(in srgb, var(--marine) 15%, var(--paper)); }
+
+.tut-live { border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-4); display: grid; gap: var(--space-3); background: var(--paper); min-width: 0; }
+.tut-live__title, .tut-live__head { margin: 0; }
+.tut-live__why { margin: 0; color: var(--muted); }
+.tut-live__points { margin: 0; padding-left: 1.2rem; }
+.tut-live__shown { padding: var(--space-2) var(--space-3); border-left: 4px solid var(--marine); background: color-mix(in srgb, var(--marine) 6%, var(--paper)); }
+.tut-live__shown-label { margin: 0; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.tut-live__shown-text { margin: 0; }
+.tut-live__rows { display: grid; gap: var(--space-2); overflow-x: auto; }
+.tut-live__cols, .tut-live__row { display: grid; grid-auto-flow: column; grid-template-columns: 2.5rem 8rem; grid-auto-columns: minmax(10rem, 1fr); gap: var(--space-2); align-items: start; }
+.tut-live__cols { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.tut-live__row { padding-top: var(--space-2); border-top: 1px solid var(--line); }
+.tut-live__row > input[type='checkbox'] { width: 22px; height: 22px; margin: .1rem 0 0; }
+.tut-live__who { display: grid; gap: .1rem; min-width: 0; }
+.tut-live__name, .tut-live__stage { font-size: var(--text-sm); color: var(--muted); overflow-wrap: anywhere; }
+.tut-live__cell { display: grid; gap: var(--space-1); min-width: 0; }
+.tut-live__cell--wrong { border-left: 3px solid var(--warn, #c9893b); padding-left: var(--space-2); }
+.tut-live__label { display: none; font-size: var(--text-xs); color: var(--muted); }
+.tut-live__answer, .tut-live__none { margin: 0; overflow-wrap: anywhere; }
+.tut-live__show { justify-self: start; }
+.tut-live__tools { display: grid; gap: var(--space-1); justify-items: start; min-width: 0; }
+.tut-live__move { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.tut-live__move-label { font-size: var(--text-xs); color: var(--muted); }
+.tut-live__hands { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.tut-live__hand { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.tut-live__hand--answered { opacity: .75; }
+.tut-live__hand-from, .tut-live__hand-text, .tut-live__hand-reply { margin: 0; overflow-wrap: anywhere; }
+.tut-live__hand-from, .tut-live__hand-reply { font-size: var(--text-sm); color: var(--muted); }
+.tut-live__hand .btn { justify-self: start; }
+.tut-live__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+
+/* Phone: cards stack, and each student becomes a stacked card with labelled answers. */
+@media (max-width: 560px) {
+  .tut-board__strip { grid-template-columns: 1fr; }
+  .tut-live { padding: var(--space-3); }
+  .tut-live__rows { overflow-x: visible; }
+  .tut-live__cols { display: none; }
+  .tut-live__row { grid-auto-flow: row; grid-template-columns: auto 1fr; grid-auto-columns: auto; }
+  .tut-live__row > .tut-live__cell, .tut-live__row > .tut-live__tools { grid-column: 1 / -1; }
+  .tut-live__label { display: block; }
+  .tut-live__actions { justify-content: stretch; }
+  .tut-live__actions .btn { flex: 1 1 100%; min-height: 44px; }
+}
