@@ -72,7 +72,7 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
       });
     }
   }
-  for (const issue of listPublishBlockIssues(lesson.blocks)) {
+  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === 'lecture' })) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),

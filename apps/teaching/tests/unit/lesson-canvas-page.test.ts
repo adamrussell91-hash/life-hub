@@ -223,6 +223,30 @@ describe('mountLessonPage', () => {
     expect(eyebrow()).toBe('Lesson');
   });
 
+  it('shows lecture controls only while the lesson type is Lecture', () => {
+    const { onChange, onSelect } = mount(makeLesson({ pedagogical_mode: 'workshop' }));
+    expect(host.querySelector('.lecture-tools')).toBeNull();
+
+    const select = host.querySelector<HTMLSelectElement>('.lesson-page__mode-select')!;
+    select.value = 'lecture';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const row = host.querySelector<HTMLElement>('.lesson-page__block[data-block-id="h1"]')!;
+    expect(row.querySelector('.lecture-tools')).not.toBeNull();
+
+    // A tap in the tools changes the heading without opening its editor.
+    onSelect.mockClear();
+    row.querySelector<HTMLButtonElement>('.lecture-tools [data-reveal="all"]')!.click();
+    expect(onSelect).not.toHaveBeenCalled();
+    const last = onChange.mock.calls.at(-1)![0] as Lesson;
+    expect(last.pedagogical_mode).toBe('lecture');
+    expect((last.blocks[0]!.content as { reveal?: string }).reveal).toBe('all');
+    expect(host.querySelector('[data-reveal="all"]')?.getAttribute('aria-checked')).toBe('true');
+
+    select.value = 'seminar';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(host.querySelector('.lecture-tools')).toBeNull();
+  });
+
   it('resolves a media_id cover when update delivers the media library', () => {
     const media: Media[] = [
       {

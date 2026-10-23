@@ -4,6 +4,9 @@ import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { mountStudentQuiz } from '@/quiz/student-quiz';
+import { mountLecturePlayer, type LecturePlayerHandle } from '@/lecture/player';
+import { lectureClient } from '@/lecture/api';
+import { isSidePath } from '@/lecture/scenes';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { scheduleNeighbors } from '@/schedule/schedule-neighbors';
 import { formatStudentDate } from '@/student/format';
@@ -74,7 +77,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
@@ -103,12 +106,28 @@ export function renderPublishedLessonHero(
   return publishedOutcomes;
 }
 
+/** Returns the lecture player's handle when the lesson plays as a lecture. */
 function renderPublishedLesson(
   content: HTMLElement,
   lesson: PublishedLesson,
   extras?: { cls?: PublishedClass; quizClassId?: string }
-): void {
+): LecturePlayerHandle | null {
   content.replaceChildren();
+  if (lesson.pedagogical_mode === 'lecture') {
+    // The hero sits on the player's title card; hand-ups need the class link.
+    const classId = extras?.cls?.id ?? extras?.quizClassId;
+    const playerHost = document.createElement('div');
+    content.append(playerHost);
+    return mountLecturePlayer(playerHost, {
+      lessonId: lesson.lesson_id,
+      title: lesson.title,
+      blocks: lesson.blocks,
+      client: classId ? lectureClient(lesson.lesson_id, classId) : null,
+      renderHero: (hostEl) => {
+        renderPublishedLessonHero(hostEl, lesson, extras?.cls);
+      }
+    });
+  }
   const publishedOutcomes = renderPublishedLessonHero(content, lesson, extras?.cls);
 
   const openNoteId = readNoteHash();
@@ -118,6 +137,8 @@ function renderPublishedLesson(
   const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
   for (const block of lesson.blocks) {
     if (isQuiz && block.block_type === 'quiz_question') continue;
+    // A side path only plays inside a lecture.
+    if (isSidePath(block)) continue;
     blocks.append(
       renderBlock(block, 'student', {
         lessonId: lesson.lesson_id,
@@ -141,6 +162,7 @@ function renderPublishedLesson(
     url.hash = '';
     history.replaceState(null, '', `${url.pathname}${url.search}`);
   }
+  return null;
 }
 
 /** `#note=<annotationId>` from anthology / deep links. */
@@ -219,9 +241,15 @@ export function mountStudentLessonView(
   const { root, lessonId, classId, isStale = () => false } = options;
   let disposed = false;
   let examples: StudentClassExamplesHandle | null = null;
+  let lecture: LecturePlayerHandle | null = null;
   const mountExamples = (content: HTMLElement) => {
     examples?.dispose();
-    examples = mountStudentClassExamples(content, { lessonId, classId });
+    // Class examples hang off rendered blocks; the lecture player redraws them per scene.
+    examples = lecture ? null : mountStudentClassExamples(content, { lessonId, classId });
+  };
+  const show = (content: HTMLElement, lesson: PublishedLesson, extras: Parameters<typeof renderPublishedLesson>[2]) => {
+    lecture?.dispose();
+    lecture = renderPublishedLesson(content, lesson, extras);
   };
 
   root.replaceChildren();
@@ -279,7 +307,7 @@ export function mountStudentLessonView(
           }
         ]
       });
-      renderPublishedLesson(content, lesson, { cls });
+      show(content, lesson, { cls });
       renderLessonNav(content, classId, lessonId, cls);
       mountExamples(content);
     });
@@ -290,7 +318,7 @@ export function mountStudentLessonView(
         renderStudentChrome(header, {});
         // The teacher's per-class Share link adds ?class= so the quiz knows the class list.
         const quizClassId = new URLSearchParams(window.location.search).get('class') ?? undefined;
-        renderPublishedLesson(content, lesson, { quizClassId });
+        show(content, lesson, { quizClassId });
         mountExamples(content);
       })
       .catch((error: unknown) => {
@@ -304,6 +332,8 @@ export function mountStudentLessonView(
       disposed = true;
       examples?.dispose();
       examples = null;
+      lecture?.dispose();
+      lecture = null;
     }
   };
 }

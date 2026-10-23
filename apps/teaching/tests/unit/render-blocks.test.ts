@@ -389,6 +389,7 @@ describe('blockRegistry', () => {
       'html_app',
       'image',
       'mind_map',
+      'note_cue',
       'outcomes',
       'peer_feedback',
       'question_drop',

@@ -819,6 +819,7 @@ var BlockTypeSchema = z8.enum([
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "chart",
   "equation",
   "diagram",
@@ -908,13 +909,23 @@ var RichTextBlockSchema = z8.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var NarrationSchema = z8.object({
+  url: z8.string().min(1),
+  duration_s: z8.number().min(0).max(900),
+  transcript: z8.string().max(8e3).optional()
+});
+var RevealSchema = z8.enum(["all", "one"]);
 var HeadingBlockSchema = z8.object({
   id: z8.string().min(1),
   type: z8.literal("block"),
   block_type: z8.literal("heading"),
   variant: HeadingVariantSchema,
   visibility: VisibilitySchema,
-  content: z8.object({ text: z8.string() }),
+  content: z8.object({
+    text: z8.string(),
+    narration: NarrationSchema.optional(),
+    reveal: RevealSchema.optional()
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -1319,7 +1330,9 @@ var HingeQuestionBlockSchema = z8.object({
     move_on: z8.number().int().min(1).max(100).default(80),
     reteach: z8.number().int().min(0).max(99).default(50),
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
-    backup: HingeBackupSchema.optional()
+    backup: HingeBackupSchema.optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1545,7 +1558,9 @@ var ClozeBlockSchema = z8.object({
   content: z8.object({
     title: z8.string().optional(),
     text: z8.string(),
-    case_sensitive: z8.boolean().optional()
+    case_sensitive: z8.boolean().optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1566,7 +1581,24 @@ var SelfCheckBlockSchema = z8.object({
     mode: SelfCheckModeSchema,
     prompt: z8.string(),
     answer: z8.string().optional(),
-    items: z8.array(SelfCheckItemSchema).max(12).optional()
+    items: z8.array(SelfCheckItemSchema).max(12).optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var NOTE_CUE_KINDS = ["copy", "own_words", "draw", "question"];
+var NoteCueKindSchema = z8.enum(NOTE_CUE_KINDS);
+var NoteCueBlockSchema = z8.object({
+  id: z8.string().min(1),
+  type: z8.literal("block"),
+  block_type: z8.literal("note_cue"),
+  variant: z8.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z8.object({
+    kind: NoteCueKindSchema,
+    prompt: z8.string().max(500)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2166,6 +2198,7 @@ var leafBlockSchemas = [
   FlashcardsBlockSchema,
   ClozeBlockSchema,
   SelfCheckBlockSchema,
+  NoteCueBlockSchema,
   ChartBlockSchema,
   EquationBlockSchema,
   DiagramBlockSchema,
@@ -2264,7 +2297,7 @@ var TabsBlockSchema = z8.object({
   ...blockLayout,
   ...blockTimestamps
 });
-var SectionChildBlockSchema = z8.lazy(
+var SectionInnerChildBlockSchema = z8.lazy(
   () => z8.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
@@ -2272,6 +2305,33 @@ var SectionChildBlockSchema = z8.lazy(
     TabsBlockSchema,
     TimelineBlockSchema,
     CardStackBlockSchema
+  ])
+);
+var SidePathSectionSchema = z8.object({
+  id: z8.string().min(1),
+  type: z8.literal("block"),
+  block_type: z8.literal("section"),
+  variant: z8.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z8.object({
+    title: z8.string(),
+    collapsed_in_editor: z8.boolean().optional(),
+    blocks: z8.array(SectionInnerChildBlockSchema),
+    side_path: z8.literal(true),
+    narration: NarrationSchema.optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var SectionChildBlockSchema = z8.lazy(
+  () => z8.discriminatedUnion("block_type", [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    TabsBlockSchema,
+    TimelineBlockSchema,
+    CardStackBlockSchema,
+    SidePathSectionSchema
   ])
 );
 var SectionLinkSchema = z8.object({
@@ -2288,7 +2348,13 @@ var SectionBlockObjectSchema = z8.object({
     title: z8.string(),
     collapsed_in_editor: z8.boolean().optional(),
     blocks: z8.array(SectionChildBlockSchema),
-    link: SectionLinkSchema.optional()
+    link: SectionLinkSchema.optional(),
+    /** Lecture: the chapter intro clip. */
+    narration: NarrationSchema.optional(),
+    /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
+    takeaway: z8.object({ enabled: z8.boolean(), prompt: z8.string().max(300).optional() }).optional(),
+    /** Lecture: plays only after a wrong answer on the gate just above it. */
+    side_path: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -3912,6 +3978,7 @@ var NEW_BLOCK_TYPES = [
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "chart",
   "equation",
   "diagram",
@@ -3978,6 +4045,7 @@ var NEW_BLOCK_LABEL = {
   flashcards: "Flashcards",
   cloze: "Cloze",
   self_check: "Self check",
+  note_cue: "Note cue",
   chart: "Chart",
   equation: "Equation",
   diagram: "Diagram",
@@ -4074,7 +4142,7 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Learning",
-    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "annotation"]
+    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "note_cue", "annotation"]
   },
   {
     label: "Visualisation",
@@ -4129,6 +4197,7 @@ var HOMEPAGE_EXCLUDED = /* @__PURE__ */ new Set([
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "outcomes",
   "annotation",
   "anthology"
@@ -4140,7 +4209,7 @@ var HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
 var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
-    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
+    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "note_cue", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
       type
     )
   )
@@ -4497,6 +4566,8 @@ function createBlock(type, id) {
           answer: ""
         }
       };
+    case "note_cue":
+      return { ...shared, block_type: "note_cue", variant: "medium", content: { kind: "own_words", prompt: "" } };
     case "chart":
       return {
         ...shared,
@@ -4693,6 +4764,45 @@ function findBlockById(blocks, id) {
     }
   }
   return null;
+}
+
+// apps/teaching/src/blocks/walk-blocks.ts
+function visitBlocks(blocks, visitor, path = "blocks") {
+  blocks.forEach((block, index) => {
+    const blockPath = `${path}[${index}]`;
+    visitor(block, blockPath);
+    if (block.block_type === "section") {
+      visitBlocks(block.content.blocks, visitor, `${blockPath}.content.blocks`);
+      return;
+    }
+    if (block.block_type === "columns") {
+      block.content.columns.forEach((column, columnIndex) => {
+        visitBlocks(
+          column.blocks,
+          visitor,
+          `${blockPath}.content.columns[${columnIndex}].blocks`
+        );
+      });
+      return;
+    }
+    if (block.block_type === "tabs") {
+      block.content.tabs.forEach((tab, tabIndex) => {
+        visitBlocks(tab.blocks, visitor, `${blockPath}.content.tabs[${tabIndex}].blocks`);
+      });
+    }
+  });
+}
+
+// apps/teaching/src/lecture/scenes.ts
+var GATE_TYPES = /* @__PURE__ */ new Set(["hinge_question", "cloze", "self_check"]);
+function isGate(block) {
+  return GATE_TYPES.has(block.block_type) && block.content.gate !== false;
+}
+function takesSidePath(block) {
+  return block.block_type === "hinge_question" || block.block_type === "cloze";
+}
+function isSidePath(block) {
+  return block.block_type === "section" && block.content.side_path === true;
 }
 
 // apps/teaching/src/teacher/lesson-canvas/drop.ts
@@ -5334,33 +5444,6 @@ function emptySearchPack(query, searchedAt = (/* @__PURE__ */ new Date()).toISOS
   };
 }
 
-// apps/teaching/src/blocks/walk-blocks.ts
-function visitBlocks(blocks, visitor, path = "blocks") {
-  blocks.forEach((block, index) => {
-    const blockPath = `${path}[${index}]`;
-    visitor(block, blockPath);
-    if (block.block_type === "section") {
-      visitBlocks(block.content.blocks, visitor, `${blockPath}.content.blocks`);
-      return;
-    }
-    if (block.block_type === "columns") {
-      block.content.columns.forEach((column, columnIndex) => {
-        visitBlocks(
-          column.blocks,
-          visitor,
-          `${blockPath}.content.columns[${columnIndex}].blocks`
-        );
-      });
-      return;
-    }
-    if (block.block_type === "tabs") {
-      block.content.tabs.forEach((tab, tabIndex) => {
-        visitBlocks(tab.blocks, visitor, `${blockPath}.content.tabs[${tabIndex}].blocks`);
-      });
-    }
-  });
-}
-
 // apps/teaching/src/ai/search-pack-validation.ts
 var HTML_URL_ATTRIBUTE = /(?<![\w:-])(href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
 function addUrl(references, path, field, value2, blockType) {
@@ -5827,6 +5910,7 @@ var KIND_LABEL = {
   discern_confirm: "Discern Confirm",
   quiz_question: "Quiz question",
   self_check: "Self check",
+  note_cue: "Note cue",
   mind_map: "Mind map",
   concept_map: "Concept map"
 };
@@ -5838,14 +5922,15 @@ function publishBlockIssues(blocks) {
   const first = listPublishBlockIssues(blocks)[0];
   return first ? formatPublishBlockIssue(first) : null;
 }
-function listPublishBlockIssues(blocks) {
+var ORPHAN_SIDE_PATH = "Place this If wrong path straight under a hinge question or cloze.";
+function listPublishBlockIssues(blocks, options = {}) {
   const typeOrder = collectTypeOrder(blocks);
   const issues = [];
   const discernHosts = /* @__PURE__ */ new Set();
   visitBlocks(blocks, (block) => {
     if (block.discern) discernHosts.add(block.id);
   });
-  walk(blocks, [], typeOrder, issues, discernHosts);
+  walk(blocks, [], typeOrder, issues, discernHosts, options.lecture === true);
   return issues;
 }
 function collectTypeOrder(blocks) {
@@ -5857,10 +5942,13 @@ function collectTypeOrder(blocks) {
   });
   return order;
 }
-function walk(blocks, ancestors, typeOrder, issues, discernHosts) {
-  for (const block of blocks) {
+function walk(blocks, ancestors, typeOrder, issues, discernHosts, lecture) {
+  const judgeOrder = lecture && (ancestors.length > 0 || blocks.length > 1);
+  for (const [index, block] of blocks.entries()) {
     const label = locateBlock(block, ancestors, typeOrder);
-    const message = ownIssue(block, discernHosts);
+    const before = blocks[index - 1];
+    const orphan = judgeOrder && isSidePath(block) && !(before && isGate(before) && takesSidePath(before));
+    const message = ownIssue(block, discernHosts) ?? (orphan ? ORPHAN_SIDE_PATH : null);
     if (message) {
       issues.push({
         blockId: block.id,
@@ -5870,21 +5958,22 @@ function walk(blocks, ancestors, typeOrder, issues, discernHosts) {
       });
     }
     if (block.block_type === "section") {
-      walk(block.content.blocks, [...ancestors, shortLabel(block)], typeOrder, issues, discernHosts);
+      walk(block.content.blocks, [...ancestors, shortLabel2(block)], typeOrder, issues, discernHosts, lecture);
     } else if (block.block_type === "columns") {
-      block.content.columns.forEach((column, index) => {
+      block.content.columns.forEach((column, index2) => {
         walk(
           column.blocks,
-          [...ancestors, `Column ${index + 1}`],
+          [...ancestors, `Column ${index2 + 1}`],
           typeOrder,
           issues,
-          discernHosts
+          discernHosts,
+          lecture
         );
       });
     } else if (block.block_type === "tabs") {
-      block.content.tabs.forEach((tab, index) => {
-        const tabLabel = tab.label.trim() ? `Tab \u201C${truncate(tab.label.trim())}\u201D` : `Tab ${index + 1}`;
-        walk(tab.blocks, [...ancestors, tabLabel], typeOrder, issues, discernHosts);
+      block.content.tabs.forEach((tab, index2) => {
+        const tabLabel = tab.label.trim() ? `Tab \u201C${truncate(tab.label.trim())}\u201D` : `Tab ${index2 + 1}`;
+        walk(tab.blocks, [...ancestors, tabLabel], typeOrder, issues, discernHosts, lecture);
       });
     }
   }
@@ -5893,7 +5982,7 @@ function locateBlock(block, ancestors, typeOrder) {
   const ids = typeOrder.get(block.block_type) ?? [block.id];
   const index = ids.indexOf(block.id);
   const ordinal = { index: index >= 0 ? index + 1 : 1, total: ids.length };
-  const self = shortLabel(block, ordinal);
+  const self = shortLabel2(block, ordinal);
   return ancestors.length > 0 ? `${ancestors.join(" \u2192 ")} \u2192 ${self}` : self;
 }
 function kindLabel(type) {
@@ -5901,7 +5990,7 @@ function kindLabel(type) {
   if (mapped) return mapped;
   return type.replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
-function shortLabel(block, ordinal) {
+function shortLabel2(block, ordinal) {
   const kind = kindLabel(block.block_type);
   const numbered = ordinal && ordinal.total > 1 ? `${kind} ${ordinal.index}` : kind;
   const caption = blockCaption(block);
@@ -6153,6 +6242,9 @@ function ownIssue(block, discernHosts) {
       return "Cloze blocks need at least one blank to publish";
     }
   }
+  if (block.block_type === "note_cue" && !block.content.prompt.trim()) {
+    return "Write the prompt for this note cue";
+  }
   if (block.block_type === "self_check") {
     if (block.content.prompt.trim().length === 0) {
       return "Self check blocks need a prompt to publish";
@@ -6264,7 +6356,7 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
       });
     }
   }
-  for (const issue of listPublishBlockIssues(lesson.blocks)) {
+  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" })) {
     ctx.addIssue({
       code: z13.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),

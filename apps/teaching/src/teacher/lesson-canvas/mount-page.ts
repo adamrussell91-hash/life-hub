@@ -10,6 +10,7 @@ import { applyRememberedTabsPanel, rememberTabsPanel } from '@/blocks/layout-edi
 import {
   createFromInsertMenu,
   cloneBlockWithNewIds,
+  createBlock,
   type InsertMenuValue
 } from '@/blocks/create-block';
 import {
@@ -21,6 +22,8 @@ import { findBlockById } from '@/blocks/find-block';
 import { createDiscernConfirmBlock, findDiscernConfirm, insertDiscernConfirm, removeDiscernConfirms } from '@/blocks/discern';
 import { DISCERN_ATTACH_EVENT, DISCERN_DETACH_EVENT } from '@/blocks/discern-editor';
 import { renderBlock } from '@/blocks/render';
+import { mountLecturePanel, type LecturePanelHandle } from '@/lecture/teacher-panel';
+import { addToScene } from '@/lecture/tree';
 import { mapBlockById, setBlockPulseOff } from '@/blocks/block-pulse';
 import { createTeacherBlockPulse } from '@/teacher/block-pulse';
 import { mountPulseSummary } from '@/teacher/pulse-summary';
@@ -50,6 +53,7 @@ import {
   insertAt,
   insertTargetForSelection,
   moveBlockTo,
+  moveByTarget,
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
 import {
@@ -60,6 +64,7 @@ import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
 import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 import { createTeacherClassExamples } from '@/class-examples/teacher';
 import { mountQuizPanel, type QuizPanelHandle } from '@/quiz/teacher-panel';
+import { createLectureEditorTools } from '@/lecture/editor-tools';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -528,18 +533,11 @@ export function mountBlockCanvas(
     return grip;
   }
 
-  function moveBy(blockId: string, delta: number): void {
-    const from = blocks.findIndex((row) => row.id === blockId);
-    if (from < 0) return;
-    const to = from + delta;
-    if (to < 0 || to >= blocks.length) return;
-    const result = moveBlockTo(
-      blocks,
-      blockId,
-      { kind: 'root' },
-      delta > 0 ? to + 1 : to,
-      { rootMode }
-    );
+  function moveBy(blockId: string, delta: 1 | -1): void {
+    // A lecture gate and its If wrong path move, and are passed, as one.
+    const at = moveByTarget(blocks, blockId, delta);
+    if (at === null) return;
+    const result = moveBlockTo(blocks, blockId, { kind: 'root' }, at, { rootMode });
     if (!result.ok) {
       setHint(result.message);
       return;
@@ -585,6 +583,7 @@ export function mountBlockCanvas(
       () => {
         const editing = selectedId === block.id;
         const index = blocks.findIndex((row) => row.id === block.id);
+        const canMoveDown = moveByTarget(blocks, block.id, 1) !== null;
         return [
           {
             label: editing ? 'Done' : 'Edit',
@@ -602,7 +601,7 @@ export function mountBlockCanvas(
           {
             label: 'Move down',
             icon: HUB_LIST_ICONS.down,
-            disabled: index < 0 || index >= blocks.length - 1,
+            disabled: !canMoveDown,
             dataset: { blockAction: 'down' },
             onSelect: () => moveBy(block.id, 1)
           },
@@ -991,6 +990,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     emitLesson({ ...lesson, pedagogical_mode });
     banner.update({ eyebrow: PEDAGOGICAL_MODE_LABELS[pedagogical_mode] });
     syncQuizPanel();
+    syncLecturePanel();
+    // Lecture controls on the canvas come and go with the lesson type.
+    canvas.update(lesson.blocks, media);
   });
   metaRow.append(modeSelect);
 
@@ -1027,8 +1029,35 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     quizHost.hidden = !isQuiz;
   }
 
+  // A lesson set to Lecture gets its panel: Play as student, the replay strip and hand-ups.
+  const lectureHost = document.createElement('div');
+  lectureHost.className = 'lesson-page__lecture';
+  let lecturePanel: LecturePanelHandle | null = null;
+  function syncLecturePanel(): void {
+    const isLecture = resolvePedagogicalMode(lesson.pedagogical_mode) === 'lecture';
+    if (isLecture && !lecturePanel) {
+      lecturePanel = mountLecturePanel({
+        getLesson: () => lesson,
+        onAddCallout: (sceneId, text) => {
+          const base = createBlock('callout', options.idFactory());
+          const callout = { ...base, content: { ...base.content, style: 'information', body: text } } as Block;
+          const blocks = addToScene(lesson.blocks, sceneId, callout);
+          if (blocks === lesson.blocks) return;
+          emitLesson({ ...lesson, blocks });
+          canvas.update(blocks, media);
+        }
+      });
+      lectureHost.append(lecturePanel.root);
+      void lecturePanel.refresh();
+    } else if (!isLecture && lecturePanel) {
+      lecturePanel.dispose();
+      lecturePanel = null;
+    }
+    lectureHost.hidden = !isLecture;
+  }
+
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, quizHost, canvasHost);
+  root.append(coverHost, metaRow, quizHost, lectureHost, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1040,10 +1069,20 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.update(blocks, media);
     }
   });
+  const lectureTools = createLectureEditorTools({
+    isLecture: () => resolvePedagogicalMode(lesson.pedagogical_mode) === 'lecture',
+    getBlocks: () => lesson.blocks,
+    onBlocks: (blocks) => {
+      emitLesson({ ...lesson, blocks });
+      canvas.update(blocks, media);
+    },
+    idFactory: options.idFactory
+  });
   const canvas = mountBlockCanvas(canvasHost, {
     decorateRow: (row, block) => {
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
+      lectureTools.decorate(row, block);
     },
     blocks: lesson.blocks,
     media,
@@ -1067,6 +1106,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
 
   syncQuizPanel();
+  syncLecturePanel();
 
   const stripHost = document.createElement('div');
   stripHost.className = 'lesson-page__meta-outcomes';
@@ -1145,6 +1185,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       titleEditor.update(lesson.title);
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
       syncQuizPanel();
+      syncLecturePanel();
+      lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
         cover: lesson.cover ?? null,
@@ -1165,6 +1207,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     dispose() {
       quizPanel?.dispose();
+      lecturePanel?.dispose();
       classExamples.dispose();
       pulseSummary.dispose();
       pulse.dispose();

@@ -62,7 +62,7 @@ async function assertLive(store, lesson, block) {
   const draft = draftLesson && !isDeletedRecord(draftLesson) ? findHinge(draftLesson.blocks, block) : null;
   const published = draft && publishedLesson ? findHinge(publishedLesson.blocks, block) : null;
   if (!draft || !published) reject(404, 'not_published', 'Publish this lesson and block before asking the class.');
-  return { draft, published, draftLesson };
+  return { draft, published, draftLesson, publishedLesson };
 }
 
 /** The draft's back-up question, if it is complete enough to ask. */
@@ -214,10 +214,29 @@ async function studentAction(store, k, activity, s, body) {
   return { ...shared, mine, ...(activity.revealed ? { correct_id: s.correct_id } : {}) };
 }
 
+/**
+ * A lecture has no teacher in the room to open a round, so each student
+ * answers alone. The right answer still comes from the draft and is sent
+ * back only after they answer.
+ *
+ *   hinge/{lesson}/{block}/solo/{device}   { pick, right, at }
+ */
+async function soloAnswer(store, lesson, block, body, { draft, published, publishedLesson }) {
+  if (publishedLesson?.pedagogical_mode !== 'lecture') reject(409, 'not_lecture', 'This question is answered with your teacher.');
+  if (!validToken(body.token)) reject(400, 'no_device', 'This browser needs to allow saving to answer.');
+  const s = setup(draft, published, 'main');
+  if (s.options.length < 2 || !s.correct_id) reject(409, 'unfinished', 'This question isn\u2019t ready yet.');
+  if (!s.options.some((o) => o.id === body.pick)) reject(400, 'bad_pick', 'Choose one of the answers.');
+  const right = body.pick === s.correct_id;
+  await store.setJSON(`hinge/${lesson}/${block}/solo/${deviceHash(body.token)}`, { pick: body.pick, right, at: new Date().toISOString() });
+  return { phase: 'solo', mine: body.pick, correct_id: s.correct_id, right };
+}
+
 export async function hingeAction(store, lesson, block, body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const teacher = opts.teacher === true;
-  const { draft, published, draftLesson } = await assertLive(store, lesson, block);
+  const { draft, published, draftLesson, publishedLesson } = await assertLive(store, lesson, block);
+  if (!teacher && body.action === 'solo') return soloAnswer(store, lesson, block, body, { draft, published, publishedLesson });
   const activeKey = keys(lesson, block, '').active;
   let activity = await read(store, activeKey);
 

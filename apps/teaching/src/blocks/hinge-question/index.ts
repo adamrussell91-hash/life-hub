@@ -2,6 +2,7 @@ import { el } from '@/blocks/peer-feedback-ui';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import { mountTeacher } from './teacher';
 import { mountStudent } from './student';
+import { mountSolo } from './solo';
 import { LETTERS, type HingeBlock } from './shared';
 import '@/blocks/peer-feedback.css';
 import './hinge-question.css';
@@ -35,6 +36,10 @@ export function renderHingeQuestion(block: HingeBlock, mode: RenderMode, ctx: Re
   }
   if (!ctx.lessonId) {
     root.append(el('p', 'pf-note block-secondary', 'Students answer from the published lesson.'));
+    return root;
+  }
+  if (mode === 'student' && ctx.lecture) {
+    root.append(mountSolo(block, ctx.lessonId, ctx.lecture === 'preview'));
     return root;
   }
   root.append(mode === 'teacher' ? mountTeacher(block, ctx.lessonId, prompt) : mountStudent(block, ctx.lessonId, prompt));

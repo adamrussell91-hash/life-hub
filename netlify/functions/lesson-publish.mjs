@@ -213,7 +213,8 @@ export function createLessonPublishHandler(deps = {}) {
       ...(draft.cover ? { cover: draft.cover } : {}),
       ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
       ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {})
+      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {}),
+      ...(!quizPublish.quiz && draft.pedagogical_mode === 'lecture' ? { pedagogical_mode: 'lecture' } : {})
     };
 
     await setJSON(store, publishedLessonKey(id), snapshot);
