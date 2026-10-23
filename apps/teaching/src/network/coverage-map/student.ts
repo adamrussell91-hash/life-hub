@@ -64,7 +64,7 @@ export function studentRoute(map: CoverageMap, input: StudentInput): StudentRout
   const took = new Set<string>();
   map.rows.forEach((row, i) => {
     if (i > now) return;
-    const side = row.lane !== 'core' || Boolean(row.option);
+    const side = row.lane !== 'core';
     if (!side || manual.has(row.id) || input.scores.has(row.id) || bySource.has(`quiz:${row.id}`)) took.add(row.id);
   });
 
