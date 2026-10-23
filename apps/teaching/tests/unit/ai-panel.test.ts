@@ -455,6 +455,34 @@ describe('mountAiPanel', () => {
     expect(handle.isWorking()).toBe(false);
   });
 
+  it('hands a meeting request for Clare to her chat in Tasks', () => {
+    writeLastAgentSlug('clare');
+    const openTasksClare = vi.fn();
+    const mounted = mountPanel({ openTasksClare });
+    handle = mounted.handle;
+
+    submitMessage(mounted.host, 'Schedule a meeting with the English faculty on Friday');
+
+    expect(openTasksClare).toHaveBeenCalledWith(
+      '/tasks/#/clare?agent=clare&send=1&prompt=Schedule%20a%20meeting%20with%20the%20English%20faculty%20on%20Friday'
+    );
+    expect(startAiJobMock).not.toHaveBeenCalled();
+    expect(mounted.host.textContent).toContain('Taking this over there now.');
+    expect(handle.isWorking()).toBe(false);
+  });
+
+  it('keeps a lesson request for Clare in Teaching', async () => {
+    writeLastAgentSlug('clare');
+    const openTasksClare = vi.fn();
+    const mounted = mountPanel({ openTasksClare });
+    handle = mounted.handle;
+
+    submitMessage(mounted.host, 'Tighten the instructions for the task in this lesson');
+
+    await vi.waitFor(() => expect(startAiJobMock).toHaveBeenCalled());
+    expect(openTasksClare).not.toHaveBeenCalled();
+  });
+
   it('does not resume an agentless job such as a voice transcription', async () => {
     listAiJobsMock.mockResolvedValue({
       jobs: [
