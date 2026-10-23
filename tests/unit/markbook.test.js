@@ -216,3 +216,12 @@ test('load reads the class’s units together', async () => {
   const waves = ['units/unit1', 'units/unit2', 'units/unit3'].map((key) => started.get(key));
   assert.equal(new Set(waves).size, 1, 'the three units go out together');
 });
+
+test('set_focus pins and dismisses tags per student', async () => {
+  const { store, bob } = await setup();
+  const { markbook } = await call(store, { action: 'set_focus', student_id: bob.id, pinned: ['tech:simile', 'tech:simile'], dismissed: ['tech:motif'] });
+  assert.deepEqual(markbook.focus[bob.id], { pinned: ['tech:simile'], dismissed: ['tech:motif'] });
+  const cleared = await call(store, { action: 'set_focus', student_id: bob.id, pinned: [], dismissed: [] });
+  assert.equal(bob.id in cleared.markbook.focus, false);
+  await assert.rejects(call(store, { action: 'set_focus', student_id: 'nobody', pinned: [] }), /class list/);
+});

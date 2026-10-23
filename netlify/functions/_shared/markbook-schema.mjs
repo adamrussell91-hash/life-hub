@@ -34,6 +34,8 @@ var HANDIN_STATUSES = ["submitted", "late", "missing", "exempt"];
 var AssessmentMarkSchema = z.object({
   criteria: z.record(z.string(), z.number().min(0, "Marks must be 0 or more.")).default({}),
   feedback: z.string().trim().max(MARKBOOK_LIMITS.feedback).optional(),
+  /** Feedback-code ids per criterion: why marks were lost. */
+  codes: z.record(z.string(), z.array(z.string().min(1).max(64)).max(8)).optional(),
   exempt: z.boolean().optional(),
   note: z.string().trim().max(MARKBOOK_LIMITS.note).optional()
 });
@@ -43,6 +45,8 @@ var MarkbookSchema = z.object({
   columns: z.array(ColumnSchema).max(MARKBOOK_LIMITS.columns).default([]),
   hidden_quizzes: z.array(z.string().min(1).max(120)).max(MARKBOOK_LIMITS.columns).default([]),
   marks: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
+  /** Per student: insight tags the teacher pinned as focus areas or dismissed. */
+  focus: z.record(z.string(), z.object({ pinned: z.array(z.string().max(120)).max(12).default([]), dismissed: z.array(z.string().max(120)).max(40).default([]) })).default({}),
   updated_at: z.string().default("")
 });
 var firstIssue = (error) => {
@@ -77,8 +81,12 @@ function checkMark(column, value) {
       if (!criterion) return { problem: "Unknown criterion." };
       if (given > criterion.max) return { problem: `Give between 0 and ${criterion.max} for ${criterion.label}.` };
     }
-    const { feedback, note, ...rest } = mark;
-    return { mark: { ...rest, ...feedback ? { feedback } : {}, ...note ? { note } : {} } };
+    for (const id of Object.keys(mark.codes ?? {})) {
+      if (!column.criteria.some((c) => c.id === id)) return { problem: "Unknown criterion." };
+    }
+    const codes = Object.fromEntries(Object.entries(mark.codes ?? {}).filter(([, list]) => list.length).map(([id, list]) => [id, [...new Set(list)]]));
+    const { feedback, note, codes: _codes, ...rest } = mark;
+    return { mark: { ...rest, ...feedback ? { feedback } : {}, ...note ? { note } : {}, ...Object.keys(codes).length ? { codes } : {} } };
   }
   if (column.kind === "handin") {
     const parsed = HandinMarkSchema.safeParse(value);
@@ -101,7 +109,9 @@ function pruneMarks(column, marks = {}) {
         const given = raw[c.id];
         if (typeof given === "number" && given >= 0 && given <= c.max) kept[c.id] = given;
       }
-      candidate = { ...mark, criteria: kept };
+      const rawCodes = mark.codes && typeof mark.codes === "object" && !Array.isArray(mark.codes) ? mark.codes : {};
+      const codes = Object.fromEntries(Object.entries(rawCodes).filter(([id]) => column.criteria.some((c) => c.id === id)));
+      candidate = { ...mark, criteria: kept, codes };
     }
     const checked = checkMark(column, candidate);
     if ("mark" in checked) out[studentId] = checked.mark;
