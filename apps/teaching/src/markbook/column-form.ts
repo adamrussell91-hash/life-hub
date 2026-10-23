@@ -1,4 +1,5 @@
 import type { SkillsContinuum } from '@/skills/schema';
+import { skillSelect } from '@/skills/select';
 import { el } from '@/quiz/dom';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { CriterionSchema, checkColumn, newMarkbookId, type Column, type Criterion } from './schema';
@@ -42,27 +43,6 @@ function labelled(text: string, control: HTMLElement): HTMLLabelElement {
   const l = el('label', 'mb-form__field');
   l.append(el('span', 'mb-form__label', text), control);
   return l;
-}
-
-/** A criterion's skill picker: none, or one sub-strand grouped by strand. Keeps a saved skill even before the list loads. */
-function skillSelect(value: string, skills: SkillsContinuum | null): HTMLSelectElement {
-  const select = el('select', 'mb-form__input mb-form__skill');
-  select.name = 'criterion-skill';
-  const none = el('option', undefined, skills ? 'No skill' : value ? value : 'Skills are loading…');
-  none.value = skills ? '' : value;
-  select.append(none);
-  for (const strand of skills?.strands ?? []) {
-    const group = el('optgroup');
-    group.label = strand.name;
-    for (const sub of strand.sub_strands) {
-      const opt = el('option', undefined, sub.name);
-      opt.value = `${strand.strand}.${sub.id}`;
-      group.append(opt);
-    }
-    select.append(group);
-  }
-  select.value = value;
-  return select;
 }
 
 export function openColumnForm(o: ColumnFormOptions): HTMLElement {
@@ -120,7 +100,8 @@ export function openColumnForm(o: ColumnFormOptions): HTMLElement {
           d[key] = fields[key].value;
         });
       }
-      const skill = skillSelect(d.skill, o.skills ?? null);
+      const skill = skillSelect(d.skill, o.skills ?? null, 'mb-form__input mb-form__skill');
+      skill.name = 'criterion-skill';
       skill.addEventListener('change', () => {
         d.skill = skill.value;
       });
