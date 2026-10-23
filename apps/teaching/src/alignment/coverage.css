@@ -412,6 +412,9 @@
 }
 
 .dots-plan__head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
   margin: 0 0 8px;
   font-size: var(--text-xs, 0.75rem);
   font-weight: 650;
@@ -428,7 +431,14 @@
   list-style: none;
 }
 
+.dots-plan__count {
+  font-weight: 500;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .dots-plan__top {
+  cursor: pointer;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -464,8 +474,62 @@
 
 .dots-plan__bullets {
   display: grid;
-  gap: 3px;
-  padding-left: 1.1em;
+  gap: 6px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.dots-plan__bullet-label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  cursor: pointer;
+}
+
+/* Text under a ticked item lines up with its name, past the box. */
+.dots-plan__item > .dots-plan__text {
+  padding-left: 26px;
+}
+
+.dots-plan__tick {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--success, #2f7a4f);
+  cursor: pointer;
+}
+
+.dots-plan__bullet-label .dots-plan__tick {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.dots-plan__item--done > .dots-plan__text {
+  opacity: 0.7;
+}
+
+.dots-plan__item--done > .dots-plan__top .dots-plan__name,
+.dots-plan__item--done > .dots-plan__bullet-label span {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+
+.lsyl__sum-plan {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cov-slate) 9%, transparent);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--cov-slate);
+}
+
+.lsyl__sum-plan--done {
+  background: color-mix(in srgb, var(--success, #2f7a4f) 14%, transparent);
+  color: var(--success, #2f7a4f);
 }
 
 .dots__menu {
