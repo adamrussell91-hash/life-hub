@@ -87,7 +87,12 @@ function persistableMessages(messages: ChatMessage[]): ChatMessage[] {
 }
 
 function hydrateTranscript(messages: ChatMessage[], random: () => number): ChatMessage[] {
-  return messages.map((msg) => {
+  // An older resume saved a user line with no text; every later send then threw on .trim().
+  const repaired = messages
+    .filter((msg) => msg && typeof msg === 'object')
+    .map((msg) => (typeof msg.text === 'string' ? msg : { ...msg, text: '' }))
+    .filter((msg) => msg.role !== 'user' || msg.text.trim());
+  return repaired.map((msg) => {
     if (msg.role === 'assistant' && msg.jobId && !msg.text.trim() && msg.agent) {
       return { ...msg, status: pickAgentWaitLine(msg.agent, { random }) };
     }
@@ -804,9 +809,11 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   async function resumeOpenJob(): Promise<void> {
     try {
       const inbox = await listAiJobs();
-      const row = inbox.jobs.find((job) => job.lesson_id === options.lessonId);
+      // The inbox also lists agentless jobs (voice transcription); only chat turns belong here.
+      const row = inbox.jobs.find((job) => job.lesson_id === options.lessonId && job.agent);
       if (!row) return;
       const job = await pollAiJob(row.id);
+      if (!job.agent || typeof job.message !== 'string' || !job.message.trim()) return;
       if (messages.some((msg) => msg.jobId === job.id)) return;
       messages.push({ id: nextMsgId(), role: 'user', text: job.message });
       const assistantId = nextMsgId();
@@ -882,17 +889,17 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
     abort?.abort();
     abort = new AbortController();
 
-    const history = messages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .slice(0, -1)
-      .filter((m) => m.text.trim())
-      .slice(-12)
-      .map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.text
-      }));
-
     try {
+      // Built inside the try so a bad transcript line clears the wait line instead of freezing Send.
+      const history = messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .slice(0, -1)
+        .filter((m) => typeof m.text === 'string' && m.text.trim())
+        .slice(-12)
+        .map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.text
+        }));
       await runAgentJob(
         trimmed,
         userId,
