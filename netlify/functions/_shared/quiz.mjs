@@ -101,7 +101,7 @@ function publicSettings(settings) {
   };
 }
 
-function mapTree(blocks, fn) {
+export function mapTree(blocks, fn) {
   return (Array.isArray(blocks) ? blocks : []).flatMap((block) => {
     const next = fn(block);
     if (!next) return [];
