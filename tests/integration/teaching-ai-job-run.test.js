@@ -12,6 +12,7 @@ import {
   runStoredLessonJob
 } from '../../netlify/functions/_shared/teaching-ai-job-run.mjs';
 import { aiJobKey, aiJobsInboxKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
+import { createLessonToolRunner } from '../../netlify/functions/_shared/teaching-lesson-tools.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -212,7 +213,7 @@ test('the runner finishes a job with a checked quiz proposal, cost and a usage l
 
 test('Ann lists the unit\'s lessons with their dates and reads an earlier one in full', async () => {
   const earlier = {
-    ...lesson, id: 'lesson_0', title: 'Samuel Wagan Watson', sequence: 0,
+    ...lesson, id: 'lesson_0', title: 'Samuel Wagan Watson', sequence: 0, outcome_ids: ['out_1'], dot_points: ['poetry:U1'],
     blocks: [{ ...heading, id: 'b_poet', content: { text: 'Who is Samuel Wagan Watson?' } },
       { ...heading, id: 'b_def', block_type: 'rich_text', content: { html: '<p>Defamiliarisation makes the <strong>familiar</strong> strange.</p>' } }]
   };
@@ -220,6 +221,7 @@ test('Ann lists the unit\'s lessons with their dates and reads an earlier one in
     ...seed(),
     'lessons/lesson_0': earlier,
     'lessons/lesson_gone': { ...lesson, id: 'lesson_gone', status: 'trashed' },
+    'outcomes/out_1': { id: 'out_1', status: 'active', code: 'EN-1', description: 'Responds to texts with invented wording' },
     'units/unit_1': { id: 'unit_1', type: 'unit', title: 'Poetry', status: 'active', year_id: 'y10', lesson_ids: ['lesson_0', 'lesson_gone', 'lesson_1'] },
     'units/unit_2': { id: 'unit_2', type: 'unit', title: 'Novel study', status: 'active', year_id: 'y10', lesson_ids: [] },
     'units/unit_9': { id: 'unit_9', type: 'unit', title: 'Year 7 unit', status: 'active', year_id: 'y7', lesson_ids: [] },
@@ -255,6 +257,10 @@ test('Ann lists the unit\'s lessons with their dates and reads an earlier one in
   assert.equal(reading.unit, 'Poetry');
   assert.match(reading.text, /\[heading\] Who is Samuel Wagan Watson\?/);
   assert.match(reading.text, /\[rich_text\] Defamiliarisation makes the familiar strange\./);
+
+  assert.deepEqual(listing.lessons[0].dot_points, ['poetry:U1']);
+  assert.deepEqual(reading.syllabus.outcomes, ['EN-1: Responds to texts with invented wording']);
+  assert.deepEqual(reading.syllabus.dot_points, [{ ref: 'poetry:U1' }], 'without the alignment the ref still shows');
 
   assert.equal(results[2].is_error, true);
   assert.match(results[2].content, /unavailable/);
@@ -332,4 +338,25 @@ test('the Claude call streams, sends effort, caching and the Sonnet fallback, an
   );
   assert.equal(sent[1].lane, 'fast');
   assert.equal(sent[1].params.fallbacks, undefined);
+});
+
+test('read_lesson gives each dot point its syllabus wording, outcomes and closely linked concepts', async () => {
+  const alignment = {
+    outcomes: [{ n: 1, code: 'O-1', text: 'Invented outcome one' }, { n: 2, code: 'O-2', text: 'Invented outcome two' }],
+    concepts: [{ key: 'PER', name: 'Perspective', head: 'h', bullets: [{ n: 1, text: 'Invented bullet', adv: false }, { n: 2, text: 'Loose bullet', adv: false }] }],
+    focus_areas: [{ id: 'poetry', name: 'Invented focus area', points: [{
+      id: 'U1', kind: 'U', short: 's', text: 'Invented dot point wording',
+      outcomes: [{ n: 2, link: 'shared' }], concepts: [{ ref: 'PER1', link: 'shared' }, { ref: 'PER2', link: 'related' }], processes: []
+    }] }]
+  };
+  const taught = { ...lesson, id: 'lesson_0', dot_points: ['poetry:U1', 'poetry:U9'] };
+  const store = memoryStore({ 'lessons/lesson_0': taught });
+  const run = createLessonToolRunner({ store, lesson, alignment: async () => alignment });
+  const reading = await run('read_lesson', { id: 'lesson_0' });
+  assert.deepEqual(reading.syllabus.dot_points, [
+    { ref: 'poetry:U1', focus_area: 'Invented focus area', dot_point: 'Invented dot point wording', outcomes: ['O-2: Invented outcome two'], concepts: ['PER1: Invented bullet'] },
+    { ref: 'poetry:U9' }
+  ]);
+  const later = await run('read_lesson', { id: 'lesson_0', offset: 5 });
+  assert.equal(later.syllabus, undefined, 'the syllabus comes with the first page only');
 });

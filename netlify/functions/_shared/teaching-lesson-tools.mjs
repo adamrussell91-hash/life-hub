@@ -1,5 +1,6 @@
 import { isDeletedRecord, withoutDeleted } from './record-liveness.mjs';
-import { draftLessonKey, getJSON, listJSON, SCHEDULED_LESSON_PREFIX, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
+import { draftLessonKey, getJSON, listJSON, outcomeKey, SCHEDULED_LESSON_PREFIX, UNIT_PREFIX, unitKey } from './teaching-blobs.mjs';
+import { loadAlignment } from './syllabus-alignment.mjs';
 import { childBlocks, editableFields } from '../../../packages/alchemy/patches.js';
 
 /** One read_lesson call returns this much text; pass offset to continue. */
@@ -20,7 +21,7 @@ export const LESSON_TOOLS = [
   },
   {
     name: 'read_lesson',
-    description: `Read one of Adam's lessons in full: every block's text in order, with its block type (${LESSON_READ_CHARS.toLocaleString('en-AU')} characters per call; pass offset to continue). This is what was taught, so ground a review in it before notes or the web. Read-only.`,
+    description: `Read one of Adam's lessons in full: its syllabus (the dot points it teaches, with their wording, outcomes and concepts, and its outcomes) and every block's text in order, with its block type (${LESSON_READ_CHARS.toLocaleString('en-AU')} characters per call; pass offset to continue). This is what was taught, so ground a review in it before notes or the web. Read-only.`,
     input_schema: { type: 'object', additionalProperties: false, required: ['id'], properties: {
       id: { type: 'string', description: 'A lesson id from list_lessons.' },
       offset: { type: 'integer', minimum: 0 }
@@ -61,9 +62,42 @@ export function lessonReadingText(lesson) {
   return lines.join('\n');
 }
 
-/** Runs list_lessons and read_lesson against the content store, loading the timetable once per job. */
-export function createLessonToolRunner({ store, lesson }) {
+/** A dot point ref ("area:U2") as its syllabus wording: the point, its outcomes and its closely linked concept bullets. */
+export function dotPointSyllabus(doc, ref) {
+  const [areaId, pointId] = String(ref).split(':');
+  const area = doc?.focus_areas?.find(f => f.id === areaId);
+  const point = area?.points.find(p => p.id === pointId);
+  if (!point) return { ref };
+  const outcomes = point.outcomes
+    .map(o => doc.outcomes.find(row => row.n === o.n))
+    .filter(Boolean)
+    .map(o => `${o.code}: ${o.text}`);
+  const concepts = point.concepts
+    .filter(c => c.link === 'shared')
+    .map(c => {
+      const key = c.ref.replace(/\d+$/, '');
+      const bullet = doc.concepts.find(row => row.key === key)?.bullets.find(b => b.n === Number(c.ref.slice(key.length)));
+      return bullet ? `${c.ref}: ${bullet.text}` : null;
+    })
+    .filter(Boolean);
+  return { ref, focus_area: area.name, dot_point: point.text, outcomes, ...(concepts.length ? { concepts } : {}) };
+}
+
+/** Runs list_lessons and read_lesson against the content store, loading the timetable and syllabus once per job. */
+export function createLessonToolRunner({ store, lesson, alignment = () => loadAlignment(store) }) {
   let scheduled = null;
+  let syllabus = null;
+  const syllabusFor = async row => {
+    syllabus ??= Promise.resolve().then(alignment).catch(() => null);
+    const doc = await syllabus;
+    const dotPoints = (row.dot_points ?? []).map(ref => dotPointSyllabus(doc, ref));
+    const outcomes = (await Promise.all((row.outcome_ids ?? []).map(id => getJSON(store, outcomeKey(id)).catch(() => null))))
+      .filter(o => o && !isDeletedRecord(o))
+      .map(o => `${o.code}: ${o.description}`);
+    const codes = row.syllabus_outcomes ?? [];
+    if (!dotPoints.length && !outcomes.length && !codes.length) return null;
+    return { ...(dotPoints.length ? { dot_points: dotPoints } : {}), ...(outcomes.length ? { outcomes } : {}), ...(codes.length ? { outcome_codes: codes } : {}) };
+  };
   const datesFor = async () => {
     scheduled ??= withoutDeleted(await listJSON(store, SCHEDULED_LESSON_PREFIX).catch(() => []));
     return lessonId => [...new Set(scheduled.filter(row => row.lesson_id === lessonId && row.delivery_status !== 'skipped').map(row => row.date))].sort();
@@ -88,6 +122,7 @@ export function createLessonToolRunner({ store, lesson }) {
             title: row.title,
             type: row.pedagogical_mode === 'quiz' ? 'quiz' : 'lesson',
             dates: dates(row.id),
+            ...(row.dot_points?.length ? { dot_points: row.dot_points } : {}),
             ...(row.id === lesson.id ? { this_lesson: true } : {})
           }));
         const units = withoutDeleted(await listJSON(store, UNIT_PREFIX).catch(() => []));
@@ -108,11 +143,13 @@ export function createLessonToolRunner({ store, lesson }) {
         const offset = Math.max(0, Number.parseInt(input.offset, 10) || 0);
         const end = offset + LESSON_READ_CHARS;
         const unit = await liveUnit(other.unit_id);
+        const taught = offset === 0 ? await syllabusFor(other) : null;
         return {
           id: other.id,
           title: other.title,
           ...(unit ? { unit: unit.title } : {}),
           dates: (await datesFor())(other.id),
+          ...(taught ? { syllabus: taught } : {}),
           text: text.slice(offset, end),
           ...(end < text.length ? { more_from: end } : {})
         };
