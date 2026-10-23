@@ -67,6 +67,9 @@ import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd'
 import { createTeacherClassExamples } from '@/class-examples/teacher';
 import { mountQuizPanel, type QuizPanelHandle } from '@/quiz/teacher-panel';
 import { createLectureEditorTools } from '@/lecture/editor-tools';
+import { mountTutorialBoard, type TutorialBoardHandle } from '@/tutorial/board';
+import { tutorialTeacherApi } from '@/tutorial/api';
+import { createTutorialTabs, inTab, movedGroups } from '@/tutorial/editor-tabs';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -995,6 +998,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     banner.update({ eyebrow: PEDAGOGICAL_MODE_LABELS[pedagogical_mode] });
     syncQuizPanel();
     syncLecturePanel();
+    syncTutorialPanel();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
   });
@@ -1073,8 +1077,42 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     lectureHost.hidden = !isLecture;
   }
 
+  // A lesson set to Tutorial gets its board (groups, live board) and the part tabs.
+  // Editor only: Focus view and student pages never mount this page.
+  const tutorialHost = document.createElement('div');
+  tutorialHost.className = 'lesson-page__tutorial';
+  let tutorialBoard: TutorialBoardHandle | null = null;
+  let tutorialTabs: ReturnType<typeof createTutorialTabs> | null = null;
+  function syncTutorialPanel(): void {
+    const isTutorial = resolvePedagogicalMode(lesson.pedagogical_mode) === 'tutorial';
+    if (isTutorial && !tutorialBoard) {
+      tutorialBoard = mountTutorialBoard({
+        getLesson: () => lesson,
+        api: tutorialTeacherApi(lesson.id),
+        // The server has already written the move into the draft. The editor
+        // sends its whole lesson on every save, so it takes the new groups too:
+        // otherwise the next autosave would put the student back.
+        onMoved: (summary) => {
+          if (!lesson.tutorial) return;
+          emitLesson({ ...lesson, tutorial: movedGroups(lesson.tutorial, summary) });
+          tutorialTabs?.repaint();
+        }
+      });
+      tutorialTabs = createTutorialTabs({ getLesson: () => lesson, onTab: () => canvas.update(lesson.blocks, media) });
+      tutorialHost.append(tutorialBoard.root, tutorialTabs.root);
+      void tutorialBoard.refresh();
+    } else if (!isTutorial && tutorialBoard) {
+      tutorialBoard.dispose();
+      tutorialBoard = null;
+      tutorialTabs = null;
+      tutorialHost.replaceChildren();
+    }
+    tutorialTabs?.repaint();
+    tutorialHost.hidden = !isTutorial;
+  }
+
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, quizHost, lectureHost, canvasHost);
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1097,6 +1135,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
   const canvas = mountBlockCanvas(canvasHost, {
     decorateRow: (row, block) => {
+      // Tabs hide page-level rows only; what's inside a section is left alone.
+      if (tutorialTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inTab(block, tutorialTabs.current());
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
       lectureTools.decorate(row, block);
@@ -1124,6 +1164,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
 
   syncQuizPanel();
   syncLecturePanel();
+  syncTutorialPanel();
+  if (tutorialTabs) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
   const syllabus = mountLessonSyllabus(document.createElement('div'));
@@ -1219,6 +1261,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
       syncQuizPanel();
       syncLecturePanel();
+      syncTutorialPanel();
       lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
@@ -1241,6 +1284,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     dispose() {
       quizPanel?.dispose();
       lecturePanel?.dispose();
+      tutorialBoard?.dispose();
+      tutorialBoard = null;
       classExamples.dispose();
       pulseSummary.dispose();
       pulse.dispose();

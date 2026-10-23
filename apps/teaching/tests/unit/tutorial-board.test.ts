@@ -276,6 +276,58 @@ describe('tutorial board', () => {
     handle.dispose();
   });
 
+  it('skips the poll while an action is out, so the board isn’t redrawn under it', async () => {
+    vi.useFakeTimers();
+    const a = api();
+    const wait = deferred<TutorialSummary>();
+    a.done = vi.fn(() => wait.promise);
+    const handle = mountTutorialBoard({ getLesson: lesson, api: a });
+    await handle.refresh();
+    (handle.root.querySelector('.tut-card__sit') as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(0);
+    const done = handle.root.querySelector<HTMLButtonElement>('.tut-live__done')!;
+    done.click();
+    const boards = vi.mocked(a.board).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(12000);
+    expect(vi.mocked(a.board).mock.calls.length).toBe(boards);
+    expect(handle.root.querySelector('.tut-live__done')).toBe(done);
+    expect(done.disabled).toBe(true);
+    wait.resolve(summary());
+    await vi.advanceTimersByTimeAsync(0);
+    const summaries = vi.mocked(a.summary).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(vi.mocked(a.summary).mock.calls.length).toBeGreaterThan(summaries);
+    handle.dispose();
+  });
+
+  it('a poll that comes back while an action is out doesn’t redraw the board or the cards', async () => {
+    vi.useFakeTimers();
+    const a = api();
+    const handle = mountTutorialBoard({ getLesson: lesson, api: a });
+    await handle.refresh();
+    (handle.root.querySelector('.tut-card__sit') as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(0);
+    const late = deferred<LiveBoard>();
+    a.board = vi.fn(() => late.promise);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(a.board).toHaveBeenCalledTimes(1);
+    const moving = deferred<TutorialSummary>();
+    a.move = vi.fn(() => moving.promise);
+    const pill = handle.root.querySelector<HTMLButtonElement>('.tut-live__move .hub-pills__btn')!;
+    const sit = handle.root.querySelector<HTMLButtonElement>('.tut-card__sit')!;
+    pill.click();
+    late.resolve(board());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(handle.root.querySelector('.tut-live__move .hub-pills__btn')).toBe(pill);
+    expect(pill.disabled).toBe(true);
+    expect(handle.root.querySelector('.tut-card__sit')).toBe(sit);
+    a.board = vi.fn(async () => board());
+    moving.resolve(summary());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(handle.root.querySelector('.tut-live__move .hub-pills__btn')).not.toBe(pill);
+    handle.dispose();
+  });
+
   it('a poll error clears on the next good fetch, and leaves an action’s error alone', async () => {
     vi.useFakeTimers();
     const a = api();

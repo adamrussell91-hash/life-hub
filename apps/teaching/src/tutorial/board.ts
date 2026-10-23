@@ -78,6 +78,11 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
   let ticks = 0;
   let seq = 0;
   let disposed = false;
+  /**
+   * Actions in flight. While any is out, polls don't repaint: a poll could
+   * otherwise redraw the board with live buttons under a pending action.
+   */
+  let busy = 0;
   /** An action's error stays until an action succeeds; a poll's error until a poll succeeds. */
   let actionError = '';
   let pollError = '';
@@ -124,17 +129,19 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
   }
   async function tick(): Promise<void> {
     if (disposed || !visible()) return;
+    // The action repaints when it lands; look again on the next tick.
+    if (busy > 0) return schedule();
     if (open) {
       ticks += 1;
       if (ticks % SUMMARY_EVERY === 0) await pollSummary();
-      await paintLive();
+      await paintLive(true);
     } else await pollSummary();
     schedule();
   }
   async function pollSummary(): Promise<void> {
     try {
       const next = await options.api.summary();
-      if (disposed) return;
+      if (disposed || busy > 0) return;
       pollOk();
       useSummary(next);
     } catch (e) {
@@ -147,7 +154,7 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
     void (async () => {
       window.clearTimeout(timer);
       await pollSummary();
-      if (open) await paintLive();
+      if (open) await paintLive(true);
       schedule();
     })();
   };
@@ -156,9 +163,11 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
   /** Disables the controls while their request is out, so a second press can't send it twice. */
   async function locked(controls: HTMLButtonElement[], run: () => Promise<void>): Promise<void> {
     for (const c of controls) c.disabled = true;
+    busy += 1;
     try {
       await run();
     } finally {
+      busy -= 1;
       for (const c of controls) c.disabled = false;
     }
   }
@@ -249,10 +258,10 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
     return entry.ticked;
   }
 
-  /** Fetches and draws the live board. Timing is schedule()'s job. */
-  async function paintLive(): Promise<void> {
+  /** Fetches and draws the live board. Timing is schedule()'s job. A poll's paint gives way to an action in flight. */
+  async function paintLive(fromPoll = false): Promise<void> {
+    if (disposed || (fromPoll && busy > 0)) return;
     const mine = ++seq;
-    if (disposed) return;
     if (!open) return void live.replaceChildren();
     // Don't repaint under the teacher's typing; the next tick looks again.
     const focused = document.activeElement;
@@ -264,7 +273,7 @@ export function mountTutorialBoard(options: TutorialBoardOptions): TutorialBoard
       if (mine === seq && !disposed) failPoll(e);
       return;
     }
-    if (disposed || mine !== seq || open !== board.group.id) return;
+    if (disposed || mine !== seq || open !== board.group.id || (fromPoll && busy > 0)) return;
     pollOk();
     const group = board.group;
     const seenAt = summary?.groups.find((g) => g.id === group.id)?.seen_at ?? null;
