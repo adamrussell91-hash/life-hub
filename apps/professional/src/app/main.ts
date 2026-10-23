@@ -26,6 +26,7 @@ import '../styles/block-page.css';
 import '../styles/comm-page.css';
 import '../styles/thread-page.css';
 import '../styles/meeting-page.css';
+import '../styles/guides.css';
 import '../styles/event-page.css';
 
 import { clearScheduleReadCache } from '@/api/client';
