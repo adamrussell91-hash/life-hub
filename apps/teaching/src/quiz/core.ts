@@ -122,7 +122,9 @@ const base = {
   explanation: OptionalText(QUIZ_LIMITS.explanation),
   image: QuizImageSchema.optional(),
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
-  outcomes: z.array(z.string().min(1).max(64)).max(8).optional()
+  outcomes: z.array(z.string().min(1).max(64)).max(8).optional(),
+  /** Skills-continuum sub-strands, `strand.sub`, for insights. */
+  skills: z.array(z.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, 'Pick a skill from the list.')).max(8).optional()
 };
 
 export const QuizQuestionSchema = z
@@ -486,6 +488,9 @@ export type QuestionKey = {
   hint?: string;
   explanation?: string;
   outcomes?: string[];
+  skills?: string[];
+  /** Public option id → technique catalogue id, for technique questions. */
+  techniques?: Record<string, string>;
   answer:
     | { type: 'choice'; ids: string[] }
     | { type: 'boolean'; value: boolean }
@@ -532,6 +537,13 @@ function idMaker(random: Random): () => string {
   };
 }
 
+/** Each public option's technique, for the options that name one. */
+function techniquesOf(options: ReadonlyArray<{ id: string; technique_id?: string }>, ids: Map<string, string>): { techniques?: Record<string, string> } {
+  const map: Record<string, string> = {};
+  for (const o of options) if (o.technique_id) map[ids.get(o.id) as string] = o.technique_id;
+  return Object.keys(map).length ? { techniques: map } : {};
+}
+
 /**
  * Splits a full question into what students see and the key that marks it.
  * Every option, item and pin gets a fresh random id, and anything whose
@@ -553,7 +565,8 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
     marks: q.marks,
     ...(q.hint?.trim() ? { hint: q.hint.trim() } : {}),
     ...(q.explanation?.trim() ? { explanation: q.explanation.trim() } : {}),
-    ...(q.outcomes?.length ? { outcomes: [...q.outcomes] } : {})
+    ...(q.outcomes?.length ? { outcomes: [...q.outcomes] } : {}),
+    ...(q.skills?.length ? { skills: [...q.skills] } : {})
   };
 
   switch (q.kind) {
@@ -564,7 +577,10 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
       const ids = new Map(q.options.map((o) => [o.id, fresh()]));
       const options = shuffled(q.options, random).map((o) => ({ id: ids.get(o.id) as string, text: o.text }));
       const question = { ...head, kind: q.kind, options, ...(q.kind === 'quote_technique' ? { quote: q.quote } : {}) } as PublicQuestion;
-      return { question, key: { ...keyHead, answer: { type: 'choice', ids: q.correct.map((id) => ids.get(id) as string) } } };
+      return {
+        question,
+        key: { ...keyHead, ...(q.kind === 'quote_technique' ? techniquesOf(q.options, ids) : {}), answer: { type: 'choice', ids: q.correct.map((id) => ids.get(id) as string) } }
+      };
     }
     case 'true_false':
       return { question: { ...head, kind: 'true_false' }, key: { ...keyHead, answer: { type: 'boolean', value: q.answer } } };
@@ -650,7 +666,7 @@ export function splitQuestion(q: QuizQuestion, random: Random = Math.random): { 
       const pick = Math.min(q.find ?? targets.length, targets.length);
       return {
         question: { ...head, kind: 'spot_technique', passage: q.passage, options, pick },
-        key: { ...keyHead, answer: { type: 'spots', passage: q.passage, targets, pick } }
+        key: { ...keyHead, ...techniquesOf(q.options, ids), answer: { type: 'spots', passage: q.passage, targets, pick } }
       };
     }
     case 'label_image': {
@@ -856,7 +872,7 @@ export function markResponse(key: QuestionKey, response: unknown): MarkResult {
   }
 }
 
-function spotList(v: unknown): Spot[] {
+export function spotList(v: unknown): Spot[] {
   if (!Array.isArray(v)) return [];
   const at = (n: unknown) => (typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 5000 ? n : null);
   return v.flatMap((x) => {
