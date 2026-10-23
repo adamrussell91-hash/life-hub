@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createLessonPublishHandler } from '../../netlify/functions/lesson-publish.mjs';
 import { prepareTutorialPublish } from '../../netlify/functions/_shared/tutorial.mjs';
+import { filterBlocksForStudent } from '../../netlify/functions/_shared/teaching-student.mjs';
 
 const block = (id, block_type, content = {}, visibility = 'student_teacher') => ({ id, type: 'block', block_type, variant: 'medium', visibility, content });
 const mc = (id) => block(id, 'quiz_question', { question: { id, kind: 'multiple_choice', prompt: `Q ${id}`, marks: 1, options: [{ id: 'a', text: 'Right' }, { id: 'b', text: 'Wrong' }], correct: ['a'] } });
@@ -112,4 +113,15 @@ test('publishing a tutorial draft stores Common publicly, tabs and the exit key 
   const record = Object.entries(data).find(([k]) => k.startsWith('quiz/tut1/') && k !== 'quiz/tut1/current')[1];
   assert.equal(record.version, current.version);
   assert.deepEqual(record.groups, { st_ann: ['qa1'], st_cy: ['qb1', 'qb2'] });
+});
+
+test("a group's teacher note (its notes from planning) never reaches students", () => {
+  const note = block('n1', 'teacher_note', { title: 'What to build', html: '<p>Private plan for this group</p>' }, 'teacher_only');
+  const withNote = blocks.map((b) => (b.id === 'tA' ? { ...b, content: { ...b.content, blocks: [note, ...b.content.blocks] } } : b));
+  const noted = { ...draft, tutorial: { ...draft.tutorial, groups: draft.tutorial.groups.map((g) => ({ ...g, notes: 'Private plan for this group' })) } };
+  const out = prepareTutorialPublish(noted, filterBlocksForStudent(withNote, { keepQuizQuestions: true }));
+  const shipped = JSON.stringify([out.common, out.tabs]);
+  assert.ok(!shipped.includes('Private plan'));
+  assert.ok(!shipped.includes('teacher_note'));
+  assert.deepEqual(out.tabs.groups[0].blocks.map((b) => b.id), ['f1', 'w1']);
 });

@@ -62,3 +62,12 @@ test('tutorial settings are ignored on a lesson that is not a tutorial', async (
   assert.equal('tutorial' in record, false);
   assert.deepEqual(record.blocks, []);
 });
+
+test('more than 40 starting blocks are refused', async () => {
+  const store = fixture();
+  const blocks = Array.from({ length: 41 }, (_, i) => shell(`h${i}`, 'heading', { text: `H${i}` }));
+  await assert.rejects(createLessonRecord(store, { title: 'Big', unit_id: 'unit1', pedagogical_mode: 'tutorial', blocks }), (e) => e.status === 400);
+  assert.equal(store.data.size, 3);
+  const ok = await createLessonRecord(store, { title: 'Forty', unit_id: 'unit1', blocks: blocks.slice(0, 40) });
+  assert.equal(ok.blocks.length, 40);
+});
