@@ -19,6 +19,11 @@ import { mountQuestionPlayer } from '@/quiz/player';
 import { spanText } from '@/quiz/word-picker';
 import { formatCode, keySummary, meter, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
 import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
+import { httpInsightApi, isInsight, type InsightApi, type InsightReply } from '@/evidence/api';
+import { loadInsightContext, type InsightContext } from '@/evidence/context';
+import type { InsightPayload } from '@/evidence/types';
+import { renderQuizInsight } from '@/evidence/views/quiz-insight';
+import { navigate } from '@/app/router';
 import './quiz.css';
 
 /**
@@ -35,6 +40,8 @@ export type QuizPanelOptions = {
   onAddBlocks: (blocks: Block[]) => void;
   onRemoveBlock: (blockId: string) => void;
   idFactory: () => string;
+  /** Test seam for the insight calls; defaults to the quiz endpoint. */
+  insightApi?: InsightApi;
 };
 
 export type QuizPanelHandle = { root: HTMLElement; update(lesson: Lesson): void; dispose(): void };
@@ -97,12 +104,49 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
   let live: LiveQuiz | null = null;
   let disposed = false;
   let timer: number | undefined;
+  const insightApi = options.insightApi ?? httpInsightApi;
+  let insight: InsightPayload | null = null;
+  let compareInsight: InsightPayload | null = null;
+  const followInsights = new Map<string, InsightPayload>();
+  /** Which class and compare/follow-up ids the cached side insights were loaded for. */
+  let sideKey = '';
+  let classes: Array<{ id: string; title: string }> | null = null;
+  let insightClass: string | null = null;
+  let ctx: InsightContext | null = null;
 
   const post = <T>(body: Record<string, unknown>) => apiPost<T>(endpoint, body);
   const showError = (error: unknown) => {
     alert.textContent = errorText(error);
     alert.hidden = false;
   };
+
+  /**
+   * Insights for the chosen class. The context and class list load once; the
+   * insight reloads with each results poll. The Compare with quiz and follow-ups
+   * reload only when the class or their ids change, so polls stay one call.
+   */
+  async function loadInsight(force = false): Promise<void> {
+    if (!classes) {
+      classes = (await insightApi.classes(lessonId)).classes;
+      insightClass = classes[0]?.id ?? null;
+    }
+    const reply: InsightReply = await insightApi.load(lessonId, insightClass);
+    insight = isInsight(reply) ? reply : null;
+    if (insight) ctx ??= await loadInsightContext();
+    const key = JSON.stringify([insightClass, insight?.compare_with ?? null, (insight?.follow_ups ?? []).map((f) => f.lesson_id)]);
+    if (!force && key === sideKey) return;
+    sideKey = key;
+    compareInsight = null;
+    followInsights.clear();
+    if (insight?.compare_with) {
+      const other = await insightApi.load(insight.compare_with, insightClass).catch(() => null);
+      compareInsight = isInsight(other) ? other : null;
+    }
+    for (const f of insight?.follow_ups ?? []) {
+      const reply2 = await insightApi.load(f.lesson_id, insightClass).catch(() => null);
+      if (isInsight(reply2)) followInsights.set(f.lesson_id, reply2);
+    }
+  }
 
   const TAB_LABELS: Record<Tab, string> = { tray: 'From students', settings: 'Settings', results: 'Results', live: 'Live' };
   function paintTabs(): void {
@@ -139,7 +183,16 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     try {
       let data: unknown;
       if (tab === 'tray') data = submissions = (await post<{ submissions: Submission[] }>({ action: 'submissions' })).submissions;
-      else if (tab === 'results' && !openAttempt) data = results = await post<Results>({ action: 'results' });
+      else if (tab === 'results' && !openAttempt) {
+        results = await post<Results>({ action: 'results' });
+        // A failed insight must not hide the results underneath it.
+        try {
+          await loadInsight();
+        } catch (error) {
+          showError(error);
+        }
+        data = [results, insight, compareInsight?.built_at ?? null, [...followInsights.values()].map((f) => f.built_at)];
+      }
       else if (tab === 'live') data = live = (await post<{ live: LiveQuiz | null }>({ action: 'live_status' })).live;
       else return;
       paintTabs();
@@ -457,6 +510,23 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     closes.value = raw.closes_at ? toLocalInput(raw.closes_at) : '';
     closes.addEventListener('change', () => save({ closes_at: closes.value ? new Date(closes.value).toISOString() : undefined }));
     grid.append(labelled('Closes', closes, 'Also stops new questions arriving from Question drop blocks.'));
+    const siblings = insight?.siblings ?? [];
+    const current = raw.compare_with ?? '';
+    const compareOptions = [{ value: '', label: 'None' }, ...siblings.map((x) => ({ value: x.lesson_id, label: x.title }))];
+    if (current && !siblings.some((x) => x.lesson_id === current)) compareOptions.push({ value: current, label: 'An earlier quiz' });
+    const compareWith = select(compareOptions, current);
+    compareWith.addEventListener('change', () => save({ compare_with: compareWith.value || undefined }));
+    grid.append(
+      labelled(
+        'Compare with',
+        compareWith,
+        siblings.length ? 'Results shows before and after against this quiz. No republish needed.' : 'Open Results once to list this unit’s other quizzes.'
+      )
+    );
+    if (raw.for_students?.length) {
+      const n = raw.for_students.length;
+      grid.append(el('p', 'qz-note block-secondary', `For ${n} ${n === 1 ? 'student' : 'students'} only (a follow-up quiz).`));
+    }
     wrap.append(grid);
 
     const toggles = el('div', 'qz-settings__toggles');
@@ -513,12 +583,13 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       );
     }
     wrap.append(top);
+    if (insight && ctx) wrap.append(...insightSection(insight, ctx));
     if (!total) {
       wrap.append(el('p', 'qz-note block-secondary', 'No one has finished the quiz yet. This updates by itself.'));
       return wrap;
     }
 
-    wrap.append(el('h4', 'qz-h', 'By question'));
+    wrap.append(el('h4', 'qz-h', 'Answers by question'));
     const qs = el('ol', 'qz-qstats');
     for (const q of r.questions) qs.append(questionStat(q));
     wrap.append(qs);
@@ -559,6 +630,52 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     );
     wrap.append(foot);
     return wrap;
+  }
+
+  function insightSection(p: InsightPayload, context: InsightContext): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    if ((classes?.length ?? 0) > 1) {
+      const pick = select((classes ?? []).map((c) => ({ value: c.id, label: c.title })), insightClass ?? '');
+      pick.addEventListener('change', async () => {
+        insightClass = pick.value || null;
+        try {
+          await loadInsight();
+        } catch (error) {
+          showError(error);
+        }
+        paint();
+      });
+      out.push(labelled('Class', pick, 'Insights use each student’s first attempt.'));
+    }
+    const act = (run: () => Promise<InsightReply>) => async () => {
+      try {
+        const reply = await run();
+        insight = isInsight(reply) ? reply : insight;
+      } catch (error) {
+        showError(error);
+      }
+      paint();
+    };
+    out.push(
+      renderQuizInsight(p, {
+        ctx: context,
+        compare: compareInsight,
+        followUps: followInsights,
+        onClose: act(() => insightApi.close(lessonId, insightClass)),
+        onReopen: act(() => insightApi.reopen(lessonId, insightClass)),
+        onDismiss: async (flag) => {
+          try {
+            const { dismissed } = await insightApi.dismiss(lessonId, flag.id);
+            if (insight) insight = { ...insight, dismissed };
+          } catch (error) {
+            showError(error);
+          }
+          paint();
+        },
+        openLesson: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+      })
+    );
+    return out;
   }
 
   function questionStat(q: QuestionStats): HTMLElement {
