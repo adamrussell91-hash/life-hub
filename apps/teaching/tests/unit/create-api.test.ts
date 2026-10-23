@@ -157,6 +157,41 @@ describe('POST create endpoints (mock)', () => {
     expect(unit.lesson_ids).toEqual([...beforeUnit.lesson_ids, body.data.id]);
   });
 
+  it('POST /api/lessons places a follow-up after its lesson and keeps quiz settings', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    const res = await api.request('POST', '/api/lessons', {
+      cookie,
+      body: { title: 'Follow-up', unit_id: UNIT_ID, pedagogical_mode: 'quiz', after_lesson_id: 'lesson_aotfw_001', quiz: { confidence: true } }
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.data.sequence).toBe(1.5);
+    expect(body.data.quiz).toEqual({ confidence: true });
+    const curriculum = await (await api.request('GET', '/api/curriculum', { cookie })).json();
+    const unit = curriculum.data.units.find((row: Unit) => row.id === UNIT_ID);
+    expect(unit.lesson_ids.slice(0, 3)).toEqual(['lesson_aotfw_001', body.data.id, 'lesson_aotfw_002']);
+  });
+
+  it('POST /api/lessons rejects a bad mode and a missing unit', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    expect((await api.request('POST', '/api/lessons', { cookie, body: { title: 'X', unit_id: UNIT_ID, pedagogical_mode: 'nope' } })).status).toBe(400);
+    expect((await api.request('POST', '/api/lessons', { cookie, body: { title: 'X', unit_id: 'unit_missing' } })).status).toBe(404);
+    expect((await api.request('POST', '/api/lessons', { cookie, body: { unit_id: UNIT_ID } })).status).toBe(400);
+  });
+
+  it('GET /api/feedback-codes serves the default codes', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+    expect((await api.request('GET', '/api/feedback-codes')).status).toBe(401);
+    const res = await api.request('GET', '/api/feedback-codes', { cookie });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.codes.length).toBeGreaterThan(0);
+    expect(body.data.codes.some((c: { id: string }) => c.id === 'comp_ts')).toBe(true);
+  });
+
   it('POST /api/scope-sequences creates scope and links subject', async () => {
     const api = freshApi();
     const cookie = await signIn(api);
