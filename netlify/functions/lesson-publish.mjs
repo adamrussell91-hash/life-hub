@@ -20,6 +20,7 @@ import {
 import { attachedOutcomeIds, filterBlocksForStudent, sanitizeBlocksDeep } from './_shared/teaching-student.mjs';
 import { materialiseLinkedCompositions } from './_shared/composition-blocks.mjs';
 import { prepareQuizPublish, storeQuizKey } from './_shared/quiz.mjs';
+import { prepareTutorialPublish, storeTutorialTabs } from './_shared/tutorial.mjs';
 
 export const config = { path: '/api/lessons/:id/publish' };
 
@@ -189,6 +190,32 @@ export function createLessonPublishHandler(deps = {}) {
           env
         );
       }
+    }
+
+    // A tutorial: Common is public; tabs and exit-check keys are stored apart (tutorial.mjs).
+    if (draft.pedagogical_mode === 'tutorial') {
+      const tutorial = prepareTutorialPublish(draft, publishBlocks);
+      if (tutorial.problems.length > 0) {
+        return withCors(errorResponse(400, 'validation_error', `An exit check question isn’t finished: ${tutorial.problems[0]}`, false), request, env);
+      }
+      if (tutorial.quiz) await storeQuizKey(store, id, tutorial.quiz);
+      await storeTutorialTabs(store, id, { ...tutorial.tabs, groups: tutorial.tabs.groups.map((g) => ({ ...g, blocks: sanitizeBlocksDeep(g.blocks) })) });
+      const tutorialSnapshot = {
+        lesson_id: id,
+        title,
+        unit_id,
+        blocks: sanitizeBlocksDeep(tutorial.common),
+        published_at: publishedAt,
+        schema_version: 1,
+        ...(draft.cover ? { cover: draft.cover } : {}),
+        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+        pedagogical_mode: 'tutorial',
+        ...(tutorial.quiz ? { quiz: tutorial.quiz.snapshot } : {})
+      };
+      await setJSON(store, publishedLessonKey(id), tutorialSnapshot);
+      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
     }
 
     // Quiz answers are split off here and stored apart; students only get the questions.
