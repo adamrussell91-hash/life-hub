@@ -121,6 +121,8 @@ export type MountLessonPageOptions = {
   subject?: { id: string; outcome_ids: string[]; network_lines?: NetworkLine[] };
   /** The unit's lessons in order, for "Before and after" at the foot of the page. */
   flowPeers?: FlowPeer[];
+  /** Lines a lesson before this one on the unit map stops on; an auto stop on any other line is Introduced. */
+  linesBefore?: ReadonlySet<string>;
   onFlowPeer?: (lessonId: string, after: string[]) => Promise<void>;
   /** Set when the subject is in the syllabus alignment: tag the dot points this lesson teaches. */
   dotPoints?: { unitTitle?: string; focusArea?: string };
@@ -1164,6 +1166,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         lines: networkLines,
         stops: lesson.line_stops,
         off: lesson.line_off,
+        ...(options.linesBefore ? { linesBefore: options.linesBefore } : {}),
         onChange: (stops, off) => emitLesson({ ...lesson, line_stops: stops, line_off: off })
       })
     : null;
