@@ -142,6 +142,7 @@ export function studentHead(view: MarkbookView, student: RosterStudent, onOpen?:
   const name = onOpen ? el('button', 'mb-student__name mb-patterns__name', student.name) : el('span', 'mb-student__name', student.name);
   if (onOpen && name instanceof HTMLButtonElement) {
     name.type = 'button';
+    name.dataset.student = student.id;
     name.addEventListener('click', () => onOpen(student.id));
   }
   name.title = student.name;

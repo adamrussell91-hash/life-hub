@@ -1,8 +1,9 @@
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: vi.fn() }));
+const insightContext = vi.hoisted(() => ({ load: async (): Promise<unknown> => ({ table: null, skills: null, codes: [], outcomes: [] }) }));
 vi.mock('@/evidence/context', () => ({
-  loadInsightContext: async () => ({ table: null, skills: null, codes: [], outcomes: [] }),
+  loadInsightContext: () => insightContext.load(),
   codeLabel: (id: string) => id
 }));
 
@@ -502,6 +503,64 @@ describe('markbook section', () => {
     host.remove();
   });
 
+  it('returns focus to the student’s redrawn name when the panel closes', async () => {
+    const { host } = await mount(view({ markbook: book({ focus: { s1: { pinned: [], dismissed: ['out:o2'] } } }), quizzes: [outcomeQuiz()] }));
+    const bob = () => [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
+    const first = bob();
+    expect(first.dataset.student).toBe('s1');
+    first.focus();
+    await vi.waitFor(() => {
+      first.click();
+      expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
+    });
+    const sheet = document.querySelector<HTMLElement>('.mb-sheet--student')!;
+    // Saving pins redraws the grid behind the panel, replacing the name button.
+    sheet.querySelector<HTMLButtonElement>('[data-focus="show-dismissed"]')!.click();
+    expect(first.isConnected).toBe(false);
+    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
+    expect(document.activeElement).toBe(bob());
+    expect(bob()).not.toBe(first);
+    host.remove();
+  });
+
+  it('opens a student pressed before the tag names load, once they arrive', async () => {
+    let arrive!: (v: unknown) => void;
+    const original = insightContext.load;
+    insightContext.load = () => new Promise((resolve) => (arrive = resolve));
+    try {
+      const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+      const name = [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
+      name.click();
+      expect(document.querySelector('.mb-sheet--student')).toBeNull();
+      expect(host.querySelector('.mb__status')?.textContent).toBe('Loading…');
+      arrive({ table: null, skills: null, codes: [], outcomes: [] });
+      await vi.waitFor(() => expect(document.querySelector('.mb-sheet--student')).not.toBeNull());
+      expect(host.querySelector('.mb__status')?.textContent).toBe('');
+      document.querySelector<HTMLButtonElement>('.mb-sheet--student .mb-sheet__close')!.click();
+      host.remove();
+    } finally {
+      insightContext.load = original;
+    }
+  });
+
+  it('says so when the tag names fail to load, instead of loading forever', async () => {
+    const original = insightContext.load;
+    insightContext.load = async () => {
+      throw new Error('offline');
+    };
+    try {
+      const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
+      const message = 'Couldn’t load the tag names, so Patterns and student panels can’t open. Reload to try again.';
+      await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe(message));
+      host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
+      expect(host.querySelector('.mb__body')?.textContent).toBe(message);
+      expect(host.textContent).not.toContain('Loading patterns…');
+      host.remove();
+    } finally {
+      insightContext.load = original;
+    }
+  });
+
   it('saves focus pins through the queue, and rolls them back when the save fails', async () => {
     const focused = book({ focus: { s1: { pinned: [], dismissed: ['out:o2'] } } });
     const { host, api } = await mount(view({ markbook: focused, quizzes: [outcomeQuiz()] }));
@@ -518,6 +577,8 @@ describe('markbook section', () => {
     sheet.querySelector<HTMLButtonElement>('[data-focus="show-dismissed"]')!.click();
     await vi.waitFor(() => expect(api.setFocus).toHaveBeenCalledWith('class1', 's1', [], []));
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Server said no'));
+    // The open panel shows the rolled-back pins without being reopened.
+    await vi.waitFor(() => expect(sheet.querySelector('[data-focus="show-dismissed"]')?.textContent).toBe('Show 1 dismissed'));
     sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
     sheet = await openBob();
     // Rolled back: the dismissed tag is still there.
@@ -575,7 +636,10 @@ describe('markbook section', () => {
   });
 
   it('keeps the patterns tables on a phone', async () => {
-    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }), true);
+    // Tagged evidence, so Patterns has tag rows and a heatmap to draw.
+    const tagged = outcomeQuiz();
+    tagged.scores.s1.rows = [{ ...tagged.scores.s1.rows[0]!, items: [{ item: 'q1', tags: ['out:o2'], share: 0.5, why: [] }] }] as typeof tagged.scores.s1.rows;
+    const { host } = await mount(view({ quizzes: [tagged] }), true);
     expect(host.querySelector('.mb-phone')).not.toBeNull();
     host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
     expect(host.querySelector('.mb-phone')).toBeNull();
