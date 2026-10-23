@@ -566,6 +566,25 @@ describe('mountLessonEditor', () => {
     );
   });
 
+  it('saves the Route pill picked under Before and after', async () => {
+    const unit = { id: 'unit_001', type: 'unit', title: 'Poetry', slug: 'poetry', year_id: 'y', subject_id: 's', lesson_ids: ['lesson_000', 'lesson_001'], blocks: [], status: 'active', created_at: ISO, updated_at: ISO, schema_version: 1 };
+    const peers = [{ id: 'lesson_000', title: 'Start', unit_id: 'unit_001' }, { id: 'lesson_001', title: 'Intro to Testing', unit_id: 'unit_001' }];
+    const curriculum = { ...emptyCurriculum, units: [unit], lessons: peers };
+    mockLessonLoad();
+    const base = apiGetMock.getMockImplementation()!;
+    apiGetMock.mockImplementation(async (path: string) => (path === '/api/curriculum' ? curriculum : base(path)));
+    apiPutMock.mockResolvedValue(makeLesson());
+    const handle = mount();
+    await tick();
+
+    const pill = [...refs.canvas.querySelectorAll<HTMLButtonElement>('.lesson-flow__pill')].find((b) => b.textContent === 'Optional');
+    expect(pill).toBeDefined();
+    pill!.click();
+    await handle.flush();
+
+    expect(apiPutMock).toHaveBeenCalledWith('/api/lessons/lesson_001', expect.objectContaining({ route_role: 'optional' }));
+  });
+
   it('awaiting flush() before dispose() preserves an edit queued behind an in-flight autosave (route teardown)', async () => {
     mockLessonLoad();
 

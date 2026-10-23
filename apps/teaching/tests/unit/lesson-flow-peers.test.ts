@@ -73,19 +73,19 @@ describe('Lesson Before and after follows the unit map', () => {
 });
 
 describe('Optional route role', () => {
-  it('keeps an optional lesson on the core line of the map', () => {
+  it('puts an optional lesson in the option lane', () => {
     const map = buildCoverageMap({
       content: { version: 2, rail_stops: [], gates: [], nudges: {}, terminus: { label: 'Essay' } },
       lines: [],
       lessons: [{ id: 'a', title: 'Harbour poems' }, { id: 'b', title: 'Extra practice', role: 'optional' }, { id: 'c', title: 'Wrap up' }]
     });
-    expect(map.rows.find((r) => r.id === 'b')?.lane).toBe('core');
+    expect(map.rows.find((r) => r.id === 'b')?.lane).toBe('option');
   });
 
-  it('keeps a lesson on an old extension stop on the core line of the map', () => {
+  it('lets a lesson set to core beat an old extension stop on the map', () => {
     const content = { version: 2 as const, rail_stops: [{ id: 'r1', line_id: 'read', after_lesson_id: 'a', kind: 'extension' as const, lesson_id: 'b' }], gates: [], nudges: {}, terminus: { label: 'Essay' } };
     const lessons = [{ id: 'a', title: 'Harbour poems' }, { id: 'b', title: 'Extra practice' }, { id: 'c', title: 'Wrap up' }];
-    expect(buildCoverageMap({ content, lines: [], lessons }).rows.find((r) => r.id === 'b')?.lane).toBe('core');
+    expect(buildCoverageMap({ content, lines: [], lessons }).rows.find((r) => r.id === 'b')?.lane).toBe('extension');
     const core = lessons.map((l) => (l.id === 'b' ? { ...l, role: 'core' as const } : l));
     expect(buildCoverageMap({ content, lines: [], lessons: core }).rows.find((r) => r.id === 'b')?.lane).toBe('core');
   });
