@@ -189,3 +189,14 @@ test('filterBlocksForStudent strips Thinking Toolkit teacher notes and class not
   for (const id of fixture.kept_block_ids) assert.match(json, new RegExp(`"id":"${id}"`));
   for (const id of fixture.dropped_block_ids) assert.doesNotMatch(json, new RegExp(`"id":"${id}"`));
 });
+
+test('filterBlocksForStudent drops a lecture scene script, keeping its narration', () => {
+  const heading = {
+    id: 'h1', type: 'block', block_type: 'heading', variant: 'section', visibility: 'student_teacher',
+    content: { text: 'Scene', script: 'Say this first.', narration: { url: '/n.webm', duration_s: 4, transcript: 'Said.' } }
+  };
+  const section = { id: 's1', type: 'block', block_type: 'section', variant: 'medium', visibility: 'student_teacher', content: { title: 'C', blocks: [heading] } };
+  const [top, chapter] = filterBlocksForStudent([heading, section]);
+  assert.deepEqual(top.content, { text: 'Scene', narration: heading.content.narration });
+  assert.equal(chapter.content.blocks[0].content.script, undefined);
+});

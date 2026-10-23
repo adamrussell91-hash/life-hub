@@ -90,6 +90,16 @@ describe('filterBlocksForStudent', () => {
     expect(c.content.columns[0]!.blocks.map((b) => b.id)).toEqual(['col_vis']);
   });
 
+  it('drops a lecture scene script, inside chapters too', () => {
+    const heading = { ...createBlock('heading', 'h1'), content: { text: 'Scene', script: 'Say this first.' } } as Block;
+    const section = createBlock('section', 'sec');
+    if (section.block_type !== 'section') throw new Error('expected section');
+    section.content.blocks = [{ ...heading, id: 'h2' }] as typeof section.content.blocks;
+    const out = filterBlocksForStudent([heading, section]);
+    expect(JSON.stringify(out)).not.toContain('Say this first.');
+    expect(out[0]!.content).toEqual({ text: 'Scene' });
+  });
+
   it('drops an entire teacher_only section', () => {
     const section = createBlock('section', 'sec');
     section.visibility = 'teacher_only';

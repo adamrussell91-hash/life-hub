@@ -1046,6 +1046,19 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
           if (blocks === lesson.blocks) return;
           emitLesson({ ...lesson, blocks });
           canvas.update(blocks, media);
+        },
+        onImportSlides: () => {
+          // pdf.js and the deck reader load only when a teacher imports slides.
+          void import('@/lecture/slide-import/dialog').then(({ openSlideImport }) =>
+            openSlideImport({
+              newId: options.idFactory,
+              onAdd: (scenes) => {
+                const blocks = [...lesson.blocks, ...scenes];
+                emitLesson({ ...lesson, blocks });
+                canvas.update(blocks, media);
+              }
+            })
+          );
         }
       });
       lectureHost.append(lecturePanel.root);

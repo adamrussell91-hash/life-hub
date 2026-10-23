@@ -1808,6 +1808,8 @@ var HeadingBlockSchema = z9.object({
   content: z9.object({
     text: z9.string(),
     narration: NarrationSchema.optional(),
+    /** Lecture: what the teacher plans to say, e.g. imported speaker notes. Teacher-only. */
+    script: z9.string().max(8e3).optional(),
     reveal: RevealSchema.optional()
   }),
   ...blockLayout,

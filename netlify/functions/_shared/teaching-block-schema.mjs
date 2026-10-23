@@ -845,6 +845,8 @@ var HeadingBlockSchema = z8.object({
   content: z8.object({
     text: z8.string(),
     narration: NarrationSchema.optional(),
+    /** Lecture: what the teacher plans to say, e.g. imported speaker notes. Teacher-only. */
+    script: z8.string().max(8e3).optional(),
     reveal: RevealSchema.optional()
   }),
   ...blockLayout,

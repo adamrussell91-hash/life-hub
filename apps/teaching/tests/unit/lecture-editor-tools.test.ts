@@ -265,4 +265,44 @@ describe('narration field', () => {
       vi.resetModules();
     }
   });
+
+  it('shows the script before recording and starts a new take’s transcript from it', async () => {
+    vi.resetModules();
+    let onUploaded: ((url: string) => void) | null = null;
+    vi.doMock('@/blocks/upload-button', async (orig) => ({
+      ...(await orig<typeof import('@/blocks/upload-button')>()),
+      createUploadButton: (opts: { onUploaded: (url: string) => void }) => {
+        onUploaded = opts.onUploaded;
+        return { el: document.createElement('div'), button: document.createElement('button'), input: document.createElement('input'), uploadFiles: async () => {} };
+      }
+    }));
+    const RealAudio = globalThis.Audio;
+    class KnownAudio extends EventTarget {
+      duration = 20;
+      preload = '';
+      currentTime = 0;
+      set src(_url: string) { queueMicrotask(() => this.dispatchEvent(new Event('loadedmetadata'))); }
+      removeAttribute() {}
+    }
+    globalThis.Audio = KnownAudio as unknown as typeof Audio;
+    try {
+      const { createNarrationField } = await import('@/lecture/narration-field');
+      const onChange = vi.fn();
+      const onScript = vi.fn();
+      const field = createNarrationField({ label: 'Scene', value: undefined, onChange, script: { value: 'Start with the author.', onChange: onScript } });
+      const area = field.querySelector<HTMLTextAreaElement>('textarea.narration-field__script')!;
+      expect(area.value).toBe('Start with the author.');
+      area.value = 'Start with the reader. ';
+      area.dispatchEvent(new Event('change'));
+      expect(onScript).toHaveBeenCalledWith('Start with the reader.');
+      onUploaded!('/take.webm');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(onChange).toHaveBeenCalledWith({ url: '/take.webm', duration_s: 20, transcript: 'Start with the reader.' });
+      expect(field.querySelector('textarea.narration-field__script')).toBeNull();
+    } finally {
+      globalThis.Audio = RealAudio;
+      vi.doUnmock('@/blocks/upload-button');
+      vi.resetModules();
+    }
+  });
 });
