@@ -42,6 +42,8 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   flashcards: 'Flip cards for vocabulary or quick recall practice.',
   cloze: 'Fill-in-the-blank sentences for guided retrieval.',
   self_check: 'Let students check their own answer against a model.',
+  with_teacher: 'In a tutorial tab: where the group waits for you. Holds your talking points.',
+  faded_example: 'A worked example with some parts left for students to write, then compare with the model.',
   note_cue: 'Tell students to write something in their book: copy a term, put it in their own words, draw it, or note a question.',
   chart: 'Visualise data with bar, line, pie, or other chart types.',
   equation: 'Render mathematical notation with LaTeX-style formatting.',
@@ -83,7 +85,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   'embed:pdf': 'Embed a PDF document for inline viewing.'
 };
 
-const VECTOR_BLOCK_ICONS = new Set<string>(["analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "continuum_line", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue"]);
+const VECTOR_BLOCK_ICONS = new Set<string>(["analogy_types", "analogy_close_reading", "analogy_pattern", "analogy_reverse", "analogy_problem", "analogy_metaphor", "analogy_transfer", "analogy_chains", "peer_feedback", "brainstorm", "hinge_question", "continuum_line", "curriculum_lines", "question_drop", "quiz_question", "fluid_analogy", "note_cue", "with_teacher", "faded_example"]);
 
 /** Line-art block icons live in `public/assets/blocks/`, under the app base. */
 export function blockIconSrc(type: InsertMenuValue): string {

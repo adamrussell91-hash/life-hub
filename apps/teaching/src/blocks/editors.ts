@@ -1,4 +1,6 @@
 import { createNoteCueEditor } from '@/blocks/note-cue';
+import { createWithTeacherEditor } from '@/blocks/with-teacher';
+import { createFadedExampleEditor } from '@/blocks/faded-example';
 import { createPeerFeedbackEditor } from '@/blocks/peer-feedback';
 import { createClassroomToolsEditor, createCountdownEditor, createDividerEditor } from '@/blocks/classroom-tools/editors';
 import { createQuestionDropEditor } from '@/blocks/question-drop';
@@ -3116,6 +3118,10 @@ function createBlockEditorFields(
       return createClozeEditor(block, onChange, latest as () => Extract<Block, { block_type: 'cloze' }>);
     case 'note_cue':
       return createNoteCueEditor(block, onChange, latest as () => Extract<Block, { block_type: 'note_cue' }>);
+    case 'with_teacher':
+      return createWithTeacherEditor(block, onChange, latest as () => Extract<Block, { block_type: 'with_teacher' }>);
+    case 'faded_example':
+      return createFadedExampleEditor(block, onChange, latest as () => Extract<Block, { block_type: 'faded_example' }>);
     case 'self_check':
       return createSelfCheckEditor(block, onChange, latest as () => Extract<Block, { block_type: 'self_check' }>);
     case 'chart':
