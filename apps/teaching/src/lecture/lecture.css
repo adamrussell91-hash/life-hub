@@ -94,5 +94,8 @@
 .lecture-handups__item { display: grid; gap: var(--space-1); padding: var(--space-2); border-left: 3px solid var(--marine); }
 .lecture-handups__item--done { border-left-color: var(--line); color: var(--muted); }
 .lecture-handups__who, .lecture-handups__text, .lecture-handups__reply { margin: 0; font-size: var(--text-sm); }
-.lecture-preview { position: fixed; inset: 0; z-index: 50; background: var(--paper); overflow: auto; padding: var(--space-3) 16px; }
-.lecture-preview__close { position: sticky; top: 0; z-index: 3; }
+.lecture-preview { overscroll-behavior: contain; position: fixed; inset: 0; z-index: 50; background: var(--paper); overflow: auto; padding: var(--space-3) 16px; }
+.lecture-preview__bar { display: flex; justify-content: flex-end; padding-bottom: var(--space-2); }
+.lecture-handups__error { margin: 0; color: var(--danger, #b00020); font-size: var(--text-sm); }
+.lecture-handups__error:empty { display: none; }
+.lecture-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

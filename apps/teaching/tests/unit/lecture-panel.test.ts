@@ -95,3 +95,63 @@ describe('prependToSection', () => {
     expect(prependToSection(same, 'x', added)).toBe(same);
   });
 });
+
+describe('review follow-ups', () => {
+  const H = (over: Record<string, unknown> = {}) => ({ id: 'o~1', scene_id: 'h1', scene_label: 'Tone', text: 't', status: 'open', reply: '', at: 'x', clip_s: 0, who: null, ...over });
+  const lesson = { id: 'l1', title: 'Tone', blocks: [b('h1', 'heading', { text: 'Tone' })] } as unknown as Lesson;
+  const mk = (fetchSummary: () => Promise<unknown>, answerHandup = vi.fn()) =>
+    mountLecturePanel({ getLesson: () => lesson, fetchSummary: fetchSummary as never, answerHandup, onAddCallout: vi.fn() });
+
+  it('places a scene callout before an opening block so a gate keeps its side path', async () => {
+    const { addToScene } = await import('@/lecture/tree');
+    const gate = b('g', 'hinge_question');
+    const side = b('sp', 'section', { title: 's', blocks: [] });
+    const c = b('c', 'callout');
+    expect(addToScene([gate, side], 'g', c).map((x) => x.id)).toEqual(['c', 'g', 'sp']);
+    const h = b('h', 'heading', { text: 'x' });
+    expect(addToScene([h, gate, side], 'h', c).map((x) => x.id)).toEqual(['h', 'c', 'g', 'sp']);
+    const sec = b('s', 'section', { title: 'A', blocks: [gate, side] });
+    expect(((addToScene([sec], 's', c)[0]!.content) as { blocks: Block[] }).blocks.map((x) => x.id)).toEqual(['c', 'g', 'sp']);
+  });
+
+  it('groups hand-ups for missing scenes and counts only open ones', async () => {
+    const p = mk(vi.fn().mockResolvedValue({ students: 2, scenes: {}, misses: {}, handups: [H(), H({ id: 'o~2', status: 'answered' }), H({ id: 'o~3', scene_id: 'gone', scene_label: 'Old' })] }));
+    await p.refresh();
+    const titles = [...p.root.querySelectorAll('.lecture-handups__group-title')].map((x) => x.textContent);
+    expect(titles).toEqual(['Tone · 1', 'Removed or moved parts · 1']);
+    expect(p.root.querySelector('.lecture-replay__scene')!.getAttribute('aria-label')).toBe('Tone: 0 of 2 reached, 1 hand-up');
+  });
+
+  it('shows a retry on load failure and an error line on a failed answer', async () => {
+    const fetchSummary = vi.fn().mockRejectedValueOnce(new Error('x')).mockResolvedValue({ students: 1, scenes: {}, misses: {}, handups: [H()] });
+    const answer = vi.fn().mockRejectedValue(new Error('x'));
+    const p = mk(fetchSummary, answer);
+    await p.refresh();
+    expect(p.root.querySelector('.lecture-panel__status')!.textContent).toContain('Couldn’t load lecture activity');
+    p.root.querySelector<HTMLButtonElement>('.lecture-panel__status button')!.click();
+    await vi.waitFor(() => expect(p.root.querySelector('.lecture-handups__item')).not.toBeNull());
+    p.root.querySelector<HTMLButtonElement>('.lecture-handups__item button')!.click();
+    await vi.waitFor(() => expect(p.root.querySelector('.lecture-handups__error')!.textContent).toBe('That didn’t save. Try again.'));
+  });
+
+  it('insulates the page while previewing and keeps Escape for an open dialog', () => {
+    const other = document.createElement('main');
+    document.body.append(other);
+    const p = mk(vi.fn().mockResolvedValue({ students: 0, scenes: {}, misses: {}, handups: [] }));
+    document.body.append(p.root);
+    p.root.querySelector<HTMLButtonElement>('.lecture-panel__head button')!.click();
+    expect(other.hasAttribute('inert')).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+    const dlg = document.createElement('dialog');
+    dlg.setAttribute('open', '');
+    document.querySelector('.lecture-preview')!.append(dlg);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelector('.lecture-preview')).not.toBeNull();
+    dlg.remove();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelector('.lecture-preview')).toBeNull();
+    expect(other.hasAttribute('inert')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+    p.dispose();
+  });
+});
