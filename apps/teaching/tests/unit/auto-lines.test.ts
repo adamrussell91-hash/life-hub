@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { autoLineIds, syncAutoStops, toggleLineStop, type AutoLineContext } from '@/alignment/auto-lines';
+import { autoLineIds, linesBefore, removeLineStop, syncAutoStops, toggleLineStop, type AutoLineContext } from '@/alignment/auto-lines';
+import { autoDepth, buildUnitNetwork, withAutoDepths } from '@/network/model';
 import type { Alignment } from '@/alignment/schema';
 import { LessonSchema } from '@/schemas/lesson';
 import type { LineStop, NetworkLine } from '@/schemas/block';
@@ -119,22 +120,67 @@ describe('toggleLineStop', () => {
   const train = { id: 'und', mode: 'train' as const };
   const rail = { id: 'read', mode: 'light_rail' as const };
 
-  it('steps an auto train stop through its depths and remembers taking it off', () => {
-    let next = toggleLineStop([{ line_id: 'und', auto: true }], [], train);
+  it('steps a depth round from the one shown, keeping the stop automatic', () => {
+    // An auto stop showing Reinforced (the map's default after the first lesson).
+    let next = toggleLineStop([{ line_id: 'und', auto: true }], [], train, { shown: 'reinforced', wrap: true });
     expect(next.stops).toEqual([{ line_id: 'und', auto: true, level: 'mastered' }]);
-    next = toggleLineStop(next.stops, next.off, train);
-    expect(next).toEqual({ stops: [], off: ['und'] });
+    next = toggleLineStop(next.stops, next.off, train, { wrap: true });
+    expect(next).toEqual({ stops: [{ line_id: 'und', auto: true, level: 'introduced' }], off: [] });
   });
 
-  it('remembers a light rail auto stop taken off', () => {
+  it('without wrap, steps past mastered to off and remembers an auto stop', () => {
+    expect(toggleLineStop([{ line_id: 'und', auto: true, level: 'mastered' }], [], train)).toEqual({ stops: [], off: ['und'] });
+  });
+
+  it('brings a line taken off back as an auto stop', () => {
+    expect(toggleLineStop([], ['und'], train)).toEqual({ stops: [{ line_id: 'und', level: 'introduced', auto: true }], off: [] });
+    expect(toggleLineStop([], ['read'], rail)).toEqual({ stops: [{ line_id: 'read', auto: true }], off: [] });
+  });
+
+  it('adds a new line by hand', () => {
+    expect(toggleLineStop([], [], train)).toEqual({ stops: [{ line_id: 'und', level: 'introduced' }], off: [] });
+  });
+
+  it('remembers a light rail auto stop taken off; a hand-set one just goes', () => {
     expect(toggleLineStop([{ line_id: 'read', auto: true }], [], rail)).toEqual({ stops: [], off: ['read'] });
-  });
-
-  it('putting a line back is a hand-set stop and clears it from off', () => {
-    expect(toggleLineStop([], ['und'], train)).toEqual({ stops: [{ line_id: 'und', level: 'introduced' }], off: [] });
-  });
-
-  it('taking off a hand-set stop does not add it to off', () => {
     expect(toggleLineStop([{ line_id: 'read' }], [], rail)).toEqual({ stops: [], off: [] });
+  });
+});
+
+describe('removeLineStop', () => {
+  it('takes a line off, remembering it only when it was automatic', () => {
+    expect(removeLineStop([{ line_id: 'und', auto: true }, { line_id: 'rep' }], [], 'und')).toEqual({ stops: [{ line_id: 'rep' }], off: ['und'] });
+    expect(removeLineStop([{ line_id: 'rep' }], [], 'rep')).toEqual({ stops: [], off: [] });
+  });
+});
+
+describe('auto depths in map order', () => {
+  it('is Introduced on the first lesson on a line and Reinforced after', () => {
+    const lessons = [
+      { id: 'a', line_stops: [{ line_id: 'und', auto: true as const }] },
+      { id: 'b', line_stops: [{ line_id: 'und', auto: true as const }, { line_id: 'rep', auto: true as const }] },
+      { id: 'c', line_stops: [{ line_id: 'rep', level: 'mastered' as const, auto: true as const }] }
+    ];
+    expect(withAutoDepths(lessons).map((l) => l.line_stops.map((s) => `${s.line_id}:${s.level}`))).toEqual([
+      ['und:introduced'],
+      ['und:reinforced', 'rep:introduced'],
+      ['rep:mastered']
+    ]);
+  });
+
+  it('counts any earlier stop on the line, hand-set or not', () => {
+    const lessons = [{ id: 'a', line_stops: [{ line_id: 'und', level: 'mastered' as const }] }, { id: 'b', line_stops: [{ line_id: 'und', auto: true as const }] }];
+    expect(withAutoDepths(lessons)[1]!.line_stops[0]!.level).toBe('reinforced');
+    expect([...linesBefore(lessons, 'b')]).toEqual(['und']);
+    expect(autoDepth(false)).toBe('introduced');
+  });
+
+  it('gives the map rows those depths', () => {
+    const lines: NetworkLine[] = [LINES[0]!];
+    const net = buildUnitNetwork({ version: 2, rail_stops: [], gates: [], nudges: {}, terminus: { label: 'End' } }, lines, [
+      { id: 'a', title: 'A', line_stops: [{ line_id: 'und', auto: true }] },
+      { id: 'b', title: 'B', line_stops: [{ line_id: 'und', auto: true }] }
+    ]);
+    expect(net.rows.map((r) => r.stops.get('und'))).toEqual(['introduced', 'reinforced']);
   });
 });
