@@ -28,9 +28,9 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { IDENTITIES, claimedIds, claimSymbol } from './class-symbols.mjs';
 import { groupAnswers } from './brainstorm-groups.mjs';
+import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
-const ACTIVITY_HOURS = 12;
 /** "Unlimited" still stops here, so one device can't flood the board. */
 export const MAX_PER_STUDENT = 20;
 const SAFETY = ['instant', 'approve', 'reveal'];
@@ -94,6 +94,7 @@ function settings(block) {
 function keys(lesson, block, session) {
   const base = `brainstorm/${lesson}/${block}`;
   return {
+    base,
     active: `${base}/active`,
     claim: (id) => `${base}/${session}/claims/${id}`,
     token: (tokenHash) => `${base}/${session}/tokens/${tokenHash}`,
@@ -167,7 +168,7 @@ async function teacherAction(store, k, activity, setup, body, opts) {
   if (action === 'symbols_on_cards') patch.symbols_on_cards = body.show === true;
   if (Object.keys(patch).length) {
     activity = { ...activity, ...patch };
-    await store.setJSON(k.active, activity);
+    await saveRound(store, k.base, activity);
   }
 
   if (action === 'approve' || action === 'remove') {
@@ -299,36 +300,46 @@ async function studentAction(store, k, activity, setup, body) {
   return state;
 }
 
+function freshRound(setup) {
+  return {
+    session: randomBytes(16).toString('hex'),
+    salt: randomBytes(16).toString('hex'),
+    code: String(randomInt(100000, 1000000)),
+    open: true,
+    started_at: new Date().toISOString(),
+    expires: roundExpiry(),
+    revealed: false,
+    layout: setup.layout,
+    students_see: 'own',
+    show_symbols: false,
+    symbols_on_cards: true
+  };
+}
+
 export async function brainstormAction(store, lesson, block, body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const teacher = opts.teacher === true;
   const live = await assertLive(store, lesson, block);
   const setup = settings(live);
-  const activeKey = keys(lesson, block, '').active;
+  const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 
   if (teacher && body.action === 'start') {
-    activity = {
-      session: randomBytes(16).toString('hex'),
-      salt: randomBytes(16).toString('hex'),
-      code: String(randomInt(100000, 1000000)),
-      open: true,
-      expires: Date.now() + ACTIVITY_HOURS * 3600_000,
-      revealed: false,
-      layout: setup.layout,
-      students_see: 'own',
-      show_symbols: false,
-      symbols_on_cards: true
-    };
-    await store.setJSON(activeKey, activity);
+    activity = freshRound(setup);
+    await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'end' && activity) {
     activity = { ...activity, open: false };
-    await store.setJSON(activeKey, activity);
+    await saveRound(store, base, activity);
+  }
+  if (teacher && body.action === 'rounds') return { rounds: await listRounds(store, base, activity, 'claims') };
+  if (teacher && body.action === 'resume') {
+    activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(setup), session }), { open: true });
+    if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
 
   const k = keys(lesson, block, activity.session);
-  const rest = body.action === 'start' || body.action === 'end' ? { ...body, action: 'status' } : body;
+  const rest = ['start', 'end', 'resume'].includes(body.action) ? { ...body, action: 'status' } : body;
   return teacher ? teacherAction(store, k, activity, setup, rest, opts) : studentAction(store, k, activity, setup, body);
 }

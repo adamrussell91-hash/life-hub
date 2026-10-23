@@ -7,6 +7,7 @@ import { createFormatField } from '@/blocks/formats/registry';
 import { taskCard } from '@/blocks/peer-feedback-task';
 import type { RenderMode, RenderContext } from '@/blocks/render';
 import './peer-feedback.css';
+import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
 
 /**
  * Peer feedback: students write a short answer, swap it anonymously, give
@@ -229,6 +230,11 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
   const autoExcluded = new Set<string>();
   /** Annotate mode: one student's piece and every note they gave, or everyone. */
   let focus: string | null = null;
+  const past = pastRounds(endpoint, (session, pressed) => {
+    if (!confirmBringBack(!!state && state.phase !== 'idle')) return;
+    freshRound();
+    return send('resume', { session }, pressed);
+  });
 
   async function send(action: string, extra: Record<string, unknown> = {}, pressed?: HTMLButtonElement): Promise<void> {
     if (busy) return;
@@ -293,7 +299,8 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
       button('Start activity', 'primary', function () {
         freshRound();
         void send('start', {}, this);
-      })
+      }),
+      past
     );
     return box;
   }
@@ -361,7 +368,7 @@ function mountTeacher(block: PeerBlock, lessonId: string): HTMLElement {
     const actions = el('div', 'pf-next__actions');
     actions.append(primary, end);
     next.append(summary, actions);
-    wrap.append(next);
+    wrap.append(next, past);
 
     if (writing.length && s.phase === 'write') {
       const still = el('div', 'pf-waiting');
