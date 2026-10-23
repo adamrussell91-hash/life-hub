@@ -71,6 +71,7 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     closed = true;
     panel.remove();
     doc.removeEventListener('keydown', onKey);
+    doc.defaultView?.removeEventListener('hashchange', close);
     if (opener && doc.contains(opener)) opener.focus();
   }
   function focusScreen(): void {
@@ -78,6 +79,8 @@ export function openGuidePanel(doc: Document, options: GuidePanelOptions): { el:
     target?.focus();
   }
   doc.addEventListener('keydown', onKey);
+  // Leaving the page (a route change) closes the panel without saving.
+  doc.defaultView?.addEventListener('hashchange', close);
   closeBtn.addEventListener('click', close);
 
   function top(subtitle: string): HTMLElement {
