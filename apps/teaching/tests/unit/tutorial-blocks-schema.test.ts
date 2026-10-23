@@ -30,6 +30,10 @@ describe('tutorial block schemas', () => {
     expect(() => BlockSchema.parse({ ...base, id: 'f3', block_type: 'faded_example', content: { ...faded, parts: five, blanks: [] } })).toThrow();
   });
 
+  it('rejects the same blank twice', () => {
+    expect(() => BlockSchema.parse({ ...base, id: 'f4', block_type: 'faded_example', content: { ...faded, blanks: [1, 1] } })).toThrow();
+  });
+
   it('allows both inside a section', () => {
     const s = BlockSchema.parse({ ...base, id: 's1', block_type: 'section', content: { title: 'G', tutorial_group: 'g1', blocks: [
       { ...base, id: 'f1', block_type: 'faded_example', content: faded },
