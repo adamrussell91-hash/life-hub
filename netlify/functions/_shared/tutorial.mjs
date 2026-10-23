@@ -118,7 +118,7 @@ export async function tutorialAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
   if (!['status', 'claim', 'progress', 'answer', 'handup'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
-  const { tabs } = await loadTutorial(store, lessonId);
+  const { lesson, tabs } = await loadTutorial(store, lessonId);
   let who;
   try {
     who = await identify(store, body, action);
@@ -148,13 +148,15 @@ export async function tutorialAction(store, lessonId, body) {
   const k = tutorialKeys(lessonId);
   const owner = deviceHash(`student:${who.classId}:${who.student.id}`);
   const stamp = { class_id: who.classId, student_id: who.student.id, group_id: group.id };
+  // Faded answers and hand-ups can come from the shared Common demo or this group's own tab, never another group's.
+  const ownIds = new Set([...blockIds(lesson.blocks), ...blockIds(group.blocks)]);
 
   if (action === 'progress') {
     if (!STAGES.has(body.stage)) reject(400, 'bad_stage', 'Unknown step.');
     await store.setJSON(k.progress(owner), { stage: body.stage, at: new Date().toISOString(), ...stamp });
   }
   if (action === 'answer') {
-    if (typeof body.block_id !== 'string' || !blockIds(group.blocks).has(body.block_id)) reject(400, 'bad_block', 'That part has changed. Reload the page.');
+    if (typeof body.block_id !== 'string' || !ownIds.has(body.block_id)) reject(400, 'bad_block', 'That part has changed. Reload the page.');
     const parts = Object.fromEntries(Object.entries(body.parts && typeof body.parts === 'object' ? body.parts : {})
       .filter(([i]) => /^[0-3]$/.test(i)).map(([i, text]) => [i, clean(text, MAX_TEXT)]));
     const rating = body.rating === 'right' || body.rating === 'wrong' ? body.rating : null;
@@ -163,7 +165,7 @@ export async function tutorialAction(store, lessonId, body) {
     await store.setJSON(k.answers(owner), all);
   }
   if (action === 'handup') {
-    if (typeof body.scene_id !== 'string' || !blockIds(group.blocks).has(body.scene_id)) reject(400, 'bad_scene', 'That part of the tutorial has changed. Reload the page.');
+    if (typeof body.scene_id !== 'string' || !ownIds.has(body.scene_id)) reject(400, 'bad_scene', 'That part of the tutorial has changed. Reload the page.');
     const mine = await listBlobKeys(store, k.ownHandups(owner));
     if (mine.length >= MAX_HANDUPS) reject(429, 'too_many', 'You’ve sent a lot of hand-ups. Ask your teacher.');
     const id = `${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;

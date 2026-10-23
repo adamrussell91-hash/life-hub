@@ -102,3 +102,17 @@ test('writes need initials, and a bad device token is treated as unclaimed', asy
   await claim(store, 1, 'AB');
   await assert.rejects(tutorialAction(store, 'tut1', { action: 'progress', class_id: 'class1', class_token: 'short', stage: 'before' }), { code: 'need_initials' });
 });
+
+test('faded answers and hand-ups accept Common block ids, but not another group’s', async () => {
+  const store = storeFor();
+  await claim(store, 1, 'AB');
+  await tutorialAction(store, 'tut1', { action: 'answer', ...who(1), block_id: 'h1', parts: { 0: 'x' }, rating: 'right' });
+  const keys = [...store.data.keys()];
+  const answers = store.data.get(keys.find((k) => k.startsWith('tutorial/tut1/answers/')));
+  assert.equal(answers.h1.rating, 'right');
+  const res = await tutorialAction(store, 'tut1', { action: 'handup', ...who(1), scene_id: 'h1', scene_label: 'Demo', text: 'Lost here' });
+  assert.equal(res.handups.length, 1);
+  assert.equal(res.handups[0].scene_id, 'h1');
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'answer', ...who(1), block_id: 'w2', parts: {}, rating: 'right' }), { code: 'bad_block' });
+  await assert.rejects(tutorialAction(store, 'tut1', { action: 'handup', ...who(1), scene_id: 'w2', text: 'x' }), { code: 'bad_scene' });
+});
