@@ -49,4 +49,36 @@ describe('tutorial grouping', () => {
     expect(groups.at(-1)!.unsure).toEqual(['st_cy']);
     expect(() => parseGroups('not json', { S1: 'st_ann' })).toThrow('Ann’s grouping came back unreadable. Try again.');
   });
+
+  const one = (g: object) => parseGroups(JSON.stringify({ groups: [{ name: 'A', why: '', goal: 'Today: x', gap_type: 'knowledge', members: ['S1'], quotes: {}, ...g }] }), { S1: 'st_ann' })[0]!;
+
+  it('coerces bad field types and blank names', () => {
+    const g = one({ name: '  ', why: 5, goal: ['x'], quotes: 'nope' });
+    expect(g.name).toBe('Group 1');
+    expect(g.why).toBe('');
+    expect(g.goal).toBe('Today: practising this together');
+    expect(g.evidence).toEqual([]);
+  });
+
+  it('ignores prototype keys as members', () => {
+    expect(() => parseGroups('{"groups":[{"name":"A","members":["constructor","__proto__","S1"]}]}', { S1: 'st_ann' })).not.toThrow();
+    expect(parseGroups('{"groups":[{"name":"A","members":["constructor","S1"]}]}', { S1: 'st_ann' })[0]!.students).toEqual(['st_ann']);
+  });
+
+  it('prepends Today: and replaces deficit or empty goals', () => {
+    expect(one({ goal: 'naming the technique' }).goal).toBe('Today: naming the technique');
+    expect(one({ goal: 'Today: they can’t name it' }).goal).toBe('Today: practising this together');
+    expect(one({ goal: 'working without notes' }).goal).toBe('Today: practising this together');
+    expect(one({ goal: '' }).goal).toBe('Today: practising this together');
+  });
+
+  it('turns structural surprises into the friendly error', () => {
+    expect(() => parseGroups('{"groups":[null, 4, {"members":"S1"}]}', { S1: 'st_ann' })).not.toThrow();
+    expect(() => parseGroups('{"groups":"x"}', { S1: 'st_ann' })).toThrow('Ann’s grouping came back unreadable. Try again.');
+  });
+
+  it('caps long mistake lines in the brief', () => {
+    const rows = [{ key: 'S1', mistakes: [{ type: 'code', id: 'x' } as never], share: 0.5 }];
+    expect(groupingBrief({ tagLabel: 'T', rows, mistakeText: () => 'y'.repeat(500) })).not.toContain('y'.repeat(161));
+  });
 });

@@ -18,6 +18,6 @@ export function createTutorialGroupsHandler(deps = {}) {
       if (e instanceof QuizError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, e.code ?? 'bad_request', e instanceof SyntaxError ? 'Invalid request.' : e.message, false), request, env);
       throw e;
     }
-  }, deps);
+  }, { requireStore: false, ...deps });
 }
 export default createTutorialGroupsHandler();
