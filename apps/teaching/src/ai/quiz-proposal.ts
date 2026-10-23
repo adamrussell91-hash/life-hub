@@ -30,10 +30,44 @@ function schemaDetail(question: unknown): string {
   return issue ? ` (${issue.path.join('.') || 'question'}: ${issue.message})` : '';
 }
 
+const ABSOLUTE = /\b(all|only|never|always|none|nothing|every|entirely|completely|totally|line for line)\b/i;
+
+/**
+ * Giveaways a test-wise student would use without knowing the content: a
+ * right answer far longer than every wrong one, wrong answers that are the
+ * extreme ones, and matching with so few pairs the last one is free.
+ */
+export function questionGiveaways(question: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  if (question.kind === 'multiple_choice') {
+    const options = (question.options as Array<{ id: string; text: string }> | undefined) ?? [];
+    const correct = new Set((question.correct as string[] | undefined) ?? []);
+    const key = options.find((option) => correct.has(option.id));
+    const wrong = options.filter((option) => !correct.has(option.id));
+    if (key && wrong.length) {
+      const longestWrong = Math.max(...wrong.map((option) => option.text.trim().length));
+      const keyLength = key.text.trim().length;
+      if (keyLength > longestWrong * 1.5 && keyLength - longestWrong >= 15) {
+        issues.push('the right answer is much longer than every wrong one, so students can pick it by length. Make the options match in length and detail.');
+      }
+      const extreme = wrong.filter((option) => ABSOLUTE.test(option.text)).length;
+      if (extreme >= 2 && !ABSOLUTE.test(key.text)) {
+        issues.push('the wrong answers are the extreme ones ("all", "only", "never"…) and the right one is not, so students can rule them out without knowing the content. Write wrong answers a student who half-knows the content would choose.');
+      }
+    }
+  }
+  if (question.kind === 'matching') {
+    const pairs = (question.pairs as unknown[] | undefined) ?? [];
+    if (pairs.length < 4) issues.push(`matching needs at least 4 pairs (it has ${pairs.length}); with fewer, the last match is free. Add pairs from the same category or use another kind.`);
+  }
+  return issues;
+}
+
 /**
  * Problems with the quiz questions in a proposal, in words the agent can fix:
  * each question must pass the quiz engine's own check, images must already be
- * in the lesson, and quiz questions need a Quiz lesson (or set_mode: quiz).
+ * in the lesson, quiz questions need a Quiz lesson (or set_mode: quiz), and
+ * none may give its answer away (questionGiveaways).
  * The block schema only checks a question's id and kind, so this is the real gate.
  */
 export function quizProposalIssues(
@@ -77,6 +111,7 @@ export function quizProposalIssues(
       issues.push(`${label}: ${checked.message}${schemaDetail(question)}`);
       return;
     }
+    for (const giveaway of questionGiveaways(question as Record<string, unknown>)) issues.push(`${label}: ${giveaway}`);
     const url = checked.question.image?.url;
     if (url && !images.has(url)) {
       issues.push(`${label}: its image must be one already in the lesson. Use one of the lesson's images or a different question kind.`);
