@@ -1,4 +1,5 @@
 import { setToolkitClasses } from '@/toolkit/class-context';
+import { linesBeforeOnMap } from '@/teacher/network-context';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
@@ -611,6 +612,10 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           .map((id) => byId.get(id))
           .filter((l): l is NonNullable<typeof l> => Boolean(l))
           .map((l) => ({ id: l.id, title: l.title, ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}) }));
+      })(),
+      linesBefore: (() => {
+        const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
+        return unit ? linesBeforeOnMap(curriculum, unit, lesson.id) : undefined;
       })(),
       dotPoints: (() => {
         const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);

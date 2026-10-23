@@ -4,9 +4,11 @@ import { subjectUsesAlignment } from '@/alignment/model';
 import type { UnitNetworkEditorContext } from '@/blocks/curriculum-lines/editor';
 import { NEW_BLOCK_LABEL, type NewBlockType } from '@/blocks/create-block';
 import { blocksToSearchText } from '@/blocks/search-text';
-import { isCurriculumLinesV2, type Block, type LineStop, type NetworkLine } from '@/schemas/block';
+import { isCurriculumLinesV2, type Block, type CurriculumLinesV2Content, type LineStop, type NetworkLine } from '@/schemas/block';
 import type { Lesson, Subject, Unit } from '@/schemas';
 import type { NetUnit } from '@/network/year';
+import { orderStations, placeByDate } from '@/network/model';
+import { linesBefore } from '@/alignment/auto-lines';
 import type { CurriculumResponse } from '@/teacher/nav';
 
 /** Saves the subject's lines and keeps the loaded curriculum in step. */
@@ -73,6 +75,24 @@ function unitLessons(curriculum: CurriculumResponse, unit: Unit) {
   return unit.lesson_ids
     .map((id) => byId.get(id))
     .filter((l): l is NonNullable<typeof l> => Boolean(l) && l!.status !== 'trashed');
+}
+
+/**
+ * The lines any lesson before this one stops on, in the unit map's order
+ * (calendar dates first, then the map's own order; lessons left off the map
+ * don't count). An auto stop on a line not yet seen is Introduced.
+ */
+export function linesBeforeOnMap(curriculum: CurriculumResponse, unit: Unit, lessonId: string): Set<string> {
+  let content: CurriculumLinesV2Content | undefined;
+  for (const block of unit.blocks ?? []) {
+    if (block.block_type === 'curriculum_lines' && isCurriculumLinesV2(block.content)) {
+      content = block.content;
+      break;
+    }
+  }
+  const hidden = new Set(content?.hidden_lessons ?? []);
+  const ordered = placeByDate(orderStations(unitLessons(curriculum, unit), content?.station_order), unitSchedule(curriculum, unit)?.dates);
+  return linesBefore(ordered.filter((l) => l.id === lessonId || !hidden.has(l.id)), lessonId);
 }
 
 /** Everything a unit map (and its editor) needs on a teacher page. */

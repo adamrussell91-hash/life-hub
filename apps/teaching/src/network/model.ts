@@ -74,6 +74,22 @@ function lessonTarget(label: string, lessonId: string | undefined, blockId: stri
   return { text, href: blockId ? `${lesson.href}#block=${encodeURIComponent(blockId)}` : lesson.href };
 }
 
+/**
+ * The depth an auto stop shows when the teacher hasn't set one: Introduced
+ * on the first lesson on that line in map order, Reinforced after that.
+ */
+export const autoDepth = (lineSeenBefore: boolean): NetLevel => (lineSeenBefore ? 'reinforced' : 'introduced');
+
+/** Each lesson's stops with auto depths filled in, walking the lessons in map order. Nothing is saved. */
+export function withAutoDepths<T extends { id: string; line_stops?: readonly LineStop[] }>(ordered: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return ordered.map((lesson) => {
+    const stops = lesson.line_stops?.map((s) => (s.auto && !s.level ? { ...s, level: autoDepth(seen.has(s.line_id)) } : s));
+    for (const s of lesson.line_stops ?? []) seen.add(s.line_id);
+    return stops ? { ...lesson, line_stops: stops } : lesson;
+  });
+}
+
 /** The unit's lessons in this map's station order (unlisted lessons keep unit order, at the end). */
 export function orderStations<T extends { id: string }>(lessons: readonly T[], order: readonly string[] | undefined): T[] {
   if (!order?.length) return [...lessons];
@@ -128,7 +144,8 @@ export function buildUnitNetwork(
     hidden,
     title: (id) => byId.get(id)?.title || 'Untitled lesson'
   });
-  const shown = flow.order.map((id) => byId.get(id)!);
+  // Auto stops with no depth of their own take it from their place on the map.
+  const shown = withAutoDepths(flow.order.map((id) => byId.get(id)!));
   // A lesson left off the map hands its gap to the nearest shown station before it.
   const rowIndex = new Map<string, number>(flow.order.map((id, i) => [id, i]));
   let row = -1;

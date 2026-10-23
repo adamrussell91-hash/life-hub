@@ -1,5 +1,6 @@
 import type { LineStop, NetworkLine } from '@/schemas/block';
 import { LEVEL_ORDER } from '@/network/model';
+import type { NetLevel } from '@/network/layout';
 import type { SkillsContinuum } from '@/skills/schema';
 import { conceptKeyOf } from './model';
 import type { Alignment, AlignmentPoint } from './schema';
@@ -63,31 +64,55 @@ export function syncAutoStops(stops: readonly LineStop[] | undefined, off: reado
   return next.slice(0, 16);
 }
 
+/** The lessons before `lessonId` in map order: the lines any of them stops on. */
+export function linesBefore(ordered: ReadonlyArray<{ id: string; line_stops?: readonly LineStop[] }>, lessonId: string): Set<string> {
+  const seen = new Set<string>();
+  for (const lesson of ordered) {
+    if (lesson.id === lessonId) break;
+    for (const stop of lesson.line_stops ?? []) seen.add(stop.line_id);
+  }
+  return seen;
+}
+
 /**
- * One tap on a lesson's line: a train or metro stop steps its depth
- * (introduced, reinforced, mastered, off); a light rail stop is on or off.
- * Taking an auto stop off remembers it in `off`; putting a line back clears it.
+ * One tap on a lesson's line. A light rail stop is on or off. A train or
+ * metro stop steps its depth from the one it shows (`shown`, for an auto
+ * stop with none of its own): introduced, reinforced, mastered, then back to
+ * introduced with `wrap`, or off without it. Taking an auto stop off
+ * remembers it in `off`; putting it back brings it back as an auto stop.
  */
 export function toggleLineStop(
   stops: readonly LineStop[] | undefined,
   off: readonly string[] | undefined,
-  line: Pick<NetworkLine, 'id' | 'mode'>
+  line: Pick<NetworkLine, 'id' | 'mode'>,
+  options: { shown?: NetLevel; wrap?: boolean } = {}
 ): { stops: LineStop[]; off: string[] } {
   const list = [...(stops ?? [])];
-  let skip = (off ?? []).filter((id) => id !== line.id);
   const at = list.findIndex((s) => s.line_id === line.id);
-  const remove = () => {
-    if (list[at]!.auto) skip = [...skip, line.id];
-    list.splice(at, 1);
-  };
   if (at < 0) {
-    list.push(line.mode === 'light_rail' ? { line_id: line.id } : { line_id: line.id, level: 'introduced' });
-  } else if (line.mode === 'light_rail') {
-    remove();
-  } else {
-    const level = LEVEL_ORDER[LEVEL_ORDER.indexOf(list[at]!.level ?? 'reinforced') + 1];
-    if (level) list[at] = { ...list[at]!, level };
-    else remove();
+    const wasAuto = (off ?? []).includes(line.id);
+    const stop: LineStop = line.mode === 'light_rail' ? { line_id: line.id } : { line_id: line.id, level: 'introduced' };
+    list.push(wasAuto ? { ...stop, auto: true } : stop);
+    return { stops: list.slice(0, 16), off: (off ?? []).filter((id) => id !== line.id) };
   }
-  return { stops: list.slice(0, 16), off: skip.slice(0, 24) };
+  const current = list[at]!;
+  if (line.mode !== 'light_rail') {
+    const now = current.level ?? options.shown ?? 'reinforced';
+    const level = LEVEL_ORDER[LEVEL_ORDER.indexOf(now) + 1] ?? (options.wrap ? LEVEL_ORDER[0] : undefined);
+    if (level) {
+      list[at] = { ...current, level };
+      return { stops: list, off: [...(off ?? [])] };
+    }
+  }
+  return removeLineStop(list, off, line.id);
+}
+
+/** Takes a line off a lesson; an auto stop is remembered in `off` so the dot points leave it off. */
+export function removeLineStop(stops: readonly LineStop[] | undefined, off: readonly string[] | undefined, lineId: string): { stops: LineStop[]; off: string[] } {
+  const stop = (stops ?? []).find((s) => s.line_id === lineId);
+  const skip = (off ?? []).filter((id) => id !== lineId);
+  return {
+    stops: (stops ?? []).filter((s) => s.line_id !== lineId),
+    off: (stop?.auto ? [...skip, lineId] : skip).slice(0, 24)
+  };
 }
