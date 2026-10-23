@@ -2213,7 +2213,7 @@ var TabsBlockSchema = z8.object({
   ...blockLayout,
   ...blockTimestamps
 });
-var SectionChildBlockSchema = z8.lazy(
+var SectionInnerChildBlockSchema = z8.lazy(
   () => z8.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
@@ -2221,6 +2221,33 @@ var SectionChildBlockSchema = z8.lazy(
     TabsBlockSchema,
     TimelineBlockSchema,
     CardStackBlockSchema
+  ])
+);
+var SidePathSectionSchema = z8.object({
+  id: z8.string().min(1),
+  type: z8.literal("block"),
+  block_type: z8.literal("section"),
+  variant: z8.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z8.object({
+    title: z8.string(),
+    collapsed_in_editor: z8.boolean().optional(),
+    blocks: z8.array(SectionInnerChildBlockSchema),
+    side_path: z8.literal(true),
+    narration: NarrationSchema.optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var SectionChildBlockSchema = z8.lazy(
+  () => z8.discriminatedUnion("block_type", [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    TabsBlockSchema,
+    TimelineBlockSchema,
+    CardStackBlockSchema,
+    SidePathSectionSchema
   ])
 );
 var SectionLinkSchema = z8.object({
@@ -2417,6 +2444,7 @@ export {
   SelfCheckBlockSchema,
   SelfCheckItemSchema,
   SelfCheckModeSchema,
+  SidePathSectionSchema,
   SpacerBlockSchema,
   SpacerSizeSchema,
   TabChildBlockSchema,
