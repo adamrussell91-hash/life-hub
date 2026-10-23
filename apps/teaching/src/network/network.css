@@ -577,6 +577,19 @@
   font-size: var(--text-xs, 0.75rem);
 }
 
+.lesson-flow__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted, #6b7788);
+}
+
+.lesson-flow__date-input {
+  min-height: 30px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
 .lesson-flow__add {
   min-height: 30px;
   max-width: 100%;

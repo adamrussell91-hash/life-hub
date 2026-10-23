@@ -135,7 +135,6 @@
 .cm-tag-text { font-size: 11px; fill: #fff; }
 
 .cm-name { font-size: 12px; font-weight: 600; fill: var(--ink, #13233a); }
-.cm-name--quiet { font-weight: 400; fill: var(--muted, #6b7788); }
 .cm-score { font-size: 11px; font-weight: 600; fill: var(--cm-secure); }
 .cm-score--low { fill: var(--cm-struggling); }
 

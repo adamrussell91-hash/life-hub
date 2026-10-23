@@ -714,8 +714,8 @@ export const LessonKindSchema = z.enum(['lesson', 'workshop', 'lecture']);
 /** The lessons that can come after this one; more than one is a choice, and the map splits. */
 export const AfterLessonIdsSchema = z.array(z.string().min(1).max(64)).max(6);
 export type LessonKind = z.infer<typeof LessonKindSchema>;
-/** Where a lesson sits on the unit's route: off the core line as support or extension. Unset is core. */
-export const LessonRouteRoleSchema = z.enum(['support', 'extension']);
+/** Where a lesson sits on the unit's route: off the core line as support, extension or optional. Unset is core. */
+export const LessonRouteRoleSchema = z.enum(['support', 'extension', 'optional']);
 export type LessonRouteRole = z.infer<typeof LessonRouteRoleSchema>;
 /** Who may skip a support lesson or take an extension, e.g. "90%+ on the pre-test". */
 export const LessonSkipRuleSchema = z.string().trim().max(80);
