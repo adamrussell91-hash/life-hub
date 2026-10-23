@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { CurriculumLinesV2Content, NetworkLine } from '@/schemas/block';
 import { buildCoverageMap, thinLimit, type MapLesson } from '@/network/coverage-map/model';
 import { studentRoute } from '@/network/coverage-map/student';
+import { rowTag } from '@/network/coverage-map/draw';
 import type { Evidence } from '@/evidence/types';
 
 /* Invented names only: this repository is public. */
@@ -46,7 +47,7 @@ describe('Coverage map: model', () => {
     expect(map.rows.find((r) => r.id === 'e')?.lane).toBe('core');
   });
 
-  it('draws a choice as options: A on the core line, B beside it', () => {
+  it('puts every lesson on a fork on the core line: forks never make options', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Start', after: ['b1', 'b2'] },
       { id: 'b1', title: 'Talk', after: ['c'] },
@@ -54,13 +55,11 @@ describe('Coverage map: model', () => {
       { id: 'c', title: 'Draft' }
     ];
     const rows = build(lessons).rows;
-    expect(rows.find((r) => r.id === 'b1')).toMatchObject({ lane: 'core', option: 'A' });
-    expect(rows.find((r) => r.id === 'b2')).toMatchObject({ lane: 'option', option: 'B' });
-    expect(rows.find((r) => r.id === 'c')).toMatchObject({ lane: 'core' });
-    expect(rows.find((r) => r.id === 'c')?.option).toBeUndefined();
+    expect(rows.map((r) => [r.id, r.lane])).toEqual([['a', 'core'], ['b1', 'core'], ['b2', 'core'], ['c', 'core'], ['__terminus', 'core']]);
+    expect(rows.map(rowTag)).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 
-  it('keeps lessons the teacher set to Core on the core line, with no option letters, even across a split', () => {
+  it('keeps lessons the teacher set to Core on the core line, even across a split', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Start', after: ['b1', 'w'] },
       { id: 'b1', title: 'Poet', role: 'core', after: ['b2'] },
@@ -72,18 +71,19 @@ describe('Coverage map: model', () => {
     const rows = build(lessons, v2({ station_order: ['a', 'b1', 'b2', 'b3', 'w', 'c'] })).rows;
     for (const row of rows) {
       expect(row.lane).toBe('core');
-      expect(row.option).toBeUndefined();
     }
   });
 
-  it('puts a detour that rejoins (the other way goes straight on) beside the core line as optional', () => {
+  it('keeps a detour that rejoins on the core line unless the lesson is set to Optional', () => {
     const lessons: MapLesson[] = [
       { id: 'a', title: 'Start', after: ['c', 'b'] },
       { id: 'b', title: 'Pre-quiz', quiz: true, after: ['c'] },
       { id: 'c', title: 'Next' }
     ];
     const rows = build(lessons, v2({ station_order: ['a', 'b', 'c'] })).rows;
-    expect(rows.map((r) => [r.id, r.lane, r.option])).toEqual([['a', 'core', undefined], ['b', 'option', undefined], ['c', 'core', undefined], ['__terminus', 'core', undefined]]);
+    expect(rows.map((r) => [r.id, r.lane])).toEqual([['a', 'core'], ['b', 'core'], ['c', 'core'], ['__terminus', 'core']]);
+    const optional = build(lessons.map((l) => (l.id === 'b' ? { ...l, role: 'optional' as const } : l)), v2({ station_order: ['a', 'b', 'c'] })).rows;
+    expect(optional.find((r) => r.id === 'b')?.lane).toBe('option');
   });
 
   it('shows an extension stop’s lesson the old map left off, after the lesson it follows, teaching the stop’s line', () => {
