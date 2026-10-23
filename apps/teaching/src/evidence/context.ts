@@ -11,13 +11,23 @@ export type InsightContext = TagContext & { codes: FeedbackCode[] };
 let cached: Promise<Omit<InsightContext, 'outcomes'>> | null = null;
 
 export async function loadInsightContext(): Promise<InsightContext> {
-  cached ??= Promise.all([
-    loadLiteraryElements().catch(() => null),
-    loadSkills().catch(() => null),
-    loadFeedbackCodes().catch(() => [] as FeedbackCode[])
-  ]).then(([table, skills, codes]) => ({ table, skills, codes }));
+  let failed = false;
+  const soft = <T>(p: Promise<T>, fallback: T): Promise<T> =>
+    p.catch(() => {
+      failed = true;
+      return fallback;
+    });
+  const mine = (cached ??= Promise.all([
+    soft(loadLiteraryElements(), null),
+    soft(loadSkills(), null),
+    soft(loadFeedbackCodes(), [] as FeedbackCode[])
+  ]).then(([table, skills, codes]) => {
+    // A degraded result is used once but not kept, so the next call retries.
+    if (failed && cached === mine) cached = null;
+    return { table, skills, codes };
+  }));
   // Outcomes are read each time: the curriculum may load after the first call.
-  return { ...(await cached), outcomes: outcomeLabels(peekCurriculum()?.outcomes ?? []) };
+  return { ...(await mine), outcomes: outcomeLabels(peekCurriculum()?.outcomes ?? []) };
 }
 
 export function codeLabel(id: string, codes: readonly FeedbackCode[]): string {

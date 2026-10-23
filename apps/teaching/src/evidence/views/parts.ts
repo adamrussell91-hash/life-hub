@@ -8,7 +8,6 @@ import './insight.css';
 /** Small pieces the quiz insight and the markbook Patterns view share. */
 
 export const pct = (share: number | null | undefined): string => (share === null || share === undefined ? '–' : `${Math.round(share * 100)}%`);
-const short = (text: string): string => (text.length > 60 ? `${text.slice(0, 57)}…` : text || 'Question');
 
 export function sectionHead(title: string, extra?: HTMLElement): HTMLElement {
   const head = el('div', 'ev-section');
@@ -24,6 +23,12 @@ function card(label: string, value: string, why?: string): HTMLElement {
   return c;
 }
 
+function cardWithNote(label: string, value: string, why: string, showNote: boolean): HTMLElement {
+  const c = card(label, value, why);
+  if (showNote) c.append(el('span', 'ev-card__note', why));
+  return c;
+}
+
 export function summaryCards(s: Summary | null, attempts: number, of: number, alpha: number | null, alphaWhy: string): HTMLElement {
   const row = el('div', 'ev-cards');
   row.append(
@@ -32,7 +37,7 @@ export function summaryCards(s: Summary | null, attempts: number, of: number, al
     card('Median', pct(s?.median)),
     card('Std dev', s ? String(Math.round(s.sd * 100)) : '–', 'Spread, in percentage points.'),
     card('Middle half', s ? `${Math.round(s.q1 * 100)}–${Math.round(s.q3 * 100)}%` : '–'),
-    card('Reliability', alpha === null ? '–' : alpha.toFixed(2), alpha === null ? alphaWhy : 'Cronbach’s alpha. Around 0.7 or more is good for a class quiz.')
+    alpha === null ? cardWithNote('Reliability', '–', alphaWhy, true) : card('Reliability', alpha.toFixed(2), 'Cronbach’s alpha. Around 0.7 or more is good for a class quiz.')
   );
   return row;
 }
@@ -48,15 +53,19 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
 export function dotPlot(shares: number[], s: Summary | null): SVGSVGElement {
   const x = (share: number): number => 20 + share * 600;
   const stacks = new Map<number, number>();
+  const bins = shares.map((share) => Math.round(share * 50));
+  const counts = new Map<number, number>();
+  for (const b of bins) counts.set(b, (counts.get(b) ?? 0) + 1);
+  const step = Math.min(9, 30 / Math.max(1, ...counts.values()));
+  const r = Math.min(4.5, step / 2);
   const dots: Array<[number, number]> = [];
   for (const share of [...shares].sort((a, b) => a - b)) {
     const bin = Math.round(share * 50);
     const k = stacks.get(bin) ?? 0;
     stacks.set(bin, k + 1);
-    dots.push([x(bin / 50), 32 - k * 9]);
+    dots.push([x(bin / 50), 36 - r - k * step]);
   }
-  const top = Math.min(0, ...dots.map(([, y]) => y - 8));
-  const root = svg('svg', { viewBox: `0 ${top} 640 ${60 - top}`, class: 'ev-dots', role: 'img' });
+  const root = svg('svg', { viewBox: '0 0 640 60', class: 'ev-dots', role: 'img' });
   const title = svg('title');
   title.textContent = `Scores of ${shares.length} ${shares.length === 1 ? 'student' : 'students'}${s ? `, median ${pct(s.median)}` : ''}`;
   root.append(title, svg('line', { x1: 20, y1: 40, x2: 620, y2: 40, class: 'ev-dots__axis' }));
@@ -64,7 +73,7 @@ export function dotPlot(shares: number[], s: Summary | null): SVGSVGElement {
     root.append(svg('rect', { x: x(s.q1), y: 22, width: Math.max(2, x(s.q3) - x(s.q1)), height: 18, rx: 3, class: 'ev-dots__band' }));
     root.append(svg('line', { x1: x(s.median), y1: 16, x2: x(s.median), y2: 44, class: 'ev-dots__median' }));
   }
-  for (const [cx, cy] of dots) root.append(svg('circle', { cx, cy, r: 4.5, class: 'ev-dots__dot' }));
+  for (const [cx, cy] of dots) root.append(svg('circle', { cx, cy, r, class: 'ev-dots__dot' }));
   for (const [t, text] of [[0, '0%'], [0.5, '50%'], [1, '100%']] as const) {
     const tick = svg('text', { x: x(t), y: 56, 'text-anchor': 'middle', class: 'ev-dots__tick' });
     tick.textContent = text;
@@ -99,7 +108,7 @@ export function tagRows(rows: TagRow[], label: (tag: string) => string): HTMLEle
     bar.setAttribute('aria-hidden', 'true');
     const full = el('span', `ev-bar__full ev-bar--${r.band}`);
     full.style.width = `${Math.round(r.full * 100)}%`;
-    const part = el('span', 'ev-bar__part');
+    const part = el('span', `ev-bar__part ev-bar--${r.band}`);
     part.style.width = `${Math.round(r.half * 100)}%`;
     bar.append(full, part);
     const meta = el('span', 'ev-tag__meta');
@@ -140,10 +149,17 @@ export function flagCards(flags: Flag[], o: FlagCardOptions): HTMLElement {
     const done = o.followed?.(f) ?? null;
     if (done) {
       const link = button(`Follow-up: ${done.title}`, 'ghost', () => done.open());
+      link.setAttribute('aria-label', `Open follow-up for ${text.head(o.label(f.tag))}: ${done.title}`);
       actions.append(link);
       if (done.outcome) li.append(el('p', 'ev-flag__outcome', done.outcome));
-    } else if (o.onFollowUp) actions.append(button('Ann drafts follow-up quiz', 'secondary', () => o.onFollowUp!(f)));
-    actions.append(button('Dismiss', 'ghost', () => o.onDismiss(f)));
+    } else if (o.onFollowUp) {
+      const ann = button('Ann drafts follow-up quiz', 'secondary', () => o.onFollowUp!(f));
+      ann.setAttribute('aria-label', `Ann drafts follow-up quiz: ${text.head(o.label(f.tag))}`);
+      actions.append(ann);
+    }
+    const dismiss = button('Dismiss', 'ghost', () => o.onDismiss(f));
+    dismiss.setAttribute('aria-label', `Dismiss: ${text.head(o.label(f.tag))}`);
+    actions.append(dismiss);
     li.append(actions);
     list.append(li);
   }
@@ -190,20 +206,28 @@ export function quadrantGrid(q: Quadrants, who: (ids: string[]) => string): HTML
 export function questionTable(questions: InsightQuestion[], stats: ItemStat[], showDiscrimination: boolean): HTMLElement {
   const table = el('table', 'ev-questions');
   const head = el('tr');
-  for (const h of ['Question', 'Right', showDiscrimination ? 'Discrimination' : '', '']) head.append(el('th', undefined, h));
+  for (const [h, hidden] of [['Question', false], ['Right', false], [showDiscrimination ? 'Discrimination' : '', false], ['Note', true]] as const) {
+    const th = el('th');
+    th.scope = 'col';
+    if (hidden || !h) th.append(el('span', 'ev-visually-hidden', h || 'Discrimination'));
+    else th.textContent = h;
+    head.append(th);
+  }
   table.append(head);
   questions.forEach((q, i) => {
     const s = stats[i];
     const tr = el('tr');
     const note =
       !s ? '' : s.facility >= ITEM.tooEasy ? 'Too easy' : s.facility <= ITEM.tooHard ? 'Too hard' : showDiscrimination && s.discrimination !== null && s.discrimination < 0 ? 'Check question' : '';
-    const prompt = el('td', 'ev-questions__prompt', short(q.prompt));
+    const prompt = el('td', 'ev-questions__prompt', q.prompt || 'Question');
     prompt.title = q.prompt;
+    const noteCell = el('td');
+    if (note) noteCell.append(el('span', `ev-badge ev-badge--${note === 'Check question' ? 'weak' : 'thin'}`, note));
     tr.append(
       prompt,
       el('td', undefined, pct(s?.facility)),
       el('td', undefined, showDiscrimination && s?.discrimination !== null && s?.discrimination !== undefined ? s.discrimination.toFixed(2) : ''),
-      el('td', note ? `ev-badge ev-badge--${note === 'Check question' ? 'weak' : 'thin'}` : undefined, note)
+      noteCell
     );
     table.append(tr);
   });
