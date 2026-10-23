@@ -57,6 +57,17 @@ export function mountSolo(block: HingeBlock, lessonId: string, preview: boolean)
     } catch (error) {
       alert.textContent = errorText(error);
       alert.hidden = false;
+      // If the question can't be answered here (storage blocked, question changed since publishing),
+      // the student can still go on; the lecture counts it as seen.
+      if (!root.querySelector('.hq-solo__skip')) {
+        const skip = el('button', 'btn btn--ghost hq-solo__skip', 'Carry on without answering');
+        skip.type = 'button';
+        skip.addEventListener('click', () => {
+          skip.disabled = true;
+          emitAnswered(root, block.id, 'done');
+        });
+        root.append(skip);
+      }
     } finally {
       busy = false;
     }

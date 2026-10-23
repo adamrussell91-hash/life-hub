@@ -1,5 +1,6 @@
 // apps/teaching/src/lecture/tree.ts
 import type { Block } from '@/schemas/block';
+import { isSidePath } from './scenes';
 
 type ChildList = { blocks: Block[]; rebuild: (blocks: Block[]) => Block };
 
@@ -150,5 +151,8 @@ export function addToScene(blocks: Block[], sceneId: string, added: Block): Bloc
   if (!target) return blocks;
   if (target.block_type === 'heading') return insertAfter(blocks, sceneId, added);
   if (target.block_type === 'section') return prependToSection(blocks, sceneId, added);
-  return insertBefore(blocks, sceneId, added);
+  // An opening or unlabelled scene is named after its first block, so the callout goes after
+  // that block (and after a gate's If wrong path) to keep the scene's id and the pair together.
+  const next = nextSibling(blocks, sceneId);
+  return insertAfter(blocks, next && isSidePath(next) ? next.id : sceneId, added);
 }
