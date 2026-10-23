@@ -25,7 +25,7 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { listBlobKeys } from './blobs-list.mjs';
 import { QuizError, deviceHash, read, reject, validToken } from './question-drop.mjs';
-import { identify, mapTree, prepareQuizPublish } from './quiz.mjs';
+import { identify, mapTree, prepareQuizPublish, setStudentExitQuestions } from './quiz.mjs';
 import { emptyGroupState, tutorialKeys } from './tutorial-status.mjs';
 
 export { QuizError as TutorialError };
@@ -232,38 +232,40 @@ function exitQuestionsFromDraft(draft, groupId, record) {
 }
 
 /**
- * Moving a student touches the draft (groups), the published tabs and the
- * current quiz key (which exit questions they get), so all three stay in step.
+ * Moving a student touches the published tabs, the current quiz key (which
+ * exit questions they get) and the draft's groups. Students' live state goes
+ * first; the draft is written last against its etag, so an edit saved in
+ * another tab meanwhile is never overwritten (the move is retried on top).
  */
 async function moveStudent(store, lessonId, studentId, groupId) {
-  const draft = await read(store, draftLessonKey(lessonId));
-  const groups = draftGroups(draft);
-  if (typeof groupId !== 'string' || !groups.some((g) => g.id === groupId)) reject(404, 'not_found', 'That group is gone.');
-  const roster = await loadRoster(store, draft.tutorial?.class_id);
-  if (typeof studentId !== 'string' || !list(roster?.students).some((s) => s.id === studentId)) reject(400, 'bad_student', 'That student isn’t on this class list.');
-  const shift = (gs) => gs.map((g) => {
-    const others = list(g?.students).filter((s) => s !== studentId);
-    return { ...g, students: g.id === groupId ? [...others, studentId] : others };
-  });
-  await store.setJSON(draftLessonKey(lessonId), { ...draft, tutorial: { ...draft.tutorial, groups: shift(groups) }, updated_at: new Date().toISOString() });
   const k = tutorialKeys(lessonId);
-  const tabs = await read(store, k.tabs);
-  if (tabs && Array.isArray(tabs.groups)) await store.setJSON(k.tabs, { ...tabs, groups: shift(tabs.groups) });
+  for (let i = 0; i < 3; i += 1) {
+    const row = await store.getWithMetadata(draftLessonKey(lessonId), { type: 'json', consistency: 'strong' });
+    const draft = row?.data;
+    if (!draft || draft.pedagogical_mode !== 'tutorial') reject(404, 'not_found', 'Tutorial not found.');
+    const groups = draftGroups(draft);
+    if (typeof groupId !== 'string' || !groups.some((g) => g.id === groupId)) reject(404, 'not_found', 'That group is gone.');
+    const classId = draft.tutorial?.class_id;
+    const roster = await loadRoster(store, classId);
+    if (typeof studentId !== 'string' || !list(roster?.students).some((s) => s.id === studentId)) reject(400, 'bad_student', 'That student isn’t on this class list.');
+    const tabs = await read(store, k.tabs);
+    if (tabs && !list(tabs.groups).some((g) => g?.id === groupId)) reject(409, 'not_published', 'Publish the tutorial again so this group has a tab.');
+    const shift = (gs) => gs.map((g) => {
+      const others = list(g?.students).filter((s) => s !== studentId);
+      return { ...g, students: g.id === groupId ? [...others, studentId] : others };
+    });
 
-  // The exit check follows the student: copy a current member's questions, else read the group's exit section.
-  const current = await read(store, `quiz/${lessonId}/current`);
-  if (!current?.version) return;
-  const recordKey = `quiz/${lessonId}/keys/${current.version}`;
-  const record = await read(store, recordKey);
-  if (!record || !record.groups || typeof record.groups !== 'object') return;
-  const mate = groups.find((g) => g.id === groupId).students.find((s) => s !== studentId && Array.isArray(record.groups[s]));
-  const questions = mate ? [...record.groups[mate]] : exitQuestionsFromDraft(draft, groupId, record);
-  const forStudents = list(record.settings?.for_students);
-  await store.setJSON(recordKey, {
-    ...record,
-    groups: { ...record.groups, [studentId]: questions },
-    settings: { ...record.settings, for_students: forStudents.includes(studentId) ? forStudents : [...forStudents, studentId] }
-  });
+    if (tabs) await store.setJSON(k.tabs, { ...tabs, groups: shift(list(tabs.groups)) });
+    // The exit check follows the student: copy a current member's questions, else read the group's exit section.
+    const mates = groups.find((g) => g.id === groupId).students.filter((s) => s !== studentId);
+    await setStudentExitQuestions(store, lessonId, classId, studentId, (record) => {
+      const mate = mates.find((s) => Array.isArray(record.groups[s]));
+      return mate ? [...record.groups[mate]] : exitQuestionsFromDraft(draft, groupId, record);
+    });
+    const written = await store.setJSON(draftLessonKey(lessonId), { ...draft, tutorial: { ...draft.tutorial, groups: shift(groups) }, updated_at: new Date().toISOString() }, { onlyIfMatch: row.etag });
+    if (written?.modified !== false) return;
+  }
+  reject(409, 'changed', 'The lesson changed in another tab. Try again.');
 }
 
 function groupStatus(state, students) {
@@ -282,7 +284,10 @@ async function summary(store, lessonId, draft) {
   const handups = await allHandups(store, lessonId);
   const groups = await Promise.all(draftGroups(draft).map(async (g) => {
     const state = await groupState(store, k.group(g.id));
-    const students = await Promise.all(g.students.map(async (id) => {
+    // With no class there is no way to find a student's progress: list them as not started.
+    const students = !classId
+      ? g.students.map((id) => ({ id, initials: '–', name: 'Removed student', stage: 'not_started', unlocked: state.done_students.includes(id) }))
+      : await Promise.all(g.students.map(async (id) => {
       const progress = await read(store, k.progress(deviceHash(`student:${classId}:${id}`)));
       const s = byId.get(id);
       return { id, initials: s?.initials ?? '–', name: s?.name ?? 'Removed student', stage: progress?.stage ?? 'not_started', unlocked: state.done_students.includes(id) };

@@ -112,6 +112,8 @@ test('move carries the exit questions: from the draft exit section when the grou
     groups: [{ id: 'gc', name: 'Empty', why: 'z', goal: 'g', gap_type: 'knowledge', students: [], evidence: [] }],
     blocks: [exitSection('xa', 'ga', ['q1']), exitSection('xb', 'gb', ['q2']), exitSection('xc', 'gc', ['q3', 'q_new'])]
   });
+  const tabs = store.data.get(tutorialKeys('tut1').tabs);
+  store.data.set(tutorialKeys('tut1').tabs, { ...tabs, groups: [...tabs.groups, { id: 'gc', goal: 'g', students: [], blocks: [] }] });
   withQuiz(store, { st_ann: ['q1'], st_cy: ['q2'] });
   await tutorialTeacherAction(store, 'tut1', { action: 'move', student_id: 'st_ed', group_id: 'gc' });
   const record = store.data.get('quiz/tut1/keys/v1');
@@ -138,4 +140,54 @@ test('hand-ups count per group, the board lists its own, and reply answers one',
   assert.deepEqual(mine.handups.filter((h) => h.status === 'answered').map((h) => h.reply), ['Look at step 2']);
   await assert.rejects(tutorialTeacherAction(store, 'tut1', { action: 'reply', id: 'nope', reply: 'x' }), { code: 'bad_id' });
   await assert.rejects(tutorialTeacherAction(store, 'tut1', { action: 'reply', id: `${ownerOf('st_ann')}~abcdef123`, reply: 'x' }), { code: 'not_found' });
+});
+
+test('move refuses a group the published tabs don’t have yet', async () => {
+  const store = withDraft({ groups: [{ id: 'gc', name: 'New', why: 'z', goal: 'g', gap_type: 'knowledge', students: [], evidence: [] }] });
+  await assert.rejects(tutorialTeacherAction(store, 'tut1', { action: 'move', student_id: 'st_ann', group_id: 'gc' }), { code: 'not_published' });
+  assert.deepEqual(store.data.get(draftLessonKey('tut1')).tutorial.groups[0].students, ['st_ann']);
+});
+
+test('move leaves the exit questions of a student who has started the check', async () => {
+  const store = withDraft();
+  withQuiz(store, { st_ann: ['q1'], st_cy: ['q2'] });
+  store.data.set(`quiz/tut1/attempts/${ownerOf('st_ann')}/0`, { n: 0, version: 'v1', started_at: new Date().toISOString(), deadline: null });
+  await tutorialTeacherAction(store, 'tut1', { action: 'move', student_id: 'st_ann', group_id: 'gb' });
+  assert.deepEqual(store.data.get('quiz/tut1/keys/v1').groups.st_ann, ['q1']);
+  assert.deepEqual(store.data.get(tutorialKeys('tut1').tabs).groups.map((g) => g.students), [[], ['st_cy', 'st_ann']]);
+});
+
+test('move keeps an edit saved in another tab, and gives up after three clashes', async () => {
+  const store = withDraft();
+  // One clash: another tab saves the draft between the move's read and its write.
+  let once = true;
+  const hook = async (key) => {
+    if (key !== draftLessonKey('tut1') || !once) return;
+    once = false;
+    store.beforeWrite = null;
+    await store.setJSON(key, { ...store.data.get(key), title: 'Renamed elsewhere' });
+    store.beforeWrite = hook;
+  };
+  store.beforeWrite = hook;
+  await tutorialTeacherAction(store, 'tut1', { action: 'move', student_id: 'st_ann', group_id: 'gb' });
+  const draft = store.data.get(draftLessonKey('tut1'));
+  assert.equal(draft.title, 'Renamed elsewhere');
+  assert.deepEqual(draft.tutorial.groups.map((g) => g.students), [[], ['st_cy', 'st_ann']]);
+
+  const always = async (key, opts) => {
+    if (key !== draftLessonKey('tut1') || !opts.onlyIfMatch) return;
+    store.beforeWrite = null;
+    await store.setJSON(key, { ...store.data.get(key) });
+    store.beforeWrite = always;
+  };
+  store.beforeWrite = always;
+  await assert.rejects(tutorialTeacherAction(store, 'tut1', { action: 'move', student_id: 'st_cy', group_id: 'ga' }), { code: 'changed' });
+});
+
+test('summary with no class lists students as not started without reading progress', async () => {
+  const store = withDraft();
+  const draft = store.data.get(draftLessonKey('tut1'));
+  store.data.set(draftLessonKey('tut1'), { ...draft, tutorial: { ...draft.tutorial, class_id: undefined } });
+  const s = await tutorialTeacherAction(store, 'tut1', { action: 'summary' });
+  assert.deepEqual(s.groups[0].students, [{ id: 'st_ann', initials: '–', name: 'Removed student', stage: 'not_started', unlocked: false }]);
 });

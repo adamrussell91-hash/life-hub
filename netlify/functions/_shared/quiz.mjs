@@ -158,6 +158,33 @@ export async function storeQuizKey(store, lessonId, quiz) {
   await store.setJSON(k.current, { version: quiz.version });
 }
 
+/**
+ * A tutorial student moved group: point their exit questions at the new
+ * group's. `pick(record)` returns the question ids from the current key.
+ * Also adds them to `for_students`. Returns 'updated', 'started' (left alone)
+ * or 'none' (no published exit check).
+ */
+export async function setStudentExitQuestions(store, lessonId, classId, studentId, pick) {
+  const k = keys(lessonId);
+  const current = await read(store, k.current);
+  if (!current?.version) return 'none';
+  const record = await read(store, k.version(current.version));
+  if (!record?.groups || typeof record.groups !== 'object') return 'none';
+  // A go already started is marked against the questions it began with, so
+  // changing them now would mis-mark it. That student keeps their old set.
+  const device = deviceHash(`student:${classId}:${studentId}`);
+  if ((await deviceAttempts(store, k, device, await clearedFrom(store, k, device))).length) return 'started';
+  const picked = pick(record);
+  const questions = (Array.isArray(picked) ? picked : []).filter((id) => record.order.includes(id));
+  const forStudents = Array.isArray(record.settings?.for_students) ? record.settings.for_students : [];
+  await store.setJSON(k.version(current.version), {
+    ...record,
+    groups: { ...record.groups, [studentId]: questions },
+    settings: { ...record.settings, for_students: forStudents.includes(studentId) ? forStudents : [...forStudents, studentId] }
+  });
+  return 'updated';
+}
+
 /* ── Loading ───────────────────────────────────────────────────────── */
 
 /** Lesson modes whose quiz questions run on this engine: a quiz, and a tutorial's exit check. */
