@@ -6,12 +6,6 @@
 const MODES = new Set(['train', 'metro', 'light_rail']);
 const LEVELS = new Set(['introduced', 'reinforced', 'mastered']);
 
-const KINDS = new Set(['workshop', 'lecture']);
-
-export function publicLessonKind(kind) {
-  return KINDS.has(kind) ? kind : undefined;
-}
-
 /**
  * What comes after each published lesson, for students. A link to a lesson
  * students cannot see passes through it to what that lesson leads to (its own

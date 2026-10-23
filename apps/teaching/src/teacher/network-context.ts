@@ -189,7 +189,6 @@ export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): 
       ...(l.line_stops ? { line_stops: l.line_stops } : {}),
       ...(l.line_off ? { line_off: l.line_off } : {}),
       ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}),
-      ...(l.lesson_kind ? { kind: l.lesson_kind } : {}),
       ...(l.dot_points ? { dot_points: l.dot_points } : {}),
       ...(l.route_role ? { role: l.route_role } : {}),
       ...(l.skip_rule ? { skip: l.skip_rule } : {}),

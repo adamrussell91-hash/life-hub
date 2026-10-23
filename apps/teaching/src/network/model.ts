@@ -1,7 +1,6 @@
 import type {
   CurriculumLinesV1Content,
   CurriculumLinesV2Content,
-  LessonKind,
   LineStop,
   NetworkLine,
   NetworkLineMode
@@ -20,7 +19,6 @@ export type NetLesson = {
   line_off?: readonly string[];
   /** Lessons after this one; unset follows the map's order. */
   after?: readonly string[];
-  kind?: LessonKind;
   /** Syllabus dot points the lesson teaches (teacher views only). */
   dot_points?: readonly string[];
 };
