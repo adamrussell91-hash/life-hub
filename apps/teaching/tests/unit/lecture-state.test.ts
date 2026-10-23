@@ -64,11 +64,11 @@ describe('lecture state', () => {
     expect(act(s, scenes, mainAction(s, scenes)).finished).toBe(true);
   });
 
-  it('counts a replay when going back to a scene already reached, and shows it whole', () => {
+  it('counts a replay when going back to a scene already reached', () => {
     let s = goTo(startState(scenes), scenes, 1);
     s = goTo(s, scenes, 0);
     expect(s.replays).toEqual({ h1: 1 });
-    expect(s.shown).toBe(2);
+    expect(s.shown).toBe(1);
   });
 
   it('restores a saved state and clamps it to the current scenes', () => {
@@ -76,5 +76,34 @@ describe('lecture state', () => {
     const s = restoreState(saved, scenes);
     expect(s.scene).toBe(2);
     expect(restoreState({ nonsense: true }, scenes)).toEqual(startState(scenes));
+  });
+
+  it('keeps a scene as far as it got when going back and forward past a gate', () => {
+    const gated = lectureScenes([heading('h1'), text('t1'), heading('h2'), b('q1', 'hinge_question', { prompt: 'p', options: [] }), text('t2')]);
+    let s = goTo(startState(gated), gated, 1);
+    s = goTo(s, gated, 0);
+    s = goTo(s, gated, 1);
+    expect(s.shown).toBe(1);
+    expect(mainAction(s, gated).kind).toBe('wait');
+  });
+
+  it('counts a replay only when going back, not forward', () => {
+    const s = goTo(goTo(startState(scenes), scenes, 1), scenes, 0);
+    expect(s.replays).toEqual({ h1: 1 });
+    expect(goTo(s, scenes, 1).replays).toEqual({ h1: 1 });
+  });
+
+  it('survives a non-finite shown', () => {
+    const s = restoreState({ ...startState(scenes), shown: null, shownBy: { h1: 'x' } }, scenes);
+    expect(s.shown).toBe(1);
+    expect(s.shownBy).toEqual({ h1: 1 });
+  });
+
+  it('restores a detour only when the gate has a side path', () => {
+    let s = answer(goTo(startState(scenes), scenes, 1), 'q1', 'wrong');
+    s = act(s, scenes, mainAction(s, scenes));
+    const saved = JSON.parse(JSON.stringify(s));
+    expect(restoreState(saved, scenes).detour).toBe('q1');
+    expect(restoreState({ ...saved, detour: 'nope' }, scenes).detour).toBeNull();
   });
 });

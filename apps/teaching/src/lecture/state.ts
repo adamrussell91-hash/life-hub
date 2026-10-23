@@ -7,6 +7,8 @@ export type LectureState = {
   scene: number;
   /** How many of the scene's beats are showing. */
   shown: number;
+  /** How far each reached scene got, by scene id, so going back and forward cannot skip a gate. */
+  shownBy: Record<string, number>;
   /** The gate whose side path is playing, or null. */
   detour: string | null;
   answered: Record<string, GateResult>;
@@ -38,6 +40,7 @@ export function startState(scenes: readonly LectureScene[]): LectureState {
   return {
     scene: 0,
     shown: firstShown(scenes[0]),
+    shownBy: scenes[0] ? { [scenes[0].id]: firstShown(scenes[0]) } : {},
     detour: null,
     answered: {},
     ticked: [],
@@ -71,8 +74,10 @@ export function mainAction(state: LectureState, scenes: readonly LectureScene[])
 
 export function act(state: LectureState, scenes: readonly LectureScene[], action: MainAction): LectureState {
   switch (action.kind) {
-    case 'reveal':
-      return { ...state, shown: state.shown + 1 };
+    case 'reveal': {
+      const id = scenes[state.scene]?.id;
+      return { ...state, shown: state.shown + 1, shownBy: id ? { ...state.shownBy, [id]: state.shown + 1 } : state.shownBy };
+    }
     case 'next':
       return goTo(state, scenes, state.scene + 1);
     case 'finish':
@@ -103,13 +108,18 @@ export function goTo(state: LectureState, scenes: readonly LectureScene[], index
   const scene = scenes[target];
   if (!scene) return state;
   const seen = state.reached.includes(scene.id);
+  const here = scenes[state.scene];
+  const shownBy = here ? { ...state.shownBy, [here.id]: state.shown } : { ...state.shownBy };
+  const shown = Math.min(shownBy[scene.id] ?? firstShown(scene), scene.beats.length);
+  shownBy[scene.id] = shown;
   return {
     ...state,
     scene: target,
     detour: null,
-    shown: seen ? scene.beats.length : firstShown(scene),
+    shown,
+    shownBy,
     reached: add(state.reached, scene.id),
-    replays: seen && target !== state.scene ? { ...state.replays, [scene.id]: (state.replays[scene.id] ?? 0) + 1 } : state.replays
+    replays: seen && target < state.scene ? { ...state.replays, [scene.id]: (state.replays[scene.id] ?? 0) + 1 } : state.replays
   };
 }
 
@@ -124,10 +134,19 @@ export function restoreState(raw: unknown, scenes: readonly LectureScene[]): Lec
   const beats = scenes[scene]?.beats.length ?? 0;
   const results = Object.entries(r.answered ?? {}).filter(([, v]) => v === 'right' || v === 'wrong' || v === 'done');
   const replays = Object.entries(r.replays ?? {}).filter(([, v]) => typeof v === 'number' && v >= 0);
+  const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const current = scenes[scene];
+  const shown = finite(r.shown) ? Math.max(firstShown(current), Math.min(Math.floor(r.shown), beats)) : firstShown(current);
+  const shownBy = Object.fromEntries(
+    Object.entries(r.shownBy ?? {}).filter(([id, v]) => finite(v) && scenes.some((sc) => sc.id === id)).map(([id, v]) => [id, Math.max(0, Math.floor(v as number))])
+  ) as Record<string, number>;
+  if (current) shownBy[current.id] = shown;
+  const detour = typeof r.detour === 'string' && current?.beats.some((beat) => beat.block.id === r.detour && beat.sidePath) ? r.detour : null;
   return {
     scene,
-    shown: Math.max(firstShown(scenes[scene]), Math.min(Math.floor(r.shown ?? 0), beats)),
-    detour: null,
+    shown,
+    shownBy,
+    detour,
     answered: Object.fromEntries(results) as Record<string, GateResult>,
     ticked: strings(r.ticked),
     detoured: strings(r.detoured),
