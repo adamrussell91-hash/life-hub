@@ -38,7 +38,7 @@ export type LectureScene = {
 const GATE_TYPES = new Set<Block['block_type']>(['hinge_question', 'cloze', 'self_check']);
 const SKIPPED = new Set<Block['block_type']>(['spacer', 'divider', 'teacher_note']);
 
-export function isGate(block: Block): block is GateBlock {
+export function isGate(block: Block): boolean {
   return GATE_TYPES.has(block.block_type) && (block.content as { gate?: boolean }).gate !== false;
 }
 
@@ -70,6 +70,7 @@ export function takeawayCue(section: SectionBlock): Block | null {
 export function lectureScenes(blocks: readonly Block[]): LectureScene[] {
   const scenes: LectureScene[] = [];
   const cursor: { open: LectureScene | null } = { open: null };
+  let chapters = 0;
 
   const start = (scene: Omit<LectureScene, 'beats'>): LectureScene => {
     const next: LectureScene = { ...scene, beats: [] };
@@ -112,10 +113,12 @@ export function lectureScenes(blocks: readonly Block[]): LectureScene[] {
   }
 
   function chapterOf(section: SectionBlock): void {
-    const chapter = { id: section.id, label: shortLabel(section.content.title, `Chapter ${scenes.length + 1}`) };
+    chapters += 1;
+    const chapter = { id: section.id, label: shortLabel(section.content.title, `Chapter ${chapters}`) };
     cursor.open = null;
     const children = section.content.blocks as Block[];
-    if (section.content.narration || children[0]?.block_type !== 'heading') {
+    const firstPlaying = children.find((child) => !isSidePath(child) && !SKIPPED.has(child.block_type));
+    if (section.content.narration || firstPlaying?.block_type !== 'heading') {
       start({ id: section.id, label: chapter.label, chapter, heading: null, intro: true, narration: section.content.narration ?? null, reveal: 'one' });
     }
     walk(children, chapter);
