@@ -295,6 +295,16 @@ describe('lecture player', () => {
     expect(main().textContent).toBe('Next scene →');
   });
 
+  it('leaves → to a block that already handled it, like tabs', () => {
+    const { host, main } = mount();
+    start(host);
+    const tabs = document.createElement('div');
+    tabs.addEventListener('keydown', (e) => e.preventDefault());
+    host.querySelector('.lecture-stage')!.append(tabs);
+    tabs.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    expect(main().textContent).toBe('Reveal · 2 of 2');
+  });
+
   it('marks the first scene of each chapter on the strip', () => {
     const chapter = b('c1', 'section', { title: 'Part one', blocks: [heading('ca'), text('x'), heading('cb')], takeaway: { enabled: false } });
     const { host } = mount(null, [heading('h0'), chapter]);
