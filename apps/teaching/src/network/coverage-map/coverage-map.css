@@ -163,7 +163,8 @@
 .cm__swatch--none { border: 1.5px solid var(--muted, #6b7788); }
 .cm__swatch--took { border-radius: 2px; height: 4px; width: 16px; background: var(--cm-support); }
 .cm__swatch--bar { border-radius: 1px; width: 6px; height: 14px; background: var(--navy, #17375e); }
-.cm__swatch--thin { background: var(--cm-support); }
+.cm__swatch--thin { background: var(--cm-support); width: 13px; height: 13px; }
+.cm__swatch--thin::after { content: '!'; display: block; color: #fff; font-size: 10px; font-weight: 700; line-height: 13px; text-align: center; }
 .cm__swatch--depth { border: 2px solid var(--navy, #17375e); }
 .cm__swatch--support { border: 2px dashed var(--cm-support); }
 .cm__swatch--side { border: 2px dashed var(--cm-side); }
