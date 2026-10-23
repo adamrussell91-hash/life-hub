@@ -29,6 +29,8 @@ import { openScheduleOverflow } from '@/teacher/schedule-overflow';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { renderUnitSequence } from '@/teacher/unit-sequence';
+import { createClassFold } from '@/teacher/class-fold';
+import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 import { renderPageHeader } from '@/teacher/page-header';
 
 export interface ClassesIndexOptions {
@@ -353,9 +355,12 @@ export function renderClassPage(
   disposers.push(() => unmountTeachingCalendar());
   main.append(errorBanner);
 
+  const lessonsFold = createClassFold(cls.id, 'lessons', { className: 'class-page__lessons' });
+  lessonsFold.summary.append(lessonsSummary(cls, classScheduled, lessonTitles, today));
   const sequenceHost = document.createElement('div');
   sequenceHost.className = 'class-page__sequence-host';
-  main.append(sequenceHost);
+  lessonsFold.details.append(sequenceHost);
+  main.append(lessonsFold.details);
 
   const studentsHost = document.createElement('div');
   studentsHost.className = 'class-page__students-host';
@@ -373,16 +378,6 @@ export function renderClassPage(
     currentUnitId: currentActiveUnitId,
     classId: cls.id,
     today,
-    onMoveUp: (scheduledId) => {
-      void runScheduleMutation(options, errorBanner, async () => {
-        await patchScheduledLesson(scheduledId, { direction: 'up' });
-      });
-    },
-    onMoveDown: (scheduledId) => {
-      void runScheduleMutation(options, errorBanner, async () => {
-        await patchScheduledLesson(scheduledId, { direction: 'down' });
-      });
-    },
     onOverflow: (scheduledId, anchor) => {
       openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
     },
@@ -576,8 +571,26 @@ async function runScheduleMutation(
   }
 }
 
+/** By date; two lessons on one day keep their schedule order. */
 function compareScheduledLessons(a: ScheduledLesson, b: ScheduledLesson): number {
-  const byOrder = a.schedule_order - b.schedule_order;
-  if (byOrder !== 0) return byOrder;
-  return a.date.localeCompare(b.date);
+  return a.date.localeCompare(b.date) || a.schedule_order - b.schedule_order;
+}
+
+/** The lessons fold's closed face: how many, and which is next. */
+function lessonsSummary(cls: Class, scheduled: ScheduledLesson[], titles: Map<string, string>, today: string): HTMLElement {
+  const wrap = document.createElement('span');
+  wrap.className = 'class-fold__face';
+  const title = document.createElement('h2');
+  title.className = 'class-fold__title';
+  title.textContent = 'Lessons';
+  const meta = document.createElement('span');
+  meta.className = 'class-fold__meta';
+  const next =
+    scheduled.find((row) => row.id === cls.current_scheduled_lesson_id) ??
+    scheduled.find((row) => row.date >= today && row.delivery_status !== 'delivered');
+  const parts = [`${scheduled.length} ${scheduled.length === 1 ? 'lesson' : 'lessons'}`];
+  if (next) parts.push(`next: ${titles.get(next.lesson_id) ?? 'Untitled lesson'}, ${formatDisplayDate(next.date)}`);
+  meta.textContent = parts.join(' · ');
+  wrap.append(title, meta);
+  return wrap;
 }

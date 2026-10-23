@@ -3,6 +3,7 @@ import { decodeBlob } from './decode-blob.mjs';
 import { validateJournal } from './travel-journal-schema.mjs';
 
 const JOURNALS_PREFIX = 'data/travel/journals/';
+const ATLAS_SETTINGS_PATH = 'data/travel/atlas-settings.json';
 
 const journalCache = new Map();
 const CACHE_TTL_MS = 30_000;
@@ -94,11 +95,54 @@ export function createTravelJournalRepository({
     }
   }
 
+  /** Every trip journal, for views that read across trips (the Arches Atlas). */
+  async function listJournals() {
+    const { tree } = await client.resolveTree();
+    const blobs = tree.filter(
+      (item) => item.type === 'blob' && item.path.startsWith(JOURNALS_PREFIX) && item.path.endsWith('.json')
+    );
+    const journals = [];
+    for (const blob of blobs) {
+      try {
+        journals.push(await readJournalBlob(blob));
+      } catch {
+        // One unreadable journal should not hide the rest.
+      }
+    }
+    return journals;
+  }
+
+  async function getAtlasSettings() {
+    const { tree } = await client.resolveTree();
+    const blob = findBlob(tree, ATLAS_SETTINGS_PATH);
+    if (!blob) return { settings: {}, version: null };
+    const raw = decodeBlob(await client.readBlob(blob.sha));
+    return { settings: JSON.parse(raw || '{}'), version: blob.sha };
+  }
+
+  async function saveAtlasSettings(settings, version) {
+    try {
+      const result = await client.writeFile({
+        path: ATLAS_SETTINGS_PATH,
+        content: `${JSON.stringify(settings, null, 2)}\n`,
+        ...(version ? { sha: version } : {}),
+        message: 'travel-atlas: update settings'
+      });
+      return { settings, version: result.sha };
+    } catch (error) {
+      if (error?.status === 409 || error?.status === 422) throw conflictError();
+      throw error;
+    }
+  }
+
   return {
     getJournal,
     createJournal,
-    saveJournal
+    saveJournal,
+    listJournals,
+    getAtlasSettings,
+    saveAtlasSettings
   };
 }
 
-export { JOURNALS_PREFIX, conflictError };
+export { JOURNALS_PREFIX, ATLAS_SETTINGS_PATH, conflictError };

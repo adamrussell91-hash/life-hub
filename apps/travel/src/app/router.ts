@@ -2,7 +2,8 @@ export type Route =
   | { name: 'trips' }
   | { name: 'trip'; tripId: string; cityId?: string; date?: string }
   | { name: 'journal'; tripId: string; momentId?: string }
-  | { name: 'today' };
+  | { name: 'today' }
+  | { name: 'atlas'; tripId?: string };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -18,7 +19,8 @@ function safeSegment(segment: string): string | null {
   return decoded;
 }
 
-/** Hash routes (§2.1): `#/`, `#/trip/:tripId[/:cityId/:date]`, `#/trip/:tripId/journal[/:momentId]`, `#/today`.
+/** Hash routes (§2.1): `#/`, `#/trip/:tripId[/:cityId/:date]`, `#/trip/:tripId/journal[/:momentId]`, `#/today`,
+ * `#/atlas[?trip=:tripId]`.
  * Anything else falls back to the trips list. */
 export function parseRoute(hash: string = location.hash): Route {
   const raw = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
@@ -27,6 +29,12 @@ export function parseRoute(hash: string = location.hash): Route {
 
   const segments = path.split('/').filter(Boolean);
   if (segments.length === 1 && segments[0] === 'today') return { name: 'today' };
+  if (segments.length === 1 && segments[0] === 'atlas') {
+    const q = hash.indexOf('?');
+    const trip = q === -1 ? null : new URLSearchParams(hash.slice(q + 1)).get('trip');
+    const tripId = trip ? safeSegment(trip) : null;
+    return tripId ? { name: 'atlas', tripId } : { name: 'atlas' };
+  }
 
   if (segments[0] === 'trip' && segments.length >= 2) {
     const tripId = safeSegment(segments[1]!);
@@ -57,6 +65,11 @@ export function tripsRoute(): string {
 
 export function todayRoute(): string {
   return '#/today';
+}
+
+/** The Arches Atlas; with a trip, the same page filtered to that trip. */
+export function atlasRoute(tripId?: string): string {
+  return tripId ? `#/atlas?trip=${encodeURIComponent(tripId)}` : '#/atlas';
 }
 
 export function tripRoute(tripId: string, cityId?: string, date?: string): string {

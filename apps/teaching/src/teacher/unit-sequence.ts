@@ -18,8 +18,6 @@ export interface RenderUnitSequenceOptions {
   currentUnitId: string;
   classId: string;
   today: string;
-  onMoveUp?: (scheduledId: string) => void;
-  onMoveDown?: (scheduledId: string) => void;
   onOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
   onNavigate?: (path: string) => void;
   /** Hide reorder/overflow controls (student / read-only class page). */
@@ -30,7 +28,7 @@ export interface RenderUnitSequenceOptions {
 
 type SequenceHandlers = Pick<
   RenderUnitSequenceOptions,
-  'onMoveUp' | 'onMoveDown' | 'onOverflow' | 'onNavigate' | 'readOnly' | 'lessonHref' | 'unitHref'
+  'onOverflow' | 'onNavigate' | 'readOnly' | 'lessonHref' | 'unitHref'
 >;
 
 const handlersByRoot = new WeakMap<HTMLElement, SequenceHandlers>();
@@ -67,10 +65,9 @@ function formatDateRange(start: string, end: string): string {
   return `${formatShortDate(start)} – ${formatShortDate(end)}`;
 }
 
+/** By date; two lessons on one day keep their schedule order. */
 function compareScheduled(a: SequenceScheduledLesson, b: SequenceScheduledLesson): number {
-  const byOrder = a.schedule_order - b.schedule_order;
-  if (byOrder !== 0) return byOrder;
-  return a.date.localeCompare(b.date);
+  return a.date.localeCompare(b.date) || a.schedule_order - b.schedule_order;
 }
 
 function earliestScheduled(rows: SequenceScheduledLesson[]): SequenceScheduledLesson | undefined {
@@ -171,28 +168,7 @@ function buildLessonRow(
   const controls = document.createElement('span');
   controls.className = 'seq__controls';
 
-  const up = document.createElement('button');
-  up.type = 'button';
-  up.className = 'hub-list__more';
-  up.innerHTML = HUB_LIST_ICONS.up;
-  up.setAttribute('aria-label', 'Move up');
-  up.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    handlersByRoot.get(root)?.onMoveUp?.(entry.id);
-  });
-
-  const down = document.createElement('button');
-  down.type = 'button';
-  down.className = 'hub-list__more';
-  down.innerHTML = HUB_LIST_ICONS.down;
-  down.setAttribute('aria-label', 'Move down');
-  down.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    handlersByRoot.get(root)?.onMoveDown?.(entry.id);
-  });
-
+  // Lessons run in date order, so a lesson moves by changing its date in More actions.
   const overflow = document.createElement('button');
   overflow.type = 'button';
   overflow.className = 'hub-list__more';
@@ -204,7 +180,7 @@ function buildLessonRow(
     handlersByRoot.get(root)?.onOverflow?.(entry.id, overflow);
   });
 
-  controls.append(up, down, overflow);
+  controls.append(overflow);
   row.append(controls);
   return row;
 }
@@ -295,8 +271,6 @@ export function renderUnitSequence(
   const root = document.createElement('div');
   root.className = 'unit-sequence';
   handlersByRoot.set(root, {
-    onMoveUp: options.onMoveUp,
-    onMoveDown: options.onMoveDown,
     onOverflow: options.onOverflow,
     onNavigate: options.onNavigate,
     readOnly: options.readOnly,

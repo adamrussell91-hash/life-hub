@@ -133,8 +133,6 @@ describe('renderUnitSequence', () => {
     currentUnitId?: string;
     today?: string;
     readOnly?: boolean;
-    onMoveUp?: (scheduledId: string) => void;
-    onMoveDown?: (scheduledId: string) => void;
     onOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
     onNavigate?: (path: string) => void;
   }) {
@@ -146,8 +144,6 @@ describe('renderUnitSequence', () => {
       classId: CLASS_ID,
       today: overrides?.today ?? '2026-08-20',
       readOnly: overrides?.readOnly,
-      onMoveUp: overrides?.onMoveUp,
-      onMoveDown: overrides?.onMoveDown,
       onOverflow: overrides?.onOverflow,
       onNavigate: overrides?.onNavigate
     });
@@ -249,7 +245,7 @@ describe('renderUnitSequence', () => {
     expect(rows[1].textContent).toContain('current');
   });
 
-  it('keeps reorder controls in the DOM without hidden or display:none', () => {
+  it('keeps lesson controls in the DOM without hidden or display:none', () => {
     render();
 
     const controls = host.querySelector(
@@ -258,7 +254,7 @@ describe('renderUnitSequence', () => {
     expect(controls).not.toBeNull();
 
     const buttons = [...controls.querySelectorAll('button')];
-    expect(buttons.map((btn) => btn.getAttribute('aria-label'))).toEqual(['Move up', 'Move down', 'More actions']);
+    expect(buttons.map((btn) => btn.getAttribute('aria-label'))).toEqual(['More actions']);
 
     for (const btn of buttons) {
       expect(btn.hasAttribute('hidden')).toBe(false);
@@ -275,24 +271,33 @@ describe('renderUnitSequence', () => {
     expect(host.querySelector('a.seq__lesson-link[href="/lessons/l1"]')).not.toBeNull();
   });
 
-  it('wires move and overflow callbacks', () => {
-    const onMoveUp = vi.fn();
-    const onMoveDown = vi.fn();
+  it('wires the overflow callback', () => {
     const onOverflow = vi.fn();
-    render({ onMoveUp, onMoveDown, onOverflow });
+    render({ onOverflow });
 
     const row = host.querySelector(
       'details[data-unit-id="unit_aotfw"] .seq__lessons .seq__row:nth-child(2)'
     )!;
-    const [up, down, overflow] = [...row.querySelectorAll('button')];
-
-    up.click();
-    down.click();
+    const [overflow] = [...row.querySelectorAll('button')];
     overflow.click();
 
-    expect(onMoveUp).toHaveBeenCalledWith('s2');
-    expect(onMoveDown).toHaveBeenCalledWith('s2');
     expect(onOverflow).toHaveBeenCalledWith('s2', overflow);
+  });
+
+  it('lists lessons by date even when the schedule order disagrees', () => {
+    renderUnitSequence(host, {
+      units: [unit({ id: 'unit_dates', title: 'Dates' })],
+      scheduled: [
+        scheduled({ id: 'late', lesson_id: 'l1', unit_id: 'unit_dates', date: '2026-08-20', schedule_order: 1, delivery_status: 'planned' }),
+        scheduled({ id: 'early', lesson_id: 'l2', unit_id: 'unit_dates', date: '2026-08-11', schedule_order: 9, delivery_status: 'planned' })
+      ],
+      lessonTitles,
+      currentUnitId: 'unit_dates',
+      classId: CLASS_ID,
+      today: '2026-08-01'
+    });
+    const titles = [...host.querySelectorAll('.seq__lesson-title')].map((n) => n.textContent);
+    expect(titles).toEqual(['Narrative Structure', 'Opening Moves']);
   });
 
   it('uses SPA navigation for unit and lesson links when onNavigate is set', () => {

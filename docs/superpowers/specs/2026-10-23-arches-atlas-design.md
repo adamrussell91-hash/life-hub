@@ -1,7 +1,7 @@
 # Arches Atlas: design
 
 Date: 23 October 2026
-Status: draft, waiting for Adam's review
+Status: approved 23 October 2026; built on this branch
 
 ## What it is
 

@@ -16,6 +16,7 @@ import { apiPost } from '@/api/client';
 import { assignInitials, initialsProblems, normaliseInitials } from '@/schemas/student-initials';
 import { patchClass } from '@/teacher/schedule-api';
 import { peekCurriculum, replaceCurriculum } from '@/app/curriculum-state';
+import { createClassFold } from '@/teacher/class-fold';
 import '@/blocks/classroom-tools/classroom-tools.css';
 
 type Options = {
@@ -61,9 +62,13 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
   let students: ClassStudent[] = assignInitials((cls.students ?? []).map((s) => ({ ...s, skip_picker: Boolean(s.skip_picker) })));
   let claims: Record<string, string> | null = null;
 
-  const section = el('section', 'class-students');
+  // Folds shut so the page leads with the calendar; open at first when there is no list yet.
+  const { details: section, summary: head } = createClassFold(cls.id, 'students', {
+    className: 'class-students',
+    openByDefault: !students.length
+  });
   section.setAttribute('aria-labelledby', `class-students-${cls.id}`);
-  const head = el('div', 'class-students__head');
+  head.classList.add('class-students__head');
   const title = el('h2', 'class-students__title', 'Students');
   title.id = `class-students-${cls.id}`;
   const count = el('span', 'class-students__count');
@@ -103,7 +108,7 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
   const status = el('p', 'class-students__status');
   status.setAttribute('role', 'status');
 
-  section.append(head, intro, editor, skipHead, skipHint, list, empty, status);
+  section.append(intro, editor, skipHead, skipHint, list, empty, status);
   host.append(section);
 
   const say = (text: string, kind: 'ok' | 'error' = 'ok') => {
@@ -198,7 +203,10 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
     );
   }
 
-  edit.addEventListener('click', () => {
+  edit.addEventListener('click', (event) => {
+    // The button sits in the fold's summary: open the fold rather than toggle it.
+    event.preventDefault();
+    section.open = true;
     area.value = students.map((s) => s.name).join('\n');
     editor.hidden = false;
     edit.hidden = true;

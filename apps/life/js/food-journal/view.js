@@ -6,6 +6,7 @@ import {
   createHubMenuButton,
 } from "../../../../packages/design-kit/js/hub-list.js";
 import { showHubToast } from "../../../../packages/design-kit/js/hub-feedback.js";
+import { isAtlasDoor, openAtlas } from "./atlas-door.js";
 import {
   createViewOnMap,
   mapsSearchUrl,
@@ -1015,6 +1016,7 @@ export function createFoodJournalView({
       search.value = journalQuery;
       const list = el("div", "fj-timeline");
       search.addEventListener("input", () => {
+        if (isAtlasDoor(search.value)) return openAtlas();
         journalQuery = search.value;
         paintTimeline(pageContext, list, journalQuery);
       });
@@ -1030,6 +1032,7 @@ export function createFoodJournalView({
     search.setAttribute("aria-label", "Search Custom Menu");
     search.value = filters.query || "";
     search.addEventListener("input", () => {
+      if (isAtlasDoor(search.value)) return openAtlas();
       filters.query = search.value;
       paintMenu(grid);
     });
