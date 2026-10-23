@@ -137,9 +137,13 @@ function flag(label: string, reason: string): HTMLElement {
   return f;
 }
 
-export function studentHead(view: MarkbookView, student: RosterStudent): HTMLElement {
+export function studentHead(view: MarkbookView, student: RosterStudent, onOpen?: (id: string) => void): HTMLElement {
   const wrap = el('div', 'mb-student');
-  const name = el('span', 'mb-student__name', student.name);
+  const name = onOpen ? el('button', 'mb-student__name mb-patterns__name', student.name) : el('span', 'mb-student__name', student.name);
+  if (onOpen && name instanceof HTMLButtonElement) {
+    name.type = 'button';
+    name.addEventListener('click', () => onOpen(student.id));
+  }
   name.title = student.name;
   wrap.append(el('span', 'mb-student__initials', student.initials), name);
   const series = quizSeries(view, student.id);
@@ -164,7 +168,7 @@ export function renderGrid(view: MarkbookView, students: RosterStudent[], action
     const row = el('tr');
     const head = el('th', 'mb-grid__student');
     head.scope = 'row';
-    head.append(studentHead(view, s));
+    head.append(studentHead(view, s, actions.openStudent));
     row.append(head);
     for (const c of columns) {
       const td = el('td', 'mb-grid__cell');

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: vi.fn() }));
+vi.mock('@/evidence/context', () => ({
+  loadInsightContext: async () => ({ table: null, skills: null, codes: [], outcomes: [] }),
+  codeLabel: (id: string) => id
+}));
 
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { ClassSchema, type Class } from '@/schemas';
@@ -57,6 +61,13 @@ function fakeApi(view: MarkbookView): MarkbookApi & { calls: unknown[][] } {
       if (mark === null) delete marks[studentId];
       else marks[studentId] = mark;
       current = { ...current, markbook: { ...current.markbook, marks: { ...current.markbook.marks, [columnId]: marks } } };
+      return current.markbook;
+    }),
+    setFocus: vi.fn(async (_c, studentId, pinned, dismissed) => {
+      const focus = { ...(current.markbook.focus ?? {}) };
+      if (!pinned.length && !dismissed.length) delete focus[studentId];
+      else focus[studentId] = { pinned, dismissed };
+      current = { ...current, markbook: { ...current.markbook, focus } };
       return current.markbook;
     })
   };
@@ -209,11 +220,11 @@ describe('markbook section', () => {
     expect(hiddenToggle().hidden).toBe(true);
   });
 
-  it('keeps the Outcomes label and marks the mode with aria-pressed', async () => {
+  it('keeps the Patterns label and marks the mode with aria-pressed', async () => {
     const { host } = await mount(view());
     const toggle = host.querySelector<HTMLButtonElement>('.mb__toggle')!;
     toggle.click();
-    expect(toggle.textContent).toBe('Outcomes');
+    expect(toggle.textContent).toBe('Patterns');
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -463,38 +474,60 @@ describe('markbook section', () => {
     scores: { s1: { attempt_id: 'x~0', submitted_at: '', score: 1, max: 2, pending: 0, rows: [{ id: 'q1', awarded: 1, max: 2, confidence: null, outcomes: ['o2'] }] } }
   });
 
-  it('draws the outcomes view from the Outcomes toggle, and goes back to the grid', async () => {
+  it('draws the patterns view from the Patterns toggle, and goes back to the grid', async () => {
     const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
     const toggle = host.querySelector<HTMLButtonElement>('.mb__toggle')!;
     toggle.click();
-    expect(host.querySelector('.mb-outcomes')).not.toBeNull();
+    await vi.waitFor(() => expect(host.querySelector('.mb-patterns')).not.toBeNull());
     expect(host.querySelector('.mb-col__title')).toBeNull();
-    expect(host.querySelector('.mb-outcome__code')?.textContent).toBe('Unknown outcome');
     toggle.click();
-    expect(host.querySelector('.mb-outcomes')).toBeNull();
+    expect(host.querySelector('.mb-patterns')).toBeNull();
     expect(host.querySelector('.mb-col__title')).not.toBeNull();
     host.remove();
   });
 
-  it('keeps focus on an outcome cell through a redraw', async () => {
+  it('opens the student panel from a name in the grid', async () => {
     const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
-    host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
-    host.querySelector<HTMLButtonElement>('button.mb-outcome-cell')!.focus();
-    host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
-    const active = document.activeElement as HTMLElement;
-    expect(active.classList.contains('mb-outcome-cell')).toBe(true);
-    expect(active.dataset.col).toBe('outcome:o2');
-    expect(active.dataset.student).toBe('s1');
+    const name = [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
+    name.focus();
+    await vi.waitFor(() => {
+      name.click();
+      expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
+    });
+    const sheet = document.querySelector<HTMLElement>('.mb-sheet--student')!;
+    expect(sheet.querySelector('.mb-panel__student')?.textContent).toBe('BB · Bob Brown');
+    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
+    expect(document.querySelector('.mb-sheet--student')).toBeNull();
+    expect(document.activeElement).toBe(name);
     host.remove();
   });
 
-  it('keeps the outcome selection through a redraw', async () => {
-    const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
-    host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
-    host.querySelector<HTMLButtonElement>('button.mb-outcome-cell')!.click();
-    host.querySelector<HTMLButtonElement>('.mb__removed')!.click();
-    expect(host.querySelector('button.mb-outcome-cell')?.getAttribute('aria-pressed')).toBe('true');
-    expect(host.querySelector('.mb-evidence__title')?.textContent).toBe('BB · Unknown outcome');
+  it('saves focus pins through the queue, and rolls them back when the save fails', async () => {
+    const focused = book({ focus: { s1: { pinned: [], dismissed: ['out:o2'] } } });
+    const { host, api } = await mount(view({ markbook: focused, quizzes: [outcomeQuiz()] }));
+    const openBob = async (): Promise<HTMLElement> => {
+      const name = [...host.querySelectorAll<HTMLButtonElement>('button.mb-student__name')].find((n) => n.textContent === 'Bob Brown')!;
+      await vi.waitFor(() => {
+        name.click();
+        expect(document.querySelector('.mb-sheet--student')).not.toBeNull();
+      });
+      return document.querySelector<HTMLElement>('.mb-sheet--student')!;
+    };
+    let sheet = await openBob();
+    (api.setFocus as Mock).mockRejectedValueOnce(new Error('Server said no'));
+    sheet.querySelector<HTMLButtonElement>('[data-focus="show-dismissed"]')!.click();
+    await vi.waitFor(() => expect(api.setFocus).toHaveBeenCalledWith('class1', 's1', [], []));
+    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Server said no'));
+    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
+    sheet = await openBob();
+    // Rolled back: the dismissed tag is still there.
+    expect(sheet.querySelector('[data-focus="show-dismissed"]')?.textContent).toBe('Show 1 dismissed');
+    sheet.querySelector<HTMLButtonElement>('[data-focus="show-dismissed"]')!.click();
+    await vi.waitFor(() => expect(api.setFocus).toHaveBeenCalledTimes(2));
+    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
+    sheet = await openBob();
+    expect(sheet.querySelector('[data-focus="show-dismissed"]')).toBeNull();
+    sheet.querySelector<HTMLButtonElement>('.mb-sheet__close')!.click();
     host.remove();
   });
 
@@ -541,12 +574,12 @@ describe('markbook section', () => {
     expect(host.querySelector<HTMLButtonElement>('.mb-phone__prev')!.disabled).toBe(false);
   });
 
-  it('keeps the outcomes table on a phone', async () => {
+  it('keeps the patterns tables on a phone', async () => {
     const { host } = await mount(view({ quizzes: [outcomeQuiz()] }), true);
     expect(host.querySelector('.mb-phone')).not.toBeNull();
     host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
     expect(host.querySelector('.mb-phone')).toBeNull();
-    expect(host.querySelector('.mb-outcomes .mb-grid')).not.toBeNull();
+    await vi.waitFor(() => expect(host.querySelector('.mb-patterns .mb-grid')).not.toBeNull());
   });
 
   it('keeps focus on a tapped phone cell, and on the student through a redraw', async () => {
