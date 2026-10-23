@@ -55,7 +55,8 @@ import { mountHubImageAnnotator } from '../../design-kit/js/hub-image-annotate.j
 import { renderToolkitContent } from '@/toolkit/render';
 import 'photoswipe/dist/photoswipe.css';
 import type { NetworkLine } from '@/schemas/block';
-import type { NetLesson } from '@/network/model';
+import type { MapLesson } from '@/network/coverage-map/model';
+import type { ClassEvidence } from '@/network/coverage-map/mount';
 // Last: the shared block anatomy roles win ties with block stylesheets above.
 import '@/styles/block-anatomy.css';
 import { emitAnswered } from '@/lecture/answered';
@@ -64,7 +65,7 @@ export type RenderMode = 'teacher' | 'student' | 'print';
 /** Lessons are in unit order and limited to what the viewer may see; `href` only on ones they may open. */
 export type UnitNetworkContext = {
   lines: NetworkLine[];
-  lessons: NetLesson[];
+  lessons: MapLesson[];
   bands?: ReadonlyMap<string, string>;
   /** Teacher pages: each lesson's first class date and time, which places it on the map. */
   dates?: ReadonlyMap<string, string>;
@@ -72,6 +73,10 @@ export type UnitNetworkContext = {
   unitTitle?: string;
   /** The subject is in the syllabus alignment. */
   usesAlignment?: boolean;
+  /** Teacher pages: classes that teach the unit, for one student's view of the coverage map. */
+  classes?: Array<{ id: string; name: string }>;
+  loadClass?: (classId: string) => Promise<ClassEvidence>;
+  saveTook?: (classId: string, studentId: string, lessonIds: string[]) => Promise<void>;
 };
 
 export type RenderContext = {
