@@ -79,14 +79,21 @@ function lanesFrom(seq: FlowSeq, roleOf: (id: string) => MapLane | undefined): M
       }
       // A branch made only of support or extension lessons is a detour, not an option.
       const plain = item.split.filter((branch) => rowsOf(branch).some((id) => !roleOf(id)));
+      // Beside a branch that goes straight on (no lessons), the others are optional detours.
+      const detour = item.split.some((branch) => rowsOf(branch).length === 0);
       item.split.forEach((branch) => {
         const at = plain.indexOf(branch);
-        if (plain.length < 2 || at < 0) walk(branch, inOption);
+        if (detour) {
+          for (const id of rowsOf(branch)) {
+            const role = roleOf(id);
+            out.set(id, role ? { lane: role } : { lane: 'option' });
+          }
+        } else if (plain.length < 2 || at < 0) walk(branch, inOption);
         else if (at === 0 && !inOption) walk(branch, undefined);
         else walk(branch, inOption ?? String.fromCharCode(65 + at));
       });
       // The first option stays on the core line and is labelled A.
-      if (plain.length >= 2 && !inOption) for (const id of rowsOf(plain[0]!)) if (!roleOf(id)) out.set(id, { lane: 'core', option: 'A' });
+      if (plain.length >= 2 && !inOption && !detour) for (const id of rowsOf(plain[0]!)) if (!roleOf(id)) out.set(id, { lane: 'core', option: 'A' });
     }
   };
   walk(seq, undefined);
@@ -103,16 +110,30 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     hidden,
     title: (id) => byId.get(id)?.title || 'Untitled lesson'
   });
-  const shown = withAutoDepths(flow.order.map((id) => byId.get(id)!).filter(Boolean));
-
   // Support and extension: the lesson's own role, else a light-rail stop that names it.
   const railRole = new Map<string, LessonRouteRole>();
   const railSkip = new Map<string, string>();
+  const railAfter = new Map<string, string | undefined>();
+  /** The line a support or extension stop sits on: the lesson teaches it, as on the old map. */
+  const railLines = new Map<string, string[]>();
   for (const stop of content.rail_stops) {
-    if (!stop.lesson_id || stop.kind === 'stop') continue;
+    if (!stop.lesson_id || stop.kind === 'stop' || !byId.has(stop.lesson_id)) continue;
     railRole.set(stop.lesson_id, stop.kind);
+    railAfter.set(stop.lesson_id, stop.after_lesson_id);
+    railLines.set(stop.lesson_id, [...(railLines.get(stop.lesson_id) ?? []), stop.line_id]);
     if (stop.skip_rule?.trim()) railSkip.set(stop.lesson_id, stop.skip_rule.trim());
   }
+  // A support or extension stop's lesson shows even when the old map left it off its stations,
+  // straight after the lesson the stop follows.
+  const order = [...flow.order];
+  for (const [id, after] of railAfter) {
+    if (order.includes(id)) continue;
+    const at = after ? order.indexOf(after) : -1;
+    let i = at < 0 ? order.length : at + 1;
+    while (i < order.length && railAfter.has(order[i]!)) i++;
+    order.splice(i, 0, id);
+  }
+  const shown = withAutoDepths(order.map((id) => byId.get(id)!).filter(Boolean));
   const roleOf = (id: string): MapLane | undefined => byId.get(id)?.role ?? railRole.get(id);
   const lanes = lanesFrom(flow.seq, roleOf);
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
@@ -159,6 +180,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       if (!line) continue;
       stopLevel.set(line.id, line.mode === 'light_rail' || !stop.level ? null : LEVEL_DEPTH[stop.level]);
     }
+    for (const id of railLines.get(lesson.id) ?? []) if (lineById.has(id) && !stopLevel.has(id)) stopLevel.set(id, null);
     for (const [lineId, level] of stopLevel) {
       if (!itemIds.has(lineId)) continue;
       const n = counted(lineId);
@@ -172,7 +194,8 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       const level = line ? stopLevel.get(line.id) : undefined;
       teaches.set(ref, level ?? n);
     }
-    const lane = lanes.get(lesson.id) ?? { lane: 'core' as MapLane };
+    const role = roleOf(lesson.id);
+    const lane = lanes.get(lesson.id) ?? { lane: role ?? ('core' as MapLane) };
     const skip = lesson.skip?.trim() || railSkip.get(lesson.id);
     const isGoal = content.terminus.lesson_id === lesson.id;
     return {

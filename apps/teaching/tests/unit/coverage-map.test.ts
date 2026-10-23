@@ -60,6 +60,28 @@ describe('Coverage map: model', () => {
     expect(rows.find((r) => r.id === 'c')?.option).toBeUndefined();
   });
 
+  it('puts a detour that rejoins (the other way goes straight on) beside the core line as optional', () => {
+    const lessons: MapLesson[] = [
+      { id: 'a', title: 'Start', after: ['c', 'b'] },
+      { id: 'b', title: 'Pre-quiz', quiz: true, after: ['c'] },
+      { id: 'c', title: 'Next' }
+    ];
+    const rows = build(lessons, v2({ station_order: ['a', 'b', 'c'] })).rows;
+    expect(rows.map((r) => [r.id, r.lane, r.option])).toEqual([['a', 'core', undefined], ['b', 'option', undefined], ['c', 'core', undefined], ['__terminus', 'core', undefined]]);
+  });
+
+  it('shows an extension stop’s lesson the old map left off, after the lesson it follows, teaching the stop’s line', () => {
+    const lessons: MapLesson[] = [...LESSONS.map((l) => ({ ...l, role: undefined })), { id: 'talk', title: 'Talk practice' }];
+    const map = build(lessons, v2({
+      hidden_lessons: ['talk'],
+      rail_stops: [{ id: 's', line_id: 'read', kind: 'extension', lesson_id: 'talk', after_lesson_id: 'a', label: '' }]
+    }));
+    expect(map.rows.map((r) => r.id).slice(0, 3)).toEqual(['a', 'talk', 'b']);
+    const talk = map.rows.find((r) => r.id === 'talk')!;
+    expect(talk.lane).toBe('extension');
+    expect(talk.teaches.has('read')).toBe(true);
+  });
+
   it('groups dot points, concepts and skills, keeping linked train lines out', () => {
     const map = build();
     expect(map.groups.map((g) => [g.name, g.items.map((i) => i.label)])).toEqual([
