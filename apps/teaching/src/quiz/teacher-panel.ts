@@ -20,7 +20,9 @@ import { spanText } from '@/quiz/word-picker';
 import { formatCode, keySummary, meter, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
 import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
 import { httpInsightApi, isInsight, type InsightApi, type InsightReply } from '@/evidence/api';
-import { loadInsightContext, type InsightContext } from '@/evidence/context';
+import { codeLabel, loadInsightContext, type InsightContext } from '@/evidence/context';
+import { openFollowUpPlan } from '@/evidence/follow-up';
+import { tagLabel } from '@/evidence/tags';
 import type { InsightPayload } from '@/evidence/types';
 import { renderQuizInsight } from '@/evidence/views/quiz-insight';
 import { codeChips } from '@/evidence/code-chips';
@@ -711,6 +713,21 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
           }
           paint();
         },
+        onFollowUp: (flag, _kind, evidence) =>
+          void openFollowUpPlan({
+            sourceLessonId: p.lesson_id,
+            sourceTitle: p.title,
+            unitId: p.unit_id,
+            flagId: flag.id,
+            tag: flag.tag,
+            students: p.students,
+            // A flag on the whole class names no students: offer everyone.
+            chosen: flag.students.length ? flag.students : p.students.map((s) => s.id),
+            evidence,
+            label: (tag) => tagLabel(tag, context),
+            codeLabel: (id) => codeLabel(id, context.codes),
+            onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+          }),
         openLesson: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
       })
     );

@@ -68,6 +68,7 @@ export async function quizColumns(store, roster, book) {
       id: `quiz:${q.lesson_id}`,
       lesson_id: q.lesson_id,
       title: q.title,
+      unit_id: q.unit_id,
       date: sydneyDay(q.first_at),
       hidden: book.hidden_quizzes.includes(q.lesson_id),
       confidence: q.confidence,
