@@ -17,6 +17,8 @@ export type LecturePanelOptions = {
   answerHandup?: (lessonId: string, id: string, reply: string) => Promise<LectureSummary>;
   /** Drops a hand-up's answer into its scene as a callout. */
   onAddCallout: (sceneId: string, text: string) => void;
+  /** Opens Import slides; the panel shows the button only when this is given. */
+  onImportSlides?: () => void;
 };
 
 export type LecturePanelHandle = { root: HTMLElement; refresh(): Promise<void>; repaint(): void; dispose(): void };
@@ -53,6 +55,12 @@ export function mountLecturePanel(options: LecturePanelOptions): LecturePanelHan
   const play = el('button', 'btn btn--secondary', '▶ Play as student');
   play.type = 'button';
   head.append(title, play);
+  if (options.onImportSlides) {
+    const importSlides = el('button', 'btn btn--ghost', 'Import slides');
+    importSlides.type = 'button';
+    importSlides.addEventListener('click', options.onImportSlides);
+    head.append(importSlides);
+  }
   const strip = el('div', 'lecture-replay');
   strip.setAttribute('role', 'list');
   strip.setAttribute('aria-label', 'Scenes by how many students reached them');
