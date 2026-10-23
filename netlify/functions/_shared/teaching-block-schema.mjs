@@ -1324,6 +1324,8 @@ var NetworkLineSchema = z8.object({
 });
 var LessonKindSchema = z8.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z8.array(z8.string().min(1).max(64)).max(6);
+var LessonRouteRoleSchema = z8.enum(["support", "extension"]);
+var LessonSkipRuleSchema = z8.string().trim().max(80);
 var LineStopSchema = z8.object({
   line_id: z8.string().min(1).max(64),
   level: CurriculumLinesLevelSchema.optional(),
@@ -2429,6 +2431,8 @@ export {
   HtmlBlockSchema,
   ImageBlockSchema,
   LessonKindSchema,
+  LessonRouteRoleSchema,
+  LessonSkipRuleSchema,
   LineAlignmentSchema,
   LineOffSchema,
   LineStopSchema,

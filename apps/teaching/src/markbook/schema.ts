@@ -64,6 +64,8 @@ export const MarkbookSchema = z.object({
   focus: z
     .record(z.string(), z.object({ pinned: z.array(z.string().max(120)).max(12).default([]), dismissed: z.array(z.string().max(120)).max(40).default([]) }))
     .default({}),
+  /** Per student: support, extension and option lessons the teacher marked as taken (the unit map's route). */
+  took: z.record(z.string(), z.array(z.string().min(1).max(64)).max(200)).default({}),
   updated_at: z.string().default('')
 });
 
