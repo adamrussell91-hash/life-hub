@@ -167,6 +167,7 @@ export function openAssessmentPanel(o: AssessmentPanelOptions): HTMLElement {
           codeChips({
             codes: o.codes,
             selected: picked[c.id] ?? [],
+            label: `Why marks were lost: ${c.label}`,
             onChange: (ids) => {
               picked[c.id] = ids;
               clearError();
