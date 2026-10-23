@@ -559,6 +559,13 @@
   color: #fff;
 }
 
+.lesson-flow__rule {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: 30px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
 .lesson-flow__add {
   min-height: 30px;
   max-width: 100%;

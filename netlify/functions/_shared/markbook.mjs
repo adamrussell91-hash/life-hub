@@ -155,6 +155,19 @@ export async function markbookAction(store, classId, body) {
     return { markbook };
   }
 
+  if (action === 'set_took') {
+    if (!roster.students.some((s) => s.id === body.student_id)) reject(404, 'not_found', 'That student isn’t on the class list.');
+    const lessonIds = Array.isArray(body.lesson_ids) ? [...new Set(body.lesson_ids.filter((t) => typeof t === 'string' && t.length > 0 && t.length <= 64))].slice(0, 200) : [];
+    const markbook = await changeBook(store, classId, (book) => {
+      const took = { ...(book.took ?? {}) };
+      if (!lessonIds.length) delete took[body.student_id];
+      else took[body.student_id] = lessonIds;
+      book.took = took;
+      return book;
+    });
+    return { markbook };
+  }
+
   if (action === 'set_focus') {
     if (!roster.students.some((s) => s.id === body.student_id)) reject(404, 'not_found', 'That student isn’t on the class list.');
     const list = (v, max) => (Array.isArray(v) ? [...new Set(v.filter((t) => typeof t === 'string' && t.length > 0 && t.length <= 120))].slice(0, max) : []);
