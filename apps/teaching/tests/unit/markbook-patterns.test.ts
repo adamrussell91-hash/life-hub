@@ -48,6 +48,8 @@ describe('renderPatterns', () => {
     const node = renderPatterns(view, view.students, ctx, { openStudent });
     expect(node.querySelector('.mb-trend')).not.toBeNull();
     expect(node.querySelector('.mb-patterns__tags')?.textContent).toContain('simile');
+    expect(node.querySelector('.mb-patterns__tags')?.textContent).toMatch(/\b1 question\b|\b\d+ questions\b/);
+    expect(node.querySelector('.mb-patterns__tags')?.textContent).not.toContain('Qs');
     const weak = node.querySelector<HTMLButtonElement>('[data-group="weak"]');
     expect(weak).toBeNull(); // one question per student: below the group minimum
     const cell = node.querySelector<HTMLButtonElement>('.mb-patterns__cell[data-student="s1"]');
