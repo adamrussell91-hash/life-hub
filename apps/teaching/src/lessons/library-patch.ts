@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { PedagogicalModeSchema } from '@/curriculum/pedagogical-mode';
 import type { Lesson } from '@/schemas/lesson';
-import { AfterLessonIdsSchema, DotPointRefSchema, LessonKindSchema, LineStopSchema } from '@/schemas/block';
+import { AfterLessonIdsSchema, DotPointRefSchema, LessonKindSchema, LineOffSchema, LineStopSchema } from '@/schemas/block';
 
 export const LessonLibraryPatchSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).max(24).optional(),
@@ -12,6 +12,7 @@ export const LessonLibraryPatchSchema = z.object({
   author_id: z.string().min(1).nullable().optional(),
   pedagogical_mode: PedagogicalModeSchema.optional(),
   line_stops: z.array(LineStopSchema).max(16).optional(),
+  line_off: LineOffSchema.optional(),
   after_lesson_ids: AfterLessonIdsSchema.nullable().optional(),
   lesson_kind: LessonKindSchema.optional(),
   dot_points: z.array(DotPointRefSchema).max(20).optional()
@@ -41,6 +42,7 @@ export function parseLessonLibraryPatch(
       ? { pedagogical_mode: record.pedagogical_mode }
       : {}),
     ...(record.line_stops !== undefined ? { line_stops: record.line_stops } : {}),
+    ...(record.line_off !== undefined ? { line_off: record.line_off } : {}),
     ...(record.after_lesson_ids !== undefined ? { after_lesson_ids: record.after_lesson_ids } : {}),
     ...(record.lesson_kind !== undefined ? { lesson_kind: record.lesson_kind } : {}),
     ...(record.dot_points !== undefined ? { dot_points: record.dot_points } : {})
@@ -68,6 +70,7 @@ export function applyLessonLibraryPatch(lesson: Lesson, patch: LessonLibraryPatc
   }
   if (patch.pedagogical_mode !== undefined) next.pedagogical_mode = patch.pedagogical_mode;
   if (patch.line_stops !== undefined) next.line_stops = patch.line_stops;
+  if (patch.line_off !== undefined) next.line_off = patch.line_off;
   // null: the lesson goes back to following unit order.
   if (patch.after_lesson_ids !== undefined) next.after_lesson_ids = patch.after_lesson_ids;
   if (patch.lesson_kind !== undefined) next.lesson_kind = patch.lesson_kind;

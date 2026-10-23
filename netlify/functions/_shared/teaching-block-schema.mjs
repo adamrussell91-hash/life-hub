@@ -1324,8 +1324,11 @@ var LessonKindSchema = z8.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z8.array(z8.string().min(1).max(64)).max(6);
 var LineStopSchema = z8.object({
   line_id: z8.string().min(1).max(64),
-  level: CurriculumLinesLevelSchema.optional()
+  level: CurriculumLinesLevelSchema.optional(),
+  /** Set from the lesson's dot points; it follows them until the teacher takes it off. */
+  auto: z8.literal(true).optional()
 });
+var LineOffSchema = z8.array(z8.string().min(1).max(64)).max(24);
 var NetworkNudgesSchema = z8.record(
   z8.string().min(1).max(160),
   z8.object({ dx: z8.number().min(-2e3).max(2e3), dy: z8.number().min(-2e3).max(2e3) })
@@ -2425,6 +2428,7 @@ export {
   ImageBlockSchema,
   LessonKindSchema,
   LineAlignmentSchema,
+  LineOffSchema,
   LineStopSchema,
   MediaSizeVariantSchema,
   MindMapBlockSchema,

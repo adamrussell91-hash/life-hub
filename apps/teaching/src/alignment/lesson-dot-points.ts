@@ -1,4 +1,8 @@
 import { autoUpdateHubFloating, positionHubFloating } from '../../../../packages/design-kit/js/hub-floating.js';
+import { SKILLS } from '../../../../packages/problem-solver/skills.mjs';
+import { loadSkills } from '@/skills/api';
+import type { SkillsContinuum } from '@/skills/schema';
+import type { AutoLineContext } from './auto-lines';
 import { loadAlignment } from './coverage-panel';
 import { dotPointRef, focusAreaFor } from './coverage';
 import { conceptKeyOf } from './model';
@@ -9,7 +13,8 @@ export type LessonDotPointsOptions = {
   dotPoints: readonly string[] | undefined;
   unitTitle?: string;
   focusArea?: string;
-  onChange: (dotPoints: string[]) => void;
+  /** With the alignment the points were read against, so the page can set the lesson's lines. */
+  onChange: (dotPoints: string[], ctx: AutoLineContext) => void;
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -24,11 +29,13 @@ const GROUPS = [['U', 'Understanding'], ['R', 'Responding']] as const;
 /**
  * The syllabus dot points a lesson teaches, beside its line chips. Only the
  * chosen points show; more are added from a menu, so the row stays quiet.
- * The outcomes and concepts they reach follow from the alignment.
+ * The outcomes, core concepts, learning processes and thinking skills they
+ * reach follow from the alignment.
  */
 export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPointsOptions): { update(dotPoints: readonly string[] | undefined): void; dispose(): void } {
   let chosen = [...(options.dotPoints ?? [])];
   let doc: Alignment | null = null;
+  let skills: SkillsContinuum | null = null;
   let area: { id: string; name: string } | null = null;
   let stopFloating: (() => void) | null = null;
   let menu: HTMLElement | null = null;
@@ -57,7 +64,7 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
   const save = (next: string[]) => {
     chosen = next.slice(0, 20);
     paint();
-    options.onChange(chosen);
+    if (doc && area) options.onChange(chosen, { doc, skills, areaId: area.id });
   };
 
   const openMenu = (anchor: HTMLElement) => {
@@ -118,20 +125,34 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     add.addEventListener('click', () => (menu ? closeMenu() : openMenu(add)));
     list.append(add);
     root.append(list);
-    // What the chosen points reach, from the alignment.
+    // What the chosen points reach, from the alignment. Concepts are the core links only, as on the map.
     const picked = chosen.map(pointFor).filter((p): p is AlignmentPoint => Boolean(p));
     if (picked.length) {
       const outcomes = [...new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)))].sort((a, b) => a - b);
-      const keys = new Set(picked.flatMap((p) => p.concepts.map((c) => conceptKeyOf(c.ref))));
+      const keys = new Set(picked.flatMap((p) => p.concepts.filter((c) => c.link === 'shared').map((c) => conceptKeyOf(c.ref))));
       const concepts = doc.concepts.filter((c) => keys.has(c.key)).map((c) => c.name);
-      root.append(el('span', 'dots__reach', `Reaches outcomes ${outcomes.join(', ') || 'none'}${concepts.length ? ` · ${concepts.join(', ')}` : ''}`));
+      const codes = new Set(picked.flatMap((p) => p.processes));
+      const processes = doc.processes.filter((p) => codes.has(p.code)).map((p) => p.name);
+      const ids = new Set(picked.flatMap((p) => p.skills ?? []));
+      const thinking = SKILLS.filter((k) => ids.has(k.id)).map((k) => k.name);
+      const reach = el('dl', 'dots__reach');
+      const row = (term: string, items: string[]) => {
+        if (!items.length) return;
+        reach.append(el('dt', undefined, term), el('dd', undefined, items.join(', ')));
+      };
+      row('Outcomes', outcomes.map(String));
+      row('Concepts', concepts);
+      row('Processes', processes);
+      row('Thinking', thinking);
+      root.append(reach);
     }
     root.hidden = false;
   }
 
-  void loadAlignment()
-    .then((loaded) => {
+  void Promise.all([loadAlignment(), loadSkills().catch((): SkillsContinuum | null => null)])
+    .then(([loaded, continuum]) => {
       doc = loaded;
+      skills = continuum;
       area = focusAreaFor(loaded, options.unitTitle, options.focusArea);
       paint();
     })

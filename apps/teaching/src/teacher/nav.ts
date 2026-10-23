@@ -24,6 +24,7 @@ export interface CurriculumLessonSummary {
   syllabus_outcomes?: string[];
   outcome_ids?: string[];
   line_stops?: LineStop[];
+  line_off?: string[];
   after_lesson_ids?: string[];
   lesson_kind?: LessonKind;
   dot_points?: string[];

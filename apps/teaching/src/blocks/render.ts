@@ -66,6 +66,8 @@ export type UnitNetworkContext = {
   lines: NetworkLine[];
   lessons: NetLesson[];
   bands?: ReadonlyMap<string, string>;
+  /** Teacher pages: each lesson's first class date and time, which places it on the map. */
+  dates?: ReadonlyMap<string, string>;
   /** Teacher pages: the unit's title, for working out its syllabus focus area. */
   unitTitle?: string;
   /** The subject is in the syllabus alignment. */
