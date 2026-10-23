@@ -9664,6 +9664,92 @@ body.is-lesson-builder-full-page .hub-utilities {
   color: var(--orca);
 }
 
+/* Phones: the block palette is a strip across the top, and blocks use the full width.
+   The ⋯ menu and the Ann beaker sit in a short header strip instead of a right-hand gutter. */
+@media (max-width: 720px) {
+  .lesson-builder--no-chat,
+  .lesson-builder--no-chat.lesson-builder--rail-shelved,
+  .lesson-builder--rail-shelved,
+  .lesson-builder {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .lesson-palette {
+    top: 0;
+    flex-direction: row;
+    align-items: center;
+    padding: var(--space-1);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+  }
+
+  .lesson-palette__rail {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: row;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .lesson-palette__family {
+    flex: none;
+    flex-direction: row;
+    width: auto;
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .lesson-palette__collapse {
+    flex: none;
+  }
+
+  .lesson-palette__flyout {
+    left: 0;
+    top: calc(100% + var(--space-1));
+    width: min(17.5rem, calc(100vw - 2rem));
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .lesson-page__block,
+  [data-alchemy-assistant] .lesson-page__block {
+    padding: calc(var(--space-4) + var(--space-8) + var(--space-1)) 12px 14px;
+  }
+
+  /* Heading rows stay slim (block-anatomy.css), so they keep a right gutter for the ⋯ and the beaker. */
+  .lesson-page__block:has(> .block[data-block-type='heading']) {
+    padding-right: 2.75rem;
+  }
+
+  [data-alchemy-assistant] .lesson-page__block:has(> .block[data-block-type='heading']) {
+    padding-right: calc(2.75rem + var(--space-8));
+  }
+
+  /* The grip and delete join the header strip, so the list needs no left lane. */
+  .lesson-page__blocks {
+    padding-left: 0;
+  }
+
+  .lesson-page__grip,
+  .lesson-page__block-delete {
+    top: var(--space-2);
+    left: var(--space-2);
+  }
+
+  .lesson-page__block-delete {
+    top: var(--space-2);
+    left: calc(var(--space-2) + 1.5rem + var(--space-1));
+  }
+
+  .unit-page__plan,
+  .unit-page__lessons {
+    padding: var(--space-3);
+  }
+}
+
 .lesson-page .lesson-page--blocks {
   background: transparent;
   border: 0;
