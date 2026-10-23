@@ -6,7 +6,7 @@ import { renderBlock } from '@/blocks/render';
 import { blockRegistry } from '@/blocks/registry';
 import { lineColour, nextColour } from '@/network/colour';
 import { connect, layoutNetwork, liveNudges, type NetInput, type NetLevel, type Pt } from '@/network/layout';
-import { buildUnitNetwork, convertV1, type NetLesson } from '@/network/model';
+import { buildUnitNetwork, convertV1, placeByDate, type NetLesson } from '@/network/model';
 import { createCurriculumLinesEditor } from '@/blocks/curriculum-lines/editor';
 import type { CurriculumLinesBlock } from '@/schemas/block';
 import { buildYearNetwork, classNow, outcomeCoverage, unitStops } from '@/network/year';
@@ -266,5 +266,51 @@ describe('Curriculum lines block: station editor', () => {
     box().checked = true;
     box().dispatchEvent(new Event('change'));
     expect(content().hidden_lessons).toBeUndefined();
+  });
+});
+
+describe('Unit map: lessons placed by calendar date', () => {
+  const ids = (lessons: readonly { id: string }[]) => lessons.map((l) => l.id);
+  const row = (id: string) => ({ id });
+
+  it('keeps an undated lesson after the lesson it follows', () => {
+    // b and c have no date: they follow a, which moves after d.
+    const order = [row('z'), row('a'), row('b'), row('c'), row('d')];
+    const dates = new Map([['a', '2026-10-24'], ['d', '2026-10-20']]);
+    expect(ids(placeByDate(order, dates))).toEqual(['z', 'd', 'a', 'b', 'c']);
+  });
+
+  it('places a dated quiz between the lessons either side of its date', () => {
+    // l3 is a quiz dated before l2; x is an undated extension after l1.
+    const order = [row('l1'), row('x'), row('l2'), row('l3')];
+    const dates = new Map([['l1', '2026-10-20T09:00'], ['l2', '2026-10-24T09:00'], ['l3', '2026-10-22T09:00']]);
+    expect(ids(placeByDate(order, dates))).toEqual(['l1', 'x', 'l3', 'l2']);
+  });
+
+  it('keeps the given order for lessons on the same day and time', () => {
+    const dates = new Map([['a', '2026-10-20T00:00'], ['b', '2026-10-20T00:00']]);
+    expect(ids(placeByDate([row('b'), row('a')], dates))).toEqual(['b', 'a']);
+  });
+
+  it('puts the earlier period first on the same day', () => {
+    const dates = new Map([['a', '2026-10-20T13:00'], ['b', '2026-10-20T09:00']]);
+    expect(ids(placeByDate([row('a'), row('b')], dates))).toEqual(['b', 'a']);
+  });
+
+  it('changes nothing without dates', () => {
+    expect(ids(placeByDate([row('b'), row('a')], undefined))).toEqual(['b', 'a']);
+  });
+
+  it('orders the map rows by date, after any custom station order', () => {
+    const dates = new Map([['l1', '2026-10-27'], ['l2', '2026-10-20'], ['l3', '2026-10-21'], ['l4', '2026-10-22']]);
+    const net = buildUnitNetwork(v2({ station_order: ['l4', 'l3', 'l2', 'l1'] }), LINES, LESSONS, undefined, dates);
+    expect(net.rows.map((r) => r.id)).toEqual(['l2', 'l3', 'l4', 'l1']);
+  });
+
+  it('drops week bands when a split runs the rows back through the weeks', () => {
+    const bands = new Map([['l1', 'Wk 1'], ['l2', 'Wk 2'], ['l3', 'Wk 1'], ['l4', 'Wk 3']]);
+    expect(buildUnitNetwork(v2(), LINES, LESSONS, bands).rows.some((r) => r.band)).toBe(false);
+    const inOrder = new Map([['l1', 'Wk 1'], ['l2', 'Wk 1'], ['l3', 'Wk 2'], ['l4', 'Wk 3']]);
+    expect(buildUnitNetwork(v2(), LINES, LESSONS, inOrder).rows.map((r) => r.band)).toEqual(['Wk 1', 'Wk 1', 'Wk 2', 'Wk 3']);
   });
 });

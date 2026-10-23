@@ -18,7 +18,7 @@ export function unitNetworkInput(block: CurriculumLinesBlock, ctx: RenderContext
     lines = converted.lines;
     lessons = withStops(lessons, converted.lessonStops);
   }
-  return buildUnitNetwork(content, lines, lessons, network?.bands);
+  return buildUnitNetwork(content, lines, lessons, network?.bands, network?.dates);
 }
 
 export function renderCurriculumLines(block: CurriculumLinesBlock, mode: RenderMode, ctx: RenderContext = {}): HTMLElement {

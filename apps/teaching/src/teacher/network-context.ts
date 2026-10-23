@@ -16,10 +16,13 @@ export async function saveSubjectLines(curriculum: CurriculumResponse, subjectId
   if (subject) subject.network_lines = lines;
 }
 
-export async function saveLessonStops(curriculum: CurriculumResponse, lessonId: string, stops: LineStop[]): Promise<void> {
-  await apiPatch<Lesson>(`/api/lessons/${lessonId}`, { line_stops: stops });
+export async function saveLessonStops(curriculum: CurriculumResponse, lessonId: string, stops: LineStop[], off: string[]): Promise<void> {
+  await apiPatch<Lesson>(`/api/lessons/${lessonId}`, { line_stops: stops, line_off: off });
   const lesson = curriculum.lessons.find((l) => l.id === lessonId);
-  if (lesson) lesson.line_stops = stops;
+  if (lesson) {
+    lesson.line_stops = stops;
+    lesson.line_off = off;
+  }
 }
 
 function blockLabel(block: Block): string {
@@ -42,26 +45,27 @@ function isoWeek(ymd: string): string {
 }
 
 /**
- * Week bands from the class with the most scheduled lessons in this unit.
- * Weeks are numbered from the unit's first scheduled week.
+ * Each lesson's first date (and start time) for the class with the most
+ * scheduled lessons in this unit, and its week band, numbered from the unit's
+ * first scheduled week. A skipped lesson has no date: it keeps its place.
  */
-export function unitWeekBands(curriculum: CurriculumResponse, unit: Unit): Map<string, string> | undefined {
-  const rows = curriculum.scheduled_lessons.filter((row) => row.unit_id === unit.id && unit.lesson_ids.includes(row.lesson_id));
+export function unitSchedule(curriculum: CurriculumResponse, unit: Unit): { dates: Map<string, string>; bands: Map<string, string> } | undefined {
+  const rows = curriculum.scheduled_lessons.filter(
+    (row) => row.unit_id === unit.id && unit.lesson_ids.includes(row.lesson_id) && row.delivery_status !== 'skipped'
+  );
   if (!rows.length) return undefined;
   const byClass = new Map<string, typeof rows>();
   for (const row of rows) byClass.set(row.class_id, [...(byClass.get(row.class_id) ?? []), row]);
   const best = [...byClass.values()].sort((a, b) => b.length - a.length)[0]!;
-  const first = new Map<string, string>();
-  for (const row of [...best].sort((a, b) => a.date.localeCompare(b.date))) {
-    if (!first.has(row.lesson_id)) first.set(row.lesson_id, row.date);
+  const when = (row: (typeof rows)[number]) => `${row.date}T${row.start_time ?? '00:00'}`;
+  const dates = new Map<string, string>();
+  for (const row of [...best].sort((a, b) => when(a).localeCompare(when(b)))) {
+    if (!dates.has(row.lesson_id)) dates.set(row.lesson_id, when(row));
   }
-  const weeks = [...new Set([...first.values()].map(isoWeek))].sort();
+  const weeks = [...new Set([...dates.values()].map((d) => isoWeek(d.slice(0, 10))))].sort();
   const bands = new Map<string, string>();
-  for (const [lessonId, date] of first) bands.set(lessonId, `Wk ${weeks.indexOf(isoWeek(date)) + 1}`);
-  // A band only helps when the lessons in unit order fall in date order.
-  const ordered = unit.lesson_ids.filter((id) => bands.has(id));
-  const sorted = [...ordered].sort((a, b) => first.get(a)!.localeCompare(first.get(b)!));
-  return ordered.join() === sorted.join() && ordered.length === unit.lesson_ids.length ? bands : undefined;
+  for (const [lessonId, d] of dates) bands.set(lessonId, `Wk ${weeks.indexOf(isoWeek(d.slice(0, 10))) + 1}`);
+  return { dates, bands };
 }
 
 function unitLessons(curriculum: CurriculumResponse, unit: Unit) {
@@ -74,7 +78,7 @@ function unitLessons(curriculum: CurriculumResponse, unit: Unit) {
 /** Everything a unit map (and its editor) needs on a teacher page. */
 export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): UnitNetworkEditorContext {
   const subject = curriculum.subjects.find((s) => s.id === unit.subject_id);
-  const bands = unitWeekBands(curriculum, unit);
+  const schedule = unitSchedule(curriculum, unit);
   return {
     lines: subject?.network_lines ?? [],
     lessons: unitLessons(curriculum, unit).map((l) => ({
@@ -82,15 +86,16 @@ export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): 
       title: l.title,
       href: withAppBase(`/lessons/${l.id}`),
       ...(l.line_stops ? { line_stops: l.line_stops } : {}),
+      ...(l.line_off ? { line_off: l.line_off } : {}),
       ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}),
       ...(l.lesson_kind ? { kind: l.lesson_kind } : {}),
       ...(l.dot_points ? { dot_points: l.dot_points } : {})
     })),
     unitTitle: unit.title,
     usesAlignment: subject ? subjectUsesAlignment(subject.title) : false,
-    ...(bands ? { bands } : {}),
+    ...(schedule ? { bands: schedule.bands, dates: schedule.dates } : {}),
     ...(subject ? { saveLines: (lines: NetworkLine[]) => saveSubjectLines(curriculum, subject.id, lines) } : {}),
-    saveLessonStops: (lessonId, stops) => saveLessonStops(curriculum, lessonId, stops),
+    saveLessonStops: (lessonId, stops, off) => saveLessonStops(curriculum, lessonId, stops, off),
     lessonBlocks: lessonBlockChoices
   };
 }

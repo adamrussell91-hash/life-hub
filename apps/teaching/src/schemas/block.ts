@@ -714,8 +714,12 @@ export const AfterLessonIdsSchema = z.array(z.string().min(1).max(64)).max(6);
 export type LessonKind = z.infer<typeof LessonKindSchema>;
 export const LineStopSchema = z.object({
   line_id: z.string().min(1).max(64),
-  level: CurriculumLinesLevelSchema.optional()
+  level: CurriculumLinesLevelSchema.optional(),
+  /** Set from the lesson's dot points; it follows them until the teacher takes it off. */
+  auto: z.literal(true).optional()
 });
+/** Lines a teacher took off a lesson that its dot points would put it on. */
+export const LineOffSchema = z.array(z.string().min(1).max(64)).max(24);
 export const NetworkNudgesSchema = z.record(
   z.string().min(1).max(160),
   z.object({ dx: z.number().min(-2000).max(2000), dy: z.number().min(-2000).max(2000) })
