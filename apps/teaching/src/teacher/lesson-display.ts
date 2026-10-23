@@ -13,6 +13,7 @@ import { createStudentShell, renderStudentStatus } from '@/student/shell';
 import { mountFocusController, type FocusStepView } from '@/teacher/focus/focus-view';
 import { mountQuizLive } from '@/teacher/focus/quiz-live';
 import { focusSteps } from '@/teacher/focus/steps';
+import { tutorialCommon } from '@/tutorial/model';
 
 /**
  * Display view: the page the teacher projects. It shows the published lesson,
@@ -34,6 +35,16 @@ export interface MountLessonDisplayViewOptions {
 
 export interface LessonDisplayViewHandle {
   dispose(): void;
+}
+
+/**
+ * What Focus view steps through: a quiz without its questions, a tutorial's
+ * Common demo only (never a group's tab or exit check), else every block.
+ */
+export function displayBlocks(lesson: Pick<PublishedLesson, 'blocks' | 'pedagogical_mode' | 'quiz'>): PublishedLesson['blocks'] {
+  if (lesson.pedagogical_mode === 'quiz' && !!lesson.quiz) return lesson.blocks.filter((block) => block.block_type !== 'quiz_question');
+  if (lesson.pedagogical_mode === 'tutorial') return tutorialCommon(lesson.blocks);
+  return lesson.blocks;
 }
 
 export function lessonDisplayPath(lessonId: string): string {
@@ -96,7 +107,7 @@ export function mountLessonDisplayView(
 
     examples = createTeacherClassExamples({ lessonId: lesson.lesson_id });
     const isQuiz = lesson.pedagogical_mode === 'quiz' && !!lesson.quiz;
-    const shown = isQuiz ? lesson.blocks.filter((block) => block.block_type !== 'quiz_question') : lesson.blocks;
+    const shown = displayBlocks(lesson);
     const views: FocusStepView[] = [{ label: 'Start', blocks: [], el: hero }];
     for (const step of focusSteps(shown)) {
       const wrap = document.createElement('section');

@@ -4,6 +4,7 @@ import { IsoDateSchema } from './common';
 import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
 import { LensAttachmentsSchema, LensLevelSchema, LogicSchema } from './lens';
+import { TutorialGroupIdSchema } from '../tutorial/schema';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -54,6 +55,8 @@ export const BlockTypeSchema = z.enum([
   'cloze',
   'self_check',
   'note_cue',
+  'with_teacher',
+  'faded_example',
   'chart',
   'equation',
   'diagram',
@@ -950,6 +953,48 @@ export const NoteCueBlockSchema = z.object({
   ...blockTimestamps
 });
 
+/** Tutorial: where a group stops for the teacher. Talking points are the teacher's only. */
+export const WithTeacherBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('with_teacher'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    talking_points: z.array(z.string().max(300)).max(8)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
+/**
+ * Tutorial: one step of a faded worked example. `parts` is the full example
+ * (technique, where, effect); `blanks` are the part indexes the student writes.
+ * No blanks is the fully worked example.
+ */
+export const FadedExampleBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('faded_example'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z
+    .object({
+      prompt: z.string().max(300),
+      extract: z.string().max(2000),
+      parts: z.array(z.object({ label: z.string().min(1).max(40), answer: z.string().max(600) })).min(1).max(4),
+      blanks: z.array(z.number().int().min(0).max(3)).max(4),
+      /** A step with blanks is a gate unless switched off. */
+      gate: z.boolean().optional()
+    })
+    .refine((c) => c.blanks.every((i) => i < c.parts.length) && new Set(c.blanks).size === c.blanks.length, {
+      message: 'Each blank must name a different part of the example.',
+      path: ['blanks']
+    }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 export const ChartTypeSchema = z.enum(['bar', 'line', 'pie', 'scatter']);
 
 export const ChartPointSchema = z.object({
@@ -1652,6 +1697,8 @@ const leafBlockSchemas = [
   ClozeBlockSchema,
   SelfCheckBlockSchema,
   NoteCueBlockSchema,
+  WithTeacherBlockSchema,
+  FadedExampleBlockSchema,
   ChartBlockSchema,
   EquationBlockSchema,
   DiagramBlockSchema,
@@ -1825,7 +1872,11 @@ const SectionBlockObjectSchema = z.object({
     /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
     takeaway: z.object({ enabled: z.boolean(), prompt: z.string().max(300).optional() }).optional(),
     /** Lecture: plays only after a wrong answer on the gate just above it. */
-    side_path: z.boolean().optional()
+    side_path: z.boolean().optional(),
+    /** Tutorial: this top-level section is the tab for the group with this id. */
+    tutorial_group: TutorialGroupIdSchema.optional(),
+    /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
+    tutorial_exit: z.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps

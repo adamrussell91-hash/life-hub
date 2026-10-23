@@ -51,6 +51,8 @@ export const NEW_BLOCK_TYPES = [
   'cloze',
   'self_check',
   'note_cue',
+  'with_teacher',
+  'faded_example',
   'chart',
   'equation',
   'diagram',
@@ -121,6 +123,8 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   cloze: 'Cloze',
   self_check: 'Self check',
   note_cue: 'Note cue',
+  with_teacher: 'With teacher',
+  faded_example: 'Faded example',
   chart: 'Chart',
   equation: 'Equation',
   diagram: 'Diagram',
@@ -242,7 +246,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Learning',
-    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'note_cue', 'annotation']
+    types: ['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'question_set', 'flashcards', 'cloze', 'self_check', 'note_cue', 'faded_example', 'with_teacher', 'annotation']
   },
   {
     label: 'Visualisation',
@@ -301,6 +305,8 @@ const HOMEPAGE_EXCLUDED = new Set([
   'cloze',
   'self_check',
   'note_cue',
+  'with_teacher',
+  'faded_example',
   'outcomes',
   'annotation',
   'anthology'
@@ -317,7 +323,7 @@ export const UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
     (type) =>
-      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
+      !['peer_feedback', 'brainstorm', 'hinge_question', 'question_drop', 'quiz_question', 'flashcards', 'cloze', 'self_check', 'note_cue', 'with_teacher', 'faded_example', 'outcomes', 'annotation', ...TOOLKIT_GROUP_TYPES].includes(
         type
       )
   )
@@ -348,6 +354,9 @@ export const SECTION_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
 export const TAB_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
   (t) => t !== 'tabs' && t !== 'section' && !PAGE_ONLY_TYPES.has(t)
 );
+
+/** Defined here (not in faded-example.ts) so create-block never imports the editors module graph. */
+const FADED_DEFAULT_PARTS = ['Technique', 'Where', 'Effect'] as const;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -683,6 +692,15 @@ export function createBlock(type: NewBlockType, id: string): Block {
       };
     case 'note_cue':
       return { ...shared, block_type: 'note_cue', variant: 'medium', content: { kind: 'own_words', prompt: '' } };
+    case 'with_teacher':
+      return { ...shared, block_type: 'with_teacher', variant: 'medium', content: { talking_points: [] } };
+    case 'faded_example':
+      return {
+        ...shared,
+        block_type: 'faded_example',
+        variant: 'medium',
+        content: { prompt: '', extract: '', parts: FADED_DEFAULT_PARTS.map((label) => ({ label, answer: '' })), blanks: [] }
+      };
     case 'chart':
       return {
         ...shared,

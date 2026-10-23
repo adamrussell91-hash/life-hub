@@ -56,6 +56,7 @@ import {
   insertTargetForSelection,
   moveBlockTo,
   moveByTarget,
+  type DropParent,
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
 import {
@@ -67,6 +68,10 @@ import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd'
 import { createTeacherClassExamples } from '@/class-examples/teacher';
 import { mountQuizPanel, type QuizPanelHandle } from '@/quiz/teacher-panel';
 import { createLectureEditorTools } from '@/lecture/editor-tools';
+import { mountTutorialBoard, type TutorialBoardHandle } from '@/tutorial/board';
+import { tutorialTeacherApi } from '@/tutorial/api';
+import { createTutorialTabs, inTab, movedGroups, type TutorialTab } from '@/tutorial/editor-tabs';
+import { groupSection, isGroupTab } from '@/tutorial/model';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -87,6 +92,13 @@ export type MountBlockCanvasOptions = {
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
   /** Adds per-block extras (class examples) after each editable row is built. */
   decorateRow?: (row: HTMLElement, block: Block) => void;
+  /**
+   * Where a new block goes when it isn't dropped beside or inside another
+   * (a palette drop on a page gap, or Insert with nothing selected). Null
+   * keeps the page-level place. A tutorial's group tab returns its section.
+   * Moving an existing block is not affected.
+   */
+  rootInsertTarget?: () => { parent: DropParent; index: number } | null;
   /** Author canvases only. Student / published surfaces omit the ⋯ menu. */
   editable?: boolean;
   /**
@@ -100,6 +112,8 @@ export type BlockCanvasHandle = {
   update(blocks: Block[], nextMedia?: Media[]): void;
   insertType(type: InsertMenuValue): void;
   revealPublishBlock(blockId: string, errorIds?: string[]): void;
+  /** Closes the open block editor, if any. */
+  clearSelection(): void;
   dispose(): void;
 };
 
@@ -438,6 +452,11 @@ export function mountBlockCanvas(
     }
 
     const block = createFromInsertMenu(payload.type as InsertMenuValue, options.idFactory());
+    const redirect = options.rootInsertTarget?.();
+    if (redirect) {
+      insertNew(block, redirect);
+      return;
+    }
     const result = insertAt(blocks, { kind: 'root' }, index, block, { rootMode });
     if (!result.ok) {
       setHint(result.message);
@@ -447,6 +466,31 @@ export function mountBlockCanvas(
     emit(result.blocks);
     pendingReveal = block.id;
     select(block.id);
+  }
+
+  /**
+   * Adds a new block at `target`. Only page-level rows can be selected, so a
+   * block added inside a section, column or tab opens its container's editor,
+   * scrolled to the new block; selecting the nested id itself left nothing
+   * editable on the page.
+   */
+  function insertNew(block: Block, target: { parent: DropParent; index: number }): void {
+    const result = insertAt(blocks, target.parent, target.index, block, { rootMode });
+    if (!result.ok) {
+      setHint(result.message);
+      return;
+    }
+    const containerId = rootAncestorId(result.blocks, block.id) ?? block.id;
+    const container = findBlockById(result.blocks, containerId);
+    emit(result.blocks, false);
+    pendingReveal = block.id;
+    if (selectedId === containerId) render();
+    else select(containerId);
+    setHint(
+      containerId !== block.id && container
+        ? `Added inside the ${blockTypeLabel(container).toLowerCase()}. Choose Done to add blocks to the page instead.`
+        : ''
+    );
   }
 
   function applyRootMove(blockId: string, index: number): void {
@@ -820,26 +864,11 @@ export function mountBlockCanvas(
     insertType(type: InsertMenuValue) {
       if (!canEdit) return;
       const block = createFromInsertMenu(type, options.idFactory());
-      const target = insertTargetForSelection(blocks, selectedId);
-      const result = insertAt(blocks, target.parent, target.index, block, { rootMode });
-      if (!result.ok) {
-        setHint(result.message);
-        return;
-      }
-      // Only page-level rows can be selected. A block added inside a section,
-      // column or tab opens its container's editor, scrolled to the new block;
-      // selecting the nested id itself left nothing editable on the page.
-      const containerId = rootAncestorId(result.blocks, block.id) ?? block.id;
-      const container = findBlockById(result.blocks, containerId);
-      emit(result.blocks, false);
-      pendingReveal = block.id;
-      if (selectedId === containerId) render();
-      else select(containerId);
-      setHint(
-        containerId !== block.id && container
-          ? `Added inside the ${blockTypeLabel(container).toLowerCase()}. Choose Done to add blocks to the page instead.`
-          : ''
-      );
+      const target = (selectedId ? null : options.rootInsertTarget?.()) ?? insertTargetForSelection(blocks, selectedId);
+      insertNew(block, target);
+    },
+    clearSelection() {
+      select(null);
     },
     revealPublishBlock(blockId: string, errorIds: string[] = [blockId]) {
       publishErrorIds = new Set(errorIds);
@@ -1001,6 +1030,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     banner.update({ eyebrow: PEDAGOGICAL_MODE_LABELS[pedagogical_mode] });
     syncQuizPanel();
     syncLecturePanel();
+    syncTutorialPanel();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
   });
@@ -1079,8 +1109,68 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     lectureHost.hidden = !isLecture;
   }
 
+  // A lesson set to Tutorial gets its board (groups, live board) and the part tabs.
+  // Editor only: Focus view and student pages never mount this page.
+  const tutorialHost = document.createElement('div');
+  tutorialHost.className = 'lesson-page__tutorial';
+  let tutorialBoard: TutorialBoardHandle | null = null;
+  let selectedBlockId: string | null = null;
+  let tutorialTabs: ReturnType<typeof createTutorialTabs> | null = null;
+  function syncTutorialPanel(): void {
+    const isTutorial = resolvePedagogicalMode(lesson.pedagogical_mode) === 'tutorial';
+    if (isTutorial && !tutorialBoard) {
+      tutorialBoard = mountTutorialBoard({
+        getLesson: () => lesson,
+        api: tutorialTeacherApi(lesson.id),
+        // The server has already written the move into the draft. The editor
+        // sends its whole lesson on every save, so it takes the new groups too:
+        // otherwise the next autosave would put the student back.
+        onMoved: (summary, move) => {
+          if (!lesson.tutorial) return;
+          emitLesson({ ...lesson, tutorial: movedGroups(lesson.tutorial, summary, move) });
+          tutorialTabs?.repaint();
+        }
+      });
+      tutorialTabs = createTutorialTabs({ getLesson: () => lesson, onTab: showTutorialTab });
+      tutorialHost.append(tutorialBoard.root, tutorialTabs.root);
+      void tutorialBoard.refresh();
+    } else if (!isTutorial && tutorialBoard) {
+      tutorialBoard.dispose();
+      tutorialBoard = null;
+      tutorialTabs = null;
+      tutorialHost.replaceChildren();
+    }
+    tutorialTabs?.repaint();
+    tutorialHost.hidden = !isTutorial;
+  }
+
+  /** The tutorial tab a page-level block belongs to: its group, else Common. */
+  const tabOf = (block: Block): TutorialTab => groupSection(block)?.id ?? 'common';
+  const rootOf = (blockId: string): Block | undefined => {
+    const rootId = rootAncestorId(lesson.blocks, blockId);
+    return rootId ? lesson.blocks.find((b) => b.id === rootId) : undefined;
+  };
+  /** The open block editor closes when its block isn't on the new tab. */
+  function showTutorialTab(tab: TutorialTab): void {
+    const open = selectedBlockId ? rootOf(selectedBlockId) : undefined;
+    if (open && !inTab(open, tab)) canvas.clearSelection();
+    canvas.update(lesson.blocks, media);
+  }
+  /** On a group's tab, new blocks go at the end of that group's tab section, so they stay in view. */
+  function tutorialInsertTarget(): { parent: DropParent; index: number } | null {
+    const tab = tutorialTabs?.current();
+    if (!tutorialTabs || !tab || tab === 'common' || tab === 'all') return null;
+    const section = lesson.blocks.find((b) => isGroupTab(b) && groupSection(b)?.id === tab);
+    if (!section || section.block_type !== 'section') {
+      // No tab section to put it in: show everything so the new block is seen.
+      tutorialTabs.set('all');
+      return null;
+    }
+    return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
+  }
+
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, quizHost, lectureHost, canvasHost);
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1103,6 +1193,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   });
   const canvas = mountBlockCanvas(canvasHost, {
     decorateRow: (row, block) => {
+      // Tabs hide page-level rows only; what's inside a section is left alone.
+      if (tutorialTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inTab(block, tutorialTabs.current());
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
       lectureTools.decorate(row, block);
@@ -1113,7 +1205,11 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     onChange: (blocks) => {
       emitLesson({ ...lesson, blocks });
     },
-    onSelect: options.onSelect,
+    onSelect: (blockId) => {
+      selectedBlockId = blockId;
+      options.onSelect?.(blockId);
+    },
+    rootInsertTarget: tutorialInsertTarget,
     idFactory: options.idFactory,
     onSaveComposition: options.onSaveComposition,
     onEditSource: options.onEditSource,
@@ -1130,6 +1226,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
 
   syncQuizPanel();
   syncLecturePanel();
+  syncTutorialPanel();
+  if (tutorialTabs) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
   const syllabus = mountLessonSyllabus(document.createElement('div'));
@@ -1226,6 +1324,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
       syncQuizPanel();
       syncLecturePanel();
+      syncTutorialPanel();
       lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
@@ -1243,11 +1342,16 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.insertType(type);
     },
     revealPublishBlock(blockId: string, errorIds?: string[]) {
+      // A publish issue on another tutorial tab: open that tab first.
+      const target = blockId ? rootOf(blockId) : undefined;
+      if (tutorialTabs && target && !inTab(target, tutorialTabs.current())) tutorialTabs.set(tabOf(target));
       canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {
       quizPanel?.dispose();
       lecturePanel?.dispose();
+      tutorialBoard?.dispose();
+      tutorialBoard = null;
       classExamples.dispose();
       pulseSummary.dispose();
       pulse.dispose();

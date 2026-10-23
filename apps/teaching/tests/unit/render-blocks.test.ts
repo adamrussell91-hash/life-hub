@@ -380,6 +380,7 @@ describe('blockRegistry', () => {
       'divider',
       'embed',
       'equation',
+      'faded_example',
       'flashcards',
       'fluid_analogy',
       'gallery',
@@ -412,7 +413,8 @@ describe('blockRegistry', () => {
       'toolkit_tool',
       'toolkit_value',
       'video',
-      'whiteboard'
+      'whiteboard',
+      'with_teacher'
     ]);
 
     for (const key of Object.keys(blockRegistry) as Array<Block['block_type']>) {

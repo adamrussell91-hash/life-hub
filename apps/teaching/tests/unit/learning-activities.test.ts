@@ -242,6 +242,8 @@ describe('createBlock learning activities', () => {
       'cloze',
       'self_check',
       'note_cue',
+      'faded_example',
+      'with_teacher',
       'annotation'
     ]);
   });

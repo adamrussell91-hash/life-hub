@@ -4,7 +4,9 @@ import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { mountStudentQuiz } from '@/quiz/student-quiz';
-import { mountLecturePlayer, type LecturePlayerHandle } from '@/lecture/player';
+import { mountLecturePlayer } from '@/lecture/player';
+import { mountTutorialPlayer } from '@/tutorial/player';
+import { tutorialClient } from '@/tutorial/api';
 import { lectureClient } from '@/lecture/api';
 import { isSidePath } from '@/lecture/scenes';
 import type { PublishedLesson } from '@/schemas/published-lesson';
@@ -77,7 +79,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
@@ -106,13 +108,27 @@ export function renderPublishedLessonHero(
   return publishedOutcomes;
 }
 
-/** Returns the lecture player's handle when the lesson plays as a lecture. */
+/** Returns the player's handle when the lesson plays as a lecture or a tutorial. */
 function renderPublishedLesson(
   content: HTMLElement,
   lesson: PublishedLesson,
   extras?: { cls?: PublishedClass; quizClassId?: string }
-): LecturePlayerHandle | null {
+): { dispose(): void } | null {
   content.replaceChildren();
+  if (lesson.pedagogical_mode === 'tutorial') {
+    // Common, the student's own group tab and the exit check; the tab comes from the server after the initials claim.
+    const classId = extras?.cls?.id ?? extras?.quizClassId;
+    const playerHost = document.createElement('div');
+    content.append(playerHost);
+    return mountTutorialPlayer(playerHost, {
+      lesson,
+      classId,
+      client: classId ? tutorialClient(lesson.lesson_id, classId) : null,
+      renderHero: (hostEl) => {
+        renderPublishedLessonHero(hostEl, lesson, extras?.cls);
+      }
+    });
+  }
   if (lesson.pedagogical_mode === 'lecture') {
     // The hero sits on the player's title card; hand-ups need the class link.
     const classId = extras?.cls?.id ?? extras?.quizClassId;
@@ -241,7 +257,7 @@ export function mountStudentLessonView(
   const { root, lessonId, classId, isStale = () => false } = options;
   let disposed = false;
   let examples: StudentClassExamplesHandle | null = null;
-  let lecture: LecturePlayerHandle | null = null;
+  let lecture: { dispose(): void } | null = null;
   const mountExamples = (content: HTMLElement) => {
     examples?.dispose();
     // Class examples hang off rendered blocks; the lecture player redraws them per scene.

@@ -30,6 +30,8 @@ const KIND_LABEL: Partial<Record<Block['block_type'], string>> = {
   quiz_question: 'Quiz question',
   self_check: 'Self check',
   note_cue: 'Note cue',
+  with_teacher: 'With teacher',
+  faded_example: 'Faded example',
   mind_map: 'Mind map',
   concept_map: 'Concept map'
 };
@@ -394,6 +396,12 @@ function ownIssue(block: Block, discernHosts: Set<string>): string | null {
   }
   if (block.block_type === 'note_cue' && !block.content.prompt.trim()) {
     return 'Write the prompt for this note cue';
+  }
+  if (
+    block.block_type === 'faded_example' &&
+    (!block.content.extract.trim() || block.content.parts.some((p) => !p.answer.trim()))
+  ) {
+    return 'Faded example needs an extract and a model answer for every part.';
   }
   if (block.block_type === 'self_check') {
     if (block.content.prompt.trim().length === 0) {

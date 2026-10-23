@@ -55,6 +55,24 @@ export function buildAiStaticPrompt(input: Pick<AiContextInput, 'agentName' | 'p
 }
 
 /** The per-lesson, per-turn part of the prompt: lesson, focus, search pack. */
+/**
+ * The lesson as the agent sees it. A tutorial's groups keep only what Ann
+ * builds from (the tag and each group's reason and goal): no student ids,
+ * unsure marks, evidence quotes, notes or class.
+ */
+export function lessonForAgent(lesson: Lesson): Lesson {
+  if (!lesson.tutorial) return lesson;
+  const groups = lesson.tutorial.groups.map(({ id, name, why, goal, gap_type }) => ({ id, name, why, goal, gap_type }));
+  const tag = lesson.tutorial.tag ? { tag: lesson.tutorial.tag } : {};
+  return { ...lesson, tutorial: { ...tag, groups } as unknown as Lesson['tutorial'] };
+}
+
+function lessonTypeLine(mode: Lesson['pedagogical_mode']): string {
+  if (mode === 'quiz') return 'quiz';
+  if (mode === 'tutorial') return 'tutorial (quiz_question only inside a group’s exit check section; follow the tutorial recipe)';
+  return `${mode ?? 'lesson'} (not a quiz)`;
+}
+
 export function buildAiLessonContext(input: AiContextInput): string {
   const selectedId = input.selectedBlockId || null;
   const selected = selectedId ? findBlockById(input.lesson.blocks, selectedId) : null;
@@ -81,7 +99,7 @@ export function buildAiLessonContext(input: AiContextInput): string {
     `Subject: ${input.subjectLabel ?? 'unknown'}`,
     `Lesson title: ${input.lesson.title}`,
     `Lesson id: ${input.lesson.id}`,
-    `Lesson type: ${input.lesson.pedagogical_mode === 'quiz' ? 'quiz' : `${input.lesson.pedagogical_mode ?? 'lesson'} (not a quiz)`}`,
+    `Lesson type: ${lessonTypeLine(input.lesson.pedagogical_mode)}`,
     `Scope: ${input.scope}`,
     `Selected block id: ${selectedId ?? ''}`,
     schemaHint,
@@ -96,7 +114,7 @@ export function buildAiLessonContext(input: AiContextInput): string {
   ];
 
   if (input.fullLesson) {
-    parts.push('', '## Lesson JSON', JSON.stringify(input.lesson));
+    parts.push('', '## Lesson JSON', JSON.stringify(lessonForAgent(input.lesson)));
   }
 
   if (input.compositionFill) {
