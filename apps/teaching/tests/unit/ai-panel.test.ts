@@ -3,6 +3,7 @@ import { writeLastAgentSlug } from '@/ai/agents';
 import { streamAiChat } from '@/ai/client';
 import { pollAiJob, startAiJob, listAiJobs, resolveAiJob, AiJobConflictError } from '@/ai/jobs-client';
 import type { AiJob } from '@/ai/jobs';
+import type { AiJobInbox } from '@/ai/jobs-inbox';
 import type { AiProposal } from '@/ai/proposals';
 import { mountAiPanel, type AiPanelHandle, type MountAiPanelOptions } from '@/teacher/ai-panel';
 
@@ -429,6 +430,48 @@ describe('mountAiPanel', () => {
 
     expect(second.host.querySelector<HTMLElement>('.agent-protocol-pills')!.hidden).toBe(true);
     expect(second.host.querySelector<HTMLElement>('.ai-panel__actions')!.hidden).toBe(true);
+  });
+
+  it('still sends when a saved transcript has a user line with no text', async () => {
+    localStorage.setItem(
+      'teaching_hub_ai_transcript_lesson_1',
+      JSON.stringify([{ id: 'm1', role: 'user' }, { id: 'm2', role: 'user', text: 'Earlier' }])
+    );
+    pollAiJobMock.mockResolvedValue({ ...workingJob(), status: 'done', response: 'Here.' });
+    const mounted = mountPanel();
+    handle = mounted.handle;
+
+    submitMessage(mounted.host, 'Can you hear me?');
+    await vi.waitFor(() => expect(mounted.host.textContent).toContain('Here.'));
+    expect(startAiJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        history: [
+          { role: 'user', content: 'Earlier' },
+          { role: 'user', content: 'Can you hear me?' }
+        ]
+      }),
+      expect.anything()
+    );
+    expect(handle.isWorking()).toBe(false);
+  });
+
+  it('does not resume an agentless job such as a voice transcription', async () => {
+    listAiJobsMock.mockResolvedValue({
+      jobs: [
+        {
+          id: 'job_voice',
+          lesson_id: 'lesson_1',
+          status: 'error',
+          created_at: SNAPSHOT
+        } as unknown as AiJobInbox['jobs'][number]
+      ]
+    });
+    const mounted = mountPanel();
+    handle = mounted.handle;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(pollAiJobMock).not.toHaveBeenCalled();
+    expect(mounted.host.querySelectorAll('.ai-panel__msg')).toHaveLength(0);
   });
 
   it('keeps suggestion buttons out of the way until asked for', () => {
