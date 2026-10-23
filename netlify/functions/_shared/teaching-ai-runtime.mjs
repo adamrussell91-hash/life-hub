@@ -1403,6 +1403,8 @@ var NetworkLineSchema = z8.object({
 });
 var LessonKindSchema = z8.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z8.array(z8.string().min(1).max(64)).max(6);
+var LessonRouteRoleSchema = z8.enum(["support", "extension"]);
+var LessonSkipRuleSchema = z8.string().trim().max(80);
 var LineStopSchema = z8.object({
   line_id: z8.string().min(1).max(64),
   level: CurriculumLinesLevelSchema.optional(),
@@ -6332,6 +6334,9 @@ var LessonSchema = z13.object({
    */
   after_lesson_ids: AfterLessonIdsSchema.nullable().optional(),
   lesson_kind: LessonKindSchema.optional(),
+  /** On the unit map: a support or extension lesson beside the core route. Null (saves merge) goes back to core. */
+  route_role: LessonRouteRoleSchema.nullable().optional(),
+  skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
   dot_points: z13.array(DotPointRefSchema).max(20).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */

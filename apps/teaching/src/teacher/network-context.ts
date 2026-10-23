@@ -10,6 +10,36 @@ import type { NetUnit } from '@/network/year';
 import { orderStations, placeByDate } from '@/network/model';
 import { linesBefore } from '@/alignment/auto-lines';
 import type { CurriculumResponse } from '@/teacher/nav';
+import { httpMarkbookApi } from '@/markbook/api';
+import { markbookEvidence } from '@/evidence/markbook-evidence';
+import type { ClassEvidence } from '@/network/coverage-map/mount';
+
+/** The classes that teach a unit: scheduled lessons from it, or the unit marked active. */
+export function unitClasses(curriculum: CurriculumResponse, unit: Unit): Array<{ id: string; name: string }> {
+  const ids = new Set(curriculum.scheduled_lessons.filter((row) => row.unit_id === unit.id).map((row) => row.class_id));
+  return curriculum.classes
+    .filter((c) => c.status !== 'trashed' && (ids.has(c.id) || c.active_unit_ids.includes(unit.id)))
+    .map((c) => ({ id: c.id, name: c.display_name || c.code }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** A class's quiz and markbook evidence, scores and ticked lessons, for one student's view of the coverage map. */
+export async function loadClassEvidence(classId: string): Promise<ClassEvidence> {
+  const view = await httpMarkbookApi.load(classId);
+  const scores = new Map<string, Map<string, { score: number; max: number }>>();
+  for (const quiz of view.quizzes) {
+    if (quiz.hidden) continue;
+    const by = new Map<string, { score: number; max: number }>();
+    for (const [student, s] of Object.entries(quiz.scores)) by.set(student, { score: s.score, max: s.max });
+    scores.set(quiz.lesson_id, by);
+  }
+  return {
+    students: view.students.filter((s) => !s.removed).map((s) => ({ id: s.id, name: s.name })),
+    evidence: markbookEvidence(view).evidence,
+    scores,
+    took: { ...(view.markbook.took ?? {}) }
+  };
+}
 
 /** Saves the subject's lines and keeps the loaded curriculum in step. */
 export async function saveSubjectLines(curriculum: CurriculumResponse, subjectId: string, lines: NetworkLine[]): Promise<void> {
@@ -109,9 +139,15 @@ export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): 
       ...(l.line_off ? { line_off: l.line_off } : {}),
       ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}),
       ...(l.lesson_kind ? { kind: l.lesson_kind } : {}),
-      ...(l.dot_points ? { dot_points: l.dot_points } : {})
+      ...(l.dot_points ? { dot_points: l.dot_points } : {}),
+      ...(l.route_role ? { role: l.route_role } : {}),
+      ...(l.skip_rule ? { skip: l.skip_rule } : {}),
+      ...(l.pedagogical_mode === 'quiz' ? { quiz: true } : {})
     })),
     unitTitle: unit.title,
+    classes: unitClasses(curriculum, unit),
+    loadClass: loadClassEvidence,
+    saveTook: async (classId, studentId, lessonIds) => { await httpMarkbookApi.setTook(classId, studentId, lessonIds); },
     usesAlignment: subject ? subjectUsesAlignment(subject.title) : false,
     ...(schedule ? { bands: schedule.bands, dates: schedule.dates } : {}),
     ...(subject ? { saveLines: (lines: NetworkLine[]) => saveSubjectLines(curriculum, subject.id, lines) } : {}),
