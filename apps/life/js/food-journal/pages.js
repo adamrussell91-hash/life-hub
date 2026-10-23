@@ -18,6 +18,7 @@ import {
   venueQueue,
   isImport,
 } from "./model.js";
+import { bindLongPress, openAtlas } from "./atlas-door.js";
 
 // Painters for the magazine, timeline, entry and fix-up pages. The view owns
 // state and writes; these only build DOM from the journal and call back.
@@ -116,6 +117,7 @@ export function paintMagazine(ctx, host) {
     el("span", "", plural(h.places, "place", "places")),
   );
   mast.append(word, edition);
+  bindLongPress(mast, () => openAtlas());
   page.append(mast, cover(ctx, h.cover));
 
   const tiles = el("section", "fj-tiles");

@@ -647,6 +647,10 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
   border-bottom: 1px solid var(--navy);
   padding: var(--space-4) 0 var(--space-3);
   text-align: center;
+  /* A long press opens a hidden page; keep the system text menu out of it. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .fj-masthead__word {
   margin: 0;

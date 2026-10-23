@@ -1,6 +1,8 @@
 import { ApiClientError } from '@/api/client';
 import type { FoodDish, FoodVisit, MealPutBody, MealRead } from '@/api/travel-meal';
 import type { JournalMedia, JournalMoment } from '@/journal/types';
+import { mountMaccasRows, type MaccasRowsHandle } from '@/atlas/maccas-section';
+import type { MaccasDraft } from '@/atlas/maccas';
 
 export const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Drinks'] as const;
 // Same limits as the journal schema.
@@ -34,7 +36,21 @@ export interface MealSectionHandle {
   changed(): boolean;
   /** Moment photos the linked visit has not copied yet; a save retries them. */
   photosPending: string[];
+  /** A Maccas run goes to the Arches Atlas in Travel, never the Food Journal. */
+  maccasEnabled(): boolean;
+  maccasWasOn: boolean;
+  maccasDrafts(): MaccasDraft[];
+  maccasChanged(): boolean;
 }
+
+export interface MaccasOptions {
+  drafts: MaccasDraft[];
+  /** The moment's local currency, the default for a new row. */
+  currency: () => string;
+}
+
+export const MACCAS_SWITCH_CONFIRM =
+  'This meal is in the Food Journal. A Maccas run lives only in Travel, so saving removes the Food Journal visit. You can restore it from the Food Journal\'s deleted items.';
 
 // Older moments have no author; they are Adam's.
 export function canBeMeal(moment: Pick<JournalMoment, 'author'>): boolean {
@@ -163,7 +179,13 @@ function hint(text: string): HTMLParagraphElement {
 
 export function mountMealSection(
   container: HTMLElement,
-  options: { moment: JournalMoment; read: MealRead | null; media?: JournalMedia[]; onChange?: () => void },
+  options: {
+    moment: JournalMoment;
+    read: MealRead | null;
+    media?: JournalMedia[];
+    onChange?: () => void;
+    maccas?: MaccasOptions;
+  },
 ): MealSectionHandle {
   const { moment, read } = options;
   const changed = () => options.onChange?.();
@@ -195,8 +217,46 @@ export function mountMealSection(
   toggleRow.append(toggle, toggleText);
   section.append(toggleRow);
 
+  // Maccas run: the other switch. Only one of the two can be on.
+  const maccasOpts = options.maccas;
+  const maccasWasOn = Boolean(maccasOpts?.drafts.length);
+  const maccasToggle = document.createElement('input');
+  maccasToggle.type = 'checkbox';
+  maccasToggle.setAttribute('role', 'switch');
+  maccasToggle.checked = maccasWasOn && !visit;
+  // A linked meal that didn't load can't be moved out of the Food Journal.
+  maccasToggle.disabled = !read && Boolean(moment.meal);
+  const maccasRow = document.createElement('label');
+  maccasRow.className = 'journal-edit-moment__meal-switch journal-edit-moment__maccas-switch';
+  const maccasText = document.createElement('span');
+  maccasText.textContent = 'Maccas run';
+  maccasRow.append(maccasToggle, maccasText);
+  const maccasBody = document.createElement('div');
+  maccasBody.className = 'journal-edit-moment__meal-body journal-edit-moment__maccas-body';
+  const maccasHint = hint('Goes to the Arches Atlas in Travel, not the Food Journal.');
+  const maccasRowsHost = document.createElement('div');
+  maccasBody.append(maccasHint, maccasRowsHost);
+  let rows: MaccasRowsHandle | null = null;
+  if (maccasOpts) {
+    rows = mountMaccasRows(maccasRowsHost, { drafts: maccasOpts.drafts, currency: maccasOpts.currency, onChange: changed });
+    section.append(maccasRow, maccasBody);
+  }
+  const maccasOn = () => Boolean(rows && maccasToggle.checked);
+  const maccasFields = {
+    maccasEnabled: maccasOn,
+    maccasWasOn,
+    maccasDrafts: () => rows?.drafts() ?? [],
+    maccasChanged: () => Boolean(rows && (maccasToggle.checked !== maccasWasOn || rows.changed())),
+  };
+
   if (!read) {
     section.append(hint("Couldn't load the meal"));
+    maccasBody.hidden = !maccasToggle.checked;
+    maccasToggle.addEventListener('change', () => {
+      if (maccasToggle.checked) rows?.ensureRow();
+      maccasBody.hidden = !maccasToggle.checked;
+      changed();
+    });
     container.replaceChildren(section);
     return {
       available: false,
@@ -206,6 +266,7 @@ export function mountMealSection(
       state: () => state,
       changed: () => false,
       photosPending: [],
+      ...maccasFields,
     };
   }
 
@@ -306,8 +367,38 @@ export function mountMealSection(
     dishList.replaceChildren(...state.dishes.map((d, i) => dishRow(d, i)));
   }
 
+  // Switching a Food Journal meal to a Maccas run asks first: saving removes the visit.
+  const confirm = document.createElement('div');
+  confirm.className = 'confirm-card journal-edit-moment__maccas-confirm';
+  confirm.hidden = true;
+  confirm.setAttribute('role', 'alertdialog');
+  const confirmText = document.createElement('p');
+  confirmText.textContent = MACCAS_SWITCH_CONFIRM;
+  const confirmActions = document.createElement('div');
+  confirmActions.className = 'confirm-card__actions';
+  const keepMeal = document.createElement('button');
+  keepMeal.type = 'button';
+  keepMeal.className = 'btn btn--secondary';
+  keepMeal.textContent = 'Keep as a meal';
+  const switchToMaccas = document.createElement('button');
+  switchToMaccas.type = 'button';
+  switchToMaccas.className = 'btn btn--primary';
+  switchToMaccas.textContent = 'Make it a Maccas run';
+  confirmActions.append(keepMeal, switchToMaccas);
+  confirm.append(confirmText, confirmActions);
+
   function refresh(): void {
     body.hidden = !toggle.checked;
+    maccasBody.hidden = !maccasToggle.checked;
+  }
+
+  function turnMaccasOn(): void {
+    maccasToggle.checked = true;
+    toggle.checked = false;
+    rows?.ensureRow();
+    confirm.hidden = true;
+    changed();
+    refresh();
   }
 
   toggle.addEventListener('change', () => {
@@ -315,9 +406,30 @@ export function mountMealSection(
       state.dishes.push({ title: '', meal_type: 'Dinner', rating: null });
       renderDishes();
     }
+    if (toggle.checked) maccasToggle.checked = false;
+    confirm.hidden = true;
     changed();
     refresh();
   });
+
+  maccasToggle.addEventListener('change', () => {
+    if (maccasToggle.checked && visit && toggle.checked) {
+      maccasToggle.checked = false;
+      confirm.hidden = false;
+      return;
+    }
+    if (maccasToggle.checked) {
+      turnMaccasOn();
+      return;
+    }
+    changed();
+    refresh();
+  });
+  keepMeal.addEventListener('click', () => {
+    confirm.hidden = true;
+    maccasToggle.focus();
+  });
+  switchToMaccas.addEventListener('click', () => turnMaccasOn());
 
   const photosPending = pendingPhotoIds(moment, options.media ?? [], visit);
 
@@ -326,6 +438,7 @@ export function mountMealSection(
   body.append(extrasRow, titleField, dishList, addBtn);
   if (photosPending.length) body.append(hint(pendingPhotoHint(photosPending.length)));
   section.append(body);
+  if (rows) maccasRow.after(confirm);
   container.replaceChildren(section);
 
   return {
@@ -336,5 +449,6 @@ export function mountMealSection(
     state: () => state,
     changed: () => mealChanged(loaded, state),
     photosPending,
+    ...maccasFields,
   };
 }

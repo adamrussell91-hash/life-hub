@@ -29,6 +29,7 @@ import { renderTripsList } from '@/views/trips-list';
 import { renderTripPage } from '@/views/trip-page';
 import { renderTodayView } from '@/views/today';
 import { renderPublicTrip } from '@/views/public-trip';
+import { renderAtlas } from '@/views/atlas';
 import { getTrip, listTrips } from '@/api/travel';
 import { pickPrimaryTrip } from '@/lib/pick-trip';
 import { registerServiceWorker, mountOfflineBanner } from '@/lib/offline';
@@ -130,6 +131,16 @@ async function bootApp(root: HTMLElement): Promise<void> {
         renderHighlight('today');
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: 'Today' });
         await renderTodayView(shell.canvas, { isCurrent: () => generation === routeGeneration });
+        return;
+      }
+
+      if (route.name === 'atlas') {
+        renderHighlight(null);
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
+        await renderAtlas(shell.canvas, {
+          tripId: route.tripId,
+          isCurrent: () => generation === routeGeneration
+        });
         return;
       }
 
