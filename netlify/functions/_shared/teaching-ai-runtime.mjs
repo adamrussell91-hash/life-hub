@@ -810,6 +810,7 @@ var BlockTypeSchema = z8.enum([
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "chart",
   "equation",
   "diagram",
@@ -899,13 +900,23 @@ var RichTextBlockSchema = z8.object({
   ...blockLayout,
   ...blockTimestamps
 });
+var NarrationSchema = z8.object({
+  url: z8.string().min(1),
+  duration_s: z8.number().min(0).max(900),
+  transcript: z8.string().max(8e3).optional()
+});
+var RevealSchema = z8.enum(["all", "one"]);
 var HeadingBlockSchema = z8.object({
   id: z8.string().min(1),
   type: z8.literal("block"),
   block_type: z8.literal("heading"),
   variant: HeadingVariantSchema,
   visibility: VisibilitySchema,
-  content: z8.object({ text: z8.string() }),
+  content: z8.object({
+    text: z8.string(),
+    narration: NarrationSchema.optional(),
+    reveal: RevealSchema.optional()
+  }),
   ...blockLayout,
   ...blockTimestamps
 });
@@ -1310,7 +1321,9 @@ var HingeQuestionBlockSchema = z8.object({
     move_on: z8.number().int().min(1).max(100).default(80),
     reteach: z8.number().int().min(0).max(99).default(50),
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
-    backup: HingeBackupSchema.optional()
+    backup: HingeBackupSchema.optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1536,7 +1549,9 @@ var ClozeBlockSchema = z8.object({
   content: z8.object({
     title: z8.string().optional(),
     text: z8.string(),
-    case_sensitive: z8.boolean().optional()
+    case_sensitive: z8.boolean().optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -1557,7 +1572,24 @@ var SelfCheckBlockSchema = z8.object({
     mode: SelfCheckModeSchema,
     prompt: z8.string(),
     answer: z8.string().optional(),
-    items: z8.array(SelfCheckItemSchema).max(12).optional()
+    items: z8.array(SelfCheckItemSchema).max(12).optional(),
+    /** Lecture: students must answer before moving on. On unless false. */
+    gate: z8.boolean().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var NOTE_CUE_KINDS = ["copy", "own_words", "draw", "question"];
+var NoteCueKindSchema = z8.enum(NOTE_CUE_KINDS);
+var NoteCueBlockSchema = z8.object({
+  id: z8.string().min(1),
+  type: z8.literal("block"),
+  block_type: z8.literal("note_cue"),
+  variant: z8.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z8.object({
+    kind: NoteCueKindSchema,
+    prompt: z8.string().max(500)
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2157,6 +2189,7 @@ var leafBlockSchemas = [
   FlashcardsBlockSchema,
   ClozeBlockSchema,
   SelfCheckBlockSchema,
+  NoteCueBlockSchema,
   ChartBlockSchema,
   EquationBlockSchema,
   DiagramBlockSchema,
@@ -2255,7 +2288,7 @@ var TabsBlockSchema = z8.object({
   ...blockLayout,
   ...blockTimestamps
 });
-var SectionChildBlockSchema = z8.lazy(
+var SectionInnerChildBlockSchema = z8.lazy(
   () => z8.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
@@ -2263,6 +2296,33 @@ var SectionChildBlockSchema = z8.lazy(
     TabsBlockSchema,
     TimelineBlockSchema,
     CardStackBlockSchema
+  ])
+);
+var SidePathSectionSchema = z8.object({
+  id: z8.string().min(1),
+  type: z8.literal("block"),
+  block_type: z8.literal("section"),
+  variant: z8.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z8.object({
+    title: z8.string(),
+    collapsed_in_editor: z8.boolean().optional(),
+    blocks: z8.array(SectionInnerChildBlockSchema),
+    side_path: z8.literal(true),
+    narration: NarrationSchema.optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var SectionChildBlockSchema = z8.lazy(
+  () => z8.discriminatedUnion("block_type", [
+    ...leafBlockSchemas,
+    SpacerBlockSchema,
+    ColumnsBlockSchema,
+    TabsBlockSchema,
+    TimelineBlockSchema,
+    CardStackBlockSchema,
+    SidePathSectionSchema
   ])
 );
 var SectionLinkSchema = z8.object({
@@ -2279,7 +2339,13 @@ var SectionBlockObjectSchema = z8.object({
     title: z8.string(),
     collapsed_in_editor: z8.boolean().optional(),
     blocks: z8.array(SectionChildBlockSchema),
-    link: SectionLinkSchema.optional()
+    link: SectionLinkSchema.optional(),
+    /** Lecture: the chapter intro clip. */
+    narration: NarrationSchema.optional(),
+    /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
+    takeaway: z8.object({ enabled: z8.boolean(), prompt: z8.string().max(300).optional() }).optional(),
+    /** Lecture: plays only after a wrong answer on the gate just above it. */
+    side_path: z8.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -3903,6 +3969,7 @@ var NEW_BLOCK_TYPES = [
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "chart",
   "equation",
   "diagram",
@@ -3969,6 +4036,7 @@ var NEW_BLOCK_LABEL = {
   flashcards: "Flashcards",
   cloze: "Cloze",
   self_check: "Self check",
+  note_cue: "Note cue",
   chart: "Chart",
   equation: "Equation",
   diagram: "Diagram",
@@ -4065,7 +4133,7 @@ var BLOCK_GROUPS = [
   },
   {
     label: "Learning",
-    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "annotation"]
+    types: ["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "question_set", "flashcards", "cloze", "self_check", "note_cue", "annotation"]
   },
   {
     label: "Visualisation",
@@ -4120,6 +4188,7 @@ var HOMEPAGE_EXCLUDED = /* @__PURE__ */ new Set([
   "flashcards",
   "cloze",
   "self_check",
+  "note_cue",
   "outcomes",
   "annotation",
   "anthology"
@@ -4131,7 +4200,7 @@ var HOMEPAGE_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
 var UNIT_PLAN_BLOCK_GROUPS = BLOCK_GROUPS.map((group) => ({
   ...group,
   types: group.types.filter(
-    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
+    (type) => !["peer_feedback", "brainstorm", "hinge_question", "question_drop", "quiz_question", "flashcards", "cloze", "self_check", "note_cue", "outcomes", "annotation", ...TOOLKIT_GROUP_TYPES].includes(
       type
     )
   )
@@ -4488,6 +4557,8 @@ function createBlock(type, id) {
           answer: ""
         }
       };
+    case "note_cue":
+      return { ...shared, block_type: "note_cue", variant: "medium", content: { kind: "own_words", prompt: "" } };
     case "chart":
       return {
         ...shared,
@@ -5818,6 +5889,7 @@ var KIND_LABEL = {
   discern_confirm: "Discern Confirm",
   quiz_question: "Quiz question",
   self_check: "Self check",
+  note_cue: "Note cue",
   mind_map: "Mind map",
   concept_map: "Concept map"
 };
@@ -6143,6 +6215,9 @@ function ownIssue(block, discernHosts) {
     if (validBlanks.length < 1) {
       return "Cloze blocks need at least one blank to publish";
     }
+  }
+  if (block.block_type === "note_cue" && !block.content.prompt.trim()) {
+    return "Write the prompt for this note cue";
   }
   if (block.block_type === "self_check") {
     if (block.content.prompt.trim().length === 0) {
