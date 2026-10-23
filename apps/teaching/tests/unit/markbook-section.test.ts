@@ -85,7 +85,7 @@ const mount = async (v: MarkbookView, narrow = false) => {
   const host = document.createElement('div');
   document.body.append(host);
   const api = fakeApi(v);
-  mountMarkbook(host, cls, { api, narrow: () => narrow, today: () => '2026-11-03' });
+  mountMarkbook(host, cls, { api, narrow: () => narrow, today: () => '2026-11-03', view: 'grid' });
   await vi.waitFor(() => expect(host.querySelector('.mb-grid, .mb-phone, .mb__empty')).not.toBeNull());
   return { host, api };
 };
@@ -221,12 +221,13 @@ describe('markbook section', () => {
     expect(hiddenToggle().hidden).toBe(true);
   });
 
-  it('keeps the Patterns label and marks the mode with aria-pressed', async () => {
+  it('marks the chosen view with aria-pressed', async () => {
     const { host } = await mount(view());
-    const toggle = host.querySelector<HTMLButtonElement>('.mb__toggle')!;
-    toggle.click();
-    expect(toggle.textContent).toBe('Patterns');
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    const detail = host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="detail"]')!;
+    detail.click();
+    expect(detail.textContent).toBe('Detail');
+    expect(detail.getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('.mb__mode[data-mode="grid"]')?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('rolls a failed save back even when the reload fails too', async () => {
@@ -245,7 +246,7 @@ describe('markbook section', () => {
     document.body.append(host);
     const api = fakeApi(view());
     (api.load as Mock).mockRejectedValueOnce(new ApiClientError({ code: 'markbook_unreadable', message: 'This markbook couldn’t be read. Nothing was changed.' }));
-    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03' });
+    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'grid' });
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('This markbook couldn’t be read. Nothing was changed.'));
   });
 
@@ -254,7 +255,7 @@ describe('markbook section', () => {
     document.body.append(host);
     const api = fakeApi(view());
     (api.load as Mock).mockRejectedValueOnce(new ApiClientError({ code: 'network_error', message: 'Failed to fetch' }));
-    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03' });
+    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'grid' });
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Couldn’t load the markbook.'));
   });
 
@@ -475,15 +476,23 @@ describe('markbook section', () => {
     scores: { s1: { attempt_id: 'x~0', submitted_at: '', score: 1, max: 2, pending: 0, rows: [{ id: 'q1', awarded: 1, max: 2, confidence: null, outcomes: ['o2'] }] } }
   });
 
-  it('draws the patterns view from the Patterns toggle, and goes back to the grid', async () => {
+  it('draws Detail from its button, and goes back to the grid', async () => {
     const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
-    const toggle = host.querySelector<HTMLButtonElement>('.mb__toggle')!;
-    toggle.click();
+    host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="detail"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-patterns')).not.toBeNull());
     expect(host.querySelector('.mb-col__title')).toBeNull();
-    toggle.click();
+    host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="grid"]')!.click();
     expect(host.querySelector('.mb-patterns')).toBeNull();
     expect(host.querySelector('.mb-col__title')).not.toBeNull();
+    host.remove();
+  });
+
+  it('opens on Next steps when no view is asked for', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountMarkbook(host, cls, { api: fakeApi(view({ quizzes: [outcomeQuiz()] })), narrow: () => false, today: () => '2026-11-03' });
+    await vi.waitFor(() => expect(host.querySelector('.mb-next')).not.toBeNull());
+    expect(host.querySelector('.mb__mode[data-mode="next"]')?.getAttribute('aria-pressed')).toBe('true');
     host.remove();
   });
 
@@ -565,9 +574,9 @@ describe('markbook section', () => {
     };
     try {
       const { host } = await mount(view({ quizzes: [outcomeQuiz()] }));
-      const message = 'Couldn’t load the tag names, so Patterns and student panels can’t open. Reload to try again.';
+      const message = 'Couldn’t load the tag names, so Next steps, Detail and student panels can’t open. Reload to try again.';
       await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe(message));
-      host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
+      host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="detail"]')!.click();
       expect(host.querySelector('.mb__body')?.textContent).toBe(message);
       expect(host.textContent).not.toContain('Loading patterns…');
       host.remove();
@@ -656,7 +665,7 @@ describe('markbook section', () => {
     tagged.scores.s1.rows = [{ ...tagged.scores.s1.rows[0]!, items: [{ item: 'q1', tags: ['out:o2'], share: 0.5, why: [] }] }] as typeof tagged.scores.s1.rows;
     const { host } = await mount(view({ quizzes: [tagged] }), true);
     expect(host.querySelector('.mb-phone')).not.toBeNull();
-    host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
+    host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="detail"]')!.click();
     expect(host.querySelector('.mb-phone')).toBeNull();
     await vi.waitFor(() => expect(host.querySelector('.mb-patterns .mb-grid')).not.toBeNull());
   });
@@ -846,7 +855,7 @@ describe('markbook section', () => {
         try {
           const host = document.createElement('div');
           document.body.append(host);
-          const dispose = mountMarkbook(host, cls, { api: fakeApi(view()), today: () => '2026-11-03' });
+          const dispose = mountMarkbook(host, cls, { api: fakeApi(view()), today: () => '2026-11-03', view: 'grid' });
           await vi.waitFor(() => expect(host.querySelector('.mb-grid')).not.toBeNull());
           expect(media.listeners.size).toBe(1);
           const listener = [...media.listeners][0]!;
