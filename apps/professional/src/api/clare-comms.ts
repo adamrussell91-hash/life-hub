@@ -14,6 +14,7 @@ export type ClareContext = {
   purpose_tag?: string | null;
   thread_ref?: string | null;
   channel?: string;
+  guides?: Array<{ about: string; guide: string; context: string; moves: string[] }>;
 };
 
 export type ClareBrief = { points: Array<{ text: string; source: string }>; owed_line: string | null };
