@@ -55,3 +55,20 @@ describe('side-path sections', () => {
     expect(renderBlock(side, 'print').querySelector('.block-section')).not.toBeNull();
   });
 });
+
+describe('hinge in a lecture', () => {
+  it('a hinge in a lecture preview checks locally and reports the result', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const got = listen(host);
+    const hinge = b('hq1', 'hinge_question', { prompt: 'Which?', options: [{ id: 'a', text: 'Gravity' }, { id: 'b', text: 'Magnetism' }], correct_id: 'a', seconds: 60, move_on: 80, reteach: 50 });
+    const el = renderBlock(hinge, 'student', { lessonId: 'l1', lecture: 'preview' });
+    host.append(el);
+    el.querySelectorAll<HTMLButtonElement>('.hq-choice')[1]!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(got).toEqual([{ blockId: 'hq1', result: 'wrong' }]);
+    expect(el.querySelector('.hq-verdict--wrong')).not.toBeNull();
+    expect(el.querySelector<HTMLElement>('.hq-choice[data-right="true"]')?.textContent).toContain('Gravity');
+  });
+});
