@@ -16,7 +16,7 @@ const tick: CheckColumn = { id: 'col0000002', kind: 'check', title: 'Bookwork', 
 
 describe('markbook schema', () => {
   it('fills an empty record', () => {
-    expect(MarkbookSchema.parse({})).toEqual({ columns: [], hidden_quizzes: [], marks: {}, focus: {}, updated_at: '' });
+    expect(MarkbookSchema.parse({})).toEqual({ columns: [], hidden_quizzes: [], marks: {}, focus: {}, took: {}, updated_at: '' });
   });
 
   it('accepts a good column and names the problem in a bad one', () => {
