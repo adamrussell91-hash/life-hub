@@ -1,5 +1,6 @@
 import type { Block } from '@/schemas/block';
 import type { RenderMode } from '@/blocks/render';
+import { loadActivityState, saveActivityState, storageKey } from '@/blocks/learning-activity';
 import { emitAnswered } from '@/lecture/answered';
 import { editorShell, type BlockChangeHandler } from '@/blocks/editors';
 
@@ -49,11 +50,14 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode): 
     list.append(term, value);
   });
   root.append(list);
-  if (mode !== 'teacher' && blanks.length > 0) attachFadedCheck(root, block);
+  if (mode === 'student' && blanks.length > 0) attachFadedCheck(root, block);
   return root;
 }
 
+type SavedFaded = { parts: Record<number, string>; rating: 'right' | 'wrong' };
+
 function attachFadedCheck(root: HTMLElement, block: FadedExampleBlock): void {
+  const key = storageKey('local', block.id);
   const actions = document.createElement('div');
   actions.className = 'block-faded__actions';
   const nudge = document.createElement('p');
@@ -65,34 +69,70 @@ function attachFadedCheck(root: HTMLElement, block: FadedExampleBlock): void {
   check.textContent = 'Check';
   actions.append(check, nudge);
   root.append(actions);
-  check.addEventListener('click', () => {
-    const inputs = [...root.querySelectorAll<HTMLTextAreaElement>('.block-faded__input')];
-    if (inputs.some((input) => !input.value.trim())) {
-      nudge.textContent = 'Write your part first.';
-      return;
-    }
-    const parts: Record<number, string> = Object.fromEntries(inputs.map((input) => [Number(input.dataset.part), input.value.trim()]));
-    for (const input of inputs) {
+  const inputs = () => [...root.querySelectorAll<HTMLTextAreaElement>('.block-faded__input')];
+
+  const lock = (): void => {
+    for (const input of inputs()) {
       input.readOnly = true;
       const model = document.createElement('p');
       model.className = 'block-faded__model';
       model.textContent = `Model: ${block.content.parts[Number(input.dataset.part)]!.answer}`;
       input.after(model);
     }
-    nudge.textContent = 'Compare yours with the model.';
-    const rate = (rating: 'right' | 'wrong', label: string) => {
+  };
+  const rateButtons = (): { group: HTMLElement; right: HTMLButtonElement; wrong: HTMLButtonElement } => {
+    const group = document.createElement('div');
+    group.className = 'block-faded__rating';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'How did yours compare?');
+    const make = (rating: 'right' | 'wrong', label: string) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `btn btn--secondary block-faded__rate block-faded__rate--${rating}`;
       button.textContent = label;
-      button.addEventListener('click', () => {
-        actions.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = true));
-        root.dispatchEvent(new CustomEvent<FadedDetail>(FADED_EVENT, { bubbles: true, detail: { blockId: block.id, parts, rating } }));
-        emitAnswered(root, block.id, rating);
-      });
       return button;
     };
-    check.replaceWith(rate('right', 'Got it'), rate('wrong', 'Not quite'));
+    const right = make('right', 'Got it');
+    const wrong = make('wrong', 'Not quite');
+    group.append(right, wrong);
+    return { group, right, wrong };
+  };
+
+  const saved = loadActivityState<SavedFaded>(key);
+  if (saved && saved.parts && (saved.rating === 'right' || saved.rating === 'wrong')) {
+    for (const input of inputs()) input.value = saved.parts[Number(input.dataset.part)] ?? '';
+    lock();
+    const { group, right, wrong } = rateButtons();
+    right.disabled = true;
+    wrong.disabled = true;
+    (saved.rating === 'right' ? right : wrong).setAttribute('aria-pressed', 'true');
+    (saved.rating === 'right' ? right : wrong).classList.add('block-faded__rate--chosen');
+    check.replaceWith(group);
+    nudge.textContent = saved.rating === 'right' ? 'You rated this: Got it.' : 'You rated this: Not quite.';
+    return;
+  }
+
+  check.addEventListener('click', () => {
+    const fields = inputs();
+    if (fields.some((input) => !input.value.trim())) {
+      nudge.textContent = 'Write your part first.';
+      return;
+    }
+    const parts: Record<number, string> = Object.fromEntries(fields.map((input) => [Number(input.dataset.part), input.value.trim()]));
+    lock();
+    nudge.textContent = 'Compare yours with the model.';
+    const { group, right, wrong } = rateButtons();
+    const rate = (rating: 'right' | 'wrong') => {
+      right.disabled = true;
+      wrong.disabled = true;
+      saveActivityState(key, { parts, rating } satisfies SavedFaded);
+      root.dispatchEvent(new CustomEvent<FadedDetail>(FADED_EVENT, { bubbles: true, detail: { blockId: block.id, parts, rating } }));
+      emitAnswered(root, block.id, rating);
+    };
+    right.addEventListener('click', () => rate('right'));
+    wrong.addEventListener('click', () => rate('wrong'));
+    check.replaceWith(group);
+    right.focus();
   });
 }
 

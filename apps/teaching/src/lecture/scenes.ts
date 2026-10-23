@@ -39,9 +39,12 @@ const GATE_TYPES = new Set<Block['block_type']>(['hinge_question', 'cloze', 'sel
 const SKIPPED = new Set<Block['block_type']>(['spacer', 'divider', 'teacher_note']);
 
 export function isGate(block: Block): boolean {
-  if (!GATE_TYPES.has(block.block_type) || (block.content as { gate?: boolean }).gate === false) return false;
-  // A fully worked step has nothing to answer.
-  return block.block_type !== 'faded_example' || block.content.blanks.length > 0;
+  if (!GATE_TYPES.has(block.block_type)) return false;
+  if (block.block_type === 'faded_example') {
+    // A fully worked step has nothing to answer.
+    return block.content.gate !== false && block.content.blanks.length > 0;
+  }
+  return (block.content as { gate?: boolean }).gate !== false;
 }
 
 export function takesSidePath(block: Block): boolean {
