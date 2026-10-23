@@ -435,7 +435,14 @@ export const QuizSettingsSchema = z.object({
   confidence: z.boolean().optional(),
   closes_at: z.string().datetime().optional(),
   /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
-  move_on: z.number().int().min(1).max(100).optional()
+  move_on: z.number().int().min(1).max(100).optional(),
+  /** A follow-up quiz: only these students (class-list ids) may sit it. */
+  for_students: z.array(z.string().min(1).max(64)).max(60).optional(),
+  /** The quiz this one follows up, and the flag that prompted it. */
+  follow_up_of: z.string().max(64).optional(),
+  follow_up_flag: z.string().max(160).optional(),
+  /** Teacher only: an earlier quiz to show before-and-after against. */
+  compare_with: z.string().max(64).optional()
 });
 export type QuizSettings = z.infer<typeof QuizSettingsSchema>;
 
