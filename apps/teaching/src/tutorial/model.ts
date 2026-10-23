@@ -63,7 +63,24 @@ export function groupOf(settings: TutorialSettings | undefined, studentId: strin
 const shellAt = (now: string, id: string, block_type: Block['block_type'], content: Record<string, unknown>): Block =>
   ({ id, type: 'block', block_type, variant: block_type === 'heading' ? 'section' : 'medium', visibility: 'student_teacher', created_at: now, updated_at: now, schema_version: 1, content }) as Block;
 
-/** A new tutorial: a Common demo heading, then per group a tab (goal, With teacher) and an empty exit check. */
+const escapeHtml = (text: string): string =>
+  text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/** Plain notes as teacher-note HTML: one paragraph per blank-line-separated chunk. */
+function notesHtml(notes: string): string {
+  return notes
+    .trim()
+    .split(/\n\s*\n/)
+    .map((para) => `<p>${escapeHtml(para.trim()).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+const teacherNote = (block: Block): Block => ({ ...block, visibility: 'teacher_only' }) as Block;
+
+/**
+ * A new tutorial: a Common demo heading, then per group a tab (the group's
+ * notes as a teacher note when there are any, goal, With teacher) and an empty exit check.
+ */
 export function tutorialSkeleton(groups: readonly TutorialGroup[], newId: () => string): Block[] {
   const now = new Date().toISOString();
   const shell = (id: string, block_type: Block['block_type'], content: Record<string, unknown>): Block => shellAt(now, id, block_type, content);
@@ -73,7 +90,11 @@ export function tutorialSkeleton(groups: readonly TutorialGroup[], newId: () => 
       shell(newId(), 'section', {
         title: group.name,
         tutorial_group: group.id,
-        blocks: [shell(newId(), 'heading', { text: group.goal }), shell(newId(), 'with_teacher', { talking_points: [] })]
+        blocks: [
+          ...(group.notes?.trim() ? [teacherNote(shell(newId(), 'teacher_note', { title: 'What to build', html: notesHtml(group.notes) }))] : []),
+          shell(newId(), 'heading', { text: group.goal }),
+          shell(newId(), 'with_teacher', { talking_points: [] })
+        ]
       }),
       shell(newId(), 'section', { title: `Exit check: ${group.name}`, tutorial_group: group.id, tutorial_exit: true, blocks: [] })
     );

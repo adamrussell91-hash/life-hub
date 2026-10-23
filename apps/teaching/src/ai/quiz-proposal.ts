@@ -48,14 +48,19 @@ function childLists(block: Block): Block[][] {
 /** Quiz questions in a proposal that won't sit inside an exit-check section once accepted. */
 function questionsOutsideExit(proposal: AiProposal, lesson: Lesson): number {
   const inside = idsInsideExits(lesson.blocks);
+  // Accept keeps an exit check's markers when a redraft drops them, so it still counts as one.
+  const exitIds = new Set<string>();
+  visitBlocks(lesson.blocks as Block[], (block) => {
+    if (isExitSection(block)) exitIds.add(block.id);
+  });
   const startsInside = (block: Block): boolean => {
     switch (proposal.kind) {
       case 'replace_block':
         return inside.has(proposal.block_id);
       case 'replace_section':
-        return inside.has(proposal.section_id);
+        return inside.has(proposal.section_id) || exitIds.has(proposal.section_id);
       case 'replace_blocks':
-        return inside.has(block.id);
+        return inside.has(block.id) || exitIds.has(block.id);
       case 'insert_blocks':
         return !!proposal.anchor_block_id && inside.has(proposal.anchor_block_id);
       default:
@@ -116,7 +121,7 @@ export function quizProposalIssues(
   if (tutorial) {
     if (questionsOutsideExit(proposal, lesson) > 0) {
       issues.push(
-        'In a tutorial, quiz questions only go in a group’s exit check section (tutorial_exit: true). Use propose_replace_section on that group’s exit check, keeping its id, title, tutorial_group and tutorial_exit.'
+        'In a tutorial, quiz questions only go in a group’s exit check section (tutorial_exit: true). Replace that group’s exit check section (propose_replace_blocks or propose_replace_section), keeping its id, title, tutorial_group and tutorial_exit.'
       );
     }
   } else if (lesson.pedagogical_mode !== 'quiz' && setMode !== 'quiz') {

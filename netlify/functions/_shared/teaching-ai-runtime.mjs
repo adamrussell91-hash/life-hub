@@ -181,6 +181,8 @@ var TutorialGroupSchema = z6.object({
   students: z6.array(z6.string().min(1).max(64)).max(40),
   /** Ann's evidence for placing each student, from their recorded mistakes. */
   evidence: z6.array(z6.object({ student: z6.string().min(1).max(64), quote: z6.string().max(300) })).max(80).default([]),
+  /** Teacher-facing: what to build for this group. Shown as a teacher note at the top of its tab. */
+  notes: z6.string().max(1200).optional(),
   /** Students the teacher marked unsure; the exit check confirms the placement. */
   unsure: z6.array(z6.string().min(1).max(64)).max(40).optional()
 });
@@ -5389,12 +5391,12 @@ Mix kinds to suit the content: recall questions first, then structure (matching,
 quiz_question only works in a lesson whose type is quiz, or inside a tutorial's exit check section (see Tutorials). In any other lesson, put set_mode: "quiz" on propose_insert_blocks (Accept switches the lesson to a Quiz) and say so in your message. When the teacher wants questions without a quiz ("just questions", "a few checks for understanding"), use question_set instead and leave the lesson type alone. Keep each proposal to 30 quiz questions or fewer. To rewrite or convert existing questions (e.g. turn find_it questions into spot_technique), use one propose_replace_blocks with every changed question, each keeping its block id; to convert a find_it, join its segments into the passage, keep line breaks, and quote the words that carry each technique.
 
 ## Tutorials
-A tutorial lesson (type tutorial) has Common blocks at the top level, and per group a section with tutorial_group (the group's tab) and a section with tutorial_group and tutorial_exit: true (the exit check). Fill each with propose_replace_section, one proposal per section, keeping the section's id, title, tutorial_group and tutorial_exit. Never use set_mode in a tutorial: it stays a tutorial.
+A tutorial lesson (type tutorial) has Common blocks at the top level, and per group a section with tutorial_group (the group's tab) and a section with tutorial_group and tutorial_exit: true (the exit check). To fill a group's tab and exit check together, use one propose_replace_blocks holding both sections (or propose_replace_section for one), each keeping its id, title, tutorial_group and tutorial_exit. A teacher note at the top of a tab is the teacher's plan for that group: follow it and keep it. Never use set_mode in a tutorial: it stays a tutorial.
 Common is a short teacher demo on one extract with tap-to-reveal steps; add it with propose_insert_blocks below the Common heading. No quiz_question in Common or in a tab.
-A group tab follows gradual release, I do \u2192 We do \u2192 You do: a heading with the group's goal; then I do: a fully worked faded_example (blanks: []) for a knowledge gap, or for a mix_up a contrast pair (two short callouts side by side in a columns block, one per technique, then a self_check asking which is which and why); then We do: two faded_example steps (blanks: [one part], then blanks: [two parts]), each followed by a section with side_path: true titled "A second look" that plays after a wrong answer; then one with_teacher block with 2\u20134 talking_points (no student names); then You do: one faded_example with every part blank on a new extract.
-- faded_example: content { prompt, extract, parts: [{ label: "Technique", answer }, { label: "Where", answer }, { label: "Effect", answer }] (1\u20134 parts), blanks: [indexes of the parts the student writes] }.
+A group tab follows gradual release, I do \u2192 We do \u2192 You do: a heading with the group's goal; then I do: a fully worked faded_example (blanks: []) for a knowledge gap, or for a mix_up a contrast pair (two short callouts side by side in a columns block, one per technique, then a self_check asking which is which and why); then We do: two faded_example steps (blanks: [one part], then blanks: [two parts]), each followed by a section with side_path: true titled "A second look" that plays after a wrong answer (inside it: a short re-explanation, then one simpler fully worked example; ordinary blocks only, no sections); then one with_teacher block with 2\u20134 talking_points (no student names); then You do: one faded_example with every part blank on a new extract.
+- faded_example: content { prompt, extract, parts: [{ label: "Technique", answer }, { label: "Where", answer }, { label: "Effect", answer }] (1\u20134 parts), blanks: [0-based indexes into parts of the parts the student writes, so [2] blanks Effect] }.
 - with_teacher: content { talking_points: [string] } (up to 8).
-No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use faded_example, cloze or self_check as the checks. Exit checks: 2\u20133 quiz_question blocks aimed at that group's exact reason, tagged with the same technique.
+No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use faded_example, cloze or self_check as the checks. Exit checks: 2\u20133 quiz_question blocks aimed at that group's exact reason, carrying the tutorial's tag (tutorial.tag in the lesson JSON): for tech:cyclical, use quote_technique or spot_technique with technique_id: "cyclical" on the option that names it, so results land on that tag.
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
 
 ## Limits: say so before you build
@@ -5466,6 +5468,12 @@ function buildAiStaticPrompt(input) {
     buildBlockSchemaExamples()
   ].join("\n");
 }
+function lessonForAgent(lesson) {
+  if (!lesson.tutorial) return lesson;
+  const groups = lesson.tutorial.groups.map(({ id, name, why, goal, gap_type }) => ({ id, name, why, goal, gap_type }));
+  const tag = lesson.tutorial.tag ? { tag: lesson.tutorial.tag } : {};
+  return { ...lesson, tutorial: { ...tag, groups } };
+}
 function lessonTypeLine(mode) {
   if (mode === "quiz") return "quiz";
   if (mode === "tutorial") return "tutorial (quiz_question only inside a group\u2019s exit check section; follow the tutorial recipe)";
@@ -5499,7 +5507,7 @@ function buildAiLessonContext(input) {
     focus ? JSON.stringify(focus) : "null"
   ];
   if (input.fullLesson) {
-    parts.push("", "## Lesson JSON", JSON.stringify(input.lesson));
+    parts.push("", "## Lesson JSON", JSON.stringify(lessonForAgent(input.lesson)));
   }
   if (input.compositionFill) {
     parts.push(
@@ -6633,14 +6641,18 @@ function childLists(block) {
 }
 function questionsOutsideExit(proposal, lesson) {
   const inside = idsInsideExits(lesson.blocks);
+  const exitIds = /* @__PURE__ */ new Set();
+  visitBlocks(lesson.blocks, (block) => {
+    if (isExitSection(block)) exitIds.add(block.id);
+  });
   const startsInside = (block) => {
     switch (proposal.kind) {
       case "replace_block":
         return inside.has(proposal.block_id);
       case "replace_section":
-        return inside.has(proposal.section_id);
+        return inside.has(proposal.section_id) || exitIds.has(proposal.section_id);
       case "replace_blocks":
-        return inside.has(block.id);
+        return inside.has(block.id) || exitIds.has(block.id);
       case "insert_blocks":
         return !!proposal.anchor_block_id && inside.has(proposal.anchor_block_id);
       default:
@@ -6685,7 +6697,7 @@ function quizProposalIssues(proposal, lesson, { questions: checkQuestions = true
   if (tutorial) {
     if (questionsOutsideExit(proposal, lesson) > 0) {
       issues.push(
-        "In a tutorial, quiz questions only go in a group\u2019s exit check section (tutorial_exit: true). Use propose_replace_section on that group\u2019s exit check, keeping its id, title, tutorial_group and tutorial_exit."
+        "In a tutorial, quiz questions only go in a group\u2019s exit check section (tutorial_exit: true). Replace that group\u2019s exit check section (propose_replace_blocks or propose_replace_section), keeping its id, title, tutorial_group and tutorial_exit."
       );
     }
   } else if (lesson.pedagogical_mode !== "quiz" && setMode !== "quiz") {

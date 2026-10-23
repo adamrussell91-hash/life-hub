@@ -4,10 +4,8 @@ import { checkProposalCall } from '@/ai/job-runner';
 import { applyProposalToLesson } from '@/ai/apply-proposal';
 import { BLOCK_BUILD_RECIPES } from '@/ai/block-recipes';
 import { buildAiLessonContext } from '@/ai/context';
-import { FollowUpStartError } from '@/evidence/follow-up';
-import { AiJobConflictError } from '@/ai/jobs-client';
 import { emptySearchPack } from '@/ai/search-pack';
-import { draftBrief, startTutorial, TutorialStartError } from '@/tutorial/draft';
+import { startTutorial } from '@/tutorial/draft';
 import { tutorialSkeleton } from '@/tutorial/model';
 import { BlockSchema, type Block } from '@/schemas/block';
 import type { Lesson } from '@/schemas/lesson';
@@ -96,51 +94,63 @@ describe('Ann in a tutorial', () => {
     expect(buildAiLessonContext({ agentName: 'Ann', protocol: '', scope: 'lesson', selectedBlockId: null, searchPack: emptySearchPack(''), lesson })).toContain('Lesson type: tutorial');
   });
 
-  it('briefs Ann per group with section ids and no names', () => {
-    const brief = draftBrief({ tagLabel: 'Cyclical structure', groups, sections: { common: 'h1', tabs: { ga: 'tA', gb: 'tB' }, exits: { ga: 'eA', gb: 'eB' } } });
-    for (const id of ['tA', 'eA', 'tB', 'eB', 'h1']) expect(brief).toContain(id);
-    expect(brief).toContain('Re-tells the plot');
-    expect(brief).toContain('faded_example');
-    expect(brief).toContain('contrast pair');
-    for (const id of ['st_ann', 'st_cy', 'st_ed']) expect(brief).not.toContain(id);
-    expect(brief).not.toContain(longQuote.trim());
-    const quoteLine = brief.split('\n').find((l) => l.includes('goes back to the start'))!;
-    expect(quoteLine.length).toBeLessThanOrEqual(2 + 160);
+  it('shows Ann the groups without students, unsure marks, evidence, notes or class', () => {
+    const withGroups = { ...lesson, tutorial: { class_id: 'class_secret', tag: 'tech:cyclical', source_lesson_id: 'quiz1', groups: [{ ...groups[0]!, notes: 'Private plan' }, groups[1]!] } } as Lesson;
+    const context = buildAiLessonContext({ agentName: 'Ann', protocol: '', scope: 'lesson', selectedBlockId: null, searchPack: emptySearchPack(''), lesson: withGroups, fullLesson: true });
+    expect(context).toContain('## Lesson JSON');
+    expect(context).toContain('Re-tells the plot');
+    expect(context).toContain('tech:cyclical');
+    for (const hidden of ['st_ann', 'st_cy', 'st_ed', 'goes back to the start', 'flashback”', 'class_secret', 'Private plan', '"evidence"', '"unsure"', '"students"']) {
+      expect(context).not.toContain(hidden);
+    }
   });
 
-  it('creates the lesson with its skeleton, then starts Ann', async () => {
+  it('keeps a tab’s or exit check’s markers when a redraft drops them', () => {
+    const built = lessonOf([heading, tab([]), exit([])]);
+    const bare = (id: string, blocks: unknown[]) => ({ id, ...meta, block_type: 'section', content: { title: 'Redrafted', blocks } });
+    // The quiz check counts the dropped-marker exit as an exit check too.
+    const proposal = { kind: 'replace_blocks', blocks: [bare('tA', [heading]), bare('eA', [mc('q1')])] } as never;
+    expect(quizProposalIssues(proposal, built)).toEqual([]);
+    const applied = applyProposalToLesson(built, proposal, () => 'n1');
+    if (!applied.ok) throw new Error('not applied');
+    const [, t, e] = applied.lesson.blocks as Block[];
+    expect(t!.block_type === 'section' && [t.content.tutorial_group, t.content.tutorial_exit]).toEqual(['ga', undefined]);
+    expect(e!.block_type === 'section' && [e.content.tutorial_group, e.content.tutorial_exit]).toEqual(['ga', true]);
+    const viaSection = applyProposalToLesson(built, { kind: 'replace_section', section_id: 'eA', section: bare('eA', [mc('q1')]) } as never, () => 'n2');
+    const e2 = viaSection.ok ? (viaSection.lesson.blocks as Block[])[2]! : null;
+    expect(e2?.block_type === 'section' && e2.content.tutorial_exit).toBe(true);
+  });
+
+  it('tells Ann what goes in A second look and how blanks count', () => {
+    expect(BLOCK_BUILD_RECIPES).toContain('A second look');
+    expect(BLOCK_BUILD_RECIPES).toContain('re-explanation');
+    expect(BLOCK_BUILD_RECIPES).toContain('0-based');
+  });
+
+  it('creates the lesson with its skeleton and starts no Ann job', async () => {
     const createLesson = vi.fn(async (_b: Record<string, unknown>) => ({ id: 'tut1' }));
-    const startJob = vi.fn(async () => ({}) as never);
-    const id = await startTutorial({ unitId: 'u1', afterLessonId: 'quiz1', classId: 'class1', tag: 'tech:cyclical', tagLabel: 'Cyclical structure', groups: groups.slice(0, 1) }, { createLesson, startJob });
+    const id = await startTutorial({ unitId: 'u1', afterLessonId: 'quiz1', classId: 'class1', tag: 'tech:cyclical', tagLabel: 'Cyclical structure', groups: groups.slice(0, 1) }, { createLesson });
     expect(id).toBe('tut1');
+    expect(createLesson).toHaveBeenCalledTimes(1);
     const body = createLesson.mock.calls[0]![0];
-    expect(body).toMatchObject({ pedagogical_mode: 'tutorial', unit_id: 'u1', after_lesson_id: 'quiz1', tutorial: { class_id: 'class1', tag: 'tech:cyclical', source_lesson_id: 'quiz1' } });
+    expect(body).toMatchObject({ title: 'Tutorial: Cyclical structure', pedagogical_mode: 'tutorial', unit_id: 'u1', after_lesson_id: 'quiz1', tutorial: { class_id: 'class1', tag: 'tech:cyclical', source_lesson_id: 'quiz1' } });
     expect((body.blocks as unknown[]).length).toBe(3);
     expect(BlockSchema.array().safeParse(body.blocks).success).toBe(true);
-    expect(startJob).toHaveBeenCalledWith(expect.objectContaining({ lesson_id: 'tut1', agent: 'ann', scope: 'lesson' }));
-    const message = (startJob.mock.calls[0] as unknown as [{ message: string }])[0].message;
-    expect(message).not.toContain('st_ann');
+    // No notes: the tab is the goal heading and With teacher only.
+    const tabBlocks = ((body.blocks as Block[])[1] as Extract<Block, { block_type: 'section' }>).content.blocks as Block[];
+    expect(tabBlocks.map((b) => b.block_type)).toEqual(['heading', 'with_teacher']);
   });
 
-  it('a job already running counts as started', async () => {
-    const createLesson = vi.fn(async () => ({ id: 'tut1' }));
-    const startJob = vi.fn(async () => {
-      throw new AiJobConflictError('job1', 'working');
-    });
-    await expect(startTutorial({ unitId: 'u1', afterLessonId: 'quiz1', classId: 'class1', tag: 't', tagLabel: 'T', groups }, { createLesson, startJob })).resolves.toBe('tut1');
-  });
-
-  it('keeps the lesson id and brief when Ann fails to start, so the sheet can retry', async () => {
-    const createLesson = vi.fn(async () => ({ id: 'tut9' }));
-    const startJob = vi.fn(async () => {
-      throw new Error('Out of budget');
-    });
-    const err = await startTutorial({ unitId: 'u1', afterLessonId: 'quiz1', classId: 'class1', tag: 't', tagLabel: 'T', groups }, { createLesson, startJob }).catch((e) => e);
-    expect(err).toBeInstanceOf(TutorialStartError);
-    expect(err).toBeInstanceOf(FollowUpStartError);
-    expect(err.lessonId).toBe('tut9');
-    expect(err.message).toBe('Out of budget');
-    expect(err.brief).toContain('reteaches T');
-    expect(err.brief).not.toContain('st_ann');
+  it('puts a group’s notes at the top of its tab as a teacher-only note', () => {
+    let n = 0;
+    const blocks = tutorialSkeleton([{ ...groups[0]!, notes: 'Start with the clock poem.\n\nUse <b>two</b> extracts.' }, groups[1]!], () => `s${++n}`);
+    expect(BlockSchema.array().safeParse(blocks).success).toBe(true);
+    const tabA = (blocks[1] as Extract<Block, { block_type: 'section' }>).content.blocks as Block[];
+    const note = tabA[0]!;
+    expect(note.block_type).toBe('teacher_note');
+    expect(note.visibility).toBe('teacher_only');
+    expect(note.block_type === 'teacher_note' && note.content.html).toBe('<p>Start with the clock poem.</p><p>Use &lt;b&gt;two&lt;/b&gt; extracts.</p>');
+    const tabB = (blocks[3] as Extract<Block, { block_type: 'section' }>).content.blocks as Block[];
+    expect(tabB.some((b) => b.block_type === 'teacher_note')).toBe(false);
   });
 });

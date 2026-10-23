@@ -1110,6 +1110,8 @@ var TutorialGroupSchema = z7.object({
   students: z7.array(z7.string().min(1).max(64)).max(40),
   /** Ann's evidence for placing each student, from their recorded mistakes. */
   evidence: z7.array(z7.object({ student: z7.string().min(1).max(64), quote: z7.string().max(300) })).max(80).default([]),
+  /** Teacher-facing: what to build for this group. Shown as a teacher note at the top of its tab. */
+  notes: z7.string().max(1200).optional(),
   /** Students the teacher marked unsure; the exit check confirms the placement. */
   unsure: z7.array(z7.string().min(1).max(64)).max(40).optional()
 });
