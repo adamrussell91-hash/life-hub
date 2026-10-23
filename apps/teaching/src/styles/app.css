@@ -6205,6 +6205,8 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
 .block-note-cue__kind { color: var(--muted); }
 .block-note-cue__kind::before { content: '·'; margin-right: var(--space-2); }
 .block-note-cue__prompt { margin: 0; font-size: var(--text-lg, 1.125rem); }
+/* The lecture player shows this (lecture.css); plain lesson pages never do. */
+.lecture-raise { display: none; }
 
 .block-flashcards__teacher-list {
   margin: 0;

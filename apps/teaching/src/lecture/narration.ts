@@ -60,7 +60,8 @@ export function createNarration(): NarrationHandle {
 
   const tryPlay = () => {
     audio.playbackRate = rate;
-    void audio.play().catch(() => paint());
+    // Autoplay refused: the student taps play. Count it as idle so the hint can still appear.
+    void audio.play().catch(() => { paint(); idleFn(true); });
   };
 
   play.addEventListener('click', () => (audio.paused ? tryPlay() : audio.pause()));
@@ -74,6 +75,8 @@ export function createNarration(): NarrationHandle {
   audio.addEventListener('play', () => { paint(); idleFn(false); });
   audio.addEventListener('pause', paint);
   audio.addEventListener('ended', () => { paint(); idleFn(true); });
+  // A clip that will not load never holds the lecture; it only lets the hint appear.
+  audio.addEventListener('error', () => { if (!audio.getAttribute('src')) return; paint(); idleFn(true); });
 
   return {
     el: root,
@@ -94,6 +97,7 @@ export function createNarration(): NarrationHandle {
     time: () => (Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime) : 0),
     onIdle(fn) { idleFn = fn; },
     dispose() {
+      idleFn = () => {};
       audio.pause();
       audio.removeAttribute('src');
     }
