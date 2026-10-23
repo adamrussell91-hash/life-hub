@@ -166,7 +166,8 @@ export function mountLessonFlow(
         input.setAttribute('aria-label', `Date for ${c.name}`);
         input.addEventListener('change', () => {
           const value = input.value;
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value === c.date) return;
+          // Typing a year fires change at every digit (0002, 0020…): wait for a real year.
+          if (!/^(19|20)\d{2}-\d{2}-\d{2}$/.test(value) || value === c.date) return;
           input.disabled = true;
           options.onDate!(c.id, value).then(
             (nextPeers) => {
@@ -188,7 +189,7 @@ export function mountLessonFlow(
     }
     dateRow.append(dateList);
 
-    // Before: lessons that lead here. Adding one adds this lesson to its "after".
+    // Before: lessons that lead here. Picking one puts this lesson straight after it.
     const beforeRow = el('div', 'lesson-flow__row');
     beforeRow.append(el('span', 'lesson-flow__label', 'Before'));
     const beforeList = el('div', 'lesson-flow__chips');
@@ -197,12 +198,23 @@ export function mountLessonFlow(
       beforeList.append(chip(id, () => void savePeer(id, (f.next.get(id) ?? []).filter((x) => x !== self))));
     }
     const beforeCandidates = peers.map((p) => p.id).filter((id) => id !== self && !into.includes(id));
+    // A real choice gains this lesson as another option; otherwise this lesson goes in between.
+    const insertAfter = (id: string): string[] => {
+      const was = f.next.get(id) ?? [];
+      return was.length >= 2 ? [...was, self] : [self];
+    };
     beforeList.append(picker('Add a lesson before…', beforeCandidates, (id) => {
-      const p = linkProblem(lessons(), id, [...(f.next.get(id) ?? []), self]);
+      const p = linkProblem(lessons(), id, insertAfter(id));
       return p ? shortReason(p.kind, 'before') : undefined;
     }, (id) => {
-      if ((f.next.get(id) ?? []).length >= 6) return;
-      void savePeer(id, [...(f.next.get(id) ?? []), self]);
+      const was = f.next.get(id) ?? [];
+      if (was.length >= 6) return;
+      if (was.length < 2) {
+        // Moving: the lesson that led here now leads where this one did, and this one takes `id`'s place.
+        for (const p of into) if ((f.next.get(p) ?? []).length === 1 && p !== id) void savePeer(p, next.filter((x) => x !== p));
+        if (was[0] && was[0] !== self) saveSelf([was[0]]);
+      }
+      void savePeer(id, insertAfter(id));
     }));
     beforeRow.append(beforeList);
 
@@ -218,11 +230,13 @@ export function mountLessonFlow(
       for (const id of next) afterList.append(chip(id, () => saveSelf(next.filter((x) => x !== id))));
     }
     const afterCandidates = peers.map((p) => p.id).filter((id) => id !== self && !next.includes(id));
+    // One lesson next: picking another replaces it. Only an existing choice gains options.
+    const choice = next.length >= 2;
     if (next.length < 6) {
-      afterList.append(picker(next.length ? 'Add another option…' : 'Add a lesson after…', afterCandidates, (id) => {
-        const p = linkProblem(lessons(), self, [...next, id]);
+      afterList.append(picker(choice ? 'Add another option…' : next.length ? 'Change the next lesson…' : 'Add a lesson after…', afterCandidates, (id) => {
+        const p = linkProblem(lessons(), self, choice ? [...next, id] : [id]);
         return p ? shortReason(p.kind, 'after') : undefined;
-      }, (id) => saveSelf([...next, id])));
+      }, (id) => saveSelf(choice ? [...next, id] : [id])));
     }
     if (after !== undefined) afterList.append(ghostButton('Follow unit order', () => saveSelf(null)));
     afterRow.append(afterList);
