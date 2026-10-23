@@ -16,6 +16,7 @@
  *   quiz/{lesson}/closed                             { at } the teacher pressed Close now
  *   quiz/{lesson}/flags                              { dismissed } insight flags the teacher dismissed
  *   quiz/{lesson}/evidence/{class|all}               saved insight of a closed, fully marked quiz
+ *   quiz/{lesson}/evidence-stamp                     { at } last change to any answer, mark or attempt
  *
  * Students answer from a class page. Once a class has a list, a student
  * claims their initials (class-claims.mjs) and their attempts are kept under
@@ -76,7 +77,8 @@ const keys = (lesson) => ({
   answers: (session, i) => `quiz/${lesson}/live/${session}/answers/${i}/`,
   closed: `quiz/${lesson}/closed`,
   flags: `quiz/${lesson}/flags`,
-  insight: (cls) => `quiz/${lesson}/evidence/${cls}`
+  insight: (cls) => `quiz/${lesson}/evidence/${cls}`,
+  stamp: `quiz/${lesson}/evidence-stamp`
 });
 
 /* ── Publish ───────────────────────────────────────────────────────── */
@@ -202,10 +204,16 @@ async function closedState(store, k, settings, now = Date.now()) {
   return Number.isFinite(closesAt) && closesAt < now ? { closed: true, by: 'date' } : { closed: false, by: null };
 }
 
-/** Saved insight goes stale when any answer, mark or attempt changes. */
-async function dropSavedInsight(store, lessonId) {
-  const saved = await listBlobKeys(store, `quiz/${lessonId}/evidence/`);
-  await mapBounded(saved, 8, (key) => store.delete(key));
+/** A saved copy is only saved once nothing has changed for this long. */
+const INSIGHT_SETTLE_MS = 60_000;
+
+/**
+ * Saved insight goes stale when any answer, mark or attempt changes. One
+ * write, no listing: a saved copy carries the stamp it was built with, so an
+ * older copy simply stops matching.
+ */
+async function markInsightChanged(store, lessonId) {
+  await store.setJSON(keys(lessonId).stamp, { at: new Date().toISOString() });
 }
 
 /** Feedback-code ids on one answer: unique, at most 8. */
@@ -436,7 +444,7 @@ export async function quizAction(store, lessonId, body) {
       overtime: pastDeadline || closed
     };
     await store.setJSON(k.result(device, current.n), result, { onlyIfNew: true });
-    await dropSavedInsight(store, lessonId);
+    await markInsightChanged(store, lessonId);
     attempts = await deviceAttempts(store, k, device, from);
     current = null;
   }
@@ -555,7 +563,6 @@ export async function quizTeacherAction(store, lessonId, body) {
   if (action === 'close' || action === 'reopen') {
     if (action === 'close') await store.setJSON(k.closed, { at: new Date().toISOString() });
     else await store.delete(k.closed);
-    await dropSavedInsight(store, lessonId);
     return classInsight(store, lessonId, body.class_id ?? null, loaded);
   }
 
@@ -576,13 +583,13 @@ export async function quizTeacherAction(store, lessonId, body) {
     const match = ATTEMPT_ID.exec(String(body.attempt_id ?? ''));
     if (!match) reject(400, 'bad_request', 'Unknown attempt.');
     await clearOwner(store, k, lessonId, match[1]);
-    await dropSavedInsight(store, lessonId);
+    await markInsightChanged(store, lessonId);
   }
 
   if (action === 'clear_all') {
     const owners = new Set((await listBlobKeys(store, `quiz/${lessonId}/attempts/`)).map((key) => key.split('/')[3]).filter(Boolean));
     await mapBounded([...owners], 4, (device) => clearOwner(store, k, lessonId, device));
-    await dropSavedInsight(store, lessonId);
+    await markInsightChanged(store, lessonId);
   }
 
   const handedIn = async () => {
@@ -608,7 +615,7 @@ export async function quizTeacherAction(store, lessonId, body) {
       next[body.question_id] = codes.length ? { marks: roundMarks(score), codes } : roundMarks(score);
     }
     await store.setJSON(k.marks(device, n), next);
-    await dropSavedInsight(store, lessonId);
+    await markInsightChanged(store, lessonId);
   }
 
   if (action === 'attempt' || action === 'mark') {
@@ -750,7 +757,7 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
     });
   }
   attempts.sort((x, y) => String(x.student).localeCompare(String(y.student)));
-  return { schema: INSIGHT_SCHEMA, record_version: record.version, built_at: new Date().toISOString(), students, attempts };
+  return { schema: INSIGHT_SCHEMA, record_version: record.version, listed: !!roster, built_at: new Date().toISOString(), students, attempts };
 }
 
 /** Quiz lessons in the same unit, and the follow-ups made from this one. */
@@ -776,7 +783,7 @@ async function unitFamily(store, draft, lessonId) {
  * `family: false` skips the unit read, for the markbook. Null when the lesson
  * isn't a published quiz.
  */
-export async function classInsight(store, lessonId, classId, loaded = null, { family = true } = {}) {
+export async function classInsight(store, lessonId, classId, loaded = null, { family = true, now = Date.now() } = {}) {
   if (!loaded) {
     try {
       loaded = await loadQuiz(store, lessonId);
@@ -787,24 +794,41 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
   }
   const { draft, record, settings, k } = loaded;
   const cls = typeof classId === 'string' && isSafeId(classId) ? classId : null;
-  const [roster, state, saved, flags, kin] = await Promise.all([
+  const [roster, state, saved, stampRow, flags, kin] = await Promise.all([
     cls ? loadRoster(store, cls) : null,
-    closedState(store, k, settings),
+    closedState(store, k, settings, now),
     read(store, k.insight(cls ?? 'all')),
-    read(store, k.flags),
+    read(store, k.stamp),
+    family ? read(store, k.flags) : null,
     family ? unitFamily(store, draft, lessonId) : { siblings: [], followUps: [] }
   ]);
   const fallback = lessonOutcomes(draft);
+  const stamp = stampRow?.at ?? null;
+  // A class with no list stays anonymous, so its insight covers every first attempt.
+  const listed = cls && roster?.students.length ? roster : null;
   let body;
-  if (saved?.schema === INSIGHT_SCHEMA && saved.record_version === record.version) body = { ...saved, saved: true };
-  else {
-    // A class with no list stays anonymous, so its insight covers every first attempt.
-    const listed = cls && roster?.students.length ? roster : null;
+  if (saved?.schema === INSIGHT_SCHEMA && saved.record_version === record.version && (saved.stamp ?? null) === stamp && saved.listed === !!listed) {
+    body = { ...saved, saved: true };
+  } else {
     body = await buildInsight(store, k, lessonId, record, fallback, listed ? cls : null, listed);
-    if (state.closed && body.attempts.every((a) => a.pending === 0)) {
-      // A failed save only costs speed: the next view builds it again.
-      await store.setJSON(k.insight(cls ?? 'all'), body).catch((error) => console.warn('quiz insight save failed', error));
+    const settled = stamp === null || now - Date.parse(stamp) > INSIGHT_SETTLE_MS;
+    const known = cls === null || !!roster;
+    if (known && settled && state.closed && body.attempts.every((a) => a.pending === 0)) {
+      // A change landing while this was built makes the copy stale before it's saved: skip it.
+      const again = (await read(store, k.stamp))?.at ?? null;
+      if (again === stamp) {
+        // A failed save only costs speed: the next view builds it again.
+        await store.setJSON(k.insight(cls ?? 'all'), { ...body, stamp }).catch((error) => console.warn('quiz insight save failed', error));
+      }
     }
+  }
+  // Names and who is on the list are always live: a saved copy never answers for them.
+  let students = body.students;
+  let attempts = body.attempts;
+  if (listed) {
+    students = listed.students.map(({ id, name, initials }) => ({ id, name, initials }));
+    const onList = new Set(students.map((st) => st.id));
+    attempts = attempts.filter((a) => onList.has(a.student));
   }
   return {
     lesson_id: lessonId,
@@ -817,12 +841,12 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
     built_at: body.built_at,
     saved: !!body.saved,
     confidence: !!settings.confidence,
-    students: body.students,
+    students,
     questions: record.order.map((id) => {
       const { question, key } = record.questions[id];
       return { id, prompt: question.prompt, marks: key.marks, kind: key.kind, outcomes: key.outcomes ?? fallback };
     }),
-    attempts: body.attempts,
+    attempts,
     compare_with: draft.quiz?.compare_with ?? null,
     follow_up_of: draft.quiz?.follow_up_of ?? null,
     follow_up_flag: draft.quiz?.follow_up_flag ?? null,
@@ -839,6 +863,7 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
  * lesson isn't a published quiz. Goes before a teacher's clear are skipped.
  */
 export async function classQuizScores(store, lessonId, classId, studentIds) {
+  if (!studentIds.length) return null;
   const insight = await classInsight(store, lessonId, classId, null, { family: false });
   if (!insight) return null;
   const wanted = new Set(studentIds);
