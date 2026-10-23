@@ -58,6 +58,7 @@ import type { NetworkLine } from '@/schemas/block';
 import type { NetLesson } from '@/network/model';
 // Last: the shared block anatomy roles win ties with block stylesheets above.
 import '@/styles/block-anatomy.css';
+import { emitAnswered } from '@/lecture/answered';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
 /** Lessons are in unit order and limited to what the viewer may see; `href` only on ones they may open. */
@@ -72,6 +73,8 @@ export type UnitNetworkContext = {
 };
 
 export type RenderContext = {
+  /** In the lecture player: `live` for students, `preview` for the teacher's Play as student. */
+  lecture?: 'live' | 'preview';
   lessonId?: string;
   attachedOutcomes?: PublicOutcome[];
   anthology?: AnthologyData;
@@ -863,6 +866,14 @@ export function renderSectionBlock(
   mode: RenderMode,
   ctx: RenderContext = {}
 ): HTMLElement {
+  const isSidePath = (block.content as { side_path?: boolean }).side_path === true;
+  if (isSidePath && mode === 'student' && !ctx.lecture) {
+    // A side path belongs to the lecture player; a normal lesson page skips it.
+    const skipped = wrapBlock(document.createElement('div'), block, mode);
+    skipped.hidden = true;
+    skipped.classList.add('block--side-path-hidden');
+    return skipped;
+  }
   const section = document.createElement('section');
   section.className = 'block-section';
 
@@ -1797,6 +1808,7 @@ export function renderClozeBlock(
     }, 0);
     paintScore();
     persist();
+    emitAnswered(root, block.id, scoreValue === blanks.length ? 'right' : 'wrong');
   });
   reveal.addEventListener('click', () => {
     inputs.forEach((input, i) => {
@@ -1808,6 +1820,7 @@ export function renderClozeBlock(
     scoreValue = blanks.length;
     paintScore();
     persist();
+    emitAnswered(root, block.id, 'wrong');
   });
   reset.addEventListener('click', () => {
     inputs.forEach((input) => {
@@ -1942,6 +1955,7 @@ export function renderSelfCheckBlock(
         if (checkbox.checked) checked.add(item.id);
         else checked.delete(item.id);
         saveActivityState(key, { checkedIds: [...checked] } satisfies ChecklistState);
+        if (checked.size) emitAnswered(root, block.id, 'done');
       });
       label.append(checkbox, document.createTextNode(item.label));
       list.append(label);
@@ -1978,6 +1992,7 @@ export function renderSelfCheckBlock(
       toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
       paintAnswer();
       saveActivityState(key, { revealed } satisfies AnswerState);
+      if (revealed) emitAnswered(root, block.id, 'done');
     });
     const disclosure = document.createElement('div');
     disclosure.className = 'block-self-check__disclosure block-disclosure';
@@ -2002,6 +2017,7 @@ export function renderSelfCheckBlock(
         );
         paintAnswer();
         saveActivityState(key, { rating, revealed } satisfies AnswerState);
+        emitAnswered(root, block.id, 'done');
       });
       scale.append(button);
     }
