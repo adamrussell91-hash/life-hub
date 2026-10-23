@@ -52,6 +52,8 @@ import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
 import { unitNetworkContext } from '@/teacher/network-context';
+import { firstTaughtDates, lessonsByDate } from '@/teacher/unit-lesson-order';
+import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 
 export const UNITS_INDEX_GROUP_STORAGE_KEY = 'teaching-hub.units-index-group';
 export type UnitsIndexGroupBy = 'subject' | 'year';
@@ -702,9 +704,12 @@ export function renderUnitPage(
     }
   });
 
-  const lessons = curriculum.lessons
-    .filter((lesson) => lesson.unit_id === unitId && isActiveLibraryStatus(lesson.status))
-    .sort((a, b) => a.sequence - b.sequence);
+  const scheduledRows = curriculum.scheduled_lessons ?? [];
+  const lessons = lessonsByDate(
+    curriculum.lessons.filter((lesson) => lesson.unit_id === unitId && isActiveLibraryStatus(lesson.status)),
+    scheduledRows
+  );
+  const firstDates = firstTaughtDates(scheduledRows);
 
   if (lessons.length === 0) {
     const empty = document.createElement('p');
@@ -748,7 +753,9 @@ export function renderUnitPage(
       const meta = document.createElement('p');
       meta.className = 'lesson-list__meta';
       meta.textContent = lesson.published ? 'Published' : 'Draft';
-      const sessions = sessionsPerClass(curriculum.scheduled_lessons ?? [], lesson.id);
+      const firstDate = firstDates.get(lesson.id);
+      if (firstDate) meta.textContent += ` · ${formatDisplayDate(firstDate)}`;
+      const sessions = sessionsPerClass(scheduledRows, lesson.id);
       if (sessions > 1) meta.textContent += ` · taught over ${sessions} sessions`;
 
       info.append(title, meta);
