@@ -90,6 +90,8 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
   host.append(root);
 
   const allItems = () => map.groups.flatMap((g) => g.items);
+  // Groups can change when the syllabus arrives, so count the ones on the map now.
+  const allCollapsed = () => map.groups.every((g) => collapsed.has(g.id));
 
   const reroute = () => {
     if (!data || !studentId) {
@@ -161,7 +163,7 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
     const nameW = fitNameWidth(map, collapsed, options.print ? 900 : scroller.clientWidth || host.clientWidth || 700);
     const drawn = drawCoverageMap(map, { collapsed, selected, focus, student: route, nameW });
     stage.innerHTML = `<svg class="cm__svg" width="${drawn.width}" height="${drawn.height}" viewBox="0 0 ${drawn.width} ${drawn.height}" aria-hidden="false">${drawn.svg}</svg>`;
-    toggleAll.textContent = collapsed.size === map.groups.length ? 'Expand all' : 'Collapse all';
+    toggleAll.textContent = allCollapsed() ? 'Expand all' : 'Collapse all';
     const row = selected ? map.rows.find((r) => r.id === selected) : undefined;
     note.replaceChildren(summary());
     if (row?.href && !options.print) {
@@ -197,7 +199,7 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
     (event.target as Element).dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
   toggleAll.addEventListener('click', () => {
-    if (collapsed.size === map.groups.length) collapsed.clear();
+    if (allCollapsed()) collapsed.clear();
     else for (const g of map.groups) collapsed.add(g.id);
     paint();
   });
