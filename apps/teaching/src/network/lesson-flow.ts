@@ -1,4 +1,4 @@
-import type { LessonKind, LessonRouteRole } from '@/schemas/block';
+import type { LessonRouteRole } from '@/schemas/block';
 import { buildFlow, linkProblem, lessonsBefore, type FlowLesson } from './flow';
 import { el, ghostButton } from './lines-editor';
 import './network.css';
@@ -6,39 +6,45 @@ import './network.css';
 export type FlowPeer = { id: string; title: string; after?: readonly string[] };
 
 export type LessonFlowOptions = {
-  /** This lesson's id; its own links and type come through `update`. */
+  /** This lesson's id; its own links and route come through `update`. */
   lessonId: string;
   /** Every lesson in the unit, in unit order (this one included). */
   peers: readonly FlowPeer[];
   after: readonly string[] | undefined;
-  kind: LessonKind | undefined;
   /** Support or extension beside the core route on the unit map; unset is core. */
   role?: LessonRouteRole | undefined;
   skipRule?: string | undefined;
-  /** Saves this lesson: `null` links mean "follow the unit order" again, a `null` role means core. */
-  onSelf: (patch: { after_lesson_ids?: string[] | null; lesson_kind?: LessonKind; route_role?: LessonRouteRole | null; skip_rule?: string | null }) => void;
+  /** Saves this lesson: `null` links mean "follow the unit order" again. */
+  onSelf: (patch: { after_lesson_ids?: string[] | null; route_role?: LessonRouteRole | null; skip_rule?: string | null }) => void;
   /** Saves another lesson's links (for "before this lesson"). */
   onPeer: (lessonId: string, after: string[]) => Promise<void>;
+  /** The classes that teach the unit, with this lesson's date in each (YYYY-MM-DD). */
+  classes?: ReadonlyArray<{ id: string; name: string; date?: string }>;
+  /** Dates this lesson for a class; resolves to the unit's lessons in their new order. */
+  onDate?: (classId: string, date: string) => Promise<FlowPeer[]>;
 };
 
-const KIND_LABEL: Record<LessonKind, string> = { lesson: 'Lesson', workshop: 'Workshop', lecture: 'Lecture' };
-const ROLE_LABEL: Record<'core' | LessonRouteRole, string> = { core: 'Core', support: 'Support', extension: 'Extension' };
-const SKIP_HINT: Record<LessonRouteRole, string> = { support: 'Who can skip it, e.g. 90%+ on the pre-test', extension: 'Who takes it, e.g. 80%+ on the quiz' };
+const ROLE_LABEL: Record<LessonRouteRole, string> = { core: 'Core', support: 'Support', extension: 'Extension', optional: 'Optional' };
+const SKIP_HINT: Record<Exclude<LessonRouteRole, 'core'>, string> = {
+  support: 'Who can skip it, e.g. 90%+ on the pre-test',
+  extension: 'Who takes it, e.g. 80%+ on the quiz',
+  optional: 'Who it suits, e.g. anyone wanting more practice'
+};
 
 /**
  * "Before and after" at the foot of a lesson: what leads here, what comes
- * next, and what kind of session this is. More than one lesson after is a
+ * next, and where it sits on the unit route. More than one lesson after is a
  * choice; the unit map splits there and students choose their next step.
  */
 export function mountLessonFlow(
   host: HTMLElement,
   options: LessonFlowOptions
-): { update(after: readonly string[] | undefined, kind: LessonKind | undefined, role?: LessonRouteRole, skipRule?: string): void; dispose(): void } {
+): { update(after: readonly string[] | undefined, role?: LessonRouteRole, skipRule?: string): void; dispose(): void } {
   let peers = options.peers.map((p) => ({ ...p }));
   let after = options.after;
-  let kind = options.kind;
   let role = options.role;
   let skipRule = options.skipRule ?? '';
+  let classes = (options.classes ?? []).map((c) => ({ ...c }));
   const self = options.lessonId;
   const root = el('section', 'lesson-flow');
   root.setAttribute('aria-label', 'Before and after this lesson');
@@ -108,59 +114,79 @@ export function mountLessonFlow(
     const into = lessonsBefore(f, self);
     root.replaceChildren(el('h3', 'lesson-flow__heading', 'Before and after'));
 
-    // Type: pills, not a select.
-    const kinds = el('div', 'lesson-flow__row');
-    kinds.append(el('span', 'lesson-flow__label', 'This is a'));
-    const pills = el('div', 'lesson-flow__pills');
-    pills.setAttribute('role', 'radiogroup');
-    pills.setAttribute('aria-label', 'Session type');
-    for (const k of ['lesson', 'workshop', 'lecture'] as LessonKind[]) {
-      const b = el('button', `lesson-flow__pill${(kind ?? 'lesson') === k ? ' lesson-flow__pill--on' : ''}`, KIND_LABEL[k]);
-      b.type = 'button';
-      b.setAttribute('role', 'radio');
-      b.setAttribute('aria-checked', String((kind ?? 'lesson') === k));
-      b.addEventListener('click', () => {
-        kind = k;
-        options.onSelf({ lesson_kind: k });
-        paint();
-      });
-      pills.append(b);
-    }
-    kinds.append(pills);
-
     // Route: core, or a support or extension lesson beside it on the unit map.
     const route = el('div', 'lesson-flow__row');
     route.append(el('span', 'lesson-flow__label', 'Route'));
+    const routeBody = el('div', 'lesson-flow__chips');
     const rolePills = el('div', 'lesson-flow__pills');
     rolePills.setAttribute('role', 'radiogroup');
     rolePills.setAttribute('aria-label', 'Place on the unit route');
-    for (const r of ['core', 'support', 'extension'] as const) {
+    for (const r of ['core', 'support', 'extension', 'optional'] as const) {
       const on = (role ?? 'core') === r;
       const b = el('button', `lesson-flow__pill${on ? ' lesson-flow__pill--on' : ''}`, ROLE_LABEL[r]);
       b.type = 'button';
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(on));
       b.addEventListener('click', () => {
-        role = r === 'core' ? undefined : r;
-        options.onSelf({ route_role: role ?? null });
+        // Core is saved too, so it beats an old support or extension stop on the unit map.
+        role = r;
+        options.onSelf({ route_role: r });
         paint();
       });
       rolePills.append(b);
     }
-    route.append(rolePills);
-    if (role) {
+    routeBody.append(rolePills);
+    route.append(routeBody);
+    if (role && role !== 'core') {
       const rule = el('input', 'lesson-flow__rule');
       rule.type = 'text';
       rule.maxLength = 80;
       rule.value = skipRule;
       rule.placeholder = SKIP_HINT[role];
-      rule.setAttribute('aria-label', role === 'support' ? 'Who can skip this lesson' : 'Who takes this lesson');
+      rule.setAttribute('aria-label', role === 'support' ? 'Who can skip this lesson' : role === 'optional' ? 'Who this lesson suits' : 'Who takes this lesson');
       rule.addEventListener('change', () => {
         skipRule = rule.value.trim();
         options.onSelf({ skip_rule: skipRule || null });
       });
-      route.append(rule);
+      routeBody.append(rule);
     }
+
+    // Date: when each class has this lesson. The unit map places dated lessons by date.
+    const dateRow = el('div', 'lesson-flow__row');
+    dateRow.append(el('span', 'lesson-flow__label', 'Date'));
+    const dateList = el('div', 'lesson-flow__chips');
+    if (!classes.length || !options.onDate) dateList.append(el('span', 'lesson-flow__hint', 'Add the unit to a class to date its lessons'));
+    else {
+      for (const c of classes) {
+        const label = el('label', 'lesson-flow__date');
+        if (classes.length > 1) label.append(el('span', undefined, c.name));
+        const input = el('input', 'lesson-flow__date-input');
+        input.type = 'date';
+        input.value = c.date ?? '';
+        input.setAttribute('aria-label', `Date for ${c.name}`);
+        input.addEventListener('change', () => {
+          const value = input.value;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value === c.date) return;
+          input.disabled = true;
+          options.onDate!(c.id, value).then(
+            (nextPeers) => {
+              classes = classes.map((x) => (x.id === c.id ? { ...x, date: value } : x));
+              peers = nextPeers.map((p) => ({ ...p }));
+              paint();
+            },
+            () => {
+              input.disabled = false;
+              input.value = c.date ?? '';
+              window.alert('Could not save that date. Try again.');
+            }
+          );
+        });
+        label.append(input);
+        dateList.append(label);
+      }
+      if (classes.every((c) => !c.date)) dateList.append(el('span', 'lesson-flow__hint', 'Not on the calendar yet'));
+    }
+    dateRow.append(dateList);
 
     // Before: lessons that lead here. Adding one adds this lesson to its "after".
     const beforeRow = el('div', 'lesson-flow__row');
@@ -201,7 +227,7 @@ export function mountLessonFlow(
     if (after !== undefined) afterList.append(ghostButton('Follow unit order', () => saveSelf(null)));
     afterRow.append(afterList);
 
-    root.append(kinds, route, beforeRow, afterRow);
+    root.append(route, dateRow, beforeRow, afterRow);
     if (next.length > 1) root.append(el('p', 'lesson-flow__note', `Students choose: ${next.map(title).join(', ')}. The unit map splits here.`));
 
     // This lesson's own problems, with a fix where there is one.
@@ -218,9 +244,8 @@ export function mountLessonFlow(
 
   paint();
   return {
-    update(nextAfter, nextKind, nextRole, nextRule) {
+    update(nextAfter, nextRole, nextRule) {
       after = nextAfter;
-      kind = nextKind;
       role = nextRole;
       skipRule = nextRule ?? '';
       paint();

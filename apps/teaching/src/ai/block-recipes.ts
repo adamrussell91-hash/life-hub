@@ -1,4 +1,5 @@
 import { createBlock, NEW_BLOCK_TYPES } from '@/blocks/create-block';
+import { QUIZ_WRITING_GUIDE } from '@/ai/quiz-writing-guide';
 
 export const BLOCK_BUILD_RECIPES = `## Block build recipes
 Every proposed block must include all required metadata fields: id, type, block_type, variant, visibility, content, layout, print, settings, created_at, updated_at, schema_version:1.
@@ -29,6 +30,7 @@ A quiz is one quiz_question block per question: content { question }. Set questi
 - label_image: image { url, alt } from an image already in the lesson, pins [{ id, x, y, label }] 2-8 with x and y from 0 to 1. Skip this kind when the lesson has no image.
 - extended_response: model_answer and guide optional. Teacher-marked.
 - explain_effect: quote, technique optional, model_answer and guide optional. Teacher-marked.
+<<<<<<< HEAD
 Mix kinds to suit the content: recall questions first, then structure (matching, ordering, categorise), then at most a few teacher-marked ones. Options must be plausible and distinct; no "all of the above".
 quiz_question only works in a lesson whose type is quiz, or inside a tutorial's exit check section (see Tutorials). In any other lesson, put set_mode: "quiz" on propose_insert_blocks (Accept switches the lesson to a Quiz) and say so in your message. When the teacher wants questions without a quiz ("just questions", "a few checks for understanding"), use question_set instead and leave the lesson type alone. Keep each proposal to 30 quiz questions or fewer. To rewrite or convert existing questions (e.g. turn find_it questions into spot_technique), use one propose_replace_blocks with every changed question, each keeping its block id; to convert a find_it, join its segments into the passage, keep line breaks, and quote the words that carry each technique.
 
@@ -40,6 +42,13 @@ A group tab follows gradual release, I do → We do → You do: a heading with t
 - with_teacher: content { talking_points: [string] } (up to 8).
 No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use faded_example, cloze or self_check as the checks. Exit checks: 2–3 quiz_question blocks aimed at that group's exact reason, carrying the tutorial's tag (tutorial.tag in the lesson JSON): for tech:cyclical, use quote_technique or spot_technique with technique_id: "cyclical" on the option that names it, so results land on that tag.
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
+=======
+Mix kinds to suit the content: recall questions first, then structure (matching, ordering, categorise), then at most a few teacher-marked ones.
+
+${QUIZ_WRITING_GUIDE}
+
+quiz_question only works in a lesson whose type is quiz. In any other lesson, put set_mode: "quiz" on propose_insert_blocks (Accept switches the lesson to a Quiz) and say so in your message. When the teacher wants questions without a quiz ("just questions", "a few checks for understanding"), use question_set instead and leave the lesson type alone. Keep each proposal to 30 quiz questions or fewer. To rewrite or convert existing questions (e.g. turn find_it questions into spot_technique), use one propose_replace_blocks with every changed question, each keeping its block id; to convert a find_it, join its segments into the passage, keep line breaks, and quote the words that carry each technique.
+>>>>>>> origin/main
 
 ## Limits: say so before you build
 Never agree to something these limits rule out. When a request hits one, say so plainly in your first sentence, then offer the nearest thing you can do. Do not quietly truncate, merge, or drop content to fit.

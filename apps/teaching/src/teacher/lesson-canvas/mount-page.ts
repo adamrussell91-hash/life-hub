@@ -38,7 +38,7 @@ import { mountLessonDotPoints } from '@/alignment/lesson-dot-points';
 import { mountLessonSyllabus } from '@/alignment/lesson-syllabus';
 import { autoLineIds, syncAutoStops } from '@/alignment/auto-lines';
 import { revealBlockFromHash } from '@/app/block-hash';
-import type { NetworkLine } from '@/schemas/block';
+import type { LessonRouteRole, NetworkLine } from '@/schemas/block';
 import {
   PEDAGOGICAL_MODES,
   PEDAGOGICAL_MODE_LABELS,
@@ -139,6 +139,12 @@ export type MountLessonPageOptions = {
   /** Lines a lesson before this one on the unit map stops on; an auto stop on any other line is Introduced. */
   linesBefore?: ReadonlySet<string>;
   onFlowPeer?: (lessonId: string, after: string[]) => Promise<void>;
+  /** The classes that teach the unit, with this lesson's date in each. */
+  flowClasses?: Array<{ id: string; name: string; date?: string }>;
+  /** The lesson's route when it has none of its own: a support or extension stop on the unit map. */
+  flowRole?: LessonRouteRole;
+  /** Dates this lesson for a class; resolves to the unit's lessons in their new order. */
+  onFlowDate?: (classId: string, date: string) => Promise<FlowPeer[]>;
   /** Set when the subject is in the syllabus alignment: tag the dot points this lesson teaches. */
   dotPoints?: { unitTitle?: string; focusArea?: string };
   onToggleFullPage?: () => void;
@@ -1281,11 +1287,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         lessonId: lesson.id,
         peers: options.flowPeers,
         after: lesson.after_lesson_ids ?? undefined,
-        kind: lesson.lesson_kind,
-        role: lesson.route_role ?? undefined,
+        role: lesson.route_role ?? options.flowRole,
         skipRule: lesson.skip_rule ?? undefined,
         onSelf: (patch) => emitLesson({ ...lesson, ...patch }),
-        onPeer: options.onFlowPeer
+        onPeer: options.onFlowPeer,
+        ...(options.flowClasses ? { classes: options.flowClasses } : {}),
+        ...(options.onFlowDate ? { onDate: options.onFlowDate } : {})
       })
     : null;
 
@@ -1311,7 +1318,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
       dotPoints?.update(lesson.dot_points, lesson.plan_covered ?? []);
-      lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.lesson_kind, lesson.route_role ?? undefined, lesson.skip_rule ?? undefined);
+      lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.route_role ?? options.flowRole, lesson.skip_rule ?? undefined);
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);

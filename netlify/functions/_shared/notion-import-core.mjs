@@ -2317,9 +2317,8 @@ var NetworkLineSchema = z10.object({
   colour: CurriculumLinesColourSchema.default("wave"),
   alignment: LineAlignmentSchema.optional()
 });
-var LessonKindSchema = z10.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z10.array(z10.string().min(1).max(64)).max(6);
-var LessonRouteRoleSchema = z10.enum(["support", "extension"]);
+var LessonRouteRoleSchema = z10.enum(["core", "support", "extension", "optional"]);
 var LessonSkipRuleSchema = z10.string().trim().max(80);
 var LineStopSchema = z10.object({
   line_id: z10.string().min(1).max(64),
@@ -4180,7 +4179,6 @@ var LessonSchema = z13.object({
    * how a lesson goes back) follows unit order; an empty list ends the unit here.
    */
   after_lesson_ids: AfterLessonIdsSchema.nullable().optional(),
-  lesson_kind: LessonKindSchema.optional(),
   /** On the unit map: a support or extension lesson beside the core route. Null (saves merge) goes back to core. */
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),

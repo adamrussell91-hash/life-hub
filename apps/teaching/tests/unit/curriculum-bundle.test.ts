@@ -256,7 +256,7 @@ describe('Lesson flow', () => {
 
 describe('Lesson flow for students', () => {
   it('passes links through lessons students cannot see, and leaves unset links unset', async () => {
-    const { publicAfterLinks, publicLessonKind } = await import('../../../../netlify/functions/_shared/teaching-network.mjs');
+    const { publicAfterLinks } = await import('../../../../netlify/functions/_shared/teaching-network.mjs');
     const drafts = new Map<string, { after_lesson_ids?: string[] | null }>([
       ['a', { after_lesson_ids: ['draft', 'c'] }], ['draft', {}], ['b', {}], ['c', { after_lesson_ids: null }]
     ]);
@@ -265,7 +265,5 @@ describe('Lesson flow for students', () => {
     expect(links.get('a')).toEqual(['b', 'c']);
     expect(links.has('b')).toBe(false);
     expect(links.has('c')).toBe(false);
-    expect(publicLessonKind('workshop')).toBe('workshop');
-    expect(publicLessonKind('lesson')).toBeUndefined();
   });
 });

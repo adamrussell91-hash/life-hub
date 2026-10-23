@@ -1286,7 +1286,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return notFoundResponse('Unit not found');
     }
 
-    const matching: { lesson_id: string; title: string; line_stops?: import('../src/schemas/block').LineStop[]; after_lesson_ids?: string[]; lesson_kind?: import('../src/schemas/block').LessonKind }[] = [];
+    const matching: { lesson_id: string; title: string; line_stops?: import('../src/schemas/block').LineStop[]; after_lesson_ids?: string[] }[] = [];
     const anthologySnapshots: Array<{
       lesson_id: string;
       lesson_title: string;
@@ -1313,8 +1313,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
           lesson_id: snapshot.lesson_id,
           title: snapshot.title,
           ...(draft?.line_stops?.length ? { line_stops: draft.line_stops } : {}),
-          ...(draft?.after_lesson_ids ? { after_lesson_ids: draft.after_lesson_ids } : {}),
-          ...(draft?.lesson_kind && draft.lesson_kind !== 'lesson' ? { lesson_kind: draft.lesson_kind } : {})
+          ...(draft?.after_lesson_ids ? { after_lesson_ids: draft.after_lesson_ids } : {})
         });
         anthologySnapshots.push({
           lesson_id: snapshot.lesson_id,

@@ -1,13 +1,12 @@
 import { z } from 'zod';
-import { AfterLessonIdsSchema, BlockSchema, LessonKindSchema, LineStopSchema, NetworkLineSchema } from './block';
+import { AfterLessonIdsSchema, BlockSchema, LineStopSchema, NetworkLineSchema } from './block';
 import { CoverSchema } from './cover';
 
 export const PublishedUnitLessonSummarySchema = z.object({
   lesson_id: z.string().min(1),
   title: z.string().min(1),
   line_stops: z.array(LineStopSchema).max(16).optional(),
-  after_lesson_ids: AfterLessonIdsSchema.optional(),
-  lesson_kind: LessonKindSchema.optional()
+  after_lesson_ids: AfterLessonIdsSchema.optional()
 });
 
 export const PublishedAnthologyItemSchema = z.object({
