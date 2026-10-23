@@ -1403,7 +1403,7 @@ var NetworkLineSchema = z8.object({
 });
 var LessonKindSchema = z8.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z8.array(z8.string().min(1).max(64)).max(6);
-var LessonRouteRoleSchema = z8.enum(["support", "extension", "optional"]);
+var LessonRouteRoleSchema = z8.enum(["core", "support", "extension", "optional"]);
 var LessonSkipRuleSchema = z8.string().trim().max(80);
 var LineStopSchema = z8.object({
   line_id: z8.string().min(1).max(64),

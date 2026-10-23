@@ -15,7 +15,7 @@ export type LessonFlowOptions = {
   /** Support or extension beside the core route on the unit map; unset is core. */
   role?: LessonRouteRole | undefined;
   skipRule?: string | undefined;
-  /** Saves this lesson: `null` links mean "follow the unit order" again, a `null` role means core. */
+  /** Saves this lesson: `null` links mean "follow the unit order" again. */
   onSelf: (patch: { after_lesson_ids?: string[] | null; lesson_kind?: LessonKind; route_role?: LessonRouteRole | null; skip_rule?: string | null }) => void;
   /** Saves another lesson's links (for "before this lesson"). */
   onPeer: (lessonId: string, after: string[]) => Promise<void>;
@@ -26,8 +26,8 @@ export type LessonFlowOptions = {
 };
 
 const KIND_LABEL: Record<LessonKind, string> = { lesson: 'Lesson', workshop: 'Workshop', lecture: 'Lecture' };
-const ROLE_LABEL: Record<'core' | LessonRouteRole, string> = { core: 'Core', support: 'Support', extension: 'Extension', optional: 'Optional' };
-const SKIP_HINT: Record<LessonRouteRole, string> = {
+const ROLE_LABEL: Record<LessonRouteRole, string> = { core: 'Core', support: 'Support', extension: 'Extension', optional: 'Optional' };
+const SKIP_HINT: Record<Exclude<LessonRouteRole, 'core'>, string> = {
   support: 'Who can skip it, e.g. 90%+ on the pre-test',
   extension: 'Who takes it, e.g. 80%+ on the quiz',
   optional: 'Who it suits, e.g. anyone wanting more practice'
@@ -151,15 +151,16 @@ export function mountLessonFlow(
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(on));
       b.addEventListener('click', () => {
-        role = r === 'core' ? undefined : r;
-        options.onSelf({ route_role: role ?? null });
+        // Core is saved too, so it beats an old support or extension stop on the unit map.
+        role = r;
+        options.onSelf({ route_role: r });
         paint();
       });
       rolePills.append(b);
     }
     routeBody.append(rolePills);
     route.append(routeBody);
-    if (role) {
+    if (role && role !== 'core') {
       const rule = el('input', 'lesson-flow__rule');
       rule.type = 'text';
       rule.maxLength = 80;
