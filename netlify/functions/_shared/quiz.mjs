@@ -910,8 +910,20 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
     for_students: settings.for_students ?? [],
     dismissed: flags?.dismissed ?? [],
     follow_ups: kin.followUps,
-    siblings: kin.siblings
+    siblings: kin.siblings,
+    // A tutorial's exit check: each student's group name, for the markbook cell.
+    tutorial_groups: tutorialGroupNames(draft)
   };
+}
+
+function tutorialGroupNames(draft) {
+  if (draft.pedagogical_mode !== 'tutorial' || !Array.isArray(draft.tutorial?.groups)) return null;
+  const names = {};
+  for (const g of draft.tutorial.groups) {
+    if (!g || typeof g.name !== 'string' || !Array.isArray(g.students)) continue;
+    for (const s of g.students) if (typeof s === 'string' && !Object.hasOwn(names, s)) names[s] = g.name;
+  }
+  return names;
 }
 
 /**
@@ -939,7 +951,8 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     closed: insight.closed,
     first_at: firstAt,
     questions: insight.questions.map(({ id, prompt, marks, outcomes }) => ({ id, prompt, marks, outcomes })),
-    scores
+    scores,
+    ...(insight.tutorial_groups ? { groups: Object.fromEntries(Object.entries(insight.tutorial_groups).filter(([id]) => wanted.has(id))) } : {})
   };
 }
 

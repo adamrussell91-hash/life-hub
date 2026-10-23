@@ -63,7 +63,9 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
     const score = column.scores[sid];
     if (!score) return el('span', 'mb-cell mb-cell--quiz mb-cell--blank', '');
     const toMark = score.pending > 0 ? `, ${score.pending} to mark` : '';
-    const b = button('mb-cell mb-cell--quiz', formatPercent(quizPercent(score)), `${column.title}, ${student.name}: ${formatPercent(quizPercent(score))}${toMark}`);
+    const group = column.groups?.[sid];
+    const b = button('mb-cell mb-cell--quiz', formatPercent(quizPercent(score)), `${column.title}, ${student.name}: ${formatPercent(quizPercent(score))}${toMark}${group ? ` · ${group}` : ''}`);
+    if (group) b.title = group;
     if (score.pending > 0) {
       const dot = el('span', 'mb-cell__pending');
       dot.title = `${score.pending} to mark`;

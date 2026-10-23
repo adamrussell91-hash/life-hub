@@ -23,6 +23,8 @@ export type QuizColumn = {
   closed?: boolean;
   questions: QuizQuestionMeta[];
   scores: Record<string, QuizScore>;
+  /** Tutorial exit checks: each student's group name. */
+  groups?: Record<string, string>;
 };
 
 export type MarkbookView = { markbook: Markbook; students: RosterStudent[]; quizzes: QuizColumn[] };
