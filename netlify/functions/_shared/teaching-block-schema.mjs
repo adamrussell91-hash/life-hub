@@ -1354,9 +1354,8 @@ var NetworkLineSchema = z9.object({
   colour: CurriculumLinesColourSchema.default("wave"),
   alignment: LineAlignmentSchema.optional()
 });
-var LessonKindSchema = z9.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z9.array(z9.string().min(1).max(64)).max(6);
-var LessonRouteRoleSchema = z9.enum(["support", "extension"]);
+var LessonRouteRoleSchema = z9.enum(["core", "support", "extension", "optional"]);
 var LessonSkipRuleSchema = z9.string().trim().max(80);
 var LineStopSchema = z9.object({
   line_id: z9.string().min(1).max(64),
@@ -2501,7 +2500,6 @@ export {
   HtmlAppBlockSchema,
   HtmlBlockSchema,
   ImageBlockSchema,
-  LessonKindSchema,
   LessonRouteRoleSchema,
   LessonSkipRuleSchema,
   LineAlignmentSchema,

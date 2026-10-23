@@ -1,5 +1,5 @@
 import { setToolkitClasses } from '@/toolkit/class-context';
-import { linesBeforeOnMap } from '@/teacher/network-context';
+import { lessonClassDates, lessonRouteRole, linesBeforeOnMap, setLessonDate, unitFlowPeers } from '@/teacher/network-context';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
@@ -258,7 +258,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       if (next.line_off) lesson.line_off = next.line_off;
       // null (follow unit order) is saved as null so the merge clears the old list.
       if (next.after_lesson_ids !== undefined) lesson.after_lesson_ids = next.after_lesson_ids;
-      if (next.lesson_kind) lesson.lesson_kind = next.lesson_kind;
       // Saves merge into the stored lesson, so clearing sends an empty list.
       if (next.dot_points) lesson.dot_points = next.dot_points;
       if (next.plan_covered) lesson.plan_covered = next.plan_covered;
@@ -343,7 +342,24 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       return { text: blockQueryText(selected), hasSelection: Boolean(selected) };
     }
 
+    // Expanded, the chat floats over the lesson so the page keeps its full
+    // width and wide blocks are never squeezed.
+    function setChatExpanded(expanded: boolean): void {
+      builder.classList.toggle('lesson-builder--chat-expanded', expanded);
+      aiPanel?.setExpanded(expanded);
+    }
+
+    function isChatExpanded(): boolean {
+      return builder.classList.contains('lesson-builder--chat-expanded');
+    }
+
+    builder.addEventListener('click', (event) => {
+      // The scrim behind an expanded chat is the builder itself.
+      if (event.target === builder && isChatExpanded()) setChatExpanded(false);
+    });
+
     function setChatShelved(shelved: boolean): void {
+      if (shelved) setChatExpanded(false);
       builder.classList.toggle('lesson-builder--chat-shelved', shelved);
       aiPanel?.setShelved(shelved);
       chatFab.hidden = !shelved;
@@ -608,13 +624,20 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
           : undefined;
       })(),
-      flowPeers: (() => {
+      ...(() => {
+        // Before and after follows the unit map: its order, its dates, the classes that teach it.
         const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
-        const byId = new Map(curriculum.lessons.map((l) => [l.id, l]));
-        return (unit?.lesson_ids ?? [])
-          .map((id) => byId.get(id))
-          .filter((l): l is NonNullable<typeof l> => Boolean(l))
-          .map((l) => ({ id: l.id, title: l.title, ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}) }));
+        if (!unit) return {};
+        const role = lessonRouteRole(unit, lesson);
+        return {
+          flowPeers: unitFlowPeers(curriculum, unit, lesson.id),
+          flowClasses: lessonClassDates(curriculum, unit, lesson.id),
+          ...(role ? { flowRole: role } : {}),
+          onFlowDate: async (classId: string, date: string) => {
+            await setLessonDate(curriculum, unit, lesson.id, classId, date);
+            return unitFlowPeers(curriculum, unit, lesson.id);
+          }
+        };
       })(),
       linesBefore: (() => {
         const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
@@ -709,6 +732,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         paintChatFab(slug);
       },
       onRequestShelve: () => setChatShelved(true),
+      onToggleExpand: () => setChatExpanded(!isChatExpanded()),
       flushDraft: () => saveController?.flush() ?? Promise.resolve()
     });
 
@@ -725,7 +749,14 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     chatFab.addEventListener('click', () => showColumn('chat'));
 
     function onWindowKeydown(event: KeyboardEvent): void {
-      if (disposed || isTypingTarget(event.target)) return;
+      if (disposed) return;
+      // Escape puts an expanded chat back in its column, even mid-message.
+      if (event.key === 'Escape' && isChatExpanded()) {
+        event.preventDefault();
+        setChatExpanded(false);
+        return;
+      }
+      if (isTypingTarget(event.target)) return;
       if (shouldExitBuilderFullPage(event.key, fullPage)) {
         event.preventDefault();
         if (!builder.classList.contains('lesson-builder--chat-shelved')) {

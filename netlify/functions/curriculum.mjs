@@ -26,8 +26,7 @@ import {
 import { isDeletedRecord, withoutDeleted } from './_shared/record-liveness.mjs';
 import { buildMediaUsage } from './_shared/media-usage.mjs';
 
-const LESSON_KINDS = new Set(['lesson', 'workshop', 'lecture']);
-const ROUTE_ROLES = new Set(['support', 'extension']);
+const ROUTE_ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
 export const config = { path: '/api/curriculum' };
 
@@ -62,7 +61,6 @@ function lessonSummary(lesson, publishedIds) {
     ...(Array.isArray(lesson.line_stops) && lesson.line_stops.length ? { line_stops: lesson.line_stops } : {}),
     ...(Array.isArray(lesson.line_off) && lesson.line_off.length ? { line_off: lesson.line_off } : {}),
     ...(Array.isArray(lesson.after_lesson_ids) ? { after_lesson_ids: lesson.after_lesson_ids } : {}),
-    ...(LESSON_KINDS.has(lesson.lesson_kind) && lesson.lesson_kind !== 'lesson' ? { lesson_kind: lesson.lesson_kind } : {}),
     ...(ROUTE_ROLES.has(lesson.route_role) ? { route_role: lesson.route_role } : {}),
     ...(typeof lesson.skip_rule === 'string' && lesson.skip_rule.trim() ? { skip_rule: lesson.skip_rule.trim().slice(0, 80) } : {}),
     ...(Array.isArray(lesson.dot_points) && lesson.dot_points.length ? { dot_points: lesson.dot_points } : {})
