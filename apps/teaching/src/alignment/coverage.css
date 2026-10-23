@@ -161,46 +161,81 @@
   }
 }
 
-/* Lesson page: dot points this lesson teaches. Chosen points only; more come from a menu. */
+/* Lesson page: one Syllabus card. Closed, a summary row; open, dot points, lines,
+   tagged outcomes and what the points ask for in full, to plan activities against. */
 
-.dots {
+.lsyl {
   --cov-slate: #424860;
+  margin: 0 0 var(--space-4, 1rem);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.lsyl__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
+  gap: 6px 14px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lsyl__head:hover {
+  background: color-mix(in srgb, var(--cov-slate) 4%, transparent);
+}
+
+.lsyl__head:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.lsyl--open .lsyl__head {
+  border-bottom: 1px solid var(--line);
+  border-radius: 12px 12px 0 0;
+}
+
+.lsyl__title {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 650;
+}
+
+.lsyl__summary {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
   min-width: 0;
 }
 
-.dots__label {
+.lsyl__sum-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lsyl__sum-text {
   font-size: var(--text-xs, 0.75rem);
-  font-weight: 650;
   color: var(--muted);
 }
 
-.dots__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  min-width: 0;
+.lsyl__sum-group .lsyl__sum-text {
+  margin-left: 4px;
 }
 
-.dots__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  min-height: 30px;
-  padding: 2px 4px 2px 4px;
-  border: 1px solid color-mix(in srgb, var(--cov-slate) 35%, var(--line));
-  border-radius: 999px;
-  background: var(--paper);
-  font-size: var(--text-xs, 0.75rem);
-  color: var(--ink);
-}
-
-.dots__chip-id {
+.lsyl__badge,
+.dots__id,
+.dots-plan__tag {
+  display: inline-block;
   min-width: 26px;
   padding: 2px 6px;
   border-radius: 999px;
@@ -208,19 +243,134 @@
   color: #fff;
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.3;
   text-align: center;
 }
 
-.dots__chip-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 220px;
+.lsyl__dash {
+  width: 14px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--net-colour);
+}
+
+.lsyl__dash--metro {
+  height: 8px;
+  border: 2.5px solid var(--net-colour);
+  background: var(--paper);
+  box-sizing: border-box;
+}
+
+.lsyl__dash--light_rail {
+  height: 3px;
+}
+
+.lsyl__toggle {
+  margin-left: auto;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lsyl__toggle::after {
+  content: ' ▾';
+}
+
+.lsyl--open .lsyl__toggle::after {
+  content: ' ▴';
+}
+
+.lsyl[hidden],
+.lsyl__body[hidden],
+.lsyl__section[hidden] {
+  display: none;
+}
+
+.lsyl__body {
+  display: grid;
+  gap: 18px;
+  padding: 16px 14px 18px;
+}
+
+.lsyl__section {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px 16px;
+  align-items: start;
+}
+
+.lsyl__label {
+  margin: 0;
+  padding-top: 6px;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.lsyl__slot {
+  min-width: 0;
+}
+
+.lsyl__section--plan {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.lsyl .outcome-strip {
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .lsyl__section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .lsyl__label {
+    padding-top: 0;
+  }
+}
+
+/* Dot points: one row each, in full. */
+
+.dots {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.dots__list {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dots__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 6px 4px 6px 8px;
+  border-radius: 8px;
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.dots__row:hover {
+  background: color-mix(in srgb, var(--cov-slate) 5%, transparent);
+}
+
+.dots__id {
+  margin-top: 1px;
 }
 
 .dots__remove {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -253,33 +403,69 @@
   color: var(--ink);
 }
 
-.dots__reach {
+/* What the chosen points ask for, in full: one column per kind. */
+
+.dots-plan {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 2px 10px;
-  flex-basis: 100%;
-  margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px 24px;
+}
+
+.dots-plan__head {
+  margin: 0 0 8px;
   font-size: var(--text-xs, 0.75rem);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 
-.dots__reach dt {
-  font-weight: 650;
+.dots-plan__items {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.dots__reach dd {
-  margin: 0;
+.dots-plan__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.dots-plan__name {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 650;
   color: var(--ink);
 }
 
-@media (max-width: 600px) {
-  .dots__reach {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.dots-plan__from {
+  display: inline-flex;
+  gap: 3px;
+}
 
-  .dots__reach dd + dt {
-    margin-top: 4px;
-  }
+.dots-plan__tag {
+  min-width: 0;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--cov-slate) 14%, var(--paper));
+  color: var(--cov-slate);
+  font-size: 10px;
+}
+
+.dots-plan__text,
+.dots-plan__bullets {
+  margin: 4px 0 0;
+  font-size: var(--text-xs, 0.75rem);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dots-plan__bullets {
+  display: grid;
+  gap: 3px;
+  padding-left: 1.1em;
 }
 
 .dots__menu {

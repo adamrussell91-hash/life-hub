@@ -13,6 +13,10 @@ export type LessonDotPointsOptions = {
   dotPoints: readonly string[] | undefined;
   unitTitle?: string;
   focusArea?: string;
+  /** Where the full wording of what the chosen points ask for goes, to plan activities against. */
+  planHost?: HTMLElement;
+  /** The chosen point ids and outcomes they reach, after each paint, for a summary. */
+  onPaint?: (summary: { points: string[]; outcomes: number[] }) => void;
   /** With the alignment the points were read against, so the page can set the lesson's lines. */
   onChange: (dotPoints: string[], ctx: AutoLineContext) => void;
 };
@@ -27,10 +31,10 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 const GROUPS = [['U', 'Understanding'], ['R', 'Responding']] as const;
 
 /**
- * The syllabus dot points a lesson teaches, beside its line chips. Only the
- * chosen points show; more are added from a menu, so the row stays quiet.
- * The outcomes, core concepts, learning processes and thinking skills they
- * reach follow from the alignment.
+ * The syllabus dot points a lesson teaches, one row each in full. More are
+ * added from a menu. What the chosen points ask for (outcomes, core concept
+ * bullets, learning processes, thinking skills) follows from the alignment,
+ * in full and tagged with the points it comes from, into the plan host.
  */
 export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPointsOptions): { update(dotPoints: readonly string[] | undefined): void; dispose(): void } {
   let chosen = [...(options.dotPoints ?? [])];
@@ -104,49 +108,87 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
 
   function paint(): void {
     if (!doc || !area) return;
-    root.replaceChildren(el('span', 'dots__label', 'Dot points'));
-    const list = el('div', 'dots__chips');
+    const list = el('ul', 'dots__list');
     for (const ref of chosen) {
       const p = pointFor(ref);
       if (!p) continue;
-      const chip = el('span', 'dots__chip');
-      chip.title = p.text;
-      chip.append(el('span', 'dots__chip-id', p.id), el('span', 'dots__chip-text', p.short));
+      const row = el('li', 'dots__row');
       const x = el('button', 'dots__remove', '×');
       x.type = 'button';
       x.setAttribute('aria-label', `Remove ${p.id}`);
       x.addEventListener('click', () => save(chosen.filter((r) => r !== ref)));
-      chip.append(x);
-      list.append(chip);
+      row.append(el('span', 'dots__id', p.id), el('span', 'dots__text', p.text), x);
+      list.append(row);
     }
-    const add = el('button', 'dots__add', chosen.some((r) => pointFor(r)) ? 'Add' : 'Add dot point');
+    const add = el('button', 'dots__add', '+ Add dot point');
     add.type = 'button';
     add.setAttribute('aria-haspopup', 'menu');
     add.addEventListener('click', () => (menu ? closeMenu() : openMenu(add)));
-    list.append(add);
-    root.append(list);
-    // What the chosen points reach, from the alignment. Concepts are the core links only, as on the map.
-    const picked = chosen.map(pointFor).filter((p): p is AlignmentPoint => Boolean(p));
-    if (picked.length) {
-      const outcomes = [...new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)))].sort((a, b) => a - b);
-      const keys = new Set(picked.flatMap((p) => p.concepts.filter((c) => c.link === 'shared').map((c) => conceptKeyOf(c.ref))));
-      const concepts = doc.concepts.filter((c) => keys.has(c.key)).map((c) => c.name);
-      const codes = new Set(picked.flatMap((p) => p.processes));
-      const processes = doc.processes.filter((p) => codes.has(p.code)).map((p) => p.name);
-      const ids = new Set(picked.flatMap((p) => p.skills ?? []));
-      const thinking = SKILLS.filter((k) => ids.has(k.id)).map((k) => k.name);
-      const reach = el('dl', 'dots__reach');
-      const row = (term: string, items: string[]) => {
-        if (!items.length) return;
-        reach.append(el('dt', undefined, term), el('dd', undefined, items.join(', ')));
-      };
-      row('Outcomes', outcomes.map(String));
-      row('Concepts', concepts);
-      row('Processes', processes);
-      row('Thinking', thinking);
-      root.append(reach);
-    }
+    root.replaceChildren(...(list.childElementCount ? [list] : []), add);
     root.hidden = false;
+    const picked = chosen.map(pointFor).filter((p): p is AlignmentPoint => Boolean(p));
+    paintPlan(picked);
+    options.onPaint?.({ points: picked.map((p) => p.id), outcomes: [...new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)))].sort((a, b) => a - b) });
+  }
+
+  /** Each thing the chosen points ask for, in full, with the points it comes from. Concepts are the core links only, as on the map. */
+  function paintPlan(picked: AlignmentPoint[]): void {
+    const host = options.planHost;
+    if (!host || !doc) return;
+    host.replaceChildren();
+    if (!picked.length) return;
+    const from = (has: (p: AlignmentPoint) => boolean) => picked.filter(has).map((p) => p.id);
+    const grid = el('div', 'dots-plan');
+    const column = (label: string, items: Array<{ name: string; text?: string; bullets?: string[]; from: string[] }>) => {
+      if (!items.length) return;
+      const col = el('section', 'dots-plan__col');
+      col.append(el('h5', 'dots-plan__head', label));
+      const ul = el('ul', 'dots-plan__items');
+      for (const item of items) {
+        const li = el('li', 'dots-plan__item');
+        const top = el('div', 'dots-plan__top');
+        top.append(el('span', 'dots-plan__name', item.name));
+        const tags = el('span', 'dots-plan__from');
+        tags.setAttribute('aria-label', `From ${item.from.join(', ')}`);
+        for (const id of item.from) tags.append(el('span', 'dots-plan__tag', id));
+        top.append(tags);
+        li.append(top);
+        if (item.text) li.append(el('p', 'dots-plan__text', item.text));
+        if (item.bullets?.length) {
+          const bl = el('ul', 'dots-plan__bullets');
+          for (const b of item.bullets) bl.append(el('li', undefined, b));
+          li.append(bl);
+        }
+        ul.append(li);
+      }
+      col.append(ul);
+      grid.append(col);
+    };
+    const outcomeNs = new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)));
+    column('Outcomes', doc.outcomes.filter((o) => outcomeNs.has(o.n)).map((o) => ({
+      name: o.code,
+      text: o.text,
+      from: from((p) => p.outcomes.some((x) => x.n === o.n))
+    })));
+    const refs = new Set(picked.flatMap((p) => p.concepts.filter((c) => c.link === 'shared').map((c) => c.ref)));
+    column('Concepts', doc.concepts.filter((c) => [...refs].some((r) => conceptKeyOf(r) === c.key)).map((c) => ({
+      name: c.name,
+      bullets: c.bullets.filter((b) => refs.has(c.key + b.n)).map((b) => b.text),
+      from: from((p) => p.concepts.some((x) => x.link === 'shared' && conceptKeyOf(x.ref) === c.key))
+    })));
+    const codes = new Set(picked.flatMap((p) => p.processes));
+    column('Processes', doc.processes.filter((p) => codes.has(p.code)).map((proc) => ({
+      name: proc.name,
+      text: proc.text,
+      from: from((p) => p.processes.includes(proc.code))
+    })));
+    const ids = new Set(picked.flatMap((p) => p.skills ?? []));
+    column('Thinking skills', SKILLS.filter((k) => ids.has(k.id)).map((k) => ({
+      name: k.name,
+      text: k.description,
+      from: from((p) => (p.skills ?? []).includes(k.id))
+    })));
+    host.append(grid);
   }
 
   void Promise.all([loadAlignment(), loadSkills().catch((): SkillsContinuum | null => null)])
@@ -166,6 +208,7 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     dispose() {
       closeMenu();
       root.remove();
+      options.planHost?.replaceChildren();
     }
   };
 }
