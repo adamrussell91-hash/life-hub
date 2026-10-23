@@ -8,7 +8,8 @@ import type { Block } from '@/schemas/block';
  */
 export function previewBlocks(blocks: readonly Block[]): Block[] {
   return blocks
-    .filter((block) => block.visibility !== 'teacher_only' && (block.block_type as string) !== 'teacher_note')
+    // Quiz questions only reach students in a quiz lesson, so a lecture's preview leaves them out too.
+    .filter((block) => block.visibility !== 'teacher_only' && (block.block_type as string) !== 'teacher_note' && block.block_type !== 'quiz_question')
     .map((block) => {
       const c = block.content as { blocks?: Block[]; columns?: Array<{ blocks: Block[] }>; tabs?: Array<{ blocks: Block[] }> };
       if (block.block_type === 'section' && c.blocks) return { ...block, content: { ...block.content, blocks: previewBlocks(c.blocks) } } as Block;

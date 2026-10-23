@@ -102,12 +102,12 @@ describe('review follow-ups', () => {
   const mk = (fetchSummary: () => Promise<unknown>, answerHandup = vi.fn()) =>
     mountLecturePanel({ getLesson: () => lesson, fetchSummary: fetchSummary as never, answerHandup, onAddCallout: vi.fn() });
 
-  it('places a scene callout before an opening block so a gate keeps its side path', async () => {
+  it('places a scene callout after an opening block (and its side path) so the scene keeps its id', async () => {
     const { addToScene } = await import('@/lecture/tree');
     const gate = b('g', 'hinge_question');
-    const side = b('sp', 'section', { title: 's', blocks: [] });
+    const side = b('sp', 'section', { title: 's', blocks: [], side_path: true });
     const c = b('c', 'callout');
-    expect(addToScene([gate, side], 'g', c).map((x) => x.id)).toEqual(['c', 'g', 'sp']);
+    expect(addToScene([gate, side], 'g', c).map((x) => x.id)).toEqual(['g', 'sp', 'c']);
     const h = b('h', 'heading', { text: 'x' });
     expect(addToScene([h, gate, side], 'h', c).map((x) => x.id)).toEqual(['h', 'c', 'g', 'sp']);
     const sec = b('s', 'section', { title: 'A', blocks: [gate, side] });

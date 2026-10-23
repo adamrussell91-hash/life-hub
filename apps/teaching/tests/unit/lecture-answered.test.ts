@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderBlock } from '@/blocks/render';
 import { LECTURE_ANSWERED, type AnsweredDetail } from '@/lecture/answered';
 import type { Block } from '@/schemas/block';
@@ -73,5 +73,22 @@ describe('hinge in a lecture', () => {
     // Drawn again (after a detour), the preview still shows the answer.
     const again = renderBlock(hinge, 'student', { lessonId: 'l1', lecture: 'preview' });
     expect(again.querySelector('.hq-verdict--wrong')).not.toBeNull();
+  });
+
+  it('lets a student carry on when a hinge in a lecture can’t be answered', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const got = listen(host);
+    const hinge = b('hq2', 'hinge_question', { prompt: 'Which?', options: [{ id: 'a', text: 'Gravity' }, { id: 'b', text: 'Magnetism' }], seconds: 60, move_on: 80, reteach: 50 });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
+    const el = renderBlock(hinge, 'student', { lessonId: 'l1', lecture: 'live' });
+    host.append(el);
+    el.querySelectorAll<HTMLButtonElement>('.hq-choice')[0]!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const skip = el.querySelector<HTMLButtonElement>('.hq-solo__skip')!;
+    expect(skip.textContent).toBe('Carry on without answering');
+    skip.click();
+    expect(got).toEqual([{ blockId: 'hq2', result: 'done' }]);
+    fetchMock.mockRestore();
   });
 });
