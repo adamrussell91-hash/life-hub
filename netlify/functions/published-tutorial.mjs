@@ -2,7 +2,7 @@
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
 import { tutorialAction, TutorialError } from './_shared/tutorial.mjs';
 import { errorResponse, guardRequestOrigin, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
-export const config = { path: '/api/published/tutorial/:id', rateLimit: { action: 'rate_limit', aggregateBy: ['ip', 'domain'], windowLimit: 300, windowSize: 60 } };
+export const config = { path: '/api/published/tutorial/:id', rateLimit: { action: 'rate_limit', aggregateBy: ['ip', 'domain'], windowLimit: 900, windowSize: 60 } };
 const MAX_BODY = 16000;
 export function createPublishedTutorialHandler(deps = {}) {
   return createPublicStudentHandler(async (request, context) => {
