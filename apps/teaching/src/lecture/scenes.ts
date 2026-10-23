@@ -35,15 +35,20 @@ export type LectureScene = {
   beats: Beat[];
 };
 
-const GATE_TYPES = new Set<Block['block_type']>(['hinge_question', 'cloze', 'self_check']);
+const GATE_TYPES = new Set<Block['block_type']>(['hinge_question', 'cloze', 'self_check', 'faded_example']);
 const SKIPPED = new Set<Block['block_type']>(['spacer', 'divider', 'teacher_note']);
 
 export function isGate(block: Block): boolean {
-  return GATE_TYPES.has(block.block_type) && (block.content as { gate?: boolean }).gate !== false;
+  if (!GATE_TYPES.has(block.block_type)) return false;
+  if (block.block_type === 'faded_example') {
+    // A fully worked step has nothing to answer.
+    return block.content.gate !== false && block.content.blanks.length > 0;
+  }
+  return (block.content as { gate?: boolean }).gate !== false;
 }
 
 export function takesSidePath(block: Block): boolean {
-  return block.block_type === 'hinge_question' || block.block_type === 'cloze';
+  return block.block_type === 'hinge_question' || block.block_type === 'cloze' || block.block_type === 'faded_example';
 }
 
 export function isSidePath(block: Block): boolean {

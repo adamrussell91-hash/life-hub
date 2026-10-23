@@ -55,7 +55,18 @@ function withBlocks(lesson: Lesson, blocks: Block[]): Lesson {
 
 /** Quiz questions only work in a Quiz lesson, so a proposal can switch the lesson type with them. */
 function withMode(lesson: Lesson, proposal: { set_mode?: 'quiz' }): Lesson {
+  // A tutorial keeps its type: its exit checks hold the quiz questions.
+  if (lesson.pedagogical_mode === 'tutorial') return lesson;
   return proposal.set_mode ? { ...lesson, pedagogical_mode: proposal.set_mode } : lesson;
+}
+
+/** A redrafted tutorial tab or exit check stays that group's, even if the proposal dropped the markers. */
+function keepTutorialMarkers(old: Block, next: Block): Block {
+  if (old.block_type !== 'section' || next.block_type !== 'section' || old.content.tutorial_group === undefined) return next;
+  const content = { ...next.content };
+  if (content.tutorial_group === undefined) content.tutorial_group = old.content.tutorial_group;
+  if (content.tutorial_exit === undefined && old.content.tutorial_exit !== undefined) content.tutorial_exit = old.content.tutorial_exit;
+  return { ...next, content } as Block;
 }
 
 export function applyProposalToLesson(
@@ -79,8 +90,9 @@ export function applyProposalToLesson(
   if (proposal.kind === 'replace_blocks') {
     let next = lesson.blocks;
     for (const block of proposal.blocks) {
-      if (!findBlockById(next, block.id)) return { ok: false, message: `Block ${block.id} not found`, lesson };
-      next = replaceBlockInTree(next, block.id, block);
+      const old = findBlockById(next, block.id);
+      if (!old) return { ok: false, message: `Block ${block.id} not found`, lesson };
+      next = replaceBlockInTree(next, block.id, keepTutorialMarkers(old, block));
     }
     return { ok: true, lesson: withBlocks(lesson, next) };
   }
@@ -99,7 +111,8 @@ export function applyProposalToLesson(
         )
       }
     };
-    const next = replaceBlockInTree(lesson.blocks, proposal.section_id, section as Block);
+    const old = findBlockById(lesson.blocks, proposal.section_id);
+    const next = replaceBlockInTree(lesson.blocks, proposal.section_id, old ? keepTutorialMarkers(old, section as Block) : (section as Block));
     const found = JSON.stringify(lesson.blocks) !== JSON.stringify(next);
     return found
       ? { ok: true, lesson: withBlocks(lesson, next) }

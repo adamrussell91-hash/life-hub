@@ -68,6 +68,9 @@ import { buildPersonModel, type PersonModel } from '@/domain/person-model';
 import { currentRoles, orgMonogram, rolesFromOverview, type PersonRole } from '@/domain/person-roles';
 import { buildPersonTimeline } from '@/domain/person-timeline';
 import { renderPersonTimeline } from '@/components/person-timeline';
+import { listMeetings } from '@/api/meetings';
+import { placeRuns, runsFor, type PlacedRun } from '@/guides/runs';
+import { guideTimelinePoints, renderMotivationStrip } from '@/components/motivation-strip';
 import { metLineFrom, renderPersonHeader } from '@/components/person-header';
 import { fetchObservations } from '@/api/observations';
 import { renderRolesEditor } from '@/components/person-roles-editor';
@@ -813,6 +816,7 @@ export async function renderPeoplePage(
     const rememberHost = pane.querySelector(
       '[data-section="remember"] .people-pane__section-body'
     ) as HTMLElement | null;
+    const motivationHost = pane.querySelector('[data-section="motivation"] .people-pane__section-body') as HTMLElement | null;
     const timelineHost = pane.querySelector('[data-section="timeline"] .people-pane__section-body') as HTMLElement | null;
     const linkedHost = pane.querySelector(
       '[data-section="linked"] .people-pane__section-body'
@@ -836,6 +840,7 @@ export async function renderPeoplePage(
       const proposalsRead = fetchLinkProposals(ref, {status:'pending'}).catch(() => ({proposals:[] as LinkProposal[],count:0}));
       const ledgerRead = fetchPersonLedger(ref).catch(() => null);
       const rememberRead = fetchRememberFacts(ref).catch(() => ({facts:[] as RememberFact[],count:0}));
+      const guidesRead = listMeetings().then((r) => placeRuns(r.meetings)).catch(() => [] as PlacedRun[]);
       const overview = await overviewRead;
       if (!current()) return;
       personOverviews.set(id, overview);
@@ -843,6 +848,7 @@ export async function renderPeoplePage(
       let proposalsRes: {proposals:LinkProposal[];count:number} = {proposals:[],count:0};
       let ledgerRes: LedgerResponse | null = null;
       let rememberRes: {facts:RememberFact[];count:number} = {facts:[],count:0};
+      let allPlaced: PlacedRun[] = [];
       const ready = new Set<string>();
       function paint(changed: string): void {
         if (!current()) return;
@@ -1084,10 +1090,17 @@ export async function renderPeoplePage(
           renderRememberSection(rememberHost, rememberRes.facts ?? [], id, model.displayName);
         }
 
-        if (timelineHost && changed === 'overview') {
+        const mine = runsFor(allPlaced, ref, model.displayName);
+        if (motivationHost && changed === 'guides') {
+          renderMotivationStrip(motivationHost, mine);
+          const box = motivationHost.closest('[data-section="motivation"]') as HTMLElement | null;
+          if (box) box.hidden = !mine.some((p) => p.run.guide === 'motivation_sdt');
+        }
+
+        if (timelineHost && (changed === 'overview' || changed === 'guides') && ready.has('overview')) {
           renderPersonTimeline(
             timelineHost,
-            buildPersonTimeline(rolesFromOverview(overview), model.arcPoints),
+            buildPersonTimeline(rolesFromOverview(overview), [...model.arcPoints, ...guideTimelinePoints(mine)]),
             (orgRef, orgName) => crestFor(orgRef, orgName)
           );
         }
@@ -1136,6 +1149,7 @@ export async function renderPeoplePage(
         proposalsRead.then(value => { proposalsRes = value; paint('proposals'); }),
         ledgerRead.then(value => { ledgerRes = value; paint('ledger'); }),
         rememberRead.then(value => { rememberRes = value; paint('remember'); }),
+        guidesRead.then(value => { allPlaced = value; paint('guides'); }),
         ledgerRead.then(async () => {
           if (!current()) return;
           await reloadToday(current);
@@ -1378,6 +1392,10 @@ export async function renderPeoplePage(
     remember.root.querySelector('.people-pane__h2')?.append(el('span', 'people-pane__h2-sub', 'pulled from your notes'));
     setSectionState(remember.body, 'loading');
     pane.append(remember.root);
+    const motivation = sectionHost('people-pane__motivation', 'Motivation');
+    motivation.root.setAttribute('data-section', 'motivation');
+    motivation.root.hidden = true;
+    pane.append(motivation.root);
 
     const linked = sectionHost('people-pane__linked', 'Linked everywhere');
     linked.root.setAttribute('data-section', 'linked');

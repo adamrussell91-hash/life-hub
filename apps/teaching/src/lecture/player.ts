@@ -21,6 +21,11 @@ export type LecturePlayerOptions = {
   renderHero: (host: HTMLElement) => void;
   /** Teacher preview: hinge answers check locally and the strip jumps to any scene. */
   preview?: boolean;
+  /**
+   * Plays one stretch of a tutorial: no title card, its own save key, and the
+   * recap's Finish becomes `doneLabel` and calls `onDone`.
+   */
+  segment?: { saveKey: string; doneLabel: string; onDone: () => void };
 };
 
 export type LecturePlayerHandle = { dispose(): void };
@@ -44,7 +49,7 @@ export function gateStateKeys(lessonId: string, blockId: string): string[] {
 export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOptions): LecturePlayerHandle {
   const { lessonId, blocks, client, preview = false } = options;
   const scenes = lectureScenes(blocks);
-  const saveKey = `lecture:${lessonId}:state`;
+  const saveKey = options.segment?.saveKey ?? `lecture:${lessonId}:state`;
   let state: LectureState = restoreState(preview ? null : readJSON(saveKey), scenes);
   let status: LectureStatus | null = null;
   /** Start waits on the server's answer, or the timeout, whichever comes first. */
@@ -502,13 +507,17 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
       }
       page.append(el('h3', 'lecture-recap__head', 'Your hand-ups'), list);
     }
-    const finish = el('button', 'btn btn--primary lecture-recap__finish', state.finished ? 'Finished ✓' : 'Finish');
+    const finish = el('button', 'btn btn--primary lecture-recap__finish', options.segment?.doneLabel ?? (state.finished ? 'Finished ✓' : 'Finish'));
     finish.type = 'button';
     finish.addEventListener('click', () => {
       state = { ...state, finished: true };
       save();
       send();
-      finish.textContent = 'Finished ✓';
+      if (options.segment) {
+        // A double-click moves the tutorial on once, not twice.
+        finish.disabled = true;
+        options.segment.onDone();
+      } else finish.textContent = 'Finished ✓';
     });
     page.append(finish);
     root.replaceChildren(page);
@@ -516,7 +525,12 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
 
   // Each teacher preview starts with every question unanswered.
   if (preview) clearGateAnswers();
-  titleCard();
+  if (options.segment) {
+    started = true;
+    // A stretch already finished on this device goes straight to its Done button.
+    if (state.finished) recap();
+    else play();
+  } else titleCard();
   if (client && !preview) {
     const settle = () => {
       if (disposed || statusReady) return;
