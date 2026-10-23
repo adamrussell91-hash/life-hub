@@ -106,6 +106,7 @@ import { createPublishedQuizHandler } from '../../../netlify/functions/published
 import { createLectureHandler } from '../../../netlify/functions/lecture.mjs';
 import { createPublishedLectureHandler } from '../../../netlify/functions/published-lecture.mjs';
 import { createPublishedTutorialHandler } from '../../../netlify/functions/published-tutorial.mjs';
+import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
 import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
@@ -3607,6 +3608,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createLectureHandler(deps)
       : path.startsWith('/api/published/lecture/')
         ? createPublishedLectureHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/tutorial$/.test(path)
+        ? createTutorialHandler(deps)
       : path.startsWith('/api/published/tutorial/')
         ? createPublishedTutorialHandler(deps)
       : path.startsWith('/api/published/hinge/')
@@ -3713,6 +3716,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/quiz\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/lecture$/.test(path) ||
       /^\/api\/published\/lecture\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/tutorial$/.test(path) ||
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
