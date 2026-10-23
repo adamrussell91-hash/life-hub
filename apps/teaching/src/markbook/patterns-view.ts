@@ -1,8 +1,8 @@
 import { el } from '@/quiz/dom';
 import type { InsightContext } from '@/evidence/context';
-import { markbookEvidence } from '@/evidence/markbook-evidence';
+import { classEvidence } from '@/evidence/class-evidence';
 import { byTag, defaultKind, kindsPresent, trend, type TrendPoint } from '@/evidence/patterns';
-import { expandTags, tagLabel } from '@/evidence/tags';
+import { tagLabel } from '@/evidence/tags';
 import type { Evidence, StudentBand, TagKind } from '@/evidence/types';
 import { pct, sectionHead, tagSwitch } from '@/evidence/views/parts';
 import { assessments } from './calc';
@@ -10,6 +10,33 @@ import { sparkline } from './grid';
 import { band4 } from './insight';
 import { openOverlay } from './overlay';
 import type { MarkbookView, RosterStudent } from './types';
+
+/** Sort orders for the Detail tables, kept by the markbook between redraws. */
+export type DetailState = {
+  kind: TagKind | null;
+  tagSort: { col: 'tag' | 'now' | 'change' | 'evidence'; asc: boolean };
+  /** A tag column, or null for the student's name. */
+  heatSort: { tag: string | null; asc: boolean };
+};
+export const newDetailState = (): DetailState => ({ kind: null, tagSort: { col: 'now', asc: true }, heatSort: { tag: null, asc: true } });
+
+/** A column heading that sorts its table; pressing it again turns the order round. */
+function sortHeading(text: string, active: boolean, asc: boolean, onSort: () => void): HTMLTableCellElement {
+  const th = el('th');
+  th.scope = 'col';
+  th.setAttribute('aria-sort', active ? (asc ? 'ascending' : 'descending') : 'none');
+  const b = el('button', 'mb-sort', text);
+  b.type = 'button';
+  b.dataset.sortCol = text;
+  if (active) b.append(el('span', 'mb-sort__arrow', asc ? ' ↑' : ' ↓'));
+  b.addEventListener('click', () => {
+    onSort();
+    // The table redraws: keep focus on the same heading.
+    th.closest('.mb-patterns')?.querySelector<HTMLButtonElement>(`.mb-sort[data-sort-col="${CSS.escape(text)}"]`)?.focus();
+  });
+  th.append(b);
+  return th;
+}
 
 export type PatternsActions = {
   openStudent: (studentId: string) => void;
@@ -89,16 +116,16 @@ function itemNamer(view: MarkbookView): (e: Evidence) => string {
   };
 }
 
-export function renderPatterns(view: MarkbookView, students: RosterStudent[], ctx: InsightContext, actions: PatternsActions): HTMLElement {
+export function renderPatterns(view: MarkbookView, students: RosterStudent[], ctx: InsightContext, actions: PatternsActions, state: DetailState = newDetailState()): HTMLElement {
   const root = el('div', 'mb-patterns');
-  const { evidence: raw, sources } = markbookEvidence(view, ctx.outcomes);
-  const evidence = expandTags(raw, ctx.table);
+  const { evidence, sources } = classEvidence(view, ctx);
   const label = (tag: string): string => tagLabel(tag, ctx);
   const titleOf = new Map(sources.map((s) => [s.source, s.title]));
   const names = new Map(students.map((s) => [s.id, s]));
   const itemName = itemNamer(view);
-  let kind: TagKind = defaultKind(evidence);
   const kinds = kindsPresent(evidence);
+  // Families read better than twenty techniques; a technique is a press away.
+  let kind: TagKind = state.kind && kinds.includes(state.kind) ? state.kind : kinds.includes('fam') ? 'fam' : defaultKind(evidence);
 
   root.append(sectionHead('Class over time'), trendChart(trend(evidence, sources)));
   const tagsHost = el('div', 'mb-patterns__tags');
@@ -106,14 +133,45 @@ export function renderPatterns(view: MarkbookView, students: RosterStudent[], ct
   root.append(tagsHost, heatHost);
 
   const paint = (): void => {
-    const rows = byTag(evidence, kind);
+    const changeOf = new Map<string, number | null>();
+    const pointsOf = new Map<string, TrendPoint[]>();
+    for (const r of byTag(evidence, kind)) {
+      const points = trend(evidence, sources, r.tag);
+      pointsOf.set(r.tag, points);
+      changeOf.set(r.tag, points.length > 1 ? points[points.length - 1]!.median - points[0]!.median : null);
+    }
+    const { col, asc } = state.tagSort;
+    const dir = asc ? 1 : -1;
+    const rows = byTag(evidence, kind).sort((a, b) => {
+      if (col === 'tag') return dir * label(a.tag).localeCompare(label(b.tag));
+      if (col === 'evidence') return dir * (a.questions - b.questions) || a.mean - b.mean;
+      if (col === 'change') {
+        const x = changeOf.get(a.tag) ?? null;
+        const y = changeOf.get(b.tag) ?? null;
+        return (x === null ? 1 : 0) - (y === null ? 1 : 0) || dir * ((x ?? 0) - (y ?? 0));
+      }
+      return dir * (a.mean - b.mean) || label(a.tag).localeCompare(label(b.tag));
+    });
     const table = el('table', 'mb-grid__table mb-patterns__table');
     const head = el('tr');
-    for (const h of ['Tag', 'Now', 'Change', 'Trend', 'Evidence', 'Groups']) {
+    const sortBy = (c: DetailState['tagSort']['col']) => () => {
+      state.tagSort = { col: c, asc: state.tagSort.col === c ? !state.tagSort.asc : true };
+      paint();
+    };
+    head.append(
+      sortHeading('Tag', col === 'tag', asc, sortBy('tag')),
+      sortHeading('Now', col === 'now', asc, sortBy('now')),
+      sortHeading('Change', col === 'change', asc, sortBy('change'))
+    );
+    for (const h of ['Trend']) {
       const th = el('th', undefined, h);
       th.scope = 'col';
       head.append(th);
     }
+    head.append(sortHeading('Evidence', col === 'evidence', asc, sortBy('evidence')));
+    const groupsHead = el('th', undefined, 'Groups');
+    groupsHead.scope = 'col';
+    head.append(groupsHead);
     table.append(head);
     /** The group button whose students are listed under its row; pressing it again closes the list. */
     let openGroup: HTMLButtonElement | null = null;
@@ -123,8 +181,8 @@ export function renderPatterns(view: MarkbookView, students: RosterStudent[], ct
       openGroup = null;
     };
     for (const r of rows) {
-      const points = trend(evidence, sources, r.tag);
-      const change = points.length > 1 ? points[points.length - 1]!.median - points[0]!.median : null;
+      const points = pointsOf.get(r.tag) ?? [];
+      const change = changeOf.get(r.tag) ?? null;
       const tr = el('tr');
       const groups = el('td', 'mb-patterns__groups');
       for (const band of ['weak', 'developing', 'secure'] as StudentBand[]) {
@@ -174,7 +232,7 @@ export function renderPatterns(view: MarkbookView, students: RosterStudent[], ct
     }
     const wrap = el('div', 'mb-grid');
     wrap.append(table);
-    tagsHost.replaceChildren(sectionHead('Tags', kinds.length > 1 ? tagSwitch(kinds, kind, (k) => { kind = k; paint(); }) : undefined), rows.length ? wrap : el('p', 'mb__empty', 'No tagged marks yet.'));
+    tagsHost.replaceChildren(sectionHead('Tags', kinds.length > 1 ? tagSwitch(kinds, kind, (k) => { kind = k; state.kind = k; paint(); }) : undefined), rows.length ? wrap : el('p', 'mb__empty', 'No tagged marks yet.'));
     if (!rows.length) {
       heatHost.replaceChildren();
       return;
@@ -182,16 +240,28 @@ export function renderPatterns(view: MarkbookView, students: RosterStudent[], ct
 
     const heat = el('table', 'mb-grid__table mb-patterns__heatmap');
     const hr = el('tr');
-    const corner = el('th', 'mb-grid__student', 'Student');
-    corner.scope = 'col';
+    const meanOf = (studentId: string, tag: string): { mean: number; items: Evidence[] } | null => {
+      const mine = evidence.filter((e) => e.student === studentId && e.tags.includes(tag) && e.share !== null);
+      return mine.length ? { mean: mine.reduce((a, e) => a + (e.share as number), 0) / mine.length, items: mine } : null;
+    };
+    const heatSort = state.heatSort.tag && rows.some((r) => r.tag === state.heatSort.tag) ? state.heatSort : { tag: null, asc: state.heatSort.tag ? true : state.heatSort.asc };
+    const sortHeat = (tag: string | null) => () => {
+      state.heatSort = { tag, asc: state.heatSort.tag === tag ? !state.heatSort.asc : true };
+      paint();
+    };
+    const corner = sortHeading('Student', heatSort.tag === null, heatSort.asc, sortHeat(null));
+    corner.classList.add('mb-grid__student');
     hr.append(corner);
-    for (const r of rows) {
-      const th = el('th', undefined, label(r.tag));
-      th.scope = 'col';
-      hr.append(th);
-    }
+    for (const r of rows) hr.append(sortHeading(label(r.tag), heatSort.tag === r.tag, heatSort.asc, sortHeat(r.tag)));
     heat.append(hr);
-    for (const s of students) {
+    const hdir = heatSort.asc ? 1 : -1;
+    const ordered = [...students].sort((a, b) => {
+      if (heatSort.tag === null) return hdir * a.name.localeCompare(b.name);
+      const x = meanOf(a.id, heatSort.tag)?.mean ?? null;
+      const y = meanOf(b.id, heatSort.tag)?.mean ?? null;
+      return (x === null ? 1 : 0) - (y === null ? 1 : 0) || hdir * ((x ?? 0) - (y ?? 0)) || a.name.localeCompare(b.name);
+    });
+    for (const s of ordered) {
       const tr = el('tr');
       const name = el('th', 'mb-grid__student');
       name.scope = 'row';
@@ -202,10 +272,10 @@ export function renderPatterns(view: MarkbookView, students: RosterStudent[], ct
       name.append(nb);
       tr.append(name);
       for (const r of rows) {
-        const mine = evidence.filter((e) => e.student === s.id && e.tags.includes(r.tag) && e.share !== null);
+        const found = meanOf(s.id, r.tag);
         const td = el('td');
-        if (mine.length) {
-          const mean = mine.reduce((a, e) => a + (e.share as number), 0) / mine.length;
+        if (found) {
+          const { mean, items: mine } = found;
           const b = el('button', `mb-patterns__cell mb-band--${band4(mean * 100)}`, String(Math.round(mean * 100)));
           b.type = 'button';
           b.dataset.student = s.id;

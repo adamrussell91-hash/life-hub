@@ -41,9 +41,9 @@ async function openPatterns(view: MarkbookView) {
   const host = document.createElement('div');
   document.body.append(host);
   const api = { load: vi.fn(async () => structuredClone(view)) } as unknown as MarkbookApi;
-  mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03' });
+  mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'grid' });
   await vi.waitFor(() => expect(host.querySelector('.mb-grid')).not.toBeNull());
-  host.querySelector<HTMLButtonElement>('.mb__toggle')!.click();
+  host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="detail"]')!.click();
   await vi.waitFor(() => expect(host.querySelector('.mb-patterns')).not.toBeNull());
   return host;
 }

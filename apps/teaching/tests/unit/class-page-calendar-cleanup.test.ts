@@ -127,6 +127,7 @@ describe('class page calendar cleanup', () => {
         const ok = (data: unknown) =>
           ({ ok: true, status: 200, json: async () => ({ ok: true, data }) }) as Response;
         if (path.includes('/api/curriculum')) return ok(curriculumWithTrashedUnit());
+        if (path.includes('/markbook')) return ok({ markbook: { columns: [], hidden_quizzes: [], marks: {}, updated_at: '' }, students: [], quizzes: [] });
         if (path.includes('/api/calendar-ghosts')) {
           return { ok: true, status: 200, json: async () => ({ ghosts: [] }) } as Response;
         }

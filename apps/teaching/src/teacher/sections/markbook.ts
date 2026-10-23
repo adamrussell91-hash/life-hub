@@ -16,12 +16,13 @@ import { assessments, formatPercent, markOf, overallFor, removedStudentIds, rowS
 import { renderGrid } from '@/markbook/grid';
 import { openColumnForm } from '@/markbook/column-form';
 import { openAssessmentPanel } from '@/markbook/assessment-panel';
-import { renderPatterns } from '@/markbook/patterns-view';
+import { newDetailState, renderPatterns } from '@/markbook/patterns-view';
+import { newNextState, renderNextSteps } from '@/markbook/next-view';
 import { openStudentPanel, type StudentPanelHandle } from '@/markbook/student-panel';
 import { loadInsightContext, codeLabel, type InsightContext } from '@/evidence/context';
-import { markbookEvidence } from '@/evidence/markbook-evidence';
+import { classEvidence } from '@/evidence/class-evidence';
 import { defaultKind } from '@/evidence/patterns';
-import { expandTags, tagLabel } from '@/evidence/tags';
+import { tagLabel } from '@/evidence/tags';
 import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
 import { renderPhone, type PhoneControl } from '@/markbook/phone';
 import { csvFileName, markbookCsv } from '@/markbook/csv';
@@ -39,7 +40,12 @@ type Options = {
   narrow?: () => boolean;
   /** Test seam for today's date, YYYY-MM-DD. */
   today?: () => string;
+  /** The view the markbook opens on. Defaults to Next steps. */
+  view?: Mode;
 };
+
+type Mode = 'next' | 'grid' | 'detail';
+const MODES: Array<[Mode, string]> = [['next', 'Next steps'], ['grid', 'Grid'], ['detail', 'Detail']];
 
 
 /** A local change still waiting for the server, re-applied after a reload. */
@@ -56,12 +62,12 @@ function latestQuizFor(view: MarkbookView, tag: string, evidence: Evidence[]): s
   return quizzes[0]?.lesson_id ?? null;
 }
 
-/** Whether a hidden quiz holds evidence on this tag: the Patterns view leaves hidden quizzes out. */
+/** Whether a hidden quiz holds evidence on this tag: Next steps and Detail leave hidden quizzes out. */
 function hiddenQuizzesHave(view: MarkbookView, tag: string, context: InsightContext): boolean {
   const hidden = view.quizzes.filter((q) => q.hidden).map((q) => ({ ...q, hidden: false }));
   if (!hidden.length) return false;
   const only: MarkbookView = { ...view, quizzes: hidden, markbook: { ...view.markbook, columns: [] } };
-  return expandTags(markbookEvidence(only, context.outcomes).evidence, context.table).some((e) => e.tags.includes(tag));
+  return classEvidence(only, context).evidence.some((e) => e.tags.includes(tag));
 }
 
 function applyChange(view: MarkbookView, change: Change): MarkbookView {
@@ -99,10 +105,13 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   let view: MarkbookView | null = null;
   /** The last view the server confirmed, with no local changes on it. */
   let confirmed: MarkbookView | null = null;
-  let mode: 'grid' | 'patterns' = 'grid';
-  /** Names for tags and codes, for Patterns and the student panel; loaded once, after the markbook. */
+  let mode: Mode = options.view ?? 'next';
+  /** Sort orders and open rows, kept across redraws. */
+  const nextState = newNextState();
+  const detailState = newDetailState();
+  /** Names for tags and codes, for Next steps, Detail and the student panel; loaded once, after the markbook. */
   let ctx: InsightContext | null = null;
-  /** Set when the tag names could not be loaded, so Patterns and the student panel say so. */
+  /** Set when the tag names could not be loaded, so those views and the student panel say so. */
   let ctxError: string | null = null;
   /** A student whose name was pressed before the tag names arrived; their panel opens once they do. */
   let pendingStudent: string | null = null;
@@ -130,8 +139,20 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   title.id = `mb-${cls.id}`;
   title.tabIndex = -1;
   const tools = el('div', 'mb__tools');
-  const toggle = el('button', 'btn btn--secondary mb__toggle', 'Patterns');
-  toggle.type = 'button';
+  const modes = el('div', 'mb__modes');
+  modes.setAttribute('role', 'group');
+  modes.setAttribute('aria-label', 'Markbook view');
+  for (const [value, text] of MODES) {
+    const b = el('button', 'btn btn--secondary mb__mode', text);
+    b.type = 'button';
+    b.dataset.mode = value;
+    b.addEventListener('click', () => {
+      mode = value;
+      paint();
+      b.focus();
+    });
+    modes.append(b);
+  }
   const hiddenToggle = el('button', 'btn btn--secondary mb__hidden-toggle');
   hiddenToggle.type = 'button';
   hiddenToggle.hidden = true;
@@ -163,8 +184,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     // Safari reads the file after the click returns; a slow download needs the URL a while longer.
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
   });
-  tools.append(addGroup, toggle, hiddenToggle, removedToggle, exportButton);
-  head.append(title, tools);
+  tools.append(addGroup, hiddenToggle, removedToggle, exportButton);
+  head.append(title, modes, tools);
   const hiddenList = el('ul', 'mb__hidden-list');
   hiddenList.id = `mb-hidden-${cls.id}`;
   hiddenList.hidden = true;
@@ -312,7 +333,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
         return;
       }
       const context = ctx;
-      const evidence = expandTags(markbookEvidence(view, context.outcomes).evidence, context.table);
+      const { evidence } = classEvidence(view, context);
       const pinsNow = () => view?.markbook.focus?.[studentId] ?? { pinned: [], dismissed: [] };
       studentPanel = openStudentPanel({
         student,
@@ -412,7 +433,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     const total = weightTotal(current.markbook);
     warning.hidden = total === 100 || assessments(current.markbook).length === 0;
     warning.textContent = `Assessment weights add to ${total}%, not 100%.`;
-    toggle.setAttribute('aria-pressed', String(mode === 'patterns'));
+    for (const b of modes.querySelectorAll<HTMLButtonElement>('.mb__mode')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
     removedToggle.hidden = removedStudentIds(current).length === 0;
     removedToggle.textContent = showRemoved ? 'Hide removed students' : 'Show removed students';
     paintHidden(current);
@@ -421,45 +442,22 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       return;
     }
     const students = rowStudents(current, showRemoved);
-    if (mode === 'patterns') {
+    if (mode !== 'grid') {
       const context = ctx;
-      body.replaceChildren(
-        context
-          ? renderPatterns(current, students, context, {
-              openStudent: actions.openStudent,
-              followUp: (tag, ids, evidence) => {
-                const lessonId = latestQuizFor(current, tag, evidence);
-                const quiz = current.quizzes.find((q) => q.lesson_id === lessonId);
-                if (!quiz) {
-                  status.textContent = hiddenQuizzesHave(current, tag, context)
-                    ? 'This tag’s quizzes are hidden in the markbook.'
-                    : 'Follow-ups start from a quiz; this tag only has assessment marks.';
-                  return;
-                }
-                if (!quiz.unit_id) {
-                  status.textContent = FOLLOW_UP.noUnit;
-                  return;
-                }
-                status.textContent = '';
-                // Only students still on the list; a removed student can sit in a group while they are shown.
-                const listed = new Set(current.students.map((s) => s.id));
-                openFollowUpPlan({
-                  sourceLessonId: quiz.lesson_id,
-                  sourceTitle: quiz.title,
-                  unitId: quiz.unit_id,
-                  flagId: null,
-                  tag,
-                  students: current.students,
-                  chosen: ids.filter((id) => listed.has(id)),
-                  evidence,
-                  label: (t) => tagLabel(t, context),
-                  codeLabel: (id) => codeLabel(id, context.codes),
-                  onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
-                });
-              }
-            })
-          : el('p', 'mb__status', ctxError ?? 'Loading patterns…')
-      );
+      if (!context) body.replaceChildren(el('p', 'mb__status', ctxError ?? 'Loading…'));
+      else if (mode === 'next')
+        body.replaceChildren(
+          renderNextSteps(current, students, context, nextState, {
+            openStudent: actions.openStudent,
+            followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence),
+            pins: (id) => current.markbook.focus?.[id] ?? { pinned: [], dismissed: [] },
+            repaint: paint
+          })
+        );
+      else
+        body.replaceChildren(
+          renderPatterns(current, students, context, { openStudent: actions.openStudent, followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence) }, detailState)
+        );
     }
     else if (narrow()) {
       const found = students.findIndex((s) => s.id === phoneStudentId);
@@ -481,6 +479,38 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     restoreFocus(key);
   }
 
+  /** Ann's follow-up quiz for `ids` on `tag`, placed after the latest shown quiz with evidence on it. */
+  function followUp(current: MarkbookView, context: InsightContext, tag: string, ids: string[], evidence: Evidence[]): void {
+    const lessonId = latestQuizFor(current, tag, evidence);
+    const quiz = current.quizzes.find((q) => q.lesson_id === lessonId);
+    if (!quiz) {
+      status.textContent = hiddenQuizzesHave(current, tag, context)
+        ? 'This tag’s quizzes are hidden in the markbook.'
+        : 'Follow-ups start from a quiz; this tag only has assessment marks.';
+      return;
+    }
+    if (!quiz.unit_id) {
+      status.textContent = FOLLOW_UP.noUnit;
+      return;
+    }
+    status.textContent = '';
+    // Only students still on the list; a removed student can sit in a group while they are shown.
+    const listed = new Set(current.students.map((s) => s.id));
+    openFollowUpPlan({
+      sourceLessonId: quiz.lesson_id,
+      sourceTitle: quiz.title,
+      unitId: quiz.unit_id,
+      flagId: null,
+      tag,
+      students: current.students,
+      chosen: ids.filter((id) => listed.has(id)),
+      evidence,
+      label: (t) => tagLabel(t, context),
+      codeLabel: (id) => codeLabel(id, context.codes),
+      onDone: (id) => navigate(`/lessons/${encodeURIComponent(id)}`)
+    });
+  }
+
   /** Fetches a fresh view; changes still queued are laid over it. Says whether the server answered. */
   async function load(repaint = true): Promise<boolean> {
     if (disposed) return false;
@@ -497,10 +527,6 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     }
   }
 
-  toggle.addEventListener('click', () => {
-    mode = mode === 'grid' ? 'patterns' : 'grid';
-    paint();
-  });
   hiddenToggle.addEventListener('click', () => {
     showHiddenList = !showHiddenList;
     paint();
@@ -518,7 +544,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     (loaded) => {
       if (disposed) return;
       ctx = { ...loaded, outcomes: options.outcomes ?? loaded.outcomes };
-      if (mode === 'patterns') paint();
+      if (mode !== 'grid') paint();
       const waiting = pendingStudent;
       pendingStudent = null;
       if (waiting) {
@@ -528,10 +554,10 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
     },
     () => {
       if (disposed) return;
-      ctxError = 'Couldn’t load the tag names, so Patterns and student panels can’t open. Reload to try again.';
+      ctxError = 'Couldn’t load the tag names, so Next steps, Detail and student panels can’t open. Reload to try again.';
       pendingStudent = null;
       status.textContent = ctxError;
-      if (mode === 'patterns') paint();
+      if (mode !== 'grid') paint();
     }
   );
   return () => {
