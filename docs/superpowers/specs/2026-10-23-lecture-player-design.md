@@ -1,7 +1,7 @@
 # Lecture player — design
 
 Date: 23 October 2026
-Status: design approved in chat, awaiting spec review
+Status: approved. The implementation plan (`docs/superpowers/plans/2026-10-23-lecture-player.md`) lists ten changes found while mapping the code. The main ones: quiz questions can't be gates, the hinge question gets a self-paced mode, a side path is a section placed right after its gate, resume is per device, and Finish is saved in progress rather than in the markbook.
 
 ## Problem
 
