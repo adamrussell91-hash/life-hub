@@ -81,13 +81,20 @@ export function act(state: LectureState, scenes: readonly LectureScene[], action
     case 'next':
       return goTo(state, scenes, state.scene + 1);
     case 'finish':
-      return { ...state, finished: true };
+      // Opens the recap only; the recap's Finish button marks the lecture finished.
+      return state;
     case 'tick':
       return { ...state, ticked: add(state.ticked, action.noteId) };
     case 'detour':
       return { ...state, detour: action.gateId, detoured: add(state.detoured, action.gateId) };
-    case 'return':
-      return { ...state, detour: null };
+    case 'return': {
+      // Nothing left after the gate: carry straight on to the next scene.
+      const scene = scenes[state.scene];
+      const gateLast = !!scene && scene.beats[scene.beats.length - 1]?.block.id === state.detour;
+      const back = { ...state, detour: null };
+      if (gateLast && state.shown >= scene.beats.length && state.scene < scenes.length - 1) return goTo(back, scenes, state.scene + 1);
+      return back;
+    }
     case 'wait':
       return state;
   }
