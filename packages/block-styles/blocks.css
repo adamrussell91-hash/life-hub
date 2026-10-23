@@ -2338,6 +2338,15 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
   flex: 1 1 auto;
   min-width: 0;
 }
+@media (max-width: 600px) {
+  .lesson-page__meta {
+    flex-wrap: wrap;
+  }
+
+  .lesson-page__meta-outcomes {
+    flex-basis: 100%;
+  }
+}
 .lesson-page__meta .outcome-strip {
   display: contents;
 }

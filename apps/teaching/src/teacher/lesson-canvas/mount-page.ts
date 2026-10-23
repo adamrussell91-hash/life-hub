@@ -35,6 +35,7 @@ import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountLineChips } from '@/network/line-chips';
 import { mountLessonFlow, type FlowPeer } from '@/network/lesson-flow';
 import { mountLessonDotPoints } from '@/alignment/lesson-dot-points';
+import { autoLineIds, syncAutoStops } from '@/alignment/auto-lines';
 import { revealBlockFromHash } from '@/app/block-hash';
 import type { NetworkLine } from '@/schemas/block';
 import {
@@ -1149,7 +1150,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     ? mountLineChips(stripHost, {
         lines: networkLines,
         stops: lesson.line_stops,
-        onChange: (stops) => emitLesson({ ...lesson, line_stops: stops })
+        off: lesson.line_off,
+        onChange: (stops, off) => emitLesson({ ...lesson, line_stops: stops, line_off: off })
       })
     : null;
 
@@ -1172,7 +1174,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     ? mountLessonDotPoints(stripHost, {
         dotPoints: lesson.dot_points,
         ...options.dotPoints,
-        onChange: (refs) => emitLesson({ ...lesson, dot_points: refs })
+        // The dot points carry the lesson's lines; hand-set stops and lines taken off stay as they are.
+        onChange: (refs, ctx) => {
+          const stops = syncAutoStops(lesson.line_stops, lesson.line_off, autoLineIds(networkLines, ctx, refs));
+          emitLesson({ ...lesson, dot_points: refs, line_stops: stops });
+          lineChips?.update(stops, lesson.line_off);
+        }
       })
     : null;
 
@@ -1197,7 +1204,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       canvas.update(lesson.blocks, media);
       pulseSummary.refresh();
       strip?.update({ attached: lesson, catalog: options.outcomesCatalog ?? [] });
-      lineChips?.update(lesson.line_stops);
+      lineChips?.update(lesson.line_stops, lesson.line_off);
     },
     insertType(type: InsertMenuValue) {
       canvas.insertType(type);

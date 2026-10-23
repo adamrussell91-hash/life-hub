@@ -254,6 +254,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
       // Saves merge into the stored lesson, so clearing sends an empty list.
       if (next.line_stops) lesson.line_stops = next.line_stops;
+      if (next.line_off) lesson.line_off = next.line_off;
       // null (follow unit order) is saved as null so the merge clears the old list.
       if (next.after_lesson_ids !== undefined) lesson.after_lesson_ids = next.after_lesson_ids;
       if (next.lesson_kind) lesson.lesson_kind = next.lesson_kind;

@@ -12,15 +12,17 @@ import { lineColour } from '@/network/colour';
 import { drawNetwork, measureStations, networkLegend } from '@/network/draw';
 import { chooseNetworkOrientation, layoutNetwork, liveNudges } from '@/network/layout';
 import { el, ghostButton, mountLinesEditor, networkId, selectOf, textInput } from '@/network/lines-editor';
-import { LEVEL_ORDER, MODE_LABEL, convertV1, orderLines, orderStations, type NetLesson } from '@/network/model';
+import { MODE_LABEL, convertV1, orderLines, orderStations, placeByDate, type NetLesson } from '@/network/model';
+import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 import { unitNetworkInput } from './render';
 import { loadAlignment } from '@/alignment/coverage-panel';
 import { focusAreaFor } from '@/alignment/coverage';
+import { toggleLineStop } from '@/alignment/auto-lines';
 
 /** What the unit page gives the editor: the network, plus how to save the parts that live elsewhere. */
 export type UnitNetworkEditorContext = UnitNetworkContext & {
   saveLines?: (lines: NetworkLine[]) => Promise<void>;
-  saveLessonStops?: (lessonId: string, stops: LineStop[]) => Promise<void>;
+  saveLessonStops?: (lessonId: string, stops: LineStop[], off: string[]) => Promise<void>;
   /** The blocks of one lesson, for stops that point at an activity. */
   lessonBlocks?: (lessonId: string) => Promise<Array<{ id: string; label: string }>>;
 };
@@ -65,10 +67,17 @@ export function createCurriculumLinesEditor(
   const root = el('div', 'cl-editor');
   const blockCache = new Map<string, Promise<Array<{ id: string; label: string }>>>();
 
-  const network = (): UnitNetworkContext => ({ lines, lessons, ...(context?.bands ? { bands: context.bands } : {}) });
+  const dates = context?.dates;
+  const network = (): UnitNetworkContext => ({
+    lines,
+    lessons,
+    ...(context?.bands ? { bands: context.bands } : {}),
+    ...(dates ? { dates } : {})
+  });
   const v2 = (): CurriculumLinesV2Content => current.content as CurriculumLinesV2Content;
   /** The unit's lessons in this map's station order, shown or not. */
-  const mapLessons = (): NetLesson[] => orderStations(lessons, isCurriculumLinesV2(current.content) ? v2().station_order : undefined);
+  const mapLessons = (): NetLesson[] =>
+    placeByDate(orderStations(lessons, isCurriculumLinesV2(current.content) ? v2().station_order : undefined), dates);
   const emit = (content: CurriculumLinesBlock['content']) => {
     current = { ...current, content };
     onChange(current);
@@ -136,7 +145,9 @@ export function createCurriculumLinesEditor(
       const out = convertV1(current.content, lines, lessons, current.id);
       try {
         if (out.added.length) await context.saveLines(out.lines);
-        for (const [lessonId, stops] of out.lessonStops) await context.saveLessonStops(lessonId, stops);
+        for (const [lessonId, stops] of out.lessonStops) {
+          await context.saveLessonStops(lessonId, stops, [...(lessons.find((l) => l.id === lessonId)?.line_off ?? [])]);
+        }
       } catch {
         go.disabled = false;
         status.textContent = 'Could not upgrade. Try again; the map itself has not changed.';
@@ -210,7 +221,7 @@ export function createCurriculumLinesEditor(
 
   /* Which lines each lesson serves (saved on the lesson). */
   function stopsSection(): HTMLElement {
-    const s = section('Stations', 'Each lesson is a station. Move it up or down to change its place on this map, or untick it to leave it off. Tap a line to say the lesson serves it; tap again to step the depth (introduced, reinforced, mastered), then off. The lesson’s settings show the same line chips.');
+    const s = section('Stations', `Each lesson is a station.${dates?.size ? ' A lesson with a class date sits in date order: change its date in the calendar to move it. Move the others up or down to place them,' : ' Move it up or down to change its place on this map,'} or untick it to leave it off. Tap a line to say the lesson serves it; tap again to step the depth (introduced, reinforced, mastered), then off. The lesson’s settings show the same line chips. Stops set from a lesson’s dot points come and go with them.`);
     if (!lessons.length) {
       s.append(el('p', 'cl-editor__hint', 'Add lessons to this unit first.'));
       return s;
@@ -244,12 +255,15 @@ export function createCurriculumLinesEditor(
         const next = ordered.map((l) => l.id).filter((id) => (id === lesson.id ? !shown.checked : hidden.has(id)));
         commit({ hidden_lessons: next.length ? next : undefined });
       });
+      const when = dates?.get(lesson.id);
       const up = ghostButton('↑', () => move(ordered, index, -1), `Move ${name} up`);
-      up.disabled = index === 0;
+      up.disabled = index === 0 || Boolean(when);
       const down = ghostButton('↓', () => move(ordered, index, 1), `Move ${name} down`);
-      down.disabled = index === ordered.length - 1;
+      down.disabled = index === ordered.length - 1 || Boolean(when);
       place.append(shown, up, down);
-      tr.append(place, el('th', undefined, name));
+      const th = el('th', undefined, name);
+      if (when) th.append(el('span', 'cl-editor__date', formatDisplayDate(when.slice(0, 10))));
+      tr.append(place, th);
       for (const line of lines) {
         const stop = lesson.line_stops?.find((x) => x.line_id === line.id);
         const td = el('td');
@@ -282,24 +296,13 @@ export function createCurriculumLinesEditor(
   async function cycle(lessonId: string, line: NetworkLine): Promise<void> {
     const lesson = lessons.find((l) => l.id === lessonId);
     if (!lesson || !context?.saveLessonStops) return;
-    const list = [...(lesson.line_stops ?? [])];
-    const at = list.findIndex((x) => x.line_id === line.id);
-    if (line.mode === 'light_rail') {
-      if (at < 0) list.push({ line_id: line.id });
-      else list.splice(at, 1);
-    } else if (at < 0) {
-      list.push({ line_id: line.id, level: 'introduced' });
-    } else {
-      const next = LEVEL_ORDER[LEVEL_ORDER.indexOf(list[at]!.level ?? 'reinforced') + 1];
-      if (next) list[at] = { line_id: line.id, level: next };
-      else list.splice(at, 1);
-    }
+    const next = toggleLineStop(lesson.line_stops, lesson.line_off, line);
     const before = lessons;
-    lessons = lessons.map((l) => (l.id === lessonId ? { ...l, line_stops: list } : l));
+    lessons = lessons.map((l) => (l.id === lessonId ? { ...l, line_stops: next.stops, line_off: next.off } : l));
     paintStops();
     paintPreview();
     try {
-      await context.saveLessonStops(lessonId, list.slice(0, 16));
+      await context.saveLessonStops(lessonId, next.stops, next.off);
     } catch {
       lessons = before;
       paintStops();

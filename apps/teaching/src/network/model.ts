@@ -16,6 +16,8 @@ export type NetLesson = {
   title: string;
   href?: string;
   line_stops?: readonly LineStop[];
+  /** Lines taken off by hand that the dot points would add. */
+  line_off?: readonly string[];
   /** Lessons after this one; unset follows the map's order. */
   after?: readonly string[];
   kind?: LessonKind;
@@ -83,19 +85,44 @@ export function orderStations<T extends { id: string }>(lessons: readonly T[], o
 }
 
 /**
+ * Lessons with a calendar date sit in date order. A lesson with no date (an
+ * extension, a skills lesson not yet timetabled) stays after the lesson it
+ * follows and moves with it; any before the first dated lesson stay first.
+ * Same-day lessons keep the order they had. `dates` sort as text
+ * ("2026-10-27T09:00").
+ */
+export function placeByDate<T extends { id: string }>(ordered: readonly T[], dates: ReadonlyMap<string, string> | undefined): T[] {
+  if (!dates?.size) return [...ordered];
+  const lead: T[] = [];
+  const groups: Array<{ when: string; at: number; lessons: T[] }> = [];
+  ordered.forEach((lesson, at) => {
+    const when = dates.get(lesson.id);
+    if (when !== undefined) groups.push({ when, at, lessons: [lesson] });
+    else (groups[groups.length - 1]?.lessons ?? lead).push(lesson);
+  });
+  groups.sort((a, b) => a.when.localeCompare(b.when) || a.at - b.at);
+  return [...lead, ...groups.flatMap((g) => g.lessons)];
+}
+
+/** "Wk 3" → 3. */
+const weekOf = (band: string): number => Number(/\d+/.exec(band)?.[0] ?? NaN);
+
+/**
  * The unit map's input. `lessons` is the unit's lessons in order, already
- * limited to what the viewer may see; `bands` names each lesson's week.
+ * limited to what the viewer may see; `bands` names each lesson's week and
+ * `dates` (teacher pages) places dated lessons by the calendar.
  */
 export function buildUnitNetwork(
   content: CurriculumLinesV2Content,
   subjectLines: readonly NetworkLine[],
   lessons: readonly NetLesson[],
-  bands?: ReadonlyMap<string, string>
+  bands?: ReadonlyMap<string, string>,
+  dates?: ReadonlyMap<string, string>
 ): NetInput {
   const lines = new Map(subjectLines.map((l) => [l.id, l]));
   const byId = new Map(lessons.map((l) => [l.id, l]));
   const hidden = new Set(content.hidden_lessons ?? []);
-  const ordered = orderStations(lessons, content.station_order);
+  const ordered = placeByDate(orderStations(lessons, content.station_order), dates);
   // Rows run in the flow's order: a branch at a time, splits where a lesson offers a choice.
   const flow = buildFlow(ordered.map((l) => ({ id: l.id, ...(l.after ? { after: l.after } : {}) })), {
     hidden,
@@ -111,11 +138,14 @@ export function buildUnitNetwork(
   }
   // A stop whose lesson left the unit falls to the end rather than vanishing.
   const afterRow = (id: string | undefined) => (id === undefined ? -1 : rowIndex.get(id) ?? shown.length - 1);
+  // Week bands only help when the rows run through the weeks in order (a split can double back).
+  const weeks = shown.map((l) => bands?.get(l.id)).filter((b): b is string => Boolean(b)).map(weekOf);
+  const useBands = weeks.every((w, i) => i === 0 || w >= weeks[i - 1]!);
   const rows: NetRow[] = shown.map((lesson) => ({
     id: lesson.id,
     target: { text: lesson.title || 'Untitled lesson', ...(lesson.href ? { href: lesson.href } : {}) },
     stops: stopsFor(lesson.line_stops, lines),
-    ...(bands?.get(lesson.id) ? { band: bands.get(lesson.id) } : {})
+    ...(useBands && bands?.get(lesson.id) ? { band: bands.get(lesson.id) } : {})
   }));
   const t = content.terminus;
   return {
