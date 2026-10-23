@@ -15,8 +15,12 @@ export type LessonDotPointsOptions = {
   focusArea?: string;
   /** Where the full wording of what the chosen points ask for goes, to plan activities against. */
   planHost?: HTMLElement;
-  /** The chosen point ids and outcomes they reach, after each paint, for a summary. */
-  onPaint?: (summary: { points: string[]; outcomes: number[] }) => void;
+  /** Plan items already covered by this lesson's activities ("outcome:3", "concept:PER2"). */
+  covered?: readonly string[];
+  /** A plan item ticked or unticked; the whole list. */
+  onCovered?: (covered: string[]) => void;
+  /** The chosen point ids, outcomes they reach and plan items ticked, after each paint, for a summary. */
+  onPaint?: (summary: { points: string[]; outcomes: number[]; plan: { done: number; total: number } }) => void;
   /** With the alignment the points were read against, so the page can set the lesson's lines. */
   onChange: (dotPoints: string[], ctx: AutoLineContext) => void;
 };
@@ -36,8 +40,9 @@ const GROUPS = [['U', 'Understanding'], ['R', 'Responding']] as const;
  * bullets, learning processes, thinking skills) follows from the alignment,
  * in full and tagged with the points it comes from, into the plan host.
  */
-export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPointsOptions): { update(dotPoints: readonly string[] | undefined): void; dispose(): void } {
+export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPointsOptions): { update(dotPoints: readonly string[] | undefined, covered?: readonly string[]): void; dispose(): void } {
   let chosen = [...(options.dotPoints ?? [])];
+  let covered = new Set(options.covered ?? []);
   let doc: Alignment | null = null;
   let skills: SkillsContinuum | null = null;
   let area: { id: string; name: string } | null = null;
@@ -127,26 +132,54 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     root.replaceChildren(...(list.childElementCount ? [list] : []), add);
     root.hidden = false;
     const picked = chosen.map(pointFor).filter((p): p is AlignmentPoint => Boolean(p));
-    paintPlan(picked);
-    options.onPaint?.({ points: picked.map((p) => p.id), outcomes: [...new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)))].sort((a, b) => a - b) });
+    const plan = paintPlan(picked);
+    options.onPaint?.({ points: picked.map((p) => p.id), outcomes: [...new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)))].sort((a, b) => a - b), plan });
   }
 
-  /** Each thing the chosen points ask for, in full, with the points it comes from. Concepts are the core links only, as on the map. */
-  function paintPlan(picked: AlignmentPoint[]): void {
+  /** A tick for one plan item; ticking saves the lesson's covered list. */
+  function tick(key: string, label: string): HTMLInputElement {
+    const box = el('input', 'dots-plan__tick');
+    box.type = 'checkbox';
+    box.checked = covered.has(key);
+    box.dataset.key = key;
+    box.setAttribute('aria-label', `${label}: covered by an activity`);
+    box.addEventListener('change', () => {
+      if (box.checked) covered.add(key);
+      else covered.delete(key);
+      options.onCovered?.([...covered]);
+      paint();
+      options.planHost?.querySelector<HTMLInputElement>(`.dots-plan__tick[data-key="${key}"]`)?.focus();
+    });
+    return box;
+  }
+
+  /**
+   * Each thing the chosen points ask for, in full, with the points it comes
+   * from and a tick for when an activity covers it. Concepts are the core
+   * links only, as on the map, ticked bullet by bullet.
+   */
+  function paintPlan(picked: AlignmentPoint[]): { done: number; total: number } {
     const host = options.planHost;
-    if (!host || !doc) return;
+    const keys: string[] = [];
+    if (!host || !doc) return { done: 0, total: 0 };
     host.replaceChildren();
-    if (!picked.length) return;
+    if (!picked.length) return { done: 0, total: 0 };
     const from = (has: (p: AlignmentPoint) => boolean) => picked.filter(has).map((p) => p.id);
     const grid = el('div', 'dots-plan');
-    const column = (label: string, items: Array<{ name: string; text?: string; bullets?: string[]; from: string[] }>) => {
+    type Item = { key?: string; name: string; text?: string; bullets?: Array<{ key: string; text: string }>; from: string[] };
+    const column = (label: string, items: Item[]) => {
       if (!items.length) return;
       const col = el('section', 'dots-plan__col');
-      col.append(el('h5', 'dots-plan__head', label));
+      const own = items.flatMap((i) => (i.key ? [i.key] : (i.bullets ?? []).map((b) => b.key)));
+      keys.push(...own);
+      const head = el('h5', 'dots-plan__head', label);
+      head.append(el('span', 'dots-plan__count', `${own.filter((k) => covered.has(k)).length}/${own.length}`));
+      col.append(head);
       const ul = el('ul', 'dots-plan__items');
       for (const item of items) {
-        const li = el('li', 'dots-plan__item');
-        const top = el('div', 'dots-plan__top');
+        const li = el('li', `dots-plan__item${item.key && covered.has(item.key) ? ' dots-plan__item--done' : ''}`);
+        const top = el('label', 'dots-plan__top');
+        if (item.key) top.append(tick(item.key, item.name));
         top.append(el('span', 'dots-plan__name', item.name));
         const tags = el('span', 'dots-plan__from');
         tags.setAttribute('aria-label', `From ${item.from.join(', ')}`);
@@ -156,7 +189,13 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
         if (item.text) li.append(el('p', 'dots-plan__text', item.text));
         if (item.bullets?.length) {
           const bl = el('ul', 'dots-plan__bullets');
-          for (const b of item.bullets) bl.append(el('li', undefined, b));
+          for (const b of item.bullets) {
+            const row = el('li', `dots-plan__bullet${covered.has(b.key) ? ' dots-plan__item--done' : ''}`);
+            const lab = el('label', 'dots-plan__bullet-label');
+            lab.append(tick(b.key, `${item.name} bullet`), el('span', undefined, b.text));
+            row.append(lab);
+            bl.append(row);
+          }
           li.append(bl);
         }
         ul.append(li);
@@ -166,6 +205,7 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     };
     const outcomeNs = new Set(picked.flatMap((p) => p.outcomes.map((o) => o.n)));
     column('Outcomes', doc.outcomes.filter((o) => outcomeNs.has(o.n)).map((o) => ({
+      key: `outcome:${o.n}`,
       name: o.code,
       text: o.text,
       from: from((p) => p.outcomes.some((x) => x.n === o.n))
@@ -173,22 +213,25 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     const refs = new Set(picked.flatMap((p) => p.concepts.filter((c) => c.link === 'shared').map((c) => c.ref)));
     column('Concepts', doc.concepts.filter((c) => [...refs].some((r) => conceptKeyOf(r) === c.key)).map((c) => ({
       name: c.name,
-      bullets: c.bullets.filter((b) => refs.has(c.key + b.n)).map((b) => b.text),
+      bullets: c.bullets.filter((b) => refs.has(c.key + b.n)).map((b) => ({ key: `concept:${c.key}${b.n}`, text: b.text })),
       from: from((p) => p.concepts.some((x) => x.link === 'shared' && conceptKeyOf(x.ref) === c.key))
     })));
     const codes = new Set(picked.flatMap((p) => p.processes));
     column('Processes', doc.processes.filter((p) => codes.has(p.code)).map((proc) => ({
+      key: `process:${proc.code}`,
       name: proc.name,
       text: proc.text,
       from: from((p) => p.processes.includes(proc.code))
     })));
     const ids = new Set(picked.flatMap((p) => p.skills ?? []));
     column('Thinking skills', SKILLS.filter((k) => ids.has(k.id)).map((k) => ({
+      key: `skill:${k.id}`,
       name: k.name,
       text: k.description,
       from: from((p) => (p.skills ?? []).includes(k.id))
     })));
     host.append(grid);
+    return { done: keys.filter((k) => covered.has(k)).length, total: keys.length };
   }
 
   void Promise.all([loadAlignment(), loadSkills().catch((): SkillsContinuum | null => null)])
@@ -201,8 +244,9 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     .catch(() => { /* No alignment: nothing to tag. */ });
 
   return {
-    update(next) {
+    update(next, nextCovered) {
       chosen = [...(next ?? [])];
+      if (nextCovered) covered = new Set(nextCovered);
       paint();
     },
     dispose() {

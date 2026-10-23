@@ -32,14 +32,15 @@ export type LessonSyllabusCard = {
   outcomes: HTMLElement;
   plan: HTMLElement;
   /** The closed card's one-line summary. */
-  setSummary(next: { points?: string[]; lines?: NetworkLine[]; outcomes?: number[] }): void;
+  setSummary(next: { points?: string[]; lines?: NetworkLine[]; outcomes?: number[]; plan?: { done: number; total: number } }): void;
   dispose(): void;
 };
 
 /**
  * One card for what a lesson teaches in the syllabus: dot points, lines,
  * tagged outcomes, and what the dot points ask for (outcomes, concept
- * bullets, processes, thinking skills) in full, to plan activities against.
+ * bullets, processes, thinking skills) in full, each ticked off once an
+ * activity covers it.
  * Closed, it is a single summary row; open state is remembered.
  */
 export function mountLessonSyllabus(host: HTMLElement): LessonSyllabusCard {
@@ -87,7 +88,7 @@ export function mountLessonSyllabus(host: HTMLElement): LessonSyllabusCard {
   });
   setOpen(open);
 
-  let state: { points: string[]; lines: NetworkLine[]; outcomes: number[] } = { points: [], lines: [], outcomes: [] };
+  let state: { points: string[]; lines: NetworkLine[]; outcomes: number[]; plan: { done: number; total: number } } = { points: [], lines: [], outcomes: [], plan: { done: 0, total: 0 } };
   const paintSummary = () => {
     summary.replaceChildren();
     if (state.points.length) {
@@ -107,6 +108,10 @@ export function mountLessonSyllabus(host: HTMLElement): LessonSyllabusCard {
       summary.append(dashes);
     }
     if (state.outcomes.length) summary.append(el('span', 'lsyl__sum-text', `Outcomes ${state.outcomes.join(', ')}`));
+    if (state.plan.total) {
+      const done = state.plan.done === state.plan.total;
+      summary.append(el('span', `lsyl__sum-plan${done ? ' lsyl__sum-plan--done' : ''}`, `${done ? '✓ ' : ''}${state.plan.done}/${state.plan.total} covered`));
+    }
     if (!summary.childElementCount) summary.append(el('span', 'lsyl__sum-text lsyl__sum-text--empty', 'Nothing tagged yet'));
   };
   paintSummary();
