@@ -8,6 +8,8 @@ import { renderContinuumLine } from '@/blocks/continuum-line';
 import { renderCurriculumLines } from '@/blocks/curriculum-lines';
 import { renderQuizQuestion } from '@/blocks/quiz-question';
 import { renderNoteCue } from '@/blocks/note-cue';
+import { renderWithTeacher } from '@/blocks/with-teacher';
+import { renderFadedExample } from '@/blocks/faded-example';
 import { attachedSteppedLenses } from '@/blocks/lenses/registry';
 import { renderAnchorBridge, renderBecauseButSo, renderHumanExperienceTable, renderQuestionLevels } from '@/blocks/formats/question-set-formats';
 import { renderReasoningChartFormat } from '@/blocks/formats/reasoning-chart';
@@ -2362,6 +2364,10 @@ function renderBlockContent(
       return renderSelfCheckBlock(block, mode);
     case 'note_cue':
       return wrapBlock(renderNoteCue(block, mode), block, mode);
+    case 'with_teacher':
+      return wrapBlock(renderWithTeacher(block, mode), block, mode);
+    case 'faded_example':
+      return wrapBlock(renderFadedExample(block, mode), block, mode);
     case 'timeline':
       return renderTimelineBlock(block, mode);
     case 'card_stack':

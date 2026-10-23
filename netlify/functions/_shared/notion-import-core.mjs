@@ -911,7 +911,7 @@ function buildImportPlan(tree, ctx) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z12 } from "zod";
+import { z as z13 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z } from "zod";
@@ -957,7 +957,7 @@ var TrashFields = {
 };
 
 // apps/teaching/src/schemas/block.ts
-import { z as z9 } from "zod";
+import { z as z10 } from "zod";
 
 // apps/teaching/src/skills/schema.ts
 import { z as z3 } from "zod";
@@ -1094,8 +1094,36 @@ var ReasoningConfigSchema = z6.object({
   examples: z6.object({ support: StepTextSchema, core: StepTextSchema, extend: StepTextSchema }).partial().optional()
 });
 
-// apps/teaching/src/quiz/core.ts
+// apps/teaching/src/tutorial/schema.ts
 import { z as z7 } from "zod";
+var GAP_TYPES = ["knowledge", "mix_up"];
+var TutorialGroupIdSchema = z7.string().regex(/^[a-z0-9_-]{1,40}$/);
+var TutorialGroupSchema = z7.object({
+  id: TutorialGroupIdSchema,
+  /** Teacher-facing: "Re-tells the plot". Students never see it. */
+  name: z7.string().min(1).max(80),
+  /** Teacher-facing: why this group gets it wrong. */
+  why: z7.string().max(300),
+  /** Student-facing goal, written as what they will do: "Today: explaining the effect". */
+  goal: z7.string().max(140),
+  gap_type: z7.enum(GAP_TYPES),
+  students: z7.array(z7.string().min(1).max(64)).max(40),
+  /** Ann's evidence for placing each student, from their recorded mistakes. */
+  evidence: z7.array(z7.object({ student: z7.string().min(1).max(64), quote: z7.string().max(300) })).max(80).default([]),
+  /** Students the teacher marked unsure; the exit check confirms the placement. */
+  unsure: z7.array(z7.string().min(1).max(64)).max(40).optional()
+});
+var TutorialSettingsSchema = z7.object({
+  class_id: z7.string().min(1).max(64),
+  /** The evidence tag the tutorial works on, e.g. "tech:cyclical_structure". */
+  tag: z7.string().max(80).optional(),
+  /** The quiz whose evidence flagged these students. */
+  source_lesson_id: z7.string().max(64).optional(),
+  groups: z7.array(TutorialGroupSchema).max(8)
+});
+
+// apps/teaching/src/quiz/core.ts
+import { z as z8 } from "zod";
 var QUIZ_QUESTION_KINDS = [
   "multiple_choice",
   "multi_select",
@@ -1113,7 +1141,7 @@ var QUIZ_QUESTION_KINDS = [
   "extended_response",
   "explain_effect"
 ];
-var QuizQuestionKindSchema = z7.enum(QUIZ_QUESTION_KINDS);
+var QuizQuestionKindSchema = z8.enum(QUIZ_QUESTION_KINDS);
 var QUIZ_LIMITS = {
   prompt: 1e3,
   option: 300,
@@ -1125,102 +1153,102 @@ var QUIZ_LIMITS = {
   response: 6e3,
   marksMax: 20
 };
-var Id = z7.string().min(1).max(64);
-var Text = (max) => z7.string().trim().min(1).max(max);
-var OptionalText = (max) => z7.string().trim().max(max).optional();
-var QuizImageSchema = z7.object({
-  url: z7.string().min(1).max(2e3),
-  alt: z7.string().max(300).default("")
+var Id = z8.string().min(1).max(64);
+var Text = (max) => z8.string().trim().min(1).max(max);
+var OptionalText = (max) => z8.string().trim().max(max).optional();
+var QuizImageSchema = z8.object({
+  url: z8.string().min(1).max(2e3),
+  alt: z8.string().max(300).default("")
 });
-var QuizChoiceSchema = z7.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
-var QuizPairSchema = z7.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
-var QuizGroupSchema = z7.object({ id: Id, name: Text(120) });
-var QuizSortItemSchema = z7.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
-var QuizSpotTargetSchema = z7.object({
+var QuizChoiceSchema = z8.object({ id: Id, text: Text(QUIZ_LIMITS.option) });
+var QuizPairSchema = z8.object({ id: Id, left: Text(QUIZ_LIMITS.option), right: Text(QUIZ_LIMITS.option) });
+var QuizGroupSchema = z8.object({ id: Id, name: Text(120) });
+var QuizSortItemSchema = z8.object({ id: Id, text: Text(QUIZ_LIMITS.option), group: Id });
+var QuizSpotTargetSchema = z8.object({
   id: Id,
   /** The words, copied exactly from the passage. */
   quote: Text(QUIZ_LIMITS.option),
   /** Every technique a fair marker would accept for these words. */
-  correct: z7.array(Id).min(1).max(10)
+  correct: z8.array(Id).min(1).max(10)
 });
-var QuizPinSchema = z7.object({
+var QuizPinSchema = z8.object({
   id: Id,
-  x: z7.number().min(0).max(1),
-  y: z7.number().min(0).max(1),
+  x: z8.number().min(0).max(1),
+  y: z8.number().min(0).max(1),
   label: Text(120)
 });
 var base = {
   id: Id,
   // A missing prompt reads as empty: fill-the-gap questions need none, and the
   // other kinds are still told to write one by questionProblems.
-  prompt: z7.string().trim().max(QUIZ_LIMITS.prompt).default(""),
-  marks: z7.number().int().min(1).max(QUIZ_LIMITS.marksMax),
+  prompt: z8.string().trim().max(QUIZ_LIMITS.prompt).default(""),
+  marks: z8.number().int().min(1).max(QUIZ_LIMITS.marksMax),
   hint: OptionalText(QUIZ_LIMITS.hint),
   explanation: OptionalText(QUIZ_LIMITS.explanation),
   image: QuizImageSchema.optional(),
   /** Syllabus outcome ids for the markbook. None means the lesson's outcomes. Capped like a criterion's (MARKBOOK_LIMITS.outcomes). */
-  outcomes: z7.array(z7.string().min(1).max(64)).max(8).optional(),
+  outcomes: z8.array(z8.string().min(1).max(64)).max(8).optional(),
   /** Skills-continuum sub-strands, `strand.sub`, for insights. */
-  skills: z7.array(z7.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
+  skills: z8.array(z8.string().regex(/^[a-z]{3,20}\.[a-z-]{2,40}$/, "Pick a skill from the list.")).max(8).optional()
 };
-var QuizQuestionSchema = z7.discriminatedUnion("kind", [
-  z7.object({ ...base, kind: z7.literal("multiple_choice"), options: z7.array(QuizChoiceSchema).min(2).max(6), correct: z7.array(Id).length(1) }),
-  z7.object({ ...base, kind: z7.literal("multi_select"), options: z7.array(QuizChoiceSchema).min(2).max(8), correct: z7.array(Id).min(1).max(8) }),
-  z7.object({ ...base, kind: z7.literal("true_false"), answer: z7.boolean() }),
-  z7.object({
+var QuizQuestionSchema = z8.discriminatedUnion("kind", [
+  z8.object({ ...base, kind: z8.literal("multiple_choice"), options: z8.array(QuizChoiceSchema).min(2).max(6), correct: z8.array(Id).length(1) }),
+  z8.object({ ...base, kind: z8.literal("multi_select"), options: z8.array(QuizChoiceSchema).min(2).max(8), correct: z8.array(Id).min(1).max(8) }),
+  z8.object({ ...base, kind: z8.literal("true_false"), answer: z8.boolean() }),
+  z8.object({
     ...base,
-    kind: z7.literal("short_answer"),
-    accepted: z7.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
-    case_sensitive: z7.boolean().optional()
+    kind: z8.literal("short_answer"),
+    accepted: z8.array(Text(QUIZ_LIMITS.answer)).min(1).max(10),
+    case_sensitive: z8.boolean().optional()
   }),
-  z7.object({ ...base, kind: z7.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z7.boolean().optional() }),
-  z7.object({ ...base, kind: z7.literal("odd_one_out"), options: z7.array(QuizChoiceSchema).min(3).max(6), correct: z7.array(Id).length(1) }),
-  z7.object({ ...base, kind: z7.literal("matching"), pairs: z7.array(QuizPairSchema).min(2).max(8) }),
-  z7.object({ ...base, kind: z7.literal("ordering"), items: z7.array(QuizChoiceSchema).min(3).max(8) }),
-  z7.object({
+  z8.object({ ...base, kind: z8.literal("fill_gap"), passage: Text(QUIZ_LIMITS.passage), word_bank: z8.boolean().optional() }),
+  z8.object({ ...base, kind: z8.literal("odd_one_out"), options: z8.array(QuizChoiceSchema).min(3).max(6), correct: z8.array(Id).length(1) }),
+  z8.object({ ...base, kind: z8.literal("matching"), pairs: z8.array(QuizPairSchema).min(2).max(8) }),
+  z8.object({ ...base, kind: z8.literal("ordering"), items: z8.array(QuizChoiceSchema).min(3).max(8) }),
+  z8.object({
     ...base,
-    kind: z7.literal("categorise"),
-    groups: z7.array(QuizGroupSchema).min(2).max(4),
-    items: z7.array(QuizSortItemSchema).min(2).max(16)
+    kind: z8.literal("categorise"),
+    groups: z8.array(QuizGroupSchema).min(2).max(4),
+    items: z8.array(QuizSortItemSchema).min(2).max(16)
   }),
-  z7.object({
+  z8.object({
     ...base,
-    kind: z7.literal("quote_technique"),
+    kind: z8.literal("quote_technique"),
     quote: Text(QUIZ_LIMITS.passage),
-    options: z7.array(QuizChoiceSchema.extend({ technique_id: z7.string().max(64).optional() })).min(2).max(6),
-    correct: z7.array(Id).length(1)
+    options: z8.array(QuizChoiceSchema.extend({ technique_id: z8.string().max(64).optional() })).min(2).max(6),
+    correct: z8.array(Id).length(1)
   }),
-  z7.object({
+  z8.object({
     ...base,
-    kind: z7.literal("find_it"),
-    segments: z7.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
-    correct: z7.array(Id).min(1).max(40)
+    kind: z8.literal("find_it"),
+    segments: z8.array(QuizChoiceSchema.extend({ text: Text(QUIZ_LIMITS.passage) })).min(2).max(40),
+    correct: z8.array(Id).min(1).max(40)
   }),
-  z7.object({
+  z8.object({
     ...base,
-    kind: z7.literal("spot_technique"),
+    kind: z8.literal("spot_technique"),
     passage: Text(QUIZ_LIMITS.passage),
-    options: z7.array(
+    options: z8.array(
       QuizChoiceSchema.extend({
-        technique_id: z7.string().max(64).optional(),
+        technique_id: z8.string().max(64).optional(),
         /** How many times students may name it: 2 for a passage with two similes. */
-        uses: z7.number().int().min(1).max(12).optional()
+        uses: z8.number().int().min(1).max(12).optional()
       })
     ).min(2).max(10),
-    targets: z7.array(QuizSpotTargetSchema).min(1).max(12),
+    targets: z8.array(QuizSpotTargetSchema).min(1).max(12),
     /** How many students must find. Fewer than the targets means any of them will do. */
-    find: z7.number().int().min(1).max(12).optional()
+    find: z8.number().int().min(1).max(12).optional()
   }),
-  z7.object({ ...base, kind: z7.literal("label_image"), image: QuizImageSchema, pins: z7.array(QuizPinSchema).min(2).max(8) }),
-  z7.object({
+  z8.object({ ...base, kind: z8.literal("label_image"), image: QuizImageSchema, pins: z8.array(QuizPinSchema).min(2).max(8) }),
+  z8.object({
     ...base,
-    kind: z7.literal("extended_response"),
+    kind: z8.literal("extended_response"),
     model_answer: OptionalText(QUIZ_LIMITS.model),
     guide: OptionalText(QUIZ_LIMITS.model)
   }),
-  z7.object({
+  z8.object({
     ...base,
-    kind: z7.literal("explain_effect"),
+    kind: z8.literal("explain_effect"),
     quote: Text(QUIZ_LIMITS.passage),
     technique: OptionalText(120),
     model_answer: OptionalText(QUIZ_LIMITS.model),
@@ -1228,10 +1256,10 @@ var QuizQuestionSchema = z7.discriminatedUnion("kind", [
   })
 ]).superRefine((q, ctx) => {
   for (const message of questionProblems(q)) {
-    ctx.addIssue({ code: z7.ZodIssueCode.custom, message });
+    ctx.addIssue({ code: z8.ZodIssueCode.custom, message });
   }
 });
-var QuizQuestionDraftSchema = z7.custom(
+var QuizQuestionDraftSchema = z8.custom(
   (value) => !!value && typeof value === "object" && !Array.isArray(value) && typeof value.id === "string" && QUIZ_QUESTION_KINDS.includes(value.kind),
   { message: "A quiz question needs an id and a known kind." }
 );
@@ -1346,31 +1374,31 @@ function locateQuote(passage, quote) {
 var FILLER = new Set(
   "a an the and or but of to in on at by for with from as is are was were be been it its this that these those i you he she we they his her their our my your so then than".split(" ")
 );
-var QuizFeedbackSchema = z7.enum(["instant", "end", "released"]);
-var QuizSettingsSchema = z7.object({
+var QuizFeedbackSchema = z8.enum(["instant", "end", "released"]);
+var QuizSettingsSchema = z8.object({
   /** Whole-quiz countdown in minutes. */
-  timer_minutes: z7.number().int().min(1).max(180).optional(),
+  timer_minutes: z8.number().int().min(1).max(180).optional(),
   /** Per-question countdown in seconds. */
-  question_seconds: z7.number().int().min(10).max(600).optional(),
+  question_seconds: z8.number().int().min(10).max(600).optional(),
   /** Hard timers lock answers at zero; soft timers only show the time. */
-  timer_hard: z7.boolean().optional(),
-  shuffle_questions: z7.boolean().optional(),
-  shuffle_options: z7.boolean().optional(),
-  attempts: z7.number().int().min(1).max(5).optional(),
+  timer_hard: z8.boolean().optional(),
+  shuffle_questions: z8.boolean().optional(),
+  shuffle_options: z8.boolean().optional(),
+  attempts: z8.number().int().min(1).max(5).optional(),
   feedback: QuizFeedbackSchema.optional(),
   /** Share of a question's marks a hint costs, 0 to 1. */
-  hint_cost: z7.number().min(0).max(1).optional(),
-  confidence: z7.boolean().optional(),
-  closes_at: z7.string().datetime().optional(),
+  hint_cost: z8.number().min(0).max(1).optional(),
+  confidence: z8.boolean().optional(),
+  closes_at: z8.string().datetime().optional(),
   /** Live quiz in focus view: a question revealed under this share right stops at a checkpoint. Blank means 80. */
-  move_on: z7.number().int().min(1).max(100).optional(),
+  move_on: z8.number().int().min(1).max(100).optional(),
   /** A follow-up quiz: only these students (class-list ids) may sit it. */
-  for_students: z7.array(z7.string().min(1).max(64)).max(60).optional(),
+  for_students: z8.array(z8.string().min(1).max(64)).max(60).optional(),
   /** The quiz this one follows up, and the flag that prompted it. */
-  follow_up_of: z7.string().max(64).optional(),
-  follow_up_flag: z7.string().max(160).optional(),
+  follow_up_of: z8.string().max(64).optional(),
+  follow_up_flag: z8.string().max(160).optional(),
   /** Teacher only: an earlier quiz to show before-and-after against. */
-  compare_with: z7.string().max(64).optional()
+  compare_with: z8.string().max(64).optional()
 });
 function norm(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();
@@ -1409,251 +1437,251 @@ function checkQuestion(input) {
 }
 
 // apps/teaching/src/schemas/toolkit.ts
-import { z as z8 } from "zod";
-var TkStepSchema = z8.object({
-  id: z8.string().min(1),
-  title: z8.string(),
-  prompt: z8.string()
+import { z as z9 } from "zod";
+var TkStepSchema = z9.object({
+  id: z9.string().min(1),
+  title: z9.string(),
+  prompt: z9.string()
 });
-var TkRevealSchema = z8.object({
-  id: z8.string().min(1),
-  label: z8.string(),
-  body: z8.string()
+var TkRevealSchema = z9.object({
+  id: z9.string().min(1),
+  label: z9.string(),
+  body: z9.string()
 });
-var TkTeacherNoteSchema = z8.object({
-  what: z8.string().default(""),
-  run: z8.array(z8.string()).default([]),
-  say: z8.array(z8.string()).default([]),
-  watch: z8.array(z8.string()).default([]),
-  extra_label: z8.string().default(""),
-  extra: z8.array(z8.string()).default([]),
-  time: z8.string().default(""),
-  source: z8.string().default(""),
+var TkTeacherNoteSchema = z9.object({
+  what: z9.string().default(""),
+  run: z9.array(z9.string()).default([]),
+  say: z9.array(z9.string()).default([]),
+  watch: z9.array(z9.string()).default([]),
+  extra_label: z9.string().default(""),
+  extra: z9.array(z9.string()).default([]),
+  time: z9.string().default(""),
+  source: z9.string().default(""),
   /** True once the teacher edits the note; Thinking move then stops rebuilding it. */
-  edited: z8.boolean().default(false)
+  edited: z9.boolean().default(false)
 });
-var TkJotsSchema = z8.record(z8.string()).default({});
-var TkItemListSchema = z8.array(z8.string().min(1)).default([]);
-var ToolkitSkillContentSchema = z8.object({
-  item: z8.string().min(1),
-  label: z8.string(),
-  definition: z8.string(),
-  definition_source: z8.string().default(""),
+var TkJotsSchema = z9.record(z9.string()).default({});
+var TkItemListSchema = z9.array(z9.string().min(1)).default([]);
+var ToolkitSkillContentSchema = z9.object({
+  item: z9.string().min(1),
+  label: z9.string(),
+  definition: z9.string(),
+  definition_source: z9.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
-  context: z8.string().default(""),
-  steps: z8.array(TkStepSchema).max(8),
-  show_test: z8.boolean().default(true),
-  checks: z8.array(z8.string()).max(8).default([]),
-  reveals: z8.array(TkRevealSchema).max(6).default([]),
-  links: z8.object({ tools: TkItemListSchema, values: TkItemListSchema }).default({ tools: [], values: [] }),
-  show_links: z8.boolean().default(true),
+  guide: z9.string().default(""),
+  context: z9.string().default(""),
+  steps: z9.array(TkStepSchema).max(8),
+  show_test: z9.boolean().default(true),
+  checks: z9.array(z9.string()).max(8).default([]),
+  reveals: z9.array(TkRevealSchema).max(6).default([]),
+  links: z9.object({ tools: TkItemListSchema, values: TkItemListSchema }).default({ tools: [], values: [] }),
+  show_links: z9.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ToolFrameSchema = z8.enum(["fork", "steps", "converter", "stress"]);
-var PairLevelSchema = z8.preprocess(
+var ToolFrameSchema = z9.enum(["fork", "steps", "converter", "stress"]);
+var PairLevelSchema = z9.preprocess(
   (value) => value === "level2" ? "none" : value,
-  z8.enum(["none", "level1", "level3", "maths", "inquiry"])
+  z9.enum(["none", "level1", "level3", "maths", "inquiry"])
 );
-var StressVerdictSchema = z8.enum(["survives", "fails", "qualifies"]);
-var ForkSlotsSchema = z8.object({
-  kind: z8.string().default(""),
-  marker: z8.string().default(""),
-  a: z8.string().default(""),
-  b: z8.string().default("")
+var StressVerdictSchema = z9.enum(["survives", "fails", "qualifies"]);
+var ForkSlotsSchema = z9.object({
+  kind: z9.string().default(""),
+  marker: z9.string().default(""),
+  a: z9.string().default(""),
+  b: z9.string().default("")
 });
-var ToolkitToolContentSchema = z8.object({
-  item: z8.string().min(1),
-  label: z8.string(),
-  definition: z8.string(),
-  definition_source: z8.string().default(""),
+var ToolkitToolContentSchema = z9.object({
+  item: z9.string().min(1),
+  label: z9.string(),
+  definition: z9.string(),
+  definition_source: z9.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
+  guide: z9.string().default(""),
   frame: ToolFrameSchema,
-  sentence: z8.string().default(""),
-  steps: z8.array(TkStepSchema).max(8).default([]),
+  sentence: z9.string().default(""),
+  steps: z9.array(TkStepSchema).max(8).default([]),
   /** Fork frame: the worked example filled into the slots on reveal. */
   worked: ForkSlotsSchema.default({}),
-  worked_note: z8.string().default(""),
-  converters: z8.array(z8.object({ id: z8.string().min(1), closed: z8.string(), open: z8.string() })).max(10).default([]),
-  statements: z8.array(
-    z8.object({
-      id: z8.string().min(1),
-      text: z8.string(),
+  worked_note: z9.string().default(""),
+  converters: z9.array(z9.object({ id: z9.string().min(1), closed: z9.string(), open: z9.string() })).max(10).default([]),
+  statements: z9.array(
+    z9.object({
+      id: z9.string().min(1),
+      text: z9.string(),
       verdict: StressVerdictSchema,
-      reason: z8.string()
+      reason: z9.string()
     })
   ).max(10).default([]),
   pair_level: PairLevelSchema.default("none"),
-  reveals: z8.array(TkRevealSchema).max(6).default([]),
-  links: z8.object({ skills: TkItemListSchema, tools: TkItemListSchema }).default({ skills: [], tools: [] }),
-  show_links: z8.boolean().default(true),
+  reveals: z9.array(TkRevealSchema).max(6).default([]),
+  links: z9.object({ skills: TkItemListSchema, tools: TkItemListSchema }).default({ skills: [], tools: [] }),
+  show_links: z9.boolean().default(true),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ToolkitValueContentSchema = z8.object({
-  item: z8.string().min(1),
-  label: z8.string(),
-  definition: z8.string(),
-  definition_source: z8.string().default(""),
+var ToolkitValueContentSchema = z9.object({
+  item: z9.string().min(1),
+  label: z9.string(),
+  definition: z9.string(),
+  definition_source: z9.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
-  claim: z8.string().default(""),
-  options: z8.array(z8.object({ id: z8.string().min(1), text: z8.string() })).max(8).default([]),
-  probes: z8.array(z8.object({ id: z8.string().min(1), question: z8.string(), asks: z8.string() })).max(8).default([]),
-  instruction: z8.string().default(""),
-  model: z8.object({ label: z8.string(), body: z8.string() }).default({ label: "", body: "" }),
-  discussion: z8.string().default(""),
+  guide: z9.string().default(""),
+  claim: z9.string().default(""),
+  options: z9.array(z9.object({ id: z9.string().min(1), text: z9.string() })).max(8).default([]),
+  probes: z9.array(z9.object({ id: z9.string().min(1), question: z9.string(), asks: z9.string() })).max(8).default([]),
+  instruction: z9.string().default(""),
+  model: z9.object({ label: z9.string(), body: z9.string() }).default({ label: "", body: "" }),
+  discussion: z9.string().default(""),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ThinkingMoveStepSchema = z8.object({
-  id: z8.string().min(1),
-  tool: z8.string().min(1),
-  prompt: z8.string(),
-  frame: z8.string(),
-  example: z8.string()
+var ThinkingMoveStepSchema = z9.object({
+  id: z9.string().min(1),
+  tool: z9.string().min(1),
+  prompt: z9.string(),
+  frame: z9.string(),
+  example: z9.string()
 });
-var ThinkingMoveContentSchema = z8.object({
-  skill: z8.string().min(1),
-  tools: z8.array(z8.string().min(1)).min(1).max(5),
-  value: z8.string().min(1),
-  community: z8.string().default(""),
+var ThinkingMoveContentSchema = z9.object({
+  skill: z9.string().min(1),
+  tools: z9.array(z9.string().min(1)).min(1).max(5),
+  value: z9.string().min(1),
+  community: z9.string().default(""),
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
-  stimulus: z8.string().default(""),
-  steps: z8.array(ThinkingMoveStepSchema).max(5).default([]),
-  check: z8.array(z8.string()).max(8).default([]),
-  why: z8.string().default(""),
+  guide: z9.string().default(""),
+  stimulus: z9.string().default(""),
+  steps: z9.array(ThinkingMoveStepSchema).max(5).default([]),
+  check: z9.array(z9.string()).max(8).default([]),
+  why: z9.string().default(""),
   teacher_note: TkTeacherNoteSchema.optional(),
   /** skill|tools|value the note was last built from. */
-  note_basis: z8.string().default(""),
+  note_basis: z9.string().default(""),
   teacher_jots: TkJotsSchema.optional()
 });
-var QuadrantSchema = z8.enum(["comprehension", "research", "speculation", "inquiry"]);
-var QuestionQuadrantContentSchema = z8.object({
+var QuadrantSchema = z9.enum(["comprehension", "research", "speculation", "inquiry"]);
+var QuestionQuadrantContentSchema = z9.object({
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
-  stimulus: z8.string().default(""),
-  procedure: z8.enum(["sort", "create"]).default("sort"),
+  guide: z9.string().default(""),
+  stimulus: z9.string().default(""),
+  procedure: z9.enum(["sort", "create"]).default("sort"),
   /** Students send their own questions and place them on the quadrant (live, published lesson). */
-  collect_questions: z8.boolean().default(false),
-  questions: z8.array(z8.object({ id: z8.string().min(1), text: z8.string(), quadrant: QuadrantSchema })).max(16).default([]),
-  converters: z8.array(z8.object({ id: z8.string().min(1), closed: z8.string(), open: z8.string() })).max(8).default([]),
+  collect_questions: z9.boolean().default(false),
+  questions: z9.array(z9.object({ id: z9.string().min(1), text: z9.string(), quadrant: QuadrantSchema })).max(16).default([]),
+  converters: z9.array(z9.object({ id: z9.string().min(1), closed: z9.string(), open: z9.string() })).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ConceptGameKindSchema = z8.enum(["kind_sort", "degree_line", "word_sort"]);
-var ConceptFeaturesContentSchema = z8.object({
+var ConceptGameKindSchema = z9.enum(["kind_sort", "degree_line", "word_sort"]);
+var ConceptFeaturesContentSchema = z9.object({
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
-  concepts: z8.array(
-    z8.object({
-      id: z8.string().min(1),
-      label: z8.string(),
-      central: z8.boolean(),
-      contestable: z8.boolean(),
-      common: z8.boolean()
+  guide: z9.string().default(""),
+  concepts: z9.array(
+    z9.object({
+      id: z9.string().min(1),
+      label: z9.string(),
+      central: z9.boolean(),
+      contestable: z9.boolean(),
+      common: z9.boolean()
     })
   ).max(8).default([]),
-  analogy: z8.object({ stem: z8.string(), example: z8.string() }).default({ stem: "", example: "" }),
-  game: z8.object({
+  analogy: z9.object({ stem: z9.string(), example: z9.string() }).default({ stem: "", example: "" }),
+  game: z9.object({
     kind: ConceptGameKindSchema,
-    left: z8.string(),
-    middle: z8.string(),
-    right: z8.string(),
-    cards: z8.array(z8.object({ id: z8.string().min(1), text: z8.string(), prompt: z8.string() })).max(16)
+    left: z9.string(),
+    middle: z9.string(),
+    right: z9.string(),
+    cards: z9.array(z9.object({ id: z9.string().min(1), text: z9.string(), prompt: z9.string() })).max(16)
   }).default({ kind: "kind_sort", left: "", middle: "?", right: "", cards: [] }),
-  criteria: z8.array(z8.string()).max(8).default([]),
+  criteria: z9.array(z9.string()).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var ThinkingIntentionsContentSchema = z8.object({
-  content: z8.string().default(""),
-  skills: z8.array(z8.string().min(1)).max(2).default([]),
-  tools: z8.array(z8.string().min(1)).max(6).default([]),
-  values: z8.array(z8.string().min(1)).max(4).default([]),
-  community: z8.array(z8.string().min(1)).max(2).default([]),
-  success: z8.array(z8.string()).max(6).default([])
+var ThinkingIntentionsContentSchema = z9.object({
+  content: z9.string().default(""),
+  skills: z9.array(z9.string().min(1)).max(2).default([]),
+  tools: z9.array(z9.string().min(1)).max(6).default([]),
+  values: z9.array(z9.string().min(1)).max(4).default([]),
+  community: z9.array(z9.string().min(1)).max(2).default([]),
+  success: z9.array(z9.string()).max(6).default([])
 });
-var ThinkingReflectionContentSchema = z8.object({
-  variant: z8.enum(["lesson", "unit"]).default("lesson"),
+var ThinkingReflectionContentSchema = z9.object({
+  variant: z9.enum(["lesson", "unit"]).default("lesson"),
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
-  concept: z8.string().default(""),
+  guide: z9.string().default(""),
+  concept: z9.string().default(""),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var AnalogyTierSchema = z8.object({
-  task: z8.string().default(""),
-  steps: z8.array(TkStepSchema).max(6).default([]),
-  example: z8.string().default("")
+var AnalogyTierSchema = z9.object({
+  task: z9.string().default(""),
+  steps: z9.array(TkStepSchema).max(6).default([]),
+  example: z9.string().default("")
 });
-var FluidAnalogyContentSchema = z8.object({
-  kind: z8.string().min(1),
-  label: z8.string(),
-  definition: z8.string(),
+var FluidAnalogyContentSchema = z9.object({
+  kind: z9.string().min(1),
+  label: z9.string(),
+  definition: z9.string(),
   /** The text, character or idea students work with. */
-  focus: z8.string().default(""),
+  focus: z9.string().default(""),
   /** The level students start at. */
-  level: z8.number().int().min(1).max(3).default(1),
+  level: z9.number().int().min(1).max(3).default(1),
   /** Students can step between levels themselves. */
-  student_choice: z8.boolean().default(true),
-  tiers: z8.array(AnalogyTierSchema).length(3),
-  show_check: z8.boolean().default(true),
-  checks: z8.array(z8.string()).max(8).default([]),
+  student_choice: z9.boolean().default(true),
+  tiers: z9.array(AnalogyTierSchema).length(3),
+  show_check: z9.boolean().default(true),
+  checks: z9.array(z9.string()).max(8).default([]),
   /** Show the prompt-card name for classes using the printed deck. */
-  show_card: z8.boolean().default(false),
+  show_card: z9.boolean().default(false),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var AnalogySlotSchema = z8.object({
-  key: z8.string().min(1),
-  label: z8.string().default(""),
-  frame: z8.string().default(""),
-  example: z8.string().default("")
+var AnalogySlotSchema = z9.object({
+  key: z9.string().min(1),
+  label: z9.string().default(""),
+  frame: z9.string().default(""),
+  example: z9.string().default("")
 });
-var AnalogyStageSchema = z8.object({
-  task: z8.string().default(""),
-  slots: z8.array(AnalogySlotSchema).max(12).default([])
+var AnalogyStageSchema = z9.object({
+  task: z9.string().default(""),
+  slots: z9.array(AnalogySlotSchema).max(12).default([])
 });
-var AnalogyMoveContentSchema = z8.object({
-  label: z8.string(),
-  definition: z8.string(),
+var AnalogyMoveContentSchema = z9.object({
+  label: z9.string(),
+  definition: z9.string(),
   /** The text, character or idea students work with. */
-  focus: z8.string().default(""),
+  focus: z9.string().default(""),
   /** The level students start at. */
-  level: z8.number().int().min(1).max(3).default(1),
+  level: z9.number().int().min(1).max(3).default(1),
   /** Students can step between levels themselves. */
-  student_choice: z8.boolean().default(true),
-  levels: z8.array(AnalogyStageSchema).length(3),
-  show_check: z8.boolean().default(true),
-  checks: z8.array(z8.string()).max(8).default([]),
+  student_choice: z9.boolean().default(true),
+  levels: z9.array(AnalogyStageSchema).length(3),
+  show_check: z9.boolean().default(true),
+  checks: z9.array(z9.string()).max(8).default([]),
   /** Show the prompt-card name for classes using the printed deck. */
-  show_card: z8.boolean().default(false),
+  show_card: z9.boolean().default(false),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var AnalogyTypesContentSchema = z8.object({
+var AnalogyTypesContentSchema = z9.object({
   /** Student instruction shown at the top of the block. */
-  guide: z8.string().default(""),
-  focus: z8.string().default(""),
+  guide: z9.string().default(""),
+  focus: z9.string().default(""),
   /** Types marked "This lesson". */
-  types: z8.array(z8.string().min(1)).max(7).default([]),
-  show_contrast: z8.boolean().default(true),
-  weak: z8.string().default(""),
-  strong: z8.string().default(""),
-  why: z8.string().default(""),
-  process: z8.array(z8.string()).max(8).default([]),
-  show_check: z8.boolean().default(true),
-  checks: z8.array(z8.string()).max(8).default([]),
+  types: z9.array(z9.string().min(1)).max(7).default([]),
+  show_contrast: z9.boolean().default(true),
+  weak: z9.string().default(""),
+  strong: z9.string().default(""),
+  why: z9.string().default(""),
+  process: z9.array(z9.string()).max(8).default([]),
+  show_check: z9.boolean().default(true),
+  checks: z9.array(z9.string()).max(8).default([]),
   teacher_note: TkTeacherNoteSchema.optional(),
   teacher_jots: TkJotsSchema.optional()
 });
-var TeacherNoteBlockContentSchema = z8.object({
-  title: z8.string().default("Teacher note"),
-  html: z8.string().default("")
+var TeacherNoteBlockContentSchema = z9.object({
+  title: z9.string().default("Teacher note"),
+  html: z9.string().default("")
 });
 var TOOLKIT_NOTE_BLOCK_TYPES = [
   "toolkit_skill",
@@ -1670,8 +1698,8 @@ var TOOLKIT_BLOCK_TYPES = [
 ];
 
 // apps/teaching/src/schemas/block.ts
-var VisibilitySchema = z9.enum(["student_teacher", "teacher_only"]);
-var BlockTypeSchema = z9.enum([
+var VisibilitySchema = z10.enum(["student_teacher", "teacher_only"]);
+var BlockTypeSchema = z10.enum([
   "rich_text",
   "heading",
   "callout",
@@ -1704,6 +1732,8 @@ var BlockTypeSchema = z9.enum([
   "cloze",
   "self_check",
   "note_cue",
+  "with_teacher",
+  "faded_example",
   "chart",
   "equation",
   "diagram",
@@ -1739,19 +1769,19 @@ var BlockTypeSchema = z9.enum([
   "analogy_chains",
   "teacher_note"
 ]);
-var ColumnPresetSchema = z9.enum(["50-50", "33-67", "67-33", "33-33-33", "custom"]);
-var SpacerSizeSchema = z9.enum(["small", "medium", "large"]);
-var VideoProviderSchema = z9.enum(["youtube", "vimeo", "file"]);
-var EmbedProviderSchema = z9.enum([
+var ColumnPresetSchema = z10.enum(["50-50", "33-67", "67-33", "33-33-33", "custom"]);
+var SpacerSizeSchema = z10.enum(["small", "medium", "large"]);
+var VideoProviderSchema = z10.enum(["youtube", "vimeo", "file"]);
+var EmbedProviderSchema = z10.enum([
   "google_maps",
   "google_slides",
   "google_docs",
   "pdf",
   "generic"
 ]);
-var HeadingVariantSchema = z9.enum(["page", "section", "subsection"]);
-var MediaSizeVariantSchema = z9.enum(["small", "medium", "large"]);
-var CalloutStyleSchema = z9.enum([
+var HeadingVariantSchema = z10.enum(["page", "section", "subsection"]);
+var MediaSizeVariantSchema = z10.enum(["small", "medium", "large"]);
+var CalloutStyleSchema = z10.enum([
   "cultural_warning",
   "information",
   "important",
@@ -1762,8 +1792,8 @@ var CalloutStyleSchema = z9.enum([
   "remember",
   "teacher"
 ]);
-var QuestionKindSchema = z9.enum(["short_answer", "multiple_choice"]);
-var ResponseSpaceSchema = z9.enum([
+var QuestionKindSchema = z10.enum(["short_answer", "multiple_choice"]);
+var ResponseSpaceSchema = z10.enum([
   "none",
   "short",
   "medium",
@@ -1773,107 +1803,107 @@ var ResponseSpaceSchema = z9.enum([
 var blockTimestamps = {
   created_at: IsoDateSchema,
   updated_at: IsoDateSchema,
-  schema_version: z9.literal(1)
+  schema_version: z10.literal(1)
 };
 var blockLayout = {
   qualifiers: KaplanQualifiersSchema.optional(),
   discern: DiscernQualifierSchema.optional(),
   lenses: LensAttachmentsSchema.optional(),
-  layout: z9.record(z9.unknown()).default({}),
-  print: z9.record(z9.unknown()).default({}),
-  settings: z9.record(z9.unknown()).default({})
+  layout: z10.record(z10.unknown()).default({}),
+  print: z10.record(z10.unknown()).default({}),
+  settings: z10.record(z10.unknown()).default({})
 };
-var RichTextBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("rich_text"),
-  variant: z9.string().default("medium"),
+var RichTextBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("rich_text"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({ html: z9.string() }),
+  content: z10.object({ html: z10.string() }),
   ...blockLayout,
   ...blockTimestamps
 });
-var NarrationSchema = z9.object({
-  url: z9.string().min(1),
-  duration_s: z9.number().min(0).max(900),
-  transcript: z9.string().max(8e3).optional()
+var NarrationSchema = z10.object({
+  url: z10.string().min(1),
+  duration_s: z10.number().min(0).max(900),
+  transcript: z10.string().max(8e3).optional()
 });
-var RevealSchema = z9.enum(["all", "one"]);
-var HeadingBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("heading"),
+var RevealSchema = z10.enum(["all", "one"]);
+var HeadingBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("heading"),
   variant: HeadingVariantSchema,
   visibility: VisibilitySchema,
-  content: z9.object({
-    text: z9.string(),
+  content: z10.object({
+    text: z10.string(),
     narration: NarrationSchema.optional(),
     /** Lecture: what the teacher plans to say, e.g. imported speaker notes. Teacher-only. */
-    script: z9.string().max(8e3).optional(),
+    script: z10.string().max(8e3).optional(),
     reveal: RevealSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CalloutBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("callout"),
-  variant: z9.string().default("medium"),
+var CalloutBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("callout"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     style: CalloutStyleSchema,
-    title: z9.string().optional(),
-    body: z9.string(),
-    related_to: z9.object({
-      block_id: z9.string().min(1),
-      question_id: z9.string().min(1).optional()
+    title: z10.string().optional(),
+    body: z10.string(),
+    related_to: z10.object({
+      block_id: z10.string().min(1),
+      question_id: z10.string().min(1).optional()
     }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ImageBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("image"),
+var ImageBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("image"),
   variant: MediaSizeVariantSchema.default("large"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    url: z9.string(),
-    alt_text: z9.string(),
-    caption: z9.string().optional(),
-    annotations: z9.array(
-      z9.object({
-        id: z9.string().min(1),
-        body: z9.string().min(1),
-        selector: z9.unknown().optional()
+  content: z10.object({
+    url: z10.string(),
+    alt_text: z10.string(),
+    caption: z10.string().optional(),
+    annotations: z10.array(
+      z10.object({
+        id: z10.string().min(1),
+        body: z10.string().min(1),
+        selector: z10.unknown().optional()
       })
     ).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var GalleryLayoutSchema = z9.enum(["grid", "carousel", "comparison"]);
-var GalleryItemSchema = z9.object({
-  id: z9.string().min(1),
-  url: z9.string(),
-  alt_text: z9.string(),
-  caption: z9.string().optional()
+var GalleryLayoutSchema = z10.enum(["grid", "carousel", "comparison"]);
+var GalleryItemSchema = z10.object({
+  id: z10.string().min(1),
+  url: z10.string(),
+  alt_text: z10.string(),
+  caption: z10.string().optional()
 });
-var GalleryBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("gallery"),
+var GalleryBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("gallery"),
   variant: MediaSizeVariantSchema.default("large"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     layout: GalleryLayoutSchema,
-    items: z9.array(GalleryItemSchema).min(2).max(12)
+    items: z10.array(GalleryItemSchema).min(2).max(12)
   }).superRefine((content, ctx) => {
     if (content.layout === "comparison" && content.items.length !== 2) {
       ctx.addIssue({
-        code: z9.ZodIssueCode.custom,
+        code: z10.ZodIssueCode.custom,
         message: "Comparison galleries need exactly 2 items",
         path: ["items"]
       });
@@ -1882,91 +1912,91 @@ var GalleryBlockSchema = z9.object({
   ...blockLayout,
   ...blockTimestamps
 });
-var VideoBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("video"),
+var VideoBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("video"),
   variant: MediaSizeVariantSchema.default("large"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     provider: VideoProviderSchema,
-    external_id: z9.string(),
-    url: z9.string().optional(),
-    start_seconds: z9.number().int().positive().optional(),
-    title: z9.string().optional(),
-    caption: z9.string().optional()
+    external_id: z10.string(),
+    url: z10.string().optional(),
+    start_seconds: z10.number().int().positive().optional(),
+    title: z10.string().optional(),
+    caption: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var EmbedBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("embed"),
-  variant: z9.string().default("large"),
+var EmbedBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("embed"),
+  variant: z10.string().default("large"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    url: z9.string(),
-    title: z9.string().optional(),
+  content: z10.object({
+    url: z10.string(),
+    title: z10.string().optional(),
     provider: EmbedProviderSchema.optional(),
-    embed_url: z9.string().optional()
+    embed_url: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var HtmlBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("html"),
-  variant: z9.string().default("medium"),
+var HtmlBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("html"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({ html: z9.string() }),
+  content: z10.object({ html: z10.string() }),
   ...blockLayout,
   ...blockTimestamps
 });
-var HtmlAppAiProviderSchema = z9.enum(["openai", "anthropic"]);
-var HtmlAppAiSchema = z9.object({
-  enabled: z9.literal(true),
+var HtmlAppAiProviderSchema = z10.enum(["openai", "anthropic"]);
+var HtmlAppAiSchema = z10.object({
+  enabled: z10.literal(true),
   provider: HtmlAppAiProviderSchema,
-  model: z9.string().min(1),
-  system: z9.string(),
-  max_tokens: z9.number().int().positive().max(2e3)
+  model: z10.string().min(1),
+  system: z10.string(),
+  max_tokens: z10.number().int().positive().max(2e3)
 });
-var HtmlAppBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("html_app"),
-  variant: z9.string().default("large"),
+var HtmlAppBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("html_app"),
+  variant: z10.string().default("large"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
-    html: z9.string(),
-    height_px: z9.number().int().positive().max(4e3).optional(),
+  content: z10.object({
+    title: z10.string().optional(),
+    html: z10.string(),
+    height_px: z10.number().int().positive().max(4e3).optional(),
     ai: HtmlAppAiSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuoteBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("quote"),
-  variant: z9.string().default("medium"),
+var QuoteBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("quote"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    quote: z9.string(),
-    attribution: z9.string().optional(),
-    source: z9.string().optional(),
-    reference: z9.string().optional()
+  content: z10.object({
+    quote: z10.string(),
+    attribution: z10.string().optional(),
+    source: z10.string().optional(),
+    reference: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var TimerSegmentSchema = z9.object({
-  label: z9.string().max(60),
-  minutes: z9.number().min(0.25).max(180)
+var TimerSegmentSchema = z10.object({
+  label: z10.string().max(60),
+  minutes: z10.number().min(0.25).max(180)
 });
-var ClassroomToolIdSchema = z9.enum([
+var ClassroomToolIdSchema = z10.enum([
   "timer",
   "stopwatch",
   "names",
@@ -1977,253 +2007,253 @@ var ClassroomToolIdSchema = z9.enum([
   "coin",
   "dice"
 ]);
-var DividerBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("divider"),
-  variant: z9.string().default("medium"),
+var DividerBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("divider"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     /** The faint gear at the end of the rule that slides out the classroom tools. */
-    tools: z9.boolean().default(true),
+    tools: z10.boolean().default(true),
     /** Timers saved with the lesson, ready when it opens. */
-    timer_stack: z9.array(TimerSegmentSchema).max(8).default([])
+    timer_stack: z10.array(TimerSegmentSchema).max(8).default([])
   }).default({}),
   ...blockLayout,
   ...blockTimestamps
 });
-var ClassroomToolsBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("classroom_tools"),
-  variant: z9.string().default("medium"),
+var ClassroomToolsBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("classroom_tools"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    timer_stack: z9.array(TimerSegmentSchema).max(8).default([]),
+  content: z10.object({
+    timer_stack: z10.array(TimerSegmentSchema).max(8).default([]),
     /** Tool to show open when the page loads. Falls back if the viewer cannot use it. */
     start_tool: ClassroomToolIdSchema.optional()
   }).default({}),
   ...blockLayout,
   ...blockTimestamps
 });
-var CountdownBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("countdown"),
-  variant: z9.string().default("medium"),
+var CountdownBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("countdown"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().max(200).default(""),
+  content: z10.object({
+    title: z10.string().max(200).default(""),
     /** YYYY-MM-DD, or empty until the teacher sets it. */
-    due_date: z9.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
+    due_date: z10.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
     /** HH:MM, 24-hour, or empty for no time. */
-    due_time: z9.string().regex(/^(\d{2}:\d{2})?$/).default(""),
+    due_time: z10.string().regex(/^(\d{2}:\d{2})?$/).default(""),
     /** When the task was set, so the bar can show days gone. Optional. */
-    set_date: z9.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
-    note: z9.string().max(400).default("")
+    set_date: z10.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
+    note: z10.string().max(400).default("")
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var DefinitionBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("definition"),
-  variant: z9.string().default("medium"),
+var DefinitionBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("definition"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    term: z9.string(),
-    definition: z9.string()
+  content: z10.object({
+    term: z10.string(),
+    definition: z10.string()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CodeBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("code"),
-  variant: z9.string().default("medium"),
+var CodeBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("code"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    code: z9.string(),
-    language: z9.string().optional()
+  content: z10.object({
+    code: z10.string(),
+    language: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AudioBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("audio"),
-  variant: z9.string().default("medium"),
+var AudioBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("audio"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
   /**
    * The Voice block. `listen` plays a clip (the original audio block); `respond`
    * and `viva` have students record a spoken answer and submit their best take.
    * Viva adds dot points the timer walks through. `url` is only used by listen.
    */
-  content: z9.object({
-    url: z9.string(),
-    title: z9.string().optional(),
-    mode: z9.enum(["listen", "respond", "viva"]).default("listen"),
-    prompt: z9.string().max(4e3).optional(),
-    time_limit_s: z9.number().int().min(30).max(300).optional(),
-    student_chooses_time: z9.boolean().optional(),
-    scaffold: z9.array(z9.object({ label: z9.string().max(80), weight: z9.number().min(0.5).max(3).default(1) })).max(8).optional(),
-    code_groups: z9.array(z9.enum(["composition", "viva", "speaking"])).optional()
+  content: z10.object({
+    url: z10.string(),
+    title: z10.string().optional(),
+    mode: z10.enum(["listen", "respond", "viva"]).default("listen"),
+    prompt: z10.string().max(4e3).optional(),
+    time_limit_s: z10.number().int().min(30).max(300).optional(),
+    student_chooses_time: z10.boolean().optional(),
+    scaffold: z10.array(z10.object({ label: z10.string().max(80), weight: z10.number().min(0.5).max(3).default(1) })).max(8).optional(),
+    code_groups: z10.array(z10.enum(["composition", "viva", "speaking"])).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AttachmentBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("attachment"),
-  variant: z9.string().default("medium"),
+var AttachmentBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("attachment"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    url: z9.string(),
-    title: z9.string(),
-    filename: z9.string().optional()
+  content: z10.object({
+    url: z10.string(),
+    title: z10.string(),
+    filename: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AccordionItemSchema = z9.object({
-  title: z9.string(),
-  body: z9.string()
+var AccordionItemSchema = z10.object({
+  title: z10.string(),
+  body: z10.string()
 });
-var AccordionBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("accordion"),
-  variant: z9.string().default("medium"),
+var AccordionBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("accordion"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    items: z9.array(AccordionItemSchema)
+  content: z10.object({
+    items: z10.array(AccordionItemSchema)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var TableBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("table"),
-  variant: z9.string().default("large"),
+var TableBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("table"),
+  variant: z10.string().default("large"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    headers: z9.array(z9.string()),
-    rows: z9.array(z9.array(z9.string()))
+  content: z10.object({
+    headers: z10.array(z10.string()),
+    rows: z10.array(z10.array(z10.string()))
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuestionItemSchema = z9.object({
-  id: z9.string().min(1),
-  prompt: z9.string(),
+var QuestionItemSchema = z10.object({
+  id: z10.string().min(1),
+  prompt: z10.string(),
   kind: QuestionKindSchema,
-  options: z9.array(z9.string()).optional(),
+  options: z10.array(z10.string()).optional(),
   response_space: ResponseSpaceSchema.optional(),
   /** The 4 levels format's band; absent means guessed from the question's opening words. */
-  level: z9.enum(["beginner", "detective", "judge", "inventor"]).optional(),
+  level: z10.enum(["beginner", "detective", "judge", "inventor"]).optional(),
   /** Reasoning chart format: which logic this question walks. Absent means Student's choice. */
   logic: LogicSchema.optional()
 });
-var PeerFeedbackBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("peer_feedback"),
-  variant: z9.string().default("medium"),
+var PeerFeedbackBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("peer_feedback"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    prompt: z9.string().max(4e3),
+  content: z10.object({
+    prompt: z10.string().max(4e3),
     /** comments: two feedback boxes, one reader. annotate: notes on the text, two readers. */
-    mode: z9.enum(["comments", "annotate"]).default("comments"),
-    strength_prompt: z9.string().max(300).default("One thing that works well\u2026"),
-    suggestion_prompt: z9.string().max(300).default("One suggestion or question\u2026")
+    mode: z10.enum(["comments", "annotate"]).default("comments"),
+    strength_prompt: z10.string().max(300).default("One thing that works well\u2026"),
+    suggestion_prompt: z10.string().max(300).default("One suggestion or question\u2026")
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ContinuumStatementSchema = z9.object({
-  id: z9.string().min(1),
-  text: z9.string().max(300).default(""),
-  snap: z9.boolean().default(false)
+var ContinuumStatementSchema = z10.object({
+  id: z10.string().min(1),
+  text: z10.string().max(300).default(""),
+  snap: z10.boolean().default(false)
 });
-var ContinuumLineBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("continuum_line"),
-  variant: z9.string().default("medium"),
+var ContinuumLineBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("continuum_line"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    stimulus: z9.object({
-      kind: z9.enum(["text", "image", "video"]).default("text"),
-      text: z9.string().max(2e3).default(""),
-      url: z9.string().max(2e3).default(""),
-      alt_text: z9.string().max(500).default("")
+  content: z10.object({
+    stimulus: z10.object({
+      kind: z10.enum(["text", "image", "video"]).default("text"),
+      text: z10.string().max(2e3).default(""),
+      url: z10.string().max(2e3).default(""),
+      alt_text: z10.string().max(500).default("")
     }).default({ kind: "text", text: "", url: "", alt_text: "" }),
-    scale: z9.object({
-      left: z9.string().max(40).default("Implied"),
-      right: z9.string().max(40).default("Not implied"),
-      stops: z9.array(z9.string().max(40)).max(3).default([])
+    scale: z10.object({
+      left: z10.string().max(40).default("Implied"),
+      right: z10.string().max(40).default("Not implied"),
+      stops: z10.array(z10.string().max(40)).max(3).default([])
     }).default({ left: "Implied", right: "Not implied", stops: [] }),
-    statements: z9.array(ContinuumStatementSchema).max(10).default([]),
-    pace: z9.enum(["teacher", "student"]).default("teacher"),
-    replace: z9.boolean().default(true)
+    statements: z10.array(ContinuumStatementSchema).max(10).default([]),
+    pace: z10.enum(["teacher", "student"]).default("teacher"),
+    replace: z10.boolean().default(true)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var BrainstormBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("brainstorm"),
-  variant: z9.string().default("medium"),
+var BrainstormBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("brainstorm"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    question: z9.string().max(500).default(""),
-    safety: z9.enum(["instant", "approve", "reveal"]).default("approve"),
-    per_student: z9.union([z9.literal(0), z9.literal(1), z9.literal(3), z9.literal(5)]).default(3),
-    max_length: z9.number().int().min(20).max(280).default(140),
-    layout: z9.enum(["grid", "cloud", "groups"]).default("grid")
+  content: z10.object({
+    question: z10.string().max(500).default(""),
+    safety: z10.enum(["instant", "approve", "reveal"]).default("approve"),
+    per_student: z10.union([z10.literal(0), z10.literal(1), z10.literal(3), z10.literal(5)]).default(3),
+    max_length: z10.number().int().min(20).max(280).default(140),
+    layout: z10.enum(["grid", "cloud", "groups"]).default("grid")
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var HingeOptionSchema = z9.object({
-  id: z9.string().min(1).max(40),
-  text: z9.string().max(300).default(""),
-  misconception: z9.string().max(300).default("")
+var HingeOptionSchema = z10.object({
+  id: z10.string().min(1).max(40),
+  text: z10.string().max(300).default(""),
+  misconception: z10.string().max(300).default("")
 });
-var HingeBackupSchema = z9.object({
-  prompt: z9.string().max(500).default(""),
-  options: z9.array(HingeOptionSchema).max(5).default([]),
-  correct_id: z9.string().max(40).default(""),
-  source: z9.enum(["teacher", "ann"]).default("teacher")
+var HingeBackupSchema = z10.object({
+  prompt: z10.string().max(500).default(""),
+  options: z10.array(HingeOptionSchema).max(5).default([]),
+  correct_id: z10.string().max(40).default(""),
+  source: z10.enum(["teacher", "ann"]).default("teacher")
 });
-var HingeQuestionBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("hinge_question"),
-  variant: z9.string().default("medium"),
+var HingeQuestionBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("hinge_question"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    prompt: z9.string().max(500).default(""),
-    options: z9.array(HingeOptionSchema).max(5).default([]),
-    correct_id: z9.string().max(40).default(""),
-    seconds: z9.union([z9.literal(0), z9.literal(30), z9.literal(60), z9.literal(90), z9.literal(120)]).default(60),
-    move_on: z9.number().int().min(1).max(100).default(80),
-    reteach: z9.number().int().min(0).max(99).default(50),
+  content: z10.object({
+    prompt: z10.string().max(500).default(""),
+    options: z10.array(HingeOptionSchema).max(5).default([]),
+    correct_id: z10.string().max(40).default(""),
+    seconds: z10.union([z10.literal(0), z10.literal(30), z10.literal(60), z10.literal(90), z10.literal(120)]).default(60),
+    move_on: z10.number().int().min(1).max(100).default(80),
+    reteach: z10.number().int().min(0).max(99).default(50),
     /** A parallel question for the re-check after re-teaching. Teacher-written, or drafted by Ann in focus view. */
     backup: HingeBackupSchema.optional(),
     /** Lecture: students must answer before moving on. On unless false. */
-    gate: z9.boolean().optional()
+    gate: z10.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CurriculumLinesColourSchema = z9.enum([
+var CurriculumLinesColourSchema = z10.enum([
   "wave",
   "wave_deep",
   "green",
@@ -2235,271 +2265,303 @@ var CurriculumLinesColourSchema = z9.enum([
   "navy",
   "navy_deep"
 ]);
-var CurriculumLinesLevelSchema = z9.enum(["introduced", "reinforced", "mastered"]);
-var CurriculumLinesStrandSchema = z9.object({
-  id: z9.string().min(1).max(64),
-  name: z9.string().max(60).default(""),
+var CurriculumLinesLevelSchema = z10.enum(["introduced", "reinforced", "mastered"]);
+var CurriculumLinesStrandSchema = z10.object({
+  id: z10.string().min(1).max(64),
+  name: z10.string().max(60).default(""),
   colour: CurriculumLinesColourSchema.default("wave")
 });
-var CurriculumLinesStationSchema = z9.object({
-  id: z9.string().min(1).max(64),
-  strand_id: z9.string().min(1).max(64),
-  week: z9.number().int().min(1).max(20),
+var CurriculumLinesStationSchema = z10.object({
+  id: z10.string().min(1).max(64),
+  strand_id: z10.string().min(1).max(64),
+  week: z10.number().int().min(1).max(20),
   level: CurriculumLinesLevelSchema.default("reinforced"),
-  label: z9.string().max(120).default(""),
-  lesson_id: z9.string().min(1).max(64).optional()
+  label: z10.string().max(120).default(""),
+  lesson_id: z10.string().min(1).max(64).optional()
 });
-var CurriculumLinesCheckpointSchema = z9.object({
-  id: z9.string().min(1).max(64),
-  week: z9.number().int().min(1).max(20),
-  label: z9.string().max(80).default(""),
-  lesson_id: z9.string().min(1).max(64).optional(),
-  strand_ids: z9.array(z9.string().min(1).max(64)).min(1).max(8)
+var CurriculumLinesCheckpointSchema = z10.object({
+  id: z10.string().min(1).max(64),
+  week: z10.number().int().min(1).max(20),
+  label: z10.string().max(80).default(""),
+  lesson_id: z10.string().min(1).max(64).optional(),
+  strand_ids: z10.array(z10.string().min(1).max(64)).min(1).max(8)
 });
-var CurriculumLinesTerminusSchema = z9.object({
-  label: z9.string().max(80).default("Assessment task"),
-  detail: z9.string().max(160).optional(),
-  when: z9.string().max(24).optional(),
-  lesson_id: z9.string().min(1).max(64).optional()
+var CurriculumLinesTerminusSchema = z10.object({
+  label: z10.string().max(80).default("Assessment task"),
+  detail: z10.string().max(160).optional(),
+  when: z10.string().max(24).optional(),
+  lesson_id: z10.string().min(1).max(64).optional()
 });
-var CurriculumLinesV1ContentSchema = z9.object({
-  title: z9.string().max(120).optional(),
-  weeks: z9.number().int().min(1).max(20).default(8),
-  strands: z9.array(CurriculumLinesStrandSchema).min(1).max(8),
-  stations: z9.array(CurriculumLinesStationSchema).max(160).default([]),
-  checkpoints: z9.array(CurriculumLinesCheckpointSchema).max(20).default([]),
+var CurriculumLinesV1ContentSchema = z10.object({
+  title: z10.string().max(120).optional(),
+  weeks: z10.number().int().min(1).max(20).default(8),
+  strands: z10.array(CurriculumLinesStrandSchema).min(1).max(8),
+  stations: z10.array(CurriculumLinesStationSchema).max(160).default([]),
+  checkpoints: z10.array(CurriculumLinesCheckpointSchema).max(20).default([]),
   terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
 });
-var NetworkLineModeSchema = z9.enum(["train", "metro", "light_rail"]);
-var LineAlignmentSchema = z9.discriminatedUnion("kind", [
-  z9.object({ kind: z9.literal("points"), group: z9.enum(["U", "R"]) }),
-  z9.object({ kind: z9.literal("concept"), key: z9.string().regex(/^[A-Z]{2,5}$/) }),
-  z9.object({ kind: z9.literal("strand"), strand: z9.enum(SKILL_STRANDS) })
+var NetworkLineModeSchema = z10.enum(["train", "metro", "light_rail"]);
+var LineAlignmentSchema = z10.discriminatedUnion("kind", [
+  z10.object({ kind: z10.literal("points"), group: z10.enum(["U", "R"]) }),
+  z10.object({ kind: z10.literal("concept"), key: z10.string().regex(/^[A-Z]{2,5}$/) }),
+  z10.object({ kind: z10.literal("strand"), strand: z10.enum(SKILL_STRANDS) })
 ]);
-var DotPointRefSchema = z9.string().regex(/^[a-z0-9-]{2,40}:[UR]\d{1,2}$/);
-var NetworkLineSchema = z9.object({
-  id: z9.string().min(1).max(64),
+var DotPointRefSchema = z10.string().regex(/^[a-z0-9-]{2,40}:[UR]\d{1,2}$/);
+var NetworkLineSchema = z10.object({
+  id: z10.string().min(1).max(64),
   mode: NetworkLineModeSchema,
-  name: z9.string().max(60).default(""),
-  short: z9.string().max(4).optional(),
+  name: z10.string().max(60).default(""),
+  short: z10.string().max(4).optional(),
   colour: CurriculumLinesColourSchema.default("wave"),
   alignment: LineAlignmentSchema.optional()
 });
-var LessonKindSchema = z9.enum(["lesson", "workshop", "lecture"]);
-var AfterLessonIdsSchema = z9.array(z9.string().min(1).max(64)).max(6);
-var LessonRouteRoleSchema = z9.enum(["support", "extension"]);
-var LessonSkipRuleSchema = z9.string().trim().max(80);
-var LineStopSchema = z9.object({
-  line_id: z9.string().min(1).max(64),
+var LessonKindSchema = z10.enum(["lesson", "workshop", "lecture"]);
+var AfterLessonIdsSchema = z10.array(z10.string().min(1).max(64)).max(6);
+var LessonRouteRoleSchema = z10.enum(["support", "extension"]);
+var LessonSkipRuleSchema = z10.string().trim().max(80);
+var LineStopSchema = z10.object({
+  line_id: z10.string().min(1).max(64),
   level: CurriculumLinesLevelSchema.optional(),
   /** Set from the lesson's dot points; it follows them until the teacher takes it off. */
-  auto: z9.literal(true).optional()
+  auto: z10.literal(true).optional()
 });
-var LineOffSchema = z9.array(z9.string().min(1).max(64)).max(24);
-var NetworkNudgesSchema = z9.record(
-  z9.string().min(1).max(160),
-  z9.object({ dx: z9.number().min(-2e3).max(2e3), dy: z9.number().min(-2e3).max(2e3) })
+var LineOffSchema = z10.array(z10.string().min(1).max(64)).max(24);
+var NetworkNudgesSchema = z10.record(
+  z10.string().min(1).max(160),
+  z10.object({ dx: z10.number().min(-2e3).max(2e3), dy: z10.number().min(-2e3).max(2e3) })
 ).refine((value) => Object.keys(value).length <= 120, { message: "At most 120 nudges" });
-var CurriculumRailStopSchema = z9.object({
-  id: z9.string().min(1).max(64),
-  line_id: z9.string().min(1).max(64),
-  after_lesson_id: z9.string().min(1).max(64).optional(),
-  kind: z9.enum(["stop", "extension", "support"]).default("stop"),
-  lesson_id: z9.string().min(1).max(64).optional(),
-  block_id: z9.string().min(1).max(120).optional(),
-  label: z9.string().max(120).default(""),
+var CurriculumRailStopSchema = z10.object({
+  id: z10.string().min(1).max(64),
+  line_id: z10.string().min(1).max(64),
+  after_lesson_id: z10.string().min(1).max(64).optional(),
+  kind: z10.enum(["stop", "extension", "support"]).default("stop"),
+  lesson_id: z10.string().min(1).max(64).optional(),
+  block_id: z10.string().min(1).max(120).optional(),
+  label: z10.string().max(120).default(""),
   /** Who may take the straight track past a support stop, e.g. "90%+ on the techniques quiz". */
-  skip_rule: z9.string().max(80).optional()
+  skip_rule: z10.string().max(80).optional()
 });
-var CurriculumGateSchema = z9.object({
-  id: z9.string().min(1).max(64),
-  after_lesson_id: z9.string().min(1).max(64).optional(),
-  label: z9.string().max(80).default(""),
-  lesson_id: z9.string().min(1).max(64).optional(),
-  line_ids: z9.array(z9.string().min(1).max(64)).max(24).default([])
+var CurriculumGateSchema = z10.object({
+  id: z10.string().min(1).max(64),
+  after_lesson_id: z10.string().min(1).max(64).optional(),
+  label: z10.string().max(80).default(""),
+  lesson_id: z10.string().min(1).max(64).optional(),
+  line_ids: z10.array(z10.string().min(1).max(64)).max(24).default([])
 });
-var CurriculumLinesV2ContentSchema = z9.object({
-  version: z9.literal(2),
-  title: z9.string().max(120).optional(),
-  rail_stops: z9.array(CurriculumRailStopSchema).max(60).default([]),
-  gates: z9.array(CurriculumGateSchema).max(12).default([]),
+var CurriculumLinesV2ContentSchema = z10.object({
+  version: z10.literal(2),
+  title: z10.string().max(120).optional(),
+  rail_stops: z10.array(CurriculumRailStopSchema).max(60).default([]),
+  gates: z10.array(CurriculumGateSchema).max(12).default([]),
   nudges: NetworkNudgesSchema.default({}),
   /** Map-only station order; lessons not listed follow in unit order. */
-  station_order: z9.array(z9.string().min(1).max(64)).max(200).optional(),
+  station_order: z10.array(z10.string().min(1).max(64)).max(200).optional(),
   /** Lessons left off this map (they stay in the unit). */
-  hidden_lessons: z9.array(z9.string().min(1).max(64)).max(200).optional(),
+  hidden_lessons: z10.array(z10.string().min(1).max(64)).max(200).optional(),
   /** The syllabus focus area this unit covers; unset is worked out from the unit's title. */
-  focus_area: z9.string().regex(/^[a-z0-9-]{2,40}$/).optional(),
+  focus_area: z10.string().regex(/^[a-z0-9-]{2,40}$/).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
 });
-var CurriculumLinesBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("curriculum_lines"),
-  variant: z9.string().default("large"),
+var CurriculumLinesBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("curriculum_lines"),
+  variant: z10.string().default("large"),
   visibility: VisibilitySchema,
-  content: z9.union([CurriculumLinesV2ContentSchema, CurriculumLinesV1ContentSchema]),
+  content: z10.union([CurriculumLinesV2ContentSchema, CurriculumLinesV1ContentSchema]),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuestionDropBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("question_drop"),
-  variant: z9.string().default("medium"),
+var QuestionDropBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("question_drop"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    target_quiz_id: z9.string().max(64).default(""),
-    prompt: z9.string().max(500).default(""),
-    kinds: z9.array(QuizQuestionKindSchema).max(20).default([]),
-    marks_min: z9.number().int().min(1).max(20).default(1),
-    marks_max: z9.number().int().min(1).max(20).default(3),
-    per_student: z9.number().int().min(1).max(5).default(1),
-    accepting: z9.boolean().default(true)
+  content: z10.object({
+    target_quiz_id: z10.string().max(64).default(""),
+    prompt: z10.string().max(500).default(""),
+    kinds: z10.array(QuizQuestionKindSchema).max(20).default([]),
+    marks_min: z10.number().int().min(1).max(20).default(1),
+    marks_max: z10.number().int().min(1).max(20).default(3),
+    per_student: z10.number().int().min(1).max(5).default(1),
+    accepting: z10.boolean().default(true)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var DiscernConfirmBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("discern_confirm"),
-  variant: z9.string().default("medium"),
+var DiscernConfirmBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("discern_confirm"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    target_block_id: z9.string().max(120).default("")
+  content: z10.object({
+    target_block_id: z10.string().max(120).default("")
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuizQuestionBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("quiz_question"),
-  variant: z9.string().default("medium"),
+var QuizQuestionBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("quiz_question"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     question: QuizQuestionDraftSchema,
     /** Teacher-only: the question came from a student's Question drop. */
-    from_submission: z9.string().max(200).optional()
+    from_submission: z10.string().max(200).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var QuestionSetBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("question_set"),
-  variant: z9.string().default("medium"),
+var QuestionSetBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("question_set"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
-    questions: z9.array(QuestionItemSchema),
+  content: z10.object({
+    title: z10.string().optional(),
+    questions: z10.array(QuestionItemSchema),
     /** Shape of the set; absent means standard. See src/blocks/formats/registry.ts. */
-    format: z9.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so", "reasoning_chart"]).optional(),
+    format: z10.enum(["standard", "human_experience_table", "anchor_bridge", "question_levels", "because_but_so", "reasoning_chart"]).optional(),
     /** Human experience table settings, kept when switching format away and back. */
-    table: z9.object({
-      rows: z9.number().int().min(3).max(5).default(3),
-      example: z9.boolean().default(true)
+    table: z10.object({
+      rows: z10.number().int().min(3).max(5).default(3),
+      example: z10.boolean().default(true)
     }).optional(),
     /** Reasoning chart settings, kept when switching format away and back. */
-    reasoning: z9.object({
+    reasoning: z10.object({
       level: LensLevelSchema.default("core"),
-      student_level: z9.boolean().default(true)
+      student_level: z10.boolean().default(true)
     }).optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var FlashcardSourceSchema = z9.object({
-  block_id: z9.string().min(1),
-  annotation_id: z9.string().min(1),
-  lesson_id: z9.string().optional(),
-  kind: z9.enum(["quote_to_technique", "find_it", "line_recall"]),
-  source_hash: z9.string().min(1)
+var FlashcardSourceSchema = z10.object({
+  block_id: z10.string().min(1),
+  annotation_id: z10.string().min(1),
+  lesson_id: z10.string().optional(),
+  kind: z10.enum(["quote_to_technique", "find_it", "line_recall"]),
+  source_hash: z10.string().min(1)
 });
-var FlashcardItemSchema = z9.object({
-  id: z9.string().min(1),
-  front: z9.string(),
-  back: z9.string(),
-  image_url: z9.string().optional(),
-  image_alt: z9.string().optional(),
+var FlashcardItemSchema = z10.object({
+  id: z10.string().min(1),
+  front: z10.string(),
+  back: z10.string(),
+  image_url: z10.string().optional(),
+  image_alt: z10.string().optional(),
   /** Teacher-only metadata; stripped from the student payload. */
   source: FlashcardSourceSchema.optional()
 });
-var FlashcardsBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("flashcards"),
-  variant: z9.string().default("medium"),
+var FlashcardsBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("flashcards"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    cards: z9.array(FlashcardItemSchema).min(1).max(20),
-    shuffle: z9.boolean().optional()
+  content: z10.object({
+    cards: z10.array(FlashcardItemSchema).min(1).max(20),
+    shuffle: z10.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ClozeBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("cloze"),
-  variant: z9.string().default("medium"),
+var ClozeBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("cloze"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
-    text: z9.string(),
-    case_sensitive: z9.boolean().optional(),
+  content: z10.object({
+    title: z10.string().optional(),
+    text: z10.string(),
+    case_sensitive: z10.boolean().optional(),
     /** Lecture: students must answer before moving on. On unless false. */
-    gate: z9.boolean().optional()
+    gate: z10.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var SelfCheckModeSchema = z9.enum(["reveal", "checklist", "confidence"]);
-var SelfCheckItemSchema = z9.object({
-  id: z9.string().min(1),
-  label: z9.string()
+var SelfCheckModeSchema = z10.enum(["reveal", "checklist", "confidence"]);
+var SelfCheckItemSchema = z10.object({
+  id: z10.string().min(1),
+  label: z10.string()
 });
-var SelfCheckBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("self_check"),
-  variant: z9.string().default("medium"),
+var SelfCheckBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("self_check"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
+  content: z10.object({
+    title: z10.string().optional(),
     mode: SelfCheckModeSchema,
-    prompt: z9.string(),
-    answer: z9.string().optional(),
-    items: z9.array(SelfCheckItemSchema).max(12).optional(),
+    prompt: z10.string(),
+    answer: z10.string().optional(),
+    items: z10.array(SelfCheckItemSchema).max(12).optional(),
     /** Lecture: students must answer before moving on. On unless false. */
-    gate: z9.boolean().optional()
+    gate: z10.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
 var NOTE_CUE_KINDS = ["copy", "own_words", "draw", "question"];
-var NoteCueKindSchema = z9.enum(NOTE_CUE_KINDS);
-var NoteCueBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("note_cue"),
-  variant: z9.string().default("medium"),
+var NoteCueKindSchema = z10.enum(NOTE_CUE_KINDS);
+var NoteCueBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("note_cue"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     kind: NoteCueKindSchema,
-    prompt: z9.string().max(500)
+    prompt: z10.string().max(500)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ChartTypeSchema = z9.enum(["bar", "line", "pie", "scatter"]);
-var ChartPointSchema = z9.object({
-  x: z9.union([z9.string(), z9.number()]),
-  y: z9.number()
+var WithTeacherBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("with_teacher"),
+  variant: z10.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z10.object({
+    talking_points: z10.array(z10.string().max(300)).max(8)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
 });
-var ChartSeriesColorSchema = z9.enum([
+var FadedExampleBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("faded_example"),
+  variant: z10.string().default("medium"),
+  visibility: VisibilitySchema,
+  content: z10.object({
+    prompt: z10.string().max(300),
+    extract: z10.string().max(2e3),
+    parts: z10.array(z10.object({ label: z10.string().min(1).max(40), answer: z10.string().max(600) })).min(1).max(4),
+    blanks: z10.array(z10.number().int().min(0).max(3)).max(4),
+    /** A step with blanks is a gate unless switched off. */
+    gate: z10.boolean().optional()
+  }).refine((c) => c.blanks.every((i) => i < c.parts.length) && new Set(c.blanks).size === c.blanks.length, {
+    message: "Each blank must name a different part of the example.",
+    path: ["blanks"]
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+var ChartTypeSchema = z10.enum(["bar", "line", "pie", "scatter"]);
+var ChartPointSchema = z10.object({
+  x: z10.union([z10.string(), z10.number()]),
+  y: z10.number()
+});
+var ChartSeriesColorSchema = z10.enum([
   "wave",
   "danger",
   "success",
@@ -2507,145 +2569,145 @@ var ChartSeriesColorSchema = z9.enum([
   "pastel-lilac-ink",
   "navy-2"
 ]);
-var ChartSeriesSchema = z9.object({
-  id: z9.string().min(1),
-  name: z9.string(),
+var ChartSeriesSchema = z10.object({
+  id: z10.string().min(1),
+  name: z10.string(),
   color: ChartSeriesColorSchema.optional(),
-  points: z9.array(ChartPointSchema).min(1).max(24)
+  points: z10.array(ChartPointSchema).min(1).max(24)
 });
-var ChartBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("chart"),
-  variant: z9.string().default("medium"),
+var ChartBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("chart"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     chart_type: ChartTypeSchema,
-    title: z9.string().optional(),
-    x_label: z9.string().optional(),
-    y_label: z9.string().optional(),
-    series: z9.array(ChartSeriesSchema).min(1).max(6)
+    title: z10.string().optional(),
+    x_label: z10.string().optional(),
+    y_label: z10.string().optional(),
+    series: z10.array(ChartSeriesSchema).min(1).max(6)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var EquationBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("equation"),
-  variant: z9.string().default("medium"),
+var EquationBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("equation"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    latex: z9.string(),
-    caption: z9.string().optional()
+  content: z10.object({
+    latex: z10.string(),
+    caption: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var DiagramSourceSchema = z9.enum(["image", "svg"]);
+var DiagramSourceSchema = z10.enum(["image", "svg"]);
 var DIAGRAM_IMAGE_PUBLISH_URL_ISSUE = "Diagram image needs a valid http(s) URL to publish";
-var DiagramBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("diagram"),
-  variant: z9.string().default("medium"),
+var DiagramBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("diagram"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     source: DiagramSourceSchema,
-    image_url: z9.string().optional(),
-    image_alt: z9.string().optional(),
-    svg_markup: z9.string().optional(),
-    caption: z9.string().optional()
+    image_url: z10.string().optional(),
+    image_alt: z10.string().optional(),
+    svg_markup: z10.string().optional(),
+    caption: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var GraphNodeSchema = z9.object({
-  id: z9.string().min(1),
-  label: z9.string(),
-  parent_id: z9.string().nullable().optional(),
-  color: z9.string().optional(),
-  x: z9.number().optional(),
-  y: z9.number().optional()
+var GraphNodeSchema = z10.object({
+  id: z10.string().min(1),
+  label: z10.string(),
+  parent_id: z10.string().nullable().optional(),
+  color: z10.string().optional(),
+  x: z10.number().optional(),
+  y: z10.number().optional()
 });
-var GraphBuildModeSchema = z9.enum(["outline", "canvas"]);
-var GraphEdgeSchema = z9.object({
-  id: z9.string().min(1),
-  from: z9.string().min(1),
-  to: z9.string().min(1),
-  label: z9.string().optional()
+var GraphBuildModeSchema = z10.enum(["outline", "canvas"]);
+var GraphEdgeSchema = z10.object({
+  id: z10.string().min(1),
+  from: z10.string().min(1),
+  to: z10.string().min(1),
+  label: z10.string().optional()
 });
-var MindMapBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("mind_map"),
-  variant: z9.string().default("medium"),
+var MindMapBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("mind_map"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
-    nodes: z9.array(GraphNodeSchema).min(1).max(24),
-    edges: z9.array(GraphEdgeSchema).max(40),
+  content: z10.object({
+    title: z10.string().optional(),
+    nodes: z10.array(GraphNodeSchema).min(1).max(24),
+    edges: z10.array(GraphEdgeSchema).max(40),
     mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ConceptMapBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("concept_map"),
-  variant: z9.string().default("medium"),
+var ConceptMapBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("concept_map"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
-    nodes: z9.array(GraphNodeSchema).min(1).max(24),
-    edges: z9.array(GraphEdgeSchema).max(40),
+  content: z10.object({
+    title: z10.string().optional(),
+    nodes: z10.array(GraphNodeSchema).min(1).max(24),
+    edges: z10.array(GraphEdgeSchema).max(40),
     mode: GraphBuildModeSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var WhiteboardBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("whiteboard"),
-  variant: z9.string().default("large"),
+var WhiteboardBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("whiteboard"),
+  variant: z10.string().default("large"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    document_id: z9.string().min(1),
-    seed_document_id: z9.string().min(1).optional(),
-    title: z9.string().optional(),
-    height_px: z9.number().int().min(360).max(1400).default(640),
-    published_snapshot: z9.unknown().optional()
+  content: z10.object({
+    document_id: z10.string().min(1),
+    seed_document_id: z10.string().min(1).optional(),
+    title: z10.string().optional(),
+    height_px: z10.number().int().min(360).max(1400).default(640),
+    published_snapshot: z10.unknown().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var TimelineEventSchema = z9.object({
-  id: z9.string().min(1),
-  when: z9.string(),
-  label: z9.string(),
-  description: z9.string(),
-  image_url: z9.string().optional(),
-  image_alt: z9.string().optional(),
-  link_url: z9.string().optional(),
-  link_label: z9.string().optional()
+var TimelineEventSchema = z10.object({
+  id: z10.string().min(1),
+  when: z10.string(),
+  label: z10.string(),
+  description: z10.string(),
+  image_url: z10.string().optional(),
+  image_alt: z10.string().optional(),
+  link_url: z10.string().optional(),
+  link_label: z10.string().optional()
 });
-var TimelineLayoutSchema = z9.enum(["rail", "alternate", "horizontal"]);
-var TimelineBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("timeline"),
-  variant: z9.string().default("medium"),
+var TimelineLayoutSchema = z10.enum(["rail", "alternate", "horizontal"]);
+var TimelineBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("timeline"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     layout: TimelineLayoutSchema.optional(),
-    events: z9.array(TimelineEventSchema).min(1).max(12)
+    events: z10.array(TimelineEventSchema).min(1).max(12)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CardStackTintSchema = z9.enum([
+var CardStackTintSchema = z10.enum([
   "navy",
   "wave",
   "marine",
@@ -2655,82 +2717,82 @@ var CardStackTintSchema = z9.enum([
   "sage",
   "peach"
 ]);
-var CardStackItemSchema = z9.object({
-  id: z9.string().min(1),
-  number: z9.string().optional(),
-  eyebrow: z9.string(),
-  title: z9.string(),
-  description: z9.string(),
-  image_url: z9.string().optional(),
-  image_alt: z9.string().optional(),
+var CardStackItemSchema = z10.object({
+  id: z10.string().min(1),
+  number: z10.string().optional(),
+  eyebrow: z10.string(),
+  title: z10.string(),
+  description: z10.string(),
+  image_url: z10.string().optional(),
+  image_alt: z10.string().optional(),
   tint: CardStackTintSchema
 });
-var CardStackBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("card_stack"),
-  variant: z9.string().default("medium"),
+var CardStackBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("card_stack"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
-    cards: z9.array(CardStackItemSchema).min(1).max(8)
+  content: z10.object({
+    title: z10.string().optional(),
+    cards: z10.array(CardStackItemSchema).min(1).max(8)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var CollectionSourceSchema = z9.enum(["unit_lessons", "recent_lessons"]);
-var CollectionBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("collection"),
-  variant: z9.string().default("medium"),
+var CollectionSourceSchema = z10.enum(["unit_lessons", "recent_lessons"]);
+var CollectionBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("collection"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     source: CollectionSourceSchema,
-    title: z9.string().optional()
+    title: z10.string().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var AnthologyViewSchema = z9.enum(["text", "theme", "technique", "connections"]);
-var AnthologyBlockObjectSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("anthology"),
-  variant: z9.string().default("medium"),
+var AnthologyViewSchema = z10.enum(["text", "theme", "technique", "connections"]);
+var AnthologyBlockObjectSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("anthology"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
+  content: z10.object({
+    title: z10.string().optional(),
     default_view: AnthologyViewSchema.default("text")
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var OutcomesBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("outcomes"),
-  variant: z9.string().default("medium"),
+var OutcomesBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("outcomes"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({}).default({}),
+  content: z10.object({}).default({}),
   ...blockLayout,
   ...blockTimestamps
 });
-var AnnotationFamilyKeySchema = z9.enum([
+var AnnotationFamilyKeySchema = z10.enum([
   "Descriptive",
   "Repetitive",
   "Comparative",
   "Structural",
   "Intertextual"
 ]);
-var AnnotationLayerKindSchema = z9.enum([
+var AnnotationLayerKindSchema = z10.enum([
   "family",
   "free",
   "lens",
   "teacher",
   "voice"
 ]);
-var AnnotationColourSchema = z9.enum([
+var AnnotationColourSchema = z10.enum([
   "wave",
   "high-sea",
   "sand",
@@ -2740,176 +2802,176 @@ var AnnotationColourSchema = z9.enum([
   "coral",
   "mist"
 ]);
-var AnnotationGranularitySchema = z9.enum(["word", "phrase", "line", "stanza"]);
-var AnnotationLineAlignSchema = z9.enum(["left", "center", "right"]);
-var AnnotationLineSchema = z9.object({
-  id: z9.string().min(1),
+var AnnotationGranularitySchema = z10.enum(["word", "phrase", "line", "stanza"]);
+var AnnotationLineAlignSchema = z10.enum(["left", "center", "right"]);
+var AnnotationLineSchema = z10.object({
+  id: z10.string().min(1),
   /** Plain text. Anchor offsets always index into this, never into `html`. */
-  text: z9.string(),
+  text: z10.string(),
   /** Inline formatting only (strong / em / u) over exactly `text`. */
-  html: z9.string().optional(),
+  html: z10.string().optional(),
   align: AnnotationLineAlignSchema.optional(),
   /** Indent steps (poetry layout); 0 or absent = flush. */
-  indent: z9.number().int().min(0).max(8).optional()
+  indent: z10.number().int().min(0).max(8).optional()
 });
-var AnnotationStanzaSchema = z9.object({
-  id: z9.string().min(1),
-  lines: z9.array(AnnotationLineSchema).min(1)
+var AnnotationStanzaSchema = z10.object({
+  id: z10.string().min(1),
+  lines: z10.array(AnnotationLineSchema).min(1)
 });
-var AnnotationTextSchema = z9.object({
-  kind: z9.enum(["verse", "prose"]),
-  stanzas: z9.array(AnnotationStanzaSchema).min(1)
+var AnnotationTextSchema = z10.object({
+  kind: z10.enum(["verse", "prose"]),
+  stanzas: z10.array(AnnotationStanzaSchema).min(1)
 });
-var AnnotationSublayerSchema = z9.object({
-  id: z9.string().min(1),
-  name: z9.string().min(1),
-  subgroup: z9.string().optional()
+var AnnotationSublayerSchema = z10.object({
+  id: z10.string().min(1),
+  name: z10.string().min(1),
+  subgroup: z10.string().optional()
 });
-var AnnotationLayerSchema = z9.object({
-  id: z9.string().min(1),
-  name: z9.string().min(1),
+var AnnotationLayerSchema = z10.object({
+  id: z10.string().min(1),
+  name: z10.string().min(1),
   kind: AnnotationLayerKindSchema,
   family: AnnotationFamilyKeySchema.optional(),
   colour: AnnotationColourSchema,
-  symbol: z9.string().optional(),
-  sublayers: z9.array(AnnotationSublayerSchema).optional()
+  symbol: z10.string().optional(),
+  sublayers: z10.array(AnnotationSublayerSchema).optional()
 });
-var AnnotationQuoteSchema = z9.object({
-  exact: z9.string().min(1),
-  prefix: z9.string().optional(),
-  suffix: z9.string().optional()
+var AnnotationQuoteSchema = z10.object({
+  exact: z10.string().min(1),
+  prefix: z10.string().optional(),
+  suffix: z10.string().optional()
 });
-var AnnotationAnchorSchema = z9.object({
+var AnnotationAnchorSchema = z10.object({
   /** Required on every stop when the annotation is a thread. */
-  id: z9.string().min(1).optional(),
+  id: z10.string().min(1).optional(),
   granularity: AnnotationGranularitySchema,
-  stanza: z9.string().min(1),
-  line: z9.string().optional(),
-  start: z9.number().int().min(0).optional(),
-  end: z9.number().int().min(0).optional(),
+  stanza: z10.string().min(1),
+  line: z10.string().optional(),
+  start: z10.number().int().min(0).optional(),
+  end: z10.number().int().min(0).optional(),
   quote: AnnotationQuoteSchema,
   /** Per-stop caption for thread step-through; sanitised on publish. */
-  note_html: z9.string().optional()
+  note_html: z10.string().optional()
 });
-var AnnotationTechniqueRefSchema = z9.object({
-  id: z9.string().min(1),
-  table_version: z9.string().min(1)
+var AnnotationTechniqueRefSchema = z10.object({
+  id: z10.string().min(1),
+  table_version: z10.string().min(1)
 });
-var AnnotationCodeRefSchema = z9.object({
-  id: z9.string().min(1).max(40),
-  code: z9.string().regex(/^[A-Z]{1,3}$/),
-  label: z9.string().max(60),
-  descriptor: z9.string().max(600).default(""),
-  colour: z9.enum(["blue", "sage", "peach", "gold", "lilac"]).default("blue"),
-  positive: z9.boolean().default(false)
+var AnnotationCodeRefSchema = z10.object({
+  id: z10.string().min(1).max(40),
+  code: z10.string().regex(/^[A-Z]{1,3}$/),
+  label: z10.string().max(60),
+  descriptor: z10.string().max(600).default(""),
+  colour: z10.enum(["blue", "sage", "peach", "gold", "lilac"]).default("blue"),
+  positive: z10.boolean().default(false)
 });
-var AnnotationAttachmentSchema = z9.discriminatedUnion("kind", [
-  z9.object({
-    kind: z9.literal("link"),
-    url: z9.string(),
-    label: z9.string().optional()
+var AnnotationAttachmentSchema = z10.discriminatedUnion("kind", [
+  z10.object({
+    kind: z10.literal("link"),
+    url: z10.string(),
+    label: z10.string().optional()
   }),
-  z9.object({
-    kind: z9.literal("video"),
-    url: z9.string(),
-    start_seconds: z9.number().int().min(0).optional()
+  z10.object({
+    kind: z10.literal("video"),
+    url: z10.string(),
+    start_seconds: z10.number().int().min(0).optional()
   }),
-  z9.object({
-    kind: z9.literal("audio"),
-    url: z9.string(),
-    title: z9.string().optional()
+  z10.object({
+    kind: z10.literal("audio"),
+    url: z10.string(),
+    title: z10.string().optional()
   }),
-  z9.object({
-    kind: z9.literal("image"),
-    url: z9.string(),
-    alt_text: z9.string()
+  z10.object({
+    kind: z10.literal("image"),
+    url: z10.string(),
+    alt_text: z10.string()
   }),
-  z9.object({
-    kind: z9.literal("block"),
-    block_id: z9.string().min(1)
+  z10.object({
+    kind: z10.literal("block"),
+    block_id: z10.string().min(1)
   })
 ]);
-var AnthologyTagSchema = z9.object({
-  include: z9.boolean(),
-  themes: z9.array(z9.string().trim().max(40)).max(8).default([]),
-  concepts: z9.array(z9.string().trim().max(40)).max(8).default([])
+var AnthologyTagSchema = z10.object({
+  include: z10.boolean(),
+  themes: z10.array(z10.string().trim().max(40)).max(8).default([]),
+  concepts: z10.array(z10.string().trim().max(40)).max(8).default([])
 });
-var AnnotationThreadKindSchema = z9.enum([
+var AnnotationThreadKindSchema = z10.enum([
   "motif",
   "opposition",
   "volta",
   "echo",
   "argument"
 ]);
-var AnnotationThreadSchema = z9.object({
+var AnnotationThreadSchema = z10.object({
   /** What links the places, in a few words; shown on the thread button. */
-  title: z9.string().trim().max(80).optional(),
+  title: z10.string().trim().max(80).optional(),
   kind: AnnotationThreadKindSchema.optional(),
-  order: z9.enum(["text", "custom"]).default("text"),
-  anchor_order: z9.array(z9.string().min(1)).optional()
+  order: z10.enum(["text", "custom"]).default("text"),
+  anchor_order: z10.array(z10.string().min(1)).optional()
 });
-var AnnotationVoiceWordSchema = z9.object({
-  w: z9.string(),
-  start: z9.number(),
-  end: z9.number()
+var AnnotationVoiceWordSchema = z10.object({
+  w: z10.string(),
+  start: z10.number(),
+  end: z10.number()
 });
-var AnnotationVoiceClipSchema = z9.object({
-  id: z9.string().min(1),
-  start_s: z9.number(),
-  end_s: z9.number(),
-  word_range: z9.tuple([z9.number().int().min(0), z9.number().int().min(0)]),
+var AnnotationVoiceClipSchema = z10.object({
+  id: z10.string().min(1),
+  start_s: z10.number(),
+  end_s: z10.number(),
+  word_range: z10.tuple([z10.number().int().min(0), z10.number().int().min(0)]),
   anchor: AnnotationAnchorSchema.optional(),
-  source: z9.enum(["tap", "quote", "ai", "manual"]),
-  confidence: z9.number().min(0).max(1),
-  approved: z9.boolean(),
-  transcript_text: z9.string()
+  source: z10.enum(["tap", "quote", "ai", "manual"]),
+  confidence: z10.number().min(0).max(1),
+  approved: z10.boolean(),
+  transcript_text: z10.string()
 });
-var AnnotationVoiceTrackSchema = z9.object({
-  id: z9.string().min(1),
-  layer_id: z9.string().min(1),
-  kind: z9.enum(["reading", "think_aloud", "feedback"]),
-  title: z9.string().min(1),
-  audio: z9.object({
-    media_id: z9.string().optional(),
-    url: z9.string().min(1),
-    duration_s: z9.number().min(0),
-    mime: z9.string().min(1)
+var AnnotationVoiceTrackSchema = z10.object({
+  id: z10.string().min(1),
+  layer_id: z10.string().min(1),
+  kind: z10.enum(["reading", "think_aloud", "feedback"]),
+  title: z10.string().min(1),
+  audio: z10.object({
+    media_id: z10.string().optional(),
+    url: z10.string().min(1),
+    duration_s: z10.number().min(0),
+    mime: z10.string().min(1)
   }),
-  transcript: z9.object({
-    words: z9.array(AnnotationVoiceWordSchema),
-    timing: z9.enum(["word", "segment", "estimated"])
+  transcript: z10.object({
+    words: z10.array(AnnotationVoiceWordSchema),
+    timing: z10.enum(["word", "segment", "estimated"])
   }),
-  taps: z9.array(
-    z9.object({
-      t: z9.number(),
+  taps: z10.array(
+    z10.object({
+      t: z10.number(),
       anchor: AnnotationAnchorSchema
     })
   ).optional(),
-  clips: z9.array(AnnotationVoiceClipSchema).default([]),
-  status: z9.enum(["draft", "published"]),
-  extras: z9.array(
-    z9.object({
-      id: z9.string().min(1),
-      kind: z9.enum(["where_to_next", "technique_tag", "class_note"]),
-      html: z9.string(),
-      approved: z9.boolean()
+  clips: z10.array(AnnotationVoiceClipSchema).default([]),
+  status: z10.enum(["draft", "published"]),
+  extras: z10.array(
+    z10.object({
+      id: z10.string().min(1),
+      kind: z10.enum(["where_to_next", "technique_tag", "class_note"]),
+      html: z10.string(),
+      approved: z10.boolean()
     })
   ).optional()
 });
-var AnnotationItemSchema = z9.object({
-  id: z9.string().min(1),
-  layer_id: z9.string().min(1),
-  sublayer_id: z9.string().optional(),
+var AnnotationItemSchema = z10.object({
+  id: z10.string().min(1),
+  layer_id: z10.string().min(1),
+  sublayer_id: z10.string().optional(),
   anchor: AnnotationAnchorSchema,
   /** Extra stops; present and non-empty => this annotation is a thread. Max 24. */
-  also_anchors: z9.array(AnnotationAnchorSchema).max(24).optional(),
+  also_anchors: z10.array(AnnotationAnchorSchema).max(24).optional(),
   thread: AnnotationThreadSchema.optional(),
   anthology: AnthologyTagSchema.optional(),
   technique: AnnotationTechniqueRefSchema.optional(),
   code: AnnotationCodeRefSchema.optional(),
-  body: z9.object({
-    html: z9.string(),
-    attachments: z9.array(AnnotationAttachmentSchema).default([])
+  body: z10.object({
+    html: z10.string(),
+    attachments: z10.array(AnnotationAttachmentSchema).default([])
   }),
   created_at: IsoDateSchema,
   updated_at: IsoDateSchema
@@ -2919,7 +2981,7 @@ var AnnotationItemSchema = z9.object({
   const primaryId = ann.anchor.id;
   if (!primaryId) {
     ctx.addIssue({
-      code: z9.ZodIssueCode.custom,
+      code: z10.ZodIssueCode.custom,
       message: "Thread primary anchor needs an id",
       path: ["anchor", "id"]
     });
@@ -2930,14 +2992,14 @@ var AnnotationItemSchema = z9.object({
   const expectedCount = extras.length + (primaryId ? 1 : 0);
   if (ids.length !== expectedCount) {
     ctx.addIssue({
-      code: z9.ZodIssueCode.custom,
+      code: z10.ZodIssueCode.custom,
       message: "Every thread stop needs an id",
       path: ["also_anchors"]
     });
   }
   if (new Set(ids).size !== ids.length) {
     ctx.addIssue({
-      code: z9.ZodIssueCode.custom,
+      code: z10.ZodIssueCode.custom,
       message: "Thread stop ids must be unique within the annotation",
       path: ["also_anchors"]
     });
@@ -2948,33 +3010,33 @@ var AnnotationItemSchema = z9.object({
   const isPermutation = order.length === ids.length && new Set(order).size === order.length && order.every((id) => idSet.has(id));
   if (!isPermutation) {
     ctx.addIssue({
-      code: z9.ZodIssueCode.custom,
+      code: z10.ZodIssueCode.custom,
       message: "anchor_order must be a permutation of thread stop ids",
       path: ["thread", "anchor_order"]
     });
   }
 });
-var AnnotationBlockSettingsSchema = z9.object({
-  show_markers: z9.boolean().default(true),
-  default_layer_id: z9.string().optional(),
+var AnnotationBlockSettingsSchema = z10.object({
+  show_markers: z10.boolean().default(true),
+  default_layer_id: z10.string().optional(),
   /** Lines of context kept around each stop in thread focus. */
-  thread_context: z9.union([z9.literal(0), z9.literal(1)]).optional(),
+  thread_context: z10.union([z10.literal(0), z10.literal(1)]).optional(),
   /** How notes are drawn on the text. Absent = fineliner. */
-  ink_style: z9.enum(["fineliner", "highlighter"]).optional()
+  ink_style: z10.enum(["fineliner", "highlighter"]).optional()
 });
-var AnnotationBlockObjectSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("annotation"),
-  variant: z9.string().default("medium"),
+var AnnotationBlockObjectSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("annotation"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string().optional(),
-    attribution: z9.string().optional(),
+  content: z10.object({
+    title: z10.string().optional(),
+    attribution: z10.string().optional(),
     text: AnnotationTextSchema,
-    layers: z9.array(AnnotationLayerSchema).default([]),
-    annotations: z9.array(AnnotationItemSchema).default([]),
-    voice_tracks: z9.array(AnnotationVoiceTrackSchema).optional(),
+    layers: z10.array(AnnotationLayerSchema).default([]),
+    annotations: z10.array(AnnotationItemSchema).default([]),
+    voice_tracks: z10.array(AnnotationVoiceTrackSchema).optional(),
     anthology: AnthologyTagSchema.optional(),
     settings: AnnotationBlockSettingsSchema.default({ show_markers: true })
   }),
@@ -2991,14 +3053,14 @@ function refineAnnotationVoiceTracks(block, ctx) {
   for (const [index, track] of (block.content.voice_tracks ?? []).entries()) {
     if (!voiceLayerIds.has(track.layer_id)) {
       ctx.addIssue({
-        code: z9.ZodIssueCode.custom,
+        code: z10.ZodIssueCode.custom,
         message: "voice_track.layer_id must point at a voice layer",
         path: ["content", "voice_tracks", index, "layer_id"]
       });
     }
     if (teacherLayerIds.has(track.layer_id)) {
       ctx.addIssue({
-        code: z9.ZodIssueCode.custom,
+        code: z10.ZodIssueCode.custom,
         message: "voice_track cannot sit on a teacher layer",
         path: ["content", "voice_tracks", index, "layer_id"]
       });
@@ -3007,11 +3069,11 @@ function refineAnnotationVoiceTracks(block, ctx) {
 }
 var AnnotationBlockSchema = AnnotationBlockObjectSchema.superRefine(refineAnnotationVoiceTracks);
 function toolkitBlockSchema(blockType, content) {
-  return z9.object({
-    id: z9.string().min(1),
-    type: z9.literal("block"),
-    block_type: z9.literal(blockType),
-    variant: z9.string().default("medium"),
+  return z10.object({
+    id: z10.string().min(1),
+    type: z10.literal("block"),
+    block_type: z10.literal(blockType),
+    variant: z10.string().default("medium"),
     visibility: VisibilitySchema,
     content,
     ...blockLayout,
@@ -3047,11 +3109,11 @@ var AnalogyProblemBlockSchema = toolkitBlockSchema("analogy_problem", AnalogyMov
 var AnalogyMetaphorBlockSchema = toolkitBlockSchema("analogy_metaphor", AnalogyMoveContentSchema);
 var AnalogyTransferBlockSchema = toolkitBlockSchema("analogy_transfer", AnalogyMoveContentSchema);
 var AnalogyChainsBlockSchema = toolkitBlockSchema("analogy_chains", AnalogyMoveContentSchema);
-var TeacherNoteBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("teacher_note"),
-  variant: z9.string().default("medium"),
+var TeacherNoteBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("teacher_note"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema.transform(() => "teacher_only"),
   content: TeacherNoteBlockContentSchema,
   ...blockLayout,
@@ -3090,6 +3152,8 @@ var leafBlockSchemas = [
   ClozeBlockSchema,
   SelfCheckBlockSchema,
   NoteCueBlockSchema,
+  WithTeacherBlockSchema,
+  FadedExampleBlockSchema,
   ChartBlockSchema,
   EquationBlockSchema,
   DiagramBlockSchema,
@@ -3118,51 +3182,51 @@ var leafBlockSchemas = [
   AnalogyChainsBlockSchema,
   TeacherNoteBlockSchema
 ];
-var SpacerBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("spacer"),
-  variant: z9.string().default("medium"),
+var SpacerBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("spacer"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     size: SpacerSizeSchema
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var ColumnChildBlockSchema = z9.lazy(
-  () => z9.discriminatedUnion("block_type", [...leafBlockSchemas, SpacerBlockSchema])
+var ColumnChildBlockSchema = z10.lazy(
+  () => z10.discriminatedUnion("block_type", [...leafBlockSchemas, SpacerBlockSchema])
 );
-var columnsArraySchema = z9.array(
-  z9.object({
-    width: z9.number().int().min(1).max(12),
-    blocks: z9.array(ColumnChildBlockSchema)
+var columnsArraySchema = z10.array(
+  z10.object({
+    width: z10.number().int().min(1).max(12),
+    blocks: z10.array(ColumnChildBlockSchema)
   })
 ).superRefine((columns, ctx) => {
   const sum = columns.reduce((acc, col) => acc + col.width, 0);
   if (sum !== 12) {
     ctx.addIssue({
-      code: z9.ZodIssueCode.custom,
+      code: z10.ZodIssueCode.custom,
       message: "Column widths must sum to 12",
       path: []
     });
   }
 });
-var ColumnsBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("columns"),
-  variant: z9.string().default("medium"),
+var ColumnsBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("columns"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
+  content: z10.object({
     preset: ColumnPresetSchema,
     columns: columnsArraySchema
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var TabChildBlockSchema = z9.lazy(
-  () => z9.discriminatedUnion("block_type", [
+var TabChildBlockSchema = z10.lazy(
+  () => z10.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
@@ -3170,26 +3234,26 @@ var TabChildBlockSchema = z9.lazy(
     CardStackBlockSchema
   ])
 );
-var TabsBlockSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("tabs"),
-  variant: z9.string().default("medium"),
+var TabsBlockSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("tabs"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    tabs: z9.array(
-      z9.object({
-        id: z9.string().min(1),
-        label: z9.string(),
-        blocks: z9.array(TabChildBlockSchema)
+  content: z10.object({
+    tabs: z10.array(
+      z10.object({
+        id: z10.string().min(1),
+        label: z10.string(),
+        blocks: z10.array(TabChildBlockSchema)
       })
     ).min(2).max(8)
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var SectionInnerChildBlockSchema = z9.lazy(
-  () => z9.discriminatedUnion("block_type", [
+var SectionInnerChildBlockSchema = z10.lazy(
+  () => z10.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
@@ -3198,24 +3262,24 @@ var SectionInnerChildBlockSchema = z9.lazy(
     CardStackBlockSchema
   ])
 );
-var SidePathSectionSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("section"),
-  variant: z9.string().default("medium"),
+var SidePathSectionSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("section"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string(),
-    collapsed_in_editor: z9.boolean().optional(),
-    blocks: z9.array(SectionInnerChildBlockSchema),
-    side_path: z9.literal(true),
+  content: z10.object({
+    title: z10.string(),
+    collapsed_in_editor: z10.boolean().optional(),
+    blocks: z10.array(SectionInnerChildBlockSchema),
+    side_path: z10.literal(true),
     narration: NarrationSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
 });
-var SectionChildBlockSchema = z9.lazy(
-  () => z9.discriminatedUnion("block_type", [
+var SectionChildBlockSchema = z10.lazy(
+  () => z10.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
@@ -3225,27 +3289,31 @@ var SectionChildBlockSchema = z9.lazy(
     SidePathSectionSchema
   ])
 );
-var SectionLinkSchema = z9.object({
-  mode: z9.literal("linked"),
-  source_composition_id: z9.string().min(1)
+var SectionLinkSchema = z10.object({
+  mode: z10.literal("linked"),
+  source_composition_id: z10.string().min(1)
 });
-var SectionBlockObjectSchema = z9.object({
-  id: z9.string().min(1),
-  type: z9.literal("block"),
-  block_type: z9.literal("section"),
-  variant: z9.string().default("medium"),
+var SectionBlockObjectSchema = z10.object({
+  id: z10.string().min(1),
+  type: z10.literal("block"),
+  block_type: z10.literal("section"),
+  variant: z10.string().default("medium"),
   visibility: VisibilitySchema,
-  content: z9.object({
-    title: z9.string(),
-    collapsed_in_editor: z9.boolean().optional(),
-    blocks: z9.array(SectionChildBlockSchema),
+  content: z10.object({
+    title: z10.string(),
+    collapsed_in_editor: z10.boolean().optional(),
+    blocks: z10.array(SectionChildBlockSchema),
     link: SectionLinkSchema.optional(),
     /** Lecture: the chapter intro clip. */
     narration: NarrationSchema.optional(),
     /** Lecture: a "write it in your book" cue at the chapter's end. On unless `enabled: false`. */
-    takeaway: z9.object({ enabled: z9.boolean(), prompt: z9.string().max(300).optional() }).optional(),
+    takeaway: z10.object({ enabled: z10.boolean(), prompt: z10.string().max(300).optional() }).optional(),
     /** Lecture: plays only after a wrong answer on the gate just above it. */
-    side_path: z9.boolean().optional()
+    side_path: z10.boolean().optional(),
+    /** Tutorial: this top-level section is the tab for the group with this id. */
+    tutorial_group: TutorialGroupIdSchema.optional(),
+    /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
+    tutorial_exit: z10.boolean().optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -3253,15 +3321,15 @@ var SectionBlockObjectSchema = z9.object({
 function refineLinkedSection(section, ctx) {
   if (section.content.link && section.content.blocks.length > 0) {
     ctx.addIssue({
-      code: z9.ZodIssueCode.custom,
+      code: z10.ZodIssueCode.custom,
       message: "Linked sections must have empty content.blocks",
       path: ["content", "blocks"]
     });
   }
 }
 var SectionBlockSchema = SectionBlockObjectSchema.superRefine(refineLinkedSection);
-var BlockSchema = z9.lazy(
-  () => z9.discriminatedUnion("block_type", [
+var BlockSchema = z10.lazy(
+  () => z10.discriminatedUnion("block_type", [
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
@@ -3307,22 +3375,87 @@ function visitBlocks(blocks, visitor, path = "blocks") {
   });
 }
 
+// apps/teaching/src/tutorial/model.ts
+function groupSection(block) {
+  if (block.block_type !== "section") return null;
+  const id = block.content.tutorial_group;
+  if (typeof id !== "string") return null;
+  return { id, section: block, exit: block.content.tutorial_exit === true };
+}
+function tutorialParts(blocks) {
+  const parts = { common: [], tabs: /* @__PURE__ */ new Map(), exits: /* @__PURE__ */ new Map(), duplicates: { tabs: [], exits: [] } };
+  for (const block of blocks) {
+    const g = groupSection(block);
+    if (!g) {
+      parts.common.push(block);
+      continue;
+    }
+    const map = g.exit ? parts.exits : parts.tabs;
+    if (map.has(g.id)) (g.exit ? parts.duplicates.exits : parts.duplicates.tabs).push(g.id);
+    else map.set(g.id, g.section);
+  }
+  return parts;
+}
+function splitAtTeacher(blocks) {
+  const at = blocks.findIndex((block) => block.block_type === "with_teacher");
+  if (at === -1) return { before: [...blocks], withTeacher: null, after: [] };
+  return { before: blocks.slice(0, at), withTeacher: blocks[at], after: blocks.slice(at + 1) };
+}
+function tutorialIssues(lesson) {
+  const settings = lesson.tutorial;
+  if (!settings || settings.groups.length === 0) return ["Plan the groups first: open the markbook and press Plan a tutorial."];
+  const issues = [];
+  const parts = tutorialParts(lesson.blocks);
+  const nameOf = (id) => settings.groups.find((group) => group.id === id)?.name ?? id;
+  for (const id of parts.duplicates.tabs) issues.push(`Group \u201C${nameOf(id)}\u201D has two tabs.`);
+  for (const id of parts.duplicates.exits) issues.push(`Group \u201C${nameOf(id)}\u201D has two exit checks.`);
+  const known = new Set(settings.groups.map((group) => group.id));
+  if ([...parts.tabs.keys(), ...parts.exits.keys()].some((id) => !known.has(id))) {
+    issues.push("A tab is for a group that\u2019s gone. Delete it or plan the groups again.");
+  }
+  for (const group of settings.groups) {
+    const tab = parts.tabs.get(group.id);
+    if (!tab) {
+      issues.push(`Group \u201C${group.name}\u201D has no tab.`);
+      continue;
+    }
+    const inner = tab.content.blocks;
+    if (!splitAtTeacher(inner).withTeacher) issues.push(`Group \u201C${group.name}\u201D has no With teacher step.`);
+    let hinge = false;
+    visitBlocks(inner, (block) => {
+      if (block.block_type === "hinge_question") hinge = true;
+    });
+    if (hinge) issues.push(`Group \u201C${group.name}\u201D has a hinge question. In a group tab, use a faded example, cloze or self-check instead.`);
+    let questions = 0;
+    visitBlocks(parts.exits.get(group.id)?.content.blocks ?? [], (block) => {
+      if (block.block_type === "quiz_question") questions += 1;
+    });
+    if (questions === 0) issues.push(`Group \u201C${group.name}\u201D has no exit check questions.`);
+  }
+  let stray = false;
+  visitBlocks([...parts.common, ...[...parts.tabs.values()].flatMap((tab) => tab.content.blocks)], (block) => {
+    if (block.block_type === "quiz_question") stray = true;
+  });
+  if (stray) issues.push("Quiz questions in a tutorial go in a group\u2019s exit check.");
+  return issues;
+}
+
 // apps/teaching/src/schemas/cover.ts
-import { z as z10 } from "zod";
-var CoverSchema = z10.object({
-  url: z10.string().min(1).optional(),
-  media_id: z10.string().min(1).optional(),
-  alt_text: z10.string().optional()
+import { z as z11 } from "zod";
+var CoverSchema = z11.object({
+  url: z11.string().min(1).optional(),
+  media_id: z11.string().min(1).optional(),
+  alt_text: z11.string().optional()
 }).superRefine((cover, ctx) => {
   if (!cover.url && !cover.media_id) {
     ctx.addIssue({
-      code: z10.ZodIssueCode.custom,
+      code: z11.ZodIssueCode.custom,
       message: "Cover needs a url and/or media_id"
     });
   }
   if (cover.url !== void 0 && !isHttpUrl(cover.url)) {
     ctx.addIssue({
-      code: z10.ZodIssueCode.custom,
+      code: z11.ZodIssueCode.custom,
       path: ["url"],
       message: "Cover url must be http(s)"
     });
@@ -3331,10 +3464,10 @@ var CoverSchema = z10.object({
 var CoverPatchSchema = CoverSchema.nullable();
 
 // apps/teaching/src/schemas/source.ts
-import { z as z11 } from "zod";
-var SourceSchema = z11.object({
-  system: z11.literal("notion"),
-  page_id: z11.string().min(1).max(64),
+import { z as z12 } from "zod";
+var SourceSchema = z12.object({
+  system: z12.literal("notion"),
+  page_id: z12.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -3625,6 +3758,8 @@ var KIND_LABEL = {
   quiz_question: "Quiz question",
   self_check: "Self check",
   note_cue: "Note cue",
+  with_teacher: "With teacher",
+  faded_example: "Faded example",
   mind_map: "Mind map",
   concept_map: "Concept map"
 };
@@ -3955,6 +4090,9 @@ function ownIssue(block, discernHosts) {
   if (block.block_type === "note_cue" && !block.content.prompt.trim()) {
     return "Write the prompt for this note cue";
   }
+  if (block.block_type === "faded_example" && (!block.content.extract.trim() || block.content.parts.some((p) => !p.answer.trim()))) {
+    return "Faded example needs an extract and a model answer for every part.";
+  }
   if (block.block_type === "self_check") {
     if (block.content.prompt.trim().length === 0) {
       return "Self check blocks need a prompt to publish";
@@ -4013,22 +4151,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z12.object({
+var LessonSchema = z13.object({
   ...CommonFields,
   ...TrashFields,
-  type: z12.literal("lesson"),
-  unit_id: z12.string().min(1),
-  sequence: z12.number().int(),
-  blocks: z12.array(BlockSchema),
+  type: z13.literal("lesson"),
+  unit_id: z13.string().min(1),
+  sequence: z13.number().int(),
+  blocks: z13.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z12.array(z12.string().min(1).max(40)).max(24).optional(),
-  author_id: z12.string().min(1).optional(),
-  review_status: z12.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z12.array(z12.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z12.array(z12.string().min(1).max(64)).max(24).optional(),
+  tags: z13.array(z13.string().min(1).max(40)).max(24).optional(),
+  author_id: z13.string().min(1).optional(),
+  review_status: z13.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z13.array(z13.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z13.array(z13.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z12.array(LineStopSchema).max(16).optional(),
+  line_stops: z13.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -4041,41 +4179,48 @@ var LessonSchema = z12.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z12.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z13.array(DotPointRefSchema).max(20).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z12.array(z12.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z13.array(z13.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z12.boolean().optional(),
+  feedback_off: z13.boolean().optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
+  /** Tutorial lessons only: the class and its groups. */
+  tutorial: TutorialSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z12.ZodIssueCode.custom,
+      code: z13.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
   }
-  if (lesson.pedagogical_mode !== "quiz") {
+  if (lesson.pedagogical_mode !== "quiz" && lesson.pedagogical_mode !== "tutorial") {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === "quiz_question") stray = true;
     });
     if (stray) {
       ctx.addIssue({
-        code: z12.ZodIssueCode.custom,
+        code: z13.ZodIssueCode.custom,
         message: "Quiz questions only work in a lesson set to Quiz. Change the lesson type or remove them.",
         path: ["blocks"]
       });
     }
   }
-  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" })) {
+  if (lesson.pedagogical_mode === "tutorial") {
+    for (const message of tutorialIssues(lesson)) {
+      ctx.addIssue({ code: z13.ZodIssueCode.custom, message, path: ["blocks"] });
+    }
+  }
+  for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z12.ZodIssueCode.custom,
+      code: z13.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
@@ -4083,28 +4228,28 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
 });
 
 // apps/teaching/src/schemas/unit.ts
-import { z as z13 } from "zod";
-var UnitSchema = z13.object({
+import { z as z14 } from "zod";
+var UnitSchema = z14.object({
   ...CommonFields,
   ...TrashFields,
-  type: z13.literal("unit"),
-  year_id: z13.string().min(1),
-  subject_id: z13.string().min(1),
-  lesson_ids: z13.array(z13.string().min(1)),
-  primary_term: z13.number().int().positive().optional(),
-  start_date: z13.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  end_date: z13.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  description: z13.string().optional(),
+  type: z14.literal("unit"),
+  year_id: z14.string().min(1),
+  subject_id: z14.string().min(1),
+  lesson_ids: z14.array(z14.string().min(1)),
+  primary_term: z14.number().int().positive().optional(),
+  start_date: z14.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z14.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  description: z14.string().optional(),
   cover: CoverSchema.optional(),
-  blocks: z13.array(BlockSchema).optional(),
-  outcome_ids: z13.array(z13.string().min(1)).max(24).optional(),
+  blocks: z14.array(BlockSchema).optional(),
+  outcome_ids: z14.array(z14.string().min(1)).max(24).optional(),
   /** 'program': same level as a unit, never one of a class's active units. */
-  kind: z13.enum(["program"]).optional(),
+  kind: z14.enum(["program"]).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/class.ts
-import { z as z14 } from "zod";
+import { z as z15 } from "zod";
 
 // apps/teaching/src/schemas/student-initials.ts
 var INITIALS_PATTERN = /^[A-Z]{1,4}[0-9]?$/;
@@ -4149,74 +4294,74 @@ function validateTimetable(input) {
 }
 
 // apps/teaching/src/schemas/class.ts
-var ClassTimetableSchema = z14.unknown().transform((value, ctx) => {
+var ClassTimetableSchema = z15.unknown().transform((value, ctx) => {
   try {
     return validateTimetable(value);
   } catch (error) {
-    ctx.addIssue({ code: z14.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
-    return z14.NEVER;
+    ctx.addIssue({ code: z15.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
+    return z15.NEVER;
   }
 });
-var ClassHomepageSchema = z14.object({
-  announcements: z14.array(BlockSchema),
-  resources: z14.array(BlockSchema),
-  custom: z14.array(BlockSchema)
+var ClassHomepageSchema = z15.object({
+  announcements: z15.array(BlockSchema),
+  resources: z15.array(BlockSchema),
+  custom: z15.array(BlockSchema)
 });
-var ClassStudentSchema = z14.object({
-  name: z14.string().min(1).max(80),
-  skip_picker: z14.boolean().default(false),
+var ClassStudentSchema = z15.object({
+  name: z15.string().min(1).max(80),
+  skip_picker: z15.boolean().default(false),
   /** Never changes once saved, so renames keep a student's quiz results. */
-  id: z14.string().regex(STUDENT_ID_PATTERN).optional(),
+  id: z15.string().regex(STUDENT_ID_PATTERN).optional(),
   /** What the student types to take a quiz. Unique within the class. */
-  initials: z14.string().regex(INITIALS_PATTERN).optional()
+  initials: z15.string().regex(INITIALS_PATTERN).optional()
 });
 var MAX_CLASS_STUDENTS = 60;
-var ClassSchema = z14.object({
+var ClassSchema = z15.object({
   ...CommonFields,
   ...TrashFields,
-  type: z14.literal("class"),
-  code: z14.string().min(1),
-  display_name: z14.string().min(1).optional(),
-  academic_year: z14.number().int(),
-  year_id: z14.string().min(1),
-  subject_id: z14.string().min(1),
-  active_unit_ids: z14.array(z14.string().min(1)),
-  current_unit_id: z14.string().min(1).optional(),
-  current_scheduled_lesson_id: z14.string().min(1).optional(),
-  meeting_days: z14.array(z14.number().int().min(1).max(7)).optional(),
+  type: z15.literal("class"),
+  code: z15.string().min(1),
+  display_name: z15.string().min(1).optional(),
+  academic_year: z15.number().int(),
+  year_id: z15.string().min(1),
+  subject_id: z15.string().min(1),
+  active_unit_ids: z15.array(z15.string().min(1)),
+  current_unit_id: z15.string().min(1).optional(),
+  current_scheduled_lesson_id: z15.string().min(1).optional(),
+  meeting_days: z15.array(z15.number().int().min(1).max(7)).optional(),
   timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
   cover: CoverSchema.optional(),
-  students: z14.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
+  students: z15.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/subject.ts
-import { z as z15 } from "zod";
-var SubjectSchema = z15.object({
+import { z as z16 } from "zod";
+var SubjectSchema = z16.object({
   ...CommonFields,
-  type: z15.literal("subject"),
-  display_title: z15.string().min(1),
-  scope_id: z15.string().min(1).optional(),
-  unit_ids: z15.array(z15.string().min(1)),
-  outcome_ids: z15.array(z15.string().min(1)),
-  class_ids: z15.array(z15.string().min(1)),
+  type: z16.literal("subject"),
+  display_title: z16.string().min(1),
+  scope_id: z16.string().min(1).optional(),
+  unit_ids: z16.array(z16.string().min(1)),
+  outcome_ids: z16.array(z16.string().min(1)),
+  class_ids: z16.array(z16.string().min(1)),
   /** Curriculum network lines, in map column order: trains, metro, light rail. */
-  network_lines: z15.array(NetworkLineSchema).max(24).optional(),
+  network_lines: z16.array(NetworkLineSchema).max(24).optional(),
   /** Drag offsets on the year network, keyed by unit id. */
   network_nudges: NetworkNudgesSchema.optional()
 });
 
 // apps/teaching/src/schemas/document.ts
-import { z as z16 } from "zod";
-var DocumentKindSchema = z16.enum(["syllabus"]);
-var DocumentSchema = z16.object({
+import { z as z17 } from "zod";
+var DocumentKindSchema = z17.enum(["syllabus"]);
+var DocumentSchema = z17.object({
   ...CommonFields,
   ...TrashFields,
-  type: z16.literal("document"),
+  type: z17.literal("document"),
   kind: DocumentKindSchema,
-  subject_id: z16.string().min(1),
-  blocks: z16.array(BlockSchema),
+  subject_id: z17.string().min(1),
+  blocks: z17.array(BlockSchema),
   cover: CoverSchema.optional(),
   source: SourceSchema.optional()
 });

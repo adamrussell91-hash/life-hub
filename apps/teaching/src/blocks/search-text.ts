@@ -124,6 +124,14 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'note_cue':
       push(parts, c.prompt);
       break;
+    case 'with_teacher':
+      push(parts, (c.talking_points as string[] | undefined)?.join(' '));
+      break;
+    case 'faded_example':
+      push(parts, c.prompt);
+      push(parts, c.extract);
+      for (const p of (c.parts as Array<{ answer?: string }> | undefined) ?? []) push(parts, p.answer);
+      break;
     case 'question_set':
     case 'flashcards':
     case 'self_check':

@@ -1,3 +1,5 @@
+import { renderWithTeacher, createWithTeacherEditor } from '@/blocks/with-teacher';
+import { renderFadedExample, createFadedExampleEditor } from '@/blocks/faded-example';
 import { renderNoteCue, createNoteCueEditor } from '@/blocks/note-cue';
 import {
   createAccordionEditor,
@@ -226,6 +228,8 @@ export const blockRegistry: {
     createEditor: createSelfCheckEditor
   },
   note_cue: { render: renderNoteCue, createEditor: createNoteCueEditor },
+  with_teacher: { render: renderWithTeacher, createEditor: createWithTeacherEditor },
+  faded_example: { render: renderFadedExample, createEditor: createFadedExampleEditor },
   timeline: {
     render: renderTimelineBlock,
     createEditor: createTimelineEditor
