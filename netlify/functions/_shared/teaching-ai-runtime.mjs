@@ -1403,8 +1403,11 @@ var LessonKindSchema = z8.enum(["lesson", "workshop", "lecture"]);
 var AfterLessonIdsSchema = z8.array(z8.string().min(1).max(64)).max(6);
 var LineStopSchema = z8.object({
   line_id: z8.string().min(1).max(64),
-  level: CurriculumLinesLevelSchema.optional()
+  level: CurriculumLinesLevelSchema.optional(),
+  /** Set from the lesson's dot points; it follows them until the teacher takes it off. */
+  auto: z8.literal(true).optional()
 });
+var LineOffSchema = z8.array(z8.string().min(1).max(64)).max(24);
 var NetworkNudgesSchema = z8.record(
   z8.string().min(1).max(160),
   z8.object({ dx: z8.number().min(-2e3).max(2e3), dy: z8.number().min(-2e3).max(2e3) })
@@ -6319,6 +6322,8 @@ var LessonSchema = z13.object({
   outcome_ids: z13.array(z13.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
   line_stops: z13.array(LineStopSchema).max(16).optional(),
+  /** Lines taken off by hand that the dot points would add; they stay off. */
+  line_off: LineOffSchema.optional(),
   /**
    * Lessons that come after this one. Unset (or null: saves merge, so null is
    * how a lesson goes back) follows unit order; an empty list ends the unit here.

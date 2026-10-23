@@ -9700,6 +9700,17 @@ body.is-lesson-builder-full-page .hub-utilities {
   min-width: 0;
 }
 
+/* On a phone the tags take a full row instead of a sliver beside the lesson type. */
+@media (max-width: 600px) {
+  .lesson-page__meta {
+    flex-wrap: wrap;
+  }
+
+  .lesson-page__meta-outcomes {
+    flex-basis: 100%;
+  }
+}
+
 /* Outcomes, + Add and the line chips share one row; an opened outcome drops below it. */
 .lesson-page__meta .outcome-strip {
   display: contents;
