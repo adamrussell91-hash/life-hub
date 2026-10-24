@@ -79,3 +79,36 @@
 .kit-chip { font: inherit; font-size: 11px; font-weight: 700; width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: var(--paper, #fbf8f2); color: var(--muted); cursor: pointer; }
 .kit-chip--on { background: var(--navy); color: #fff; border-color: var(--navy); }
 .sprint-edit-tabs { margin: 12px 0; }
+/* Teacher: progress map and group board. */
+.smap { padding: 16px; border-radius: var(--radius-lg); background: rgba(255,255,255,.75); border: 1px solid var(--line); display: grid; gap: 10px; margin-bottom: 12px; }
+.smap__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.smap__head h2 { margin-right: auto; }
+.smap__notice { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.smap-row { display: grid; grid-template-columns: 150px repeat(5, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.smap-row > div { padding: 10px; }
+.smap-ph { display: grid; gap: 4px; font-size: 13px; }
+.smap-due { color: var(--muted); font-size: 12px; }
+.smap-name span { display: block; color: var(--muted); font-size: 12px; }
+.smap-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; cursor: pointer; border-radius: 10px; }
+.smap-cell:hover, .smap-cell:focus-visible { background: rgba(23,55,94,.06); }
+.smap-cell--now { background: rgba(23,55,94,.03); }
+.smap-confirm { padding: 14px; border-radius: 14px; background: var(--pastel-gold); color: var(--pastel-gold-ink); display: grid; gap: 8px; }
+.smap .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--navy); }
+.smap .dot--in { background: var(--navy); }
+.smap .dot--none { border-color: rgba(23,55,94,.18); }
+.smap .dot--late { background: var(--pastel-gold-ink); border-color: var(--pastel-gold-ink); }
+.smap .pill { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.smap .pill--class { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.smap .pill--home { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.smap .pill--wait { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.smap .pill--mark { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.sboard { display: grid; gap: 12px; padding: 16px; border-radius: var(--radius-lg); background: rgba(255,255,255,.75); border: 1px solid var(--line); }
+.sboard__part { display: grid; gap: 6px; }
+.sboard__chosen { border-color: var(--navy); }
+@media (max-width: 600px) {
+  .smap-row--head { display: none; }
+  .smap-row { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 10px 0; }
+  .smap-name { grid-column: 1 / -1; padding: 0 4px; }
+  .smap-cell { padding: 6px 4px; justify-content: center; background: var(--paper, #fbf8f2); }
+  .smap-cell .pill { display: none; }
+}
