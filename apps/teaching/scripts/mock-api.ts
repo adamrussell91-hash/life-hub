@@ -109,6 +109,7 @@ import { createPublishedTutorialHandler } from '../../../netlify/functions/publi
 import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
 import { createPublishedSprintHandler } from '../../../netlify/functions/published-sprint.mjs';
 import { createSprintHandler } from '../../../netlify/functions/sprint.mjs';
+import { createSprintPracticeHandler } from '../../../netlify/functions/sprint-practice.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
 import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
@@ -3624,6 +3625,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createPublishedTutorialHandler(deps)
       : /^\/api\/lessons\/[^/]+\/sprint$/.test(path)
         ? createSprintHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/sprint-practice$/.test(path)
+        ? createSprintPracticeHandler(deps)
       : path.startsWith('/api/published/sprint/')
         ? createPublishedSprintHandler(deps)
       : path.startsWith('/api/published/hinge/')
@@ -3752,6 +3755,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/lessons\/[^/]+\/tutorial$/.test(path) ||
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/sprint$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/sprint-practice$/.test(path) ||
       /^\/api\/published\/sprint\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||

@@ -8,7 +8,7 @@ import { openPitchView } from './pitch-view';
 import type { MapGroup, SprintSummary, SprintTeacherApi } from './api';
 import './sprint.css';
 
-export type SprintMapHandle = { root: HTMLElement; refresh(): Promise<void>; dispose(): void };
+export type SprintMapHandle = { root: HTMLElement; refresh(): Promise<void>; openBoard(groupId: string): void; dispose(): void };
 const POLL_MS = 15000;
 const STATE_TEXT = { none: 'not in', draft: 'started', in: 'in', late: 'in late' } as const;
 const DOT = { none: 'dot--none', draft: 'dot--started', in: 'dot--in', late: 'dot--late' } as const;
@@ -25,7 +25,7 @@ function badge(g: MapGroup, key: SprintPhaseKey): string {
  * The teacher's progress map: phases across, groups down, a dot per student.
  * Names show here only. Clicking a row opens that group's board below.
  */
-export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherApi; emitLesson: (next: Lesson) => void; now?: () => number }): SprintMapHandle {
+export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherApi; emitLesson: (next: Lesson) => void; now?: () => number; practice?: boolean }): SprintMapHandle {
   const now = o.now ?? (() => Date.now());
   const root = el('section', 'smap');
   const head = el('header', 'smap__head');
@@ -92,7 +92,7 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
 
   function openBoard(groupId: string): void {
     board?.dispose();
-    board = mountGroupBoard(boardHost, { api: o.api, groupId, getLesson: o.getLesson, emitLesson: o.emitLesson, onChanged: () => void refresh() });
+    board = mountGroupBoard(boardHost, { api: o.api, groupId, getLesson: o.getLesson, emitLesson: o.emitLesson, onChanged: () => void refresh(), practice: o.practice });
   }
 
   function paint(): void {
@@ -177,5 +177,5 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
   }
 
   poll = window.setInterval(() => { if (document.visibilityState !== 'hidden') void refresh(); }, POLL_MS);
-  return { root, refresh, dispose() { window.clearInterval(poll); board?.dispose(); } };
+  return { root, refresh, openBoard, dispose() { window.clearInterval(poll); board?.dispose(); } };
 }
