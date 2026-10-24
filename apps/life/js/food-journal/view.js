@@ -1451,7 +1451,7 @@ export function createFoodJournalView({
         "ghost",
       );
       where.append(findVenue);
-      const address = el("div", "food-pair food-pair--keep");
+      const address = el("div", "food-pair");
       address.append(
         field(
           "Address",

@@ -2,6 +2,7 @@ import { apiPost } from '@/api/client';
 import { button, el, errorText, isNotPublished, notLivePanel } from '@/blocks/peer-feedback-ui';
 import { mountBoard, type BoardGroup, type Layout } from './board';
 import { poller, formatCode, showCodeOverlay, type BrainstormBlock } from './shared';
+import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
 
 type TeacherAnswer = { id: string; symbol: string; text: string; flagged: boolean; status: 'pending' | 'shown' | 'removed'; created_at: string };
 type TeacherState =
@@ -53,6 +54,9 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
   root.append(controls, alert, notLive, idle, board.root, queue);
 
   let state = lastState.get(endpoint) ?? null;
+  const past = pastRounds(endpoint, (session, pressed) => {
+    if (confirmBringBack(state?.phase === 'live')) return send('resume', { session }, pressed);
+  });
   let busy = false;
   let paintedControls = '';
   let paintedQueue = '';
@@ -160,7 +164,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
             if (confirm('Start a new round? This board clears and students join again.')) void send('start', {}, this);
           })
     );
-    controls.replaceChildren(bar, settings, round);
+    controls.replaceChildren(bar, settings, round, past);
   }
 
   function paintQueue(s: Live): void {
@@ -220,7 +224,8 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string): HTMLElem
         el('p', 'pf-panel__text block-body', 'Students join on the lesson link with the code. No accounts, and they never pick or see a symbol.'),
         button('Start brainstorm', 'primary', function () {
           void send('start', {}, this);
-        })
+        }),
+        past
       );
       return;
     }

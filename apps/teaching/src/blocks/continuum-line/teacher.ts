@@ -1,6 +1,7 @@
 import { apiPost } from '@/api/client';
 import { button, el, errorText, identityName, isNotPublished, notLivePanel, token } from '@/blocks/peer-feedback-ui';
 import { poller, formatCode, showCodeOverlay } from '@/blocks/brainstorm/shared';
+import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
 import { mountStage } from './stage';
 import { liveStatements, type ContinuumBlock, type Phase } from './shared';
 
@@ -52,6 +53,9 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
   root.append(alert, notLive, idle, live);
 
   let state = lastState.get(endpoint) ?? null;
+  const past = pastRounds(endpoint, (session, pressed) => {
+    if (confirmBringBack(state?.phase === 'live')) return send('resume', { session }, pressed);
+  });
   let busy = false;
   let viewing = 0;
   let picked: string | null = null;
@@ -123,7 +127,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
             if (confirm('Start a new round? Every line clears and students join again.')) void send('start', {}, this);
           })
     );
-    round.replaceChildren(code, right);
+    round.replaceChildren(code, right, past);
   }
 
   let paintedNav = '';
@@ -398,7 +402,8 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
         el('p', 'pf-panel__text block-body', 'Students join on the lesson link with the code. No accounts. Each gets a colour-and-shape symbol to place on the line.'),
         button('Start the line', 'primary', function () {
           void send('start', {}, this);
-        })
+        }),
+        past
       );
       return;
     }

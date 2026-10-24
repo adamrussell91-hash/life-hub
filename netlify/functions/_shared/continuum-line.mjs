@@ -30,9 +30,9 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { claimedIds, claimSymbol } from './class-symbols.mjs';
 import { groupReasons } from './continuum-line-groups.mjs';
+import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
-const ACTIVITY_HOURS = 12;
 export const MAX_REASON = 280;
 const PHASES = ['collect', 'revealed', 'replace'];
 
@@ -102,6 +102,7 @@ function settings(block) {
 function keys(lesson, block, session) {
   const base = `continuum/${lesson}/${block}`;
   return {
+    base,
     active: `${base}/active`,
     claim: (id) => `${base}/${session}/claims/${id}`,
     token: (tokenHash) => `${base}/${session}/tokens/${tokenHash}`,
@@ -167,13 +168,13 @@ async function teacherAction(store, k, activity, setup, body, opts) {
 
   const setPhase = async (sid, patch) => {
     activity = { ...activity, phases: { ...activity.phases, [sid]: { ...activity.phases?.[sid], ...patch } } };
-    await store.setJSON(k.active, activity);
+    await saveRound(store, k.base, activity);
   };
   if (action === 'go') {
     const at = setup.statements.findIndex((s) => s.id === body.statement);
     if (at < 0) reject(400, 'bad_request', 'Unknown statement.');
     activity = { ...activity, current: at };
-    await store.setJSON(k.active, activity);
+    await saveRound(store, k.base, activity);
   }
   if (action === 'reveal') await setPhase(statement.id, { phase: 'revealed' });
   if (action === 'collect') await setPhase(statement.id, { phase: 'collect' });
@@ -295,33 +296,43 @@ async function studentAction(store, k, activity, setup, body) {
   return { ...shared, joined: true, symbol: id, current, statements };
 }
 
+function freshRound() {
+  return {
+    session: randomBytes(16).toString('hex'),
+    code: String(randomInt(100000, 1000000)),
+    open: true,
+    started_at: new Date().toISOString(),
+    expires: roundExpiry(),
+    current: 0,
+    phases: {}
+  };
+}
+
 export async function continuumAction(store, lesson, block, body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const teacher = opts.teacher === true;
   const live = await assertLive(store, lesson, block);
   const setup = settings(live);
-  const activeKey = keys(lesson, block, '').active;
+  const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 
   if (teacher && body.action === 'start') {
-    activity = {
-      session: randomBytes(16).toString('hex'),
-      code: String(randomInt(100000, 1000000)),
-      open: true,
-      expires: Date.now() + ACTIVITY_HOURS * 3600_000,
-      current: 0,
-      phases: {}
-    };
-    await store.setJSON(activeKey, activity);
+    activity = freshRound();
+    await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'end' && activity) {
     activity = { ...activity, open: false };
-    await store.setJSON(activeKey, activity);
+    await saveRound(store, base, activity);
+  }
+  if (teacher && body.action === 'rounds') return { rounds: await listRounds(store, base, activity, 'claims') };
+  if (teacher && body.action === 'resume') {
+    activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(), session }), { open: true });
+    if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
 
   const k = keys(lesson, block, activity.session);
-  const rest = body.action === 'start' || body.action === 'end' ? { ...body, action: 'status' } : body;
+  const rest = ['start', 'end', 'resume'].includes(body.action) ? { ...body, action: 'status' } : body;
   const stimulusText = live.content?.stimulus?.kind === 'text' ? String(live.content.stimulus.text ?? '') : '';
   return teacher ? teacherAction(store, k, activity, setup, rest, { ...opts, stimulusText }) : studentAction(store, k, activity, setup, body);
 }
