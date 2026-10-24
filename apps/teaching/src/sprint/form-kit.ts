@@ -27,7 +27,8 @@ export type FormContext = {
    */
   drafts?: Partial<PhasePayload>;
 };
-export type PhaseForm = { el: HTMLElement; dispose(): void };
+/** `update` takes a polled status without a rebuild (a form that shows live group state). */
+export type PhaseForm = { el: HTMLElement; dispose(): void; update?(next: SprintStatus): void };
 
 /** What the form starts from: the student's unsaved draft while they can edit, else what the server has. */
 export function draftOf<P extends SprintPhaseKey>(ctx: FormContext, phase: P): PhasePayload[P] | undefined {
@@ -149,4 +150,18 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
       void ctx.client.save(phase, payload()).catch(() => {});
     }
   };
+}
+
+/** The group brief from Understand, shown at the top of the later phases: the problem, the audience, the expert's answers. */
+export function briefCard(s: SprintStatus): HTMLElement | null {
+  const b = s.brief;
+  const problem = b?.problem ?? s.question?.text ?? null;
+  if (!problem && !b?.audience && !b?.answers.length) return null;
+  const card = el('details', 'su-brief');
+  card.open = true;
+  card.append(el('summary', '', 'Our group brief'));
+  if (problem) card.append(el('p', '', `Problem: ${problem}`));
+  if (b?.audience?.who) card.append(el('p', '', `Audience: ${b.audience.who}${b.audience.why ? `. ${b.audience.why}` : ''}`));
+  for (const a of b?.answers ?? []) card.append(el('p', 'sprint-note', `Expert: ${a.question} ${a.answer}`));
+  return card;
 }

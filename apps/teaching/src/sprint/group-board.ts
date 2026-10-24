@@ -5,7 +5,8 @@ import { mountMarking } from './marking';
 import type { GroupBoard, SprintTeacherApi } from './api';
 
 /**
- * One group's board for the teacher: its questions, the gallery with
+ * One group's board for the teacher: its Understand space (problem statements,
+ * audience, limits and the questions to answer), the gallery with
  * authors, heat and vote totals, the reasons, parts, pitch file, the work to
  * mark and the pitch feedback with hold-and-release. Spotlight puts one
  * answer up for the class with no name.
@@ -22,12 +23,31 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     root.append(el('h2', '', `Group ${b.group.name}`));
 
     const q = el('div', 'sboard__part');
-    q.append(el('h3', '', 'Questions'), el('p', 'sprint-note', b.question ? `Group question: ${b.question.text}` : b.awaiting?.kind === 'question' ? 'Waiting for you to choose the question.' : 'The question is chosen when Understand closes.'));
+    q.append(el('h3', '', 'Understand'), el('p', 'sprint-note', b.question ? `Group problem: ${b.question.text}` : b.awaiting?.kind === 'question' ? 'Waiting for you to choose the problem.' : 'The problem is chosen when Understand closes.'));
     for (const n of b.notes) {
       const r = el('div', 'kit-row');
-      r.append(el('span', '', `${n.text} · ${n.name}`), button('Spotlight', 'ghost', () => void act(o.api.spotlight(n.student_id, 'understand', `notes.${n.index}`))));
+      r.append(el('span', '', `${n.text} · ${n.name}`), button('Spotlight', 'ghost', () => void act(o.api.spotlight(n.student_id, 'understand', n.field ?? `notes.${n.index}`))));
       if (b.awaiting?.kind === 'question') r.append(button('Choose this one', 'secondary', () => void act(o.api.confirm(b.group.id, 'question', n.id))));
       q.append(r);
+    }
+    const u = b.understand;
+    if (u) {
+      if (u.audience) q.append(el('p', '', `Audience: ${u.audience.who}${u.audience.why ? `. ${u.audience.why}` : ''}`));
+      const cards = Object.entries(u.limits).flatMap(([box, list]) => list.map((c) => `${c.text}${c.count > 1 ? ` ×${c.count}` : ''} (${box.replace('_', ' ').replace('cant', 'can’t')})`));
+      if (cards.length) q.append(el('p', 'sprint-note', `Limits: ${cards.join(' · ')}`));
+      for (const sent of u.sent) {
+        const f = el('form', 'kit-row sboard__answer');
+        const input = el('input', 'qz-input');
+        input.maxLength = 600;
+        input.value = sent.answer ?? '';
+        input.placeholder = 'Your answer';
+        input.setAttribute('aria-label', `Answer: ${sent.text}`);
+        const go = el('button', 'btn btn--secondary', sent.answer ? 'Update answer' : 'Send answer');
+        go.type = 'submit';
+        f.addEventListener('submit', (e) => { e.preventDefault(); void act(o.api.answer(b.group.id, sent.id, input.value)); });
+        f.append(el('span', '', `Question: ${sent.text}`), input, go);
+        q.append(f);
+      }
     }
     root.append(q);
 

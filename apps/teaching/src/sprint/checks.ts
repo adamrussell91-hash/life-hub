@@ -1,4 +1,4 @@
-import type { FeedbackEntry, Part, PhasePayload, SprintCriterion, SprintRequirement } from './schema';
+import type { FeedbackEntry, Part, PhasePayload, SprintCriterion, SprintRequirement, UnderstandStep } from './schema';
 
 /**
  * "Check before you submit": short, kind nudges that say what to add.
@@ -9,11 +9,21 @@ const MORE = 'Add a little more: say what it shows.';
 export const fullSentence = (text: string | undefined): boolean => (text ?? '').trim().split(/\s+/).filter(Boolean).length >= 4;
 const crit = (c: { text: string }) => `"${c.text}"`;
 
-export function understandProblems(p: PhasePayload['understand'], ideas: number): string[] {
+/** Understand: one nudge per switched-on step that still needs something. */
+export function understandProblems(p: PhasePayload['understand'], steps: Record<UnderstandStep, boolean>, statements: number): string[] {
   const out: string[] = [];
-  const notes = p.notes.filter((n) => n.trim());
-  if (notes.length < ideas) out.push(`Write ${ideas} "How might we" questions. You have ${notes.length} so far.`);
-  if (notes.some((n) => !/^how might we\b/i.test(n.trim()))) out.push('Start each question with "How might we".');
+  if (steps.spot && p.spot.length < 3) out.push(`Spot: tap at least 3 words in the brief that stand out. You have ${p.spot.length} so far.`);
+  if (steps.audience && !p.audience.who.trim()) out.push('Audience: say who this is for.');
+  if (steps.audience && !fullSentence(p.audience.why)) out.push('Audience: say why it matters to them in a full sentence.');
+  if (steps.dig && p.dig.filter((d) => d.trim()).length < 2) out.push('Dig: write the surface problem, then ask why at least once.');
+  if (steps.say && !fullSentence(p.say)) out.push('Say it: write the problem in your own words, in a full sentence.');
+  if (steps.limits) {
+    const known = p.limits.can_known.length + p.limits.cant_known.length;
+    const unknown = p.limits.can_unknown.length + p.limits.cant_unknown.length;
+    if (!known) out.push('Limits: add at least one thing you know.');
+    if (!unknown) out.push('Limits: add at least one thing you don’t know yet.');
+  }
+  if (steps.vote && statements > 0 && !p.star) out.push('Vote: star the problem statement your group should take on.');
   return out;
 }
 

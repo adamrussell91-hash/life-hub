@@ -1,7 +1,7 @@
 import { el } from '@/quiz/dom';
 import { sketchProblems } from './checks';
 import { SKETCH_STARTERS } from './defaults';
-import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { briefCard, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
 import type { PhasePayload, SketchCard } from './schema';
 import type { SprintStatus } from './api';
 
@@ -16,7 +16,8 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   const reqs = ctx.sprint.requirements.filter((r) => r.phases.includes('sketch'));
   const root = el('div', 'sprint-sketch');
   root.append(el('h2', '', `Your ${ideas} ideas`));
-  if (ctx.status.question) root.append(el('p', 'sprint-note', `Our question: ${ctx.status.question.text}`));
+  const brief = briefCard(ctx.status);
+  if (brief) root.append(brief);
   const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements }));
   const tabs = el('div', 'sprint-tabs');
   tabs.setAttribute('role', 'tablist');
@@ -128,4 +129,4 @@ function tickRow(label: string, into: Record<string, string>, id: string, placeh
   return row;
 }
 
-export const sketchSignature = (s: SprintStatus) => (s.question?.text ?? '');
+export const sketchSignature = (s: SprintStatus) => `${s.question?.text ?? ''}|${s.brief?.audience?.who ?? ''}|${s.brief?.answers.length ?? 0}`;

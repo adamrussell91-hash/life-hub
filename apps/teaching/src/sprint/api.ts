@@ -1,7 +1,7 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import { deviceToken } from '@/quiz/dom';
-import type { FeedbackEntry, Level, Part, PhasePayload, SprintPhaseKey } from './schema';
+import type { FeedbackEntry, Level, LimitBox, Part, PhasePayload, SprintPhaseKey } from './schema';
 
 // ---------------------------------------------------------------- student
 
@@ -12,6 +12,18 @@ export type PhaseRow = {
 export type GalleryIdea = { id: string; index?: number; title: string; idea: string; answers: string; evidence: string; file: string | null; strongest: boolean };
 export type GallerySet = { id: string; ideas: GalleryIdea[] };
 export type HeatLevel = 0 | 1 | 2 | 3;
+export type Stacked = { text: string; count: number };
+/** The group's shared Understand space. */
+export type UnderstandGroup = {
+  who: Stacked[];
+  why: Stacked[];
+  audience: { who: string; why: string } | null;
+  limits: Record<LimitBox, Stacked[]>;
+  questions: Array<{ id: string; text: string; count: number; picked: boolean; sent: boolean }>;
+  sent: Array<{ id: string; text: string; answer: string | null }>;
+};
+/** What the group carries from Understand into the later phases. */
+export type GroupBrief = { problem: string | null; audience: { who: string; why: string } | null; answers: Array<{ question: string; answer: string }> };
 export type SprintStatus = {
   identity: { need: 'class' | 'initials' | null; initials: string | null };
   anonymous?: boolean;
@@ -33,6 +45,8 @@ export type SprintStatus = {
   round?: { group_id: string; group_name: string; sent: boolean } | null;
   received?: { levels: Record<string, [number, number, number]>; lines: Array<{ worked: string; next: string; about: string }> } | null;
   running?: string | null;
+  understand_group?: UnderstandGroup;
+  brief?: GroupBrief;
 };
 export type UploadedFile = { id: string; name: string; mime: string; size: number; at: string; phase: SprintPhaseKey };
 
@@ -46,6 +60,12 @@ export type SprintClient = {
   claimPart(partId: string): Promise<SprintStatus>;
   pitch(source: { file_id: string } | { link: string }): Promise<SprintStatus>;
   feedback(groupId: string, entry: FeedbackEntry): Promise<SprintStatus>;
+  /** The group's agreed audience. */
+  audience(who: string, why: string): Promise<SprintStatus>;
+  askAdd(text: string): Promise<SprintStatus>;
+  /** Star or unstar one question for the expert (up to 3). */
+  askPick(id: string): Promise<SprintStatus>;
+  askSend(): Promise<SprintStatus>;
   upload(phase: 'sketch' | 'prototype', file: File): Promise<UploadedFile>;
   /** An object URL for a file the student may read. */
   fileUrl(fileId: string): Promise<string>;
@@ -80,6 +100,10 @@ export function sprintClient(lessonId: string, classId: string): SprintClient {
     claimPart: (partId) => call('claim_part', { part_id: partId }),
     pitch: (source) => call('pitch', source),
     feedback: (groupId, entry) => call('feedback', { group_id: groupId, entry }),
+    audience: (who, why) => call('audience', { who, why }),
+    askAdd: (text) => call('ask_add', { text }),
+    askPick: (id) => call('ask_pick', { id }),
+    askSend: () => call('ask_send'),
     async upload(phase, file) {
       const form = new FormData();
       form.set('class_id', classId);
@@ -95,7 +119,7 @@ export function sprintClient(lessonId: string, classId: string): SprintClient {
 // ---------------------------------------------------------------- teacher
 
 export type MapStudent = { id: string; initials: string; name: string; phases: Record<SprintPhaseKey, 'none' | 'draft' | 'in' | 'late'>; opened: Record<SprintPhaseKey, boolean> };
-export type MapGroup = { id: string; name: string; students: MapStudent[]; open: SprintPhaseKey[]; awaiting: { kind: 'question' | 'idea'; tie: boolean; empty: boolean } | null; chosen: boolean; question: string | null };
+export type MapGroup = { id: string; name: string; students: MapStudent[]; open: SprintPhaseKey[]; awaiting: { kind: 'question' | 'idea'; tie: boolean; empty: boolean } | null; chosen: boolean; question: string | null; /** Questions the group sent that have no answer yet. */ asked?: number };
 export type SprintSummary = {
   groups: MapGroup[];
   class_parts: Partial<Record<SprintPhaseKey, 'open' | 'ended'>>;
@@ -111,7 +135,8 @@ export type GroupBoard = {
   awaiting: MapGroup['awaiting'];
   question: { id: string; text: string } | null;
   chosen: string | null;
-  notes: Array<{ id: string; text: string; name: string; student_id: string; index: number }>;
+  notes: Array<{ id: string; text: string; name: string; student_id: string; index: number; field?: string }>;
+  understand?: UnderstandGroup;
   gallery: Array<{ id: string; name: string; student_id: string; ideas: GalleryIdea[] }>;
   totals: Record<string, number>;
   heat: Record<string, Record<string, HeatLevel>>;
@@ -135,6 +160,8 @@ export type SprintTeacherApi = {
   run(groupId: string | null): Promise<SprintSummary>;
   round(groupId: string, op: 'open' | 'close' | 'release'): Promise<SprintSummary>;
   moderate(groupId: string, studentId: string, status: 'released' | 'removed'): Promise<SprintSummary>;
+  /** Answer a question a group sent; an empty answer takes it back. */
+  answer(groupId: string, questionId: string, text: string): Promise<SprintSummary>;
   fileUrl(fileId: string): Promise<string>;
 };
 
@@ -154,6 +181,7 @@ export function sprintTeacherApi(lessonId: string): SprintTeacherApi {
     run: (groupId) => call('run', { group_id: groupId }),
     round: (groupId, op) => call('round', { group_id: groupId, op }),
     moderate: (groupId, studentId, status) => call('moderate', { group_id: groupId, student_id: studentId, status }),
+    answer: (groupId, questionId, text) => call('answer', { group_id: groupId, id: questionId, text }),
     fileUrl: (fileId) => postForUrl(`/api/lessons/${encodeURIComponent(lessonId)}/sprint-file`, { file_id: fileId })
   };
 }
@@ -199,6 +227,10 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
         claimPart: (partId) => call('claim_part', { part_id: partId }),
         pitch: (source) => call('pitch', source),
         feedback: (groupId, entry) => call('feedback', { group_id: groupId, entry }),
+        audience: (who, why) => call('audience', { who, why }),
+        askAdd: (text) => call('ask_add', { text }),
+        askPick: (id) => call('ask_pick', { id }),
+        askSend: () => call('ask_send'),
         upload: NO_UPLOADS,
         fileUrl: NO_UPLOADS
       };
@@ -222,6 +254,7 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
         run: (groupId) => call('run', { group_id: groupId }),
         round: (groupId, opName) => call('round', { group_id: groupId, op: opName }),
         moderate: (groupId, studentId, status) => call('moderate', { group_id: groupId, student_id: studentId, status }),
+        answer: (groupId, questionId, text) => call('answer', { group_id: groupId, id: questionId, text }),
         fileUrl: NO_UPLOADS
       };
     }

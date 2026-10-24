@@ -69,7 +69,7 @@ lesson type that changes behaviour, as Quiz, Lecture and Tutorial already do.
 
 | # | Phase | Where | Each student submits | The group gets |
 |---|---|---|---|---|
-| 1 | **Understand** | Class | **3** "How might we…" questions, built on the question frame, then one star on the group's questions | The group question (the top-starred one) |
+| 1 | **Understand** | Class | Their own working-out of the problem (Spot, Audience, Dig, Say it, Limits; see 1a), then a star on one of the group's problem statements | The group brief: the problem (the top-starred statement), one agreed audience, the combined limits and the expert's answers |
 | 2 | **Sketch** | Home | **3** idea cards (section 3). Each has a title, the idea, how it answers the group question, the evidence it uses, and an optional picture or file. Students then mark one card as their strongest and say why. | The group's gallery of ideas |
 | 3 | **Decide** | Class | A vote on each criterion in the anonymous gallery, each with a one-line reason, then a claim on one prototype part | The chosen idea, the parts list and who builds each part |
 | 4 | **Prototype** | Home | Their own part (file, link or text). One member also uploads the group's pitch file. **Marked.** | The prototype and pitch file |
@@ -81,6 +81,32 @@ class phase can do their part from home before the deadline.
 Phase 1 runs the same route as phase 3 on a small scale: notes are posted
 anonymously, students star one, and the decider setting applies. This gives
 the class a practice round of the voting before the big decision.
+
+### 1a. Understand (Adam's call, 24 Oct)
+
+Understand is about working out the problem before designing anything:
+analyse the brief, find the audience, find the real problem, say it in
+your own words, sort the limits, find the gaps, and ask the expert. The
+Kit's **Understand** card picks the steps and shows them as **slides** (one
+at a time) or **down the page**. Every step can be left out.
+
+| Step | Where | What students do |
+|---|---|---|
+| Spot | Alone | Tap the words in the brief that stand out |
+| Audience | Alone | Who it is for, and why it matters to them |
+| Dig | Alone | The surface problem, then "why is that a problem?", up to 5 times |
+| Say it | Alone | The problem in their own words (*[Who] needs ___ because ___*) |
+| Limits | Alone | Cards in a 2×2: can / can't control × known / unknown |
+| Vote | Group | Everyone's statements, no names; star one. The top star (or the teacher, as the decider setting says) sets the group's problem |
+| One audience | Group | Everyone's audiences stacked with counts; any member saves the agreed one |
+| Our limits | Group | Everyone's cards in one grid, repeats stacked |
+| Ask | Group | Questions from the unknowns (the group can add or reword); star up to 3 and send |
+| Expert | Group | The teacher answers from the group's board; answers show here |
+
+The submission is the student's own steps plus their star. The group
+steps are shared writes any member makes. Sketch and Decide open with the
+group brief (problem, audience, expert answers). Understand is recorded as
+in, late or not in, never marked.
 
 ### Phase content
 
@@ -261,7 +287,7 @@ How the guide reaches the work:
 
 | Phase | Model | Frame | Check before submitting | Stretch (class) |
 |---|---|---|---|---|
-| **Understand** | 2–3 example "How might we" questions from the teacher | *How might we [action] for [who] so that [result]?* in three fields | Each question can be answered more than one way and is about our challenge (two ticks) | "What do we need to find out?": one research question for the group |
+| **Understand** | The challenge brief | The steps in 1a, with the Say it frame *[Who] needs ___ because ___* | One nudge per step that is on (for example "Say it: write the problem in your own words, in a full sentence") | (none) |
 | **Sketch** | The idea guide | Idea card: *Our idea is… / It answers our question because… / The evidence it uses is…* and an optional picture | Each idea is linked to at least one criterion, with the line that shows it. The three ideas differ in who they're for, their form or their evidence. One is marked strongest, with a reason. | (Home phase, none) |
 | **Decide** | The idea guide again | Vote reason: *It does this best because…*. Parts list: part, what it must show, which criterion it serves. | Votes open once every set of ideas has been opened. Every part links to a criterion. | Write the pitch's first line |
 | **Prototype** | The teacher may upload an exemplar (their own, or an anonymous one from a past class) | The part brief from Decide sits at the top of the student's page | Self-check: Starting · Showing · Strong on each criterion their part serves, with one line of evidence. The teacher sees it beside their own mark. | (Home phase, none) |

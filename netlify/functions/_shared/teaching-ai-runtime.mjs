@@ -243,6 +243,15 @@ var SprintGroupSchema = z7.object({
   name: z7.string().trim().min(1).max(40),
   students: z7.array(z7.string().min(1).max(64)).max(SPRINT_LIMITS.groupSize)
 });
+var UNDERSTAND_ALONE = ["spot", "audience", "dig", "say", "limits"];
+var UNDERSTAND_GROUP = ["vote", "merge", "grid", "ask", "expert"];
+var UNDERSTAND_STEPS = [...UNDERSTAND_ALONE, ...UNDERSTAND_GROUP];
+var allSteps = () => Object.fromEntries(UNDERSTAND_STEPS.map((k) => [k, true]));
+var UnderstandSettingsSchema = z7.object({
+  layout: z7.enum(["slides", "vertical"]).default("slides"),
+  steps: z7.record(z7.string(), z7.boolean()).default(allSteps).transform((v) => ({ ...allSteps(), ...Object.fromEntries(Object.entries(v).filter(([k]) => UNDERSTAND_STEPS.includes(k))) }))
+});
+var defaultUnderstand = () => ({ layout: "slides", steps: allSteps() });
 var phasesInOrder = (phases) => phases.every((p, i) => p.key === SPRINT_PHASES[i]);
 var SprintSettingsSchema = z7.object({
   class_id: z7.string().min(1).max(64),
@@ -256,6 +265,7 @@ var SprintSettingsSchema = z7.object({
   idea_guide: IdeaGuideSchema,
   phases: z7.array(SprintPhaseSchema).length(5).refine(phasesInOrder, "Phases must be in order: Understand, Sketch, Decide, Prototype, Test."),
   groups: z7.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z7.object({ prototype: z7.string().optional(), reflection: z7.string().optional() }).default({})
 });
@@ -267,15 +277,26 @@ var PublicSprintSchema = z7.object({
   reflection_prompts: z7.array(z7.string().max(200)).max(2),
   requirements: z7.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
-  phases: z7.array(SprintPhaseSchema).length(5)
+  phases: z7.array(SprintPhaseSchema).length(5),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand)
 });
 var where = text(200);
 var Wheres = z7.record(z7.string().max(40), where).default({});
+var cards = z7.array(text(120)).max(8).default([]);
 var UnderstandPayloadSchema = z7.object({
+  /** Earlier sprints' "How might we" notes; still read, no longer written. */
   notes: z7.array(text(200)).max(SPRINT_LIMITS.ideas).default([]),
-  /** The note id (from the group's notes) this student starred. */
+  /** The note id (from the group's statements) this student starred. */
   star: z7.string().max(40).default(""),
-  stretch: text(300).default("")
+  stretch: text(300).default(""),
+  /** Words from the brief that stand out. */
+  spot: z7.array(text(40)).max(30).default([]),
+  audience: z7.object({ who: text(200).default(""), why: text(300).default("") }).default({ who: "", why: "" }),
+  /** The surface problem, then each "why is that a problem?". */
+  dig: z7.array(text(300)).max(6).default([]),
+  /** The problem in their own words. */
+  say: text(400).default(""),
+  limits: z7.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).default({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
 });
 var SketchCardSchema = z7.object({
   id: SprintIdSchema,
