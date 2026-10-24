@@ -27,8 +27,14 @@ async function samplePayload(
   const tag = name.replace(/\D/g, '') || '1';
 
   if (key === 'understand') {
-    const n = sprint.phases[0]!.ideas ?? 3;
-    const payload: PhasePayload['understand'] = { notes: Array.from({ length: n }, (_, i) => `How might we help ${name} answer question ${i + 1}?`), star: '', stretch: '' };
+    const payload: PhasePayload['understand'] = {
+      notes: [], star: '', stretch: '',
+      spot: ['brief', 'audience', 'problem'].map((w) => `${w}${tag}`),
+      audience: { who: `The people in ${name}'s brief`, why: `They need a clear answer to the problem ${name} found.` },
+      dig: [`The surface problem ${name} sees.`, `Because it hides the real problem for ${name}.`],
+      say: `The audience needs a clear way in because ${name} found the real problem underneath.`,
+      limits: { can_known: [`What ${name} makes`], cant_known: ['The deadline'], can_unknown: [`How long ${name}'s part takes`], cant_unknown: ['What the audience already knows'] }
+    };
     status = await client.save('understand', payload);
     payload.star = status.notes?.[0]?.id ?? '';
     return { payload, status };

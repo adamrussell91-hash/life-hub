@@ -222,7 +222,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       void client.open(key).catch(() => {});
     }
     const sig = `${key}|${FORM_SIGNATURES[key]?.(s) ?? ''}`;
-    if (sig === formKey && form) return;
+    if (sig === formKey && form) { form.update?.(s); return; }
     form?.dispose();
     formKey = sig;
     const row = s.phases!.find((p) => p.key === key)!;

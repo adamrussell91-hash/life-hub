@@ -1,6 +1,6 @@
 import { button, el } from '@/quiz/dom';
 import { partsProblems, voteProblems } from './checks';
-import { draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { briefCard, draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import type { Part, PhasePayload } from './schema';
 import type { GalleryIdea, SprintStatus } from './api';
 
@@ -17,7 +17,8 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   const state: PhasePayload['decide'] = { votes: { ...(mine?.votes ?? {}) }, reasons: { ...(mine?.reasons ?? {}) }, opened: [...(mine?.opened ?? [])], stretch: mine?.stretch ?? '' };
   const sets = s.gallery ?? [];
   const root = el('div', 'sprint-decide');
-  if (s.question) root.append(el('p', 'sprint-note', `Our question: ${s.question.text}`));
+  const brief = briefCard(s);
+  if (brief) root.append(brief);
   const voting = !s.votes_closed;
   const bar = submitBar(ctx, 'decide', () => state, () => [
     ...(voting ? voteProblems(state, ctx.sprint.criteria, sets.map((x) => x.id)) : []),

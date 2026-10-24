@@ -1,6 +1,6 @@
 import type { Lesson } from '@/schemas/lesson';
 import { button, el } from '@/quiz/dom';
-import { PHASE_LABELS, SPRINT_LIMITS, SPRINT_PHASES, type SprintGroup, type SprintPhase, type SprintPhaseKey, type SprintSettings } from './schema';
+import { PHASE_LABELS, SPRINT_LIMITS, SPRINT_PHASES, UNDERSTAND_ALONE, UNDERSTAND_GROUP, UNDERSTAND_STEP_LABELS, defaultUnderstand, type SprintGroup, type SprintPhase, type SprintPhaseKey, type SprintSettings, type UnderstandSettings } from './schema';
 import { newSprintSettings } from './defaults';
 import { noteEl, type KitNoteKey } from './notes';
 import { phaseSpans, renderPhaseGantt } from './phase-timeline';
@@ -143,6 +143,25 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       selectOf([1, 2, 3, 4, 5].map((n) => [String(n), `${n} ${n === 1 ? 'idea' : 'ideas'} each`]), String(cur.phases[1]!.ideas ?? 3), (v) => put((d) => { d.phases[0]!.ideas = Number(v); d.phases[1]!.ideas = Number(v); }), 'Ideas per person'),
       selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
     );
+
+    const und = card('Understand', 'How students work out the problem: alone first, then together. Untick a step to leave it out.', 'understand');
+    const u = cur.understand ?? defaultUnderstand();
+    und.append(selectOf([['slides', 'One step at a time (slides)'], ['vertical', 'All steps down the page']], u.layout, (v) => put((d) => { d.understand = { ...(d.understand ?? defaultUnderstand()), layout: v as UnderstandSettings['layout'] }; }), 'Understand layout'));
+    for (const [title, keys] of [['Alone, on their own computer', UNDERSTAND_ALONE], ['Together, in the group’s space', UNDERSTAND_GROUP]] as const) {
+      und.append(el('p', 'kit-label', title));
+      for (const k of keys) {
+        const row = el('div', 'kit-phase-edit__row');
+        const tick = el('input');
+        tick.type = 'checkbox';
+        tick.id = `kit-und-${k}`;
+        tick.checked = u.steps[k] !== false;
+        tick.addEventListener('change', () => put((d) => { const cu = d.understand ?? defaultUnderstand(); d.understand = { ...cu, steps: { ...cu.steps, [k]: tick.checked } }; }));
+        const lab = el('label', '', UNDERSTAND_STEP_LABELS[k]);
+        lab.htmlFor = tick.id;
+        row.append(tick, lab);
+        und.append(row);
+      }
+    }
 
     const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes, pitch feedback and your marks.', 'criteria');
     cur.criteria.forEach((c, i) => {
