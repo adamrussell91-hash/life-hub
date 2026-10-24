@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint class lock</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .pair { grid-template-columns: 1fr; } }
+  .lock { padding: 26px 22px; text-align: center; }
+  .lock__icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 12px; background: var(--pastel-sage); color: var(--pastel-sage-ink); font-size: 26px; }
+  .lock h2 { font-size: 20px; }
+  .lock p { margin: 8px auto 0; max-width: 40ch; color: var(--muted); font-size: 14px; }
+  .clock { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 16px 0 2px; color: var(--navy); }
+  .ro { text-align: left; margin-top: 20px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .ro h3 { margin-bottom: 8px; }
+  .ro div { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid var(--line); margin-bottom: 6px; }
+  .ro small { color: var(--muted); }
+
+  .teach { padding: 18px; }
+  .phhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid var(--line); margin-top: 12px; }
+  .phhead b { font-size: 15px; }
+  .confirm { margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--pastel-gold); color: var(--pastel-gold-ink); font-size: 14px; }
+  .confirm ul { margin: 6px 0 10px; padding-left: 18px; }
+  .confirm .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="mock-label">Mockup 6 · Class lock: the teacher ends the class part, and students see the lock</p>
+  <p class="mock-note">"End class part" freezes the class work, submits any drafts, and locks the sprint for the class for 2 hours. The next phase opens when the lock lifts. A student who never opened the phase in class counts as absent and can catch up once the lock lifts.</p>
+
+  <div class="pair">
+    <section class="glass teach">
+      <div class="muted small">Teacher · progress map, Decide column</div>
+      <h2>End the class part?</h2>
+      <div class="phhead"><span><b>Decide</b> · <span class="pill pill--class">Class</span></span><button class="btn btn--primary btn--sm">End class part · locks 2 h</button></div>
+      <div class="confirm">
+        <b>This will:</b>
+        <ul>
+          <li>Freeze votes, reasons and part claims (3 drafts will be submitted as they are)</li>
+          <li>Lock the sprint for 7B until 3:40 pm</li>
+          <li>Open Prototype at 3:40 pm</li>
+          <li>Mark 2 students absent (FG, PQ): they can vote from home after 3:40 pm</li>
+        </ul>
+        <div class="btns"><button class="btn btn--primary btn--sm">End and lock</button><button class="btn btn--sm">Not yet</button></div>
+      </div>
+    </section>
+
+    <section class="glass lock">
+      <div class="lock__icon">✓</div>
+      <h2>Your class work is in</h2>
+      <p>The sprint opens again at 3:40 pm. Prototype starts then: you'll build the part you claimed.</p>
+      <div class="clock">1:52:07</div>
+      <div class="small muted">until it opens</div>
+      <div class="ro">
+        <h3>What you submitted</h3>
+        <div><small>Votes</small><br>Uses sources → Idea A · Explains why it matters → Idea B · Grabs a Year 7 visitor → Idea A</div>
+        <div><small>Your part</small><br>Panel text: the baker's morning</div>
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

@@ -107,6 +107,8 @@ import { createLectureHandler } from '../../../netlify/functions/lecture.mjs';
 import { createPublishedLectureHandler } from '../../../netlify/functions/published-lecture.mjs';
 import { createPublishedTutorialHandler } from '../../../netlify/functions/published-tutorial.mjs';
 import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
+import { createPublishedSprintHandler } from '../../../netlify/functions/published-sprint.mjs';
+import { createSprintHandler } from '../../../netlify/functions/sprint.mjs';
 import { createClassClaimsHandler } from '../../../netlify/functions/class-claims.mjs';
 import { createOutcomeHandler } from '../../../netlify/functions/outcome.mjs';
 import { createMarkbookHandler } from '../../../netlify/functions/markbook.mjs';
@@ -124,6 +126,7 @@ import { createPublishedContinuumHandler } from '../../../netlify/functions/publ
 import { createPeerFeedbackHandler } from '../../../netlify/functions/peer-feedback.mjs';
 import { createPublishedPeerFeedbackHandler } from '../../../netlify/functions/published-peer-feedback.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
+import { prepareSprintPublish, storeSprintConfig } from '../../../netlify/functions/_shared/sprint.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -1165,10 +1168,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return errorResponse(400, 'validation_error', `A quiz question isn’t finished: ${quizPublish.problems[0]}`);
     }
     if (quizPublish.quiz) await storeQuizKey(functionBlobStore(), id, quizPublish.quiz);
+    // A design sprint keeps its groups and rules server-side, as the real publish does.
+    const sprint = parsed.data.pedagogical_mode === 'design_sprint' && parsed.data.sprint ? prepareSprintPublish(parsed.data, studentBlocks) : null;
+    if (sprint) await storeSprintConfig(functionBlobStore(), id, sprint.config);
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
       blocks: quizPublish.blocks,
-      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {})
+      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {}),
+      ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {})
     });
 
     try {
@@ -3615,6 +3622,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createTutorialHandler(deps)
       : path.startsWith('/api/published/tutorial/')
         ? createPublishedTutorialHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/sprint$/.test(path)
+        ? createSprintHandler(deps)
+      : path.startsWith('/api/published/sprint/')
+        ? createPublishedSprintHandler(deps)
       : path.startsWith('/api/published/hinge/')
         ? createPublishedHingeHandler(deps)
       : /^\/api\/lessons\/[^/]+\/continuum\//.test(path)
@@ -3740,6 +3751,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/lecture\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/tutorial$/.test(path) ||
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/sprint$/.test(path) ||
+      /^\/api\/published\/sprint\/[^/]+$/.test(path) ||
       /^\/api\/published\/question-drop\/[^/]+\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/discern$/.test(path) ||
       /^\/api\/published\/discern\/[^/]+$/.test(path) ||

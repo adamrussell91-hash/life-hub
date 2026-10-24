@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint kit setup</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 18px; }
+  .steps span { font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.6); color: var(--muted); }
+  .steps .now { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card { padding: 18px; }
+  .card h2 { font-size: 16px; }
+  .card .why { font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+  .line { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 9px 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 6px; font-size: 14px; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .chip { font-size: 11px; font-weight: 700; width: 24px; height: 24px; display: inline-grid; place-items: center; border-radius: 7px; border: 1px solid var(--line-2); color: var(--muted); background: var(--paper); }
+  .chip--on { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .out { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--pastel-sage); color: var(--pastel-sage-ink); white-space: nowrap; }
+  .add { font: inherit; font-size: 13px; font-weight: 600; color: var(--wave); background: none; border: 1px dashed var(--line-2); border-radius: 12px; padding: 8px; width: 100%; cursor: pointer; margin-top: 4px; }
+  .settings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 700px) { .settings { grid-template-columns: 1fr 1fr; } }
+  .set { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .set small { display: block; color: var(--muted); font-size: 12px; }
+  .set b { font-size: 14px; }
+  details.phase { background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; }
+  details.phase summary { list-style: none; cursor: pointer; padding: 11px 12px; display: flex; justify-content: space-between; gap: 8px; align-items: center; font-weight: 650; font-size: 14px; }
+  details.phase summary::-webkit-details-marker { display: none; }
+  details.phase summary .count { font-weight: 500; font-size: 12px; color: var(--muted); }
+  .phase__body { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .gl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; padding: 8px 10px; border-radius: 10px; background: var(--paper); }
+  .gl i { font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--pastel-lilac-ink); margin-right: 6px; }
+  .gl .x { color: var(--muted); font-size: 13px; }
+  .key { font-size: 12px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="mock-label">Mockup 5 · Teacher · Sprint editor, Kit step</p>
+  <p class="mock-note">Everything is set up once here and flows into the phases. Each criterion links to an outcome from the lesson's dot points. Requirements and guides are each switched on for the phases that use them (U S D P T). Every phase starts with a default Thinking Toolkit move, which the teacher can swap or add to.</p>
+
+  <div class="muted small">7B · Year 7 History</div>
+  <h1>Pompeii: why it still matters</h1>
+  <div class="steps"><span>Challenge</span><span class="now">Kit</span><span>Phases and deadlines</span><span>Groups</span><span>Publish</span></div>
+
+  <section class="glass card" style="margin-bottom:16px">
+    <h2>Settings</h2>
+    <div class="settings" style="margin-top:10px">
+      <div class="set"><small>Support level</small><b>Guided</b></div>
+      <div class="set"><small>Who decides</small><b>Teacher confirms</b></div>
+      <div class="set"><small>Ideas per person</small><b>3</b></div>
+      <div class="set"><small>Class lock</small><b>2 hours</b></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div>
+      <section class="glass card" style="margin-bottom:16px">
+        <h2>Criteria</h2>
+        <p class="why">Judged on Starting · Showing · Strong. Used for idea cards, votes, feedback and your marks.</p>
+        <div class="line"><span>Uses sources to support the idea</span><span class="out">HT4-9 sources</span></div>
+        <div class="line"><span>Explains why it matters today</span><span class="out">HT4-2 significance</span></div>
+        <div class="line"><span>Grabs a Year 7 visitor</span><span class="out">HT4-10 communicates</span></div>
+        <button class="add">+ Criterion</button>
+      </section>
+
+      <section class="glass card">
+        <h2>Requirements</h2>
+        <p class="why">Must-haves, yes or no. Students tick each one and say where it is.</p>
+        <div class="line"><span>Uses at least two sources</span><span class="chips"><span class="chip">U</span><span class="chip chip--on">S</span><span class="chip">D</span><span class="chip chip--on">P</span><span class="chip">T</span></span></div>
+        <div class="line"><span>Fits on one A3 panel</span><span class="chips"><span class="chip">U</span><span class="chip chip--on">S</span><span class="chip">D</span><span class="chip chip--on">P</span><span class="chip">T</span></span></div>
+        <div class="line"><span>Includes one direct quote</span><span class="chips"><span class="chip">U</span><span class="chip">S</span><span class="chip">D</span><span class="chip chip--on">P</span><span class="chip">T</span></span></div>
+        <button class="add">+ Requirement</button>
+        <p class="key">U Understand · S Sketch · D Decide · P Prototype · T Test</p>
+      </section>
+    </div>
+
+    <section class="glass card">
+      <h2>Guides by phase</h2>
+      <p class="why">Shown beside students' work in each phase. Toolkit moves set the frames and the value check.</p>
+
+      <details class="phase"><summary>Understand <span class="count">2 guides</span></summary>
+        <div class="phase__body">
+          <div class="gl"><span><i>Move</i>Examining using questions · relevance</span><span class="x">Change</span></div>
+          <div class="gl"><span><i>Toolkit</i>Question Quadrant</span><span class="x">×</span></div>
+        </div></details>
+      <details class="phase" open><summary>Sketch <span class="count">4 guides</span></summary>
+        <div class="phase__body">
+          <div class="gl"><span><i>Move</i>Applying with suggestions and examples · breadth</span><span class="x">Change</span></div>
+          <div class="gl"><span><i>Guide</i>Good idea checklist</span><span class="x">Edit</span></div>
+          <div class="gl"><span><i>Guide</i>Model idea: the Great Wall</span><span class="x">Edit</span></div>
+          <div class="gl"><span><i>Resource</i>Source pack (Sources A–F)</span><span class="x">×</span></div>
+          <button class="add">+ Toolkit block, resource or guide</button>
+        </div></details>
+      <details class="phase"><summary>Decide <span class="count">2 guides</span></summary>
+        <div class="phase__body">
+          <div class="gl"><span><i>Move</i>Applying criteria with reasons · relevance</span><span class="x">Change</span></div>
+          <div class="gl"><span><i>Guide</i>Good idea checklist</span><span class="x">Edit</span></div>
+        </div></details>
+      <details class="phase"><summary>Prototype <span class="count">2 guides</span></summary>
+        <div class="phase__body">
+          <div class="gl"><span><i>Move</i>Justifying with reasons and examples · accuracy</span><span class="x">Change</span></div>
+          <div class="gl"><span><i>Exemplar</i>Last year's panel (anonymous)</span><span class="x">×</span></div>
+        </div></details>
+      <details class="phase"><summary>Test <span class="count">2 guides</span></summary>
+        <div class="phase__body">
+          <div class="gl"><span><i>Move</i>Evaluating with reasons and suggestions · clarity</span><span class="x">Change</span></div>
+          <div class="gl"><span><i>Toolkit</i>Thinking reflection + Implication · significance</span><span class="x">Change</span></div>
+        </div></details>
+    </section>
+  </div>
+</div>
+</body>
+</html>

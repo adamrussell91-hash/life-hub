@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint pitch feedback</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 22px; align-items: start; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+  .focus { border-radius: var(--radius-lg); background: #0f2238; color: #fff; padding: 18px; box-shadow: var(--shadow); }
+  .focus__bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .focus__who { font-size: 20px; font-weight: 700; }
+  .focus__who span { display: block; font-size: 12px; font-weight: 500; opacity: .7; }
+  .timer { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .timer small { font-size: 12px; font-weight: 500; opacity: .7; display: block; text-align: right; }
+  .slide { aspect-ratio: 16 / 9; border-radius: 16px; background: linear-gradient(160deg, #f6efe2, #e9dcc6); color: #3d2b16;
+           display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; padding: 26px; }
+  .slide h2 { font-size: 26px; line-height: 1.1; margin: 0 0 10px; }
+  .slide p { margin: 0 0 8px; font-size: 14px; }
+  .slide__pic { border-radius: 12px; background: repeating-linear-gradient(135deg, rgba(61,43,22,.08) 0 10px, transparent 10px 20px); border: 1px dashed rgba(61,43,22,.3);
+                display: grid; place-items: center; font-size: 12px; opacity: .8; }
+  @media (max-width: 600px) { .slide { grid-template-columns: 1fr; padding: 16px; aspect-ratio: auto; } .slide h2 { font-size: 20px; } .slide__pic { height: 90px; } }
+  .focus__foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+  .fb-state { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .live { width: 10px; height: 10px; border-radius: 50%; background: #6fd39a; box-shadow: 0 0 0 4px rgba(111,211,154,.2); }
+  .bar { width: 160px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.15); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 81%; background: #fff; }
+  .focus .btn { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.25); }
+  .focus .btn--primary { background: #fff; color: var(--navy); border-color: #fff; }
+  .order { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; }
+  .order span { padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.08); opacity: .8; }
+  .order .done { text-decoration: line-through; opacity: .5; }
+  .order .now { background: #fff; color: var(--navy); opacity: 1; font-weight: 700; }
+
+  .phone { width: 360px; max-width: 100%; margin: 0 auto; border-radius: 34px; padding: 12px; background: #1b2433; box-shadow: var(--shadow); }
+  .screen { border-radius: 24px; background: var(--paper); padding: 16px; min-height: 640px; }
+  .screen h2 { font-size: 17px; }
+  .crit { margin-top: 14px; }
+  .crit__name { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .lvl { font: inherit; font-size: 13px; font-weight: 600; padding: 9px 4px; border-radius: 12px; border: 1px solid var(--line-2); background: #fff; color: var(--ink); cursor: pointer; }
+  .lvl[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .box { margin-top: 14px; }
+  .box label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .box textarea { width: 100%; font: inherit; font-size: 14px; border: 1px solid var(--line-2); border-radius: 12px; padding: 10px; min-height: 64px; background: #fff; resize: vertical; }
+  .send { width: 100%; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="mock-label">Mockup 3 · Test · Focus view on the projector, and a student's feedback card</p>
+  <p class="mock-note">The teacher picks the group, and Focus view shows that group's uploaded pitch file and a 2-minute timer. "Open feedback" puts a card on every other student's device, with one level per criterion plus two short lines. Feedback is held for moderation, then released to the presenting group.</p>
+
+  <div class="layout">
+    <section>
+      <div class="focus">
+        <div class="focus__bar">
+          <div class="focus__who">Group Heron<span>Pitch 2 of 5 · pitch file uploaded 3 Nov</span></div>
+          <div class="timer">1:24<small>of 2:00</small></div>
+        </div>
+        <div class="slide">
+          <div>
+            <h2>What the ash kept</h2>
+            <p>Five objects. Five things historians know because the ash buried them in one afternoon.</p>
+            <p>1. A carbonised loaf: bread was stamped by the bakery that made it.</p>
+            <p>2. Graffiti: people wrote jokes and election slogans on walls, just like now.</p>
+          </div>
+          <div class="slide__pic">group's uploaded picture</div>
+        </div>
+        <div class="focus__foot">
+          <div class="fb-state"><i class="live"></i>Feedback open · 13 of 16 in <span class="bar"><i></i></span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn--sm">Restart timer</button>
+            <button class="btn btn--primary btn--sm">Close feedback</button>
+          </div>
+        </div>
+        <div class="order"><span class="done">Kestrel</span><span class="now">Heron</span><span>Wren</span><span>Falcon</span><span>Osprey</span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="phone"><div class="screen">
+        <div class="muted small">Feedback for</div>
+        <h2>Group Heron's panel</h2>
+        <p class="small muted" style="margin:4px 0 0">Your name stays hidden from the group.</p>
+
+        <div class="crit"><div class="crit__name">Uses sources</div>
+          <div class="levels"><button class="lvl">Starting</button><button class="lvl">Showing</button><button class="lvl" aria-pressed="true">Strong</button></div></div>
+        <div class="crit"><div class="crit__name">Explains why it matters</div>
+          <div class="levels"><button class="lvl">Starting</button><button class="lvl" aria-pressed="true">Showing</button><button class="lvl">Strong</button></div></div>
+        <div class="crit"><div class="crit__name">Grabs a Year 7 visitor</div>
+          <div class="levels"><button class="lvl">Starting</button><button class="lvl">Showing</button><button class="lvl">Strong</button></div></div>
+
+        <div class="box"><label>What worked</label><textarea>The graffiti one made it feel like real people lived there.</textarea></div>
+        <div class="box"><label>One thing to try next</label><textarea placeholder="Something the group could add or change"></textarea></div>
+        <button class="btn btn--primary send">Send feedback</button>
+      </div></div>
+    </section>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.levels').forEach((row) => row.addEventListener('click', (e) => {
+    const b = e.target.closest('.lvl'); if (!b) return;
+    row.querySelectorAll('.lvl').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+  }));
+</script>
+</body>
+</html>

@@ -272,6 +272,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
       // A tutorial's groups change on the board (a student moved); the next save carries them.
       if (next.tutorial) lesson.tutorial = next.tutorial;
+      // A design sprint's Kit is edited on the page; the next save carries it.
+      if (next.sprint) lesson.sprint = next.sprint;
     }
 
     function bumpDraftClock(): void {
@@ -819,6 +821,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function showPublishSuccess(_studentPath: string): void {
       const publishedAt = new Date().toISOString();
       lesson.published_at = publishedAt;
+      page?.markPublished?.(publishedAt);
 
       publishPanel.replaceChildren();
       publishPanel.hidden = true;
