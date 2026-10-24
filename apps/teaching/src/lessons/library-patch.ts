@@ -16,6 +16,8 @@ export const LessonLibraryPatchSchema = z.object({
   after_lesson_ids: AfterLessonIdsSchema.nullable().optional(),
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
+  branch_from: z.string().min(1).max(64).nullable().optional(),
+  pre_unit: z.boolean().nullable().optional(),
   dot_points: z.array(DotPointRefSchema).max(20).optional()
 });
 
@@ -47,6 +49,8 @@ export function parseLessonLibraryPatch(
     ...(record.after_lesson_ids !== undefined ? { after_lesson_ids: record.after_lesson_ids } : {}),
     ...(record.route_role !== undefined ? { route_role: record.route_role } : {}),
     ...(record.skip_rule !== undefined ? { skip_rule: record.skip_rule } : {}),
+    ...(record.branch_from !== undefined ? { branch_from: record.branch_from } : {}),
+    ...(record.pre_unit !== undefined ? { pre_unit: record.pre_unit } : {}),
     ...(record.dot_points !== undefined ? { dot_points: record.dot_points } : {})
   };
   const parsed = LessonLibraryPatchSchema.safeParse(subset);
@@ -77,6 +81,8 @@ export function applyLessonLibraryPatch(lesson: Lesson, patch: LessonLibraryPatc
   if (patch.after_lesson_ids !== undefined) next.after_lesson_ids = patch.after_lesson_ids;
   if (patch.route_role !== undefined) next.route_role = patch.route_role;
   if (patch.skip_rule !== undefined) next.skip_rule = patch.skip_rule;
+  if (patch.branch_from !== undefined) next.branch_from = patch.branch_from;
+  if (patch.pre_unit !== undefined) next.pre_unit = patch.pre_unit;
   if (patch.dot_points !== undefined) next.dot_points = patch.dot_points;
   return next;
 }

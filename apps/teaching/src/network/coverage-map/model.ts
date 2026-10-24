@@ -1,6 +1,6 @@
 import type { CurriculumLinesV2Content, LessonRouteRole, NetworkLine } from '@/schemas/block';
 import { lineColour } from '../colour';
-import { buildFlow } from '../flow';
+import { buildFlow, hangSides } from '../flow';
 import { orderStations, placeByDate, withAutoDepths, type NetLesson } from '../model';
 
 /**
@@ -17,6 +17,8 @@ export type Depth = 1 | 2 | 3;
 export type MapLesson = NetLesson & {
   role?: LessonRouteRole;
   skip?: string;
+  /** A support, extension or optional lesson: the core lesson it branches off. */
+  branchFrom?: string;
   /** A quiz lesson: a checkpoint on the route. */
   quiz?: boolean;
 };
@@ -96,11 +98,13 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     while (i < order.length && railAfter.has(order[i]!)) i++;
     order.splice(i, 0, id);
   }
-  const shown = withAutoDepths(order.map((id) => byId.get(id)!).filter(Boolean));
   const roleOf = (id: string): MapLane | undefined => {
     const role = byId.get(id)?.role ?? railRole.get(id);
     return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
   };
+  // Side lessons sit under the core lesson they branch off, in that lesson's week.
+  const hung = hangSides(order, (id) => roleOf(id) !== undefined, (id) => byId.get(id)?.branchFrom ?? railAfter.get(id));
+  const shown = withAutoDepths(hung.order.map((id) => byId.get(id)!).filter(Boolean));
   const gateLessons = new Set(content.gates.map((g) => g.lesson_id).filter((x): x is string => Boolean(x)));
 
   /* Items, in four groups. */
@@ -162,6 +166,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     // Every lesson is core unless it has its own support, extension or optional role: forks never make options.
     const lane = roleOf(lesson.id) ?? 'core';
     const skip = lesson.skip?.trim() || railSkip.get(lesson.id);
+    const bandOf = hung.anchor.get(lesson.id) ?? lesson.id;
     const isGoal = content.terminus.lesson_id === lesson.id;
     return {
       id: lesson.id,
@@ -170,7 +175,7 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
       lane,
       kind: isGoal ? 'goal' : lesson.quiz || gateLessons.has(lesson.id) ? 'check' : 'lesson',
       ...(skip && isSide(lane) ? { skip } : {}),
-      ...(bands?.get(lesson.id) ? { band: bands.get(lesson.id) } : {}),
+      ...(bands?.get(bandOf) ? { band: bands.get(bandOf) } : {}),
       ...(dates?.get(lesson.id) ? { date: dates.get(lesson.id) } : {}),
       teaches
     };

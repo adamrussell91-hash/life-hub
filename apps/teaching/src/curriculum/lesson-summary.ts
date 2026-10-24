@@ -56,6 +56,8 @@ export function toCurriculumLessonSummary(
     ...(lesson.after_lesson_ids ? { after_lesson_ids: lesson.after_lesson_ids } : {}),
     ...(lesson.route_role ? { route_role: lesson.route_role } : {}),
     ...(lesson.skip_rule ? { skip_rule: lesson.skip_rule } : {}),
+    ...(lesson.branch_from ? { branch_from: lesson.branch_from } : {}),
+    ...(lesson.pre_unit ? { pre_unit: true } : {}),
     ...(lesson.dot_points && lesson.dot_points.length > 0 ? { dot_points: lesson.dot_points } : {})
   };
 }

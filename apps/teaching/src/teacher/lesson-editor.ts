@@ -261,6 +261,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       // The Route pills: Core is saved too, so it beats an old support or extension stop on the unit map.
       if (next.route_role !== undefined) lesson.route_role = next.route_role;
       if (next.skip_rule !== undefined) lesson.skip_rule = next.skip_rule;
+      if (next.branch_from !== undefined) lesson.branch_from = next.branch_from;
+      if (next.pre_unit !== undefined) lesson.pre_unit = next.pre_unit;
       // Saves merge into the stored lesson, so clearing sends an empty list.
       if (next.dot_points) lesson.dot_points = next.dot_points;
       if (next.plan_covered) lesson.plan_covered = next.plan_covered;
