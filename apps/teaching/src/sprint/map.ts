@@ -3,6 +3,7 @@ import { button, el } from '@/quiz/dom';
 import { dueText } from './player';
 import { PHASE_LABELS, SPRINT_PHASES, type SprintPhaseKey } from './schema';
 import { mountGroupBoard } from './group-board';
+import { earlyNotes, phaseSpans, renderPhaseGantt } from './phase-timeline';
 import { openPitchView } from './pitch-view';
 import type { MapGroup, SprintSummary, SprintTeacherApi } from './api';
 import './sprint.css';
@@ -24,16 +25,18 @@ function badge(g: MapGroup, key: SprintPhaseKey): string {
  * The teacher's progress map: phases across, groups down, a dot per student.
  * Names show here only. Clicking a row opens that group's board below.
  */
-export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherApi; emitLesson: (next: Lesson) => void }): SprintMapHandle {
+export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherApi; emitLesson: (next: Lesson) => void; now?: () => number }): SprintMapHandle {
+  const now = o.now ?? (() => Date.now());
   const root = el('section', 'smap');
   const head = el('header', 'smap__head');
   const notice = el('div', 'smap__notice');
+  const gantt = el('div', 'smap__gantt');
   const grid = el('div', 'smap__grid');
   const confirmHost = el('div');
   const boardHost = el('div');
   const error = el('p', 'sprint-submit__err');
   error.setAttribute('role', 'alert');
-  root.append(head, notice, confirmHost, grid, boardHost, error);
+  root.append(head, notice, confirmHost, gantt, grid, boardHost, error);
   let summary: SprintSummary | null = null;
   let poll = 0;
   let board: { refresh(): Promise<void>; dispose(): void } | null = null;
@@ -112,13 +115,19 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       who.addEventListener('change', () => { if (who.value) void run(o.api.unlock(who.value)); });
       notice.append(el('span', 'pill pill--wait', `Locked until ${until}`), who);
     }
+    if (sprint) {
+      // Class deadlines after any class-wide extension, as the students see them.
+      const ext = (s.extend as { class?: Record<string, { due_date: string; due_time: string }> }).class ?? {};
+      const spans = phaseSpans(sprint.phases.map((p) => ({ ...p, ...(ext[p.key] ?? {}) })), sprint.lock_hours, s.ended);
+      gantt.replaceChildren(renderPhaseGantt(spans, { now: now(), note: earlyNotes(spans, s.groups.map((g) => g.open), now()) }));
+    }
     grid.replaceChildren();
     const header = el('div', 'smap-row smap-row--head');
     header.append(el('div'));
     for (const key of SPRINT_PHASES) {
       const p = sprint?.phases.find((x) => x.key === key);
       const h = el('div', 'smap-ph');
-      h.append(el('b', '', PHASE_LABELS[key]), el('span', `pill ${p?.where === 'class' ? 'pill--class' : 'pill--home'}`, p?.where === 'class' ? 'Class' : 'Home'), el('span', 'smap-due', p ? dueText(p.due_date, p.due_time, Date.now()) : ''));
+      h.append(el('b', '', PHASE_LABELS[key]), el('span', `pill ${p?.where === 'class' ? 'pill--class' : 'pill--home'}`, p?.where === 'class' ? 'Class' : 'Home'), el('span', 'smap-due', p ? dueText(p.due_date, p.due_time, now()) : ''));
       if (p?.where === 'class' && s.class_parts[key] === 'open' && s.groups.some((g) => g.open.includes(key))) {
         const end = button('End class part', 'secondary', () => confirmEnd(key));
         // The lock length is dropped on a phone; the confirm still says it.

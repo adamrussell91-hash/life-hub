@@ -103,9 +103,9 @@
 .smap .dot--in { background: var(--navy); }
 .smap .dot--none { border-color: rgba(23,55,94,.18); }
 .smap .dot--late { background: var(--pastel-gold-ink); border-color: var(--pastel-gold-ink); }
-.smap .pill { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-.smap .pill--class { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
-.smap .pill--home { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.smap .pill, .pgantt .pill { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.smap .pill--class, .pgantt .pill--class { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.smap .pill--home, .pgantt .pill--home { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
 .smap .pill--wait { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
 .smap .pill--mark { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
 .sboard { display: grid; gap: 12px; padding: 16px; border-radius: var(--radius-lg); background: rgba(255,255,255,.75); border: 1px solid var(--line); }
@@ -155,3 +155,45 @@
 .kit-note summary { cursor: pointer; font-weight: 600; color: var(--ink, inherit); width: fit-content; }
 .kit-note p { margin: 6px 0 0; line-height: 1.5; }
 .kit > .kit-note { padding: 12px 16px; border-radius: var(--radius-lg); background: rgba(255,255,255,.75); border: 1px solid var(--line); }
+
+/* Phase Gantt: one row per phase, bars on a shared day axis. */
+.pgantt { display: grid; grid-template-columns: minmax(170px, 230px) minmax(0, 1fr); column-gap: 12px; row-gap: 8px; align-items: center; }
+.pgantt__axis { position: relative; height: 22px; border-bottom: 1px solid var(--line); }
+.pgantt__tick { position: absolute; top: 0; font-size: 11px; color: var(--muted); padding-left: 3px; border-left: 1px solid var(--line); height: 100%; overflow: hidden; white-space: nowrap; }
+.pgantt__row { display: contents; }
+.pgantt__name { display: grid; gap: 2px; font-size: 12px; }
+.pgantt__name b { font-size: 14px; margin-right: 6px; }
+.pgantt__name .pill { justify-self: start; }
+.pgantt__times { display: grid; color: var(--muted); }
+.pgantt__soon { font-size: 11px; }
+.pgantt__bad { color: #a32d2d; font-weight: 600; }
+.pgantt__track { position: relative; height: 46px; border-radius: 8px; background: rgba(23,55,94,.03); }
+.pgantt__bar { position: absolute; top: 8px; height: 30px; min-width: 6px; border-radius: 8px; border: 1px solid; font: inherit; font-size: 12px; padding: 0 8px; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; }
+.pgantt__bar > span { overflow: hidden; text-overflow: ellipsis; }
+button.pgantt__bar { cursor: pointer; }
+.pgantt__bar--class { background: var(--pastel-blue); border-color: var(--pastel-blue-ink); color: var(--pastel-blue-ink); }
+.pgantt__bar--home { background: var(--pastel-peach); border-color: var(--pastel-peach-ink); color: var(--pastel-peach-ink); }
+.pgantt__bar--missing { background: #fcebeb; border: 1px dashed #a32d2d; color: #791f1f; }
+.pgantt__bar.is-picked { outline: 2px solid #185fa5; outline-offset: 2px; }
+.pgantt__row--bad .pgantt__bar:not(.pgantt__bar--missing) { border-color: #a32d2d; }
+.pgantt__lock { position: absolute; top: 14px; height: 18px; border-radius: 4px; background: repeating-linear-gradient(135deg, #d3d1c7 0 4px, transparent 4px 8px); border: 1px solid #888780; }
+.pgantt__now { position: absolute; top: 0; bottom: 0; width: 2px; background: #e24b4a; transform: translateX(-1px); pointer-events: none; }
+.pgantt__problem, .pgantt__note { grid-column: 2; margin: -6px 0 0; font-size: 12px; }
+.pgantt__problem { color: #a32d2d; }
+.pgantt__note { color: var(--muted); }
+.pgantt__legend { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.pgantt__key--now { display: inline-block; width: 2px; height: 14px; background: #e24b4a; }
+.kit-phase-edit { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.kit-phase-edit__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.kit-phase-edit__row .qz-input { flex: 1 1 160px; min-width: 0; }
+.kit-phase-edit label { font-size: 13px; }
+@media (max-width: 640px) {
+  .pgantt { grid-template-columns: minmax(0, 1fr); }
+  .pgantt__corner, .pgantt__axis { display: none; }
+  .pgantt__track { height: 20px; }
+  .pgantt__bar { top: 4px; height: 12px; padding: 0; }
+  .pgantt__bar > span { display: none; }
+  .pgantt__lock { top: 6px; height: 8px; }
+  .pgantt__problem, .pgantt__note { grid-column: 1; margin: 0; }
+  .pgantt__row + .pgantt__row .pgantt__name { border-top: 1px solid var(--line); padding-top: 8px; }
+}
