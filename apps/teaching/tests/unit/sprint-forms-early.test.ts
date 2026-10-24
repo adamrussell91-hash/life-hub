@@ -75,12 +75,51 @@ describe('understand form', () => {
   });
 });
 
+const sketchRow = { key: 'sketch', open: true, due_date: '', due_time: '', state: 'none', late: false, frozen: false, closed: false, count_in: 0 } as const;
+const typeIdea = (root: HTMLElement, text: string) => {
+  const input = root.querySelector<HTMLInputElement>('.sk-rapid')!.closest('section')!.querySelector<HTMLInputElement>('input')!;
+  input.value = text;
+  input.form!.requestSubmit();
+};
+
 describe('sketch form', () => {
-  it('has a tab per idea, the idea card fields and the requirement ticks', () => {
-    const f = mountSketch(ctx({ row: { key: 'sketch', open: true, due_date: '', due_time: '', state: 'none', late: false, frozen: false, closed: false, count_in: 0 } }));
-    expect(f.el.querySelectorAll('.sprint-tab')).toHaveLength(3);
-    expect(f.el.textContent).toContain('It answers our question because…');
+  it('opens the rapid ideas box with the timer, counts each idea, and locks it when time is up', () => {
+    vi.useFakeTimers();
+    try {
+      const f = mountSketch(ctx({ row: sketchRow }));
+      const box = () => f.el.querySelector('.sk-rapid')!.closest('section')!.querySelector<HTMLInputElement>('input')!;
+      expect(box().disabled).toBe(true);
+      [...f.el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Start the 8-minute timer')!.click();
+      expect(box().disabled).toBe(false);
+      typeIdea(f.el, 'A five-object panel');
+      typeIdea(f.el, 'a five-object panel');
+      typeIdea(f.el, 'Then and now streets');
+      expect(f.el.querySelectorAll('.sk-rapid li')).toHaveLength(2);
+      expect(f.el.querySelector('.sk-timer__count')?.textContent).toBe('2 ideas');
+      vi.advanceTimersByTime(8 * 60_000 + 1000);
+      expect(box().disabled).toBe(true);
+      expect(f.el.querySelector('.sk-timer')?.textContent).toContain('Time’s up. 2 ideas.');
+      f.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stars up to the number put forward, and each star becomes a card to develop and justify', () => {
+    const f = mountSketch(ctx({ row: sketchRow, sprint: { ...sprint, sketch_timer: 0 } }));
+    for (const t of ['Objects', 'Streets', 'Letters']) typeIdea(f.el, t);
+    const stars = () => [...f.el.querySelectorAll<HTMLButtonElement>('.sk-pick .sprint-star')];
+    stars()[0]!.click();
+    stars()[2]!.click();
+    expect(f.el.querySelectorAll('.sprint-tab')).toHaveLength(2);
+    expect(stars()[1]!.disabled).toBe(true);
+    expect(f.el.querySelector<HTMLInputElement>('.sprint-card-pane input')!.value).toBe('Objects');
+    expect(f.el.textContent).toContain('It solves our problem for the audience because…');
     expect(f.el.textContent).toContain('Two sources');
     expect(f.el.textContent).toContain('Is there another way to look at this?');
+    expect(f.el.querySelector<HTMLElement>('.sprint-strongest')!.hidden).toBe(false);
+    stars()[0]!.click();
+    expect(f.el.querySelectorAll('.sprint-tab')).toHaveLength(1);
+    expect(f.el.querySelector<HTMLElement>('.sprint-strongest')!.hidden).toBe(true);
   });
 });

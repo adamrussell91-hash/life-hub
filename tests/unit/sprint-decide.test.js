@@ -79,3 +79,20 @@ test('parts: written once the idea is chosen, one claim each, then Decide can be
   const sent = await act(store, 2, 'submit', { phase: 'decide', payload: ballot });
   assert.equal(sent.phases[2].state, 'in');
 });
+
+test('Sketch keeps the inspiration and rapid ideas private; only the starred cards reach the gallery', async () => {
+  setSprintClock(() => Date.parse('2026-11-01T00:00:00Z'));
+  const store = storeFor();
+  for (const n of [1, 2]) await act(store, n, 'claim', { initials: INITIALS[n] });
+  const s = await act(store, 1, 'save', { phase: 'understand', payload: { notes: ['How might we a?'], star: '', stretch: '' } });
+  for (const n of [1, 2]) await act(store, n, 'submit', { phase: 'understand', payload: { notes: [`How might we ${n}?`], star: s.notes[0].id, stretch: '' } });
+  const sketch = { inspiration: [{ from: 'A museum audio guide', borrow: 'One voice talking to you' }], rapid: ['Ash', 'Streets', 'A private rough idea'], rapid_started_at: '2026-11-03T10:00:00.000Z', cards: [{ ...card('k1', 'Ash'), seed: 'Ash' }], strongest: 'k1', strongest_why: 'Only one.' };
+  const saved = await act(store, 1, 'submit', { phase: 'sketch', payload: sketch });
+  assert.deepEqual(saved.mine.sketch.rapid, sketch.rapid);
+  assert.equal(saved.mine.sketch.rapid_started_at, sketch.rapid_started_at);
+  await act(store, 2, 'submit', { phase: 'sketch', payload: { cards: [card('k1', 'Baker')], strongest: 'k1', strongest_why: 'One person’s day.' } });
+  const decide = await act(store, 2, 'status');
+  const gallery = JSON.stringify(decide.gallery);
+  assert.deepEqual(decide.gallery.flatMap((set) => set.ideas.map((i) => i.title)).sort(), ['Ash', 'Baker']);
+  assert.ok(!gallery.includes('A private rough idea') && !gallery.includes('museum audio guide'));
+});

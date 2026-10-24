@@ -26,7 +26,7 @@ export const DEFAULT_MODEL = {
 export const DEFAULT_REFLECTION_CRITERION = 'Explains what the test showed and what to change next';
 export const DEFAULT_REFLECTION_PROMPTS = ['What did the feedback show your idea does well?', 'What would you change next, and why?'];
 
-export const SKETCH_STARTERS = { idea: 'Our idea is…', answers: 'It answers our question because…', evidence: 'The evidence it uses is…' };
+export const SKETCH_STARTERS = { idea: 'Our idea is…', answers: 'It solves our problem for the audience because…', evidence: 'The evidence it uses is…' };
 export const FEEDBACK_STARTERS = { worked: 'It works because…', next: 'Try…' };
 
 const WHERE: Record<SprintPhaseKey, 'class' | 'home'> = { understand: 'class', sketch: 'home', decide: 'class', prototype: 'home', test: 'class' };
@@ -50,10 +50,11 @@ export function newSprintSettings(classId: string): SprintSettings {
       ends_at: '',
       instruction: '',
       stretch: '',
-      ...(key === 'understand' || key === 'sketch' ? { ideas: 3 } : {})
+      ...(key === 'understand' || key === 'sketch' ? { ideas: 2 } : {})
     })),
     groups: [],
     understand: defaultUnderstand(),
+    sketch_timer: 8,
     columns: {}
   };
 }
