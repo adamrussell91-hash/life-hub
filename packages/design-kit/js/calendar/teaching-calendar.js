@@ -15,8 +15,9 @@ export function teachingEventsFromCurriculum(data) {
     }
   }
 
-  const rows = (data?.scheduled_lessons ?? [])
+  const dated = (data?.scheduled_lessons ?? [])
     .filter(row => row && typeof row.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.date));
+  const { rows, alsoBySlot } = placeUntimed(dated, titles);
   const links = lessonLinks(rows, titles);
 
   return rows
@@ -28,10 +29,16 @@ export function teachingEventsFromCurriculum(data) {
         lesson_id: typeof row.lesson_id === 'string' ? row.lesson_id : undefined,
         class_id: typeof row.class_id === 'string' ? row.class_id : undefined,
         date: row.date,
-        // Untimed lessons still fill the School band (default first period).
-        time: TIME_KEY.test(row.start_time) ? row.start_time : '09:00',
-        duration_min: TIME_KEY.test(row.start_time) && TIME_KEY.test(row.end_time) && row.end_time > row.start_time
-          ? minutes(row.end_time) - minutes(row.start_time) : 60,
+        // A lesson with a date but no period, on a day its class has no period, rides
+        // the all-day row. It never invents a 9 am block.
+        ...(TIME_KEY.test(row.start_time)
+          ? {
+            time: row.start_time,
+            duration_min: TIME_KEY.test(row.end_time) && row.end_time > row.start_time
+              ? minutes(row.end_time) - minutes(row.start_time) : 60
+          }
+          : { all_day: true }),
+        ...(alsoBySlot.has(row.id) ? { also_lessons: alsoBySlot.get(row.id) } : {}),
         title: titles.get(row.lesson_id) || 'Untitled lesson',
         class_title: classTitles.get(row.class_id),
         unit_id: row.unit_id,
@@ -47,6 +54,41 @@ export function teachingEventsFromCurriculum(data) {
       },
       body: ''
     }));
+}
+
+const live = row => row.delivery_status !== 'skipped' && row.delivery_status !== 'rescheduled';
+
+/**
+ * A lesson dated from its page has no period. On a day its class has a period, it joins
+ * that period's card ("also …") instead of drawing its own block. On a day with no
+ * period it stays, untimed, for the all-day row. The same lesson saved twice for one
+ * class and day shows once.
+ */
+function placeUntimed(dated, titles) {
+  const seen = new Set();
+  const rows = [];
+  const alsoBySlot = new Map();
+  for (const row of dated) {
+    if (TIME_KEY.test(row.start_time)) {
+      rows.push(row);
+      continue;
+    }
+    const key = `${row.class_id}|${row.lesson_id}|${row.date}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const slots = dated
+      .filter(other => TIME_KEY.test(other.start_time) && other.class_id === row.class_id && other.date === row.date && live(other))
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+    if (!slots.length) {
+      rows.push(row);
+      continue;
+    }
+    if (slots.some(slot => slot.lesson_id === row.lesson_id)) continue;
+    const also = alsoBySlot.get(slots[0].id) ?? [];
+    also.push({ id: row.id, lesson_id: row.lesson_id, title: titles.get(row.lesson_id) || 'Untitled lesson' });
+    alsoBySlot.set(slots[0].id, also);
+  }
+  return { rows, alsoBySlot };
 }
 
 const slotOrder = (a, b) => a.date.localeCompare(b.date) || String(a.start_time ?? '').localeCompare(String(b.start_time ?? ''));

@@ -200,6 +200,10 @@ export function chipFromEvent(event) {
         ? `${record.class_title} · ${clockMeta(start, end)}`
         : record.class_title || clockMeta(start, end), part].filter(Boolean).join(' · ')
     : [clockMeta(start, end), splitPartMeta(record)].filter(Boolean).join(' · ');
+  // Lessons dated to this day with no period of their own ride this period's card.
+  const also = isClass && Array.isArray(record.also_lessons) && record.also_lessons.length
+    ? `also ${record.also_lessons.map(lesson => lesson.title).join(', ')}`
+    : '';
   return {
     id: record.id || event.path,
     date: record.date,
@@ -208,7 +212,7 @@ export function chipFromEvent(event) {
     kind,
     // Prefer lesson title for class chips; class name stays in meta.
     title: isClass ? (record.title || record.class_title || 'Class') : (record.title || kind),
-    meta: workout?.meta ?? feedMeta ?? peopleMeta ?? (done ? `Done · ${classMeta}` : classMeta),
+    meta: workout?.meta ?? feedMeta ?? peopleMeta ?? [done ? `Done · ${classMeta}` : classMeta, also].filter(Boolean).join(' · '),
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
@@ -369,8 +373,27 @@ function allDayFeedRows(events, date) {
     });
 }
 
+/** A lesson dated to a day its class has no period: one quiet all-day line, not a 9 am block. */
+function untimedLessonRows(events, date) {
+  return (events ?? [])
+    .filter(event => event.record?.type === 'scheduled_lesson' && event.record.all_day && event.record.date === date)
+    .map(event => ({
+      id: event.record.id || event.path,
+      date,
+      title: event.record.title || 'Lesson',
+      kind: 'allday',
+      filterKey: 'classes',
+      source: 'scheduled_lesson',
+      isClass: true,
+      meta: event.record.class_title || '',
+      lesson_id: event.record.lesson_id,
+      class_id: event.record.class_id,
+      record: event.record
+    }));
+}
+
 function dueFor(visual, events, date, useVisual) {
-  const allDay = allDayFeedRows(events, date);
+  const allDay = [...allDayFeedRows(events, date), ...untimedLessonRows(events, date)];
   return [...allDay, ...dueForHubs(visual, events, date, useVisual)];
 }
 

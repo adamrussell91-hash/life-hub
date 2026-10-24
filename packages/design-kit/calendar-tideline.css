@@ -389,6 +389,7 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-chip.is-ambient .cal-chip__title{font-weight:var(--weight-medium);color:color-mix(in srgb,var(--ink) 78%,transparent)}
 .cal-due.is-allday{background:var(--k-bg,var(--paper));border:1px solid color-mix(in srgb,var(--k-stripe,var(--line)) 45%,transparent);cursor:pointer}
 .cal-due.is-allday.is-ambient{border-style:dashed}
+.cal-due.is-allday.k-classes{--k-bg:var(--pastel-blue);--k-stripe:var(--wave)}
 .cal-due.is-allday b{font-weight:var(--weight-medium)}
 .dd-arc.k-social{fill:color-mix(in srgb,var(--pastel-lilac) 45%,#fff);stroke:color-mix(in srgb,var(--pastel-lilac-ink) 45%,#fff);stroke-dasharray:3 2}
 .dd-arc.k-family{fill:color-mix(in srgb,var(--pastel-gold) 40%,#fff);stroke:color-mix(in srgb,var(--pastel-gold-ink) 45%,#fff);stroke-dasharray:3 2}
