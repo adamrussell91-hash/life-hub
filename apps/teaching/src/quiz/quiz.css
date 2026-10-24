@@ -1743,6 +1743,22 @@
   border-color: var(--danger-line);
 }
 
+.qz-deck__strip .qz-dot {
+  position: relative;
+}
+
+.qz-deck__strip .qz-dot[data-ann='true']::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  background: var(--alchemy-accent, var(--wave));
+  border: 2px solid var(--paper);
+  border-radius: var(--radius-full);
+}
+
 .qz-deck__track {
   min-width: 0;
   touch-action: pan-y;
