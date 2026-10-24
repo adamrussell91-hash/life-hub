@@ -45,4 +45,35 @@ describe('sprint on the lesson page', () => {
     expect(fake.api.summary).toHaveBeenCalled();
     handle.dispose();
   });
+
+  it('gives a sprint with no phase sections its sections, so a block added on Understand lands there', () => {
+    const onChange = vi.fn();
+    let n = 0;
+    const brief = { id: 'h1', type: 'block', block_type: 'heading', variant: 'section', visibility: 'student_teacher', content: { text: 'The challenge' } };
+    const handle = mountLessonPage(host, { lesson: sprintLesson({ blocks: [brief] as never }), media: [], onChange, onPrint: vi.fn(), onSelect: vi.fn(), idFactory: () => `new_${++n}` });
+    const phases = (blocks: Lesson['blocks']) => blocks.map((b) => (b.block_type === 'section' ? b.content.sprint_phase : b.block_type));
+    expect(phases(onChange.mock.calls.at(-1)![0].blocks)).toEqual(['heading', 'understand', 'sketch', 'decide', 'prototype', 'test']);
+    host.querySelector<HTMLButtonElement>('.sprint-edit-tabs button[data-tab="understand"]')!.click();
+    handle.insertType('brainstorm');
+    const blocks: Lesson['blocks'] = onChange.mock.calls.at(-1)![0].blocks;
+    const understand = blocks.find((b) => b.block_type === 'section' && b.content.sprint_phase === 'understand');
+    expect(understand?.block_type === 'section' && understand.content.blocks.map((b) => b.block_type)).toEqual(['thinking_move', 'question_quadrant', 'brainstorm']);
+    expect(blocks.filter((b) => b.block_type === 'brainstorm')).toHaveLength(0);
+    handle.dispose();
+  });
+
+  it('puts back a deleted phase section when a block is added on its tab', () => {
+    const onChange = vi.fn();
+    let n = 0;
+    const lesson = sprintLesson();
+    const blocks = lesson.blocks.filter((b) => !(b.block_type === 'section' && b.content.sprint_phase === 'sketch'));
+    const handle = mountLessonPage(host, { lesson: { ...lesson, blocks }, media: [], onChange, onPrint: vi.fn(), onSelect: vi.fn(), idFactory: () => `new_${++n}` });
+    host.querySelector<HTMLButtonElement>('.sprint-edit-tabs button[data-tab="sketch"]')!.click();
+    handle.insertType('rich_text');
+    const saved: Lesson['blocks'] = onChange.mock.calls.at(-1)![0].blocks;
+    const sketch = saved.find((b) => b.block_type === 'section' && b.content.sprint_phase === 'sketch');
+    expect(sketch?.block_type === 'section' && sketch.content.blocks.at(-1)?.block_type).toBe('rich_text');
+    expect(saved.filter((b) => b.block_type === 'rich_text')).toHaveLength(0);
+    handle.dispose();
+  });
 });
