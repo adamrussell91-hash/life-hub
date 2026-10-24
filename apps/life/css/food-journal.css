@@ -148,6 +148,7 @@ html[data-hub="life"] .hub-card.food-dish {
 }
 .food-sheet .hub-field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   min-width: 0;
 }
@@ -159,6 +160,11 @@ html[data-hub="life"] .hub-card.food-dish {
 }
 .food-sheet textarea {
   min-height: 8rem;
+}
+/* Keep Safari's native date control inside its field at phone widths. */
+.food-sheet input[type="date"] {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .food-dish-editor {
   display: grid;
