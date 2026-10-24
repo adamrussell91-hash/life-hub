@@ -263,6 +263,8 @@ var SprintSettingsSchema = z7.object({
   phases: z7.array(SprintPhaseSchema).length(5).refine(phasesInOrder, "Phases must be in order: Understand, Sketch, Decide, Prototype, Test."),
   groups: z7.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
+  sketch_timer: z7.number().int().min(0).max(30).default(8),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z7.object({ prototype: z7.string().optional(), reflection: z7.string().optional() }).default({})
 });
@@ -275,7 +277,8 @@ var PublicSprintSchema = z7.object({
   requirements: z7.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
   phases: z7.array(SprintPhaseSchema).length(5),
-  understand: UnderstandSettingsSchema.default(defaultUnderstand)
+  understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  sketch_timer: z7.number().int().min(0).max(30).default(8)
 });
 var where = text(200);
 var Wheres = z7.record(z7.string().max(40), where).default({});
@@ -297,6 +300,8 @@ var UnderstandPayloadSchema = z7.object({
 });
 var SketchCardSchema = z7.object({
   id: SprintIdSchema,
+  /** The rapid idea it grew from. */
+  seed: text(120).optional(),
   title: text(80),
   idea: text(600),
   answers: text(600),
@@ -309,6 +314,13 @@ var SketchCardSchema = z7.object({
   value_answer: text(300).default("")
 });
 var SketchPayloadSchema = z7.object({
+  /** Examples worth borrowing from, and what to take from each. */
+  inspiration: z7.array(z7.object({ from: text(120).default(""), borrow: text(200).default("") })).max(3).default([]),
+  /** Rapid ideas: one line each, written against the timer. */
+  rapid: z7.array(text(120)).max(40).default([]),
+  /** When the student started the timer (ISO), or empty. */
+  rapid_started_at: z7.string().max(40).default(""),
+  /** Developed ideas, one per rapid idea picked (card id "r{index}"). These go to the group. */
   cards: z7.array(SketchCardSchema).max(SPRINT_LIMITS.ideas).default([]),
   strongest: z7.string().max(40).default(""),
   strongest_why: text(300).default("")

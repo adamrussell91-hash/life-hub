@@ -40,9 +40,11 @@ async function samplePayload(
     return { payload, status };
   }
   if (key === 'sketch') {
-    const n = sprint.phases[1]!.ideas ?? 3;
+    const n = sprint.phases[1]!.ideas ?? 2;
+    const rapid = Array.from({ length: n + 2 }, (_, i) => `${name} rapid idea ${i + 1}`);
     const cards = Array.from({ length: n }, (_, i) => ({
       id: `sample${tag}x${i + 1}`,
+      seed: rapid[i]!,
       title: `${name} idea ${i + 1}`,
       idea: `${name} suggests idea number ${i + 1} for the group.`,
       answers: `It answers the group question in way ${i + 1}.`,
@@ -51,7 +53,17 @@ async function samplePayload(
       requirements: wheres('sketch', `In the first line of idea ${i + 1}.`),
       value_answer: `Another view would see idea ${i + 1} differently.`
     }));
-    return { payload: { cards, strongest: cards[0]!.id, strongest_why: 'It answers the question most clearly of the three.' }, status };
+    return {
+      payload: {
+        inspiration: [{ from: `An example ${name} has seen`, borrow: 'The way it speaks straight to the audience.' }],
+        rapid,
+        rapid_started_at: '',
+        cards,
+        strongest: cards[0]!.id,
+        strongest_why: 'It answers the question most clearly of the ideas.'
+      },
+      status
+    };
   }
   if (key === 'decide') {
     if (status.chosen) {

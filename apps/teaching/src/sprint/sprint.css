@@ -258,3 +258,15 @@ body.spractice-open { overflow: hidden; }
 .sboard__answer { flex-wrap: wrap; }
 .sboard__answer .qz-input { flex: 1 1 240px; }
 .su-step[hidden] { display: none; }
+
+/* Sketch: inspiration, rapid ideas on a timer, the picks. */
+.sprint-sketch { display: grid; gap: 14px; }
+.sk-insp { display: grid; gap: 8px; }
+.sk-insp__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+@media (max-width: 640px) { .sk-insp__row { grid-template-columns: minmax(0, 1fr); } }
+.sk-timer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.sk-timer__clock { font-size: 28px; font-variant-numeric: tabular-nums; color: var(--navy); }
+.sk-timer__count { font-weight: 600; color: var(--muted); }
+.sk-rapid { margin: 0; padding-left: 22px; display: grid; gap: 4px; }
+.sk-rapid li { padding: 2px 0; }
+.sk-pick { display: grid; gap: 6px; }
