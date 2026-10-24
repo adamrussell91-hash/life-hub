@@ -14,6 +14,8 @@ export const PUBLIC_STUDENT_API_ROUTES = [
   { method: 'POST', pattern: /^\/api\/published\/quiz\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/lecture\/[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/published\/tutorial\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/published\/sprint\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/published\/sprint-file\/[^/]+$/ },
   { method: 'GET', pattern: /^\/\.netlify\/functions\/published-lesson(?:\/|$)/ },
   { method: 'GET', pattern: /^\/api\/published\/lessons\/[^/]+$/ },
   { method: 'GET', pattern: /^\/api\/published\/units\/[^/]+$/ },
