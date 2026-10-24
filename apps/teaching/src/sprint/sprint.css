@@ -284,3 +284,13 @@ body.spractice-open { overflow: hidden; }
 .sd-borrow { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
 .sd-borrow h4 { margin: 0; }
 .sd-status { font-weight: 600; }
+
+/* Prototype: the group's parts and the assembler. */
+.sd-assembler { margin-top: 12px; display: grid; gap: 6px; }
+.sd-assembler h4 { margin: 0; }
+.sp-parts { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; background: #fff; margin: 12px 0; }
+.sp-parts summary { font-weight: 700; cursor: pointer; }
+.sp-part { border-top: 1px solid var(--line); padding: 8px 0; display: grid; gap: 4px; }
+.sp-part__state { font-size: 12px; font-weight: 600; color: var(--muted); }
+.sp-part--in .sp-part__state { color: var(--pastel-sage-ink, #2f5d3a); }
+.sp-part__text { margin: 0; white-space: pre-wrap; max-height: 9em; overflow: auto; font-size: 14px; }
