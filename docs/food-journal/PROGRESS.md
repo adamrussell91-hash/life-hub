@@ -38,3 +38,26 @@ Verified release commands:
 - Mandatory gate: 5,696 root tests, 1,425 Tasks tests, static guards and Professional typecheck.
 
  No production journal data is created by these tests. The actual Day One export is not supplied, so migration tooling is ready and existing personal entries have not been imported.
+
+## Mobile date field — 24 October 2026
+
+Address and Date now stack on phones instead of squeezing the native date
+control into a fixed 10.5rem column. Field grid tracks can shrink to their
+container, and the date input is bounded by its field. Desktop retains the
+paired layout; Venue and Find venue retain their compact phone row.
+
+Checked R4, L1 and P2: browser checks at 390 and 320 fill and save the date,
+measure the date inside its field and viewport, and exercise long notes,
+reduced viewport height, scrolling and reachable 44px actions with 16px+
+controls. Visual review at 1440 and 390: difference from the supplied phone
+screenshot is the intended full-width Address and Date rows. Screenshots use
+the existing browser test journal, not personal production data; production
+iPhone verification remains unperformed. WebKit could not run because this
+environment lacks its system libraries and root installation access.
+
+Food Journal browser suite: 27/28 passed on the first run; the recipe-book
+phone case timed out waiting for app startup before reaching the feature.
+It passed on a focused rerun alongside both mobile date/action cases (3/3).
+Mandatory `npm run pre-pr-check`: exit 0; root tests report 7,204 passed,
+zero failed, 12 skipped; static guards, affected Tasks/Teaching test selection
+and Professional typecheck passed.
