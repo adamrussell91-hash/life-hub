@@ -126,6 +126,8 @@ export const SprintSettingsSchema = z.object({
   phases: z.array(SprintPhaseSchema).length(5).refine(phasesInOrder, 'Phases must be in order: Understand, Sketch, Decide, Prototype, Test.'),
   groups: z.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
+  sketch_timer: z.number().int().min(0).max(30).default(8),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z.object({ prototype: z.string().optional(), reflection: z.string().optional() }).default({})
 });
@@ -141,7 +143,8 @@ export const PublicSprintSchema = z.object({
   requirements: z.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
   phases: z.array(SprintPhaseSchema).length(5),
-  understand: UnderstandSettingsSchema.default(defaultUnderstand)
+  understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  sketch_timer: z.number().int().min(0).max(30).default(8)
 });
 export type PublicSprint = z.infer<typeof PublicSprintSchema>;
 
@@ -168,6 +171,8 @@ export const UnderstandPayloadSchema = z.object({
 });
 export const SketchCardSchema = z.object({
   id: SprintIdSchema,
+  /** The rapid idea it grew from. */
+  seed: text(120).optional(),
   title: text(80),
   idea: text(600),
   answers: text(600),
@@ -181,6 +186,13 @@ export const SketchCardSchema = z.object({
 });
 export type SketchCard = z.infer<typeof SketchCardSchema>;
 export const SketchPayloadSchema = z.object({
+  /** Examples worth borrowing from, and what to take from each. */
+  inspiration: z.array(z.object({ from: text(120).default(''), borrow: text(200).default('') })).max(3).default([]),
+  /** Rapid ideas: one line each, written against the timer. */
+  rapid: z.array(text(120)).max(40).default([]),
+  /** When the student started the timer (ISO), or empty. */
+  rapid_started_at: z.string().max(40).default(''),
+  /** Developed ideas, one per rapid idea picked (card id "r{index}"). These go to the group. */
   cards: z.array(SketchCardSchema).max(SPRINT_LIMITS.ideas).default([]),
   strongest: z.string().max(40).default(''),
   strongest_why: text(300).default('')

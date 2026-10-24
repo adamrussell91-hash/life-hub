@@ -1195,6 +1195,8 @@ var SprintSettingsSchema = z8.object({
   phases: z8.array(SprintPhaseSchema).length(5).refine(phasesInOrder, "Phases must be in order: Understand, Sketch, Decide, Prototype, Test."),
   groups: z8.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
+  sketch_timer: z8.number().int().min(0).max(30).default(8),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z8.object({ prototype: z8.string().optional(), reflection: z8.string().optional() }).default({})
 });
@@ -1207,7 +1209,8 @@ var PublicSprintSchema = z8.object({
   requirements: z8.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
   phases: z8.array(SprintPhaseSchema).length(5),
-  understand: UnderstandSettingsSchema.default(defaultUnderstand)
+  understand: UnderstandSettingsSchema.default(defaultUnderstand),
+  sketch_timer: z8.number().int().min(0).max(30).default(8)
 });
 var where = text(200);
 var Wheres = z8.record(z8.string().max(40), where).default({});
@@ -1229,6 +1232,8 @@ var UnderstandPayloadSchema = z8.object({
 });
 var SketchCardSchema = z8.object({
   id: SprintIdSchema,
+  /** The rapid idea it grew from. */
+  seed: text(120).optional(),
   title: text(80),
   idea: text(600),
   answers: text(600),
@@ -1241,6 +1246,13 @@ var SketchCardSchema = z8.object({
   value_answer: text(300).default("")
 });
 var SketchPayloadSchema = z8.object({
+  /** Examples worth borrowing from, and what to take from each. */
+  inspiration: z8.array(z8.object({ from: text(120).default(""), borrow: text(200).default("") })).max(3).default([]),
+  /** Rapid ideas: one line each, written against the timer. */
+  rapid: z8.array(text(120)).max(40).default([]),
+  /** When the student started the timer (ISO), or empty. */
+  rapid_started_at: z8.string().max(40).default(""),
+  /** Developed ideas, one per rapid idea picked (card id "r{index}"). These go to the group. */
   cards: z8.array(SketchCardSchema).max(SPRINT_LIMITS.ideas).default([]),
   strongest: z8.string().max(40).default(""),
   strongest_why: text(300).default("")

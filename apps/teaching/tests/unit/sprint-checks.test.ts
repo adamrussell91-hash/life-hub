@@ -26,6 +26,15 @@ describe('sprint checks', () => {
     expect(sketchProblems({ ...good, strongest: '' }, { ideas: 3, requirements: reqs })).toContain('Pick your strongest idea and say why.');
   });
 
+  it('checks the inspiration, the rapid ideas and the picks, and needs a strongest only with two or more', () => {
+    const two = { inspiration: [{ from: 'A museum audio guide', borrow: 'One voice talking to you' }], rapid: ['Objects', 'Streets', 'Letters'], rapid_started_at: '', cards: [card({ id: 'r0' }), card({ id: 'r1', title: 'Then and now', idea: 'What if it compared streets?' })], strongest: 'r0', strongest_why: 'It names two sources and fits Year 7.' };
+    expect(sketchProblems(two, { ideas: 2, requirements: reqs })).toEqual([]);
+    expect(sketchProblems({ ...two, inspiration: [] }, { ideas: 2, requirements: reqs })[0]).toBe('Inspiration: note one example and what you’d borrow from it.');
+    expect(sketchProblems({ ...two, rapid: ['Objects'] }, { ideas: 2, requirements: reqs })).toContain('Rapid ideas: write at least 2. You have 1 so far.');
+    expect(sketchProblems({ ...two, cards: two.cards.slice(0, 1) }, { ideas: 2, requirements: reqs })).toContain('Pick: star your best 2 ideas. You have 1 starred.');
+    expect(sketchProblems({ ...two, cards: two.cards.slice(0, 1), strongest: '' }, { ideas: 1, requirements: reqs })).toEqual([]);
+  });
+
   it('checks votes: every set opened, a vote and a reason per criterion', () => {
     const crit = [{ id: 'c1', text: 'Uses sources' }];
     expect(voteProblems({ votes: { c1: 'A' }, reasons: { c1: 'It names the loaf and the graffiti.' }, opened: ['s1', 's2'] }, crit, ['s1', 's2'])).toEqual([]);
