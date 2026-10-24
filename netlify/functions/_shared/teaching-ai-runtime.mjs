@@ -6065,6 +6065,7 @@ function sydneyEpoch(date, time) {
 function phaseDue(phase) {
   return sydneyEpoch(phase.due_date, phase.due_time || "23:59");
 }
+var SHORT_WHEN = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", weekday: "short", hour: "numeric", minute: "2-digit" });
 
 // apps/teaching/src/sprint/model.ts
 function sprintIssues(lesson) {
