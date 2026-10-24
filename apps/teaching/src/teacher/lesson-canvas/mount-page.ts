@@ -77,7 +77,7 @@ import { createSprintTabs, inSprintTab, type SprintTab } from '@/sprint/editor-t
 import { mountSprintMap, type SprintMapHandle } from '@/sprint/map';
 import { sprintTeacherApi } from '@/sprint/api';
 import { openPracticeRun } from '@/sprint/practice';
-import { seedSprint } from '@/sprint/defaults';
+import { seedSprint, withPhaseSections } from '@/sprint/defaults';
 import { phaseOfSection } from '@/sprint/model';
 import { httpMarkbookApi } from '@/markbook/api';
 import { outcomeLabels } from '@/markbook/parse';
@@ -1176,7 +1176,13 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     // On a sprint phase tab, new blocks land in that phase's section.
     const st = sprintTabs?.current();
     if (sprintTabs && st && st !== 'kit' && st !== 'brief' && st !== 'all') {
-      const section = lesson.blocks.find((b) => phaseOfSection(b) === st);
+      let section = lesson.blocks.find((b) => phaseOfSection(b) === st);
+      if (!section) {
+        // The phase's section was deleted: put it back, so the block lands on this tab and not in the brief.
+        emitLesson({ ...lesson, blocks: withPhaseSections(lesson.blocks, options.idFactory) });
+        canvas.update(lesson.blocks, media);
+        section = lesson.blocks.find((b) => phaseOfSection(b) === st);
+      }
       if (section && section.block_type === 'section') return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
     }
     const tab = tutorialTabs?.current();
@@ -1206,11 +1212,14 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   function syncSprintPanel(): void {
     const isSprint = resolvePedagogicalMode(lesson.pedagogical_mode) === 'design_sprint';
     const classes = options.flowClasses ?? [];
-    // A new sprint starts with the default Kit and one guide section per phase.
-    if (isSprint && !lesson.sprint && classes.length) {
+    // A new sprint starts with the default Kit and one guide section per phase; a phase that has lost its section gets it back.
+    if (isSprint && (lesson.sprint || classes.length)) {
+      const seeded = seedSprint(lesson, classes[0]?.id ?? '', options.idFactory);
       // emitLesson only records the lesson, so redraw the canvas for the new sections and carry on mounting.
-      emitLesson(seedSprint(lesson, classes[0]!.id, options.idFactory));
-      canvas.update(lesson.blocks, media);
+      if (seeded !== lesson) {
+        emitLesson(seeded);
+        canvas.update(lesson.blocks, media);
+      }
     }
     if (isSprint && !sprintTabs) {
       sprintTabs = createSprintTabs({ onTab: showSprintTab });

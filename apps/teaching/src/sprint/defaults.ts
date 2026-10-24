@@ -72,17 +72,27 @@ const section = (id: string, key: SprintPhaseKey, blocks: Block[]): Block => {
   return { ...base, content: { title: PHASE_LABELS[key], blocks, sprint_phase: key } } as Block;
 };
 
-/** One section per phase, each starting with its move; Understand adds the Question Quadrant, Test the Thinking reflection. */
+/** One phase's section, starting with its move; Understand adds the Question Quadrant, Test the Thinking reflection. */
+function phaseSection(key: SprintPhaseKey, newId: () => string): Block {
+  const m = PHASE_MOVES[key];
+  const moveId = newId();
+  const move = { ...createBlock('thinking_move', moveId), content: moveContent(m.skill, m.tools, m.value, moveId) } as Block;
+  const extra: Block[] = [];
+  if (key === 'understand') extra.push(createBlock('question_quadrant', newId()));
+  if (key === 'test') extra.push(createBlock('thinking_reflection', newId()));
+  return section(newId(), key, [move, ...extra]);
+}
+
+/** One section per phase. */
 export function newSprintBlocks(newId: () => string): Block[] {
-  return SPRINT_PHASES.map((key) => {
-    const m = PHASE_MOVES[key];
-    const moveId = newId();
-    const move = { ...createBlock('thinking_move', moveId), content: moveContent(m.skill, m.tools, m.value, moveId) } as Block;
-    const extra: Block[] = [];
-    if (key === 'understand') extra.push(createBlock('question_quadrant', newId()));
-    if (key === 'test') extra.push(createBlock('thinking_reflection', newId()));
-    return section(newId(), key, [move, ...extra]);
-  });
+  return SPRINT_PHASES.map((key) => phaseSection(key, newId));
+}
+
+/** The blocks with a section added for each phase that has none, so every phase tab has somewhere to put new blocks. Unchanged blocks come back as the same array. */
+export function withPhaseSections(blocks: Block[], newId: () => string): Block[] {
+  const have = new Set(blocks.map((b) => (b.block_type === 'section' ? b.content.sprint_phase : undefined)));
+  const missing = SPRINT_PHASES.filter((key) => !have.has(key));
+  return missing.length ? [...blocks, ...missing.map((key) => phaseSection(key, newId))] : blocks;
 }
 
 type Move = { skill: string; tools: string[]; value: string };
@@ -107,9 +117,9 @@ export function toolFrames(move: Move | null): string[] {
   return (move?.tools ?? []).map((id) => libraryTool(id)?.sentence ?? '').filter(Boolean);
 }
 
-/** A lesson just set to Design Sprint gets the default Kit, and phase sections unless it already has them. */
+/** A lesson set to Design Sprint gets the default Kit if it has none, and a section for any phase that is missing one. */
 export function seedSprint<L extends { sprint?: SprintSettings; blocks: Block[] }>(lesson: L, classId: string, newId: () => string): L {
-  if (lesson.sprint) return lesson;
-  const hasPhases = lesson.blocks.some((b) => b.block_type === 'section' && !!b.content.sprint_phase);
-  return { ...lesson, sprint: newSprintSettings(classId), blocks: hasPhases ? lesson.blocks : [...lesson.blocks, ...newSprintBlocks(newId)] };
+  const blocks = withPhaseSections(lesson.blocks, newId);
+  if (lesson.sprint && blocks === lesson.blocks) return lesson;
+  return { ...lesson, sprint: lesson.sprint ?? newSprintSettings(classId), blocks };
 }
