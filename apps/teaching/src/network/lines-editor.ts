@@ -83,6 +83,30 @@ function parseLink(value: string): LineAlignment | undefined {
 }
 
 /**
+ * A metro line for each syllabus concept no metro line stands for yet (by link
+ * or by name), linked to its concept, up to the line limit.
+ */
+export function missingConceptLines(
+  lines: readonly NetworkLine[],
+  concepts: ReadonlyArray<{ key: string; name: string }>,
+  makeId: () => string = () => networkId('line')
+): NetworkLine[] {
+  const metro = lines.filter((l) => l.mode === 'metro');
+  const keys = new Set(metro.map((l) => (l.alignment?.kind === 'concept' ? l.alignment.key : '')).filter(Boolean));
+  const names = new Set(metro.map((l) => l.name.trim().toLowerCase()));
+  const used = lines.map((l) => l.colour);
+  const added: NetworkLine[] = [];
+  for (const c of concepts) {
+    if (lines.length + added.length >= MAX_LINES) break;
+    if (keys.has(c.key) || names.has(c.name.trim().toLowerCase())) continue;
+    const colour = nextColour(used);
+    used.push(colour);
+    added.push({ id: makeId(), mode: 'metro', name: c.name, colour, alignment: { kind: 'concept', key: c.key } });
+  }
+  return added;
+}
+
+/**
  * The subject's line list: add, rename, reorder, change mode and colour,
  * remove (asks first when the line is in use). Lines stay grouped by mode,
  * trains first, because that is the order of the map's columns.
@@ -188,6 +212,14 @@ export function mountLinesEditor(host: HTMLElement, options: LinesEditorOptions)
       });
       add.disabled = lines.length >= MAX_LINES;
       group.append(add);
+      if (m === 'metro' && concepts.length) {
+        const missing = missingConceptLines(lines, concepts);
+        if (missing.length) {
+          const all = ghostButton(`Add the other ${missing.length} ${missing.length === 1 ? 'concept' : 'concepts'}`, () => void save([...lines, ...missing]));
+          all.title = missing.map((l) => l.name).join(', ');
+          group.append(all);
+        }
+      }
       root.append(group);
     }
     root.append(status);

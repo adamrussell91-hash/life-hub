@@ -325,3 +325,27 @@ describe('Unit map: lessons placed by calendar date', () => {
     expect(buildUnitNetwork(v2(), LINES, LESSONS, inOrder).rows.map((r) => r.band)).toEqual(['Wk 1', 'Wk 1', 'Wk 2', 'Wk 3']);
   });
 });
+
+describe('missingConceptLines', () => {
+  const concepts = [
+    { key: 'representation', name: 'Representation' },
+    { key: 'context', name: 'Context' },
+    { key: 'genre', name: 'Genre' }
+  ];
+  it('adds a linked metro line for each concept not already a metro line', async () => {
+    const { missingConceptLines } = await import('@/network/lines-editor');
+    let n = 0;
+    const added = missingConceptLines(LINES, concepts, () => `new${++n}`);
+    expect(added.map((l) => l.name)).toEqual(['Context', 'Genre']);
+    expect(added.every((l) => l.mode === 'metro')).toBe(true);
+    expect(added[0]!.alignment).toEqual({ kind: 'concept', key: 'context' });
+    expect(new Set([...LINES, ...added].map((l) => l.colour)).size).toBe(LINES.length + added.length);
+  });
+  it('skips concepts already linked and stops at the line limit', async () => {
+    const { missingConceptLines, MAX_LINES } = await import('@/network/lines-editor');
+    const linked: NetworkLine[] = [{ id: 'x', mode: 'metro', name: 'Setting', colour: 'wave', alignment: { kind: 'concept', key: 'context' } }];
+    expect(missingConceptLines(linked, concepts).map((l) => l.name)).toEqual(['Representation', 'Genre']);
+    const full = Array.from({ length: MAX_LINES - 1 }, (_, i): NetworkLine => ({ id: `f${i}`, mode: 'train', name: `Line ${i}`, colour: 'wave' }));
+    expect(missingConceptLines(full, concepts)).toHaveLength(1);
+  });
+});
