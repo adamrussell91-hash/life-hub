@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
 import type { Block } from '@/schemas/block';
 import { mountBlockCanvas } from '@/teacher/lesson-canvas/mount-page';
+import { ROW_REVEAL_EVENT } from '@/teacher/lesson-canvas/quiz-deck';
 import { clickBlockMenuAction } from './helpers/block-edit';
 
 const visibleQuiz = (host: HTMLElement) =>
@@ -68,6 +69,21 @@ describe('quiz question deck', () => {
     expect(host.querySelector('.qz-deck')).toBeNull();
     button(host, 'Show the questions as cards').click();
     expect(visibleQuiz(host)).toEqual(['q1']);
+  });
+
+  it('turns to a card Ann wants on screen and marks her suggestions on the strip', async () => {
+    mount();
+    const row = (id: string) => host.querySelector<HTMLElement>(`.lesson-page__block[data-block-id="${id}"]`)!;
+    const card = document.createElement('article');
+    row('q3').append(card);
+    card.dispatchEvent(new CustomEvent(ROW_REVEAL_EVENT, { bubbles: true }));
+    expect(visibleQuiz(host)).toEqual(['q3']);
+
+    row('q2').classList.add('ann-target');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const dots = host.querySelectorAll<HTMLElement>('.qz-deck__strip .qz-dot');
+    expect(dots[1]!.dataset.ann).toBe('true');
+    expect(dots[0]!.dataset.ann).toBeUndefined();
   });
 
   it('keeps a single question as a plain block', () => {
