@@ -189,7 +189,10 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       groups.append(n, button('Make even groups', 'secondary', () => put((d) => { d.groups = evenGroups(roster, Number(n.value)); }, true)));
       const byStudent = new Map(cur.groups.flatMap((g) => g.students.map((st) => [st, g.id] as const)));
       for (const g of cur.groups) {
-        groups.append(text(g.name, 40, (v) => put((d) => { const x = d.groups.find((y) => y.id === g.id); if (x) x.name = v; }), 'Group name'));
+        const name = text(g.name, 40, (v) => put((d) => { const x = d.groups.find((y) => y.id === g.id); if (x) x.name = v; }), 'Group name');
+        // The students' group menus show the new name once typing is done.
+        name.addEventListener('change', paint);
+        groups.append(name);
       }
       for (const st of roster) {
         const row = el('div', 'kit-row');

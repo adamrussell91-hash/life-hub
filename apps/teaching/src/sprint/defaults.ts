@@ -106,3 +106,10 @@ export function phaseIntention(move: Move | null): string {
 export function toolFrames(move: Move | null): string[] {
   return (move?.tools ?? []).map((id) => libraryTool(id)?.sentence ?? '').filter(Boolean);
 }
+
+/** A lesson just set to Design Sprint gets the default Kit, and phase sections unless it already has them. */
+export function seedSprint<L extends { sprint?: SprintSettings; blocks: Block[] }>(lesson: L, classId: string, newId: () => string): L {
+  if (lesson.sprint) return lesson;
+  const hasPhases = lesson.blocks.some((b) => b.block_type === 'section' && !!b.content.sprint_phase);
+  return { ...lesson, sprint: newSprintSettings(classId), blocks: hasPhases ? lesson.blocks : [...lesson.blocks, ...newSprintBlocks(newId)] };
+}

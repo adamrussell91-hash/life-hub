@@ -1,6 +1,6 @@
 // apps/teaching/tests/unit/sprint-defaults.test.ts
 import { describe, it, expect } from 'vitest';
-import { newSprintSettings, newSprintBlocks, PHASE_MOVES, phaseIntention, phaseMove, toolFrames } from '@/sprint/defaults';
+import { newSprintSettings, newSprintBlocks, PHASE_MOVES, phaseIntention, phaseMove, seedSprint, toolFrames } from '@/sprint/defaults';
 import { SprintSettingsSchema } from '@/sprint/schema';
 import { BlockSchema } from '@/schemas/block';
 
@@ -37,5 +37,14 @@ describe('sprint defaults', () => {
     expect(phaseIntention(move)).toMatch(/^We will think by applying/);
     expect(toolFrames(phaseMove(blocks, 'sketch'))).toEqual(['What if ___?', 'For example, ___.']);
     expect(phaseMove([], 'decide')).toBeNull();
+  });
+
+  it('seeds the Kit once and never adds a second set of phase sections', () => {
+    const seeded = seedSprint({ blocks: [] as never[] }, 'class1', id);
+    expect(seeded.blocks).toHaveLength(5);
+    expect(seedSprint(seeded, 'class1', id)).toBe(seeded);
+    const kitLost = seedSprint({ blocks: seeded.blocks }, 'class1', id);
+    expect(kitLost.sprint?.class_id).toBe('class1');
+    expect(kitLost.blocks).toHaveLength(5);
   });
 });

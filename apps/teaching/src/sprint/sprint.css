@@ -1,4 +1,6 @@
 /* Design Sprint: student player, teacher map, board, marking and pitch view. */
+/* Display rules below would otherwise beat the hidden attribute. */
+.kit[hidden], .sprint [hidden], .lesson-page__sprint[hidden] { display: none !important; }
 .sprint { display: grid; gap: var(--space-4, 16px); }
 .sprint-spotlight { padding: 12px 16px; border-radius: var(--radius-md); background: var(--pastel-gold); color: var(--pastel-gold-ink); }
 .sprint-spotlight p { margin: 4px 0 0; }

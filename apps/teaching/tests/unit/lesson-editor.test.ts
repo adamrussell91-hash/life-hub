@@ -47,6 +47,7 @@ import { createBlock } from '@/blocks/create-block';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import { renderTeacherShell } from '@/teacher/shell';
 import { enterBlockEdit } from './helpers/block-edit';
+import { newSprintSettings, newSprintBlocks } from '@/sprint/defaults';
 
 const startAiJobMock = vi.mocked(startAiJob);
 const pollAiJobMock = vi.mocked(pollAiJob);
@@ -1292,5 +1293,19 @@ describe('mountLessonEditor', () => {
     await handle.flush();
     const saved = apiPutMock.mock.calls.at(-1)![1] as Lesson;
     expect(saved.tutorial?.groups.map((g) => g.students)).toEqual([['st_ann'], ['st_cy', 'st_ed']]);
+  });
+
+  it('a change made in the sprint Kit goes out with the next save', async () => {
+    let n = 0;
+    const lesson = makeLesson({ pedagogical_mode: 'design_sprint', sprint: newSprintSettings('class_1'), blocks: newSprintBlocks(() => `sp${++n}`) });
+    mockLessonLoad(lesson);
+    apiPutMock.mockResolvedValue(lesson);
+    apiPostMock.mockRejectedValue(new Error('offline'));
+    const handle = mount();
+    for (let i = 0; i < 4; i += 1) await tick();
+    refs.canvas.querySelector<HTMLButtonElement>('[data-add="criterion"]')!.click();
+    await handle.flush();
+    const saved = apiPutMock.mock.calls.at(-1)![1] as Lesson;
+    expect(saved.sprint?.criteria).toHaveLength(1);
   });
 });
