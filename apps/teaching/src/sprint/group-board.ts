@@ -10,7 +10,7 @@ import type { GroupBoard, SprintTeacherApi } from './api';
  * mark and the pitch feedback with hold-and-release. Spotlight puts one
  * answer up for the class with no name.
  */
-export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; groupId: string; getLesson: () => Lesson; emitLesson: (next: Lesson) => void; onChanged(): void }): { refresh(): Promise<void>; dispose(): void } {
+export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; groupId: string; getLesson: () => Lesson; emitLesson: (next: Lesson) => void; onChanged(): void; practice?: boolean }): { refresh(): Promise<void>; dispose(): void } {
   const root = el('section', 'sboard');
   host.replaceChildren(root);
   let disposed = false;
@@ -71,7 +71,8 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const markHost = el('div');
     const inProto = b.subs.prototype.filter((x) => x.sub?.submitted_at).length;
     const inTest = b.subs.test.filter((x) => x.sub?.submitted_at).length;
-    mark.append(
+    if (o.practice) mark.append(el('p', 'kit-why', 'Marking is off in a practice run, so nothing reaches your markbook.'));
+    else mark.append(
       button(`Mark prototype parts (${inProto} in)`, 'secondary', () => mountMarking(markHost, { kind: 'prototype', board: b, api: o.api, getLesson: o.getLesson, emitLesson: o.emitLesson })),
       button(`Mark reflections (${inTest} in)`, 'secondary', () => mountMarking(markHost, { kind: 'reflection', board: b, api: o.api, getLesson: o.getLesson, emitLesson: o.emitLesson })),
       markHost

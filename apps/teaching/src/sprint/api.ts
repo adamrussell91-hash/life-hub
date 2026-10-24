@@ -157,3 +157,73 @@ export function sprintTeacherApi(lessonId: string): SprintTeacherApi {
     fileUrl: (fileId) => postForUrl(`/api/lessons/${encodeURIComponent(lessonId)}/sprint-file`, { file_id: fileId })
   };
 }
+
+// ---------------------------------------------------------------- practice run
+
+export type PracticeState = {
+  now: number;
+  next: { at: number; label: string } | null;
+  lesson: import('@/schemas/published-lesson').PublishedLesson;
+  summary: SprintSummary;
+  students: { s1: SprintStatus; s2: SprintStatus };
+};
+export type PracticeApi = {
+  state(): Promise<PracticeState>;
+  skip(): Promise<PracticeState>;
+  /** Wipes the last run and starts again from this lesson's Kit. */
+  start(lesson: import('@/schemas/lesson').Lesson): Promise<PracticeState>;
+  /** Student 1 or 2's SprintClient: the real student screen, on the practice copy. */
+  client(as: 's1' | 's2'): SprintClient;
+  /** The progress map's API, on the practice copy. `changed` runs after every class control. */
+  teacher(changed: () => void): SprintTeacherApi;
+};
+
+const NO_UPLOADS = () => Promise.reject(new ApiClientError({ code: 'practice', message: 'Uploads are off in a practice run. Use a link.' }));
+
+export function sprintPracticeApi(lessonId: string): PracticeApi {
+  const path = `/api/lessons/${encodeURIComponent(lessonId)}/sprint-practice`;
+  const op = <T>(name: string, extra: Record<string, unknown> = {}) => apiPost<T>(path, { op: name, ...extra });
+  return {
+    state: () => op<PracticeState>('state'),
+    skip: () => op<PracticeState>('skip'),
+    start: (lesson) => op<PracticeState>('start', { draft: { title: lesson.title, unit_id: lesson.unit_id, pedagogical_mode: lesson.pedagogical_mode, blocks: lesson.blocks, sprint: lesson.sprint } }),
+    client(as) {
+      const call = (action: string, extra: Record<string, unknown> = {}) => op<SprintStatus>('student', { as, body: { action, ...extra } });
+      return {
+        status: () => call('status'),
+        claim: () => call('status'),
+        open: (phase) => call('open', { phase }),
+        save: (phase, payload) => call('save', { phase, payload }),
+        submit: (phase, payload) => call('submit', { phase, payload }),
+        parts: (parts) => call('parts', { parts }),
+        claimPart: (partId) => call('claim_part', { part_id: partId }),
+        pitch: (source) => call('pitch', source),
+        feedback: (groupId, entry) => call('feedback', { group_id: groupId, entry }),
+        upload: NO_UPLOADS,
+        fileUrl: NO_UPLOADS
+      };
+    },
+    teacher(changed) {
+      const call = async <T = SprintSummary>(action: string, extra: Record<string, unknown> = {}) => {
+        const out = await op<T>('teacher', { body: { action, ...extra } });
+        if (action !== 'summary' && action !== 'board') changed();
+        return out;
+      };
+      return {
+        summary: () => call('summary'),
+        board: (groupId) => call<GroupBoard>('board', { group_id: groupId }),
+        endClass: (phase) => call('end_class', { phase }),
+        unlock: (studentId) => call('unlock', { student_id: studentId }),
+        extend: (input) => call('extend', input),
+        confirm: (groupId, kind, id) => call('confirm', { group_id: groupId, kind, id }),
+        spotlight: (studentId, phase, field) => call('spotlight', { student_id: studentId, phase, field }),
+        clearSpotlight: () => call('spotlight', { clear: true }),
+        move: (studentId, groupId) => call('move', { student_id: studentId, group_id: groupId }),
+        run: (groupId) => call('run', { group_id: groupId }),
+        round: (groupId, opName) => call('round', { group_id: groupId, op: opName }),
+        moderate: (groupId, studentId, status) => call('moderate', { group_id: groupId, student_id: studentId, status }),
+        fileUrl: NO_UPLOADS
+      };
+    }
+  };
+}

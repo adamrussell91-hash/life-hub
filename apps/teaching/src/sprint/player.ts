@@ -1,13 +1,14 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
 import { renderBlock } from '@/blocks/render';
-import { el } from '@/quiz/dom';
+import { button, el } from '@/quiz/dom';
 import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
 import { phaseDue } from './rules';
 import { phaseIntention, phaseMove, toolFrames } from './defaults';
 import { sprintParts } from './model';
 import { PHASE_LABELS, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 import { valueCheckFor, type FormContext, type PhaseForm } from './form-kit';
+import { fillPhaseSample } from './practice-sample';
 import type { SprintClient, SprintStatus } from './api';
 import './sprint.css';
 
@@ -16,7 +17,12 @@ export type SprintPlayerOptions = {
   classId?: string;
   client: SprintClient | null;
   renderHero: (host: HTMLElement) => void;
+  /** The practice clock in a teacher's practice run; the real time otherwise. */
+  now?: () => number;
+  /** A practice run: each form gets Fill with sample answers, signed with this name. */
+  practice?: { name: string };
 };
+
 
 /** Each phase's form; Tasks 12–14 register theirs. */
 export const PHASE_FORMS: Partial<Record<SprintPhaseKey, (ctx: FormContext) => PhaseForm>> = {};
@@ -42,6 +48,7 @@ export function dueText(due_date: string, due_time: string, now: number): string
 
 export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOptions): { dispose(): void } {
   const { lesson, client } = options;
+  const now = options.now ?? (() => Date.now());
   const sprint = lesson.sprint as PublicSprint;
   const blocks = lesson.blocks as Block[];
   const parts = sprintParts(blocks);
@@ -104,7 +111,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const cd = el('div', 'sprint-countdown');
     const left = el('div');
     left.append(el('div', 'sprint-countdown__title', `${PHASE_LABELS[key]} closes`), el('div', 'sprint-countdown__sub', test ? `Pitch day: ${formatDueDay(test.due_date)}` : ''));
-    cd.append(left, el('div', 'sprint-countdown__fig', row ? dueText(row.due_date, row.due_time, Date.now()) : ''));
+    cd.append(left, el('div', 'sprint-countdown__fig', row ? dueText(row.due_date, row.due_time, now()) : ''));
     const group = el('div', 'sprint-group', `Group ${s.group?.name ?? ''} · ${(s.group?.mates ?? []).join(' · ')} · ${row?.count_in ?? 0} of ${s.group?.size ?? 0} in`);
     const intent = el('p', 'sprint-intent', phaseIntention(phaseMove(blocks, key)));
     const steps = el('nav', 'sprint-steps');
@@ -167,7 +174,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     box.append(el('div', 'sprint-lock__icon', '✓'), el('h2', '', 'Your class work is in'), el('p', '', `The sprint opens again at ${until.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}.`));
     const clock = el('div', 'sprint-lock__clock');
     const tick = () => {
-      const ms = Math.max(0, until.getTime() - Date.now());
+      const ms = Math.max(0, until.getTime() - now());
       const h = Math.floor(ms / 3_600_000);
       const m = Math.floor((ms % 3_600_000) / 60_000);
       const sec = Math.floor((ms % 60_000) / 1000);
@@ -233,6 +240,20 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     form = make ? make(ctx) : { el: el('p', 'sprint-note', 'This phase opens soon.'), dispose() {} };
     const layout = el('div', 'sprint-layout');
     const work = el('section', 'sprint-form');
+    if (options.practice && ctx.editable && client) {
+      const fill = button('Fill with sample answers', 'secondary', () => {
+        fill.disabled = true;
+        void fillPhaseSample(key, { status: s, sprint, client, name: options.practice!.name })
+          .then(({ payload, status: next }) => {
+            (drafts as Record<string, unknown>)[key] = payload;
+            formKey = '';
+            apply(next);
+          })
+          .catch(() => { fill.disabled = false; });
+      });
+      fill.classList.add('sprint-practice-fill');
+      work.append(fill);
+    }
     work.append(form.el);
     layout.append(work, guidesPanel(key));
     body.replaceChildren(layout);

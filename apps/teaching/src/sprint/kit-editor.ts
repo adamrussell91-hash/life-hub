@@ -1,7 +1,9 @@
 import type { Lesson } from '@/schemas/lesson';
 import { button, el } from '@/quiz/dom';
-import { PHASE_LABELS, SPRINT_LIMITS, SPRINT_PHASES, type SprintGroup, type SprintPhaseKey, type SprintSettings } from './schema';
+import { PHASE_LABELS, SPRINT_LIMITS, SPRINT_PHASES, type SprintGroup, type SprintPhase, type SprintPhaseKey, type SprintSettings } from './schema';
 import { newSprintSettings } from './defaults';
+import { noteEl, type KitNoteKey } from './notes';
+import { phaseSpans, renderPhaseGantt } from './phase-timeline';
 
 export type KitEditorOptions = {
   getLesson: () => Lesson;
@@ -41,6 +43,8 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
   const root = el('section', 'kit');
   let outcomes: Array<{ id: string; label: string }> = [];
   let roster: Array<{ id: string; name: string; initials: string }> = [];
+  const openNotes = new Set<string>();
+  let picked: SprintPhaseKey | null = null;
   const s = (): SprintSettings => o.getLesson().sprint ?? newSprintSettings(o.classes[0]?.id ?? '');
   const put = (change: (draft: SprintSettings) => void, repaint = false) => {
     const draft = structuredClone(s());
@@ -48,9 +52,9 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     o.emit({ ...o.getLesson(), sprint: draft });
     if (repaint) paint();
   };
-  const card = (title: string, why: string) => {
+  const card = (title: string, why: string, note: KitNoteKey) => {
     const c = el('div', 'kit-card');
-    c.append(el('h3', '', title), el('p', 'kit-why', why));
+    c.append(el('h3', '', title), el('p', 'kit-why', why), noteEl(note, openNotes));
     root.append(c);
     return c;
   };
@@ -70,11 +74,69 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     return sel;
   };
 
+  /** One phase's settings, shown under the chart when its bar is picked. */
+  function phaseEditor(p: SprintPhase, i: number): HTMLElement {
+    const box = el('div', 'kit-phase-edit');
+    box.dataset.phase = p.key;
+    const name = PHASE_LABELS[p.key];
+    const row = el('div', 'kit-phase-edit__row');
+    const date = el('input', 'qz-input');
+    date.type = 'date';
+    date.value = p.due_date;
+    date.setAttribute('aria-label', `${name} closes on`);
+    date.addEventListener('change', () => put((d) => {
+      const ph = d.phases[i]!;
+      ph.due_date = date.value;
+      // The lesson end time is on the close day.
+      if (ph.ends_at) ph.ends_at = date.value ? `${date.value}T${ph.ends_at.slice(11)}` : '';
+    }, true));
+    const time = el('input', 'qz-input');
+    time.type = 'time';
+    time.value = p.due_time;
+    time.setAttribute('aria-label', `${name} closes at`);
+    time.addEventListener('change', () => put((d) => { d.phases[i]!.due_time = time.value; }, true));
+    row.append(
+      el('b', '', name),
+      selectOf([['class', 'In class'], ['home', 'At home']], p.where, (v) => put((d) => { d.phases[i]!.where = v as 'class' | 'home'; if (v === 'home') d.phases[i]!.ends_at = ''; }, true), `${name} where`),
+      el('label', '', 'Closes'), date, time
+    );
+    box.append(row);
+    if (p.where === 'class') {
+      const lockRow = el('div', 'kit-phase-edit__row');
+      const tick = el('input');
+      tick.type = 'checkbox';
+      tick.id = `kit-lock-${p.key}`;
+      tick.checked = !!p.ends_at;
+      const lab = el('label', '', 'Lock work when the lesson ends at');
+      lab.htmlFor = tick.id;
+      const at = el('input', 'qz-input');
+      at.type = 'time';
+      at.value = p.ends_at ? p.ends_at.slice(11) : '';
+      at.disabled = !p.ends_at;
+      at.setAttribute('aria-label', `${name} lesson ends at`);
+      tick.addEventListener('change', () => put((d) => { d.phases[i]!.ends_at = tick.checked && d.phases[i]!.due_date ? `${d.phases[i]!.due_date}T${at.value || '12:30'}` : ''; }, true));
+      at.addEventListener('change', () => put((d) => { if (d.phases[i]!.due_date && at.value) d.phases[i]!.ends_at = `${d.phases[i]!.due_date}T${at.value}`; }, true));
+      lockRow.append(tick, lab, at);
+      box.append(lockRow, el('p', 'kit-why', p.due_date ? `Or press End class part on the progress map. Work then locks for ${s().lock_hours} h.` : 'Set the close day first. Or press End class part on the progress map.'));
+    }
+    const what = el('textarea', 'qz-input');
+    what.rows = 2;
+    what.maxLength = 600;
+    what.value = p.instruction;
+    what.placeholder = 'What students do in this phase, in one or two sentences.';
+    what.setAttribute('aria-label', `${name}: what students do`);
+    what.addEventListener('input', () => put((d) => { d.phases[i]!.instruction = what.value; }));
+    const stretch = text(p.stretch, 300, (v) => put((d) => { d.phases[i]!.stretch = v; }), `${name}: stretch`);
+    stretch.placeholder = 'An extra step for students who finish early.';
+    box.append(el('label', 'kit-label', 'What students do'), what, el('label', 'kit-label', 'Stretch (optional)'), stretch);
+    return box;
+  }
+
   function paint(): void {
-    root.replaceChildren();
+    root.replaceChildren(noteEl('overview', openNotes, 'How a sprint runs'));
     const cur = s();
 
-    const settings = card('Settings', 'How much scaffolding shows, who chooses the group’s idea, ideas each, and the class lock.');
+    const settings = card('Settings', 'How much scaffolding shows, who chooses the group’s idea, ideas each, and the class lock.', 'settings');
     settings.append(
       selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level'),
       selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Top vote goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides'),
@@ -82,7 +144,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
     );
 
-    const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes, pitch feedback and your marks.');
+    const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes, pitch feedback and your marks.', 'criteria');
     cur.criteria.forEach((c, i) => {
       const row = el('div', 'kit-row kit-criterion');
       row.append(
@@ -97,13 +159,13 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addC.disabled = cur.criteria.length >= SPRINT_LIMITS.criteria;
     crit.append(addC);
 
-    const refl = card('Reflection', 'Marked with its own criterion. Two prompts students answer at home after the pitch.');
+    const refl = card('Reflection', 'Marked with its own criterion. Two prompts students answer at home after the pitch.', 'reflection');
     refl.append(
       text(cur.reflection_criteria[0]?.text ?? '', 160, (v) => put((d) => { d.reflection_criteria = [{ ...(d.reflection_criteria[0] ?? { id: kitId() }), text: v }]; }), 'Reflection criterion'),
       ...[0, 1].map((i) => text(cur.reflection_prompts[i] ?? '', 200, (v) => put((d) => { d.reflection_prompts[i] = v; }), `Reflection prompt ${i + 1}`))
     );
 
-    const req = card('Requirements', 'Must-haves, yes or no. Students tick each one and say where it is.');
+    const req = card('Requirements', 'Must-haves, yes or no. Students tick each one and say where it is.', 'requirements');
     cur.requirements.forEach((r, i) => {
       const row = el('div', 'kit-row kit-requirement');
       row.append(text(r.text, 160, (v) => put((d) => { d.requirements[i]!.text = v; }), 'Requirement'));
@@ -129,7 +191,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addR.disabled = cur.requirements.length >= SPRINT_LIMITS.requirements;
     req.append(addR, el('p', 'kit-why', 'U Understand · S Sketch · D Decide · P Prototype · T Test'));
 
-    const guide = card('Idea guide', 'Shown in Sketch and Decide. Write the model on a different topic from the challenge, so students follow it without copying it.');
+    const guide = card('Idea guide', 'Shown in Sketch and Decide. Write the model on a different topic from the challenge, so students follow it without copying it.', 'idea_guide');
     const lines = el('textarea', 'qz-input');
     lines.rows = 5;
     lines.value = cur.idea_guide.checklist.join('\n');
@@ -147,36 +209,12 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     notes.addEventListener('input', () => put((d) => { d.idea_guide.model.notes = notes.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 6); }));
     guide.append(el('label', 'kit-label', 'Good idea checklist'), lines, el('label', 'kit-label', 'Model topic'), text(cur.idea_guide.model.topic, 80, (v) => put((d) => { d.idea_guide.model.topic = v; }), 'Model topic'), el('label', 'kit-label', 'Model idea'), modelText, el('label', 'kit-label', 'What each part does'), notes);
 
-    const phases = card('Phases and deadlines', 'A phase opens when the one before is due, everyone in the group is in, or its class part ends.');
-    cur.phases.forEach((p, i) => {
-      const row = el('div', 'kit-row kit-phase');
-      const date = el('input', 'qz-input');
-      date.type = 'date';
-      date.value = p.due_date;
-      date.setAttribute('aria-label', `${PHASE_LABELS[p.key]} due date`);
-      date.addEventListener('change', () => put((d) => { d.phases[i]!.due_date = date.value; }));
-      const time = el('input', 'qz-input');
-      time.type = 'time';
-      time.value = p.due_time;
-      time.setAttribute('aria-label', `${PHASE_LABELS[p.key]} due time`);
-      time.addEventListener('change', () => put((d) => { d.phases[i]!.due_time = time.value; }));
-      row.append(el('strong', '', PHASE_LABELS[p.key]), selectOf([['class', 'Class'], ['home', 'Home']], p.where, (v) => put((d) => { d.phases[i]!.where = v as 'class' | 'home'; }, true), `${PHASE_LABELS[p.key]} where`), date, time);
-      if (p.where === 'class') {
-        const ends = el('input', 'qz-input');
-        ends.type = 'datetime-local';
-        ends.value = p.ends_at;
-        ends.setAttribute('aria-label', `${PHASE_LABELS[p.key]} class part ends`);
-        ends.addEventListener('change', () => put((d) => { d.phases[i]!.ends_at = ends.value.slice(0, 16); }));
-        row.append(el('label', 'kit-label', 'Class part ends (optional)'), ends);
-      }
-      row.append(
-        text(p.instruction, 600, (v) => put((d) => { d.phases[i]!.instruction = v; }), `${PHASE_LABELS[p.key]} instruction`),
-        text(p.stretch, 300, (v) => put((d) => { d.phases[i]!.stretch = v; }), `${PHASE_LABELS[p.key]} stretch`)
-      );
-      phases.append(row);
-    });
+    const phases = card('Phases and deadlines', 'You set when each phase closes. Each phase opens when the one above it closes. Click a bar to edit it.', 'phases');
+    phases.append(renderPhaseGantt(phaseSpans(cur.phases, cur.lock_hours), { onPick: (key) => { picked = picked === key ? null : key; paint(); }, picked }));
+    const pi = cur.phases.findIndex((p) => p.key === picked);
+    if (pi >= 0) phases.append(phaseEditor(cur.phases[pi]!, pi));
 
-    const groups = card('Groups', 'Groups for this sprint only. Students join by their initials.');
+    const groups = card('Groups', 'Groups for this sprint only. Students join by their initials.', 'groups');
     if (!o.classes.length) groups.append(el('p', 'kit-why', 'Add this unit to a class first.'));
     else {
       groups.append(selectOf(o.classes.map((c): [string, string] => [c.id, c.name]), cur.class_id, (v) => { put((d) => { d.class_id = v; d.groups = []; }); void loadRoster(v); }, 'Class'));
