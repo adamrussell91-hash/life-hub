@@ -1,6 +1,6 @@
 import { button, el } from '@/quiz/dom';
 import { partsProblems, voteProblems } from './checks';
-import { frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import type { Part, PhasePayload } from './schema';
 import type { GalleryIdea, SprintStatus } from './api';
 
@@ -13,7 +13,7 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
  */
 export function mountDecide(ctx: FormContext): PhaseForm {
   const s = ctx.status;
-  const mine = s.mine?.decide;
+  const mine = draftOf(ctx, 'decide');
   const state: PhasePayload['decide'] = { votes: { ...(mine?.votes ?? {}) }, reasons: { ...(mine?.reasons ?? {}) }, opened: [...(mine?.opened ?? [])], stretch: mine?.stretch ?? '' };
   const sets = s.gallery ?? [];
   const root = el('div', 'sprint-decide');

@@ -1,7 +1,7 @@
 import { el } from '@/quiz/dom';
 import { sketchProblems } from './checks';
 import { SKETCH_STARTERS } from './defaults';
-import { frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
 import type { PhasePayload, SketchCard } from './schema';
 import type { SprintStatus } from './api';
 
@@ -10,7 +10,7 @@ const blank = (i: number): SketchCard => ({ id: `k${i + 1}`, title: '', idea: ''
 /** Sketch: one tab per idea card, the checks for each, then the strongest pick. */
 export function mountSketch(ctx: FormContext): PhaseForm {
   const ideas = ctx.sprint.phases[1]!.ideas ?? 3;
-  const mine = ctx.status.mine?.sketch;
+  const mine = draftOf(ctx, 'sketch');
   const state: PhasePayload['sketch'] = { cards: [...(mine?.cards ?? [])], strongest: mine?.strongest ?? '', strongest_why: mine?.strongest_why ?? '' };
   while (state.cards.length < ideas) state.cards.push(blank(state.cards.length));
   const reqs = ctx.sprint.requirements.filter((r) => r.phases.includes('sketch'));

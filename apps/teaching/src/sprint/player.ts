@@ -6,7 +6,7 @@ import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
 import { phaseDue } from './rules';
 import { phaseIntention, phaseMove, toolFrames } from './defaults';
 import { sprintParts } from './model';
-import { PHASE_LABELS, type PublicSprint, type SprintPhaseKey } from './schema';
+import { PHASE_LABELS, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 import { valueCheckFor, type FormContext, type PhaseForm } from './form-kit';
 import type { SprintClient, SprintStatus } from './api';
 import './sprint.css';
@@ -52,6 +52,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   let poll = 0;
   let disposed = false;
   const opened = new Set<SprintPhaseKey>();
+  const drafts: Partial<PhasePayload> = {};
 
   const shell = el('div', 'sprint');
   const hero = el('div', 'sprint__hero');
@@ -225,7 +226,8 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
       frames: toolFrames(move),
       valueCheck: valueCheckFor(move?.value),
       support: sprint.support,
-      onStatus: (next) => apply(next)
+      onStatus: (next) => apply(next),
+      drafts
     };
     const make = PHASE_FORMS[key];
     form = make ? make(ctx) : { el: el('p', 'sprint-note', 'This phase opens soon.'), dispose() {} };

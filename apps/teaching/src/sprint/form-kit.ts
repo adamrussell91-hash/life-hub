@@ -20,8 +20,20 @@ export type FormContext = {
   /** Show starters inline (Guided), folded (Standard) or not at all (Open). */
   support: PublicSprint['support'];
   onStatus(next: SprintStatus): void;
+  /**
+   * The player's copy of what the student has typed in each phase. A form
+   * rebuilt by polling (a groupmate's new question, the pitch file being set)
+   * starts from it, so nothing typed is lost.
+   */
+  drafts?: Partial<PhasePayload>;
 };
 export type PhaseForm = { el: HTMLElement; dispose(): void };
+
+/** What the form starts from: the student's unsaved draft while they can edit, else what the server has. */
+export function draftOf<P extends SprintPhaseKey>(ctx: FormContext, phase: P): PhasePayload[P] | undefined {
+  const local = ctx.editable ? ctx.drafts?.[phase] : undefined;
+  return structuredClone(local ?? ctx.status.mine?.[phase]) as PhasePayload[P] | undefined;
+}
 
 export function valueCheckFor(valueId: string | undefined): FormContext['valueCheck'] {
   const probe = valueId ? libraryValue(valueId)?.probes[0] : undefined;
@@ -125,9 +137,16 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
     el: bar,
     changed() {
       if (!ctx.editable) return;
+      if (ctx.drafts) ctx.drafts[phase] = structuredClone(payload());
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => void send('save'), 4000);
+      timer = window.setTimeout(() => { timer = 0; void send('save'); }, 4000);
     },
-    dispose: () => window.clearTimeout(timer)
+    // A rebuild sends a waiting autosave now rather than dropping it.
+    dispose: () => {
+      if (!timer) return;
+      window.clearTimeout(timer);
+      timer = 0;
+      void ctx.client.save(phase, payload()).catch(() => {});
+    }
   };
 }

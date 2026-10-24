@@ -1,13 +1,13 @@
 import { button, el } from '@/quiz/dom';
 import { prototypeProblems } from './checks';
-import { frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
 import { LEVEL_LABELS, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
 /** Prototype: build your part (write, upload or link), set the group's pitch file, then check it against the criteria. */
 export function mountPrototype(ctx: FormContext): PhaseForm {
   const s = ctx.status;
-  const mine = s.mine?.prototype;
+  const mine = draftOf(ctx, 'prototype');
   const state: PhasePayload['prototype'] = { text: mine?.text ?? '', link: mine?.link ?? '', files: [...(mine?.files ?? [])], requirements: { ...(mine?.requirements ?? {}) }, self: { ...(mine?.self ?? {}) }, self_why: { ...(mine?.self_why ?? {}) }, value_answer: mine?.value_answer ?? '' };
   const myPart = (s.parts ?? []).find((p) => p.mine);
   const root = el('div', 'sprint-prototype');
