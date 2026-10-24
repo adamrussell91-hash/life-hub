@@ -118,8 +118,8 @@ export function placeByDate<T extends { id: string }>(ordered: readonly T[], dat
   return [...lead, ...groups.flatMap((g) => g.lessons)];
 }
 
-/** "Wk 3" → 3. */
-const weekOf = (band: string): number => Number(/\d+/.exec(band)?.[0] ?? NaN);
+/** "Wk 3" → 3; "Pre" (before the unit starts) → 0. */
+const weekOf = (band: string): number => Number(/\d+/.exec(band)?.[0] ?? 0);
 
 /**
  * The unit map's input. `lessons` is the unit's lessons in order, already

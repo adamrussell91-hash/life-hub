@@ -272,9 +272,9 @@ function shapeFlow(
 }
 
 /** Would giving `lessonId` these lessons after it break the flow? Returns the problem it would cause. */
-export function linkProblem(lessons: readonly FlowLesson[], lessonId: string, after: readonly string[]): FlowProblem | undefined {
-  const before = shapeFlow(lessons).problems;
-  const next = shapeFlow(lessons.map((l) => (l.id === lessonId ? { ...l, after } : l))).problems;
+export function linkProblem(lessons: readonly FlowLesson[], lessonId: string, after: readonly string[], hidden?: ReadonlySet<string>): FlowProblem | undefined {
+  const before = shapeFlow(lessons, { ...(hidden ? { hidden } : {}) }).problems;
+  const next = shapeFlow(lessons.map((l) => (l.id === lessonId ? { ...l, after } : l)), { ...(hidden ? { hidden } : {}) }).problems;
   const key = (p: FlowProblem) => `${p.kind}:${p.lessonId}:${p.target ?? ''}`;
   const had = new Set(before.map(key));
   return next.find((p) => (p.kind === 'cross_link' || p.kind === 'too_deep' || p.kind === 'loop') && !had.has(key(p)));
@@ -283,4 +283,35 @@ export function linkProblem(lessons: readonly FlowLesson[], lessonId: string, af
 /** The lessons that come before `id`, as drawn. */
 export function lessonsBefore(flow: Flow, id: string): string[] {
   return [...flow.next.entries()].filter(([, v]) => v.includes(id)).map(([k]) => k);
+}
+
+/**
+ * Support, extension and optional lessons hang off a core lesson: the one the
+ * teacher picked, else the nearest core lesson before them in the order. Each
+ * sits straight after its core lesson (after any others hanging there), so the
+ * map loops it out of that lesson and back to the next core one.
+ */
+export function hangSides(
+  order: readonly string[],
+  isSide: (id: string) => boolean,
+  branchFrom: (id: string) => string | undefined
+): { order: string[]; anchor: Map<string, string> } {
+  const core = order.filter((id) => !isSide(id));
+  const coreSet = new Set(core);
+  const anchor = new Map<string, string>();
+  const lead: string[] = [];
+  let last: string | undefined;
+  for (const id of order) {
+    if (!isSide(id)) { last = id; continue; }
+    const picked = branchFrom(id);
+    const at = picked && coreSet.has(picked) ? picked : last;
+    if (at) anchor.set(id, at);
+    else lead.push(id);
+  }
+  const hung = new Map<string, string[]>();
+  for (const id of order) {
+    const at = anchor.get(id);
+    if (at) hung.set(at, [...(hung.get(at) ?? []), id]);
+  }
+  return { order: [...lead, ...core.flatMap((id) => [id, ...(hung.get(id) ?? [])])], anchor };
 }

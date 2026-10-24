@@ -1,9 +1,16 @@
 import type { LessonRouteRole } from '@/schemas/block';
-import { buildFlow, linkProblem, lessonsBefore, type FlowLesson } from './flow';
+import { buildFlow, hangSides, linkProblem, lessonsBefore, type FlowLesson } from './flow';
 import { el, ghostButton } from './lines-editor';
 import './network.css';
 
-export type FlowPeer = { id: string; title: string; after?: readonly string[] };
+export type FlowPeer = {
+  id: string;
+  title: string;
+  after?: readonly string[];
+  /** Support, extension or optional hang off a core lesson; unset is core. */
+  role?: LessonRouteRole;
+  branchFrom?: string;
+};
 
 export type LessonFlowOptions = {
   /** This lesson's id; its own links and route come through `update`. */
@@ -14,8 +21,12 @@ export type LessonFlowOptions = {
   /** Support or extension beside the core route on the unit map; unset is core. */
   role?: LessonRouteRole | undefined;
   skipRule?: string | undefined;
+  /** A side lesson's core lesson; unset hangs it off the core lesson before it. */
+  branchFrom?: string | undefined;
+  /** Taught before the unit officially starts. */
+  preUnit?: boolean | undefined;
   /** Saves this lesson: `null` links mean "follow the unit order" again. */
-  onSelf: (patch: { after_lesson_ids?: string[] | null; route_role?: LessonRouteRole | null; skip_rule?: string | null }) => void;
+  onSelf: (patch: { after_lesson_ids?: string[] | null; route_role?: LessonRouteRole | null; skip_rule?: string | null; branch_from?: string | null; pre_unit?: boolean | null }) => void;
   /** Saves another lesson's links (for "before this lesson"). */
   onPeer: (lessonId: string, after: string[]) => Promise<void>;
   /** The classes that teach the unit, with this lesson's date in each (YYYY-MM-DD). */
@@ -33,26 +44,40 @@ const SKIP_HINT: Record<Exclude<LessonRouteRole, 'core'>, string> = {
 
 /**
  * "Before and after" at the foot of a lesson: what leads here, what comes
- * next, and where it sits on the unit route. More than one lesson after is a
- * choice; the unit map splits there and students choose their next step.
+ * next, and where it sits on the unit route. A core lesson sits on the line
+ * of core lessons; a support, extension or optional lesson branches off one
+ * core lesson and rejoins at the next.
  */
 export function mountLessonFlow(
   host: HTMLElement,
   options: LessonFlowOptions
-): { update(after: readonly string[] | undefined, role?: LessonRouteRole, skipRule?: string): void; dispose(): void } {
+): { update(after: readonly string[] | undefined, role?: LessonRouteRole, skipRule?: string, branchFrom?: string, preUnit?: boolean): void; dispose(): void } {
   let peers = options.peers.map((p) => ({ ...p }));
   let after = options.after;
   let role = options.role;
   let skipRule = options.skipRule ?? '';
+  let branchFrom = options.branchFrom;
+  let preUnit = Boolean(options.preUnit);
   let classes = (options.classes ?? []).map((c) => ({ ...c }));
   const self = options.lessonId;
   const root = el('section', 'lesson-flow');
   root.setAttribute('aria-label', 'Before and after this lesson');
   host.append(root);
 
-  const lessons = (): FlowLesson[] => peers.map((p) => (p.id === self ? { id: p.id, ...(after ? { after } : {}) } : { id: p.id, ...(p.after ? { after: p.after } : {}) }));
+  const isSide = (id: string) => {
+    const r = id === self ? role : peers.find((p) => p.id === id)?.role;
+    return Boolean(r && r !== 'core');
+  };
+  const sideIds = () => new Set(peers.map((p) => p.id).filter(isSide));
+  /** The unit as the map draws it: core lessons in order, each side lesson after the core one it branches off. */
+  const hung = () => hangSides(peers.map((p) => p.id), isSide, (id) => (id === self ? branchFrom : peers.find((p) => p.id === id)?.branchFrom));
+  const lessons = (): FlowLesson[] => hung().order.map((id) => {
+    const links = id === self ? after : peers.find((p) => p.id === id)?.after;
+    return { id, ...(links ? { after: links } : {}) };
+  });
   const title = (id: string) => peers.find((p) => p.id === id)?.title || 'Untitled lesson';
-  const flow = () => buildFlow(lessons(), { title });
+  // Before and after run along the core lessons: side lessons hang off them and don't break the line.
+  const flow = () => buildFlow(lessons(), { title, hidden: sideIds() });
 
   const saveSelf = (next: string[] | null) => {
     after = next ?? undefined;
@@ -130,7 +155,10 @@ export function mountLessonFlow(
       b.addEventListener('click', () => {
         // Core is saved too, so it beats an old support or extension stop on the unit map.
         role = r;
-        options.onSelf({ route_role: r });
+        if (r === 'core' && branchFrom) {
+          branchFrom = undefined;
+          options.onSelf({ route_role: r, branch_from: null });
+        } else options.onSelf({ route_role: r });
         paint();
       });
       rolePills.append(b);
@@ -187,7 +215,22 @@ export function mountLessonFlow(
       }
       if (classes.every((c) => !c.date)) dateList.append(el('span', 'lesson-flow__hint', 'Not on the calendar yet'));
     }
+    const preLabel = el('label', 'lesson-flow__date');
+    const preBox = el('input');
+    preBox.type = 'checkbox';
+    preBox.checked = preUnit;
+    preBox.addEventListener('change', () => {
+      preUnit = preBox.checked;
+      options.onSelf({ pre_unit: preUnit || null });
+    });
+    preLabel.append(preBox, el('span', undefined, 'Before the unit starts'));
+    dateList.append(preLabel);
     dateRow.append(dateList);
+
+    if (isSide(self)) {
+      root.append(route, dateRow, ...branchRows());
+      return;
+    }
 
     // Before: lessons that lead here. Picking one puts this lesson straight after it.
     const beforeRow = el('div', 'lesson-flow__row');
@@ -197,14 +240,14 @@ export function mountLessonFlow(
     for (const id of into) {
       beforeList.append(chip(id, () => void savePeer(id, (f.next.get(id) ?? []).filter((x) => x !== self))));
     }
-    const beforeCandidates = peers.map((p) => p.id).filter((id) => id !== self && !into.includes(id));
+    const beforeCandidates = peers.map((p) => p.id).filter((id) => id !== self && !into.includes(id) && !isSide(id));
     // A real choice gains this lesson as another option; otherwise this lesson goes in between.
     const insertAfter = (id: string): string[] => {
       const was = f.next.get(id) ?? [];
       return was.length >= 2 ? [...was, self] : [self];
     };
     beforeList.append(picker('Add a lesson before…', beforeCandidates, (id) => {
-      const p = linkProblem(lessons(), id, insertAfter(id));
+      const p = linkProblem(lessons(), id, insertAfter(id), sideIds());
       return p ? shortReason(p.kind, 'before') : undefined;
     }, (id) => {
       const was = f.next.get(id) ?? [];
@@ -229,19 +272,32 @@ export function mountLessonFlow(
       if (!after.length) afterList.append(el('span', 'lesson-flow__hint', 'The unit ends here'));
       for (const id of next) afterList.append(chip(id, () => saveSelf(next.filter((x) => x !== id))));
     }
-    const afterCandidates = peers.map((p) => p.id).filter((id) => id !== self && !next.includes(id));
+    const afterCandidates = peers.map((p) => p.id).filter((id) => id !== self && !next.includes(id) && !isSide(id));
     // One lesson next: picking another replaces it. Only an existing choice gains options.
     const choice = next.length >= 2;
     if (next.length < 6) {
       afterList.append(picker(choice ? 'Add another option…' : next.length ? 'Change the next lesson…' : 'Add a lesson after…', afterCandidates, (id) => {
-        const p = linkProblem(lessons(), self, choice ? [...next, id] : [id]);
+        const p = linkProblem(lessons(), self, choice ? [...next, id] : [id], sideIds());
         return p ? shortReason(p.kind, 'after') : undefined;
       }, (id) => saveSelf(choice ? [...next, id] : [id])));
     }
     if (after !== undefined) afterList.append(ghostButton('Follow unit order', () => saveSelf(null)));
     afterRow.append(afterList);
 
-    root.append(route, dateRow, beforeRow, afterRow);
+    // Side lessons that branch off this one.
+    const { anchor } = hung();
+    const hanging = [...anchor].filter(([, at]) => at === self).map(([id]) => id);
+    const sideRow = el('div', 'lesson-flow__row');
+    sideRow.append(el('span', 'lesson-flow__label', 'Branches'));
+    const sideList = el('div', 'lesson-flow__chips');
+    if (!hanging.length) sideList.append(el('span', 'lesson-flow__hint', 'None: set a lesson to Support, Extension or Optional, then pick this one'));
+    for (const id of hanging) {
+      const r = peers.find((p) => p.id === id)?.role;
+      sideList.append(chip(id, () => {}, true), el('span', 'lesson-flow__hint', r && r !== 'core' ? ROLE_LABEL[r] : ''));
+    }
+    sideRow.append(sideList);
+
+    root.append(route, dateRow, beforeRow, afterRow, sideRow);
     if (next.length > 1) root.append(el('p', 'lesson-flow__note', `Students choose: ${next.map(title).join(', ')}. The unit map splits here.`));
 
     // This lesson's own problems, with a fix where there is one.
@@ -256,12 +312,43 @@ export function mountLessonFlow(
     }
   }
 
+  /** A side lesson: the core lesson it branches off, and where students rejoin. */
+  function branchRows(): HTMLElement[] {
+    const { order, anchor } = hung();
+    const from = anchor.get(self);
+    const core = order.filter((id) => !isSide(id));
+    const back = from ? core[core.indexOf(from) + 1] : core[0];
+
+    const offRow = el('div', 'lesson-flow__row');
+    offRow.append(el('span', 'lesson-flow__label', 'Branches off'));
+    const offList = el('div', 'lesson-flow__chips');
+    if (from) offList.append(chip(from, () => {}, true));
+    else offList.append(el('span', 'lesson-flow__hint', 'The start of the unit'));
+    if (from && !branchFrom) offList.append(el('span', 'lesson-flow__hint', 'From its place in the unit'));
+    offList.append(picker(from ? 'Change…' : 'Pick a lesson…', core.filter((id) => id !== from), () => undefined, (id) => {
+      branchFrom = id;
+      options.onSelf({ branch_from: id });
+      paint();
+    }));
+    offRow.append(offList);
+
+    const backRow = el('div', 'lesson-flow__row');
+    backRow.append(el('span', 'lesson-flow__label', 'Rejoins at'));
+    const backList = el('div', 'lesson-flow__chips');
+    if (back) backList.append(chip(back, () => {}, true), el('span', 'lesson-flow__hint', 'The next core lesson'));
+    else backList.append(el('span', 'lesson-flow__hint', 'The end of the unit'));
+    backRow.append(backList);
+    return [offRow, backRow];
+  }
+
   paint();
   return {
-    update(nextAfter, nextRole, nextRule) {
+    update(nextAfter, nextRole, nextRule, nextBranch, nextPre) {
+      preUnit = Boolean(nextPre);
       after = nextAfter;
       role = nextRole;
       skipRule = nextRule ?? '';
+      branchFrom = nextBranch;
       paint();
     },
     dispose() {

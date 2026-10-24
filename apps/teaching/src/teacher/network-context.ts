@@ -10,6 +10,7 @@ import type { FlowPeer } from '@/network/lesson-flow';
 import { patchScheduledLesson, postScheduledLesson } from '@/teacher/schedule-api';
 import type { NetUnit } from '@/network/year';
 import { orderStations, placeByDate } from '@/network/model';
+import { hangSides } from '@/network/flow';
 import { linesBefore } from '@/alignment/auto-lines';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { httpMarkbookApi } from '@/markbook/api';
@@ -82,6 +83,7 @@ function isoWeek(ymd: string): string {
  * Each lesson's first date (and start time) for the class with the most
  * scheduled lessons in this unit, and its week band, numbered from the unit's
  * first scheduled week. A skipped lesson has no date: it keeps its place.
+ * Lessons taught before the unit starts are "Pre" and don't count as weeks.
  */
 export function unitSchedule(curriculum: CurriculumResponse, unit: Unit): { dates: Map<string, string>; bands: Map<string, string> } | undefined {
   const rows = curriculum.scheduled_lessons.filter(
@@ -96,9 +98,11 @@ export function unitSchedule(curriculum: CurriculumResponse, unit: Unit): { date
   for (const row of [...best].sort((a, b) => when(a).localeCompare(when(b)))) {
     if (!dates.has(row.lesson_id)) dates.set(row.lesson_id, when(row));
   }
-  const weeks = [...new Set([...dates.values()].map((d) => isoWeek(d.slice(0, 10))))].sort();
+  const pre = new Set(curriculum.lessons.filter((l) => l.pre_unit && unit.lesson_ids.includes(l.id)).map((l) => l.id));
+  const weeks = [...new Set([...dates].filter(([id]) => !pre.has(id)).map(([, d]) => isoWeek(d.slice(0, 10))))].sort();
   const bands = new Map<string, string>();
-  for (const [lessonId, d] of dates) bands.set(lessonId, `Wk ${weeks.indexOf(isoWeek(d.slice(0, 10))) + 1}`);
+  for (const [lessonId, d] of dates) bands.set(lessonId, pre.has(lessonId) ? 'Pre' : `Wk ${weeks.indexOf(isoWeek(d.slice(0, 10))) + 1}`);
+  for (const id of pre) if (!bands.has(id)) bands.set(id, 'Pre');
   return { dates, bands };
 }
 
@@ -144,7 +148,23 @@ export function unitFlowPeers(curriculum: CurriculumResponse, unit: Unit, lesson
     const at = follows ? shown.findIndex((l) => l.id === follows) : -1;
     shown.splice(at < 0 ? shown.length : at + 1, 0, self);
   }
-  return shown.map((l) => ({ id: l.id, title: l.title, ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}) }));
+  const role = (l: Pick<Lesson, 'id' | 'route_role'>) => lessonRouteRole(unit, l);
+  const railAfter = (id: string) => content?.rail_stops.find((s) => s.lesson_id === id && s.kind !== 'stop')?.after_lesson_id;
+  const byId = new Map(shown.map((l) => [l.id, l]));
+  // As on the map: each side lesson straight after the core lesson it branches off.
+  const isSide = (id: string) => { const r = role(byId.get(id)!); return Boolean(r && r !== 'core'); };
+  const { order } = hangSides(shown.map((l) => l.id), isSide, (id) => byId.get(id)!.branch_from ?? railAfter(id));
+  return order.map((id) => {
+    const l = byId.get(id)!;
+    const r = role(l);
+    return {
+      id: l.id,
+      title: l.title,
+      ...(l.after_lesson_ids ? { after: l.after_lesson_ids } : {}),
+      ...(r ? { role: r } : {}),
+      ...(l.branch_from ? { branchFrom: l.branch_from } : {})
+    };
+  });
 }
 
 /** A lesson's place on the route: its own role, else the support or extension stop on the unit map that names it. */
@@ -192,6 +212,7 @@ export function unitNetworkContext(curriculum: CurriculumResponse, unit: Unit): 
       ...(l.dot_points ? { dot_points: l.dot_points } : {}),
       ...(l.route_role ? { role: l.route_role } : {}),
       ...(l.skip_rule ? { skip: l.skip_rule } : {}),
+      ...(l.branch_from ? { branchFrom: l.branch_from } : {}),
       ...(l.pedagogical_mode === 'quiz' ? { quiz: true } : {})
     })),
     unitTitle: unit.title,

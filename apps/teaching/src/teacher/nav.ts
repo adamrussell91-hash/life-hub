@@ -28,6 +28,8 @@ export interface CurriculumLessonSummary {
   after_lesson_ids?: string[];
   route_role?: LessonRouteRole;
   skip_rule?: string;
+  branch_from?: string;
+  pre_unit?: boolean;
   dot_points?: string[];
   excerpt?: string;
   attachment_count?: number;
