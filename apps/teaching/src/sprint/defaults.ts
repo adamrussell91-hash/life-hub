@@ -1,5 +1,5 @@
 import type { Block } from '@/schemas/block';
-import { moveContent, moveSentence } from '@/toolkit/content';
+import { moveSentence } from '@/toolkit/content';
 import { libraryTool } from '@/toolkit/library';
 import { createBlock } from '@/blocks/create-block';
 import { SPRINT_PHASES, PHASE_LABELS, type SprintPhaseKey, type SprintSettings } from './schema';
@@ -29,15 +29,6 @@ export const DEFAULT_REFLECTION_PROMPTS = ['What did the feedback show your idea
 
 export const SKETCH_STARTERS = { idea: 'Our idea is…', answers: 'It answers our question because…', evidence: 'The evidence it uses is…' };
 export const FEEDBACK_STARTERS = { worked: 'It works because…', next: 'Try…' };
-
-/** Each phase's default Thinking move: skill, tools, value (library ids). */
-export const PHASE_MOVES: Record<SprintPhaseKey, { skill: string; tools: string[]; value: string }> = {
-  understand: { skill: 'skill:examine', tools: ['tool:question'], value: 'value:relevance' },
-  sketch: { skill: 'skill:apply', tools: ['tool:suggestion', 'tool:example'], value: 'value:breadth' },
-  decide: { skill: 'skill:apply', tools: ['tool:criteria', 'tool:reasons'], value: 'value:relevance' },
-  prototype: { skill: 'skill:justify', tools: ['tool:reasons', 'tool:example'], value: 'value:accuracy' },
-  test: { skill: 'skill:evaluate', tools: ['tool:reasons', 'tool:suggestion'], value: 'value:clarity' }
-};
 
 const WHERE: Record<SprintPhaseKey, 'class' | 'home'> = { understand: 'class', sketch: 'home', decide: 'class', prototype: 'home', test: 'class' };
 
@@ -72,15 +63,9 @@ const section = (id: string, key: SprintPhaseKey, blocks: Block[]): Block => {
   return { ...base, content: { title: PHASE_LABELS[key], blocks, sprint_phase: key } } as Block;
 };
 
-/** One phase's section, starting with its move; Understand adds the Question Quadrant, Test the Thinking reflection. */
+/** One phase's section, empty: the teacher builds each phase page. */
 function phaseSection(key: SprintPhaseKey, newId: () => string): Block {
-  const m = PHASE_MOVES[key];
-  const moveId = newId();
-  const move = { ...createBlock('thinking_move', moveId), content: moveContent(m.skill, m.tools, m.value, moveId) } as Block;
-  const extra: Block[] = [];
-  if (key === 'understand') extra.push(createBlock('question_quadrant', newId()));
-  if (key === 'test') extra.push(createBlock('thinking_reflection', newId()));
-  return section(newId(), key, [move, ...extra]);
+  return section(newId(), key, []);
 }
 
 /** One section per phase. */

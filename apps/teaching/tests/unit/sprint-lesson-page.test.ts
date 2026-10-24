@@ -57,7 +57,7 @@ describe('sprint on the lesson page', () => {
     handle.insertType('brainstorm');
     const blocks: Lesson['blocks'] = onChange.mock.calls.at(-1)![0].blocks;
     const understand = blocks.find((b) => b.block_type === 'section' && b.content.sprint_phase === 'understand');
-    expect(understand?.block_type === 'section' && understand.content.blocks.map((b) => b.block_type)).toEqual(['thinking_move', 'question_quadrant', 'brainstorm']);
+    expect(understand?.block_type === 'section' && understand.content.blocks.map((b) => b.block_type)).toEqual(['brainstorm']);
     expect(blocks.filter((b) => b.block_type === 'brainstorm')).toHaveLength(0);
     handle.dispose();
   });
