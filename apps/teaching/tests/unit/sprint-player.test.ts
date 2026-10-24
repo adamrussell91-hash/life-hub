@@ -33,7 +33,7 @@ describe('sprint player', () => {
     expect(host.querySelector('input[aria-label="Your initials"]')).not.toBeNull();
   });
 
-  it('shows the group, the stepper, the intention and the Understand form', async () => {
+  it('shows the group, the stepper and the Understand form, with no intention line when the phase has no move', async () => {
     const host = document.createElement('div');
     const c = client(status());
     mountSprintPlayer(host, { lesson, classId: 'class1', client: c, renderHero: () => {} });
@@ -41,7 +41,7 @@ describe('sprint player', () => {
     expect(host.querySelector('.sprint-group')?.textContent).toContain('Kestrel');
     expect([...host.querySelectorAll('.sprint-step')].map((s) => s.textContent)).toHaveLength(5);
     expect(host.querySelector('.sprint-step--now')?.textContent).toContain('Understand');
-    expect(host.querySelector('.sprint-intent')?.textContent).toMatch(/^We will think by/);
+    expect(host.querySelector<HTMLElement>('.sprint-intent')?.hidden).toBe(true);
     expect(c.open).toHaveBeenCalledWith('understand');
   });
 

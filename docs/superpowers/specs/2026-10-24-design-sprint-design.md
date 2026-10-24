@@ -226,11 +226,12 @@ Quadrant, Features of a Concept and the Thinking reflection. The sprint uses
 them as phase guides. **No new thinking content is written for the sprint;
 it reuses the library.**
 
-Each phase starts with a default **Thinking move** (skill + tools + value)
-that fits what the phase asks students to do. The teacher can change it, add
-toolkit blocks, or remove them:
+**Adam's call (24 Oct):** each phase starts empty, and the teacher builds
+the phase page. Nothing is added to a phase automatically. A teacher who
+wants a Thinking move adds one from the toolkit; the table below is the
+suggested move for each phase, not a default:
 
-| Phase | Default Thinking move | Other default guides |
+| Phase | Suggested Thinking move | Other suggested guides |
 |---|---|---|
 | **Understand** | Examining using questions, judged for **relevance** (`skill:examine`, `tool:question`) | Question Quadrant, for sorting the group's questions |
 | **Sketch** | Applying with suggestions and examples, judged for **breadth** (`skill:apply`, `tool:suggestion`, `tool:example`). Breadth suits three different ideas. | The idea guide. Analogy (`tool:analogy`) as an optional stretch. |
@@ -250,7 +251,8 @@ How the guide reaches the work:
   question?"), beside the criteria and requirements.
 - **Thinking intentions** at the top of each phase are built from its move
   ("We will think by applying criteria, using reasons, judged for
-  relevance"), so students hear the same language in every phase.
+  relevance"), so students hear the same language in every phase. A phase
+  with no move shows no intention line.
 - Guides are normal toolkit blocks in the phase's section of the lesson body,
   so teacher notes and My notes are stripped for students exactly as now
   (`filterBlocksForStudent`).
@@ -415,7 +417,8 @@ names only).
   model_text?, stretch?}`, `groups[] {id, name, students[]}`. Guides
   (toolkit blocks, resources, the idea guide) live in the lesson body under
   one section marker per phase, as tutorial groups do; a new sprint is
-  seeded with each phase's default Thinking move.
+  seeded with one empty section per phase, and a missing one is put back
+  empty.
 - **Class lock record** (one per sprint per class): `{ phase, ended_at,
   locked_until, present[] }`, plus single-student unlocks. The server
   checks it on every student read and write; the client only shows it.

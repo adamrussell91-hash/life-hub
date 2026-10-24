@@ -114,6 +114,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     cd.append(left, el('div', 'sprint-countdown__fig', row ? dueText(row.due_date, row.due_time, now()) : ''));
     const group = el('div', 'sprint-group', `Group ${s.group?.name ?? ''} · ${(s.group?.mates ?? []).join(' · ')} · ${row?.count_in ?? 0} of ${s.group?.size ?? 0} in`);
     const intent = el('p', 'sprint-intent', phaseIntention(phaseMove(blocks, key)));
+    intent.hidden = !intent.textContent;
     const steps = el('nav', 'sprint-steps');
     steps.setAttribute('aria-label', 'Sprint phases');
     for (const p of s.phases ?? []) {
