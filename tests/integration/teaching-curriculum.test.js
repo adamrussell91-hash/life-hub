@@ -607,6 +607,19 @@ test('scheduled-lesson collection creates a dated row behind the Life session', 
   assert.equal(row.schedule_order, 1);
   assert.equal(row.delivery_status, 'planned');
 
+  const post = body => createScheduledLessonsHandler(deps)(
+    request({ method: 'POST', url: 'https://api.adam-russell.com/api/scheduled-lessons', body })
+  );
+  // Saving the same lesson on the same day again (a double click, a stale page) keeps one row.
+  const again = await post({ class_id: 'class_1', lesson_id: 'lesson_1', date: '2026-08-12' });
+  assert.equal((await again.json()).data.id, row.id);
+  // Dating a lesson from a stale page moves its row rather than adding a second one.
+  const moved = (await (await post({ class_id: 'class_1', lesson_id: 'lesson_1', date: '2026-08-14', move_existing: true })).json()).data;
+  assert.equal(moved.id, row.id);
+  assert.equal(moved.date, '2026-08-14');
+  assert.equal((await store.list({ prefix: 'scheduled_lessons/' })).blobs.length, 1);
+  await post({ class_id: 'class_1', lesson_id: 'lesson_1', date: '2026-08-12', move_existing: true });
+
   const listed = await createScheduledLessonsHandler(deps)(
     request({ url: 'https://api.adam-russell.com/api/scheduled-lessons' })
   );
