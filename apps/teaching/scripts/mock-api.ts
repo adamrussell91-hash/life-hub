@@ -126,6 +126,7 @@ import { createPublishedContinuumHandler } from '../../../netlify/functions/publ
 import { createPeerFeedbackHandler } from '../../../netlify/functions/peer-feedback.mjs';
 import { createPublishedPeerFeedbackHandler } from '../../../netlify/functions/published-peer-feedback.mjs';
 import { prepareQuizPublish, storeQuizKey } from '../../../netlify/functions/_shared/quiz.mjs';
+import { prepareSprintPublish, storeSprintConfig } from '../../../netlify/functions/_shared/sprint.mjs';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -1167,10 +1168,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       return errorResponse(400, 'validation_error', `A quiz question isn’t finished: ${quizPublish.problems[0]}`);
     }
     if (quizPublish.quiz) await storeQuizKey(functionBlobStore(), id, quizPublish.quiz);
+    // A design sprint keeps its groups and rules server-side, as the real publish does.
+    const sprint = parsed.data.pedagogical_mode === 'design_sprint' && parsed.data.sprint ? prepareSprintPublish(parsed.data, studentBlocks) : null;
+    if (sprint) await storeSprintConfig(functionBlobStore(), id, sprint.config);
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
       blocks: quizPublish.blocks,
-      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {})
+      ...(quizPublish.quiz ? { pedagogical_mode: 'quiz', quiz: quizPublish.quiz.snapshot } : {}),
+      ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {})
     });
 
     try {

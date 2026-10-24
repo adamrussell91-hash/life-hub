@@ -171,6 +171,8 @@ export type LessonPageHandle = {
   update(lesson: Lesson, nextMedia?: Media[]): void;
   insertType(type: InsertMenuValue): void;
   revealPublishBlock(blockId: string, errorIds?: string[]): void;
+  /** The lesson was just published: panels that need a published lesson (the sprint map) can appear. */
+  markPublished?(at: string): void;
   dispose(): void;
 };
 
@@ -1218,15 +1220,19 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         loadRoster: (classId) => httpMarkbookApi.load(classId).then((v) => v.students.filter((s) => !s.removed)),
         outcomes: sprintOutcomes
       });
-      sprintMap = lesson.published_at ? mountSprintMap({ getLesson: () => lesson, api: sprintTeacherApi(lesson.id), emitLesson }) : null;
-      sprintHost.append(...(sprintMap ? [sprintMap.root] : []), sprintTabs.root, sprintKit.root);
-      if (sprintMap) void sprintMap.refresh();
+      sprintHost.append(sprintTabs.root, sprintKit.root);
     } else if (!isSprint && sprintTabs) {
       sprintMap?.dispose();
       sprintMap = null;
       sprintKit = null;
       sprintTabs = null;
       sprintHost.replaceChildren();
+    }
+    // The progress map needs a published sprint; it appears on the first publish too.
+    if (isSprint && sprintTabs && !sprintMap && lesson.published_at) {
+      sprintMap = mountSprintMap({ getLesson: () => lesson, api: sprintTeacherApi(lesson.id), emitLesson });
+      sprintHost.prepend(sprintMap.root);
+      void sprintMap.refresh();
     }
     if (sprintKit) sprintKit.root.hidden = sprintTabs?.current() !== 'kit';
     sprintHost.hidden = !isSprint;
@@ -1411,6 +1417,10 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     insertType(type: InsertMenuValue) {
       canvas.insertType(type);
+    },
+    markPublished(at: string) {
+      lesson = { ...lesson, published_at: at };
+      syncSprintPanel();
     },
     revealPublishBlock(blockId: string, errorIds?: string[]) {
       // A publish issue on another tutorial tab: open that tab first.
