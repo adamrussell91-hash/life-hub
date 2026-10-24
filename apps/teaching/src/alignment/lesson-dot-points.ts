@@ -43,6 +43,8 @@ const GROUPS = [['U', 'Understanding'], ['R', 'Responding']] as const;
 export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPointsOptions): { update(dotPoints: readonly string[] | undefined, covered?: readonly string[]): void; dispose(): void } {
   let chosen = [...(options.dotPoints ?? [])];
   let covered = new Set(options.covered ?? []);
+  /** The chip whose definition is open; stays open when a tick repaints the plan. */
+  let chipOpen: string | undefined;
   let doc: Alignment | null = null;
   let skills: SkillsContinuum | null = null;
   let area: { id: string; name: string } | null = null;
@@ -167,14 +169,19 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
     const from = (has: (p: AlignmentPoint) => boolean) => picked.filter(has).map((p) => p.id);
     const grid = el('div', 'dots-plan');
     type Item = { key?: string; name: string; text?: string; bullets?: Array<{ key: string; text: string }>; from: string[] };
-    const column = (label: string, items: Item[]) => {
+    const column = (label: string, items: Item[], chips = false) => {
       if (!items.length) return;
-      const col = el('section', 'dots-plan__col');
+      const col = el('section', `dots-plan__col${chips ? ' dots-plan__col--chips' : ''}`);
       const own = items.flatMap((i) => (i.key ? [i.key] : (i.bullets ?? []).map((b) => b.key)));
       keys.push(...own);
       const head = el('h5', 'dots-plan__head', label);
       head.append(el('span', 'dots-plan__count', `${own.filter((k) => covered.has(k)).length}/${own.length}`));
       col.append(head);
+      if (chips) {
+        col.append(chipStrip(items));
+        grid.append(col);
+        return;
+      }
       const ul = el('ul', 'dots-plan__items');
       for (const item of items) {
         const li = el('li', `dots-plan__item${item.key && covered.has(item.key) ? ' dots-plan__item--done' : ''}`);
@@ -223,13 +230,53 @@ export function mountLessonDotPoints(host: HTMLElement, options: LessonDotPoints
       text: proc.text,
       from: from((p) => p.processes.includes(proc.code))
     })));
+    /** Short items as one wrapping row of ticks; a definition opens under the row on ⓘ (or shows on hover). */
+    const chipStrip = (items: Item[]): HTMLElement => {
+      const wrap = el('div', 'dots-plan__chip-wrap');
+      const row = el('ul', 'dots-plan__chips');
+      const note = el('p', 'dots-plan__chip-note');
+      const showNote = () => {
+        const item = items.find((i) => i.key === chipOpen && i.text);
+        note.hidden = !item;
+        note.replaceChildren(...(item ? [el('strong', undefined, `${item.name}: `), document.createTextNode(item.text!)] : []));
+        for (const b of row.querySelectorAll<HTMLButtonElement>('.dots-plan__info')) b.setAttribute('aria-expanded', String(b.dataset.key === chipOpen));
+      };
+      for (const item of items) {
+        if (!item.key) continue;
+        const key = item.key;
+        const li = el('li', `dots-plan__chip${covered.has(key) ? ' dots-plan__item--done' : ''}`);
+        const top = el('label', 'dots-plan__top');
+        if (item.text) top.title = item.text;
+        top.append(tick(key, item.name), el('span', 'dots-plan__name', item.name));
+        const tags = el('span', 'dots-plan__from');
+        tags.setAttribute('aria-label', `From ${item.from.join(', ')}`);
+        for (const id of item.from) tags.append(el('span', 'dots-plan__tag', id));
+        top.append(tags);
+        li.append(top);
+        if (item.text) {
+          const info = el('button', 'dots-plan__info', 'ⓘ');
+          info.type = 'button';
+          info.dataset.key = key;
+          info.setAttribute('aria-label', `What ${item.name} means`);
+          info.addEventListener('click', () => {
+            chipOpen = chipOpen === key ? undefined : key;
+            showNote();
+          });
+          li.append(info);
+        }
+        row.append(li);
+      }
+      showNote();
+      wrap.append(row, note);
+      return wrap;
+    };
     const ids = new Set(picked.flatMap((p) => p.skills ?? []));
     column('Thinking skills', SKILLS.filter((k) => ids.has(k.id)).map((k) => ({
       key: `skill:${k.id}`,
       name: k.name,
       text: k.description,
       from: from((p) => (p.skills ?? []).includes(k.id))
-    })));
+    })), true);
     host.append(grid);
     return { done: keys.filter((k) => covered.has(k)).length, total: keys.length };
   }
