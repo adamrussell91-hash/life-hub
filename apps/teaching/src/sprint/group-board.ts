@@ -92,11 +92,9 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     const mark = el('div', 'sboard__part');
     mark.append(el('h3', '', 'Marking'));
     const markHost = el('div');
-    const inProto = b.subs.prototype.filter((x) => x.sub?.submitted_at).length;
     const inTest = b.subs.test.filter((x) => x.sub?.submitted_at).length;
     if (o.practice) mark.append(el('p', 'kit-why', 'Marking is off in a practice run, so nothing reaches your markbook.'));
     else mark.append(
-      button(`Mark prototype parts (${inProto} in)`, 'secondary', () => mountMarking(markHost, { kind: 'prototype', board: b, api: o.api, getLesson: o.getLesson, emitLesson: o.emitLesson })),
       button(`Mark reflections (${inTest} in)`, 'secondary', () => mountMarking(markHost, { kind: 'reflection', board: b, api: o.api, getLesson: o.getLesson, emitLesson: o.emitLesson })),
       markHost
     );

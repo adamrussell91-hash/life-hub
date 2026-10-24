@@ -25,12 +25,15 @@ describe('sprint marking', () => {
     expect(sprintColumn(lesson, 'reflection', 'col67890').criteria[0]!.label).toBe('Explains what the test showed and what to change next');
   });
 
-  it('makes the two columns once and remembers them on the lesson', async () => {
+  it('makes only the reflection column, once, and remembers it on the lesson: the prototype isn’t marked', async () => {
     const markbook = { saveColumn: vi.fn(async () => ({})) } as never;
+    const saved = (markbook as { saveColumn: ReturnType<typeof vi.fn> }).saveColumn;
     const first = await ensureColumns(lesson, markbook);
-    expect((markbook as { saveColumn: ReturnType<typeof vi.fn> }).saveColumn).toHaveBeenCalledTimes(2);
+    expect(saved).toHaveBeenCalledTimes(1);
+    expect(saved.mock.calls[0]![1]).toMatchObject({ title: 'Pompeii: Reflection' });
+    expect(first.ids.prototype).toBe('');
     const again = await ensureColumns(first.lesson, markbook);
-    expect((markbook as { saveColumn: ReturnType<typeof vi.fn> }).saveColumn).toHaveBeenCalledTimes(2);
+    expect(saved).toHaveBeenCalledTimes(1);
     expect(again.ids).toEqual(first.ids);
   });
 });

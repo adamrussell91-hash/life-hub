@@ -165,7 +165,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       }
     }
 
-    const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes, pitch feedback and your marks.', 'criteria');
+    const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes and the class’s pitch feedback.', 'criteria');
     cur.criteria.forEach((c, i) => {
       const row = el('div', 'kit-row kit-criterion');
       row.append(
