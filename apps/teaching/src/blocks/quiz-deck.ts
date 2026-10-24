@@ -200,3 +200,56 @@ export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
   markAnn();
   return deck;
 }
+
+/** The card each nested deck last showed, so a redraw of its section stays on it. */
+const nestedShown = new Set<string>();
+
+/**
+ * Renders a container's children (a section, a column, a tab) with any run of
+ * quiz questions as a deck. The List switch flips the run in place, since
+ * these renderers have no page to redraw.
+ */
+export function appendWithQuizDecks(host: HTMLElement, blocks: Block[], render: (block: Block) => HTMLElement, decks: boolean): void {
+  for (let index = 0; index < blocks.length; ) {
+    const run = decks ? quizRunLength(blocks, index) : 0;
+    if (run < 2) {
+      host.append(render(blocks[index]!));
+      index += 1;
+      continue;
+    }
+    const runBlocks = blocks.slice(index, index + run);
+    const rows = runBlocks.map(render);
+    const group = document.createElement('div');
+    group.className = 'qz-deck-group';
+    const paint = () => {
+      rows.forEach((row) => {
+        row.hidden = false;
+        row.classList.remove('qz-deck__card', 'qz-deck__card--in-next', 'qz-deck__card--in-prev');
+      });
+      if (readDeckAsList()) {
+        group.replaceChildren(deckListBar(run, () => {
+          writeDeckAsList(false);
+          paint();
+        }), ...rows);
+        return;
+      }
+      const showId = runBlocks.find((b) => nestedShown.has(b.id))?.id ?? runBlocks[0]!.id;
+      group.replaceChildren(mountQuizDeck({
+        blocks: runBlocks,
+        rows,
+        showId,
+        onShow: (id) => {
+          for (const b of runBlocks) nestedShown.delete(b.id);
+          nestedShown.add(id);
+        },
+        onList: () => {
+          writeDeckAsList(true);
+          paint();
+        }
+      }));
+    };
+    paint();
+    host.append(group);
+    index += run;
+  }
+}

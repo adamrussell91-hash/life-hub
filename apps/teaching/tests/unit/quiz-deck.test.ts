@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlock } from '@/blocks/create-block';
+import { renderBlock } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
 import { mountBlockCanvas } from '@/teacher/lesson-canvas/mount-page';
-import { ROW_REVEAL_EVENT } from '@/teacher/lesson-canvas/quiz-deck';
+import { ROW_REVEAL_EVENT } from '@/blocks/quiz-deck';
 import { clickBlockMenuAction } from './helpers/block-edit';
 
 const visibleQuiz = (host: HTMLElement) =>
@@ -90,5 +91,27 @@ describe('quiz question deck', () => {
     blocks = [createBlock('quiz_question', 'q1')];
     mount();
     expect(host.querySelector('.qz-deck')).toBeNull();
+  });
+
+  it('decks the questions inside a section for the teacher, and leaves print and students alone', () => {
+    const section = createBlock('section', 's1');
+    if (section.block_type !== 'section') throw new Error('section');
+    section.content.blocks = ['q1', 'q2', 'q3'].map((id) => createBlock('quiz_question', id));
+    const teacher = renderBlock(section, 'teacher');
+    host.append(teacher);
+    expect(teacher.querySelectorAll('.qz-deck')).toHaveLength(1);
+    expect(visibleQuiz(host)).toEqual([]);
+    const shown = () => Array.from(teacher.querySelectorAll<HTMLElement>('.qz-deck__card')).filter((c) => !c.hidden).length;
+    expect(shown()).toBe(1);
+    button(host, 'Next question').click();
+    expect(teacher.querySelector('.qz-deck__count')?.textContent).toBe('Question 2 of 3');
+    button(host, 'Show the questions as a list').click();
+    expect(teacher.querySelector('.qz-deck')).toBeNull();
+    expect(teacher.querySelectorAll('[hidden]')).toHaveLength(0);
+    button(host, 'Show the questions as cards').click();
+    expect(teacher.querySelector('.qz-deck__count')?.textContent).toBe('Question 2 of 3');
+
+    expect(renderBlock(section, 'print').querySelector('.qz-deck')).toBeNull();
+    expect(renderBlock(section, 'student').querySelector('.qz-deck')).toBeNull();
   });
 });

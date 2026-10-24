@@ -67,7 +67,7 @@ import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
 import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 import { createTeacherClassExamples } from '@/class-examples/teacher';
 import { mountQuizPanel, type QuizPanelHandle } from '@/quiz/teacher-panel';
-import { deckListBar, mountQuizDeck, quizRunLength, readDeckAsList, writeDeckAsList } from '@/teacher/lesson-canvas/quiz-deck';
+import { deckListBar, mountQuizDeck, quizRunLength, readDeckAsList, writeDeckAsList } from '@/blocks/quiz-deck';
 import { createLectureEditorTools } from '@/lecture/editor-tools';
 import { mountTutorialBoard, type TutorialBoardHandle } from '@/tutorial/board';
 import { tutorialTeacherApi } from '@/tutorial/api';

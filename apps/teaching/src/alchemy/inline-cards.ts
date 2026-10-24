@@ -10,7 +10,7 @@ import { liveField, withProposal, withoutProposal, PatchError } from './apply-pr
 import { followAgentJob, recordDecision, startAgentReview } from './agent-client';
 import { researchTrail, lostTouch } from './ann-bar';
 import type { Entry, ReviewStore } from './review-state';
-import { ROW_REVEAL_EVENT } from '@/teacher/lesson-canvas/quiz-deck';
+import { ROW_REVEAL_EVENT } from '@/blocks/quiz-deck';
 
 export type InlineCardsOptions = {
   host: HTMLElement;
