@@ -7,6 +7,7 @@ import { TutorialSettingsSchema } from '../tutorial/schema';
 import { SprintSettingsSchema } from '../sprint/schema';
 import { visitBlocks } from '../blocks/walk-blocks';
 import { tutorialIssues } from '../tutorial/model';
+import { sprintIssues } from '../sprint/model';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
 import {
@@ -88,6 +89,11 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
   if (lesson.pedagogical_mode === 'tutorial') {
     for (const message of tutorialIssues(lesson)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['blocks'] });
+    }
+  }
+  if (lesson.pedagogical_mode === 'design_sprint') {
+    for (const message of sprintIssues(lesson)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['sprint'] });
     }
   }
   // Tutorials use the lecture publish rules: gates and side paths.
