@@ -1303,11 +1303,18 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       sprintHost.prepend(sprintMap.root);
       void sprintMap.refresh();
     }
-    if (sprintKit) sprintKit.root.hidden = sprintTabs?.current() !== 'kit';
+    showSprintPanel();
     sprintHost.hidden = !isSprint;
   }
+  /** The Kit shows on its tab; each phase tab shows that phase's panel above its own blocks. */
+  function showSprintPanel(): void {
+    const tab = sprintTabs?.current();
+    if (!sprintKit) return;
+    sprintKit.root.hidden = !tab || tab === 'brief' || tab === 'all';
+    if (tab && tab !== 'brief' && tab !== 'all') sprintKit.show(tab);
+  }
   function showSprintTab(_tab: SprintTab): void {
-    if (sprintKit) sprintKit.root.hidden = sprintTabs?.current() !== 'kit';
+    showSprintPanel();
     canvas.clearSelection();
     canvas.update(lesson.blocks, media);
   }
