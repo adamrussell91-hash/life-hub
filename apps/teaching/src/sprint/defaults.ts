@@ -55,6 +55,7 @@ export function newSprintSettings(classId: string): SprintSettings {
     groups: [],
     understand: defaultUnderstand(),
     sketch_timer: 8,
+    decide_dots: 3,
     columns: {}
   };
 }

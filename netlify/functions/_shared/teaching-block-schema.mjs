@@ -265,6 +265,8 @@ var SprintSettingsSchema = z7.object({
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z7.number().int().min(0).max(30).default(8),
+  /** Decide's stand-out dots each student places on parts of any idea; 0 turns them off. */
+  decide_dots: z7.number().int().min(0).max(5).default(3),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z7.object({ prototype: z7.string().optional(), reflection: z7.string().optional() }).default({})
 });
@@ -278,7 +280,8 @@ var PublicSprintSchema = z7.object({
   idea_guide: IdeaGuideSchema,
   phases: z7.array(SprintPhaseSchema).length(5),
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
-  sketch_timer: z7.number().int().min(0).max(30).default(8)
+  sketch_timer: z7.number().int().min(0).max(30).default(8),
+  decide_dots: z7.number().int().min(0).max(5).default(3)
 });
 var where = text(200);
 var Wheres = z7.record(z7.string().max(40), where).default({});
@@ -325,7 +328,11 @@ var SketchPayloadSchema = z7.object({
   strongest: z7.string().max(40).default(""),
   strongest_why: text(300).default("")
 });
+var IDEA_PARTS = ["idea", "answers", "evidence"];
+var DotSchema = z7.object({ idea: z7.string().max(40), part: z7.enum(IDEA_PARTS), note: text(120).default("") });
 var DecidePayloadSchema = z7.object({
+  /** Stand-out dots: up to the Kit's number, on parts of any idea. */
+  dots: z7.array(DotSchema).max(5).default([]),
   /** Criterion id → idea id. */
   votes: z7.record(z7.string().max(40), z7.string().max(40)).default({}),
   reasons: z7.record(z7.string().max(40), text(300)).default({}),

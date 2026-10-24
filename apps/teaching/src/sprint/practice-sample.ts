@@ -72,17 +72,21 @@ async function samplePayload(
         status = await client.parts(parts.length ? parts : [{ id: 'part1', text: 'Part 1', shows: '', criterion: '' }]);
       }
       const parts = status.parts ?? [];
-      const free = parts.find((p) => !p.claimed) ?? parts[0];
-      if (free && !parts.some((p) => p.mine)) status = await client.claimPart(free.id);
+      const me = status.members?.find((m) => m.me);
+      const free = parts.find((p) => !(p.assigned ?? []).length) ?? parts[0];
+      if (free && me && !parts.some((p) => p.mine)) status = await client.assign(free.id, [...(free.assigned ?? []), me.key].slice(-((status.members?.length ?? 0) > parts.length ? 2 : 1)));
     }
     const sets = status.gallery ?? [];
-    const idea = sets.flatMap((s) => s.ideas)[0]?.id ?? '';
+    const ideas = sets.flatMap((s) => s.ideas);
+    const idea = ideas[0]?.id ?? '';
+    const dots = ideas.flatMap((i) => (['idea', 'answers', 'evidence'] as const).filter((p) => i[p]?.trim()).map((part) => ({ idea: i.id, part, note: '' }))).slice(0, status.dots ?? 0);
     return {
       payload: {
         votes: idea ? Object.fromEntries(criteria.map((c) => [c, idea])) : {},
         reasons: Object.fromEntries(criteria.map((c) => [c, 'This idea meets the criterion most clearly.'])),
         opened: sets.map((s) => s.id),
-        stretch: ''
+        stretch: '',
+        dots
       },
       status
     };
