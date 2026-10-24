@@ -27,7 +27,7 @@ export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
     setup: 'Keep to 3 or 4. Write each one as something students can do, such as “Uses a quote from the poems as evidence”.'
   },
   reflection: {
-    what: 'The last piece of Test: two questions students answer at home after the pitch, marked with their own criterion.',
+    what: 'The last piece of Test: two questions students answer at home after the pitch. Marking it is optional; if you do, it uses its own criterion.',
     students: 'They answer both prompts once feedback on their pitch is back.',
     setup: 'Ask what the feedback showed their idea does well, and what they would change next and why.'
   },
