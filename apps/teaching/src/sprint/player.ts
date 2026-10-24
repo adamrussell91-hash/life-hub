@@ -8,6 +8,7 @@ import { phaseIntention, phaseMove, toolFrames } from './defaults';
 import { sprintParts } from './model';
 import { PHASE_LABELS, type PhasePayload, type PublicSprint, type SprintPhaseKey } from './schema';
 import { valueCheckFor, type FormContext, type PhaseForm } from './form-kit';
+import { fillPhaseSample } from './practice-sample';
 import type { SprintClient, SprintStatus } from './api';
 import './sprint.css';
 
@@ -22,29 +23,6 @@ export type SprintPlayerOptions = {
   practice?: { name: string };
 };
 
-/**
- * Practice runs only: fill every empty field in a form with sample text, and
- * pick the first choice where none is picked, through the same input and
- * change events a student's typing fires, so each form records it as usual.
- */
-export function fillSample(form: HTMLElement, name: string): void {
-  const fire = (node: HTMLElement, type: string) => node.dispatchEvent(new Event(type, { bubbles: true }));
-  for (const f of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('textarea, input[type="text"], input:not([type])')) {
-    if (f.disabled || f.readOnly || f.value.trim()) continue;
-    const label = (f.id && form.querySelector(`label[for="${f.id}"]`)?.textContent) || f.getAttribute('aria-label') || f.placeholder || 'answer';
-    f.value = `${name}'s sample ${label.trim().toLowerCase().replace(/[.:?]+$/, '')}.`.slice(0, f.maxLength > 0 ? f.maxLength : 400);
-    fire(f, 'input');
-  }
-  for (const sel of form.querySelectorAll<HTMLSelectElement>('select')) {
-    if (sel.disabled || sel.value) continue;
-    const first = [...sel.options].find((o) => o.value);
-    if (first) { sel.value = first.value; fire(sel, 'change'); }
-  }
-  const radios = new Map<string, HTMLInputElement[]>();
-  for (const r of form.querySelectorAll<HTMLInputElement>('input[type="radio"]')) if (!r.disabled) radios.set(r.name, [...(radios.get(r.name) ?? []), r]);
-  for (const group of radios.values()) if (!group.some((r) => r.checked)) { group[0]!.checked = true; fire(group[0]!, 'change'); }
-  for (const c of form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) if (!c.disabled && !c.checked) { c.checked = true; fire(c, 'change'); }
-}
 
 /** Each phase's form; Tasks 12–14 register theirs. */
 export const PHASE_FORMS: Partial<Record<SprintPhaseKey, (ctx: FormContext) => PhaseForm>> = {};
@@ -262,9 +240,17 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     form = make ? make(ctx) : { el: el('p', 'sprint-note', 'This phase opens soon.'), dispose() {} };
     const layout = el('div', 'sprint-layout');
     const work = el('section', 'sprint-form');
-    if (options.practice && ctx.editable) {
-      const formEl = form.el;
-      const fill = button('Fill with sample answers', 'secondary', () => fillSample(formEl, options.practice!.name));
+    if (options.practice && ctx.editable && client) {
+      const fill = button('Fill with sample answers', 'secondary', () => {
+        fill.disabled = true;
+        void fillPhaseSample(key, { status: s, sprint, client, name: options.practice!.name })
+          .then(({ payload, status: next }) => {
+            (drafts as Record<string, unknown>)[key] = payload;
+            formKey = '';
+            apply(next);
+          })
+          .catch(() => { fill.disabled = false; });
+      });
       fill.classList.add('sprint-practice-fill');
       work.append(fill);
     }
