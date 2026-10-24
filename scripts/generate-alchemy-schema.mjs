@@ -60,3 +60,9 @@ await build({
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],
   banner: {js:'// Generated from apps/teaching/src/sprint/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
+await build({
+  entryPoints: ['apps/teaching/src/sprint/rules.ts'],
+  outfile: 'netlify/functions/_shared/sprint-rules.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/sprint/rules.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
