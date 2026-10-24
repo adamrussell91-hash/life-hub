@@ -9,6 +9,7 @@ import { mountTutorialPlayer } from '@/tutorial/player';
 import { tutorialClient } from '@/tutorial/api';
 import { mountSprintPlayer } from '@/sprint/player';
 import { sprintClient } from '@/sprint/api';
+import '@/sprint/forms';
 import { lectureClient } from '@/lecture/api';
 import { isSidePath } from '@/lecture/scenes';
 import type { PublishedLesson } from '@/schemas/published-lesson';
