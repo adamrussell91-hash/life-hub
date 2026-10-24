@@ -36,16 +36,20 @@ export function sprintColumn(lesson: Lesson, kind: MarkKind, columnId: string): 
   };
 }
 
-/** Makes whichever of the two columns is missing; returns their ids and the lesson that records them. */
+/**
+ * Makes the reflection column if it is missing; returns the ids and the lesson
+ * that records them. The prototype isn't marked (the class judges it in Test),
+ * so its column is only kept when an earlier sprint already made one.
+ */
 export async function ensureColumns(lesson: Lesson, markbook: Pick<MarkbookApi, 'saveColumn'>): Promise<{ ids: { prototype: string; reflection: string }; lesson: Lesson }> {
   const s = lesson.sprint!;
   const ids = { prototype: s.columns.prototype ?? '', reflection: s.columns.reflection ?? '' };
-  for (const kind of ['prototype', 'reflection'] as const) {
-    if (ids[kind]) continue;
-    ids[kind] = kitId();
-    await markbook.saveColumn(s.class_id, sprintColumn(lesson, kind, ids[kind]));
+  if (!ids.reflection) {
+    ids.reflection = kitId();
+    await markbook.saveColumn(s.class_id, sprintColumn(lesson, 'reflection', ids.reflection));
   }
-  return { ids, lesson: { ...lesson, sprint: { ...s, columns: ids } } };
+  const columns = ids.prototype ? ids : { reflection: ids.reflection };
+  return { ids, lesson: { ...lesson, sprint: { ...s, columns } } };
 }
 
 /** The marking panel: each student's work, their self-check, a level per criterion and a comment. */

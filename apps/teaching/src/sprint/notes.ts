@@ -22,7 +22,7 @@ export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
     setup: 'Slides suit younger classes: one step at a time. Answer the group’s questions from its board on the progress map. If you switch off Vote, you choose each group’s problem yourself.'
   },
   criteria: {
-    what: 'One list used three times: students link each idea to a criterion, vote with the criteria in Decide, and you mark the prototype with them.',
+    what: 'One list used three times: students link each idea to a criterion, vote with the criteria in Decide, and the class judges the finished prototype with them in Test’s pitch feedback.',
     students: 'They see each criterion on their idea cards, on the vote, and in pitch feedback, judged Starting · Showing · Strong.',
     setup: 'Keep to 3 or 4. Write each one as something students can do, such as “Uses a quote from the poems as evidence”.'
   },
