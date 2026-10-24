@@ -128,7 +128,7 @@ var PartSchema = z.object({
   shows: text(200).default(""),
   criterion: z.string().max(40).default("")
 });
-var PartsSchema = z.array(PartSchema).max(SPRINT_LIMITS.parts);
+var PartsSchema = z.array(PartSchema).max(SPRINT_LIMITS.parts).refine((parts) => new Set(parts.map((p) => p.id)).size === parts.length, "Each part needs its own id.");
 var FeedbackEntrySchema = z.object({
   levels: z.record(z.string().max(40), LevelSchema).default({}),
   worked: text(300).default(""),

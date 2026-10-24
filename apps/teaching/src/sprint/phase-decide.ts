@@ -21,6 +21,7 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   const voting = !s.votes_closed;
   const bar = submitBar(ctx, 'decide', () => state, () => [
     ...(voting ? voteProblems(state, ctx.sprint.criteria, sets.map((x) => x.id)) : []),
+    ...(!s.chosen ? ['Your votes are saved. Submit once your group’s idea is chosen and you have claimed a part.'] : []),
     ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Claim a part of the prototype.'] : [])
   ]);
   let letter = 0;
@@ -145,7 +146,7 @@ function partsEditor(ctx: FormContext): HTMLElement {
     }));
   };
   paint();
-  box.append(list, button('+ Part', 'ghost', () => { parts.push({ id: `p${Date.now().toString(36)}`, text: 'New part', shows: '', criterion: '' }); paint(); }), button('Save parts', 'secondary', () => void save()), err);
+  box.append(list, button('+ Part', 'ghost', () => { parts.push({ id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, text: 'New part', shows: '', criterion: '' }); paint(); }), button('Save parts', 'secondary', () => void save()), err);
   return box;
 }
 

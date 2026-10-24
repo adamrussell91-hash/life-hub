@@ -99,7 +99,8 @@ export function submitBar<P extends SprintPhaseKey>(ctx: FormContext, phase: P, 
   const send = async (kind: 'save' | 'submit') => {
     if (busy || !ctx.editable) return;
     busy = true;
-    err.textContent = '';
+    // An autosave keeps a submit's message in view; a new submit clears it.
+    if (kind === 'submit') err.textContent = '';
     try {
       const next = kind === 'save' ? await ctx.client.save(phase, payload()) : await ctx.client.submit(phase, payload());
       note.textContent = kind === 'submit' ? 'In. You can change it until the deadline.' : 'Saved as a draft.';

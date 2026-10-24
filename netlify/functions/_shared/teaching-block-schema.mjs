@@ -320,7 +320,7 @@ var PartSchema = z7.object({
   shows: text(200).default(""),
   criterion: z7.string().max(40).default("")
 });
-var PartsSchema = z7.array(PartSchema).max(SPRINT_LIMITS.parts);
+var PartsSchema = z7.array(PartSchema).max(SPRINT_LIMITS.parts).refine((parts) => new Set(parts.map((p) => p.id)).size === parts.length, "Each part needs its own id.");
 var FeedbackEntrySchema = z7.object({
   levels: z7.record(z7.string().max(40), LevelSchema).default({}),
   worked: text(300).default(""),

@@ -185,7 +185,7 @@ export const PartSchema = z.object({
   criterion: z.string().max(40).default('')
 });
 export type Part = z.infer<typeof PartSchema>;
-export const PartsSchema = z.array(PartSchema).max(SPRINT_LIMITS.parts);
+export const PartsSchema = z.array(PartSchema).max(SPRINT_LIMITS.parts).refine((parts) => new Set(parts.map((p) => p.id)).size === parts.length, 'Each part needs its own id.');
 
 export const FeedbackEntrySchema = z.object({
   levels: z.record(z.string().max(40), LevelSchema).default({}),
