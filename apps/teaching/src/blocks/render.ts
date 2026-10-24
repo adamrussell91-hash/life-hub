@@ -1,4 +1,5 @@
 import { renderPeerFeedback } from '@/blocks/peer-feedback';
+import { appendWithQuizDecks } from '@/blocks/quiz-deck';
 import { mountCulturalWarningTracks } from '@/blocks/cultural-warning-tracks';
 import { renderClassroomToolsContent, renderCountdownContent, renderDividerContent } from '@/blocks/classroom-tools/render';
 import { renderQuestionDrop } from '@/blocks/question-drop';
@@ -892,9 +893,7 @@ export function renderSectionBlock(
 
   const body = document.createElement('div');
   body.className = 'block-section__body';
-  for (const child of block.content.blocks) {
-    body.append(renderBlock(child, mode, ctx));
-  }
+  appendWithQuizDecks(body, block.content.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
 
   section.append(title, body);
   return wrapBlock(section, block, mode);
@@ -917,9 +916,7 @@ export function renderColumnsBlock(
     const cell = document.createElement('div');
     cell.className = 'block-columns__col';
     cell.dataset.width = String(col.width);
-    for (const child of col.blocks) {
-      cell.append(renderBlock(child, mode, ctx));
-    }
+    appendWithQuizDecks(cell, col.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
     grid.append(cell);
   }
 
@@ -1190,9 +1187,7 @@ export function renderTabsBlock(
       panel.hidden = !active;
       panel.replaceChildren();
       if (active) {
-        for (const child of block.content.tabs[i]!.blocks) {
-          panel.append(renderBlock(child, mode, ctx));
-        }
+        appendWithQuizDecks(panel, block.content.tabs[i]!.blocks, (child) => renderBlock(child, mode, ctx), mode === 'teacher');
       }
     });
   }
