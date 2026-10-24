@@ -487,6 +487,75 @@
   cursor: pointer;
 }
 
+/* Thinking skills: one row of ticks across the whole card, under the columns. */
+.dots-plan__col--chips {
+  grid-column: 1 / -1;
+}
+
+.dots-plan__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dots-plan__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+.dots-plan__chip .dots-plan__tick {
+  width: 16px;
+  height: 16px;
+}
+
+.dots-plan__chip.dots-plan__item--done > .dots-plan__top .dots-plan__name {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+
+.dots-plan__info {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dots-plan__info:hover,
+.dots-plan__info:focus-visible,
+.dots-plan__info[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--cov-slate) 10%, transparent);
+  color: var(--ink);
+}
+
+.dots-plan__chip-note {
+  max-width: 64ch;
+  margin: 8px 0 0;
+  font-size: var(--text-xs, 0.75rem);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dots-plan__chip-note strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
 /* Text under a ticked item lines up with its name, past the box. */
 .dots-plan__item > .dots-plan__text {
   padding-left: 26px;
