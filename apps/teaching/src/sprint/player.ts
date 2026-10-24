@@ -1,7 +1,7 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import type { Block } from '@/schemas/block';
 import { renderBlock } from '@/blocks/render';
-import { el } from '@/quiz/dom';
+import { button, el } from '@/quiz/dom';
 import { formatDueDay, formatDueTime } from '@/blocks/classroom-tools/logic';
 import { phaseDue } from './rules';
 import { phaseIntention, phaseMove, toolFrames } from './defaults';
@@ -16,7 +16,35 @@ export type SprintPlayerOptions = {
   classId?: string;
   client: SprintClient | null;
   renderHero: (host: HTMLElement) => void;
+  /** The practice clock in a teacher's practice run; the real time otherwise. */
+  now?: () => number;
+  /** A practice run: each form gets Fill with sample answers, signed with this name. */
+  practice?: { name: string };
 };
+
+/**
+ * Practice runs only: fill every empty field in a form with sample text, and
+ * pick the first choice where none is picked, through the same input and
+ * change events a student's typing fires, so each form records it as usual.
+ */
+export function fillSample(form: HTMLElement, name: string): void {
+  const fire = (node: HTMLElement, type: string) => node.dispatchEvent(new Event(type, { bubbles: true }));
+  for (const f of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('textarea, input[type="text"], input:not([type])')) {
+    if (f.disabled || f.readOnly || f.value.trim()) continue;
+    const label = (f.id && form.querySelector(`label[for="${f.id}"]`)?.textContent) || f.getAttribute('aria-label') || f.placeholder || 'answer';
+    f.value = `${name}'s sample ${label.trim().toLowerCase().replace(/[.:?]+$/, '')}.`.slice(0, f.maxLength > 0 ? f.maxLength : 400);
+    fire(f, 'input');
+  }
+  for (const sel of form.querySelectorAll<HTMLSelectElement>('select')) {
+    if (sel.disabled || sel.value) continue;
+    const first = [...sel.options].find((o) => o.value);
+    if (first) { sel.value = first.value; fire(sel, 'change'); }
+  }
+  const radios = new Map<string, HTMLInputElement[]>();
+  for (const r of form.querySelectorAll<HTMLInputElement>('input[type="radio"]')) if (!r.disabled) radios.set(r.name, [...(radios.get(r.name) ?? []), r]);
+  for (const group of radios.values()) if (!group.some((r) => r.checked)) { group[0]!.checked = true; fire(group[0]!, 'change'); }
+  for (const c of form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) if (!c.disabled && !c.checked) { c.checked = true; fire(c, 'change'); }
+}
 
 /** Each phase's form; Tasks 12–14 register theirs. */
 export const PHASE_FORMS: Partial<Record<SprintPhaseKey, (ctx: FormContext) => PhaseForm>> = {};
@@ -42,6 +70,7 @@ export function dueText(due_date: string, due_time: string, now: number): string
 
 export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOptions): { dispose(): void } {
   const { lesson, client } = options;
+  const now = options.now ?? (() => Date.now());
   const sprint = lesson.sprint as PublicSprint;
   const blocks = lesson.blocks as Block[];
   const parts = sprintParts(blocks);
@@ -104,7 +133,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     const cd = el('div', 'sprint-countdown');
     const left = el('div');
     left.append(el('div', 'sprint-countdown__title', `${PHASE_LABELS[key]} closes`), el('div', 'sprint-countdown__sub', test ? `Pitch day: ${formatDueDay(test.due_date)}` : ''));
-    cd.append(left, el('div', 'sprint-countdown__fig', row ? dueText(row.due_date, row.due_time, Date.now()) : ''));
+    cd.append(left, el('div', 'sprint-countdown__fig', row ? dueText(row.due_date, row.due_time, now()) : ''));
     const group = el('div', 'sprint-group', `Group ${s.group?.name ?? ''} · ${(s.group?.mates ?? []).join(' · ')} · ${row?.count_in ?? 0} of ${s.group?.size ?? 0} in`);
     const intent = el('p', 'sprint-intent', phaseIntention(phaseMove(blocks, key)));
     const steps = el('nav', 'sprint-steps');
@@ -167,7 +196,7 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     box.append(el('div', 'sprint-lock__icon', '✓'), el('h2', '', 'Your class work is in'), el('p', '', `The sprint opens again at ${until.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}.`));
     const clock = el('div', 'sprint-lock__clock');
     const tick = () => {
-      const ms = Math.max(0, until.getTime() - Date.now());
+      const ms = Math.max(0, until.getTime() - now());
       const h = Math.floor(ms / 3_600_000);
       const m = Math.floor((ms % 3_600_000) / 60_000);
       const sec = Math.floor((ms % 60_000) / 1000);
@@ -233,6 +262,12 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     form = make ? make(ctx) : { el: el('p', 'sprint-note', 'This phase opens soon.'), dispose() {} };
     const layout = el('div', 'sprint-layout');
     const work = el('section', 'sprint-form');
+    if (options.practice && ctx.editable) {
+      const formEl = form.el;
+      const fill = button('Fill with sample answers', 'secondary', () => fillSample(formEl, options.practice!.name));
+      fill.classList.add('sprint-practice-fill');
+      work.append(fill);
+    }
     work.append(form.el);
     layout.append(work, guidesPanel(key));
     body.replaceChildren(layout);

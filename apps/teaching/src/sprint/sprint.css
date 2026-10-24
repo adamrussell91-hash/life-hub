@@ -197,3 +197,27 @@ button.pgantt__bar { cursor: pointer; }
   .pgantt__problem, .pgantt__note { grid-column: 1; margin: 0; }
   .pgantt__row + .pgantt__row .pgantt__name { border-top: 1px solid var(--line); padding-top: 8px; }
 }
+
+/* Practice run: a full-page layer over the lesson editor. */
+body.spractice-open { overflow: hidden; }
+.spractice { position: fixed; inset: 0; z-index: 900; overflow: auto; background: var(--bg, #f7f4ee); padding: 0 16px 40px; display: grid; gap: 14px; align-content: start; }
+.spractice__bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 0; background: var(--bg, #f7f4ee); border-bottom: 1px solid var(--line); }
+.spractice__title { font-size: 16px; }
+.spractice__time { font-variant-numeric: tabular-nums; color: var(--muted); margin-right: auto; }
+.spractice__done { color: var(--muted); font-size: 13px; }
+.spractice__gantt, .spractice__card { padding: 16px; border-radius: var(--radius-lg); background: rgba(255,255,255,.75); border: 1px solid var(--line); }
+.spractice__card { display: grid; gap: 6px; justify-items: start; background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.spractice__card p { margin: 0; }
+.spractice__tabs { display: none; }
+.spractice__pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.spractice__student { min-width: 0; padding: 12px; border-radius: var(--radius-lg); border: 1px dashed var(--line); }
+.spractice__who { margin: 0 0 6px; font-size: 18px; }
+.spractice .sprint-layout { grid-template-columns: minmax(0, 1fr); }
+.spractice .sprint-guides { position: static; }
+.sprint-practice-fill { margin-bottom: 10px; }
+@media (max-width: 760px) {
+  .spractice__tabs { display: inline-flex; justify-self: start; }
+  .spractice__pair { grid-template-columns: minmax(0, 1fr); }
+  .spractice__pair[data-shown="s1"] .spractice__student[data-as="s2"], .spractice__pair[data-shown="s2"] .spractice__student[data-as="s1"] { display: none; }
+}
+.sprint-edit-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
