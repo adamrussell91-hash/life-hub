@@ -1,6 +1,9 @@
 // apps/teaching/tests/unit/sprint-defaults.test.ts
 import { describe, it, expect } from 'vitest';
-import { newSprintSettings, newSprintBlocks, PHASE_MOVES, phaseIntention, phaseMove, seedSprint, toolFrames } from '@/sprint/defaults';
+import { newSprintSettings, newSprintBlocks, phaseIntention, phaseMove, seedSprint, toolFrames } from '@/sprint/defaults';
+import { createBlock } from '@/blocks/create-block';
+import { moveContent } from '@/toolkit/content';
+import type { Block } from '@/schemas/block';
 import { SprintSettingsSchema } from '@/sprint/schema';
 import { BlockSchema } from '@/schemas/block';
 
@@ -18,25 +21,24 @@ describe('sprint defaults', () => {
     expect(s.reflection_prompts).toHaveLength(2);
   });
 
-  it('seeds one section per phase, each starting with its Thinking move', () => {
+  it('seeds one empty section per phase, for the teacher to build', () => {
     const blocks = newSprintBlocks(id).map((b) => BlockSchema.parse(b));
     const phases = blocks.filter((b) => b.block_type === 'section' && b.content.sprint_phase).map((b) => b.block_type === 'section' && b.content.sprint_phase);
     expect(phases).toEqual(['understand', 'sketch', 'decide', 'prototype', 'test']);
-    const sketch = blocks.find((b) => b.block_type === 'section' && b.content.sprint_phase === 'sketch');
-    const first = sketch?.block_type === 'section' ? sketch.content.blocks[0] : undefined;
-    expect(first?.block_type).toBe('thinking_move');
-    expect(first?.block_type === 'thinking_move' && first.content.value).toBe('value:breadth');
-    const understand = blocks.find((b) => b.block_type === 'section' && b.content.sprint_phase === 'understand');
-    expect(understand?.block_type === 'section' && understand.content.blocks.map((b) => b.block_type)).toEqual(['thinking_move', 'question_quadrant']);
+    expect(blocks.every((b) => b.block_type === 'section' && b.content.blocks.length === 0)).toBe(true);
   });
 
-  it('reads the move, its intention and the tool frames from a phase section', () => {
-    const blocks = newSprintBlocks(id);
-    const move = phaseMove(blocks, 'decide');
-    expect(move).toMatchObject({ skill: PHASE_MOVES.decide.skill, value: 'value:relevance' });
+  it('reads a move the teacher added, its intention and the tool frames, and nothing when there is none', () => {
+    const withMove = (key: 'decide' | 'sketch', skill: string, tools: string[], value: string): Block[] =>
+      newSprintBlocks(id).map((b) => (b.block_type === 'section' && b.content.sprint_phase === key
+        ? { ...b, content: { ...b.content, blocks: [{ ...createBlock('thinking_move', 'm1'), content: moveContent(skill, tools, value, 'm1') } as Block] } }
+        : b));
+    const move = phaseMove(withMove('decide', 'skill:apply', ['tool:criteria', 'tool:reasons'], 'value:relevance'), 'decide');
+    expect(move).toMatchObject({ skill: 'skill:apply', value: 'value:relevance' });
     expect(phaseIntention(move)).toMatch(/^We will think by applying/);
-    expect(toolFrames(phaseMove(blocks, 'sketch'))).toEqual(['What if ___?', 'For example, ___.']);
-    expect(phaseMove([], 'decide')).toBeNull();
+    expect(toolFrames(phaseMove(withMove('sketch', 'skill:apply', ['tool:suggestion', 'tool:example'], 'value:breadth'), 'sketch'))).toEqual(['What if ___?', 'For example, ___.']);
+    expect(phaseMove(newSprintBlocks(id), 'decide')).toBeNull();
+    expect(phaseIntention(null)).toBe('');
   });
 
   it('seeds the Kit once and never adds a second set of phase sections', () => {
