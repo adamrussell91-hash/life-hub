@@ -28,11 +28,16 @@ export function understandProblems(p: PhasePayload['understand'], steps: Record<
 }
 
 export function sketchProblems(
-  p: PhasePayload['sketch'],
+  p: Pick<PhasePayload['sketch'], 'cards' | 'strongest' | 'strongest_why'> & Partial<Pick<PhasePayload['sketch'], 'inspiration' | 'rapid'>>,
   opts: { ideas: number; requirements: readonly SprintRequirement[] }
 ): string[] {
   const out: string[] = [];
   const reqs = opts.requirements.filter((r) => r.phases.includes('sketch'));
+  if (p.inspiration && !p.inspiration.some((i) => i.from.trim() && i.borrow.trim())) out.push('Inspiration: note one example and what you’d borrow from it.');
+  if (p.rapid) {
+    const n = p.rapid.filter((r) => r.trim()).length;
+    if (n < opts.ideas) out.push(`Rapid ideas: write at least ${opts.ideas}. You have ${n} so far.`);
+  }
   p.cards.forEach((c, i) => {
     const name = `Idea ${i + 1}`;
     if (!c.title.trim()) out.push(`${name}: give it a title.`);
@@ -41,11 +46,11 @@ export function sketchProblems(
     for (const r of reqs) if (!c.requirements[r.id]?.trim()) out.push(`${name}: say where it meets "${r.text}".`);
     if (!fullSentence(c.value_answer)) out.push(`${name}: answer the check question in a full sentence.`);
   });
-  if (p.cards.length < opts.ideas) out.push(`Write ${opts.ideas} ideas. You have ${p.cards.length} so far.`);
+  if (p.cards.length < opts.ideas) out.push(p.rapid ? `Pick: star your best ${opts.ideas} ideas. You have ${p.cards.length} starred.` : `Write ${opts.ideas} ideas. You have ${p.cards.length} so far.`);
   const titles = new Set(p.cards.map((c) => c.title.trim().toLowerCase()));
   const ideasText = new Set(p.cards.map((c) => c.idea.trim().toLowerCase()));
   if (titles.size < p.cards.length || ideasText.size < p.cards.length) out.push('Give each idea its own title and its own idea.');
-  if (!p.strongest || !fullSentence(p.strongest_why)) out.push('Pick your strongest idea and say why.');
+  if (p.cards.length > 1 && (!p.strongest || !fullSentence(p.strongest_why))) out.push('Pick your strongest idea and say why.');
   return out;
 }
 

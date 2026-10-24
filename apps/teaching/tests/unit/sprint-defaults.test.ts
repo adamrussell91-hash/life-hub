@@ -11,11 +11,12 @@ let n = 0;
 const id = () => `b${++n}`;
 
 describe('sprint defaults', () => {
-  it('makes valid settings with 3 ideas, the checklist and reflection defaults', () => {
+  it('makes valid settings with 2 ideas put forward, an 8 minute timer, the checklist and reflection defaults', () => {
     const s = SprintSettingsSchema.parse(newSprintSettings('class1'));
     expect(s.phases.map((p) => p.where)).toEqual(['class', 'home', 'class', 'home', 'class']);
-    expect(s.phases[0]!.ideas).toBe(3);
-    expect(s.phases[1]!.ideas).toBe(3);
+    expect(s.phases[0]!.ideas).toBe(2);
+    expect(s.phases[1]!.ideas).toBe(2);
+    expect(s.sketch_timer).toBe(8);
     expect(s.idea_guide.checklist).toHaveLength(5);
     expect(s.reflection_criteria[0]!.text).toBe('Explains what the test showed and what to change next');
     expect(s.reflection_prompts).toHaveLength(2);

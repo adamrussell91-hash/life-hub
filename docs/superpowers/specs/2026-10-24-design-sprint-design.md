@@ -108,6 +108,17 @@ steps are shared writes any member makes. Sketch and Decide open with the
 group brief (problem, audience, expert answers). Understand is recorded as
 in, late or not in, never marked.
 
+### 1b. Sketch (Adam's call, 24 Oct)
+
+Alone, at home. Students go wide, then narrow: the group brief at the top,
+then **Inspiration** (up to 3 examples and what they'd borrow), **Rapid
+ideas** (one line each; the Kit's timer, 8 minutes by default, starts when
+the student presses Start and locks the box when it runs out; 0 means no
+timer), **Pick** (star their best; the Kit's "each puts forward" number, 2
+by default), then **Develop and justify** each starred idea on a card.
+Only the cards go to the group's Decide gallery, without names. The
+inspiration and rapid ideas stay private.
+
 ### Phase content
 
 Each phase has a short teacher instruction and may hold normal blocks above

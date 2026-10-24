@@ -33,7 +33,8 @@ export function prepareSprintPublish(draft, studentBlocks) {
       requirements: s.requirements,
       idea_guide: s.idea_guide,
       phases: s.phases,
-      understand: UnderstandSettingsSchema.parse(s.understand ?? {})
+      understand: UnderstandSettingsSchema.parse(s.understand ?? {}),
+      sketch_timer: Number.isInteger(s.sketch_timer) ? s.sketch_timer : 8
     }
   };
   const config = {

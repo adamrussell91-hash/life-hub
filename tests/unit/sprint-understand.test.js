@@ -96,3 +96,9 @@ test('publishing carries the Understand layout to students and the steps to the 
   assert.equal(snapshot.sprint.understand.steps.spot, true);
   assert.equal(config.understand.dig, false);
 });
+
+test('publishing carries the Sketch timer to students', () => {
+  const base = { ...DRAFT().sprint, support: 'standard', reflection_criteria: [], reflection_prompts: [], requirements: [], idea_guide: { checklist: ['x'], model: { topic: 't', text: 'm', notes: [] } } };
+  assert.equal(prepareSprintPublish({ ...DRAFT(), sprint: { ...base, sketch_timer: 5 } }, []).snapshot.sprint.sketch_timer, 5);
+  assert.equal(prepareSprintPublish({ ...DRAFT(), sprint: base }, []).snapshot.sprint.sketch_timer, 8);
+});
