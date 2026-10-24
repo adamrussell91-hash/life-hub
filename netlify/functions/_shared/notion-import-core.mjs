@@ -1252,7 +1252,7 @@ var PartSchema = z8.object({
   shows: text(200).default(""),
   criterion: z8.string().max(40).default("")
 });
-var PartsSchema = z8.array(PartSchema).max(SPRINT_LIMITS.parts);
+var PartsSchema = z8.array(PartSchema).max(SPRINT_LIMITS.parts).refine((parts) => new Set(parts.map((p) => p.id)).size === parts.length, "Each part needs its own id.");
 var FeedbackEntrySchema = z8.object({
   levels: z8.record(z8.string().max(40), LevelSchema).default({}),
   worked: text(300).default(""),
@@ -3580,6 +3580,55 @@ function tutorialIssues(lesson) {
   return issues;
 }
 
+// apps/teaching/src/sprint/rules.ts
+var SYDNEY = new Intl.DateTimeFormat("en-AU", {
+  timeZone: "Australia/Sydney",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit"
+});
+function sydneyOffset(epoch) {
+  const parts = SYDNEY.formatToParts(new Date(epoch));
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value);
+  return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute")) - Math.floor(epoch / 6e4) * 6e4;
+}
+function sydneyEpoch(date, time) {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!d) return null;
+  const t = /^(\d{2}):(\d{2})$/.exec(time) ?? ["", "23", "59"];
+  const wall = Date.UTC(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(t[1]), Number(t[2]));
+  let epoch = wall - sydneyOffset(wall);
+  epoch = wall - sydneyOffset(epoch);
+  return epoch;
+}
+function phaseDue(phase) {
+  return sydneyEpoch(phase.due_date, phase.due_time || "23:59");
+}
+
+// apps/teaching/src/sprint/model.ts
+function sprintIssues(lesson) {
+  const s = lesson.sprint;
+  if (!s) return ["Set up the sprint\u2019s Kit before publishing."];
+  const out = [];
+  if (s.criteria.length < 2) out.push("Add at least 2 criteria in the Kit.");
+  const dues = s.phases.map((p) => phaseDue(p));
+  if (dues.some((d) => d === null)) out.push("Set a deadline for every phase.");
+  else if (dues.some((d, i) => i > 0 && d <= dues[i - 1])) out.push("Each phase\u2019s deadline must come after the one before it.");
+  if (!s.groups.length || s.groups.some((g) => !g.students.length)) out.push("Put every student in a group.");
+  const seen = /* @__PURE__ */ new Set();
+  for (const g of s.groups) for (const st of g.students) {
+    if (seen.has(st)) {
+      out.push("A student is in two groups. Keep each student in one group.");
+      break;
+    }
+    seen.add(st);
+  }
+  return out;
+}
+
 // apps/teaching/src/schemas/cover.ts
 import { z as z12 } from "zod";
 var CoverSchema = z12.object({
@@ -4361,6 +4410,11 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
       ctx.addIssue({ code: z14.ZodIssueCode.custom, message, path: ["blocks"] });
+    }
+  }
+  if (lesson.pedagogical_mode === "design_sprint") {
+    for (const message of sprintIssues(lesson)) {
+      ctx.addIssue({ code: z14.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {

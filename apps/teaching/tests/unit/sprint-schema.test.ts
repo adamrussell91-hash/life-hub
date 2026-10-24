@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { BlockSchema } from '@/schemas/block';
 import { LessonSchema } from '@/schemas/lesson';
 import { PublishedLessonSchema } from '@/schemas/published-lesson';
-import { SketchPayloadSchema, SprintSettingsSchema, SPRINT_PHASES } from '@/sprint/schema';
+import { PartsSchema, SketchPayloadSchema, SprintSettingsSchema, SPRINT_PHASES } from '@/sprint/schema';
 
 const phase = (key: string, where: 'class' | 'home') => ({ key, where, due_date: '2026-10-28', due_time: '15:00' });
 export const settings = () => ({
@@ -63,5 +63,11 @@ describe('sprint schema', () => {
     const card = { id: 'k1', title: '  Ash  ', idea: 'x', answers: 'y', evidence: 'z', criteria: {}, requirements: {}, value_answer: '' };
     expect(SketchPayloadSchema.parse({ cards: [card], strongest: 'k1', strongest_why: '' }).cards[0]!.title).toBe('Ash');
     expect(() => SketchPayloadSchema.parse({ cards: Array.from({ length: 6 }, (_, i) => ({ ...card, id: `k${i}` })), strongest: '', strongest_why: '' })).toThrow();
+  });
+
+  it('refuses two parts with the same id', () => {
+    const part = { id: 'p1', text: 'Panel', shows: '', criterion: '' };
+    expect(() => PartsSchema.parse([part, { ...part, text: 'Map' }])).toThrow(/own id/);
+    expect(PartsSchema.parse([part, { ...part, id: 'p2' }])).toHaveLength(2);
   });
 });

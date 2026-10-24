@@ -39,7 +39,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
         const r = el('div', `kit-row${b.chosen === i.id ? ' sboard__chosen' : ''}`);
         const heat = el('span', 'sprint-heat');
         for (const c of crit()) { const cell = el('i'); cell.dataset.level = String(b.heat[i.id]?.[c.id] ?? 0); cell.title = c.text; heat.append(cell); }
-        r.append(el('span', '', `${i.title}${i.strongest ? ' (their strongest)' : ''} · ${b.totals[i.id] ?? 0} votes`), heat);
+        r.append(el('span', '', `${i.title}${i.strongest ? ' (their strongest)' : ''} · ${b.totals[i.id] ?? 0} ${(b.totals[i.id] ?? 0) === 1 ? 'vote' : 'votes'}`), heat);
         if (typeof i.index === 'number') r.append(button('Spotlight', 'ghost', () => void act(o.api.spotlight(set.student_id, 'sketch', `cards.${i.index}.idea`))));
         if (b.awaiting?.kind === 'idea' || (!b.chosen && b.awaiting === null)) r.append(button(b.awaiting?.kind === 'idea' ? 'Choose this idea' : 'Pick this idea', 'secondary', () => void act(o.api.confirm(b.group.id, 'idea', i.id))));
         g.append(r);

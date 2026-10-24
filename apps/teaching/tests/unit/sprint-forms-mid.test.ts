@@ -35,6 +35,14 @@ describe('decide form', () => {
     expect(f.el.textContent).not.toMatch(/Ann|AB/);
   });
 
+  it('says votes are saved while the group’s idea is still being chosen', () => {
+    const c = ctx(base({ opened: undefined } as never));
+    const f = mountDecide(c);
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Your votes are saved.');
+    expect(c.client.submit).not.toHaveBeenCalled();
+  });
+
   it('after voting shows the chosen idea, the heat and the parts editor', () => {
     const f = mountDecide(ctx(base({ votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'What if Baker?' }, heat: { i1: { c1: 1, c2: 0 }, i2: { c1: 0, c2: 0 }, i3: { c1: 3, c2: 3 } }, parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1', claimed: 0, mine: false }] })));
     expect(f.el.querySelector('.sprint-chosen')?.textContent).toContain('Baker');
