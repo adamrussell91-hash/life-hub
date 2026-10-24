@@ -1,0 +1,70 @@
+/* Design Sprint: student player, teacher map, board, marking and pitch view. */
+.sprint { display: grid; gap: var(--space-4, 16px); }
+.sprint-spotlight { padding: 12px 16px; border-radius: var(--radius-md); background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.sprint-spotlight p { margin: 4px 0 0; }
+.sprint-countdown { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--navy), var(--navy-2, #244f7c)); color: #fff; }
+.sprint-countdown__title { font-weight: 650; font-size: 18px; }
+.sprint-countdown__sub { font-size: 12px; opacity: .75; }
+.sprint-countdown__fig { font-weight: 650; text-align: right; }
+.sprint-group { color: var(--muted); font-size: 13px; margin: 8px 0; }
+.sprint-steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.sprint-step { font: inherit; text-align: left; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: rgba(255,255,255,.6); color: var(--ink); cursor: pointer; }
+.sprint-step b { display: block; font-size: 14px; }
+.sprint-step span { font-size: 12px; }
+.sprint-step--now { background: #fff; border-color: var(--navy); box-shadow: 0 0 0 2px rgba(23,55,94,.12); }
+.sprint-step--done { background: var(--pastel-sage); color: var(--pastel-sage-ink); border-color: transparent; }
+.sprint-step--later, .sprint-step:disabled { color: var(--muted); cursor: default; }
+.sprint-intent { margin: 12px 0 0; padding: 12px 16px; border-radius: var(--radius-md); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.sprint-brief { margin-top: 12px; }
+.sprint-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.sprint-form { padding: 18px 20px; border-radius: var(--radius-lg); background: rgba(255,255,255,.75); border: 1px solid var(--line); }
+.sprint-guides { padding: 16px; border-radius: var(--radius-lg); background: rgba(255,255,255,.75); border: 1px solid var(--line); position: sticky; top: 16px; }
+.sprint-guides > summary { font-weight: 650; cursor: pointer; }
+.sprint-guide { border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 12px; margin-top: 10px; font-size: 13px; }
+.sprint-guide__kind { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--pastel-lilac-ink); }
+.sprint-guide__note { color: var(--muted); }
+.sprint-field { margin-bottom: 14px; }
+.sprint-field__label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.sprint-field__starter { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.sprint-field__input { width: 100%; }
+.sprint-frame { font-size: 12px; padding: 2px 8px; }
+.sprint-value { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.sprint-value p { margin: 4px 0 8px; }
+.sprint-value input { width: 100%; }
+.sprint-submit { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px; }
+.sprint-checks { margin: 0 0 10px; padding-left: 18px; color: var(--pastel-peach-ink); }
+.sprint-submit__note { color: var(--muted); font-size: 13px; }
+.sprint-submit__err, .sprint-claim__err { color: var(--danger, #a33); font-size: 13px; }
+.sprint-lock { padding: 26px 22px; text-align: center; border-radius: var(--radius-lg); background: rgba(255,255,255,.8); border: 1px solid var(--line); }
+.sprint-lock__icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 12px; background: var(--pastel-sage); color: var(--pastel-sage-ink); font-size: 26px; }
+.sprint-lock__clock { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--navy); margin-top: 12px; }
+.sprint-note { color: var(--muted); }
+.sprint-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 16px; }
+.sprint-tab[aria-selected="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.sprint-row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 6px 0; font-size: 14px; }
+.sprint-row input[type="text"], .sprint-row .qz-input { width: 100%; margin-top: 4px; }
+.sprint-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.sprint-idea { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; display: grid; gap: 8px; }
+.sprint-idea__tag { font-size: 12px; font-weight: 700; color: var(--muted); }
+.sprint-chip { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper, #fbf8f2); cursor: pointer; }
+.sprint-chip[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.sprint-heat { display: flex; gap: 3px; }
+.sprint-heat i { width: 18px; height: 18px; border-radius: 5px; background: var(--pastel-blue); }
+.sprint-heat i[data-level="1"] { background: #c3d7ef; }
+.sprint-heat i[data-level="2"] { background: #7fa4d3; }
+.sprint-heat i[data-level="3"] { background: var(--navy); }
+.sprint-levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sprint-level[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.sprint-card { position: fixed; inset: auto 16px 16px auto; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; z-index: 40; padding: 16px; border-radius: var(--radius-lg); background: #fff; box-shadow: 0 18px 48px rgba(39,55,74,.2); }
+@media (max-width: 900px) {
+  .sprint-layout { grid-template-columns: 1fr; }
+  .sprint-guides { position: static; order: -1; }
+  .sprint-gallery { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .sprint-countdown { flex-direction: column; align-items: flex-start; }
+  .sprint-countdown__fig { text-align: left; }
+  .sprint-step { padding: 6px 4px; text-align: center; }
+  .sprint-step b { font-size: 11px; }
+  .sprint-step span { display: none; }
+}
