@@ -252,6 +252,64 @@
 .ps-composer__now[data-q='2']::before { border-radius: 0 0 1rem 1rem; background: var(--ps-red); }
 .ps-composer__now[data-q='-1']::before { display: none; }
 
+/* A phone coach owns its input floor. Clare remains available in the bottom
+   navigation; a second floating launcher must not cover the coach's Send. */
+@media (max-width: 720px) {
+  body:has(.ps-coach) .floating-chat-button { display: none; }
+
+  /* hub.css reserves a second launcher-sized floor on ordinary pages. */
+  .hub-canvas:has(.ps-coach) { padding-bottom: 0; }
+
+  .ps-coach {
+    min-height: calc(100dvh - 5.5rem - env(safe-area-inset-bottom, 0px) - var(--space-8));
+  }
+
+  .ps-scope .ps-composer {
+    position: sticky;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    z-index: 2;
+    flex: 0 0 auto;
+    margin-top: auto;
+    padding-block: var(--space-2);
+    background: var(--paper);
+  }
+
+  .ps-composer .btn { min-height: 2.75rem; }
+  .ps-composer .hub-ai-bar__input { font-size: max(16px, var(--text-base)); }
+
+  /* Reuse the shared visual-viewport contract while typing. Only the thread
+     scrolls; the composer stays above the keyboard, without the nav gap. */
+  html.vv-keyboard-open .ps-coach {
+    position: fixed;
+    z-index: 40;
+    top: var(--vv-offset-top, 0px);
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+    height: var(--vv-height, 100dvh);
+    min-height: 0;
+    padding: var(--space-3) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom, 0px));
+    background: var(--paper);
+  }
+
+  html.vv-keyboard-open .ps-scope .ps-coach__messages {
+    flex: 1 1 0;
+    height: auto;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  html.vv-keyboard-open .ps-coach > :is(.ps-coach__extras, .ps-taskcards) {
+    flex: 0 1 auto;
+    max-height: 30%;
+    overflow-y: auto;
+  }
+
+  html.vv-keyboard-open .ps-scope .ps-composer { position: static; }
+  html.vv-keyboard-open:has(.ps-coach) .hub-mobile-nav { display: none; }
+}
+
 @media (max-width: 1100px) { .ps-skills { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
   .ps-hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
