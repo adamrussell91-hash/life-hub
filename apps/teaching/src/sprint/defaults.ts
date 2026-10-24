@@ -2,7 +2,7 @@ import type { Block } from '@/schemas/block';
 import { moveSentence } from '@/toolkit/content';
 import { libraryTool } from '@/toolkit/library';
 import { createBlock } from '@/blocks/create-block';
-import { SPRINT_PHASES, PHASE_LABELS, type SprintPhaseKey, type SprintSettings } from './schema';
+import { SPRINT_PHASES, PHASE_LABELS, defaultUnderstand, type SprintPhaseKey, type SprintSettings } from './schema';
 
 /**
  * The Kit a new sprint starts with, so the teacher edits rather than builds.
@@ -23,7 +23,6 @@ export const DEFAULT_MODEL = {
   notes: ['Answers the question: makes a huge thing feel human', 'Grabs the visitor: one object, one story', 'Names its source: the maker’s stamp']
 };
 
-export const HMW_FRAME = { lead: 'How might we', parts: ['[action]', 'for [who]', 'so that [result]?'] };
 export const DEFAULT_REFLECTION_CRITERION = 'Explains what the test showed and what to change next';
 export const DEFAULT_REFLECTION_PROMPTS = ['What did the feedback show your idea does well?', 'What would you change next, and why?'];
 
@@ -54,6 +53,7 @@ export function newSprintSettings(classId: string): SprintSettings {
       ...(key === 'understand' || key === 'sketch' ? { ideas: 3 } : {})
     })),
     groups: [],
+    understand: defaultUnderstand(),
     columns: {}
   };
 }

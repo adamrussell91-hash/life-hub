@@ -15,8 +15,9 @@ const DOT = { none: 'dot--none', draft: 'dot--started', in: 'dot--in', late: 'do
 
 function badge(g: MapGroup, key: SprintPhaseKey): string {
   const a = g.awaiting;
+  if (key === 'understand' && g.asked) return `${g.asked} ${g.asked === 1 ? 'question' : 'questions'} to answer`;
   if (!a) return '';
-  if (a.kind === 'question' && key === 'understand') return a.empty ? 'No questions in' : a.tie ? 'Tie: choose question' : 'Choose question';
+  if (a.kind === 'question' && key === 'understand') return a.empty ? 'No problems in' : a.tie ? 'Tie: choose problem' : 'Choose problem';
   if (a.kind === 'idea' && key === 'decide') return a.empty ? 'No ideas in' : a.tie ? 'Tie: choose idea' : 'Choose idea';
   return '';
 }

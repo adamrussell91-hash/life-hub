@@ -13,7 +13,7 @@ const fill = (key: Parameters<typeof fillPhaseSample>[0]) => fillPhaseSample(key
 
 describe('fillPhaseSample', () => {
   it('passes every phase’s checks', async () => {
-    expect(understandProblems(await fill('understand'), 3)).toEqual([]);
+    expect(understandProblems(await fill('understand'), settings.understand.steps, 1)).toEqual([]);
     expect(sketchProblems(await fill('sketch'), { ideas: 3, requirements: sprint.requirements })).toEqual([]);
     expect(voteProblems(await fill('decide'), sprint.criteria, ['set1'])).toEqual([]);
     expect(prototypeProblems(await fill('prototype'), sprint.criteria, sprint.requirements)).toEqual([]);

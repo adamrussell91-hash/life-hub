@@ -1,6 +1,6 @@
 import type { Block } from '@/schemas/block';
 import { phaseDue } from './rules';
-import { SPRINT_PHASES, type PublicSprint, type SprintPhaseKey, type SprintSettings } from './schema';
+import { SPRINT_PHASES, defaultUnderstand, type PublicSprint, type SprintPhaseKey, type SprintSettings } from './schema';
 
 type Section = Extract<Block, { block_type: 'section' }>;
 
@@ -47,8 +47,26 @@ export function publicSprint(s: SprintSettings): PublicSprint {
     reflection_prompts: [...s.reflection_prompts],
     requirements: s.requirements.map((r) => ({ ...r, phases: [...r.phases] })),
     idea_guide: s.idea_guide,
-    phases: s.phases.map((p) => ({ ...p }))
+    phases: s.phases.map((p) => ({ ...p })),
+    understand: s.understand ? { layout: s.understand.layout, steps: { ...s.understand.steps } } : defaultUnderstand()
   };
 }
 
 export { SPRINT_PHASES };
+
+/** The brief's words as plain text, for Understand's Spot step: headings, text, callouts and quotes, in order. */
+export function briefText(blocks: readonly Block[]): string {
+  const plain = (html: string) => {
+    if (typeof DOMParser === 'undefined') return html.replace(/<[^>]*>/g, ' ');
+    return new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '';
+  };
+  const out: string[] = [];
+  for (const b of sprintParts(blocks).brief) {
+    const c = b.content as Record<string, unknown>;
+    for (const key of ['text', 'html', 'body', 'title'] as const) {
+      const v = c[key];
+      if (typeof v === 'string' && v.trim()) out.push(key === 'html' || key === 'body' ? plain(v) : v);
+    }
+  }
+  return out.join(' ').replace(/\s+/g, ' ').trim();
+}

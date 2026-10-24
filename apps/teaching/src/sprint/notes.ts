@@ -3,7 +3,7 @@ import { el } from '@/quiz/dom';
 /** A teacher note: fixed help text that folds open under a Kit card. */
 export type KitNote = { what: string; students: string; setup: string };
 
-export type KitNoteKey = 'overview' | 'settings' | 'criteria' | 'reflection' | 'requirements' | 'idea_guide' | 'phases' | 'groups';
+export type KitNoteKey = 'overview' | 'settings' | 'understand' | 'criteria' | 'reflection' | 'requirements' | 'idea_guide' | 'phases' | 'groups';
 
 export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
   overview: {
@@ -15,6 +15,11 @@ export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
     what: 'How much help shows, who picks each group’s idea, how many ideas each student writes, and the class lock.',
     students: 'Guided adds sentence starters and tighter checks. The class lock stops work for a few hours after you end a class part, so class work stays class work.',
     setup: 'Teacher confirms lets you check each group’s pick before they build. 2 hours of lock suits a lesson that ends at lunch or the end of the day.'
+  },
+  understand: {
+    what: 'The steps students go through to work out the problem before they design anything. Five they do alone, five the group does together in a shared space.',
+    students: 'Alone: they spot words in the brief, name the audience, dig for the real problem, say it in their own words and sort what they know into a limits grid. Together: they vote on one problem statement, agree one audience, see everyone’s limits in one grid, choose up to 3 questions for you and read your answers. The agreed problem, audience and answers go with them to Sketch.',
+    setup: 'Slides suit younger classes: one step at a time. Answer the group’s questions from its board on the progress map. If you switch off Vote, you choose each group’s problem yourself.'
   },
   criteria: {
     what: 'One list used three times: students link each idea to a criterion, vote with the criteria in Decide, and you mark the prototype with them.',
