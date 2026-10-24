@@ -76,7 +76,7 @@ import { mountKitEditor } from '@/sprint/kit-editor';
 import { createSprintTabs, inSprintTab, type SprintTab } from '@/sprint/editor-tabs';
 import { mountSprintMap, type SprintMapHandle } from '@/sprint/map';
 import { sprintTeacherApi } from '@/sprint/api';
-import { newSprintSettings, newSprintBlocks } from '@/sprint/defaults';
+import { seedSprint } from '@/sprint/defaults';
 import { phaseOfSection } from '@/sprint/model';
 import { httpMarkbookApi } from '@/markbook/api';
 import { outcomeLabels } from '@/markbook/parse';
@@ -1206,7 +1206,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     // A new sprint starts with the default Kit and one guide section per phase.
     if (isSprint && !lesson.sprint && classes.length) {
       // emitLesson only records the lesson, so redraw the canvas for the new sections and carry on mounting.
-      emitLesson({ ...lesson, sprint: newSprintSettings(classes[0]!.id), blocks: [...lesson.blocks, ...newSprintBlocks(options.idFactory)] });
+      emitLesson(seedSprint(lesson, classes[0]!.id, options.idFactory));
       canvas.update(lesson.blocks, media);
     }
     if (isSprint && !sprintTabs) {

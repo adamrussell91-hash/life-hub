@@ -272,6 +272,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       }
       // A tutorial's groups change on the board (a student moved); the next save carries them.
       if (next.tutorial) lesson.tutorial = next.tutorial;
+      // A design sprint's Kit is edited on the page; the next save carries it.
+      if (next.sprint) lesson.sprint = next.sprint;
     }
 
     function bumpDraftClock(): void {
