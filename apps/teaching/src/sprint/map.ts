@@ -120,7 +120,9 @@ export function mountSprintMap(o: { getLesson: () => Lesson; api: SprintTeacherA
       const h = el('div', 'smap-ph');
       h.append(el('b', '', PHASE_LABELS[key]), el('span', `pill ${p?.where === 'class' ? 'pill--class' : 'pill--home'}`, p?.where === 'class' ? 'Class' : 'Home'), el('span', 'smap-due', p ? dueText(p.due_date, p.due_time, Date.now()) : ''));
       if (p?.where === 'class' && s.class_parts[key] === 'open' && s.groups.some((g) => g.open.includes(key))) {
-        const end = button(`End class part · locks ${sprint?.lock_hours ?? 2} h`, 'secondary', () => confirmEnd(key));
+        const end = button('End class part', 'secondary', () => confirmEnd(key));
+        // The lock length is dropped on a phone; the confirm still says it.
+        end.append(el('span', 'smap-lock-note', ` · locks ${sprint?.lock_hours ?? 2} h`));
         end.dataset.end = key;
         h.append(end);
       }

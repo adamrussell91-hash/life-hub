@@ -112,8 +112,11 @@
 .sboard__part { display: grid; gap: 6px; }
 .sboard__chosen { border-color: var(--navy); }
 @media (max-width: 600px) {
-  .smap-row--head { display: none; }
   .smap-row { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 10px 0; }
+  .smap-row--head > div:first-child, .smap-ph .pill, .smap-ph .smap-due, .smap-lock-note { display: none; }
+  .smap-row--head > .smap-ph { padding: 0 2px; justify-items: center; text-align: center; }
+  .smap-ph b { font-size: 11px; }
+  .smap-ph .btn { font-size: 10px; padding: 3px 4px; }
   .smap-name { grid-column: 1 / -1; padding: 0 4px; }
   .smap-cell { padding: 6px 4px; justify-content: center; background: var(--paper, #fbf8f2); }
   .smap-cell .pill { display: none; }
