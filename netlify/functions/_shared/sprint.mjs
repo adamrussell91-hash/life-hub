@@ -6,11 +6,11 @@
  * called here.
  */
 import { isSafeId } from './class-examples.mjs';
-import { publishedLessonKey } from './teaching-blobs.mjs';
+import { publishedLessonKey, draftLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, read, reject } from './question-drop.mjs';
 import { identify } from './quiz.mjs';
-import { PAYLOAD_SCHEMAS, SprintSettingsSchema } from './sprint-schema.mjs';
+import { PAYLOAD_SCHEMAS, PartsSchema, SprintSettingsSchema } from './sprint-schema.mjs';
 import { openPhases, lockState, isFrozen, isLate, tally, heatLevels, endsAtEpoch, phaseDue } from './sprint-rules.mjs';
 import { sprintKeys, emptyGroup, emptyLock } from './sprint-keys.mjs';
 
@@ -334,6 +334,8 @@ async function studentView(store, lessonId, config, who, group) {
     parts: list(state.parts).map((p) => ({ ...p, claimed: list(state.claims[p.id]).length, mine: list(state.claims[p.id]).includes(sid) })),
     pitch: state.pitch ? { kind: state.pitch.kind, name: state.pitch.name ?? '', file: state.pitch.file ?? null, link: state.pitch.link ?? '' } : null
   };
+  const stage = (await read(store, k.stage)) ?? {};
+  view.spotlight = stage.spotlight ?? null;
   return view;
 }
 
@@ -428,7 +430,220 @@ export async function sprintAction(store, lessonId, body) {
 }
 
 async function checkOwnFiles() {}
-function checkVotes() {}
-async function groupWrite() { reject(400, 'bad_action', 'Unknown action.'); }
+/** Votes name a known criterion and an idea in this group's gallery; opened lists only real set ids. */
+function checkVotes(view, config, payload) {
+  const ideas = new Set((view.gallery ?? []).flatMap((s) => s.ideas.map((i) => i.id)));
+  const sets = new Set((view.gallery ?? []).map((s) => s.id));
+  for (const [c, idea] of Object.entries(payload.votes)) {
+    if (!config.criteria.includes(c) || !ideas.has(idea)) reject(400, 'bad_vote', 'That idea has changed. Reload the page.');
+  }
+  payload.opened = payload.opened.filter((id) => sets.has(id));
+}
+
+/** Parts list, part claims and the pitch file: shared group state any member may write. */
+async function groupWrite(store, lessonId, config, group, sid, owner, view, action, body) {
+  const k = sprintKeys(lessonId);
+  if (view.lock) reject(423, 'locked', 'The sprint is locked for now. It opens again soon.');
+  const state = await groupState(store, k, group.id);
+  if (action === 'parts' || action === 'claim_part') {
+    if (!view.phases.find((p) => p.key === 'decide')?.open) reject(409, 'not_open', 'Decide hasn’t opened yet.');
+    if (!state.chosen) reject(409, 'no_idea_yet', 'Your group’s idea is still being chosen.');
+    if (view.phases.find((p) => p.key === 'decide')?.frozen) reject(409, 'frozen', 'Your class work for this phase is in.');
+  }
+  if (action === 'parts') {
+    const parsed = PartsSchema.safeParse(body.parts);
+    if (!parsed.success) reject(400, 'bad_parts', parsed.error.issues[0]?.message ?? 'Check the parts list.');
+    const keep = new Set(parsed.data.map((p) => p.id));
+    state.parts = parsed.data.map((p) => ({ ...p, criterion: config.criteria.includes(p.criterion) ? p.criterion : '' }));
+    state.claims = Object.fromEntries(Object.entries(state.claims).filter(([id]) => keep.has(id)));
+  }
+  if (action === 'claim_part') {
+    const part = list(state.parts).find((p) => p.id === body.part_id);
+    if (!part) reject(404, 'not_found', 'That part has gone. Reload the page.');
+    // Two may share a part only when the group has more people than parts.
+    const cap = group.students.length > list(state.parts).length ? 2 : 1;
+    const others = list(state.claims[part.id]).filter((s) => s !== sid);
+    if (others.length >= cap) reject(409, 'part_taken', 'Someone has claimed that part. Pick another.');
+    state.claims = Object.fromEntries(Object.entries(state.claims).map(([id, ss]) => [id, list(ss).filter((s) => s !== sid)]));
+    state.claims[part.id] = [...others, sid];
+  }
+  if (action === 'pitch') {
+    if (!view.phases.find((p) => p.key === 'prototype')?.open) reject(409, 'not_open', 'Prototype hasn’t opened yet.');
+    if (typeof body.link === 'string' && body.link) {
+      if (!/^https:\/\/\S{3,490}$/.test(body.link)) reject(400, 'bad_link', 'Links start with https://');
+      state.pitch = { kind: 'link', link: body.link, by: sid, at: iso(clock()) };
+    } else {
+      const meta = typeof body.file_id === 'string' ? await read(store, k.fileMeta(owner, body.file_id)) : null;
+      if (!meta) reject(404, 'not_found', 'Upload the file first.');
+      state.pitch = { kind: 'file', file: body.file_id, name: meta.name, by: sid, at: iso(clock()) };
+    }
+  }
+  await store.setJSON(k.group(group.id), state);
+}
 async function giveFeedback() { reject(400, 'bad_action', 'Unknown action.'); }
 async function withRound(store, lessonId, config, group, sid, view) { return view; }
+async function roundAction() { reject(400, 'bad_action', 'Unknown action.'); }
+
+// ---------------------------------------------------------------------------
+// Teacher side: the progress map, a group's board and the class controls.
+// Names show here only; anything put up for students goes through stage, nameless.
+// ---------------------------------------------------------------------------
+
+const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate'];
+
+async function teacherContext(store, lessonId) {
+  const { config } = await loadSprint(store, lessonId);
+  const k = sprintKeys(lessonId);
+  const lockRec = await endDueClassParts(store, lessonId, config);
+  const extend = (await read(store, k.extend)) ?? {};
+  const roster = await loadRoster(store, config.class_id);
+  const byId = new Map(list(roster?.students).map((s) => [s.id, s]));
+  return { config, k, lockRec, extend, byId };
+}
+
+async function teacherSummary(store, lessonId) {
+  const { config, k, lockRec, extend, byId } = await teacherContext(store, lessonId);
+  const now = clock();
+  const groups = [];
+  for (const g of config.groups) {
+    const state = await resolveGroup(store, lessonId, config, g, await groupState(store, k, g.id), lockRec, extend, now);
+    const open = openPhases(groupPhases(config, extend, g.id), factsFor(g, state, lockRec), now);
+    const students = await Promise.all(g.students.map(async (id) => {
+      const owner = ownerOf(config.class_id, id);
+      const phases = {};
+      for (const key of PHASES) {
+        const sub = await read(store, k.sub(owner, key));
+        phases[key] = !sub ? 'none' : !sub.submitted_at ? 'draft' : sub.late ? 'late' : 'in';
+      }
+      // Who has opened each phase: End class part uses it to say who was there.
+      const seen = (await read(store, k.seen(owner))) ?? {};
+      const opened = Object.fromEntries(PHASES.map((key) => [key, !!seen[key]]));
+      return { id, initials: byId.get(id)?.initials ?? '–', name: byId.get(id)?.name ?? 'Removed student', phases, opened };
+    }));
+    groups.push({ id: g.id, name: g.name, students, open, awaiting: state.awaiting ?? null, chosen: !!state.chosen, question: state.question?.text ?? null });
+  }
+  const classParts = Object.fromEntries(config.phases.filter((p) => p.where === 'class').map((p) => [p.key, lockRec.ended[p.key] ? 'ended' : 'open']));
+  const lock = lockRec.lock && Date.parse(lockRec.lock.until) > now ? lockRec.lock : null;
+  const stage = (await read(store, k.stage)) ?? {};
+  return { groups, class_parts: classParts, ended: lockRec.ended, lock, extend, running: stage.running ?? null, spotlight: stage.spotlight ?? null };
+}
+
+async function teacherBoard(store, lessonId, groupId) {
+  const { config, k, lockRec, extend, byId } = await teacherContext(store, lessonId);
+  const g = config.groups.find((x) => x.id === groupId);
+  if (!g) reject(404, 'not_found', 'That group is gone.');
+  const state = await resolveGroup(store, lessonId, config, g, await groupState(store, k, g.id), lockRec, extend, clock());
+  const name = (id) => byId.get(id)?.name ?? 'Removed student';
+  const notes = (await groupNotes(store, lessonId, config, g)).map((n) => ({ id: n.id, text: n.text, name: name(n.student), student_id: n.student, index: n.index }));
+  const gallery = (await groupGallery(store, lessonId, config, g, state.votes_closed_at)).map((set) => ({ id: set.id, name: name(set.student), student_id: set.student, ideas: set.ideas }));
+  const decide = await groupSubs(store, lessonId, config, g, 'decide');
+  const t = tally(decide.map(({ sub }) => sub?.payload?.votes ?? {}), config.criteria, gallery.flatMap((s) => s.ideas.map((i) => i.id)));
+  const subs = {};
+  for (const key of ['prototype', 'test']) {
+    subs[key] = (await groupSubs(store, lessonId, config, g, key)).map(({ student, sub }) => ({ student_id: student, name: name(student), sub }));
+  }
+  const reasons = decide.map(({ student, sub }) => ({ name: name(student), votes: sub?.payload?.votes ?? {}, reasons: sub?.payload?.reasons ?? {} }));
+  const round = (await read(store, k.round(g.id))) ?? null;
+  return {
+    group: { id: g.id, name: g.name },
+    awaiting: state.awaiting ?? null,
+    question: state.question ?? null,
+    chosen: state.chosen ?? null,
+    notes,
+    gallery,
+    totals: t.totals,
+    heat: heatLevels(t.counts, config.criteria),
+    reasons,
+    parts: list(state.parts).map((p) => ({ ...p, by: list(state.claims[p.id]).map(name) })),
+    pitch: state.pitch ? { ...state.pitch, by: name(state.pitch.by) } : null,
+    subs,
+    round: round ? { ...round, entries: Object.entries(round.entries ?? {}).map(([student, e]) => ({ student_id: student, name: name(student), ...e })) } : null
+  };
+}
+
+/** "notes.0", "cards.1.idea", "reasons.c1", "text": one text field from a submission. */
+function fieldText(payload, field) {
+  if (typeof field !== 'string' || !/^[a-z_]+(\.[a-z0-9_]+){0,2}$/.test(field)) return null;
+  let value = payload;
+  for (const part of field.split('.')) value = value?.[/^\d+$/.test(part) ? Number(part) : part];
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+/** Moves a student in the published config and in the draft (against its etag, so a save in another tab wins and the move retries). */
+async function moveStudent(store, lessonId, config, studentId, groupId) {
+  const k = sprintKeys(lessonId);
+  if (!config.groups.some((g) => g.id === groupId)) reject(404, 'not_found', 'That group is gone.');
+  const shift = (groups) => groups.map((g) => {
+    const others = list(g.students).filter((s) => s !== studentId);
+    return { ...g, students: g.id === groupId ? [...others, studentId] : others };
+  });
+  await store.setJSON(k.config, { ...config, groups: shift(config.groups) });
+  for (let i = 0; i < 3; i += 1) {
+    const row = await store.getWithMetadata(draftLessonKey(lessonId), { type: 'json', consistency: 'strong' });
+    if (!row?.data?.sprint) return;
+    const written = await store.setJSON(draftLessonKey(lessonId), { ...row.data, sprint: { ...row.data.sprint, groups: shift(row.data.sprint.groups) }, updated_at: iso(clock()) }, { onlyIfMatch: row.etag });
+    if (written?.modified !== false) return;
+  }
+  reject(409, 'changed', 'The lesson changed in another tab. Try again.');
+}
+
+export async function sprintTeacherAction(store, lessonId, body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
+  const action = body.action ?? 'summary';
+  if (!TEACHER_ACTIONS.includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (action === 'summary') return teacherSummary(store, lessonId);
+  if (action === 'board') return teacherBoard(store, lessonId, body.group_id);
+  const { config, k, extend } = await teacherContext(store, lessonId);
+  const now = clock();
+
+  if (action === 'end_class') {
+    const p = config.phases.find((x) => x.key === body.phase);
+    if (!p || p.where !== 'class') reject(400, 'not_class', 'Only class phases have a class part to end.');
+    await endClassPart(store, lessonId, config, p.key, now);
+  }
+  if (action === 'unlock') {
+    const rec = { ...emptyLock(), ...((await read(store, k.lock)) ?? {}) };
+    if (rec.lock && typeof body.student_id === 'string') await store.setJSON(k.lock, { ...rec, lock: { ...rec.lock, unlocked: [...new Set([...rec.lock.unlocked, body.student_id])] } });
+  }
+  if (action === 'extend') {
+    if (!PHASES.includes(body.phase) || !/^\d{4}-\d{2}-\d{2}$/.test(body.due_date ?? '')) reject(400, 'bad_date', 'Pick a phase and a date.');
+    const time = /^\d{2}:\d{2}$/.test(body.due_time ?? '') ? body.due_time : '15:00';
+    const scope = body.scope;
+    if (scope === 'group' && !config.groups.some((g) => g.id === body.id)) reject(404, 'not_found', 'That group is gone.');
+    if (scope === 'student' && !config.groups.some((g) => g.students.includes(body.id))) reject(404, 'not_found', 'That student isn’t in this sprint.');
+    if (!['class', 'group', 'student'].includes(scope)) reject(400, 'bad_scope', 'Pick the class, a group or a student.');
+    const next = { class: {}, group: {}, student: {}, ...extend };
+    const over = { due_date: body.due_date, due_time: time };
+    if (scope === 'class') next.class = { ...next.class, [body.phase]: over };
+    else next[scope] = { ...next[scope], [body.id]: { ...(next[scope][body.id] ?? {}), [body.phase]: over } };
+    await store.setJSON(k.extend, next);
+  }
+  if (action === 'confirm') {
+    const g = config.groups.find((x) => x.id === body.group_id);
+    if (!g) reject(404, 'not_found', 'That group is gone.');
+    const state = await groupState(store, k, g.id);
+    if (body.kind === 'question') {
+      const note = (await groupNotes(store, lessonId, config, g)).find((n) => n.id === body.id);
+      if (!note) reject(404, 'not_found', 'That question is gone.');
+      await store.setJSON(k.group(g.id), { ...state, question: { id: note.id, text: note.text }, awaiting: null });
+    } else if (body.kind === 'idea') {
+      const ideas = (await groupGallery(store, lessonId, config, g, state.votes_closed_at)).flatMap((s) => s.ideas);
+      if (!ideas.some((i) => i.id === body.id)) reject(404, 'not_found', 'That idea is gone.');
+      await store.setJSON(k.group(g.id), { ...state, chosen: body.id, awaiting: null, votes_closed_at: state.votes_closed_at ?? iso(now) });
+    } else reject(400, 'bad_kind', 'Confirm a question or an idea.');
+  }
+  if (action === 'spotlight') {
+    const stage = (await read(store, k.stage)) ?? {};
+    if (body.clear) await store.setJSON(k.stage, { ...stage, spotlight: null });
+    else {
+      if (!PHASES.includes(body.phase) || !config.groups.some((g) => g.students.includes(body.student_id))) reject(400, 'bad_spotlight', 'That answer is gone.');
+      const sub = await read(store, k.sub(ownerOf(config.class_id, body.student_id), body.phase));
+      const text = fieldText(sub?.payload, body.field);
+      if (!text) reject(404, 'not_found', 'That answer is gone.');
+      await store.setJSON(k.stage, { ...stage, spotlight: { text, label: 'One idea from the class' } });
+    }
+  }
+  if (action === 'move') await moveStudent(store, lessonId, config, body.student_id, body.group_id);
+  if (action === 'run' || action === 'round' || action === 'moderate') await roundAction(store, lessonId, config, action, body);
+  return teacherSummary(store, lessonId);
+}
