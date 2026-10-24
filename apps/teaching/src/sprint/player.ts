@@ -22,6 +22,8 @@ export type SprintPlayerOptions = {
 export const PHASE_FORMS: Partial<Record<SprintPhaseKey, (ctx: FormContext) => PhaseForm>> = {};
 /** A form is rebuilt only when this changes, so polling never wipes what a student is typing. */
 export const FORM_SIGNATURES: Partial<Record<SprintPhaseKey, (s: SprintStatus) => string>> = {};
+/** Set by forms.ts: the feedback card for a running round. */
+export const CARDS: { feedback?: (ctx: FormContext, round: NonNullable<SprintStatus['round']>) => HTMLElement } = {};
 
 const POLL_MS = 8000;
 
@@ -58,6 +60,9 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
   const top = el('div', 'sprint__top');
   const body = el('div', 'sprint__body');
   shell.append(hero, spot, top, body);
+  const cardHost = el('div', 'sprint__card');
+  shell.append(cardHost);
+  let cardKey = '';
   host.replaceChildren(shell);
 
   const current = (s: SprintStatus): SprintPhaseKey => {
@@ -186,6 +191,16 @@ export function mountSprintPlayer(host: HTMLElement, options: SprintPlayerOption
     }
     const key = current(s);
     paintTop(s, key);
+    const r = s.round;
+    const roundKey = r && !s.lock ? `${r.group_id}:${r.sent ? 1 : 0}` : '';
+    if (roundKey !== cardKey) {
+      cardKey = roundKey;
+      cardHost.replaceChildren();
+      if (r && !s.lock && CARDS.feedback) {
+        const row = s.phases!.find((p) => p.key === 'test')!;
+        cardHost.append(CARDS.feedback({ status: s, sprint, blocks, row, editable: true, client: client!, frames: [], valueCheck: null, support: sprint.support, onStatus: (next) => apply(next) }, r));
+      }
+    }
     if (s.lock) {
       form?.dispose();
       form = null;
