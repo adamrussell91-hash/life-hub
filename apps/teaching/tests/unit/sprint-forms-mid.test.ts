@@ -61,4 +61,17 @@ describe('prototype form', () => {
     expect(f.el.querySelectorAll('.sprint-levels')).toHaveLength(2);
     expect(f.el.textContent).toContain('Pitch file');
   });
+
+  it('a rebuilt form keeps what was typed and sends the waiting autosave', () => {
+    const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' } });
+    const c = { ...ctx(s, 'prototype'), drafts: {} };
+    const first = mountPrototype(c);
+    const area = first.el.querySelector<HTMLTextAreaElement>('textarea')!;
+    area.value = 'The panel opens with the baker at dawn.';
+    area.dispatchEvent(new Event('input'));
+    first.dispose();
+    expect(c.client.save).toHaveBeenCalledWith('prototype', expect.objectContaining({ text: 'The panel opens with the baker at dawn.' }));
+    const again = mountPrototype(c);
+    expect(again.el.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('The panel opens with the baker at dawn.');
+  });
 });

@@ -1,14 +1,14 @@
 import { el } from '@/quiz/dom';
 import { understandProblems } from './checks';
 import { HMW_FRAME } from './defaults';
-import { submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { draftOf, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import type { PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
 /** Understand: write the "How might we" questions, then star the strongest one from the group. */
 export function mountUnderstand(ctx: FormContext): PhaseForm {
   const ideas = ctx.sprint.phases[0]!.ideas ?? 3;
-  const mine = ctx.status.mine?.understand;
+  const mine = draftOf(ctx, 'understand');
   const state: PhasePayload['understand'] = { notes: [...(mine?.notes ?? [])], star: mine?.star ?? '', stretch: mine?.stretch ?? '' };
   while (state.notes.length < ideas) state.notes.push('');
   const root = el('div', 'sprint-understand');

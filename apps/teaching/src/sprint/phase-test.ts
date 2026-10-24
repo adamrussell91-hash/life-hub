@@ -1,14 +1,14 @@
 import { button, el } from '@/quiz/dom';
 import { feedbackProblems, reflectionProblems } from './checks';
 import { FEEDBACK_STARTERS } from './defaults';
-import { frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
 import { LEVEL_LABELS, type FeedbackEntry, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
 /** Test: the pitch is live in class; this is the reflection on what the group's feedback showed. */
 export function mountTest(ctx: FormContext): PhaseForm {
   const s = ctx.status;
-  const mine = s.mine?.test;
+  const mine = draftOf(ctx, 'test');
   const prompts = ctx.sprint.reflection_prompts.length ? ctx.sprint.reflection_prompts : ['What did the feedback show your idea does well?', 'What would you change next, and why?'];
   const state: PhasePayload['test'] = { reflection: [...(mine?.reflection ?? [])], quote: mine?.quote ?? '', change_criterion: mine?.change_criterion ?? '', value_answer: mine?.value_answer ?? '' };
   while (state.reflection.length < 2) state.reflection.push('');
