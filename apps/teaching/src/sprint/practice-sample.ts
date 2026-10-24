@@ -75,6 +75,7 @@ async function samplePayload(
       const me = status.members?.find((m) => m.me);
       const free = parts.find((p) => !(p.assigned ?? []).length) ?? parts[0];
       if (free && me && !parts.some((p) => p.mine)) status = await client.assign(free.id, [...(free.assigned ?? []), me.key].slice(-((status.members?.length ?? 0) > parts.length ? 2 : 1)));
+      if (status.assemble && !status.assembler && me) status = await client.setAssembler(me.key);
     }
     const sets = status.gallery ?? [];
     const ideas = sets.flatMap((s) => s.ideas);

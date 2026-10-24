@@ -50,7 +50,9 @@ export function prepareSprintPublish(draft, studentBlocks) {
     reflection_criteria: s.reflection_criteria.map((c) => c.id),
     requirements: s.requirements.map((r) => ({ id: r.id, phases: [...r.phases] })),
     understand: snapshot.sprint.understand.steps,
-    dots: snapshot.sprint.decide_dots
+    dots: snapshot.sprint.decide_dots,
+    // One member puts the prototype together and uploads it; sprints published before this have no assembler.
+    assemble: true
   };
   return { snapshot, config };
 }
@@ -345,11 +347,31 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
   return next;
 }
 
+/** Prototype: every part with who is doing it and what they have saved so far, for the whole group to see. */
+async function groupParts(store, lessonId, config, group, state, initials, sid) {
+  const k = sprintKeys(lessonId);
+  const subs = new Map((await groupSubs(store, lessonId, config, group, 'prototype')).map((x) => [x.student, x]));
+  const rows = [];
+  for (const part of list(state.parts)) {
+    for (const student of list(state.claims[part.id]).filter((x) => group.students.includes(x))) {
+      const { owner, sub } = subs.get(student) ?? {};
+      const p = sub?.payload ?? {};
+      const files = [];
+      for (const id of list(p.files)) {
+        const meta = owner ? await read(store, k.fileMeta(owner, id)) : null;
+        if (meta) files.push({ id, name: meta.name });
+      }
+      rows.push({ part_id: part.id, part: part.text, who: initials.get(student) ?? '–', me: student === sid, text: p.text ?? '', link: p.link ?? '', files, in: !!sub?.submitted_at, started: !!sub });
+    }
+  }
+  return rows;
+}
+
 // ---------------------------------------------------------------------------
 // Student actions
 // ---------------------------------------------------------------------------
 
-const STUDENT_ACTIONS = ['status', 'claim', 'open', 'save', 'submit', 'parts', 'claim_part', 'assign', 'pitch', 'feedback', 'audience', 'ask_add', 'ask_pick', 'ask_send'];
+const STUDENT_ACTIONS = ['status', 'claim', 'open', 'save', 'submit', 'parts', 'claim_part', 'assign', 'assembler', 'pitch', 'feedback', 'audience', 'ask_add', 'ask_pick', 'ask_send'];
 
 async function whoAndGroup(store, config, body, action) {
   let who = scope.getStore()?.who;
@@ -436,6 +458,9 @@ async function studentView(store, lessonId, config, who, group) {
     awaiting: state.awaiting ? { kind: state.awaiting.kind } : null,
     parts: list(state.parts).map((p) => ({ ...p, claimed: list(state.claims[p.id]).length, mine: list(state.claims[p.id]).includes(sid), assigned: list(state.claims[p.id]).map((x) => memberKey(lessonId, x)) })),
     members: group.students.map((x) => ({ key: memberKey(lessonId, x), initials: initials.get(x) ?? '–', me: x === sid })),
+    assemble: !!config.assemble,
+    assembler: state.assembler && group.students.includes(state.assembler) ? { key: memberKey(lessonId, state.assembler), initials: initials.get(state.assembler) ?? '–', me: state.assembler === sid } : null,
+    group_parts: open.includes('prototype') ? await groupParts(store, lessonId, config, group, state, initials, sid) : null,
     dots: dotsOf(config),
     pitch: state.pitch ? { kind: state.pitch.kind, name: state.pitch.name ?? '', file: state.pitch.file ?? null, link: state.pitch.link ?? '' } : null,
     understand_group: shared,
@@ -466,6 +491,7 @@ async function submitProblem(store, lessonId, config, group, sid, phase, payload
     const dottable = (view.gallery ?? []).flatMap((set) => set.ideas).reduce((n, i) => n + Object.keys(IDEA_PART_TEXT).filter((k) => (i[k] ?? '').trim()).length, 0);
     if (dotsOf(config) && payload.dots.length < Math.min(dotsOf(config), dottable)) return ['need_dots', `Place all ${dotsOf(config)} stand-out dots.`];
     if (!view.parts.some((p) => p.mine)) return ['need_part', 'Your group hasn’t given you a part yet.'];
+    if (config.assemble && !view.assembler) return ['need_assembler', 'Pick who puts the prototype together.'];
   }
   if (phase === 'test' && payload.reflection.filter((r) => r.trim()).length < 2) return ['need_reflection', 'Answer both reflection questions.'];
   return null;
@@ -541,7 +567,7 @@ export async function sprintAction(store, lessonId, body) {
     }
     if (changed) await store.setJSON(k.group(group.id), state);
   }
-  if (action === 'parts' || action === 'claim_part' || action === 'assign' || action === 'pitch') await groupWrite(store, lessonId, config, group, sid, owner, view, action, body);
+  if (action === 'parts' || action === 'claim_part' || action === 'assign' || action === 'assembler' || action === 'pitch') await groupWrite(store, lessonId, config, group, sid, owner, view, action, body);
   if (action === 'audience' || action.startsWith('ask_')) await understandWrite(store, lessonId, config, group, view, action, body);
   if (action === 'feedback') await giveFeedback(store, lessonId, config, group, sid, body);
   view = await studentView(store, lessonId, config, who, group);
@@ -681,7 +707,7 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
   const k = sprintKeys(lessonId);
   if (view.lock) reject(423, 'locked', 'The sprint is locked for now. It opens again soon.');
   const state = await groupState(store, k, group.id);
-  if (action === 'parts' || action === 'claim_part' || action === 'assign') {
+  if (action === 'parts' || action === 'claim_part' || action === 'assign' || action === 'assembler') {
     if (!view.phases.find((p) => p.key === 'decide')?.open) reject(409, 'not_open', 'Decide hasn’t opened yet.');
     if (!state.chosen) reject(409, 'no_idea_yet', 'Your group’s idea is still being chosen.');
     if (view.phases.find((p) => p.key === 'decide')?.frozen) reject(409, 'frozen', 'Your class work for this phase is in.');
@@ -716,8 +742,14 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
     state.claims = Object.fromEntries(Object.entries(state.claims).map(([id, ss]) => [id, list(ss).filter((x) => !who.includes(x))]));
     state.claims[part.id] = who;
   }
+  if (action === 'assembler') {
+    const byKey = new Map(group.students.map((x) => [memberKey(lessonId, x), x]));
+    if (body.key !== null && !byKey.has(body.key)) reject(400, 'bad_member', 'That person isn’t in your group. Reload the page.');
+    state.assembler = body.key === null ? null : byKey.get(body.key);
+  }
   if (action === 'pitch') {
     if (!view.phases.find((p) => p.key === 'prototype')?.open) reject(409, 'not_open', 'Prototype hasn’t opened yet.');
+    if (config.assemble && state.assembler && state.assembler !== sid) reject(403, 'not_assembler', `${view.assembler?.initials ?? 'Your assembler'} puts the prototype together and uploads it.`);
     if (typeof body.link === 'string' && body.link) {
       if (!/^https:\/\/\S{3,490}$/.test(body.link)) reject(400, 'bad_link', 'Links start with https://');
       state.pitch = { kind: 'link', link: body.link, by: sid, at: iso(clock()) };
@@ -804,6 +836,7 @@ async function teacherBoard(store, lessonId, groupId) {
     reasons,
     parts: list(state.parts).map((p) => ({ ...p, by: list(state.claims[p.id]).map(name) })),
     pitch: state.pitch ? { ...state.pitch, by: name(state.pitch.by) } : null,
+    assembler: state.assembler ? name(state.assembler) : null,
     subs,
     round: round ? { ...round, entries: Object.entries(round.entries ?? {}).map(([student, e]) => ({ student_id: student, name: name(student), ...e })) } : null
   };

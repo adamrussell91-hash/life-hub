@@ -7,7 +7,7 @@
  *   sprint/{lesson}/seen/{student}            { [phase]: iso }   first time the student opened the phase
  *   sprint/{lesson}/subs/{student}/{phase}    { payload, saved_at, submitted_at, late, frozen }
  *   sprint/{lesson}/groups/{group}            { in: { [phase]: student[] }, question, chosen, awaiting, votes_closed_at, parts, claims, pitch,
- *                                               audience, ask_added[], ask_picked[], ask_sent[], answers: { [question]: { text, at } } }
+ *                                               audience, ask_added[], ask_picked[], ask_sent[], answers: { [question]: { text, at } }, assembler }
  *   sprint/{lesson}/fileowner/{id}            { owner, student }
  *   sprint/{lesson}/files/{student}/{id}      bytes, metadata { contentType }
  *   sprint/{lesson}/filemeta/{student}/{id}   { name, mime, size, at, phase }
@@ -29,5 +29,5 @@ export const sprintKeys = (lesson) => ({
   stage: `sprint/${lesson}/stage`
 });
 
-export const emptyGroup = () => ({ in: {}, question: null, chosen: null, awaiting: null, votes_closed_at: null, parts: [], claims: {}, pitch: null, audience: null, ask_added: [], ask_picked: [], ask_sent: [], answers: {} });
+export const emptyGroup = () => ({ in: {}, question: null, chosen: null, awaiting: null, votes_closed_at: null, parts: [], claims: {}, pitch: null, audience: null, ask_added: [], ask_picked: [], ask_sent: [], answers: {}, assembler: null });
 export const emptyLock = () => ({ ended: {}, lock: null });
