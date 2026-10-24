@@ -133,6 +133,17 @@ their initials** (one person a part, two when there are more people than
 parts; one part each). Decide is done when every part has someone and
 everyone has a part. No discussion step: the reasons do that work.
 
+### 1d. Prototype (Adam's call, 24 Oct)
+
+At home. Each student builds and uploads their own part, as before. In
+Decide the group also picks one **assembler** by initials (they still do
+their own part). In Prototype everyone in the group sees **Your group's
+parts**: each part, who is doing it, whether it is in, and what they have
+written, linked or uploaded so far. The assembler puts the parts together
+and uploads the finished prototype (or its link); only they can set it, and
+it is what the group shows at the pitch. Assembling is not marked: the
+finished prototype is judged by the class in Test's peer feedback.
+
 ### Phase content
 
 Each phase has a short teacher instruction and may hold normal blocks above

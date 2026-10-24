@@ -27,7 +27,8 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     ...(voting && dots && state.dots.length < Math.min(dots, dottable) ? [`Place all ${dots} stand-out dots. You have placed ${state.dots.length}.`] : []),
     ...(voting ? voteProblems(state, ctx.sprint.criteria, sets.map((x) => x.id)) : []),
     ...(!s.chosen ? ['Your votes are saved. Submit once your group’s idea is chosen and every part has someone.'] : []),
-    ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Your group hasn’t given you a part yet. Pick your initials on a part.'] : [])
+    ...(s.chosen && !(s.parts ?? []).some((p) => p.mine) ? ['Your group hasn’t given you a part yet. Pick your initials on a part.'] : []),
+    ...(s.chosen && s.assemble && !s.assembler ? ['Pick who puts the prototype together.'] : [])
   ]);
   const dotCounter = el('p', 'sd-counter');
   const paintCounter = () => { dotCounter.textContent = `Stand-out dots: ${state.dots.length} of ${dots} placed.`; };
@@ -259,14 +260,35 @@ function partsEditor(ctx: FormContext): HTMLElement {
     }
     box.append(b);
   }
+  if (ctx.status.assemble) {
+    const a = el('div', 'sd-assembler');
+    a.append(el('h4', '', 'Who puts it together?'), el('p', 'sprint-note', 'The assembler collects everyone’s parts in Prototype, puts them together and uploads the finished prototype for the pitch. They still do their own part.'));
+    const who = el('div', 'sd-who');
+    who.setAttribute('role', 'group');
+    who.setAttribute('aria-label', 'Assembler');
+    for (const m of members) {
+      const on = ctx.status.assembler?.key === m.key;
+      const chip = el('button', 'sprint-chip', m.me ? `${m.initials} (you)` : m.initials);
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', String(on));
+      chip.disabled = !ctx.editable;
+      chip.addEventListener('click', async () => {
+        try { ctx.onStatus(await ctx.client.setAssembler(on ? null : m.key)); } catch (e) { err.textContent = e instanceof Error ? e.message : 'That didn’t work.'; }
+      });
+      who.append(chip);
+    }
+    a.append(who);
+    box.append(a);
+  }
   const all = (ctx.status.parts ?? []);
   const unplaced = members.filter((m) => !all.some((p) => (p.assigned ?? []).includes(m.key)));
   const empty = all.filter((p) => !(p.assigned ?? []).length);
-  box.append(el('p', 'sprint-note sd-status', !all.length ? 'No parts saved yet.' : empty.length || unplaced.length
-    ? [empty.length ? `${empty.length} ${empty.length === 1 ? 'part has' : 'parts have'} no one yet.` : '', unplaced.length ? `Still without a part: ${unplaced.map((m) => m.initials).join(', ')}.` : ''].filter(Boolean).join(' ')
-    : 'Every part has someone and everyone has a part.'), err);
+  const noAssembler = !!ctx.status.assemble && !ctx.status.assembler;
+  box.append(el('p', 'sprint-note sd-status', !all.length ? 'No parts saved yet.' : empty.length || unplaced.length || noAssembler
+    ? [empty.length ? `${empty.length} ${empty.length === 1 ? 'part has' : 'parts have'} no one yet.` : '', unplaced.length ? `Still without a part: ${unplaced.map((m) => m.initials).join(', ')}.` : '', noAssembler ? 'No assembler yet.' : ''].filter(Boolean).join(' ')
+    : `Every part has someone and everyone has a part.${ctx.status.assembler ? ` ${ctx.status.assembler.initials} puts it together.` : ''}`), err);
   return box;
 }
 
 export const decideSignature = (s: SprintStatus) =>
-  [(s.gallery ?? []).map((x) => x.id).join(','), s.votes_closed ? 1 : 0, s.chosen?.id ?? '', (s.parts ?? []).map((p) => `${p.id}:${(p.assigned ?? []).join('+')}:${p.mine ? 1 : 0}`).join(','), (s.borrow ?? []).length].join('|');
+  [(s.gallery ?? []).map((x) => x.id).join(','), s.votes_closed ? 1 : 0, s.chosen?.id ?? '', (s.parts ?? []).map((p) => `${p.id}:${(p.assigned ?? []).join('+')}:${p.mine ? 1 : 0}`).join(','), (s.borrow ?? []).length, s.assembler?.key ?? ''].join('|');

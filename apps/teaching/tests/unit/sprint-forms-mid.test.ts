@@ -115,3 +115,36 @@ describe('prototype form', () => {
     expect(again.el.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('The panel opens with the baker at dawn.');
   });
 });
+
+describe('assembler', () => {
+  const members = [{ key: 'm1', initials: 'AB', me: true }, { key: 'm2', initials: 'CD', me: false }];
+  const parts = [{ id: 'p1', text: 'Panel text', shows: 'The morning', criterion: 'c1', claimed: 1, mine: true, assigned: ['m1'] }, { id: 'p2', text: 'Artefacts', shows: '', criterion: 'c2', claimed: 1, mine: false, assigned: ['m2'] }];
+  const groupParts = [
+    { part_id: 'p1', part: 'Panel text', who: 'AB', me: true, text: 'The baker at dawn.', link: '', files: [], in: true, started: true },
+    { part_id: 'p2', part: 'Artefacts', who: 'CD', me: false, text: '', link: 'https://example.com/list', files: [{ id: 'f1', name: 'list.pdf' }], in: false, started: true }
+  ];
+
+  it('is picked in Decide by initials, and Decide asks for one until it is', () => {
+    const status = base({ votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'x' }, members, parts, assemble: true, assembler: null });
+    const c = ctx(status);
+    (c.client as unknown as { setAssembler: unknown }).setAssembler = vi.fn(async () => status);
+    const f = mountDecide(c);
+    expect(f.el.querySelector('.sd-status')?.textContent).toBe('No assembler yet.');
+    [...f.el.querySelectorAll<HTMLButtonElement>('.sd-assembler .sprint-chip')].find((b) => b.textContent === 'CD')!.click();
+    expect((c.client as unknown as { setAssembler: ReturnType<typeof vi.fn> }).setAssembler).toHaveBeenCalledWith('m2');
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Pick who puts the prototype together.');
+  });
+
+  it('in Prototype everyone sees the group’s parts; only the assembler can upload the finished prototype', () => {
+    const others = mountPrototype(ctx(base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts, members, assemble: true, assembler: { key: 'm2', initials: 'CD', me: false }, group_parts: groupParts }), 'prototype'));
+    expect(others.el.querySelector('.sp-parts summary')?.textContent).toBe('Your group’s parts · 1 of 2 in');
+    expect(others.el.querySelector('.sp-parts')?.textContent).toContain('The baker at dawn.');
+    expect(others.el.querySelector('.sp-parts')?.textContent).toContain('Open list.pdf');
+    expect(others.el.textContent).toContain('Waiting for CD to put it together.');
+    expect(others.el.querySelector('[aria-label="Upload the finished prototype"]')).toBeNull();
+    const assembler = mountPrototype(ctx(base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts, members, assemble: true, assembler: { key: 'm1', initials: 'AB', me: true }, group_parts: groupParts }), 'prototype'));
+    expect(assembler.el.querySelector('[aria-label="Upload the finished prototype"]')).not.toBeNull();
+    expect(assembler.el.textContent).toContain('You’re the assembler.');
+  });
+});

@@ -43,6 +43,12 @@ export type SprintStatus = {
   parts?: Array<Part & { claimed: number; mine: boolean; assigned?: string[] }>;
   /** The group, for the part picker: keys that name no one, and initials. */
   members?: Array<{ key: string; initials: string; me: boolean }>;
+  /** True when the group picks an assembler (sprints published from late October 2026). */
+  assemble?: boolean;
+  /** Who puts the prototype together and uploads it. */
+  assembler?: { key: string; initials: string; me: boolean } | null;
+  /** Prototype: every part, who is doing it and what they have saved so far. */
+  group_parts?: Array<{ part_id: string; part: string; who: string; me: boolean; text: string; link: string; files: Array<{ id: string; name: string }>; in: boolean; started: boolean }> | null;
   /** Stand-out dots each student places in Decide; 0 means none. */
   dots?: number;
   /** After voting closes: dots per part of each idea, and the most-dotted parts of ideas not chosen. */
@@ -68,6 +74,8 @@ export type SprintClient = {
   claimPart(partId: string): Promise<SprintStatus>;
   /** Give a part to members of the group (by member key); they leave any other part. */
   assign(partId: string, keys: string[]): Promise<SprintStatus>;
+  /** Pick the group's assembler by member key, or null to clear. */
+  setAssembler(key: string | null): Promise<SprintStatus>;
   pitch(source: { file_id: string } | { link: string }): Promise<SprintStatus>;
   feedback(groupId: string, entry: FeedbackEntry): Promise<SprintStatus>;
   /** The group's agreed audience. */
@@ -109,6 +117,7 @@ export function sprintClient(lessonId: string, classId: string): SprintClient {
     parts: (parts) => call('parts', { parts }),
     claimPart: (partId) => call('claim_part', { part_id: partId }),
     assign: (partId, keys) => call('assign', { part_id: partId, keys }),
+    setAssembler: (key) => call('assembler', { key }),
     pitch: (source) => call('pitch', source),
     feedback: (groupId, entry) => call('feedback', { group_id: groupId, entry }),
     audience: (who, why) => call('audience', { who, why }),
@@ -154,6 +163,7 @@ export type GroupBoard = {
   reasons: Array<{ name: string; votes: Record<string, string>; reasons: Record<string, string>; dots?: Dot[] }>;
   parts: Array<Part & { by: string[] }>;
   pitch: { kind: 'file' | 'link'; file?: string; link?: string; name?: string; by: string } | null;
+  assembler?: string | null;
   subs: { prototype: BoardSub[]; test: BoardSub[] };
   round: { status: 'open' | 'closed' | 'released'; entries: Array<{ student_id: string; name: string; levels: Record<string, Level>; worked: string; next: string; about: string; flagged: boolean; status: string }> } | null;
 };
@@ -237,6 +247,7 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
         parts: (parts) => call('parts', { parts }),
         claimPart: (partId) => call('claim_part', { part_id: partId }),
         assign: (partId, keys) => call('assign', { part_id: partId, keys }),
+        setAssembler: (key) => call('assembler', { key }),
         pitch: (source) => call('pitch', source),
         feedback: (groupId, entry) => call('feedback', { group_id: groupId, entry }),
         audience: (who, why) => call('audience', { who, why }),
