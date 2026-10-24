@@ -5,6 +5,7 @@ import { KaplanQualifiersSchema } from './kaplan';
 import { DiscernQualifierSchema } from './discern';
 import { LensAttachmentsSchema, LensLevelSchema, LogicSchema } from './lens';
 import { TutorialGroupIdSchema } from '../tutorial/schema';
+import { SprintPhaseKeySchema } from '../sprint/schema';
 import { QuizQuestionDraftSchema, QuizQuestionKindSchema } from '../quiz/core';
 import {
   AnalogyMoveContentSchema,
@@ -1876,7 +1877,9 @@ const SectionBlockObjectSchema = z.object({
     /** Tutorial: this top-level section is the tab for the group with this id. */
     tutorial_group: TutorialGroupIdSchema.optional(),
     /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
-    tutorial_exit: z.boolean().optional()
+    tutorial_exit: z.boolean().optional(),
+    /** Design Sprint: this top-level section holds the guides for one phase. */
+    sprint_phase: SprintPhaseKeySchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps

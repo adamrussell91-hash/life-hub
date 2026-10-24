@@ -4,6 +4,7 @@ import { CommonFields, IsoDateSchema, TrashFields } from './common';
 import { AfterLessonIdsSchema, BlockSchema, DotPointRefSchema, LessonRouteRoleSchema, LessonSkipRuleSchema, LineOffSchema, LineStopSchema } from './block';
 import { QuizSettingsSchema } from '../quiz/core';
 import { TutorialSettingsSchema } from '../tutorial/schema';
+import { SprintSettingsSchema } from '../sprint/schema';
 import { visitBlocks } from '../blocks/walk-blocks';
 import { tutorialIssues } from '../tutorial/model';
 import { CoverSchema } from './cover';
@@ -58,6 +59,8 @@ export const LessonSchema = z.object({
   quiz: QuizSettingsSchema.optional(),
   /** Tutorial lessons only: the class and its groups. */
   tutorial: TutorialSettingsSchema.optional(),
+  /** Design Sprint lessons only: Kit, phases and groups. */
+  sprint: SprintSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 
