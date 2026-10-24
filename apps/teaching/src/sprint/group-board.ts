@@ -78,6 +78,7 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
 
     const p = el('div', 'sboard__part');
     p.append(el('h3', '', 'Parts and pitch file'));
+    if (b.assembler) p.append(el('p', '', `Assembler: ${b.assembler}`));
     for (const part of b.parts) p.append(el('p', '', `${part.text}: ${part.by.join(', ') || 'unclaimed'}`));
     if (b.pitch) {
       const pitch = b.pitch;

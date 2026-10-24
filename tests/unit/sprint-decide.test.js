@@ -138,3 +138,27 @@ test('parts are given to group members by their initials: one part each, one per
   const sent = await act(store, 2, 'submit', { phase: 'decide', payload: ballot });
   assert.equal(sent.phases[2].state, 'in');
 });
+
+test('the group picks an assembler in Decide; in Prototype everyone sees every part, and only the assembler sets the finished prototype', async () => {
+  const store = await atDecide({ ...CONFIG(), assemble: true });
+  const s = await act(store, 1, 'status');
+  const baker = s.gallery.flatMap((x) => x.ideas).find((i) => i.title === 'Baker').id;
+  const ballot = { votes: { c1: baker, c2: baker }, reasons: { c1: 'It names a source.', c2: 'It says why it matters.' }, opened: s.gallery.map((x) => x.id) };
+  for (const n of [1, 2]) await act(store, n, 'save', { phase: 'decide', payload: ballot });
+  let v = await act(store, 1, 'parts', { parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1' }, { id: 'p2', text: 'Artefact list', shows: '', criterion: 'c2' }] });
+  const [ann, cy] = v.members.map((m) => m.key);
+  await act(store, 1, 'assign', { part_id: 'p1', keys: [ann] });
+  await act(store, 1, 'assign', { part_id: 'p2', keys: [cy] });
+  assert.equal(v.assemble, true);
+  await assert.rejects(act(store, 1, 'submit', { phase: 'decide', payload: ballot }), { code: 'need_assembler' });
+  v = await act(store, 2, 'assembler', { key: cy });
+  assert.deepEqual(v.assembler, { key: cy, initials: 'CD', me: true });
+  for (const n of [1, 2]) await act(store, n, 'submit', { phase: 'decide', payload: ballot });
+  await act(store, 1, 'save', { phase: 'prototype', payload: { text: 'The baker’s morning, in 80 words.', link: 'https://example.com/panel' } });
+  v = await act(store, 2, 'status');
+  assert.deepEqual(v.group_parts.map((r) => [r.part, r.who, r.started, r.in]), [['Panel text', 'AB', true, false], ['Artefact list', 'CD', false, false]]);
+  assert.equal(v.group_parts[0].text, 'The baker’s morning, in 80 words.');
+  await assert.rejects(act(store, 1, 'pitch', { link: 'https://example.com/finished' }), { code: 'not_assembler' });
+  v = await act(store, 2, 'pitch', { link: 'https://example.com/finished' });
+  assert.equal(v.pitch.link, 'https://example.com/finished');
+});

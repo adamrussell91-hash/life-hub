@@ -4,7 +4,11 @@ import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type
 import { LEVEL_LABELS, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
-/** Prototype: build your part (write, upload or link), set the group's pitch file, then check it against the criteria. */
+/**
+ * Prototype: build your part (write, upload or link) and check it against the
+ * criteria. Everyone sees the group's parts as they come in; the assembler
+ * puts them together and uploads the finished prototype for the pitch.
+ */
 export function mountPrototype(ctx: FormContext): PhaseForm {
   const s = ctx.status;
   const mine = draftOf(ctx, 'prototype');
@@ -13,7 +17,7 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   const root = el('div', 'sprint-prototype');
   root.append(el('h2', '', myPart ? `Your part: ${myPart.text}` : 'Your part'));
   const brief = el('div', 'sprint-brief-part');
-  brief.append(el('p', '', s.chosen ? `Group idea: ${s.chosen.title}` : ''), el('p', '', myPart?.shows ? `It must show: ${myPart.shows}` : 'Claim a part in Decide first.'));
+  brief.append(el('p', '', s.chosen ? `Group idea: ${s.chosen.title}` : ''), el('p', '', myPart?.shows ? `It must show: ${myPart.shows}` : 'Your group gives out parts in Decide.'));
   const serves = ctx.sprint.criteria.find((c) => c.id === myPart?.criterion);
   if (serves) brief.append(el('p', '', `It serves: ${serves.text}`));
   root.append(brief);
@@ -51,20 +55,8 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   files.append(el('label', 'sprint-field__label', 'Upload a PDF or picture (up to 5 MB), or add a link'), upload, fileList, link, err);
   root.append(files);
 
-  const pitch = el('div', 'sprint-pitch');
-  pitch.append(el('h3', '', 'Pitch file'), el('p', 'sprint-note', s.pitch ? `Set: ${s.pitch.kind === 'link' ? s.pitch.link : s.pitch.name}` : 'One person sets what your group will show during the 2-minute pitch.'));
-  const usePitch = button('Use my file or link as the pitch file', 'secondary', async () => {
-    try {
-      const next = state.link ? await ctx.client.pitch({ link: state.link }) : state.files[0] ? await ctx.client.pitch({ file_id: state.files.at(-1)! }) : null;
-      if (next) ctx.onStatus(next);
-      else err.textContent = 'Upload a file or add a link first.';
-    } catch (e) {
-      err.textContent = e instanceof Error ? e.message : 'That didn’t work.';
-    }
-  });
-  usePitch.disabled = !ctx.editable;
-  pitch.append(usePitch);
-  root.append(pitch);
+  if (s.group_parts) root.append(groupPartsPanel(ctx));
+  root.append(s.assemble ? finishedPrototype(ctx) : pitchFromMine(ctx, state, err));
 
   const self = el('div', 'sprint-self');
   self.append(el('h3', '', 'Check your part against the criteria'));
@@ -95,4 +87,93 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   return { el: root, dispose: bar.dispose };
 }
 
-export const prototypeSignature = (s: SprintStatus) => [(s.parts ?? []).find((p) => p.mine)?.id ?? '', s.pitch?.file ?? s.pitch?.link ?? ''].join('|');
+/** Sprints published before assemblers: anyone sets the pitch file from their own part. */
+function pitchFromMine(ctx: FormContext, state: PhasePayload['prototype'], err: HTMLElement): HTMLElement {
+  const s = ctx.status;
+  const pitch = el('div', 'sprint-pitch');
+  pitch.append(el('h3', '', 'Pitch file'), el('p', 'sprint-note', s.pitch ? `Set: ${s.pitch.kind === 'link' ? s.pitch.link : s.pitch.name}` : 'One person sets what your group will show during the 2-minute pitch.'));
+  const usePitch = button('Use my file or link as the pitch file', 'secondary', async () => {
+    try {
+      const next = state.link ? await ctx.client.pitch({ link: state.link }) : state.files[0] ? await ctx.client.pitch({ file_id: state.files.at(-1)! }) : null;
+      if (next) ctx.onStatus(next);
+      else err.textContent = 'Upload a file or add a link first.';
+    } catch (e) {
+      err.textContent = e instanceof Error ? e.message : 'That didn’t work.';
+    }
+  });
+  usePitch.disabled = !ctx.editable;
+  pitch.append(usePitch);
+  return pitch;
+}
+
+/** Every part of the group's prototype as it comes in: who, what they wrote, their files and links. */
+function groupPartsPanel(ctx: FormContext): HTMLElement {
+  const rows = ctx.status.group_parts ?? [];
+  const box = el('details', 'sp-parts');
+  box.open = true;
+  const done = rows.filter((r) => r.in).length;
+  box.append(el('summary', '', `Your group’s parts · ${done} of ${rows.length} in`));
+  for (const r of rows) {
+    const card = el('div', `sp-part${r.in ? ' sp-part--in' : ''}`);
+    card.append(el('strong', '', `${r.part} · ${r.me ? 'you' : r.who}`), el('span', 'sp-part__state', r.in ? 'In' : r.started ? 'Started' : 'Not started'));
+    if (r.text) card.append(el('p', 'sp-part__text', r.text));
+    if (r.link) {
+      const a = el('a', '', r.link);
+      a.href = r.link;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      card.append(a);
+    }
+    for (const f of r.files) card.append(button(`Open ${f.name}`, 'ghost', async () => window.open(await ctx.client.fileUrl(f.id), '_blank', 'noopener')));
+    box.append(card);
+  }
+  if (!rows.length) box.append(el('p', 'sprint-note', 'Parts show here once your group has given them out in Decide.'));
+  return box;
+}
+
+/** The assembler uploads the put-together prototype for the pitch; everyone else sees where it is up to. */
+function finishedPrototype(ctx: FormContext): HTMLElement {
+  const s = ctx.status;
+  const box = el('div', 'sprint-pitch');
+  box.append(el('h3', '', 'The finished prototype'));
+  const set = s.pitch ? `In: ${s.pitch.kind === 'link' ? s.pitch.link : s.pitch.name}` : '';
+  if (!s.assembler?.me) {
+    box.append(el('p', 'sprint-note', set || (s.assembler ? `Waiting for ${s.assembler.initials} to put it together.` : 'Your group hasn’t picked an assembler. Ask your teacher.')));
+    return box;
+  }
+  box.append(el('p', 'sprint-note', set || 'You’re the assembler. Put everyone’s parts together, then upload the finished prototype or add its link. This is what your group shows at the pitch.'));
+  const err = el('p', 'sprint-submit__err');
+  err.setAttribute('role', 'alert');
+  const upload = el('input');
+  upload.type = 'file';
+  upload.accept = 'application/pdf,image/png,image/jpeg,image/webp';
+  upload.disabled = !ctx.editable;
+  upload.setAttribute('aria-label', 'Upload the finished prototype');
+  upload.addEventListener('change', async () => {
+    const file = upload.files?.[0];
+    if (!file) return;
+    try {
+      const up = await ctx.client.upload('prototype', file);
+      ctx.onStatus(await ctx.client.pitch({ file_id: up.id }));
+    } catch (e) {
+      err.textContent = e instanceof Error ? e.message : 'That didn’t upload.';
+    }
+  });
+  const link = el('form', 'su-add');
+  const input = el('input', 'qz-input');
+  input.placeholder = 'https://… (the finished Canva, Slides or document)';
+  input.setAttribute('aria-label', 'Link to the finished prototype');
+  input.disabled = !ctx.editable;
+  const go = el('button', 'btn btn--secondary', 'Use this link');
+  go.type = 'submit';
+  go.disabled = !ctx.editable;
+  link.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try { ctx.onStatus(await ctx.client.pitch({ link: input.value.trim() })); } catch (x) { err.textContent = x instanceof Error ? x.message : 'That didn’t work.'; }
+  });
+  link.append(input, go);
+  box.append(upload, link, err);
+  return box;
+}
+
+export const prototypeSignature = (s: SprintStatus) => [(s.parts ?? []).find((p) => p.mine)?.id ?? '', s.pitch?.file ?? s.pitch?.link ?? '', s.assembler?.key ?? '', (s.group_parts ?? []).map((r) => `${r.part_id}:${r.who}:${r.in ? 1 : r.started ? 0 : '-'}:${r.files.length}:${r.link ? 1 : 0}`).join(',')].join('|');
