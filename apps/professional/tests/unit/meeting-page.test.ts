@@ -93,7 +93,7 @@ vi.mock('@/components/block-page', () => ({
 
 import { renderMeetingPage } from '@/views/meeting-page';
 import { mountBlockPage } from '@/components/block-page';
-import { meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
+import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
 import { createUniversalLink, suppressUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
 
 describe('meeting page', () => {
@@ -245,7 +245,68 @@ describe('meeting page', () => {
     canvas.querySelector<HTMLButtonElement>('[data-part="end-meeting"]')!.click();
     await vi.advanceTimersByTimeAsync(0);
     expect(meetingStateAction).toHaveBeenCalledWith(MEETING_ID, 'complete');
+    expect(canvas.querySelector('.meeting-page__state')?.textContent).toBe('Completed');
+    expect(canvas.querySelector('[data-state-action]')).toBeNull();
     expect(canvas.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('after');
+  });
+
+  it.each(['complete', 'cancel', 'no-show'] as const)('%s updates in place without reloading notes', async (action) => {
+    const state = { complete: 'completed', cancel: 'cancelled', 'no-show': 'no_show' }[action];
+    vi.mocked(meetingStateAction).mockResolvedValueOnce({ meeting: { ...meeting, state } } as never);
+    const canvas = await render();
+    const root = canvas.firstElementChild;
+    const notes = canvas.querySelector('[data-part="notes"]');
+    canvas.querySelector<HTMLButtonElement>(`[data-state-action="${action}"]`)!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(canvas.firstElementChild).toBe(root);
+    expect(canvas.querySelector('[data-part="notes"]')).toBe(notes);
+    expect(getMeeting).toHaveBeenCalledTimes(1);
+    expect(mountBlockPage).toHaveBeenCalledTimes(1);
+    expect(canvas.querySelector('.meeting-page__state')?.classList.contains(`is-${state}`)).toBe(true);
+    expect(canvas.querySelector('[data-state-action]')).toBeNull();
+    expect(canvas.querySelector('[data-part="end-meeting"]')).toBeNull();
+    expect(canvas.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('after');
+  });
+
+  it('locks competing state actions while completion is saving', async () => {
+    let finish!: (result: Awaited<ReturnType<typeof meetingStateAction>>) => void;
+    vi.mocked(meetingStateAction).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-state-action="complete"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    for (const button of canvas.querySelectorAll<HTMLButtonElement>('[data-state-action], [data-part="end-meeting"]')) {
+      expect(button.disabled).toBe(true);
+      button.click();
+    }
+    expect(meetingStateAction).toHaveBeenCalledTimes(1);
+    finish({ meeting: { ...meeting, state: 'completed' } } as never);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(canvas.querySelector('.meeting-page__state')?.textContent).toBe('Completed');
+    expect(canvas.querySelector('[data-state-action]')).toBeNull();
+  });
+
+  it('failed completion stays open and allows retry', async () => {
+    vi.mocked(meetingStateAction).mockRejectedValueOnce(new Error('Could not save completion.'));
+    const canvas = await render();
+    const complete = canvas.querySelector<HTMLButtonElement>('[data-state-action="complete"]')!;
+    complete.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(canvas.textContent).toContain('Could not save completion.');
+    expect(canvas.querySelector('.meeting-page__state')?.textContent).toBe('Scheduled');
+    expect(complete.disabled).toBe(false);
+    complete.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(canvas.querySelector('.meeting-page__state')?.textContent).toBe('Completed');
+    expect(canvas.querySelector('[data-state-action]')).toBeNull();
+  });
+
+  it('completed meetings open in wrap-up and never offer End', async () => {
+    vi.mocked(getMeeting).mockResolvedValueOnce({ meeting: { ...meeting, state: 'completed' } } as never);
+    const canvas = await render();
+    expect(canvas.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('after');
+    expect(canvas.querySelector('[data-state-action]')).toBeNull();
+    canvas.querySelector<HTMLButtonElement>('[data-set-phase="during"]')!.click();
+    expect(canvas.querySelector('[data-part="end-meeting"]')).toBeNull();
   });
 
   it('Edit details saves a new title and moves the time', async () => {
