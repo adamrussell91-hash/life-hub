@@ -10,7 +10,8 @@ import { publishedLessonKey, draftLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, read, reject } from './question-drop.mjs';
 import { identify } from './quiz.mjs';
-import { PAYLOAD_SCHEMAS, PartsSchema, SprintSettingsSchema } from './sprint-schema.mjs';
+import { FeedbackEntrySchema, PAYLOAD_SCHEMAS, PartsSchema, SprintSettingsSchema } from './sprint-schema.mjs';
+import { flagText } from './peer-feedback-filter.mjs';
 import { openPhases, lockState, isFrozen, isLate, tally, heatLevels, endsAtEpoch, phaseDue } from './sprint-rules.mjs';
 import { sprintKeys, emptyGroup, emptyLock } from './sprint-keys.mjs';
 
@@ -429,7 +430,85 @@ export async function sprintAction(store, lessonId, body) {
   return withRound(store, lessonId, config, group, sid, view);
 }
 
-async function checkOwnFiles() {}
+/** Files named in a payload must be the student's own. */
+async function checkOwnFiles(store, lessonId, owner, phase, payload) {
+  const ids = phase === 'prototype' ? payload.files : phase === 'sketch' ? payload.cards.map((c) => c.file).filter(Boolean) : [];
+  const k = sprintKeys(lessonId);
+  for (const id of ids) {
+    const index = await read(store, k.fileOwner(id));
+    if (index?.owner !== owner) reject(400, 'bad_file', 'That file has gone. Upload it again.');
+  }
+}
+
+/** Feedback on the presenting group: once per student, while the round is open, never on your own group. */
+async function giveFeedback(store, lessonId, config, group, sid, body) {
+  const k = sprintKeys(lessonId);
+  const target = config.groups.find((g) => g.id === body.group_id);
+  if (!target) reject(404, 'not_found', 'That group is gone.');
+  if (target.id === group.id) reject(400, 'own_group', 'Your group is presenting. Listen to the feedback.');
+  const round = await read(store, k.round(target.id));
+  if (round?.status !== 'open') reject(409, 'round_closed', 'Feedback for this group has closed.');
+  const parsed = FeedbackEntrySchema.safeParse(body.entry);
+  if (!parsed.success) reject(400, 'bad_feedback', parsed.error.issues[0]?.message ?? 'Check your feedback.');
+  const e = parsed.data;
+  const levels = Object.fromEntries(Object.entries(e.levels).filter(([c]) => config.criteria.includes(c)));
+  const flagged = flagText(e.worked) || flagText(e.next);
+  const entries = { ...(round.entries ?? {}), [sid]: { levels, worked: e.worked, next: e.next, about: config.criteria.includes(e.about) ? e.about : '', flagged, status: flagged ? 'held' : 'ok', at: iso(clock()) } };
+  await store.setJSON(k.round(target.id), { ...round, entries });
+}
+
+/** Adds the running round's card, the group's released feedback and the spotlight to a student view. */
+async function withRound(store, lessonId, config, group, sid, view) {
+  const k = sprintKeys(lessonId);
+  const stage = (await read(store, k.stage)) ?? {};
+  let round = null;
+  for (const g of config.groups) {
+    if (g.id === group.id) continue;
+    const r = await read(store, k.round(g.id));
+    if (r?.status === 'open') { round = { group_id: g.id, group_name: g.name, sent: !!r.entries?.[sid] }; break; }
+  }
+  const own = await read(store, k.round(group.id));
+  let received = null;
+  if (own?.status === 'released') {
+    const shown = Object.values(own.entries ?? {}).filter((e) => e.status === 'ok' || e.status === 'released');
+    const levels = Object.fromEntries(config.criteria.map((c) => [c, [1, 2, 3].map((lv) => shown.filter((e) => e.levels[c] === lv).length)]));
+    received = { levels, lines: shown.map((e) => ({ worked: e.worked, next: e.next, about: e.about })) };
+  }
+  return { ...view, round, received, running: stage.running ?? null };
+}
+
+/** run: who is pitching now. round: open, close or release a group's feedback. moderate: release or remove one entry. */
+async function roundAction(store, lessonId, config, action, body) {
+  const k = sprintKeys(lessonId);
+  if (action === 'run') {
+    if (body.group_id !== null && !config.groups.some((g) => g.id === body.group_id)) reject(404, 'not_found', 'That group is gone.');
+    const stage = (await read(store, k.stage)) ?? {};
+    await store.setJSON(k.stage, { ...stage, running: body.group_id });
+    return;
+  }
+  const g = config.groups.find((x) => x.id === body.group_id);
+  if (!g) reject(404, 'not_found', 'That group is gone.');
+  const round = (await read(store, k.round(g.id))) ?? { status: 'closed', entries: {} };
+  if (action === 'round') {
+    const now = iso(clock());
+    if (body.op === 'open') {
+      // One round at a time: opening this one closes any other.
+      for (const other of config.groups) {
+        if (other.id === g.id) continue;
+        const r = await read(store, k.round(other.id));
+        if (r?.status === 'open') await store.setJSON(k.round(other.id), { ...r, status: 'closed', closed_at: now });
+      }
+      await store.setJSON(k.round(g.id), { ...round, status: 'open', opened_at: now });
+    } else if (body.op === 'close') await store.setJSON(k.round(g.id), { ...round, status: 'closed', closed_at: now });
+    else if (body.op === 'release') await store.setJSON(k.round(g.id), { ...round, status: 'released' });
+    else reject(400, 'bad_op', 'Open, close or release.');
+  }
+  if (action === 'moderate') {
+    const e = round.entries?.[body.student_id];
+    if (!e || !['released', 'removed'].includes(body.status)) reject(404, 'not_found', 'That feedback is gone.');
+    await store.setJSON(k.round(g.id), { ...round, entries: { ...round.entries, [body.student_id]: { ...e, status: body.status } } });
+  }
+}
 /** Votes name a known criterion and an idea in this group's gallery; opened lists only real set ids. */
 function checkVotes(view, config, payload) {
   const ideas = new Set((view.gallery ?? []).flatMap((s) => s.ideas.map((i) => i.id)));
@@ -480,9 +559,6 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
   }
   await store.setJSON(k.group(group.id), state);
 }
-async function giveFeedback() { reject(400, 'bad_action', 'Unknown action.'); }
-async function withRound(store, lessonId, config, group, sid, view) { return view; }
-async function roundAction() { reject(400, 'bad_action', 'Unknown action.'); }
 
 // ---------------------------------------------------------------------------
 // Teacher side: the progress map, a group's board and the class controls.
