@@ -10,6 +10,7 @@ import { liveField, withProposal, withoutProposal, PatchError } from './apply-pr
 import { followAgentJob, recordDecision, startAgentReview } from './agent-client';
 import { researchTrail, lostTouch } from './ann-bar';
 import type { Entry, ReviewStore } from './review-state';
+import { ROW_REVEAL_EVENT } from '@/teacher/lesson-canvas/quiz-deck';
 
 export type InlineCardsOptions = {
   host: HTMLElement;
@@ -209,7 +210,10 @@ export function mountInlineCards(options: InlineCardsOptions) {
     });
     const focus = store.state.focus;
     if (focus && focus !== lastFocus) {
-      const target = host.querySelector<HTMLElement>(`[data-ann-key="${CSS.escape(focus)}"]`);
+      const find = () => host.querySelector<HTMLElement>(`[data-ann-key="${CSS.escape(focus)}"]`);
+      // A quiz deck shows one card at a time, so it turns to this one first (and may redraw).
+      find()?.dispatchEvent(new CustomEvent(ROW_REVEAL_EVENT, { bubbles: true }));
+      const target = find();
       if (target) {
         target.scrollIntoView({ block: 'center', behavior: 'smooth' });
         target.focus({ preventScroll: true });

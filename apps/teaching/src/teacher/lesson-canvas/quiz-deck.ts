@@ -9,6 +9,11 @@ import { checkQuestion } from '@/quiz/core';
  */
 
 const LIST_KEY = 'teaching_quiz_deck_list_v1';
+/**
+ * Sent (bubbling) from a row that something outside the canvas wants on
+ * screen, such as Ann's "next suggestion". The deck turns to that card.
+ */
+export const ROW_REVEAL_EVENT = 'lesson-row-reveal';
 const SWIPE_PX = 48;
 
 /** How many quiz questions run on from `index`. Decks start at two. */
@@ -146,6 +151,18 @@ export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
     if (id) options.onShow(id);
   }
 
+  track.addEventListener(ROW_REVEAL_EVENT, (event) => {
+    const index = rows.findIndex((row) => row.contains(event.target as Node));
+    if (index >= 0) go(index);
+  });
+
+  // Ann marks a row she has a suggestion for; the strip shows which cards.
+  const markAnn = () => rows.forEach((row, i) => {
+    if (row.classList.contains('ann-target')) dots[i]!.dataset.ann = 'true';
+    else delete dots[i]!.dataset.ann;
+  });
+  new MutationObserver(markAnn).observe(track, { attributes: true, attributeFilter: ['class'], subtree: true });
+
   prev.addEventListener('click', () => go(at - 1));
   next.addEventListener('click', () => go(at + 1));
   const onKey = (event: KeyboardEvent) => {
@@ -180,5 +197,6 @@ export function mountQuizDeck(options: QuizDeckOptions): HTMLElement {
   });
 
   paint(0);
+  markAnn();
   return deck;
 }
