@@ -94,6 +94,8 @@ var SprintSettingsSchema = z.object({
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z.number().int().min(0).max(30).default(8),
+  /** Decide's stand-out dots each student places on parts of any idea; 0 turns them off. */
+  decide_dots: z.number().int().min(0).max(5).default(3),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z.object({ prototype: z.string().optional(), reflection: z.string().optional() }).default({})
 });
@@ -107,7 +109,8 @@ var PublicSprintSchema = z.object({
   idea_guide: IdeaGuideSchema,
   phases: z.array(SprintPhaseSchema).length(5),
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
-  sketch_timer: z.number().int().min(0).max(30).default(8)
+  sketch_timer: z.number().int().min(0).max(30).default(8),
+  decide_dots: z.number().int().min(0).max(5).default(3)
 });
 var where = text(200);
 var Wheres = z.record(z.string().max(40), where).default({});
@@ -154,7 +157,11 @@ var SketchPayloadSchema = z.object({
   strongest: z.string().max(40).default(""),
   strongest_why: text(300).default("")
 });
+var IDEA_PARTS = ["idea", "answers", "evidence"];
+var DotSchema = z.object({ idea: z.string().max(40), part: z.enum(IDEA_PARTS), note: text(120).default("") });
 var DecidePayloadSchema = z.object({
+  /** Stand-out dots: up to the Kit's number, on parts of any idea. */
+  dots: z.array(DotSchema).max(5).default([]),
   /** Criterion id → idea id. */
   votes: z.record(z.string().max(40), z.string().max(40)).default({}),
   reasons: z.record(z.string().max(40), text(300)).default({}),
@@ -199,7 +206,9 @@ var FeedbackEntrySchema = z.object({
 });
 export {
   DecidePayloadSchema,
+  DotSchema,
   FeedbackEntrySchema,
+  IDEA_PARTS,
   IdeaGuideSchema,
   LEVEL_LABELS,
   LIMIT_BOXES,

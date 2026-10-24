@@ -92,6 +92,7 @@ export function openPracticeRun(o: { getLesson: () => Lesson; api?: PracticeApi 
       submit: (phase, payload) => after(client.submit(phase, payload)),
       parts: (parts) => after(client.parts(parts)),
       claimPart: (id) => after(client.claimPart(id)),
+      assign: (id, keys) => after(client.assign(id, keys)),
       pitch: (source) => after(client.pitch(source)),
       feedback: (g, e) => after(client.feedback(g, e))
     };

@@ -52,6 +52,46 @@ describe('decide form', () => {
   });
 });
 
+describe('decide: stand-out dots and parts', () => {
+  it('places up to the Kit’s dots on parts of any idea, with an optional note, and checks they are all placed', () => {
+    const c = ctx(base({ dots: 2 }));
+    const f = mountDecide(c);
+    f.el.querySelectorAll<HTMLDetailsElement>('.sprint-set').forEach((s) => { s.open = true; s.dispatchEvent(new Event('toggle')); });
+    const dots = () => [...f.el.querySelectorAll<HTMLButtonElement>('.sd-dot')];
+    expect(dots()).toHaveLength(9);
+    expect(f.el.querySelector('.sd-counter')?.textContent).toBe('Stand-out dots: 0 of 2 placed.');
+    dots()[0]!.click();
+    dots()[5]!.click();
+    expect(f.el.querySelector('.sd-counter')?.textContent).toBe('Stand-out dots: 2 of 2 placed.');
+    expect(dots()[1]!.disabled).toBe(true);
+    const note = dots()[0]!.parentElement!.querySelector<HTMLInputElement>('.sd-note')!;
+    expect(note.hidden).toBe(false);
+    dots()[5]!.click();
+    expect(dots()[1]!.disabled).toBe(false);
+    f.el.querySelector<HTMLButtonElement>('.sprint-submit .btn--primary')!.click();
+    expect(f.el.querySelector('.sprint-checks')?.textContent).toContain('Place all 2 stand-out dots. You have placed 1.');
+  });
+
+  it('gives a part to someone by their initials, says who still needs a part, and adds a borrowed part', () => {
+    const status = base({
+      votes_closed: true, chosen: { id: 'i3', title: 'Baker', idea: 'What if Baker?' },
+      members: [{ key: 'm1', initials: 'AB', me: true }, { key: 'm2', initials: 'CD', me: false }],
+      parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1', claimed: 0, mine: false, assigned: [] }, { id: 'p2', text: 'Artefacts', shows: '', criterion: 'c2', claimed: 1, mine: false, assigned: ['m2'] }],
+      borrow: [{ idea_id: 'i1', title: 'Ash', part: 'evidence', text: 'Source B', count: 2, notes: ['Strong source'] }]
+    });
+    const c = ctx(status);
+    (c.client as unknown as { assign: unknown }).assign = vi.fn(async () => status);
+    const f = mountDecide(c);
+    expect(f.el.querySelector('.sd-status')?.textContent).toBe('1 part has no one yet. Still without a part: AB.');
+    const chip = [...f.el.querySelectorAll<HTMLButtonElement>('.sd-who .sprint-chip')].find((b) => b.textContent === 'AB (you)')!;
+    chip.click();
+    expect((c.client as unknown as { assign: ReturnType<typeof vi.fn> }).assign).toHaveBeenCalledWith('p1', ['m1']);
+    expect(f.el.querySelector('.sd-borrow')?.textContent).toContain('Ash: Source B ●●');
+    [...f.el.querySelectorAll<HTMLButtonElement>('.sd-borrow button')][0]!.click();
+    expect([...f.el.querySelectorAll<HTMLInputElement>('.sprint-parts input')].map((i) => i.value)).toContain('From "Ash"');
+  });
+});
+
 describe('prototype form', () => {
   it('shows the part brief, upload, pitch file and the self-check', () => {
     const s = base({ chosen: { id: 'i3', title: 'Baker', idea: 'x' }, parts: [{ id: 'p1', text: 'Panel text', shows: 'The baker’s morning', criterion: 'c1', claimed: 1, mine: true }] });

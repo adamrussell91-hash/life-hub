@@ -67,10 +67,12 @@ export function mountGroupBoard(host: HTMLElement, o: { api: SprintTeacherApi; g
     }
     root.append(g);
 
-    if (b.reasons.some((r) => Object.keys(r.reasons).length)) {
+    if (b.reasons.some((r) => Object.keys(r.reasons).length || r.dots?.length)) {
       const rs = el('div', 'sboard__part');
       rs.append(el('h3', '', 'Vote reasons'));
       for (const r of b.reasons) for (const c of crit()) if (r.reasons[c.id]) rs.append(el('p', '', `${r.name}, ${c.text}: ${r.reasons[c.id]}`));
+      const titles = new Map(b.gallery.flatMap((set) => set.ideas.map((i) => [i.id, i.title])));
+      for (const r of b.reasons) for (const d of r.dots ?? []) rs.append(el('p', 'sprint-note', `${r.name} dotted ${d.part === 'idea' ? 'the idea' : d.part === 'answers' ? 'how it solves the problem' : 'the evidence'} in "${titles.get(d.idea) ?? 'an idea'}"${d.note ? `: ${d.note}` : ''}`));
       root.append(rs);
     }
 

@@ -13,7 +13,7 @@ export const KIT_NOTES: Record<KitNoteKey, KitNote> = {
   },
   settings: {
     what: 'How much help shows, who picks each group’s idea, how many ideas each student puts forward, the rapid ideas timer in Sketch, and the class lock.',
-    students: 'Guided adds sentence starters and tighter checks. In Sketch, students start the timer, write as many rough ideas as they can until it locks the box, then star their best and develop those. Only the starred ideas go to the group. The class lock stops work for a few hours after you end a class part, so class work stays class work.',
+    students: 'Guided adds sentence starters and tighter checks. In Sketch, students start the timer, write as many rough ideas as they can until it locks the box, then star their best and develop those. Only the starred ideas go to the group. In Decide, each student places stand-out dots on the parts of any idea that stand out; after voting, the most-dotted parts of ideas not chosen show as Worth borrowing. The class lock stops work for a few hours after you end a class part, so class work stays class work.',
     setup: 'Teacher confirms lets you check each group’s pick before they build. Two ideas each keeps a group of four’s gallery to eight. 2 hours of lock suits a lesson that ends at lunch or the end of the day.'
   },
   understand: {

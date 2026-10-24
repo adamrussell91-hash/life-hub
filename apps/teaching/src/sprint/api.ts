@@ -1,7 +1,7 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import { deviceToken } from '@/quiz/dom';
-import type { FeedbackEntry, Level, LimitBox, Part, PhasePayload, SprintPhaseKey } from './schema';
+import type { Dot, FeedbackEntry, IdeaPart, Level, LimitBox, Part, PhasePayload, SprintPhaseKey } from './schema';
 
 // ---------------------------------------------------------------- student
 
@@ -39,7 +39,15 @@ export type SprintStatus = {
   votes_closed?: boolean;
   chosen?: { id: string; title: string; idea: string } | null;
   awaiting?: { kind: 'question' | 'idea' } | null;
-  parts?: Array<Part & { claimed: number; mine: boolean }>;
+  /** `assigned`: member keys on this part. */
+  parts?: Array<Part & { claimed: number; mine: boolean; assigned?: string[] }>;
+  /** The group, for the part picker: keys that name no one, and initials. */
+  members?: Array<{ key: string; initials: string; me: boolean }>;
+  /** Stand-out dots each student places in Decide; 0 means none. */
+  dots?: number;
+  /** After voting closes: dots per part of each idea, and the most-dotted parts of ideas not chosen. */
+  dot_counts?: Record<string, Record<IdeaPart, number>> | null;
+  borrow?: Array<{ idea_id: string; title: string; part: IdeaPart; text: string; count: number; notes: string[] }> | null;
   pitch?: { kind: 'file' | 'link'; name: string; file: string | null; link: string } | null;
   spotlight?: { text: string; label: string } | null;
   round?: { group_id: string; group_name: string; sent: boolean } | null;
@@ -58,6 +66,8 @@ export type SprintClient = {
   submit<P extends SprintPhaseKey>(phase: P, payload: PhasePayload[P]): Promise<SprintStatus>;
   parts(parts: Part[]): Promise<SprintStatus>;
   claimPart(partId: string): Promise<SprintStatus>;
+  /** Give a part to members of the group (by member key); they leave any other part. */
+  assign(partId: string, keys: string[]): Promise<SprintStatus>;
   pitch(source: { file_id: string } | { link: string }): Promise<SprintStatus>;
   feedback(groupId: string, entry: FeedbackEntry): Promise<SprintStatus>;
   /** The group's agreed audience. */
@@ -98,6 +108,7 @@ export function sprintClient(lessonId: string, classId: string): SprintClient {
     submit: (phase, payload) => call('submit', { phase, payload }),
     parts: (parts) => call('parts', { parts }),
     claimPart: (partId) => call('claim_part', { part_id: partId }),
+    assign: (partId, keys) => call('assign', { part_id: partId, keys }),
     pitch: (source) => call('pitch', source),
     feedback: (groupId, entry) => call('feedback', { group_id: groupId, entry }),
     audience: (who, why) => call('audience', { who, why }),
@@ -140,7 +151,7 @@ export type GroupBoard = {
   gallery: Array<{ id: string; name: string; student_id: string; ideas: GalleryIdea[] }>;
   totals: Record<string, number>;
   heat: Record<string, Record<string, HeatLevel>>;
-  reasons: Array<{ name: string; votes: Record<string, string>; reasons: Record<string, string> }>;
+  reasons: Array<{ name: string; votes: Record<string, string>; reasons: Record<string, string>; dots?: Dot[] }>;
   parts: Array<Part & { by: string[] }>;
   pitch: { kind: 'file' | 'link'; file?: string; link?: string; name?: string; by: string } | null;
   subs: { prototype: BoardSub[]; test: BoardSub[] };
@@ -225,6 +236,7 @@ export function sprintPracticeApi(lessonId: string): PracticeApi {
         submit: (phase, payload) => call('submit', { phase, payload }),
         parts: (parts) => call('parts', { parts }),
         claimPart: (partId) => call('claim_part', { part_id: partId }),
+        assign: (partId, keys) => call('assign', { part_id: partId, keys }),
         pitch: (source) => call('pitch', source),
         feedback: (groupId, entry) => call('feedback', { group_id: groupId, entry }),
         audience: (who, why) => call('audience', { who, why }),
