@@ -2,6 +2,7 @@ import type { Lesson } from '@/schemas/lesson';
 import { button, el } from '@/quiz/dom';
 import { PHASE_LABELS, SPRINT_LIMITS, SPRINT_PHASES, type SprintGroup, type SprintPhaseKey, type SprintSettings } from './schema';
 import { newSprintSettings } from './defaults';
+import { noteEl, type KitNoteKey } from './notes';
 
 export type KitEditorOptions = {
   getLesson: () => Lesson;
@@ -41,6 +42,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
   const root = el('section', 'kit');
   let outcomes: Array<{ id: string; label: string }> = [];
   let roster: Array<{ id: string; name: string; initials: string }> = [];
+  const openNotes = new Set<string>();
   const s = (): SprintSettings => o.getLesson().sprint ?? newSprintSettings(o.classes[0]?.id ?? '');
   const put = (change: (draft: SprintSettings) => void, repaint = false) => {
     const draft = structuredClone(s());
@@ -48,9 +50,9 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     o.emit({ ...o.getLesson(), sprint: draft });
     if (repaint) paint();
   };
-  const card = (title: string, why: string) => {
+  const card = (title: string, why: string, note: KitNoteKey) => {
     const c = el('div', 'kit-card');
-    c.append(el('h3', '', title), el('p', 'kit-why', why));
+    c.append(el('h3', '', title), el('p', 'kit-why', why), noteEl(note, openNotes));
     root.append(c);
     return c;
   };
@@ -71,10 +73,10 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
   };
 
   function paint(): void {
-    root.replaceChildren();
+    root.replaceChildren(noteEl('overview', openNotes, 'How a sprint runs'));
     const cur = s();
 
-    const settings = card('Settings', 'How much scaffolding shows, who chooses the group’s idea, ideas each, and the class lock.');
+    const settings = card('Settings', 'How much scaffolding shows, who chooses the group’s idea, ideas each, and the class lock.', 'settings');
     settings.append(
       selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level'),
       selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Top vote goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides'),
@@ -82,7 +84,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
     );
 
-    const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes, pitch feedback and your marks.');
+    const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes, pitch feedback and your marks.', 'criteria');
     cur.criteria.forEach((c, i) => {
       const row = el('div', 'kit-row kit-criterion');
       row.append(
@@ -97,13 +99,13 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addC.disabled = cur.criteria.length >= SPRINT_LIMITS.criteria;
     crit.append(addC);
 
-    const refl = card('Reflection', 'Marked with its own criterion. Two prompts students answer at home after the pitch.');
+    const refl = card('Reflection', 'Marked with its own criterion. Two prompts students answer at home after the pitch.', 'reflection');
     refl.append(
       text(cur.reflection_criteria[0]?.text ?? '', 160, (v) => put((d) => { d.reflection_criteria = [{ ...(d.reflection_criteria[0] ?? { id: kitId() }), text: v }]; }), 'Reflection criterion'),
       ...[0, 1].map((i) => text(cur.reflection_prompts[i] ?? '', 200, (v) => put((d) => { d.reflection_prompts[i] = v; }), `Reflection prompt ${i + 1}`))
     );
 
-    const req = card('Requirements', 'Must-haves, yes or no. Students tick each one and say where it is.');
+    const req = card('Requirements', 'Must-haves, yes or no. Students tick each one and say where it is.', 'requirements');
     cur.requirements.forEach((r, i) => {
       const row = el('div', 'kit-row kit-requirement');
       row.append(text(r.text, 160, (v) => put((d) => { d.requirements[i]!.text = v; }), 'Requirement'));
@@ -129,7 +131,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addR.disabled = cur.requirements.length >= SPRINT_LIMITS.requirements;
     req.append(addR, el('p', 'kit-why', 'U Understand · S Sketch · D Decide · P Prototype · T Test'));
 
-    const guide = card('Idea guide', 'Shown in Sketch and Decide. Write the model on a different topic from the challenge, so students follow it without copying it.');
+    const guide = card('Idea guide', 'Shown in Sketch and Decide. Write the model on a different topic from the challenge, so students follow it without copying it.', 'idea_guide');
     const lines = el('textarea', 'qz-input');
     lines.rows = 5;
     lines.value = cur.idea_guide.checklist.join('\n');
@@ -147,7 +149,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     notes.addEventListener('input', () => put((d) => { d.idea_guide.model.notes = notes.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 6); }));
     guide.append(el('label', 'kit-label', 'Good idea checklist'), lines, el('label', 'kit-label', 'Model topic'), text(cur.idea_guide.model.topic, 80, (v) => put((d) => { d.idea_guide.model.topic = v; }), 'Model topic'), el('label', 'kit-label', 'Model idea'), modelText, el('label', 'kit-label', 'What each part does'), notes);
 
-    const phases = card('Phases and deadlines', 'A phase opens when the one before is due, everyone in the group is in, or its class part ends.');
+    const phases = card('Phases and deadlines', 'A phase opens when the one before is due, everyone in the group is in, or its class part ends.', 'phases');
     cur.phases.forEach((p, i) => {
       const row = el('div', 'kit-row kit-phase');
       const date = el('input', 'qz-input');
@@ -176,7 +178,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       phases.append(row);
     });
 
-    const groups = card('Groups', 'Groups for this sprint only. Students join by their initials.');
+    const groups = card('Groups', 'Groups for this sprint only. Students join by their initials.', 'groups');
     if (!o.classes.length) groups.append(el('p', 'kit-why', 'Add this unit to a class first.'));
     else {
       groups.append(selectOf(o.classes.map((c): [string, string] => [c.id, c.name]), cur.class_id, (v) => { put((d) => { d.class_id = v; d.groups = []; }); void loadRoster(v); }, 'Class'));
