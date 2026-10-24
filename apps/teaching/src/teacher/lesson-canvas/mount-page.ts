@@ -67,6 +67,7 @@ import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
 import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 import { createTeacherClassExamples } from '@/class-examples/teacher';
 import { mountQuizPanel, type QuizPanelHandle } from '@/quiz/teacher-panel';
+import { deckListBar, mountQuizDeck, quizRunLength, readDeckAsList, writeDeckAsList } from '@/teacher/lesson-canvas/quiz-deck';
 import { createLectureEditorTools } from '@/lecture/editor-tools';
 import { mountTutorialBoard, type TutorialBoardHandle } from '@/tutorial/board';
 import { tutorialTeacherApi } from '@/tutorial/api';
@@ -302,6 +303,9 @@ export function mountBlockCanvas(
   let publishErrorIds = new Set<string>();
   let dndCleanups: CleanupFn[] = [];
   let menuDisposers: Array<() => void> = [];
+  // Which card each quiz deck shows, so a re-render stays on it.
+  let deckCards = new Set<string>();
+  let deckAsList = readDeckAsList();
   const rootMode: DropRootMode = options.allowCollectionAtRoot ? 'page' : 'lesson';
   const canEdit = options.editable !== false;
 
@@ -813,9 +817,7 @@ export function mountBlockCanvas(
     const list = document.createElement('div');
     list.className = 'lesson-page__blocks';
 
-    blocks.forEach((block, index) => {
-      list.append(createGap(index));
-
+    const buildRow = (block: Block, index: number): HTMLElement => {
       const row = document.createElement('div');
       row.className = 'lesson-page__block';
       row.dataset.blockId = block.id;
@@ -849,9 +851,57 @@ export function mountBlockCanvas(
         row.append(preview(block));
       }
       if (canEdit) options.decorateRow?.(row, block);
+      return row;
+    };
 
-      list.append(row);
-    });
+    const shownCards = new Set<string>();
+    for (let index = 0; index < blocks.length; ) {
+      const block = blocks[index]!;
+      list.append(createGap(index));
+      const run = quizRunLength(blocks, index);
+      if (run < 2) {
+        list.append(buildRow(block, index));
+        index += 1;
+        continue;
+      }
+      // A run of quiz questions is one deck, so the page stays short.
+      const runBlocks = blocks.slice(index, index + run);
+      const rows = runBlocks.map((b, i) => buildRow(b, index + i));
+      const has = (id: string | null) => !!id && runBlocks.some((b) => b.id === id);
+      if (deckAsList) {
+        list.append(deckListBar(run, () => {
+          deckAsList = false;
+          writeDeckAsList(false);
+          render();
+        }));
+        rows.forEach((row, i) => {
+          if (i > 0) list.append(createGap(index + i));
+          list.append(row);
+        });
+      } else {
+        const remembered = [...deckCards].find((id) => has(id)) ?? null;
+        const showId = [pendingReveal, selectedId, remembered].find((id) => has(id)) ?? runBlocks[0]!.id;
+        shownCards.add(showId);
+        list.append(mountQuizDeck({
+          blocks: runBlocks,
+          rows,
+          showId,
+          onShow: (id) => {
+            for (const b of runBlocks) deckCards.delete(b.id);
+            deckCards.add(id);
+            // An editor left open on a card out of view would pull the deck back to it.
+            if (has(selectedId) && selectedId !== id) select(null);
+          },
+          onList: () => {
+            deckAsList = true;
+            writeDeckAsList(true);
+            render();
+          }
+        }));
+      }
+      index += run;
+    }
+    deckCards = shownCards;
 
     list.append(createGap(blocks.length));
     root.append(list);
