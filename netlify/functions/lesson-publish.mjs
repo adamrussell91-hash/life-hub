@@ -21,6 +21,8 @@ import { attachedOutcomeIds, filterBlocksForStudent, sanitizeBlocksDeep } from '
 import { materialiseLinkedCompositions } from './_shared/composition-blocks.mjs';
 import { prepareQuizPublish, storeQuizKey } from './_shared/quiz.mjs';
 import { prepareTutorialPublish, storeTutorialTabs } from './_shared/tutorial.mjs';
+import { prepareSprintPublish, sprintPublishProblems, storeSprintConfig } from './_shared/sprint.mjs';
+import { SprintSettingsSchema } from './_shared/sprint-schema.mjs';
 
 export const config = { path: '/api/lessons/:id/publish' };
 
@@ -190,6 +192,29 @@ export function createLessonPublishHandler(deps = {}) {
           env
         );
       }
+    }
+
+    // A design sprint: the body is public; groups, class and rules are stored apart (sprint.mjs).
+    if (draft.pedagogical_mode === 'design_sprint') {
+      const problems = sprintPublishProblems(draft);
+      if (problems.length > 0) return withCors(errorResponse(400, 'validation_error', problems[0], false), request, env);
+      const sprint = prepareSprintPublish({ ...draft, sprint: SprintSettingsSchema.parse(draft.sprint) }, publishBlocks);
+      await storeSprintConfig(store, id, sprint.config);
+      await setJSON(store, publishedLessonKey(id), {
+        lesson_id: id,
+        title,
+        unit_id,
+        blocks: sanitizeBlocksDeep(sprint.snapshot.blocks),
+        published_at: publishedAt,
+        schema_version: 1,
+        ...(draft.cover ? { cover: draft.cover } : {}),
+        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+        pedagogical_mode: 'design_sprint',
+        sprint: sprint.snapshot.sprint
+      });
+      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
     }
 
     // A tutorial: Common is public; tabs and exit-check keys are stored apart (tutorial.mjs).

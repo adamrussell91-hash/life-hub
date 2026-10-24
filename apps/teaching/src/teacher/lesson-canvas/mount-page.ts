@@ -72,6 +72,17 @@ import { mountTutorialBoard, type TutorialBoardHandle } from '@/tutorial/board';
 import { tutorialTeacherApi } from '@/tutorial/api';
 import { createTutorialTabs, inTab, movedGroups, type TutorialTab } from '@/tutorial/editor-tabs';
 import { groupSection, isGroupTab } from '@/tutorial/model';
+import { mountKitEditor } from '@/sprint/kit-editor';
+import { createSprintTabs, inSprintTab, type SprintTab } from '@/sprint/editor-tabs';
+import { mountSprintMap, type SprintMapHandle } from '@/sprint/map';
+import { sprintTeacherApi } from '@/sprint/api';
+import { seedSprint } from '@/sprint/defaults';
+import { phaseOfSection } from '@/sprint/model';
+import { httpMarkbookApi } from '@/markbook/api';
+import { outcomeLabels } from '@/markbook/parse';
+import { peekCurriculum } from '@/app/curriculum-state';
+import { loadAlignment } from '@/alignment/api';
+import { dotPointOutcomes } from '@/evidence/syllabus';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -160,6 +171,8 @@ export type LessonPageHandle = {
   update(lesson: Lesson, nextMedia?: Media[]): void;
   insertType(type: InsertMenuValue): void;
   revealPublishBlock(blockId: string, errorIds?: string[]): void;
+  /** The lesson was just published: panels that need a published lesson (the sprint map) can appear. */
+  markPublished?(at: string): void;
   dispose(): void;
 };
 
@@ -1031,6 +1044,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     syncQuizPanel();
     syncLecturePanel();
     syncTutorialPanel();
+    syncSprintPanel();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
   });
@@ -1158,6 +1172,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   }
   /** On a group's tab, new blocks go at the end of that group's tab section, so they stay in view. */
   function tutorialInsertTarget(): { parent: DropParent; index: number } | null {
+    // On a sprint phase tab, new blocks land in that phase's section.
+    const st = sprintTabs?.current();
+    if (sprintTabs && st && st !== 'kit' && st !== 'brief' && st !== 'all') {
+      const section = lesson.blocks.find((b) => phaseOfSection(b) === st);
+      if (section && section.block_type === 'section') return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
+    }
     const tab = tutorialTabs?.current();
     if (!tutorialTabs || !tab || tab === 'common' || tab === 'all') return null;
     const section = lesson.blocks.find((b) => isGroupTab(b) && groupSection(b)?.id === tab);
@@ -1169,8 +1189,62 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     return { parent: { kind: 'section', id: section.id }, index: section.content.blocks.length };
   }
 
+  // A lesson set to Design Sprint gets the progress map, the Kit and the phase tabs.
+  const sprintHost = document.createElement('div');
+  sprintHost.className = 'lesson-page__sprint';
+  let sprintTabs: ReturnType<typeof createSprintTabs> | null = null;
+  let sprintKit: ReturnType<typeof mountKitEditor> | null = null;
+  let sprintMap: SprintMapHandle | null = null;
+  const sprintOutcomes = async (): Promise<Array<{ id: string; label: string }>> => {
+    const labels = outcomeLabels(peekCurriculum()?.outcomes ?? []);
+    const alignment = await loadAlignment().catch(() => null);
+    const tags = dotPointOutcomes(lesson.dot_points ?? [], alignment, labels).map((t) => t.slice(4));
+    const pick = tags.length ? labels.filter((l) => tags.includes(l.id)) : labels;
+    return pick.map((l) => ({ id: l.id, label: `${l.code} ${l.title}` }));
+  };
+  function syncSprintPanel(): void {
+    const isSprint = resolvePedagogicalMode(lesson.pedagogical_mode) === 'design_sprint';
+    const classes = options.flowClasses ?? [];
+    // A new sprint starts with the default Kit and one guide section per phase.
+    if (isSprint && !lesson.sprint && classes.length) {
+      // emitLesson only records the lesson, so redraw the canvas for the new sections and carry on mounting.
+      emitLesson(seedSprint(lesson, classes[0]!.id, options.idFactory));
+      canvas.update(lesson.blocks, media);
+    }
+    if (isSprint && !sprintTabs) {
+      sprintTabs = createSprintTabs({ onTab: showSprintTab });
+      sprintKit = mountKitEditor({
+        getLesson: () => lesson,
+        emit: emitLesson,
+        classes,
+        loadRoster: (classId) => httpMarkbookApi.load(classId).then((v) => v.students.filter((s) => !s.removed)),
+        outcomes: sprintOutcomes
+      });
+      sprintHost.append(sprintTabs.root, sprintKit.root);
+    } else if (!isSprint && sprintTabs) {
+      sprintMap?.dispose();
+      sprintMap = null;
+      sprintKit = null;
+      sprintTabs = null;
+      sprintHost.replaceChildren();
+    }
+    // The progress map needs a published sprint; it appears on the first publish too.
+    if (isSprint && sprintTabs && !sprintMap && lesson.published_at) {
+      sprintMap = mountSprintMap({ getLesson: () => lesson, api: sprintTeacherApi(lesson.id), emitLesson });
+      sprintHost.prepend(sprintMap.root);
+      void sprintMap.refresh();
+    }
+    if (sprintKit) sprintKit.root.hidden = sprintTabs?.current() !== 'kit';
+    sprintHost.hidden = !isSprint;
+  }
+  function showSprintTab(_tab: SprintTab): void {
+    if (sprintKit) sprintKit.root.hidden = sprintTabs?.current() !== 'kit';
+    canvas.clearSelection();
+    canvas.update(lesson.blocks, media);
+  }
+
   if (showPageMenu) root.append(chrome);
-  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, canvasHost);
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, canvasHost);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1195,6 +1269,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     decorateRow: (row, block) => {
       // Tabs hide page-level rows only; what's inside a section is left alone.
       if (tutorialTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inTab(block, tutorialTabs.current());
+      if (sprintTabs && lesson.blocks.some((b) => b.id === block.id)) row.hidden = !inSprintTab(block, sprintTabs.current());
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
       lectureTools.decorate(row, block);
@@ -1227,7 +1302,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   syncQuizPanel();
   syncLecturePanel();
   syncTutorialPanel();
-  if (tutorialTabs) canvas.update(lesson.blocks, media);
+  syncSprintPanel();
+  if (tutorialTabs || sprintTabs) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
   const syllabus = mountLessonSyllabus(document.createElement('div'));
@@ -1325,6 +1401,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       syncQuizPanel();
       syncLecturePanel();
       syncTutorialPanel();
+    syncSprintPanel();
       lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
@@ -1341,10 +1418,15 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     insertType(type: InsertMenuValue) {
       canvas.insertType(type);
     },
+    markPublished(at: string) {
+      lesson = { ...lesson, published_at: at };
+      syncSprintPanel();
+    },
     revealPublishBlock(blockId: string, errorIds?: string[]) {
       // A publish issue on another tutorial tab: open that tab first.
       const target = blockId ? rootOf(blockId) : undefined;
       if (tutorialTabs && target && !inTab(target, tutorialTabs.current())) tutorialTabs.set(tabOf(target));
+      if (sprintTabs && target && !inSprintTab(target, sprintTabs.current())) sprintTabs.set(phaseOfSection(target) ?? 'brief');
       canvas.revealPublishBlock(blockId, errorIds);
     },
     dispose() {
@@ -1352,6 +1434,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       lecturePanel?.dispose();
       tutorialBoard?.dispose();
       tutorialBoard = null;
+      sprintMap?.dispose();
+      sprintMap = null;
       classExamples.dispose();
       pulseSummary.dispose();
       pulse.dispose();

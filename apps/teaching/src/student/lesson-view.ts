@@ -7,6 +7,9 @@ import { mountStudentQuiz } from '@/quiz/student-quiz';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
 import { tutorialClient } from '@/tutorial/api';
+import { mountSprintPlayer } from '@/sprint/player';
+import { sprintClient } from '@/sprint/api';
+import '@/sprint/forms';
 import { lectureClient } from '@/lecture/api';
 import { isSidePath } from '@/lecture/scenes';
 import type { PublishedLesson } from '@/schemas/published-lesson';
@@ -79,7 +82,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
@@ -108,13 +111,27 @@ export function renderPublishedLessonHero(
   return publishedOutcomes;
 }
 
-/** Returns the player's handle when the lesson plays as a lecture or a tutorial. */
+/** Returns the player's handle when the lesson plays as a lecture, a tutorial or a design sprint. */
 function renderPublishedLesson(
   content: HTMLElement,
   lesson: PublishedLesson,
   extras?: { cls?: PublishedClass; quizClassId?: string }
 ): { dispose(): void } | null {
   content.replaceChildren();
+  if (lesson.pedagogical_mode === 'design_sprint' && lesson.sprint) {
+    // The brief and phase guides are in the snapshot; the group and submissions come from the server after the claim.
+    const classId = extras?.cls?.id ?? extras?.quizClassId;
+    const playerHost = document.createElement('div');
+    content.append(playerHost);
+    return mountSprintPlayer(playerHost, {
+      lesson,
+      classId,
+      client: classId ? sprintClient(lesson.lesson_id, classId) : null,
+      renderHero: (hostEl) => {
+        renderPublishedLessonHero(hostEl, lesson, extras?.cls);
+      }
+    });
+  }
   if (lesson.pedagogical_mode === 'tutorial') {
     // Common, the student's own group tab and the exit check; the tab comes from the server after the initials claim.
     const classId = extras?.cls?.id ?? extras?.quizClassId;
