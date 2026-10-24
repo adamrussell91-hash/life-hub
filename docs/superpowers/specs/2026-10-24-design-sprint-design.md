@@ -43,7 +43,7 @@ lesson type that changes behaviour, as Quiz, Lecture and Tutorial already do.
   about 2 minutes per group.
 - During each pitch the teacher **opens feedback to the rest of the class**,
   and the presenting group gets it.
-- **Only the Reflection is marked** (Adam's call, 24 Oct: the prototype is judged only by the class's pitch feedback in Test, not marked by the teacher). The other phases are
+- **Nothing has to be marked** (Adam's call, 24 Oct): the prototype is judged only by the class's pitch feedback in Test, and marking the Reflection is optional (its markbook column is made the first time the teacher marks one). The other phases are
   recorded as in, late or not in.
 - **The teacher writes the criteria.** No AI anywhere in the sprint.
 - **Class lock.** When the class part of a phase ends, the sprint locks for
@@ -73,7 +73,7 @@ lesson type that changes behaviour, as Quiz, Lecture and Tutorial already do.
 | 2 | **Sketch** | Home | **3** idea cards (section 3). Each has a title, the idea, how it answers the group question, the evidence it uses, and an optional picture or file. Students then mark one card as their strongest and say why. | The group's gallery of ideas |
 | 3 | **Decide** | Class | A vote on each criterion in the anonymous gallery, each with a one-line reason, then a claim on one prototype part | The chosen idea, the parts list and who builds each part |
 | 4 | **Prototype** | Home | Their own part (file, link or text). The assembler uploads the finished prototype. Judged by the class in Test, not marked. | The prototype and pitch file |
-| 5 | **Test** | Class, then home | In class: feedback on every other group's pitch. At home: a reflection on the feedback their group received. **Reflection marked.** | Feedback from the class |
+| 5 | **Test** | Class, then home | In class: feedback on every other group's pitch. At home: a reflection on the feedback their group received. Reflection marking optional. | Feedback from the class |
 
 "Where" is the default. The teacher can change it, and a student who missed a
 class phase can do their part from home before the deadline.

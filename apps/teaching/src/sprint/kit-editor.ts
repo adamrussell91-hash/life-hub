@@ -180,7 +180,7 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addC.disabled = cur.criteria.length >= SPRINT_LIMITS.criteria;
     crit.append(addC);
 
-    const refl = card('Reflection', 'Marked with its own criterion. Two prompts students answer at home after the pitch.', 'reflection');
+    const refl = card('Reflection', 'Two prompts students answer at home after the pitch. Marking it is optional: press Mark reflections on a group’s board if you want it in your markbook.', 'reflection');
     refl.append(
       text(cur.reflection_criteria[0]?.text ?? '', 160, (v) => put((d) => { d.reflection_criteria = [{ ...(d.reflection_criteria[0] ?? { id: kitId() }), text: v }]; }), 'Reflection criterion'),
       ...[0, 1].map((i) => text(cur.reflection_prompts[i] ?? '', 200, (v) => put((d) => { d.reflection_prompts[i] = v; }), `Reflection prompt ${i + 1}`))
