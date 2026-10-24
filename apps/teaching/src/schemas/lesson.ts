@@ -48,6 +48,10 @@ export const LessonSchema = z.object({
   /** On the unit map: a support or extension lesson beside the core route. Null (saves merge) goes back to core. */
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
+  /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
+  branch_from: z.string().min(1).max(64).nullable().optional(),
+  /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
+  pre_unit: z.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
   dot_points: z.array(DotPointRefSchema).max(20).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */

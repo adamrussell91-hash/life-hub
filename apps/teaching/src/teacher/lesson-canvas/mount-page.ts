@@ -1365,6 +1365,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         after: lesson.after_lesson_ids ?? undefined,
         role: lesson.route_role ?? options.flowRole,
         skipRule: lesson.skip_rule ?? undefined,
+        branchFrom: lesson.branch_from ?? undefined,
+        preUnit: lesson.pre_unit ?? undefined,
         onSelf: (patch) => emitLesson({ ...lesson, ...patch }),
         onPeer: options.onFlowPeer,
         ...(options.flowClasses ? { classes: options.flowClasses } : {}),
@@ -1394,7 +1396,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
       dotPoints?.update(lesson.dot_points, lesson.plan_covered ?? []);
-      lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.route_role ?? options.flowRole, lesson.skip_rule ?? undefined);
+      lessonFlow?.update(lesson.after_lesson_ids ?? undefined, lesson.route_role ?? options.flowRole, lesson.skip_rule ?? undefined, lesson.branch_from ?? undefined, lesson.pre_unit ?? undefined);
       if (nextMedia) media = nextMedia;
       titleEditor.update(lesson.title);
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
