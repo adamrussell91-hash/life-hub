@@ -46,6 +46,14 @@ lesson type that changes behaviour, as Quiz, Lecture and Tutorial already do.
 - **Only the Prototype and the Reflection are marked.** The other phases are
   recorded as in, late or not in.
 - **The teacher writes the criteria.** No AI anywhere in the sprint.
+- **Class lock.** When the class part of a phase ends, the sprint locks for
+  that class for **2 hours** (the default). Students can't keep working on
+  the class part after the bell, and can't start the home part straight
+  away.
+- **3 ideas per person** (the default) in every round that generates ideas.
+- **Guides to what a good idea looks like**, with enough scaffolding and
+  rigour that the sprint is supportive, challenging and useful for learning.
+  See section 3.
 
 ## Out of scope
 
@@ -61,9 +69,9 @@ lesson type that changes behaviour, as Quiz, Lecture and Tutorial already do.
 
 | # | Phase | Where | Each student submits | The group gets |
 |---|---|---|---|---|
-| 1 | **Understand** | Class | 1–5 "How might we…" notes, then one star on the group's notes | The group question (the top-starred note) |
-| 2 | **Sketch** | Home | One solution sketch: a title, a short explanation and an optional picture or file. Crazy 8s or the mind map tool comes first if the teacher adds it. | The group's gallery of ideas |
-| 3 | **Decide** | Class | A vote on each criterion in the anonymous gallery, then a claim on one prototype part | The chosen idea, the parts list and who builds each part |
+| 1 | **Understand** | Class | **3** "How might we…" questions, built on the question frame, then one star on the group's questions | The group question (the top-starred one) |
+| 2 | **Sketch** | Home | **3** idea cards (section 3). Each has a title, the idea, how it answers the group question, the evidence it uses, and an optional picture or file. Students then mark one card as their strongest and say why. | The group's gallery of ideas |
+| 3 | **Decide** | Class | A vote on each criterion in the anonymous gallery, each with a one-line reason, then a claim on one prototype part | The chosen idea, the parts list and who builds each part |
 | 4 | **Prototype** | Home | Their own part (file, link or text). One member also uploads the group's pitch file. **Marked.** | The prototype and pitch file |
 | 5 | **Test** | Class, then home | In class: feedback on every other group's pitch. At home: a reflection on the feedback their group received. **Reflection marked.** | Feedback from the class |
 
@@ -92,6 +100,38 @@ area at the top of the sprint and stays visible in every phase.
   passes. Then the decider rule runs.
 - The teacher can **extend** a deadline for the whole class, one group or one
   student.
+- **Ideas per person:** 3 by default for Understand and Sketch. The teacher
+  can set 1–5 for each round. With 3 each, a group of 4 has 12 ideas in its
+  gallery. The gallery groups each student's three ideas together without a
+  name ("Set 1, Set 2…"), and each student's chosen strongest idea comes first
+  in their set.
+
+### Class lock
+
+Students will try to keep working on the class part after the lesson, or
+start the home part early. The class lock stops both.
+
+- On the progress map, the teacher presses **End class part** for a class
+  phase. If the teacher sets a lesson end time for that phase, it ends on its
+  own at that time.
+- Ending does three things for that class:
+  1. **It freezes the class part.** Work done in class (notes, stars,
+     votes and reasons, part claims, feedback) can no longer be changed.
+     Anything not submitted is saved as a draft and submitted automatically.
+  2. **It locks the whole sprint for 2 hours.** Students see "Your class
+     work is in. The sprint opens again at 3:40 pm" with a countdown.
+     Nothing can be opened or edited, including the next phase.
+  3. **The next phase opens when the lock lifts** (or later, if its own
+     opening time is later).
+- The lock length is a sprint setting: 2 hours by default, 0–24 hours. 0
+  means no lock.
+- **Absent students:** a student who never opened the phase during class
+  counts as absent. Once the lock lifts, they can do their class part from
+  home until the phase deadline. A student who did open it in class can't
+  add to their class work later.
+- The teacher can **unlock one student** (for example, a student who left
+  early for a reason) from their dot on the map.
+- Home phases don't lock. Their deadline closes them as normal.
 
 ## 2. Criteria: one list, used three times
 
@@ -115,7 +155,130 @@ edit it and link it to outcomes.
 Phases 1–3 and the class part of 5 carry **no marks**. They show up in the
 markbook only as in, late or not in.
 
-## 3. Groups and the decider
+## 3. Guidance, scaffolding and rigour
+
+A sprint can turn into a fun activity with little learning in it. Three
+supports in every phase stop that:
+
+- **A model:** what good looks like.
+- **A frame:** a structure to build into.
+- **A check:** testing your own work against the criteria before you submit.
+
+Each phase also has a **stretch** for students who finish the class part
+early, since the class lock means they can't take it home.
+
+### Support level
+
+This is a sprint setting that changes how much scaffolding students see by
+default. Students can always open what is folded away.
+
+| Level | For | Frames and starters | Model | Decider default |
+|---|---|---|---|---|
+| **Guided** | Years 7–8 | On, inline | Open beside the work | Teacher confirms |
+| **Standard** | Years 9–10 | On, folded under "Show starters" | Open | Teacher confirms |
+| **Open** | Years 11–12 | Off ("Show starters" if wanted) | Folded | Top vote |
+
+### What a good idea looks like: the idea guide
+
+The idea guide is shown in Sketch and again in Decide. It has two parts.
+
+**1. The good idea checklist.** The sprint ships with a default the teacher
+can edit. It uses can-do wording:
+
+1. It answers our group question.
+2. It meets the criteria. (This line expands into the sprint's own criteria.)
+3. It uses evidence from what we've studied, and names the source, text or
+   quote.
+4. Our group could build it before the deadline.
+5. It does something of its own, rather than repeating the model.
+
+**2. A model idea.** The teacher writes one worked example, **on a different
+topic from the challenge** so it can be followed but not copied. Each part is
+labelled with the checklist point it meets. The teacher can add a second,
+**developing → strong** pair, where the note says what the strong version
+does ("names the source and says what it shows").
+
+The editor tells the teacher to choose a different topic, and opens with a
+filled-in example to edit, so nothing starts blank.
+
+### The sprint kit: criteria, requirements, guides
+
+Everything the teacher sets up at the start lives in one **Kit** step of the
+sprint editor. It then flows into the phases where it is needed, so it is
+written once and used throughout:
+
+| Kit item | What it is | Where students meet it |
+|---|---|---|
+| **Criteria** (section 2) | Quality, judged on Starting · Showing · Strong | Idea cards, votes, Prototype self-check, pitch feedback, marking |
+| **Requirements** | Must-haves, yes or no ("Uses at least two sources", "Under 150 words", "Includes one quote"). 0–6 lines. | A checklist on idea cards (Sketch) and on the Prototype. The student ticks each one and says where it is. Requirements can't be ticked without a "where". |
+| **Guides** | What helps students think: the idea guide, Thinking Toolkit items, resources (blocks), the exemplar | A **Guides** panel beside the work, showing only the guides attached to the current phase. On a phone it folds into a **Guides** button above the work that opens a sheet. |
+
+Each requirement and guide is attached to one or more phases. A new sprint
+comes with sensible defaults attached, so the teacher edits rather than
+builds.
+
+### Thinking Toolkit guides
+
+The Thinking Toolkit blocks (`apps/teaching/src/toolkit/`) are the critical
+thinking framework the class already knows: 16 skills, 12 tools with
+sentence frames, 9 values with check questions, Thinking moves, the Question
+Quadrant, Features of a Concept and the Thinking reflection. The sprint uses
+them as phase guides. **No new thinking content is written for the sprint;
+it reuses the library.**
+
+Each phase starts with a default **Thinking move** (skill + tools + value)
+that fits what the phase asks students to do. The teacher can change it, add
+toolkit blocks, or remove them:
+
+| Phase | Default Thinking move | Other default guides |
+|---|---|---|
+| **Understand** | Examining using questions, judged for **relevance** (`skill:examine`, `tool:question`) | Question Quadrant, for sorting the group's questions |
+| **Sketch** | Applying with suggestions and examples, judged for **breadth** (`skill:apply`, `tool:suggestion`, `tool:example`). Breadth suits three different ideas. | The idea guide. Analogy (`tool:analogy`) as an optional stretch. |
+| **Decide** | Formulating and applying criteria, justified with reasons, judged for **relevance** (the `apply-criteria` preset plus `tool:reasons`) | The idea guide |
+| **Prototype** | Justifying using reasons and examples, judged for **accuracy** (`skill:justify`, `tool:reasons`, `tool:example`) | Exemplar, if uploaded. Features of a Concept when the challenge turns on a concept. |
+| **Test (feedback)** | Evaluating with reasons and suggestions, judged for **clarity** (`skill:evaluate`, `tool:reasons`, `tool:suggestion`) | (none) |
+| **Test (reflection)** | Thinking reflection, with `tool:implication` ("What this means for our next version"), judged for **significance** | (none) |
+
+How the guide reaches the work:
+
+- **Frames come from the tools.** When a phase's move includes a tool, that
+  tool's sentence frame is offered in the submission box under "Use a
+  frame" (for example the Reasons frame in vote reasons). The sprint's own
+  frames below are the fallback.
+- **The value check is the last step before submitting.** The move's value
+  check question and hint appear in the check ("Is each idea relevant to our
+  question?"), beside the criteria and requirements.
+- **Thinking intentions** at the top of each phase are built from its move
+  ("We will think by applying criteria, using reasons, judged for
+  relevance"), so students hear the same language in every phase.
+- Guides are normal toolkit blocks in the phase's section of the lesson body,
+  so teacher notes and My notes are stripped for students exactly as now
+  (`filterBlocksForStudent`).
+
+### Each phase
+
+| Phase | Model | Frame | Check before submitting | Stretch (class) |
+|---|---|---|---|---|
+| **Understand** | 2–3 example "How might we" questions from the teacher | *How might we [action] for [who] so that [result]?* in three fields | Each question can be answered more than one way and is about our challenge (two ticks) | "What do we need to find out?": one research question for the group |
+| **Sketch** | The idea guide | Idea card: *Our idea is… / It answers our question because… / The evidence it uses is…* and an optional picture | Each idea is linked to at least one criterion, with the line that shows it. The three ideas differ in who they're for, their form or their evidence. One is marked strongest, with a reason. | (Home phase, none) |
+| **Decide** | The idea guide again | Vote reason: *It does this best because…*. Parts list: part, what it must show, which criterion it serves. | Votes open once every set of ideas has been opened. Every part links to a criterion. | Write the pitch's first line |
+| **Prototype** | The teacher may upload an exemplar (their own, or an anonymous one from a past class) | The part brief from Decide sits at the top of the student's page | Self-check: Starting · Showing · Strong on each criterion their part serves, with one line of evidence. The teacher sees it beside their own mark. | (Home phase, none) |
+| **Test** | Feedback frames | *It works because… / Try…*. Each comment names the criterion it's about. | Reflection quotes one piece of feedback received and names one change, linked to a criterion | Feedback on one more group, or a second "Try…" |
+
+### Rigour guards
+
+- Reason and evidence fields need a full sentence, not one word. The check
+  is short and kind: "Add a little more: say what it shows."
+- Votes need reasons, so the voting is evaluation and not popularity.
+- **Spotlight:** during a class phase, the teacher can put one anonymous
+  submission up in Focus view as a live model ("Look at how this one names
+  its source"), as Tutorial's Show to group does.
+- The Prototype self-check against the teacher's mark shows whether students
+  judge their own work accurately. A large gap appears on the marking panel
+  for the teacher to talk through.
+- All student-facing wording says what students do and can do.
+
+## 4. Groups and the decider
 
 - The sprint has its own `groups[]`. Each group has an id, a name the
   students see (for example "Group 3" or a name the teacher picks), and its
@@ -137,7 +300,7 @@ markbook only as in, late or not in.
   heat map, which shows which ideas did best on which criteria, without
   numbers.
 
-## 4. Prototype parts
+## 5. Prototype parts
 
 After the vote, still in Decide, the group writes a short **parts list**
 (2–6 parts, for example "Panel text", "Artefact list", "Opening paragraph").
@@ -152,7 +315,7 @@ uploads the **pitch file**: whatever the group will show during the
 Uploads accept PDF, images, or a link (Canva, Google Slides, a document).
 That covers a PowerPoint saved as PDF and anything made in another tool.
 
-## 5. Test: pitch and feedback
+## 6. Test: pitch and feedback
 
 The teacher runs Test from the **Focus view** (`apps/teaching/src/teacher/focus/`):
 
@@ -181,7 +344,7 @@ two prompts, editable by the teacher:
 - "What did the feedback show your idea does well?"
 - "What would you change next, and why?"
 
-## 6. Teacher views
+## 7. Teacher views
 
 ### Progress map
 
@@ -196,6 +359,9 @@ The sprint's teacher page opens on the **progress map**:
 - Clicking a cell opens the **group board** at that phase: the notes, the
   gallery (authors visible to the teacher), the heat map, the parts and who
   claimed them, the uploads.
+- During a class phase, the phase header has **End class part** and shows
+  the lock length ("Locks for 2 h"). After that it shows "Locked until 3:40
+  pm".
 - Clicking one student's dot opens what they submitted. For Prototype and
   Reflection it opens the **marking panel**.
 
@@ -209,7 +375,7 @@ the group's pitch file beside it. They pick a level for each criterion
 (*Starting · Showing · Strong*) and can add a comment. **Next student** moves
 through the group.
 
-## 7. Student view
+## 8. Student view
 
 A student opens the published sprint and claims their initials, as for
 quizzes. They see:
@@ -221,13 +387,17 @@ quizzes. They see:
 - The challenge brief, which folds away.
 - The current phase: the teacher's instruction, any blocks, and their
   submission box. Once they submit: "In. You can change it until [deadline]."
+  For a class phase, it says "until your teacher ends the class part".
+- **The lock screen** while the class lock runs: "Your class work is in.
+  The sprint opens again at 3:40 pm", a countdown, and a read-only view of
+  what they submitted.
 - **Their group's status line:** group name, teammates' initials, "3 of 4
   in".
 
 All student-facing text says what students do and can do ("Pick the idea
 that best uses sources") and never uses deficit phrasing.
 
-## 8. Data, markbook, map
+## 9. Data, markbook, map
 
 Storage follows the tutorial's pattern (`netlify/functions/_shared/tutorial.mjs`,
 `published-tutorial.mjs`, `tutorial-groups.mjs`). The plan sets the exact
@@ -236,15 +406,26 @@ names only).
 
 - **Lesson:** `pedagogical_mode: 'design_sprint'` and a `sprint` settings
   object (`apps/teaching/src/sprint/schema.ts`):
-  `class_id`, `decider`, `criteria[] {id, text, outcome?}`,
-  `reflection_criteria[]`, `phases[5] {key, where, due_date, due_time,
-  instruction}`, `groups[] {id, name, students[]}`. Phase blocks live in the
-  lesson body under one section marker per phase, as tutorial groups do.
+  `class_id`, `decider`, `support_level` (`guided | standard | open`),
+  `lock_hours` (default 2), `criteria[] {id, text, outcome?}`,
+  `reflection_criteria[]`, `requirements[] {id, text, phases[]}`,
+  `idea_guide {checklist[], model {topic, parts[]
+  {text, meets}}, pair? {developing, strong, note}}`, `phases[5] {key,
+  where, due_date, due_time, ends_at?, instruction, ideas_per_person?,
+  model_text?, stretch?}`, `groups[] {id, name, students[]}`. Guides
+  (toolkit blocks, resources, the idea guide) live in the lesson body under
+  one section marker per phase, as tutorial groups do; a new sprint is
+  seeded with each phase's default Thinking move.
+- **Class lock record** (one per sprint per class): `{ phase, ended_at,
+  locked_until, present[] }`, plus single-student unlocks. The server
+  checks it on every student read and write; the client only shows it.
 - **Group record** (one per group): phase opened times, the group question,
   the chosen idea, `awaiting_teacher`, the parts list and claims, and the
   pitch file.
 - **Student submission** (one per student per phase), overwritten in place:
-  `{ phase, payload, submitted_at, late }`. Votes are stored in their own
+  `{ phase, payload, submitted_at, late, frozen }`. Sketch payloads hold the
+  idea cards, criterion links, the strongest pick and its reason. Prototype
+  payloads hold the self-check. Votes are stored in their own
   record per student and only read on the server to make the heat map. The
   student API never returns authors or raw counts.
 - **Feedback round** (one per presenting group): opened and closed times,
@@ -283,7 +464,7 @@ sprint endpoint:
 One dot at the sprint's first phase date, labelled with progress ("Phase 3
 of 5").
 
-## 9. Edge cases
+## 10. Edge cases
 
 - **Absent for a class phase:** they can submit from home until the
   deadline. Their dot is empty until then, and the group carries on at the
@@ -298,13 +479,24 @@ of 5").
   phase and claim an open part.
 - **Nobody in a group sketched by the Decide deadline:** the group waits on
   the teacher ("No ideas in") and the teacher extends the deadline.
+- **Class lock while a student is mid-typing:** their draft is saved and
+  submitted as it stands, and the lock screen says so.
+- **Teacher forgets to end the class part and has set no end time:** nothing
+  locks, and the phase deadline closes it as normal. The map reminds the
+  teacher with "Class part still open".
+- **Fewer than 3 ideas by the deadline:** what's in goes to the gallery, and
+  the map marks the student "2 of 3".
 - **Whole-group absence on pitch day:** the teacher moves that group to the
   end of the running order or to another day; Test closes when every group
   has pitched.
 
-## 10. Testing
+## 11. Testing
 
-- Unit: phase open rule (deadline or all in), late marks, gallery lock,
+- Unit: class lock (freeze, auto-submit drafts, lock window, next phase
+  opening at lift, absent catch-up, single-student unlock, server refusal
+  while locked), ideas per person, check-before-submit rules (criterion
+  link, full-sentence reasons, votes open after every set is opened),
+  phase open rule (deadline or all in), late marks, gallery lock,
   vote tally and tie, decider paths, anonymity (the student API returns no
   author or count fields), part claims, upload rules (mime, size, phase,
   claim), feedback moderation, mark → evidence tags.
@@ -319,12 +511,20 @@ of 5").
 ## Phases (commits in one PR)
 
 1. `sprint` schema, editor (challenge, criteria with outcome links, five
-   phases with deadlines, decider), grouping screen.
-2. Student player: claim, stepper, countdown, phase submissions, group
-   status line, phase open rule.
-3. Anonymous gallery, criterion voting, heat map, decider (top vote and
+   phases with deadlines, decider, support level, lock length), the Kit
+   step (criteria, requirements, idea guide, Thinking Toolkit guides seeded
+   per phase), grouping screen.
+2. Student player: claim, stepper, countdown, Guides panel, Thinking
+   intentions, phase submissions with tool frames, requirement ticks and
+   value checks, idea cards (3 per person), group status line, phase open
+   rule.
+3. Class lock: End class part, end time, freeze, lock screen, absent
+   catch-up, unlock one student.
+4. Anonymous gallery, criterion voting with reasons, heat map, decider (top vote and
    teacher), parts and claims.
-4. Student uploads (endpoint, rules, storage) and the pitch file.
-5. Teacher progress map and group board.
-6. Test: Focus view pitch, feedback rounds with moderation, reflection.
-7. Marking panel, markbook column, evidence tags, unit map dot.
+5. Student uploads (endpoint, rules, storage), the pitch file, Prototype
+   self-check.
+6. Teacher progress map, group board, Spotlight.
+7. Test: Focus view pitch, feedback rounds with moderation, reflection.
+8. Marking panel (with self-check beside it), markbook column, evidence
+   tags, unit map dot.

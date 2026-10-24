@@ -125,3 +125,8 @@ h3 { font-size: 15px; margin: 0; font-weight: 650; }
 .dot--started { background: transparent; }
 .dot--none { border-color: var(--line-2); background: transparent; }
 .dot--late { background: var(--pastel-gold-ink); border-color: var(--pastel-gold-ink); }
+
+@media (max-width: 600px) {
+  .countdown { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .countdown__fig { text-align: left; display: flex; align-items: baseline; gap: 8px; }
+}

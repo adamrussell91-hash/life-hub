@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprint student Sketch</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .layout { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; margin-top: 14px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .guides { order: -1; } }
+  .intent { padding: 12px 16px; border-radius: var(--radius-md); background: var(--pastel-lilac); color: var(--pastel-lilac-ink); font-size: 14px; margin-top: 14px; }
+  .intent b { font-weight: 650; }
+  .work { padding: 18px 20px; }
+  .tabs { display: flex; gap: 6px; margin: 12px 0 16px; flex-wrap: wrap; }
+  .tab { font: inherit; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: #fff; cursor: pointer; color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .tab .ok { color: var(--pastel-sage-ink); }
+  .tab[aria-selected="true"] .ok { color: #cfe6d6; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .field .starter { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field textarea { width: 100%; font: inherit; font-size: 14px; border: 1px solid var(--line-2); border-radius: 12px; padding: 10px; background: #fff; }
+  .field textarea { min-height: 64px; resize: vertical; }
+  .frame-btn { font: inherit; font-size: 12px; font-weight: 600; color: var(--wave); background: none; border: 0; padding: 0; cursor: pointer; }
+  .hint { font-size: 12px; color: var(--pastel-peach-ink); background: var(--pastel-peach); border-radius: 8px; padding: 4px 8px; display: inline-block; margin-top: 6px; }
+  .check { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px; }
+  .check h3 { margin-bottom: 8px; }
+  .row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 7px 0; font-size: 14px; }
+  .row input[type=checkbox] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--navy); }
+  .row .where { margin-top: 6px; width: 100%; font: inherit; font-size: 13px; border: 1px solid var(--line-2); border-radius: 10px; padding: 7px 9px; background: #fff; }
+  .sub { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; margin: 10px 0 2px; }
+  .value { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--pastel-lilac); color: var(--pastel-lilac-ink); font-size: 14px; }
+  .value b { display: block; }
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+  .guides { padding: 16px; position: sticky; top: 16px; }
+  .guides h2 { font-size: 16px; margin-bottom: 10px; }
+  .g { border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+  .g__kind { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--pastel-lilac-ink); }
+  .g h3 { margin: 2px 0 6px; }
+  .g p { margin: 0 0 6px; font-size: 13px; }
+  .g ol, .g ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .g li { margin-bottom: 3px; }
+  .frames { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .frames span { font-size: 13px; background: var(--paper); border-radius: 8px; padding: 5px 8px; }
+  .model { font-size: 13px; }
+  .model mark { background: var(--pastel-gold); color: var(--pastel-gold-ink); border-radius: 4px; padding: 0 3px; }
+  .model sup { font-size: 10px; font-weight: 700; color: var(--pastel-gold-ink); }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="mock-label">Mockup 4 · Student · Phase 2 Sketch (home) · Guided support level</p>
+  <p class="mock-note">Each student writes three ideas. The Guides panel shows the phase's Thinking move (skill, tools, value) from the Thinking Toolkit, the good idea checklist, and a model idea on a different topic. Before submitting, each idea is checked: link it to a criterion, tick each requirement with where it is, answer the value check. Starters show because this class is on Guided.</p>
+
+  <div class="countdown">
+    <div><div class="countdown__title">Sketch closes</div><div class="countdown__what">Three ideas each</div><div class="countdown__sub">Group Kestrel · 2 of 4 in</div></div>
+    <div class="countdown__fig"><div class="countdown__n">3</div><div class="countdown__unit">days left · Fri 24 Oct, 9:00 am</div></div>
+  </div>
+
+  <div class="intent"><b>We will think by</b> applying our question to new ideas, using suggestions and examples, judged for breadth.</div>
+
+  <div class="layout">
+    <section class="glass work">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+        <h2>Your three ideas</h2><span class="pill pill--home">At home</span>
+      </div>
+      <p class="small muted" style="margin:6px 0 0">Our question: <b style="color:var(--ink)">How might we make a 2000-year-old town feel close to a Year 7 visitor?</b></p>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="false">Idea 1 <span class="ok">✓</span></button>
+        <button class="tab" role="tab" aria-selected="true">Idea 2</button>
+        <button class="tab" role="tab" aria-selected="false">Idea 3</button>
+      </div>
+
+      <div class="field"><label>Title</label><input value="What the ash kept"></div>
+      <div class="field">
+        <label>Our idea is…</label>
+        <div class="starter">Frame from Suggestion: <i>What if ___?</i> <button class="frame-btn">Use a frame</button></div>
+        <textarea>What if the panel showed five objects the ash preserved, each with one line on what it tells us?</textarea>
+      </div>
+      <div class="field">
+        <label>It answers our question because…</label>
+        <textarea>Ordinary objects like bread and graffiti</textarea>
+        <span class="hint">Add a little more: say how it makes the town feel close.</span>
+      </div>
+      <div class="field">
+        <label>The evidence it uses is…</label>
+        <div class="starter">Frame from Example: <i>For example, ___.</i></div>
+        <textarea>For example, the carbonised loaf (Source B) and the election graffiti (Source D).</textarea>
+      </div>
+
+      <div class="check">
+        <h3>Check before you submit</h3>
+        <div class="sub">Criteria this idea meets</div>
+        <label class="row"><input type="checkbox" checked><span>Uses sources<input class="where" value="Loaf and graffiti, Sources B and D"></span></label>
+        <label class="row"><input type="checkbox"><span>Explains why it matters</span></label>
+        <label class="row"><input type="checkbox" checked><span>Grabs a Year 7 visitor<input class="where" value="Jokes on walls, like their own school"></span></label>
+        <div class="sub">Requirements</div>
+        <label class="row"><input type="checkbox" checked><span>Uses at least two sources<input class="where" value="B and D"></span></label>
+        <label class="row"><input type="checkbox"><span>Fits on one A3 panel<input class="where" placeholder="Where does it show this?"></span></label>
+        <div class="value"><b>Breadth: Is there another way to look at this?</b>Your three ideas each take a different angle: who it's for, its form, or its evidence. How is this one different from Idea 1?</div>
+      </div>
+
+      <div class="foot">
+        <span class="small muted">Saved as a draft. Then pick your strongest idea and say why.</span>
+        <button class="btn btn--primary">Next idea</button>
+      </div>
+    </section>
+
+    <aside class="glass guides">
+      <h2>Guides</h2>
+      <div class="g">
+        <div class="g__kind">Thinking move</div>
+        <h3>Applying, with suggestions and examples, judged for breadth</h3>
+        <ol>
+          <li><b>Rule:</b> name our question.</li>
+          <li><b>Case:</b> look closely at your idea.</li>
+          <li><b>Fit:</b> show how it answers the question.</li>
+        </ol>
+        <div class="frames"><span>What if ___?</span><span>For example, ___.</span></div>
+      </div>
+      <div class="g">
+        <div class="g__kind">Good idea checklist</div>
+        <ul>
+          <li>It answers our group question.</li>
+          <li>It meets the criteria.</li>
+          <li>It uses evidence and names the source.</li>
+          <li>Our group could build it by the deadline.</li>
+          <li>It does something of its own.</li>
+        </ul>
+      </div>
+      <div class="g model">
+        <div class="g__kind">Model idea · a different topic</div>
+        <h3>The Great Wall: "One brick's story"</h3>
+        <p>What if the panel followed one brick from the kiln to the wall?<sup>1</sup> It makes a huge wall feel human<sup>2</sup>, using <mark>the stamped maker's brick from the Ming section</mark><sup>3</sup>.</p>
+        <p class="muted">1 answers the question · 2 grabs the visitor · 3 names its source</p>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((o) => o.setAttribute('aria-selected', String(o === t)));
+  }));
+</script>
+</body>
+</html>
