@@ -49,7 +49,8 @@ export function publicSprint(s: SprintSettings): PublicSprint {
     idea_guide: s.idea_guide,
     phases: s.phases.map((p) => ({ ...p })),
     understand: s.understand ? { layout: s.understand.layout, steps: { ...s.understand.steps } } : defaultUnderstand(),
-    sketch_timer: s.sketch_timer ?? 8
+    sketch_timer: s.sketch_timer ?? 8,
+    decide_dots: s.decide_dots ?? 3
   };
 }
 

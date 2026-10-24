@@ -136,12 +136,13 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     root.replaceChildren(noteEl('overview', openNotes, 'How a sprint runs'));
     const cur = s();
 
-    const settings = card('Settings', 'How much scaffolding shows, who chooses the group’s idea, ideas each puts forward, the rapid ideas timer and the class lock.', 'settings');
+    const settings = card('Settings', 'How much scaffolding shows, who chooses the group’s idea, ideas each puts forward, the rapid ideas timer, stand-out dots and the class lock.', 'settings');
     settings.append(
       selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level'),
       selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Top vote goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides'),
       selectOf([1, 2, 3, 4, 5].map((n) => [String(n), `Each puts forward ${n} ${n === 1 ? 'idea' : 'ideas'}`]), String(cur.phases[1]!.ideas ?? 2), (v) => put((d) => { d.phases[0]!.ideas = Number(v); d.phases[1]!.ideas = Number(v); }), 'Ideas each student puts forward'),
       selectOf([0, 3, 5, 8, 10, 15].map((n) => [String(n), n ? `Rapid ideas: ${n} minute timer` : 'Rapid ideas: no timer']), String(cur.sketch_timer ?? 8), (v) => put((d) => { d.sketch_timer = Number(v); }), 'Rapid ideas timer'),
+      selectOf([0, 1, 2, 3, 4, 5].map((n) => [String(n), n ? `Decide: ${n} stand-out ${n === 1 ? 'dot' : 'dots'} each` : 'Decide: no stand-out dots']), String(cur.decide_dots ?? 3), (v) => put((d) => { d.decide_dots = Number(v); }), 'Stand-out dots'),
       selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
     );
 
