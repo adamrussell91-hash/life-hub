@@ -821,6 +821,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function showPublishSuccess(_studentPath: string): void {
       const publishedAt = new Date().toISOString();
       lesson.published_at = publishedAt;
+      page?.markPublished?.(publishedAt);
 
       publishPanel.replaceChildren();
       publishPanel.hidden = true;
