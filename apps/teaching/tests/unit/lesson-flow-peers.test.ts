@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { buildCoverageMap } from '@/network/coverage-map/model';
-import { buildFlow, linkProblem } from '@/network/flow';
+import { buildFlow, hangSides, linkProblem } from '@/network/flow';
 import { lessonClassDates, lessonRouteRole, unitFlowPeers } from '@/teacher/network-context';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Unit } from '@/schemas';
@@ -159,5 +159,107 @@ describe('A lesson nothing leads into', () => {
     expect(f.seq.every((item) => 'row' in item)).toBe(true);
     expect(f.order).toEqual(['a', 'b', 'poet', 'pretest', 'poem', 'review', 'next']);
     expect(linkProblem([{ id: 'a' }, { id: 'b' }, { id: 'poet', after: ['poem'] }, { id: 'pretest', after: ['poem'] }, { id: 'poem' }], 'a', ['pretest'])).toBeUndefined();
+  });
+});
+
+describe('Side lessons branch off the core lesson the teacher picks', () => {
+  // The order puts the side lessons in the wrong places; the picked core lesson wins.
+  const lessons = [
+    { id: 'intro', title: 'Harbour poems' },
+    { id: 'finn', title: 'Salt and stone' },
+    { id: 'pre', title: 'Tide quiz', quiz: true },
+    { id: 'sea', title: 'Sea shanties', role: 'extension' as const, branchFrom: 'finn' },
+    { id: 'gull', title: 'Gull drawings', role: 'optional' as const, branchFrom: 'finn' },
+    { id: 'help', title: 'Rhyme help', role: 'support' as const, branchFrom: 'pre' },
+    { id: 'wrap', title: 'Wrap up' }
+  ];
+  const content = { version: 2 as const, rail_stops: [], gates: [], nudges: {}, terminus: { label: 'Essay' } };
+
+  it('hangs each side lesson straight under its core lesson on the map', () => {
+    const map = buildCoverageMap({ content, lines: [], lessons });
+    expect(map.rows.map((r) => r.id)).toEqual(['intro', 'finn', 'sea', 'gull', 'pre', 'help', 'wrap', '__terminus']);
+  });
+
+  it('puts a side lesson in its core lesson’s week', () => {
+    const bands = new Map([['intro', 'Wk 1'], ['finn', 'Wk 2'], ['pre', 'Wk 3'], ['help', 'Wk 4'], ['wrap', 'Wk 4']]);
+    const map = buildCoverageMap({ content, lines: [], lessons, bands });
+    expect(map.rows.find((r) => r.id === 'help')?.band).toBe('Wk 3');
+  });
+
+  it('with no pick, hangs off the core lesson before it', () => {
+    const { order, anchor } = hangSides(['a', 'b', 'x', 'c'], (id) => id === 'x', () => undefined);
+    expect(order).toEqual(['a', 'b', 'x', 'c']);
+    expect(anchor.get('x')).toBe('b');
+  });
+
+  it('the card asks what a side lesson branches off and saves the pick', async () => {
+    const { mountLessonFlow } = await import('@/network/lesson-flow');
+    const host = document.createElement('div');
+    const patches: unknown[] = [];
+    mountLessonFlow(host, {
+      lessonId: 'help',
+      peers: lessons.map(({ id, title, role, branchFrom }) => ({ id, title, ...(role ? { role } : {}), ...(branchFrom ? { branchFrom } : {}) })),
+      after: undefined,
+      role: 'support',
+      branchFrom: 'pre',
+      onSelf: (patch) => patches.push(patch),
+      onPeer: async () => {}
+    });
+    expect(host.textContent).toContain('Branches off');
+    expect(host.textContent).toContain('Rejoins at');
+    expect(host.querySelector('select[aria-label="Add a lesson before…"]')).toBeNull();
+    const pick = host.querySelector<HTMLSelectElement>('select[aria-label="Change…"]')!;
+    // Only core lessons can be branched off.
+    expect([...pick.options].map((o) => o.value).filter(Boolean)).toEqual(['intro', 'finn', 'wrap']);
+    pick.value = 'finn';
+    pick.dispatchEvent(new Event('change'));
+    expect(patches).toContainEqual({ branch_from: 'finn' });
+    expect(host.querySelector('.lesson-flow__chip')?.textContent).toBe('Salt and stone');
+  });
+
+  it('a core lesson lists the side lessons off it and skips them in Before and after', async () => {
+    const { mountLessonFlow } = await import('@/network/lesson-flow');
+    const host = document.createElement('div');
+    mountLessonFlow(host, {
+      lessonId: 'finn',
+      peers: lessons.map(({ id, title, role, branchFrom }) => ({ id, title, ...(role ? { role } : {}), ...(branchFrom ? { branchFrom } : {}) })),
+      after: undefined,
+      onSelf: () => {},
+      onPeer: async () => {}
+    });
+    const rows = [...host.querySelectorAll('.lesson-flow__row')].map((r) => r.textContent ?? '');
+    expect(rows.find((t) => t.startsWith('After'))).toContain('Tide quiz');
+    expect(rows.find((t) => t.startsWith('Branches'))).toContain('Sea shanties');
+    expect(rows.find((t) => t.startsWith('Branches'))).toContain('Gull drawings');
+  });
+});
+
+describe('Lessons before the unit starts', () => {
+  it('band as Pre and week 1 starts at the first unit lesson', async () => {
+    const { unitSchedule } = await import('@/teacher/network-context');
+    const unit = { id: 'u1', lesson_ids: ['a', 'b', 'c'] } as unknown as Unit;
+    const curriculum = {
+      lessons: [lesson('a', 'Course outline', { pre_unit: true }), lesson('b', 'Harbour poems'), lesson('c', 'Tide quiz')],
+      scheduled_lessons: [
+        { id: 's1', class_id: 'k1', lesson_id: 'a', unit_id: 'u1', date: '2026-10-05', delivery_status: 'planned' },
+        { id: 's2', class_id: 'k1', lesson_id: 'b', unit_id: 'u1', date: '2026-10-12', delivery_status: 'planned' },
+        { id: 's3', class_id: 'k1', lesson_id: 'c', unit_id: 'u1', date: '2026-10-19', delivery_status: 'planned' }
+      ]
+    } as unknown as CurriculumResponse;
+    expect([...unitSchedule(curriculum, unit)!.bands]).toEqual([['a', 'Pre'], ['b', 'Wk 1'], ['c', 'Wk 2']]);
+  });
+
+  it('the card ticks a lesson as before the unit starts', async () => {
+    const { mountLessonFlow } = await import('@/network/lesson-flow');
+    const host = document.createElement('div');
+    const patches: unknown[] = [];
+    mountLessonFlow(host, { lessonId: 'a', peers: [{ id: 'a', title: 'Course outline' }], after: undefined, onSelf: (p) => patches.push(p), onPeer: async () => {} });
+    const box = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(box.parentElement?.textContent).toBe('Before the unit starts');
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    expect(patches).toEqual([{ pre_unit: true }, { pre_unit: null }]);
   });
 });

@@ -586,6 +586,26 @@ describe('mountLessonEditor', () => {
     expect(apiPutMock).toHaveBeenCalledWith('/api/lessons/lesson_001', expect.objectContaining({ route_role: 'optional' }));
   });
 
+  it('saves the core lesson a side lesson branches off', async () => {
+    const unit = { id: 'unit_001', type: 'unit', title: 'Poetry', slug: 'poetry', year_id: 'y', subject_id: 's', lesson_ids: ['lesson_000', 'lesson_002', 'lesson_001'], blocks: [], status: 'active', created_at: ISO, updated_at: ISO, schema_version: 1 };
+    const peers = [{ id: 'lesson_000', title: 'Start', unit_id: 'unit_001' }, { id: 'lesson_002', title: 'Middle', unit_id: 'unit_001' }, { id: 'lesson_001', title: 'Intro to Testing', unit_id: 'unit_001' }];
+    const curriculum = { ...emptyCurriculum, units: [unit], lessons: peers };
+    mockLessonLoad();
+    const base = apiGetMock.getMockImplementation()!;
+    apiGetMock.mockImplementation(async (path: string) => (path === '/api/curriculum' ? curriculum : base(path)));
+    apiPutMock.mockResolvedValue(makeLesson());
+    const handle = mount();
+    await tick();
+
+    [...refs.canvas.querySelectorAll<HTMLButtonElement>('.lesson-flow__pill')].find((b) => b.textContent === 'Extension')!.click();
+    const pick = refs.canvas.querySelector<HTMLSelectElement>('select[aria-label="Change…"]')!;
+    pick.value = 'lesson_000';
+    pick.dispatchEvent(new Event('change'));
+    await handle.flush();
+
+    expect(apiPutMock).toHaveBeenLastCalledWith('/api/lessons/lesson_001', expect.objectContaining({ route_role: 'extension', branch_from: 'lesson_000' }));
+  });
+
   it('awaiting flush() before dispose() preserves an edit queued behind an in-flight autosave (route teardown)', async () => {
     mockLessonLoad();
 

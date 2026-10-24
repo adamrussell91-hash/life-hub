@@ -63,6 +63,8 @@ function lessonSummary(lesson, publishedIds) {
     ...(Array.isArray(lesson.after_lesson_ids) ? { after_lesson_ids: lesson.after_lesson_ids } : {}),
     ...(ROUTE_ROLES.has(lesson.route_role) ? { route_role: lesson.route_role } : {}),
     ...(typeof lesson.skip_rule === 'string' && lesson.skip_rule.trim() ? { skip_rule: lesson.skip_rule.trim().slice(0, 80) } : {}),
+    ...(typeof lesson.branch_from === 'string' && lesson.branch_from ? { branch_from: lesson.branch_from } : {}),
+    ...(lesson.pre_unit === true ? { pre_unit: true } : {}),
     ...(Array.isArray(lesson.dot_points) && lesson.dot_points.length ? { dot_points: lesson.dot_points } : {})
   };
 }
