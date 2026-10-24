@@ -96,3 +96,45 @@ test('Sketch keeps the inspiration and rapid ideas private; only the starred car
   assert.deepEqual(decide.gallery.flatMap((set) => set.ideas.map((i) => i.title)).sort(), ['Ash', 'Baker']);
   assert.ok(!gallery.includes('A private rough idea') && !gallery.includes('museum audio guide'));
 });
+
+test('stand-out dots: all must be placed, only on gallery ideas, hidden until voting closes, then the most-dotted parts of ideas not chosen are worth borrowing', async () => {
+  const store = await atDecide({ ...CONFIG(), dots: 2 });
+  const s = await act(store, 1, 'status');
+  assert.equal(s.dots, 2);
+  const id = (t) => s.gallery.flatMap((x) => x.ideas).find((i) => i.title === t).id;
+  const ballot = (dots) => ({ votes: { c1: id('Baker'), c2: id('Baker') }, reasons: { c1: 'It names a source.', c2: 'It says why it matters.' }, opened: s.gallery.map((x) => x.id), dots });
+  const saved = await act(store, 1, 'save', { phase: 'decide', payload: ballot([{ idea: id('Ash'), part: 'evidence', note: 'Source B is strong' }, { idea: 'nope', part: 'idea' }]) });
+  assert.deepEqual(saved.mine.decide.dots.map((d) => d.part), ['evidence']);
+  assert.equal(saved.dot_counts, null);
+  await assert.rejects(act(store, 1, 'submit', { phase: 'decide', payload: ballot([{ idea: id('Ash'), part: 'evidence' }]) }), { code: 'need_dots' });
+  await act(store, 1, 'save', { phase: 'decide', payload: ballot([{ idea: id('Ash'), part: 'evidence', note: 'Source B is strong' }, { idea: id('Baker'), part: 'idea' }]) });
+  await act(store, 2, 'save', { phase: 'decide', payload: ballot([{ idea: id('Ash'), part: 'evidence' }, { idea: id('Streets'), part: 'idea' }]) });
+  const after = await act(store, 1, 'status');
+  assert.equal(after.chosen.title, 'Baker');
+  assert.deepEqual(after.dot_counts[id('Ash')], { idea: 0, answers: 0, evidence: 2 });
+  assert.deepEqual(after.borrow.map((b) => [b.title, b.part, b.count]), [['Ash', 'evidence', 2], ['Streets', 'idea', 1]]);
+  assert.deepEqual(after.borrow[0].notes, ['Source B is strong']);
+  assert.ok(!JSON.stringify(after.borrow).includes('st_'));
+});
+
+test('parts are given to group members by their initials: one part each, one person a part unless there are more people than parts', async () => {
+  const store = await atDecide();
+  const s = await act(store, 1, 'status');
+  const baker = s.gallery.flatMap((x) => x.ideas).find((i) => i.title === 'Baker').id;
+  const ballot = { votes: { c1: baker, c2: baker }, reasons: { c1: 'It names a source.', c2: 'It says why it matters.' }, opened: s.gallery.map((x) => x.id) };
+  for (const n of [1, 2]) await act(store, n, 'save', { phase: 'decide', payload: ballot });
+  let v = await act(store, 1, 'parts', { parts: [{ id: 'p1', text: 'Panel text', shows: '', criterion: 'c1' }, { id: 'p2', text: 'Artefact list', shows: '', criterion: 'c2' }] });
+  assert.deepEqual(v.members.map((m) => [m.initials, m.me]), [['AB', true], ['CD', false]]);
+  assert.ok(!JSON.stringify(v.members).includes('st_'));
+  const [ann, cy] = v.members.map((m) => m.key);
+  await assert.rejects(act(store, 2, 'submit', { phase: 'decide', payload: ballot }), { code: 'need_part' });
+  await assert.rejects(act(store, 1, 'assign', { part_id: 'p1', keys: [ann, cy] }), { code: 'too_many' });
+  await assert.rejects(act(store, 1, 'assign', { part_id: 'p1', keys: ['stranger'] }), { code: 'bad_member' });
+  await act(store, 1, 'assign', { part_id: 'p1', keys: [cy] });
+  v = await act(store, 2, 'assign', { part_id: 'p2', keys: [ann] });
+  assert.deepEqual(v.parts.map((p) => [p.id, p.assigned, p.mine]), [['p1', [cy], true], ['p2', [ann], false]]);
+  v = await act(store, 2, 'assign', { part_id: 'p2', keys: [cy] });
+  assert.deepEqual(v.parts.map((p) => p.assigned), [[], [cy]]);
+  const sent = await act(store, 2, 'submit', { phase: 'decide', payload: ballot });
+  assert.equal(sent.phases[2].state, 'in');
+});

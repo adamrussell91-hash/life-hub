@@ -119,6 +119,20 @@ by default), then **Develop and justify** each starred idea on a card.
 Only the cards go to the group's Decide gallery, without names. The
 inspiration and rapid ideas stay private.
 
+### 1c. Decide (Adam's call, 24 Oct)
+
+In class. Students read every set (no names), placing **stand-out dots**
+(the Kit's number, 3 by default, 0 for none) on the parts of any idea that
+stand out: the idea, how it solves the problem, or the evidence, each with
+an optional "borrow this because" note. They give each criterion to one
+idea with a reason. Dots stay hidden until voting closes; then everyone
+sees where they landed, and the most-dotted parts of ideas not chosen show
+as **Worth borrowing**, each one tap from becoming a part. Once the idea is
+chosen, the group writes the parts and **gives each part to someone by
+their initials** (one person a part, two when there are more people than
+parts; one part each). Decide is done when every part has someone and
+everyone has a part. No discussion step: the reasons do that work.
+
 ### Phase content
 
 Each phase has a short teacher instruction and may hold normal blocks above

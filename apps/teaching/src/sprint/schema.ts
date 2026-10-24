@@ -128,6 +128,8 @@ export const SprintSettingsSchema = z.object({
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Sketch's rapid ideas: minutes on the timer, 0 for no timer. */
   sketch_timer: z.number().int().min(0).max(30).default(8),
+  /** Decide's stand-out dots each student places on parts of any idea; 0 turns them off. */
+  decide_dots: z.number().int().min(0).max(5).default(3),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z.object({ prototype: z.string().optional(), reflection: z.string().optional() }).default({})
 });
@@ -144,7 +146,8 @@ export const PublicSprintSchema = z.object({
   idea_guide: IdeaGuideSchema,
   phases: z.array(SprintPhaseSchema).length(5),
   understand: UnderstandSettingsSchema.default(defaultUnderstand),
-  sketch_timer: z.number().int().min(0).max(30).default(8)
+  sketch_timer: z.number().int().min(0).max(30).default(8),
+  decide_dots: z.number().int().min(0).max(5).default(3)
 });
 export type PublicSprint = z.infer<typeof PublicSprintSchema>;
 
@@ -197,7 +200,14 @@ export const SketchPayloadSchema = z.object({
   strongest: z.string().max(40).default(''),
   strongest_why: text(300).default('')
 });
+/** The parts of an idea card a stand-out dot can go on. */
+export const IDEA_PARTS = ['idea', 'answers', 'evidence'] as const;
+export type IdeaPart = (typeof IDEA_PARTS)[number];
+export const DotSchema = z.object({ idea: z.string().max(40), part: z.enum(IDEA_PARTS), note: text(120).default('') });
+export type Dot = z.infer<typeof DotSchema>;
 export const DecidePayloadSchema = z.object({
+  /** Stand-out dots: up to the Kit's number, on parts of any idea. */
+  dots: z.array(DotSchema).max(5).default([]),
   /** Criterion id → idea id. */
   votes: z.record(z.string().max(40), z.string().max(40)).default({}),
   reasons: z.record(z.string().max(40), text(300)).default({}),

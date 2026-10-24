@@ -270,3 +270,17 @@ body.spractice-open { overflow: hidden; }
 .sk-rapid { margin: 0; padding-left: 22px; display: grid; gap: 4px; }
 .sk-rapid li { padding: 2px 0; }
 .sk-pick { display: grid; gap: 6px; }
+
+/* Decide: stand-out dots and the part picker. */
+.sd-counter { font-weight: 600; color: var(--navy); }
+.sd-part { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; align-items: start; }
+.sd-part p { margin: 0; }
+.sd-dot { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--line); font-size: 14px; cursor: pointer; }
+.sd-dot[aria-pressed="true"] { background: var(--pastel-gold, #ffe08a); color: var(--pastel-gold-ink, #5a4300); border-color: var(--pastel-gold-ink, #5a4300); }
+.sd-dot:disabled:not([aria-pressed="true"]) { opacity: .4; cursor: default; }
+.sd-note { grid-column: 1 / -1; }
+.sd-note[hidden] { display: none; }
+.sd-who { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sd-borrow { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.sd-borrow h4 { margin: 0; }
+.sd-status { font-weight: 600; }

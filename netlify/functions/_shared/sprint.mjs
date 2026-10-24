@@ -34,7 +34,8 @@ export function prepareSprintPublish(draft, studentBlocks) {
       idea_guide: s.idea_guide,
       phases: s.phases,
       understand: UnderstandSettingsSchema.parse(s.understand ?? {}),
-      sketch_timer: Number.isInteger(s.sketch_timer) ? s.sketch_timer : 8
+      sketch_timer: Number.isInteger(s.sketch_timer) ? s.sketch_timer : 8,
+      decide_dots: Number.isInteger(s.decide_dots) ? s.decide_dots : 3
     }
   };
   const config = {
@@ -48,7 +49,8 @@ export function prepareSprintPublish(draft, studentBlocks) {
     criteria: s.criteria.map((c) => c.id),
     reflection_criteria: s.reflection_criteria.map((c) => c.id),
     requirements: s.requirements.map((r) => ({ id: r.id, phases: [...r.phases] })),
-    understand: snapshot.sprint.understand.steps
+    understand: snapshot.sprint.understand.steps,
+    dots: snapshot.sprint.decide_dots
   };
   return { snapshot, config };
 }
@@ -236,6 +238,37 @@ function stack(texts) {
   return [...seen.values()].sort((a, b) => b.count - a.count);
 }
 const questionId = (lessonId, text) => short(`${lessonId}:q:${norm(text)}`);
+/** A group member as other members see them: a key that names no one, and their initials. */
+const memberKey = (lessonId, student) => short(`${lessonId}:member:${student}`);
+/** Stand-out dots each student places in Decide (sprints published before dots have none). */
+const dotsOf = (config) => (Number.isInteger(config.dots) ? config.dots : 0);
+const IDEA_PART_TEXT = { idea: 'idea', answers: 'answers', evidence: 'evidence' };
+
+/**
+ * After voting closes: how many stand-out dots each part of each idea got,
+ * and the most-dotted parts of the ideas that weren't chosen, to borrow.
+ */
+async function dotResults(store, lessonId, config, group, gallery, chosenId) {
+  const subs = await groupSubs(store, lessonId, config, group, 'decide');
+  const ideas = new Map(gallery.flatMap((set) => set.ideas).map((i) => [i.id, i]));
+  const counts = {};
+  const notes = {};
+  for (const { sub } of subs) for (const d of list(sub?.payload?.dots)) {
+    if (!ideas.has(d.idea) || !IDEA_PART_TEXT[d.part]) continue;
+    counts[d.idea] = { idea: 0, answers: 0, evidence: 0, ...(counts[d.idea] ?? {}) };
+    counts[d.idea][d.part] += 1;
+    if (d.note?.trim()) (notes[`${d.idea}:${d.part}`] ??= []).push(d.note.trim());
+  }
+  const borrow = Object.entries(counts)
+    .filter(([id]) => id !== chosenId)
+    .flatMap(([id, parts]) => Object.entries(parts).filter(([, n]) => n > 0).map(([part, n]) => {
+      const idea = ideas.get(id);
+      return { idea_id: id, title: idea.title, part, text: idea[part] ?? '', count: n, notes: notes[`${id}:${part}`] ?? [] };
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  return { counts, borrow };
+}
 
 /**
  * The group's shared Understand space: everyone's audiences and limits
@@ -316,7 +349,7 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
 // Student actions
 // ---------------------------------------------------------------------------
 
-const STUDENT_ACTIONS = ['status', 'claim', 'open', 'save', 'submit', 'parts', 'claim_part', 'pitch', 'feedback', 'audience', 'ask_add', 'ask_pick', 'ask_send'];
+const STUDENT_ACTIONS = ['status', 'claim', 'open', 'save', 'submit', 'parts', 'claim_part', 'assign', 'pitch', 'feedback', 'audience', 'ask_add', 'ask_pick', 'ask_send'];
 
 async function whoAndGroup(store, config, body, action) {
   let who = scope.getStore()?.who;
@@ -387,6 +420,7 @@ async function studentView(store, lessonId, config, who, group) {
     heat = heatLevels(t.counts, config.criteria);
   }
   const chosenIdea = state.chosen && gallery ? gallery.flatMap((s) => s.ideas).find((i) => i.id === state.chosen) ?? null : null;
+  const dotView = state.votes_closed_at && gallery && dotsOf(config) ? await dotResults(store, lessonId, config, group, gallery, state.chosen) : null;
   const view = {
     identity: { need: null, initials: who.student.initials },
     group: { id: group.id, name: group.name, size: group.students.length, mates: group.students.filter((s) => s !== sid).map((s) => initials.get(s) ?? '–') },
@@ -400,9 +434,13 @@ async function studentView(store, lessonId, config, who, group) {
     votes_closed: !!state.votes_closed_at,
     chosen: chosenIdea ? { id: chosenIdea.id, title: chosenIdea.title, idea: chosenIdea.idea } : null,
     awaiting: state.awaiting ? { kind: state.awaiting.kind } : null,
-    parts: list(state.parts).map((p) => ({ ...p, claimed: list(state.claims[p.id]).length, mine: list(state.claims[p.id]).includes(sid) })),
+    parts: list(state.parts).map((p) => ({ ...p, claimed: list(state.claims[p.id]).length, mine: list(state.claims[p.id]).includes(sid), assigned: list(state.claims[p.id]).map((x) => memberKey(lessonId, x)) })),
+    members: group.students.map((x) => ({ key: memberKey(lessonId, x), initials: initials.get(x) ?? '–', me: x === sid })),
+    dots: dotsOf(config),
     pitch: state.pitch ? { kind: state.pitch.kind, name: state.pitch.name ?? '', file: state.pitch.file ?? null, link: state.pitch.link ?? '' } : null,
     understand_group: shared,
+    dot_counts: dotView?.counts ?? null,
+    borrow: dotView?.borrow ?? null,
     // What the group takes from Understand into the later phases.
     brief: {
       problem: state.question?.text ?? null,
@@ -424,7 +462,10 @@ async function submitProblem(store, lessonId, config, group, sid, phase, payload
   if (phase === 'sketch' && !payload.cards.length) return ['need_ideas', 'Write at least one idea first.'];
   if (phase === 'decide') {
     if (!config.criteria.every((c) => payload.votes[c])) return ['need_votes', 'Give every criterion to one idea.'];
-    if (!view.parts.some((p) => p.mine)) return ['need_part', 'Claim a part of the prototype.'];
+    // Fewer parts to dot than dots (a tiny gallery) needs only as many as there are.
+    const dottable = (view.gallery ?? []).flatMap((set) => set.ideas).reduce((n, i) => n + Object.keys(IDEA_PART_TEXT).filter((k) => (i[k] ?? '').trim()).length, 0);
+    if (dotsOf(config) && payload.dots.length < Math.min(dotsOf(config), dottable)) return ['need_dots', `Place all ${dotsOf(config)} stand-out dots.`];
+    if (!view.parts.some((p) => p.mine)) return ['need_part', 'Your group hasn’t given you a part yet.'];
   }
   if (phase === 'test' && payload.reflection.filter((r) => r.trim()).length < 2) return ['need_reflection', 'Answer both reflection questions.'];
   return null;
@@ -474,6 +515,7 @@ export async function sprintAction(store, lessonId, body) {
     if (phase === 'decide' && view.votes_closed) {
       const before = prev?.payload?.votes ?? {};
       if (!config.criteria.every((c) => (before[c] ?? '') === (payload.votes[c] ?? ''))) reject(409, 'votes_closed', 'Voting has closed for your group.');
+      payload.dots = list(prev?.payload?.dots);
     }
     const now = clock();
     const next = { ...(prev ?? {}), payload, saved_at: iso(now) };
@@ -499,7 +541,7 @@ export async function sprintAction(store, lessonId, body) {
     }
     if (changed) await store.setJSON(k.group(group.id), state);
   }
-  if (action === 'parts' || action === 'claim_part' || action === 'pitch') await groupWrite(store, lessonId, config, group, sid, owner, view, action, body);
+  if (action === 'parts' || action === 'claim_part' || action === 'assign' || action === 'pitch') await groupWrite(store, lessonId, config, group, sid, owner, view, action, body);
   if (action === 'audience' || action.startsWith('ask_')) await understandWrite(store, lessonId, config, group, view, action, body);
   if (action === 'feedback') await giveFeedback(store, lessonId, config, group, sid, body);
   view = await studentView(store, lessonId, config, who, group);
@@ -593,6 +635,7 @@ function checkVotes(view, config, payload) {
     if (!config.criteria.includes(c) || !ideas.has(idea)) reject(400, 'bad_vote', 'That idea has changed. Reload the page.');
   }
   payload.opened = payload.opened.filter((id) => sets.has(id));
+  payload.dots = payload.dots.filter((d) => ideas.has(d.idea)).slice(0, dotsOf(config));
 }
 
 /** The group's shared Understand space: the agreed audience, questions added, picked and sent to the teacher. */
@@ -638,7 +681,7 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
   const k = sprintKeys(lessonId);
   if (view.lock) reject(423, 'locked', 'The sprint is locked for now. It opens again soon.');
   const state = await groupState(store, k, group.id);
-  if (action === 'parts' || action === 'claim_part') {
+  if (action === 'parts' || action === 'claim_part' || action === 'assign') {
     if (!view.phases.find((p) => p.key === 'decide')?.open) reject(409, 'not_open', 'Decide hasn’t opened yet.');
     if (!state.chosen) reject(409, 'no_idea_yet', 'Your group’s idea is still being chosen.');
     if (view.phases.find((p) => p.key === 'decide')?.frozen) reject(409, 'frozen', 'Your class work for this phase is in.');
@@ -659,6 +702,19 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
     if (others.length >= cap) reject(409, 'part_taken', 'Someone has claimed that part. Pick another.');
     state.claims = Object.fromEntries(Object.entries(state.claims).map(([id, ss]) => [id, list(ss).filter((s) => s !== sid)]));
     state.claims[part.id] = [...others, sid];
+  }
+  if (action === 'assign') {
+    // The group gives a part to one member, or two when there are more people than parts. Each member has one part.
+    const part = list(state.parts).find((p) => p.id === body.part_id);
+    if (!part) reject(404, 'not_found', 'That part has gone. Reload the page.');
+    const byKey = new Map(group.students.map((x) => [memberKey(lessonId, x), x]));
+    const keys = Array.isArray(body.keys) ? body.keys : [];
+    if (keys.some((key) => !byKey.has(key))) reject(400, 'bad_member', 'That person isn’t in your group. Reload the page.');
+    const who = [...new Set(keys.map((key) => byKey.get(key)))];
+    const cap = group.students.length > list(state.parts).length ? 2 : 1;
+    if (who.length > cap) reject(409, 'too_many', cap === 1 ? 'One person per part.' : 'Two people at most on one part.');
+    state.claims = Object.fromEntries(Object.entries(state.claims).map(([id, ss]) => [id, list(ss).filter((x) => !who.includes(x))]));
+    state.claims[part.id] = who;
   }
   if (action === 'pitch') {
     if (!view.phases.find((p) => p.key === 'prototype')?.open) reject(409, 'not_open', 'Prototype hasn’t opened yet.');
@@ -733,7 +789,7 @@ async function teacherBoard(store, lessonId, groupId) {
   for (const key of ['prototype', 'test']) {
     subs[key] = (await groupSubs(store, lessonId, config, g, key)).map(({ student, sub }) => ({ student_id: student, name: name(student), sub }));
   }
-  const reasons = decide.map(({ student, sub }) => ({ name: name(student), votes: sub?.payload?.votes ?? {}, reasons: sub?.payload?.reasons ?? {} }));
+  const reasons = decide.map(({ student, sub }) => ({ name: name(student), votes: sub?.payload?.votes ?? {}, reasons: sub?.payload?.reasons ?? {}, dots: list(sub?.payload?.dots) }));
   const round = (await read(store, k.round(g.id))) ?? null;
   return {
     group: { id: g.id, name: g.name },
