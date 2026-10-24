@@ -1,6 +1,7 @@
 import { mountAlignmentView } from '@/alignment/view';
 import { subjectUsesAlignment } from '@/alignment/model';
 import { mountYearNetworkView } from '@/network/year-view';
+import { mountYearCoverageView } from '@/alignment/year-coverage-view';
 import { liveUnitLessonCount } from '@/curriculum/with-entity-status';
 import { navigate } from '@/app/router';
 import { pastelFromId } from '@/design/pastel';
@@ -331,7 +332,8 @@ export function renderScopeTimelineEditor(
   networkTab.type = 'button';
   networkTab.className = 'hub-pills__btn scope-timeline__tab';
   networkTab.dataset.scopeTab = 'network';
-  networkTab.textContent = 'Network';
+  // Syllabus subjects see the year as coverage of the syllabus; others keep the network.
+  networkTab.textContent = subjectUsesAlignment(subject.title) ? 'Coverage' : 'Network';
 
   const alignmentTab = document.createElement('button');
   alignmentTab.type = 'button';
@@ -1229,7 +1231,8 @@ export function renderScopeTimelineEditor(
       mountAlignmentView(viewHost);
     } else {
       scrollEl = null;
-      mountYearNetworkView(viewHost, curriculum, subject.id);
+      if (subjectUsesAlignment(subject.title)) mountYearCoverageView(viewHost, curriculum, subject.id);
+      else mountYearNetworkView(viewHost, curriculum, subject.id);
     }
     paintCompare();
   };
