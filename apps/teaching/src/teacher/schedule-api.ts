@@ -21,6 +21,8 @@ export function postScheduledLesson(body: {
   unit_id?: string;
   date: string;
   start_time?: string | null;
+  /** Move the lesson's first row for this class here, if it has one, instead of adding a row. */
+  move_existing?: boolean;
 }): Promise<ScheduledLesson> {
   return apiPost('/api/scheduled-lessons', body);
 }

@@ -785,9 +785,10 @@ function mountAllDay(grid, date) {
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
     const allDayClass = due.kind === 'allday' ? ` is-allday k-${due.filterKey === 'events' ? 'event' : due.filterKey}${due.ambient ? ' is-ambient' : ''}` : '';
-    const promiseClass = allDayClass || due.kind === 'promise'
+    // An all-day item keeps its own colour; only a promise reads as owed by you or them.
+    const promiseClass = allDayClass || (due.kind === 'promise'
       ? ` is-promise ${due.direction === 'they_owe' ? 'is-them' : 'is-you'}${due.late ? ' is-late' : ''}`
-      : '';
+      : '');
     const kindLabel = due.kind === 'promise' ? 'Promise' : due.kind === 'allday' ? 'All day' : 'Task';
     const hint = [kindLabel, due.meta].filter(Boolean).join(' · ');
     const progress = due.progress ? `${due.progress.done} of ${due.progress.total} ${due.progress.unit}` : '';
