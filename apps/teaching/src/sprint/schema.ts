@@ -79,6 +79,38 @@ export const SprintGroupSchema = z.object({
 });
 export type SprintGroup = z.infer<typeof SprintGroupSchema>;
 
+/**
+ * Understand's steps, each one the teacher can leave out. Alone steps are on
+ * each student's own screen; group steps are the group's shared space.
+ */
+export const UNDERSTAND_ALONE = ['spot', 'audience', 'dig', 'say', 'limits'] as const;
+export const UNDERSTAND_GROUP = ['vote', 'merge', 'grid', 'ask', 'expert'] as const;
+export const UNDERSTAND_STEPS = [...UNDERSTAND_ALONE, ...UNDERSTAND_GROUP] as const;
+export type UnderstandStep = (typeof UNDERSTAND_STEPS)[number];
+export const UNDERSTAND_STEP_LABELS: Record<UnderstandStep, string> = {
+  spot: 'Spot: words that stand out in the brief',
+  audience: 'Audience: who it is for and why',
+  dig: 'Dig: why is that a problem?',
+  say: 'Say it: the problem in your own words',
+  limits: 'Limits: control and known',
+  vote: 'Vote on the problem',
+  merge: 'One audience',
+  grid: 'Our limits',
+  ask: 'Choose questions for the expert',
+  expert: 'Expert answers'
+};
+const allSteps = () => Object.fromEntries(UNDERSTAND_STEPS.map((k) => [k, true])) as Record<UnderstandStep, boolean>;
+export const UnderstandSettingsSchema = z.object({
+  layout: z.enum(['slides', 'vertical']).default('slides'),
+  steps: z.record(z.string(), z.boolean()).default(allSteps).transform((v) => ({ ...allSteps(), ...Object.fromEntries(Object.entries(v).filter(([k]) => (UNDERSTAND_STEPS as readonly string[]).includes(k))) }) as Record<UnderstandStep, boolean>)
+});
+export type UnderstandSettings = z.infer<typeof UnderstandSettingsSchema>;
+export const defaultUnderstand = (): UnderstandSettings => ({ layout: 'slides', steps: allSteps() });
+
+/** Limits grid boxes: can or can't control, known or unknown. */
+export const LIMIT_BOXES = ['can_known', 'cant_known', 'can_unknown', 'cant_unknown'] as const;
+export type LimitBox = (typeof LIMIT_BOXES)[number];
+
 const phasesInOrder = (phases: readonly { key: string }[]) => phases.every((p, i) => p.key === SPRINT_PHASES[i]);
 
 export const SprintSettingsSchema = z.object({
@@ -93,6 +125,7 @@ export const SprintSettingsSchema = z.object({
   idea_guide: IdeaGuideSchema,
   phases: z.array(SprintPhaseSchema).length(5).refine(phasesInOrder, 'Phases must be in order: Understand, Sketch, Decide, Prototype, Test.'),
   groups: z.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z.object({ prototype: z.string().optional(), reflection: z.string().optional() }).default({})
 });
@@ -107,7 +140,8 @@ export const PublicSprintSchema = z.object({
   reflection_prompts: z.array(z.string().max(200)).max(2),
   requirements: z.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
-  phases: z.array(SprintPhaseSchema).length(5)
+  phases: z.array(SprintPhaseSchema).length(5),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand)
 });
 export type PublicSprint = z.infer<typeof PublicSprintSchema>;
 
@@ -116,11 +150,21 @@ export type PublicSprint = z.infer<typeof PublicSprintSchema>;
 const where = text(200);
 const Wheres = z.record(z.string().max(40), where).default({});
 
+const cards = z.array(text(120)).max(8).default([]);
 export const UnderstandPayloadSchema = z.object({
+  /** Earlier sprints' "How might we" notes; still read, no longer written. */
   notes: z.array(text(200)).max(SPRINT_LIMITS.ideas).default([]),
-  /** The note id (from the group's notes) this student starred. */
+  /** The note id (from the group's statements) this student starred. */
   star: z.string().max(40).default(''),
-  stretch: text(300).default('')
+  stretch: text(300).default(''),
+  /** Words from the brief that stand out. */
+  spot: z.array(text(40)).max(30).default([]),
+  audience: z.object({ who: text(200).default(''), why: text(300).default('') }).default({ who: '', why: '' }),
+  /** The surface problem, then each "why is that a problem?". */
+  dig: z.array(text(300)).max(6).default([]),
+  /** The problem in their own words. */
+  say: text(400).default(''),
+  limits: z.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).default({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
 });
 export const SketchCardSchema = z.object({
   id: SprintIdSchema,

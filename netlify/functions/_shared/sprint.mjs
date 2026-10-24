@@ -11,7 +11,7 @@ import { publishedLessonKey, draftLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { QuizError, deviceHash, read, reject } from './question-drop.mjs';
 import { identify } from './quiz.mjs';
-import { FeedbackEntrySchema, PAYLOAD_SCHEMAS, PartsSchema, SprintSettingsSchema } from './sprint-schema.mjs';
+import { FeedbackEntrySchema, PAYLOAD_SCHEMAS, PartsSchema, SprintSettingsSchema, UnderstandSettingsSchema, LIMIT_BOXES } from './sprint-schema.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { openPhases, lockState, isFrozen, isLate, tally, heatLevels, endsAtEpoch, phaseDue } from './sprint-rules.mjs';
 import { sprintKeys, emptyGroup, emptyLock } from './sprint-keys.mjs';
@@ -32,7 +32,8 @@ export function prepareSprintPublish(draft, studentBlocks) {
       reflection_prompts: [...s.reflection_prompts],
       requirements: s.requirements,
       idea_guide: s.idea_guide,
-      phases: s.phases
+      phases: s.phases,
+      understand: UnderstandSettingsSchema.parse(s.understand ?? {})
     }
   };
   const config = {
@@ -45,7 +46,8 @@ export function prepareSprintPublish(draft, studentBlocks) {
     ideas: Object.fromEntries(s.phases.filter((p) => p.ideas).map((p) => [p.key, p.ideas])),
     criteria: s.criteria.map((c) => c.id),
     reflection_criteria: s.reflection_criteria.map((c) => c.id),
-    requirements: s.requirements.map((r) => ({ id: r.id, phases: [...r.phases] }))
+    requirements: s.requirements.map((r) => ({ id: r.id, phases: [...r.phases] })),
+    understand: snapshot.sprint.understand.steps
   };
   return { snapshot, config };
 }
@@ -200,11 +202,62 @@ async function groupSubs(store, lessonId, config, group, phase) {
   }));
 }
 
+/**
+ * What the group votes on in Understand: each member's problem statement
+ * (Say it), then any "How might we" notes from earlier sprints. `field` is
+ * where the text sits in the submission, for the spotlight.
+ */
 export async function groupNotes(store, lessonId, config, group) {
   const subs = await groupSubs(store, lessonId, config, group, 'understand');
-  return subs.flatMap(({ student, owner, sub }) =>
-    list(sub?.payload?.notes).map((text, i) => ({ id: noteId(lessonId, owner, i), index: i, text, student, star: sub?.payload?.star ?? '' })).filter((n) => n.text.trim())
-  );
+  return subs.flatMap(({ student, owner, sub }) => {
+    const p = sub?.payload ?? {};
+    const star = p.star ?? '';
+    const say = typeof p.say === 'string' && p.say.trim() ? [{ id: noteId(lessonId, owner, 'say'), index: -1, field: 'say', text: p.say, student, star }] : [];
+    const notes = list(p.notes).map((text, i) => ({ id: noteId(lessonId, owner, i), index: i, field: `notes.${i}`, text, student, star })).filter((n) => n.text.trim());
+    return [...say, ...notes];
+  });
+}
+
+/** An Understand step is on unless the Kit switched it off (sprints published before steps had them all on). */
+export const stepOn = (config, step) => config.understand?.[step] !== false;
+
+const norm = (text) => text.trim().replace(/\s+/g, ' ').toLowerCase();
+/** Repeated answers stacked: [{ text, count }], most common first, the first wording kept. */
+function stack(texts) {
+  const seen = new Map();
+  for (const t of texts) {
+    if (typeof t !== 'string' || !t.trim()) continue;
+    const key = norm(t);
+    const row = seen.get(key);
+    if (row) row.count += 1;
+    else seen.set(key, { text: t.trim(), count: 1 });
+  }
+  return [...seen.values()].sort((a, b) => b.count - a.count);
+}
+const questionId = (lessonId, text) => short(`${lessonId}:q:${norm(text)}`);
+
+/**
+ * The group's shared Understand space: everyone's audiences and limits
+ * stacked (no names), the agreed audience, the questions made from the
+ * unknowns plus any the group added, which are picked, and what was sent with
+ * the teacher's answers.
+ */
+export async function groupUnderstand(store, lessonId, config, group, state) {
+  const subs = (await groupSubs(store, lessonId, config, group, 'understand')).map(({ sub }) => sub?.payload ?? {});
+  const limits = Object.fromEntries(LIMIT_BOXES.map((box) => [box, stack(subs.flatMap((p) => list(p.limits?.[box])))]));
+  const fromUnknowns = [...limits.can_unknown, ...limits.cant_unknown];
+  const questions = stack([...fromUnknowns.flatMap((c) => Array(c.count).fill(c.text)), ...list(state.ask_added).map((q) => q.text)])
+    .map((q) => ({ id: questionId(lessonId, q.text), text: q.text, count: q.count }));
+  const picked = list(state.ask_picked);
+  const answers = state.answers ?? {};
+  return {
+    who: stack(subs.map((p) => p.audience?.who)),
+    why: stack(subs.map((p) => p.audience?.why)),
+    audience: state.audience ? { who: state.audience.who, why: state.audience.why } : null,
+    limits,
+    questions: questions.map((q) => ({ ...q, picked: picked.includes(q.id), sent: list(state.ask_sent).some((x) => x.id === q.id) })),
+    sent: list(state.ask_sent).map((q) => ({ id: q.id, text: q.text, answer: answers[q.id]?.text ?? null }))
+  };
 }
 
 /** The gallery: submitted sketches, each author's cards as one set, strongest first. Sets are ordered by id, never by roster. */
@@ -262,7 +315,7 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
 // Student actions
 // ---------------------------------------------------------------------------
 
-const STUDENT_ACTIONS = ['status', 'claim', 'open', 'save', 'submit', 'parts', 'claim_part', 'pitch', 'feedback'];
+const STUDENT_ACTIONS = ['status', 'claim', 'open', 'save', 'submit', 'parts', 'claim_part', 'pitch', 'feedback', 'audience', 'ask_add', 'ask_pick', 'ask_send'];
 
 async function whoAndGroup(store, config, body, action) {
   let who = scope.getStore()?.who;
@@ -324,6 +377,7 @@ async function studentView(store, lessonId, config, who, group) {
     });
   }
   const notes = (await groupNotes(store, lessonId, config, group)).map((n) => ({ id: n.id, text: n.text, mine: n.student === sid }));
+  const shared = await groupUnderstand(store, lessonId, config, group, state);
   const gallery = open.includes('decide') ? (await groupGallery(store, lessonId, config, group, state.votes_closed_at)).map(({ id, ideas }) => ({ id, ideas })) : null;
   let heat = null;
   if (state.votes_closed_at && gallery) {
@@ -346,7 +400,14 @@ async function studentView(store, lessonId, config, who, group) {
     chosen: chosenIdea ? { id: chosenIdea.id, title: chosenIdea.title, idea: chosenIdea.idea } : null,
     awaiting: state.awaiting ? { kind: state.awaiting.kind } : null,
     parts: list(state.parts).map((p) => ({ ...p, claimed: list(state.claims[p.id]).length, mine: list(state.claims[p.id]).includes(sid) })),
-    pitch: state.pitch ? { kind: state.pitch.kind, name: state.pitch.name ?? '', file: state.pitch.file ?? null, link: state.pitch.link ?? '' } : null
+    pitch: state.pitch ? { kind: state.pitch.kind, name: state.pitch.name ?? '', file: state.pitch.file ?? null, link: state.pitch.link ?? '' } : null,
+    understand_group: shared,
+    // What the group takes from Understand into the later phases.
+    brief: {
+      problem: state.question?.text ?? null,
+      audience: shared.audience,
+      answers: shared.sent.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer }))
+    }
   };
   const stage = (await read(store, k.stage)) ?? {};
   view.spotlight = stage.spotlight ?? null;
@@ -356,8 +417,8 @@ async function studentView(store, lessonId, config, who, group) {
 /** Structural checks the server makes before a submit; the browser shows the kinder, fuller checks. */
 async function submitProblem(store, lessonId, config, group, sid, phase, payload, view) {
   if (phase === 'understand') {
-    if (!payload.notes.some((n) => n.trim())) return ['need_notes', 'Write at least one question first.'];
-    if (!view.notes.some((n) => n.id === payload.star)) return ['need_star', 'Star one of your group’s questions.'];
+    if (stepOn(config, 'say') && !payload.say.trim() && !payload.notes.some((n) => n.trim())) return ['need_say', 'Write the problem in your own words first.'];
+    if (stepOn(config, 'vote') && !view.notes.some((n) => n.id === payload.star)) return ['need_star', 'Star one of your group’s problem statements.'];
   }
   if (phase === 'sketch' && !payload.cards.length) return ['need_ideas', 'Write at least one idea first.'];
   if (phase === 'decide') {
@@ -438,6 +499,7 @@ export async function sprintAction(store, lessonId, body) {
     if (changed) await store.setJSON(k.group(group.id), state);
   }
   if (action === 'parts' || action === 'claim_part' || action === 'pitch') await groupWrite(store, lessonId, config, group, sid, owner, view, action, body);
+  if (action === 'audience' || action.startsWith('ask_')) await understandWrite(store, lessonId, config, group, view, action, body);
   if (action === 'feedback') await giveFeedback(store, lessonId, config, group, sid, body);
   view = await studentView(store, lessonId, config, who, group);
   return withRound(store, lessonId, config, group, sid, view);
@@ -532,6 +594,44 @@ function checkVotes(view, config, payload) {
   payload.opened = payload.opened.filter((id) => sets.has(id));
 }
 
+/** The group's shared Understand space: the agreed audience, questions added, picked and sent to the teacher. */
+async function understandWrite(store, lessonId, config, group, view, action, body) {
+  const k = sprintKeys(lessonId);
+  if (view.lock) reject(423, 'locked', 'The sprint is locked for now. It opens again soon.');
+  const row = view.phases.find((p) => p.key === 'understand');
+  if (!row?.open) reject(409, 'not_open', 'Understand hasn’t opened yet.');
+  if (row.frozen) reject(409, 'frozen', 'Your class work for this phase is in.');
+  const state = await groupState(store, k, group.id);
+  const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  if (action === 'audience') {
+    if (!stepOn(config, 'merge')) reject(409, 'step_off', 'This step is switched off.');
+    state.audience = { who: str(body.who, 200), why: str(body.why, 300), at: iso(clock()) };
+  } else {
+    if (!stepOn(config, 'ask')) reject(409, 'step_off', 'This step is switched off.');
+    const shared = await groupUnderstand(store, lessonId, config, group, state);
+    if (action === 'ask_add') {
+      const text = str(body.text, 200);
+      if (!text) reject(400, 'empty', 'Write the question first.');
+      if (list(state.ask_added).length >= 10) reject(409, 'too_many', 'Your group has added 10 questions. Pick from those.');
+      if (!shared.questions.some((q) => q.id === questionId(lessonId, text))) state.ask_added = [...list(state.ask_added), { text, at: iso(clock()) }];
+    }
+    if (action === 'ask_pick') {
+      if (!shared.questions.some((q) => q.id === body.id)) reject(404, 'not_found', 'That question has gone. Reload the page.');
+      const picked = list(state.ask_picked);
+      if (picked.includes(body.id)) state.ask_picked = picked.filter((id) => id !== body.id);
+      else if (picked.length >= 3) reject(409, 'too_many', 'Pick up to 3. Unstar one first.');
+      else state.ask_picked = [...picked, body.id];
+    }
+    if (action === 'ask_send') {
+      const picked = shared.questions.filter((q) => list(state.ask_picked).includes(q.id));
+      if (!picked.length) reject(400, 'none_picked', 'Star up to 3 questions first.');
+      const sent = list(state.ask_sent);
+      state.ask_sent = [...sent, ...picked.filter((q) => !sent.some((x) => x.id === q.id)).map((q) => ({ id: q.id, text: q.text, at: iso(clock()) }))];
+    }
+  }
+  await store.setJSON(k.group(group.id), state);
+}
+
 /** Parts list, part claims and the pitch file: shared group state any member may write. */
 async function groupWrite(store, lessonId, config, group, sid, owner, view, action, body) {
   const k = sprintKeys(lessonId);
@@ -578,7 +678,7 @@ async function groupWrite(store, lessonId, config, group, sid, owner, view, acti
 // Names show here only; anything put up for students goes through stage, nameless.
 // ---------------------------------------------------------------------------
 
-const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate'];
+const TEACHER_ACTIONS = ['summary', 'board', 'end_class', 'unlock', 'extend', 'confirm', 'spotlight', 'move', 'run', 'round', 'moderate', 'answer'];
 
 async function teacherContext(store, lessonId) {
   const { config } = await loadSprint(store, lessonId);
@@ -609,7 +709,7 @@ async function teacherSummary(store, lessonId) {
       const opened = Object.fromEntries(PHASES.map((key) => [key, !!seen[key]]));
       return { id, initials: byId.get(id)?.initials ?? '–', name: byId.get(id)?.name ?? 'Removed student', phases, opened };
     }));
-    groups.push({ id: g.id, name: g.name, students, open, awaiting: state.awaiting ?? null, chosen: !!state.chosen, question: state.question?.text ?? null });
+    groups.push({ id: g.id, name: g.name, students, open, awaiting: state.awaiting ?? null, chosen: !!state.chosen, question: state.question?.text ?? null, asked: list(state.ask_sent).filter((q) => !state.answers?.[q.id]).length });
   }
   const classParts = Object.fromEntries(config.phases.filter((p) => p.where === 'class').map((p) => [p.key, lockRec.ended[p.key] ? 'ended' : 'open']));
   const lock = lockRec.lock && Date.parse(lockRec.lock.until) > now ? lockRec.lock : null;
@@ -623,7 +723,8 @@ async function teacherBoard(store, lessonId, groupId) {
   if (!g) reject(404, 'not_found', 'That group is gone.');
   const state = await resolveGroup(store, lessonId, config, g, await groupState(store, k, g.id), lockRec, extend, clock());
   const name = (id) => byId.get(id)?.name ?? 'Removed student';
-  const notes = (await groupNotes(store, lessonId, config, g)).map((n) => ({ id: n.id, text: n.text, name: name(n.student), student_id: n.student, index: n.index }));
+  const notes = (await groupNotes(store, lessonId, config, g)).map((n) => ({ id: n.id, text: n.text, name: name(n.student), student_id: n.student, index: n.index, field: n.field }));
+  const understand = await groupUnderstand(store, lessonId, config, g, state);
   const gallery = (await groupGallery(store, lessonId, config, g, state.votes_closed_at)).map((set) => ({ id: set.id, name: name(set.student), student_id: set.student, ideas: set.ideas }));
   const decide = await groupSubs(store, lessonId, config, g, 'decide');
   const t = tally(decide.map(({ sub }) => sub?.payload?.votes ?? {}), config.criteria, gallery.flatMap((s) => s.ideas.map((i) => i.id)));
@@ -639,6 +740,7 @@ async function teacherBoard(store, lessonId, groupId) {
     question: state.question ?? null,
     chosen: state.chosen ?? null,
     notes,
+    understand,
     gallery,
     totals: t.totals,
     heat: heatLevels(t.counts, config.criteria),
@@ -720,6 +822,17 @@ export async function sprintTeacherAction(store, lessonId, body) {
       if (!ideas.some((i) => i.id === body.id)) reject(404, 'not_found', 'That idea is gone.');
       await store.setJSON(k.group(g.id), { ...state, chosen: body.id, awaiting: null, votes_closed_at: state.votes_closed_at ?? iso(now) });
     } else reject(400, 'bad_kind', 'Confirm a question or an idea.');
+  }
+  if (action === 'answer') {
+    const g = config.groups.find((x) => x.id === body.group_id);
+    if (!g) reject(404, 'not_found', 'That group is gone.');
+    const state = await groupState(store, k, g.id);
+    if (!list(state.ask_sent).some((q) => q.id === body.id)) reject(404, 'not_found', 'That question is gone.');
+    const text = typeof body.text === 'string' ? body.text.trim().slice(0, 600) : '';
+    const answers = { ...(state.answers ?? {}) };
+    if (text) answers[body.id] = { text, at: iso(now) };
+    else delete answers[body.id];
+    await store.setJSON(k.group(g.id), { ...state, answers });
   }
   if (action === 'spotlight') {
     const stage = (await read(store, k.stage)) ?? {};

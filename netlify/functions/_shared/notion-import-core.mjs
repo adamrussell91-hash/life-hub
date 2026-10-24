@@ -1172,6 +1172,15 @@ var SprintGroupSchema = z8.object({
   name: z8.string().trim().min(1).max(40),
   students: z8.array(z8.string().min(1).max(64)).max(SPRINT_LIMITS.groupSize)
 });
+var UNDERSTAND_ALONE = ["spot", "audience", "dig", "say", "limits"];
+var UNDERSTAND_GROUP = ["vote", "merge", "grid", "ask", "expert"];
+var UNDERSTAND_STEPS = [...UNDERSTAND_ALONE, ...UNDERSTAND_GROUP];
+var allSteps = () => Object.fromEntries(UNDERSTAND_STEPS.map((k) => [k, true]));
+var UnderstandSettingsSchema = z8.object({
+  layout: z8.enum(["slides", "vertical"]).default("slides"),
+  steps: z8.record(z8.string(), z8.boolean()).default(allSteps).transform((v) => ({ ...allSteps(), ...Object.fromEntries(Object.entries(v).filter(([k]) => UNDERSTAND_STEPS.includes(k))) }))
+});
+var defaultUnderstand = () => ({ layout: "slides", steps: allSteps() });
 var phasesInOrder = (phases) => phases.every((p, i) => p.key === SPRINT_PHASES[i]);
 var SprintSettingsSchema = z8.object({
   class_id: z8.string().min(1).max(64),
@@ -1185,6 +1194,7 @@ var SprintSettingsSchema = z8.object({
   idea_guide: IdeaGuideSchema,
   phases: z8.array(SprintPhaseSchema).length(5).refine(phasesInOrder, "Phases must be in order: Understand, Sketch, Decide, Prototype, Test."),
   groups: z8.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z8.object({ prototype: z8.string().optional(), reflection: z8.string().optional() }).default({})
 });
@@ -1196,15 +1206,26 @@ var PublicSprintSchema = z8.object({
   reflection_prompts: z8.array(z8.string().max(200)).max(2),
   requirements: z8.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
-  phases: z8.array(SprintPhaseSchema).length(5)
+  phases: z8.array(SprintPhaseSchema).length(5),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand)
 });
 var where = text(200);
 var Wheres = z8.record(z8.string().max(40), where).default({});
+var cards = z8.array(text(120)).max(8).default([]);
 var UnderstandPayloadSchema = z8.object({
+  /** Earlier sprints' "How might we" notes; still read, no longer written. */
   notes: z8.array(text(200)).max(SPRINT_LIMITS.ideas).default([]),
-  /** The note id (from the group's notes) this student starred. */
+  /** The note id (from the group's statements) this student starred. */
   star: z8.string().max(40).default(""),
-  stretch: text(300).default("")
+  stretch: text(300).default(""),
+  /** Words from the brief that stand out. */
+  spot: z8.array(text(40)).max(30).default([]),
+  audience: z8.object({ who: text(200).default(""), why: text(300).default("") }).default({ who: "", why: "" }),
+  /** The surface problem, then each "why is that a problem?". */
+  dig: z8.array(text(300)).max(6).default([]),
+  /** The problem in their own words. */
+  say: text(400).default(""),
+  limits: z8.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).default({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
 });
 var SketchCardSchema = z8.object({
   id: SprintIdSchema,
@@ -4371,6 +4392,10 @@ var LessonSchema = z14.object({
   /** On the unit map: a support or extension lesson beside the core route. Null (saves merge) goes back to core. */
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
+  /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
+  branch_from: z14.string().min(1).max(64).nullable().optional(),
+  /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
+  pre_unit: z14.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
   dot_points: z14.array(DotPointRefSchema).max(20).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */

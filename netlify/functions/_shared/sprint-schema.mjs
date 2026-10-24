@@ -56,6 +56,28 @@ var SprintGroupSchema = z.object({
   name: z.string().trim().min(1).max(40),
   students: z.array(z.string().min(1).max(64)).max(SPRINT_LIMITS.groupSize)
 });
+var UNDERSTAND_ALONE = ["spot", "audience", "dig", "say", "limits"];
+var UNDERSTAND_GROUP = ["vote", "merge", "grid", "ask", "expert"];
+var UNDERSTAND_STEPS = [...UNDERSTAND_ALONE, ...UNDERSTAND_GROUP];
+var UNDERSTAND_STEP_LABELS = {
+  spot: "Spot: words that stand out in the brief",
+  audience: "Audience: who it is for and why",
+  dig: "Dig: why is that a problem?",
+  say: "Say it: the problem in your own words",
+  limits: "Limits: control and known",
+  vote: "Vote on the problem",
+  merge: "One audience",
+  grid: "Our limits",
+  ask: "Choose questions for the expert",
+  expert: "Expert answers"
+};
+var allSteps = () => Object.fromEntries(UNDERSTAND_STEPS.map((k) => [k, true]));
+var UnderstandSettingsSchema = z.object({
+  layout: z.enum(["slides", "vertical"]).default("slides"),
+  steps: z.record(z.string(), z.boolean()).default(allSteps).transform((v) => ({ ...allSteps(), ...Object.fromEntries(Object.entries(v).filter(([k]) => UNDERSTAND_STEPS.includes(k))) }))
+});
+var defaultUnderstand = () => ({ layout: "slides", steps: allSteps() });
+var LIMIT_BOXES = ["can_known", "cant_known", "can_unknown", "cant_unknown"];
 var phasesInOrder = (phases) => phases.every((p, i) => p.key === SPRINT_PHASES[i]);
 var SprintSettingsSchema = z.object({
   class_id: z.string().min(1).max(64),
@@ -69,6 +91,7 @@ var SprintSettingsSchema = z.object({
   idea_guide: IdeaGuideSchema,
   phases: z.array(SprintPhaseSchema).length(5).refine(phasesInOrder, "Phases must be in order: Understand, Sketch, Decide, Prototype, Test."),
   groups: z.array(SprintGroupSchema).max(SPRINT_LIMITS.groups).default([]),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand),
   /** Markbook assessment columns made for this sprint's marks. */
   columns: z.object({ prototype: z.string().optional(), reflection: z.string().optional() }).default({})
 });
@@ -80,15 +103,26 @@ var PublicSprintSchema = z.object({
   reflection_prompts: z.array(z.string().max(200)).max(2),
   requirements: z.array(SprintRequirementSchema).max(SPRINT_LIMITS.requirements),
   idea_guide: IdeaGuideSchema,
-  phases: z.array(SprintPhaseSchema).length(5)
+  phases: z.array(SprintPhaseSchema).length(5),
+  understand: UnderstandSettingsSchema.default(defaultUnderstand)
 });
 var where = text(200);
 var Wheres = z.record(z.string().max(40), where).default({});
+var cards = z.array(text(120)).max(8).default([]);
 var UnderstandPayloadSchema = z.object({
+  /** Earlier sprints' "How might we" notes; still read, no longer written. */
   notes: z.array(text(200)).max(SPRINT_LIMITS.ideas).default([]),
-  /** The note id (from the group's notes) this student starred. */
+  /** The note id (from the group's statements) this student starred. */
   star: z.string().max(40).default(""),
-  stretch: text(300).default("")
+  stretch: text(300).default(""),
+  /** Words from the brief that stand out. */
+  spot: z.array(text(40)).max(30).default([]),
+  audience: z.object({ who: text(200).default(""), why: text(300).default("") }).default({ who: "", why: "" }),
+  /** The surface problem, then each "why is that a problem?". */
+  dig: z.array(text(300)).max(6).default([]),
+  /** The problem in their own words. */
+  say: text(400).default(""),
+  limits: z.object({ can_known: cards, cant_known: cards, can_unknown: cards, cant_unknown: cards }).default({ can_known: [], cant_known: [], can_unknown: [], cant_unknown: [] })
 });
 var SketchCardSchema = z.object({
   id: SprintIdSchema,
@@ -156,6 +190,7 @@ export {
   FeedbackEntrySchema,
   IdeaGuideSchema,
   LEVEL_LABELS,
+  LIMIT_BOXES,
   LevelSchema,
   PAYLOAD_SCHEMAS,
   PHASE_LABELS,
@@ -175,5 +210,11 @@ export {
   SprintRequirementSchema,
   SprintSettingsSchema,
   TestPayloadSchema,
-  UnderstandPayloadSchema
+  UNDERSTAND_ALONE,
+  UNDERSTAND_GROUP,
+  UNDERSTAND_STEPS,
+  UNDERSTAND_STEP_LABELS,
+  UnderstandPayloadSchema,
+  UnderstandSettingsSchema,
+  defaultUnderstand
 };
