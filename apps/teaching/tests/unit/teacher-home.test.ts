@@ -205,7 +205,7 @@ describe('teacher home dashboard', () => {
     dispose = result.dispose;
   });
 
-  it('mounts kit Tideline with lesson chip (no classic month/timeline skin)', async () => {
+  it('mounts kit Tideline with the lesson (no classic month/timeline skin)', async () => {
     // Month / Timeline zoom stops DROPPED — see HUB-MIGRATION.md / Step 4 PR note.
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
@@ -220,11 +220,13 @@ describe('teacher home dashboard', () => {
     expect(canvas.querySelector('.calendar-compose')).toBeNull();
     expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
 
+    // A lesson with a date but no period rides the all-day row, not a made-up 9 am block.
     await vi.waitFor(() => {
-      const chip = canvas.querySelector<HTMLElement>('.cal-chip[data-lesson-id="lesson_aotfw_008"]');
-      expect(chip).not.toBeNull();
-      expect(chip?.querySelector('.cal-chip__title')?.textContent).toContain('Memory');
+      const row = canvas.querySelector<HTMLElement>('.cal-due.is-allday[data-id="scheduled_aotfw_008"]');
+      expect(row).not.toBeNull();
+      expect(row?.textContent).toContain('Memory');
     });
+    expect(canvas.querySelector('.cal-chip[data-lesson-id="lesson_aotfw_008"]')).toBeNull();
   });
 
   it('expands class tiles from the dashboard before opening the class page', async () => {

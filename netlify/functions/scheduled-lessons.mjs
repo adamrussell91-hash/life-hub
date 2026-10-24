@@ -41,6 +41,20 @@ export async function createScheduledLessonRecord(store, body) {
 
   const existing = (await listJSON(store, SCHEDULED_LESSON_PREFIX))
     .filter(item => item.class_id === class_id);
+  // One lesson, one class, one day. A repeat save (a double click, a page that has not
+  // seen the first save) gets the row already there. Dating a lesson (move_existing)
+  // moves its first live row, so a stale page never leaves a second copy behind.
+  const sameLesson = existing
+    .filter(item => item.lesson_id === lesson_id && !isDeletedRecord(item) && item.delivery_status !== 'skipped')
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const sameDay = sameLesson.find(item => item.date === date);
+  if (sameDay) return sameDay;
+  if (body.move_existing === true && sameLesson.length) {
+    const moved = { ...sameLesson[0], date, updated_at: new Date().toISOString() };
+    await setJSON(store, scheduledLessonKey(moved.id), moved);
+    return moved;
+  }
+
   let maxOrder = 0;
   for (const item of existing) {
     if (typeof item.schedule_order === 'number' && item.schedule_order > maxOrder) {

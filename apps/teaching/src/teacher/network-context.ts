@@ -192,7 +192,7 @@ export async function setLessonDate(curriculum: CurriculumResponse, unit: Unit, 
     .sort((a, b) => a.date.localeCompare(b.date))[0];
   const saved = row
     ? await patchScheduledLesson(row.id, { date })
-    : await postScheduledLesson({ class_id: classId, lesson_id: lessonId, unit_id: unit.id, date });
+    : await postScheduledLesson({ class_id: classId, lesson_id: lessonId, unit_id: unit.id, date, move_existing: true });
   curriculum.scheduled_lessons = [...curriculum.scheduled_lessons.filter((r) => r.id !== saved.id), saved];
 }
 
