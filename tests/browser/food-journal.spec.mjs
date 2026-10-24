@@ -406,6 +406,23 @@ for (const width of [390, 320])
   test(`phone ${width}: More route, long form, saved visit and docked actions`, async () => {
     const { page, errors, read } = await pageFor(width);
     await page.getByRole("button", { name: "Add visit", exact: true }).click();
+    await page.getByLabel("Date", { exact: true }).fill("2026-10-24");
+    const dateLayout = await page.getByLabel("Date", { exact: true }).evaluate((input) => {
+      const date = input.getBoundingClientRect();
+      const field = input.closest(".hub-field").getBoundingClientRect();
+      const address = input.closest(".food-pair").firstElementChild
+        .getBoundingClientRect();
+      return {
+        left: date.left, right: date.right, fieldRight: field.right,
+        top: field.top, addressBottom: address.bottom, viewport: innerWidth,
+      };
+    });
+    assert.ok(
+      dateLayout.left >= 0 && dateLayout.right <= dateLayout.viewport,
+      JSON.stringify(dateLayout),
+    );
+    assert.ok(dateLayout.right <= dateLayout.fieldRight + 1, JSON.stringify(dateLayout));
+    assert.ok(dateLayout.top >= dateLayout.addressBottom, JSON.stringify(dateLayout));
     await page.getByLabel("Visit title", { exact: true }).fill("Dinner");
     await page
       .getByLabel("Dish title", { exact: true })
@@ -439,6 +456,7 @@ for (const width of [390, 320])
     }
     await page.setViewportSize({ width, height: 900 });
     assert.equal(read().visits.length, 2);
+    assert.equal(read().visits.at(-1).date, "2026-10-24");
     assert.equal(await page.locator(".food-visit").count(), 2);
     assert.equal(
       await page.locator("#food-journal-dashboard script").count(),
