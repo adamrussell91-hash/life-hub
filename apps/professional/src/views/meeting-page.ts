@@ -205,7 +205,9 @@ export async function renderMeetingPage(
   const head = el('header', 'meeting-page__head');
   const chips = el('div', 'comm-page__chips');
   chips.append(el('span', 'chip chip--meet', '● Meeting'));
-  chips.append(el('span', `chip meeting-page__state is-${record.state}`, STATE_LABEL[record.state] ?? record.state));
+  const stateChip = el('span', `chip meeting-page__state is-${record.state}`, STATE_LABEL[record.state] ?? record.state);
+  stateChip.setAttribute('role', 'status');
+  chips.append(stateChip);
   const facts = el('p', 'meeting-page__facts');
   facts.dataset.part = 'facts';
   facts.append(el('span', undefined, meetingWhenLabel(record)));
@@ -222,6 +224,38 @@ export async function renderMeetingPage(
   headActions.append(editBtn);
   const actionStatus = el('p', 'meeting-form__status');
   actionStatus.hidden = true;
+  let stateActionPending = false;
+
+  async function applyStateAction(action: 'complete' | 'cancel' | 'no-show'): Promise<void> {
+    if (stateActionPending || !isOpenState(record.state)) return;
+    stateActionPending = true;
+    actionStatus.hidden = true;
+    const buttons = root.querySelectorAll<HTMLButtonElement>('[data-state-action], [data-part="end-meeting"]');
+    buttons.forEach((button) => { button.disabled = true; });
+    try {
+      await blockPage?.flush();
+      const { meeting } = await meetingStateAction(id, action);
+      record = { ...record, ...meeting };
+      if (!options.isCurrent() || !root.isConnected) return;
+      stateChip.className = `chip meeting-page__state is-${record.state}`;
+      stateChip.textContent = STATE_LABEL[record.state] ?? record.state;
+      if (!isOpenState(record.state)) {
+        buttons.forEach((button) => button.remove());
+        if (clock !== null) clearTimeout(clock);
+        clock = null;
+        manual = false;
+        setPhase('after');
+      }
+    } catch (err) {
+      if (!options.isCurrent() || !root.isConnected) return;
+      actionStatus.hidden = false;
+      actionStatus.textContent = err instanceof Error ? err.message : 'Could not update the meeting. Try again.';
+    } finally {
+      stateActionPending = false;
+      buttons.forEach((button) => { button.disabled = false; });
+    }
+  }
+
   if (isOpenState(record.state)) {
     for (const [action, label] of [
       ['complete', 'Mark complete'],
@@ -231,17 +265,7 @@ export async function renderMeetingPage(
       const button = el('button', 'btn btn--ghost', label) as HTMLButtonElement;
       button.type = 'button';
       button.dataset.stateAction = action;
-      button.addEventListener('click', async () => {
-        button.disabled = true;
-        try {
-          await meetingStateAction(id, action);
-          await reload();
-        } catch (err) {
-          actionStatus.hidden = false;
-          actionStatus.textContent = err instanceof ApiClientError ? err.message : `${label} failed.`;
-          button.disabled = false;
-        }
-      });
+      button.addEventListener('click', () => void applyStateAction(action));
       headActions.append(button);
     }
   }
@@ -746,19 +770,7 @@ export async function renderMeetingPage(
     const end = el('button', 'btn btn--ghost', 'End ›') as HTMLButtonElement;
     end.type = 'button';
     end.dataset.part = 'end-meeting';
-    end.addEventListener('click', async () => {
-      end.disabled = true;
-      await blockPage?.flush();
-      if (isOpenState(record.state)) {
-        try {
-          record = (await meetingStateAction(id, 'complete')).meeting;
-        } catch {
-          // The wrap-up still opens; the state buttons stay in the header.
-        }
-      }
-      manual = true;
-      setPhase('after');
-    });
+    end.addEventListener('click', () => void applyStateAction('complete'));
 
     const photo = el('label', 'btn btn--ghost', '✎ Read a photo');
     const file = el('input') as HTMLInputElement;
@@ -786,7 +798,8 @@ export async function renderMeetingPage(
     guidesBtn.type = 'button';
     guidesBtn.dataset.part = 'open-guides';
     guidesBtn.addEventListener('click', () => openGuides());
-    strip.append(el('span', 'live-strip__rec', 'Live'), timer, photo, guidesBtn, end);
+    strip.append(el('span', 'live-strip__rec', 'Live'), timer, photo, guidesBtn);
+    if (isOpenState(record.state)) strip.append(end);
     return strip;
   }
 
@@ -1031,7 +1044,7 @@ export async function renderMeetingPage(
   function scheduleClock(): void {
     if (clock !== null) clearTimeout(clock);
     const delay = nextSwitchDelayMs(slot(), new Date());
-    if (delay === null) return;
+    if (delay === null || !isOpenState(record.state)) return;
     clock = setTimeout(() => {
       if (!root.isConnected) return;
       if (!manual) setPhase(phaseFor(slot(), new Date()));
@@ -1039,7 +1052,7 @@ export async function renderMeetingPage(
     }, delay);
   }
 
-  setPhase(phaseFor(slot(), new Date()));
+  setPhase(isOpenState(record.state) ? phaseFor(slot(), new Date()) : 'after');
   scheduleClock();
 }
 
