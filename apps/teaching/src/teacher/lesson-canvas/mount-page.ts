@@ -76,6 +76,7 @@ import { mountKitEditor } from '@/sprint/kit-editor';
 import { createSprintTabs, inSprintTab, type SprintTab } from '@/sprint/editor-tabs';
 import { mountSprintMap, type SprintMapHandle } from '@/sprint/map';
 import { sprintTeacherApi } from '@/sprint/api';
+import { openPracticeRun } from '@/sprint/practice';
 import { seedSprint } from '@/sprint/defaults';
 import { phaseOfSection } from '@/sprint/model';
 import { httpMarkbookApi } from '@/markbook/api';
@@ -1220,7 +1221,16 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         loadRoster: (classId) => httpMarkbookApi.load(classId).then((v) => v.students.filter((s) => !s.removed)),
         outcomes: sprintOutcomes
       });
-      sprintHost.append(sprintTabs.root, sprintKit.root);
+      const tryIt = document.createElement('button');
+      tryIt.type = 'button';
+      tryIt.className = 'btn btn--secondary sprint-try';
+      tryIt.textContent = 'Try it as a student';
+      tryIt.title = 'Run the whole sprint with a practice group of two. Your class sees nothing.';
+      tryIt.addEventListener('click', () => openPracticeRun({ getLesson: () => lesson }));
+      const bar = document.createElement('div');
+      bar.className = 'sprint-edit-bar';
+      bar.append(sprintTabs.root, tryIt);
+      sprintHost.append(bar, sprintKit.root);
     } else if (!isSprint && sprintTabs) {
       sprintMap?.dispose();
       sprintMap = null;

@@ -133,3 +133,30 @@ export function heatLevels(counts: Tally['counts'], criteria: readonly string[])
   }
   return out;
 }
+
+const LABEL: Record<SprintPhaseKey, string> = { understand: 'Understand', sketch: 'Sketch', decide: 'Decide', prototype: 'Prototype', test: 'Test' };
+const SHORT_WHEN = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', weekday: 'short', hour: 'numeric', minute: '2-digit' });
+const shortWhen = (epoch: number) => SHORT_WHEN.format(new Date(epoch)).replace(/\s?(am|pm)$/i, (m) => ` ${m.trim().toLowerCase()}`);
+
+/**
+ * The next moment the sprint changes on its own after `now`: a phase
+ * closing, a class part's lesson ending, or the lock lifting. A practice run
+ * skips to it. Null once nothing is left.
+ */
+export function nextChange(
+  phases: ReadonlyArray<{ key: SprintPhaseKey; where: 'class' | 'home'; due_date: string; due_time: string; ends_at?: string }>,
+  lockRec: { ended?: Partial<Record<SprintPhaseKey, unknown>>; lock?: { until: string } | null },
+  now: number
+): { at: number; label: string } | null {
+  const events: Array<{ at: number; label: string }> = [];
+  for (const p of phases) {
+    const due = phaseDue(p);
+    if (due !== null && due > now) events.push({ at: due, label: `${LABEL[p.key]} closing (${shortWhen(due)})` });
+    const end = p.where === 'class' && !lockRec.ended?.[p.key] ? endsAtEpoch(p.ends_at ?? '') : null;
+    if (end !== null && end > now) events.push({ at: end, label: `${LABEL[p.key]} lesson ending (${shortWhen(end)})` });
+  }
+  const until = lockRec.lock ? Date.parse(lockRec.lock.until) : NaN;
+  if (until > now) events.push({ at: until, label: `Lock lifting (${shortWhen(until)})` });
+  events.sort((a, b) => a.at - b.at);
+  return events[0] ?? null;
+}

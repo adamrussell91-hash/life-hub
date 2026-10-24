@@ -224,12 +224,29 @@ function heatLevels(counts, criteria) {
   }
   return out;
 }
+var LABEL = { understand: "Understand", sketch: "Sketch", decide: "Decide", prototype: "Prototype", test: "Test" };
+var SHORT_WHEN = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", weekday: "short", hour: "numeric", minute: "2-digit" });
+var shortWhen = (epoch) => SHORT_WHEN.format(new Date(epoch)).replace(/\s?(am|pm)$/i, (m) => ` ${m.trim().toLowerCase()}`);
+function nextChange(phases, lockRec, now) {
+  const events = [];
+  for (const p of phases) {
+    const due = phaseDue(p);
+    if (due !== null && due > now) events.push({ at: due, label: `${LABEL[p.key]} closing (${shortWhen(due)})` });
+    const end = p.where === "class" && !lockRec.ended?.[p.key] ? endsAtEpoch(p.ends_at ?? "") : null;
+    if (end !== null && end > now) events.push({ at: end, label: `${LABEL[p.key]} lesson ending (${shortWhen(end)})` });
+  }
+  const until = lockRec.lock ? Date.parse(lockRec.lock.until) : NaN;
+  if (until > now) events.push({ at: until, label: `Lock lifting (${shortWhen(until)})` });
+  events.sort((a, b) => a.at - b.at);
+  return events[0] ?? null;
+}
 export {
   endsAtEpoch,
   heatLevels,
   isFrozen,
   isLate,
   lockState,
+  nextChange,
   openPhases,
   phaseDue,
   sydneyEpoch,

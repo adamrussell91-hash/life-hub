@@ -5,6 +5,7 @@
  * below read and write the records listed in sprint-keys.mjs. No model is
  * called here.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { isSafeId } from './class-examples.mjs';
 import { publishedLessonKey, draftLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
@@ -74,9 +75,19 @@ export async function storeSprintConfig(store, lessonId, config) {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-let clock = () => Date.now();
+let baseClock = () => Date.now();
 /** Tests set the time; pass nothing to go back to the real clock. */
-export const setSprintClock = (fn) => { clock = fn ?? (() => Date.now()); };
+export const setSprintClock = (fn) => { baseClock = fn ?? (() => Date.now()); };
+
+/**
+ * A practice run (sprint-practice.mjs) runs these actions inside a scope that
+ * brings its own time, config, roster and student, so it never touches the
+ * real class's records or clock. Outside a scope everything reads as usual.
+ */
+const scope = new AsyncLocalStorage();
+export const withSprintScope = (ctx, fn) => scope.run(ctx, fn);
+const clock = () => scope.getStore()?.now ?? baseClock();
+const rosterOf = (store, classId) => scope.getStore()?.roster ?? loadRoster(store, classId);
 const iso = (ms) => new Date(ms).toISOString();
 const list = (v) => (Array.isArray(v) ? v : []);
 export const PHASES = ['understand', 'sketch', 'decide', 'prototype', 'test'];
@@ -84,6 +95,8 @@ const short = (text) => deviceHash(text).slice(0, 12);
 export const ownerOf = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
 
 async function loadSprint(store, lessonId) {
+  const sc = scope.getStore();
+  if (sc?.config) return { lesson: sc.lesson, config: sc.config };
   if (!isSafeId(lessonId)) reject(404, 'not_found', 'Sprint not found.');
   const lesson = await read(store, publishedLessonKey(lessonId));
   if (!lesson) reject(404, 'not_found', 'Sprint not found.');
@@ -252,8 +265,8 @@ export async function resolveGroup(store, lessonId, config, group, state, lockRe
 const STUDENT_ACTIONS = ['status', 'claim', 'open', 'save', 'submit', 'parts', 'claim_part', 'pitch', 'feedback'];
 
 async function whoAndGroup(store, config, body, action) {
-  let who;
-  try {
+  let who = scope.getStore()?.who;
+  if (!who) try {
     who = await identify(store, body, action);
   } catch (e) {
     if (e instanceof QuizError && e.code === 'need_class') reject(e.status, 'need_class', 'Open this sprint from your class page.');
@@ -289,7 +302,7 @@ async function studentView(store, lessonId, config, who, group) {
   let state = await groupState(store, k, group.id);
   state = await resolveGroup(store, lessonId, config, group, state, lockRec, extend, now);
   const open = openPhases(groupPhases(config, extend, group.id), factsFor(group, state, lockRec), now);
-  const roster = await loadRoster(store, config.class_id);
+  const roster = await rosterOf(store, config.class_id);
   const initials = new Map(list(roster?.students).map((s) => [s.id, s.initials]));
   const mine = {};
   const phases = [];
@@ -572,7 +585,7 @@ async function teacherContext(store, lessonId) {
   const k = sprintKeys(lessonId);
   const lockRec = await endDueClassParts(store, lessonId, config);
   const extend = (await read(store, k.extend)) ?? {};
-  const roster = await loadRoster(store, config.class_id);
+  const roster = await rosterOf(store, config.class_id);
   const byId = new Map(list(roster?.students).map((s) => [s.id, s]));
   return { config, k, lockRec, extend, byId };
 }
@@ -719,6 +732,7 @@ export async function sprintTeacherAction(store, lessonId, body) {
       await store.setJSON(k.stage, { ...stage, spotlight: { text, label: 'One idea from the class' } });
     }
   }
+  if (action === 'move' && scope.getStore()) reject(409, 'practice', 'The practice group stays as it is.');
   if (action === 'move') await moveStudent(store, lessonId, config, body.student_id, body.group_id);
   if (action === 'run' || action === 'round' || action === 'moderate') await roundAction(store, lessonId, config, action, body);
   return teacherSummary(store, lessonId);
