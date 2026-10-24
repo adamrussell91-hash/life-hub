@@ -51,4 +51,7 @@ test('a missing close stops the run before it starts', async () => {
   d.sprint.phases[2].due_date = '';
   await assert.rejects(practice(store, 'start', { draft: d }), { code: 'need_closes' });
   await assert.rejects(practice(store, 'state'), { code: 'not_started' });
+  const one = draft();
+  one.sprint.criteria = one.sprint.criteria.slice(0, 1);
+  await assert.rejects(practice(store, 'start', { draft: one }), { code: 'need_criteria' });
 });

@@ -91,7 +91,11 @@ export async function sprintPracticeAction(store, lessonId, body) {
     // Check the Kit before wiping the last run.
     const kit = SprintSettingsSchema.safeParse(d.sprint);
     if (!kit.success) reject(409, 'bad_kit', `The Kit isn’t valid yet: ${kit.error.issues[0]?.message ?? 'check the settings'}`);
-    if (d.sprint.phases.some((p) => phaseDue(p) === null)) reject(409, 'need_closes', 'Set a close time for every phase first.');
+    // Publish's own checks, less the groups: the practice run brings its own.
+    const dues = kit.data.phases.map((p) => phaseDue(p));
+    if (dues.some((x) => x === null)) reject(409, 'need_closes', 'Set a close time for every phase first.');
+    if (dues.some((x, i) => i > 0 && x <= dues[i - 1])) reject(409, 'bad_order', 'Each phase’s close must come after the one before it.');
+    if (kit.data.criteria.length < 2) reject(409, 'need_criteria', 'Add at least 2 criteria in the Kit first.');
     for (const key of await listBlobKeys(store, `sprint/${practiceId(lessonId)}/`)) await store.delete(key);
     await store.setJSON(draftKey(lessonId), { title: d.title, unit_id: d.unit_id, pedagogical_mode: 'design_sprint', blocks: Array.isArray(d.blocks) ? d.blocks : [], sprint: d.sprint });
   }
