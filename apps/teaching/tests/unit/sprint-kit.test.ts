@@ -21,6 +21,33 @@ describe('kit editor', () => {
     expect(groups.map((g) => g.name)).toEqual(['Group 1', 'Group 2']);
   });
 
+  it('shows the shared Kit on its tab and each phase’s own settings and a live student preview on the phase’s tab', async () => {
+    let current = lesson();
+    const k = mountKitEditor({ getLesson: () => current, emit: (next) => { current = next; }, classes: [{ id: 'class1', name: '7B' }], loadRoster: async () => roster, outcomes: async () => [] });
+    document.body.append(k.root);
+    await new Promise((r) => setTimeout(r, 0));
+    const titles = () => [...k.root.querySelectorAll('.kit-card > h3')].map((h) => h.textContent);
+    expect(titles()).toEqual(['Settings', 'Criteria', 'Requirements', 'Phases and deadlines', 'Groups']);
+    k.show('understand');
+    expect(titles()).toEqual(['Understand: what students do', 'Understand steps', 'What students see']);
+    expect(k.root.querySelectorAll('.kit-preview .su-step')).toHaveLength(10);
+    k.root.querySelector<HTMLInputElement>('#kit-und-dig')!.click();
+    expect(current.sprint!.understand.steps.dig).toBe(false);
+    expect(k.root.querySelectorAll('.kit-preview .su-step')).toHaveLength(9);
+    k.show('sketch');
+    expect(titles()).toEqual(['Sketch: what students do', 'Sketch settings', 'Idea guide', 'What students see']);
+    k.show('decide');
+    expect(titles()).toEqual(['Decide: what students do', 'Decide settings', 'What students see']);
+    k.show('test');
+    expect(titles()).toEqual(['Test: what students do', 'Reflection', 'What students see']);
+    const instruction = k.root.querySelector<HTMLTextAreaElement>('[aria-label="Test: your instruction"]')!;
+    instruction.value = 'Pitch, then reflect.';
+    instruction.dispatchEvent(new Event('input'));
+    expect(current.sprint!.phases[4]!.instruction).toBe('Pitch, then reflect.');
+    k.dispose();
+    k.root.remove();
+  });
+
   it('adds a criterion with an outcome and emits the lesson', async () => {
     let current = lesson();
     const emit = vi.fn((next: Lesson) => { current = next; });
