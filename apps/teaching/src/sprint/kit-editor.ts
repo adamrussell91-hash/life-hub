@@ -4,6 +4,8 @@ import { PHASE_LABELS, SPRINT_LIMITS, SPRINT_PHASES, UNDERSTAND_ALONE, UNDERSTAN
 import { newSprintSettings } from './defaults';
 import { noteEl, type KitNoteKey } from './notes';
 import { phaseSpans, renderPhaseGantt } from './phase-timeline';
+import { phasePreview } from './preview';
+import { publicSprint } from './model';
 
 export type KitEditorOptions = {
   getLesson: () => Lesson;
@@ -33,18 +35,29 @@ export function evenGroups(students: ReadonlyArray<{ id: string }>, n: number): 
   return groups.filter((g) => g.students.length);
 }
 
+/** One line on each phase, at the top of its tab. */
+const PHASE_SUMMARY: Record<SprintPhaseKey, string> = {
+  understand: 'Students work out the problem before designing anything: alone first (spot, audience, dig, say it, limits), then together in their group’s space (vote on the problem, one audience, our limits, questions for you, your answers).',
+  sketch: 'Alone, at home: the group brief, inspiration to borrow from, rapid ideas against a timer, then their best ideas starred and developed into cards for the group.',
+  decide: 'In class: the anonymous gallery, stand-out dots on what stands out, a vote per criterion with reasons, then the group writes the parts, gives each one out by initials and picks an assembler.',
+  prototype: 'At home: each student builds their part; everyone sees the group’s parts as they come in; the assembler puts them together and uploads the finished prototype.',
+  test: 'In class: each group pitches and the class gives feedback on the criteria. At home: a reflection on what their feedback showed.'
+};
+
 const SHORT: Record<SprintPhaseKey, string> = { understand: 'U', sketch: 'S', decide: 'D', prototype: 'P', test: 'T' };
 
 /**
  * The Kit: everything set once and used through the phases. Every change
  * emits the whole lesson, as the canvas does; the page autosaves it.
  */
-export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repaint(): void; dispose(): void } {
+export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repaint(): void; show(view: SprintPhaseKey | 'kit'): void; dispose(): void } {
   const root = el('section', 'kit');
   let outcomes: Array<{ id: string; label: string }> = [];
   let roster: Array<{ id: string; name: string; initials: string }> = [];
   const openNotes = new Set<string>();
   let picked: SprintPhaseKey | null = null;
+  let view: SprintPhaseKey | 'kit' = 'kit';
+  let preview: { el: HTMLElement; dispose(): void } | null = null;
   const s = (): SprintSettings => o.getLesson().sprint ?? newSprintSettings(o.classes[0]?.id ?? '');
   const put = (change: (draft: SprintSettings) => void, repaint = false) => {
     const draft = structuredClone(s());
@@ -119,51 +132,110 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
       lockRow.append(tick, lab, at);
       box.append(lockRow, el('p', 'kit-why', p.due_date ? `Or press End class part on the progress map. Work then locks for ${s().lock_hours} h.` : 'Set the close day first. Or press End class part on the progress map.'));
     }
-    const what = el('textarea', 'qz-input');
-    what.rows = 2;
-    what.maxLength = 600;
-    what.value = p.instruction;
-    what.placeholder = 'What students do in this phase, in one or two sentences.';
-    what.setAttribute('aria-label', `${name}: what students do`);
-    what.addEventListener('input', () => put((d) => { d.phases[i]!.instruction = what.value; }));
-    const stretch = text(p.stretch, 300, (v) => put((d) => { d.phases[i]!.stretch = v; }), `${name}: stretch`);
-    stretch.placeholder = 'An extra step for students who finish early.';
-    box.append(el('label', 'kit-label', 'What students do'), what, el('label', 'kit-label', 'Stretch (optional)'), stretch);
+    box.append(el('p', 'kit-why', `What students do in ${name}, and its stretch, are on the ${name} tab.`));
     return box;
   }
 
-  function paint(): void {
-    root.replaceChildren(noteEl('overview', openNotes, 'How a sprint runs'));
-    const cur = s();
+  /** A phase tab: what students do, the phase's own settings, and a live preview with a sample group. */
+  function paintPhase(key: SprintPhaseKey, cur: SprintSettings): void {
+    const i = cur.phases.findIndex((p) => p.key === key);
+    const ph = cur.phases[i]!;
+    const name = PHASE_LABELS[key];
+    const intro = el('div', 'kit-card');
+    intro.append(el('h3', '', `${name}: what students do`), el('p', 'kit-why', PHASE_SUMMARY[key]));
+    const what = el('textarea', 'qz-input');
+    what.rows = 2;
+    what.maxLength = 600;
+    what.value = ph.instruction;
+    what.placeholder = 'Your instruction for this phase, in one or two sentences. Students see it at the top.';
+    what.setAttribute('aria-label', `${name}: your instruction`);
+    what.addEventListener('input', () => put((d) => { d.phases[i]!.instruction = what.value; }));
+    const stretch = text(ph.stretch, 300, (v) => put((d) => { d.phases[i]!.stretch = v; }), `${name}: stretch`);
+    stretch.placeholder = 'An extra step for students who finish early.';
+    intro.append(el('label', 'kit-label', 'Your instruction'), what, el('label', 'kit-label', 'Stretch (optional)'), stretch);
+    root.append(intro);
 
-    const settings = card('Settings', 'How much scaffolding shows, who chooses the group’s idea, ideas each puts forward, the rapid ideas timer, stand-out dots and the class lock.', 'settings');
-    settings.append(
-      selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level'),
-      selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Top vote goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides'),
-      selectOf([1, 2, 3, 4, 5].map((n) => [String(n), `Each puts forward ${n} ${n === 1 ? 'idea' : 'ideas'}`]), String(cur.phases[1]!.ideas ?? 2), (v) => put((d) => { d.phases[0]!.ideas = Number(v); d.phases[1]!.ideas = Number(v); }), 'Ideas each student puts forward'),
-      selectOf([0, 3, 5, 8, 10, 15].map((n) => [String(n), n ? `Rapid ideas: ${n} minute timer` : 'Rapid ideas: no timer']), String(cur.sketch_timer ?? 8), (v) => put((d) => { d.sketch_timer = Number(v); }), 'Rapid ideas timer'),
-      selectOf([0, 1, 2, 3, 4, 5].map((n) => [String(n), n ? `Decide: ${n} stand-out ${n === 1 ? 'dot' : 'dots'} each` : 'Decide: no stand-out dots']), String(cur.decide_dots ?? 3), (v) => put((d) => { d.decide_dots = Number(v); }), 'Stand-out dots'),
-      selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
-    );
-
-    const und = card('Understand', 'How students work out the problem: alone first, then together. Untick a step to leave it out.', 'understand');
-    const u = cur.understand ?? defaultUnderstand();
-    und.append(selectOf([['slides', 'One step at a time (slides)'], ['vertical', 'All steps down the page']], u.layout, (v) => put((d) => { d.understand = { ...(d.understand ?? defaultUnderstand()), layout: v as UnderstandSettings['layout'] }; }), 'Understand layout'));
-    for (const [title, keys] of [['Alone, on their own computer', UNDERSTAND_ALONE], ['Together, in the group’s space', UNDERSTAND_GROUP]] as const) {
-      und.append(el('p', 'kit-label', title));
-      for (const k of keys) {
-        const row = el('div', 'kit-phase-edit__row');
-        const tick = el('input');
-        tick.type = 'checkbox';
-        tick.id = `kit-und-${k}`;
-        tick.checked = u.steps[k] !== false;
-        tick.addEventListener('change', () => put((d) => { const cu = d.understand ?? defaultUnderstand(); d.understand = { ...cu, steps: { ...cu.steps, [k]: tick.checked } }; }));
-        const lab = el('label', '', UNDERSTAND_STEP_LABELS[k]);
-        lab.htmlFor = tick.id;
-        row.append(tick, lab);
-        und.append(row);
+    if (key === 'understand') {
+      const und = card('Understand steps', 'How students work out the problem: alone first, then together. Untick a step to leave it out.', 'understand');
+      const u = cur.understand ?? defaultUnderstand();
+      und.append(selectOf([['slides', 'One step at a time (slides)'], ['vertical', 'All steps down the page']], u.layout, (v) => put((d) => { d.understand = { ...(d.understand ?? defaultUnderstand()), layout: v as UnderstandSettings['layout'] }; }, true), 'Understand layout'));
+      for (const [title, keys] of [['Alone, on their own computer', UNDERSTAND_ALONE], ['Together, in the group’s space', UNDERSTAND_GROUP]] as const) {
+        und.append(el('p', 'kit-label', title));
+        for (const k of keys) {
+          const row = el('div', 'kit-phase-edit__row');
+          const tick = el('input');
+          tick.type = 'checkbox';
+          tick.id = `kit-und-${k}`;
+          tick.checked = u.steps[k] !== false;
+          tick.addEventListener('change', () => put((d) => { const cu = d.understand ?? defaultUnderstand(); d.understand = { ...cu, steps: { ...cu.steps, [k]: tick.checked } }; }, true));
+          const lab = el('label', '', UNDERSTAND_STEP_LABELS[k]);
+          lab.htmlFor = tick.id;
+          row.append(tick, lab);
+          und.append(row);
+        }
       }
     }
+    if (key === 'sketch') {
+      const sk = card('Sketch settings', 'How many ideas each student puts forward to the group, and the rapid ideas timer.', 'settings');
+      sk.append(
+        selectOf([1, 2, 3, 4, 5].map((n) => [String(n), `Each puts forward ${n} ${n === 1 ? 'idea' : 'ideas'}`]), String(cur.phases[1]!.ideas ?? 2), (v) => put((d) => { d.phases[0]!.ideas = Number(v); d.phases[1]!.ideas = Number(v); }, true), 'Ideas each student puts forward'),
+        selectOf([0, 3, 5, 8, 10, 15].map((n) => [String(n), n ? `Rapid ideas: ${n} minute timer` : 'Rapid ideas: no timer']), String(cur.sketch_timer ?? 8), (v) => put((d) => { d.sketch_timer = Number(v); }, true), 'Rapid ideas timer')
+      );
+      const guide = card('Idea guide', 'Shown in Sketch and Decide. Write the model on a different topic from the challenge, so students follow it without copying it.', 'idea_guide');
+      const lines = el('textarea', 'qz-input');
+      lines.rows = 5;
+      lines.value = cur.idea_guide.checklist.join('\n');
+      lines.setAttribute('aria-label', 'Good idea checklist, one per line');
+      lines.addEventListener('input', () => put((d) => { d.idea_guide.checklist = lines.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 8); }));
+      const modelText = el('textarea', 'qz-input');
+      modelText.rows = 3;
+      modelText.value = cur.idea_guide.model.text;
+      modelText.setAttribute('aria-label', 'Model idea');
+      modelText.addEventListener('input', () => put((d) => { d.idea_guide.model.text = modelText.value; }));
+      const notes = el('textarea', 'qz-input');
+      notes.rows = 3;
+      notes.value = cur.idea_guide.model.notes.join('\n');
+      notes.setAttribute('aria-label', 'What each part of the model does, one per line');
+      notes.addEventListener('input', () => put((d) => { d.idea_guide.model.notes = notes.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 6); }));
+      guide.append(el('label', 'kit-label', 'Good idea checklist'), lines, el('label', 'kit-label', 'Model topic'), text(cur.idea_guide.model.topic, 80, (v) => put((d) => { d.idea_guide.model.topic = v; }), 'Model topic'), el('label', 'kit-label', 'Model idea'), modelText, el('label', 'kit-label', 'What each part does'), notes);
+
+    }
+    if (key === 'decide') {
+      const dc = card('Decide settings', 'Who confirms each group’s choice (its problem in Understand and its idea here), and the stand-out dots.', 'settings');
+      dc.append(
+        selectOf([['teacher', 'Teacher confirms'], ['top_vote', 'Top vote goes through']], cur.decider, (v) => put((d) => { d.decider = v as SprintSettings['decider']; }), 'Who decides'),
+        selectOf([0, 1, 2, 3, 4, 5].map((n) => [String(n), n ? `${n} stand-out ${n === 1 ? 'dot' : 'dots'} each` : 'No stand-out dots']), String(cur.decide_dots ?? 3), (v) => put((d) => { d.decide_dots = Number(v); }, true), 'Stand-out dots')
+      );
+    }
+    if (key === 'test') {
+      const refl = card('Reflection', 'Two prompts students answer at home after the pitch. Marking it is optional: press Mark reflections on a group’s board if you want it in your markbook.', 'reflection');
+      refl.append(
+        text(cur.reflection_criteria[0]?.text ?? '', 160, (v) => put((d) => { d.reflection_criteria = [{ ...(d.reflection_criteria[0] ?? { id: kitId() }), text: v }]; }), 'Reflection criterion'),
+        ...[0, 1].map((i) => text(cur.reflection_prompts[i] ?? '', 200, (v) => put((d) => { d.reflection_prompts[i] = v; }), `Reflection prompt ${i + 1}`))
+      );
+
+    }
+
+    const prev = el('div', 'kit-card');
+    prev.append(el('h3', '', 'What students see'), el('p', 'kit-why', 'A sample group, so you can click through it. Nothing is sent. Your own blocks for this phase sit below and show beside it as Guides.'));
+    preview?.dispose();
+    preview = phasePreview(key, publicSprint(cur), o.getLesson().blocks);
+    prev.append(preview.el);
+    root.append(prev);
+  }
+
+  function paint(): void {
+    root.replaceChildren();
+    if (view === 'kit') root.append(noteEl('overview', openNotes, 'How a sprint runs'));
+    const cur = s();
+
+    if (view !== 'kit') { paintPhase(view, cur); return; }
+
+    const settings = card('Settings', 'How much scaffolding shows, and the class lock. Each phase’s own settings are on its tab.', 'settings');
+    settings.append(
+      selectOf([['guided', 'Guided (Years 7–8)'], ['standard', 'Standard (Years 9–10)'], ['open', 'Open (Years 11–12)']], cur.support, (v) => put((d) => { d.support = v as SprintSettings['support']; }), 'Support level'),
+      selectOf([0, 1, 2, 3, 4, 6, 12, 24].map((n) => [String(n), n === 0 ? 'No class lock' : `Lock for ${n} h`]), String(cur.lock_hours), (v) => put((d) => { d.lock_hours = Number(v); }), 'Class lock')
+    );
 
     const crit = card('Criteria', 'Judged on Starting · Showing · Strong. Used for idea cards, votes and the class’s pitch feedback.', 'criteria');
     cur.criteria.forEach((c, i) => {
@@ -179,12 +251,6 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addC.dataset.add = 'criterion';
     addC.disabled = cur.criteria.length >= SPRINT_LIMITS.criteria;
     crit.append(addC);
-
-    const refl = card('Reflection', 'Two prompts students answer at home after the pitch. Marking it is optional: press Mark reflections on a group’s board if you want it in your markbook.', 'reflection');
-    refl.append(
-      text(cur.reflection_criteria[0]?.text ?? '', 160, (v) => put((d) => { d.reflection_criteria = [{ ...(d.reflection_criteria[0] ?? { id: kitId() }), text: v }]; }), 'Reflection criterion'),
-      ...[0, 1].map((i) => text(cur.reflection_prompts[i] ?? '', 200, (v) => put((d) => { d.reflection_prompts[i] = v; }), `Reflection prompt ${i + 1}`))
-    );
 
     const req = card('Requirements', 'Must-haves, yes or no. Students tick each one and say where it is.', 'requirements');
     cur.requirements.forEach((r, i) => {
@@ -211,24 +277,6 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
     addR.dataset.add = 'requirement';
     addR.disabled = cur.requirements.length >= SPRINT_LIMITS.requirements;
     req.append(addR, el('p', 'kit-why', 'U Understand · S Sketch · D Decide · P Prototype · T Test'));
-
-    const guide = card('Idea guide', 'Shown in Sketch and Decide. Write the model on a different topic from the challenge, so students follow it without copying it.', 'idea_guide');
-    const lines = el('textarea', 'qz-input');
-    lines.rows = 5;
-    lines.value = cur.idea_guide.checklist.join('\n');
-    lines.setAttribute('aria-label', 'Good idea checklist, one per line');
-    lines.addEventListener('input', () => put((d) => { d.idea_guide.checklist = lines.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 8); }));
-    const modelText = el('textarea', 'qz-input');
-    modelText.rows = 3;
-    modelText.value = cur.idea_guide.model.text;
-    modelText.setAttribute('aria-label', 'Model idea');
-    modelText.addEventListener('input', () => put((d) => { d.idea_guide.model.text = modelText.value; }));
-    const notes = el('textarea', 'qz-input');
-    notes.rows = 3;
-    notes.value = cur.idea_guide.model.notes.join('\n');
-    notes.setAttribute('aria-label', 'What each part of the model does, one per line');
-    notes.addEventListener('input', () => put((d) => { d.idea_guide.model.notes = notes.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 6); }));
-    guide.append(el('label', 'kit-label', 'Good idea checklist'), lines, el('label', 'kit-label', 'Model topic'), text(cur.idea_guide.model.topic, 80, (v) => put((d) => { d.idea_guide.model.topic = v; }), 'Model topic'), el('label', 'kit-label', 'Model idea'), modelText, el('label', 'kit-label', 'What each part does'), notes);
 
     const phases = card('Phases and deadlines', 'You set when each phase closes. Each phase opens when the one above it closes. Click a bar to edit it.', 'phases');
     phases.append(renderPhaseGantt(phaseSpans(cur.phases, cur.lock_hours), { onPick: (key) => { picked = picked === key ? null : key; paint(); }, picked }));
@@ -274,5 +322,11 @@ export function mountKitEditor(o: KitEditorOptions): { root: HTMLElement; repain
   paint();
   void o.outcomes().then((list) => { outcomes = list; paint(); }).catch(() => {});
   void loadRoster(s().class_id);
-  return { root, repaint: paint, dispose() {} };
+  return {
+    root,
+    repaint: paint,
+    /** The Kit, or one phase's panel. */
+    show(next: SprintPhaseKey | 'kit') { if (next === view) return; view = next; paint(); },
+    dispose() { preview?.dispose(); }
+  };
 }
