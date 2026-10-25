@@ -135,6 +135,37 @@ describe('add form save', () => {
     expect(input(host, 'arrive_time').value).toBe('11:50');
     expect(input(host, 'time').value).toBe('09:00');
   });
+
+  it('fills a hotel stay from a pasted email and sends the trip cities', async () => {
+    const { host, note } = open();
+    parseEmail.mockResolvedValueOnce({
+      draft: {
+        kind: 'stay',
+        title: 'Test Piazza Hotel',
+        city_id: 'opo',
+        date: '2027-03-05',
+        time: '14:00',
+        nights: 2,
+        check_out_date: '2027-03-07',
+        booking_ref: '11122233344455',
+        note: 'Check-out 11:00.',
+        status: 'booked',
+        cost: { amount: 300, currency: 'AUD' },
+        place: { name: 'Test Piazza Hotel', lat: 0, lon: 0, address: 'Via di Prova 9, Testville' }
+      },
+      confidence: 'high',
+      missing: []
+    });
+    button(host, 'Fill from email').click();
+    await vi.waitFor(() => expect(note()).toContain('Filled from the email'));
+    expect(parseEmail.mock.calls[0][1]).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'opo', start_date: '2027-03-05' })])
+    );
+    expect(button(host, 'Stay').getAttribute('aria-checked')).toBe('true');
+    expect(input(host, 'title').value).toBe('Test Piazza Hotel');
+    expect(input(host, 'time').value).toBe('14:00');
+    expect(input(host, 'nights').value).toBe('2');
+  });
 });
 
 describe('normalizeLink', () => {
