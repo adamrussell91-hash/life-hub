@@ -345,6 +345,24 @@ export function validateAchievementCreateInput(input) {
   };
 }
 
+// Criteria from the editor or Ann arrive without ids; give each new line one.
+export function validateCriteriaInput(list) {
+  if (!Array.isArray(list)) throw validationError('invalid_criteria', 'criteria must be a list.');
+  if (list.length > MAX_CRITERIA) {
+    throw validationError('too_many_criteria', `At most ${MAX_CRITERIA} criteria.`);
+  }
+  return list.map((item, index) => {
+    const text = trimBounded(item?.text, 'criterion', CRITERION_TEXT_MAX);
+    const source = CRITERION_SOURCES.has(item?.source) ? item.source : 'adam';
+    return {
+      id: typeof item?.id === 'string' && FCRIT_ID.test(item.id) ? item.id : generateFutureCriterionId(),
+      text,
+      order: Number.isInteger(item?.order) ? item.order : index,
+      source
+    };
+  });
+}
+
 export function validateFutureCreateInput(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw validationError('invalid_input', 'Future creation requires a request body object.');
@@ -357,22 +375,7 @@ export function validateFutureCreateInput(input) {
         .filter(Boolean)
         .slice(0, MAX_ALIASES)
     : [];
-  let criteria = [];
-  if (Array.isArray(input.criteria)) {
-    if (input.criteria.length > MAX_CRITERIA) {
-      throw validationError('too_many_criteria', `At most ${MAX_CRITERIA} criteria.`);
-    }
-    criteria = input.criteria.map((item, index) => {
-      const text = trimBounded(item?.text, 'criterion', CRITERION_TEXT_MAX);
-      const source = CRITERION_SOURCES.has(item?.source) ? item.source : 'adam';
-      return {
-        id: typeof item?.id === 'string' && FCRIT_ID.test(item.id) ? item.id : generateFutureCriterionId(),
-        text,
-        order: Number.isInteger(item?.order) ? item.order : index,
-        source
-      };
-    });
-  }
+  const criteria = Array.isArray(input.criteria) ? validateCriteriaInput(input.criteria) : [];
   const colour_slot = Number.isInteger(input.colour_slot) ? input.colour_slot : 1;
   if (colour_slot < 1 || colour_slot > 6) {
     throw validationError('invalid_colour_slot', 'colour_slot must be 1–6.');
