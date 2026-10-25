@@ -2,7 +2,7 @@ import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { readFile } from "node:fs/promises";
-import { chromium } from "playwright";
+import { chromium, webkit, devices } from "playwright";
 import "../../scripts/prepare-web.mjs";
 import { createStaticServer } from "../../scripts/serve.mjs";
 import {
@@ -26,9 +26,13 @@ before(async () => {
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   base = `http://127.0.0.1:${server.address().port}`;
-  browser = await chromium.launch({
+  const safari = process.env.PLAYWRIGHT_BROWSER === "webkit";
+  browser = await (safari ? webkit : chromium).launch({
     headless: true,
-    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+    ...(safari && process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE
+      ? { executablePath: process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE }
+      : {}),
+    ...(!safari && process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
       ? {
           executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,
           args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
@@ -74,6 +78,8 @@ function fixture() {
 }
 async function pageFor(width = 1440, { editorial = false, seed, media = {} } = {}) {
   const page = await browser.newPage({
+    ...(process.env.PLAYWRIGHT_BROWSER === "webkit" && width <= 720
+      ? devices["iPhone 13"] : {}),
     viewport: { width, height: 900 },
     reducedMotion: "reduce",
     serviceWorkers: "block",
@@ -402,6 +408,64 @@ test("real main route groups dishes, filters Custom Menu and opens a saved cooki
   assert.deepEqual(errors, []);
   await page.close();
 });
+for (const width of [1440, 390, 320])
+  test(`date control ${width}: bounded paint, native input, draft and saved date`, async () => {
+    const { page, read, errors } = await pageFor(width);
+    await page.getByRole("button", { name: "Add visit", exact: true }).click();
+    await page.getByLabel("Address", { exact: true }).fill("12 Example Street");
+    const date = page.getByLabel("Date", { exact: true });
+    await date.fill("2026-10-25");
+    assert.equal(await page.locator(".food-date__value").innerText(), "25/10/26");
+    const geometry = await date.evaluate((input) => {
+      const control = input.parentElement;
+      const box = control.getBoundingClientRect();
+      const native = input.getBoundingClientRect();
+      const address = document.querySelector('label[for="' + input.id + '"]')
+        .closest(".food-pair").firstElementChild.querySelector("input")
+        .getBoundingClientRect();
+      const style = getComputedStyle(control);
+      return {
+        box, native, address, viewport: innerWidth,
+        overflow: style.overflowX, opacity: getComputedStyle(input).opacity,
+        leftTap: document.elementFromPoint(box.left + 5, box.top + box.height / 2) === input,
+        rightTap: document.elementFromPoint(box.right - 5, box.top + box.height / 2) === input,
+        type: input.type,
+      };
+    });
+    assert.equal(geometry.type, "date");
+    assert.equal(geometry.overflow, "hidden");
+    assert.equal(geometry.opacity, "0");
+    assert.ok(geometry.leftTap && geometry.rightTap, JSON.stringify(geometry));
+    assert.ok(geometry.box.left >= 0 && geometry.box.right <= width, JSON.stringify(geometry));
+    assert.ok(Math.abs(geometry.native.right - geometry.box.right) <= 1, JSON.stringify(geometry));
+    if (width <= 720) {
+      assert.ok(Math.abs(geometry.box.right - geometry.address.right) <= 1, JSON.stringify(geometry));
+      await phoneGate(page);
+    }
+    await page.screenshot({ path: `/tmp/food-date-${process.env.PLAYWRIGHT_BROWSER || "chromium"}-${width}.png` });
+    // The same labelled native input retains focus and handles date choices.
+    await date.focus();
+    assert.equal(await date.evaluate((n) => n === document.activeElement), true);
+    await date.fill("2026-10-26");
+    assert.equal(await page.locator(".food-date__value").innerText(), "26/10/26");
+    // Native picker implementations can commit with change rather than input.
+    await date.evaluate((input) => {
+      input.value = "2026-10-27";
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    assert.equal(await page.locator(".food-date__value").innerText(), "27/10/26");
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Resume", exact: true }).click();
+    assert.equal(await page.getByLabel("Date", { exact: true }).inputValue(), "2026-10-27");
+    assert.equal(await page.locator(".food-date__value").innerText(), "27/10/26");
+    await page.getByLabel("Dish title", { exact: true }).fill("Test dish");
+    await page.getByRole("button", { name: "Save visit", exact: true }).click();
+    await page.locator(".food-sheet").waitFor({ state: "detached" });
+    assert.equal(read().visits.at(-1).date, "2026-10-27");
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
 for (const width of [390, 320])
   test(`phone ${width}: More route, long form, saved visit and docked actions`, async () => {
     const { page, errors, read } = await pageFor(width);
