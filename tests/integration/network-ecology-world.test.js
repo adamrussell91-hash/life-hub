@@ -606,3 +606,32 @@ test('miniworld: upcoming_events lists future meetings with visible attendees on
   assert.equal(ev.date, '2026-10-10');
   assert.deepEqual(ev.attendee_refs.sort(), [alice.ref, bob.ref].sort());
 });
+
+for (const lifecycleStatus of ['deleted', 'deidentified']) {
+  test(`removed ${lifecycleStatus} people and endpoints never appear anywhere in the world`, async () => {
+    const store = memoryStore();
+    const professionalStore = memoryStore();
+    const alice = await makePerson(store, { display_name: 'Visible colleague' });
+    const removed = await makePerson(store, { display_name: 'Former colleague' });
+    const org = await makeOrganisation(store, { display_name: 'Visible workplace' });
+    const removedOrg = await makeOrganisation(store, { display_name: 'Former workplace' });
+    for (const person of [alice, removed]) {
+      await makeLink(store, { sourceRef: person.ref, targetRef: org.ref, relationshipType: 'employee_at', validFrom: '2020-01-01T00:00:00.000Z' });
+    }
+    await makeLink(store, { sourceRef: alice.ref, targetRef: removed.ref, relationshipType: 'professional_relationship' });
+    await makeLink(store, { sourceRef: alice.ref, targetRef: removedOrg.ref, relationshipType: 'employee_at' });
+    await store.setJSON(personKey(removed.id), { ...removed, lifecycle_status: lifecycleStatus, display_name: 'Removed record' });
+    await store.setJSON(`entities/organisation/${removedOrg.id}`, { ...removedOrg, lifecycle_status: 'deleted', display_name: 'Removed record' });
+
+    const handler = createNetworkEcologyWorldHandler(baseDeps(store, professionalStore));
+    const response = await handler(request({ url: URL_BASE }));
+    assert.equal(response.status, 200);
+    const body = (await response.json()).data;
+    assert.ok(body.nodes.some((n) => n.ref === alice.ref));
+    const serialized = JSON.stringify(body);
+    for (const forbidden of [removed.ref, removedOrg.ref, 'Removed record']) {
+      assert.ok(!serialized.includes(forbidden), `${forbidden} leaked through the world response`);
+    }
+    assert.equal(body.clusters.find((c) => c.id === org.ref), undefined, 'removed member must not keep a community alive');
+  });
+}
