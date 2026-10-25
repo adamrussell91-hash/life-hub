@@ -181,6 +181,13 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
     try {
       const service = await serviceFor(env, deps);
       const body = parsed.value ?? {};
+      if (body.deleteSessionIds !== undefined) {
+        const ids = body.deleteSessionIds;
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200 || !ids.every(id => typeof id === 'string' && ID_RE.test(id))) {
+          return withCors(errorResponse(400, 'validation_error', 'Choose between 1 and 200 valid session IDs to delete.', false), request, env);
+        }
+        return withCors(okResponse(200, await service.deleteRuns(owner(env), [...new Set(ids)])), request, env);
+      }
       if (body.sessionId && !ID_RE.test(body.sessionId)) {
         return withCors(errorResponse(400, 'validation_error', 'Valid session ID required.', false), request, env);
       }
