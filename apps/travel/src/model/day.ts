@@ -33,13 +33,28 @@ export function ticketShowsOnDay(item: TicketItem, cityId: string, date: IsoDate
   return isOvernightTicket(item) && item.arrive_date === date && ticketLandCityId(item) === cityId;
 }
 
-function itemOnCityDay(item: Item, cityId: string, date: IsoDate): boolean {
-  return isTicketItem(item)
-    ? ticketShowsOnDay(item, cityId, date)
-    : item.city_id === cityId && item.date === date;
+/** True when `date` is one of the stay's nights: check-in night up to the night before check-out. */
+export function stayCoversNight(stay: StayItem, date: IsoDate): boolean {
+  return stay.date <= date && date < stay.check_out_date;
 }
 
-/** Items for one city day list — includes overnight tickets landing that morning. */
+/** Which night of the stay `date` is (1-based), or null when the stay doesn't cover it. */
+export function stayNightOf(stay: StayItem, date: IsoDate): { night: number; total: number } | null {
+  if (!stayCoversNight(stay, date)) return null;
+  return {
+    night: nightsBetween(stay.date, date).length + 1,
+    total: nightsBetween(stay.date, stay.check_out_date).length
+  };
+}
+
+function itemOnCityDay(item: Item, cityId: string, date: IsoDate): boolean {
+  if (isTicketItem(item)) return ticketShowsOnDay(item, cityId, date);
+  if (item.kind === 'stay') return item.city_id === cityId && (item.date === date || stayCoversNight(item, date));
+  return item.city_id === cityId && item.date === date;
+}
+
+/** Items for one city day list — includes overnight tickets landing that morning
+ * and multi-night stays on every night they cover (one record, many days). */
 export function itemsForCityDay(trip: Trip, cityId: string, date: IsoDate): Item[] {
   return trip.items.filter((item) => itemOnCityDay(item, cityId, date));
 }
@@ -59,6 +74,9 @@ export function daysForCity(trip: Trip, cityId: string): IsoDate[] {
   }
   for (const item of trip.items) {
     if (item.city_id === cityId) dates.add(item.date);
+    if (item.kind === 'stay' && item.city_id === cityId) {
+      for (const night of nightsBetween(item.date, item.check_out_date)) dates.add(night);
+    }
     if (isTicketItem(item) && ticketLandCityId(item) === cityId) dates.add(item.arrive_date);
   }
   return [...dates].sort();
@@ -146,8 +164,8 @@ function addDaysUtc(d: Date, n: number): Date {
 }
 
 /** §3 rule 2 — time ascending, `time: null` first, ties keep insertion order.
- * Tickets sort by `depart_time`, or by `arrive_time` when the view is their
- * overnight landing day. */
+ * A stay's later nights count as `time: null`. Tickets sort by `depart_time`,
+ * or by `arrive_time` when the view is their overnight landing day. */
 export function orderDayItems(items: Item[], viewDate?: IsoDate): Item[] {
   return items
     .map((item, index) => ({ item, index }))
@@ -164,6 +182,8 @@ export function orderDayItems(items: Item[], viewDate?: IsoDate): Item[] {
 }
 
 function sortTime(item: Item, viewDate?: IsoDate): string | null {
+  // A stay continuing from an earlier night has no time today: you wake up there.
+  if (item.kind === 'stay' && viewDate && viewDate !== item.date) return null;
   if (!isTicketItem(item)) return item.time;
   // On the overnight land day, order by arrival so the ticket sits in the morning.
   if (viewDate && item.arrive_date === viewDate && item.date !== viewDate) return item.arrive_time;

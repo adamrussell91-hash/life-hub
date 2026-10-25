@@ -485,7 +485,8 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
     clearInvalid();
     fillBtn.disabled = true;
     try {
-      const result = await parseEmail(pasteTextarea.value);
+      const cities = trip.cities.map(({ id, name, start_date, end_date }) => ({ id, name, start_date, end_date }));
+      const result = await parseEmail(pasteTextarea.value, cities);
       applyDraft(result.draft as unknown as Record<string, unknown>);
       const stillEmpty = result.missing
         .map((path) => fieldFor(path))
