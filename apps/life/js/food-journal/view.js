@@ -100,7 +100,27 @@ function field(
   input.value = value ?? "";
   input.maxLength = max;
   input.addEventListener("input", () => change(input.value));
-  wrap.append(lab, input);
+  if (type === "date") {
+    // iOS can paint its native date bezel beyond width/max-width. Keep the
+    // native picker and accessible input, but let an ordinary box paint it.
+    const control = el("div", "hub-input food-date"),
+      display = el("span", "food-date__value");
+    display.setAttribute("aria-hidden", "true");
+    input.className = "food-date__native";
+    const paint = () => { display.textContent = formatDisplayDate(input.value); };
+    input.addEventListener("input", paint);
+    input.addEventListener("change", () => {
+      paint();
+      change(input.value);
+    });
+    input.addEventListener("click", () => {
+      // Also open the picker when tapping the middle of the field on desktop.
+      try { input.showPicker?.(); } catch { /* native tap remains available */ }
+    });
+    paint();
+    control.append(display, input);
+    wrap.append(lab, control);
+  } else wrap.append(lab, input);
   return wrap;
 }
 // The phone's location, or null when it is off or refused.
