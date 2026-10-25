@@ -75,6 +75,7 @@ import { metLineFrom, renderPersonHeader } from '@/components/person-header';
 import { fetchObservations } from '@/api/observations';
 import { renderRolesEditor } from '@/components/person-roles-editor';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { renderProfessionalProfileSummary, renderProfessionalProfileTab } from '@/components/professional-profile';
 
 export interface PeoplePageOptions {
   selectedId?: string | null;
@@ -824,6 +825,7 @@ export async function renderPeoplePage(
     const rolesHost = pane.querySelector('[data-section="roles"] .people-pane__section-body') as HTMLElement | null;
     const tagHost = pane.querySelector('[data-section="tags"]') as HTMLElement | null;
     const fullHost = pane.querySelector('[data-section="full"] .people-pane__section-body') as HTMLElement | null;
+    const profileHost = pane.querySelector('[data-section="profile"] .people-pane__section-body') as HTMLElement | null;
 
     if (nextHost) setSectionState(nextHost, 'loading');
     if (ledgerHost) setSectionState(ledgerHost, 'loading');
@@ -844,6 +846,12 @@ export async function renderPeoplePage(
       const overview = await overviewRead;
       if (!current()) return;
       personOverviews.set(id, overview);
+      if (profileHost) {
+        profileHost.replaceChildren();
+        const profile = overview.entity.kind === 'person' ? overview.entity.professional_profile : undefined;
+        profileHost.closest<HTMLElement>('[data-section="profile"]')!.hidden = !profile;
+        renderProfessionalProfileSummary(profileHost,profile);
+      }
       let brief: PersonBrief | null = null;
       let proposalsRes: {proposals:LinkProposal[];count:number} = {proposals:[],count:0};
       let ledgerRes: LedgerResponse | null = null;
@@ -1128,6 +1136,11 @@ export async function renderPeoplePage(
 
         if (fullHost && changed === 'overview') {
           fullHost.replaceChildren();
+          if (overview.entity.kind === 'person' && overview.entity.professional_profile) {
+            const profile = el('div');
+            renderProfessionalProfileTab(profile,overview.entity.professional_profile);
+            fullHost.append(profile);
+          }
           const ul = el('ul', 'people-pane__full-list');
           for (const entry of overview.current_relationships ?? []) {
             const li = el('li');
@@ -1339,6 +1352,11 @@ export async function renderPeoplePage(
     header.setAttribute('data-section', 'header');
     header.append(el('p', 'people-pane__loading', 'Loading…'));
     pane.append(header);
+
+    const profile = sectionHost('people-pane__profile', 'Profile');
+    profile.root.setAttribute('data-section','profile');
+    profile.root.hidden = true;
+    pane.append(profile.root);
 
     const roles = sectionHost('people-pane__roles', 'Roles and education');
     roles.root.setAttribute('data-section', 'roles');
