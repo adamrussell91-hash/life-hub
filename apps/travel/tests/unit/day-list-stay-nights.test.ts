@@ -87,9 +87,9 @@ describe('multi-night stays and Mark safe', () => {
   it('offers Mark safe on check-in night only', () => {
     const first = document.createElement('div');
     renderDayList(first, { ...withStay, checkins: [] }, 'lis', '2027-03-01', { onMarkSafe: () => {} });
-    expect(first.textContent).toContain('Mark safe');
+    expect(first.querySelector('button[aria-label="Mark safe"]')).not.toBeNull();
     const later = document.createElement('div');
     renderDayList(later, { ...withStay, checkins: [] }, 'lis', '2027-03-02', { onMarkSafe: () => {} });
-    expect(later.textContent).not.toContain('Mark safe');
+    expect(later.querySelector('button[aria-label="Mark safe"]')).toBeNull();
   });
 });

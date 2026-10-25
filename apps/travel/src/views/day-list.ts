@@ -72,10 +72,13 @@ function appendSafeMark(
   const tz = options.cityTz || 'UTC';
 
   if (safe) {
+    // Same little tick as the button, filled green, with the time beside it.
+    const time = formatSafeTime(safe.at, tz);
     const badge = document.createElement('span');
     badge.className = 'safe-mark is-safe';
-    badge.innerHTML = `${I.check}<span>Safe · ${formatSafeTime(safe.at, tz)}</span>`;
-    badge.title = `Marked safe at ${safe.at}`;
+    badge.innerHTML = `<span class="safe-mark__tick">${I.check}</span><span>${time}</span>`;
+    badge.title = `Marked safe at ${time}`;
+    badge.setAttribute('aria-label', `Safe at ${time}`);
     meta.append(badge);
 
     if (safe.photoId) {
@@ -104,8 +107,9 @@ function appendSafeMark(
   const tick = document.createElement('button');
   tick.type = 'button';
   tick.className = 'safe-mark safe-mark__btn';
-  tick.innerHTML = `${I.check}<span>Mark safe</span>`;
+  tick.innerHTML = `<span class="safe-mark__tick">${I.check}</span>`;
   tick.title = 'Mark safe for people following along';
+  tick.setAttribute('aria-label', 'Mark safe');
   tick.addEventListener('click', (e) => {
     e.stopPropagation();
     options.onMarkSafe?.(item, 'mark');
