@@ -1857,6 +1857,17 @@ export const SectionLinkSchema = z.object({
   source_composition_id: z.string().min(1)
 });
 
+/** A quiz section holding practice questions for one saved markbook group (see group-sets.mjs). */
+export const GroupSetSchema = z.object({
+  group_id: z.string().min(1).max(64),
+  class_id: z.string().min(1).max(64),
+  name: z.string().min(1).max(120),
+  tags: z.array(z.string().min(1).max(120)).min(1).max(8),
+  students: z.array(z.string().min(1).max(64)).max(60),
+  target: z.number().int().min(1).max(10)
+});
+export type GroupSet = z.infer<typeof GroupSetSchema>;
+
 const SectionBlockObjectSchema = z.object({
   id: z.string().min(1),
   type: z.literal('block'),
@@ -1879,7 +1890,9 @@ const SectionBlockObjectSchema = z.object({
     /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
     tutorial_exit: z.boolean().optional(),
     /** Design Sprint: this top-level section holds the guides for one phase. */
-    sprint_phase: SprintPhaseKeySchema.optional()
+    sprint_phase: SprintPhaseKeySchema.optional(),
+    /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
+    group_set: GroupSetSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps

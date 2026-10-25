@@ -2512,6 +2512,14 @@ var SectionLinkSchema = z10.object({
   mode: z10.literal("linked"),
   source_composition_id: z10.string().min(1)
 });
+var GroupSetSchema = z10.object({
+  group_id: z10.string().min(1).max(64),
+  class_id: z10.string().min(1).max(64),
+  name: z10.string().min(1).max(120),
+  tags: z10.array(z10.string().min(1).max(120)).min(1).max(8),
+  students: z10.array(z10.string().min(1).max(64)).max(60),
+  target: z10.number().int().min(1).max(10)
+});
 var SectionBlockObjectSchema = z10.object({
   id: z10.string().min(1),
   type: z10.literal("block"),
@@ -2534,7 +2542,9 @@ var SectionBlockObjectSchema = z10.object({
     /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
     tutorial_exit: z10.boolean().optional(),
     /** Design Sprint: this top-level section holds the guides for one phase. */
-    sprint_phase: SprintPhaseKeySchema.optional()
+    sprint_phase: SprintPhaseKeySchema.optional(),
+    /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
+    group_set: GroupSetSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -2669,6 +2679,7 @@ export {
   GraphBuildModeSchema,
   GraphEdgeSchema,
   GraphNodeSchema,
+  GroupSetSchema,
   HeadingBlockSchema,
   HeadingVariantSchema,
   HingeBackupSchema,

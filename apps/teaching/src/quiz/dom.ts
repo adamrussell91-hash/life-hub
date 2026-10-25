@@ -150,3 +150,25 @@ export function formatClock(ms: number): string {
   const s = total % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
+
+/** Two strands crossing: the interleaved mark on a practice question. */
+export function practiceIcon(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('qz-practice__icon');
+  for (const d of ['M2 4c4 0 8 8 12 8', 'M2 12c4 0 8-8 12-8']) {
+    const p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', d);
+    svg.append(p);
+  }
+  return svg;
+}
+
+/** The "Practice for you" chip. */
+export function practiceChip(): HTMLElement {
+  const chip = el('span', 'qz-practice', 'Practice for you');
+  chip.prepend(practiceIcon());
+  return chip;
+}

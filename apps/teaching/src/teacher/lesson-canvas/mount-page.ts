@@ -81,6 +81,17 @@ import { openPracticeRun } from '@/sprint/practice';
 import { seedSprint, withPhaseSections } from '@/sprint/defaults';
 import { phaseOfSection } from '@/sprint/model';
 import { httpMarkbookApi } from '@/markbook/api';
+import { todayInSydney } from '@/markbook/calc';
+import { createGroupSetTools, groupSetBrief } from '@/quiz/group-set-tools';
+import { activeMembers, joinWhy, newGroupId } from '@/evidence/groups';
+import { codeLabel, loadInsightContext } from '@/evidence/context';
+import { classEvidence } from '@/evidence/class-evidence';
+import { moveKind, nextMoves } from '@/evidence/next-moves';
+import { tagLabel } from '@/evidence/tags';
+import { mixUps } from '@/evidence/patterns';
+import { mixUpText } from '@/evidence/views/parts';
+import { startAnn } from '@/evidence/follow-up';
+import type { TagKind } from '@/evidence/types';
 import { outcomeLabels } from '@/markbook/parse';
 import { peekCurriculum } from '@/app/curriculum-state';
 import { loadAlignment } from '@/alignment/api';
@@ -1114,6 +1125,26 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       quizPanel = mountQuizPanel({
         getLesson: () => lesson,
         idFactory: options.idFactory,
+        loadGroups: async (classId) => {
+          const [view, context] = await Promise.all([httpMarkbookApi.load(classId), loadInsightContext()]);
+          const { evidence } = classEvidence(view, context);
+          const kind = moveKind(evidence);
+          return { saved: view.markbook.groups ?? [], moves: kind ? nextMoves(evidence, kind) : [], label: (t) => tagLabel(t, context) };
+        },
+        saveSuggestion: async (classId, tags, students) => {
+          const context = await loadInsightContext();
+          const view = await httpMarkbookApi.load(classId);
+          const { evidence } = classEvidence(view, context);
+          const label = (t: string) => tagLabel(t, context);
+          const titles = new Map(view.quizzes.map((q) => [q.id, q.title] as const));
+          const id = newGroupId();
+          const markbook = await httpMarkbookApi.saveGroup(
+            classId,
+            { id, name: tags.map(label).join(' · '), tags, members: students.map((s) => ({ student: s, why: joinWhy(s, tags, evidence, titles, label) })) },
+            todayInSydney()
+          );
+          return markbook.groups.find((g) => g.id === id)!;
+        },
         onSettings: (quiz) => emitLesson({ ...lesson, quiz }),
         onAddBlocks: (added) => {
           const blocks = [...lesson.blocks, ...added];
@@ -1341,6 +1372,38 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     },
     idFactory: options.idFactory
   });
+  let rosterNames = new Map<string, string>();
+  const groupSetTools = createGroupSetTools({
+    getBlocks: () => lesson.blocks,
+    onBlocks: (blocks) => {
+      emitLesson({ ...lesson, blocks });
+      canvas.update(blocks, media);
+    },
+    idFactory: options.idFactory,
+    names: () => rosterNames,
+    refreshMembers: async (config) => {
+      const view = await httpMarkbookApi.load(config.class_id);
+      rosterNames = new Map(view.students.map((s) => [s.id, s.initials] as const));
+      const group = (view.markbook.groups ?? []).find((g) => g.id === config.group_id);
+      return group ? activeMembers(group) : [];
+    },
+    onError: (error) => console.error(error),
+    startAnn: (sectionId, config) => {
+      void (async () => {
+        const context = await loadInsightContext();
+        const view = await httpMarkbookApi.load(config.class_id);
+        const { evidence } = classEvidence(view, context);
+        const label = (t: string) => tagLabel(t, context);
+        const inGroup = new Set(config.students);
+        const mistakes = config.tags.flatMap((tag) =>
+          mixUps(evidence.filter((e) => inGroup.has(e.student) && e.tags.includes(tag)), tag.slice(0, tag.indexOf(':')) as TagKind)
+            .slice(0, 3)
+            .map((m) => `- ${mixUpText(m, label, (id) => codeLabel(id, context.codes))} (${m.count} ${m.count === 1 ? 'student' : 'students'})`)
+        );
+        await startAnn(lesson.id, groupSetBrief({ sectionId, config, label, lessonTitle: lesson.title, mistakes }));
+      })().catch((error) => console.error(error));
+    }
+  });
   const canvas = mountBlockCanvas(canvasHost, {
     decorateRow: (row, block) => {
       // Tabs hide page-level rows only; what's inside a section is left alone.
@@ -1349,6 +1412,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       classExamples.decorate(row, block);
       pulse.decorate(row, block);
       lectureTools.decorate(row, block);
+      if (resolvePedagogicalMode(lesson.pedagogical_mode) === 'quiz') groupSetTools.decorate(row, block);
     },
     blocks: lesson.blocks,
     media,
