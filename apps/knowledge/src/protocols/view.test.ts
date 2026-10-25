@@ -172,6 +172,11 @@ describe("protocol conversation view", () => {
     await expect(deletePastRuns(["sess-a"], fetchImpl as unknown as typeof fetch)).resolves.toEqual(["sess-a"]);
   });
 
+  it("keeps a single change handler so Past runs ticks, the filter and mode hints all work", async () => {
+    const { default: source } = await import("./view.ts?raw");
+    expect(source.match(/host\.onchange\s*=/g)).toHaveLength(1);
+  });
+
   it("gives each thinking persona an in-world status line", () => {
     const horizon = {
       ...definition,

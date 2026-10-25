@@ -810,6 +810,7 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
     paint();
     void poll();
   };
+  // The view's only change handler: assigning onchange again later would silently replace it.
   host.onchange = event => {
     const pickBox = (event.target as HTMLElement | null)?.closest?.<HTMLInputElement>("[data-protocol-past-pick]");
     if (pickBox) {
@@ -817,6 +818,13 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
       if (pickBox.checked) pastPick.chosen.add(id); else pastPick.chosen.delete(id);
       pastPick.confirming = false;
       paintPastRuns();
+      return;
+    }
+    const filter = (event.target as HTMLElement | null)?.closest?.<HTMLSelectElement>("[data-protocol-past-filter]");
+    if (filter) {
+      pastFilter = filter.value;
+      if (host.querySelector(".protocol-library")) paintPastRuns();
+      else paint();
       return;
     }
     const select = (event.target as HTMLElement).closest<HTMLSelectElement>("select[name='mode']");
@@ -942,13 +950,6 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
         paint();
       });
     }
-  };
-  host.onchange = event => {
-    const filter = (event.target as HTMLElement | null)?.closest?.<HTMLSelectElement>("[data-protocol-past-filter]");
-    if (!filter) return;
-    pastFilter = filter.value;
-    if (host.querySelector(".protocol-library")) paintPastRuns();
-    else paint();
   };
   host.onsubmit = async event => {
     const form = event.target as HTMLFormElement;
