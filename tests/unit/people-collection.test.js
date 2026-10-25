@@ -374,3 +374,25 @@ test('a GitHub person adopted into Blobs keeps its imported relationships', asyn
   assert.equal(result[0].relationships.length, 1, 'the imported employee_at link is still there');
   assert.equal(result[0].relationships[0].endpoint.display_label, 'Tallowwood College');
 });
+
+for (const lifecycleStatus of ['deleted', 'deidentified']) {
+  test(`removed ${lifecycleStatus} imports stay absent from collections and relationship endpoints`, async () => {
+    resetProfessionalDataCache();
+    const store = memoryStore();
+    const removedId = derivePersonId('removed-colleague');
+    await makePerson(store, { id: removedId, display_name: 'Removed record', lifecycle_status: lifecycleStatus });
+    const env = { GITHUB_TOKEN: 'test-token' };
+    const fetchImpl = githubFetch({
+      people: [
+        { legacy_id: 'removed-colleague', display_name: 'Former Colleague' },
+        { legacy_id: 'visible-colleague', display_name: 'Visible Colleague' }
+      ],
+      organisations: [],
+      relationships: [{ person_legacy_id: 'visible-colleague', other_person_legacy_id: 'removed-colleague', relationship_type: 'professional_relationship', role: 'colleague' }]
+    });
+    const result = await loadAllPeopleWithRelationships({ store, env, fetchImpl, resolveEntity: makeGithubResolveEntity(store, env, fetchImpl) });
+    assert.deepEqual(result.map((row) => row.person.display_name), ['Visible Colleague']);
+    assert.deepEqual(result[0].relationships, []);
+    assert.ok(await store.get(`entities/person/${removedId}`), 'the suppression marker must still block import fallback');
+  });
+}

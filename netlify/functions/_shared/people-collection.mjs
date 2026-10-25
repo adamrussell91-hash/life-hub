@@ -17,6 +17,7 @@ import {
   listGithubRelationshipEntries
 } from './github-professional-data.mjs';
 import { dedupeIdentityRows, identityNameKey } from './identity-display-name.mjs';
+import { isDeletedRecord } from './record-liveness.mjs';
 import { withoutSupersededImports } from './person-workplace.mjs';
 
 // The single expensive full-population scan every People Home (Phase 2)
@@ -67,8 +68,9 @@ function isNetworkExcludedPerson(person, studentIds, studentNameKeys) {
   return Boolean(key && studentNameKeys.has(key));
 }
 
-function withoutStudentPersonEndpoints(relationships, studentIds) {
+function withoutExcludedEndpoints(relationships, studentIds) {
   return (relationships ?? []).filter((entry) => {
+    if (isDeletedRecord(entry?.endpoint)) return false;
     if (entry?.endpoint?.kind !== 'person') return true;
     const id = personIdFromRef(entry.endpoint.ref);
     return !id || !studentIds.has(id);
@@ -172,7 +174,8 @@ export async function loadAllPeopleWithRelationships({
     })
   ).filter(Boolean);
 
-  const nativeIds = new Set(nativeStubs.map((row) => row.person.id));
+  // Stored ids include tombstones: never revive a removed imported identity.
+  const nativeIds = new Set(ids);
   const githubPeople = await listGithubPersonCandidates(github);
   const githubIds = new Set(githubPeople.map((record) => record.id));
   const endpointCache = new Map();
@@ -210,7 +213,9 @@ export async function loadAllPeopleWithRelationships({
   );
 
   const survivors = dedupeIdentityRows(
-    [...nativeStubs, ...imported],
+    // Keep removed ids in nativeIds above to prevent GitHub fallback from
+    // resurrecting an import, but never expose their records to callers.
+    [...nativeStubs, ...imported].filter((row) => !isDeletedRecord(row.person)),
     (row) => row.person,
     (row, person) => ({ person, relationships: row.relationships, _source: row._source }),
     (row) => row._source
@@ -230,14 +235,14 @@ export async function loadAllPeopleWithRelationships({
       }
       return { person: { ...record, ref }, relationships, _source: 'github' };
     });
-    survivors.push(...studentRows);
+    survivors.push(...studentRows.filter((row) => !nativeIds.has(row.person.id) && !isDeletedRecord(row.person)));
   }
 
   return mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {
     if (row._source === 'github') {
       return {
         person: row.person,
-        relationships: withoutStudentPersonEndpoints(row.relationships, studentIds)
+        relationships: withoutExcludedEndpoints(row.relationships, studentIds)
       };
     }
 
@@ -262,7 +267,7 @@ export async function loadAllPeopleWithRelationships({
     }
     return {
       person: row.person,
-      relationships: withoutStudentPersonEndpoints(
+      relationships: withoutExcludedEndpoints(
         withoutSupersededImports([...native, ...imported]),
         studentIds
       )
