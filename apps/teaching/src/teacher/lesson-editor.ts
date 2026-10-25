@@ -29,7 +29,7 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
-import { classLessonUrl, mountPublicLinkControl } from '@/teacher/public-link';
+import { mountPublicLinkControl } from '@/teacher/public-link';
 import { lessonDisplayPath } from '@/teacher/lesson-display';
 import {
   buildLinkedPreview,
@@ -849,17 +849,6 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         lead: 'Currently live at (last published version):',
         copyLabel: 'Copy link',
         openLabel: 'Open student view',
-        ...(lesson.pedagogical_mode === 'quiz'
-          ? {
-              loadClassLinks: async () => {
-                const { classes } = await apiPost<{ classes: Array<{ id: string; title: string }> }>(
-                  `/api/lessons/${encodeURIComponent(lesson.id)}/quiz`,
-                  { action: 'classes' }
-                );
-                return classes.map((c) => ({ label: c.title, url: classLessonUrl(lesson.id, c.id) }));
-              }
-            }
-          : {})
       }).dispose;
     }
 
