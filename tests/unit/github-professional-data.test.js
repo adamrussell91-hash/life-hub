@@ -321,7 +321,13 @@ test('caches parsed data for repeated calls within the TTL, issuing only one set
   await listGithubPersonCandidates({ env, fetchImpl });
   await listGithubPersonCandidates({ env, fetchImpl });
   await listGithubOrganisationCandidates({ env, fetchImpl });
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4, 'people, organisations, relationships and optional deletion markers');
+});
+
+test('concurrent person reads share a single source load', async () => {
+  const {fetchImpl,calls}=memoryFetch({people:PEOPLE,organisations:ORGANISATIONS,relationships:RELATIONSHIPS});
+  await Promise.all(Array.from({length:10},()=>getGithubPerson(derivePersonId('leg-person-1'),{env:{GITHUB_TOKEN:'token'},fetchImpl})));
+  assert.equal(calls.filter(url=>url.endsWith('/people.json')).length,1);
 });
 
 test('honors a single is_self flag and ignores a second self-claim', async () => {

@@ -41,6 +41,7 @@ function time(iso: string | null): number {
 export function dayMonth(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
+  if (/^\d{4}-\d{2}$/.test(iso)) return MONTHS[d.getUTCMonth()]!;
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 

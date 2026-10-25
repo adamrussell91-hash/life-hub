@@ -11,6 +11,7 @@ import {
   isValidSteppingStoneId,
   parseAchievementRecord,
   parseFutureRecord,
+  validateCriteriaInput,
   parseSteppingStoneRecord,
   validateAchievementCreateInput,
   validateFutureCreateInput,
@@ -156,6 +157,7 @@ export function createCareerRepository(deps = {}) {
 
   async function updateFuture(id, patch) {
     const existing = await getFuture(id);
+    if (patch && 'criteria' in patch) patch = { ...patch, criteria: validateCriteriaInput(patch.criteria) };
     const merged = { ...existing, ...patch, id: existing.id, schema_version: CAREER_SCHEMA_VERSION, updated_at: now() };
     const parsed = parseFutureRecord(merged);
     if (!parsed) throw validationError('invalid_future', 'Updated future is invalid.');

@@ -364,7 +364,7 @@ test('a GitHub person adopted into Blobs keeps its imported relationships', asyn
   const { createIdentityRepository } = await import('../../netlify/functions/_shared/identity-repository.mjs');
   const { getGithubPerson } = await import('../../netlify/functions/_shared/github-professional-data.mjs');
   const id = derivePersonId('leg-colleague');
-  const repo = createIdentityRepository({ store });
+  const repo = createIdentityRepository({ store, github:{env,fetchImpl} });
   await repo.adoptImportedIdentity({ kind: 'person', record: await getGithubPerson(id, { env, fetchImpl }) });
   await repo.updateFields({ ref: { namespace: 'shared', kind: 'person', id }, patch: { display_name: 'Yara Zephyrine-Lee' } });
 
