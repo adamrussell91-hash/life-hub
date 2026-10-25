@@ -13,6 +13,7 @@ import {
   retainWorldCentre,
   sizeFactor,
   tickCameraAnim,
+  toScreen,
   toWorld,
   wheelZoom,
   zoomAt,
@@ -29,6 +30,7 @@ import {
   drawSleep,
   drawSparkle
 } from './creatures';
+import { placeLabels, wrapLabel, type LabelCandidate } from './labels';
 import { layoutCommunities, layoutOpenSea, type WorldLayout } from './layout';
 import {
   HABITAT_LABELS,
@@ -55,6 +57,11 @@ import {
   type RegionDrawState,
   type SeaGlint
 } from './terrain';
+
+const PLACE_FONT = (px: number) => `700 ${px}px Inter, sans-serif`;
+const PERSON_FONT = (px: number) => `600 ${px}px Inter, sans-serif`;
+const SEA_FONT = (px: number) => `600 ${px}px Inter, sans-serif`;
+const clampPx = (px: number, min: number, max: number) => Math.min(max, Math.max(min, px));
 
 export type MiniworldSelection =
   | { kind: 'person'; id: string }
@@ -489,7 +496,9 @@ export function mountWorldCanvas(
         layers.opportunity &&
         model.upcomingEvents.some((ev) => ev.attendee_refs.some((r) => eco.people.includes(r)));
       drawPlant(ctx, mx, my, eco.people.length, sf, t, {
-        badge: true,
+        // A "1" over every single-person sandbar was most of the clutter;
+        // the plant's size already says it is one person.
+        badge: eco.people.length > 1,
         opp,
         reduceMotion
       });
@@ -537,27 +546,20 @@ export function mountWorldCanvas(
     if (cam.k < 0.6 && model.openSea.people.length) {
       const pts = [...openSeaPos.values()];
       if (pts.length) {
-        let sx = 0;
-        let sy = 0;
-        for (const p of pts) {
-          sx += p.x;
-          sy += p.y;
-        }
-        sx /= pts.length;
-        sy /= pts.length;
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
         for (const p of pts.slice(0, 40)) {
           ctx.beginPath();
           ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
           ctx.fill();
         }
-        haloText(`Open sea · ${model.openSea.people.length} people`, sx, sy - 18, `600 ${12 / cam.k}px Inter, sans-serif`, '#17375e');
       }
     }
 
     const dimSet = dimBeyondHops ? hopSet(dimBeyondHops, 2) : null;
     const showNames = layers.names || cam.k >= 1.6;
     const fullNames = layers.names || cam.k >= 2.2;
+    const personPx = personPxFor();
+    const nameLabels: LabelCandidate[] = [];
 
     for (const person of model.people) {
       if (!person.present) continue;
@@ -588,11 +590,21 @@ export function mountWorldCanvas(
       const hoverOrForce =
         (hover?.kind === 'person' && hover.id === person.ref) ||
         (selection?.kind === 'person' && selection.id === person.ref);
-      if ((showNames || hoverOrForce) && cam.k >= 0.55) {
+      if ((showNames || hoverOrForce) && cam.k >= 0.55 && alpha === 1) {
         let label = person.displayName;
         if (person.isSelf && cam.k >= 0.55) label = 'You';
         else if (!fullNames && !hoverOrForce) label = person.displayName.split(/\s+/)[0] ?? person.displayName;
-        haloText(label, c.x, c.y - 14 * sf, `600 ${11 / Math.sqrt(cam.k)}px Inter, sans-serif`, '#13233a');
+        const [sx, sy] = toScreen(cam, c.x, c.y - 14 * sf);
+        ctx.font = PERSON_FONT(personPx);
+        nameLabels.push({
+          id: `p:${person.ref}`,
+          lines: [label],
+          priority: hoverOrForce ? 1_000 : person.isSelf ? 500 : 1,
+          anchors: [{ x: sx, y: sy }],
+          width: ctx.measureText(label).width,
+          lineHeight: personPx * 1.2,
+          force: hoverOrForce
+        });
       }
       ctx.globalAlpha = 1;
     }
@@ -602,23 +614,94 @@ export function mountWorldCanvas(
       void ref;
     }
 
-    // Community labels
+    drawLabels(nameLabels);
+  }
+
+  /**
+   * Place names, island names and the open-sea count in screen space so the
+   * text stays readable at any zoom, then drop whichever lower-priority label
+   * would overlap another. Zooming in makes room and brings them back.
+   */
+  function drawLabels(nameLabels: LabelCandidate[]): void {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const placePx = clampPx(13 * Math.sqrt(cam.k), 11, 15);
+    const subPx = clampPx(10 * Math.sqrt(cam.k), 9, 12);
+    const candidates: LabelCandidate[] = [...nameLabels];
+    const meta = new Map<string, { color: string; sub: string | null }>();
+    ctx.font = PLACE_FONT(placePx);
     for (const c of model.communities) {
       const r = regions.get(c.id);
       if (!r || r.rCur < 2) continue;
-      const at = LABEL_AT[r.habitat];
-      const ly = r.cy - r.rCur * at - 8;
-      haloText(c.label, r.cx, ly, `700 ${13 / Math.sqrt(cam.k)}px Inter, sans-serif`, HAB_COLORS[r.habitat].edge);
-      if (cam.k >= 1.2) {
-        haloText(
-          HABITAT_LABELS[r.habitat],
-          r.cx,
-          ly + 14 / cam.k,
-          `500 ${10 / Math.sqrt(cam.k)}px Inter, sans-serif`,
-          '#6b7788'
-        );
+      const focused =
+        (hover?.kind === 'community' && hover.id === c.id) ||
+        (selection?.kind === 'community' && selection.id === c.id);
+      const span = r.rCur * 2 * cam.k;
+      const lines = wrapLabel(c.label, focused ? 320 : Math.max(120, Math.min(240, span * 0.9)), (t) =>
+        ctx.measureText(t).width
+      );
+      const sub = cam.k >= 1.2 ? HABITAT_LABELS[r.habitat] : null;
+      const width = Math.max(...lines.map((l) => ctx.measureText(l).width));
+      const lineHeight = placePx * 1.2;
+      const [ax, ay] = toScreen(cam, r.cx, r.cy - r.rCur * LABEL_AT[r.habitat]);
+      const [, cy] = toScreen(cam, r.cx, r.cy);
+      const [, by] = toScreen(cam, r.cx, r.cy + r.rCur);
+      const block = lineHeight * (lines.length - 1) + (sub ? subPx * 1.3 : 0);
+      candidates.push({
+        id: `c:${c.id}`,
+        lines: sub ? [...lines, sub] : lines,
+        priority: (focused ? 2_000 : 100) + c.stats.memberCount,
+        // Above the shore, then over the middle, then just below.
+        anchors: [
+          { x: ax, y: ay - 6 - block },
+          { x: ax, y: cy - block / 2 },
+          { x: ax, y: by + placePx + 4 }
+        ],
+        width,
+        lineHeight,
+        force: focused
+      });
+      meta.set(`c:${c.id}`, { color: HAB_COLORS[r.habitat].edge, sub });
+    }
+    if (model.openSea.people.length) {
+      const text = `Open sea · ${model.openSea.people.length} ${model.openSea.people.length === 1 ? 'person' : 'people'}`;
+      ctx.font = SEA_FONT(placePx);
+      const [x, y] = toScreen(cam, (layout.bounds.minX + layout.bounds.maxX) / 2, layout.bounds.maxY);
+      candidates.push({
+        id: 'open-sea',
+        lines: [text],
+        priority: 50,
+        // Just below the landmass; hidden when zoomed in past it.
+        anchors: [{ x, y: y + placePx + 8 }],
+        width: ctx.measureText(text).width,
+        lineHeight: placePx * 1.2
+      });
+    }
+
+    const stageBox = stage.getBoundingClientRect();
+    const blocked = [...host.querySelectorAll<HTMLElement>('.miniworld__zoom, .miniworld__hint, .miniworld__key')]
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.width > 0)
+      .map((r) => ({ x: r.left - stageBox.left, y: r.top - stageBox.top, width: r.width, height: r.height }));
+    for (const { candidate, x, y } of placeLabels(candidates, { width: W, height: H }, blocked)) {
+      if (candidate.id.startsWith('p:')) {
+        haloText(candidate.lines[0], x, y, PERSON_FONT(personPxFor()), '#13233a');
+        continue;
+      }
+      if (candidate.id === 'open-sea') {
+        haloText(candidate.lines[0], x, y, SEA_FONT(placePx), '#17375e');
+        continue;
+      }
+      const m = meta.get(candidate.id)!;
+      const nameLines = m.sub ? candidate.lines.slice(0, -1) : candidate.lines;
+      nameLines.forEach((line, i) => haloText(line, x, y + i * candidate.lineHeight, PLACE_FONT(placePx), m.color));
+      if (m.sub) {
+        haloText(m.sub, x, y + (nameLines.length - 1) * candidate.lineHeight + subPx * 1.3, `500 ${subPx}px Inter, sans-serif`, '#6b7788');
       }
     }
+  }
+
+  function personPxFor(): number {
+    return clampPx(11 * Math.sqrt(cam.k), 10, 13);
   }
 
   function haloText(text: string, x: number, y: number, font: string, color: string): void {
