@@ -4,6 +4,7 @@ import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
 import { mountStudentQuiz } from '@/quiz/student-quiz';
+import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
 import { tutorialClient } from '@/tutorial/api';
@@ -350,9 +351,43 @@ export function mountStudentLessonView(
         if (disposed || isStale()) return;
         renderStudentChrome(header, {});
         // The teacher's per-class Share link adds ?class= so the quiz knows the class list.
-        const quizClassId = new URLSearchParams(window.location.search).get('class') ?? undefined;
-        show(content, lesson, { quizClassId });
-        mountExamples(content);
+        const fromLink = new URLSearchParams(window.location.search).get('class') ?? undefined;
+        const choices = fromLink || lesson.pedagogical_mode === 'quiz' ? [] : lesson.classes ?? [];
+        if (choices.length < 2) {
+          // The one link is enough: a lecture, tutorial or sprint finds its single class itself.
+          show(content, lesson, { quizClassId: fromLink ?? choices[0]?.id });
+          mountExamples(content);
+          return;
+        }
+        // Two or more classes share the link: ask once, then this device remembers.
+        const pickedKey = `lesson-class:${lessonId}`;
+        const saved = readJSON<string>(pickedKey);
+        if (saved && choices.some((c) => c.id === saved)) {
+          show(content, lesson, { quizClassId: saved });
+          mountExamples(content);
+          return;
+        }
+        const box = document.createElement('div');
+        box.className = 'qz-panel qz-class-pick';
+        const title = document.createElement('p');
+        title.className = 'qz-panel__title';
+        title.textContent = 'Which class are you in?';
+        const row = document.createElement('div');
+        row.className = 'qz-actions';
+        for (const c of choices) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn btn--secondary';
+          b.textContent = c.title;
+          b.addEventListener('click', () => {
+            writeJSON(pickedKey, c.id);
+            show(content, lesson, { quizClassId: c.id });
+            mountExamples(content);
+          });
+          row.append(b);
+        }
+        box.append(title, row);
+        content.replaceChildren(box);
       })
       .catch((error: unknown) => {
         if (disposed || isStale()) return;

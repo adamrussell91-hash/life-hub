@@ -21,6 +21,8 @@ export const PublishedLessonSchema = z.object({
   /** Quiz lessons: the settings students may see, with the published version. */
   pedagogical_mode: z.enum(['quiz', 'lecture', 'tutorial', 'design_sprint']).optional(),
   sprint: PublicSprintSchema.optional(),
+  /** Lectures, tutorials and sprints: the classes a plain lesson link can mean. */
+  classes: z.array(z.object({ id: z.string(), title: z.string() })).optional(),
   quiz: QuizSettingsSchema.extend({
     version: z.string(),
     question_count: z.number().int(),
