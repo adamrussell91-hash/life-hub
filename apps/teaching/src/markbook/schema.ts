@@ -8,7 +8,7 @@ import { z } from 'zod';
  * Generated to netlify/functions/_shared/markbook-schema.mjs for the server.
  */
 
-export const MARKBOOK_LIMITS = { columns: 200, criteria: 12, bands: 6, outcomes: 8, title: 120, label: 120, band: 24, feedback: 2000, note: 200 } as const;
+export const MARKBOOK_LIMITS = { columns: 200, criteria: 12, bands: 6, outcomes: 8, title: 120, label: 120, band: 24, feedback: 2000, note: 200, groups: 100, members: 60, history: 3000, why: 200 } as const;
 
 export const MarkbookIdSchema = z.string().regex(/^[a-z0-9]{8,24}$/, 'Something went wrong with this column. Reload and try again.');
 const Day = z
@@ -56,6 +56,27 @@ export const AssessmentMarkSchema = z.object({
 export const HandinMarkSchema = z.object({ status: z.enum(HANDIN_STATUSES), at: Day.optional() });
 export const CheckMarkSchema = z.union([z.boolean(), z.number().int().min(1).max(4)]);
 
+const Why = z.string().trim().max(MARKBOOK_LIMITS.why);
+export const GroupMemberSchema = z.object({ student: z.string().min(1).max(64), joined: Day, left: Day.nullable().default(null), why_joined: Why.default(''), why_left: Why.nullable().default(null) });
+/** A saved group: students behind on the same tags. Members leave on evidence; the group retires when none are left. */
+export const SavedGroupSchema = z.object({
+  id: MarkbookIdSchema,
+  name: z.string().trim().min(1).max(MARKBOOK_LIMITS.title),
+  tags: z.array(z.string().min(1).max(120)).min(1).max(8),
+  started: Day,
+  retired: Day.nullable().default(null),
+  members: z.array(GroupMemberSchema).max(MARKBOOK_LIMITS.members)
+});
+const EventBase = { id: z.string().min(1).max(200), group: MarkbookIdSchema, name: z.string().max(MARKBOOK_LIMITS.title), tags: z.array(z.string().max(120)).max(8), day: Day };
+/** Written once and kept: what happened to whom, for interviews and records. */
+export const HistoryEventSchema = z.discriminatedUnion('kind', [
+  z.object({ ...EventBase, kind: z.literal('joined'), student: z.string().min(1).max(64), why: Why }),
+  z.object({ ...EventBase, kind: z.literal('received'), student: z.string().min(1).max(64), source: z.string().max(120), title: z.string().max(MARKBOOK_LIMITS.title), questions: z.number().int().min(0).max(50) }),
+  z.object({ ...EventBase, kind: z.literal('result'), student: z.string().min(1).max(64), source: z.string().max(120), title: z.string().max(MARKBOOK_LIMITS.title), score: z.number().min(0), max: z.number().min(0) }),
+  z.object({ ...EventBase, kind: z.literal('left'), student: z.string().min(1).max(64), why: Why }),
+  z.object({ ...EventBase, kind: z.literal('retired') })
+]);
+
 export const MarkbookSchema = z.object({
   columns: z.array(ColumnSchema).max(MARKBOOK_LIMITS.columns).default([]),
   hidden_quizzes: z.array(z.string().min(1).max(120)).max(MARKBOOK_LIMITS.columns).default([]),
@@ -66,6 +87,10 @@ export const MarkbookSchema = z.object({
     .default({}),
   /** Per student: support, extension and option lessons the teacher marked as taken (the unit map's route). */
   took: z.record(z.string(), z.array(z.string().min(1).max(64)).max(200)).default({}),
+  /** Saved groups (Next steps, quiz group sets). */
+  groups: z.array(SavedGroupSchema).max(MARKBOOK_LIMITS.groups).default([]),
+  /** Group history, appended and never recomputed. */
+  history: z.array(HistoryEventSchema).max(MARKBOOK_LIMITS.history).default([]),
   updated_at: z.string().default('')
 });
 
@@ -81,6 +106,9 @@ export type HandinStatus = (typeof HANDIN_STATUSES)[number];
 export type CheckMark = z.infer<typeof CheckMarkSchema>;
 export type Mark = AssessmentMark | HandinMark | CheckMark;
 export type Markbook = z.infer<typeof MarkbookSchema>;
+export type SavedGroup = z.infer<typeof SavedGroupSchema>;
+export type GroupMember = z.infer<typeof GroupMemberSchema>;
+export type HistoryEvent = z.infer<typeof HistoryEventSchema>;
 
 const firstIssue = (error: z.ZodError): string => {
   const issue = error.issues[0];

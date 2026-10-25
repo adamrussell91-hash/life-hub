@@ -566,6 +566,80 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     media: (options.seed.media ?? []).map((m) => (m as { id: string }).id)
   };
 
+  /** A walkable group set case: a quiz with a shared part and a set for a saved group, on the first seeded class. */
+  function seedGroupSetQuiz(): void {
+    // Dev walk only: tests count the seeded units, lessons and students.
+    if (process.env.VITEST) return;
+    const cls = options.seed.classes[0] as { id: string } | undefined;
+    const unit = options.seed.units[0] as { id: string; lesson_ids: string[] } | undefined;
+    if (!cls || !unit) return;
+    const stamp = '2026-01-02T09:00:00.000Z';
+    const students = [
+      { id: 'st_ann', name: 'Ann Bell', initials: 'AB', skip_picker: false },
+      { id: 'st_cy', name: 'Cy Dale', initials: 'CD', skip_picker: false },
+      { id: 'st_ed', name: 'Ed Fox', initials: 'EF', skip_picker: false }
+    ];
+    const stored = store.getJSON<Record<string, unknown>>(classKey(cls.id));
+    if (stored) store.setJSON(classKey(cls.id), { ...stored, students });
+    const shared = { type: 'block', variant: 'medium', visibility: 'student_teacher', layout: {}, print: {}, settings: {}, created_at: stamp, updated_at: stamp, schema_version: 1 };
+    const question = (n: number, prompt: string, right: string, wrong: string) => ({
+      ...shared,
+      id: `block_w3_q${n}`,
+      block_type: 'quiz_question',
+      content: { question: { id: `w3q${n}`, kind: 'multiple_choice', prompt, marks: 1, options: [{ id: `w3q${n}a`, text: right }, { id: `w3q${n}b`, text: wrong }], correct: [`w3q${n}a`] } }
+    });
+    const lessonId = 'lesson_week3_review';
+    const lesson = {
+      id: lessonId,
+      type: 'lesson',
+      title: 'Week 3 review',
+      slug: 'week_3_review',
+      unit_id: unit.id,
+      sequence: unit.lesson_ids.length + 1,
+      pedagogical_mode: 'quiz',
+      blocks: [
+        { ...shared, id: 'block_w3_h', block_type: 'heading', variant: 'page', content: { text: 'Week 3 review' } },
+        question(1, 'Which device repeats a word at the start of successive lines?', 'Anaphora', 'Epistrophe'),
+        question(2, 'Which device repeats a word at the end of successive lines?', 'Epistrophe', 'Anaphora'),
+        question(3, 'Which device repeats a word in a circle, ending where it began?', 'Cyclical repetition', 'Alliteration'),
+        {
+          ...shared,
+          id: 'block_w3_set',
+          block_type: 'section',
+          content: {
+            title: 'Practice: Repetition',
+            blocks: [],
+            group_set: { group_id: 'grp0000001', class_id: cls.id, name: 'Repetition', tags: ['fam:repetition'], students: ['st_ann', 'st_cy'], target: 3 }
+          }
+        }
+      ],
+      status: 'active',
+      created_at: stamp,
+      updated_at: stamp,
+      schema_version: 1,
+      tags: [],
+      syllabus_outcomes: [],
+      outcome_ids: []
+    };
+    store.setJSON(draftLessonKey(lessonId), lesson);
+    store.setJSON(unitKey(unit.id), { ...(store.getJSON<Record<string, unknown>>(unitKey(unit.id)) ?? unit), lesson_ids: [...unit.lesson_ids, lessonId] });
+    seedIds.lessons.push(lessonId);
+    store.setJSON(`markbook/${cls.id}`, {
+      groups: [
+        {
+          id: 'grp0000001',
+          name: 'Repetition',
+          tags: ['fam:repetition'],
+          started: '2026-10-14',
+          retired: null,
+          members: ['st_ann', 'st_cy'].map((student) => ({ student, joined: '2026-10-14', left: null, why_joined: 'Mixed up anaphora and epistrophe', why_left: null }))
+        }
+      ]
+    });
+  }
+
+  seedGroupSetQuiz();
+
   function sign(payload: string): string {
     return createHmac('sha256', sessionSecret).update(payload).digest('base64url');
   }

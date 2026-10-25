@@ -4,9 +4,11 @@ import { classEvidence } from '@/evidence/class-evidence';
 import { moveKind, nextMoves, sortStudents, studentRows, syllabusRows, type Move, type Spread, type StudentSort, type SyllabusRow } from '@/evidence/next-moves';
 import type { FocusPins } from '@/evidence/patterns';
 import { tagLabel } from '@/evidence/tags';
+import { activeMembers, overlapsSaved } from '@/evidence/groups';
 import type { Evidence } from '@/evidence/types';
 import { pct, sectionHead } from '@/evidence/views/parts';
 import type { MarkbookView, RosterStudent } from './types';
+import { formatDay } from './calc';
 
 /**
  * Next steps: what to teach next, where the class stands against the
@@ -23,6 +25,10 @@ export type NextActions = {
   followUp?: (tag: string, students: string[], evidence: Evidence[]) => void;
   /** Small group cards: plan a tutorial for the students behind on one tag. */
   planTutorial?: (tag: string, students: string[], evidence: Evidence[]) => void;
+  /** Save a suggested group so it can be targeted and tracked. */
+  saveGroup?: (tags: string[], students: string[]) => void;
+  /** Add students the evidence now flags to a saved group. */
+  addFlagged?: (groupId: string, students: string[]) => void;
   pins: (studentId: string) => FocusPins;
   repaint: () => void;
 };
@@ -94,7 +100,18 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
   if (!moves.length) {
     movesHost.append(el('p', 'mb__empty', kind ? 'No clear move yet. A tag needs marks from at least three students on two or more questions.' : 'No tagged marks yet. Tag quiz questions or task criteria to see next steps.'));
   }
-  const shown = state.showAllMoves ? moves : moves.slice(0, FIRST_MOVES);
+  // A suggestion that repeats a saved group is folded into that group, with its new students offered.
+  const saved = (view.markbook.groups ?? []).filter((g) => g.retired === null);
+  const repeats = new Map<string, string[]>();
+  const drawn = moves.filter((m) => {
+    if (m.kind !== 'group') return true;
+    const same = overlapsSaved(m.students, m.parts.map((p) => p.tag), saved);
+    if (!same) return true;
+    const have = activeMembers(same);
+    repeats.set(same.id, [...new Set([...(repeats.get(same.id) ?? []), ...m.students.filter((st) => !have.includes(st))])]);
+    return false;
+  });
+  const shown = state.showAllMoves ? drawn : drawn.slice(0, FIRST_MOVES);
   for (const move of shown) {
     const card = el('article', `mb-move mb-move--${move.kind}`);
     card.dataset.tag = move.tag;
@@ -139,11 +156,17 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
         tools.append(plan);
       }
     }
+    if (move.kind === 'group' && actions.saveGroup) {
+      const save = el('button', 'btn btn--secondary mb-move__save', 'Save group');
+      save.type = 'button';
+      save.addEventListener('click', () => actions.saveGroup?.(move.parts.map((p) => p.tag), move.students));
+      tools.append(save);
+    }
     card.append(list, tools);
     movesHost.append(card);
   }
-  if (moves.length > FIRST_MOVES) {
-    const more = el('button', 'btn btn--ghost mb-next__more', state.showAllMoves ? 'Show fewer' : `Show all ${moves.length}`);
+  if (drawn.length > FIRST_MOVES) {
+    const more = el('button', 'btn btn--ghost mb-next__more', state.showAllMoves ? 'Show fewer' : `Show all ${drawn.length}`);
     more.type = 'button';
     more.addEventListener('click', () => {
       state.showAllMoves = !state.showAllMoves;
@@ -152,6 +175,30 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
     movesHost.append(more);
   }
   root.append(sectionHead('Next steps'), movesHost);
+
+  if (saved.length) {
+    const savedHost = el('section', 'mb-saved-list');
+    savedHost.append(sectionHead('Saved groups'), el('p', 'mb__empty', 'Students leave a group as their marks show they’re secure.'));
+    for (const g of saved) {
+      const card = el('article', 'mb-saved');
+      card.dataset.group = g.id;
+      const active = activeMembers(g);
+      card.append(
+        el('h4', 'mb-saved__name', g.name),
+        el('p', 'mb-move__meta', `${g.tags.map(label).join(' · ')} · since ${formatDay(g.started)} · ${active.length} of ${g.members.length} still in`),
+        el('p', 'mb-move__who', names(active))
+      );
+      const extra = repeats.get(g.id) ?? [];
+      if (extra.length && actions.addFlagged) {
+        const add = el('button', 'btn btn--secondary mb-saved__add', `${extra.length} more flagged, add?`);
+        add.type = 'button';
+        add.addEventListener('click', () => actions.addFlagged?.(g.id, extra));
+        card.append(add);
+      }
+      savedHost.append(card);
+    }
+    root.append(savedHost);
+  }
 
   // The syllabus, outcome by outcome.
   const syllabus = syllabusRows(evidence, sources, listed.map((s) => s.id));

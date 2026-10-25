@@ -3,7 +3,7 @@ import type { Block } from '@/schemas/block';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 import { hasAnswer, type MarkResult, type PublicQuestion, type QuestionKey, type QuizResponse } from '@/quiz/core';
 import { mountQuestionPlayer, seededShuffle } from '@/quiz/player';
-import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, readJSON, writeJSON } from '@/quiz/dom';
+import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
 import './quiz.css';
 
 /**
@@ -21,13 +21,14 @@ import './quiz.css';
  */
 
 type Settings = NonNullable<PublishedLesson['quiz']>;
-type ResultRow = { id: string; question: PublicQuestion; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; key: QuestionKey | null };
-type Result = { n: number; submitted_at: string; released: boolean; score?: number; max?: number; pending?: number; same_version?: boolean; keys_shown?: boolean; rows?: ResultRow[] };
+type ResultRow = { practice?: boolean; id: string; question: PublicQuestion; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; key: QuestionKey | null };
+type Result = { practice?: { score: number; max: number; pending: number } | null; n: number; submitted_at: string; released: boolean; score?: number; max?: number; pending?: number; same_version?: boolean; keys_shown?: boolean; rows?: ResultRow[] };
 type Current = {
   n: number;
   version: string;
   settings: Settings;
   questions: PublicQuestion[];
+  practice?: string[];
   started_at: string;
   deadline: string | null;
   hints: Record<string, string>;
@@ -40,6 +41,7 @@ type Status = {
   attempts_used: number;
   settings: Settings;
   questions: PublicQuestion[];
+  practice?: string[];
   live: boolean;
   identity?: { need: 'class' | 'initials' | null; initials: string | null; classes?: Array<{ id: string; title: string }> };
   now?: string;
@@ -78,6 +80,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
   const endpoint = `/api/published/quiz/${encodeURIComponent(lessonId)}`;
   let questions = collectQuestions(lesson.blocks);
   let byId = new Map(questions.map((q) => [q.id, q]));
+  let practice = new Set<string>();
   const useQuestions = (list: PublicQuestion[], next: Settings) => {
     questions = list;
     byId = new Map(list.map((q) => [q.id, q]));
@@ -129,6 +132,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       const next = await apiPost<Status>(endpoint, { action, ...(token ? { token } : {}), ...classFields, ...extra });
       if (next.now) clockOffset = Date.parse(next.now) - Date.now();
       status = next;
+      practice = new Set(next.current?.practice ?? next.practice ?? []);
       if (next.current) useQuestions(next.current.questions, next.current.settings);
       else if (next.questions) useQuestions(next.questions, next.settings);
       alert.hidden = true;
@@ -328,6 +332,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     // Top bar: where you are, the clocks, and the question dots.
     const bar = el('div', 'qz-taking__bar');
     bar.append(el('span', 'qz-taking__where', `Question ${d.index + 1} of ${d.order.length}`));
+    if (practice.has(id)) bar.append(practiceChip());
     const clocks = el('span', 'qz-taking__clocks');
     const quizClock = el('span', 'qz-clock');
     const questionClock = el('span', 'qz-clock qz-clock--question');
@@ -588,12 +593,14 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
       const top = el('div', 'qz-score');
       top.append(el('p', 'qz-score__big', `${formatMarks(r.score ?? 0)} / ${formatMarks(r.max)}`), el('p', 'qz-note', `${pct}%${r.pending ? ` · ${plural(r.pending, 'answer')} still to be marked` : ''}`));
       wrap.append(top);
+      if (r.practice) wrap.append(el('p', 'qz-result__practice', `Practice for you: ${formatMarks(r.practice.score)}/${formatMarks(r.practice.max)}${r.practice.pending ? ' (some still to mark)' : ''}`));
       if (r.same_version === false) wrap.append(el('p', 'qz-note', 'Your teacher has changed the quiz since, so some questions may look different now.'));
       const list = el('ol', 'qz-result-list');
       if (r.keys_shown === false) wrap.append(el('p', 'qz-note', 'Right answers show after your last go.'));
       (r.rows ?? []).forEach((row, i) => {
         const q = row.question;
         const li = el('li');
+        if (row.practice) li.append(practiceChip());
         li.append(mountQuestionPlayer({ question: q, number: i + 1, response: row.response, result: { mark: row.mark, key: row.key, hinted: row.hinted, awarded: row.awarded } }));
         list.append(li);
       });

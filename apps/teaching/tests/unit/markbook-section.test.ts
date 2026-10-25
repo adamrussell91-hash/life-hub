@@ -77,7 +77,12 @@ function fakeApi(view: MarkbookView): MarkbookApi & { calls: unknown[][] } {
       else took[studentId] = lessonIds;
       current = { ...current, markbook: { ...current.markbook, took } };
       return current.markbook;
-    })
+    }),
+    saveGroup: vi.fn(async () => current.markbook),
+    addMembers: vi.fn(async () => current.markbook),
+    removeMember: vi.fn(async () => current.markbook),
+    renameGroup: vi.fn(async () => current.markbook),
+    recordHistory: vi.fn(async () => current.markbook)
   };
 }
 

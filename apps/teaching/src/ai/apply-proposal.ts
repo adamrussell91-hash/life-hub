@@ -60,12 +60,16 @@ function withMode(lesson: Lesson, proposal: { set_mode?: 'quiz' }): Lesson {
   return proposal.set_mode ? { ...lesson, pedagogical_mode: proposal.set_mode } : lesson;
 }
 
-/** A redrafted tutorial tab or exit check stays that group's, even if the proposal dropped the markers. */
-function keepTutorialMarkers(old: Block, next: Block): Block {
-  if (old.block_type !== 'section' || next.block_type !== 'section' || old.content.tutorial_group === undefined) return next;
+/** A redrafted tutorial tab, exit check or group set stays what it was, even if the proposal dropped the markers. */
+function keepSectionMarkers(old: Block, next: Block): Block {
+  if (old.block_type !== 'section' || next.block_type !== 'section') return next;
+  const was = old.content;
+  if (was.tutorial_group === undefined && was.group_set === undefined) return next;
   const content = { ...next.content };
-  if (content.tutorial_group === undefined) content.tutorial_group = old.content.tutorial_group;
-  if (content.tutorial_exit === undefined && old.content.tutorial_exit !== undefined) content.tutorial_exit = old.content.tutorial_exit;
+  if (was.tutorial_group !== undefined && content.tutorial_group === undefined) content.tutorial_group = was.tutorial_group;
+  if (was.tutorial_exit !== undefined && content.tutorial_exit === undefined) content.tutorial_exit = was.tutorial_exit;
+  // A group set's group and students are the teacher's: Ann never changes them.
+  if (was.group_set !== undefined) content.group_set = was.group_set;
   return { ...next, content } as Block;
 }
 
@@ -92,7 +96,7 @@ export function applyProposalToLesson(
     for (const block of proposal.blocks) {
       const old = findBlockById(next, block.id);
       if (!old) return { ok: false, message: `Block ${block.id} not found`, lesson };
-      next = replaceBlockInTree(next, block.id, keepTutorialMarkers(old, block));
+      next = replaceBlockInTree(next, block.id, keepSectionMarkers(old, block));
     }
     return { ok: true, lesson: withBlocks(lesson, next) };
   }
@@ -112,7 +116,7 @@ export function applyProposalToLesson(
       }
     };
     const old = findBlockById(lesson.blocks, proposal.section_id);
-    const next = replaceBlockInTree(lesson.blocks, proposal.section_id, old ? keepTutorialMarkers(old, section as Block) : (section as Block));
+    const next = replaceBlockInTree(lesson.blocks, proposal.section_id, old ? keepSectionMarkers(old, section as Block) : (section as Block));
     const found = JSON.stringify(lesson.blocks) !== JSON.stringify(next);
     return found
       ? { ok: true, lesson: withBlocks(lesson, next) }
