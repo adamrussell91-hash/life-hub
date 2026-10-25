@@ -47,10 +47,11 @@ type SavedGroup = {
 
 ## Group set block
 
-A new container block, `group_set`, allowed only in quiz-mode lessons (and inside sections, columns or tabs there):
+A group set is a **section** with a `group_set` field, the same way tutorial tabs are sections marked with `tutorial_group`. So the editor, the canvas, Ann's section replace and the deck all work unchanged. It is allowed at the top level of a quiz-mode lesson only (not inside another section, column or tab):
 
 ```ts
-{ type: 'group_set', group_id: string, students: string[], target: number /* 1–10 questions wanted */, children: quiz_question[] }
+section.content.group_set = { group_id: string, class_id: string, name: string, tags: string[], students: string[], target: number /* 1–10 questions wanted */ }
+// section.content.blocks: the set's quiz_question cards
 ```
 
 **Teacher view (editor):**
