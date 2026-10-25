@@ -54,6 +54,7 @@ import { pdPlacementKey, projectNotionPdEvent } from './_shared/notion-pd-events
 import { createAccessContext } from './_shared/entity-access.mjs';
 
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
+import { readProfessionalPerson } from './_shared/professional-person.mjs';
 
 export const config = { path: '/api/entities/search' };
 
@@ -211,7 +212,7 @@ export function matchRank(query, label, sortName) {
 // always lived here, at the route level), so this export is the smallest
 // change that lets a `_shared` module genuinely reuse it instead of
 // duplicating it.
-export async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthoritative, query, includeArchived) {
+export async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthoritative, query, includeArchived, github = {}) {
   const indexKeys = await listKeys(store);
   const indexRecords = await mapBounded(indexKeys, READ_BATCH_SIZE, key => getJSON(store, key));
 
@@ -227,7 +228,8 @@ export async function searchIdentityKind(store, kind, listKeys, loadKey, parseAu
   }
 
   const hydrated = await mapBounded(candidateIds, READ_BATCH_SIZE, async id => {
-    const record = parseAuthoritative(await getJSON(store, loadKey(id)));
+    const native = parseAuthoritative(await getJSON(store, loadKey(id)));
+    const record = kind === 'person' ? await readProfessionalPerson(id,native,github) : native;
     if (!record) return null;
     const visible = record.lifecycle_status === 'active' || (includeArchived && record.lifecycle_status === 'archived');
     if (!visible) return null;
@@ -263,7 +265,7 @@ export function mergeNativeFirst(native, githubMatches) {
   return [...native, ...githubMatches.filter(entry => !seen.has(entry.ref))];
 }
 
-export async function searchGithubIdentityKind(kind, query, includeArchived, github) {
+export async function searchGithubIdentityKind(kind, query, includeArchived, github, store = null) {
   // Imported students are searchable too: the meeting picker and global
   // search find people only through this route, and students have no
   // Blob record of their own once duplicate copies are merged away.
@@ -271,8 +273,16 @@ export async function searchGithubIdentityKind(kind, query, includeArchived, git
     ? [...await listGithubPersonCandidates(github), ...await listGithubImportedStudentPeople(github)]
     : await listGithubOrganisationCandidates(github);
 
+  // Rank the in-memory import first; only matching candidates need a Blob
+  // read to apply local edits/lifecycle. Bound those independent reads.
+  const matching = candidates.filter(record => matchRank(query,displayLabelFor(record),kind === 'person' ? record.sort_name : null) !== null);
+  const records = kind === 'person' && store
+    ? await mapBounded(matching,READ_BATCH_SIZE,async candidate =>
+      readProfessionalPerson(candidate.id,parsePersonRecord(await getJSON(store,personKey(candidate.id))),github))
+    : matching;
   const out = [];
-  for (const record of candidates) {
+  for (const record of records) {
+    if (!record) continue;
     const visible = record.lifecycle_status === 'active' || (includeArchived && record.lifecycle_status === 'archived');
     if (!visible) continue;
     const label = displayLabelFor(record);
@@ -622,8 +632,8 @@ export function createEntitySearchHandler(deps = {}) {
     const perKind = await Promise.all([
       requestedKinds.has('person')
         ? settle('person', () => Promise.all([
-          searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, query, includeArchived),
-          searchGithubIdentityKind('person', query, includeArchived, github).catch(() => {
+          searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, query, includeArchived, github),
+          searchGithubIdentityKind('person', query, includeArchived, github, store).catch(() => {
             unavailable.push('github');
             return [];
           })

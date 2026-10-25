@@ -190,6 +190,30 @@ describe('renderPeoplePage (W2 real entry)', () => {
     expect(full?.open).toBe(false);
   });
 
+  it('renders the enriched profile, relationship context and approximate contact dates through the real People page', async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const response = await original(input, init);
+      if (!String(input).includes('/api/entities/overview')) return response;
+      const body = await response.json();
+      body.data.entity.professional_profile = {
+        schema_version:1,source:{system:'hub',page_url:null,properties:{'First met':'2025-02','First met precision':'month','Relationship to Adam':'Learned from — university or PD','Last contacted precision':'week','Last contacted range start':'2025-04-07','Last contacted range end':'2025-04-11'}},
+        summary:'Verified educator biography',contact:{email:null,phone:null,linkedin_url:'https://www.linkedin.com/in/example'},last_contacted:'2025-04-11',current_workplace:['Example College'],references:{profile_sources:[{label:'University biography',source_url:'https://example.edu/biography',hub_href:null}]},body_markdown:'Additional professional history.'
+      };
+      return jsonResponse(body.data);
+    });
+    const canvas=document.createElement('div'); document.body.append(canvas);
+    await renderPeoplePage(canvas,{selectedId:PERSON_ID});
+    await vi.waitFor(()=>expect(canvas.querySelector('[data-section="profile"]')?.textContent).toContain('Verified educator biography'));
+    const profile=canvas.querySelector('[data-section="profile"]')!;
+    expect(profile.textContent).toContain('February 2025');
+    expect(profile.textContent).toContain('07/04/25–11/04/25');
+    expect(profile.textContent).toContain('Learned from');
+    const full=canvas.querySelector<HTMLDetailsElement>('details.people-pane__full')!; full.open=true;
+    expect(full.textContent).toContain('Additional professional history.');
+    expect(full.querySelector('a[href="https://example.edu/biography"]')?.textContent).toBe('University biography');
+  });
+
   it('shows an editable profile while the directory and optional services are still pending', async () => {
     const original = vi.mocked(fetch).getMockImplementation()!;
     const releases: Array<() => void> = [];

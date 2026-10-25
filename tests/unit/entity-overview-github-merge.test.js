@@ -5,6 +5,7 @@ import { resolveOrganisation, resolvePerson } from '../../netlify/functions/_sha
 import { endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
 import { parseEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
 import { derivePersonId, deriveOrganisationId, resetProfessionalDataCache } from '../../netlify/functions/_shared/github-professional-data.mjs';
+import { createIdentityRepository } from '../../netlify/functions/_shared/identity-repository.mjs';
 
 // Verifies entity-overview.mjs's read-only merge of the GitHub-canonical
 // Professional import's employee_at/member_of relationships alongside the
@@ -14,7 +15,7 @@ import { derivePersonId, deriveOrganisationId, resetProfessionalDataCache } from
 
 const GITHUB_ENV = { GITHUB_TOKEN: 'token' };
 
-function githubFetch({ people, organisations, relationships }) {
+function githubFetch({ people, organisations, relationships, deletions = [] }) {
   return async (url) => {
     const href = String(url);
     // Contents mock must include sha/encoding/size — fetchDataFile (#531) rejects
@@ -35,6 +36,7 @@ function githubFetch({ people, organisations, relationships }) {
     if (href.endsWith('/data/professional/people.json')) return body(people);
     if (href.endsWith('/data/professional/organisations.json')) return body(organisations);
     if (href.endsWith('/data/professional/relationships.json')) return body(relationships);
+    if (href.endsWith('/data/professional/people-deletions.json')) return body(deletions);
     return { ok: false, status: 404 };
   };
 }
@@ -81,6 +83,47 @@ const RELATIONSHIPS = [{
 }];
 
 test.beforeEach(() => resetProfessionalDataCache());
+
+test('a corrected imported profile supersedes its stale adopted copy without losing Hub-only fields', async () => {
+  const store = emptyStore();
+  const id = derivePersonId('corrected-person');
+  const native = { schema_version:1, id, kind:'person', display_name:'Old Given Name', sort_name:null, aliases:[], lifecycle_status:'active', is_self:false, retention_reason:null, retention_review_at:null, created_at:'2025-01-01T00:00:00Z', updated_at:'2026-01-01T00:00:00Z', hub_note:'keep this' };
+  await store.setJSON(`entities/person/${id}`, native);
+  const profile = {schema_version:1, source:{system:'hub',page_url:null,properties:{'First met':'2025-02'}},summary:'Verified educator',contact:{email:null,phone:null,linkedin_url:null},last_contacted:'2025-04-11',current_workplace:[],references:{},body_markdown:'Confirmed shared history.'};
+  const fetchImpl = githubFetch({people:[{legacy_id:'corrected-person',display_name:'Correct Given Name',professional_profile:profile}],organisations:[],relationships:[]});
+  const overview = await assembleEntityOverview(`shared:person:${id}`, {store,env:GITHUB_ENV,fetchImpl,resolveEntity:makeResolveEntity(store,fetchImpl)});
+  assert.equal(overview.entity.display_name,'Correct Given Name');
+  assert.equal(overview.entity.professional_profile.summary,'Verified educator');
+  assert.equal(overview.entity.professional_profile.last_contacted,'2025-04-11');
+  assert.equal((await store.get(`entities/person/${id}`)).hub_note,'keep this');
+  assert.equal((await store.get(`entities/person/${id}`)).display_name,'Old Given Name','a read must not rewrite storage');
+});
+
+test('an imported deletion cannot be resurrected by an older adopted person record', async () => {
+  const store = emptyStore();
+  const id = derivePersonId('removed-person');
+  await store.setJSON(`entities/person/${id}`, {schema_version:1,id,kind:'person',display_name:'Removed Educator',sort_name:null,aliases:[],lifecycle_status:'active',is_self:false,retention_reason:null,retention_review_at:null,created_at:'2025-01-01T00:00:00Z',updated_at:'2026-01-01T00:00:00Z'});
+  const fetchImpl=githubFetch({people:[],organisations:[],relationships:[],deletions:[{legacy_id:'removed-person'}]});
+  await assert.rejects(assembleEntityOverview(`shared:person:${id}`,{store,env:GITHUB_ENV,fetchImpl,resolveEntity:makeResolveEntity(store,fetchImpl)}),error=>error.status===404);
+});
+
+test('intentional Hub edits survive unrelated source updates, while a corrected source field supersedes its old edit', async () => {
+  const store=emptyStore(), id=derivePersonId('editable-import');
+  const profile={schema_version:1,source:{system:'hub',page_url:null,properties:{}},summary:'Imported summary',contact:{email:null,phone:null,linkedin_url:null},last_contacted:null,current_workplace:[],references:{},body_markdown:'Original history'};
+  const people=[{legacy_id:'editable-import',display_name:'Imported Name',professional_profile:profile}];
+  const fetchImpl=githubFetch({people,organisations:[],relationships:[]});
+  await store.setJSON(`entities/person/${id}`,{schema_version:1,id,kind:'person',display_name:'Old Name',sort_name:null,aliases:[],lifecycle_status:'active',is_self:false,retention_reason:null,retention_review_at:null,created_at:'2025-01-01T00:00:00Z',updated_at:'2026-01-01T00:00:00Z'});
+  const github={env:GITHUB_ENV,fetchImpl};
+  const repo=createIdentityRepository({store,github,now:()=> '2026-02-01T00:00:00Z'});
+  await repo.updateFields({ref:{namespace:'shared',kind:'person',id},patch:{display_name:'Chosen Name',professional_profile:{summary:'Personal note'}}});
+  const read=()=>assembleEntityOverview(`shared:person:${id}`,{store,...github,resolveEntity:makeResolveEntity(store,fetchImpl)});
+  assert.equal((await read()).entity.display_name,'Chosen Name');
+  people[0].display_name='Corrected Source Name'; profile.body_markdown='Updated history'; resetProfessionalDataCache();
+  const result=await read();
+  assert.equal(result.entity.display_name,'Corrected Source Name');
+  assert.equal(result.entity.professional_profile.summary,'Personal note');
+  assert.equal(result.entity.professional_profile.body_markdown,'Updated history');
+});
 
 test('a GitHub-only Person overview shows a current employee_at relationship to a GitHub-only Organisation', async () => {
   const store = emptyStore();
