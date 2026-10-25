@@ -161,3 +161,23 @@ test('R2 purge deletes session body and index for incomplete runs only', async (
   assert.ok(keys.some(key => key.endsWith(`${completedId}.json`)));
   assert.equal(keys.some(key => key.endsWith(`${dropId}.json`)), false);
 });
+
+test('Past runs delete removes only the chosen runs for this owner', async () => {
+  const store = createMemoryCognitiveStore();
+  const keepId = await seedRun(store, 'operator', { status: 'completed', title: 'Keep me' });
+  const dropA = await seedRun(store, 'operator', { status: 'completed', title: 'Test A' });
+  const dropB = await seedRun(store, 'operator', { status: 'completed', title: 'Test B' });
+  const strangerId = await seedRun(store, 'stranger', { status: 'completed', title: 'Not yours' });
+  const handler = createKnowledgeProtocolsHandler({ env, verifySessionToken: () => ({ valid: true }), getStore: async () => store, model: goodModel, retrieve: retrieval });
+  const response = await handler(request('POST', { deleteSessionIds: [dropA, dropB, dropB, strangerId] }));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.data.deleted.sort(), [dropA, dropB].sort());
+  assert.equal(await store.read('operator', dropA), null);
+  assert.equal(await store.read('operator', dropB), null);
+  assert.ok(await store.read('operator', keepId));
+  assert.ok(await store.read('stranger', strangerId));
+  for (const bad of [[], ['../bad'], 'not-a-list', Array.from({ length: 201 }, () => randomUUID())]) {
+    assert.equal((await handler(request('POST', { deleteSessionIds: bad }))).status, 400);
+  }
+});

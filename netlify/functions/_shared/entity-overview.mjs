@@ -12,6 +12,7 @@ import {
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { getGithubOrganisation, getGithubPerson, listGithubRelationshipEntries } from './github-professional-data.mjs';
+import { readProfessionalPerson } from './professional-person.mjs';
 import { findActiveSelfPerson } from './career-overview.mjs';
 import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { parseProfessionalProfile } from './professional-profile.mjs';
@@ -140,8 +141,7 @@ function overviewEntity(record, canonicalRef) {
 // loads the same way a native one does.
 async function loadEntity(store, ref, github) {
   if (ref.kind === 'person') {
-    const record = parsePersonRecord(await getJSON(store, personKey(ref.id)))
-      ?? await getGithubPerson(ref.id, github);
+    const record = await readProfessionalPerson(ref.id, parsePersonRecord(await getJSON(store, personKey(ref.id))), github);
     if (!record) throw notFound();
     return record;
   }

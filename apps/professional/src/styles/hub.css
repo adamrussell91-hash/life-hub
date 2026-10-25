@@ -249,6 +249,8 @@
   max-width: 52rem;
   margin: 0;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .professional-profile__references {

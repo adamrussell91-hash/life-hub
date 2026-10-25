@@ -2538,6 +2538,8 @@ var CurriculumLinesV2ContentSchema = z11.object({
   hidden_lessons: z11.array(z11.string().min(1).max(64)).max(200).optional(),
   /** The syllabus focus area this unit covers; unset is worked out from the unit's title. */
   focus_area: z11.string().regex(/^[a-z0-9-]{2,40}$/).optional(),
+  /** The metro lines (textual concepts) this unit shows; unset shows every one. The year network always shows them all. */
+  concept_lines: z11.array(z11.string().min(1).max(64)).max(4).optional(),
   terminus: CurriculumLinesTerminusSchema.default({ label: "Assessment task" })
 });
 var CurriculumLinesBlockSchema = z11.object({

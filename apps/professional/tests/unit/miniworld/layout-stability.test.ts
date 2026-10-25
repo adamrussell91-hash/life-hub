@@ -61,3 +61,87 @@ describe('layoutCommunities stability', () => {
     expect(layout.bounds.maxX - layout.bounds.minX).toBeLessThan(20_000);
   });
 });
+
+// Regression: islands (communities that share nobody with anyone) used to get
+// an outward push every iteration, so a lone school ended up stranded at the
+// far edge with an empty sea between it and the mainland.
+function mainlandWithIslands(): NetworkEcologyWorld {
+  const mainland = Array.from({ length: 10 }, (_, i) => `shared:organisation:m${i}`);
+  const islands = Array.from({ length: 4 }, (_, i) => `shared:organisation:i${i}`);
+  const clusters: NetworkEcologyCluster[] = [
+    ...mainland.map((id, o) => ({
+      id,
+      kind: 'organisation' as const,
+      label: id,
+      // Neighbouring mainland orgs share one person, chaining them together.
+      member_refs: [`shared:person:m${o}a`, `shared:person:m${o}b`, `shared:person:m${(o + 1) % 10}a`],
+      habitat: (o % 2 ? 'forest' : 'savannah') as NetworkEcologyCluster['habitat'],
+      since: 2018
+    })),
+    ...islands.map((id, o) => ({
+      id,
+      kind: 'organisation' as const,
+      label: id,
+      member_refs: Array.from({ length: 2 + o * 3 }, (_, k) => `shared:person:i${o}-${k}`),
+      habitat: 'island' as const,
+      since: 2020
+    }))
+  ];
+  const people = [...new Set(clusters.flatMap((c) => c.member_refs))];
+  return {
+    nodes: [
+      ...people.map((ref) => ({ ref, kind: 'person' as const, display_name: ref })),
+      ...clusters.map((c) => ({ ref: c.id, kind: 'organisation' as const, display_name: c.label }))
+    ],
+    edges: [],
+    links: [],
+    clusters,
+    bridge_people: [],
+    timeline: { '2026': { clusters, bridge_people: [] } },
+    upcoming_events: []
+  } as unknown as NetworkEcologyWorld;
+}
+
+describe('layoutCommunities packing', () => {
+  const layout = layoutCommunities(asWorldApi(mainlandWithIslands()));
+  const gapToNearest = (id: string) => {
+    const a = layout.communities.find((c) => c.id === id)!;
+    return Math.min(
+      ...layout.communities
+        .filter((b) => b.id !== id)
+        .map((b) => Math.hypot(a.x - b.x, a.y - b.y) - a.radius * 1.35 - b.radius * 1.35)
+    );
+  };
+
+  it('keeps unlinked islands beside the mainland, not out at the edge', () => {
+    for (const c of layout.communities) {
+      expect(gapToNearest(c.id)).toBeLessThan(160);
+    }
+  });
+
+  it('frames a roughly square world, not one stretched by an outlier', () => {
+    const w = layout.bounds.maxX - layout.bounds.minX;
+    const h = layout.bounds.maxY - layout.bounds.minY;
+    expect(Math.max(w, h) / Math.min(w, h)).toBeLessThan(1.8);
+  });
+});
+
+describe('asWorldApi', () => {
+  it('drops meeting and event clusters so they never become named places', () => {
+    const raw = mainlandWithIslands();
+    raw.clusters = [
+      ...raw.clusters,
+      {
+        id: 'professional:meeting:m1',
+        kind: 'event',
+        label: 'Planning meeting',
+        member_refs: ['shared:person:m0a', 'shared:person:m1a'],
+        habitat: 'wetland',
+        since: 2026
+      } as NetworkEcologyCluster
+    ];
+    const api = asWorldApi(raw);
+    expect(api.clusters.some((c) => c.kind === 'event')).toBe(false);
+    expect(layoutCommunities(api).communities.some((c) => c.id === 'professional:meeting:m1')).toBe(false);
+  });
+});

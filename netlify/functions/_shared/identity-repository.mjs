@@ -17,6 +17,8 @@ import {
   validatePersonFieldUpdate
 } from './identity-schema.mjs';
 import { mergeProfessionalProfile } from './professional-profile.mjs';
+import { getGithubPerson } from './github-professional-data.mjs';
+import { mergeProfessionalPerson, professionalEditBaselines } from './professional-person.mjs';
 import { deriveOperationId, isValidOperationId } from './universal-link-schema.mjs';
 import { mapBounded } from './blobs-list.mjs';
 import {
@@ -353,7 +355,7 @@ function computeResumeState({ journal, preUpdatedAt }) {
   return { resuming: true, entityAlreadyWritten: matchesPost };
 }
 
-export function createIdentityRepository({ store, now = () => new Date().toISOString() } = {}) {
+export function createIdentityRepository({ store, now = () => new Date().toISOString(), github = {} } = {}) {
   if (!store) {
     throw new Error('createIdentityRepository requires a store.');
   }
@@ -891,7 +893,9 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   }
 
   async function updateFields({ ref, patch }) {
-    const record = await loadEntity(ref);
+    const native = await loadEntity(ref);
+    const imported = ref.kind === 'person' ? await getGithubPerson(ref.id,github) : null;
+    const record = mergeProfessionalPerson(native,imported);
 
     // B3: identifying field updates are rejected once a record has
     // reached a terminal, redacted lifecycle state. The previous code
@@ -940,6 +944,7 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       : Object.freeze({
           ...record,
           ...fieldPatch,
+          ...(imported ? {professional_edits:professionalEditBaselines(native,imported,validatedPatch)} : {}),
           ...(mergedProfile ? { professional_profile: mergedProfile } : {}),
           updated_at: timestamp
         });

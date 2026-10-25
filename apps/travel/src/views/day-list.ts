@@ -8,6 +8,7 @@ import {
   isOvernightTicket,
   itemPlace,
   itemsForCityDay,
+  stayNightOf,
   numberStops,
   orderDayItems,
   showArrivalGuide
@@ -71,10 +72,13 @@ function appendSafeMark(
   const tz = options.cityTz || 'UTC';
 
   if (safe) {
+    // Same little tick as the button, filled green, with the time beside it.
+    const time = formatSafeTime(safe.at, tz);
     const badge = document.createElement('span');
     badge.className = 'safe-mark is-safe';
-    badge.innerHTML = `${I.check}<span>Safe · ${formatSafeTime(safe.at, tz)}</span>`;
-    badge.title = `Marked safe at ${safe.at}`;
+    badge.innerHTML = `<span class="safe-mark__tick">${I.check}</span><span>${time}</span>`;
+    badge.title = `Marked safe at ${time}`;
+    badge.setAttribute('aria-label', `Safe at ${time}`);
     meta.append(badge);
 
     if (safe.photoId) {
@@ -103,8 +107,9 @@ function appendSafeMark(
   const tick = document.createElement('button');
   tick.type = 'button';
   tick.className = 'safe-mark safe-mark__btn';
-  tick.innerHTML = `${I.check}<span>Mark safe</span>`;
+  tick.innerHTML = `<span class="safe-mark__tick">${I.check}</span>`;
   tick.title = 'Mark safe for people following along';
+  tick.setAttribute('aria-label', 'Mark safe');
   tick.addEventListener('click', (e) => {
     e.stopPropagation();
     options.onMarkSafe?.(item, 'mark');
@@ -117,7 +122,8 @@ function renderCard(
   number: number | undefined,
   options: DayListOptions,
   hop: Hop | undefined,
-  byItem: Map<string, Checkin>
+  byItem: Map<string, Checkin>,
+  viewDate: string
 ): HTMLElement {
   const stop = document.createElement('div');
   stop.className = 'stop';
@@ -229,10 +235,22 @@ function renderCard(
   } else {
     const row1 = document.createElement('div');
     row1.className = 'row1';
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 't';
-    timeSpan.textContent = item.time ?? 'Time to set';
-    row1.append(timeSpan);
+    // Multi-night stays show on every night; later nights swap the check-in
+    // time for "Night 3 of 5" so it reads as the same booking continuing.
+    const stayNight = item.kind === 'stay' ? stayNightOf(item, viewDate) : null;
+    const continuing = Boolean(stayNight && stayNight.night > 1);
+    if (!continuing) {
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 't';
+      timeSpan.textContent = item.time ?? 'Time to set';
+      row1.append(timeSpan);
+    }
+    if (stayNight && stayNight.total > 1) {
+      const nightSpan = document.createElement('span');
+      nightSpan.className = 't';
+      nightSpan.textContent = `Night ${stayNight.night} of ${stayNight.total}`;
+      row1.append(nightSpan);
+    }
     if (item.kind !== 'checkin_slot' && (item as { off_map_label?: string }).off_map_label && !itemPlace(item)) {
       const offMap = document.createElement('span');
       offMap.className = 't';
@@ -254,7 +272,8 @@ function renderCard(
       tagEl.textContent = tag.label;
       meta.append(tagEl);
     }
-    if (item.cost && !options.isPublic) {
+    // Price once, on check-in night, so later nights don't read as extra spend.
+    if (item.cost && !options.isPublic && !continuing) {
       const price = document.createElement('span');
       price.className = 'price';
       price.textContent = formatAud(item.cost);
@@ -277,7 +296,8 @@ function renderCard(
       mapsLink.textContent = useNaver ? 'Naver Map ↗' : 'Directions in Google Maps ↗';
       meta.append(mapsLink);
     }
-    appendSafeMark(meta, item, options, byItem);
+    // Mark safe belongs to arriving; a later night would echo night 1's check-in.
+    if (!continuing) appendSafeMark(meta, item, options, byItem);
   }
 
   if (!options.isPublic && options.onEdit) {
@@ -445,7 +465,7 @@ export function renderDayList(
       const fallback = hopFallback(item, next);
       if (fallback) hop = { mode: 'walk', minutes: fallback.minutes };
     }
-    list.append(renderCard(item, numbers.get(item.id), listOptions, hop, safeByItem));
+    list.append(renderCard(item, numbers.get(item.id), listOptions, hop, safeByItem, date));
   }
 
   if (!options.isPublic) {

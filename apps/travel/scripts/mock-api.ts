@@ -411,6 +411,33 @@ export function createMockApi() {
 
     if (path === '/api/travel-parse' && method === 'POST') {
       const text = String((body as { text?: string })?.text ?? '');
+      // No model locally: a pasted hotel confirmation gets the stay draft the
+      // real parser returns, on the fixture's Porto dates, so the fill can be walked.
+      if (/check-in/i.test(text) && /check-out/i.test(text)) {
+        return json(200, {
+          ok: true,
+          data: {
+            draft: {
+              kind: 'stay',
+              title: text.split('\n').map((l) => l.trim()).find((l) => /hotel/i.test(l)) ?? 'Mock hotel',
+              city_id: 'opo',
+              date: '2027-03-05',
+              time: '14:00',
+              check_in_time: '14:00',
+              nights: 2,
+              check_out_date: '2027-03-07',
+              booking_ref: text.match(/#\s*(\d{6,})/)?.[1] ?? '',
+              note: 'Check-out 11:00. Single Room.',
+              status: 'booked',
+              home_base: true,
+              cost: { amount: 300, currency: 'AUD' },
+              place: { name: 'Mock hotel', lat: 0, lon: 0, address: 'Via di Prova 9, Testville' }
+            },
+            confidence: 'high',
+            missing: []
+          }
+        });
+      }
       const hasCost = /\$|AUD|EUR|GBP/.test(text);
       return json(200, {
         ok: true,

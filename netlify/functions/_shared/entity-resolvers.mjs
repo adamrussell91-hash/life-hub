@@ -53,6 +53,7 @@ import {
   unitKey
 } from './universal-link-blobs.mjs';
 import { getGithubOrganisation, getGithubPerson, listGithubPdEvents } from './github-professional-data.mjs';
+import { readProfessionalPerson } from './professional-person.mjs';
 import { importedPdEventById } from './notion-pd-events.mjs';
 import { classKey, defaultGetContentStore as defaultGetTeachingStore, getJSON as getTeachingJSON } from './teaching-blobs.mjs';
 import {
@@ -161,8 +162,7 @@ export async function resolvePerson(id, accessContext, { getStore = defaultGetUn
   const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });
   if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
   const store = await getStore();
-  let record = parsePersonRecord(await getIdentityJSON(store, personKey(id)));
-  if (!record) record = await getGithubPerson(id, { env, fetchImpl });
+  const record = await readProfessionalPerson(id, parsePersonRecord(await getIdentityJSON(store, personKey(id))), {env,fetchImpl});
   if (!record) throw endpointNotFoundError();
   if (record.lifecycle_status === 'archived' && !includeArchived) throw endpointNotFoundError();
   return {

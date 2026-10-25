@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import seedData from '../fixtures/seed.json' with { type: 'json' };
+import { mockNetworkEcologyWorld } from './mock-network-ecology';
 
 const MOCK_DIR = path.dirname(fileURLToPath(import.meta.url));
 const NOTION_COMMS_CANDIDATES = [
@@ -2526,6 +2527,10 @@ export function createMockApi() {
 
     if (path === '/api/calendar-ghosts' && method === 'POST') {
       return json(200, { ok: true, receipt: 'Dismissed. Nothing written.' });
+    }
+
+    if (path === '/api/network-ecology/world' && method === 'GET') {
+      return json(200, { ok: true, data: mockNetworkEcologyWorld() });
     }
 
     // Soft-empty hub calendar sources so local Home does not paint fail banners.

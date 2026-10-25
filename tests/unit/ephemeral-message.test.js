@@ -21,7 +21,9 @@ test('ephemeral message shows then clears after hold + fade', async () => {
   showEphemeralMessage(el, 'Boom', { holdMs: 20, fadeMs: 10 });
   assert.equal(el.hidden, false);
   assert.equal(el.textContent, 'Boom');
-  await new Promise(resolve => setTimeout(resolve, 50));
+  // Generous slack: under the full parallel suite a busy event loop can run
+  // the 30ms of timers well past a tight 50ms wait.
+  await new Promise(resolve => setTimeout(resolve, 300));
   assert.equal(el.hidden, true);
   assert.equal(el.textContent, '');
 });

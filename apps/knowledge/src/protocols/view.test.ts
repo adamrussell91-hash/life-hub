@@ -151,6 +151,32 @@ describe("protocol conversation view", () => {
     expect(html).toContain('data-protocol-past-more');
   });
 
+  it("Past runs select mode shows ticks, a count and a two-step delete", async () => {
+    const { pastRunsHtml, deletePastRuns } = await import("./view");
+    const runs = [
+      { id: "sess-a", protocolId: "refinery", mode: "full", status: "completed", title: "Test A", updatedAt: "2026-09-28T00:00:00.000Z" },
+      { id: "sess-b", protocolId: "cartographers", mode: "full", status: "waiting", title: "Test B", updatedAt: "2026-09-29T00:00:00.000Z" },
+    ];
+    const idle = pastRunsHtml(runs, "", []);
+    expect(idle).toContain("data-protocol-past-select");
+    expect(idle).not.toContain("data-protocol-past-pick");
+    const picking = pastRunsHtml(runs, "", [], {}, { selecting: true, chosen: new Set(["sess-a"]) });
+    expect(picking).toContain('data-protocol-past-pick="sess-a" checked');
+    expect(picking).toContain("1 selected");
+    expect(picking).not.toContain("data-protocol-resume-run");
+    expect(picking).toMatch(/data-protocol-past-delete\s*>Delete</);
+    const armed = pastRunsHtml(runs, "", [], {}, { selecting: true, chosen: new Set(["sess-a", "sess-b"]), confirming: true });
+    expect(armed).toContain("Delete 2 for good");
+    expect(armed).toContain("Clear shown");
+    const fetchImpl = vi.fn(async (_url: unknown, init?: RequestInit) => new Response(JSON.stringify({ data: { deleted: JSON.parse(String(init?.body)).deleteSessionIds } }), { status: 200 }));
+    await expect(deletePastRuns(["sess-a"], fetchImpl as unknown as typeof fetch)).resolves.toEqual(["sess-a"]);
+  });
+
+  it("keeps a single change handler so Past runs ticks, the filter and mode hints all work", async () => {
+    const { default: source } = await import("./view.ts?raw");
+    expect(source.match(/host\.onchange\s*=/g)).toHaveLength(1);
+  });
+
   it("gives each thinking persona an in-world status line", () => {
     const horizon = {
       ...definition,

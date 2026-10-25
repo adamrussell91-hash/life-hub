@@ -13,8 +13,19 @@ export const config = { path: '/api/travel-parse' };
 
 const SYSTEM = `You extract a travel itinerary ItemDraft from a confirmation email.
 Return ONLY JSON with shape:
-{"draft":{"kind":"stay"|"flight"|"train"|"do"|"food","title":"","date":"YYYY-MM-DD","time":"HH:MM"|null,"city_id":"","note":"","status":"booked","carrier":"","number":"","from_code":"","to_code":"","depart_time":"HH:MM","arrive_time":"HH:MM","arrive_date":"YYYY-MM-DD","nights":1,"check_out_date":"YYYY-MM-DD","home_base":true,"cost":{"amount":0,"currency":"AUD"},"place":{"name":"","lat":0,"lon":0,"address":""}},"missing":["field",...]}
-Use only kinds stay/flight/train/do/food. Omit unknown fields. Never invent booking references.`;
+{"draft":{"kind":"stay"|"flight"|"train"|"do"|"food","title":"","date":"YYYY-MM-DD","time":"HH:MM"|null,"city_id":"","note":"","status":"booked","booking_ref":"","carrier":"","number":"","from_code":"","to_code":"","depart_time":"HH:MM","arrive_time":"HH:MM","arrive_date":"YYYY-MM-DD","nights":1,"check_out_date":"YYYY-MM-DD","check_in_time":"HH:MM","cancel_until":"YYYY-MM-DD","home_base":true,"cost":{"amount":0,"currency":"AUD"},"place":{"name":"","lat":0,"lon":0,"address":""}},"missing":["field",...]}
+Use only kinds stay/flight/train/do/food. Omit unknown fields. Never invent booking references.
+Emails are often pasted as plain text with labels and values split across lines,
+e.g. "Check-in" / "Check-out" / "Sun, 20 Dec" / "Tue, 22 Dec": pair them in order.
+Dates without a year: use the trip's dates if one fits, otherwise the next occurrence on or after today.
+Times are 24-hour ("2:00 pm" -> "14:00").
+Stays (hotels, apartments, hostels): title is the property name, date is the check-in date,
+time and check_in_time are the check-in time, nights and check_out_date from the stay,
+booking_ref is the itinerary / confirmation / booking number, place.name and place.address
+from the property, put the check-out time and room type in note, and cost is the total price
+with an ISO currency (AU$ / A$ -> AUD). cancel_until only when free cancellation has a date.
+city_id is one of the trip's city ids when the place fits one, else omit it.
+Ignore marketing, fee and policy boilerplate.`;
 
 export function createTravelParseHandler(deps = {}) {
   const anthropic = deps.anthropic ?? null;
@@ -38,17 +49,22 @@ export function createTravelParseHandler(deps = {}) {
       );
     }
 
+    const prompt = buildParsePrompt(text, {
+      today: new Date(ctx.now()).toISOString().slice(0, 10),
+      cities: body?.cities
+    });
+
     try {
       let result;
       if (anthropic) {
-        result = await callAnthropicFallback(anthropic, text);
+        result = await callAnthropicFallback(anthropic, prompt);
       } else {
         const apiKey = typeof ctx.env?.ANTHROPIC_API_KEY === 'string' ? ctx.env.ANTHROPIC_API_KEY : '';
         if (!apiKey) {
           return errorResponse(503, 'upstream_unavailable', 'Could not parse that email right now.', true, PRIVATE_CACHE);
         }
         const client = createAnthropicClient({ apiKey, fetchImpl: deps.fetchImpl ?? fetch });
-        result = await callAnthropicFallback(client, text);
+        result = await callAnthropicFallback(client, prompt);
       }
 
       const parsed = typeof result === 'string' ? JSON.parse(extractJson(result)) : result;
@@ -83,6 +99,19 @@ export function createTravelParseHandler(deps = {}) {
   }, deps);
 }
 
+/** The user turn: today's date and the trip's cities, so year-less dates
+ * ("Sun, 20 Dec") and city ids resolve, then the pasted email. */
+export function buildParsePrompt(text, { today, cities } = {}) {
+  const lines = [`Today is ${today}.`];
+  const list = Array.isArray(cities) ? cities.slice(0, 30) : [];
+  const described = list
+    .filter((c) => c && typeof c.id === 'string')
+    .map((c) => `${c.id}: ${String(c.name ?? '').slice(0, 60)} (${c.start_date ?? '?'} to ${c.end_date ?? '?'})`);
+  if (described.length) lines.push(`Trip cities:\n${described.join('\n')}`);
+  lines.push('', 'Email:', text);
+  return lines.join('\n');
+}
+
 function extractJson(text) {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
@@ -101,8 +130,11 @@ async function callAnthropicFallback(client, text) {
       messages: [{ role: 'user', content: text }],
       maxTokens: 1200
     })) {
-      if (event?.type === 'text_delta' && typeof event.text === 'string') out += event.text;
-      if (event?.type === 'text' && typeof event.text === 'string') out += event.text;
+      // The shared stream client yields { type: 'text', delta }. Reading only
+      // `.text` left `out` empty, so every paste failed as "could not read".
+      if (event?.type !== 'text' && event?.type !== 'text_delta') continue;
+      if (typeof event.delta === 'string') out += event.delta;
+      else if (typeof event.text === 'string') out += event.text;
     }
     return out;
   }

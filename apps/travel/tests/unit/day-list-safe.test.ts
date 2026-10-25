@@ -17,7 +17,7 @@ describe('renderDayList marked safe', () => {
     const onMarkSafe = vi.fn();
     const item = stopItem();
     renderDayList(host, { ...trip, checkins: [] }, item.city_id, item.date, { onMarkSafe });
-    const btn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Mark safe'));
+    const btn = host.querySelector<HTMLButtonElement>('button[aria-label="Mark safe"]');
     expect(btn).toBeTruthy();
     btn!.click();
     expect(onMarkSafe).toHaveBeenCalledWith(expect.objectContaining({ id: item.id }), 'mark');
@@ -43,12 +43,12 @@ describe('renderDayList marked safe', () => {
       shareToken: 'share-token',
       cityTz: 'UTC'
     });
-    expect(host.textContent).toMatch(/Safe · 15:30/);
+    expect(host.querySelector('.safe-mark.is-safe')?.getAttribute('aria-label')).toBe('Safe at 15:30');
     const img = host.querySelector('img.safe-mark__photo') as HTMLImageElement | null;
     expect(img).toBeTruthy();
     expect(img!.src).toContain('tph_abc');
     expect(img!.src).toContain('token=share-token');
-    expect(host.textContent).not.toContain('Mark safe');
+    expect(host.querySelector('button[aria-label="Mark safe"]')).toBeNull();
   });
 
   it('reads live check-ins for the owner without redacted fields', () => {
@@ -70,7 +70,7 @@ describe('renderDayList marked safe', () => {
       onMarkSafe: vi.fn(),
       cityTz: 'UTC'
     });
-    expect(host.textContent).toMatch(/Safe · 11:05/);
+    expect(host.querySelector('.safe-mark.is-safe')?.getAttribute('aria-label')).toBe('Safe at 11:05');
     expect(host.textContent).toContain('Photo');
   });
 });
