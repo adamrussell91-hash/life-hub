@@ -51,7 +51,8 @@ import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
 import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
-import { unitNetworkContext } from '@/teacher/network-context';
+import { settleConceptLines, unitNetworkContext } from '@/teacher/network-context';
+import { loadAlignment } from '@/alignment/api';
 import { firstTaughtDates, lessonsByDate } from '@/teacher/unit-lesson-order';
 import { formatDisplayDate } from '../../../design-kit/js/format-display-date.js';
 
@@ -1036,6 +1037,21 @@ function mountUnitPlanEditor(
   });
 
   void refreshAnthology();
+
+  // A unit map with no concepts picked takes its focus area's few from the syllabus, once.
+  if (network.usesAlignment && blocks.some((b) => b.block_type === 'curriculum_lines')) {
+    void loadAlignment()
+      .then((doc) => {
+        if (destroyed) return;
+        const settled = settleConceptLines(blocks, network.lines, doc, options.unit.title);
+        if (!settled) return;
+        blocks = settled;
+        revision += 1;
+        canvas.update(blocks);
+        scheduleSave();
+      })
+      .catch(() => { /* No alignment: the map keeps every line. */ });
+  }
 
   assistant = mountAnnReview({
     host: root, kind: 'unit', id: options.unit.id,
