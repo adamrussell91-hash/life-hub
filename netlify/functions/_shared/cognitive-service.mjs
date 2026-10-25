@@ -143,6 +143,16 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
         summary: value.summary || (typeof value.summary === 'string' ? value.summary : null) || null
       }));
     },
+    async deleteRuns(owner, ids) {
+      // Adam's own delete from Past runs: session body and index row go together.
+      const deleted = [];
+      for (const id of ids) {
+        if (!(await store.read(owner, id))) continue;
+        await store.delete(owner, id);
+        deleted.push(id);
+      }
+      return { deleted };
+    },
     async purgeIncomplete(owner) {
       const rows = await store.list(owner, 5000, 0);
       const deleted = [];

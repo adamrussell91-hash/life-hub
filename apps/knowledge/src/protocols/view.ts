@@ -202,7 +202,22 @@ export function protocolDisplayName(id: string, definitions: Definition[] = []) 
   return definitions.find(d => d.id === id)?.name || id;
 }
 
-export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: string, definitions: Definition[] = [], { hasMore = false } = {}) {
+export async function deletePastRuns(ids: string[], fetchImpl: typeof fetch = fetch): Promise<string[]> {
+  const response = await fetchImpl(`${API_BASE}/protocols`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ deleteSessionIds: ids }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error?.message || "Those runs could not be deleted.");
+  return Array.isArray(body?.data?.deleted) ? body.data.deleted : [];
+}
+
+type PastSelection = { selecting?: boolean; chosen?: Set<string>; confirming?: boolean; busy?: boolean; error?: string };
+
+export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: string, definitions: Definition[] = [], { hasMore = false } = {}, pick: PastSelection = {}) {
+  const chosen = pick.chosen ?? new Set<string>();
   const filtered = filterId ? runs.filter(run => run.protocolId === filterId) : runs;
   const options = ["", "fates", "horizon", "refinery", "cartographers", "mirror", "consilium", "witness", "tribunal"]
     .map(id => `<option value="${id}" ${id === filterId ? "selected" : ""}>${id ? escapeHtml(protocolDisplayName(id, definitions)) : "All protocols"}</option>`)
@@ -210,20 +225,36 @@ export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: str
   const rows = filtered.length
     ? filtered.map(run => {
       const resumable = run.status === "waiting" || run.status === "paused";
-      return `<li class="protocol-past__row">
-        <button type="button" class="protocol-past__open" data-protocol-open-run="${escapeHtml(String(run.id))}">
+      const id = escapeHtml(String(run.id));
+      const tick = pick.selecting
+        ? `<label class="protocol-past__tick"><input type="checkbox" data-protocol-past-pick="${id}" ${chosen.has(String(run.id)) ? "checked" : ""} aria-label="Select ${escapeHtml(String(run.title || "run"))}"></label>`
+        : "";
+      return `<li class="protocol-past__row${chosen.has(String(run.id)) ? " is-picked" : ""}">
+        ${tick}<button type="button" class="protocol-past__open" data-protocol-open-run="${escapeHtml(String(run.id))}">
           <span>${escapeHtml(formatRunDate(String(run.updatedAt || run.createdAt || "")))}</span>
           <span>${escapeHtml(protocolDisplayName(String(run.protocolId || ""), definitions))}</span>
           <span>${escapeHtml(String(run.title || "Untitled"))}</span>
           <span>${escapeHtml(String(run.mode || ""))}</span>
           <span>${escapeHtml(String(run.status || ""))}</span>
         </button>
-        ${resumable ? `<button type="button" class="btn btn--ghost" data-protocol-resume-run="${escapeHtml(String(run.id))}">Resume</button>` : ""}
+        ${resumable && !pick.selecting ? `<button type="button" class="btn btn--ghost" data-protocol-resume-run="${escapeHtml(String(run.id))}">Resume</button>` : ""}
       </li>`;
     }).join("")
     : `<li class="protocol-past__empty">No past runs yet.</li>`;
   const more = hasMore ? `<button type="button" class="btn btn--ghost" data-protocol-past-more>Load more</button>` : "";
-  return `<section class="protocol-past" aria-label="Past runs"><header class="protocol-past__header"><h2>Past runs</h2><label>Filter by protocol<select data-protocol-past-filter>${options}</select></label></header><ul class="protocol-past__list">${rows}</ul>${more}</section>`;
+  const count = chosen.size;
+  const toggle = filtered.length || pick.selecting
+    ? `<button type="button" class="btn btn--ghost" data-protocol-past-select>${pick.selecting ? "Done" : "Select"}</button>`
+    : "";
+  const bar = pick.selecting
+    ? `<div class="protocol-past__bar" role="group" aria-label="Selected runs">
+        <span>${count} selected</span>
+        <button type="button" class="btn btn--ghost" data-protocol-past-all>${filtered.length && filtered.every(run => chosen.has(String(run.id))) ? "Clear shown" : "Select all shown"}</button>
+        <button type="button" class="btn protocol-past__delete${pick.confirming ? " is-confirming" : ""}" data-protocol-past-delete ${count && !pick.busy ? "" : "disabled"}>${pick.busy ? "Deleting…" : pick.confirming ? `Delete ${count} for good` : "Delete"}</button>
+        ${pick.error ? `<span class="protocol-past__error" role="alert">${escapeHtml(pick.error)}</span>` : ""}
+      </div>`
+    : "";
+  return `<section class="protocol-past" aria-label="Past runs"><header class="protocol-past__header"><h2>Past runs</h2><div class="protocol-past__tools"><label>Filter by protocol<select data-protocol-past-filter>${options}</select></label>${toggle}</div></header>${bar}<ul class="protocol-past__list">${rows}</ul>${more}</section>`;
 }
 
 function downloadMarkdown(session: Session & { summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[] }; protocolId?: string; mode?: string }) {
@@ -670,6 +701,7 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
   let pastOffset = 0;
   let pastHasMore = false;
   const PAST_PAGE = 20;
+  const pastPick: Required<Omit<PastSelection, "error">> & { error: string } = { selecting: false, chosen: new Set(), confirming: false, busy: false, error: "" };
   let pollTimer: number | null = null;
   let viewingIndex: number | null = null;
   let frequencyGate: string | null = null;
@@ -704,7 +736,7 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
     }
     library.classList.add("is-settled");
     const wrap = document.createElement("div");
-    wrap.innerHTML = pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore });
+    wrap.innerHTML = pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore }, pastPick);
     const next = wrap.firstElementChild;
     if (!next) return;
     const current = library.querySelector(".protocol-past");
@@ -745,7 +777,7 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
         return;
       }
       // Re-entry after intake/session keeps is-settled so deal does not replay.
-      host.innerHTML = `<section class="protocol-library${libraryDealt ? " is-settled" : ""}"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
+      host.innerHTML = `<section class="protocol-library${libraryDealt ? " is-settled" : ""}"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore }, pastPick)}</section>`;
       libraryDealt = true;
     }
   };
@@ -779,6 +811,14 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
     void poll();
   };
   host.onchange = event => {
+    const pickBox = (event.target as HTMLElement | null)?.closest?.<HTMLInputElement>("[data-protocol-past-pick]");
+    if (pickBox) {
+      const id = pickBox.dataset.protocolPastPick || "";
+      if (pickBox.checked) pastPick.chosen.add(id); else pastPick.chosen.delete(id);
+      pastPick.confirming = false;
+      paintPastRuns();
+      return;
+    }
     const select = (event.target as HTMLElement).closest<HTMLSelectElement>("select[name='mode']");
     const hint = select && selected ? host.querySelector<HTMLElement>("[data-protocol-mode-hint]") : null;
     if (!select || !hint || !selected) return;
@@ -812,6 +852,53 @@ export function renderProtocols({ host, deepLink = null }: { host: HTMLElement; 
     if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; frequencyGate = null; lastPrompt = ""; lastMode = ""; paint(); return; }
     if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; frequencyGate = null; paint(); void refreshPastRuns(); return; }
     if (target.closest("[data-protocol-past-more]")) { void refreshPastRuns({ append: true }); return; }
+    if (target.closest("[data-protocol-past-select]")) {
+      pastPick.selecting = !pastPick.selecting;
+      pastPick.chosen.clear();
+      pastPick.confirming = false;
+      pastPick.error = "";
+      paintPastRuns();
+      return;
+    }
+    if (target.closest("[data-protocol-past-all]")) {
+      const shown = pastRuns.filter(run => !pastFilter || run.protocolId === pastFilter).map(run => String(run.id));
+      const all = shown.every(id => pastPick.chosen.has(id));
+      shown.forEach(id => (all ? pastPick.chosen.delete(id) : pastPick.chosen.add(id)));
+      pastPick.confirming = false;
+      paintPastRuns();
+      return;
+    }
+    if (target.closest("[data-protocol-past-delete]")) {
+      if (!pastPick.chosen.size || pastPick.busy) return;
+      // First press arms the button; the second deletes.
+      if (!pastPick.confirming) { pastPick.confirming = true; paintPastRuns(); return; }
+      const ids = [...pastPick.chosen];
+      pastPick.busy = true;
+      pastPick.error = "";
+      paintPastRuns();
+      void (async () => {
+        try {
+          const gone = new Set(await deletePastRuns(ids));
+          // Ids the server no longer has are gone too, so drop every chosen row.
+          ids.forEach(id => gone.add(id));
+          pastRuns = pastRuns.filter(run => !gone.has(String(run.id)));
+          pastOffset = pastRuns.length;
+          pastPick.chosen.clear();
+        } catch (reason) {
+          pastPick.error = reason instanceof Error ? reason.message : "Those runs could not be deleted.";
+        }
+        pastPick.busy = false;
+        pastPick.confirming = false;
+        paintPastRuns();
+      })();
+      return;
+    }
+    if (pastPick.selecting && target.closest(".protocol-past__open")) {
+      const id = target.closest<HTMLButtonElement>("[data-protocol-open-run]")?.dataset.protocolOpenRun;
+      if (id) { pastPick.chosen.has(id) ? pastPick.chosen.delete(id) : pastPick.chosen.add(id); pastPick.confirming = false; paintPastRuns(); }
+      return;
+    }
+    if (target.closest("[data-protocol-past-pick]")) return;
     if (target.closest("[data-protocol-download]") && currentSession) { downloadMarkdown(currentSession); return; }
     const openRun = target.closest<HTMLButtonElement>("[data-protocol-open-run]")?.dataset.protocolOpenRun
       || target.closest<HTMLButtonElement>("[data-protocol-resume-run]")?.dataset.protocolResumeRun;
