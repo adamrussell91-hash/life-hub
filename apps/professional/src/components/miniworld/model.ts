@@ -618,10 +618,16 @@ function buildInsights(input: {
   return insights.filter((i) => i.focus.id || i.id === 'open-sea' || i.id === 'history');
 }
 
-/** Normalize a world API payload (fills defaults for older shapes). */
+/**
+ * Normalize a world API payload (fills defaults for older shapes).
+ * Meetings and events are moments, not places: the server still sends them
+ * as event clusters, but the map only names organisations. Upcoming ones
+ * reach the map through `upcoming_events` (the Opportunity layer).
+ */
 export function asWorldApi(raw: NetworkEcologyWorld): WorldApi {
   return {
     ...raw,
+    clusters: (raw.clusters ?? []).filter((c) => c.kind !== 'event'),
     links: raw.links ?? [],
     timeline: raw.timeline ?? {},
     upcoming_events: raw.upcoming_events ?? []
