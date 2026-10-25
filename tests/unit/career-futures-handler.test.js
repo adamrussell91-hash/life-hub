@@ -54,3 +54,31 @@ test('stone POST keeps the entered label and PATCH updates it', async () => {
   assert.equal(patched.status, 200, await patched.clone().text());
   assert.equal((await patched.json()).data.stone.label, 'Lead two PL sessions');
 });
+
+test('future PATCH saves new criteria that have no id yet', async () => {
+  const { handler, request } = setup(createCareerFuturesHandler, '/api/career-futures');
+  const created = await handler(request('POST', { title: 'School Academic Leader',
+    criteria: [{ text: 'Leads teaching and learning', order: 0, source: 'ad' }] }));
+  const { data: { future } } = await created.json();
+  const kept = future.criteria[0];
+  const patched = await handler(request('PATCH', { criteria: [
+    { id: kept.id, text: kept.text, order: 0, source: 'ad' },
+    { text: 'Strong stakeholder communication', order: 1, source: 'ann' },
+    { id: undefined, text: 'Alignment with school priorities', order: 2, source: 'adam' }
+  ] }, future.id));
+  assert.equal(patched.status, 200, await patched.clone().text());
+  const saved = (await patched.json()).data.future.criteria;
+  assert.equal(saved.length, 3);
+  assert.equal(saved[0].id, kept.id);
+  assert.deepEqual(saved.map(c => c.source), ['ad', 'ann', 'adam']);
+  assert.ok(saved.every(c => /^fcrit_/.test(c.id)));
+});
+
+test('future PATCH names the criterion that is too long', async () => {
+  const { handler, request } = setup(createCareerFuturesHandler, '/api/career-futures');
+  const created = await handler(request('POST', { title: 'Director of Innovation' }));
+  const { data: { future } } = await created.json();
+  const patched = await handler(request('PATCH', { criteria: [{ text: 'x'.repeat(501), order: 0 }] }, future.id));
+  assert.equal(patched.status, 400);
+  assert.equal((await patched.json()).error.code, 'criterion_too_long');
+});
