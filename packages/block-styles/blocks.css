@@ -2527,7 +2527,7 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
 .lesson-page__block--dragging {
   opacity: 0.45;
 }
-.lesson-page__block:not(.lesson-page__block--selected) iframe {
+.lesson-page__block:not(.lesson-page__block--selected) iframe:not(.block-html-app__frame) {
   pointer-events: none;
 }
 
