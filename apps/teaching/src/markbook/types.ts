@@ -5,8 +5,11 @@ import type { AssessmentMark, Column, Markbook } from './schema';
 
 export type RosterStudent = { id: string; name: string; initials: string; removed?: true };
 
-export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[]; codes?: string[]; items?: EvidenceItem[] };
-export type QuizScore = { attempt_id: string; submitted_at: string; score: number; max: number; pending: number; rows: QuizRow[] };
+export type QuizRow = { id: string; awarded: number | null; max: number; confidence: 1 | 2 | 3 | null; outcomes: string[]; codes?: string[]; items?: EvidenceItem[]; set?: string };
+export type PracticeScore = { score: number; max: number; pending: number };
+export type QuizScore = { attempt_id: string; submitted_at: string; score: number; max: number; pending: number; rows: QuizRow[]; practice?: Record<string, PracticeScore> };
+/** A quiz's group set, as the markbook sees it. */
+export type QuizSet = { id: string; group_id: string; name: string; students: string[]; questions: number };
 export type QuizQuestionMeta = { id: string; prompt: string; marks: number; outcomes: string[] };
 export type QuizColumn = {
   kind: 'quiz';
@@ -25,6 +28,8 @@ export type QuizColumn = {
   scores: Record<string, QuizScore>;
   /** Tutorial exit checks: each student's group name. */
   groups?: Record<string, string>;
+  /** Group sets in this quiz (practice for saved markbook groups). */
+  sets?: QuizSet[];
 };
 
 export type MarkbookView = { markbook: Markbook; students: RosterStudent[]; quizzes: QuizColumn[] };
