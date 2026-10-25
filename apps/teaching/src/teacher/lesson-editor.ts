@@ -1,5 +1,5 @@
 import { setToolkitClasses } from '@/toolkit/class-context';
-import { lessonClassDates, lessonRouteRole, linesBeforeOnMap, setLessonDate, unitFlowPeers } from '@/teacher/network-context';
+import { lessonClassDates, lessonRouteRole, linesBeforeOnMap, setLessonDate, unitFlowPeers, unitLessonLines } from '@/teacher/network-context';
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
@@ -627,9 +627,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       outcomesCatalog: curriculum.outcomes ?? [],
       subject: (() => {
         const unit = curriculum.units.find((entry) => entry.id === lesson.unit_id);
-        return unit
-          ? curriculum.subjects.find((entry) => entry.id === unit.subject_id)
-          : undefined;
+        const subject = unit ? curriculum.subjects.find((entry) => entry.id === unit.subject_id) : undefined;
+        // The lesson shows the unit's few concepts, not every one the year network tracks.
+        return unit && subject?.network_lines ? { ...subject, network_lines: unitLessonLines(unit, subject.network_lines) } : subject;
       })(),
       ...(() => {
         // Before and after follows the unit map: its order, its dates, the classes that teach it.

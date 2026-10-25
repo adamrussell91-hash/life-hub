@@ -222,6 +222,35 @@
   height: 3px;
 }
 
+/* Concepts on this map: a chip the teacher ticks on or off. */
+.cl-editor__pick {
+  min-height: 32px;
+  background: var(--paper);
+  font: inherit;
+  font-size: var(--text-xs, 0.75rem);
+  cursor: pointer;
+}
+
+.cl-editor__pick--on {
+  border-color: var(--net-colour);
+  box-shadow: inset 0 0 0 1px var(--net-colour);
+  font-weight: 600;
+}
+
+.cl-editor__pick--on.cl-editor__chip--metro::before {
+  background: var(--net-colour);
+}
+
+.cl-editor__pick:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cl-editor__pick:focus-visible {
+  outline: 2px solid var(--net-colour);
+  outline-offset: 2px;
+}
+
 .cl-editor__upgrade {
   display: flex;
   flex-wrap: wrap;
