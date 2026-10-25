@@ -37,6 +37,7 @@ const MAX_RADIUS = 260;
 const MAX_ATTRACTION_GAIN = 0.2;
 const MAX_STEP = 60;
 const COLLIDE_PAD = 40;
+const GRAVITY = 0.02;
 
 function mulberry32(seed: number): () => number {
   return () => {
@@ -185,8 +186,8 @@ function buildWeights(
 /**
  * Seeded force layout — synchronous, converges to a stable layout for the
  * same community id set. Wetlands start at the centroid of linked
- * communities; sandbanks near their best-linked neighbour; islands get
- * extra outward push.
+ * communities; sandbanks near their best-linked neighbour; everything is
+ * pulled toward the middle so unlinked islands pack beside the mainland.
  */
 export function layoutCommunities(api: WorldApi): WorldLayout {
   const communities = collectAllCommunities(api);
@@ -286,16 +287,13 @@ export function layoutCommunities(api: WorldApi): WorldLayout {
       }
     }
 
-    // Island outward push + mild centering.
+    // Centering. Islands share no people with anyone, so nothing but this
+    // pull holds them in; an earlier outward push flung lone islands to the
+    // far edge of the map. Collision still keeps them off their neighbours.
     for (const c of communities) {
       const p = pos.get(c.id)!;
-      const dist = Math.hypot(p.x, p.y) || 0.01;
-      if (c.habitat === 'island') {
-        p.vx += (p.x / dist) * 8 * alpha;
-        p.vy += (p.y / dist) * 8 * alpha;
-      }
-      p.vx -= p.x * 0.002 * alpha;
-      p.vy -= p.y * 0.002 * alpha;
+      p.vx -= p.x * GRAVITY * alpha;
+      p.vy -= p.y * GRAVITY * alpha;
       const speed = Math.hypot(p.vx, p.vy);
       if (speed > MAX_STEP) {
         p.vx = (p.vx / speed) * MAX_STEP;
