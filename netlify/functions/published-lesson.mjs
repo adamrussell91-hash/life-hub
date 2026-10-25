@@ -4,6 +4,7 @@ import {
   okResponse,
   withCors
 } from './_shared/http.mjs';
+import { classesForLesson, loadRoster } from './_shared/class-claims.mjs';
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
 import { isDeletedRecord } from './_shared/record-liveness.mjs';
 import {
@@ -50,7 +51,20 @@ export function createPublishedLessonHandler(deps = {}) {
       if (publicOutcome) outcomes.push(publicOutcome);
     }
 
-    return withCors(okResponse(200, { ...snapshot, outcome_ids: ids, outcomes }), request, env);
+    // A plain lesson link names no class. Lectures, tutorials and sprints need one, so the page gets the choices.
+    const needsClass = ['lecture', 'tutorial', 'design_sprint'].includes(snapshot.pedagogical_mode);
+    let classes;
+    if (needsClass) {
+      classes = await classesForLesson(store, id);
+      // A tutorial belongs to the one class it was planned for, scheduled or not.
+      const own = draft.pedagogical_mode === 'tutorial' ? draft.tutorial?.class_id : null;
+      if (own) {
+        const roster = await loadRoster(store, own);
+        classes = roster ? [{ id: roster.cls.id, title: roster.cls.display_name || roster.cls.title || roster.cls.code || 'Class' }] : classes;
+      }
+    }
+
+    return withCors(okResponse(200, { ...snapshot, outcome_ids: ids, outcomes, ...(classes ? { classes } : {}) }), request, env);
   }, deps);
 }
 

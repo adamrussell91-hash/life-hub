@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   absolutePublicUrl,
-  classLessonUrl,
   mountPublicLinkControl,
   publicStudentPath,
   teacherPreviewUrl
@@ -47,23 +46,6 @@ describe('mountPublicLinkControl', () => {
   beforeEach(() => {
     host = document.createElement('div');
     document.body.append(host);
-  });
-
-  it('lists a link per class when the popover opens', async () => {
-    expect(classLessonUrl('lesson_1', 'class_1')).toBe('https://class.adam-russell.com/s/lessons/lesson_1?class=class_1');
-    const load = vi.fn(async () => [{ label: '12 English', url: classLessonUrl('lesson_1', 'class_1') }]);
-    mountPublicLinkControl(host, { kind: 'lesson', id: 'lesson_1', published: true, loadClassLinks: load });
-    expect(load).not.toHaveBeenCalled();
-    host.querySelector<HTMLButtonElement>('.public-link__trigger')!.click();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(load).toHaveBeenCalledOnce();
-    const row = host.querySelector('.public-link__class');
-    expect(row?.textContent).toContain('12 English');
-    expect(row?.textContent).toContain('Copy class link');
-    const headings = [...host.querySelectorAll('.public-link__heading')].map((h) => h.textContent);
-    expect(headings).toEqual(['Class link', 'General link']);
-    expect(host.textContent).toContain('Copy general link');
-    expect(row?.getAttribute('title')).toBe('https://class.adam-russell.com/s/lessons/lesson_1?class=class_1');
   });
 
   afterEach(() => {

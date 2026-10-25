@@ -52,13 +52,6 @@ export interface PublicLinkControlOptions {
   lead?: string;
   copyLabel?: string;
   openLabel?: string;
-  /** Extra per-class links, loaded when the popover opens. */
-  loadClassLinks?: () => Promise<Array<{ label: string; url: string }>>;
-}
-
-/** Lesson link for one class: the quiz on it knows the class list without asking. */
-export function classLessonUrl(lessonId: string, classId: string): string {
-  return `${absolutePublicUrl('lesson', lessonId)}?class=${encodeURIComponent(classId)}`;
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -155,12 +148,10 @@ export function mountPublicLinkControl(
     if (!options.published) return;
 
     const absolute = absolutePublicUrl(options.kind, options.id);
-    // With class links, they come first and the plain link is the general one.
-    if (options.loadClassLinks) paintClassLinks(options.loadClassLinks);
-    const lead = options.loadClassLinks ? 'General link' : options.lead;
+    const lead = options.lead;
     if (lead) {
       const leadEl = document.createElement('p');
-      leadEl.className = options.loadClassLinks ? 'public-link__heading' : 'public-link__lead';
+      leadEl.className = 'public-link__lead';
       leadEl.textContent = lead;
       popover.append(leadEl);
     }
@@ -171,7 +162,7 @@ export function mountPublicLinkControl(
     const actions = document.createElement('div');
     actions.className = 'public-link__actions';
 
-    const copyBtn = copyButton(absolute, options.loadClassLinks ? 'Copy general link' : (options.copyLabel ?? 'Copy'));
+    const copyBtn = copyButton(absolute, options.copyLabel ?? 'Copy');
 
     const openBtn = document.createElement('a');
     openBtn.className = 'btn btn--secondary';
@@ -185,33 +176,6 @@ export function mountPublicLinkControl(
 
     actions.append(copyBtn, openBtn);
     popover.append(urlEl, actions);
-  }
-
-  function paintClassLinks(load: () => Promise<Array<{ label: string; url: string }>>): void {
-    const section = document.createElement('div');
-    section.className = 'public-link__classes';
-    popover.append(section);
-    void load()
-      .then((links) => {
-        if (!links.length) return;
-        const heading = document.createElement('p');
-        heading.className = 'public-link__heading';
-        heading.textContent = links.length === 1 ? 'Class link' : 'Class links';
-        section.append(heading);
-        for (const link of links) {
-          const row = document.createElement('div');
-          row.className = 'public-link__class';
-          const name = document.createElement('span');
-          name.className = 'public-link__class-name';
-          name.textContent = link.label;
-          row.title = link.url;
-          row.append(name, copyButton(link.url, 'Copy class link'));
-          section.append(row);
-        }
-      })
-      .catch(() => {
-        /* the plain link still works: the quiz asks which class */
-      });
   }
 
   function setOpen(open: boolean): void {
