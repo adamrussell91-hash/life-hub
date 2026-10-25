@@ -239,3 +239,9 @@ test('PERSON_LIFECYCLE_STATUSES includes deidentified; ORGANISATION_LIFECYCLE_ST
   assert.equal(PERSON_LIFECYCLE_STATUSES.has('deidentified'), true);
   assert.equal(ORGANISATION_LIFECYCLE_STATUSES.has('deidentified'), false);
 });
+
+test('identity responses never expose internal edit baselines, including after deletion', () => {
+  const record = personRecord({professional_edits:{schema_version:1,identity:{display_name:{base:'Previous private name'}}}});
+  assert.equal(redactIdentityRecord(record).professional_edits,undefined);
+  assert.equal(redactIdentityRecord({...record,lifecycle_status:'deleted'}).professional_edits,undefined);
+});

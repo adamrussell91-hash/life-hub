@@ -328,7 +328,8 @@ function normalizeRelationships(rows, peopleIdByLegacyId, organisationsIdByLegac
         occurred_at: null,
         status: row.valid_to ? 'ended' : 'current',
         visibility: 'operator',
-        metadata: {},
+        metadata: typeof row.metadata?.human_label === 'string'
+          ? {human_label:row.metadata.human_label.slice(0,512)} : {},
         import_source: IMPORT_SOURCE,
         created_at: LEGACY_IMPORT_TIMESTAMP,
         updated_at: LEGACY_IMPORT_TIMESTAMP
@@ -378,21 +379,36 @@ function normalizeRelationships(rows, peopleIdByLegacyId, organisationsIdByLegac
 }
 
 let cache = null; // { repo, expiresAt, data }
+let pendingLoad = null;
 
 export function resetProfessionalDataCache() {
   cache = null;
+  pendingLoad = null;
 }
 
 async function loadProfessionalData({ env = process.env, fetchImpl = fetch, now = () => Date.now() } = {}) {
+  if (!professionalDataToken(env)) return null;
+  const repo = professionalDataRepo(env);
+  if (cache && cache.repo === repo && cache.expiresAt > now()) return cache.data;
+  if (pendingLoad?.repo === repo) return pendingLoad.promise;
+  const promise = fetchProfessionalData({env,fetchImpl,now});
+  const pending = {repo,promise};
+  pendingLoad = pending;
+  try { return await promise; }
+  finally { if (pendingLoad === pending) pendingLoad = null; }
+}
+
+async function fetchProfessionalData({ env = process.env, fetchImpl = fetch, now = () => Date.now() } = {}) {
   const token = professionalDataToken(env);
   if (!token) return null;
   const repo = professionalDataRepo(env);
   if (cache && cache.repo === repo && cache.expiresAt > now()) return cache.data;
 
-  const [peopleRaw, organisationsRaw, relationshipsRaw] = await Promise.all([
+  const [peopleRaw, organisationsRaw, relationshipsRaw, deletionsRaw] = await Promise.all([
     fetchDataFile(repo, token, fetchImpl, 'people.json'),
     fetchDataFile(repo, token, fetchImpl, 'organisations.json'),
-    fetchDataFile(repo, token, fetchImpl, 'relationships.json')
+    fetchDataFile(repo, token, fetchImpl, 'relationships.json'),
+    fetchDataFile(repo, token, fetchImpl, 'people-deletions.json')
   ]);
   if (!Array.isArray(peopleRaw) || !Array.isArray(organisationsRaw) || !Array.isArray(relationshipsRaw)) {
     return null;
@@ -403,6 +419,9 @@ async function loadProfessionalData({ env = process.env, fetchImpl = fetch, now 
   const relationships = normalizeRelationships(relationshipsRaw, people.idByLegacyId, organisations.idByLegacyId);
 
   const data = {
+    deletedPersonIds: new Set((Array.isArray(deletionsRaw) ? deletionsRaw : [])
+      .filter(row => row && typeof row.legacy_id === 'string')
+      .map(row => derivePersonId(row.legacy_id))),
     peopleById: people.byId,
     organisationsById: organisations.byId,
     relationshipsByPersonId: relationships.byPersonId,
@@ -462,7 +481,13 @@ export async function listGithubPdEvents({ env = process.env, fetchImpl = fetch,
 
 export async function getGithubPerson(id, options = {}) {
   const data = await loadProfessionalData(options);
+  if (data?.deletedPersonIds.has(id)) return null;
   return data?.peopleById.get(id) ?? null;
+}
+
+export async function isGithubPersonDeleted(id, options = {}) {
+  const data = await loadProfessionalData(options);
+  return data?.deletedPersonIds.has(id) ?? false;
 }
 
 export async function getGithubOrganisation(id, options = {}) {
@@ -476,14 +501,14 @@ export async function listGithubPersonCandidates(options = {}) {
   // Professional People, Network Ecology, and entity search all feed from
   // this list — adults only. Direct getGithubPerson still resolves a
   // student by id if something already holds their ref.
-  return [...data.peopleById.values()].filter((record) => !isImportedStudentPerson(record));
+  return [...data.peopleById.values()].filter((record) => !data.deletedPersonIds.has(record.id) && !isImportedStudentPerson(record));
 }
 
 /** Communications-database students co-imported into people.json (not colleagues). */
 export async function listGithubImportedStudentPeople(options = {}) {
   const data = await loadProfessionalData(options);
   if (!data) return [];
-  return [...data.peopleById.values()].filter(isImportedStudentPerson);
+  return [...data.peopleById.values()].filter(record => !data.deletedPersonIds.has(record.id) && isImportedStudentPerson(record));
 }
 
 export async function getGithubActiveSelfPerson(options = {}) {

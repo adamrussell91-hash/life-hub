@@ -236,8 +236,8 @@ export async function searchPeopleForAgent({ query, kinds, store, env, fetchImpl
   const groups = [];
   if (wanted.has('person')) {
     const [native, imported] = await Promise.all([
-      searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, q, false),
-      searchGithubIdentityKind('person', q, false, github)
+      searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, q, false, github),
+      searchGithubIdentityKind('person', q, false, github, store)
     ]);
     groups.push(...mergeNativeFirst(native, imported));
   }
@@ -591,7 +591,7 @@ export function createPeopleWriteExecutor({
 } = {}) {
   if (!store) throw new Error('createPeopleWriteExecutor requires a store.');
   const github = { env, ...(fetchImpl ? { fetchImpl } : {}) };
-  const identityRepo = createIdentityRepository({ store, ...(now ? { now } : {}) });
+  const identityRepo = createIdentityRepository({ store, github, ...(now ? { now } : {}) });
   const linkRepo = createUniversalLinkRepository({
     store,
     resolveEntity: (ref, ctx, options = {}) => resolveEntity(ref, ctx, { ...github, ...options }),

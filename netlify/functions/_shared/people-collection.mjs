@@ -18,6 +18,7 @@ import {
 } from './github-professional-data.mjs';
 import { dedupeIdentityRows, identityNameKey } from './identity-display-name.mjs';
 import { withoutSupersededImports } from './person-workplace.mjs';
+import { readProfessionalPerson } from './professional-person.mjs';
 
 // The single expensive full-population scan every People Home (Phase 2)
 // aggregation function consumes — `people-home-signals.mjs` and
@@ -164,7 +165,7 @@ export async function loadAllPeopleWithRelationships({
   // Also drop Blob twins of Communications students before dedupe / scan.
   const nativeStubs = (
     await mapBounded(ids, PEOPLE_BATCH_SIZE, async (id) => {
-      const record = parsePersonRecord(await getJSON(store, personKey(id)));
+      const record = await readProfessionalPerson(id, parsePersonRecord(await getJSON(store, personKey(id))), github);
       if (!record) return null;
       if (isNetworkExcludedPerson(record, studentIds, studentNameKeys)) return null;
       const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });

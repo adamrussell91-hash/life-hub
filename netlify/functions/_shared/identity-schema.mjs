@@ -310,9 +310,10 @@ export function validateOrganisationFieldUpdate(input) {
 // tombstone label (or emptied), for any other status the record is
 // returned unchanged (still a copy).
 export function redactIdentityRecord(record) {
-  if (!record || !REDACTED_STATUSES.has(record.lifecycle_status)) return { ...record };
+  const { professional_edits: ignoredEdits, ...safeRecord } = record ?? {};
+  if (!record || !REDACTED_STATUSES.has(record.lifecycle_status)) return safeRecord;
   const redacted = {
-    ...record,
+    ...safeRecord,
     display_name: TOMBSTONE_LABEL,
     aliases: []
   };

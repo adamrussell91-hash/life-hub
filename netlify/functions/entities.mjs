@@ -6,6 +6,7 @@ import { redactIdentityRecord } from './_shared/identity-schema.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createIdentityRepository } from './_shared/identity-repository.mjs';
 import { getGithubPerson } from './_shared/github-professional-data.mjs';
+import { readProfessionalPerson } from './_shared/professional-person.mjs';
 
 export const config = { path: '/api/entities' };
 
@@ -93,12 +94,16 @@ export function createEntitiesHandler(deps = {}) {
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
     const url = new URL(request.url);
-    const repo = createRepository({ store, now: identityNow });
+    const repo = createRepository({ store, now: identityNow, github:{env} });
 
     try {
       if (request.method === 'GET') {
         const ref = readRef(url);
-        const record = await repo.loadEntity(ref);
+        let record = await repo.loadEntity(ref);
+        if (ref.kind === 'person') {
+          record = await readProfessionalPerson(ref.id,record,{env});
+          if (!record) return withCors(errorResponse(404,'entity_not_found','Entity not found.',false),request,env);
+        }
         return withCors(okResponse(200, projectEntity(ref.kind, record)), request, env);
       }
 

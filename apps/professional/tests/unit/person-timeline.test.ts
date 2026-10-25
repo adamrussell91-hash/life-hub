@@ -62,3 +62,9 @@ describe('person timeline', () => {
     expect(host.querySelector('.person-timeline__row--touchpoint .person-timeline__dot')).toBeTruthy();
   });
 });
+
+describe('month-precision relationship dates', () => {
+  it('does not invent the first day of the month', () => {
+    expect(dayMonth('2025-02')).toBe('Feb');
+  });
+});
