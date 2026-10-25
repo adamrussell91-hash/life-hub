@@ -45,6 +45,9 @@ A group tab follows gradual release, I do → We do → You do: a heading with t
 No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use faded_example, cloze or self_check as the checks. Exit checks: 2–3 quiz_question blocks aimed at that group's exact reason, carrying the tutorial's tag (tutorial.tag in the lesson JSON): for tech:cyclical, use quote_technique or spot_technique with technique_id: "cyclical" on the option that names it, so results land on that tag.
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
 
+## Group sets
+A quiz may hold group sets: top-level sections with group_set { group_id, class_id, name, tags, students, target }. Only that group's students get a set's questions, mixed in with the quiz. To fill one, use propose_replace_section on it, keeping its id, title and group_set exactly; put target quiz_question blocks inside, written on the lesson's own content and tagged so results land on the set's tags. Never add a group set yourself and never move quiz questions into or out of one.
+
 ## Limits: say so before you build
 Never agree to something these limits rule out. When a request hits one, say so plainly in your first sentence, then offer the nearest thing you can do. Do not quietly truncate, merge, or drop content to fit.
 

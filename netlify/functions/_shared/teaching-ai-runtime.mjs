@@ -2589,6 +2589,14 @@ var SectionLinkSchema = z10.object({
   mode: z10.literal("linked"),
   source_composition_id: z10.string().min(1)
 });
+var GroupSetSchema = z10.object({
+  group_id: z10.string().min(1).max(64),
+  class_id: z10.string().min(1).max(64),
+  name: z10.string().min(1).max(120),
+  tags: z10.array(z10.string().min(1).max(120)).min(1).max(8),
+  students: z10.array(z10.string().min(1).max(64)).max(60),
+  target: z10.number().int().min(1).max(10)
+});
 var SectionBlockObjectSchema = z10.object({
   id: z10.string().min(1),
   type: z10.literal("block"),
@@ -2611,7 +2619,9 @@ var SectionBlockObjectSchema = z10.object({
     /** Tutorial: with tutorial_group, this section is that group's exit check (quiz questions). */
     tutorial_exit: z10.boolean().optional(),
     /** Design Sprint: this top-level section holds the guides for one phase. */
-    sprint_phase: SprintPhaseKeySchema.optional()
+    sprint_phase: SprintPhaseKeySchema.optional(),
+    /** Quiz: this top-level section is a group set, practice for one markbook group's students only. */
+    group_set: GroupSetSchema.optional()
   }),
   ...blockLayout,
   ...blockTimestamps
@@ -5657,6 +5667,9 @@ A group tab follows gradual release, I do \u2192 We do \u2192 You do: a heading 
 - with_teacher: content { talking_points: [string] } (up to 8).
 No hinge_question in a tutorial tab: tabs aren't in the published lesson, so use faded_example, cloze or self_check as the checks. Exit checks: 2\u20133 quiz_question blocks aimed at that group's exact reason, carrying the tutorial's tag (tutorial.tag in the lesson JSON): for tech:cyclical, use quote_technique or spot_technique with technique_id: "cyclical" on the option that names it, so results land on that tag.
 Goals and talking points say what students will do ("Today: explaining the effect"), never what they can't do or get wrong.
+
+## Group sets
+A quiz may hold group sets: top-level sections with group_set { group_id, class_id, name, tags, students, target }. Only that group's students get a set's questions, mixed in with the quiz. To fill one, use propose_replace_section on it, keeping its id, title and group_set exactly; put target quiz_question blocks inside, written on the lesson's own content and tagged so results land on the set's tags. Never add a group set yourself and never move quiz questions into or out of one.
 
 ## Limits: say so before you build
 Never agree to something these limits rule out. When a request hits one, say so plainly in your first sentence, then offer the nearest thing you can do. Do not quietly truncate, merge, or drop content to fit.

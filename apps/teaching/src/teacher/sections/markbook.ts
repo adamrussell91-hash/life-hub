@@ -23,6 +23,8 @@ import { loadInsightContext, codeLabel, type InsightContext } from '@/evidence/c
 import { classEvidence } from '@/evidence/class-evidence';
 import { defaultKind } from '@/evidence/patterns';
 import { tagLabel } from '@/evidence/tags';
+import { historyEventsFor, joinWhy, leavesFor, newGroupId } from '@/evidence/groups';
+import { newHistoryState, renderHistory } from '@/markbook/history-view';
 import { mixUpText } from '@/evidence/views/parts';
 import { openTutorialPlan } from '@/tutorial/plan-sheet';
 import { openHeatmap, openQuizAttempt } from '@/markbook/heatmap';
@@ -46,8 +48,8 @@ type Options = {
   view?: Mode;
 };
 
-type Mode = 'next' | 'grid' | 'detail';
-const MODES: Array<[Mode, string]> = [['next', 'Next steps'], ['grid', 'Grid'], ['detail', 'Detail']];
+type Mode = 'next' | 'grid' | 'detail' | 'history';
+const MODES: Array<[Mode, string]> = [['next', 'Next steps'], ['grid', 'Grid'], ['detail', 'Detail'], ['history', 'History']];
 
 
 /** A local change still waiting for the server, re-applied after a reload. */
@@ -111,6 +113,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   /** Sort orders and open rows, kept across redraws. */
   const nextState = newNextState();
   const detailState = newDetailState();
+  const historyState = newHistoryState();
   /** Names for tags and codes, for Next steps, Detail and the student panel; loaded once, after the markbook. */
   let ctx: InsightContext | null = null;
   /** Set when the tag names could not be loaded, so those views and the student panel say so. */
@@ -345,6 +348,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
         codeLabel: (id) => codeLabel(id, context.codes),
         pins: pinsNow(),
         pinsNow,
+        history: (view.markbook.history ?? []),
         overall: formatPercent(overallFor(view.markbook, studentId).percent),
         onPins: (next) =>
           change({ kind: 'focus', studentId, pinned: next.pinned, dismissed: next.dismissed }, () => api.setFocus(cls.id, studentId, next.pinned, next.dismissed)),
@@ -374,6 +378,69 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       openHeatmap(quiz, rowStudents(view, false), { returnFocus: () => findInBody('.mb-col__title', quiz.id) ?? title });
     }
   };
+
+  /** Quiz and task titles by evidence source, for history wording. */
+  function sourceTitles(current: MarkbookView): Map<string, string> {
+    const titles = new Map<string, string>();
+    for (const q of current.quizzes) titles.set(q.id, q.title);
+    for (const c of current.markbook.columns) titles.set(c.id, c.title);
+    return titles;
+  }
+
+  /** Once per load: write what the evidence now shows about saved groups. The server keeps each event once. */
+  let synced = false;
+  async function syncGroups(): Promise<void> {
+    const current = view;
+    const context = ctx;
+    if (synced || !current || !context || !(current.markbook.groups ?? []).length) return;
+    synced = true;
+    const { evidence } = classEvidence(current, context);
+    const have = new Set((current.markbook.history ?? []).map((e) => e.id));
+    const events = historyEventsFor((current.markbook.groups ?? []), current.quizzes).filter((e) => !have.has(e.id));
+    const leaves = leavesFor((current.markbook.groups ?? []), evidence, sourceTitles(current));
+    if (!events.length && !leaves.length) return;
+    try {
+      const markbook = await enqueue(() => api.recordHistory(cls.id, events, leaves));
+      if (disposed || !view) return;
+      if (confirmed) confirmed = withServerCopy(confirmed, markbook, []);
+      view = queued.reduce(applyChange, confirmed ?? view);
+      paint();
+    } catch {
+      // The next load tries again; nothing is lost.
+      synced = false;
+    }
+  }
+
+  async function saveGroup(current: MarkbookView, context: InsightContext, tags: string[], students: string[]): Promise<void> {
+    const { evidence } = classEvidence(current, context);
+    const label = (t: string) => tagLabel(t, context);
+    const titles = sourceTitles(current);
+    const group = { id: newGroupId(), name: tags.map(label).join(' · '), tags, members: students.map((s) => ({ student: s, why: joinWhy(s, tags, evidence, titles, label) })) };
+    await writeGroups(() => api.saveGroup(cls.id, group, today()));
+  }
+
+  async function addFlagged(current: MarkbookView, context: InsightContext, groupId: string, students: string[]): Promise<void> {
+    const group = (current.markbook.groups ?? []).find((g) => g.id === groupId);
+    if (!group) return;
+    const { evidence } = classEvidence(current, context);
+    const label = (t: string) => tagLabel(t, context);
+    const titles = sourceTitles(current);
+    const members = students.map((s) => ({ student: s, why: joinWhy(s, group.tags, evidence, titles, label) }));
+    await writeGroups(() => api.addMembers(cls.id, groupId, members, today()));
+  }
+
+  async function writeGroups(call: () => Promise<Markbook>): Promise<void> {
+    try {
+      const markbook = await enqueue(call);
+      if (disposed || !view) return;
+      if (confirmed) confirmed = withServerCopy(confirmed, markbook, []);
+      view = queued.reduce(applyChange, confirmed ?? view);
+      status.textContent = '';
+      paint();
+    } catch (error) {
+      status.textContent = error instanceof ApiClientError ? error.message : 'That didn’t save. Try again.';
+    }
+  }
 
   /** Which cell or column title had focus, so a redraw can put it back. */
   type FocusKey = { col: string; student?: string } | { phone: PhoneControl };
@@ -453,8 +520,22 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
             openStudent: actions.openStudent,
             followUp: (tag, ids, evidence) => followUp(current, context, tag, ids, evidence),
             planTutorial: (tag, ids, evidence) => planTutorial(current, context, tag, ids, evidence),
+            saveGroup: (tags, ids) => void saveGroup(current, context, tags, ids),
+            addFlagged: (groupId, ids) => void addFlagged(current, context, groupId, ids),
             pins: (id) => current.markbook.focus?.[id] ?? { pinned: [], dismissed: [] },
             repaint: paint
+          })
+        );
+      else if (mode === 'history')
+        body.replaceChildren(
+          renderHistory({
+            groups: (current.markbook.groups ?? []),
+            history: (current.markbook.history ?? []),
+            names: new Map(current.students.map((s) => [s.id, `${s.initials} · ${s.name}`])),
+            label: (t) => tagLabel(t, context),
+            state: historyState,
+            repaint: paint,
+            openStudent: actions.openStudent
           })
         );
       else
@@ -554,6 +635,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       confirmed = await api.load(cls.id);
       view = queued.reduce(applyChange, confirmed);
       if (repaint) paint();
+      void syncGroups();
       return true;
     } catch (error) {
       // A server's own message says what went wrong; a dropped connection or garbled reply gets the plain one.
@@ -581,6 +663,7 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       if (disposed) return;
       ctx = { ...loaded, outcomes: options.outcomes ?? loaded.outcomes };
       if (mode !== 'grid') paint();
+      void syncGroups();
       const waiting = pendingStudent;
       pendingStudent = null;
       if (waiting) {

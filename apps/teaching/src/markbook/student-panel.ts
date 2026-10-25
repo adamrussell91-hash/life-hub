@@ -4,6 +4,8 @@ import type { Evidence, TagKind } from '@/evidence/types';
 import { mixUpText, pct } from '@/evidence/views/parts';
 import { openOverlay } from './overlay';
 import type { RosterStudent } from './types';
+import type { HistoryEvent } from './schema';
+import { studentTimeline } from './history-view';
 
 export type StudentPanelOptions = {
   student: RosterStudent;
@@ -14,6 +16,7 @@ export type StudentPanelOptions = {
   pins: FocusPins;
   onPins: (pins: FocusPins) => void;
   overall: string;
+  history?: HistoryEvent[];
 };
 
 /** One student's focus areas, secure tags and confidence, for the panel and for tests. */
@@ -65,6 +68,17 @@ export function studentPanelBody(o: StudentPanelOptions, headingId?: string): HT
     undo.addEventListener('click', () => o.onPins({ ...o.pins, dismissed: [] }));
     body.append(undo);
   }
+  const history = el('section', 'mb-panel-history');
+  history.append(el('h4', 'mb-form__label', 'History'));
+  const mineEvents = (o.history ?? []).filter((e) => 'student' in e && e.student === o.student.id);
+  const groupIds = [...new Set(mineEvents.map((e) => e.group))].reverse();
+  if (!groupIds.length) history.append(el('p', 'mb__empty', 'Not in any group yet.'));
+  for (const id of groupIds) {
+    const list = el('ol', 'mb-hist__lines');
+    for (const line of studentTimeline(o.student.id, mineEvents, id)) list.append(el('li', `mb-hist__line mb-hist__line--${line.kind}`, line.text));
+    history.append(list);
+  }
+  body.append(history);
   return body;
 }
 
