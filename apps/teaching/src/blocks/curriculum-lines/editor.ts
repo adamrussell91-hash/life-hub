@@ -18,6 +18,7 @@ import { unitNetworkInput } from './render';
 import { loadAlignment } from '@/alignment/coverage-panel';
 import { focusAreaFor } from '@/alignment/coverage';
 import { toggleLineStop } from '@/alignment/auto-lines';
+import { MAX_UNIT_CONCEPTS, unitLines } from '@/network/unit-concepts';
 
 /** What the unit page gives the editor: the network, plus how to save the parts that live elsewhere. */
 export type UnitNetworkEditorContext = UnitNetworkContext & {
@@ -75,6 +76,8 @@ export function createCurriculumLinesEditor(
     ...(dates ? { dates } : {})
   });
   const v2 = (): CurriculumLinesV2Content => current.content as CurriculumLinesV2Content;
+  /** The subject's lines this map shows: its own concepts among the metro lines. */
+  const mapLines = (): NetworkLine[] => unitLines(lines, isCurriculumLinesV2(current.content) ? v2().concept_lines : undefined);
   /** The unit's lessons in this map's station order, shown or not. */
   const mapLessons = (): NetLesson[] =>
     placeByDate(orderStations(lessons, isCurriculumLinesV2(current.content) ? v2().station_order : undefined), dates);
@@ -206,6 +209,7 @@ export function createCurriculumLinesEditor(
           const fresh = lineChips();
           chips.replaceWith(fresh);
           chips = fresh;
+          paintConcepts();
           paintStops();
           paintPreview();
         },
@@ -219,6 +223,33 @@ export function createCurriculumLinesEditor(
     return s;
   }
 
+  /* The unit's few concepts: the year network shows every one, this map only these. */
+  function conceptsSection(): HTMLElement | null {
+    const metro = lines.filter((l) => l.mode === 'metro');
+    if (!metro.length || !isCurriculumLinesV2(current.content)) return null;
+    const s = section('Concepts on this map', `Pick the ${MAX_UNIT_CONCEPTS - 1} or ${MAX_UNIT_CONCEPTS} textual concepts this unit is built on. This map and its lessons show only those; the year network shows every concept.`);
+    const chosen = v2().concept_lines ?? [];
+    const chips = el('div', 'cl-editor__chips');
+    chips.setAttribute('role', 'group');
+    chips.setAttribute('aria-label', 'Concepts on this map');
+    for (const line of metro) {
+      const on = chosen.includes(line.id);
+      const chip = el('button', `cl-editor__chip cl-editor__chip--metro cl-editor__pick${on ? ' cl-editor__pick--on' : ''}`, line.name || 'Untitled line');
+      chip.type = 'button';
+      chip.style.setProperty('--net-colour', lineColour(line.colour));
+      chip.setAttribute('aria-pressed', String(on));
+      chip.disabled = !on && chosen.length >= MAX_UNIT_CONCEPTS;
+      chip.addEventListener('click', () => {
+        const next = on ? chosen.filter((id) => id !== line.id) : [...chosen, line.id];
+        commit({ concept_lines: next.length ? next : undefined });
+      });
+      chips.append(chip);
+    }
+    s.append(chips);
+    if (!chosen.length) s.append(el('p', 'cl-editor__hint', 'None picked: the map shows every concept line.'));
+    return s;
+  }
+
   /* Which lines each lesson serves (saved on the lesson). */
   function stopsSection(): HTMLElement {
     const s = section('Stations', `Each lesson is a station.${dates?.size ? ' A lesson with a class date sits in date order: change its date in the calendar to move it. Move the others up or down to place them,' : ' Move it up or down to change its place on this map,'} or untick it to leave it off. Tap a line to say the lesson serves it; tap again to step the depth (introduced, reinforced, mastered), then off. The lesson’s settings show the same line chips. Stops set from a lesson’s dot points come and go with them.`);
@@ -226,7 +257,8 @@ export function createCurriculumLinesEditor(
       s.append(el('p', 'cl-editor__hint', 'Add lessons to this unit first.'));
       return s;
     }
-    if (!lines.length) {
+    const gridLines = mapLines();
+    if (!gridLines.length) {
       s.append(el('p', 'cl-editor__hint', 'Add lines first.'));
       return s;
     }
@@ -234,7 +266,7 @@ export function createCurriculumLinesEditor(
     const table = el('table', 'cl-editor__grid');
     const head = el('tr');
     head.append(el('th', 'cl-editor__place', 'On map'), el('th', undefined, 'Lesson'));
-    for (const line of lines) {
+    for (const line of gridLines) {
       const th = el('th', `cl-editor__col cl-editor__col--${line.mode}`, line.short?.trim() || line.name.slice(0, 4) || '?');
       th.title = `${MODE_LABEL[line.mode]}: ${line.name}`;
       th.style.setProperty('--net-colour', lineColour(line.colour));
@@ -266,7 +298,7 @@ export function createCurriculumLinesEditor(
       const th = el('th', undefined, name);
       if (when) th.append(el('span', 'cl-editor__date', formatDisplayDate(when.slice(0, 10))));
       tr.append(place, th);
-      for (const line of lines) {
+      for (const line of gridLines) {
         const stop = (shownStops.get(lesson.id) ?? lesson.line_stops)?.find((x) => x.line_id === line.id);
         const td = el('td');
         const cell = el('button', `cl-editor__cell${stop ? '' : ' cl-editor__cell--empty'}`);
@@ -397,13 +429,14 @@ export function createCurriculumLinesEditor(
       const lesson = selectOf(lessonOptions('No quiz lesson'), gate.lesson_id ?? '', 'Quiz lesson');
       lesson.addEventListener('change', () => update(gate.id, { lesson_id: lesson.value || undefined }));
       const checks = el('div', 'cl-editor__checks');
-      for (const line of lines) {
+      const gateLines = mapLines();
+      for (const line of gateLines) {
         const box = el('label');
         const input = el('input');
         input.type = 'checkbox';
         input.checked = gate.line_ids.includes(line.id);
         input.addEventListener('change', () => {
-          const ids = lines.map((l) => l.id).filter((id) => (id === line.id ? input.checked : gate.line_ids.includes(id)));
+          const ids = gateLines.map((l) => l.id).filter((id) => (id === line.id ? input.checked : gate.line_ids.includes(id)));
           update(gate.id, { line_ids: ids });
         });
         box.append(input, document.createTextNode(` ${line.name || 'Untitled line'}`));
@@ -414,7 +447,7 @@ export function createCurriculumLinesEditor(
       s.append(row);
     }
     const add = ghostButton('Add gate', () => {
-      commit({ gates: [...v2().gates, { id: networkId('gate'), label: 'Diagnostic', line_ids: lines.filter((l) => l.mode !== 'light_rail').map((l) => l.id) }] });
+      commit({ gates: [...v2().gates, { id: networkId('gate'), label: 'Diagnostic', line_ids: mapLines().filter((l) => l.mode !== 'light_rail').map((l) => l.id) }] });
     });
     add.disabled = v2().gates.length >= 12;
     s.append(add);
@@ -439,6 +472,12 @@ export function createCurriculumLinesEditor(
     return s;
   }
 
+  const conceptsHost = el('div', 'cl-editor__stack');
+  const paintConcepts = () => {
+    const s = conceptsSection();
+    conceptsHost.hidden = !s;
+    conceptsHost.replaceChildren(...(s ? [s] : []));
+  };
   const stopsHost = el('div', 'cl-editor__stack');
   const paintStops = () => stopsHost.replaceChildren(stopsSection(), railSection(), gatesSection());
   /* Syllabus focus area: the guess from the unit's title, or the teacher's pick. */
@@ -464,8 +503,9 @@ export function createCurriculumLinesEditor(
       paintPreview();
       return;
     }
+    paintConcepts();
     paintStops();
-    root.replaceChildren(...[titleRow(), linesSection(), stopsHost, syllabusSection(), terminusSection(), preview].filter((n): n is HTMLElement => Boolean(n)));
+    root.replaceChildren(...[titleRow(), linesSection(), conceptsHost, stopsHost, syllabusSection(), terminusSection(), preview].filter((n): n is HTMLElement => Boolean(n)));
     paintPreview();
   }
   paint();
