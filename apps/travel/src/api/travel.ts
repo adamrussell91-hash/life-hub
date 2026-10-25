@@ -133,6 +133,14 @@ export interface ParseResult {
   missing: string[];
 }
 
-export function parseEmail(text: string): Promise<ParseResult> {
-  return apiPost('/api/travel-parse', { text });
+export interface ParseCity {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+}
+
+/** `cities` lets the parser place year-less dates ("Sun, 20 Dec") and city ids. */
+export function parseEmail(text: string, cities: ParseCity[] = []): Promise<ParseResult> {
+  return apiPost('/api/travel-parse', { text, cities });
 }
