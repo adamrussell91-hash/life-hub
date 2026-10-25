@@ -10021,9 +10021,9 @@ body.is-lesson-builder-full-page .hub-utilities {
   opacity: 0.45;
 }
 
-/* The builder gutter is too narrow to hold the grip, so the block list keeps
-   a left lane for it. */
-.lesson-page__block:not(.lesson-page__block--selected) iframe {
+/* HTML apps run in the preview; editing their source uses the block menu.
+   Keep them interactive even inside an unselected section, column or tab. */
+.lesson-page__block:not(.lesson-page__block--selected) iframe:not(.block-html-app__frame) {
   pointer-events: none;
 }
 
