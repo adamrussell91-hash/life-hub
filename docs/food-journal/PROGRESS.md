@@ -97,3 +97,34 @@ failed; static guards, affected Tasks/Teaching test selection and Professional
 typecheck passed. Run the WebKit cases with
 `PLAYWRIGHT_BROWSER=webkit node --test --test-name-pattern='date control|phone (390|320)' tests/browser/food-journal.spec.mjs`
 after installing Playwright WebKit and its host libraries.
+
+## 27/10/26 · Quick entry in three steps, Brisket straight after saving
+
+Adam found Add visit a long form that took too long on the phone, the venue
+picker inaccurate, and tags drifting into moods rather than foods.
+
+- Add and edit visit are now three steps on the same page: Where and when,
+  The food, Check and save. A step bar under the title reaches any step; an
+  existing visit can be saved from any step. New visits open on Where, edits
+  on The food, and Check venues' Edit visit on Where.
+- Where: Snap the dish and Photo the menu first. The venue is typed; places
+  logged before match as you type. Nearby places are suggestions only, marked
+  as possibly off. Meal buttons set every dish's meal, defaulting to the time
+  of day in Sydney. Visit notes cover the venue and the visit.
+- Food: tags are foods (Burger, Sandwich, Ramen…), offered as buttons with the
+  person's own food tags first, plus find-or-add. A food tag fills the cuisine
+  while it is empty. Ingredients and dish notes are always shown; menu
+  ingredients carry a "From the menu" badge, and a dish typed by a menu name
+  picks up that item's ingredients. "Would order again" is a dish field
+  (`order_again`, yes or no). Cuisine and meal type sit under More.
+- Check: a summary of the venue and each dish, tap to edit, then visit title,
+  menu text and "Count in Brisket after saving" (on by default).
+- After saving, uncounted or re-count dishes are offered to Brisket with a
+  portion each; Send hands them off one dish per message, as before.
+- Capture and fix-up prompts now ask for food tags, never moods.
+
+Verification: Chromium Food Journal suite 35/35 (four new quick-entry cases at
+1440 and 390, including the post-save Brisket hand-off, Not now, and turning
+it off). New unit tests in `tests/unit/food-journal-quick-entry.test.js`.
+WebKit was not available in this environment; run the phone cases there with
+`PLAYWRIGHT_BROWSER=webkit node --test --test-name-pattern='quick entry|phone (390|320)' tests/browser/food-journal.spec.mjs`.
