@@ -245,7 +245,7 @@ function entryFor(record, id) {
   return typeof id === 'string' && Object.hasOwn(record.questions, id) ? record.questions[id] : null;
 }
 
-const INSIGHT_SCHEMA = 2;
+const INSIGHT_SCHEMA = 3;
 
 /** Closed by the teacher's Close now, or by the Closes date. */
 async function closedState(store, k, settings, now = Date.now()) {
@@ -823,11 +823,12 @@ export async function quizTeacherAction(store, lessonId, body) {
 const lessonOutcomes = (draft) => (draft.outcome_ids?.length ? draft.outcome_ids : draft.syllabus_outcomes ?? []);
 
 /**
- * Each owner's first handed-in attempt that a teacher hasn't cleared. With
- * `owners` (hash → student id) only they are read. The cleared record and the
- * first go are read together, so most students cost one round trip.
+ * Each owner's latest handed-in attempt that a teacher hasn't cleared: a
+ * second go replaces the first in marks, progress and outcomes. With `owners`
+ * (hash → student id) only they are read. The cleared record and the latest
+ * go are read together, so most students cost one round trip.
  */
-async function firstAttempts(store, k, lessonId, owners) {
+async function latestAttempts(store, k, lessonId, owners) {
   const handedIn = new Map();
   // Listings can lag a just-written hand-in; the next load picks it up, the same as Results.
   for (const key of await listBlobKeys(store, `quiz/${lessonId}/results/`)) {
@@ -836,13 +837,13 @@ async function firstAttempts(store, k, lessonId, owners) {
   }
   const out = [];
   await mapBounded([...handedIn], 8, async ([owner, ns]) => {
-    const sorted = [...ns].sort((a, b) => a - b);
+    const sorted = [...ns].sort((a, b) => b - a);
     const readAttempt = (n) => Promise.all([read(store, k.attempt(owner, n)), read(store, k.result(owner, n)), read(store, k.marks(owner, n))]);
-    // Most students were never cleared, so their first go is read alongside the cleared record.
-    const [cleared, firstRead] = await Promise.all([read(store, k.cleared(owner)), readAttempt(sorted[0])]);
+    // Most students were never cleared, so their latest go is read alongside the cleared record.
+    const [cleared, latestRead] = await Promise.all([read(store, k.cleared(owner)), readAttempt(sorted[0])]);
     const from = cleared?.from ?? 0;
     for (const n of sorted.filter((x) => x >= from)) {
-      const [start, result, marks] = n === sorted[0] ? firstRead : await readAttempt(n);
+      const [start, result, marks] = n === sorted[0] ? latestRead : await readAttempt(n);
       if (!start || !result) continue;
       out.push({ owner, n, start, result, marks });
       return;
@@ -853,11 +854,11 @@ async function firstAttempts(store, k, lessonId, owners) {
 
 async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
   const owners = roster ? new Map(roster.students.map((s) => [deviceHash(`student:${cls}:${s.id}`), s.id])) : null;
-  const firsts = await firstAttempts(store, k, lessonId, owners);
+  const counted = await latestAttempts(store, k, lessonId, owners);
   const rosters = new Map();
   const students = roster ? roster.students.map(({ id, name, initials }) => ({ id, name, initials })) : [];
   const attempts = [];
-  for (const a of firsts) {
+  for (const a of counted) {
     const rec = narrow(await recordFor(store, lessonId, a.start.version, record), a.start.student_id);
     const scored = scoreAttempt(rec, a.result, a.marks);
     const student = owners ? owners.get(a.owner) : a.start.student_id ?? a.owner;
@@ -901,8 +902,8 @@ async function unitFamily(store, draft, lessonId) {
 }
 
 /**
- * One class's insight (every first attempt when classId is null): each
- * student's first attempt with its evidence items. A closed quiz with nothing
+ * One class's insight (every latest attempt when classId is null): each
+ * student's latest attempt with its evidence items. A closed quiz with nothing
  * left to mark saves the attempts at quiz/{lesson}/evidence/{class} and reads
  * them back until something changes; a new publish makes the copy stale.
  * `family: false` skips the unit read, for the markbook. Null when the lesson
@@ -929,7 +930,7 @@ export async function classInsight(store, lessonId, classId, loaded = null, { fa
   ]);
   const fallback = lessonOutcomes(draft);
   const stamp = stampRow?.at ?? null;
-  // A class with no list stays anonymous, so its insight covers every first attempt.
+  // A class with no list stays anonymous, so its insight covers every latest attempt.
   const listed = cls && roster?.students.length ? roster : null;
   let body;
   if (saved?.schema === INSIGHT_SCHEMA && saved.record_version === record.version && (saved.stamp ?? null) === stamp && saved.listed === !!listed) {
@@ -996,7 +997,7 @@ function tutorialGroupNames(draft) {
 }
 
 /**
- * Each listed student's first handed-in attempt at this quiz in one class,
+ * Each listed student's latest handed-in attempt at this quiz in one class,
  * scored as the Results tab scores it, with evidence items. Null when the
  * lesson isn't a published quiz. Goes before a teacher's clear are skipped.
  */
