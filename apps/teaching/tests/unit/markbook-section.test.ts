@@ -97,7 +97,7 @@ const mount = async (v: MarkbookView, narrow = false) => {
   const host = document.createElement('div');
   document.body.append(host);
   const api = fakeApi(v);
-  mountMarkbook(host, cls, { api, narrow: () => narrow, today: () => '2026-11-03', view: 'grid' });
+  mountMarkbook(host, cls, { api, narrow: () => narrow, today: () => '2026-11-03', view: 'marks' });
   await vi.waitFor(() => expect(host.querySelector('.mb-grid, .mb-phone, .mb__empty')).not.toBeNull());
   return { host, api };
 };
@@ -239,7 +239,7 @@ describe('markbook section', () => {
     detail.click();
     expect(detail.textContent).toBe('Detail');
     expect(detail.getAttribute('aria-pressed')).toBe('true');
-    expect(host.querySelector('.mb__mode[data-mode="grid"]')?.getAttribute('aria-pressed')).toBe('false');
+    expect(host.querySelector('.mb__mode[data-mode="marks"]')?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('rolls a failed save back even when the reload fails too', async () => {
@@ -258,7 +258,7 @@ describe('markbook section', () => {
     document.body.append(host);
     const api = fakeApi(view());
     (api.load as Mock).mockRejectedValueOnce(new ApiClientError({ code: 'markbook_unreadable', message: 'This markbook couldn’t be read. Nothing was changed.' }));
-    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'grid' });
+    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'marks' });
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('This markbook couldn’t be read. Nothing was changed.'));
   });
 
@@ -267,7 +267,7 @@ describe('markbook section', () => {
     document.body.append(host);
     const api = fakeApi(view());
     (api.load as Mock).mockRejectedValueOnce(new ApiClientError({ code: 'network_error', message: 'Failed to fetch' }));
-    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'grid' });
+    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'marks' });
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Couldn’t load the markbook.'));
   });
 
@@ -493,18 +493,21 @@ describe('markbook section', () => {
     host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="detail"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-patterns')).not.toBeNull());
     expect(host.querySelector('.mb-col__title')).toBeNull();
-    host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="grid"]')!.click();
+    host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="marks"]')!.click();
     expect(host.querySelector('.mb-patterns')).toBeNull();
     expect(host.querySelector('.mb-col__title')).not.toBeNull();
     host.remove();
   });
 
-  it('opens on Next steps when no view is asked for', async () => {
+  it('opens on the syllabus Grid when no view is asked for, and Next steps is one press away', async () => {
     const host = document.createElement('div');
     document.body.append(host);
     mountMarkbook(host, cls, { api: fakeApi(view({ quizzes: [outcomeQuiz()] })), narrow: () => false, today: () => '2026-11-03' });
+    await vi.waitFor(() => expect(host.querySelector('.mbg')).not.toBeNull());
+    expect(host.querySelector('.mb__mode[data-mode="grid"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect([...host.querySelectorAll('.mb__mode')].map((b) => b.textContent)).toEqual(['Grid', 'Next steps', 'Detail', 'History', 'Marks']);
+    host.querySelector<HTMLButtonElement>('.mb__mode[data-mode="next"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.mb-next')).not.toBeNull());
-    expect(host.querySelector('.mb__mode[data-mode="next"]')?.getAttribute('aria-pressed')).toBe('true');
     host.remove();
   });
 
@@ -867,7 +870,7 @@ describe('markbook section', () => {
         try {
           const host = document.createElement('div');
           document.body.append(host);
-          const dispose = mountMarkbook(host, cls, { api: fakeApi(view()), today: () => '2026-11-03', view: 'grid' });
+          const dispose = mountMarkbook(host, cls, { api: fakeApi(view()), today: () => '2026-11-03', view: 'marks' });
           await vi.waitFor(() => expect(host.querySelector('.mb-grid')).not.toBeNull());
           expect(media.listeners.size).toBe(1);
           const listener = [...media.listeners][0]!;

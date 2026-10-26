@@ -54,3 +54,13 @@ export const FOLLOW_UP = {
   /** Shown instead of the plan sheet: a follow-up lesson goes after its quiz, in the same unit. */
   noUnit: 'This quiz isn’t in a unit, so a follow-up can’t be placed after it.'
 } as const;
+
+/**
+ * Skills climb a ladder, so they are placed on a rung, not banded. `from` is the
+ * lowest share (0–1) that reaches each rung; under `capable` is below Capable.
+ * A starting guess to tune once real marks are in.
+ */
+export const RUNG_CUTS = { capable: 0.4, skilled: 0.6, accomplished: 0.8, excellent: 0.9 } as const;
+
+/** The syllabus Grid: a student needs this many items on a row to get a colour. */
+export const GRID = { minItems: 1 } as const;

@@ -1,3 +1,4 @@
+import type { Alignment } from '@/alignment/schema';
 import type { LiteraryElementsTable } from '@/blocks/literary-elements';
 import { sydneyDay } from '@/markbook/calc';
 import type { OutcomeLabel } from '@/markbook/types';
@@ -5,7 +6,7 @@ import { norm } from '@/quiz/core';
 import type { SkillsContinuum } from '@/skills/schema';
 import type { Evidence, InsightPayload, TagKind, Why } from './types';
 
-export type TagContext = { table: LiteraryElementsTable | null; outcomes: readonly OutcomeLabel[]; skills: SkillsContinuum | null };
+export type TagContext = { table: LiteraryElementsTable | null; outcomes: readonly OutcomeLabel[]; skills: SkillsContinuum | null; alignment?: Alignment | null };
 
 export function kindOf(tag: string): TagKind | null {
   const prefix = tag.slice(0, Math.max(0, tag.indexOf(':')));
@@ -56,6 +57,11 @@ export function expandTags(evidence: Evidence[], table: LiteraryElementsTable | 
 const capital = (s: string): string => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 
 export function tagLabel(tag: string, ctx: TagContext): string {
+  if (tag.startsWith('dp:')) {
+    const [area, id] = tag.slice(3).split(':');
+    const point = ctx.alignment?.focus_areas.find((a) => a.id === area)?.points.find((p) => p.id === id);
+    return point ? `${point.id} ${point.short}` : (id ?? tag);
+  }
   const kind = kindOf(tag);
   const value = tag.slice(tag.indexOf(':') + 1);
   if (kind === 'tech') {
