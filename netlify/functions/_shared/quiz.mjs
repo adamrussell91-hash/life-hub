@@ -902,6 +902,24 @@ async function buildInsight(store, k, lessonId, record, fallback, cls, roster) {
   return { schema: INSIGHT_SCHEMA, record_version: record.version, listed: !!roster, built_at: new Date().toISOString(), students, attempts };
 }
 
+/**
+ * Listed students who opened this quiz but have nothing handed in yet, so the
+ * markbook can show "In progress" rather than a blank that reads as not done.
+ * A teacher's clear is honoured: attempts before it don't count.
+ */
+async function startedNotHandedIn(k, lessonId, classId, studentIds, scores, store) {
+  const owners = new Map(studentIds.filter((id) => !scores[id]).map((id) => [deviceHash(`student:${classId}:${id}`), id]));
+  if (!owners.size) return [];
+  const latest = new Map();
+  for (const key of await listBlobKeys(store, `quiz/${lessonId}/attempts/`)) {
+    const [, , , owner, nText] = key.split('/');
+    const n = Number(nText);
+    if (owners.has(owner) && Number.isInteger(n)) latest.set(owner, Math.max(latest.get(owner) ?? 0, n));
+  }
+  const open = await mapBounded([...latest], 8, async ([owner, n]) => (n >= (await clearedFrom(store, k, owner)) ? owners.get(owner) : null));
+  return open.filter(Boolean);
+}
+
 /** Quiz lessons in the same unit, and the follow-ups made from this one. */
 async function unitFamily(store, draft, lessonId) {
   const unit = draft.unit_id && isSafeId(draft.unit_id) ? await read(store, unitKey(draft.unit_id)) : null;
@@ -1029,6 +1047,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     scores[a.student] = { attempt_id: a.attempt_id, submitted_at: a.submitted_at, score: a.score, max: a.max, pending: a.pending, practice: a.practice ?? {}, rows: a.rows };
     if (!firstAt || a.submitted_at < firstAt) firstAt = a.submitted_at;
   }
+  const started = await startedNotHandedIn(keys(lessonId), lessonId, classId, studentIds, scores, store);
   return {
     lesson_id: lessonId,
     title: insight.title,
@@ -1036,6 +1055,7 @@ export async function classQuizScores(store, lessonId, classId, studentIds) {
     confidence: insight.confidence,
     closed: insight.closed,
     first_at: firstAt,
+    ...(started.length ? { started } : {}),
     questions: insight.questions.map(({ id, prompt, marks, outcomes }) => ({ id, prompt, marks, outcomes })),
     scores,
     ...(insight.sets.length ? { sets: insight.sets } : {}),

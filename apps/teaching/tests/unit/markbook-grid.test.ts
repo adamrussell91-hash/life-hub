@@ -27,4 +27,14 @@ describe('markbook grid quiz cells', () => {
     expect(ann!.title).toBe('');
     expect(ann!.getAttribute('aria-label')).toBe('Tutorial: Structure, Ann Bell: 50%');
   });
+
+  it('grey the cells of students outside a tutorial’s groups, and mark who has only started', () => {
+    const blank = { st_ann: score };
+    const [ann, cy] = cells(column({ scores: blank, groups: { st_ann: 'Re-tells the plot' } }));
+    expect(ann!.classList.contains('mb-cell--na')).toBe(false);
+    expect(cy!.classList.contains('mb-cell--na')).toBe(true);
+    const [, started] = cells(column({ scores: blank, started: ['st_cy'] }));
+    expect(started!.textContent).toBe('Started');
+    expect(started!.classList.contains('mb-cell--na')).toBe(false);
+  });
 });
