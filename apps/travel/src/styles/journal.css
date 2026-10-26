@@ -421,6 +421,7 @@
 .journal-moment__photos img {
   display: block;
   width: 100%;
+  height: auto;
   border-radius: var(--radius-xs);
   object-fit: cover;
 }
@@ -1030,6 +1031,7 @@ html.vv-keyboard-open .sheet.addform.journal-edit-moment-sheet {
 .journal-split__tile img {
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 1;
   object-fit: cover;
 }
@@ -1312,6 +1314,7 @@ html.vv-keyboard-open .sheet.addform.journal-move-sheet {
 .journal-annotation-sheet__preview img {
   display: block;
   width: 100%;
+  height: auto;
   border-radius: var(--radius-md);
 }
 
