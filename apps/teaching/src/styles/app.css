@@ -13831,21 +13831,33 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 
 /* Technique family mark colours: --fam-* is set from the Periodic Table data. */
-.block-annotation__ink--fam-descriptive { --ink-c: color-mix(in srgb, var(--fam-descriptive) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-descriptive) 34%, transparent); }
+.block-annotation__ink--fam-descriptive { --ink-c: var(--fam-descriptive); --ink-band: color-mix(in srgb, var(--fam-descriptive) 52%, transparent); }
 .block-annotation__anchor--fam-descriptive { text-decoration-color: var(--fam-descriptive); }
 .block-annotation__panel--fam-descriptive { --note-c: var(--fam-descriptive); }
-.block-annotation__ink--fam-repetitive { --ink-c: color-mix(in srgb, var(--fam-repetitive) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-repetitive) 34%, transparent); }
+.block-annotation__ink--fam-repetitive { --ink-c: var(--fam-repetitive); --ink-band: color-mix(in srgb, var(--fam-repetitive) 52%, transparent); }
 .block-annotation__anchor--fam-repetitive { text-decoration-color: var(--fam-repetitive); }
 .block-annotation__panel--fam-repetitive { --note-c: var(--fam-repetitive); }
-.block-annotation__ink--fam-comparative { --ink-c: color-mix(in srgb, var(--fam-comparative) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-comparative) 34%, transparent); }
+.block-annotation__ink--fam-comparative { --ink-c: var(--fam-comparative); --ink-band: color-mix(in srgb, var(--fam-comparative) 52%, transparent); }
 .block-annotation__anchor--fam-comparative { text-decoration-color: var(--fam-comparative); }
 .block-annotation__panel--fam-comparative { --note-c: var(--fam-comparative); }
-.block-annotation__ink--fam-structural { --ink-c: color-mix(in srgb, var(--fam-structural) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-structural) 34%, transparent); }
+.block-annotation__ink--fam-structural { --ink-c: var(--fam-structural); --ink-band: color-mix(in srgb, var(--fam-structural) 52%, transparent); }
 .block-annotation__anchor--fam-structural { text-decoration-color: var(--fam-structural); }
 .block-annotation__panel--fam-structural { --note-c: var(--fam-structural); }
-.block-annotation__ink--fam-intertextual { --ink-c: color-mix(in srgb, var(--fam-intertextual) 82%, var(--ink-base)); --ink-band: color-mix(in srgb, var(--fam-intertextual) 34%, transparent); }
+.block-annotation__ink--fam-intertextual { --ink-c: var(--fam-intertextual); --ink-band: color-mix(in srgb, var(--fam-intertextual) 52%, transparent); }
 .block-annotation__anchor--fam-intertextual { text-decoration-color: var(--fam-intertextual); }
 .block-annotation__panel--fam-intertextual { --note-c: var(--fam-intertextual); }
+
+/* The picked or hovered stretch of text takes its family colour too. */
+.block-annotation--ink .block-annotation__anchor--fam-descriptive.is-open,
+.block-annotation--ink .block-annotation__anchor--fam-descriptive.is-active { background: color-mix(in srgb, var(--fam-descriptive) 40%, transparent); }
+.block-annotation--ink .block-annotation__anchor--fam-repetitive.is-open,
+.block-annotation--ink .block-annotation__anchor--fam-repetitive.is-active { background: color-mix(in srgb, var(--fam-repetitive) 40%, transparent); }
+.block-annotation--ink .block-annotation__anchor--fam-comparative.is-open,
+.block-annotation--ink .block-annotation__anchor--fam-comparative.is-active { background: color-mix(in srgb, var(--fam-comparative) 40%, transparent); }
+.block-annotation--ink .block-annotation__anchor--fam-structural.is-open,
+.block-annotation--ink .block-annotation__anchor--fam-structural.is-active { background: color-mix(in srgb, var(--fam-structural) 40%, transparent); }
+.block-annotation--ink .block-annotation__anchor--fam-intertextual.is-open,
+.block-annotation--ink .block-annotation__anchor--fam-intertextual.is-active { background: color-mix(in srgb, var(--fam-intertextual) 40%, transparent); }
 
 /* The ink replaces the old underline and coloured bars; anchors stay the click targets. */
 .block-annotation--ink .block-annotation__anchor--word,
