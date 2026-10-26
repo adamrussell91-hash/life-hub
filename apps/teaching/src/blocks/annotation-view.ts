@@ -823,6 +823,8 @@ function buildInteractiveView(
   familyKey.className = 'block-annotation__family-key';
   familyKey.hidden = true;
   let colourByFamily = false;
+  /** The reader's own choice; null leaves it to the automatic rule. */
+  let familyOverride: boolean | null = null;
 
   const threadIntro = document.createElement('p');
   threadIntro.className = 'block-annotation__threads-intro';
@@ -1126,6 +1128,19 @@ function buildInteractiveView(
   }
 
   /**
+   * Family colours switch on by themselves when one layer is showing and it is
+   * the literary-techniques layer, or it carries more than five technique tags.
+   */
+  function wantsFamilyColours(placed: PlacedAnnotation[]): boolean {
+    if (!table) return false;
+    const layerIds = new Set(placed.map((item) => item.annotation.layer_id));
+    if (layerIds.size !== 1) return false;
+    const [layerId] = layerIds;
+    if (layerById(content.layers, layerId!)?.kind === 'family') return true;
+    return placed.filter((item) => techniqueFamilyOf(item.annotation)).length > 5;
+  }
+
+  /**
    * In family colours, a tagged mark takes its Periodic Table card's own colour
    * (a `fam-*` mark colour fed from the table); the rest keep their layer's.
    */
@@ -1164,7 +1179,7 @@ function buildInteractiveView(
       ? 'Go back to layer colours'
       : 'Colour each technique to match its Periodic Table card';
     toggle.addEventListener('click', () => {
-      colourByFamily = !colourByFamily;
+      familyOverride = !colourByFamily;
       paint();
     });
     familyKey.append(toggle);
@@ -1343,7 +1358,9 @@ function buildInteractiveView(
       focusBar.append(eyebrow, heading, body, hint, nav);
     }
 
-    const placed = recolourByFamily(placedFor(content, mode, state));
+    const shown = placedFor(content, mode, state);
+    colourByFamily = familyOverride ?? wantsFamilyColours(shown);
+    const placed = recolourByFamily(shown);
     fillFamilyKey(placed);
     const byLine = new Map<string, LineMark[]>();
     const lineBars = new Map<string, PlacedAnnotation[]>();
