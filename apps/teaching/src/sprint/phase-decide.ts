@@ -47,8 +47,8 @@ export function mountDecide(ctx: FormContext): PhaseForm {
   for (const set of sets) for (const i of set.ideas) label.set(i.id, `Idea ${LETTERS[letter++] ?? letter}`);
 
   if (voting) {
-    root.append(el('h2', '', 'Pick the idea that does each one best'), el('p', '', `Open every set first.${dots ? ` As you read, place your ${dots} stand-out dots on the parts of any idea that stand out, even ideas you won’t pick.` : ''} Then give each criterion to one idea and say why. One idea can get more than one.`));
-    if (dots) root.append(dotCounter);
+    root.append(el('h2', '', 'Pick the idea that does each one best'));
+    if (dots) root.append(dotCounter, el('p', 'sprint-note sd-legend', `● marks a part that stands out. You have ${dots}. Under each idea, tap the criteria it does best.`));
     const gallery = el('div', 'sprint-sets');
     sets.forEach((set, n) => {
       const d = el('details', 'sprint-set');
@@ -64,7 +64,6 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     });
     root.append(gallery);
     const reasons = el('div', 'sprint-reasons');
-    reasons.append(el('h3', '', 'Why each one?'));
     for (const c of ctx.sprint.criteria) {
       reasons.append(frameField({ label: `${c.text}: it does this best because…`, value: state.reasons[c.id] ?? '', max: 300, rows: 2, frames: ctx.frames.slice(-1), support: ctx.support, disabled: !ctx.editable, onInput: (v) => { state.reasons[c.id] = v; bar.changed(); } }));
     }
@@ -80,8 +79,12 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     if (s.dot_counts && Object.keys(s.dot_counts).length) root.append(standOuts(sets, label, s.dot_counts));
   }
   if (s.chosen) root.append(partsEditor(ctx));
+  if (!voting) stepify(root, [
+    { pick: '.sprint-chosen, .sprint-heat-table', title: 'See what your group picked', guide: LATER_GUIDE.result },
+    { pick: '.sprint-parts', title: 'Plan the parts of the prototype', guide: LATER_GUIDE.parts }
+  ]);
   if (voting) stepify(root, [
-    { pick: '.sd-counter, .sprint-sets', title: 'Read the ideas and place your dots', guide: LATER_GUIDE.read },
+    { pick: '.sd-counter, .sd-legend, .sprint-sets', title: 'Read the ideas and place your dots', guide: LATER_GUIDE.read },
     { pick: '.sprint-reasons', title: 'Say which idea does each criterion best', guide: LATER_GUIDE.reasons }
   ]);
   root.append(bar.el);
@@ -153,12 +156,13 @@ function ideaCard(i: GalleryIdea, name: string, ctx: FormContext, state: PhasePa
 /** Which ideas did best on which criterion: shades, never numbers. */
 function heatTable(sets: SprintStatus['gallery'] & object, label: Map<string, string>, heat: NonNullable<SprintStatus['heat']>, ctx: FormContext): HTMLElement {
   const box = el('div', 'sprint-heat-table');
-  box.append(el('h3', '', 'How the group voted'), el('p', 'sprint-note', `Darker means more of your group picked it for ${ctx.sprint.criteria.map((c) => c.text).join(', ')}.`));
+  const short = (t: string) => t.split(/[:.]/)[0]!.trim().slice(0, 14);
+  box.append(el('p', 'sprint-note', 'Darker means more of your group picked that idea for that criterion.'));
   for (const set of sets) for (const i of set.ideas) {
     const r = el('div', 'sprint-heat-row');
     const cells = el('span', 'sprint-heat');
     for (const c of ctx.sprint.criteria) {
-      const cell = el('i');
+      const cell = el('i', '', short(c.text));
       cell.dataset.level = String(heat[i.id]?.[c.id] ?? 0);
       cell.title = c.text;
       cells.append(cell);
@@ -172,7 +176,6 @@ function heatTable(sets: SprintStatus['gallery'] & object, label: Map<string, st
 /** After voting: where the group's stand-out dots landed. */
 function standOuts(sets: NonNullable<SprintStatus['gallery']>, label: Map<string, string>, counts: NonNullable<SprintStatus['dot_counts']>): HTMLElement {
   const box = el('div', 'sprint-heat-table');
-  box.append(el('h3', '', 'What stood out'));
   for (const set of sets) for (const i of set.ideas) {
     const c = counts[i.id];
     if (!c) continue;

@@ -54,7 +54,10 @@
 .sprint-chip { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper, #fbf8f2); cursor: pointer; }
 .sprint-chip[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
 .sprint-heat { display: flex; gap: 3px; }
-.sprint-heat i { width: 18px; height: 18px; border-radius: 5px; background: var(--pastel-blue); }
+.sprint-heat i { min-width: 62px; height: 24px; padding: 0 6px; border-radius: 6px; background: var(--pastel-blue); font-size: 11px; font-style: normal; font-weight: 600; line-height: 24px; text-align: center; color: var(--navy); overflow: hidden; }
+.sprint-heat i[data-level="2"], .sprint-heat i[data-level="3"] { color: #fff; }
+.sprint-heat--names span { min-width: 62px; padding: 0 6px; font-size: 11px; font-weight: 700; text-align: center; color: var(--muted); }
+.sprint-heat-row--head { border-bottom: 0; }
 .sprint-heat i[data-level="1"] { background: #c3d7ef; }
 .sprint-heat i[data-level="2"] { background: #7fa4d3; }
 .sprint-heat i[data-level="3"] { background: var(--navy); }
@@ -313,7 +316,7 @@ body.spractice-open { overflow: hidden; }
 
 /* Step cards: bigger icon, calmer head. */
 .su-step__icon { margin-left: auto; font-size: 26px; line-height: 1; }
-.su-step { gap: 12px; }
+.su-step { gap: 12px; container-type: inline-size; }
 
 /* The 2 × 2 sorter: columns are control, rows are knowledge. */
 .su-matrix { display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: stretch; }
@@ -332,7 +335,7 @@ body.spractice-open { overflow: hidden; }
 .su-card { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(39,55,74,.12); font-size: 15px; }
 .su-card--ghost { background: transparent; border: 1px dashed var(--line); box-shadow: none; color: var(--muted); font-style: italic; justify-content: flex-start; }
 .su-card__x { padding: 0 8px; min-height: 28px; line-height: 1; }
-@media (max-width: 760px) {
+@container (max-width: 560px) {
   .su-matrix { grid-template-columns: minmax(0, 1fr); }
   .su-axis { display: none; }
 }
@@ -344,5 +347,14 @@ body.spractice-open { overflow: hidden; }
 .su-rail__dot.is-done { background: var(--pastel-sage, #dcefe1); color: var(--pastel-sage-ink, #2f5d3a); border-color: var(--pastel-sage-ink, #2f5d3a); }
 .su-rail__dot.is-now { background: var(--navy); color: #fff; border-color: var(--navy); transform: scale(1.12); }
 .su-rail__dot.is-group.is-now { background: var(--pastel-peach-ink, #9a4a1c); border-color: var(--pastel-peach-ink, #9a4a1c); }
-.su-nav { position: sticky; bottom: 0; padding: 10px 0; background: linear-gradient(to top, var(--bg, #f7f4ee) 70%, transparent); }
+.su-nav { padding: 4px 0; }
 
+
+/* Narrow cards (two students side by side, phones): stack the pairs. */
+@container (max-width: 560px) {
+  .sk-insp__row { grid-template-columns: minmax(0, 1fr); }
+  .sprint-gallery { grid-template-columns: minmax(0, 1fr); }
+}
+.sprint-brief-part { display: grid; gap: 6px; }
+.sprint-brief-part__line { margin: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--paper, #fbf8f2); }
+.sprint-brief-part__line b { color: var(--navy); font-size: 13px; }
