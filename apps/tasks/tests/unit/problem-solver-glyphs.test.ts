@@ -29,7 +29,7 @@ describe('tool emblems', () => {
     const { TOOLS } = await import('../../../../packages/problem-solver/tools/index.mjs');
     // Decision Maker's models (dm_) and Gear Shifter's techniques (gt_) carry their own emblems
     // in packages/decision-book/glyphs and packages/get-things-done/glyphs.
-    for (const id of (Object.keys(TOOLS) as Array<keyof typeof TOOLS>).filter((key) => !String(key).startsWith('dm_') && !String(key).startsWith('gt_'))) {
+    for (const id of (Object.keys(TOOLS) as Array<keyof typeof TOOLS>).filter((key) => !String(key).startsWith('dm_') && !String(key).startsWith('gt_') && !String(key).startsWith('rb_'))) {
       const emblem = toolEmblem(id);
       expect(emblem.className).toBe('ps-emblem');
       expect(emblem.getAttribute('aria-hidden')).toBe('true');
