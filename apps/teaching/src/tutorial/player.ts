@@ -1,9 +1,10 @@
 import type { PublishedLesson } from '@/schemas/published-lesson';
+import type { Block } from '@/schemas/block';
+import { renderBlock } from '@/blocks/render';
+import { isSidePath } from '@/lecture/scenes';
 import { el, readJSON, writeJSON } from '@/quiz/dom';
-import { mountLecturePlayer, type LecturePlayerHandle } from '@/lecture/player';
 import { mountStudentQuiz } from '@/quiz/student-quiz';
 import { FADED_EVENT, type FadedDetail } from '@/blocks/faded-example';
-import { splitAtTeacher } from './model';
 import { studentStage, type DeviceProgress } from './stage';
 import type { TutorialStage } from './schema';
 import type { TutorialClient, TutorialStatus } from './api';
@@ -17,13 +18,13 @@ export type TutorialPlayerOptions = {
   renderHero: (host: HTMLElement) => void;
 };
 
-const POLL_MS = 5000;
-const NONE: DeviceProgress = { common: false, before: false, after: false, exit: false };
+const RETRY_MS = 5000;
+const NONE: DeviceProgress = { common: false, exit: false };
 
 /**
- * A student's tutorial: Common (if any), their group's tab up to With teacher,
- * a calm wait until the teacher has sat with them, You do, then the exit check.
- * Each stretch plays in the lecture player; this file only moves between them.
+ * A student's tutorial is two pages: the Common demo, full width, then their
+ * group's page with the exit check at the bottom. The teacher is sitting with
+ * them, so there is nothing to wait for and nothing else to navigate.
  */
 export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOptions): { dispose(): void } {
   const { lesson, client } = options;
@@ -31,19 +32,13 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
   const doneKey = `tutorial:${lessonId}:done`;
   let done: DeviceProgress = { ...NONE, ...(readJSON<Partial<DeviceProgress>>(doneKey) ?? {}) };
   let status: TutorialStatus | null = null;
-  let player: LecturePlayerHandle | null = null;
-  let poll = 0;
+  let retry = 0;
   let disposed = false;
-  /** Bumped on every paint, so a check-in sent before the screen changed can't repaint over it. */
-  let paintId = 0;
   /** The last stage told to the server; progress is sent only when it changes. */
   let lastStage: TutorialStage | '' = '';
   /** The first status check failed; the screen says so and keeps trying. */
   let unreachable = false;
-  /** What the waiting screen is showing, so an unchanged check-in leaves it alone. Empty when it isn't up. */
-  let waitShowing = '';
   const shell = el('div', 'tut');
-  // Segments skip the lecture title card, so the hero sits once above every stage.
   const hero = el('div', 'tut__hero');
   options.renderHero(hero);
   const root = el('div', 'tut__body');
@@ -54,19 +49,7 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
     done = { ...done, [part]: true };
     writeJSON(doneKey, done);
     paint();
-    // A teacher already sitting with the group, or already Done, shows at once.
-    if (lastStage === 'waiting') void refresh();
-  };
-
-  const stageOf = (s: TutorialStatus): TutorialStage | null => {
-    if (s.identity.need === 'initials' || s.anonymous || !s.group) return null;
-    const tab = splitAtTeacher(s.group.blocks);
-    return studentStage(done, { unlocked: s.unlocked, hasCommon: lesson.blocks.length > 0, hasAfter: tab.after.length > 0, hasExit: !!lesson.quiz });
-  };
-  const waitKey = (s: TutorialStatus) => JSON.stringify([stageOf(s), s.sitting, s.sitting ? s.shown : null]);
-  const schedule = () => {
-    window.clearTimeout(poll);
-    poll = window.setTimeout(() => void refresh(), POLL_MS);
+    window.scrollTo?.({ top: 0 });
   };
 
   // Faded answers go to the teacher's live board.
@@ -75,74 +58,65 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
     void client?.answer(blockId, parts, rating).catch(() => {});
   });
 
-  function segment(blocks: PublishedLesson['blocks'], key: string, doneLabel: string, part: keyof DeviceProgress): void {
-    const stage = el('div', 'tut__segment');
-    root.append(stage);
-    player = mountLecturePlayer(stage, {
-      lessonId,
-      title: lesson.title,
-      blocks,
-      client: client ? client.forPlayer() : null,
-      renderHero: () => {},
-      segment: { saveKey: `tutorial:${lessonId}:${key}`, doneLabel, onDone: () => finish(part) }
-    });
+  /** A run of blocks as one scrolling page. */
+  function page(blocks: Block[]): HTMLElement {
+    const box = el('div', 'tut__page');
+    for (const block of blocks) {
+      // Side paths belong to the lecture player, and With teacher is the teacher's marker.
+      if (isSidePath(block) || block.block_type === 'with_teacher') continue;
+      box.append(renderBlock(block, 'student', { lessonId, pageBlocks: blocks }));
+    }
+    return box;
   }
+
+  const button = (label: string, onClick: () => void): HTMLButtonElement => {
+    const b = el('button', 'btn btn--primary tut__next', label);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      b.disabled = true;
+      onClick();
+    });
+    return b;
+  };
 
   function paint(): void {
     if (disposed) return;
-    paintId += 1;
-    waitShowing = '';
-    window.clearTimeout(poll);
-    player?.dispose();
-    player = null;
+    window.clearTimeout(retry);
     root.replaceChildren();
+    hero.hidden = false;
     if (!client) return void root.append(el('p', 'tut__note', 'Open this tutorial from your class page.'));
     if (!status) {
       if (!unreachable) return void root.append(el('p', 'tut__note', 'Loading…'));
       root.append(el('p', 'tut__note', 'Couldn’t reach your teacher’s board. Trying again…'));
-      return schedule();
+      retry = window.setTimeout(() => void refresh(), RETRY_MS);
+      return;
     }
     if (status.identity.need === 'initials') return void root.append(claimForm(client));
-    // No lecture segment and no ✋ for anyone who isn't in a group today.
+    // No page for anyone who isn't in a group today.
     if (status.anonymous) return void root.append(el('p', 'tut__note', 'Your teacher hasn’t added a class list yet.'));
     if (!status.group) return void root.append(el('p', 'tut__note', 'This one isn’t for you today.'));
-    const tab = splitAtTeacher(status.group.blocks);
-    const stage = stageOf(status) ?? 'done';
+    const stage = studentStage(done, { hasCommon: lesson.blocks.length > 0 });
     if (stage !== lastStage) {
       lastStage = stage;
       void client.progress(stage).catch(() => {});
     }
-    root.append(el('p', 'tut__goal', status.group.goal));
-    if (stage === 'common') return segment(lesson.blocks, 'common', 'On to your group', 'common');
-    if (stage === 'before') return segment(tab.before, 'before', 'I’m ready for my teacher', 'before');
-    if (stage === 'waiting') return waiting(status);
-    if (stage === 'after') return segment(tab.after, 'after', 'On to the check', 'after');
-    // A tutorial with no exit questions publishes no quiz, so its stage goes straight to done.
-    if (stage === 'exit' && lesson.quiz) {
-      const quiz = el('div', 'tut__exit');
-      quiz.append(mountStudentQuiz(lesson, { classId: options.classId, pickClass: false }));
-      const end = el('button', 'btn btn--secondary tut__finish', 'I’ve handed it in');
-      end.type = 'button';
-      end.addEventListener('click', () => finish('exit'));
-      root.append(quiz, end);
+    if (stage === 'common') {
+      root.append(page(lesson.blocks), button('On to the next page', () => finish('common')));
+      return;
+    }
+    hero.hidden = true;
+    if (stage === 'waiting') {
+      root.append(page(status.group.blocks));
+      // A tutorial with no exit questions publishes no quiz, so its page just ends.
+      if (lesson.quiz) {
+        const quiz = el('div', 'tut__exit');
+        quiz.append(mountStudentQuiz(lesson, { classId: options.classId, pickClass: false }));
+        root.append(quiz);
+      }
+      root.append(button(lesson.quiz ? 'I’ve handed it in' : 'I’m finished', () => finish('exit')));
       return;
     }
     root.append(el('p', 'tut__note', 'All done. Nice work.'));
-  }
-
-  /** The With teacher screen. It checks in every few seconds, only while it's showing. */
-  function waiting(s: TutorialStatus): void {
-    const box = el('section', 'tut-wait');
-    box.append(el('h2', 'tut-wait__title', s.sitting ? 'Your teacher is with your group.' : 'Your teacher will join you here.'));
-    if (s.sitting && s.shown) {
-      // The answer the teacher put up, with no name on it.
-      const shown = el('blockquote', 'tut-shown');
-      shown.append(el('p', 'tut-shown__label', s.shown.label), el('p', 'tut-shown__text', s.shown.text));
-      box.append(shown);
-    }
-    root.append(box);
-    waitShowing = waitKey(s);
-    schedule();
   }
 
   function claimForm(c: TutorialClient): HTMLElement {
@@ -175,27 +149,15 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
 
   async function refresh(): Promise<void> {
     if (!client || disposed) return;
-    const asked = paintId;
-    let next: TutorialStatus | null = null;
     try {
-      next = await client.status();
+      status = await client.status();
+      unreachable = false;
     } catch {
-      // A dropped check-in tries again on the next tick.
+      // Say so and try again; once there is a status, a dropped check is not worth a screen.
+      if (status) return;
+      unreachable = true;
     }
-    if (disposed || asked !== paintId) return;
-    if (!next) {
-      // The first check failed: say so and keep trying. A dropped check-in while waiting tries again.
-      if (!status) {
-        unreachable = true;
-        return paint();
-      }
-      if (waitShowing) schedule();
-      return;
-    }
-    status = next;
-    unreachable = false;
-    // Nothing new while waiting: leave the screen as it is and check again later.
-    if (waitShowing && waitShowing === waitKey(next)) return schedule();
+    if (disposed) return;
     paint();
   }
 
@@ -204,9 +166,7 @@ export function mountTutorialPlayer(host: HTMLElement, options: TutorialPlayerOp
   return {
     dispose() {
       disposed = true;
-      window.clearTimeout(poll);
-      player?.dispose();
-      player = null;
+      window.clearTimeout(retry);
     }
   };
 }

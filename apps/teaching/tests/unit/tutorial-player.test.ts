@@ -7,10 +7,10 @@ vi.mock('@/quiz/student-quiz', () => ({ mountStudentQuiz: () => Object.assign(do
 
 const b = (id: string, block_type: string, content: Record<string, unknown>): Block =>
   ({ id, type: 'block', block_type, variant: 'medium', visibility: 'student_teacher', content }) as Block;
-const lesson = { lesson_id: 'tut1', title: 'Structure', unit_id: 'u1', blocks: [], published_at: '2026-10-23T00:00:00.000Z', schema_version: 1 as const, pedagogical_mode: 'tutorial' as const };
+const lesson = { lesson_id: 'tut1', title: 'Structure', unit_id: 'u1', blocks: [b('c1', 'heading', { text: 'Common demo' })], published_at: '2026-10-23T00:00:00.000Z', schema_version: 1 as const, pedagogical_mode: 'tutorial' as const };
 const withQuiz = { ...lesson, quiz: { version: 'v', question_count: 1, total_marks: 1 } as never };
 const status = (over: Partial<TutorialStatus> = {}): TutorialStatus => ({
-  identity: { need: null, initials: 'AB' }, group: { id: 'ga', goal: 'Today: the effect', blocks: [b('r1', 'rich_text', { text: 'Step' }), b('w1', 'with_teacher', { talking_points: [] }), b('r2', 'rich_text', { text: 'You do' })] },
+  identity: { need: null, initials: 'AB' }, group: { id: 'ga', goal: 'Today: the effect', blocks: [b('r1', 'heading', { text: 'Step' }), b('w1', 'with_teacher', { talking_points: [] }), b('r2', 'heading', { text: 'You do' })] },
   sitting: false, unlocked: false, shown: null, handups: [], ...over
 });
 const client = (s: TutorialStatus | (() => TutorialStatus)): TutorialClient => {
@@ -21,114 +21,80 @@ const client = (s: TutorialStatus | (() => TutorialStatus)): TutorialClient => {
   };
 };
 const flush = () => new Promise((r) => setTimeout(r, 0));
-const setDone = (d: Record<string, boolean>) => localStorage.setItem('tutorial:tut1:done', JSON.stringify({ common: true, before: false, after: false, exit: false, ...d }));
+const setDone = (d: Record<string, boolean>) => localStorage.setItem('tutorial:tut1:done', JSON.stringify({ common: false, exit: false, ...d }));
+const click = (host: HTMLElement, selector: string) => (host.querySelector(selector) as HTMLButtonElement).click();
 
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.useRealTimers());
 
 describe('tutorial player', () => {
-  it('shows the goal and plays the tab up to With teacher, then waits', async () => {
+  it('starts on the Common page, full width, with no group content or navigation pills', async () => {
     const host = document.createElement('div');
-    mountTutorialPlayer(host, { lesson, client: client(status()), renderHero: () => {} });
+    const c = client(status());
+    mountTutorialPlayer(host, { lesson, client: c, renderHero: () => {} });
     await flush();
-    expect(host.textContent).toContain('Today: the effect');
-    expect(host.querySelector('.lecture-stage')).not.toBeNull();
-    setDone({ before: true });
-    const again = document.createElement('div');
-    mountTutorialPlayer(again, { lesson, client: client(status()), renderHero: () => {} });
-    await flush();
-    expect(again.querySelector('.tut-wait')?.textContent).toContain('Your teacher will join you here');
+    expect(host.textContent).toContain('Common demo');
+    expect(host.textContent).not.toContain('Step');
+    expect(host.textContent).not.toContain('Today: the effect');
+    expect(host.querySelector('.lecture-stage, .lecture-strip, .tut-wait')).toBeNull();
+    expect(c.progress).toHaveBeenLastCalledWith('common');
   });
 
-  it('shows what the teacher put up while sitting with the group', async () => {
-    setDone({ before: true });
+  it('the next button moves to the group page: the whole tab, no With teacher marker, no hero', async () => {
     const host = document.createElement('div');
-    mountTutorialPlayer(host, { lesson, client: client(status({ sitting: true, shown: { text: 'It goes back to the start', label: 'Effect' } })), renderHero: () => {} });
+    const c = client(status());
+    mountTutorialPlayer(host, { lesson, client: c, renderHero: (h) => h.append(document.createTextNode('Title')) });
     await flush();
-    expect(host.querySelector('.tut-wait')?.textContent).toContain('Your teacher is with your group.');
-    expect(host.querySelector('.tut-shown')?.textContent).toContain('It goes back to the start');
+    click(host, '.tut__next');
+    expect(host.textContent).not.toContain('Common demo');
+    expect(host.textContent).toContain('Step');
+    expect(host.textContent).toContain('You do');
+    expect(host.querySelector('.block-with-teacher')).toBeNull();
+    expect((host.querySelector('.tut__hero') as HTMLElement).hidden).toBe(true);
+    expect(c.progress).toHaveBeenLastCalledWith('waiting');
   });
 
-  it('after Done goes to You do, then the exit check', async () => {
-    setDone({ before: true, after: true });
+  it('puts the exit check at the bottom of the group page, then finishes', async () => {
+    setDone({ common: true });
     const host = document.createElement('div');
-    mountTutorialPlayer(host, { lesson: withQuiz, classId: 'class1', client: client(status({ unlocked: true })), renderHero: () => {} });
+    const c = client(status());
+    mountTutorialPlayer(host, { lesson: withQuiz, classId: 'class1', client: c, renderHero: () => {} });
     await flush();
-    expect(host.querySelector('.qz-quiz')).not.toBeNull();
-  });
-
-  it('with no exit questions, the exit stage just says well done', async () => {
-    setDone({ before: true, after: true });
-    const host = document.createElement('div');
-    const c = client(status({ unlocked: true }));
-    mountTutorialPlayer(host, { lesson, classId: 'class1', client: c, renderHero: () => {} });
-    await flush();
-    expect(host.querySelector('.qz-quiz')).toBeNull();
+    const page = host.querySelector('.tut__page')!;
+    const quiz = host.querySelector('.qz-quiz')!;
+    expect(page.compareDocumentPosition(quiz) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    click(host, '.tut__next');
     expect(host.textContent).toContain('All done. Nice work.');
-    expect(c.progress).toHaveBeenCalledWith('done');
-    expect(c.progress).not.toHaveBeenCalledWith('exit');
+    expect(c.progress).toHaveBeenLastCalledWith('done');
   });
 
-  it('tells a student outside the groups, with no lecture or hand-up', async () => {
+  it('with no common blocks or exit questions, goes straight to the group page and just ends', async () => {
+    const host = document.createElement('div');
+    mountTutorialPlayer(host, { lesson: { ...lesson, blocks: [] }, client: client(status()), renderHero: () => {} });
+    await flush();
+    expect(host.textContent).toContain('Step');
+    expect(host.querySelector('.qz-quiz')).toBeNull();
+    expect(host.querySelector('.tut__next')?.textContent).toBe('I’m finished');
+  });
+
+  it('tells a student outside the groups, with nothing else', async () => {
     const host = document.createElement('div');
     mountTutorialPlayer(host, { lesson, client: client(status({ group: null, not_for_you: true })), renderHero: () => {} });
     await flush();
     expect(host.textContent).toContain('This one isn’t for you today.');
-    expect(host.querySelector('.lecture-stage')).toBeNull();
-    expect(host.querySelector('.lecture-strip__hand')).toBeNull();
+    expect(host.querySelector('.tut__next')).toBeNull();
   });
 
-  it('sends progress only when the stage changes', async () => {
+  it('does not poll once the page is up', async () => {
     vi.useFakeTimers();
-    setDone({ before: true });
     const c = client(status());
-    const host = document.createElement('div');
-    mountTutorialPlayer(host, { lesson, client: c, renderHero: () => {} });
+    mountTutorialPlayer(document.createElement('div'), { lesson, client: c, renderHero: () => {} });
     await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(5000);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(c.status).toHaveBeenCalledTimes(3);
-    expect(c.progress).toHaveBeenCalledTimes(1);
-    expect(c.progress).toHaveBeenCalledWith('waiting');
-  });
-
-  it('polls only while waiting, moves on when unlocked and stops on dispose', async () => {
-    vi.useFakeTimers();
-    setDone({ before: true });
-    let s = status();
-    const c = client(() => s);
-    const host = document.createElement('div');
-    const handle = mountTutorialPlayer(host, { lesson, client: c, renderHero: () => {} });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(host.querySelector('.tut-wait')).not.toBeNull();
-    s = status({ unlocked: true });
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(host.querySelector('.tut-wait')).toBeNull();
-    expect(host.querySelector('.lecture-stage')).not.toBeNull();
-    const calls = (c.status as ReturnType<typeof vi.fn>).mock.calls.length;
-    await vi.advanceTimersByTimeAsync(20000);
-    expect((c.status as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
-    handle.dispose();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(c.status).toHaveBeenCalledTimes(1);
   });
 
   it('a check-in in flight at dispose does not repaint', async () => {
-    vi.useFakeTimers();
-    setDone({ before: true });
-    let resolveLate: (v: TutorialStatus) => void = () => {};
-    const c = client(status());
-    const host = document.createElement('div');
-    const handle = mountTutorialPlayer(host, { lesson, client: c, renderHero: () => {} });
-    await vi.advanceTimersByTimeAsync(0);
-    (c.status as ReturnType<typeof vi.fn>).mockImplementationOnce(() => new Promise<TutorialStatus>((r) => { resolveLate = r; }));
-    await vi.advanceTimersByTimeAsync(5000);
-    handle.dispose();
-    resolveLate(status({ sitting: true }));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(host.textContent).not.toContain('Your teacher is with your group.');
-  });
-
-  it('stops repainting after dispose', async () => {
-    setDone({ before: true });
     let resolveLate: (v: TutorialStatus) => void = () => {};
     const c = client(status());
     (c.status as ReturnType<typeof vi.fn>).mockImplementationOnce(() => new Promise<TutorialStatus>((r) => { resolveLate = r; }));
@@ -137,7 +103,7 @@ describe('tutorial player', () => {
     handle.dispose();
     resolveLate(status());
     await flush();
-    expect(host.querySelector('.tut-wait')).toBeNull();
+    expect(host.textContent).not.toContain('Common demo');
   });
 
   it('sends faded answers to the server', async () => {
@@ -145,11 +111,11 @@ describe('tutorial player', () => {
     const host = document.createElement('div');
     mountTutorialPlayer(host, { lesson, client: c, renderHero: () => {} });
     await flush();
-    host.querySelector('.lecture-stage')!.dispatchEvent(new CustomEvent('tutorial:faded', { bubbles: true, detail: { blockId: 'f1', parts: { 0: 'x' }, rating: 'right' } }));
+    host.querySelector('.tut__page')!.dispatchEvent(new CustomEvent('tutorial:faded', { bubbles: true, detail: { blockId: 'f1', parts: { 0: 'x' }, rating: 'right' } }));
     expect(c.answer).toHaveBeenCalledWith('f1', { 0: 'x' }, 'right');
   });
 
-  it('shows the hero once above the stages', async () => {
+  it('shows the hero once, above the Common page', async () => {
     const host = document.createElement('div');
     mountTutorialPlayer(host, { lesson, client: client(status()), renderHero: (h) => h.append(Object.assign(document.createElement('h1'), { textContent: 'Structure' })) });
     await flush();
@@ -159,7 +125,6 @@ describe('tutorial player', () => {
 
   it('a failed first check says so and keeps trying until it answers', async () => {
     vi.useFakeTimers();
-    setDone({ before: true });
     const c = client(status());
     const fail = c.status as ReturnType<typeof vi.fn>;
     fail.mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'));
@@ -170,20 +135,9 @@ describe('tutorial player', () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(host.textContent).toContain('Couldn’t reach your teacher’s board. Trying again…');
     await vi.advanceTimersByTimeAsync(5000);
-    expect(host.querySelector('.tut-wait')).not.toBeNull();
+    expect(host.textContent).toContain('Common demo');
     expect(fail).toHaveBeenCalledTimes(3);
     handle.dispose();
-  });
-
-  it('an unchanged check-in leaves the waiting screen alone', async () => {
-    vi.useFakeTimers();
-    setDone({ before: true });
-    const host = document.createElement('div');
-    mountTutorialPlayer(host, { lesson, client: client(status({ sitting: true, shown: { text: 'It goes back to the start', label: 'Effect' } })), renderHero: () => {} });
-    await vi.advanceTimersByTimeAsync(0);
-    const box = host.querySelector('.tut-wait');
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(host.querySelector('.tut-wait')).toBe(box);
   });
 
   it('a bad claim says so, then a good one moves on', async () => {
@@ -204,25 +158,7 @@ describe('tutorial player', () => {
     await flush();
     expect(c.claim).toHaveBeenLastCalledWith('AB');
     expect(host.querySelector('.tut-claim')).toBeNull();
-    expect(host.querySelector('.lecture-stage')).not.toBeNull();
-  });
-
-  it('Done on the first stretch leads to the wait, and checks in at once', async () => {
-    let s = status();
-    const c = client(() => s);
-    const host = document.createElement('div');
-    mountTutorialPlayer(host, { lesson, client: c, renderHero: () => {} });
-    await flush();
-    const main = host.querySelector('.lecture-bar__main') as HTMLButtonElement;
-    for (let i = 0; i < 5 && !host.querySelector('.lecture-recap'); i += 1) main.click();
-    const finish = host.querySelector('.lecture-recap__finish') as HTMLButtonElement;
-    expect(finish.textContent).toBe('I’m ready for my teacher');
-    s = status({ sitting: true });
-    finish.click();
-    expect(host.querySelector('.tut-wait')).not.toBeNull();
-    expect(c.progress).toHaveBeenLastCalledWith('waiting');
-    await flush();
-    expect(host.querySelector('.tut-wait')?.textContent).toContain('Your teacher is with your group.');
+    expect(host.textContent).toContain('Common demo');
   });
 
   it('asks a student with no class link to open it from their class page', () => {
