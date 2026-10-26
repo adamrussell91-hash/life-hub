@@ -1255,11 +1255,12 @@
 
 .qz-attempt {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: var(--qz-attempt-cols);
+  align-items: center;
   gap: var(--space-1) var(--space-3);
   width: 100%;
-  min-height: 48px;
-  padding: var(--space-2) var(--space-4);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3);
   font: inherit;
   text-align: left;
   color: var(--ink);
@@ -1267,6 +1268,44 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   cursor: pointer;
+}
+
+.qz-attempts {
+  --qz-attempt-cols: minmax(0, 1fr) auto 3rem;
+}
+
+.qz-attempts__head {
+  display: grid;
+  grid-template-columns: var(--qz-attempt-cols);
+  align-items: end;
+  gap: var(--space-1) var(--space-3);
+  padding: 0 var(--space-3);
+}
+
+.qz-students {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.qz-students__tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.qz-attempt__score {
+  text-align: right;
+}
+
+
+.qz-attempt__score[data-band='low'] { color: var(--danger); }
+.qz-attempt__score[data-band='high'] { color: var(--success); }
+
+.qz-qdetail {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .qz-attempt[data-pending='true'] {
@@ -1284,9 +1323,21 @@
 }
 
 .qz-attempt__meta {
-  grid-column: 1 / -1;
+  grid-column: 1;
+  grid-row: 2;
   font-size: var(--text-xs);
   color: var(--muted);
+}
+
+.qz-attempt__who {
+  grid-row: 1;
+}
+
+.qz-attempt .ev-strip,
+.qz-attempt__score,
+.qz-attempt__set {
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 
 .qz-mark {
@@ -1860,13 +1911,32 @@
   color: var(--muted);
 }
 .qz-attempts__head {
-  display: flex;
-  gap: var(--space-3);
   font-size: var(--text-xs);
   color: var(--muted);
   list-style: none;
 }
 .qz-attempt__set {
   min-width: 4em;
+  text-align: right;
   font-size: var(--text-sm);
+}
+
+@media (max-width: 600px) {
+  .qz-attempts {
+    --qz-attempt-cols: minmax(0, 1fr) 3rem;
+  }
+  .qz-attempt .ev-strip,
+  .qz-attempts__head .ev-strip {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .qz-attempt__score {
+    grid-column: 2;
+  }
+  .qz-attempt__meta {
+    grid-column: 1;
+  }
+  .qz-attempts__head {
+    display: none;
+  }
 }

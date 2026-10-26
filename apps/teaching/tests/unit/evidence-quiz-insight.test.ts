@@ -56,9 +56,8 @@ describe('renderQuizInsight', () => {
       { ...payload, attempts: [waiting('s1', 1, null), waiting('s2', 1, null), waiting('s3', 0, null)] } as unknown as InsightPayload,
       { ctx, onDismiss: vi.fn(), openLesson: vi.fn() }
     );
-    const cells = [...node.querySelectorAll('.ev-questions tr')].slice(1).map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
-    expect(cells[0]!.slice(1)).toEqual(['67%', '']);
-    expect(cells[1]!.slice(1)).toEqual(['–', '']);
-    expect(node.querySelector('.ev-questions')?.textContent).not.toContain('Too hard');
+    [...node.querySelectorAll<HTMLButtonElement>('.ev-tab')].find((t) => t.textContent?.startsWith('Questions'))!.click();
+    expect([...node.querySelectorAll('.ev-qrow__pct')].map((n) => n.textContent)).toEqual(['67%', '–']);
+    expect(node.querySelector('.ev-qrows')?.textContent).not.toContain('Too hard');
   });
 });
