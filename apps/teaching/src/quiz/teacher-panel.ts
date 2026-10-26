@@ -710,7 +710,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         }
         paint();
       });
-      out.push(labelled('Class', pick, 'Insights use each student’s first attempt.'));
+      out.push(labelled('Class', pick, 'Insights use each student’s latest attempt.'));
     }
     const act = (run: () => Promise<InsightReply>) => async () => {
       insightGen++;
