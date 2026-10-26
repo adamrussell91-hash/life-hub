@@ -16,6 +16,12 @@ export interface JournalCaptureDraft {
    * edited `localDate`, so changing the date never orphans the draft.
    */
   draftKeyDate?: string;
+  /** When the capture screen was first opened; the moment's time stamp. */
+  openedAt?: string;
+  /** Per photo, whether it came from the camera or the library. */
+  photoSources?: ('camera' | 'library')[];
+  /** Location fix from the phone, kept so a restored draft keeps its place. */
+  deviceCoordinates?: { lat: number; lon: number };
 }
 
 const IDB_NAME = 'lifehub-travel-journal-capture';
