@@ -291,7 +291,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
 
   const input = document.createElement('textarea');
   input.className = 'ai-panel__input';
-  input.rows = 3;
+  input.rows = 2;
   input.placeholder = 'Ask the selected agent…';
   input.setAttribute('aria-label', 'Message');
 
