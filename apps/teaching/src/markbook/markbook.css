@@ -30,6 +30,8 @@
 .mb-cell { min-width: 5.5ch; min-height: 32px; padding: 2px var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); background: none; font: inherit; font-variant-numeric: tabular-nums; color: inherit; cursor: pointer; position: relative; }
 .mb-cell:hover, .mb-cell:focus-visible { border-color: var(--line); }
 .mb-cell--blank { display: inline-block; cursor: default; }
+.mb-cell--na { background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.mb-cell--started { color: var(--warning); font-size: 0.8em; }
 span.mb-cell { display: inline-block; cursor: default; }
 .mb-cell.is-exempt { color: var(--muted); font-style: italic; }
 .mb-cell__pending { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }

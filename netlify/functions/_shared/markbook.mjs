@@ -75,6 +75,7 @@ export async function quizColumns(store, roster, book) {
       closed: q.closed,
       questions: q.questions,
       scores: q.scores,
+      ...(q.started ? { started: q.started } : {}),
       ...(q.groups ? { groups: q.groups } : {})
     }));
 }
