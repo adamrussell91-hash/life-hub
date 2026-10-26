@@ -188,14 +188,15 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
   let saving = false;
   const saveChips = new Set<HTMLElement>();
 
+  function paintSaveChip(chip: HTMLElement): void {
+    chip.dataset.state = saveState;
+    chip.textContent = saveState === 'failed' ? 'Not saved yet. Keep this page open.' : saveState === 'saving' ? 'Saving…' : 'Saved ✓';
+  }
+
   function paintSaveChips(): void {
     for (const chip of saveChips) {
-      if (!chip.isConnected) {
-        saveChips.delete(chip);
-        continue;
-      }
-      chip.dataset.state = saveState;
-      chip.textContent = saveState === 'failed' ? 'Not saved yet. Keep this page open.' : saveState === 'saving' ? 'Saving…' : 'Saved ✓';
+      if (!chip.isConnected) saveChips.delete(chip);
+      else paintSaveChip(chip);
     }
   }
 
@@ -203,7 +204,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     const chip = el('span', 'qz-save');
     chip.setAttribute('role', 'status');
     saveChips.add(chip);
-    paintSaveChips();
+    paintSaveChip(chip);
     return chip;
   }
 
