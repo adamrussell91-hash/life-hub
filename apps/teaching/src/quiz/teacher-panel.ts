@@ -18,7 +18,8 @@ import { mountQuestionBuilder } from '@/quiz/builder';
 import { mountQuestionPlayer } from '@/quiz/player';
 import { spanText } from '@/quiz/word-picker';
 import { formatCode, keySummary, meter, renderLiveStage, type LiveQuiz } from '@/quiz/live-stage';
-import { button, checkbox, el, errorText, formatMarks, labelled, plural, select } from '@/quiz/dom';
+import { button, checkbox, el, errorText, formatMarks, labelled, plural, practiceChip, select } from '@/quiz/dom';
+import { groupSetSection, renderGroupSetPicker, type PickerOptions } from '@/quiz/group-set-picker';
 import { httpInsightApi, isInsight, type InsightApi, type InsightReply } from '@/evidence/api';
 import { codeLabel, loadInsightContext, type InsightContext } from '@/evidence/context';
 import { openFollowUpPlan } from '@/evidence/follow-up';
@@ -44,6 +45,9 @@ export type QuizPanelOptions = {
   onAddBlocks: (blocks: Block[]) => void;
   onRemoveBlock: (blockId: string) => void;
   idFactory: () => string;
+  /** Loads a class's saved groups and suggested group moves, for Personalise. */
+  loadGroups?: PickerOptions['load'];
+  saveSuggestion?: PickerOptions['saveSuggestion'];
   /** Test seam for the insight calls; defaults to the quiz endpoint. */
   insightApi?: InsightApi;
 };
@@ -63,11 +67,11 @@ type Submission = {
   quiz_block_id: string | null;
 };
 
-type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey; codes: string[] };
+type Row = { id: string; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; confidence: number | null; question: PublicQuestion; key: QuestionKey; codes: string[]; set?: string };
 /** Initials and name from the class list; both null when the student was removed. */
 type StudentLabel = { initials: string | null; name: string | null };
 
-type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; go: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean };
+type AttemptSummary = { student: StudentLabel | null; id: string; device: string; n: number; go: number; submitted_at: string; overtime: boolean; score: number; max: number; pending: number; current: boolean; practice?: Record<string, { score: number; max: number; pending: number }> };
 type QuestionStats = {
   id: string;
   question: PublicQuestion;
@@ -80,7 +84,7 @@ type QuestionStats = {
   confidence: Record<'1' | '2' | '3', [number, number]>;
   picks: Record<string, number>;
 };
-type Results = { published: false } | { published: true; version: string; feedback: string; released: boolean; attempts: AttemptSummary[]; questions: QuestionStats[] };
+type Results = { published: false } | { published: true; version: string; feedback: string; released: boolean; attempts: AttemptSummary[]; questions: QuestionStats[]; sets?: Array<{ id: string; name: string; questions: number }> };
 type Tab = 'tray' | 'settings' | 'results' | 'live';
 
 const TAB_KEY = 'quiz-panel:tab';
@@ -564,6 +568,16 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       grid.append(el('p', 'qz-note block-secondary', `For ${n} ${n === 1 ? 'student' : 'students'} only (a follow-up quiz).`));
     }
     wrap.append(grid);
+    if (options.loadGroups && options.saveSuggestion && !raw.for_students?.length) {
+      wrap.append(
+        renderGroupSetPicker({
+          classes: classes ?? [],
+          load: options.loadGroups,
+          saveSuggestion: options.saveSuggestion,
+          onAdd: (config) => options.onAddBlocks([groupSetSection(options.idFactory(), config)])
+        })
+      );
+    }
 
     const toggles = el('div', 'qz-settings__toggles');
     toggles.append(
@@ -633,6 +647,13 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
     wrap.append(el('h4', 'qz-h', 'Attempts'));
     const names = deviceNames(r.attempts.filter((a) => !a.student).map((a) => a.device));
     const list = el('ul', 'qz-attempts');
+    const sets = r.sets ?? [];
+    if (sets.length) {
+      const head = el('li', 'qz-attempts__head');
+      head.append(el('span', 'qz-attempt__who'), el('span', 'qz-attempt__score'));
+      for (const set of sets) head.append(el('span', 'qz-attempt__set', set.name));
+      list.append(head);
+    }
     for (const a of r.attempts) {
       const li = el('li');
       const b = el('button', 'qz-attempt');
@@ -640,6 +661,12 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
       b.append(
         el('span', 'qz-attempt__who', `${whoLabel(a, names)}${a.go > 0 ? ` · go ${a.go + 1}` : ''}`),
         el('span', 'qz-attempt__score', `${formatMarks(a.score)} / ${formatMarks(a.max)}`),
+        ...sets.map((set) => {
+          const p = a.practice?.[set.id];
+          const cell = el('span', 'qz-attempt__set', p ? `${formatMarks(p.score)}/${formatMarks(p.max)}` : '');
+          cell.dataset.set = set.id;
+          return cell;
+        }),
         el('span', 'qz-attempt__meta', [a.pending ? `${a.pending} to mark` : '', a.overtime ? 'Late' : '', a.current ? '' : 'Earlier version', timeAgo(a.submitted_at)].filter(Boolean).join(' · '))
       );
       if (a.pending) b.dataset.pending = 'true';
@@ -683,7 +710,7 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
         }
         paint();
       });
-      out.push(labelled('Class', pick, 'Insights use each student’s first attempt.'));
+      out.push(labelled('Class', pick, 'Insights use each student’s latest attempt.'));
     }
     const act = (run: () => Promise<InsightReply>) => async () => {
       insightGen++;
@@ -806,11 +833,25 @@ export function mountQuizPanel(options: QuizPanelOptions): QuizPanelHandle {
           showError(error);
           this.disabled = false;
         }
+      }),
+      button('Delete this attempt', 'ghost', async function () {
+        const who = a.student ? whoLabel(a, new Map()) : 'this student';
+        if (!window.confirm(`Delete this attempt by ${who}? It stops counting in the markbook and insights, and they get that go back. Their other attempts stay. This can’t be undone.`)) return;
+        this.disabled = true;
+        try {
+          results = await post<Results>({ action: 'delete_attempt', attempt_id: a.id });
+          openAttempt = null;
+          paint();
+        } catch (error) {
+          showError(error);
+          this.disabled = false;
+        }
       })
     );
     wrap.append(bar);
     a.rows.forEach((r, i) => {
       const item = el('div', 'qz-attempt-row');
+      if (r.set) item.append(practiceChip());
       item.append(mountQuestionPlayer({ question: r.question, response: r.response, number: i + 1, result: { mark: r.mark, key: r.key, hinted: r.hinted, awarded: r.awarded } }));
       if (r.confidence) item.append(el('p', 'qz-note block-secondary', `How sure: ${['', 'Guessing', 'Fairly sure', 'Sure'][r.confidence]}`));
       const markRow = el('div', 'qz-mark');

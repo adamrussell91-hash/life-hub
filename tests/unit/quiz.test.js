@@ -510,7 +510,7 @@ test('a claimed device needs no device token', async () => {
   assert.equal(done.attempts_used, 1);
 });
 
-test('markbook: each student’s first handed-in attempt, scored like Results', async () => {
+test('markbook: each student’s latest handed-in attempt, scored like Results', async () => {
   const { classQuizScores } = await import('../../netlify/functions/_shared/quiz.mjs');
   const { loadRoster } = await import('../../netlify/functions/_shared/class-claims.mjs');
   const store = withClass(baseStore({ quizSettings: { attempts: 3, confidence: true } }));
@@ -522,9 +522,9 @@ test('markbook: each student’s first handed-in attempt, scored like Results', 
 
   await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'BB' });
   await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
-  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Romeo' }, qc: { text: 'Because fate.' } }, confidence: { qb: 3 } });
-  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
   await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: {} });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
+  await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'submit', responses: { qb: { text: 'Romeo' }, qc: { text: 'Because fate.' } }, confidence: { qb: 3 } });
   await quizAction(store, 'quiz1', { token: token(7), action: 'start' });
   await quizAction(store, 'quiz1', { token: token(7), action: 'submit', responses: {} });
 
@@ -533,7 +533,7 @@ test('markbook: each student’s first handed-in attempt, scored like Results', 
   assert.equal(found.confidence, true);
   assert.deepEqual(Object.keys(found.scores), [bob.id], 'Tom never handed in; the anonymous go is not on the list');
   const first = found.scores[bob.id];
-  assert.match(first.attempt_id, /~0$/, 'the first go counts, not the later one');
+  assert.match(first.attempt_id, /~1$/, 'the latest go counts, not the first');
   assert.equal(first.score, 1);
   assert.equal(first.max, 7);
   assert.equal(first.pending, 1);

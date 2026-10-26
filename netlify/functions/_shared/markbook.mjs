@@ -76,9 +76,58 @@ export async function quizColumns(store, roster, book) {
       questions: q.questions,
       scores: q.scores,
       ...(q.started ? { started: q.started } : {}),
+      ...(q.sets ? { sets: q.sets } : {}),
       ...(q.groups ? { groups: q.groups } : {})
     }));
 }
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** The teacher's Sydney day, sent by the browser; the server's when missing or malformed. */
+const dayOf = (body) => (typeof body.today === 'string' && DAY.test(body.today) ? body.today : sydneyDay(new Date().toISOString()));
+const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+const eventBase = (group, day) => ({ group: group.id, name: group.name, tags: group.tags, day });
+
+/** Members to add: on the list, once each. */
+function cleanMembers(roster, list) {
+  const onList = new Set(roster.students.map((s) => s.id));
+  const seen = new Set();
+  const out = [];
+  for (const m of Array.isArray(list) ? list : []) {
+    if (!m || typeof m.student !== 'string' || seen.has(m.student)) continue;
+    if (!onList.has(m.student)) reject(404, 'not_found', 'That student isn’t on the class list.');
+    seen.add(m.student);
+    out.push({ student: m.student, why: text(m.why, 200) });
+  }
+  return out;
+}
+
+/** Adds or rejoins members, writing a joined event for each one that changed. */
+function joinMembers(book, group, members, day) {
+  for (const m of members) {
+    const at = group.members.findIndex((x) => x.student === m.student);
+    if (at >= 0 && group.members[at].left === null) continue;
+    const member = { student: m.student, joined: day, left: null, why_joined: m.why, why_left: null };
+    if (at >= 0) group.members[at] = member;
+    else group.members.push(member);
+    group.retired = null;
+    book.history.push({ id: `joined:${group.id}:${m.student}:${day}`, kind: 'joined', ...eventBase(group, day), student: m.student, why: m.why });
+  }
+}
+
+/** Marks a member as left; retires the group when nobody is left. Ignores one who already left. */
+function leaveMember(book, group, student, day, why) {
+  const member = group.members.find((m) => m.student === student);
+  if (!member || member.left !== null) return;
+  member.left = day;
+  member.why_left = why;
+  book.history.push({ id: `left:${group.id}:${student}:${day}`, kind: 'left', ...eventBase(group, day), student, why });
+  if (group.retired === null && group.members.every((m) => m.left !== null)) {
+    group.retired = group.members.reduce((top, m) => (m.left > top ? m.left : top), day);
+    book.history.push({ id: `retired:${group.id}:${group.retired}`, kind: 'retired', ...eventBase(group, group.retired) });
+  }
+}
+
+const findGroup = (book, id) => book.groups.find((g) => g.id === id) ?? reject(404, 'not_found', 'That group is gone.');
 
 export async function markbookAction(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
@@ -180,6 +229,74 @@ export async function markbookAction(store, classId, body) {
       if (!pinned.length && !dismissed.length) delete focus[body.student_id];
       else focus[body.student_id] = { pinned, dismissed };
       book.focus = focus;
+      return book;
+    });
+    return { markbook };
+  }
+
+  if (action === 'save_group') {
+    const g = body.group ?? {};
+    const members = cleanMembers(roster, g.members);
+    const tags = Array.isArray(g.tags) ? [...new Set(g.tags.filter((t) => typeof t === 'string' && t.length && t.length <= 120))].slice(0, 8) : [];
+    if (!members.length || !tags.length || !text(g.name, 120)) reject(400, 'bad_request', 'A group needs a name, a tag and at least one student.');
+    const day = dayOf(body);
+    const markbook = await changeBook(store, classId, (book) => {
+      if (book.groups.some((x) => x.id === g.id)) reject(409, 'exists', 'That group is already saved.');
+      if (book.groups.length >= MARKBOOK_LIMITS.groups) reject(400, 'too_many', 'This markbook has as many groups as it can hold.');
+      const group = { id: g.id, name: text(g.name, 120), tags, started: day, retired: null, members: [] };
+      book.groups.push(group);
+      joinMembers(book, group, members, day);
+      return book;
+    });
+    return { markbook };
+  }
+
+  if (action === 'add_members') {
+    const members = cleanMembers(roster, body.members);
+    const day = dayOf(body);
+    const markbook = await changeBook(store, classId, (book) => {
+      joinMembers(book, findGroup(book, body.group_id), members, day);
+      return book;
+    });
+    return { markbook };
+  }
+
+  if (action === 'remove_member') {
+    const day = dayOf(body);
+    const markbook = await changeBook(store, classId, (book) => {
+      leaveMember(book, findGroup(book, body.group_id), body.student, day, 'Removed by teacher');
+      return book;
+    });
+    return { markbook };
+  }
+
+  if (action === 'rename_group') {
+    const name = text(body.name, 120);
+    if (!name) reject(400, 'bad_request', 'Give the group a name.');
+    const markbook = await changeBook(store, classId, (book) => {
+      findGroup(book, body.group_id).name = name;
+      return book;
+    });
+    return { markbook };
+  }
+
+  if (action === 'record_history') {
+    const events = (Array.isArray(body.events) ? body.events : []).slice(0, 500);
+    const leaves = (Array.isArray(body.leaves) ? body.leaves : []).slice(0, 200);
+    const markbook = await changeBook(store, classId, (book) => {
+      const have = new Set(book.history.map((e) => e.id));
+      for (const e of events) {
+        if (!e || typeof e.id !== 'string' || have.has(e.id) || !['received', 'result'].includes(e.kind)) continue;
+        if (!book.groups.some((g) => g.id === e.group)) continue;
+        book.history.push(e);
+        have.add(e.id);
+      }
+      for (const l of leaves) {
+        const group = book.groups.find((g) => g.id === l?.group_id);
+        if (group && typeof l.day === 'string' && DAY.test(l.day)) leaveMember(book, group, l.student, l.day, text(l.why, 200));
+      }
+      // Oldest first, so the record reads in order.
+      book.history.sort((a, b) => a.day.localeCompare(b.day));
       return book;
     });
     return { markbook };

@@ -1,4 +1,4 @@
-import { el } from '@/quiz/dom';
+import { el, formatMarks } from '@/quiz/dom';
 import type { AssessmentMark, CheckMark, HandinMark } from './schema';
 import type { AnyColumn, MarkbookActions, MarkbookView, RosterStudent } from './types';
 import { assessmentResult, dateOf, formatDay, formatPercent, markOf, orderedColumns, overallFor, quizPercent, type Overall } from './calc';
@@ -79,6 +79,14 @@ function cellButton(view: MarkbookView, column: AnyColumn, student: RosterStuden
       const dot = el('span', 'mb-cell__pending');
       dot.title = `${score.pending} to mark`;
       b.append(dot);
+    }
+    const practice = Object.values(score.practice ?? {});
+    if (practice.length) {
+      const got = practice.reduce((n, p) => n + p.score, 0);
+      const max = practice.reduce((n, p) => n + p.max, 0);
+      const line = el('span', 'mb-cell__practice', `+${formatMarks(got)}/${formatMarks(max)}`);
+      line.title = `Practice for their group: ${formatMarks(got)}/${formatMarks(max)}`;
+      b.append(line);
     }
     b.addEventListener('click', () => actions.openQuiz(column.lesson_id, sid));
     return b;

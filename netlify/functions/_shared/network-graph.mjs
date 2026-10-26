@@ -21,7 +21,7 @@
 // Pure — no I/O. `peopleWithRelationships` MUST already be filtered to
 // VISIBLE people by the caller (`network-ecology-world.mjs`'s
 // `filterVisiblePeople`) before it reaches this module: this module does
-// not itself re-check `lifecycle_status`. Every Organisation endpoint this
+// defensively excludes removed people/endpoints too. Every Organisation endpoint this
 // module encounters is already trusted visible because
 // `universal-link-read-repository.mjs`'s `toAccessibleEntry` drops an
 // archived "other endpoint" before `loadAllPeopleWithRelationships` ever
@@ -29,6 +29,8 @@
 // Person's own top-level entry, when that person themself is the one
 // being iterated) is exactly what the caller's pre-filter closes. See
 // network-ecology-world.mjs's doc comment for the full explanation.
+
+import { isDeletedRecord } from './record-liveness.mjs';
 
 const TRAVERSABLE_LINK_TYPES = new Set(['employee_at', 'member_of', 'professional_relationship']);
 
@@ -74,14 +76,18 @@ function describeVia(edge, nodes) {
 export function buildRelationshipGraph(peopleWithRelationships, { isLinkIncluded = isCurrentLink } = {}) {
   const nodes = new Map();
   const edgesById = new Map();
+  const removedRefs = new Set((peopleWithRelationships ?? [])
+    .filter(({ person }) => isDeletedRecord(person)).map(({ person }) => person.ref));
 
   for (const { person, relationships } of peopleWithRelationships ?? []) {
+    if (isDeletedRecord(person)) continue;
     nodes.set(person.ref, { ref: person.ref, kind: 'person', display_name: person.display_name });
 
     for (const entry of relationships ?? []) {
       const { link, endpoint, direction } = entry;
       if (!link || !isLinkIncluded(link)) continue;
       if (!TRAVERSABLE_LINK_TYPES.has(link.relationship_type)) continue;
+      if (isDeletedRecord(endpoint) || removedRefs.has(endpoint?.ref)) continue;
       if (!endpoint || (endpoint.kind !== 'person' && endpoint.kind !== 'organisation')) continue;
 
       if (!nodes.has(endpoint.ref)) {
