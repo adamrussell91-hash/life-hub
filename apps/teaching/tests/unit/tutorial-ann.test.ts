@@ -17,7 +17,7 @@ const mc = (id: string) => ({
   id,
   ...meta,
   block_type: 'quiz_question',
-  content: { question: { id, kind: 'multiple_choice', prompt: 'Which?', marks: 1, options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], correct: ['a'] } }
+  content: { question: { id, kind: 'multiple_choice', prompt: 'Which?', marks: 1, outcomes: ['O-1'], skills: ['reading.inference'], options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], correct: ['a'] } }
 });
 const exit = (blocks: unknown[]) => ({ id: 'eA', ...meta, block_type: 'section', content: { title: 'Exit', tutorial_group: 'ga', tutorial_exit: true, blocks } });
 const tab = (blocks: unknown[]) => ({ id: 'tA', ...meta, block_type: 'section', content: { title: 'Re-tells', tutorial_group: 'ga', blocks } });

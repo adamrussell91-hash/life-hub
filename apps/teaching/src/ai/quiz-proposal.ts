@@ -118,6 +118,18 @@ export function questionGiveaways(question: Record<string, unknown>): string[] {
   return issues;
 }
 
+/** Every question names what it tests, so the markbook and insights track the right thing. */
+export function questionTagIssues(label: string, question: { outcomes?: string[]; skills?: string[] }): string[] {
+  const issues: string[] = [];
+  if (!question.outcomes?.length) {
+    issues.push(`${label}: add outcomes, the one or two outcome ids this question tests (call list_question_tags).`);
+  }
+  if (!question.skills?.length) {
+    issues.push(`${label}: add skills, the skill id a student uses to answer (call list_question_tags).`);
+  }
+  return issues;
+}
+
 /**
  * Problems with the quiz questions in a proposal, in words the agent can fix:
  * each question must pass the quiz engine's own check, images must already be
@@ -177,6 +189,7 @@ export function quizProposalIssues(
       return;
     }
     for (const giveaway of questionGiveaways(question as Record<string, unknown>)) issues.push(`${label}: ${giveaway}`);
+    issues.push(...questionTagIssues(label, checked.question));
     const url = checked.question.image?.url;
     if (url && !images.has(url)) {
       issues.push(`${label}: its image must be one already in the lesson. Use one of the lesson's images or a different question kind.`);
