@@ -15,10 +15,15 @@ export type MoveKind = 'reteach' | 'group' | 'move_on';
  */
 export type Move = { kind: MoveKind; tag: string; parts: Array<{ tag: string; students: string[] }>; mean: number; assessed: number; students: string[]; secure: string[] };
 
-/** The level moves are decided at: family, then outcome, then technique, then skill. */
-export function moveKind(evidence: Evidence[]): TagKind | null {
+/** The level students' needs are read at: family, then outcome, then technique, then skill. */
+export function needKind(evidence: Evidence[]): TagKind | null {
   const present = kindsPresent(evidence);
   return (['fam', 'out', 'tech', 'skill'] as TagKind[]).find((k) => present.includes(k)) ?? null;
+}
+
+/** The level moves are decided at: the syllabus dot point where evidence reaches one, else as `needKind`. */
+export function moveKind(evidence: Evidence[]): string | null {
+  return evidence.some((e) => e.tags.some((t) => t.startsWith('dp:'))) ? 'dp' : needKind(evidence);
 }
 
 const assessedOf = (row: TagRow): number => row.groups.weak.length + row.groups.developing.length + row.groups.secure.length;
@@ -28,7 +33,7 @@ const assessedOf = (row: TagRow): number => row.groups.weak.length + row.groups.
  * group when a few are; move on when most are secure. Tags with too little
  * evidence make no move. Reteach first (weakest first), then groups, then move on.
  */
-export function nextMoves(evidence: Evidence[], kind: TagKind): Move[] {
+export function nextMoves(evidence: Evidence[], kind: string): Move[] {
   const moves: Move[] = [];
   for (const row of byTag(evidence, kind)) {
     if (row.band === 'thin') continue;

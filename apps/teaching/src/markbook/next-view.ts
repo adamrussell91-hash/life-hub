@@ -1,8 +1,9 @@
 import { el } from '@/quiz/dom';
 import type { InsightContext } from '@/evidence/context';
 import { classEvidence } from '@/evidence/class-evidence';
-import { moveKind, nextMoves, sortStudents, studentRows, syllabusRows, type Move, type Spread, type StudentSort, type SyllabusRow } from '@/evidence/next-moves';
-import type { FocusPins } from '@/evidence/patterns';
+import { moveKind, needKind, nextMoves, sortStudents, studentRows, syllabusRows, type Move, type Spread, type StudentSort, type SyllabusRow } from '@/evidence/next-moves';
+import { byTag, type FocusPins } from '@/evidence/patterns';
+import { RUNG_NAME, rungOf } from '@/evidence/syllabus-grid';
 import { tagLabel } from '@/evidence/tags';
 import { activeMembers, overlapsSaved } from '@/evidence/groups';
 import type { Evidence } from '@/evidence/types';
@@ -11,8 +12,9 @@ import type { MarkbookView, RosterStudent } from './types';
 import { formatDay } from './calc';
 
 /**
- * Next steps: what to teach next, where the class stands against the
- * syllabus, and the students who need what. Opens first in the markbook.
+ * Next steps: what to teach next (decided per syllabus dot point, with the
+ * weakest outcome and skill inside it), where the class stands against the
+ * syllabus, and the students who need what.
  */
 
 export type SyllabusSort = 'weakest' | 'syllabus' | 'change';
@@ -93,6 +95,7 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const names = (ids: string[]): string => ids.map((id) => nameOf.get(id) ?? 'Removed student').join(', ');
   const kind = moveKind(evidence);
+  const needs = needKind(evidence);
 
   // What to do next.
   const movesHost = el('div', 'mb-next__moves');
@@ -125,6 +128,17 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
             : `Class ${pct(move.mean)} · ${move.students.length} well behind`
           : `${pct(move.mean)} · ${move.secure.length} of ${move.assessed} secure`;
     card.append(el('p', 'mb-move__meta', meta));
+    if (move.tag.startsWith('dp:')) {
+      // Inside a dot point: the outcome and the skill that need the most.
+      const inside = evidence.filter((e) => e.tags.includes(move.tag) && nameOf.has(e.student));
+      const weakest = byTag(inside, 'out')[0];
+      const skill = byTag(inside, 'skill')[0];
+      const bits = [
+        weakest ? `Outcome to work on: ${label(weakest.tag)} ${pct(weakest.mean)}` : '',
+        skill ? `Skill to build: ${label(skill.tag)}, class at ${rungOf(skill.mean) === 'below' ? 'building towards Capable' : RUNG_NAME[rungOf(skill.mean) as Exclude<ReturnType<typeof rungOf>, 'below'>]}` : ''
+      ].filter(Boolean);
+      if (bits.length) card.append(el('p', 'mb-move__meta mb-move__inside', bits.join(' · ')));
+    }
     const who = move.kind === 'move_on' ? move.secure : move.students;
     const list = el('p', 'mb-move__who', move.kind === 'move_on' ? `Ready to extend: ${names(who)}` : names(who));
     list.hidden = move.kind !== 'group';
@@ -255,7 +269,7 @@ export function renderNextSteps(view: MarkbookView, students: RosterStudent[], c
   );
 
   // Students, most need first.
-  const rows = kind ? sortStudents(studentRows(evidence, sources, listed.map((s) => s.id), kind, actions.pins), state.studentSort, (id) => nameOf.get(id) ?? '') : [];
+  const rows = needs ? sortStudents(studentRows(evidence, sources, listed.map((s) => s.id), needs, actions.pins), state.studentSort, (id) => nameOf.get(id) ?? '') : [];
   const list = el('ul', 'mb-next__students');
   const byId = new Map(students.map((s) => [s.id, s]));
   for (const row of rows) {
