@@ -32,6 +32,7 @@ type Current = {
   started_at: string;
   deadline: string | null;
   hints: Record<string, string>;
+  saved?: { responses: Record<string, QuizResponse>; confidence: Record<string, 1 | 2 | 3>; at?: string };
   answers: Record<string, { response: QuizResponse | null; mark: MarkResult; key: QuestionKey | null }>;
 };
 type Status = {
@@ -121,6 +122,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
   let view: 'landing' | 'quiz' | 'review' | 'result' = 'landing';
   let resultIndex = -1;
   let submitting = false;
+  let receiptAt: Date | null = null;
 
   const showError = (text: string) => {
     alert.textContent = text;
@@ -159,20 +161,103 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
   const draftKey = (n: number) => `quiz:${lessonId}:${status?.current?.version ?? settings.version}:${n}`;
   function loadDraft(current: Current): Draft {
     const saved = readJSON<Draft>(draftKey(current.n));
-    if (saved && saved.order?.length === questions.length && saved.order.every((id) => byId.has(id))) return saved;
+    // Answers kept by the server fill in whatever this browser lost or never had.
+    const fromServer = (d: Draft): Draft => {
+      for (const [id, response] of Object.entries(current.saved?.responses ?? {})) if (byId.has(id) && !hasAnswer(d.responses[id])) d.responses[id] = response;
+      for (const [id, value] of Object.entries(current.saved?.confidence ?? {})) if (byId.has(id) && !d.confidence[id]) d.confidence[id] = value;
+      return d;
+    };
+    if (saved && saved.order?.length === questions.length && saved.order.every((id) => byId.has(id))) return fromServer(saved);
     const ids = questions.map((q) => q.id);
-    return {
+    return fromServer({
       order: settings.shuffle_questions ? seededShuffle(ids, `${token ?? ''}:${current.n}`) : ids,
       index: 0,
       responses: {},
       confidence: {},
       spent: {}
-    };
+    });
   }
+
+  /* ── Saving to the server as the student goes ── */
+
+  type SaveState = 'saved' | 'saving' | 'failed';
+  let saveState: SaveState = 'saved';
+  let dirty = false;
+  let lastSavedAt: number | null = null;
+  let saveTimer: number | undefined;
+  let saving = false;
+  const saveChips = new Set<HTMLElement>();
+
+  function paintSaveChips(): void {
+    for (const chip of saveChips) {
+      if (!chip.isConnected) {
+        saveChips.delete(chip);
+        continue;
+      }
+      chip.dataset.state = saveState;
+      chip.textContent = saveState === 'failed' ? 'Not saved yet. Keep this page open.' : saveState === 'saving' ? 'Saving…' : 'Saved ✓';
+    }
+  }
+
+  function saveChip(): HTMLElement {
+    const chip = el('span', 'qz-save');
+    chip.setAttribute('role', 'status');
+    saveChips.add(chip);
+    paintSaveChips();
+    return chip;
+  }
+
+  /** Sends the answers so far to the server. Safe to call often; failures retry on the next beat. */
+  async function pushSave(): Promise<void> {
+    window.clearTimeout(saveTimer);
+    if (saving || !draft || !status?.current || submitting) return;
+    saving = true;
+    saveState = 'saving';
+    paintSaveChips();
+    const sent = JSON.stringify([draft.responses, draft.confidence]);
+    try {
+      await apiPost(endpoint, { action: 'save', ...(token ? { token } : {}), ...classFields, responses: draft.responses, confidence: draft.confidence });
+      lastSavedAt = Date.now();
+      if (draft && JSON.stringify([draft.responses, draft.confidence]) === sent) dirty = false;
+      saveState = 'saved';
+    } catch (error) {
+      // The attempt may have ended (handed in elsewhere, or closed): nothing to keep saving.
+      if (error instanceof ApiClientError && ['no_attempt', 'need_class', 'need_initials'].includes(error.code ?? '')) dirty = false;
+      saveState = dirty ? 'failed' : 'saved';
+    }
+    saving = false;
+    paintSaveChips();
+    if (dirty && saveState === 'saved') queueSave();
+  }
+
+  function queueSave(): void {
+    dirty = true;
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => void pushSave(), 700);
+  }
+
+  // A beat every 10 seconds covers a failed save and any change the quick save missed.
+  window.setInterval(() => {
+    if (!root.isConnected || !draft || !status?.current) return;
+    if (dirty || saveState === 'failed' || lastSavedAt === null || Date.now() - lastSavedAt > 30_000) {
+      dirty = true;
+      void pushSave();
+    }
+  }, 10_000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && dirty && root.isConnected) void pushSave();
+  });
+  window.addEventListener('beforeunload', (event) => {
+    if (dirty && saveState === 'failed' && root.isConnected) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  });
   function saveDraft(): void {
     if (draft && status?.current && !writeJSON(draftKey(status.current.n), draft)) {
       showError('This browser isn’t saving your answers as you go. Keep this page open until you finish.');
     }
+    if (draft && status?.current) queueSave();
   }
 
   /* ── Views ── */
@@ -337,7 +422,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     const quizClock = el('span', 'qz-clock');
     const questionClock = el('span', 'qz-clock qz-clock--question');
     clocks.append(quizClock, questionClock);
-    bar.append(clocks);
+    bar.append(clocks, saveChip());
     wrap.append(bar);
 
     const dots = el('ol', 'qz-dots');
@@ -513,7 +598,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     const d = draft ?? loadDraft(current);
     const wrap = el('div', 'qz-review');
     const unanswered = d.order.filter((id) => !hasAnswer(d.responses[id]) && !current.answers[id]);
-    wrap.append(el('h3', 'qz-h', 'Ready to hand in?'));
+    wrap.append(el('h3', 'qz-h', 'Ready to hand in?'), saveChip());
+    wrap.append(el('p', 'qz-note', 'Your answers are saved, but your teacher only sees them after you press Hand it in.'));
     if (unanswered.length) {
       wrap.append(el('p', 'qz-note', `${plural(unanswered.length, 'question')} not answered yet:`));
       const list = el('div', 'qz-actions');
@@ -563,17 +649,25 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
   async function submit(auto: boolean): Promise<void> {
     if (submitting || !status?.current) return;
     submitting = true;
+    window.clearTimeout(saveTimer);
     const n = status.current.n;
     const d = draft ?? loadDraft(status.current);
     const res = await call('submit', { responses: d.responses, confidence: d.confidence });
     submitting = false;
-    if (res) {
+    // Handed in only when the server's own list says so; anything else keeps the answers and says so.
+    const confirmed = res?.results.find((r) => r.n === n);
+    if (res && confirmed) {
       writeJSON(draftKey(n), null);
       draft = null;
+      dirty = false;
       checking = {};
+      receiptAt = new Date(confirmed.submitted_at);
       resultIndex = res.results.length - 1;
       view = 'result';
       if (auto) showError('Time’s up. Your answers were handed in.');
+    } else if (res) {
+      showError('Your hand-in didn’t go through. Your answers are kept: press Hand it in again.');
+      view = 'review';
     }
     paint();
   }
@@ -582,6 +676,16 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: { classId?: s
     const s = status as Status;
     const r = s.results[resultIndex] ?? s.results[s.results.length - 1];
     const wrap = el('div', 'qz-result-view');
+    if (r) {
+      const at = receiptAt && new Date(r.submitted_at).getTime() === receiptAt.getTime() ? receiptAt : new Date(r.submitted_at);
+      const receipt = el('div', 'qz-receipt');
+      receipt.setAttribute('role', 'status');
+      receipt.append(
+        el('p', 'qz-receipt__title', '✓ Handed in'),
+        el('p', 'qz-note', `Your teacher has your answers, received ${at.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}.${s.identity?.initials ? ` Handed in as ${s.identity.initials}.` : ''} Take a photo of this screen if you want proof.`)
+      );
+      wrap.append(receipt);
+    }
     if (!r) {
       wrap.append(panel('Nothing handed in yet.', ''));
       return wrap;
