@@ -263,7 +263,7 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
   function ask(box: HTMLElement): void {
     const g = group();
     const picked = g.questions.filter((q) => q.picked).length;
-    box.append(el('p', 'sprint-note', `Questions made from your group’s unknowns. Reword one by adding it below. Star up to 3 to send. ${picked} of 3 starred.`));
+    box.append(el('p', 'sprint-note', `${picked} of 3 starred. Made from your group’s unknowns.`));
     for (const q of g.questions) {
       const b = el('button', 'sprint-chip sprint-star', `${q.picked ? '★' : '☆'} ${counted(q.text, q.count)}${q.sent ? ' · sent' : ''}`);
       b.type = 'button';
@@ -380,8 +380,10 @@ export function mountUnderstand(ctx: FormContext): PhaseForm {
     flow.append(boxes.get(k)!);
   }
   if (!order.length) flow.append(el('p', 'sprint-note', 'Your teacher hasn’t set the steps for this phase yet.'));
+  if (slides) root.append(rail);
   root.append(flow);
-  if (slides) { root.append(rail); nav.append(back, where, next); root.append(nav); }
+  if (slides) root.append(nav);
+  if (slides) nav.append(back, where, next);
   show();
   root.append(err, bar.el);
   return {
