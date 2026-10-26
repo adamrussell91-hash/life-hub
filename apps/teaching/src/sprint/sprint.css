@@ -294,3 +294,55 @@ body.spractice-open { overflow: hidden; }
 .sp-part__state { font-size: 12px; font-weight: 600; color: var(--muted); }
 .sp-part--in .sp-part__state { color: var(--pastel-sage-ink, #2f5d3a); }
 .sp-part__text { margin: 0; white-space: pre-wrap; max-height: 9em; overflow: auto; font-size: 14px; }
+
+/* Coach: one-line instruction, then folded help under every step. */
+.coach { display: grid; gap: 8px; }
+.coach__do { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--pastel-blue, #e6eefb); color: var(--pastel-blue-ink, #1d3e6e); font-size: 15px; line-height: 1.45; }
+.coach__tag { display: inline-block; margin-right: 4px; padding: 1px 8px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.coach__help { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: flex-start; }
+.coach__fold { border: 1px solid var(--line); border-radius: 12px; background: #fff; font-size: 14px; }
+.coach__fold[open] { flex: 1 1 100%; }
+.coach__fold > summary { cursor: pointer; padding: 6px 12px; font-weight: 600; font-size: 13px; list-style: none; border-radius: 12px; }
+.coach__fold > summary::-webkit-details-marker { display: none; }
+.coach__fold > summary:hover { background: rgba(23,55,94,.05); }
+.coach__fold--stuck > summary { color: var(--pastel-peach-ink, #9a4a1c); }
+.coach__body { padding: 2px 14px 12px; display: grid; gap: 4px; }
+.coach__body p, .coach__body ul { margin: 0; }
+.coach__body ul { padding-left: 18px; display: grid; gap: 3px; }
+.coach__fold--example .coach__body { background: var(--paper, #fbf8f2); margin: 0 10px 10px; padding: 10px 12px; border-radius: 10px; border-left: 3px solid var(--pastel-gold-ink, #8a6a00); }
+
+/* Step cards: bigger icon, calmer head. */
+.su-step__icon { margin-left: auto; font-size: 26px; line-height: 1; }
+.su-step { gap: 12px; }
+
+/* The 2 × 2 sorter: columns are control, rows are knowledge. */
+.su-matrix { display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: stretch; }
+.su-axis { font-size: 12px; font-weight: 700; letter-spacing: .03em; color: var(--navy); display: flex; align-items: center; justify-content: center; text-align: center; padding: 6px; border-radius: 10px; background: rgba(23,55,94,.07); }
+.su-axis--corner { background: none; }
+.su-axis--row { writing-mode: horizontal-tb; }
+.su-box { border: 2px solid transparent; border-radius: 16px; padding: 12px 14px; gap: 8px; }
+.su-box--can_known { background: #e8f4ec; border-color: #bfe0c9; }
+.su-box--cant_known { background: #eef1f6; border-color: #cfd8e6; }
+.su-box--can_unknown { background: #fff6dc; border-color: #f0dc9b; }
+.su-box--cant_unknown { background: #fdeee4; border-color: #f2cdb2; }
+.su-box__head { display: flex; align-items: center; gap: 8px; }
+.su-box__icon { font-size: 20px; }
+.su-box h4 { font-size: 15px; }
+.su-box__ask { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.35; }
+.su-card { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(39,55,74,.12); font-size: 15px; }
+.su-card--ghost { background: transparent; border: 1px dashed var(--line); box-shadow: none; color: var(--muted); font-style: italic; justify-content: flex-start; }
+.su-card__x { padding: 0 8px; min-height: 28px; line-height: 1; }
+@media (max-width: 760px) {
+  .su-matrix { grid-template-columns: minmax(0, 1fr); }
+  .su-axis { display: none; }
+}
+
+/* Slide rail: numbered dots, ticked once a step has something in it. */
+.su-rail { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.su-rail__dot { font: inherit; font-size: 13px; font-weight: 700; width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--navy); background: #fff; color: var(--navy); cursor: pointer; }
+.su-rail__dot.is-group { border-color: var(--pastel-peach-ink, #9a4a1c); color: var(--pastel-peach-ink, #9a4a1c); }
+.su-rail__dot.is-done { background: var(--pastel-sage, #dcefe1); color: var(--pastel-sage-ink, #2f5d3a); border-color: var(--pastel-sage-ink, #2f5d3a); }
+.su-rail__dot.is-now { background: var(--navy); color: #fff; border-color: var(--navy); transform: scale(1.12); }
+.su-rail__dot.is-group.is-now { background: var(--pastel-peach-ink, #9a4a1c); border-color: var(--pastel-peach-ink, #9a4a1c); }
+.su-nav { position: sticky; bottom: 0; padding: 10px 0; background: linear-gradient(to top, var(--bg, #f7f4ee) 70%, transparent); }
+

@@ -1,6 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { prototypeProblems } from './checks';
-import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { LATER_GUIDE } from './guidance';
+import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, stepify } from './form-kit';
 import { LEVEL_LABELS, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
@@ -83,7 +84,14 @@ export function mountPrototype(ctx: FormContext): PhaseForm {
   }
   const value = valueCheckField(ctx, state.value_answer, (v) => { state.value_answer = v; bar.changed(); });
   if (value) self.append(value);
-  root.append(self, bar.el);
+  root.append(self);
+  stepify(root, [
+    { pick: '.sprint-brief-part', title: 'Your part', guide: LATER_GUIDE.part },
+    { pick: '.sprint-field, .sprint-files', title: 'Build it', guide: LATER_GUIDE.build },
+    { pick: '.sp-parts, .sprint-pitch', title: 'Bring the parts together', guide: LATER_GUIDE.share },
+    { pick: '.sprint-self', title: 'Check your part', guide: LATER_GUIDE.check }
+  ]);
+  root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }
 

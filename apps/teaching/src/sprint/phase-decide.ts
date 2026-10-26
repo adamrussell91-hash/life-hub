@@ -1,6 +1,7 @@
 import { button, el } from '@/quiz/dom';
 import { partsProblems, voteProblems } from './checks';
-import { briefCard, draftOf, frameField, submitBar, type FormContext, type PhaseForm } from './form-kit';
+import { LATER_GUIDE } from './guidance';
+import { briefCard, draftOf, frameField, stepify, submitBar, type FormContext, type PhaseForm } from './form-kit';
 import { IDEA_PARTS, type IdeaPart, type Part, type PhasePayload } from './schema';
 import type { GalleryIdea, SprintStatus } from './api';
 
@@ -79,6 +80,10 @@ export function mountDecide(ctx: FormContext): PhaseForm {
     if (s.dot_counts && Object.keys(s.dot_counts).length) root.append(standOuts(sets, label, s.dot_counts));
   }
   if (s.chosen) root.append(partsEditor(ctx));
+  if (voting) stepify(root, [
+    { pick: '.sd-counter, .sprint-sets', title: 'Read the ideas and place your dots', guide: LATER_GUIDE.read },
+    { pick: '.sprint-reasons', title: 'Say which idea does each criterion best', guide: LATER_GUIDE.reasons }
+  ]);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }

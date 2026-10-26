@@ -1,7 +1,8 @@
 import { button, el } from '@/quiz/dom';
 import { sketchProblems } from './checks';
 import { SKETCH_STARTERS } from './defaults';
-import { briefCard, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { SKETCH_GUIDE } from './guidance';
+import { briefCard, coach, draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
 import type { PhasePayload, SketchCard } from './schema';
 import type { SprintStatus } from './api';
 
@@ -36,17 +37,19 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   if (brief) root.append(brief);
   const bar = submitBar(ctx, 'sketch', () => state, () => sketchProblems(state, { ideas, requirements: ctx.sprint.requirements }));
   const change = () => bar.changed();
-  const step = (n: number, title: string, note: string) => {
+  const step = (n: number, key: keyof typeof SKETCH_GUIDE, title: string, note: string) => {
     const box = el('section', 'su-step su-step--alone');
     const head = el('div', 'su-step__head');
-    head.append(el('span', 'su-step__num', String(n)), el('h3', '', title));
-    box.append(head, el('p', 'sprint-note', note));
+    head.append(el('span', 'su-step__num', String(n)), el('h3', '', title), el('span', 'su-step__icon', SKETCH_GUIDE[key].icon));
+    head.lastElementChild!.setAttribute('aria-hidden', 'true');
+    box.append(head, coach(SKETCH_GUIDE[key]));
+    if (note) box.append(el('p', 'sprint-note', note));
     root.append(box);
     return box;
   };
 
   // 1. Inspiration
-  const insp = step(1, 'Inspiration: what could you borrow from?', 'An example, a model or something that already exists. Say what you’d take from it.');
+  const insp = step(1, 'inspiration', 'Inspiration: what could you borrow from?', '');
   const inspList = el('div', 'sk-insp');
   const paintInsp = () => {
     inspList.replaceChildren();
@@ -75,7 +78,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   insp.append(inspList);
 
   // 2. Rapid ideas against the timer
-  const rapid = step(2, 'Rapid ideas: as many as you can', minutes ? `You have ${minutes} minutes once you start. One line per idea, press Enter, no judging yet.` : 'One line per idea, press Enter, no judging yet.');
+  const rapid = step(2, 'rapid', 'Rapid ideas: as many as you can', minutes ? `You have ${minutes} minutes once you start. One line per idea, press Enter, no judging yet.` : 'One line per idea, press Enter, no judging yet.');
   const timer = el('div', 'sk-timer');
   const add = el('form', 'su-add');
   const input = el('input', 'qz-input');
@@ -140,7 +143,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   if (minutes && state.rapid_started_at && left() > 0) startTick();
 
   // 3. Pick the best
-  const pickBox = step(3, `Pick: star your best ${ideas}`, `These are the ${ideas === 1 ? 'idea' : 'ideas'} you put forward to your group, without your name.`);
+  const pickBox = step(3, 'pick', `Pick: star your best ${ideas}`, `These are the ${ideas === 1 ? 'idea' : 'ideas'} you put forward to your group, without your name.`);
   const pickList = el('div', 'sk-pick');
   pickBox.append(pickList);
   const nextId = () => { let n = 1; while (state.cards.some((c) => c.id === `k${n}`)) n += 1; return `k${n}`; };
@@ -171,7 +174,7 @@ export function mountSketch(ctx: FormContext): PhaseForm {
   };
 
   // 4. Develop and justify each starred idea
-  const dev = step(4, 'Develop and justify', 'Make each idea clear enough that someone could follow it without you there. Then say how it solves the problem.');
+  const dev = step(4, 'develop', 'Develop and justify', '');
   const tabs = el('div', 'sprint-tabs');
   tabs.setAttribute('role', 'tablist');
   const pane = el('div', 'sprint-card-pane');

@@ -1,7 +1,8 @@
 import { button, el } from '@/quiz/dom';
 import { feedbackProblems, reflectionProblems } from './checks';
 import { FEEDBACK_STARTERS } from './defaults';
-import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm } from './form-kit';
+import { LATER_GUIDE } from './guidance';
+import { draftOf, frameField, submitBar, valueCheckField, type FormContext, type PhaseForm, stepify } from './form-kit';
 import { LEVEL_LABELS, type FeedbackEntry, type Level, type PhasePayload } from './schema';
 import type { SprintStatus } from './api';
 
@@ -39,6 +40,10 @@ export function mountTest(ctx: FormContext): PhaseForm {
   root.append(crit);
   const value = valueCheckField(ctx, state.value_answer, (v) => { state.value_answer = v; bar.changed(); });
   if (value) root.append(value);
+  stepify(root, [
+    { pick: '.sprint-received', title: 'What your group got', guide: LATER_GUIDE.feedback },
+    { pick: '.sprint-field, select.qz-input, .sprint-value', title: 'Think about what to change', guide: LATER_GUIDE.reflect }
+  ]);
   root.append(bar.el);
   return { el: root, dispose: bar.dispose };
 }
