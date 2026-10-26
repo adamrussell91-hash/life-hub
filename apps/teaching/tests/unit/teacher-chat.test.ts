@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickChatLessonId } from '@/teacher/chat';
+import { pickChatLessonId, resolveChatLessonId } from '@/teacher/chat';
 import type { CurriculumResponse } from '@/teacher/nav';
 
 function curriculum(partial: Partial<CurriculumResponse> = {}): CurriculumResponse {
@@ -44,5 +44,17 @@ describe('pickChatLessonId', () => {
 
   it('returns null when the hub has no lessons', () => {
     expect(pickChatLessonId(curriculum(), '2026-08-12')).toBeNull();
+  });
+});
+
+describe('resolveChatLessonId', () => {
+  const lessons = [{ id: 'a' }, { id: 'b' }] as CurriculumResponse['lessons'];
+
+  it('keeps the teacher’s last pick when that lesson still exists', () => {
+    expect(resolveChatLessonId(curriculum({ lessons }), 'b')).toBe('b');
+  });
+
+  it('ignores a stored pick that no longer exists', () => {
+    expect(resolveChatLessonId(curriculum({ lessons }), 'gone')).toBe('a');
   });
 });
