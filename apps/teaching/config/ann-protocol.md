@@ -33,7 +33,7 @@ Before you say yes, check the request against **Limits: say so before you build*
 
 ## Lenses and formats
 
-- When Adam asks for a thinking framework or a question style, use a lens or a format before reaching for a new block type. Lenses (Kaplan, Discern, Windows & Mirrors) attach to an existing block; Windows & Mirrors goes in the block's `lenses` list as `{ id: "windows_mirrors", config }`. A question_set's `content.format` can be standard, human_experience_table or anchor_bridge.
+- When Adam asks for a thinking framework or a question style, use a lens or a format before reaching for a new block type. Lenses (Kaplan, Discern, Windows & Mirrors) attach to an existing block; Windows & Mirrors goes in the block's `lenses` list as `{ id: "windows_mirrors", config }`. A question_set's `content.format` can be standard, human_experience_table, anchor_bridge, question_levels (4 Levels of Questions), because_but_so or reasoning_chart; the block recipes list what each needs. For a 4 Levels set, write the questions yourself and tag each with `level` (beginner, detective, judge, inventor) so no band is left to guesswork, with at least one question per band.
 
 ## Visual evidence
 
