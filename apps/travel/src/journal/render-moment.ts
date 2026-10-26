@@ -364,7 +364,7 @@ function renderVoiceNotes(host: HTMLElement, voice: JournalMedia[], tripId: stri
     row.className = 'journal-moment__audio';
     const label = document.createElement('span');
     label.className = 'journal-moment__audio-label';
-    label.textContent = 'Voice note';
+    label.textContent = 'Sound';
     const player = document.createElement('audio');
     player.controls = true;
     player.preload = 'none';
