@@ -1,0 +1,112 @@
+/* packages/rules-book/rules-book.css
+   The Rules Book's tokens, scoped to .rb-scope the way Gear Shifter scopes .gt-scope and
+   Decision Maker .dm-scope. The book's screen palette: deep indigo for structure and the way
+   out of a rule, burnt orange for the rule, the focus or the act, ink for dividers, cream paper,
+   and the bulb yellow and ray grey only as shapes. The bright orange, yellow and grey fall
+   under 4.5:1 on paper, so small text takes the darker label shades. Motion matches the other
+   tools. */
+.rb-scope {
+  --rb-paper: #fffef9;
+  --rb-ink: #14142b;
+  --rb-indigo: #3a3a9a;
+  --rb-orange: #e0581a;
+  --rb-yellow: #fcea24;
+  --rb-grey: #8e8f8a;
+  --rb-indigo-label: #2d2c70;
+  --rb-orange-label: #a8400f;
+  --rb-indigo-tint: #e4e4f3;
+  --rb-orange-tint: #fbe4d8;
+  --rb-soft: #f3f2ea;
+  --rb-line: #b9bab4;
+  --rb-muted: #55564f;
+  --rb-ghost: rgba(20, 20, 43, 0.12);
+  --rb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --rb-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* The re-skin: Decision Maker's family charts (decision-book.css) draw from --dm-* tokens, so
+     remapping them here draws every shared chart in the Rules Book's palette. Red becomes
+     orange (the label shade under text); green, which carries Decision Maker's "go", becomes
+     indigo, which takes paper text. */
+  --dm-paper: var(--rb-paper);
+  --dm-ink: var(--rb-ink);
+  --dm-red: var(--rb-orange);
+  --dm-green: var(--rb-indigo);
+  --dm-red-label: var(--rb-orange-label);
+  --dm-soft: var(--rb-soft);
+  --dm-line: var(--rb-line);
+  --dm-green-tint: var(--rb-indigo-tint);
+  --dm-red-tint: var(--rb-orange-tint);
+  --dm-ghost: var(--rb-ghost);
+  --dm-ease: var(--rb-ease);
+  --dm-spring: var(--rb-spring);
+  --dm-muted: var(--rb-muted);
+  --dm-contested: var(--rb-orange-label);
+  --dm-band: var(--rb-indigo-label);
+}
+
+.rb-emblem { display: inline-flex; line-height: 0; }
+.rb-emblem svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------------ the shared charts
+   Twins of Decision Maker's .dm-scope-only rules, so the details cards look the same here. */
+.rb-scope .dm-details__card { box-shadow: none; border-top: 3px solid var(--rb-ink); background: var(--rb-paper); }
+.rb-scope .dm-details__card--red { border-top-color: var(--rb-orange); }
+.rb-scope .dm-details__card--green { border-top-color: var(--rb-indigo); }
+.rb-scope .dm-details__card--tint { border-top-color: var(--rb-line); }
+/* Decision Maker sets ink on its brighter label red; on the darker orange label, paper reads. */
+.rb-scope .dm-qk__row[data-answer='no'] .dm-qk__chip,
+.rb-scope .dm-qk__answer[data-answer='no'] { color: var(--rb-paper); }
+
+/* ------------------------------------------------------------------ Pareto
+   Problem Solver's renderer, remapped inside .rb-scope only: the orange label field, the bulb
+   yellow bars with ink text, the indigo cumulative line. The reflection sits in a card below. */
+.rb-scope .ps-pareto {
+  --ps-red: var(--rb-orange-label);
+  --ps-yellow: var(--rb-yellow);
+  --ps-on-yellow: var(--rb-ink);
+  --ps-blue: var(--rb-indigo);
+  --ps-paper: var(--rb-paper);
+  --ps-ink: var(--rb-ink);
+}
+.rb-scope .ps-pareto .ps-details__card { box-shadow: none; border-top: 3px solid var(--rb-ink); }
+.rb-pareto { display: grid; gap: 12px; min-width: 0; }
+.rb-pareto__reflection { margin: 0; padding: 12px 14px; border: 1.5px solid var(--rb-line); border-top: 3px solid var(--rb-indigo); border-radius: 14px; background: var(--rb-paper); color: var(--rb-ink); font: 400 14px / 1.45 var(--font-ui, sans-serif); overflow-wrap: anywhere; }
+.rb-pareto__reflection[hidden] { display: none; }
+
+/* Scales and plots: the newest overlay draws in indigo, the older ones stay ink outlines. */
+.rb-scope .dm-scales__poly[data-style='solid'] { stroke: var(--rb-indigo); stroke-width: 2; }
+.rb-scope .dm-scales__legend-item[data-style='solid']::before,
+.rb-scope .dm-scales__bar[data-style='solid'] { background: var(--rb-indigo); }
+
+/* ------------------------------------------------------------------ the experiment (render/commit.ts)
+   The result as the headline, the next action beside how it starts, the check time and an
+   orange band for what would overturn the reading. Phone: one column. */
+.rb-commit__part { position: relative; display: grid; align-content: start; gap: 6px; padding: 12px 14px 12px 52px; border-radius: 4px; background: var(--rb-paper); border: 1.5px solid var(--rb-line); min-width: 0; }
+.rb-commit__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--rb-muted); }
+.rb-commit__mark { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; }
+.rb-commit__result { border: 2px solid var(--rb-ink); }
+.rb-commit__result .dm-entry__pill { font-size: 18px; font-weight: 700; padding: 10px 18px; }
+.rb-commit__rests { display: flex; flex-wrap: wrap; gap: 6px; }
+.rb-commit__rests .rb-commit__title { flex-basis: 100%; }
+.rb-commit__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.rb-commit__action { background: var(--rb-indigo-tint); border-color: var(--rb-indigo); }
+.rb-commit__action .rb-commit__title { color: var(--rb-indigo-label); }
+.rb-commit__back { background: var(--rb-soft); border-color: var(--rb-ink); }
+.rb-commit__turn { background: var(--rb-orange-tint); border: 2px solid var(--rb-orange); }
+.rb-commit__turn .rb-commit__title { color: var(--rb-orange-label); }
+.dm-chart--commit .dm-chart__frame { display: grid; gap: 10px; }
+
+/* ------------------------------------------------------------------ the review (render/review.ts) */
+.rb-review__row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; position: relative; }
+.rb-review__station { position: relative; display: grid; align-content: start; gap: 8px; padding: 12px; border-radius: 4px; border: 1.5px solid var(--rb-line); background: var(--rb-paper); min-width: 0; }
+.rb-review__station + .rb-review__station::before { content: ''; position: absolute; left: -7px; top: 8px; bottom: 8px; border-left: 3px dashed var(--rb-ink); }
+.rb-review__n { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; display: grid; place-items: center; font: 800 14px / 1 var(--font-ui, sans-serif); color: var(--rb-paper); background: var(--rb-indigo); }
+.rb-review__station--held .rb-review__n { background: var(--rb-orange-label); }
+.rb-review__station--keep .rb-review__n { background: var(--rb-ink); }
+.rb-review__title { font: 700 11px / 1.3 var(--font-ui, sans-serif); text-transform: uppercase; letter-spacing: 0.06em; color: var(--rb-muted); padding-left: 36px; min-height: 28px; display: flex; align-items: center; }
+
+@media (max-width: 480px) {
+  .rb-commit__row, .rb-review__row { grid-template-columns: 1fr; }
+  .rb-review__station + .rb-review__station::before { left: 8px; right: 8px; top: -7px; bottom: auto; border-left: 0; border-top: 3px dashed var(--rb-ink); }
+  .rb-review__row { gap: 14px; }
+}
