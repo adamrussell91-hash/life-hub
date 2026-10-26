@@ -1,7 +1,7 @@
 {
-  "version": "widgets@7366b85a401d",
-  "source": "widgets@7366b85a401d",
-  "synced_at": "2026-10-16T09:05:42.770Z",
+  "version": "widgets@d7f1c04db524",
+  "source": "widgets@d7f1c04db524",
+  "synced_at": "2026-10-26T04:01:47.488Z",
   "families": [
     {
       "key": "Descriptive",
@@ -423,6 +423,21 @@
     {
       "from": "parallelism",
       "to": "chiasmus",
+      "axis": "subtype"
+    },
+    {
+      "from": "chiasmus",
+      "to": "antimetabole",
+      "axis": "subtype"
+    },
+    {
+      "from": "chiasmus",
+      "to": "syntactic-chiasmus",
+      "axis": "subtype"
+    },
+    {
+      "from": "chiasmus",
+      "to": "conceptual-chiasmus",
       "axis": "subtype"
     },
     {
@@ -1001,6 +1016,23 @@
       "related": [
         "nominalization",
         "neologism"
+      ]
+    },
+    {
+      "id": "idiom",
+      "symbol": "Ii",
+      "name": "Idiom",
+      "subgroup": "descriptive-diction",
+      "definition": "A fixed expression whose meaning cannot be worked out from the literal meaning of its words.",
+      "effect": "Creates a familiar, conversational voice and cultural rootedness; writers can also literalise or twist a worn idiom to make it strange and fresh.",
+      "example": "Kick the bucket; spill the beans; break the ice; it's raining cats and dogs",
+      "lang": "Greek",
+      "etymology": "Greek idíōma (peculiarity, special phrasing), from idios (one's own, private).",
+      "related": [
+        "colloquialism",
+        "dead-metaphor",
+        "slang",
+        "idiolect"
       ]
     },
     {
@@ -2122,13 +2154,15 @@
       "symbol": "Ai",
       "name": "Antimetabole",
       "subgroup": "repetitive-lexical",
-      "definition": "The repetition of words or phrases in reverse order, often to create a paradoxical or rhetorically forceful structure.",
+      "definition": "Lexical chiasmus: the same words or phrases repeated in reverse order (A-B-B-A), so the words themselves carry the crossing pattern.",
       "effect": "Produces memorability and rhetorical punch; can reverse, complicate or deepen the logic of a statement.",
-      "example": "\"Ask not what your country can do for you — ask what you can do for your country.\" (JFK)",
+      "example": "\"Fair is foul, and foul is fair.\" (Macbeth) / \"Ask not what your country can do for you — ask what you can do for your country.\" (JFK)",
       "lang": "Greek",
       "etymology": "From Greek anti (against, opposite) + metabole (change, turning).",
       "related": [
         "chiasmus",
+        "syntactic-chiasmus",
+        "conceptual-chiasmus",
         "anaphora",
         "parallelism"
       ]
@@ -2181,7 +2215,7 @@
       "symbol": "Ch",
       "name": "Chiasmus",
       "subgroup": "repetitive-structural",
-      "definition": "Reversal of grammatical structures in successive phrases",
+      "definition": "Crossed (A-B-B-A) reversal in successive phrases: the second half mirrors the first. The mirroring can lie in the words (lexical chiasmus, or antimetabole), the grammar (syntactic chiasmus) or the ideas (conceptual chiasmus).",
       "effect": "Creates elegant symmetry and memorable phrasing",
       "example": "Ask not what your country can do for you; ask what you can do for your country",
       "lang": "Greek",
@@ -2209,8 +2243,45 @@
         }
       ],
       "related": [
+        "antimetabole",
+        "syntactic-chiasmus",
+        "conceptual-chiasmus",
         "parallelism",
         "antithesis-structural"
+      ]
+    },
+    {
+      "id": "syntactic-chiasmus",
+      "symbol": "Snt",
+      "name": "Syntactic Chiasmus",
+      "subgroup": "repetitive-structural",
+      "definition": "Reversal of grammatical structure without repeating any words: adjective-noun then noun-adjective, or subject-verb then verb-subject. The pattern lives in the syntax alone.",
+      "effect": "Creates a subtle, felt balance; the mirror is heard in the rhythm rather than seen in repeated vocabulary.",
+      "example": "\"His time is forever, everywhere his place.\" (Abraham Cowley): noun and adverb, then adverb and noun.",
+      "lang": "Greek",
+      "etymology": "Greek syntaxis (arrangement) + khiasmos (a crossing) — a crossing of grammatical arrangement",
+      "related": [
+        "chiasmus",
+        "antimetabole",
+        "parallelism",
+        "anastrophe"
+      ]
+    },
+    {
+      "id": "conceptual-chiasmus",
+      "symbol": "Cnc",
+      "name": "Conceptual Chiasmus",
+      "subgroup": "repetitive-structural",
+      "definition": "Reversal of ideas, themes or images across a passage (A-B-C-B'-A') without identical vocabulary. Common in biblical writing, where whole narrative sections are arranged by mirrored themes around a central turn.",
+      "effect": "Frames and spotlights the centre of the structure; gives a long passage unity and makes its turning point the emphatic heart.",
+      "example": "The Flood narrative in Genesis 6–9: the waters rise, then recede through the same stages in reverse, pivoting on \"God remembered Noah\" (8:1).",
+      "lang": "Greek",
+      "etymology": "Latin conceptus (a thing conceived) + Greek khiasmos (a crossing) — a crossing of ideas",
+      "related": [
+        "chiasmus",
+        "antimetabole",
+        "syntactic-chiasmus",
+        "parallelism"
       ]
     },
     {
@@ -3880,6 +3951,23 @@
       "lang": "French",
       "related": [
         "end-stopping"
+      ]
+    },
+    {
+      "id": "volta",
+      "symbol": "Vo",
+      "name": "Volta",
+      "subgroup": "structural-syntactic",
+      "definition": "The turn in a poem: a marked shift in argument, tone or perspective, classically between the octave and sestet of a Petrarchan sonnet or before the final couplet of a Shakespearean one.",
+      "effect": "Reframes or answers what came before; the turn is often where the poem's meaning lands, so it rewards close attention.",
+      "example": "Shakespeare's Sonnet 130 mocks conventional praise for twelve lines, then turns: \"And yet, by heaven, I think my love as rare / As any she belied with false compare.\"",
+      "lang": "Latin",
+      "etymology": "Italian volta (a turn), from Latin volvere (to roll, turn)",
+      "related": [
+        "enjambment",
+        "caesura",
+        "peripeteia",
+        "antithesis"
       ]
     },
     {

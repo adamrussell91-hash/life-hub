@@ -119,7 +119,7 @@ test('scan calls OpenAI on the server with the widget prompt, chosen model and s
     assert.ok(prompt.includes(phrase), phrase);
   }
   const table = JSON.parse(readFileSync(new URL('../../apps/teaching/src/data/literary-elements.json', import.meta.url)));
-  assert.equal(table.techniques.length, 310);
+  assert.equal(table.techniques.length, 314);
   for (const { name } of table.techniques) assert.ok(prompt.includes(name), name);
 });
 

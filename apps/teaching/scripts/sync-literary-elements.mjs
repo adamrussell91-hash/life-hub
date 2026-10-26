@@ -142,7 +142,11 @@ function buildSnapshot(data, previous, sourceLabel, sourceSha) {
   const previousById = new Map(
     (previous?.techniques ?? []).map((t) => [t.id, t])
   );
+  // Reserve every prior symbol first so a new technique never takes one.
   const usedSymbols = new Set();
+  const priorSymbols = new Set(
+    (previous?.techniques ?? []).map((t) => t.symbol).filter(Boolean)
+  );
 
   const families = [];
   const subgroups = [];
@@ -174,7 +178,8 @@ function buildSnapshot(data, previous, sourceLabel, sourceSha) {
           symbol = prior.symbol;
           usedSymbols.add(symbol);
         } else {
-          symbol = generateSymbol(tech.name, usedSymbols);
+          symbol = generateSymbol(tech.name, new Set([...usedSymbols, ...priorSymbols]));
+          usedSymbols.add(symbol);
         }
 
         nameToId.set(tech.name.toLowerCase(), id);
