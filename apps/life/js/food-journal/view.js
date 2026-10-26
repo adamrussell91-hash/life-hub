@@ -6,6 +6,7 @@ import {
   createHubMenuButton,
 } from "../../../../packages/design-kit/js/hub-list.js";
 import { showHubToast } from "../../../../packages/design-kit/js/hub-feedback.js";
+import { withoutDeleted } from "../../../../packages/design-kit/js/record-liveness.js";
 import { isAtlasDoor, openAtlas } from "./atlas-door.js";
 import {
   createViewOnMap,
@@ -33,6 +34,10 @@ import {
   unshoutVisit,
   knownTags,
   tagKey,
+  foodTagOptions,
+  cuisineFor,
+  mealAt,
+  pastVenues,
 } from "./model.js";
 import {
   paintMagazine,
@@ -55,6 +60,8 @@ import {
   captureBatches,
   toggleMenuDish,
   menuDishIndex,
+  menuIngredientsFor,
+  ingredientsFromMenu,
 } from "./capture.js";
 import { PORTION_CHIPS, portionOf } from "./portion.js";
 import { handoffMessage, needsRecount } from "./brisket-handoff.js";
@@ -134,61 +141,79 @@ function whereAmI() {
     );
   });
 }
-// Tags as chips. Tags used before show as suggestions, filtered as you type.
-function tagField(tags, known, change) {
+// Food tags: what kind of food the dish is. Picked foods show first and
+// come off with a tap; the common foods (yours first) are buttons below,
+// and the box finds one or adds a new food.
+function foodTagField(tags, known, change) {
   const wrap = el("div", "hub-field food-tags"),
     id = `food-field-${crypto.randomUUID()}`,
-    lab = el("label", "hub-label", "Tags"),
+    lab = el("label", "hub-label", "What kind of food?"),
     chips = el("div", "hub-chips food-tags__chips"),
-    input = el("input", "hub-input"),
-    hints = el("div", "hub-chips food-tags__hints");
+    input = el("input", "hub-input food-tags__find"),
+    grid = el("div", "food-tags__grid");
   lab.htmlFor = id;
   input.id = id;
   input.type = "text";
   input.maxLength = 100;
   input.enterKeyHint = "done";
   input.autocomplete = "off";
-  input.placeholder = known.length ? "Type or pick a tag" : "Spicy, would order again";
-  let current = [...tags];
+  input.placeholder = "Find or add a food";
+  let current = [...tags],
+    all = false;
   const has = (t) => current.some((c) => tagKey(c) === tagKey(t));
+  const more = el("button", "btn btn--ghost food-tags__more");
+  more.type = "button";
+  more.addEventListener("click", () => {
+    all = !all;
+    paint();
+  });
   const add = (raw) => {
-    for (const part of raw.split(",")) {
-      const t = part.replace(/^#/, "").trim().slice(0, 100);
-      if (t && !has(t) && current.length < 40) current.push(t);
-    }
+    const t = String(raw).replace(/^#/, "").trim().slice(0, 100);
+    if (t && !has(t) && current.length < 40)
+      current.push(t.charAt(0).toUpperCase() + t.slice(1));
     input.value = "";
     change([...current]);
     paint();
   };
-  const paintHints = () => {
-    const q = tagKey(input.value);
-    hints.replaceChildren();
-    for (const key of known.filter((k) => !has(k) && k.includes(q)).slice(0, 8)) {
-      const b = button(key, () => add(key));
-      b.className = "hub-chip food-tags__chip";
-      b.setAttribute("aria-label", `Add tag ${key}`);
-      // Keep focus in the field, so a half-typed tag is not added on blur.
-      b.addEventListener("pointerdown", (e) => e.preventDefault());
-      hints.append(b);
-    }
-    hints.hidden = !hints.childElementCount;
+  const option = (label, fn, cls = "") => {
+    const b = el("button", `hub-chip food-tags__option${cls}`, label);
+    b.type = "button";
+    // Keep the keyboard up while picking.
+    b.addEventListener("pointerdown", (e) => e.preventDefault());
+    b.addEventListener("click", fn);
+    return b;
   };
   const paint = () => {
     chips.replaceChildren();
     for (const t of current) {
-      const b = button(t, () => {
+      const b = el("button", "hub-chip is-active food-tags__chip", t);
+      b.type = "button";
+      b.setAttribute("aria-label", `Remove tag ${t}`);
+      const x = el("span", "food-tags__x", "×");
+      x.setAttribute("aria-hidden", "true");
+      b.append(x);
+      b.addEventListener("click", () => {
         current = current.filter((c) => c !== t);
         change([...current]);
         paint();
       });
-      b.className = "hub-chip is-active food-tags__chip";
-      b.setAttribute("aria-label", `Remove tag ${t}`);
-      b.append(el("span", "food-tags__x", "×"));
-      b.lastChild.setAttribute("aria-hidden", "true");
       chips.append(b);
     }
     chips.hidden = !current.length;
-    paintHints();
+    const q = input.value.trim();
+    const options = foodTagOptions(known, current, q);
+    const shown = q || all ? options : options.slice(0, 12);
+    grid.replaceChildren(
+      ...shown.map((label) => {
+        const b = option(label, () => add(label));
+        b.setAttribute("aria-label", `Add tag ${label}`);
+        return b;
+      }),
+    );
+    if (q && !has(q) && !options.some((o) => tagKey(o) === tagKey(q)))
+      grid.append(option(`Add “${q}”`, () => add(q), " food-tags__new"));
+    more.hidden = Boolean(q) || options.length <= 12;
+    more.textContent = all ? "Fewer foods" : "More foods";
   };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === ",") {
@@ -197,13 +222,10 @@ function tagField(tags, known, change) {
     }
   });
   input.addEventListener("input", () =>
-    input.value.includes(",") ? add(input.value) : paintHints(),
+    input.value.includes(",") ? add(input.value.replace(/,/g, "")) : paint(),
   );
-  input.addEventListener("blur", () => {
-    if (input.value.trim()) add(input.value);
-  });
   paint();
-  wrap.append(lab, chips, input, hints);
+  wrap.append(lab, chips, input, grid, more);
   return wrap;
 }
 export function createFoodJournalView({
@@ -663,9 +685,11 @@ export function createFoodJournalView({
       );
       content.append(stars);
     }
-    if (dish.tags.length) {
+    if (dish.tags.length || dish.order_again) {
       const tags = el("div", "hub-chips");
       for (const t of dish.tags) tags.append(el("span", "hub-chip", t));
+      if (dish.order_again)
+        tags.append(el("span", "hub-chip food-again-chip", "Would order again"));
       content.append(tags);
     }
     content.append(...dishNotes(dish, visit, "food-notes fj-serif fj-italic"));
@@ -1181,7 +1205,10 @@ export function createFoodJournalView({
     updateSearch();
     s.actions.append(button("Close", s.close, "ghost"), find);
   }
-  function editVisit(original, trigger, { fixup = false } = {}) {
+  // Add or edit a visit in three short steps: where and when, the food, then
+  // a check before saving. Every step can be reached from the step bar, and
+  // an existing visit can be saved from any step.
+  function editVisit(original, trigger, { fixup = false, step: startStep } = {}) {
     const baseVersion = Object.hasOwn(original, "__draft_version")
       ? original.__draft_version
       : version;
@@ -1194,100 +1221,347 @@ export function createFoodJournalView({
         ? journal.visits.find((v) => v.id === visit.id)
         : null;
     let reviewedNewerVisit = !newerSavedVisit;
+    const isNew = !journal.visits.some((v) => v.id === visit.id);
+    // A new visit starts on the meal the time of day suggests.
+    if (
+      isNew &&
+      !Object.hasOwn(original, "__draft_version") &&
+      visit.dishes.every((d) => !d.title.trim())
+    )
+      for (const d of visit.dishes) d.meal_type = mealAt();
     // A full page, not a sheet: a sheet jumps as the keyboard comes and goes.
     const s = modal(
       fixup ? "Fix up entry" : original.title ? "Edit visit" : "Add visit",
       trigger,
       { page: true },
     );
+    const STEPS = ["Where and when", "The food", "Check and save"];
+    let step = Number.isInteger(startStep) ? startStep : isNew && !fixup ? 0 : 1;
+    let panels = [];
+    let paintSummary = () => {};
     let repaintMenu = () => {};
     let dishList = null,
       menuImages = [],
       photoGps = null,
       hereGps = null,
       dateEdited = false,
-      captureBusy = false;
+      captureBusy = false,
+      brisketAfter = Boolean(sendToBrisket);
     const persistDraft = () => writeDraft(visit, baseVersion);
     const tags = knownTags(journal);
+    // The meal every dish shares, or "" when they differ.
+    const sharedMeal = () => {
+      const m = visit.dishes[0]?.meal_type;
+      return visit.dishes.every((d) => d.meal_type === m) ? m : "";
+    };
+    const stepBar = el("nav", "food-steps");
+    stepBar.setAttribute("aria-label", "Steps");
+    const SHORT = ["Where", "Food", "Check"];
+    const stepButtons = STEPS.map((label, i) => {
+      const b = el("button", "food-steps__step");
+      b.type = "button";
+      b.setAttribute("aria-label", `Step ${i + 1}: ${label}`);
+      b.append(
+        el("span", "food-steps__num", String(i + 1)),
+        el("span", "food-steps__label", SHORT[i]),
+      );
+      b.addEventListener("click", () => setStep(i));
+      return b;
+    });
+    stepBar.append(...stepButtons);
+    s.error.before(stepBar);
+    function setStep(next) {
+      step = Math.max(0, Math.min(STEPS.length - 1, next));
+      paintSteps();
+      window.scrollTo?.(0, 0);
+    }
+    function paintSteps() {
+      panels.forEach((p, i) => (p.hidden = i !== step));
+      stepButtons.forEach((b, i) => {
+        if (i === step) b.setAttribute("aria-current", "step");
+        else b.removeAttribute("aria-current");
+        b.classList.toggle("is-done", i < step);
+      });
+      back.textContent = step ? "Back" : "Close";
+      next.hidden = step === STEPS.length - 1;
+      next.textContent = step === 0 ? "Next: the food" : "Check and save";
+      save.hidden = isNew && step !== STEPS.length - 1;
+      save.className = `btn btn--${next.hidden ? "primary" : "secondary"}`;
+      if (step === STEPS.length - 1) paintSummary();
+    }
+    // Uploads photos onto one dish. Their date and place fill in the visit.
+    async function addPhotos(d, files) {
+      const added = [];
+      captureBusy = true;
+      save.disabled = true;
+      s.error.textContent = "Adding photos.";
+      try {
+        for (const file of files) {
+          if (d.photos.length >= 20) break;
+          const metadata = await inspectPhoto(file, journal);
+          if (metadata.date && !original.title && !dateEdited)
+            visit.date = metadata.date;
+          if (metadata.gps) photoGps = metadata.gps;
+          const blob = await compressPhoto(file),
+            p = await api.upload(blob),
+            url = URL.createObjectURL(blob);
+          objectUrls.add(url);
+          photoCache.set(p.key, url);
+          d.photos.push(p);
+          added.push(p);
+        }
+        persistDraft();
+        s.error.textContent = "";
+      } catch (err) {
+        s.error.textContent = err.message;
+      } finally {
+        captureBusy = false;
+        save.disabled = false;
+      }
+      return added;
+    }
     const fields = () => {
       s.fields.replaceChildren();
-      if (newerSavedVisit) {
-        const current = el("details", "hub-row");
-        current.append(
-          el("summary", "", "Current saved visit"),
-          el("p", "", newerSavedVisit.title),
-          el(
-            "p",
-            "food-meta",
-            [
-              formatDisplayDate(newerSavedVisit.date),
-              newerSavedVisit.venue.name,
-              newerSavedVisit.venue.address,
-            ]
-              .filter(Boolean)
-              .join(" · "),
-          ),
-          el("p", "", newerSavedVisit.notes),
-          el("pre", "food-menu-text", newerSavedVisit.menu_text),
-        );
-        for (const d of newerSavedVisit.dishes)
-          current.append(
-            el(
-              "p",
-              "",
-              [
-                d.title,
-                d.cuisine,
-                d.meal_type,
-                d.rating ? `${d.rating} out of 5` : "",
-                d.tags.join(", "),
-                d.notes,
-              ]
-                .filter(Boolean)
-                .join(". "),
-            ),
-          );
-        const label = el("label", "food-check"),
-          check = el("input", "hub-check");
-        check.type = "checkbox";
-        check.checked = reviewedNewerVisit;
-        check.addEventListener(
-          "change",
-          () => (reviewedNewerVisit = check.checked),
-        );
-        label.append(
-          check,
-          el("span", "", "Replace the saved visit with this reviewed draft."),
-        );
-        s.fields.append(
-          el(
-            "p",
-            "",
-            "A newer visit is saved. Review the current visit and your draft before saving.",
-          ),
-          current,
-          label,
-        );
-      }
-      // A menu photo lists every item to tick off as a dish. Dish photos are
-      // added inside each dish, so they land on that dish and nowhere else.
-      const capture = el("div", "food-quick"),
-        pick = el("label", "food-quick__pick btn btn--secondary"),
-        input = el("input");
-      input.type = "file";
-      input.accept = "image/*";
-      input.multiple = true;
-      input.setAttribute("aria-label", "Menu photo");
-      input.addEventListener("change", () => {
-        void readMenu([...input.files]);
-        input.value = "";
+      panels = STEPS.map((label) => {
+        const p = el("section", "food-step");
+        p.setAttribute("aria-label", label);
+        return p;
       });
-      pick.append(input, el("span", "", "Photo the menu"));
-      capture.append(pick);
-      s.fields.append(capture);
+      const [wherePanel, foodPanel, checkPanel] = panels;
+
+      // ── 1 · Where and when ──────────────────────────────────────────
+      // The dish photo goes on a dish; the menu photo lists every item to
+      // tick off. Both lead straight on to the food.
+      const snap = el("div", "food-snap");
+      const dishPick = el("label", "food-snap__pick food-snap__pick--dish"),
+        dishInput = el("input");
+      dishInput.type = "file";
+      dishInput.accept = "image/*";
+      dishInput.multiple = true;
+      dishInput.setAttribute("aria-label", "Dish photo");
+      dishInput.addEventListener("change", async () => {
+        const files = [...dishInput.files];
+        dishInput.value = "";
+        if (!files.length) return;
+        let target = visit.dishes.find(
+          (d) => !d.title.trim() && !d.photos.length,
+        );
+        if (!target) {
+          target = { ...newDish(), meal_type: sharedMeal() || "Dinner" };
+          visit.dishes.push(target);
+        }
+        await addPhotos(target, files);
+        if (!s.isOpen()) return;
+        step = 1;
+        fields();
+      });
+      dishPick.append(
+        dishInput,
+        el("span", "food-snap__title", "Snap the dish"),
+        el("span", "food-snap__hint", "Photo first, details after"),
+      );
+      const menuPick = el("label", "food-snap__pick food-quick__pick"),
+        menuInput = el("input");
+      menuInput.type = "file";
+      menuInput.accept = "image/*";
+      menuInput.multiple = true;
+      menuInput.setAttribute("aria-label", "Menu photo");
+      menuInput.addEventListener("change", () => {
+        void readMenu([...menuInput.files]);
+        menuInput.value = "";
+      });
+      menuPick.append(
+        menuInput,
+        el("span", "food-snap__title", "Photo the menu"),
+        el("span", "food-snap__hint", "Tick what you had"),
+      );
+      snap.append(dishPick, menuPick);
+      wherePanel.append(snap);
+
+      const meals = el("div", "food-group");
+      const mealRow = el("div", "food-choices food-choices--meals");
+      mealRow.setAttribute("role", "group");
+      mealRow.setAttribute("aria-label", "Which meal");
+      const current = sharedMeal();
+      for (const m of MEAL_TYPES) {
+        const b = button(m, () => {
+          for (const d of visit.dishes) d.meal_type = m;
+          persistDraft();
+          fields();
+        });
+        b.className = `hub-chip food-choice${m === current ? " is-active" : ""}`;
+        b.setAttribute("aria-pressed", String(m === current));
+        mealRow.append(b);
+      }
+      meals.append(el("h3", "food-sheet__label", "Which meal"), mealRow);
+      wherePanel.append(meals);
+
+      // The venue is typed first. Places logged before match as you type;
+      // nearby places are only suggestions, since location can be off.
+      const venueGroup = el("div", "food-group");
+      const venueField = field(
+        "Venue",
+        visit.venue.name,
+        (v) => {
+          visit.venue.name = v;
+          persistDraft();
+          paintMatches();
+        },
+        { max: 200 },
+      );
+      venueField.classList.add("food-venue");
+      const venueInput = venueField.querySelector("input");
+      venueInput.placeholder = "Type the venue name";
+      venueInput.autocomplete = "off";
+      const matches = el("div", "food-suggest");
+      const paintMatches = () => {
+        matches.replaceChildren();
+        const found = pastVenues(journal, venueInput.value);
+        if (!found.length) {
+          matches.hidden = true;
+          return;
+        }
+        const row = el("div", "food-choices");
+        for (const v of found) {
+          const b = button(v.name, () => {
+            visit.venue = structuredClone(v);
+            persistDraft();
+            fields();
+          });
+          b.className = "hub-chip food-choice";
+          b.setAttribute("aria-label", `Use ${v.name}`);
+          // Keep the keyboard up while picking.
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          row.append(b);
+        }
+        matches.append(el("p", "food-meta", "Places you've logged"), row);
+        matches.hidden = false;
+      };
+      paintMatches();
+      const suggestions = el("div", "food-choices");
+      for (const item of nearbyVenues(journal, photoGps)) {
+        const b = button(`Use ${item.venue.name}`, () => {
+          visit.venue = structuredClone(item.venue);
+          persistDraft();
+          fields();
+        });
+        b.className = "hub-chip food-choice";
+        suggestions.append(b);
+      }
+      const findVenue = button(
+        "Find venue",
+        async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            // Without photo GPS or a saved venue, search near the phone.
+            if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
+              hereGps = await whereAmI();
+            const point =
+              photoGps || (Number.isFinite(visit.venue.lat) ? visit.venue : hereGps);
+            // Food places at the point, nearest and best-named first; a plain
+            // text search only when there is no point at all.
+            const typed = visit.venue.name.trim();
+            const found = hasPoint(point) ? await api.foodPlaces(point, typed) : null;
+            const result = found
+              ? { places: rankVenues(found.candidates, point, typed) }
+              : await api.places(typed || "restaurant", {});
+            suggestions.replaceChildren();
+            // Not every venue is on the map. What Adam typed is always a
+            // choice, at the point the photo was taken.
+            if (typed && !result.places.some((p) => nameSimilarity(typed, p.name) >= 0.6)) {
+              const own = button(`Use ${typed}`, () => {
+                visit.venue = settleVenue(visit.venue, {
+                  name: typed,
+                  address: found?.street || visit.venue.address,
+                  ...(hasPoint(point) ? { lat: point.lat, lon: point.lon } : {}),
+                });
+                persistDraft();
+                fields();
+              });
+              own.className = "hub-chip food-choice is-active";
+              suggestions.append(own);
+            }
+            for (const p of result.places) {
+              const b = button(
+                Number.isFinite(p.distance) ? `${p.name} · ${p.distance} m` : p.name,
+                () => {
+                  visit.venue = settleVenue(visit.venue, {
+                    name: p.name,
+                    address: p.address,
+                    lat: p.lat,
+                    lon: p.lon,
+                  });
+                  persistDraft();
+                  fields();
+                },
+              );
+              b.className = "hub-chip food-choice";
+              suggestions.append(b);
+            }
+            if (!result.places.length && !typed)
+              s.error.textContent =
+                "No venues found here. Type the venue, then Find venue.";
+            else if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
+              s.error.textContent =
+                "Location is off, so these may be far away. Allow location for Life Hub in Settings, or add the suburb to the venue.";
+          } catch (err) {
+            s.error.textContent = err.message;
+          } finally {
+            e.currentTarget.disabled = false;
+          }
+        },
+        "ghost",
+      );
+      findVenue.classList.add("food-find");
+      const nearby = el("div", "food-suggest");
+      const nearbyHead = el("div", "food-suggest__head");
+      nearbyHead.append(
+        el("p", "food-meta", "Nearby suggestions. Location can be off."),
+        findVenue,
+      );
+      nearby.append(nearbyHead, suggestions);
+      venueGroup.append(venueField, matches, nearby);
+      wherePanel.append(venueGroup);
+
+      const address = el("div", "food-pair");
+      address.append(
+        field(
+          "Address",
+          visit.venue.address,
+          (v) => {
+            visit.venue.address = v;
+            persistDraft();
+          },
+          { max: 1000 },
+        ),
+        field(
+          "Date",
+          visit.date,
+          (v) => {
+            visit.date = v;
+            dateEdited = true;
+            persistDraft();
+          },
+          { type: "date" },
+        ),
+      );
+      wherePanel.append(address);
+      const visitNotes = field(
+        "Visit notes",
+        visit.notes,
+        (v) => {
+          visit.notes = v;
+          persistDraft();
+        },
+        { type: "textarea" },
+      );
+      visitNotes.classList.add("food-field--short");
+      visitNotes.querySelector("textarea").placeholder =
+        "The venue, the service, the company";
+      wherePanel.append(visitNotes);
+
+      // ── 2 · The food ────────────────────────────────────────────────
       repaintMenu = () => {};
-      // The menu sits just above the dishes it fills, after the visit itself.
-      let menuSection = null;
       if (visit.menu_items?.length) {
         const menu = el("section", "food-onmenu");
         menu.setAttribute("aria-label", "On the menu");
@@ -1374,140 +1648,9 @@ export function createFoodJournalView({
         }
         repaintMenu();
         menu.append(list);
-        menuSection = menu;
+        foodPanel.append(menu);
       }
-      s.fields.append(el("h3", "food-sheet__label", "The visit"));
-      // Find venue sits by the Venue field and searches what is typed there.
-      const where = el("div", "food-pair food-pair--end food-pair--keep");
-      where.append(
-        field(
-          "Venue",
-          visit.venue.name,
-          (v) => {
-            visit.venue.name = v;
-            persistDraft();
-          },
-          { max: 200 },
-        ),
-      );
-      s.fields.append(where);
-      const suggestions = el("div", "food-actions");
-      for (const item of nearbyVenues(journal, photoGps))
-        suggestions.append(
-          button(
-            `Use ${item.venue.name}`,
-            () => {
-              visit.venue = structuredClone(item.venue);
-              persistDraft();
-              fields();
-            },
-            "ghost",
-          ),
-        );
-      const findVenue = button(
-        "Find venue",
-        async (e) => {
-          e.currentTarget.disabled = true;
-          try {
-            // Without photo GPS or a saved venue, search near the phone.
-            if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
-              hereGps = await whereAmI();
-            const point =
-              photoGps || (Number.isFinite(visit.venue.lat) ? visit.venue : hereGps);
-            // Food places at the point, nearest and best-named first; a plain
-            // text search only when there is no point at all.
-            const typed = visit.venue.name.trim();
-            const found = hasPoint(point) ? await api.foodPlaces(point, typed) : null;
-            const result = found
-              ? { places: rankVenues(found.candidates, point, typed) }
-              : await api.places(typed || "restaurant", {});
-            suggestions.replaceChildren();
-            // Not every venue is on the map. What Adam typed is always a
-            // choice, at the point the photo was taken.
-            if (typed && !result.places.some((p) => nameSimilarity(typed, p.name) >= 0.6))
-              suggestions.append(
-                button(
-                  `Use ${typed}`,
-                  () => {
-                    visit.venue = settleVenue(visit.venue, {
-                      name: typed,
-                      address: found?.street || visit.venue.address,
-                      ...(hasPoint(point) ? { lat: point.lat, lon: point.lon } : {}),
-                    });
-                    persistDraft();
-                    fields();
-                  },
-                ),
-              );
-            for (const p of result.places)
-              suggestions.append(
-                button(
-                  Number.isFinite(p.distance) ? `${p.name} · ${p.distance} m` : p.name,
-                  () => {
-                    visit.venue = settleVenue(visit.venue, {
-                      name: p.name,
-                      address: p.address,
-                      lat: p.lat,
-                      lon: p.lon,
-                    });
-                    persistDraft();
-                    fields();
-                  },
-                  "ghost",
-                ),
-              );
-            if (!result.places.length && !typed)
-              s.error.textContent =
-                "No venues found here. Type the venue, then Find venue.";
-            else if (!photoGps && !Number.isFinite(visit.venue.lat) && !hereGps)
-              s.error.textContent =
-                "Location is off, so these may be far away. Allow location for Life Hub in Settings, or add the suburb to the venue.";
-          } catch (err) {
-            s.error.textContent = err.message;
-          } finally {
-            e.currentTarget.disabled = false;
-          }
-        },
-        "ghost",
-      );
-      where.append(findVenue);
-      const address = el("div", "food-pair");
-      address.append(
-        field(
-          "Address",
-          visit.venue.address,
-          (v) => {
-            visit.venue.address = v;
-            persistDraft();
-          },
-          { max: 1000 },
-        ),
-        field(
-          "Date",
-          visit.date,
-          (v) => {
-            visit.date = v;
-            dateEdited = true;
-            persistDraft();
-          },
-          { type: "date" },
-        ),
-      );
-      s.fields.append(suggestions, address);
-      const visitNotes = field(
-        "Visit notes",
-        visit.notes,
-        (v) => {
-          visit.notes = v;
-          persistDraft();
-        },
-        { type: "textarea" },
-      );
-      visitNotes.querySelector("textarea").placeholder =
-        "The place, the service, the company";
-      s.fields.append(visitNotes);
-      if (menuSection) s.fields.append(menuSection);
-      s.fields.append(el("h3", "food-sheet__label", "What you ate"));
+      foodPanel.append(el("h3", "food-sheet__label", "What you ate"));
       dishList?.dispose();
       dishList = createHubList({
         items: visit.dishes,
@@ -1515,145 +1658,124 @@ export function createFoodJournalView({
         noun: "dish",
         min: 1,
         max: 100,
-        create: () => newDish(),
+        create: () => ({ ...newDish(), meal_type: sharedMeal() || "Dinner" }),
         onChange: (rows) => {
           visit.dishes = rows;
           persistDraft();
           repaintMenu();
         },
-        renderItem: (d, ctx) => {
-          const block = el("div", "food-dish-editor");
-          const set = (key, v) => {
-            d[key] = v;
-            // An old translation never shows against new text.
-            if (key === "notes") delete d.notes_en;
-            ctx.update({ ...d });
-            persistDraft();
-            if (key === "title") repaintMenu();
-          };
-          const top = el("div", "food-dish-editor__top");
-          const rates = el("div");
-          const repaint = () => {
-            rates.replaceChildren(
-              stars(d, (v) => {
-                set("rating", v);
-                repaint();
-              }),
-            );
-          };
-          repaint();
-          top.append(
-            field("Dish title", d.title, (v) => set("title", v), { max: 200 }),
-            rates,
-          );
-          const notes = field("Dish notes", d.notes, (v) => set("notes", v), {
-            type: "textarea",
-          });
-          notes.classList.add("food-field--short");
-          const more = el("div", "food-pair food-dish-editor__more");
-          more.append(
-            field("Cuisine", d.cuisine, (v) => set("cuisine", v), { max: 100 }),
-            field("Meal type", d.meal_type, (v) => set("meal_type", v), {
-              options: MEAL_TYPES,
-            }),
-            tagField(d.tags, tags, (v) => set("tags", v)),
-          );
-          const ingredients = field(
-            "Ingredients",
-            d.ingredients || "",
-            (v) => set("ingredients", v),
-            { type: "textarea", max: 2000 },
-          );
-          ingredients.classList.add("food-field--short");
-          block.append(top, ingredients, notes, more);
-          const photos = el("div", "food-thumbnails");
-          const tile = (p) => {
-            const wrap = el("div", "food-photo-wrap");
-            wrap.append(
-              photoCache.has(p.key)
-                ? photoNode(p)
-                : el("span", "food-meta", "Photo attached"),
-              createHubMenuButton(
-                () => [
-                  {
-                    label: "Delete photo",
-                    hold: true,
-                    danger: true,
-                    onSelect: () => {
-                      set(
-                        "photos",
-                        d.photos.filter((x) => x.key !== p.key),
-                      );
-                      wrap.remove();
-                    },
-                  },
-                  ...visit.dishes
-                    .filter((other) => other.id !== d.id)
-                    .map((other) => ({
-                      label: `Move to ${other.title || "another dish"}`,
-                      onSelect: () => {
-                        set(
-                          "photos",
-                          d.photos.filter((x) => x.key !== p.key),
-                        );
-                        if (!other.photos.some((x) => x.key === p.key))
-                          other.photos.push(p);
-                        persistDraft();
-                        fields();
-                      },
-                    })),
-                ],
-                { label: "Photo options" },
-              ),
-            );
-            return wrap;
-          };
-          for (const p of d.photos) photos.append(tile(p));
-          // Photos chosen here belong to this dish. They are not read, so they
-          // never add a dish; their date and place still fill in the visit.
-          const add = el("label", "food-quick__pick food-quick__pick--small btn btn--ghost"),
-            pick = el("input");
-          pick.type = "file";
-          pick.accept = "image/*";
-          pick.multiple = true;
-          pick.setAttribute("aria-label", "Add photos to this dish");
-          add.append(pick, el("span", "", "Add photo"));
-          pick.addEventListener("change", async () => {
-            const files = [...pick.files];
-            pick.value = "";
-            if (!files.length) return;
-            captureBusy = true;
-            save.disabled = true;
-            s.error.textContent = "Adding photos.";
-            try {
-              for (const file of files) {
-                const metadata = await inspectPhoto(file, journal);
-                if (metadata.date && !original.title && !dateEdited)
-                  visit.date = metadata.date;
-                if (metadata.gps) photoGps = metadata.gps;
-                const blob = await compressPhoto(file),
-                  p = await api.upload(blob),
-                  url = URL.createObjectURL(blob);
-                objectUrls.add(url);
-                photoCache.set(p.key, url);
-                d.photos.push(p);
-                photos.append(tile(p));
-              }
-              set("photos", d.photos);
-              s.error.textContent = "";
-            } catch (err) {
-              s.error.textContent = err.message;
-            } finally {
-              captureBusy = false;
-              save.disabled = false;
-            }
-          });
-          block.append(photos, add);
-          return block;
-        },
+        renderItem: (d, ctx) => dishEditor(d, ctx),
       });
-      s.fields.append(dishList.el);
-      s.fields.append(
+      foodPanel.append(dishList.el);
+
+      // ── 3 · Check and save ──────────────────────────────────────────
+      if (newerSavedVisit) {
+        const current = el("details", "hub-row");
+        current.append(
+          el("summary", "", "Current saved visit"),
+          el("p", "", newerSavedVisit.title),
+          el(
+            "p",
+            "food-meta",
+            [
+              formatDisplayDate(newerSavedVisit.date),
+              newerSavedVisit.venue.name,
+              newerSavedVisit.venue.address,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          ),
+          el("p", "", newerSavedVisit.notes),
+          el("pre", "food-menu-text", newerSavedVisit.menu_text),
+        );
+        for (const d of newerSavedVisit.dishes)
+          current.append(
+            el(
+              "p",
+              "",
+              [
+                d.title,
+                d.cuisine,
+                d.meal_type,
+                d.rating ? `${d.rating} out of 5` : "",
+                d.tags.join(", "),
+                d.notes,
+              ]
+                .filter(Boolean)
+                .join(". "),
+            ),
+          );
+        const label = el("label", "food-check"),
+          check = el("input", "hub-check");
+        check.type = "checkbox";
+        check.checked = reviewedNewerVisit;
+        check.addEventListener(
+          "change",
+          () => (reviewedNewerVisit = check.checked),
+        );
+        label.append(
+          check,
+          el("span", "", "Replace the saved visit with this reviewed draft."),
+        );
+        checkPanel.append(
+          el(
+            "p",
+            "",
+            "A newer visit is saved. Review the current visit and your draft before saving.",
+          ),
+          current,
+          label,
+        );
+      }
+      const summary = el("div", "food-summary");
+      paintSummary = () => {
+        summary.replaceChildren();
+        const place = el("button", "food-summary__row");
+        place.type = "button";
+        const placeText = el("span", "food-summary__text");
+        placeText.append(
+          el("span", "food-summary__title", visit.venue.name.trim() || "No venue yet"),
+          el(
+            "span",
+            "food-meta",
+            [formatDisplayDate(visit.date), sharedMeal()].filter(Boolean).join(" · "),
+          ),
+        );
+        place.append(placeText, el("span", "food-summary__edit", "Edit"));
+        place.addEventListener("click", () => setStep(0));
+        summary.append(place);
+        visit.dishes.forEach((d, i) => {
+          const row = el("button", "food-summary__row");
+          row.type = "button";
+          const text = el("span", "food-summary__text");
+          const name = d.title.trim();
+          text.append(
+            el(
+              "span",
+              `food-summary__title${name ? "" : " food-error"}`,
+              name || `Dish ${i + 1} needs a name`,
+            ),
+          );
+          const meta = [
+            d.tags.join(" · "),
+            d.rating ? `${d.rating} out of 5` : "Not rated",
+            d.order_again ? "Would order again" : "",
+          ].filter(Boolean);
+          text.append(el("span", "food-meta", meta.join(" · ")));
+          if (String(d.ingredients || "").trim())
+            text.append(el("span", "food-summary__ingredients", d.ingredients));
+          row.append(text, el("span", "food-summary__edit", "Edit"));
+          row.addEventListener("click", () => {
+            setStep(1);
+            dishList.el
+              .querySelectorAll(".food-dish-editor")
+              [i]?.scrollIntoView?.({ block: "start" });
+          });
+          summary.append(row);
+        });
+      };
+      checkPanel.append(summary);
+      checkPanel.append(
         field(
           "Visit title",
           visit.title,
@@ -1664,7 +1786,7 @@ export function createFoodJournalView({
           { max: 200 },
         ),
       );
-      // The full menu text stays searchable; the ticks above are the fast path.
+      // The full menu text stays searchable; the ticks are the fast path.
       const saved = el("details", "food-menu-fold");
       saved.append(
         el("summary", "", visit.menu_text ? "Menu text" : "Paste menu text"),
@@ -1678,8 +1800,193 @@ export function createFoodJournalView({
           { type: "textarea", max: 100000 },
         ),
       );
-      s.fields.append(saved);
+      checkPanel.append(saved);
+      if (sendToBrisket) {
+        const label = el("label", "food-check food-brisket-after"),
+          check = el("input", "hub-check"),
+          text = el("span", "food-summary__text");
+        check.type = "checkbox";
+        check.checked = brisketAfter;
+        check.addEventListener("change", () => (brisketAfter = check.checked));
+        text.append(
+          el("span", "food-summary__title", "Count in Brisket after saving"),
+          el("span", "food-meta", "You'll pick how much of each dish you ate."),
+        );
+        label.append(check, text);
+        checkPanel.append(label);
+      }
+
+      s.fields.append(...panels);
+      paintSteps();
     };
+    // One dish: photo and name, what kind of food, how good, then the
+    // menu's ingredients and notes. Cuisine and meal sit under More.
+    function dishEditor(d, ctx) {
+      const block = el("div", "food-dish-editor");
+      const set = (key, v) => {
+        d[key] = v;
+        // An old translation never shows against new text.
+        if (key === "notes") delete d.notes_en;
+        ctx.update({ ...d });
+        persistDraft();
+        if (key === "title") repaintMenu();
+      };
+      const title = field("Dish title", d.title, (v) => set("title", v), {
+        max: 200,
+      });
+      const titleInput = title.querySelector("input");
+      titleInput.placeholder = "e.g. Double cheeseburger";
+      const photos = el("div", "food-thumbnails");
+      const tile = (p) => {
+        const wrap = el("div", "food-photo-wrap");
+        wrap.append(
+          photoCache.has(p.key)
+            ? photoNode(p)
+            : el("span", "food-meta", "Photo attached"),
+          createHubMenuButton(
+            () => [
+              {
+                label: "Delete photo",
+                hold: true,
+                danger: true,
+                onSelect: () => {
+                  set(
+                    "photos",
+                    d.photos.filter((x) => x.key !== p.key),
+                  );
+                  wrap.remove();
+                },
+              },
+              ...visit.dishes
+                .filter((other) => other.id !== d.id)
+                .map((other) => ({
+                  label: `Move to ${other.title || "another dish"}`,
+                  onSelect: () => {
+                    set(
+                      "photos",
+                      d.photos.filter((x) => x.key !== p.key),
+                    );
+                    if (!other.photos.some((x) => x.key === p.key))
+                      other.photos.push(p);
+                    persistDraft();
+                    fields();
+                  },
+                })),
+            ],
+            { label: "Photo options" },
+          ),
+        );
+        return wrap;
+      };
+      for (const p of d.photos) photos.append(tile(p));
+      // Photos chosen here belong to this dish. They are not read, so they
+      // never add a dish; their date and place still fill in the visit.
+      const add = el("label", "food-quick__pick food-quick__pick--small btn btn--ghost"),
+        pick = el("input");
+      pick.type = "file";
+      pick.accept = "image/*";
+      pick.multiple = true;
+      pick.setAttribute("aria-label", "Add photos to this dish");
+      add.append(pick, el("span", "", "Add photo"));
+      pick.addEventListener("change", async () => {
+        const files = [...pick.files];
+        pick.value = "";
+        if (!files.length) return;
+        for (const p of await addPhotos(d, files)) photos.append(tile(p));
+        set("photos", d.photos);
+      });
+      photos.append(add);
+
+      const cuisine = field("Cuisine", d.cuisine, (v) => set("cuisine", v), {
+        max: 100,
+      });
+      const cuisineInput = cuisine.querySelector("input");
+      const kind = foodTagField(d.tags, tags, (v) => {
+        set("tags", v);
+        // The food suggests a cuisine until one is typed.
+        if (!d.cuisine.trim()) {
+          const c = cuisineFor(v);
+          if (c) {
+            set("cuisine", c);
+            cuisineInput.value = c;
+          }
+        }
+      });
+
+      const rate = el("div", "food-group");
+      const rateHead = el("div", "food-rate");
+      const starsBox = el("div");
+      const again = el("button", "hub-chip food-choice food-again");
+      again.type = "button";
+      again.textContent = "Would order again";
+      again.addEventListener("click", () => {
+        set("order_again", !d.order_again);
+        paintRate();
+      });
+      const paintRate = () => {
+        starsBox.replaceChildren(
+          stars(d, (v) => {
+            set("rating", v);
+            paintRate();
+          }),
+        );
+        again.classList.toggle("is-active", Boolean(d.order_again));
+        again.setAttribute("aria-pressed", String(Boolean(d.order_again)));
+      };
+      paintRate();
+      rateHead.append(starsBox, again);
+      rate.append(el("h3", "food-sheet__label", "How good?"), rateHead);
+
+      const ingredients = field(
+        "Ingredients",
+        d.ingredients || "",
+        (v) => {
+          set("ingredients", v);
+          paintBadge();
+        },
+        { type: "textarea", max: 2000 },
+      );
+      ingredients.classList.add("food-field--short");
+      const ingredientsInput = ingredients.querySelector("textarea");
+      ingredientsInput.placeholder =
+        "Comes across from the menu when you photo it, or type your own";
+      const badge = el("span", "food-badge", "From the menu");
+      ingredients.querySelector("label").after(badge);
+      const paintBadge = () => {
+        badge.hidden = !ingredientsFromMenu(visit, d);
+      };
+      paintBadge();
+      // A dish typed by name still picks up the menu's ingredients.
+      titleInput.addEventListener("change", () => {
+        if (String(d.ingredients || "").trim()) return;
+        const found = menuIngredientsFor(visit, d.title);
+        if (!found) return;
+        Object.assign(d, found);
+        ctx.update({ ...d });
+        persistDraft();
+        ingredientsInput.value = d.ingredients;
+        paintBadge();
+      });
+      const notes = field("Dish notes", d.notes, (v) => set("notes", v), {
+        type: "textarea",
+      });
+      notes.classList.add("food-field--short");
+      notes.querySelector("textarea").placeholder =
+        "How it tasted, what you'd change";
+
+      const more = el("details", "food-dish-more");
+      const pair = el("div", "food-pair food-dish-editor__more");
+      pair.append(
+        cuisine,
+        field("Meal type", d.meal_type, (v) => set("meal_type", v), {
+          options: MEAL_TYPES,
+        }),
+      );
+      more.append(el("summary", "", "More: cuisine and meal"), pair);
+
+      block.append(title, photos, kind, rate, ingredients, notes, more);
+      return block;
+    }
     // A menu photo is read as soon as it is chosen: no separate extract step.
     async function readMenu(files) {
       if (!files.length) return;
@@ -1728,6 +2035,8 @@ export function createFoodJournalView({
         if (!s.isOpen()) return;
         for (const draft of results) visit = mergeCapture(visit, draft);
         persistDraft();
+        // The menu's list is ticked on the food step.
+        if (visit.menu_items?.length) step = 1;
         fields();
         s.error.textContent = visit.menu_items?.length
           ? "Tick what you had."
@@ -1738,6 +2047,16 @@ export function createFoodJournalView({
         captureBusy = false;
       }
     }
+    const back = button("Close", () => {
+      if (step) {
+        setStep(step - 1);
+        return;
+      }
+      persistDraft();
+      s.close();
+      render();
+    }, "ghost");
+    const next = button("Next", () => setStep(step + 1), "primary");
     const save = button(
       "Save visit",
       async (e) => {
@@ -1747,11 +2066,13 @@ export function createFoodJournalView({
           return;
         }
         if (!reviewedNewerVisit) {
+          setStep(STEPS.length - 1);
           s.error.textContent =
             "Review the current saved visit before replacing its details.";
           return;
         }
         if (visit.dishes.some((d) => !d.title.trim())) {
+          setStep(1);
           s.error.textContent = "Give every dish a title.";
           return;
         }
@@ -1765,14 +2086,14 @@ export function createFoodJournalView({
               visit.venue.address !== original.venue.address)
           )
             visit.venue = settleVenue(visit.venue);
-          const next = structuredClone(journal),
-            index = next.visits.findIndex((v) => v.id === visit.id);
-          if (index < 0) next.visits.push(visit);
-          else next.visits[index] = visit;
+          const updated = structuredClone(journal),
+            index = updated.visits.findIndex((v) => v.id === visit.id);
+          if (index < 0) updated.visits.push(visit);
+          else updated.visits[index] = visit;
           const ids = new Set(
-            next.visits.flatMap((v) => v.dishes.map((d) => d.id)),
+            updated.visits.flatMap((v) => v.dishes.map((d) => d.id)),
           );
-          next.recipes = next.recipes.filter((r) => ids.has(r.dish_id));
+          updated.recipes = updated.recipes.filter((r) => ids.has(r.dish_id));
           const kept = new Set(visit.dishes.map((d) => d.id));
           const saved = journal.visits.find((v) => v.id === visit.id);
           for (const d of visit.dishes) {
@@ -1788,10 +2109,17 @@ export function createFoodJournalView({
             return;
           }
           const removeMeals = yes ? paths : [];
-          await persist(next, { removeMeals });
+          await persist(updated, { removeMeals });
           clearDraft();
           s.close();
           render();
+          // Counting in Brisket comes straight after, so nothing needs
+          // reopening from the journal.
+          const savedVisit = journal.visits.find((v) => v.id === visit.id);
+          if (brisketAfter && sendToBrisket && savedVisit) {
+            const due = brisketDue(savedVisit);
+            if (due.length) offerBrisket(savedVisit, due);
+          }
         } catch (err) {
           s.error.textContent = err.message;
         } finally {
@@ -1800,20 +2128,117 @@ export function createFoodJournalView({
       },
       "primary",
     );
-    s.actions.append(
-      button(
-        "Close",
-        () => {
-          persistDraft();
-          s.close();
-          render();
-        },
-        "ghost",
-      ),
-      save,
-    );
+    s.actions.append(back, next, save);
     fields();
     return s;
+  }
+  // Dishes on a saved visit that Brisket has not counted, or must re-count.
+  const brisketDue = (visit) =>
+    withoutDeleted(visit.dishes).filter(
+      (d) => !d.brisket || d.brisket.needs_recount,
+    );
+  // Straight after a save: how much of each dish was eaten, then each one
+  // goes to Brisket's chat, one hand-off per dish.
+  function offerBrisket(visit, dishes) {
+    const s = modal(
+      dishes.length === 1 ? "Count it in Brisket?" : "Count these in Brisket?",
+      null,
+    );
+    const rows = dishes.map((dish) => ({ dish, on: true, chip: "All" }));
+    const list = el("div", "food-count-list");
+    for (const r of rows) {
+      const row = el("div", "food-count");
+      const label = el("label", "food-check"),
+        check = el("input", "hub-check");
+      check.type = "checkbox";
+      check.checked = true;
+      check.addEventListener("change", () => {
+        r.on = check.checked;
+        paint();
+      });
+      const name = r.dish.title_en || r.dish.title;
+      label.append(check, el("span", "food-count__name", name));
+      r.chips = el("div", "hub-chips food-portion");
+      r.chips.setAttribute("role", "group");
+      r.chips.setAttribute("aria-label", `How much of ${name}`);
+      r.buttons = PORTION_CHIPS.map((c) => {
+        const b = button(c.label, () => {
+          r.chip = c.label;
+          paint();
+        });
+        b.className = "hub-chip food-portion__chip";
+        b.dataset.portion = c.label;
+        return b;
+      });
+      r.chips.append(...r.buttons);
+      row.append(label, r.chips);
+      list.append(row);
+    }
+    const send = button(
+      "Send to Brisket",
+      async (e) => {
+        const chosen = rows.filter((r) => r.on);
+        if (!chosen.length) return;
+        e.currentTarget.disabled = true;
+        s.error.textContent = "Sending to Brisket.";
+        let first = true;
+        for (const r of chosen) {
+          const message = handoffMessage({
+            visit,
+            dish: r.dish,
+            portion: { ...portionOf({ chip: r.chip }), note: "" },
+            previous: r.dish.brisket || undefined,
+          });
+          const photo = await dishAttachment(r.dish);
+          if (first && !s.isOpen()) return;
+          const result = await Promise.resolve(
+            sendToBrisket(message, photo ? [photo] : []),
+          ).catch(() => ({ ok: false }));
+          if (result?.ok === false) {
+            if (first) {
+              if (!s.isOpen()) return;
+              s.error.textContent =
+                "Couldn't reach Brisket. Try again, or send it from the dish later.";
+              paint();
+              return;
+            }
+            showHubToast(
+              `Couldn't send ${r.dish.title} to Brisket. Send it from the dish.`,
+            );
+            continue;
+          }
+          sentToBrisket = true;
+          if (first) {
+            first = false;
+            if (s.isOpen()) s.close();
+          }
+        }
+      },
+      "primary",
+    );
+    function paint() {
+      for (const r of rows) {
+        for (const b of r.buttons) {
+          const on = b.dataset.portion === r.chip;
+          b.classList.toggle("is-active", on);
+          b.setAttribute("aria-pressed", String(on));
+        }
+        r.chips.hidden = !r.on;
+      }
+      const n = rows.filter((r) => r.on).length;
+      send.disabled = !n;
+      send.textContent = n > 1 ? `Send ${n} to Brisket` : "Send to Brisket";
+    }
+    s.fields.append(
+      el(
+        "p",
+        "food-meta",
+        dishes.length === 1 ? "How much did you eat?" : "How much of each did you eat?",
+      ),
+      list,
+    );
+    s.actions.append(button("Not now", s.close, "ghost"), send);
+    paint();
   }
   async function openRecipe(dish, trigger) {
     const token = epoch;
